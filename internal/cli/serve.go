@@ -97,7 +97,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := a.syncPlayers(cmd.Context(), p, player.MissingOnly, false); err != nil {
+			if err := a.syncPlayers(cmd.Context(), p, player.MissingOnly, false, true); err != nil {
 				return err
 			}
 			b, err := a.builder(cmd.Context(), p)

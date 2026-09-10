@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/pack"
 	"github.com/andrewmast/shulker/internal/player"
 	"github.com/andrewmast/shulker/internal/project"
 	"github.com/spf13/cobra"
@@ -16,6 +18,8 @@ import (
 
 type syncResult struct {
 	Source   string        `json:"source"`
+	Kind     pack.Kind     `json:"kind"`
+	Commit   string        `json:"commit,omitempty"`
 	Target   string        `json:"target"`
 	Dir      string        `json:"dir"`
 	Fetched  []string      `json:"fetched"`
@@ -24,18 +28,22 @@ type syncResult struct {
 }
 
 func (a *app) syncCmd() *cobra.Command {
-	var target, into string
+	var target, into, ref string
 	var force bool
 	cmd := &cobra.Command{
-		Use:   "sync <project-dir>",
+		Use:   "sync <project-dir | git-url | manifest-url>",
 		Short: "Download and build one target of a project straight into a directory",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			source, err := filepath.Abs(args[0])
+			co, err := a.checkout(cmd.Context(), args[0], ref)
 			if err != nil {
 				return err
 			}
-			p, err := a.openProjectAt(source)
+			source := co.Source
+			if co.Kind == pack.Local {
+				source = co.Dir
+			}
+			p, err := a.openProjectAt(co.Dir)
 			if errors.Is(err, project.ErrNoManifest) {
 				return out.Errorf("project-not-found", "no shulker.json in %s", source)
 			}
@@ -52,8 +60,12 @@ func (a *app) syncCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			remote := co.Kind != pack.Local
+			if into == "" && remote {
+				return out.Errorf("into-required", "--into is required when syncing from %s", source)
+			}
 			if into == "" {
-				into = filepath.Join(source, t.Build)
+				into = filepath.Join(co.Dir, t.Build)
 			}
 			if into, err = filepath.Abs(into); err != nil {
 				return err
@@ -62,19 +74,19 @@ func (a *app) syncCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := a.syncPlayers(cmd.Context(), p, player.MissingOnly, false); err != nil {
+			if err := a.syncPlayers(cmd.Context(), p, player.MissingOnly, false, !remote); err != nil {
 				return err
 			}
 			b, err := a.builder(cmd.Context(), p)
 			if err != nil {
 				return err
 			}
-			rep, err := b.Build(name, build.Options{Force: force, Dir: into})
+			rep, err := b.Build(name, build.Options{Force: force, Dir: into, NoDataLinks: remote})
 			if err != nil {
 				return err
 			}
 			a.warn(rep.Warnings)
-			res := syncResult{Source: source, Target: name, Dir: into, Fetched: fetched, Warnings: warnings, Build: rep}
+			res := syncResult{Source: source, Kind: co.Kind, Commit: co.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: warnings, Build: rep}
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
 				fmt.Fprintf(w, "%s into %s\n", rep.Summary(), into)
@@ -87,7 +99,17 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd.Flags().StringVar(&target, "target", "", "target to build (default: the only target)")
 	cmd.Flags().StringVar(&into, "into", "", "output directory (default: the target's build directory)")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the output directory")
+	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	return cmd
+}
+
+func (a *app) checkout(ctx context.Context, source, ref string) (*pack.Checkout, error) {
+	d, err := a.deps()
+	if err != nil {
+		return nil, err
+	}
+	store := &pack.Store{CacheDir: d.cache.Dir, Fetch: d.fetch, Log: a.progress}
+	return store.Checkout(ctx, source, ref)
 }
 
 func singleTarget(p *project.Project, want string) (string, manifest.Target, error) {

@@ -80,8 +80,10 @@ func (b *Builder) planLinks(dir, target string, dirs []string, prev State, repor
 
 func (b *Builder) applyLinks(dir, target string, plan linkPlan, report *Report) error {
 	dataRoot := filepath.Join(b.Dir, DataDir, target)
-	if err := os.MkdirAll(dataRoot, 0o755); err != nil {
-		return err
+	if len(plan.move)+len(plan.link) > 0 {
+		if err := os.MkdirAll(dataRoot, 0o755); err != nil {
+			return err
+		}
 	}
 	for _, rel := range plan.move {
 		if err := os.Rename(filepath.Join(dir, rel), filepath.Join(dataRoot, rel)); err != nil {

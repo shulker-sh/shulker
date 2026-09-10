@@ -94,7 +94,7 @@ func manifestPlayerRefs(m *manifest.Manifest) []player.Ref {
 	return refs
 }
 
-func (a *app) syncPlayers(ctx context.Context, p *project.Project, mode player.Mode, acceptChange bool) error {
+func (a *app) syncPlayers(ctx context.Context, p *project.Project, mode player.Mode, acceptChange, persist bool) error {
 	refs := manifestPlayerRefs(p.Manifest)
 	if len(refs) == 0 && len(p.Lock.Players) == 0 {
 		return nil
@@ -112,7 +112,12 @@ func (a *app) syncPlayers(ctx context.Context, p *project.Project, mode player.M
 	if err != nil {
 		return err
 	}
-	return a.savePlayers(p, player.Apply(results, p.Lock.Players, acceptChange))
+	next := player.Apply(results, p.Lock.Players, acceptChange)
+	if !persist {
+		p.Lock.Players = next
+		return nil
+	}
+	return a.savePlayers(p, next)
 }
 
 func (a *app) savePlayers(p *project.Project, next []lock.Player) error {

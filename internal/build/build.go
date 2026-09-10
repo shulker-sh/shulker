@@ -54,8 +54,9 @@ type Report struct {
 }
 
 type Options struct {
-	Force bool
-	Dir   string
+	Force       bool
+	Dir         string
+	NoDataLinks bool
 }
 
 type Builder struct {
@@ -93,6 +94,9 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	desired, dirs, err := b.collect(name, target, report)
 	if err != nil {
 		return nil, err
+	}
+	if opts.NoDataLinks {
+		dirs = nil
 	}
 	prev := b.loadState(dir)
 	next := State{Target: name, Files: map[string]string{}}

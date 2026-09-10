@@ -20,7 +20,7 @@ import (
 func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {
 	bin, err := exec.LookPath("git")
 	if err != nil {
-		return nil, out.Errorf("git-missing", "git is required for git pack sources but was not found in PATH")
+		return nil, out.Errorf("git-missing", "git is required for git sources but was not found in PATH")
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
@@ -45,22 +45,22 @@ func (s *Store) exportDir(commit string) string {
 	return filepath.Join(s.CacheDir, "packs", "src", commit)
 }
 
-func (s *Store) ensureMirror(ctx context.Context, name, source string) (string, error) {
+func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (string, error) {
 	dir := s.mirrorDir(source)
 	if _, err := os.Stat(dir); err == nil {
-		s.log("fetching pack %s", name)
+		s.log("fetching %s", what.label)
 		if _, err := s.git(ctx, "--git-dir="+dir, "fetch", "--quiet", "origin"); err != nil {
-			return "", gitFailure(err, "pack %s: fetching %s failed: %v", name, source, err)
+			return "", gitFailure(err, what.code, "%s: fetching %s failed: %v", what.label, source, err)
 		}
 		return dir, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return "", err
 	}
-	s.log("cloning pack %s", name)
+	s.log("cloning %s", what.label)
 	if _, err := s.git(ctx, "clone", "--quiet", "--mirror", source, dir); err != nil {
 		os.RemoveAll(dir)
-		return "", gitFailure(err, "pack %s: cloning %s failed: %v", name, source, err)
+		return "", gitFailure(err, what.code, "%s: cloning %s failed: %v", what.label, source, err)
 	}
 	return dir, nil
 }
@@ -73,14 +73,14 @@ func (s *Store) revParse(ctx context.Context, mirror, ref string) (string, error
 	return strings.TrimSpace(string(data)), nil
 }
 
-func (s *Store) export(ctx context.Context, mirror, commit string) (string, error) {
+func (s *Store) export(ctx context.Context, what origin, mirror, commit string) (string, error) {
 	dir := s.exportDir(commit)
 	if _, err := os.Stat(dir); err == nil {
 		return dir, nil
 	}
 	archive, err := s.git(ctx, "--git-dir="+mirror, "archive", "--format=tar", commit)
 	if err != nil {
-		return "", gitFailure(err, "commit %s is not available from the pack's repository: %v", commit, err)
+		return "", gitFailure(err, what.code, "%s: commit %s is not available from the repository: %v", what.label, commit, err)
 	}
 	if err := os.MkdirAll(filepath.Join(s.CacheDir, "packs", "tmp"), 0o755); err != nil {
 		return "", err
@@ -149,9 +149,16 @@ func untar(r io.Reader, dst string) error {
 	}
 }
 
-func gitFailure(err error, format string, args ...any) error {
+type origin struct {
+	label string
+	code  string
+}
+
+func packOrigin(name string) origin { return origin{label: "pack " + name, code: "pack-fetch"} }
+
+func gitFailure(err error, code, format string, args ...any) error {
 	if out.CodeOf(err) == "git-missing" {
 		return err
 	}
-	return out.Errorf("pack-fetch", format, args...)
+	return out.Errorf(code, format, args...)
 }

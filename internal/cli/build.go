@@ -28,7 +28,7 @@ func (a *app) buildCmd() *cobra.Command {
 			if a.printer.LockStale && !force {
 				return out.Errorf("lock-stale", "shulker.lock does not match shulker.json; run `shulker add`, `remove`, or `update`, or pass --force")
 			}
-			if err := a.syncPlayers(cmd.Context(), p, player.Recheck, acceptPlayerChange); err != nil {
+			if err := a.syncPlayers(cmd.Context(), p, player.Recheck, acceptPlayerChange, true); err != nil {
 				return err
 			}
 			b, err := a.builder(cmd.Context(), p)

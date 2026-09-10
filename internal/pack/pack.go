@@ -123,7 +123,7 @@ func (s *Store) Resolve(ctx context.Context, p manifest.Pack) (*Loaded, error) {
 			return nil, err
 		}
 	case Git:
-		mirror, err := s.ensureMirror(ctx, name, p.Source)
+		mirror, err := s.ensureMirror(ctx, packOrigin(name), p.Source)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +133,7 @@ func (s *Store) Resolve(ctx context.Context, p manifest.Pack) (*Loaded, error) {
 		}
 		l.Pin.Ref = p.Ref
 		l.Pin.Commit = commit
-		if l.Dir, err = s.export(ctx, mirror, commit); err != nil {
+		if l.Dir, err = s.export(ctx, packOrigin(name), mirror, commit); err != nil {
 			return nil, err
 		}
 		if err := s.loadDir(l); err != nil {
@@ -181,11 +181,11 @@ func (s *Store) Open(ctx context.Context, p manifest.Pack, pinned lock.Pack) (*L
 		}
 		dir := s.exportDir(pinned.Commit)
 		if _, err := os.Stat(dir); err != nil {
-			mirror, err := s.ensureMirror(ctx, name, p.Source)
+			mirror, err := s.ensureMirror(ctx, packOrigin(name), p.Source)
 			if err != nil {
 				return nil, "", err
 			}
-			if dir, err = s.export(ctx, mirror, pinned.Commit); err != nil {
+			if dir, err = s.export(ctx, packOrigin(name), mirror, pinned.Commit); err != nil {
 				return nil, "", err
 			}
 		}
