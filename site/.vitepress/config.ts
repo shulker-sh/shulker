@@ -1,6 +1,26 @@
+import { cpSync, createReadStream, existsSync } from 'node:fs'
+import { join, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import type { Plugin } from 'vite'
 import { defineConfig } from 'vitepress'
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
+
+const schemaDir = fileURLToPath(new URL('../../schema/v1', import.meta.url))
+
+function serveSchema(): Plugin {
+  return {
+    name: 'shulker-schema',
+    configureServer(server) {
+      server.middlewares.use('/schema/v1', (req, res, next) => {
+        const file = join(schemaDir, decodeURIComponent((req.url ?? '').split('?')[0]))
+        if (!file.startsWith(schemaDir + sep) || !file.endsWith('.json') || !existsSync(file)) return next()
+        res.setHeader('Content-Type', 'application/schema+json')
+        createReadStream(file).pipe(res)
+      })
+    },
+  }
+}
 
 export default defineConfig({
   title: 'Shulker',
@@ -48,6 +68,9 @@ export default defineConfig({
     },
   },
   vite: {
-    plugins: [groupIconVitePlugin()],
+    plugins: [groupIconVitePlugin(), serveSchema()],
+  },
+  buildEnd(site) {
+    cpSync(schemaDir, resolve(site.outDir, 'schema/v1'), { recursive: true })
   },
 })
