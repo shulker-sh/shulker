@@ -64,7 +64,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 					return err
 				}
 			}
-			l := &launcher.Prism{Dir: launcherDir}
+			l := &launcher.Prism{Dir: launcherDir, MultiMC: cmd.CalledAs() == "multimc"}
 			if err := l.Check(); errors.Is(err, launcher.ErrNotFound) {
 				return out.Errorf("launcher-not-found", "no launcher directory at %s; run the launcher once or pass --launcher-dir", launcherDir)
 			} else if err != nil {

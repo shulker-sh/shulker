@@ -27,7 +27,8 @@ var loaderUIDs = map[string]string{
 }
 
 type Prism struct {
-	Dir string
+	Dir     string
+	MultiMC bool
 }
 
 type Instance struct {
@@ -87,7 +88,7 @@ func (l *Prism) Check() error {
 
 func (l *Prism) InstancesDir() string {
 	for _, cfg := range []string{"prismlauncher.cfg", "multimc.cfg"} {
-		values, err := readINI(filepath.Join(l.Dir, cfg))
+		values, err := readINI(filepath.Join(l.Dir, cfg), cfg == "multimc.cfg")
 		if err != nil {
 			continue
 		}
@@ -119,7 +120,7 @@ func (l *Prism) WriteInstance(inst Instance) (InstanceResult, error) {
 	if err := writePack(filepath.Join(dir, PackFile), inst); err != nil {
 		return res, err
 	}
-	return res, writeInstanceConfig(cfgPath, inst)
+	return res, writeInstanceConfig(cfgPath, inst, l.MultiMC)
 }
 
 func (l *Prism) prepareGameDir(dir, link string) (string, error) {
@@ -219,12 +220,23 @@ func jsonString(s string) json.RawMessage {
 	return data
 }
 
-func writeInstanceConfig(path string, inst Instance) error {
+// Prism reads instance.cfg with QSettings only when ConfigVersion is present;
+// otherwise it uses the MultiMC-era parser, which strips backslashes but keeps
+// the surrounding quotes of a QSettings-quoted value. MultiMC only has the old
+// parser, so its values are written unquoted with old-style escapes.
+func writeInstanceConfig(path string, inst Instance, multimc bool) error {
 	lines, err := readINILines(path)
 	if err != nil {
 		return err
 	}
+	escape := iniEscape
+	if multimc {
+		escape = multimcEscape
+	}
 	set := map[string]string{"InstanceType": "OneSix", "name": inst.Name}
+	if !multimc {
+		set["ConfigVersion"] = "1.3"
+	}
 	remove := map[string]bool{}
 	if inst.PreLaunch != "" {
 		set["PreLaunchCommand"] = inst.PreLaunch
@@ -243,17 +255,19 @@ func writeInstanceConfig(path string, inst Instance) error {
 			if remove[key] {
 				continue
 			}
-			if value, has := set[key]; has {
-				fmt.Fprintf(&buf, "%s=%s\n", key, iniEscape(value))
+			if key == "ConfigVersion" {
+				done[key] = true
+			} else if value, has := set[key]; has {
+				fmt.Fprintf(&buf, "%s=%s\n", key, escape(value))
 				done[key] = true
 				continue
 			}
 		}
 		buf.WriteString(line + "\n")
 	}
-	for _, key := range []string{"InstanceType", "name", "OverrideCommands", "PreLaunchCommand"} {
+	for _, key := range []string{"ConfigVersion", "InstanceType", "name", "OverrideCommands", "PreLaunchCommand"} {
 		if value, has := set[key]; has && !done[key] {
-			fmt.Fprintf(&buf, "%s=%s\n", key, iniEscape(value))
+			fmt.Fprintf(&buf, "%s=%s\n", key, escape(value))
 		}
 	}
 	return writeAtomic(path, buf.Bytes())
@@ -276,7 +290,7 @@ func readINILines(path string) ([]string, error) {
 	return lines, sc.Err()
 }
 
-func readINI(path string) (map[string]string, error) {
+func readINI(path string, multimc bool) (map[string]string, error) {
 	lines, err := readINILines(path)
 	if err != nil {
 		return nil, err
@@ -284,10 +298,14 @@ func readINI(path string) (map[string]string, error) {
 	if lines == nil {
 		return nil, os.ErrNotExist
 	}
+	unescape := iniUnescape
+	if multimc {
+		unescape = multimcUnescape
+	}
 	values := map[string]string{}
 	for _, line := range lines {
 		if key, value, ok := splitINILine(line); ok {
-			values[key] = iniUnescape(value)
+			values[key] = unescape(value)
 		}
 	}
 	return values, nil
@@ -327,6 +345,34 @@ func iniEscape(value string) string {
 		return `"` + escaped + `"`
 	}
 	return escaped
+}
+
+func multimcEscape(value string) string {
+	return strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\t", `\t`, "#", `\#`).Replace(value)
+}
+
+func multimcUnescape(value string) string {
+	var b strings.Builder
+	escape := false
+	for _, r := range value {
+		switch {
+		case escape:
+			switch r {
+			case 'n':
+				b.WriteRune('\n')
+			case 't':
+				b.WriteRune('\t')
+			default:
+				b.WriteRune(r)
+			}
+			escape = false
+		case r == '\\':
+			escape = true
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func iniUnescape(value string) string {

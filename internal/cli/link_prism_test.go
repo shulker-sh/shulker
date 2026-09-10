@@ -158,3 +158,41 @@ func readINIFile(t *testing.T, path string) map[string]string {
 	}
 	return values
 }
+
+func TestLinkPrismConfigFormats(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "my-pack")
+	h.mustRun(t, "add", "sodium")
+	exe, _ := os.Executable()
+	cmdValue := launcher.CommandArg(exe) + " sync " + launcher.CommandArg(h.dir) + ` --target client --into "$INST_MC_DIR"`
+
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir)
+	prismCfg := filepath.Join(prismDir, "instances", "shulker-my-pack", launcher.InstanceConfigFile)
+	lines := rawINILines(t, prismCfg)
+	quoted := `PreLaunchCommand="` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(cmdValue) + `"`
+	if !lines["ConfigVersion=1.3"] || !lines[quoted] {
+		t.Fatalf("prism instance.cfg:\n%s", readFile(t, prismCfg))
+	}
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir)
+	if strings.Count(readFile(t, prismCfg), "ConfigVersion=") != 1 {
+		t.Fatalf("ConfigVersion duplicated:\n%s", readFile(t, prismCfg))
+	}
+
+	multimcDir := t.TempDir()
+	h.mustRun(t, "link", "multimc", "--launcher-dir", multimcDir)
+	multimcCfg := filepath.Join(multimcDir, "instances", "shulker-my-pack", launcher.InstanceConfigFile)
+	content := readFile(t, multimcCfg)
+	if strings.Contains(content, "ConfigVersion") || !rawINILines(t, multimcCfg)["PreLaunchCommand="+cmdValue] {
+		t.Fatalf("multimc instance.cfg:\n%s", content)
+	}
+}
+
+func rawINILines(t *testing.T, path string) map[string]bool {
+	t.Helper()
+	lines := map[string]bool{}
+	for _, line := range strings.Split(readFile(t, path), "\n") {
+		lines[line] = true
+	}
+	return lines
+}
