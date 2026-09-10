@@ -28,7 +28,7 @@ type Version struct {
 }
 
 var (
-	coreRe   = regexp.MustCompile(`^(\d+)\.(\d+)(?:\.(\d+))?(?:-(.+))?$`)
+	coreRe   = regexp.MustCompile(`^(\d+)\.(\d+)(?:\.(\d+))?(?:-(.*))?$`)
 	weeklyRe = regexp.MustCompile(`^(\d\d)w(\d\d)([a-z])$`)
 	taggedRe = regexp.MustCompile(`^(snapshot|pre|rc)-?(\d+)$`)
 )
@@ -38,7 +38,13 @@ func Parse(id string) (Version, error) {
 	if m := weeklyRe.FindStringSubmatch(id); m != nil {
 		year, _ := strconv.Atoi(m[1])
 		week, _ := strconv.Atoi(m[2])
-		return Version{ID: id, Major: 0, Minor: year, Patch: week, Kind: Snapshot, Num: int(m[3][0] - 'a'), Tag: id}, nil
+		release, ok := weeklyRelease(year*100 + week)
+		if !ok {
+			return Version{}, fmt.Errorf("weekly snapshot %q has no known release", id)
+		}
+		v := MustParse(release)
+		v.ID, v.Kind, v.Num, v.Tag = id, Snapshot, year*100+week, id
+		return v, nil
 	}
 	m := coreRe.FindStringSubmatch(id)
 	if m == nil {
@@ -50,7 +56,9 @@ func Parse(id string) (Version, error) {
 	if m[3] != "" {
 		v.Patch, _ = strconv.Atoi(m[3])
 	}
-	if m[4] != "" {
+	if strings.HasSuffix(id, "-") {
+		v.Kind, v.Num = Snapshot, -1
+	} else if m[4] != "" {
 		v.Tag = m[4]
 		if t := taggedRe.FindStringSubmatch(m[4]); t != nil {
 			v.Num, _ = strconv.Atoi(t[2])

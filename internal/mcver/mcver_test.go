@@ -3,14 +3,19 @@ package mcver
 import "testing"
 
 func TestOrder(t *testing.T) {
-	ordered := []string{"1.21.1", "24w33a", "26.1", "26.1.1-rc-1", "26.1.1", "26.2", "26.3-snapshot-1", "26.3-snapshot-10", "26.3-pre-1", "26.3-pre-3", "26.3-rc-1", "26.3"}
+	ordered := []string{"1.16.5", "20w51a", "21w03a", "1.17-pre1", "1.17", "1.21.1", "1.21.2-", "24w33a", "24w33b", "24w40a", "1.21.2-pre1", "1.21.2", "26.1", "26.1.1-rc-1", "26.1.1", "26.2", "26.3-", "26.3-snapshot-1", "26.3-snapshot-10", "26.3-pre-1", "26.3-pre-3", "26.3-rc-1", "26.3"}
 	for i := 1; i < len(ordered); i++ {
 		a, b := MustParse(ordered[i-1]), MustParse(ordered[i])
-		if a.ID == "24w33a" || b.ID == "24w33a" {
-			continue
-		}
 		if Compare(a, b) >= 0 {
 			t.Errorf("%s should sort before %s", a, b)
+		}
+	}
+}
+
+func TestUnknownWeekly(t *testing.T) {
+	for _, id := range []string{"17w43a", "26w14a"} {
+		if _, err := Parse(id); err == nil {
+			t.Errorf("%s should not parse", id)
 		}
 	}
 }

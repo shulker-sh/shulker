@@ -196,7 +196,6 @@ func (p Problem) ignoreEntry() string {
 
 var (
 	bareInt  = regexp.MustCompile(`^\d+$`)
-	weekly   = regexp.MustCompile(`^\d\dw\d\d[a-z]$`)
 	minorX   = regexp.MustCompile(`^(\d+)\.[xX*]$`)
 	patchX   = regexp.MustCompile(`^(\d+)\.(\d+)\.[xX*]$`)
 	rangeOps = []string{">=", "<=", ">", "<", "=", "~", "^"}
@@ -204,7 +203,7 @@ var (
 
 func satisfies(version, declared string) (bool, error) {
 	v, err := mcver.Parse(normalizeVersion(version))
-	if err != nil || weekly.MatchString(v.ID) {
+	if err != nil {
 		return false, fmt.Errorf("installed version %q is not semver", version)
 	}
 	rng, err := fabricRange(declared)
@@ -219,7 +218,6 @@ func normalizeVersion(s string) string {
 	if i := strings.IndexByte(s, '+'); i >= 0 {
 		s = s[:i]
 	}
-	s = strings.TrimSuffix(s, "-")
 	if bareInt.MatchString(s) {
 		s += ".0"
 	}
