@@ -12,6 +12,7 @@ import (
 	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/andrewmast/shulker/internal/out"
 	"github.com/andrewmast/shulker/internal/project"
+	"github.com/andrewmast/shulker/internal/server"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +65,9 @@ func (a *app) initCmd() *cobra.Command {
 				Loader:    manifest.Loader{Type: loader, Version: loaderVersion},
 				Targets:   map[string]manifest.Target{target: {Side: target, Overrides: []string{"overrides"}, Build: "build/" + target}},
 				Mods:      map[string]manifest.Mod{},
+			}
+			if target == "server" {
+				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory}
 			}
 			d, err := a.deps()
 			if err != nil {

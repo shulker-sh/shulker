@@ -2,6 +2,7 @@ package cli
 
 import (
 	"io"
+	"os"
 	"strings"
 
 	"github.com/andrewmast/shulker/internal/out"
@@ -12,6 +13,7 @@ var version = "dev"
 
 type app struct {
 	printer *out.Printer
+	stdin   io.Reader
 	dir     string
 	d       *deps
 }
@@ -21,7 +23,7 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 }
 
 func newApp(stdout, stderr io.Writer) *app {
-	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}}
+	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin}
 }
 
 func (a *app) run(args []string) int {
@@ -48,7 +50,7 @@ func (a *app) root() *cobra.Command {
 	}
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
-	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.linkCmd())
+	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.serveCmd(), a.linkCmd())
 	return root
 }
 

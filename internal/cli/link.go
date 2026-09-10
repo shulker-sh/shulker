@@ -52,7 +52,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if p.Lock.Loader.Type != "fabric" {
 				return out.Errorf("unsupported-loader", "link mojang supports only the fabric loader for now, not %s", p.Lock.Loader.Type)
 			}
-			name, t, err := clientTarget(p.Manifest, target)
+			name, t, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {
 				return err
 			}
@@ -107,7 +107,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	return cmd
 }
 
-func clientTarget(m *manifest.Manifest, want string) (string, manifest.Target, error) {
+func sideTarget(m *manifest.Manifest, want, side, verb string) (string, manifest.Target, error) {
 	if want != "" {
 		t, ok := m.Targets[want]
 		if !ok {
@@ -115,26 +115,26 @@ func clientTarget(m *manifest.Manifest, want string) (string, manifest.Target, e
 			e.Candidates = targetNames(m.Targets)
 			return "", t, e
 		}
-		if t.Side != "client" {
-			return "", t, out.Errorf("not-client-target", "target %q is a %s target; link needs a client target", want, t.Side)
+		if t.Side != side {
+			return "", t, out.Errorf("not-"+side+"-target", "target %q is a %s target; %s needs a %s target", want, t.Side, verb, side)
 		}
 		return want, t, nil
 	}
-	var clients []string
+	var matches []string
 	for name, t := range m.Targets {
-		if t.Side == "client" {
-			clients = append(clients, name)
+		if t.Side == side {
+			matches = append(matches, name)
 		}
 	}
-	sort.Strings(clients)
-	switch len(clients) {
+	sort.Strings(matches)
+	switch len(matches) {
 	case 0:
-		return "", manifest.Target{}, out.Errorf("no-client-target", "shulker.json has no client target to link")
+		return "", manifest.Target{}, out.Errorf("no-"+side+"-target", "shulker.json has no %s target to %s", side, verb)
 	case 1:
-		return clients[0], m.Targets[clients[0]], nil
+		return matches[0], m.Targets[matches[0]], nil
 	}
-	e := out.Errorf("ambiguous-target", "shulker.json has several client targets; pass --target")
-	e.Candidates = clients
+	e := out.Errorf("ambiguous-target", "shulker.json has several %s targets; pass --target", side)
+	e.Candidates = matches
 	return "", manifest.Target{}, e
 }
 

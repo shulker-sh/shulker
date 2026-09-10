@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -62,6 +63,7 @@ type harness struct {
 	newer         bool
 	serverJar     fakeJar
 	serverJarHits int
+	stdin         io.Reader
 }
 
 func newHarness(t *testing.T) *harness {
@@ -194,6 +196,7 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	var stdout, stderr bytes.Buffer
 	a := newApp(&stdout, &stderr)
 	a.dir = h.dir
+	a.stdin = h.stdin
 	f := fetch.New("test")
 	piston := meta.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"
