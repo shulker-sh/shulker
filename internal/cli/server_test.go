@@ -123,3 +123,38 @@ func readFile(t *testing.T, path string) string {
 	}
 	return string(data)
 }
+
+func TestServerBuildAlwaysWritesProperties(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "install")
+
+	path := filepath.Join(h.dir, "build", "server", "server.properties")
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) != 0 {
+		t.Fatalf("expected an empty server.properties, got %q, %v", data, err)
+	}
+
+	gameWritten := "#Minecraft server properties\nmotd=A Minecraft Server\npvp=true\n"
+	if err := os.WriteFile(path, []byte(gameWritten), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout := h.mustRun(t, "build")
+	if !strings.Contains(stdout, "0 written, 2 unchanged, 0 kept") {
+		t.Fatalf("rebuild after game write: %s", stdout)
+	}
+	if data, _ := os.ReadFile(path); string(data) != gameWritten {
+		t.Fatalf("game-written file was changed: %q", data)
+	}
+
+	h.editManifest(t, func(m map[string]any) {
+		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"pvp": false}}
+	})
+	stdout = h.mustRun(t, "build")
+	if !strings.Contains(stdout, "2 written, 1 unchanged") {
+		t.Fatalf("rebuild with owned key: %s", stdout)
+	}
+	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\nmotd=A Minecraft Server\npvp=false\n" {
+		t.Fatalf("merged file: %q", data)
+	}
+}

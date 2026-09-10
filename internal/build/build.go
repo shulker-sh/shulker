@@ -28,10 +28,11 @@ const (
 )
 
 type State struct {
-	Target     string            `json:"target"`
-	BuiltAt    string            `json:"builtAt"`
-	LockSha256 string            `json:"lockSha256"`
-	Files      map[string]string `json:"files"`
+	Target     string              `json:"target"`
+	BuiltAt    string              `json:"builtAt"`
+	LockSha256 string              `json:"lockSha256"`
+	Files      map[string]string   `json:"files"`
+	Keys       map[string][]string `json:"propertyKeys,omitempty"`
 }
 
 type Report struct {
@@ -90,7 +91,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 			return nil, err
 		}
 		abs := filepath.Join(dir, filepath.FromSlash(rel))
-		current, exists, err := b.currentHash(abs, src)
+		current, exists, err := b.currentHash(abs, src, prev.Keys[rel])
 		if err != nil {
 			return nil, err
 		}
@@ -112,6 +113,12 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 			continue
 		}
 		next.Files[rel] = newHash
+		if src.props != nil {
+			if next.Keys == nil {
+				next.Keys = map[string][]string{}
+			}
+			next.Keys[rel] = src.props.keys()
+		}
 	}
 	for rel, recorded := range prev.Files {
 		if _, still := desired[rel]; still {
@@ -229,13 +236,10 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	desired[ServerJarFile] = source{sha512: jar.Sha512}
 	srv := b.Manifest.Server
 	if srv == nil {
-		return nil
+		srv = &manifest.Server{}
 	}
 	if srv.Eula {
 		desired[EulaFile] = source{data: []byte("eula=true\n")}
-	}
-	if len(srv.Properties) == 0 {
-		return nil
 	}
 	props := properties{}
 	for key, raw := range srv.Properties {
@@ -253,7 +257,7 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	return nil
 }
 
-func (b *Builder) currentHash(abs string, s source) (string, bool, error) {
+func (b *Builder) currentHash(abs string, s source, recordedKeys []string) (string, bool, error) {
 	if s.props == nil {
 		return fileSha256(abs)
 	}
@@ -264,7 +268,14 @@ func (b *Builder) currentHash(abs string, s source) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	return sha256Hex(s.props.restrict(parseProperties(data)).canonical()), true, nil
+	owned := s.props
+	if recordedKeys != nil {
+		owned = properties{}
+		for _, k := range recordedKeys {
+			owned[k] = ""
+		}
+	}
+	return sha256Hex(owned.restrict(parseProperties(data)).canonical()), true, nil
 }
 
 func (b *Builder) hashSource(s source) (string, error) {
