@@ -5,6 +5,7 @@ import { VPButton } from 'vitepress/theme'
 <template>
   <main class="home">
     <section class="hero">
+      <img class="logo" src="/logo.png" alt="" width="128" height="128" />
       <h1>Shulker</h1>
       <p class="tagline">
         One manifest for your Minecraft mods, client instances, and servers.
@@ -30,6 +31,11 @@ import { VPButton } from 'vitepress/theme'
 .hero {
   max-width: 40rem;
   text-align: center;
+}
+.logo {
+  display: block;
+  margin: 0 auto 1.5rem;
+  image-rendering: pixelated;
 }
 h1 {
   font-size: 4rem;

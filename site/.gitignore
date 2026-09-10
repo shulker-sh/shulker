@@ -1,3 +1,5 @@
 node_modules/
 .vitepress/dist/
 .vitepress/cache/
+docs/manifest.md
+docs/lock.md

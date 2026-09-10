@@ -7,8 +7,9 @@ export default defineConfig({
   description: 'Manage Minecraft mods, client instances, and servers from one manifest',
   cleanUrls: true,
   lastUpdated: true,
-  head: [['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }]],
+  head: [['link', { rel: 'icon', href: '/logo.png', type: 'image/png' }]],
   themeConfig: {
+    logo: '/logo.png',
     nav: [
       { text: 'Guide', link: '/docs/getting-started' },
       { text: 'CLI', link: '/docs/cli' },

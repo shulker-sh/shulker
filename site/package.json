@@ -3,10 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "docs:gen": "node scripts/gen-schema-docs.mjs",
+    "predev": "npm run docs:gen",
     "dev": "vitepress dev",
+    "prebuild": "npm run docs:gen",
     "build": "vitepress build",
-    "preview": "vitepress preview",
-    "build:pages": "vitepress build && mkdir -p .vitepress/dist/schema && cp -R ../schema/v1 .vitepress/dist/schema/"
+    "build:pages": "npm run build && mkdir -p .vitepress/dist/schema && cp -R ../schema/v1 .vitepress/dist/schema/",
+    "preview": "vitepress preview"
   },
   "devDependencies": {
     "@shikijs/vitepress-twoslash": "^3.12.0",
