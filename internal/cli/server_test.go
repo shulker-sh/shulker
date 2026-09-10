@@ -79,19 +79,59 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "kept server.properties") {
+	if !strings.Contains(stdout, "kept server.properties online-mode (edited in build)") {
 		t.Fatalf("rebuild after user edit: %s", stdout)
+	}
+	if got := readFile(t, propsPath); !strings.Contains(got, "online-mode=true") {
+		t.Fatalf("in-game edit must survive a rebuild: %q", got)
+	}
+
+	h.editManifest(t, func(m map[string]any) {
+		m["server"].(map[string]any)["properties"].(map[string]any)["motd"] = "Changed"
+	})
+	stdout = h.mustRun(t, "build")
+	if !strings.Contains(stdout, "server: 1 written") || !strings.Contains(stdout, "kept server.properties online-mode (edited in build)") {
+		t.Fatalf("manifest change to another key must keep the edit: %s", stdout)
+	}
+	if got := readFile(t, propsPath); !strings.Contains(got, "online-mode=true") || !strings.Contains(got, "motd=Changed") {
+		t.Fatalf("merged after unrelated manifest change: %q", got)
 	}
 
 	h.editManifest(t, func(m map[string]any) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["online-mode"] = true
 	})
+	stdout = h.mustRun(t, "build")
+	if !strings.Contains(stdout, "server: 0 written") || strings.Contains(stdout, "kept") && strings.Contains(stdout, "online-mode") {
+		t.Fatalf("manifest catching up to the edit: %s", stdout)
+	}
+
 	h.editManifest(t, func(m map[string]any) {
-		m["server"].(map[string]any)["properties"].(map[string]any)["motd"] = "Changed"
+		m["server"].(map[string]any)["properties"].(map[string]any)["online-mode"] = false
+	})
+	if err := os.WriteFile(propsPath, []byte(strings.Replace(readFile(t, propsPath), "motd=Changed", "motd=Mine", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.editManifest(t, func(m map[string]any) {
+		m["server"].(map[string]any)["properties"].(map[string]any)["motd"] = "Theirs"
 	})
 	code, stdout, _ := h.run(t, "build", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "build-conflict" || len(e.Candidates) != 1 || !strings.HasPrefix(e.Candidates[0], "server.properties") {
-		t.Fatalf("conflict: exit %d %s", code, stdout)
+	if code != 0 {
+		t.Fatalf("both-changed key must not fail the build: %s", stdout)
+	}
+	var env struct {
+		Data []struct {
+			Written  []string `json:"written"`
+			Warnings []string `json:"warnings"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 1 || len(env.Data[0].Written) != 1 || len(env.Data[0].Warnings) != 1 || !strings.Contains(env.Data[0].Warnings[0], "motd was edited in the build and changed in the manifest") {
+		t.Fatalf("both-changed key: %+v", env.Data)
+	}
+	if got := readFile(t, propsPath); !strings.Contains(got, "motd=Theirs") || !strings.Contains(got, "online-mode=false") {
+		t.Fatalf("manifest must win a both-changed key: %q", got)
 	}
 }
 

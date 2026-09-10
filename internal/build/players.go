@@ -45,52 +45,32 @@ func (f *playerFile) keys() []string {
 	return keys
 }
 
-func (f *playerFile) canonical() []byte {
-	list := make([]playerEntry, 0, len(f.order))
-	for _, u := range f.keys() {
-		list = append(list, driftFields(f.entries[u]))
+func (f *playerFile) values() map[string]string {
+	values := map[string]string{}
+	for u, e := range f.entries {
+		data, _ := json.Marshal(driftFields(e))
+		values[u] = string(data)
 	}
-	data, _ := json.Marshal(list)
-	return data
+	return values
 }
 
-func (f *playerFile) current(existing []byte, recordedKeys []string) []byte {
-	owned := map[string]bool{}
-	if recordedKeys != nil {
-		for _, k := range recordedKeys {
-			owned[k] = true
-		}
-	} else {
-		for _, k := range f.order {
-			owned[k] = true
-		}
-	}
+func (f *playerFile) existingValues(existing []byte) map[string]string {
+	values := map[string]string{}
 	list, err := parsePlayerEntries(existing)
 	if err != nil {
-		return existing
+		return values
 	}
-	found := []playerEntry{}
 	for _, e := range list {
-		if !owned[entryUUID(e)] {
-			continue
-		}
-		found = append(found, driftFields(e))
+		data, _ := json.Marshal(driftFields(e))
+		values[entryUUID(e)] = string(data)
 	}
-	sort.Slice(found, func(i, j int) bool { return entryUUID(found[i]) < entryUUID(found[j]) })
-	data, _ := json.Marshal(found)
-	return data
+	return values
 }
 
-func (f *playerFile) merge(existing []byte, recordedKeys []string) ([]byte, error) {
+func (f *playerFile) render(existing []byte, kept, dropped map[string]bool) ([]byte, error) {
 	list, err := parsePlayerEntries(existing)
 	if err != nil {
 		return nil, err
-	}
-	dropped := map[string]bool{}
-	for _, k := range recordedKeys {
-		if _, still := f.entries[k]; !still {
-			dropped[k] = true
-		}
 	}
 	merged := []playerEntry{}
 	seen := map[string]bool{}
@@ -100,8 +80,11 @@ func (f *playerFile) merge(existing []byte, recordedKeys []string) ([]byte, erro
 			continue
 		}
 		own, ok := f.entries[u]
-		if !ok {
+		if !ok || kept[u] {
 			merged = append(merged, e)
+			if ok {
+				seen[u] = true
+			}
 			continue
 		}
 		seen[u] = true

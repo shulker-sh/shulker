@@ -75,38 +75,21 @@ type propsFile struct {
 	sep   string
 }
 
-func (f propsFile) keys() []string    { return f.props.keys() }
-func (f propsFile) canonical() []byte { return f.props.canonical() }
+func (f propsFile) keys() []string            { return f.props.keys() }
+func (f propsFile) values() map[string]string { return map[string]string(f.props) }
 
-func (f propsFile) current(existing []byte, recordedKeys []string) []byte {
-	owned := f.props
-	if recordedKeys != nil {
-		owned = properties{}
-		for _, k := range recordedKeys {
-			owned[k] = ""
-		}
-	}
-	return owned.restrict(parseProperties(existing)).canonical()
+func (f propsFile) existingValues(existing []byte) map[string]string {
+	return map[string]string(parseProperties(existing))
 }
 
-func (f propsFile) merge(existing []byte, recordedKeys []string) ([]byte, error) {
-	dropped := map[string]bool{}
-	for _, k := range recordedKeys {
-		if _, owned := f.props[k]; !owned {
-			dropped[k] = true
+func (f propsFile) render(existing []byte, kept, dropped map[string]bool) ([]byte, error) {
+	write := properties{}
+	for k, v := range f.props {
+		if !kept[k] {
+			write[k] = v
 		}
 	}
-	return f.props.mergeInto(existing, f.sep, dropped), nil
-}
-
-func (p properties) restrict(existing properties) properties {
-	sub := properties{}
-	for k := range p {
-		if v, ok := existing[k]; ok {
-			sub[k] = v
-		}
-	}
-	return sub
+	return write.mergeInto(existing, f.sep, dropped), nil
 }
 
 func (p properties) mergeInto(existing []byte, sep string, dropped map[string]bool) []byte {

@@ -140,7 +140,7 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, report *MrpackReport) error {
 			continue
 		}
 		if s.owned != nil {
-			data, err := s.owned.merge(nil, nil)
+			data, err := s.owned.render(nil, nil, nil)
 			if err != nil {
 				return err
 			}

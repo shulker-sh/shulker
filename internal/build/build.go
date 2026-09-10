@@ -31,12 +31,32 @@ const (
 )
 
 type State struct {
-	Target     string              `json:"target"`
-	BuiltAt    string              `json:"builtAt"`
-	LockSha256 string              `json:"lockSha256"`
-	Files      map[string]string   `json:"files"`
-	Keys       map[string][]string `json:"propertyKeys,omitempty"`
-	Links      []string            `json:"links,omitempty"`
+	Target     string                       `json:"target"`
+	BuiltAt    string                       `json:"builtAt"`
+	LockSha256 string                       `json:"lockSha256"`
+	Files      map[string]string            `json:"files"`
+	Keys       map[string][]string          `json:"propertyKeys,omitempty"`
+	Values     map[string]map[string]string `json:"managedValues,omitempty"`
+	Links      []string                     `json:"links,omitempty"`
+}
+
+func (s State) recordedKeys(rel string) []string {
+	if v, ok := s.Values[rel]; ok {
+		keys := make([]string, 0, len(v))
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return keys
+	}
+	return s.Keys[rel]
+}
+
+func (s *State) record(rel string, f ownedFile) {
+	if s.Values == nil {
+		s.Values = map[string]map[string]string{}
+	}
+	s.Values[rel] = f.values()
 }
 
 type Report struct {
@@ -95,13 +115,63 @@ type planned struct {
 	state fileState
 	src   source
 	hash  string
+	merge keyMerge
 }
 
 type ownedFile interface {
 	keys() []string
-	canonical() []byte
-	current(existing []byte, recordedKeys []string) []byte
-	merge(existing []byte, recordedKeys []string) ([]byte, error)
+	values() map[string]string
+	existingValues(existing []byte) map[string]string
+	render(existing []byte, kept, dropped map[string]bool) ([]byte, error)
+}
+
+type keyMerge struct {
+	kept     map[string]bool
+	dropped  map[string]bool
+	overrode []string
+	changed  bool
+}
+
+func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recordedKeys []string, force bool) keyMerge {
+	m := keyMerge{kept: map[string]bool{}, dropped: map[string]bool{}}
+	desired := f.values()
+	current := f.existingValues(existing)
+	for _, k := range f.keys() {
+		want := desired[k]
+		have, present := current[k]
+		last, known := recorded[k]
+		switch {
+		case !present:
+			m.changed = true
+		case have == want:
+		case force, !known, have == last:
+			m.changed = true
+		case want == last:
+			m.kept[k] = true
+		default:
+			m.overrode = append(m.overrode, k)
+			m.changed = true
+		}
+	}
+	for _, k := range recordedKeys {
+		if _, still := desired[k]; still {
+			continue
+		}
+		if _, present := current[k]; present {
+			m.dropped[k] = true
+			m.changed = true
+		}
+	}
+	return m
+}
+
+func sortedKeys(set map[string]bool) []string {
+	keys := make([]string, 0, len(set))
+	for k := range set {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func (b *Builder) Build(name string, opts Options) (*Report, error) {
@@ -141,7 +211,9 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		case stateUnchanged:
 			report.Unchanged++
 		case stateKept:
-			report.Kept = append(report.Kept, f.rel)
+			if f.src.owned == nil {
+				report.Kept = append(report.Kept, f.rel)
+			}
 		case stateConflict:
 			report.Conflicts = append(report.Conflicts, f.rel+" (changed in both build and source)")
 			continue
@@ -157,10 +229,13 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		}
 		next.Files[f.rel] = f.hash
 		if f.src.owned != nil {
-			if next.Keys == nil {
-				next.Keys = map[string][]string{}
+			next.record(f.rel, f.src.owned)
+			for _, k := range sortedKeys(f.merge.kept) {
+				report.Kept = append(report.Kept, f.rel+" "+k+" (edited in build)")
 			}
-			next.Keys[f.rel] = f.src.owned.keys()
+			for _, k := range f.merge.overrode {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was edited in the build and changed in the manifest; the manifest value was written", f.rel, k))
+			}
 		}
 	}
 	if len(report.Conflicts) > 0 {
@@ -168,8 +243,12 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		e.Candidates = report.Conflicts
 		return report, e
 	}
+	merges := map[string]keyMerge{}
+	for _, f := range plans {
+		merges[f.rel] = f.merge
+	}
 	for _, rel := range writes {
-		if err := b.write(filepath.Join(dir, filepath.FromSlash(rel)), desired[rel], prev.Keys[rel]); err != nil {
+		if err := b.write(filepath.Join(dir, filepath.FromSlash(rel)), desired[rel], merges[rel]); err != nil {
 			return nil, err
 		}
 		report.Written = append(report.Written, rel)
@@ -283,7 +362,7 @@ func (b *Builder) layer(root, label, pack string, vars map[string]string, desire
 		}
 		if owned := desired[rel].owned; owned != nil {
 			src.managed = owned
-			if data, err = owned.merge(data, nil); err != nil {
+			if data, err = owned.render(data, nil, nil); err != nil {
 				return err
 			}
 		}
@@ -368,23 +447,9 @@ func renderProperties(file string, raw map[string]any, vars map[string]string) (
 	return props, nil
 }
 
-func (b *Builder) currentHash(abs string, s source, recordedKeys []string) (string, bool, error) {
-	if s.owned == nil {
-		return fileSha256(abs)
-	}
-	data, err := os.ReadFile(abs)
-	if errors.Is(err, fs.ErrNotExist) {
-		return "", false, nil
-	}
-	if err != nil {
-		return "", false, err
-	}
-	return sha256Hex(s.owned.current(data, recordedKeys)), true, nil
-}
-
 func (b *Builder) hashSource(s source) (string, error) {
 	if s.owned != nil {
-		return sha256Hex(s.owned.canonical()), nil
+		return sha256Hex(canonicalValues(s.owned.values())), nil
 	}
 	if s.sha512 != "" {
 		data, err := os.ReadFile(b.Cache.Path(s.sha512))
@@ -410,19 +475,34 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 			return nil, err
 		}
 		abs := filepath.Join(dir, filepath.FromSlash(rel))
-		current, exists, err := b.currentHash(abs, src, prev.Keys[rel])
+		f := planned{rel: rel, src: src, hash: newHash}
+		if src.owned != nil {
+			existing, err := os.ReadFile(abs)
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return nil, err
+			}
+			f.merge = mergeKeys(src.owned, existing, prev.Values[rel], prev.recordedKeys(rel), force)
+			switch {
+			case f.merge.changed:
+				f.state = stateWrite
+			case len(f.merge.kept) > 0:
+				f.state = stateKept
+			default:
+				f.state = stateUnchanged
+			}
+			plans = append(plans, f)
+			continue
+		}
+		current, exists, err := fileSha256(abs)
 		if err != nil {
 			return nil, err
 		}
 		recorded := prev.Files[rel]
-		f := planned{rel: rel, src: src, hash: newHash}
 		switch {
 		case !exists:
 			f.state = stateWrite
 		case current == newHash:
 			f.state = stateUnchanged
-		case recorded == "" && src.owned != nil:
-			f.state = stateWrite
 		case recorded == "" && !force:
 			f.state = stateUntracked
 		case current == recorded || force:
@@ -459,21 +539,21 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 	return plans, nil
 }
 
-func (b *Builder) write(abs string, s source, recordedKeys []string) error {
+func (b *Builder) write(abs string, s source, m keyMerge) error {
 	if s.sha512 != "" {
 		return b.Cache.CopyTo(s.sha512, abs)
 	}
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return err
 	}
-	data, err := b.output(abs, s, recordedKeys)
+	data, err := b.output(abs, s, m)
 	if err != nil {
 		return err
 	}
 	return os.WriteFile(abs, data, 0o644)
 }
 
-func (b *Builder) output(abs string, s source, recordedKeys []string) ([]byte, error) {
+func (b *Builder) output(abs string, s source, m keyMerge) ([]byte, error) {
 	if s.sha512 != "" {
 		return os.ReadFile(b.Cache.Path(s.sha512))
 	}
@@ -484,7 +564,20 @@ func (b *Builder) output(abs string, s source, recordedKeys []string) ([]byte, e
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
-	return s.owned.merge(existing, recordedKeys)
+	return s.owned.render(existing, m.kept, m.dropped)
+}
+
+func canonicalValues(values map[string]string) []byte {
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var buf bytes.Buffer
+	for _, k := range keys {
+		fmt.Fprintf(&buf, "%s=%s\n", k, values[k])
+	}
+	return buf.Bytes()
 }
 
 func (b *Builder) loadState(dir string) State {

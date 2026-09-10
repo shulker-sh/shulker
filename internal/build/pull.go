@@ -42,7 +42,7 @@ func (b *Builder) Diff(name string, opts Options) (*DiffReport, error) {
 	}
 	report := &DiffReport{Target: name, Dir: d.dir, Files: []FileDiff{}, Warnings: d.warnings}
 	for _, f := range d.plans {
-		if !drifted(f.state) {
+		if !drifted(f) {
 			continue
 		}
 		abs := filepath.Join(d.dir, filepath.FromSlash(f.rel))
@@ -52,7 +52,7 @@ func (b *Builder) Diff(name string, opts Options) (*DiffReport, error) {
 		}
 		var want []byte
 		if f.state != stateOrphan {
-			if want, err = b.output(abs, d.desired[f.rel], d.prev.Keys[f.rel]); err != nil {
+			if want, err = b.output(abs, d.desired[f.rel], keyMerge{dropped: f.merge.dropped}); err != nil {
 				return nil, err
 			}
 		}
@@ -73,12 +73,12 @@ func (b *Builder) Pull(name string, files []string, opts Options) (*PullReport, 
 	for _, f := range files {
 		named[filepath.ToSlash(filepath.Clean(f))] = true
 	}
-	states := map[string]fileState{}
+	byPath := map[string]planned{}
 	for _, f := range plans {
-		states[f.rel] = f.state
+		byPath[f.rel] = f
 	}
 	for rel := range named {
-		if !drifted(states[rel]) {
+		if !drifted(byPath[rel]) {
 			e := out.Errorf("not-drifted", "%s is not changed in the build directory of %s", rel, name)
 			e.Candidates = driftedPaths(plans)
 			return nil, e
@@ -86,7 +86,7 @@ func (b *Builder) Pull(name string, files []string, opts Options) (*PullReport, 
 	}
 	var pulled []string
 	for _, f := range plans {
-		if !drifted(f.state) || (len(named) > 0 && !named[f.rel]) {
+		if !drifted(f) || (len(named) > 0 && !named[f.rel]) {
 			continue
 		}
 		abs := filepath.Join(dir, filepath.FromSlash(f.rel))
@@ -159,17 +159,13 @@ func (b *Builder) Pull(name string, files []string, opts Options) (*PullReport, 
 	}
 	for _, rel := range pulled {
 		src := desired[rel]
-		abs := filepath.Join(dir, filepath.FromSlash(rel))
-		hash, _, err := b.currentHash(abs, src, nil)
+		hash, err := b.hashSource(src)
 		if err != nil {
 			return nil, err
 		}
 		prev.Files[rel] = hash
 		if src.owned != nil {
-			if prev.Keys == nil {
-				prev.Keys = map[string][]string{}
-			}
-			prev.Keys[rel] = src.owned.keys()
+			prev.record(rel, src.owned)
 		}
 	}
 	if err := b.saveState(dir, prev); err != nil {
@@ -211,14 +207,17 @@ func (b *Builder) drift(name string, opts Options) (*drift, error) {
 	return &drift{dir: dir, desired: desired, prev: prev, plans: plans, warnings: report.Warnings}, nil
 }
 
-func drifted(s fileState) bool {
-	return s == stateKept || s == stateConflict || s == stateUntracked || s == stateOrphan
+func drifted(f planned) bool {
+	if f.src.owned != nil {
+		return len(f.merge.kept) > 0
+	}
+	return f.state == stateKept || f.state == stateConflict || f.state == stateUntracked || f.state == stateOrphan
 }
 
 func driftedPaths(plans []planned) []string {
 	var paths []string
 	for _, f := range plans {
-		if drifted(f.state) {
+		if drifted(f) {
 			paths = append(paths, f.rel)
 		}
 	}

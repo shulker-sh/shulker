@@ -68,3 +68,39 @@ func TestClientBuildMergesIntoGameWrittenOptions(t *testing.T) {
 		t.Fatalf("rebuild: %s", stdout)
 	}
 }
+
+func TestClientBuildRestoresDroppedOptions(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.editManifest(t, func(m map[string]any) {
+		m["client"] = map[string]any{"options": map[string]any{"key_zoomify.key.zoom": "key.keyboard.z", "fov": 0.5}}
+	})
+	h.mustRun(t, "install")
+	path := filepath.Join(h.dir, "build", "client", "options.txt")
+
+	gameWritten := "version:4325\nfov:0.5\nlastServer:play.example.org:25565\n"
+	if err := os.WriteFile(path, []byte(gameWritten), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout := h.mustRun(t, "build")
+	if !strings.Contains(stdout, "1 written, 1 unchanged, 0 kept") {
+		t.Fatalf("rebuild after the game dropped a key: %s", stdout)
+	}
+	if data, _ := os.ReadFile(path); string(data) != gameWritten+"key_zoomify.key.zoom:key.keyboard.z\n" {
+		t.Fatalf("dropped key not restored: %q", data)
+	}
+
+	if err := os.WriteFile(path, []byte("version:4325\nfov:0.5\nlastServer:play.example.org:25565\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.editManifest(t, func(m map[string]any) {
+		m["client"].(map[string]any)["options"].(map[string]any)["key_zoomify.key.zoom"] = "key.keyboard.v"
+	})
+	stdout = h.mustRun(t, "build")
+	if !strings.Contains(stdout, "2 written, 0 unchanged, 0 kept") {
+		t.Fatalf("dropped in build and changed in manifest must just write: %s", stdout)
+	}
+	if data, _ := os.ReadFile(path); !strings.HasSuffix(string(data), "key_zoomify.key.zoom:key.keyboard.v\n") {
+		t.Fatalf("new value not written: %q", data)
+	}
+}
