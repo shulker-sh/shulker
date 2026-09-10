@@ -89,3 +89,22 @@ func (a *app) warn(warnings []string) {
 		a.progress("warning: %s", w)
 	}
 }
+
+func (a *app) commit(p *project.Project, r *resolve.Resolver) (*resolve.Validation, error) {
+	v, err := r.Validate()
+	if err != nil {
+		return nil, err
+	}
+	if err := v.Err(); err != nil {
+		return nil, err
+	}
+	if err := p.SaveManifest(); err != nil {
+		return nil, err
+	}
+	if err := p.SaveLock(); err != nil {
+		return nil, err
+	}
+	a.printer.LockStale = false
+	a.warn(v.Warnings)
+	return v, nil
+}

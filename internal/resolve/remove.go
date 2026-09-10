@@ -38,6 +38,12 @@ func (r *Resolver) Remove(ids []string) (*Removed, error) {
 			r.dropLocked(id)
 		}
 	}
+	res.Pruned = r.pruneOrphans()
+	return res, nil
+}
+
+func (r *Resolver) pruneOrphans() []string {
+	pruned := []string{}
 	for changed := true; changed; {
 		changed = false
 		for _, id := range r.lockIDs() {
@@ -45,12 +51,12 @@ func (r *Resolver) Remove(ids []string) (*Removed, error) {
 				continue
 			}
 			r.dropLocked(id)
-			res.Pruned = append(res.Pruned, id)
+			pruned = append(pruned, id)
 			changed = true
 		}
 	}
-	sort.Strings(res.Pruned)
-	return res, nil
+	sort.Strings(pruned)
+	return pruned
 }
 
 func (r *Resolver) dropLocked(id string) {

@@ -35,6 +35,10 @@ func makeJar(t *testing.T, id, filename string, env string) fakeJar {
 }
 
 func makeJarWith(t *testing.T, id, filename, env, extra string) fakeJar {
+	return makeJarVersion(t, id, filename, env, "1.0.0", extra)
+}
+
+func makeJarVersion(t *testing.T, id, filename, env, version, extra string) fakeJar {
 	t.Helper()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -42,7 +46,7 @@ func makeJarWith(t *testing.T, id, filename, env, extra string) fakeJar {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Fprintf(w, `{"id":%q,"version":"1.0.0","environment":%q,%s}`, id, env, extra)
+	fmt.Fprintf(w, `{"id":%q,"version":%q,"environment":%q,%s}`, id, version, env, extra)
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -55,6 +59,7 @@ type harness struct {
 	jars   map[string]fakeJar
 	dir    string
 	cache  string
+	newer  bool
 }
 
 func newHarness(t *testing.T) *harness {
@@ -63,6 +68,7 @@ func newHarness(t *testing.T) *harness {
 	sodium := makeJar(t, "sodium", "sodium-fabric-0.9.2+mc26.2.jar", "client")
 	fabricAPI := makeJar(t, "fabric-api", "fabric-api-0.130.0+26.2.jar", "*")
 	h.jars["sodium"], h.jars["fabric-api"] = sodium, fabricAPI
+	h.jars["sodium-next"] = makeJarVersion(t, "sodium", "sodium-fabric-0.9.3+mc26.2.jar", "client", "1.1.0", `"depends":{"fabricloader":">=0.17"}`)
 
 	mux := http.NewServeMux()
 	var base string
@@ -92,23 +98,46 @@ func newHarness(t *testing.T) *harness {
 		"fabric-api": {"id": "P7dR8mSH", "slug": "fabric-api", "title": "Fabric API", "client_side": "required", "server_side": "required"},
 		"P7dR8mSH":   {"id": "P7dR8mSH", "slug": "fabric-api", "title": "Fabric API", "client_side": "required", "server_side": "required"},
 	}
-	versionOf := func(projectID string, jar fakeJar, deps []map[string]any) map[string]any {
+	versionOf := func(id, projectID, number, published string, jar fakeJar, deps []map[string]any) map[string]any {
 		return map[string]any{
-			"id": "Q" + projectID[1:], "project_id": projectID, "version_number": "1.0.0+mc26.2", "version_type": "release",
-			"date_published": "2026-09-01T00:00:00Z", "game_versions": []string{"26.2"}, "loaders": []string{"fabric"},
+			"id": id, "project_id": projectID, "version_number": number, "version_type": "release",
+			"date_published": published, "game_versions": []string{"26.2"}, "loaders": []string{"fabric"},
 			"files":        []map[string]any{{"url": base + "/cdn/" + jar.filename, "filename": jar.filename, "primary": true, "hashes": map[string]string{"sha512": jar.sha512}}},
 			"dependencies": deps,
 		}
 	}
+	needsFabricAPI := []map[string]any{{"project_id": "P7dR8mSH", "dependency_type": "required"}}
+	versions := func(projectID string) []map[string]any {
+		switch projectID {
+		case "AANobbMI":
+			list := []map[string]any{versionOf("QANobbMI", "AANobbMI", "1.0.0+mc26.2", "2026-09-01T00:00:00Z", h.jars["sodium"], needsFabricAPI)}
+			if h.newer {
+				list = append(list, versionOf("QANobbM2", "AANobbMI", "1.1.0+mc26.2", "2026-09-05T00:00:00Z", h.jars["sodium-next"], needsFabricAPI))
+			}
+			return list
+		case "P7dR8mSH":
+			return []map[string]any{versionOf("Q7dR8mSH", "P7dR8mSH", "1.0.0+mc26.2", "2026-09-01T00:00:00Z", h.jars["fabric-api"], nil)}
+		}
+		return nil
+	}
+	mux.HandleFunc("/modrinth/version/", func(w http.ResponseWriter, r *http.Request) {
+		id := strings.TrimPrefix(r.URL.Path, "/modrinth/version/")
+		for _, projectID := range []string{"AANobbMI", "P7dR8mSH"} {
+			for _, v := range versions(projectID) {
+				if v["id"] == id {
+					writeJSON(w, v)
+					return
+				}
+			}
+		}
+		http.NotFound(w, r)
+	})
 	mux.HandleFunc("/modrinth/project/", func(w http.ResponseWriter, r *http.Request) {
 		rest := strings.TrimPrefix(r.URL.Path, "/modrinth/project/")
 		if strings.HasSuffix(rest, "/version") {
-			switch strings.TrimSuffix(rest, "/version") {
-			case "AANobbMI":
-				writeJSON(w, []map[string]any{versionOf("AANobbMI", h.jars["sodium"], []map[string]any{{"project_id": "P7dR8mSH", "dependency_type": "required"}})})
-			case "P7dR8mSH":
-				writeJSON(w, []map[string]any{versionOf("P7dR8mSH", h.jars["fabric-api"], nil)})
-			default:
+			if list := versions(strings.TrimSuffix(rest, "/version")); list != nil {
+				writeJSON(w, list)
+			} else {
 				http.NotFound(w, r)
 			}
 			return
@@ -464,5 +493,132 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 	stdout = h.mustRun(t, "install")
 	if !strings.Contains(stdout, "client: 2 written") {
 		t.Fatalf("install: %s", stdout)
+	}
+}
+
+func TestUpdateOutdatedAndPin(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "add", "sodium")
+
+	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "All mods are up to date") {
+		t.Fatalf("outdated before a new release: %s", out)
+	}
+	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
+		t.Fatalf("update before a new release: %s", out)
+	}
+
+	h.newer = true
+	stdout := h.mustRun(t, "outdated", "--json")
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	list := env.Data.([]any)
+	if len(list) != 1 || list[0].(map[string]any)["id"] != "sodium" || list[0].(map[string]any)["latest"] != "1.1.0+mc26.2" || list[0].(map[string]any)["pinned"] != false {
+		t.Fatalf("outdated: %v", list)
+	}
+
+	stdout = h.mustRun(t, "pin", "sodium", "--json")
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	data := env.Data.(map[string]any)
+	if data["pin"] != "QANobbMI" || len(data["updated"].([]any)) != 0 {
+		t.Fatalf("pin to locked version: %v", data)
+	}
+	var m struct {
+		Mods map[string]struct {
+			Pin string `json:"pin"`
+		} `json:"mods"`
+	}
+	h.readJSON(t, "shulker.json", &m)
+	if m.Mods["sodium"].Pin != "QANobbMI" {
+		t.Fatalf("manifest pin: %+v", m.Mods)
+	}
+	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "sodium 1.0.0+mc26.2 -> 1.1.0+mc26.2 (pinned)") {
+		t.Fatalf("outdated with pin: %s", out)
+	}
+	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
+		t.Fatalf("update must respect the pin: %s", out)
+	}
+
+	stdout = h.mustRun(t, "unpin", "sodium", "--json")
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	data = env.Data.(map[string]any)
+	updated := data["updated"].([]any)
+	if len(updated) != 1 || updated[0].(map[string]any)["to"] != "1.1.0+mc26.2" || len(data["added"].([]any)) != 0 || len(data["removed"].([]any)) != 0 {
+		t.Fatalf("unpin re-resolves: %v", data)
+	}
+	var l struct {
+		Mods map[string]struct {
+			Version    string   `json:"version"`
+			RequiredBy []string `json:"requiredBy"`
+		} `json:"mods"`
+	}
+	h.readJSON(t, "shulker.lock", &l)
+	if l.Mods["sodium"].Version != "QANobbM2" || len(l.Mods["fabric-api"].RequiredBy) != 1 || l.Mods["fabric-api"].RequiredBy[0] != "sodium" {
+		t.Fatalf("lock after unpin: %+v", l.Mods)
+	}
+	h.readJSON(t, "shulker.json", &m)
+	if m.Mods["sodium"].Pin != "" {
+		t.Fatalf("manifest still pinned: %+v", m.Mods)
+	}
+
+	stdout = h.mustRun(t, "pin", "sodium", "QANobbMI", "--json")
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	if from := env.Data.(map[string]any)["updated"].([]any)[0].(map[string]any)["from"]; from != "1.1.0+mc26.2" {
+		t.Fatalf("pin downgrades: %v", env.Data)
+	}
+	if code, stdout, _ := h.run(t, "pin", "fabric-api", "--json"); code == 0 || !strings.Contains(stdout, `"not-direct"`) {
+		t.Fatalf("pinning a dependency: code=%d %s", code, stdout)
+	}
+	if code, stdout, _ := h.run(t, "pin", "sodium", "Q7dR8mSH", "--json"); code == 0 || !strings.Contains(stdout, `"pin-mismatch"`) {
+		t.Fatalf("pinning another project's version: code=%d %s", code, stdout)
+	}
+	if code, stdout, _ := h.run(t, "update", "fabric-api", "--json"); code == 0 || !strings.Contains(stdout, `"not-direct"`) {
+		t.Fatalf("updating a dependency: code=%d %s", code, stdout)
+	}
+	if code, _, _ := h.run(t, "build"); code != 0 {
+		t.Fatal("lock should not be stale after pin")
+	}
+}
+
+func TestUpdateKeepsPinnedDirectDependency(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "add", "sodium", "fabric-api")
+	h.mustRun(t, "pin", "fabric-api")
+	h.newer = true
+
+	stdout := h.mustRun(t, "update", "sodium", "--json")
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	data := env.Data.(map[string]any)
+	if updated := data["updated"].([]any); len(updated) != 1 || updated[0].(map[string]any)["id"] != "sodium" {
+		t.Fatalf("update sodium: %v", data)
+	}
+	var l struct {
+		Mods map[string]struct {
+			Version    string   `json:"version"`
+			RequiredBy []string `json:"requiredBy"`
+		} `json:"mods"`
+	}
+	h.readJSON(t, "shulker.lock", &l)
+	if fa := l.Mods["fabric-api"]; fa.Version != "Q7dR8mSH" || len(fa.RequiredBy) != 1 || fa.RequiredBy[0] != "sodium" {
+		t.Fatalf("fabric-api after update sodium: %+v", l.Mods)
+	}
+	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
+		t.Fatalf("update all: %s", out)
+	}
+	h.readJSON(t, "shulker.lock", &l)
+	if fa := l.Mods["fabric-api"]; fa.Version != "Q7dR8mSH" || len(fa.RequiredBy) != 1 {
+		t.Fatalf("fabric-api after update all: %+v", l.Mods)
 	}
 }

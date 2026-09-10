@@ -44,21 +44,10 @@ func (a *app) addCmd() *cobra.Command {
 				}
 				results = append(results, added)
 			}
-			v, err := r.Validate()
+			v, err := a.commit(p, r)
 			if err != nil {
 				return err
 			}
-			if err := v.Err(); err != nil {
-				return err
-			}
-			if err := p.SaveManifest(); err != nil {
-				return err
-			}
-			if err := p.SaveLock(); err != nil {
-				return err
-			}
-			a.printer.LockStale = false
-			a.warn(v.Warnings)
 			res := addResult{Added: results, Warnings: v.Warnings, Suggestions: v.Suggestions}
 			return a.printer.Emit(res, func(w io.Writer) {
 				for _, r := range res.Added {
