@@ -741,3 +741,119 @@ func TestUpdateKeepsPinnedDirectDependency(t *testing.T) {
 		t.Fatalf("fabric-api after update all: %+v", l.Mods)
 	}
 }
+
+func TestDiffAndPull(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "add", "sodium")
+	overrides := filepath.Join(h.dir, "overrides", "config")
+	if err := os.MkdirAll(overrides, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"plain.txt": "a=1\n", "tpl.txt.tmpl": "v=1\n"} {
+		if err := os.WriteFile(filepath.Join(overrides, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.mustRun(t, "install")
+	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "client: no changes in the build directory") {
+		t.Fatalf("clean diff: %s", stdout)
+	}
+
+	buildDir := filepath.Join(h.dir, "build", "client")
+	write := func(dir, rel, body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(rel)), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(buildDir, "config/plain.txt", "a=2\n")
+	write(buildDir, "config/tpl.txt", "v=2\n")
+	write(buildDir, "config/new.txt", "hand\n")
+	write(h.dir, "overrides/config/new.txt", "source\n")
+	options, _ := os.ReadFile(filepath.Join(buildDir, "options.txt"))
+	write(buildDir, "options.txt", strings.Replace(string(options), "joinedFirstServer:true", "joinedFirstServer:false", 1)+"foo:bar\n")
+
+	stdout := h.mustRun(t, "diff", "--json")
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	files := env.Data.([]any)[0].(map[string]any)["files"].([]any)
+	states := map[string]string{}
+	diffs := map[string]string{}
+	for _, f := range files {
+		m := f.(map[string]any)
+		states[m["path"].(string)] = m["state"].(string)
+		diffs[m["path"].(string)] = m["diff"].(string)
+	}
+	want := map[string]string{"config/new.txt": "untracked", "config/plain.txt": "kept", "config/tpl.txt": "kept", "options.txt": "kept"}
+	if len(states) != len(want) {
+		t.Fatalf("diff states: %v", states)
+	}
+	for p, s := range want {
+		if states[p] != s {
+			t.Fatalf("diff state of %s: %q want %q (%v)", p, states[p], s, states)
+		}
+	}
+	if d := diffs["options.txt"]; !strings.Contains(d, "-joinedFirstServer:false\n+joinedFirstServer:true\n") || strings.Contains(d, "foo") {
+		t.Fatalf("options diff should cover managed keys only: %s", d)
+	}
+	if d := diffs["config/plain.txt"]; !strings.Contains(d, "@@ -1 +1 @@\n-a=2\n+a=1\n") {
+		t.Fatalf("plain diff: %s", d)
+	}
+
+	stdout = h.mustRun(t, "pull")
+	for _, line := range []string{
+		"client: 1 file(s) pulled, 1 key(s) written to shulker.json, 2 skipped",
+		"pulled config/plain.txt -> overrides/config/plain.txt",
+		"set options.txt joinedFirstServer=false",
+		"skipped config/new.txt (not written by shulker; name it to adopt it)",
+		"skipped config/tpl.txt (rendered from template overrides/config/tpl.txt.tmpl)",
+	} {
+		if !strings.Contains(stdout, line) {
+			t.Fatalf("pull output missing %q:\n%s", line, stdout)
+		}
+	}
+	if data, _ := os.ReadFile(filepath.Join(overrides, "plain.txt")); string(data) != "a=2\n" {
+		t.Fatalf("pulled override: %q", data)
+	}
+	var m map[string]any
+	h.readJSON(t, "shulker.json", &m)
+	if v := m["client"].(map[string]any)["options"].(map[string]any)["joinedFirstServer"]; v != false {
+		t.Fatalf("manifest option should be the bool false: %#v", v)
+	}
+
+	if code, _, stderr := h.run(t, "pull", "config/missing.txt"); code == 0 || !strings.Contains(stderr, "is not changed in the build directory") {
+		t.Fatalf("pull of an unchanged path should fail: %d %s", code, stderr)
+	}
+	stdout = h.mustRun(t, "pull", "config/new.txt")
+	if !strings.Contains(stdout, "pulled config/new.txt -> overrides/config/new.txt") {
+		t.Fatalf("named untracked file should be adopted: %s", stdout)
+	}
+	if data, _ := os.ReadFile(filepath.Join(overrides, "new.txt")); string(data) != "hand\n" {
+		t.Fatalf("adopted override: %q", data)
+	}
+
+	stdout = h.mustRun(t, "build")
+	if !strings.Contains(stdout, "1 written, 5 unchanged, 1 kept, 0 removed") || !strings.Contains(stdout, "kept config/tpl.txt") {
+		t.Fatalf("build after pull: %s", stdout)
+	}
+	if data, _ := os.ReadFile(filepath.Join(buildDir, "options.txt")); !strings.Contains(string(data), "joinedFirstServer:false\n") || !strings.Contains(string(data), "foo:bar\n") {
+		t.Fatalf("options after pull: %q", data)
+	}
+
+	write(h.dir, "overrides/config/plain.txt", "a=3\n")
+	write(buildDir, "config/plain.txt", "a=4\n")
+	stdout = h.mustRun(t, "diff")
+	if !strings.Contains(stdout, "conflict config/plain.txt\n") || !strings.Contains(stdout, "-a=4\n+a=3\n") {
+		t.Fatalf("conflict diff: %s", stdout)
+	}
+	h.mustRun(t, "pull", "config/plain.txt")
+	if data, _ := os.ReadFile(filepath.Join(overrides, "plain.txt")); string(data) != "a=4\n" {
+		t.Fatalf("pulled conflict should take the build file: %q", data)
+	}
+	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "0 written, 6 unchanged, 1 kept") {
+		t.Fatalf("build after conflict pull: %s", stdout)
+	}
+}

@@ -69,9 +69,32 @@ type Builder struct {
 }
 
 type source struct {
-	sha512 string
-	data   []byte
-	owned  ownedFile
+	sha512   string
+	data     []byte
+	owned    ownedFile
+	origin   string
+	pack     string
+	template bool
+	managed  ownedFile
+}
+
+type fileState string
+
+const (
+	stateWrite     fileState = "write"
+	stateUnchanged fileState = "unchanged"
+	stateKept      fileState = "kept"
+	stateConflict  fileState = "conflict"
+	stateUntracked fileState = "untracked"
+	stateOrphan    fileState = "orphan"
+	stateRemove    fileState = "remove"
+)
+
+type planned struct {
+	rel   string
+	state fileState
+	src   source
+	hash  string
 }
 
 type ownedFile interface {
@@ -106,67 +129,39 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	}
 	next.Links = dirs
 
-	paths := make([]string, 0, len(desired))
-	for p := range desired {
-		paths = append(paths, p)
+	plans, err := b.plan(dir, desired, prev, opts.Force)
+	if err != nil {
+		return nil, err
 	}
-	sort.Strings(paths)
 	var writes []string
-	for _, rel := range paths {
-		src := desired[rel]
-		newHash, err := b.hashSource(src)
-		if err != nil {
-			return nil, err
-		}
-		abs := filepath.Join(dir, filepath.FromSlash(rel))
-		current, exists, err := b.currentHash(abs, src, prev.Keys[rel])
-		if err != nil {
-			return nil, err
-		}
-		recorded := prev.Files[rel]
-		switch {
-		case !exists:
-			writes = append(writes, rel)
-		case current == newHash:
+	for _, f := range plans {
+		switch f.state {
+		case stateWrite:
+			writes = append(writes, f.rel)
+		case stateUnchanged:
 			report.Unchanged++
-		case recorded == "" && src.owned != nil:
-			writes = append(writes, rel)
-		case recorded == "" && !opts.Force:
-			report.Conflicts = append(report.Conflicts, rel+" (not written by shulker)")
+		case stateKept:
+			report.Kept = append(report.Kept, f.rel)
+		case stateConflict:
+			report.Conflicts = append(report.Conflicts, f.rel+" (changed in both build and source)")
 			continue
-		case current == recorded || opts.Force:
-			writes = append(writes, rel)
-		case newHash == recorded:
-			report.Kept = append(report.Kept, rel)
-		default:
-			report.Conflicts = append(report.Conflicts, rel+" (changed in both build and source)")
+		case stateUntracked:
+			report.Conflicts = append(report.Conflicts, f.rel+" (not written by shulker)")
+			continue
+		case stateOrphan:
+			report.Kept = append(report.Kept, f.rel+" (edited; no longer in source)")
+			continue
+		case stateRemove:
+			report.Removed = append(report.Removed, f.rel)
 			continue
 		}
-		next.Files[rel] = newHash
-		if src.owned != nil {
+		next.Files[f.rel] = f.hash
+		if f.src.owned != nil {
 			if next.Keys == nil {
 				next.Keys = map[string][]string{}
 			}
-			next.Keys[rel] = src.owned.keys()
+			next.Keys[f.rel] = f.src.owned.keys()
 		}
-	}
-	for rel, recorded := range prev.Files {
-		if _, still := desired[rel]; still {
-			continue
-		}
-		abs := filepath.Join(dir, filepath.FromSlash(rel))
-		current, exists, err := fileSha256(abs)
-		if err != nil {
-			return nil, err
-		}
-		if !exists {
-			continue
-		}
-		if current != recorded && !opts.Force {
-			report.Kept = append(report.Kept, rel+" (edited; no longer in source)")
-			continue
-		}
-		report.Removed = append(report.Removed, rel)
 	}
 	if len(report.Conflicts) > 0 {
 		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the build directory and in the source; run `shulker diff`, or `build --force` to overwrite", name, len(report.Conflicts))
@@ -248,20 +243,20 @@ func (b *Builder) collect(name string, target manifest.Target, report *Report) (
 			}
 		}
 		for _, layer := range pt.Overrides {
-			if err := b.layer(filepath.Join(pk.Dir, layer), pk.Name+":"+layer, packVars, desired); err != nil {
+			if err := b.layer(filepath.Join(pk.Dir, layer), pk.Name+":"+layer, pk.Name, packVars, desired); err != nil {
 				return nil, nil, err
 			}
 		}
 	}
 	for _, layer := range target.Overrides {
-		if err := b.layer(filepath.Join(b.Dir, layer), layer, vars, desired); err != nil {
+		if err := b.layer(filepath.Join(b.Dir, layer), layer, "", vars, desired); err != nil {
 			return nil, nil, err
 		}
 	}
 	return desired, dirs, nil
 }
 
-func (b *Builder) layer(root, label string, vars map[string]string, desired map[string]source) error {
+func (b *Builder) layer(root, label, pack string, vars map[string]string, desired map[string]source) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && path == root {
@@ -278,18 +273,22 @@ func (b *Builder) layer(root, label string, vars map[string]string, desired map[
 		if err != nil {
 			return err
 		}
+		src := source{origin: path, pack: pack}
 		if strings.HasSuffix(rel, TemplateSuffix) {
 			rel = strings.TrimSuffix(rel, TemplateSuffix)
+			src.template = true
 			if data, err = render(label+"/"+rel+TemplateSuffix, data, vars); err != nil {
 				return err
 			}
 		}
 		if owned := desired[rel].owned; owned != nil {
+			src.managed = owned
 			if data, err = owned.merge(data, nil); err != nil {
 				return err
 			}
 		}
-		desired[rel] = source{data: data}
+		src.data = data
+		desired[rel] = src
 		return nil
 	})
 }
@@ -401,6 +400,69 @@ func (b *Builder) hashSource(s source) (string, error) {
 	return sha256Hex(s.data), nil
 }
 
+func (b *Builder) plan(dir string, desired map[string]source, prev State, force bool) ([]planned, error) {
+	paths := make([]string, 0, len(desired))
+	for p := range desired {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths)
+	var plans []planned
+	for _, rel := range paths {
+		src := desired[rel]
+		newHash, err := b.hashSource(src)
+		if err != nil {
+			return nil, err
+		}
+		abs := filepath.Join(dir, filepath.FromSlash(rel))
+		current, exists, err := b.currentHash(abs, src, prev.Keys[rel])
+		if err != nil {
+			return nil, err
+		}
+		recorded := prev.Files[rel]
+		f := planned{rel: rel, src: src, hash: newHash}
+		switch {
+		case !exists:
+			f.state = stateWrite
+		case current == newHash:
+			f.state = stateUnchanged
+		case recorded == "" && src.owned != nil:
+			f.state = stateWrite
+		case recorded == "" && !force:
+			f.state = stateUntracked
+		case current == recorded || force:
+			f.state = stateWrite
+		case newHash == recorded:
+			f.state = stateKept
+		default:
+			f.state = stateConflict
+		}
+		plans = append(plans, f)
+	}
+	stale := make([]string, 0, len(prev.Files))
+	for rel := range prev.Files {
+		if _, still := desired[rel]; !still {
+			stale = append(stale, rel)
+		}
+	}
+	sort.Strings(stale)
+	for _, rel := range stale {
+		abs := filepath.Join(dir, filepath.FromSlash(rel))
+		current, exists, err := fileSha256(abs)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			continue
+		}
+		state := stateRemove
+		if current != prev.Files[rel] && !force {
+			state = stateOrphan
+		}
+		plans = append(plans, planned{rel: rel, state: state})
+	}
+	return plans, nil
+}
+
 func (b *Builder) write(abs string, s source, recordedKeys []string) error {
 	if s.sha512 != "" {
 		return b.Cache.CopyTo(s.sha512, abs)
@@ -408,17 +470,25 @@ func (b *Builder) write(abs string, s source, recordedKeys []string) error {
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return err
 	}
-	data := s.data
-	if s.owned != nil {
-		existing, err := os.ReadFile(abs)
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-		if data, err = s.owned.merge(existing, recordedKeys); err != nil {
-			return err
-		}
+	data, err := b.output(abs, s, recordedKeys)
+	if err != nil {
+		return err
 	}
 	return os.WriteFile(abs, data, 0o644)
+}
+
+func (b *Builder) output(abs string, s source, recordedKeys []string) ([]byte, error) {
+	if s.sha512 != "" {
+		return os.ReadFile(b.Cache.Path(s.sha512))
+	}
+	if s.owned == nil {
+		return s.data, nil
+	}
+	existing, err := os.ReadFile(abs)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	return s.owned.merge(existing, recordedKeys)
 }
 
 func (b *Builder) loadState(dir string) State {
