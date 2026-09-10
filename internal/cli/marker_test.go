@@ -47,7 +47,7 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 	if meta.SchemaVersion != 1 || meta.ID != "shulker_my_pack" || meta.Name != "my.pack" || meta.Environment != "*" || len(meta.Version) != 8 || meta.Custom.ModMenu.UpdateChecker {
 		t.Fatalf("fabric.mod.json: %+v", meta)
 	}
-	want := "Minecraft 26.2 \u00b7 fabric 0.17.3 \u00b7 2 mods\n\nMods\n  \u2022 sodium  1.0.0+mc26.2\n\nDependencies\n  \u2022 fabric-api  1.0.0+mc26.2"
+	want := "Minecraft 26.2 \u00b7 fabric 0.17.3 \u00b7 2 mods\n\nMods\n  \u2022 sodium\n\nDependencies\n  \u2022 fabric-api"
 	if meta.Description != want {
 		t.Fatalf("description:\n%s", meta.Description)
 	}

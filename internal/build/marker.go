@@ -207,7 +207,7 @@ func (b *Builder) markerDescription(direct, deps []string) string {
 		lines := make([]string, 0, len(ids)+1)
 		lines = append(lines, title)
 		for _, id := range ids {
-			lines = append(lines, "  \u2022 "+id+"  "+b.Lock.Mods[id].VersionNumber)
+			lines = append(lines, "  \u2022 "+id)
 		}
 		return strings.Join(lines, "\n")
 	}
