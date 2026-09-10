@@ -64,6 +64,7 @@ type harness struct {
 	serverJar     fakeJar
 	serverJarHits int
 	stdin         io.Reader
+	tty           bool
 }
 
 func newHarness(t *testing.T) *harness {
@@ -197,6 +198,7 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	a := newApp(&stdout, &stderr)
 	a.dir = h.dir
 	a.stdin = h.stdin
+	a.tty = func() bool { return h.tty }
 	f := fetch.New("test")
 	piston := meta.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"

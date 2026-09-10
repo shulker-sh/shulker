@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/andrewmast/shulker/internal/build"
@@ -27,7 +29,7 @@ type serveResult struct {
 
 func (a *app) serveCmd() *cobra.Command {
 	var target string
-	var force bool
+	var force, acceptEula bool
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Build a server target and run it in the foreground",
@@ -47,12 +49,27 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			srv := p.Manifest.Server
-			if srv == nil {
-				srv = &manifest.Server{}
+			var in io.Reader = a.stdin
+			if in == nil {
+				in = strings.NewReader("")
 			}
+			stdin := bufio.NewReader(in)
+			if p.Manifest.Server == nil {
+				p.Manifest.Server = &manifest.Server{}
+			}
+			srv := p.Manifest.Server
 			if !srv.Eula {
-				return out.Errorf("eula-required", "set \"server\": {\"eula\": true} in shulker.json once you accept the Minecraft EULA (%s)", eulaURL)
+				accepted, err := a.acceptEula(stdin, acceptEula)
+				if err != nil {
+					return err
+				}
+				if !accepted {
+					return out.Errorf("eula-required", "set \"server\": {\"eula\": true} in shulker.json or pass --accept-eula once you accept the Minecraft EULA (%s)", eulaURL)
+				}
+				srv.Eula = true
+				if err := p.SaveManifest(); err != nil {
+					return err
+				}
 			}
 			jvm, err := server.JVMArgs(srv.Memory, srv.JvmFlags, srv.JvmArgs)
 			if err != nil {
@@ -86,7 +103,7 @@ func (a *app) serveCmd() *cobra.Command {
 				Java:      java.Path,
 				Dir:       dir,
 				Args:      args,
-				Stdin:     a.stdin,
+				Stdin:     stdin,
 				Stdout:    gameOut,
 				Stderr:    a.printer.Stderr,
 				Interrupt: interrupt,
@@ -110,5 +127,25 @@ func (a *app) serveCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&target, "target", "", "server target to run (default: the only server target)")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory and ignore a stale lock")
+	cmd.Flags().BoolVar(&acceptEula, "accept-eula", false, "record acceptance of the Minecraft EULA in shulker.json without prompting")
 	return cmd
+}
+
+func (a *app) acceptEula(stdin *bufio.Reader, flag bool) (bool, error) {
+	if flag {
+		return true, nil
+	}
+	if a.printer.JSON || a.tty == nil || !a.tty() {
+		return false, nil
+	}
+	fmt.Fprintf(a.printer.Stderr, "Running a Minecraft server requires accepting the EULA: %s\nAccept and record \"eula\": true in shulker.json? [y/N] ", eulaURL)
+	line, err := stdin.ReadString('\n')
+	if err != nil && line == "" {
+		return false, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		return true, nil
+	}
+	return false, nil
 }

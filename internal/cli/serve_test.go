@@ -58,10 +58,29 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	jdk := h.fakeJDK(t, "25.0.1", "0")
 	h.editManifest(t, func(m map[string]any) {
 		m["java"] = jdk
-		m["server"] = map[string]any{"eula": true, "memory": "2G", "jvmArgs": []any{"-Dshulker.test=1"}}
+		m["server"] = map[string]any{"eula": false, "memory": "2G", "jvmArgs": []any{"-Dshulker.test=1"}}
 	})
-	h.stdin = strings.NewReader("say hi\nstop\n")
+	h.tty = true
+	h.stdin = strings.NewReader("n\n")
+	code, _, stderr = h.run(t, "serve")
+	if code == 0 || !strings.Contains(stderr, "Accept and record") || !strings.Contains(stderr, "--accept-eula") {
+		t.Fatalf("declined prompt: %d %s", code, stderr)
+	}
+	h.readJSON(t, "shulker.json", &m)
+	if m["server"].(map[string]any)["eula"] != false {
+		t.Fatal("declining must not change the manifest")
+	}
+
+	h.stdin = strings.NewReader("y\nsay hi\nstop\n")
 	code, stdout, stderr := h.run(t, "serve")
+	h.readJSON(t, "shulker.json", &m)
+	if m["server"].(map[string]any)["eula"] != true {
+		t.Fatal("accepting must record eula: true")
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "server", "eula.txt")); err != nil {
+		t.Fatal("eula.txt not written after accepting")
+	}
+	h.tty = false
 	if code != 0 {
 		t.Fatalf("serve: %d\n%s\n%s", code, stdout, stderr)
 	}
@@ -113,11 +132,13 @@ func TestServeErrors(t *testing.T) {
 	h.mustRun(t, "install")
 
 	old := h.fakeJDK(t, "17.0.12", "0")
-	h.editManifest(t, func(m map[string]any) {
-		m["java"] = old
-		m["server"] = map[string]any{"eula": true}
-	})
-	code, _, stderr := h.run(t, "serve")
+	h.editManifest(t, func(m map[string]any) { m["java"] = old })
+	code, _, stderr := h.run(t, "serve", "--accept-eula")
+	var m map[string]any
+	h.readJSON(t, "shulker.json", &m)
+	if m["server"].(map[string]any)["eula"] != true {
+		t.Fatal("--accept-eula must record eula: true")
+	}
 	if code == 0 || !strings.Contains(stderr, "needs Java 25") {
 		t.Fatalf("expected java-version error, got %d: %s", code, stderr)
 	}

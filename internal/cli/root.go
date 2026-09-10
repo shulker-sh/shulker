@@ -7,6 +7,7 @@ import (
 
 	"github.com/andrewmast/shulker/internal/out"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var version = "dev"
@@ -14,6 +15,7 @@ var version = "dev"
 type app struct {
 	printer *out.Printer
 	stdin   io.Reader
+	tty     func() bool
 	dir     string
 	d       *deps
 }
@@ -23,7 +25,7 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 }
 
 func newApp(stdout, stderr io.Writer) *app {
-	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin}
+	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal}
 }
 
 func (a *app) run(args []string) int {
@@ -66,4 +68,8 @@ func jsonRequested(args []string) bool {
 		}
 	}
 	return false
+}
+
+func stdinIsTerminal() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }
