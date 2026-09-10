@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"sort"
 
 	"github.com/andrewmast/shulker/internal/build"
@@ -104,6 +105,9 @@ func (a *app) installCmd() *cobra.Command {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
 				for _, rep := range res.Builds {
 					fmt.Fprintln(w, rep.Summary())
+					for _, m := range rep.Moved {
+						fmt.Fprintf(w, "  moved %s into %s\n", m, filepath.Join(build.DataDir, rep.Target, m))
+					}
 				}
 			})
 		},

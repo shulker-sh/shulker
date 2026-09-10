@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/out"
@@ -46,6 +47,9 @@ func (a *app) buildCmd() *cobra.Command {
 			return a.printer.Emit(reports, func(w io.Writer) {
 				for _, rep := range reports {
 					fmt.Fprintln(w, rep.Summary())
+					for _, m := range rep.Moved {
+						fmt.Fprintf(w, "  moved %s into %s\n", m, filepath.Join(build.DataDir, rep.Target, m))
+					}
 					for _, k := range rep.Kept {
 						fmt.Fprintf(w, "  kept %s\n", k)
 					}

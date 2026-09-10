@@ -35,6 +35,7 @@ type State struct {
 	LockSha256 string              `json:"lockSha256"`
 	Files      map[string]string   `json:"files"`
 	Keys       map[string][]string `json:"propertyKeys,omitempty"`
+	Links      []string            `json:"links,omitempty"`
 }
 
 type Report struct {
@@ -44,6 +45,8 @@ type Report struct {
 	Unchanged int      `json:"unchanged"`
 	Kept      []string `json:"kept"`
 	Removed   []string `json:"removed"`
+	Linked    []string `json:"linked"`
+	Moved     []string `json:"moved"`
 	Conflicts []string `json:"conflicts"`
 	Warnings  []string `json:"warnings"`
 	Forced    bool     `json:"forced"`
@@ -74,13 +77,18 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		return nil, out.Errorf("unknown-target", "target %q is not in the manifest", name)
 	}
 	dir := filepath.Join(b.Dir, target.Build)
-	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Conflicts: []string{}, Warnings: []string{}, Forced: opts.Force}
-	desired, err := b.collect(target, report)
+	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, Conflicts: []string{}, Warnings: []string{}, Forced: opts.Force}
+	desired, dirs, err := b.collect(target, report)
 	if err != nil {
 		return nil, err
 	}
 	prev := b.loadState(dir)
 	next := State{Target: name, Files: map[string]string{}}
+	links, err := b.planLinks(dir, name, dirs, prev, report)
+	if err != nil {
+		return nil, err
+	}
+	next.Links = dirs
 
 	paths := make([]string, 0, len(desired))
 	for p := range desired {
@@ -160,6 +168,9 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 			return nil, err
 		}
 	}
+	if err := b.applyLinks(dir, name, links, report); err != nil {
+		return nil, err
+	}
 	next.BuiltAt = time.Now().UTC().Format(time.RFC3339)
 	if next.LockSha256, err = lock.FileSha256(b.LockPath); err != nil {
 		return nil, err
@@ -170,14 +181,15 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	return report, nil
 }
 
-func (b *Builder) collect(target manifest.Target, report *Report) (map[string]source, error) {
+func (b *Builder) collect(target manifest.Target, report *Report) (map[string]source, []string, error) {
 	desired := map[string]source{}
+	dirs := dataDirs(target.Side, "world")
 	for id, m := range b.Lock.Mods {
 		if m.Side != "both" && m.Side != target.Side {
 			continue
 		}
 		if !b.Cache.Has(m.Sha512) {
-			return nil, out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", id)
+			return nil, nil, out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", id)
 		}
 		desired["mods/"+m.Filename] = source{sha512: m.Sha512}
 	}
@@ -189,17 +201,19 @@ func (b *Builder) collect(target manifest.Target, report *Report) (map[string]so
 		vars[k] = v
 	}
 	if target.Side == "server" {
-		if err := b.collectServer(desired, vars, report); err != nil {
-			return nil, err
+		levelName, err := b.collectServer(desired, vars, report)
+		if err != nil {
+			return nil, nil, err
 		}
+		dirs = dataDirs(target.Side, levelName)
 	}
 	if target.Side == "client" {
 		if err := b.collectClient(desired, vars); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		jar, err := b.markerJar(target.Side)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		desired[markerJarPath(b.Manifest.Name)] = source{data: jar}
 	}
@@ -234,16 +248,16 @@ func (b *Builder) collect(target manifest.Target, report *Report) (map[string]so
 			return nil
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return desired, nil
+	return desired, dirs, nil
 }
 
-func (b *Builder) collectServer(desired map[string]source, vars map[string]string, report *Report) error {
+func (b *Builder) collectServer(desired map[string]source, vars map[string]string, report *Report) (string, error) {
 	jar := b.Lock.Loader.Server
 	if jar == nil || !b.Cache.Has(jar.Sha512) {
-		return out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
+		return "", out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
 	}
 	desired[ServerJarFile] = source{sha512: jar.Sha512}
 	srv := b.Manifest.Server
@@ -254,14 +268,18 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 		desired[EulaFile] = source{data: []byte("eula=true\n")}
 	}
 	if err := b.checkPropertyKeys(srv.Properties, report); err != nil {
-		return err
+		return "", err
 	}
 	props, err := renderProperties(PropertiesFile, srv.Properties, vars)
 	if err != nil {
-		return err
+		return "", err
 	}
 	desired[PropertiesFile] = source{props: props, sep: "="}
-	return nil
+	levelName := props["level-name"]
+	if levelName == "" {
+		levelName = "world"
+	}
+	return levelName, nil
 }
 
 func (b *Builder) collectClient(desired map[string]source, vars map[string]string) error {
@@ -408,5 +426,12 @@ func sha256Hex(data []byte) string {
 }
 
 func (r *Report) Summary() string {
-	return fmt.Sprintf("%s: %d written, %d unchanged, %d kept, %d removed", r.Target, len(r.Written), r.Unchanged, len(r.Kept), len(r.Removed))
+	s := fmt.Sprintf("%s: %d written, %d unchanged, %d kept, %d removed", r.Target, len(r.Written), r.Unchanged, len(r.Kept), len(r.Removed))
+	if len(r.Linked) > 0 {
+		s += fmt.Sprintf(", %d linked", len(r.Linked))
+	}
+	if len(r.Moved) > 0 {
+		s += fmt.Sprintf(", %d moved", len(r.Moved))
+	}
+	return s
 }
