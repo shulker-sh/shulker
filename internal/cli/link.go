@@ -32,7 +32,7 @@ func (a *app) linkCmd() *cobra.Command {
 		Use:   "link",
 		Short: "Point a launcher at this project's client build",
 	}
-	cmd.AddCommand(a.linkMojangCmd())
+	cmd.AddCommand(a.linkMojangCmd(), a.linkPrismCmd())
 	return cmd
 }
 
@@ -86,20 +86,21 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			display := p.Manifest.DisplayName(name)
 			rep := linkReport{
 				Launcher:    "mojang",
 				LauncherDir: launcherDir,
-				Profile:     profileKey(p.Manifest.Name),
+				Profile:     profileKey(display),
 				VersionID:   versionID,
 				Target:      name,
 				GameDir:     gameDir,
 			}
-			if err := v.WriteProfile(launcher.Profile{Key: rep.Profile, Name: p.Manifest.Name, VersionID: versionID, GameDir: gameDir}); err != nil {
+			if err := v.WriteProfile(launcher.Profile{Key: rep.Profile, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
 			return a.printer.Emit(rep, func(w io.Writer) {
 				fmt.Fprintf(w, "Installed %s into %s\n", versionID, filepath.Join(launcherDir, "versions"))
-				fmt.Fprintf(w, "Linked launcher profile %q to %s\n", p.Manifest.Name, gameDir)
+				fmt.Fprintf(w, "Linked launcher profile %q to %s\n", display, gameDir)
 				if _, err := os.Stat(filepath.Join(gameDir, build.StateFile)); err != nil {
 					fmt.Fprintln(w, "Run `shulker install` before launching.")
 				}

@@ -93,6 +93,7 @@ type Loader struct {
 }
 
 type Target struct {
+	Name      string            `json:"name,omitempty"`
 	Side      string            `json:"side"`
 	Overrides []string          `json:"overrides"`
 	Build     string            `json:"build"`
@@ -168,6 +169,13 @@ func (m *Manifest) Save(path string) error {
 		return fmt.Errorf("refusing to write invalid %s: %w", FileName, err)
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+func (m *Manifest) DisplayName(target string) string {
+	if t, ok := m.Targets[target]; ok && t.Name != "" {
+		return t.Name
+	}
+	return m.Name
 }
 
 func (m *Manifest) ProviderOrder() []string {
