@@ -13,6 +13,11 @@
       "pattern": "^[a-z0-9][a-z0-9._-]*$",
       "description": "Project name. Used in messages and as the default instance name for launchers."
     },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Pack version shown to people, e.g. \"1.0\" or \"2026-09\". Never parsed. Used as the versionId of an exported .mrpack and in its file name."
+    },
     "minecraft": {
       "$ref": "#/$defs/semverRange",
       "description": "Semver range over Minecraft version ids, e.g. \"~26.2\", \"^26.1\", or an exact version. Pre-release order is snapshot < pre < rc < release."

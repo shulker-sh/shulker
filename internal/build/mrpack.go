@@ -1,0 +1,331 @@
+package build
+
+import (
+	"archive/zip"
+	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/andrewmast/shulker/internal/manifest"
+	"github.com/andrewmast/shulker/internal/out"
+)
+
+const MrpackIndexFile = "modrinth.index.json"
+
+var MrpackHosts = []string{"cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"}
+
+var mrpackLoaderKeys = map[string]string{
+	"fabric":   "fabric-loader",
+	"quilt":    "quilt-loader",
+	"neoforge": "neoforge",
+	"forge":    "forge",
+}
+
+type MrpackOptions struct {
+	Targets   []string
+	VersionID string
+	Output    string
+	Bundle    bool
+}
+
+type MrpackReport struct {
+	Path      string   `json:"path"`
+	VersionID string   `json:"versionId"`
+	Name      string   `json:"name"`
+	Targets   []string `json:"targets"`
+	Mods      []string `json:"mods"`
+	Bundled   []string `json:"bundled"`
+	Overrides []string `json:"overrides"`
+	Warnings  []string `json:"warnings"`
+}
+
+type mrpackIndex struct {
+	FormatVersion int               `json:"formatVersion"`
+	Game          string            `json:"game"`
+	VersionID     string            `json:"versionId"`
+	Name          string            `json:"name"`
+	Summary       string            `json:"summary,omitempty"`
+	Files         []mrpackFile      `json:"files"`
+	Dependencies  map[string]string `json:"dependencies"`
+}
+
+type mrpackFile struct {
+	Path      string            `json:"path"`
+	Hashes    map[string]string `json:"hashes"`
+	Env       map[string]string `json:"env"`
+	Downloads []string          `json:"downloads"`
+	FileSize  int64             `json:"fileSize"`
+}
+
+type mrpackTarget struct {
+	name  string
+	side  string
+	files map[string][]byte
+}
+
+func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
+	targets, err := b.mrpackTargets(opts.Targets)
+	if err != nil {
+		return nil, err
+	}
+	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, Bundled: []string{}, Overrides: []string{}, Warnings: []string{}}
+	for _, t := range targets {
+		report.Targets = append(report.Targets, t.name)
+		if err := b.mrpackCollect(t, report); err != nil {
+			return nil, err
+		}
+	}
+	files, err := b.mrpackMods(targets, opts.Bundle, report)
+	if err != nil {
+		return nil, err
+	}
+	entries := mrpackSplit(targets)
+	for path := range entries {
+		report.Overrides = append(report.Overrides, path)
+	}
+	sort.Strings(report.Overrides)
+	index := mrpackIndex{
+		FormatVersion: 1,
+		Game:          "minecraft",
+		VersionID:     opts.VersionID,
+		Name:          report.Name,
+		Summary:       b.Manifest.Note,
+		Files:         files,
+		Dependencies:  map[string]string{"minecraft": b.Lock.Minecraft, mrpackLoaderKeys[b.Lock.Loader.Type]: b.Lock.Loader.Version},
+	}
+	indexData, err := json.MarshalIndent(index, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	entries[MrpackIndexFile] = append(indexData, '\n')
+	if err := writeMrpack(opts.Output, entries); err != nil {
+		return nil, err
+	}
+	return report, nil
+}
+
+func (b *Builder) mrpackTargets(names []string) ([]*mrpackTarget, error) {
+	if len(names) == 0 {
+		for n := range b.Manifest.Targets {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+	}
+	var targets []*mrpackTarget
+	bySide := map[string]string{}
+	for _, n := range names {
+		t, ok := b.Manifest.Targets[n]
+		if !ok {
+			e := out.Errorf("target-not-found", "no target %q in shulker.json", n)
+			for c := range b.Manifest.Targets {
+				e.Candidates = append(e.Candidates, c)
+			}
+			sort.Strings(e.Candidates)
+			return nil, e
+		}
+		if other, dup := bySide[t.Side]; dup {
+			e := out.Errorf("ambiguous-target", "targets %s and %s are both %s side; pass --target", other, n, t.Side)
+			e.Candidates = names
+			return nil, e
+		}
+		bySide[t.Side] = n
+		targets = append(targets, &mrpackTarget{name: n, side: t.Side, files: map[string][]byte{}})
+	}
+	return targets, nil
+}
+
+func (b *Builder) mrpackName(targets []*mrpackTarget) string {
+	pick := targets[0]
+	for _, t := range targets {
+		if t.side == "client" {
+			pick = t
+		}
+	}
+	if name := b.Manifest.Targets[pick.name].Name; name != "" {
+		return name
+	}
+	return b.Manifest.Name
+}
+
+func (b *Builder) mrpackCollect(t *mrpackTarget, report *MrpackReport) error {
+	rep := &Report{}
+	desired, _, err := b.collect(t.name, b.Manifest.Targets[t.name], rep)
+	if err != nil {
+		return err
+	}
+	report.Warnings = append(report.Warnings, rep.Warnings...)
+	for path, s := range desired {
+		if s.sha512 != "" {
+			continue
+		}
+		if s.owned != nil {
+			data, err := s.owned.merge(nil, nil)
+			if err != nil {
+				return err
+			}
+			t.files[path] = data
+			continue
+		}
+		t.files[path] = s.data
+	}
+	return nil
+}
+
+func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpackFile, error) {
+	files := []mrpackFile{}
+	var blocked []string
+	ids := make([]string, 0, len(b.Lock.Mods))
+	for id := range b.Lock.Mods {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		m := b.Lock.Mods[id]
+		var owners []*mrpackTarget
+		for _, t := range targets {
+			if m.Side == "both" || m.Side == t.side {
+				owners = append(owners, t)
+			}
+		}
+		if len(owners) == 0 {
+			continue
+		}
+		data, err := os.ReadFile(b.Cache.Path(m.Sha512))
+		if err != nil {
+			return nil, out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", id)
+		}
+		if m.URL != nil && mrpackHostAllowed(*m.URL) {
+			sum := sha1.Sum(data)
+			files = append(files, mrpackFile{
+				Path:      "mods/" + m.Filename,
+				Hashes:    map[string]string{"sha1": hex.EncodeToString(sum[:]), "sha512": m.Sha512},
+				Env:       mrpackEnv(m.Side),
+				Downloads: []string{*m.URL},
+				FileSize:  int64(len(data)),
+			})
+			report.Mods = append(report.Mods, id)
+			continue
+		}
+		if !bundle {
+			blocked = append(blocked, id+" ("+mrpackOrigin(m.Provider, m.URL)+")")
+			continue
+		}
+		for _, t := range owners {
+			t.files["mods/"+m.Filename] = data
+		}
+		report.Bundled = append(report.Bundled, id)
+		report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s from %s into the archive; recipients receive the file itself, not a download link", id, mrpackOrigin(m.Provider, m.URL)))
+	}
+	if len(blocked) > 0 {
+		e := out.Errorf("mrpack-host-not-allowed", "Modrinth launchers only download from %s; pass --bundle to ship these mods inside the archive instead: %s", strings.Join(MrpackHosts, ", "), strings.Join(blocked, ", "))
+		e.Candidates = blocked
+		return nil, e
+	}
+	return files, nil
+}
+
+func mrpackOrigin(provider string, u *string) string {
+	if u == nil {
+		return provider + ", manual download"
+	}
+	parsed, err := url.Parse(*u)
+	if err != nil || parsed.Host == "" {
+		return provider
+	}
+	return provider + ", " + parsed.Host
+}
+
+func mrpackHostAllowed(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	for _, h := range MrpackHosts {
+		if parsed.Hostname() == h {
+			return true
+		}
+	}
+	return false
+}
+
+func mrpackEnv(side string) map[string]string {
+	env := map[string]string{"client": "required", "server": "required"}
+	switch side {
+	case "client":
+		env["server"] = "unsupported"
+	case "server":
+		env["client"] = "unsupported"
+	}
+	return env
+}
+
+func mrpackSplit(targets []*mrpackTarget) map[string][]byte {
+	entries := map[string][]byte{}
+	if len(targets) == 1 {
+		for path, data := range targets[0].files {
+			entries["overrides/"+path] = data
+		}
+		return entries
+	}
+	for path, data := range targets[0].files {
+		shared := true
+		for _, t := range targets[1:] {
+			if other, ok := t.files[path]; !ok || !bytes.Equal(other, data) {
+				shared = false
+				break
+			}
+		}
+		if shared {
+			entries["overrides/"+path] = data
+		}
+	}
+	for _, t := range targets {
+		for path, data := range t.files {
+			if _, ok := entries["overrides/"+path]; ok {
+				continue
+			}
+			entries[t.side+"-overrides/"+path] = data
+		}
+	}
+	return entries
+}
+
+func writeMrpack(output string, entries map[string][]byte) error {
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+		return err
+	}
+	names := make([]string, 0, len(entries))
+	for n := range entries {
+		if n != MrpackIndexFile {
+			names = append(names, n)
+		}
+	}
+	sort.Strings(names)
+	names = append([]string{MrpackIndexFile}, names...)
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, n := range names {
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: n, Method: zip.Deflate, Modified: markerTime})
+		if err != nil {
+			return err
+		}
+		if _, err := w.Write(entries[n]); err != nil {
+			return err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return err
+	}
+	return os.WriteFile(output, buf.Bytes(), 0o644)
+}
+
+func MrpackFileName(m *manifest.Manifest, versionID string) string {
+	return m.Name + "-" + versionID + ".mrpack"
+}

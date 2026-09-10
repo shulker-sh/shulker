@@ -21,6 +21,7 @@ var DefaultProviders = []string{"modrinth", "curseforge"}
 type Manifest struct {
 	Schema    string            `json:"$schema,omitempty"`
 	Name      string            `json:"name"`
+	Version   string            `json:"version,omitempty"`
 	Note      string            `json:"note,omitempty"`
 	Minecraft string            `json:"minecraft"`
 	Loader    Loader            `json:"loader"`

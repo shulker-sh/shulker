@@ -1,6 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/andrewmast/shulker/main/schema/manifest-v1.json",
   "name": "westcoast-smp",
+  "version": "1.0",
   "minecraft": "~26.2",
   "loader": { "type": "fabric", "version": "^0.17" },
   "providers": ["modrinth", "curseforge"],
