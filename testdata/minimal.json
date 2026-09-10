@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/andrewmast/shulker/main/schema/manifest-v1.json",
+  "name": "my-client",
+  "minecraft": "26.2",
+  "loader": { "type": "fabric", "version": "*" },
+  "targets": {
+    "client": { "side": "client", "overrides": ["overrides"], "build": "build/client" }
+  },
+  "mods": {
+    "sodium": {}
+  }
+}

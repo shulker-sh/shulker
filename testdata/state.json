@@ -1,0 +1,11 @@
+{
+  "target": "client",
+  "builtAt": "2026-09-09T14:22:41Z",
+  "lockSha256": "0c030586945fe504b604ecc2e875c38ede400cd5cd73da9730302162e6b02c6f",
+  "files": {
+    "config/iris.properties": "3e32b50b5bf20b0a651ba7643f0d90a2e454ea8e03f6ad1eac268c1b35f7346a",
+    "mods/sodium-fabric-0.9.2-beta.1+mc26.2.jar": "089a902da8872c8cee12bd0b34374bf3593585ae602f8d43156c6b2c6d532628",
+    "options.txt": "a793ab8fcc2afce5e42b3044090719ddaff19741697d93b3b7f36838dd5e825c",
+    "servers.dat": "8e3dc1afbc3ec556bb8b13749fb07bf6e431acf8a13f06e0f281566b60c4841f"
+  }
+}

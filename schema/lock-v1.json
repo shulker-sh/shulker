@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/andrewmast/shulker/main/schema/lock-v1.json",
+  "title": "shulker.lock",
+  "description": "Shulker lock file. Tool-owned, key-sorted, pretty-printed. Records the exact resolution of shulker.json; install and build read only this file.",
+  "type": "object",
+  "required": ["lockVersion", "manifestSha256", "minecraft", "loader", "java", "packs", "mods", "players"],
+  "additionalProperties": false,
+  "properties": {
+    "lockVersion": { "type": "integer", "const": 1 },
+    "manifestSha256": {
+      "$ref": "#/$defs/sha256",
+      "description": "Hash of the resolution-relevant manifest fields (minecraft, loader, providers, packs, mods, ignore). install warns on mismatch; build and serve refuse unless forced."
+    },
+    "minecraft": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Resolved Minecraft version id, exactly as Mojang's manifest names it."
+    },
+    "loader": {
+      "type": "object",
+      "required": ["type", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["fabric", "quilt", "neoforge", "forge"] },
+        "version": { "type": "string", "minLength": 1, "description": "Resolved loader version, exactly as the loader's meta names it." }
+      }
+    },
+    "java": {
+      "type": "object",
+      "required": ["major", "component"],
+      "additionalProperties": false,
+      "properties": {
+        "major": { "type": "integer", "minimum": 8, "description": "javaVersion.majorVersion from the Mojang version json, or the override's major." },
+        "component": { "type": "string", "minLength": 1, "description": "Mojang runtime component name, e.g. java-runtime-epsilon. Used to fetch the managed runtime." }
+      }
+    },
+    "packs": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/pack" },
+      "description": "Keyed by manifest source string."
+    },
+    "mods": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/modId" },
+      "additionalProperties": { "$ref": "#/$defs/mod" },
+      "description": "Every mod in the resolved set, direct and transitive, keyed by in-jar mod id."
+    },
+    "players": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/player" },
+      "description": "Every player referenced anywhere in the manifest, fully resolved. uuid is the identity across renames."
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "sha512": { "type": "string", "pattern": "^[0-9a-f]{128}$" },
+    "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "modId": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+    "packName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "modrinthId": { "type": "string", "pattern": "^[A-Za-z0-9]{8}$" },
+    "curseforgeId": { "type": "integer", "minimum": 1 },
+    "pack": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/packName", "description": "Manifest name or the derived default." },
+        "ref": { "type": "string", "minLength": 1, "description": "The manifest ref at resolution time. Git sources only." },
+        "commit": { "$ref": "#/$defs/gitCommit", "description": "Resolved commit. Git sources only." },
+        "dirSha256": { "$ref": "#/$defs/sha256", "description": "Content hash of the pack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only." },
+        "sha256": { "$ref": "#/$defs/sha256", "description": "Hash of the fetched manifest. Raw manifest URL sources only." }
+      },
+      "oneOf": [
+        { "required": ["commit"] },
+        { "required": ["dirSha256"], "not": { "required": ["ref"] } },
+        { "required": ["sha256"], "not": { "required": ["ref"] } }
+      ]
+    },
+    "mod": {
+      "type": "object",
+      "required": ["provider", "project", "version", "versionNumber", "filename", "url", "sha512", "side", "requiredBy", "aliases"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "enum": ["modrinth", "curseforge"] },
+        "project": { "description": "Provider project id, typed as the provider types it." },
+        "version": { "description": "Provider version id (Modrinth) or file id (CurseForge)." },
+        "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed." },
+        "filename": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\]+\\.jar$" },
+        "url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "Download url. null when the author disabled third-party distribution; page is then required."
+        },
+        "page": {
+          "type": "string",
+          "format": "uri",
+          "description": "Provider file page for manual download. Present only when url is null."
+        },
+        "sha512": { "$ref": "#/$defs/sha512", "description": "Cache key and install verification hash." },
+        "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Effective side after any manifest override." },
+        "requiredBy": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+          "description": "Mod ids (or pack names) whose jar metadata depends on this mod. Empty plus absent from manifest and packs means orphan."
+        },
+        "aliases": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "modrinth": { "$ref": "#/$defs/modrinthId" },
+            "curseforge": { "$ref": "#/$defs/curseforgeId" }
+          },
+          "description": "The same mod's project id on other providers, discovered on first download."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "provider": { "const": "modrinth" } } },
+          "then": {
+            "properties": {
+              "project": { "$ref": "#/$defs/modrinthId" },
+              "version": { "$ref": "#/$defs/modrinthId" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "provider": { "const": "curseforge" } } },
+          "then": {
+            "properties": {
+              "project": { "$ref": "#/$defs/curseforgeId" },
+              "version": { "$ref": "#/$defs/curseforgeId" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "url": { "type": "null" } } },
+          "then": { "required": ["page"] },
+          "else": { "not": { "required": ["page"] } }
+        }
+      ]
+    },
+    "player": {
+      "type": "object",
+      "required": ["name", "uuid", "resolvedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_]{3,16}$" },
+        "uuid": { "$ref": "#/$defs/uuid" },
+        "resolvedAt": { "type": "string", "format": "date-time", "description": "When this name/uuid pair was last confirmed against Mojang." }
+      }
+    }
+  }
+}

@@ -1,0 +1,426 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/andrewmast/shulker/main/schema/manifest-v1.json",
+  "title": "shulker.json",
+  "description": "Shulker project manifest. Lists direct mods, targets, and first-class configuration. Resolution results live in shulker.lock.",
+  "type": "object",
+  "required": ["name", "minecraft", "loader", "targets"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "format": "uri" },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "description": "Project name. Used in messages and as the default instance name for launchers."
+    },
+    "minecraft": {
+      "$ref": "#/$defs/semverRange",
+      "description": "Semver range over Minecraft version ids, e.g. \"~26.2\", \"^26.1\", or an exact version. Pre-release order is snapshot < pre < rc < release."
+    },
+    "loader": { "$ref": "#/$defs/loader" },
+    "java": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional override. Either an absolute path to a JDK/JRE home or a semver range over the Java major version, e.g. \">=25\". Omit to derive from the Minecraft version json and use the managed runtime."
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/provider" },
+      "default": ["modrinth", "curseforge"],
+      "description": "Provider preference order. A single entry makes the tool single-provider."
+    },
+    "targets": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/target" },
+      "description": "Build targets. Each lists its override layers explicitly; paths are never inferred."
+    },
+    "packs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pack" },
+      "description": "Packs whose mods and overrides merge into this project. A pack's own lock is ignored."
+    },
+    "mods": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/modId" },
+      "additionalProperties": { "$ref": "#/$defs/mod" },
+      "default": {},
+      "description": "Direct mods keyed by in-jar mod id. An empty object selects the newest release-channel file for the locked Minecraft and loader."
+    },
+    "ignore": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ignore" },
+      "description": "Per-pair overrides for unmet depends or matched breaks found in jar metadata."
+    },
+    "variables": { "$ref": "#/$defs/variables" },
+    "server": { "$ref": "#/$defs/server" },
+    "client": { "$ref": "#/$defs/client" },
+    "note": { "$ref": "#/$defs/note" }
+  },
+  "$defs": {
+    "note": {
+      "type": "string",
+      "description": "Free-text documentation. The comment substitute; ignored by the tool."
+    },
+    "semverRange": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(.*\\S)?$"
+    },
+    "provider": {
+      "type": "string",
+      "enum": ["modrinth", "curseforge"]
+    },
+    "modId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{1,63}$",
+      "description": "In-jar mod id as declared in fabric.mod.json or neoforge.mods.toml."
+    },
+    "projectId": {
+      "description": "Provider project id. Modrinth ids are base62 strings, CurseForge ids are integers.",
+      "oneOf": [
+        { "type": "string", "pattern": "^[A-Za-z0-9]{8}$" },
+        { "type": "integer", "minimum": 1 }
+      ]
+    },
+    "versionId": {
+      "description": "Provider version id. Modrinth version ids are base62 strings, CurseForge file ids are integers.",
+      "oneOf": [
+        { "type": "string", "pattern": "^[A-Za-z0-9]{8}$" },
+        { "type": "integer", "minimum": 1 }
+      ]
+    },
+    "side": {
+      "type": "string",
+      "enum": ["client", "server", "both"]
+    },
+    "loader": {
+      "type": "object",
+      "required": ["type", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["fabric", "quilt", "neoforge", "forge"] },
+        "version": {
+          "$ref": "#/$defs/semverRange",
+          "description": "Semver range over the loader's own version. \"*\" selects the newest for the locked Minecraft version."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\]",
+      "description": "Path relative to the project root, forward slashes, no leading slash. The tool rejects .. segments."
+    },
+    "variables": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+      "additionalProperties": { "type": ["string", "number", "boolean"] },
+      "description": "Values substituted for ${name} in *.tmpl override files and in server.properties values."
+    },
+    "target": {
+      "type": "object",
+      "required": ["side", "overrides"],
+      "additionalProperties": false,
+      "properties": {
+        "side": {
+          "type": "string",
+          "enum": ["client", "server"],
+          "description": "Which side this target builds. Mods with side \"both\" are included in every target."
+        },
+        "overrides": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relativePath" },
+          "description": "Override layers applied in order; later layers win. Pack overrides sit beneath all of these."
+        },
+        "build": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Output directory. Defaults to build/<target>."
+        },
+        "variables": { "$ref": "#/$defs/variables" },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "pack": {
+      "type": "object",
+      "required": ["source"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Local path, git URL, or raw manifest URL."
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Branch, tag, or commit for git sources. The lock records the resolved commit."
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "description": "Display name used in messages and requiredBy. Defaults to the last path segment of the source minus .git. Must be unique across packs."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "mod": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "$ref": "#/$defs/projectId",
+          "description": "Written by add when the provider slug differs from the mod id or the provider is CurseForge."
+        },
+        "pin": {
+          "$ref": "#/$defs/versionId",
+          "description": "Pin to one provider version. update skips pinned mods."
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["release", "beta", "alpha"],
+          "default": "release",
+          "description": "Least stable channel accepted. A channel admits itself and anything more stable."
+        },
+        "side": {
+          "$ref": "#/$defs/side",
+          "description": "Overrides the side derived from provider environment data."
+        },
+        "provider": {
+          "$ref": "#/$defs/provider",
+          "description": "Overrides the provider preference list for this mod."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "ignore": {
+      "type": "object",
+      "required": ["rule", "mod", "on", "declared", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "rule": { "type": "string", "enum": ["depends", "breaks"] },
+        "mod": {
+          "$ref": "#/$defs/modId",
+          "description": "The mod whose jar metadata declares the constraint."
+        },
+        "on": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{1,63}$",
+          "description": "Subject of the constraint: a mod id or one of the built-ins minecraft, fabricloader, neoforge, java."
+        },
+        "declared": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The range exactly as the jar declared it when this ignore was written. A jar that declares a different range makes the ignore stale and the original failure re-surfaces."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why this constraint is safe to ignore. Required."
+        }
+      }
+    },
+    "player": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_]{3,16}$" },
+        "uuid": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "note": { "$ref": "#/$defs/note" }
+      },
+      "anyOf": [{ "required": ["name"] }, { "required": ["uuid"] }],
+      "description": "A player by name, uuid, or both. The lock stores both after resolution."
+    },
+    "propertyValue": { "type": ["string", "integer", "boolean"] },
+    "serverProperties": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9.-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/propertyValue" },
+      "description": "Keys written into server.properties. Values may reference ${variables}. Known keys are listed for completion (verified against the 26.2 table on 2026-09-10); the tool validates the full set against the locked Minecraft version.",
+      "properties": {
+        "accepts-transfers": {"type": "boolean"},
+        "allow-flight": {"type": "boolean"},
+        "broadcast-console-to-ops": {"type": "boolean"},
+        "broadcast-rcon-to-ops": {"type": "boolean"},
+        "bug-report-link": {"type": "string"},
+        "chat-spam-threshold-seconds": {"type": "integer", "minimum": 0},
+        "command-spam-threshold-seconds": {"type": "integer", "minimum": 0},
+        "difficulty": {"type": "string", "enum": ["peaceful", "easy", "normal", "hard"]},
+        "enable-code-of-conduct": {"type": "boolean"},
+        "enable-jmx-monitoring": {"type": "boolean"},
+        "enable-query": {"type": "boolean"},
+        "enable-rcon": {"type": "boolean"},
+        "enable-status": {"type": "boolean"},
+        "enforce-secure-profile": {"type": "boolean"},
+        "enforce-whitelist": {"type": "boolean"},
+        "entity-broadcast-range-percentage": {"type": "integer", "minimum": 10, "maximum": 1000},
+        "force-gamemode": {"type": "boolean"},
+        "function-permission-level": {"type": "integer", "minimum": 1, "maximum": 4},
+        "gamemode": {"type": "string", "enum": ["survival", "creative", "adventure", "spectator"]},
+        "generate-structures": {"type": "boolean"},
+        "generator-settings": {"type": "string"},
+        "hardcore": {"type": "boolean"},
+        "hide-online-players": {"type": "boolean"},
+        "initial-disabled-packs": {"type": "string"},
+        "initial-enabled-packs": {"type": "string"},
+        "level-name": {
+          "type": "string",
+          "pattern": "^[^/\\\\]+$",
+          "description": "World folder name. Also selects which world under data/ is linked into the server build."
+        },
+        "level-seed": {"type": ["string", "integer"]},
+        "level-type": {"type": "string"},
+        "log-ips": {"type": "boolean"},
+        "management-server-allowed-origins": {"type": "string"},
+        "management-server-enabled": {"type": "boolean"},
+        "management-server-host": {"type": "string"},
+        "management-server-port": {"type": "integer", "minimum": 0, "maximum": 65535},
+        "management-server-secret": {"type": "string"},
+        "management-server-tls-enabled": {"type": "boolean"},
+        "management-server-tls-keystore": {"type": "string"},
+        "management-server-tls-keystore-password": {"type": "string"},
+        "max-chained-neighbor-updates": {"type": "integer"},
+        "max-players": {"type": "integer", "minimum": 0},
+        "max-tick-time": {"type": "integer", "minimum": -1},
+        "max-world-size": {"type": "integer", "minimum": 1, "maximum": 29999984},
+        "motd": {"type": "string"},
+        "network-compression-threshold": {"type": "integer"},
+        "online-mode": {"type": "boolean"},
+        "op-permission-level": {"type": "integer", "minimum": 0, "maximum": 4},
+        "pause-when-empty-seconds": {"type": "integer"},
+        "player-idle-timeout": {"type": "integer", "minimum": 0},
+        "prevent-proxy-connections": {"type": "boolean"},
+        "pvp": {"type": "boolean"},
+        "query.port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "rate-limit": {"type": "integer", "minimum": 0},
+        "rcon.password": {"type": "string"},
+        "rcon.port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "region-file-compression": {"type": "string", "enum": ["deflate", "lz4", "none"]},
+        "require-resource-pack": {"type": "boolean"},
+        "resource-pack": {"type": "string"},
+        "resource-pack-id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+        "resource-pack-prompt": {"type": "string"},
+        "resource-pack-sha1": {"type": "string"},
+        "server-ip": {"type": "string"},
+        "server-port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "simulation-distance": {"type": "integer", "minimum": 3, "maximum": 32},
+        "spawn-protection": {"type": "integer", "minimum": 0},
+        "status-heartbeat-interval": {"type": "integer", "minimum": 0},
+        "sync-chunk-writes": {"type": "boolean"},
+        "text-filtering-config": {"type": "string"},
+        "text-filtering-version": {"type": "integer"},
+        "use-native-transport": {"type": "boolean"},
+        "view-distance": {"type": "integer", "minimum": 3, "maximum": 32},
+        "white-list": {"type": "boolean"}
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "eula": {
+          "type": "boolean",
+          "default": false,
+          "description": "eula.txt is written only when true. serve refuses to start otherwise."
+        },
+        "memory": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[MmGg]$",
+          "description": "Heap size passed as -Xms/-Xmx, e.g. \"6G\"."
+        },
+        "jvmFlags": {
+          "type": "string",
+          "enum": ["aikars", "none"],
+          "default": "aikars",
+          "description": "JVM flags preset used by serve. aikars applies Aikar's G1 flags (12 GB+ variant chosen from memory, -Xms set equal to -Xmx); none passes only the memory flags."
+        },
+        "jvmArgs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Extra JVM arguments appended after the preset, e.g. ZGC flags."
+        },
+        "properties": { "$ref": "#/$defs/serverProperties" },
+        "players": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "whitelist": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/player" }
+            },
+            "ops": {
+              "type": "array",
+              "items": {
+                "allOf": [
+                  { "$ref": "#/$defs/player" },
+                  {
+                    "properties": {
+                      "level": { "type": "integer", "minimum": 1, "maximum": 4, "default": 4 },
+                      "bypassesPlayerLimit": { "type": "boolean", "default": false }
+                    }
+                  }
+                ],
+                "unevaluatedProperties": false
+              }
+            },
+            "bans": {
+              "type": "array",
+              "items": {
+                "allOf": [
+                  { "$ref": "#/$defs/player" },
+                  {
+                    "properties": {
+                      "reason": { "type": "string" },
+                      "expires": { "type": "string", "format": "date-time" }
+                    }
+                  }
+                ],
+                "unevaluatedProperties": false
+              }
+            }
+          }
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "options": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_.:]*$" },
+          "additionalProperties": { "type": ["string", "number", "boolean"] },
+          "description": "Keys written into options.txt as key:value. Other keys already in the file are left alone."
+        },
+        "servers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "ip"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "ip": {
+                "type": "string",
+                "minLength": 1,
+                "description": "host or host:port, as typed into the multiplayer screen."
+              },
+              "note": { "$ref": "#/$defs/note" }
+            }
+          },
+          "description": "Entries written into servers.dat."
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
+    }
+  }
+}

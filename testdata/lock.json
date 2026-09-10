@@ -1,0 +1,98 @@
+{
+  "lockVersion": 1,
+  "manifestSha256": "5d8a1f0c3b7e9a2d4c6f8e0b1a3d5c7e9f0a2b4c6d8e0f1a3b5c7d9e1f2a4b6c",
+  "minecraft": "26.2",
+  "loader": { "type": "fabric", "version": "0.17.3" },
+  "java": { "major": 25, "component": "java-runtime-epsilon" },
+
+  "packs": {
+    "https://github.com/andrewmast/shulker-base-pack.git": {
+      "name": "shulker-base-pack",
+      "ref": "v3",
+      "commit": "4f2c9a1e7b3d5c8e0a6f1b2d3c4e5f6a7b8c9d0e"
+    }
+  },
+
+  "mods": {
+    "appleskin": {
+      "provider": "modrinth",
+      "project": "EsAfCjCV",
+      "version": "Qm3xP7Lr",
+      "versionNumber": "3.0.10+mc26.2",
+      "filename": "appleskin-fabric-mc26.2-3.0.10.jar",
+      "url": "https://cdn.modrinth.com/data/EsAfCjCV/versions/Qm3xP7Lr/appleskin-fabric-mc26.2-3.0.10.jar",
+      "sha512": "c821bb8d132d4caf04f2b9ee49c785391a97860b2c97e2a57a5e5176451ecd176d95d180003001257d7b785ad7e79c278a2b9d76a5a2472d40a0f0635a54889d",
+      "side": "both",
+      "requiredBy": [],
+      "aliases": { "curseforge": 248787 }
+    },
+    "betterthirdperson": {
+      "provider": "curseforge",
+      "project": 355424,
+      "version": 6721093,
+      "versionNumber": "1.9.2",
+      "filename": "BetterThirdPerson-Fabric-26.2-1.9.2.jar",
+      "url": null,
+      "page": "https://www.curseforge.com/minecraft/mc-mods/better-third-person/files/6721093",
+      "sha512": "58e66b646f3e179b236e90b098b9c0740e776f59e813e7879b3cf6b5897ced8787c7d37c0bb217b1a4970bfbd5d4c77b55d48f57a6b771b526f3fa1c4d48561c",
+      "side": "client",
+      "requiredBy": [],
+      "aliases": {}
+    },
+    "fabric-api": {
+      "provider": "modrinth",
+      "project": "P7dR8mSH",
+      "version": "b2Xw9NzT",
+      "versionNumber": "0.160.2+26.2",
+      "filename": "fabric-api-0.160.2+26.2.jar",
+      "url": "https://cdn.modrinth.com/data/P7dR8mSH/versions/b2Xw9NzT/fabric-api-0.160.2%2B26.2.jar",
+      "sha512": "65503ab11b8d6db8949f66b0f45c005444a722d866cf801d8c5953fb5bde1d22d393782a338c76ee759dcb83549b45e1e553c1341d834932733e27aad3d1503b",
+      "side": "both",
+      "requiredBy": ["appleskin"],
+      "aliases": { "curseforge": 306612 }
+    },
+    "iris": {
+      "provider": "modrinth",
+      "project": "YL57xq9U",
+      "version": "k9RhZq2X",
+      "versionNumber": "1.11.3+mc26.2-fabric",
+      "filename": "iris-fabric-1.11.3+mc26.2.jar",
+      "url": "https://cdn.modrinth.com/data/YL57xq9U/versions/k9RhZq2X/iris-fabric-1.11.3%2Bmc26.2.jar",
+      "sha512": "a8c4731bbfb53275aadd8306b94e5a3dcfd97e95ce687bb6c54a744a2987885cb9b2863513391ef6ccabeea957b1084e07714d17979cd6ac89978dedde05e604",
+      "side": "client",
+      "requiredBy": [],
+      "aliases": { "curseforge": 455508 }
+    },
+    "lithium": {
+      "provider": "modrinth",
+      "project": "gvQqBUqZ",
+      "version": "Hs4dV1Wn",
+      "versionNumber": "mc26.2-0.25.3-fabric",
+      "filename": "lithium-fabric-0.25.3+mc26.2.jar",
+      "url": "https://cdn.modrinth.com/data/gvQqBUqZ/versions/Hs4dV1Wn/lithium-fabric-0.25.3%2Bmc26.2.jar",
+      "sha512": "2b3fe446eb23c4baa67cd22fa44d8bb4645fefd12a38b6edbba16fcd00bb0a831315668e1826beacfab1b50ad9a77824a39b189b93e5b51f13c68fc31dc3dfbe",
+      "side": "both",
+      "requiredBy": [],
+      "aliases": { "curseforge": 360438 }
+    },
+    "sodium": {
+      "provider": "modrinth",
+      "project": "AANobbMI",
+      "version": "Zp8uK3Fy",
+      "versionNumber": "mc26.2-0.9.2-beta.1-fabric",
+      "filename": "sodium-fabric-0.9.2-beta.1+mc26.2.jar",
+      "url": "https://cdn.modrinth.com/data/AANobbMI/versions/Zp8uK3Fy/sodium-fabric-0.9.2-beta.1%2Bmc26.2.jar",
+      "sha512": "27cf5886d5adce39c8deea22e299312e72527c08558e8bca6eb04829da30c40a30e6f23e9f33ff3a22546b1d2c2f58fa87755651474349c0be8ddf770339518e",
+      "side": "client",
+      "requiredBy": ["iris"],
+      "aliases": { "curseforge": 394468 }
+    }
+  },
+
+  "players": [
+    { "name": "AndrewMast", "uuid": "21dffd6e-b89b-4d18-8b3a-8227201e71be", "resolvedAt": "2026-09-09T14:20:03Z" },
+    { "name": "Ayrix", "uuid": "fead01dc-ec27-4e78-8c6b-e8b9a679be98", "resolvedAt": "2026-09-09T14:20:03Z" },
+    { "name": "Griefer99", "uuid": "9c1e4b7a-2d5f-4a8b-b3c6-0e7d1f2a3b4c", "resolvedAt": "2026-09-09T14:20:03Z" },
+    { "name": "Kestrel_", "uuid": "7371a875-977e-4b88-9088-9c6b758acf5b", "resolvedAt": "2026-09-09T14:20:03Z" }
+  ]
+}
