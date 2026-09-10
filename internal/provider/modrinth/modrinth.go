@@ -3,6 +3,7 @@ package modrinth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -56,6 +57,9 @@ type version struct {
 func (m *Modrinth) Project(ctx context.Context, slugOrID string) (*provider.Project, error) {
 	var p project
 	if err := m.Client.GetJSON(ctx, m.BaseURL+"/project/"+url.PathEscape(slugOrID), &p); err != nil {
+		if errors.Is(err, fetch.ErrNotFound) {
+			err = provider.ErrNotFound
+		}
 		return nil, fmt.Errorf("modrinth project %s: %w", slugOrID, err)
 	}
 	return &provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide)}, nil

@@ -38,6 +38,7 @@ func (e *StatusError) Is(target error) bool {
 type Client struct {
 	HTTP      *http.Client
 	UserAgent string
+	Header    http.Header
 }
 
 func New(version string) *Client {
@@ -57,6 +58,9 @@ func (c *Client) do(ctx context.Context, method, url, accept string, body io.Rea
 		return nil, err
 	}
 	req.Header.Set("User-Agent", c.UserAgent)
+	for k, vs := range c.Header {
+		req.Header[k] = vs
+	}
 	if accept != "" {
 		req.Header.Set("Accept", accept)
 	}

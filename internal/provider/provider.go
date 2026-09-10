@@ -2,8 +2,11 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+var ErrNotFound = errors.New("project not found")
 
 type Project struct {
 	ID    string
@@ -16,6 +19,7 @@ type File struct {
 	URL      string
 	Filename string
 	Sha512   string
+	Sha1     string
 }
 
 type Dependency struct {
@@ -34,6 +38,7 @@ type Version struct {
 	Dependencies []Dependency
 	GameVersions []string
 	Loaders      []string
+	Page         string
 }
 
 type Provider interface {

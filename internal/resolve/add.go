@@ -2,8 +2,10 @@ package resolve
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/andrewmast/shulker/internal/cache"
@@ -14,9 +16,11 @@ import (
 	"github.com/andrewmast/shulker/internal/out"
 	"github.com/andrewmast/shulker/internal/pack"
 	"github.com/andrewmast/shulker/internal/provider"
+	"github.com/andrewmast/shulker/internal/provider/curseforge"
 )
 
 type Resolver struct {
+	Dir       string
 	Manifest  *manifest.Manifest
 	Lock      *lock.Lock
 	Providers map[string]provider.Provider
@@ -66,12 +70,40 @@ func (r *Resolver) provider(name string) (provider.Provider, error) {
 	return nil, out.Errorf("provider-unavailable", "none of the manifest providers %v are available", r.Manifest.ProviderOrder())
 }
 
-func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Added, error) {
-	p, err := r.provider(opts.Provider)
-	if err != nil {
-		return nil, err
+func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provider.Provider, *provider.Project, error) {
+	if providerName != "" {
+		p, err := r.provider(providerName)
+		if err != nil {
+			return nil, nil, err
+		}
+		proj, err := p.Project(ctx, slug)
+		return p, proj, err
 	}
-	proj, err := p.Project(ctx, slug)
+	var missed []string
+	for _, n := range r.Manifest.ProviderOrder() {
+		p, ok := r.Providers[n]
+		if !ok {
+			continue
+		}
+		proj, err := p.Project(ctx, slug)
+		if errors.Is(err, provider.ErrNotFound) {
+			missed = append(missed, n)
+			continue
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		return p, proj, nil
+	}
+	if len(missed) == 0 {
+		_, err := r.provider("")
+		return nil, nil, err
+	}
+	return nil, nil, out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(missed, " or "))
+}
+
+func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Added, error) {
+	p, proj, err := r.lookup(ctx, slug, opts.Provider)
 	if err != nil {
 		return nil, err
 	}
@@ -94,13 +126,13 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Adde
 		entry.Channel = opts.Channel
 	}
 	if opts.Pin != "" {
-		entry.Pin = opts.Pin
+		entry.Pin = lockID(p.Name(), opts.Pin)
 	}
 	if proj.Slug != id || p.Name() != "modrinth" {
-		entry.Project = proj.ID
+		entry.Project = lockID(p.Name(), proj.ID)
 	}
-	if opts.Provider != "" && opts.Provider != r.Manifest.ProviderOrder()[0] {
-		entry.Provider = opts.Provider
+	if p.Name() != r.Manifest.ProviderOrder()[0] {
+		entry.Provider = p.Name()
 	}
 	r.Manifest.Mods[id] = entry
 	return added, nil
@@ -150,13 +182,56 @@ func otherChannels(versions []provider.Version) []string {
 	return out
 }
 
+type obtained struct {
+	path   string
+	sha512 string
+	url    *string
+	page   string
+}
+
+func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provider.Version) (obtained, error) {
+	if v.File.Sha512 != "" {
+		path, err := r.Cache.Ensure(ctx, r.Fetch, v.File.URL, v.File.Sha512)
+		url := v.File.URL
+		return obtained{path: path, sha512: v.File.Sha512, url: &url}, err
+	}
+	if v.File.URL != "" {
+		sha, err := r.Cache.Fetch(ctx, r.Fetch, v.File.URL)
+		if err == nil {
+			got, err := sha1Of(r.Cache.Path(sha))
+			if err != nil {
+				return obtained{}, err
+			}
+			if got != v.File.Sha1 {
+				return obtained{}, fmt.Errorf("%s: sha1 mismatch (expected %s…, got %s…)", v.File.URL, v.File.Sha1[:12], got[:12])
+			}
+			url := v.File.URL
+			return obtained{path: r.Cache.Path(sha), sha512: sha, url: &url}, nil
+		}
+		if !errors.Is(err, fetch.ErrForbidden) {
+			return obtained{}, err
+		}
+		r.log("%s %s: download forbidden, treating it as distribution-disabled", proj.Slug, v.Number)
+	}
+	files, err := r.sweepDownloads()
+	if err != nil {
+		return obtained{}, err
+	}
+	for _, f := range files {
+		if f.Sha1 == v.File.Sha1 {
+			return obtained{path: r.Cache.Path(f.Sha512), sha512: f.Sha512, page: v.Page}, nil
+		}
+	}
+	return obtained{}, out.Errorf("manual-download", "%s %s is not distributed by its provider: download %s from %s into %s/ and run the command again", proj.Slug, v.Number, v.File.Filename, v.Page, DownloadsDir)
+}
+
 func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, requiredBy, sideOverride string) (string, bool, error) {
 	r.log("fetching %s %s", proj.Slug, v.Number)
-	path, err := r.Cache.Ensure(ctx, r.Fetch, v.File.URL, v.File.Sha512)
+	got, err := r.obtain(ctx, proj, v)
 	if err != nil {
 		return "", false, err
 	}
-	info, err := jarmeta.Read(path)
+	info, err := jarmeta.Read(got.path)
 	if err != nil {
 		return "", false, err
 	}
@@ -164,24 +239,32 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		if requiredBy != "" {
 			r.Lock.AddRequiredBy(info.ID, requiredBy)
 		}
-		if existing.Sha512 != v.File.Sha512 {
+		switch {
+		case existing.Provider != p.Name():
+			setAlias(&existing, p.Name(), proj.ID)
+			r.Lock.Mods[info.ID] = existing
+			r.log("keeping %s %s from %s (%s project %s recorded as an alias)", info.ID, existing.VersionNumber, existing.Provider, p.Name(), proj.ID)
+		case fmt.Sprint(existing.Version) != v.ID:
 			r.log("keeping %s %s already in lock", info.ID, existing.VersionNumber)
 		}
 		return info.ID, true, nil
 	}
 	side := proj.Side
+	if side == "" {
+		side = info.Side
+	}
 	if sideOverride != "" {
 		side = sideOverride
 	}
-	url := v.File.URL
 	entry := lock.Mod{
 		Provider:      p.Name(),
-		Project:       proj.ID,
-		Version:       v.ID,
+		Project:       lockID(p.Name(), proj.ID),
+		Version:       lockID(p.Name(), v.ID),
 		VersionNumber: v.Number,
 		Filename:      v.File.Filename,
-		URL:           &url,
-		Sha512:        v.File.Sha512,
+		URL:           got.url,
+		Page:          got.page,
+		Sha512:        got.sha512,
 		Side:          side,
 		RequiredBy:    []string{},
 	}
@@ -190,6 +273,15 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	r.Lock.Mods[info.ID] = entry
 	return info.ID, false, nil
+}
+
+func setAlias(m *lock.Mod, providerName, projectID string) {
+	switch providerName {
+	case "modrinth":
+		m.Aliases.Modrinth = projectID
+	case "curseforge":
+		m.Aliases.CurseForge, _ = strconv.Atoi(projectID)
+	}
 }
 
 func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider.Version, parentID, channel string, added *Added, visited map[string]bool) error {
@@ -243,7 +335,17 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-func (r *Resolver) Install(ctx context.Context) ([]string, error) {
+func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
+	files, err := r.sweepDownloads()
+	if err != nil {
+		return nil, nil, err
+	}
+	var warnings []string
+	for _, f := range files {
+		if !r.lockHas(f.Sha512) {
+			warnings = append(warnings, fmt.Sprintf("%s/%s matches no mod in the lock", DownloadsDir, f.Name))
+		}
+	}
 	ids := make([]string, 0, len(r.Lock.Mods))
 	for id := range r.Lock.Mods {
 		ids = append(ids, id)
@@ -257,19 +359,43 @@ func (r *Resolver) Install(ctx context.Context) ([]string, error) {
 			continue
 		}
 		if m.URL == nil {
-			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in downloads/", id, m.Filename, m.Page))
+			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", id, m.Filename, m.Page, DownloadsDir))
 			continue
 		}
 		r.log("downloading %s %s", id, m.VersionNumber)
-		if _, err := r.Cache.Ensure(ctx, r.Fetch, *m.URL, m.Sha512); err != nil {
-			return fetched, err
+		_, err := r.Cache.Ensure(ctx, r.Fetch, *m.URL, m.Sha512)
+		if errors.Is(err, fetch.ErrForbidden) {
+			missing = append(missing, fmt.Sprintf("%s: download forbidden; download %s from %s and place it in %s/", id, m.Filename, pageFor(m), DownloadsDir))
+			continue
+		}
+		if err != nil {
+			return fetched, warnings, err
 		}
 		fetched = append(fetched, id)
 	}
 	if len(missing) > 0 {
 		e := out.Errorf("missing-files", "%d mod(s) need a manual download:\n  %s", len(missing), strings.Join(missing, "\n  "))
 		e.Candidates = missing
-		return fetched, e
+		return fetched, warnings, e
 	}
-	return fetched, nil
+	return fetched, warnings, nil
+}
+
+func (r *Resolver) lockHas(sha512 string) bool {
+	for _, m := range r.Lock.Mods {
+		if m.Sha512 == sha512 {
+			return true
+		}
+	}
+	return false
+}
+
+func pageFor(m lock.Mod) string {
+	switch {
+	case m.Page != "":
+		return m.Page
+	case m.Provider == "curseforge":
+		return curseforge.ProjectPage(fmt.Sprint(m.Project))
+	}
+	return *m.URL
 }

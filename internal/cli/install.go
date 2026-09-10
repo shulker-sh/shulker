@@ -40,7 +40,7 @@ func (a *app) installCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fetched, err := r.Install(cmd.Context())
+			fetched, dropWarnings, err := r.Install(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -84,6 +84,7 @@ func (a *app) installCmd() *cobra.Command {
 			if err := v.Err(); err != nil {
 				return err
 			}
+			v.Warnings = append(dropWarnings, v.Warnings...)
 			if runtimeWarning != "" {
 				v.Warnings = append(v.Warnings, runtimeWarning)
 			}

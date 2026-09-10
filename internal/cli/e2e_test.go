@@ -3,6 +3,7 @@ package cli
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha1"
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
@@ -22,6 +23,7 @@ import (
 	"github.com/andrewmast/shulker/internal/out"
 	"github.com/andrewmast/shulker/internal/player"
 	"github.com/andrewmast/shulker/internal/provider"
+	"github.com/andrewmast/shulker/internal/provider/curseforge"
 	"github.com/andrewmast/shulker/internal/provider/modrinth"
 	"github.com/andrewmast/shulker/internal/resolve"
 )
@@ -30,6 +32,7 @@ type fakeJar struct {
 	id, filename string
 	data         []byte
 	sha512       string
+	sha1         string
 }
 
 func makeJar(t *testing.T, id, filename string, env string) fakeJar {
@@ -53,7 +56,8 @@ func makeJarVersion(t *testing.T, id, filename, env, version, extra string) fake
 		t.Fatal(err)
 	}
 	sum := sha512.Sum512(buf.Bytes())
-	return fakeJar{id: id, filename: filename, data: buf.Bytes(), sha512: hex.EncodeToString(sum[:])}
+	sum1 := sha1.Sum(buf.Bytes())
+	return fakeJar{id: id, filename: filename, data: buf.Bytes(), sha512: hex.EncodeToString(sum[:]), sha1: hex.EncodeToString(sum1[:])}
 }
 
 type harness struct {
@@ -69,6 +73,9 @@ type harness struct {
 	runtime       *fakeRuntime
 	mojang        map[string]string
 	mojangHits    int
+	noCurseForge  bool
+	cfMods        map[int]*cfMod
+	cfHits        int
 }
 
 func newHarness(t *testing.T) *harness {
@@ -212,6 +219,7 @@ func newHarness(t *testing.T) *harness {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	h.runtime.register(mux, func() string { return base })
+	h.registerCurseForge(t, mux, func() string { return base })
 	h.server = httptest.NewServer(mux)
 	base = h.server.URL
 	t.Cleanup(h.server.Close)
@@ -242,10 +250,16 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	players := player.New(f)
 	players.APIURL = h.server.URL + "/mojang"
 	players.SessionURL = h.server.URL + "/session"
+	providers := map[string]provider.Provider{"modrinth": mr}
+	if !h.noCurseForge {
+		cf := curseforge.New(f, curseForgeTestKey)
+		cf.BaseURL = h.server.URL + "/curseforge"
+		providers["curseforge"] = cf
+	}
 	a.d = &deps{
 		fetch:     f,
 		cache:     &cache.Cache{Dir: h.cache},
-		providers: map[string]provider.Provider{"modrinth": mr},
+		providers: providers,
 		meta:      &resolve.Meta{Piston: piston, Fabric: fabric},
 		runtimes:  runtimes,
 		players:   players,

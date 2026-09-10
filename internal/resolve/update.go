@@ -117,7 +117,7 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 			return nil, err
 		}
 		newest, ok := provider.Newest(versions, r.channelFor(id))
-		if !ok || newest.File.Sha512 == m.Sha512 {
+		if !ok || newest.ID == fmt.Sprint(m.Version) {
 			continue
 		}
 		entry := r.Manifest.Mods[id]
@@ -137,7 +137,7 @@ func (r *Resolver) Pin(ctx context.Context, id string, version string) (*Updated
 		version = fmt.Sprint(r.Lock.Mods[id].Version)
 	}
 	entry := r.Manifest.Mods[id]
-	entry.Pin = version
+	entry.Pin = lockID(r.Lock.Mods[id].Provider, version)
 	r.Manifest.Mods[id] = entry
 	res, err := r.Update(ctx, []string{id})
 	return res, version, err

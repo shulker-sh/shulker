@@ -7,12 +7,14 @@ import (
 
 	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/cache"
+	"github.com/andrewmast/shulker/internal/config"
 	"github.com/andrewmast/shulker/internal/fetch"
 	"github.com/andrewmast/shulker/internal/meta"
 	"github.com/andrewmast/shulker/internal/pack"
 	"github.com/andrewmast/shulker/internal/player"
 	"github.com/andrewmast/shulker/internal/project"
 	"github.com/andrewmast/shulker/internal/provider"
+	"github.com/andrewmast/shulker/internal/provider/curseforge"
 	"github.com/andrewmast/shulker/internal/provider/modrinth"
 	"github.com/andrewmast/shulker/internal/resolve"
 	"github.com/andrewmast/shulker/internal/server"
@@ -35,11 +37,19 @@ func (a *app) deps() (*deps, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
 	f := fetch.New(version)
+	providers := map[string]provider.Provider{"modrinth": modrinth.New(f)}
+	if key := curseforge.Key(cfg.CurseForge.Key); key != "" {
+		providers["curseforge"] = curseforge.New(f, key)
+	}
 	a.d = &deps{
 		fetch:     f,
 		cache:     c,
-		providers: map[string]provider.Provider{"modrinth": modrinth.New(f)},
+		providers: providers,
 		meta:      &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f)},
 		runtimes:  meta.NewRuntimes(f),
 		players:   player.New(f),
@@ -73,6 +83,7 @@ func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolv
 		return nil, err
 	}
 	return &resolve.Resolver{
+		Dir:       p.Dir,
 		Manifest:  p.Manifest,
 		Lock:      p.Lock,
 		Providers: d.providers,
