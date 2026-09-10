@@ -336,3 +336,57 @@ func TestStaleLockBlocksBuild(t *testing.T) {
 		t.Fatalf("code=%d env=%+v", code, env)
 	}
 }
+
+func TestRemovePrunesOrphans(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "add", "sodium")
+
+	code, stdout, _ := h.run(t, "remove", "fabric-api", "--json")
+	var env out.Envelope
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code == 0 || env.Error == nil || env.Error.Code != "not-direct" || env.Error.Candidates[0] != "sodium" {
+		t.Fatalf("removing a dependency: code=%d env=%+v", code, env)
+	}
+	if code, stdout, _ = h.run(t, "remove", "nope", "--json"); code == 0 || !strings.Contains(stdout, `"not-found"`) {
+		t.Fatalf("removing an unknown mod: code=%d %s", code, stdout)
+	}
+
+	stdout = h.mustRun(t, "remove", "sodium", "--json")
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	data := env.Data.(map[string]any)
+	if !env.OK || env.LockStale || data["removed"].([]any)[0] != "sodium" || data["pruned"].([]any)[0] != "fabric-api" {
+		t.Fatalf("remove envelope: %+v", env)
+	}
+	var l struct {
+		Mods map[string]any `json:"mods"`
+	}
+	h.readJSON(t, "shulker.lock", &l)
+	var m struct {
+		Mods map[string]any `json:"mods"`
+	}
+	h.readJSON(t, "shulker.json", &m)
+	if len(l.Mods) != 0 || len(m.Mods) != 0 {
+		t.Fatalf("lock mods %v, manifest mods %v", l.Mods, m.Mods)
+	}
+
+	h.mustRun(t, "add", "sodium", "fabric-api")
+	stdout = h.mustRun(t, "remove", "sodium")
+	if strings.Contains(stdout, "pruned") {
+		t.Fatalf("direct fabric-api must survive: %s", stdout)
+	}
+	var kept struct {
+		Mods map[string]struct {
+			RequiredBy []string `json:"requiredBy"`
+		} `json:"mods"`
+	}
+	h.readJSON(t, "shulker.lock", &kept)
+	if fa, ok := kept.Mods["fabric-api"]; !ok || len(fa.RequiredBy) != 0 {
+		t.Fatalf("lock after remove: %+v", kept.Mods)
+	}
+	if code, _, _ := h.run(t, "build"); code != 0 {
+		t.Fatal("lock should not be stale after remove")
+	}
+}

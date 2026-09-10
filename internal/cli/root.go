@@ -47,7 +47,7 @@ func (a *app) root() *cobra.Command {
 	}
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
-	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.installCmd(), a.buildCmd())
+	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.installCmd(), a.buildCmd())
 	return root
 }
 
