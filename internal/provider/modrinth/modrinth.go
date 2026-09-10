@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/andrewmast/shulker/internal/fetch"
-	"github.com/andrewmast/shulker/internal/provider"
+	"github.com/shulker-sh/shulker/internal/fetch"
+	"github.com/shulker-sh/shulker/internal/provider"
 )
 
 const APIURL = "https://api.modrinth.com/v2"

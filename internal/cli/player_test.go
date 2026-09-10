@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andrewmast/shulker/internal/lock"
+	"github.com/shulker-sh/shulker/internal/lock"
 )
 
 const (

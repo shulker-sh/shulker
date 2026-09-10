@@ -13,11 +13,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/andrewmast/shulker/internal/fetch"
-	"github.com/andrewmast/shulker/internal/lock"
-	"github.com/andrewmast/shulker/internal/manifest"
-	"github.com/andrewmast/shulker/internal/mcver"
-	"github.com/andrewmast/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/fetch"
+	"github.com/shulker-sh/shulker/internal/lock"
+	"github.com/shulker-sh/shulker/internal/manifest"
+	"github.com/shulker-sh/shulker/internal/mcver"
+	"github.com/shulker-sh/shulker/internal/out"
 )
 
 type Kind string

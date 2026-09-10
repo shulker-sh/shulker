@@ -2,10 +2,10 @@ package server
 
 import (
 	"fmt"
-	"github.com/andrewmast/shulker/internal/near"
+	"github.com/shulker-sh/shulker/internal/near"
 	"sort"
 
-	"github.com/andrewmast/shulker/internal/mcver"
+	"github.com/shulker-sh/shulker/internal/mcver"
 )
 
 type Property struct {

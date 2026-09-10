@@ -14,13 +14,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrewmast/shulker/internal/cache"
-	"github.com/andrewmast/shulker/internal/lock"
-	"github.com/andrewmast/shulker/internal/manifest"
-	"github.com/andrewmast/shulker/internal/mcver"
-	"github.com/andrewmast/shulker/internal/out"
-	"github.com/andrewmast/shulker/internal/pack"
-	"github.com/andrewmast/shulker/internal/server"
+	"github.com/shulker-sh/shulker/internal/cache"
+	"github.com/shulker-sh/shulker/internal/lock"
+	"github.com/shulker-sh/shulker/internal/manifest"
+	"github.com/shulker-sh/shulker/internal/mcver"
+	"github.com/shulker-sh/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/pack"
+	"github.com/shulker-sh/shulker/internal/server"
 )
 
 const (

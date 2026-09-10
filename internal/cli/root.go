@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/andrewmast/shulker/internal/out"
-	"github.com/andrewmast/shulker/internal/pack"
+	"github.com/shulker-sh/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/pack"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

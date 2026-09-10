@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/andrewmast/shulker/schema"
+	"github.com/shulker-sh/shulker/schema"
 )
 
 const (
 	FileName  = "shulker.json"
-	SchemaURL = "https://raw.githubusercontent.com/andrewmast/shulker/main/schema/manifest-v1.json"
+	SchemaURL = "https://shulker.sh/schema/manifest-v1.json"
 )
 
 var DefaultProviders = []string{"modrinth", "curseforge"}

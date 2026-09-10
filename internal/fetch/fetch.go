@@ -44,7 +44,7 @@ type Client struct {
 func New(version string) *Client {
 	return &Client{
 		HTTP:      &http.Client{Timeout: 5 * time.Minute},
-		UserAgent: fmt.Sprintf("shulker/%s (github.com/andrewmast/shulker)", version),
+		UserAgent: fmt.Sprintf("shulker/%s (https://shulker.sh)", version),
 	}
 }
 

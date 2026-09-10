@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/andrewmast/shulker/internal/jarmeta"
-	"github.com/andrewmast/shulker/internal/manifest"
-	"github.com/andrewmast/shulker/internal/mcver"
-	"github.com/andrewmast/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/jarmeta"
+	"github.com/shulker-sh/shulker/internal/manifest"
+	"github.com/shulker-sh/shulker/internal/mcver"
+	"github.com/shulker-sh/shulker/internal/out"
 )
 
 type Problem struct {

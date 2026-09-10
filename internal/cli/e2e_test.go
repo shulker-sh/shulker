@@ -16,16 +16,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andrewmast/shulker/internal/build"
-	"github.com/andrewmast/shulker/internal/cache"
-	"github.com/andrewmast/shulker/internal/fetch"
-	"github.com/andrewmast/shulker/internal/meta"
-	"github.com/andrewmast/shulker/internal/out"
-	"github.com/andrewmast/shulker/internal/player"
-	"github.com/andrewmast/shulker/internal/provider"
-	"github.com/andrewmast/shulker/internal/provider/curseforge"
-	"github.com/andrewmast/shulker/internal/provider/modrinth"
-	"github.com/andrewmast/shulker/internal/resolve"
+	"github.com/shulker-sh/shulker/internal/build"
+	"github.com/shulker-sh/shulker/internal/cache"
+	"github.com/shulker-sh/shulker/internal/fetch"
+	"github.com/shulker-sh/shulker/internal/meta"
+	"github.com/shulker-sh/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/player"
+	"github.com/shulker-sh/shulker/internal/provider"
+	"github.com/shulker-sh/shulker/internal/provider/curseforge"
+	"github.com/shulker-sh/shulker/internal/provider/modrinth"
+	"github.com/shulker-sh/shulker/internal/resolve"
 )
 
 type fakeJar struct {

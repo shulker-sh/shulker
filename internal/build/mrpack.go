@@ -13,8 +13,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/andrewmast/shulker/internal/manifest"
-	"github.com/andrewmast/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/manifest"
+	"github.com/shulker-sh/shulker/internal/out"
 )
 
 const MrpackIndexFile = "modrinth.index.json"

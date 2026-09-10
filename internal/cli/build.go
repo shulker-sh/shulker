@@ -5,9 +5,9 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/andrewmast/shulker/internal/build"
-	"github.com/andrewmast/shulker/internal/out"
-	"github.com/andrewmast/shulker/internal/player"
+	"github.com/shulker-sh/shulker/internal/build"
+	"github.com/shulker-sh/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/player"
 	"github.com/spf13/cobra"
 )
 

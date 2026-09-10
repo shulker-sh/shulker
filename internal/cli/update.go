@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/andrewmast/shulker/internal/lock"
-	"github.com/andrewmast/shulker/internal/project"
-	"github.com/andrewmast/shulker/internal/resolve"
+	"github.com/shulker-sh/shulker/internal/lock"
+	"github.com/shulker-sh/shulker/internal/project"
+	"github.com/shulker-sh/shulker/internal/resolve"
 	"github.com/spf13/cobra"
 )
 

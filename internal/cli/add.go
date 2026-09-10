@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/andrewmast/shulker/internal/resolve"
+	"github.com/shulker-sh/shulker/internal/resolve"
 	"github.com/spf13/cobra"
 )
 

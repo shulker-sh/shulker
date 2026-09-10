@@ -6,7 +6,7 @@
   "java": { "major": 25, "component": "java-runtime-epsilon" },
 
   "packs": {
-    "https://github.com/andrewmast/shulker-base-pack.git": {
+    "https://github.com/shulker-sh/base-pack.git": {
       "name": "shulker-base-pack",
       "ref": "v3",
       "commit": "4f2c9a1e7b3d5c8e0a6f1b2d3c4e5f6a7b8c9d0e"

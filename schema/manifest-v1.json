@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/andrewmast/shulker/main/schema/manifest-v1.json",
+  "$id": "https://shulker.sh/schema/manifest-v1.json",
   "title": "shulker.json",
   "description": "Shulker project manifest. Lists direct mods, targets, and first-class configuration. Resolution results live in shulker.lock.",
   "type": "object",

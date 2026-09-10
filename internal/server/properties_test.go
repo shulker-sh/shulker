@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/andrewmast/shulker/internal/mcver"
+	"github.com/shulker-sh/shulker/internal/mcver"
 )
 
 func TestCheckPropertyKeys(t *testing.T) {

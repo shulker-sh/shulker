@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/andrewmast/shulker/internal/mcver"
-	"github.com/andrewmast/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/mcver"
+	"github.com/shulker-sh/shulker/internal/out"
 )
 
 type Java struct {

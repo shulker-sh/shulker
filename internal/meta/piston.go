@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/andrewmast/shulker/internal/fetch"
+	"github.com/shulker-sh/shulker/internal/fetch"
 )
 
 const PistonManifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andrewmast/shulker/internal/build"
-	"github.com/andrewmast/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/build"
+	"github.com/shulker-sh/shulker/internal/out"
 )
 
 type mrpackIndex struct {

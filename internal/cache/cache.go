@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/andrewmast/shulker/internal/fetch"
+	"github.com/shulker-sh/shulker/internal/fetch"
 )
 
 type Cache struct {

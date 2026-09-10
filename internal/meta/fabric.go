@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/andrewmast/shulker/internal/fetch"
+	"github.com/shulker-sh/shulker/internal/fetch"
 )
 
 const FabricMetaURL = "https://meta.fabricmc.net/v2"

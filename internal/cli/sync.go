@@ -7,12 +7,12 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/andrewmast/shulker/internal/build"
-	"github.com/andrewmast/shulker/internal/manifest"
-	"github.com/andrewmast/shulker/internal/out"
-	"github.com/andrewmast/shulker/internal/pack"
-	"github.com/andrewmast/shulker/internal/player"
-	"github.com/andrewmast/shulker/internal/project"
+	"github.com/shulker-sh/shulker/internal/build"
+	"github.com/shulker-sh/shulker/internal/manifest"
+	"github.com/shulker-sh/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/pack"
+	"github.com/shulker-sh/shulker/internal/player"
+	"github.com/shulker-sh/shulker/internal/project"
 	"github.com/spf13/cobra"
 )
 

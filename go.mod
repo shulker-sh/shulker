@@ -1,4 +1,4 @@
-module github.com/andrewmast/shulker
+module github.com/shulker-sh/shulker
 
 go 1.26.4
 

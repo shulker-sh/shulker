@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/andrewmast/shulker/internal/out"
+	"github.com/shulker-sh/shulker/internal/out"
 )
 
 type Removed struct {

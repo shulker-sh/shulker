@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andrewmast/shulker/internal/launcher"
-	"github.com/andrewmast/shulker/internal/manifest"
+	"github.com/shulker-sh/shulker/internal/launcher"
+	"github.com/shulker-sh/shulker/internal/manifest"
 )
 
 func TestLinkPrism(t *testing.T) {

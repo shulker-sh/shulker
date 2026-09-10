@@ -9,7 +9,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/andrewmast/shulker/schema"
+	"github.com/shulker-sh/shulker/schema"
 )
 
 const FileName = "shulker.lock"
