@@ -11,14 +11,24 @@ var version = "dev"
 
 type app struct {
 	printer *out.Printer
+	dir     string
+	d       *deps
 }
 
 func Execute(args []string, stdout, stderr io.Writer) int {
-	a := &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr, JSON: jsonRequested(args)}}
+	return newApp(stdout, stderr).run(args)
+}
+
+func newApp(stdout, stderr io.Writer) *app {
+	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}}
+}
+
+func (a *app) run(args []string) int {
+	a.printer.JSON = jsonRequested(args)
 	root := a.root()
 	root.SetArgs(args)
-	root.SetOut(stdout)
-	root.SetErr(stderr)
+	root.SetOut(a.printer.Stdout)
+	root.SetErr(a.printer.Stderr)
 	if err := root.Execute(); err != nil {
 		return a.printer.Fail(err)
 	}
@@ -36,7 +46,8 @@ func (a *app) root() *cobra.Command {
 		},
 	}
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
-	root.AddCommand(a.versionCmd())
+	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
+	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.installCmd(), a.buildCmd())
 	return root
 }
 
