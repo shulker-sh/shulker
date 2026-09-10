@@ -35,7 +35,7 @@ func (a *app) installCmd() *cobra.Command {
 			if a.printer.LockStale {
 				a.progress("warning: shulker.lock is out of date with shulker.json; run `shulker add`, `remove`, or `update` to refresh it")
 			}
-			r, err := a.resolver(p)
+			r, err := a.resolver(cmd.Context(), p)
 			if err != nil {
 				return err
 			}
@@ -87,7 +87,7 @@ func (a *app) installCmd() *cobra.Command {
 				v.Warnings = append(v.Warnings, runtimeWarning)
 			}
 			a.warn(v.Warnings)
-			b, err := a.builder(p)
+			b, err := a.builder(cmd.Context(), p)
 			if err != nil {
 				return err
 			}

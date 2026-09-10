@@ -96,7 +96,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			b, err := a.builder(p)
+			b, err := a.builder(cmd.Context(), p)
 			if err != nil {
 				return err
 			}

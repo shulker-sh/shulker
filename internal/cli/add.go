@@ -32,7 +32,7 @@ func (a *app) addCmd() *cobra.Command {
 			if opts.Pin != "" && len(args) > 1 {
 				return fmt.Errorf("--pin applies to a single mod")
 			}
-			r, err := a.resolver(p)
+			r, err := a.resolver(cmd.Context(), p)
 			if err != nil {
 				return err
 			}

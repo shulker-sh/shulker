@@ -9,6 +9,7 @@ import (
 	"github.com/andrewmast/shulker/internal/cache"
 	"github.com/andrewmast/shulker/internal/fetch"
 	"github.com/andrewmast/shulker/internal/meta"
+	"github.com/andrewmast/shulker/internal/pack"
 	"github.com/andrewmast/shulker/internal/project"
 	"github.com/andrewmast/shulker/internal/provider"
 	"github.com/andrewmast/shulker/internal/provider/modrinth"
@@ -59,8 +60,12 @@ func (a *app) openProject() (*project.Project, error) {
 	return p, nil
 }
 
-func (a *app) resolver(p *project.Project) (*resolve.Resolver, error) {
+func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolver, error) {
 	d, err := a.deps()
+	if err != nil {
+		return nil, err
+	}
+	packs, err := a.openPacks(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -70,16 +75,86 @@ func (a *app) resolver(p *project.Project) (*resolve.Resolver, error) {
 		Providers: d.providers,
 		Cache:     d.cache,
 		Fetch:     d.fetch,
+		Packs:     packs,
 		Log:       a.progress,
 	}, nil
 }
 
-func (a *app) builder(p *project.Project) (*build.Builder, error) {
+func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, error) {
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
 	}
-	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache}, nil
+	packs, err := a.openPacks(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs}, nil
+}
+
+func (a *app) packStore(p *project.Project) (*pack.Store, error) {
+	d, err := a.deps()
+	if err != nil {
+		return nil, err
+	}
+	return &pack.Store{CacheDir: d.cache.Dir, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress}, nil
+}
+
+func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded, error) {
+	if a.packs != nil {
+		return a.packs, nil
+	}
+	if _, err := pack.Names(p.Manifest.Packs); err != nil {
+		return nil, err
+	}
+	store, err := a.packStore(p)
+	if err != nil {
+		return nil, err
+	}
+	loaded := []*pack.Loaded{}
+	for _, mp := range p.Manifest.Packs {
+		pinned, ok := p.Lock.Packs[mp.Source]
+		if !ok {
+			name, _ := pack.Name(mp)
+			a.progress("warning: pack %s is not in the lock yet; resolving it", name)
+			l, err := store.Resolve(ctx, mp)
+			if err != nil {
+				return nil, err
+			}
+			loaded = append(loaded, l)
+			continue
+		}
+		l, warning, err := store.Open(ctx, mp, pinned)
+		if err != nil {
+			return nil, err
+		}
+		if warning != "" {
+			a.progress("warning: %s", warning)
+		}
+		loaded = append(loaded, l)
+	}
+	a.packs = loaded
+	return loaded, nil
+}
+
+func (a *app) resolvePacks(ctx context.Context, p *project.Project) ([]*pack.Loaded, error) {
+	if _, err := pack.Names(p.Manifest.Packs); err != nil {
+		return nil, err
+	}
+	store, err := a.packStore(p)
+	if err != nil {
+		return nil, err
+	}
+	loaded := []*pack.Loaded{}
+	for _, mp := range p.Manifest.Packs {
+		l, err := store.Resolve(ctx, mp)
+		if err != nil {
+			return nil, err
+		}
+		loaded = append(loaded, l)
+	}
+	a.packs = loaded
+	return loaded, nil
 }
 
 func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool) (server.Runtime, error) {
@@ -104,6 +179,9 @@ func (a *app) warn(warnings []string) {
 }
 
 func (a *app) commit(p *project.Project, r *resolve.Resolver) (*resolve.Validation, error) {
+	if err := r.RefreshPacks(r.Packs); err != nil {
+		return nil, err
+	}
 	v, err := r.Validate()
 	if err != nil {
 		return nil, err

@@ -113,7 +113,7 @@
         "requiredBy": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z][a-z0-9._-]*$" },
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
           "description": "Mod ids (or pack names) whose jar metadata depends on this mod. Empty plus absent from manifest and packs means orphan."
         },
         "aliases": {

@@ -17,9 +17,10 @@ type Change struct {
 }
 
 type Updated struct {
-	Updated []Change `json:"updated"`
-	Added   []string `json:"added"`
-	Removed []string `json:"removed"`
+	Updated []Change     `json:"updated"`
+	Added   []string     `json:"added"`
+	Removed []string     `json:"removed"`
+	Packs   []PackChange `json:"packs"`
 }
 
 type Outdated struct {
@@ -80,7 +81,7 @@ func (r *Resolver) Update(ctx context.Context, ids []string) (*Updated, error) {
 		}
 	}
 	r.pruneOrphans()
-	res := &Updated{Updated: []Change{}, Added: []string{}, Removed: []string{}}
+	res := &Updated{Updated: []Change{}, Added: []string{}, Removed: []string{}, Packs: []PackChange{}}
 	for _, id := range r.lockIDs() {
 		old, existed := before[id]
 		switch {
@@ -156,7 +157,8 @@ func (r *Resolver) Unpin(ctx context.Context, id string) (*Updated, error) {
 }
 
 func (r *Resolver) relock(ctx context.Context, id string) error {
-	entry := r.Manifest.Mods[id]
+	direct := r.directMods()[id]
+	entry := direct.entry
 	p, err := r.provider(entry.Provider)
 	if err != nil {
 		return err
@@ -184,17 +186,21 @@ func (r *Resolver) relock(ctx context.Context, id string) error {
 	if placed != id {
 		return out.Errorf("id-changed", "%s %s identifies itself as %s; remove it and add it again", id, v.Number, placed)
 	}
+	for _, name := range direct.packs {
+		r.Lock.AddRequiredBy(id, name)
+	}
 	visited := map[string]bool{proj.ID: true}
 	return r.addDeps(ctx, p, v, id, entry.Channel, &Added{ID: id}, visited)
 }
 
 func (r *Resolver) directTargets(ids []string) ([]string, error) {
 	if len(ids) == 0 {
-		return r.manifestIDs(), nil
+		return r.directIDs(), nil
 	}
+	direct := r.directMods()
 	var targets []string
 	for _, id := range ids {
-		if _, ok := r.Manifest.Mods[id]; ok {
+		if _, ok := direct[id]; ok {
 			if !contains(targets, id) {
 				targets = append(targets, id)
 			}
@@ -206,7 +212,7 @@ func (r *Resolver) directTargets(ids []string) ([]string, error) {
 			return nil, e
 		}
 		e := out.Errorf("not-found", "%s is not in the manifest", id)
-		e.Candidates = r.manifestIDs()
+		e.Candidates = r.directIDs()
 		return nil, e
 	}
 	sort.Strings(targets)
@@ -215,6 +221,7 @@ func (r *Resolver) directTargets(ids []string) ([]string, error) {
 
 func (r *Resolver) scope(targets []string) map[string]lock.Mod {
 	scope := map[string]lock.Mod{}
+	direct := r.directMods()
 	for _, id := range targets {
 		if m, ok := r.Lock.Mods[id]; ok {
 			scope[id] = m
@@ -226,7 +233,7 @@ func (r *Resolver) scope(targets []string) map[string]lock.Mod {
 			if _, done := scope[id]; done {
 				continue
 			}
-			if _, direct := r.Manifest.Mods[id]; direct {
+			if _, isDirect := direct[id]; isDirect {
 				continue
 			}
 			for _, by := range m.RequiredBy {

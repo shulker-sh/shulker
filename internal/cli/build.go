@@ -16,7 +16,7 @@ func (a *app) buildCmd() *cobra.Command {
 		Use:   "build [target]",
 		Short: "Assemble build directories from the lock and overrides",
 		Args:  cobra.MaximumNArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {
 				return err
@@ -27,7 +27,7 @@ func (a *app) buildCmd() *cobra.Command {
 			if a.printer.LockStale && !force {
 				return out.Errorf("lock-stale", "shulker.lock does not match shulker.json; run `shulker add`, `remove`, or `update`, or pass --force")
 			}
-			b, err := a.builder(p)
+			b, err := a.builder(cmd.Context(), p)
 			if err != nil {
 				return err
 			}

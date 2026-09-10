@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/pack"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -18,6 +19,7 @@ type app struct {
 	tty     func() bool
 	dir     string
 	d       *deps
+	packs   []*pack.Loaded
 }
 
 func Execute(args []string, stdout, stderr io.Writer) int {
@@ -52,7 +54,7 @@ func (a *app) root() *cobra.Command {
 	}
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
-	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.serveCmd(), a.linkCmd())
+	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.serveCmd(), a.linkCmd(), a.packCmd())
 	return root
 }
 

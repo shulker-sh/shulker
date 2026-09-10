@@ -60,6 +60,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 			}
 		}
 	}
+	ignores := r.ignores()
 	used := map[int]bool{}
 	for _, id := range sortedKeys(infos) {
 		info := infos[id]
@@ -76,7 +77,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 					continue
 				}
 			}
-			v.record(r.Manifest, used, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+			v.record(ignores, used, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
 		}
 		for _, on := range sortedKeys(info.Breaks) {
 			declared := info.Breaks[on]
@@ -90,7 +91,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 				continue
 			}
 			if match {
-				v.record(r.Manifest, used, Problem{Rule: "breaks", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+				v.record(ignores, used, Problem{Rule: "breaks", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
 			}
 		}
 		for _, on := range sortedKeys(info.Conflicts) {
@@ -119,8 +120,26 @@ func (r *Resolver) Validate() (*Validation, error) {
 	return v, nil
 }
 
-func (v *Validation) record(m *manifest.Manifest, used map[int]bool, p Problem) {
-	for i, ig := range m.Ignore {
+type ignoreEntry struct {
+	manifest.Ignore
+	label string
+}
+
+func (r *Resolver) ignores() []ignoreEntry {
+	var list []ignoreEntry
+	for i, ig := range r.Manifest.Ignore {
+		list = append(list, ignoreEntry{ig, fmt.Sprintf("ignore entry %d", i+1)})
+	}
+	for _, p := range r.Packs {
+		for i, ig := range p.Manifest.Ignore {
+			list = append(list, ignoreEntry{ig, fmt.Sprintf("ignore entry %d of pack %s", i+1, p.Name)})
+		}
+	}
+	return list
+}
+
+func (v *Validation) record(ignores []ignoreEntry, used map[int]bool, p Problem) {
+	for i, ig := range ignores {
 		if ig.Rule != p.Rule || ig.Mod != p.Mod || ig.On != p.On {
 			continue
 		}
@@ -128,7 +147,7 @@ func (v *Validation) record(m *manifest.Manifest, used map[int]bool, p Problem) 
 		if ig.Declared == p.Declared {
 			return
 		}
-		p.StaleNote = fmt.Sprintf("ignore entry %d is stale: it was written for %q", i+1, ig.Declared)
+		p.StaleNote = fmt.Sprintf("%s is stale: it was written for %q", ig.label, ig.Declared)
 	}
 	v.Problems = append(v.Problems, p)
 }

@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/andrewmast/shulker/internal/out"
 )
@@ -12,9 +13,13 @@ type Removed struct {
 }
 
 func (r *Resolver) Remove(ids []string) (*Removed, error) {
+	direct := r.directMods()
 	for _, id := range ids {
 		if _, ok := r.Manifest.Mods[id]; ok {
 			continue
+		}
+		if d, ok := direct[id]; ok {
+			return nil, out.Errorf("pack-provided", "%s is provided by pack %s; remove the pack or list the mod in shulker.json yourself", id, strings.Join(d.packs, ", "))
 		}
 		if m, ok := r.Lock.Mods[id]; ok {
 			e := out.Errorf("not-direct", "%s is not in the manifest; it is required by %v", id, m.RequiredBy)
@@ -33,7 +38,11 @@ func (r *Resolver) Remove(ids []string) (*Removed, error) {
 		delete(r.Manifest.Mods, id)
 		res.Removed = append(res.Removed, id)
 	}
+	direct = r.directMods()
 	for _, id := range res.Removed {
+		if _, stillDirect := direct[id]; stillDirect {
+			continue
+		}
 		if _, locked := r.Lock.Mods[id]; locked {
 			r.dropLocked(id)
 		}
@@ -44,10 +53,11 @@ func (r *Resolver) Remove(ids []string) (*Removed, error) {
 
 func (r *Resolver) pruneOrphans() []string {
 	pruned := []string{}
+	direct := r.directMods()
 	for changed := true; changed; {
 		changed = false
 		for _, id := range r.lockIDs() {
-			if _, direct := r.Manifest.Mods[id]; direct || len(r.Lock.Mods[id].RequiredBy) > 0 {
+			if _, isDirect := direct[id]; isDirect || len(r.Lock.Mods[id].RequiredBy) > 0 {
 				continue
 			}
 			r.dropLocked(id)
@@ -61,16 +71,7 @@ func (r *Resolver) pruneOrphans() []string {
 
 func (r *Resolver) dropLocked(id string) {
 	delete(r.Lock.Mods, id)
-	for other, m := range r.Lock.Mods {
-		kept := m.RequiredBy[:0]
-		for _, by := range m.RequiredBy {
-			if by != id {
-				kept = append(kept, by)
-			}
-		}
-		m.RequiredBy = kept
-		r.Lock.Mods[other] = m
-	}
+	r.dropRequiredBy(id)
 }
 
 func (r *Resolver) manifestIDs() []string {

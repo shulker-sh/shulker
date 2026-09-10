@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/andrewmast/shulker/internal/lock"
+	"github.com/andrewmast/shulker/internal/project"
 	"github.com/andrewmast/shulker/internal/resolve"
 	"github.com/spf13/cobra"
 )
@@ -21,8 +23,41 @@ func (a *app) updateCmd() *cobra.Command {
 		Aliases: []string{"upgrade"},
 		Short:   "Re-resolve mods to the newest compatible versions",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.relock(cmd, func(r *resolve.Resolver) (*resolve.Updated, string, error) {
-				res, err := r.Update(cmd.Context(), args)
+			return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (*resolve.Updated, string, error) {
+				packNames := map[string]bool{}
+				for _, l := range r.Packs {
+					packNames[l.Name] = true
+				}
+				var targets []string
+				requested := map[string]bool{}
+				for _, arg := range args {
+					if packNames[arg] {
+						requested[arg] = true
+						continue
+					}
+					targets = append(targets, arg)
+				}
+				refresh := len(args) == 0 || len(requested) > 0
+				if refresh {
+					loaded, err := a.resolvePacks(cmd.Context(), p)
+					if err != nil {
+						return nil, "", err
+					}
+					if err := r.RefreshPacks(loaded); err != nil {
+						return nil, "", err
+					}
+					for _, l := range loaded {
+						if requested[l.Name] {
+							for id := range l.Manifest.Mods {
+								targets = append(targets, id)
+							}
+						}
+					}
+				}
+				if len(args) > 0 && len(targets) == 0 {
+					return &resolve.Updated{Updated: []resolve.Change{}, Added: []string{}, Removed: []string{}}, "", nil
+				}
+				res, err := r.Update(cmd.Context(), targets)
 				return res, "", err
 			})
 		},
@@ -39,7 +74,7 @@ func (a *app) pinCmd() *cobra.Command {
 			if len(args) == 2 {
 				version = args[1]
 			}
-			return a.relock(cmd, func(r *resolve.Resolver) (*resolve.Updated, string, error) {
+			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (*resolve.Updated, string, error) {
 				return r.Pin(cmd.Context(), args[0], version)
 			})
 		},
@@ -52,7 +87,7 @@ func (a *app) unpinCmd() *cobra.Command {
 		Short: "Remove a mod's pin and re-resolve it",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.relock(cmd, func(r *resolve.Resolver) (*resolve.Updated, string, error) {
+			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (*resolve.Updated, string, error) {
 				res, err := r.Unpin(cmd.Context(), args[0])
 				return res, "", err
 			})
@@ -60,7 +95,7 @@ func (a *app) unpinCmd() *cobra.Command {
 	}
 }
 
-func (a *app) relock(cmd *cobra.Command, run func(*resolve.Resolver) (*resolve.Updated, string, error)) error {
+func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Resolver) (*resolve.Updated, string, error)) error {
 	p, err := a.openProject()
 	if err != nil {
 		return err
@@ -68,11 +103,15 @@ func (a *app) relock(cmd *cobra.Command, run func(*resolve.Resolver) (*resolve.U
 	if err := p.RequireLock(); err != nil {
 		return err
 	}
-	r, err := a.resolver(p)
+	r, err := a.resolver(cmd.Context(), p)
 	if err != nil {
 		return err
 	}
-	updated, pin, err := run(r)
+	pinsBefore := map[string]lock.Pack{}
+	for source, pin := range p.Lock.Packs {
+		pinsBefore[source] = pin
+	}
+	updated, pin, err := run(p, r)
 	if err != nil {
 		return err
 	}
@@ -80,6 +119,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*resolve.Resolver) (*resolve.U
 	if err != nil {
 		return err
 	}
+	updated.Packs = resolve.PackChanges(pinsBefore, p.Lock.Packs)
 	res := updateResult{Updated: updated, Pin: pin, Warnings: v.Warnings, Suggestions: v.Suggestions}
 	return a.printer.Emit(res, func(w io.Writer) {
 		if cmd.Name() == "pin" {
@@ -88,6 +128,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*resolve.Resolver) (*resolve.U
 		if cmd.Name() == "unpin" {
 			fmt.Fprintf(w, "unpinned %s\n", cmd.Flags().Arg(0))
 		}
+		printPackChanges(w, res.Packs)
 		for _, c := range res.Updated.Updated {
 			fmt.Fprintf(w, "~ %s %s -> %s\n", c.ID, c.From, c.To)
 		}
@@ -100,7 +141,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*resolve.Resolver) (*resolve.U
 		for _, s := range res.Suggestions {
 			fmt.Fprintf(w, "  %s (not installed)\n", s)
 		}
-		if len(res.Updated.Updated)+len(res.Added)+len(res.Removed) == 0 {
+		if len(res.Updated.Updated)+len(res.Added)+len(res.Removed)+len(res.Packs) == 0 {
 			fmt.Fprintln(w, "Already up to date.")
 			return
 		}
@@ -120,7 +161,7 @@ func (a *app) outdatedCmd() *cobra.Command {
 			if err := p.RequireLock(); err != nil {
 				return err
 			}
-			r, err := a.resolver(p)
+			r, err := a.resolver(cmd.Context(), p)
 			if err != nil {
 				return err
 			}
@@ -143,5 +184,18 @@ func (a *app) outdatedCmd() *cobra.Command {
 				fmt.Fprintln(w, "Next: shulker update")
 			})
 		},
+	}
+}
+
+func printPackChanges(w io.Writer, changes []resolve.PackChange) {
+	for _, c := range changes {
+		switch {
+		case c.From == "":
+			fmt.Fprintf(w, "+ pack %s %s\n", c.Name, c.To)
+		case c.To == "":
+			fmt.Fprintf(w, "- pack %s\n", c.Name)
+		default:
+			fmt.Fprintf(w, "~ pack %s %s -> %s\n", c.Name, c.From, c.To)
+		}
 	}
 }

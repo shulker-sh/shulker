@@ -21,7 +21,7 @@ func (a *app) removeCmd() *cobra.Command {
 			if err := p.RequireLock(); err != nil {
 				return err
 			}
-			r, err := a.resolver(p)
+			r, err := a.resolver(cmd.Context(), p)
 			if err != nil {
 				return err
 			}

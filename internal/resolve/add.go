@@ -12,6 +12,7 @@ import (
 	"github.com/andrewmast/shulker/internal/lock"
 	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/pack"
 	"github.com/andrewmast/shulker/internal/provider"
 )
 
@@ -21,6 +22,7 @@ type Resolver struct {
 	Providers map[string]provider.Provider
 	Cache     *cache.Cache
 	Fetch     *fetch.Client
+	Packs     []*pack.Loaded
 	Log       func(format string, args ...any)
 }
 

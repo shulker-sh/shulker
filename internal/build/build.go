@@ -19,6 +19,7 @@ import (
 	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/andrewmast/shulker/internal/mcver"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/pack"
 	"github.com/andrewmast/shulker/internal/server"
 )
 
@@ -62,6 +63,7 @@ type Builder struct {
 	Lock     *lock.Lock
 	LockPath string
 	Cache    *cache.Cache
+	Packs    []*pack.Loaded
 }
 
 type source struct {
@@ -78,7 +80,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	}
 	dir := filepath.Join(b.Dir, target.Build)
 	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, Conflicts: []string{}, Warnings: []string{}, Forced: opts.Force}
-	desired, dirs, err := b.collect(target, report)
+	desired, dirs, err := b.collect(name, target, report)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +183,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	return report, nil
 }
 
-func (b *Builder) collect(target manifest.Target, report *Report) (map[string]source, []string, error) {
+func (b *Builder) collect(name string, target manifest.Target, report *Report) (map[string]source, []string, error) {
 	desired := map[string]source{}
 	dirs := dataDirs(target.Side, "world")
 	for id, m := range b.Lock.Mods {
@@ -217,41 +219,63 @@ func (b *Builder) collect(target manifest.Target, report *Report) (map[string]so
 		}
 		desired[markerJarPath(b.Manifest.Name)] = source{data: jar}
 	}
-	for _, layer := range target.Overrides {
-		root := filepath.Join(b.Dir, layer)
-		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				if errors.Is(err, fs.ErrNotExist) && path == root {
-					return nil
-				}
-				return err
-			}
-			if d.IsDir() {
-				return nil
-			}
-			rel, _ := filepath.Rel(root, path)
-			rel = filepath.ToSlash(rel)
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			if strings.HasSuffix(rel, TemplateSuffix) {
-				rel = strings.TrimSuffix(rel, TemplateSuffix)
-				if data, err = render(filepath.Join(layer, rel+TemplateSuffix), data, vars); err != nil {
-					return err
-				}
-			}
-			if owned := desired[rel]; owned.props != nil {
-				data = owned.props.mergeInto(data, owned.sep)
-			}
-			desired[rel] = source{data: data}
-			return nil
-		})
+	for _, pk := range b.Packs {
+		pt, err := pk.Target(name, target.Side)
 		if err != nil {
+			return nil, nil, err
+		}
+		if pt == nil || pk.Dir == "" {
+			continue
+		}
+		packVars := map[string]string{}
+		for _, layer := range []map[string]string{pk.Manifest.Variables, pt.Variables, vars} {
+			for k, v := range layer {
+				packVars[k] = v
+			}
+		}
+		for _, layer := range pt.Overrides {
+			if err := b.layer(filepath.Join(pk.Dir, layer), pk.Name+":"+layer, packVars, desired); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	for _, layer := range target.Overrides {
+		if err := b.layer(filepath.Join(b.Dir, layer), layer, vars, desired); err != nil {
 			return nil, nil, err
 		}
 	}
 	return desired, dirs, nil
+}
+
+func (b *Builder) layer(root, label string, vars map[string]string, desired map[string]source) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) && path == root {
+				return nil
+			}
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, _ := filepath.Rel(root, path)
+		rel = filepath.ToSlash(rel)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(rel, TemplateSuffix) {
+			rel = strings.TrimSuffix(rel, TemplateSuffix)
+			if data, err = render(label+"/"+rel+TemplateSuffix, data, vars); err != nil {
+				return err
+			}
+		}
+		if owned := desired[rel]; owned.props != nil {
+			data = owned.props.mergeInto(data, owned.sep)
+		}
+		desired[rel] = source{data: data}
+		return nil
+	})
 }
 
 func (b *Builder) collectServer(desired map[string]source, vars map[string]string, report *Report) (string, error) {
