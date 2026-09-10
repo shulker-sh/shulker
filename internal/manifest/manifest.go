@@ -102,6 +102,7 @@ type Target struct {
 	Overrides []string          `json:"overrides"`
 	Build     string            `json:"build"`
 	Variables map[string]string `json:"variables,omitempty"`
+	Features  []string          `json:"features,omitempty"`
 	Note      string            `json:"note,omitempty"`
 }
 
@@ -113,12 +114,42 @@ type Pack struct {
 }
 
 type Mod struct {
-	Project  any    `json:"project,omitempty"`
-	Pin      any    `json:"pin,omitempty"`
-	Channel  string `json:"channel,omitempty"`
-	Side     string `json:"side,omitempty"`
-	Provider string `json:"provider,omitempty"`
-	Note     string `json:"note,omitempty"`
+	Project  any        `json:"project,omitempty"`
+	Pin      any        `json:"pin,omitempty"`
+	Channel  string     `json:"channel,omitempty"`
+	Side     string     `json:"side,omitempty"`
+	Provider string     `json:"provider,omitempty"`
+	OS       StringList `json:"os,omitempty"`
+	Feature  StringList `json:"feature,omitempty"`
+	Note     string     `json:"note,omitempty"`
+}
+
+func (m Mod) WithoutConditions() Mod {
+	m.OS, m.Feature = nil, nil
+	return m
+}
+
+type StringList []string
+
+func (l *StringList) UnmarshalJSON(data []byte) error {
+	var one string
+	if err := json.Unmarshal(data, &one); err == nil {
+		*l = StringList{one}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(data, &many); err != nil {
+		return err
+	}
+	*l = many
+	return nil
+}
+
+func (l StringList) MarshalJSON() ([]byte, error) {
+	if len(l) == 1 {
+		return json.Marshal(l[0])
+	}
+	return json.Marshal([]string(l))
 }
 
 type Ignore struct {
@@ -197,7 +228,10 @@ func (m *Manifest) ResolutionSha256() (string, error) {
 		Packs     []Pack         `json:"packs"`
 		Mods      map[string]Mod `json:"mods"`
 		Ignore    []Ignore       `json:"ignore"`
-	}{m.Minecraft, m.Loader, m.ProviderOrder(), m.Packs, m.Mods, m.Ignore}
+	}{m.Minecraft, m.Loader, m.ProviderOrder(), m.Packs, map[string]Mod{}, m.Ignore}
+	for id, mod := range m.Mods {
+		fields.Mods[id] = mod.WithoutConditions()
+	}
 	data, err := json.Marshal(fields)
 	if err != nil {
 		return "", err

@@ -153,7 +153,7 @@ func (b *Builder) Pull(name string, files []string, opts Options) (*PullReport, 
 	if len(pulled) == 0 {
 		return report, nil
 	}
-	desired, _, err = b.collect(name, target, &Report{})
+	desired, _, err = b.collect(name, target, opts, &Report{})
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func (b *Builder) drift(name string, opts Options) (*drift, error) {
 		dir = filepath.Join(b.Dir, target.Build)
 	}
 	report := &Report{Warnings: []string{}}
-	desired, _, err := b.collect(name, target, report)
+	desired, _, err := b.collect(name, target, opts, report)
 	if err != nil {
 		return nil, err
 	}

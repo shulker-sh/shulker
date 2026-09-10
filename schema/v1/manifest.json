@@ -117,6 +117,20 @@
       "type": "string",
       "enum": ["modrinth", "curseforge"]
     },
+    "osCondition": {
+      "type": "string",
+      "pattern": "^!?(macos|windows|linux)$",
+      "description": "An operating system name, or !name to exclude it."
+    },
+    "featureCondition": {
+      "type": "string",
+      "pattern": "^!?[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "description": "A feature name, or !name to require it off."
+    },
+    "featureName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+    },
     "modId": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_-]{1,63}$",
@@ -192,6 +206,12 @@
           "description": "Output directory. Defaults to build/<target>."
         },
         "variables": { "$ref": "#/$defs/variables" },
+        "features": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/featureName" },
+          "description": "Features on by default for this target. A mod gated with feature ships when one of its names is on."
+        },
         "note": { "$ref": "#/$defs/note" }
       }
     },
@@ -243,6 +263,20 @@
         "provider": {
           "$ref": "#/$defs/provider",
           "description": "Overrides the provider preference list for this mod."
+        },
+        "os": {
+          "oneOf": [
+            { "$ref": "#/$defs/osCondition" },
+            { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/osCondition" } }
+          ],
+          "description": "Ship only on these operating systems, evaluated where the build runs. Names are any-of, !names are none-of; both must hold. A dependency needed only by excluded mods is excluded too."
+        },
+        "feature": {
+          "oneOf": [
+            { "$ref": "#/$defs/featureCondition" },
+            { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/featureCondition" } }
+          ],
+          "description": "Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Features default from the target's features list."
         },
         "note": { "$ref": "#/$defs/note" }
       }

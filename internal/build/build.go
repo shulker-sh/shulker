@@ -69,6 +69,7 @@ type Report struct {
 	Linked    []string `json:"linked"`
 	Moved     []string `json:"moved"`
 	Conflicts []string `json:"conflicts"`
+	Excluded  []string `json:"excluded"`
 	Warnings  []string `json:"warnings"`
 	Forced    bool     `json:"forced"`
 }
@@ -77,6 +78,9 @@ type Options struct {
 	Force       bool
 	Dir         string
 	NoDataLinks bool
+	OS          string
+	NoOS        bool
+	Features    map[string]bool
 }
 
 type Builder struct {
@@ -183,8 +187,8 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	if dir == "" {
 		dir = filepath.Join(b.Dir, target.Build)
 	}
-	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, Conflicts: []string{}, Warnings: []string{}, Forced: opts.Force}
-	desired, dirs, err := b.collect(name, target, report)
+	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
+	desired, dirs, err := b.collect(name, target, opts, report)
 	if err != nil {
 		return nil, err
 	}
@@ -271,11 +275,14 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	return report, nil
 }
 
-func (b *Builder) collect(name string, target manifest.Target, report *Report) (map[string]source, []string, error) {
+func (b *Builder) collect(name string, target manifest.Target, opts Options, report *Report) (map[string]source, []string, error) {
 	desired := map[string]source{}
 	dirs := dataDirs(target.Side, "world")
+	sel := b.selectMods(b.conditions(target, opts))
+	report.Excluded = append(report.Excluded, sel.excluded...)
+	report.Warnings = append(report.Warnings, sel.warnings...)
 	for id, m := range b.Lock.Mods {
-		if m.Side != "both" && m.Side != target.Side {
+		if !sel.included[id] || (m.Side != "both" && m.Side != target.Side) {
 			continue
 		}
 		if !b.Cache.Has(m.Sha512) {
@@ -629,6 +636,9 @@ func (r *Report) Summary() string {
 	}
 	if len(r.Moved) > 0 {
 		s += fmt.Sprintf(", %d moved", len(r.Moved))
+	}
+	if len(r.Excluded) > 0 {
+		s += fmt.Sprintf(", %d excluded", len(r.Excluded))
 	}
 	return s
 }

@@ -3,6 +3,7 @@ package manifest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -58,5 +59,27 @@ func TestSaveRefusesInvalid(t *testing.T) {
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestConditionsRoundTripAndSkipTheResolutionHash(t *testing.T) {
+	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"],"features":["fancy"]}},"mods":{"aa":{"os":"macos"},"bb":{"feature":["fancy","!shaders"]}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Mods["aa"].OS) != 1 || m.Mods["aa"].OS[0] != "macos" || len(m.Mods["bb"].Feature) != 2 || m.Targets["client"].Features[0] != "fancy" {
+		t.Fatalf("parsed conditions: %+v", m.Mods)
+	}
+	data, err := m.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := string(data); !strings.Contains(s, `"os": "macos"`) || !strings.Contains(s, "\"feature\": [\n") {
+		t.Fatalf("encoded conditions: %s", s)
+	}
+	before, _ := m.ResolutionSha256()
+	m.Mods["aa"] = Mod{OS: StringList{"linux"}, Feature: StringList{"x"}}
+	if after, _ := m.ResolutionSha256(); after != before {
+		t.Fatal("conditions must not affect the resolution hash")
 	}
 }

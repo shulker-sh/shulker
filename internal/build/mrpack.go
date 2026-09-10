@@ -25,6 +25,7 @@ type MrpackOptions struct {
 	VersionID string
 	Output    string
 	Bundle    bool
+	OS        string
 }
 
 type MrpackReport struct {
@@ -42,6 +43,7 @@ type mrpackTarget struct {
 	name  string
 	side  string
 	files map[string][]byte
+	mods  map[string]bool
 }
 
 func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
@@ -52,7 +54,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, Bundled: []string{}, Overrides: []string{}, Warnings: []string{}}
 	for _, t := range targets {
 		report.Targets = append(report.Targets, t.name)
-		if err := b.mrpackCollect(t, report); err != nil {
+		if err := b.mrpackCollect(t, opts.OS, report); err != nil {
 			return nil, err
 		}
 	}
@@ -128,13 +130,24 @@ func (b *Builder) mrpackName(targets []*mrpackTarget) string {
 	return b.Manifest.Name
 }
 
-func (b *Builder) mrpackCollect(t *mrpackTarget, report *MrpackReport) error {
+func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, report *MrpackReport) error {
 	rep := &Report{}
-	desired, _, err := b.collect(t.name, b.Manifest.Targets[t.name], rep)
+	desired, _, err := b.collect(t.name, b.Manifest.Targets[t.name], Options{OS: osName, NoOS: osName == ""}, rep)
 	if err != nil {
 		return err
 	}
 	report.Warnings = append(report.Warnings, rep.Warnings...)
+	t.mods = map[string]bool{}
+	for id, m := range b.Lock.Mods {
+		if _, ok := desired["mods/"+m.Filename]; ok {
+			t.mods[id] = true
+		}
+	}
+	for _, e := range rep.Excluded {
+		if strings.Contains(e, "(needs os ") {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: left out of %s; pass --os to export that variation", e, t.name))
+		}
+	}
 	for path, s := range desired {
 		if s.sha512 != "" {
 			continue
@@ -164,7 +177,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 		m := b.Lock.Mods[id]
 		var owners []*mrpackTarget
 		for _, t := range targets {
-			if m.Side == "both" || m.Side == t.side {
+			if t.mods[id] {
 				owners = append(owners, t)
 			}
 		}

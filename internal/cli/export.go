@@ -20,7 +20,7 @@ func (a *app) exportCmd() *cobra.Command {
 }
 
 func (a *app) exportMrpackCmd() *cobra.Command {
-	var version, output, target string
+	var version, output, target, osName string
 	var bundle bool
 	cmd := &cobra.Command{
 		Use:   "mrpack",
@@ -53,7 +53,7 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := build.MrpackOptions{VersionID: version, Output: output, Bundle: bundle}
+			opts := build.MrpackOptions{VersionID: version, Output: output, Bundle: bundle, OS: osName}
 			if target != "" {
 				opts.Targets = []string{target}
 			}
@@ -70,6 +70,7 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 	cmd.Flags().StringVar(&version, "version", "", "version id written into the pack (default: \"version\" in shulker.json)")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "archive path (default: build/<name>-<version>.mrpack)")
 	cmd.Flags().StringVar(&target, "target", "", "export one target only (default: every target)")
+	cmd.Flags().StringVar(&osName, "os", "", "include mods gated on this os: macos, windows, or linux (default: leave them out)")
 	cmd.Flags().BoolVar(&bundle, "bundle", false, "put mods that Modrinth launchers cannot download inside the archive")
 	return cmd
 }

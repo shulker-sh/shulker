@@ -66,6 +66,9 @@ func (a *app) installCmd() *cobra.Command {
 					for _, m := range rep.Moved {
 						fmt.Fprintf(w, "  moved %s into %s\n", m, filepath.Join(build.DataDir, rep.Target, m))
 					}
+					for _, e := range rep.Excluded {
+						fmt.Fprintf(w, "  excluded %s\n", e)
+					}
 				}
 			})
 		},
