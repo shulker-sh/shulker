@@ -6,6 +6,7 @@ import { defineConfig } from 'vitepress'
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
 
+const siteUrl = 'https://shulker.sh'
 const schemaDir = fileURLToPath(new URL('../../schema/v1', import.meta.url))
 
 function serveSchema(): Plugin {
@@ -27,7 +28,25 @@ export default defineConfig({
   description: 'Manage Minecraft mods, client instances, and servers from one manifest',
   cleanUrls: true,
   lastUpdated: true,
-  head: [['link', { rel: 'icon', href: '/logo.png', type: 'image/png' }]],
+  head: [
+    ['link', { rel: 'icon', href: '/logo.png', type: 'image/png' }],
+    ['meta', { name: 'theme-color', content: '#d9772b' }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:site_name', content: 'Shulker' }],
+    ['meta', { property: 'og:image', content: `${siteUrl}/logo.png` }],
+    ['meta', { property: 'og:image:width', content: '512' }],
+    ['meta', { property: 'og:image:height', content: '512' }],
+    ['meta', { name: 'twitter:card', content: 'summary' }],
+  ],
+  sitemap: { hostname: siteUrl },
+  transformHead({ pageData, title, description }) {
+    const path = pageData.relativePath.replace(/(^|\/)index\.md$/, '$1').replace(/\.md$/, '')
+    return [
+      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:description', content: description }],
+      ['meta', { property: 'og:url', content: `${siteUrl}/${path}` }],
+    ]
+  },
   themeConfig: {
     logo: '/logo.png',
     nav: [
