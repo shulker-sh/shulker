@@ -242,12 +242,36 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 			Added []map[string]any `json:"added"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &env); err != nil || len(env.Data.Added) != 1 || env.Data.Added[0]["alreadyLocked"] != true {
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil || len(env.Data.Added) != 1 || env.Data.Added[0]["alreadyLocked"] != true || env.Data.Added[0]["switchedFrom"] != "modrinth" {
 		t.Fatalf("add via curseforge: %s", stdout)
 	}
 	sodium := h.readLock(t).Mods["sodium"]
-	if sodium.Provider != "modrinth" || sodium.Aliases.CurseForge != 394468 {
-		t.Fatalf("alias: %+v", sodium)
+	if sodium.Provider != "curseforge" || sodium.Aliases.Modrinth != "AANobbMI" || sodium.Aliases.CurseForge != 0 {
+		t.Fatalf("switched entry: %+v", sodium)
+	}
+	if by := h.readLock(t).Mods["fabric-api"].RequiredBy; len(by) != 1 || by[0] != "sodium" {
+		t.Fatalf("fabric-api requiredBy after switch: %v", by)
+	}
+	var m struct {
+		Mods map[string]map[string]any `json:"mods"`
+	}
+	h.readJSON(t, "shulker.json", &m)
+	if m.Mods["sodium"]["provider"] != "curseforge" || m.Mods["sodium"]["project"] != float64(394468) {
+		t.Fatalf("manifest after switch: %v", m.Mods["sodium"])
+	}
+	stdout = h.mustRun(t, "add", "sodium", "--provider", "modrinth")
+	if !strings.HasPrefix(stdout, "~ sodium ") || !strings.Contains(stdout, "curseforge -> modrinth") {
+		t.Fatalf("switch back: %s", stdout)
+	}
+	sodium = h.readLock(t).Mods["sodium"]
+	if sodium.Provider != "modrinth" || sodium.Aliases.CurseForge != 394468 || sodium.Aliases.Modrinth != "" {
+		t.Fatalf("switched back entry: %+v", sodium)
+	}
+	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth -> curseforge") {
+		t.Fatalf("second switch: %s", stdout)
+	}
+	if stdout = h.mustRun(t, "add", "sodium"); !strings.HasPrefix(stdout, "+ sodium ") || h.readLock(t).Mods["sodium"].Provider != "curseforge" {
+		t.Fatalf("plain add after switch should keep the curseforge entry: %s", stdout)
 	}
 
 	h.noCurseForge = true

@@ -91,11 +91,11 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if err != nil {
 		return err
 	}
-	id, existed, err := im.r.place(ctx, im.modrinth, proj, v, "", "")
+	id, prior, err := im.r.place(ctx, im.modrinth, proj, v, "", "", false)
 	if err != nil {
 		return err
 	}
-	if existed {
+	if prior != nil {
 		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, im.r.Lock.Mods[id].Filename))
 		return nil
 	}

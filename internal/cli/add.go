@@ -51,11 +51,18 @@ func (a *app) addCmd() *cobra.Command {
 			res := addResult{Added: results, Warnings: v.Warnings, Suggestions: v.Suggestions}
 			return a.printer.Emit(res, func(w io.Writer) {
 				for _, r := range res.Added {
-					fmt.Fprintf(w, "+ %s %s (%s)", r.ID, r.VersionNumber, r.Side)
+					if r.SwitchedFrom != "" {
+						fmt.Fprintf(w, "~ %s %s (%s) %s -> %s", r.ID, r.VersionNumber, r.Side, r.SwitchedFrom, r.Provider)
+					} else {
+						fmt.Fprintf(w, "+ %s %s (%s)", r.ID, r.VersionNumber, r.Side)
+					}
 					if len(r.Dependencies) > 0 {
 						fmt.Fprintf(w, " with %s", strings.Join(r.Dependencies, ", "))
 					}
 					fmt.Fprintln(w)
+					for _, id := range r.Pruned {
+						fmt.Fprintf(w, "  pruned %s\n", id)
+					}
 				}
 				for _, s := range res.Suggestions {
 					fmt.Fprintf(w, "  %s (not installed)\n", s)

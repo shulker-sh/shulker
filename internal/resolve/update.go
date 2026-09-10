@@ -179,7 +179,7 @@ func (r *Resolver) relock(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	placed, _, err := r.place(ctx, p, proj, v, "", entry.Side)
+	placed, _, err := r.place(ctx, p, proj, v, "", entry.Side, false)
 	if err != nil {
 		return err
 	}

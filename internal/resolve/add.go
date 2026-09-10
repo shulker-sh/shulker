@@ -46,6 +46,8 @@ type Added struct {
 	Side          string   `json:"side"`
 	Dependencies  []string `json:"dependencies"`
 	AlreadyLocked bool     `json:"alreadyLocked"`
+	SwitchedFrom  string   `json:"switchedFrom,omitempty"`
+	Pruned        []string `json:"pruned,omitempty"`
 }
 
 func (r *Resolver) log(format string, args ...any) {
@@ -103,6 +105,10 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provi
 }
 
 func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Added, error) {
+	explicit := opts.Provider != ""
+	if prev, ok := r.Manifest.Mods[slug]; !explicit && ok && prev.Provider != "" {
+		opts.Provider = prev.Provider
+	}
 	p, proj, err := r.lookup(ctx, slug, opts.Provider)
 	if err != nil {
 		return nil, err
@@ -111,11 +117,22 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Adde
 	if err != nil {
 		return nil, err
 	}
-	id, existed, err := r.place(ctx, p, proj, v, "", opts.Side)
+	id, prior, err := r.place(ctx, p, proj, v, "", opts.Side, explicit)
 	if err != nil {
 		return nil, err
 	}
-	added := &Added{ID: id, Provider: p.Name(), Project: proj.ID, VersionNumber: v.Number, Filename: v.File.Filename, Side: r.Lock.Mods[id].Side, Dependencies: []string{}, AlreadyLocked: existed}
+	added := &Added{ID: id, Provider: p.Name(), Project: proj.ID, VersionNumber: v.Number, Filename: v.File.Filename, Side: r.Lock.Mods[id].Side, Dependencies: []string{}, AlreadyLocked: prior != nil}
+	previous := r.Manifest.Mods[id]
+	if explicit && prior != nil && prior.Provider != p.Name() {
+		added.SwitchedFrom = prior.Provider
+		r.dropRequiredBy(id)
+		if opts.Side == "" {
+			opts.Side = previous.Side
+		}
+		if opts.Channel == "" {
+			opts.Channel = previous.Channel
+		}
+	}
 	visited := map[string]bool{proj.ID: true}
 	if err := r.addDeps(ctx, p, v, id, opts.Channel, added, visited); err != nil {
 		return nil, err
@@ -135,6 +152,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Adde
 		entry.Provider = p.Name()
 	}
 	r.Manifest.Mods[id] = entry
+	if added.SwitchedFrom != "" {
+		added.Pruned = r.pruneOrphans()
+	}
 	return added, nil
 }
 
@@ -225,29 +245,37 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	return obtained{}, out.Errorf("manual-download", "%s %s is not distributed by its provider: download %s from %s into %s/ and run the command again", proj.Slug, v.Number, v.File.Filename, v.Page, DownloadsDir)
 }
 
-func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, requiredBy, sideOverride string) (string, bool, error) {
+func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, requiredBy, sideOverride string, replace bool) (string, *lock.Mod, error) {
 	r.log("fetching %s %s", proj.Slug, v.Number)
 	got, err := r.obtain(ctx, proj, v)
 	if err != nil {
-		return "", false, err
+		return "", nil, err
 	}
 	info, err := jarmeta.Read(got.path)
 	if err != nil {
-		return "", false, err
+		return "", nil, err
 	}
+	var prior *lock.Mod
 	if existing, ok := r.Lock.Mods[info.ID]; ok {
+		prior = &existing
 		if requiredBy != "" {
 			r.Lock.AddRequiredBy(info.ID, requiredBy)
 		}
 		switch {
+		case existing.Provider != p.Name() && replace:
+			r.log("switching %s from %s to %s", info.ID, existing.Provider, p.Name())
 		case existing.Provider != p.Name():
-			setAlias(&existing, p.Name(), proj.ID)
-			r.Lock.Mods[info.ID] = existing
+			aliased := r.Lock.Mods[info.ID]
+			setAlias(&aliased, p.Name(), proj.ID)
+			r.Lock.Mods[info.ID] = aliased
 			r.log("keeping %s %s from %s (%s project %s recorded as an alias)", info.ID, existing.VersionNumber, existing.Provider, p.Name(), proj.ID)
+			return info.ID, prior, nil
 		case fmt.Sprint(existing.Version) != v.ID:
 			r.log("keeping %s %s already in lock", info.ID, existing.VersionNumber)
+			return info.ID, prior, nil
+		default:
+			return info.ID, prior, nil
 		}
-		return info.ID, true, nil
 	}
 	side := proj.Side
 	if side == "" {
@@ -271,8 +299,26 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	if requiredBy != "" {
 		entry.RequiredBy = []string{requiredBy}
 	}
+	if prior != nil {
+		entry.RequiredBy = prior.RequiredBy
+		entry.Aliases = prior.Aliases
+		if sideOverride == "" {
+			entry.Side = prior.Side
+		}
+		setAlias(&entry, prior.Provider, fmt.Sprint(prior.Project))
+		clearAlias(&entry, p.Name())
+	}
 	r.Lock.Mods[info.ID] = entry
-	return info.ID, false, nil
+	return info.ID, prior, nil
+}
+
+func clearAlias(m *lock.Mod, providerName string) {
+	switch providerName {
+	case "modrinth":
+		m.Aliases.Modrinth = ""
+	case "curseforge":
+		m.Aliases.CurseForge = 0
+	}
 }
 
 func setAlias(m *lock.Mod, providerName, projectID string) {
@@ -312,7 +358,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 				return fmt.Errorf("dependency of %s: %w", parentID, err)
 			}
 		}
-		id, _, err := r.place(ctx, p, dproj, dv, parentID, "")
+		id, _, err := r.place(ctx, p, dproj, dv, parentID, "", false)
 		if err != nil {
 			return err
 		}
