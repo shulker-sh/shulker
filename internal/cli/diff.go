@@ -2,13 +2,16 @@ package cli
 
 import (
 	"fmt"
+	"github.com/shulker-sh/shulker/internal/out"
 	"io"
+	"path/filepath"
 
 	"github.com/shulker-sh/shulker/internal/build"
 	"github.com/spf13/cobra"
 )
 
 func (a *app) diffCmd() *cobra.Command {
+	var into string
 	cmd := &cobra.Command{
 		Use:   "diff [target]",
 		Short: "Show build files that differ from what build would write",
@@ -32,9 +35,17 @@ func (a *app) diffCmd() *cobra.Command {
 			if len(args) == 1 {
 				names = args
 			}
+			if into != "" {
+				if len(names) != 1 {
+					return out.Errorf("into-target", "--into applies to one target; name it")
+				}
+				if into, err = filepath.Abs(into); err != nil {
+					return err
+				}
+			}
 			var reports []*build.DiffReport
 			for _, name := range names {
-				rep, err := b.Diff(name, build.Options{})
+				rep, err := b.Diff(name, build.Options{Dir: into})
 				if err != nil {
 					return err
 				}
@@ -56,11 +67,12 @@ func (a *app) diffCmd() *cobra.Command {
 			})
 		},
 	}
+	cmd.Flags().StringVar(&into, "into", "", "directory the target was synced into (default: the target's build directory)")
 	return cmd
 }
 
 func (a *app) pullCmd() *cobra.Command {
-	var target string
+	var target, into string
 	cmd := &cobra.Command{
 		Use:   "pull [file...]",
 		Short: "Copy edits made in a build directory back into their source",
@@ -83,7 +95,12 @@ func (a *app) pullCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep, err := b.Pull(name, args, build.Options{})
+			if into != "" {
+				if into, err = filepath.Abs(into); err != nil {
+					return err
+				}
+			}
+			rep, err := b.Pull(name, args, build.Options{Dir: into})
 			if err != nil {
 				return err
 			}
@@ -108,5 +125,6 @@ func (a *app) pullCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&target, "target", "", "target whose build directory to pull from (default: the only target)")
+	cmd.Flags().StringVar(&into, "into", "", "directory the target was synced into (default: the target's build directory)")
 	return cmd
 }

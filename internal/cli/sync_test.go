@@ -193,3 +193,37 @@ func TestSyncFromManifestURL(t *testing.T) {
 		t.Fatalf("missing manifest: exit %d %s", code, stdout)
 	}
 }
+
+func TestDiffAndPullInto(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	overrides := filepath.Join(h.dir, "overrides", "config")
+	if err := os.MkdirAll(overrides, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(overrides, "plain.txt"), []byte("a=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	into := filepath.Join(t.TempDir(), "instance", "minecraft")
+	h.mustRun(t, "sync", h.dir, "--into", into)
+	if err := os.WriteFile(filepath.Join(into, "config", "plain.txt"), []byte("a=2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if code, _, stderr := h.run(t, "diff"); code == 0 || !strings.Contains(stderr, "no build directory") {
+		t.Fatalf("diff without --into must look at the project build dir: %d %s", code, stderr)
+	}
+	stdout := h.mustRun(t, "diff", "client", "--into", into)
+	if !strings.Contains(stdout, "config/plain.txt") || !strings.Contains(stdout, "-a=2") {
+		t.Fatalf("diff --into: %s", stdout)
+	}
+
+	h.mustRun(t, "pull", "--into", into)
+	if data, _ := os.ReadFile(filepath.Join(overrides, "plain.txt")); string(data) != "a=2\n" {
+		t.Fatalf("pull --into did not copy the edit back: %q", data)
+	}
+	if stdout := h.mustRun(t, "diff", "client", "--into", into); !strings.Contains(stdout, "no changes") {
+		t.Fatalf("diff after pull: %s", stdout)
+	}
+}
