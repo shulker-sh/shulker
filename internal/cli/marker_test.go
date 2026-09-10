@@ -31,7 +31,10 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 		Description   string `json:"description"`
 		Icon          string `json:"icon"`
 		Environment   string `json:"environment"`
-		Custom        struct {
+		Entrypoints   struct {
+			ModMenu []string `json:"modmenu"`
+		} `json:"entrypoints"`
+		Custom struct {
 			ModMenu struct {
 				UpdateChecker bool `json:"update_checker"`
 			} `json:"modmenu"`
@@ -49,6 +52,21 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 	}
 	if meta.Icon != "assets/shulker_my_pack/icon.png" || len(entries[meta.Icon]) == 0 {
 		t.Fatalf("icon %q missing from jar", meta.Icon)
+	}
+	if len(meta.Entrypoints.ModMenu) != 1 || meta.Entrypoints.ModMenu[0] != "shulker.marker.ShulkerModMenu" {
+		t.Fatalf("entrypoints: %+v", meta.Entrypoints)
+	}
+	if got := string(entries["shulker/mods.txt"]); got != "fabric-api\nsodium\n" {
+		t.Fatalf("mods.txt: %q", got)
+	}
+	for _, class := range []string{"shulker/marker/ShulkerModMenu.class", "shulker/marker/ShulkerModMenu$1.class"} {
+		data := entries[class]
+		if len(data) < 8 || !bytes.HasPrefix(data, []byte{0xCA, 0xFE, 0xBA, 0xBE}) {
+			t.Fatalf("%s missing or not a class file", class)
+		}
+		if major := int(data[6])<<8 | int(data[7]); major != 61 {
+			t.Fatalf("%s targets class version %d, want 61 (Java 17)", class, major)
+		}
 	}
 	var embedded map[string]any
 	if err := json.Unmarshal(entries["shulker.lock"], &embedded); err != nil || embedded["minecraft"] != "26.2" {
