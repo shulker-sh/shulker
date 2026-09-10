@@ -159,16 +159,21 @@ func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
 	}
 }
 
-func TestMarkerVersionUsesManifestVersion(t *testing.T) {
+func TestMarkerUsesManifestVersionAndDisplayName(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "versioned")
-	h.editManifest(t, func(m map[string]any) { m["version"] = "1.0" })
+	h.editManifest(t, func(m map[string]any) {
+		m["version"] = "1.0"
+		m["targets"].(map[string]any)["client"].(map[string]any)["name"] = "LAN Party"
+	})
 	h.mustRun(t, "install")
 	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-versioned.jar"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var meta struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
 		Version string `json:"version"`
 	}
 	if err := json.Unmarshal(readZip(t, data)["fabric.mod.json"], &meta); err != nil {
@@ -176,6 +181,9 @@ func TestMarkerVersionUsesManifestVersion(t *testing.T) {
 	}
 	if !strings.HasPrefix(meta.Version, "1.0+") || len(meta.Version) != len("1.0+")+8 {
 		t.Fatalf("version: %q", meta.Version)
+	}
+	if meta.Name != "LAN Party" || meta.ID != "shulker_versioned" {
+		t.Fatalf("name %q id %q", meta.Name, meta.ID)
 	}
 }
 

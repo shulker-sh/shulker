@@ -54,7 +54,7 @@ type markerEntry struct {
 	data []byte
 }
 
-func (b *Builder) markerJar(side string) ([]byte, error) {
+func (b *Builder) markerJar(targetName, side string) ([]byte, error) {
 	lockData, err := os.ReadFile(b.LockPath)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (b *Builder) markerJar(side string) ([]byte, error) {
 		"schemaVersion": 1,
 		"id":            id,
 		"version":       markerVersion(b.Manifest.Version, lockHash),
-		"name":          b.Manifest.Name,
+		"name":          b.Manifest.DisplayName(targetName),
 		"description":   b.markerDescription(direct, deps),
 		"icon":          "assets/" + id + "/icon.png",
 		"environment":   "*",

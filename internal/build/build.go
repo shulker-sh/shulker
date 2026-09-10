@@ -222,7 +222,7 @@ func (b *Builder) collect(name string, target manifest.Target, report *Report) (
 		if err := b.collectClient(desired, vars); err != nil {
 			return nil, nil, err
 		}
-		jar, err := b.markerJar(target.Side)
+		jar, err := b.markerJar(name, target.Side)
 		if err != nil {
 			return nil, nil, err
 		}
