@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -46,7 +47,7 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 	if meta.SchemaVersion != 1 || meta.ID != "shulker_my_pack" || meta.Name != "my.pack" || meta.Environment != "*" || len(meta.Version) != 8 || meta.Custom.ModMenu.UpdateChecker {
 		t.Fatalf("fabric.mod.json: %+v", meta)
 	}
-	want := "Built by shulker: Minecraft 26.2, fabric 0.17.3, 2 mods.\n\nMods:\nsodium 1.0.0+mc26.2\n\nDependencies:\nfabric-api 1.0.0+mc26.2"
+	want := "Minecraft 26.2, fabric 0.17.3, 2 mods.\n\nMods:\nsodium 1.0.0+mc26.2\n\nDependencies:\nfabric-api 1.0.0+mc26.2"
 	if meta.Description != want {
 		t.Fatalf("description:\n%s", meta.Description)
 	}
@@ -102,4 +103,67 @@ func readZip(t *testing.T, data []byte) map[string][]byte {
 		rc.Close()
 	}
 	return entries
+}
+
+func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "linked")
+	h.editManifest(t, func(m map[string]any) {
+		m["description"] = "Survival with friends."
+		m["authors"] = []string{"Alice", "shulker.sh"}
+		m["links"] = map[string]any{
+			"website":      "https://example.com",
+			"issues":       "https://example.com/issues",
+			"source":       "https://example.com/src",
+			"discord":      "https://discord.gg/abc",
+			"Server rules": "https://example.com/rules",
+		}
+	})
+	h.mustRun(t, "install")
+
+	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-linked.jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := readZip(t, data)
+	var meta struct {
+		Description string            `json:"description"`
+		Authors     []string          `json:"authors"`
+		Contact     map[string]string `json:"contact"`
+		Custom      struct {
+			ModMenu struct {
+				Links map[string]string `json:"links"`
+			} `json:"modmenu"`
+		} `json:"custom"`
+	}
+	if err := json.Unmarshal(entries["fabric.mod.json"], &meta); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(meta.Description, "Survival with friends.\n\nMinecraft 26.2, ") {
+		t.Fatalf("description:\n%s", meta.Description)
+	}
+	if strings.Join(meta.Authors, ",") != "Alice,shulker.sh" {
+		t.Fatalf("authors: %v", meta.Authors)
+	}
+	wantContact := map[string]string{"homepage": "https://example.com", "issues": "https://example.com/issues", "sources": "https://example.com/src"}
+	if fmt.Sprint(meta.Contact) != fmt.Sprint(wantContact) {
+		t.Fatalf("contact: %v", meta.Contact)
+	}
+	wantLinks := map[string]string{"modmenu.discord": "https://discord.gg/abc", "shulker.link.server_rules": "https://example.com/rules"}
+	if fmt.Sprint(meta.Custom.ModMenu.Links) != fmt.Sprint(wantLinks) {
+		t.Fatalf("links: %v", meta.Custom.ModMenu.Links)
+	}
+	var lang map[string]string
+	if err := json.Unmarshal(entries["assets/shulker_linked/lang/en_us.json"], &lang); err != nil || lang["shulker.link.server_rules"] != "Server rules" {
+		t.Fatalf("lang: %v %v", err, lang)
+	}
+}
+
+func TestInitSeedsAuthors(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "seeded")
+	m := h.readManifest(t)
+	if len(m.Authors) == 0 || m.Authors[len(m.Authors)-1] != "shulker.sh" {
+		t.Fatalf("authors: %v", m.Authors)
+	}
 }

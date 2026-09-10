@@ -92,6 +92,7 @@ func TestExportMrpack(t *testing.T) {
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"
 		m["note"] = "A demo pack"
+		m["description"] = "Survival with friends."
 		m["targets"] = map[string]any{
 			"client": map[string]any{"side": "client", "name": "Demo Pack", "overrides": []string{"overrides/common", "overrides/client"}, "build": "build/client"},
 			"server": map[string]any{"side": "server", "overrides": []string{"overrides/common", "overrides/server"}, "build": "build/server"},
@@ -118,7 +119,7 @@ func TestExportMrpack(t *testing.T) {
 		t.Fatalf("export output: %s", stdout)
 	}
 	index, entries := readMrpack(t, archive)
-	if index.FormatVersion != 1 || index.Game != "minecraft" || index.VersionID != "1.0" || index.Name != "Demo Pack" || index.Summary != "A demo pack" {
+	if index.FormatVersion != 1 || index.Game != "minecraft" || index.VersionID != "1.0" || index.Name != "Demo Pack" || index.Summary != "Survival with friends.\n\nA demo pack" {
 		t.Fatalf("index header: %+v", index)
 	}
 	if index.Dependencies["minecraft"] != "26.2" || index.Dependencies["fabric-loader"] != "0.17.3" || len(index.Dependencies) != 2 {

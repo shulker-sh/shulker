@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -61,6 +62,7 @@ func (a *app) initCmd() *cobra.Command {
 			m := &manifest.Manifest{
 				Schema:    manifest.SchemaURL,
 				Name:      name,
+				Authors:   defaultAuthors(),
 				Minecraft: minecraft,
 				Loader:    manifest.Loader{Type: loader, Version: loaderVersion},
 				Targets:   map[string]manifest.Target{target: {Side: target, Overrides: []string{"overrides"}, Build: "build/" + target}},
@@ -144,4 +146,16 @@ func scaffold(dir string) error {
 		return os.WriteFile(gi, []byte("/build/\n/data/\n/downloads/\n"), 0o644)
 	}
 	return nil
+}
+
+func defaultAuthors() []string {
+	authors := []string{"shulker.sh"}
+	name, err := exec.Command("git", "config", "user.name").Output()
+	if err != nil {
+		return authors
+	}
+	if user := strings.TrimSpace(string(name)); user != "" {
+		authors = append([]string{user}, authors...)
+	}
+	return authors
 }

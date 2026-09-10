@@ -61,6 +61,8 @@ func (b *Builder) markerJar(side string) ([]byte, error) {
 	}
 	direct, deps := b.markerMods(side)
 	id := markerModID(b.Manifest.Name)
+	contact, links, labels := markerLinks(b.Manifest.Links)
+	modmenu := map[string]any{"update_checker": false}
 	meta := map[string]any{
 		"schemaVersion": 1,
 		"id":            id,
@@ -70,7 +72,16 @@ func (b *Builder) markerJar(side string) ([]byte, error) {
 		"icon":          "assets/" + id + "/icon.png",
 		"environment":   "*",
 		"entrypoints":   map[string]any{"modmenu": []string{markerEntrypoint}},
-		"custom":        map[string]any{"modmenu": map[string]any{"update_checker": false}},
+		"custom":        map[string]any{"modmenu": modmenu},
+	}
+	if len(links) > 0 {
+		modmenu["links"] = links
+	}
+	if len(b.Manifest.Authors) > 0 {
+		meta["authors"] = b.Manifest.Authors
+	}
+	if len(contact) > 0 {
+		meta["contact"] = contact
 	}
 	metaData, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
@@ -79,10 +90,19 @@ func (b *Builder) markerJar(side string) ([]byte, error) {
 	entries := []markerEntry{
 		{"fabric.mod.json", metaData},
 		{"assets/" + id + "/icon.png", markerIcon},
-		{manifest.FileName, manifestData},
-		{lock.FileName, lockData},
-		{markerModsPath, markerModList(direct, deps)},
 	}
+	if len(labels) > 0 {
+		lang, err := json.MarshalIndent(labels, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, markerEntry{"assets/" + id + "/lang/en_us.json", lang})
+	}
+	entries = append(entries,
+		markerEntry{manifest.FileName, manifestData},
+		markerEntry{lock.FileName, lockData},
+		markerEntry{markerModsPath, markerModList(direct, deps)},
+	)
 	classes, err := markerClassEntries()
 	if err != nil {
 		return nil, err
@@ -143,6 +163,45 @@ func markerModList(direct, deps []string) []byte {
 	return []byte(strings.Join(ids, "\n") + "\n")
 }
 
+var markerContactKeys = map[string]string{"website": "homepage", "issues": "issues", "source": "sources"}
+
+var markerKnownLinks = map[string]bool{
+	"buymeacoffee": true, "coindrop": true, "crowdin": true, "curseforge": true, "discord": true,
+	"donate": true, "flattr": true, "github_releases": true, "github_sponsors": true, "kofi": true,
+	"liberapay": true, "mastodon": true, "modrinth": true, "opencollective": true, "patreon": true,
+	"paypal": true, "reddit": true, "twitch": true, "twitter": true, "wiki": true, "youtube": true,
+}
+
+func markerLinks(links map[string]string) (contact, modmenu, labels map[string]string) {
+	contact, modmenu, labels = map[string]string{}, map[string]string{}, map[string]string{}
+	for label, url := range links {
+		if key, ok := markerContactKeys[label]; ok {
+			contact[key] = url
+			continue
+		}
+		if markerKnownLinks[label] {
+			modmenu["modmenu."+label] = url
+			continue
+		}
+		key := "shulker.link." + markerLangKey(label)
+		modmenu[key] = url
+		labels[key] = label
+	}
+	return contact, modmenu, labels
+}
+
+func markerLangKey(label string) string {
+	var sb strings.Builder
+	for _, r := range strings.ToLower(label) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			sb.WriteRune(r)
+		} else {
+			sb.WriteByte('_')
+		}
+	}
+	return sb.String()
+}
+
 func (b *Builder) markerDescription(direct, deps []string) string {
 	lines := func(ids []string) []string {
 		out := make([]string, len(ids))
@@ -152,7 +211,10 @@ func (b *Builder) markerDescription(direct, deps []string) string {
 		return out
 	}
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "Built by shulker: Minecraft %s, %s %s, %d mods.", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
+	if b.Manifest.Description != "" {
+		sb.WriteString(strings.TrimSpace(b.Manifest.Description) + "\n\n")
+	}
+	fmt.Fprintf(&sb, "Minecraft %s, %s %s, %d mods.", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
 	if len(direct) > 0 {
 		sb.WriteString("\n\nMods:\n" + strings.Join(lines(direct), "\n"))
 	}

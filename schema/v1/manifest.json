@@ -18,6 +18,20 @@
       "minLength": 1,
       "description": "Pack version shown to people, e.g. \"1.0\" or \"2026-09\". Never parsed. Used as the versionId of an exported .mrpack and in its file name."
     },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One paragraph about the pack, shown to players. First paragraph of the ModMenu entry and, joined with note, the summary of an exported .mrpack."
+    },
+    "authors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "description": "Shown by ModMenu as \"by ...\" under the pack name. init seeds the git user.name and shulker.sh; delete entries freely."
+    },
+    "links": {
+      "$ref": "#/$defs/links"
+    },
     "minecraft": {
       "$ref": "#/$defs/semverRange",
       "description": "Semver range over Minecraft version ids, e.g. \"~26.2\", \"^26.1\", or an exact version. Pre-release order is snapshot < pre < rc < release."
@@ -66,6 +80,30 @@
     "note": { "$ref": "#/$defs/note" }
   },
   "$defs": {
+    "links": {
+      "type": "object",
+      "propertyNames": { "type": "string", "minLength": 1 },
+      "additionalProperties": { "type": "string", "format": "uri" },
+      "description": "Links shown on the pack's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written.",
+      "properties": {
+        "website": { "type": "string", "format": "uri" },
+        "issues": { "type": "string", "format": "uri" },
+        "source": { "type": "string", "format": "uri" },
+        "discord": { "type": "string", "format": "uri" },
+        "modrinth": { "type": "string", "format": "uri" },
+        "curseforge": { "type": "string", "format": "uri" },
+        "wiki": { "type": "string", "format": "uri" },
+        "youtube": { "type": "string", "format": "uri" },
+        "reddit": { "type": "string", "format": "uri" },
+        "twitter": { "type": "string", "format": "uri" },
+        "mastodon": { "type": "string", "format": "uri" },
+        "twitch": { "type": "string", "format": "uri" },
+        "patreon": { "type": "string", "format": "uri" },
+        "kofi": { "type": "string", "format": "uri" },
+        "paypal": { "type": "string", "format": "uri" },
+        "donate": { "type": "string", "format": "uri" }
+      }
+    },
     "note": {
       "type": "string",
       "description": "Free-text documentation. The comment substitute; ignored by the tool."

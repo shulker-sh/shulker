@@ -70,7 +70,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		Game:          mrpack.Game,
 		VersionID:     opts.VersionID,
 		Name:          report.Name,
-		Summary:       b.Manifest.Note,
+		Summary:       mrpackSummary(b.Manifest),
 		Files:         files,
 		Dependencies:  map[string]string{"minecraft": b.Lock.Minecraft, mrpack.LoaderKeys[b.Lock.Loader.Type]: b.Lock.Loader.Version},
 	}
@@ -291,4 +291,14 @@ func writeMrpack(output string, entries map[string][]byte) error {
 
 func MrpackFileName(m *manifest.Manifest, versionID string) string {
 	return m.Name + "-" + versionID + ".mrpack"
+}
+
+func mrpackSummary(m *manifest.Manifest) string {
+	var parts []string
+	for _, p := range []string{m.Description, m.Note} {
+		if p = strings.TrimSpace(p); p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return strings.Join(parts, "\n\n")
 }

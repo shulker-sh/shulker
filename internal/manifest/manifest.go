@@ -19,21 +19,24 @@ const (
 var DefaultProviders = []string{"modrinth", "curseforge"}
 
 type Manifest struct {
-	Schema    string            `json:"$schema,omitempty"`
-	Name      string            `json:"name"`
-	Version   string            `json:"version,omitempty"`
-	Note      string            `json:"note,omitempty"`
-	Minecraft string            `json:"minecraft"`
-	Loader    Loader            `json:"loader"`
-	Java      string            `json:"java,omitempty"`
-	Providers []string          `json:"providers,omitempty"`
-	Targets   map[string]Target `json:"targets"`
-	Packs     []Pack            `json:"packs,omitempty"`
-	Mods      map[string]Mod    `json:"mods"`
-	Ignore    []Ignore          `json:"ignore,omitempty"`
-	Variables map[string]string `json:"variables,omitempty"`
-	Server    *Server           `json:"server,omitempty"`
-	Client    *Client           `json:"client,omitempty"`
+	Schema      string            `json:"$schema,omitempty"`
+	Name        string            `json:"name"`
+	Version     string            `json:"version,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Authors     []string          `json:"authors,omitempty"`
+	Links       map[string]string `json:"links,omitempty"`
+	Note        string            `json:"note,omitempty"`
+	Minecraft   string            `json:"minecraft"`
+	Loader      Loader            `json:"loader"`
+	Java        string            `json:"java,omitempty"`
+	Providers   []string          `json:"providers,omitempty"`
+	Targets     map[string]Target `json:"targets"`
+	Packs       []Pack            `json:"packs,omitempty"`
+	Mods        map[string]Mod    `json:"mods"`
+	Ignore      []Ignore          `json:"ignore,omitempty"`
+	Variables   map[string]string `json:"variables,omitempty"`
+	Server      *Server           `json:"server,omitempty"`
+	Client      *Client           `json:"client,omitempty"`
 }
 
 type Server struct {
