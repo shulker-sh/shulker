@@ -357,10 +357,29 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
+	if !strings.Contains(stdout, "0 written, 4 unchanged, 0 kept, 0 removed") {
+		t.Fatalf("removed override should hand options.txt back to client.options: %s", stdout)
+	}
+	if data, _ := os.ReadFile(options); string(data) != "renderDistance:16\nlang:en_us\njoinedFirstServer:true\nonboardAccessibility:false\nskipMultiplayerWarning:true\ntutorialStep:none\n" {
+		t.Fatalf("options.txt after override removal: %q", data)
+	}
+
+	extra := filepath.Join(h.dir, "overrides", "config", "extra.txt")
+	if err := os.MkdirAll(filepath.Dir(extra), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(extra, []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "build")
+	if err := os.Remove(extra); err != nil {
+		t.Fatal(err)
+	}
+	stdout = h.mustRun(t, "build")
 	if !strings.Contains(stdout, "1 removed") {
 		t.Fatalf("removed source should delete build file: %s", stdout)
 	}
-	if _, err := os.Stat(options); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(buildDir, "config", "extra.txt")); !os.IsNotExist(err) {
 		t.Fatal("build file should be gone")
 	}
 
@@ -530,7 +549,7 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 		t.Fatalf("suggestions: %v", sg)
 	}
 	stdout = h.mustRun(t, "install")
-	if !strings.Contains(stdout, "client: 3 written") {
+	if !strings.Contains(stdout, "client: 4 written") {
 		t.Fatalf("install: %s", stdout)
 	}
 }

@@ -62,6 +62,7 @@ type source struct {
 	sha512 string
 	data   []byte
 	props  properties
+	sep    string
 }
 
 func (b *Builder) Build(name string, opts Options) (*Report, error) {
@@ -101,6 +102,8 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 			writes = append(writes, rel)
 		case current == newHash:
 			report.Unchanged++
+		case recorded == "" && src.props != nil:
+			writes = append(writes, rel)
 		case recorded == "" && !opts.Force:
 			report.Conflicts = append(report.Conflicts, rel+" (not written by shulker)")
 			continue
@@ -188,6 +191,9 @@ func (b *Builder) collect(target manifest.Target) (map[string]source, error) {
 		}
 	}
 	if target.Side == "client" {
+		if err := b.collectClient(desired, vars); err != nil {
+			return nil, err
+		}
 		jar, err := b.markerJar(target.Side)
 		if err != nil {
 			return nil, err
@@ -218,6 +224,9 @@ func (b *Builder) collect(target manifest.Target) (map[string]source, error) {
 					return err
 				}
 			}
+			if owned := desired[rel]; owned.props != nil {
+				data = owned.props.mergeInto(data, owned.sep)
+			}
 			desired[rel] = source{data: data}
 			return nil
 		})
@@ -241,24 +250,52 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if srv.Eula {
 		desired[EulaFile] = source{data: []byte("eula=true\n")}
 	}
-	props := properties{}
-	for key, raw := range srv.Properties {
-		value, err := formatProperty(raw)
-		if err != nil {
-			return fmt.Errorf("server.properties %s: %w", key, err)
-		}
-		rendered, err := render("shulker.json server.properties "+key, []byte(value), vars)
-		if err != nil {
-			return err
-		}
-		props[key] = string(rendered)
+	props, err := renderProperties(PropertiesFile, srv.Properties, vars)
+	if err != nil {
+		return err
 	}
-	desired[PropertiesFile] = source{props: props}
+	desired[PropertiesFile] = source{props: props, sep: "="}
 	return nil
 }
 
+func (b *Builder) collectClient(desired map[string]source, vars map[string]string) error {
+	cl := b.Manifest.Client
+	if cl == nil || len(cl.Options) == 0 {
+		return nil
+	}
+	options, err := renderProperties(OptionsFile, cl.Options, vars)
+	if err != nil {
+		return err
+	}
+	desired[OptionsFile] = source{props: options, sep: ":"}
+	return nil
+}
+
+func renderProperties(file string, raw map[string]any, vars map[string]string) (properties, error) {
+	props := properties{}
+	for key, v := range raw {
+		value, err := formatProperty(v)
+		if err != nil {
+			return nil, fmt.Errorf("%s %s: %w", file, key, err)
+		}
+		rendered, err := render("shulker.json "+file+" "+key, []byte(value), vars)
+		if err != nil {
+			return nil, err
+		}
+		props[key] = string(rendered)
+	}
+	return props, nil
+}
+
 func (b *Builder) currentHash(abs string, s source, recordedKeys []string) (string, bool, error) {
-	if s.props == nil {
+	owned := s.props
+	if recordedKeys != nil {
+		owned = properties{}
+		for _, k := range recordedKeys {
+			owned[k] = ""
+		}
+	}
+	if owned == nil {
 		return fileSha256(abs)
 	}
 	data, err := os.ReadFile(abs)
@@ -267,13 +304,6 @@ func (b *Builder) currentHash(abs string, s source, recordedKeys []string) (stri
 	}
 	if err != nil {
 		return "", false, err
-	}
-	owned := s.props
-	if recordedKeys != nil {
-		owned = properties{}
-		for _, k := range recordedKeys {
-			owned[k] = ""
-		}
 	}
 	return sha256Hex(owned.restrict(parseProperties(data)).canonical()), true, nil
 }
@@ -305,7 +335,7 @@ func (b *Builder) write(abs string, s source) error {
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		data = s.props.mergeInto(existing)
+		data = s.props.mergeInto(existing, s.sep)
 	}
 	return os.WriteFile(abs, data, 0o644)
 }

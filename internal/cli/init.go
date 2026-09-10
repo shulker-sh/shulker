@@ -69,6 +69,14 @@ func (a *app) initCmd() *cobra.Command {
 			if target == "server" {
 				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
 			}
+			if target == "client" {
+				m.Client = &manifest.Client{Options: map[string]any{
+					"onboardAccessibility":   false,
+					"skipMultiplayerWarning": true,
+					"tutorialStep":           "none",
+					"joinedFirstServer":      true,
+				}}
+			}
 			d, err := a.deps()
 			if err != nil {
 				return err

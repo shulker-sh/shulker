@@ -32,7 +32,7 @@ type Manifest struct {
 	Ignore    []Ignore          `json:"ignore,omitempty"`
 	Variables map[string]string `json:"variables,omitempty"`
 	Server    *Server           `json:"server,omitempty"`
-	Client    json.RawMessage   `json:"client,omitempty"`
+	Client    *Client           `json:"client,omitempty"`
 }
 
 type Server struct {
@@ -42,6 +42,11 @@ type Server struct {
 	JvmArgs    []string        `json:"jvmArgs,omitempty"`
 	Properties map[string]any  `json:"properties,omitempty"`
 	Players    json.RawMessage `json:"players,omitempty"`
+}
+
+type Client struct {
+	Options map[string]any  `json:"options,omitempty"`
+	Servers json.RawMessage `json:"servers,omitempty"`
 }
 
 type Loader struct {

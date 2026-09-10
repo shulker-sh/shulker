@@ -9,7 +9,10 @@ import (
 	"strings"
 )
 
-const PropertiesFile = "server.properties"
+const (
+	PropertiesFile = "server.properties"
+	OptionsFile    = "options.txt"
+)
 
 type properties map[string]string
 
@@ -77,9 +80,13 @@ func (p properties) restrict(existing properties) properties {
 	return sub
 }
 
-func (p properties) mergeInto(existing []byte) []byte {
+func (p properties) mergeInto(existing []byte, sep string) []byte {
 	if len(existing) == 0 {
-		return p.canonical()
+		var buf bytes.Buffer
+		for _, k := range p.keys() {
+			buf.WriteString(k + sep + p[k] + "\n")
+		}
+		return buf.Bytes()
 	}
 	pending := map[string]bool{}
 	for k := range p {
@@ -91,12 +98,12 @@ func (p properties) mergeInto(existing []byte) []byte {
 		if !ok || !pending[key] {
 			continue
 		}
-		lines[i] = key + "=" + p[key]
+		lines[i] = key + sep + p[key]
 		delete(pending, key)
 	}
 	for _, k := range p.keys() {
 		if pending[k] {
-			lines = append(lines, k+"="+p[k])
+			lines = append(lines, k+sep+p[k])
 		}
 	}
 	return []byte(strings.Join(lines, "\n") + "\n")
