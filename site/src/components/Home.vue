@@ -27,9 +27,7 @@ import { VPButton } from 'vitepress/theme'
   display: grid;
   place-items: center;
   padding: 4rem 1.5rem;
-  background:
-    radial-gradient(60rem 30rem at 50% -10%, var(--vp-c-brand-soft), transparent 70%),
-    var(--vp-c-bg);
+  background: var(--vp-c-bg);
   color: var(--vp-c-text-1);
 }
 .hero {
