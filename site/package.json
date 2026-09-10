@@ -1,0 +1,17 @@
+{
+  "name": "shulker-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "build:pages": "vitepress build && mkdir -p .vitepress/dist/schema && cp -R ../schema/v1 .vitepress/dist/schema/"
+  },
+  "devDependencies": {
+    "@shikijs/vitepress-twoslash": "^3.12.0",
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-group-icons": "^1.6.3",
+    "vue": "^3.5.21"
+  }
+}
