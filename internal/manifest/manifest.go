@@ -31,8 +31,17 @@ type Manifest struct {
 	Mods      map[string]Mod    `json:"mods"`
 	Ignore    []Ignore          `json:"ignore,omitempty"`
 	Variables map[string]string `json:"variables,omitempty"`
-	Server    json.RawMessage   `json:"server,omitempty"`
+	Server    *Server           `json:"server,omitempty"`
 	Client    json.RawMessage   `json:"client,omitempty"`
+}
+
+type Server struct {
+	Eula       bool            `json:"eula"`
+	Memory     string          `json:"memory,omitempty"`
+	JvmFlags   string          `json:"jvmFlags,omitempty"`
+	JvmArgs    []string        `json:"jvmArgs,omitempty"`
+	Properties map[string]any  `json:"properties,omitempty"`
+	Players    json.RawMessage `json:"players,omitempty"`
 }
 
 type Loader struct {

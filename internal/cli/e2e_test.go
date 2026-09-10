@@ -55,11 +55,13 @@ func makeJarVersion(t *testing.T, id, filename, env, version, extra string) fake
 }
 
 type harness struct {
-	server *httptest.Server
-	jars   map[string]fakeJar
-	dir    string
-	cache  string
-	newer  bool
+	server        *httptest.Server
+	jars          map[string]fakeJar
+	dir           string
+	cache         string
+	newer         bool
+	serverJar     fakeJar
+	serverJarHits int
 }
 
 func newHarness(t *testing.T) *harness {
@@ -98,6 +100,17 @@ func newHarness(t *testing.T) *harness {
 			"mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
 			"libraries": []map[string]any{{"name": "net.fabricmc:fabric-loader:0.17.3", "url": "https://maven.fabricmc.net/"}},
 		})
+	})
+	mux.HandleFunc("/fabric/versions/installer", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, []map[string]any{
+			{"version": "1.2.0-beta.1", "stable": false},
+			{"version": "1.1.2", "stable": true},
+		})
+	})
+	h.serverJar = makeJar(t, "fabric-server-launch", "fabric-server-launch.jar", "server")
+	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/1.1.2/server/jar", func(w http.ResponseWriter, r *http.Request) {
+		h.serverJarHits++
+		w.Write(h.serverJar.data)
 	})
 	projects := map[string]map[string]any{
 		"sodium":     {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},

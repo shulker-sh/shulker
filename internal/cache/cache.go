@@ -91,6 +91,23 @@ func (c *Cache) Ensure(ctx context.Context, client *fetch.Client, url, sha strin
 	return c.Path(sha), c.commit(tmp.Name(), sha)
 }
 
+func (c *Cache) Fetch(ctx context.Context, client *fetch.Client, url string) (string, error) {
+	if err := os.MkdirAll(filepath.Join(c.Dir, "tmp"), 0o755); err != nil {
+		return "", err
+	}
+	tmp, err := os.CreateTemp(filepath.Join(c.Dir, "tmp"), "dl-*")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmp.Name())
+	sha, err := client.Download(ctx, url, tmp)
+	tmp.Close()
+	if err != nil {
+		return "", err
+	}
+	return sha, c.commit(tmp.Name(), sha)
+}
+
 func (c *Cache) CopyTo(sha, dst string) error {
 	src, err := os.Open(c.Path(sha))
 	if err != nil {

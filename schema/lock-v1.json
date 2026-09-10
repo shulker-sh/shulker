@@ -23,7 +23,17 @@
       "additionalProperties": false,
       "properties": {
         "type": { "type": "string", "enum": ["fabric", "quilt", "neoforge", "forge"] },
-        "version": { "type": "string", "minLength": 1, "description": "Resolved loader version, exactly as the loader's meta names it." }
+        "version": { "type": "string", "minLength": 1, "description": "Resolved loader version, exactly as the loader's meta names it." },
+        "server": {
+          "type": "object",
+          "required": ["installer", "sha512"],
+          "additionalProperties": false,
+          "description": "Server launcher jar, present once a server target has been installed.",
+          "properties": {
+            "installer": { "type": "string", "minLength": 1, "description": "Loader installer version whose bundled server launcher is locked." },
+            "sha512": { "$ref": "#/$defs/sha512" }
+          }
+        }
       }
     },
     "java": {

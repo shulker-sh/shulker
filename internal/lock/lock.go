@@ -26,8 +26,14 @@ type Lock struct {
 }
 
 type Loader struct {
-	Type    string `json:"type"`
-	Version string `json:"version"`
+	Type    string     `json:"type"`
+	Version string     `json:"version"`
+	Server  *ServerJar `json:"server,omitempty"`
+}
+
+type ServerJar struct {
+	Installer string `json:"installer"`
+	Sha512    string `json:"sha512"`
 }
 
 type Java struct {

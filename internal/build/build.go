@@ -23,6 +23,8 @@ import (
 const (
 	StateFile      = ".shulker-state.json"
 	TemplateSuffix = ".tmpl"
+	ServerJarFile  = "fabric-server-launch.jar"
+	EulaFile       = "eula.txt"
 )
 
 type State struct {
@@ -58,6 +60,7 @@ type Builder struct {
 type source struct {
 	sha512 string
 	data   []byte
+	props  properties
 }
 
 func (b *Builder) Build(name string, opts Options) (*Report, error) {
@@ -87,7 +90,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 			return nil, err
 		}
 		abs := filepath.Join(dir, filepath.FromSlash(rel))
-		current, exists, err := fileSha256(abs)
+		current, exists, err := b.currentHash(abs, src)
 		if err != nil {
 			return nil, err
 		}
@@ -172,6 +175,11 @@ func (b *Builder) collect(target manifest.Target) (map[string]source, error) {
 	for k, v := range target.Variables {
 		vars[k] = v
 	}
+	if target.Side == "server" {
+		if err := b.collectServer(desired, vars); err != nil {
+			return nil, err
+		}
+	}
 	for _, layer := range target.Overrides {
 		root := filepath.Join(b.Dir, layer)
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -206,7 +214,56 @@ func (b *Builder) collect(target manifest.Target) (map[string]source, error) {
 	return desired, nil
 }
 
+func (b *Builder) collectServer(desired map[string]source, vars map[string]string) error {
+	jar := b.Lock.Loader.Server
+	if jar == nil || !b.Cache.Has(jar.Sha512) {
+		return out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
+	}
+	desired[ServerJarFile] = source{sha512: jar.Sha512}
+	srv := b.Manifest.Server
+	if srv == nil {
+		return nil
+	}
+	if srv.Eula {
+		desired[EulaFile] = source{data: []byte("eula=true\n")}
+	}
+	if len(srv.Properties) == 0 {
+		return nil
+	}
+	props := properties{}
+	for key, raw := range srv.Properties {
+		value, err := formatProperty(raw)
+		if err != nil {
+			return fmt.Errorf("server.properties %s: %w", key, err)
+		}
+		rendered, err := render("shulker.json server.properties "+key, []byte(value), vars)
+		if err != nil {
+			return err
+		}
+		props[key] = string(rendered)
+	}
+	desired[PropertiesFile] = source{props: props}
+	return nil
+}
+
+func (b *Builder) currentHash(abs string, s source) (string, bool, error) {
+	if s.props == nil {
+		return fileSha256(abs)
+	}
+	data, err := os.ReadFile(abs)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return sha256Hex(s.props.restrict(parseProperties(data)).canonical()), true, nil
+}
+
 func (b *Builder) hashSource(s source) (string, error) {
+	if s.props != nil {
+		return sha256Hex(s.props.canonical()), nil
+	}
 	if s.sha512 != "" {
 		data, err := os.ReadFile(b.Cache.Path(s.sha512))
 		if err != nil {
@@ -224,7 +281,15 @@ func (b *Builder) write(abs string, s source) error {
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(abs, s.data, 0o644)
+	data := s.data
+	if s.props != nil {
+		existing, err := os.ReadFile(abs)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		data = s.props.mergeInto(existing)
+	}
+	return os.WriteFile(abs, data, 0o644)
 }
 
 func (b *Builder) loadState(dir string) State {

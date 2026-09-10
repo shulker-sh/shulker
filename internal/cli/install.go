@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/andrewmast/shulker/internal/build"
+	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/spf13/cobra"
 )
 
@@ -43,6 +44,24 @@ func (a *app) installCmd() *cobra.Command {
 			if fetched == nil {
 				fetched = []string{}
 			}
+			if hasServerTarget(p.Manifest.Targets) {
+				d, err := a.deps()
+				if err != nil {
+					return err
+				}
+				jar, err := r.EnsureServerJar(cmd.Context(), d.meta.Fabric)
+				if err != nil {
+					return err
+				}
+				if jar.Fetched {
+					fetched = append(fetched, "fabric-server-launcher")
+				}
+				if jar.Locked {
+					if err := p.Lock.Save(p.LockPath()); err != nil {
+						return err
+					}
+				}
+			}
 			v, err := r.Validate()
 			if err != nil {
 				return err
@@ -74,6 +93,15 @@ func (a *app) installCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory")
 	return cmd
+}
+
+func hasServerTarget(targets map[string]manifest.Target) bool {
+	for _, t := range targets {
+		if t.Side == "server" {
+			return true
+		}
+	}
+	return false
 }
 
 func targetNames[T any](targets map[string]T) []string {

@@ -3,6 +3,7 @@ package meta
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/andrewmast/shulker/internal/fetch"
@@ -48,4 +49,27 @@ func (f *Fabric) LoaderProfile(ctx context.Context, game, loader string) (json.R
 		return nil, fmt.Errorf("fabric profile for %s with loader %s: %w", game, loader, err)
 	}
 	return raw, nil
+}
+
+func (f *Fabric) InstallerVersion(ctx context.Context) (string, error) {
+	var entries []struct {
+		Version string `json:"version"`
+		Stable  bool   `json:"stable"`
+	}
+	if err := f.Client.GetJSON(ctx, f.BaseURL+"/versions/installer", &entries); err != nil {
+		return "", fmt.Errorf("fabric installer versions: %w", err)
+	}
+	for _, e := range entries {
+		if e.Stable {
+			return e.Version, nil
+		}
+	}
+	if len(entries) > 0 {
+		return entries[0].Version, nil
+	}
+	return "", errors.New("fabric meta lists no installer versions")
+}
+
+func (f *Fabric) ServerJarURL(game, loader, installer string) string {
+	return fmt.Sprintf("%s/versions/loader/%s/%s/%s/server/jar", f.BaseURL, game, loader, installer)
 }
