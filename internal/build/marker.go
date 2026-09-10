@@ -37,6 +37,14 @@ func markerModID(name string) string {
 	return "shulker_" + strings.NewReplacer(".", "_", "-", "_").Replace(name)
 }
 
+func markerVersion(packVersion, lockHash string) string {
+	build := lockHash[:8]
+	if packVersion == "" {
+		return build
+	}
+	return packVersion + "+" + build
+}
+
 func markerJarPath(name string) string {
 	return "mods/shulker-" + name + ".jar"
 }
@@ -66,7 +74,7 @@ func (b *Builder) markerJar(side string) ([]byte, error) {
 	meta := map[string]any{
 		"schemaVersion": 1,
 		"id":            id,
-		"version":       lockHash[:8],
+		"version":       markerVersion(b.Manifest.Version, lockHash),
 		"name":          b.Manifest.Name,
 		"description":   b.markerDescription(direct, deps),
 		"icon":          "assets/" + id + "/icon.png",

@@ -159,6 +159,26 @@ func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
 	}
 }
 
+func TestMarkerVersionUsesManifestVersion(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "versioned")
+	h.editManifest(t, func(m map[string]any) { m["version"] = "1.0" })
+	h.mustRun(t, "install")
+	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-versioned.jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(readZip(t, data)["fabric.mod.json"], &meta); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(meta.Version, "1.0+") || len(meta.Version) != len("1.0+")+8 {
+		t.Fatalf("version: %q", meta.Version)
+	}
+}
+
 func TestInitSeedsAuthors(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "seeded")
