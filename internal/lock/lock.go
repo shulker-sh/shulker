@@ -49,6 +49,18 @@ type Pack struct {
 	Sha256    string `json:"sha256,omitempty"`
 }
 
+func (p Pack) Label() string {
+	switch {
+	case p.Commit != "":
+		return p.Commit[:12]
+	case p.DirSha256 != "":
+		return p.DirSha256[:12]
+	case p.Sha256 != "":
+		return p.Sha256[:12]
+	}
+	return ""
+}
+
 type Mod struct {
 	Provider      string   `json:"provider"`
 	Project       any      `json:"project"`

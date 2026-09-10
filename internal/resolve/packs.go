@@ -152,13 +152,13 @@ func PackChanges(before, after map[string]lock.Pack) []PackChange {
 	changes := []PackChange{}
 	for source, now := range after {
 		old, had := before[source]
-		if !had || pinLabel(old) != pinLabel(now) {
-			changes = append(changes, PackChange{Name: now.Name, From: pinLabel(old), To: pinLabel(now)})
+		if !had || old.Label() != now.Label() {
+			changes = append(changes, PackChange{Name: now.Name, From: old.Label(), To: now.Label()})
 		}
 	}
 	for source, old := range before {
 		if _, still := after[source]; !still {
-			changes = append(changes, PackChange{Name: old.Name, From: pinLabel(old)})
+			changes = append(changes, PackChange{Name: old.Name, From: old.Label()})
 		}
 	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Name < changes[j].Name })
@@ -176,16 +176,4 @@ func (r *Resolver) dropRequiredBy(name string) {
 		m.RequiredBy = kept
 		r.Lock.Mods[id] = m
 	}
-}
-
-func pinLabel(p lock.Pack) string {
-	switch {
-	case p.Commit != "":
-		return p.Commit[:12]
-	case p.DirSha256 != "":
-		return p.DirSha256[:12]
-	case p.Sha256 != "":
-		return p.Sha256[:12]
-	}
-	return ""
 }

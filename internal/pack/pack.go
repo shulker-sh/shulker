@@ -361,3 +361,43 @@ func refOrHead(ref string) string {
 	}
 	return ref
 }
+
+type Status struct {
+	Name   string `json:"name"`
+	Kind   Kind   `json:"kind"`
+	Source string `json:"source"`
+	Ref    string `json:"ref,omitempty"`
+	Pin    string `json:"pin,omitempty"`
+	State  string `json:"state"`
+}
+
+func (s *Store) Status(p manifest.Pack, pinned lock.Pack, locked bool) (Status, error) {
+	name, err := Name(p)
+	if err != nil {
+		return Status{}, err
+	}
+	st := Status{Name: name, Kind: Classify(p.Source), Source: p.Source, Ref: p.Ref, State: "unlocked"}
+	if !locked {
+		return st, nil
+	}
+	st.Pin, st.State = pinned.Label(), "ok"
+	if st.Kind != Local {
+		return st, nil
+	}
+	l := &Loaded{Name: name, Source: p.Source, Kind: Local, Dir: s.localDir(p.Source)}
+	if err := s.loadDir(l); err != nil {
+		if out.CodeOf(err) == "pack-manifest" {
+			st.State = "missing"
+			return st, nil
+		}
+		return Status{}, err
+	}
+	current, err := dirSha256(l.Dir, l.Manifest)
+	if err != nil {
+		return Status{}, err
+	}
+	if current != pinned.DirSha256 {
+		st.State = "changed"
+	}
+	return st, nil
+}

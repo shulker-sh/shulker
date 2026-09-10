@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/shulker-sh/shulker/internal/lock"
 	"github.com/shulker-sh/shulker/internal/manifest"
 	"github.com/shulker-sh/shulker/internal/out"
 	"github.com/shulker-sh/shulker/internal/pack"
@@ -17,7 +18,7 @@ func (a *app) packCmd() *cobra.Command {
 		Use:   "pack",
 		Short: "Manage packs whose mods and overrides merge into this project",
 	}
-	cmd.AddCommand(a.packAddCmd(), a.packRemoveCmd())
+	cmd.AddCommand(a.packAddCmd(), a.packRemoveCmd(), a.packListCmd())
 	return cmd
 }
 
@@ -95,6 +96,55 @@ func (a *app) packRemoveCmd() *cobra.Command {
 					fmt.Fprintf(w, "  pruned %s\n", id)
 				}
 				fmt.Fprintln(w, "Next: shulker install")
+			})
+		},
+	}
+}
+
+func (a *app) packListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List packs with their locked ref and whether a local pack has changed",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			p, err := a.openProject()
+			if err != nil {
+				return err
+			}
+			store, err := a.packStore(p)
+			if err != nil {
+				return err
+			}
+			res := []pack.Status{}
+			for _, entry := range p.Manifest.Packs {
+				var pinned lock.Pack
+				locked := false
+				if p.Lock != nil {
+					pinned, locked = p.Lock.Packs[entry.Source]
+				}
+				st, err := store.Status(entry, pinned, locked)
+				if err != nil {
+					return err
+				}
+				res = append(res, st)
+			}
+			return a.printer.Emit(res, func(w io.Writer) {
+				if len(res) == 0 {
+					fmt.Fprintln(w, "No packs.")
+					return
+				}
+				for _, st := range res {
+					fmt.Fprintf(w, "%s %s %s", st.Name, st.Kind, st.State)
+					if st.Pin != "" {
+						fmt.Fprintf(w, " %s", st.Pin)
+					}
+					fmt.Fprintf(w, " %s", st.Source)
+					if st.Ref != "" {
+						fmt.Fprintf(w, " (ref %s)", st.Ref)
+					}
+					fmt.Fprintln(w)
+				}
 			})
 		},
 	}

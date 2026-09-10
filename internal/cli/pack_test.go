@@ -97,6 +97,16 @@ func TestLocalPack(t *testing.T) {
 	if len(m.Packs) != 1 || m.Packs[0]["source"] != "./base" || m.Packs[0]["name"] != "" {
 		t.Fatalf("manifest packs: %v", m.Packs)
 	}
+	_, stdout, _ = h.run(t, "pack", "list", "--json")
+	var listEnv struct {
+		Data []map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &listEnv); err != nil {
+		t.Fatalf("pack list json: %v: %s", err, stdout)
+	}
+	if listed := listEnv.Data; len(listed) != 1 || listed[0]["name"] != "base" || listed[0]["kind"] != "local" || listed[0]["state"] != "ok" || listed[0]["pin"] != l.Packs["./base"]["dirSha256"][:12] {
+		t.Fatalf("pack list: %v", listed)
+	}
 
 	code, stdout, _ := h.run(t, "remove", "sodium", "--json")
 	var env out.Envelope
@@ -121,6 +131,9 @@ func TestLocalPack(t *testing.T) {
 
 	if err := os.WriteFile(filepath.Join(h.dir, "base", "overrides", "config", "base.txt"), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
+	}
+	if stdout = h.mustRun(t, "pack", "list"); !strings.HasPrefix(stdout, "base local changed "+l.Packs["./base"]["dirSha256"][:12]+" ./base\n") {
+		t.Fatalf("pack list after edit: %s", stdout)
 	}
 	_, stderr := h.mustRunStderr(t, "build")
 	if !strings.Contains(stderr, "pack base has changed since the lock") {
@@ -221,6 +234,9 @@ func TestGitPack(t *testing.T) {
 	stdout := h.mustRun(t, "pack", "add", source, "--ref", "main")
 	if !strings.Contains(stdout, "+ pack shared-pack "+first[:12]) {
 		t.Fatalf("pack add output: %s", stdout)
+	}
+	if stdout = h.mustRun(t, "pack", "list"); stdout != "shared-pack git ok "+first[:12]+" "+source+" (ref main)\n" {
+		t.Fatalf("pack list: %s", stdout)
 	}
 	l := readLock(t, h)
 	if p := l.Packs[source]; p["commit"] != first || p["ref"] != "main" || p["name"] != "shared-pack" {
