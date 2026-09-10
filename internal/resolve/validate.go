@@ -1,0 +1,277 @@
+package resolve
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/andrewmast/shulker/internal/jarmeta"
+	"github.com/andrewmast/shulker/internal/manifest"
+	"github.com/andrewmast/shulker/internal/mcver"
+	"github.com/andrewmast/shulker/internal/out"
+)
+
+type Problem struct {
+	Rule       string `json:"rule"`
+	Mod        string `json:"mod"`
+	ModVersion string `json:"modVersion"`
+	On         string `json:"on"`
+	Declared   string `json:"declared"`
+	Found      string `json:"found,omitempty"`
+	StaleNote  string `json:"staleNote,omitempty"`
+}
+
+type Validation struct {
+	Problems    []Problem `json:"problems"`
+	Warnings    []string  `json:"warnings"`
+	Suggestions []string  `json:"suggestions"`
+}
+
+var builtins = map[string]bool{"minecraft": true, "fabricloader": true, "neoforge": true, "java": true}
+
+func (r *Resolver) Validate() (*Validation, error) {
+	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []string{}}
+	installed := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
+	if r.Lock.Loader.Type == "fabric" {
+		installed["fabricloader"] = r.Lock.Loader.Version
+	} else {
+		installed[r.Lock.Loader.Type] = r.Lock.Loader.Version
+	}
+	infos := map[string]*jarmeta.Info{}
+	for _, id := range r.lockIDs() {
+		m := r.Lock.Mods[id]
+		if !r.Cache.Has(m.Sha512) {
+			v.Warnings = append(v.Warnings, fmt.Sprintf("%s is not downloaded; its metadata was not checked", id))
+			continue
+		}
+		info, err := jarmeta.Read(r.Cache.Path(m.Sha512))
+		if err != nil {
+			return nil, err
+		}
+		infos[id] = info
+		installed[id] = info.Version
+		for pid, pv := range info.Provides {
+			if _, taken := installed[pid]; !taken {
+				installed[pid] = pv
+			}
+		}
+	}
+	used := map[int]bool{}
+	for _, id := range sortedKeys(infos) {
+		info := infos[id]
+		for _, on := range sortedKeys(info.Depends) {
+			declared := info.Depends[on]
+			found, ok := installed[on]
+			if ok {
+				match, err := satisfies(found, declared)
+				if err != nil {
+					v.Warnings = append(v.Warnings, fmt.Sprintf("%s depends on %s %s but %s: not checked", id, on, declared, err))
+					continue
+				}
+				if match {
+					continue
+				}
+			}
+			v.record(r.Manifest, used, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+		}
+		for _, on := range sortedKeys(info.Breaks) {
+			declared := info.Breaks[on]
+			found, ok := installed[on]
+			if !ok {
+				continue
+			}
+			match, err := satisfies(found, declared)
+			if err != nil {
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s breaks %s %s but %s: not checked", id, on, declared, err))
+				continue
+			}
+			if match {
+				v.record(r.Manifest, used, Problem{Rule: "breaks", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+			}
+		}
+		for _, on := range sortedKeys(info.Conflicts) {
+			found, ok := installed[on]
+			if !ok {
+				continue
+			}
+			if match, err := satisfies(found, info.Conflicts[on]); err == nil && match {
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s)", id, info.Version, on, info.Conflicts[on], found))
+			}
+		}
+		for kind, set := range map[string]map[string]string{"recommends": info.Recommends, "suggests": info.Suggests} {
+			for _, on := range sortedKeys(set) {
+				if _, ok := installed[on]; !ok {
+					v.Suggestions = append(v.Suggestions, fmt.Sprintf("%s %s %s", id, kind, on))
+				}
+			}
+		}
+	}
+	for i, ig := range r.Manifest.Ignore {
+		if !used[i] {
+			v.Warnings = append(v.Warnings, fmt.Sprintf("ignore entry %d (%s: %s on %s) matched nothing", i+1, ig.Rule, ig.Mod, ig.On))
+		}
+	}
+	sort.Strings(v.Suggestions)
+	return v, nil
+}
+
+func (v *Validation) record(m *manifest.Manifest, used map[int]bool, p Problem) {
+	for i, ig := range m.Ignore {
+		if ig.Rule != p.Rule || ig.Mod != p.Mod || ig.On != p.On {
+			continue
+		}
+		used[i] = true
+		if ig.Declared == p.Declared {
+			return
+		}
+		p.StaleNote = fmt.Sprintf("ignore entry %d is stale: it was written for %q", i+1, ig.Declared)
+	}
+	v.Problems = append(v.Problems, p)
+}
+
+func (v *Validation) Err() error {
+	if len(v.Problems) == 0 {
+		return nil
+	}
+	var b strings.Builder
+	var candidates []string
+	fmt.Fprintf(&b, "%d problem(s) in the locked mods:", len(v.Problems))
+	for i, p := range v.Problems {
+		line := p.line()
+		candidates = append(candidates, line)
+		fmt.Fprintf(&b, "\n  Problem %d\n    - %s", i+1, line)
+		if p.StaleNote != "" {
+			fmt.Fprintf(&b, "\n      %s", p.StaleNote)
+		}
+		if p.Rule == "depends" && p.Found == "" && !builtins[p.On] {
+			fmt.Fprintf(&b, "\n      Fix: shulker add %s", p.On)
+		}
+		fmt.Fprintf(&b, "\n      Ignore: %s", p.ignoreEntry())
+	}
+	e := out.Errorf("validation-failed", "%s", b.String())
+	e.Candidates = candidates
+	return e
+}
+
+func (p Problem) line() string {
+	if p.Rule == "breaks" {
+		return fmt.Sprintf("%s %s breaks %s %s, found %s %s", p.Mod, p.ModVersion, p.On, p.Declared, p.On, p.Found)
+	}
+	if p.Found == "" {
+		return fmt.Sprintf("%s %s requires %s %s, not installed", p.Mod, p.ModVersion, p.On, p.Declared)
+	}
+	return fmt.Sprintf("%s %s requires %s %s, found %s %s", p.Mod, p.ModVersion, p.On, p.Declared, p.On, p.Found)
+}
+
+func (p Problem) ignoreEntry() string {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(manifest.Ignore{Rule: p.Rule, Mod: p.Mod, On: p.On, Declared: p.Declared, Note: "why this is safe"})
+	return strings.TrimSpace(buf.String())
+}
+
+var (
+	bareInt  = regexp.MustCompile(`^\d+$`)
+	weekly   = regexp.MustCompile(`^\d\dw\d\d[a-z]$`)
+	minorX   = regexp.MustCompile(`^(\d+)\.[xX*]$`)
+	patchX   = regexp.MustCompile(`^(\d+)\.(\d+)\.[xX*]$`)
+	rangeOps = []string{">=", "<=", ">", "<", "=", "~", "^"}
+)
+
+func satisfies(version, declared string) (bool, error) {
+	v, err := mcver.Parse(normalizeVersion(version))
+	if err != nil || weekly.MatchString(v.ID) {
+		return false, fmt.Errorf("installed version %q is not semver", version)
+	}
+	rng, err := fabricRange(declared)
+	if err != nil {
+		return false, err
+	}
+	return rng.Contains(v), nil
+}
+
+func normalizeVersion(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '+'); i >= 0 {
+		s = s[:i]
+	}
+	s = strings.TrimSuffix(s, "-")
+	if bareInt.MatchString(s) {
+		s += ".0"
+	}
+	return s
+}
+
+func fabricRange(declared string) (mcver.Range, error) {
+	var alts []string
+	for _, alt := range strings.Split(declared, "||") {
+		var toks []string
+		for _, tok := range strings.Fields(alt) {
+			norm, err := normalizeToken(tok)
+			if err != nil {
+				return mcver.Range{}, fmt.Errorf("range %q is not understood", declared)
+			}
+			toks = append(toks, norm)
+		}
+		if len(toks) == 0 {
+			toks = []string{"*"}
+		}
+		alts = append(alts, strings.Join(toks, " "))
+	}
+	rng, err := mcver.ParseRange(strings.Join(alts, " || "))
+	if err != nil {
+		return mcver.Range{}, fmt.Errorf("range %q is not understood", declared)
+	}
+	return rng, nil
+}
+
+func normalizeToken(tok string) (string, error) {
+	if tok == "*" {
+		return tok, nil
+	}
+	op := ""
+	for _, candidate := range rangeOps {
+		if strings.HasPrefix(tok, candidate) {
+			op = candidate
+			break
+		}
+	}
+	ver := normalizeVersion(tok[len(op):])
+	switch {
+	case minorX.MatchString(ver):
+		if op != "" {
+			return "", fmt.Errorf("wildcard with operator")
+		}
+		major := atoi(minorX.FindStringSubmatch(ver)[1])
+		return fmt.Sprintf(">=%d.0.0 <%d.0.0", major, major+1), nil
+	case patchX.MatchString(ver):
+		if op != "" {
+			return "", fmt.Errorf("wildcard with operator")
+		}
+		m := patchX.FindStringSubmatch(ver)
+		return fmt.Sprintf(">=%d.%d.0 <%d.%d.0", atoi(m[1]), atoi(m[2]), atoi(m[1]), atoi(m[2])+1), nil
+	}
+	if _, err := mcver.Parse(ver); err != nil {
+		return "", err
+	}
+	return op + ver, nil
+}
+
+func atoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}

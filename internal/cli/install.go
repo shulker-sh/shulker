@@ -10,8 +10,9 @@ import (
 )
 
 type installResult struct {
-	Fetched []string        `json:"fetched"`
-	Builds  []*build.Report `json:"builds"`
+	Fetched  []string        `json:"fetched"`
+	Warnings []string        `json:"warnings"`
+	Builds   []*build.Report `json:"builds"`
 }
 
 func (a *app) installCmd() *cobra.Command {
@@ -42,12 +43,20 @@ func (a *app) installCmd() *cobra.Command {
 			if fetched == nil {
 				fetched = []string{}
 			}
+			v, err := r.Validate()
+			if err != nil {
+				return err
+			}
+			if err := v.Err(); err != nil {
+				return err
+			}
+			a.warn(v.Warnings)
 			b, err := a.builder(p)
 			if err != nil {
 				return err
 			}
 			names := targetNames(p.Manifest.Targets)
-			res := installResult{Fetched: fetched}
+			res := installResult{Fetched: fetched, Warnings: v.Warnings}
 			for _, name := range names {
 				rep, err := b.Build(name, build.Options{Force: force})
 				if err != nil {

@@ -9,6 +9,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type addResult struct {
+	Added       []*resolve.Added `json:"added"`
+	Warnings    []string         `json:"warnings"`
+	Suggestions []string         `json:"suggestions"`
+}
+
 func (a *app) addCmd() *cobra.Command {
 	var opts resolve.AddOptions
 	cmd := &cobra.Command{
@@ -38,6 +44,13 @@ func (a *app) addCmd() *cobra.Command {
 				}
 				results = append(results, added)
 			}
+			v, err := r.Validate()
+			if err != nil {
+				return err
+			}
+			if err := v.Err(); err != nil {
+				return err
+			}
 			if err := p.SaveManifest(); err != nil {
 				return err
 			}
@@ -45,13 +58,18 @@ func (a *app) addCmd() *cobra.Command {
 				return err
 			}
 			a.printer.LockStale = false
-			return a.printer.Emit(results, func(w io.Writer) {
-				for _, r := range results {
+			a.warn(v.Warnings)
+			res := addResult{Added: results, Warnings: v.Warnings, Suggestions: v.Suggestions}
+			return a.printer.Emit(res, func(w io.Writer) {
+				for _, r := range res.Added {
 					fmt.Fprintf(w, "+ %s %s (%s)", r.ID, r.VersionNumber, r.Side)
 					if len(r.Dependencies) > 0 {
 						fmt.Fprintf(w, " with %s", strings.Join(r.Dependencies, ", "))
 					}
 					fmt.Fprintln(w)
+				}
+				for _, s := range res.Suggestions {
+					fmt.Fprintf(w, "  %s (not installed)\n", s)
 				}
 				fmt.Fprintln(w, "Next: shulker install")
 			})

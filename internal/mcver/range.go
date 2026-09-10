@@ -165,3 +165,22 @@ func Newest(candidates []Version, r Range) (Version, bool) {
 	sort.Slice(matched, func(i, j int) bool { return Compare(matched[i], matched[j]) > 0 })
 	return matched[0], true
 }
+
+func (r Range) Contains(v Version) bool {
+	if r.IsAny() {
+		return true
+	}
+	for _, set := range r.sets {
+		all := true
+		for _, c := range set {
+			if !c.matches(v) {
+				all = false
+				break
+			}
+		}
+		if all {
+			return true
+		}
+	}
+	return false
+}

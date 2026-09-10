@@ -83,3 +83,9 @@ func (a *app) progress(format string, args ...any) {
 		fmt.Fprintf(a.printer.Stderr, format+"\n", args...)
 	}
 }
+
+func (a *app) warn(warnings []string) {
+	for _, w := range warnings {
+		a.progress("warning: %s", w)
+	}
+}

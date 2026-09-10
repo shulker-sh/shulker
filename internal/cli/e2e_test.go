@@ -31,6 +31,10 @@ type fakeJar struct {
 }
 
 func makeJar(t *testing.T, id, filename string, env string) fakeJar {
+	return makeJarWith(t, id, filename, env, `"depends":{"fabricloader":">=0.17"}`)
+}
+
+func makeJarWith(t *testing.T, id, filename, env, extra string) fakeJar {
 	t.Helper()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -38,7 +42,7 @@ func makeJar(t *testing.T, id, filename string, env string) fakeJar {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Fprintf(w, `{"id":%q,"version":"1.0.0","environment":%q,"depends":{"fabricloader":">=0.17"}}`, id, env)
+	fmt.Fprintf(w, `{"id":%q,"version":"1.0.0","environment":%q,%s}`, id, env, extra)
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -101,9 +105,9 @@ func newHarness(t *testing.T) *harness {
 		if strings.HasSuffix(rest, "/version") {
 			switch strings.TrimSuffix(rest, "/version") {
 			case "AANobbMI":
-				writeJSON(w, []map[string]any{versionOf("AANobbMI", sodium, []map[string]any{{"project_id": "P7dR8mSH", "dependency_type": "required"}})})
+				writeJSON(w, []map[string]any{versionOf("AANobbMI", h.jars["sodium"], []map[string]any{{"project_id": "P7dR8mSH", "dependency_type": "required"}})})
 			case "P7dR8mSH":
-				writeJSON(w, []map[string]any{versionOf("P7dR8mSH", fabricAPI, nil)})
+				writeJSON(w, []map[string]any{versionOf("P7dR8mSH", h.jars["fabric-api"], nil)})
 			default:
 				http.NotFound(w, r)
 			}
@@ -202,7 +206,7 @@ func TestVerticalSlice(t *testing.T) {
 	if !env.OK || env.LockStale {
 		t.Fatalf("add envelope: %+v", env)
 	}
-	added := env.Data.([]any)[0].(map[string]any)
+	added := env.Data.(map[string]any)["added"].([]any)[0].(map[string]any)
 	if added["id"] != "sodium" || added["side"] != "client" || added["dependencies"].([]any)[0] != "fabric-api" {
 		t.Fatalf("added: %v", added)
 	}
@@ -388,5 +392,77 @@ func TestRemovePrunesOrphans(t *testing.T) {
 	}
 	if code, _, _ := h.run(t, "build"); code != 0 {
 		t.Fatal("lock should not be stale after remove")
+	}
+}
+
+func TestValidationFailsAndIgnores(t *testing.T) {
+	h := newHarness(t)
+	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "client",
+		`"depends":{"fabricloader":">=0.17","fabric-api":">=2.0.0","minecraft":"26.x"},"recommends":{"iris":"*"},"conflicts":{"fabric-api":"1.x"}`)
+	h.mustRun(t, "init", "--yes")
+
+	code, stdout, _ := h.run(t, "add", "sodium", "--json")
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	if code == 0 || env.Error == nil || env.Error.Code != "validation-failed" {
+		t.Fatalf("expected validation failure: code=%d env=%+v", code, env)
+	}
+	if len(env.Error.Candidates) != 1 || !strings.Contains(env.Error.Candidates[0], "sodium 1.0.0 requires fabric-api >=2.0.0, found fabric-api 1.0.0") {
+		t.Fatalf("candidates: %v", env.Error.Candidates)
+	}
+	if !strings.Contains(env.Error.Message, `"declared":">=2.0.0"`) {
+		t.Fatalf("message should print the ignore entry: %s", env.Error.Message)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "shulker.lock")); err != nil {
+		t.Fatal("lock from init should still exist")
+	}
+	var l struct {
+		Mods map[string]any `json:"mods"`
+	}
+	h.readJSON(t, "shulker.lock", &l)
+	if len(l.Mods) != 0 {
+		t.Fatalf("failed add must not write the lock: %v", l.Mods)
+	}
+
+	manifestPath := filepath.Join(h.dir, "shulker.json")
+	patch := func(ignore string) {
+		data, _ := os.ReadFile(manifestPath)
+		var m map[string]any
+		_ = json.Unmarshal(data, &m)
+		var entries []any
+		_ = json.Unmarshal([]byte(ignore), &entries)
+		m["ignore"] = entries
+		data, _ = json.MarshalIndent(m, "", "  ")
+		if err := os.WriteFile(manifestPath, data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	patch(`[{"rule":"depends","mod":"sodium","on":"fabric-api","declared":">=1.5.0","note":"old"}]`)
+	code, stdout, _ = h.run(t, "add", "sodium", "--json")
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code == 0 || !strings.Contains(env.Error.Message, "ignore entry 1 is stale") {
+		t.Fatalf("stale ignore should re-surface: code=%d %s", code, env.Error.Message)
+	}
+
+	patch(`[{"rule":"depends","mod":"sodium","on":"fabric-api","declared":">=2.0.0","note":"works fine in practice"}]`)
+	code, stdout, stderr := h.run(t, "add", "sodium", "--json")
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	if code != 0 {
+		t.Fatalf("matching ignore should pass: %s %s", stdout, stderr)
+	}
+	data := env.Data.(map[string]any)
+	if w := data["warnings"].([]any); len(w) != 1 || !strings.Contains(w[0].(string), "conflicts with fabric-api 1.x") {
+		t.Fatalf("conflict should warn: %v", w)
+	}
+	if sg := data["suggestions"].([]any); len(sg) != 1 || sg[0] != "sodium recommends iris" {
+		t.Fatalf("suggestions: %v", sg)
+	}
+	stdout = h.mustRun(t, "install")
+	if !strings.Contains(stdout, "client: 2 written") {
+		t.Fatalf("install: %s", stdout)
 	}
 }
