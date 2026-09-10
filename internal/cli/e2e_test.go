@@ -65,11 +65,12 @@ type harness struct {
 	serverJarHits int
 	stdin         io.Reader
 	tty           bool
+	runtime       *fakeRuntime
 }
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	h := &harness{dir: t.TempDir(), cache: t.TempDir(), jars: map[string]fakeJar{}}
+	h := &harness{dir: t.TempDir(), cache: t.TempDir(), jars: map[string]fakeJar{}, runtime: newFakeRuntime()}
 	sodium := makeJar(t, "sodium", "sodium-fabric-0.9.2+mc26.2.jar", "client")
 	fabricAPI := makeJar(t, "fabric-api", "fabric-api-0.130.0+26.2.jar", "*")
 	h.jars["sodium"], h.jars["fabric-api"] = sodium, fabricAPI
@@ -181,6 +182,7 @@ func newHarness(t *testing.T) *harness {
 		}
 		http.NotFound(w, r)
 	})
+	h.runtime.register(mux, func() string { return base })
 	h.server = httptest.NewServer(mux)
 	base = h.server.URL
 	t.Cleanup(h.server.Close)
@@ -206,14 +208,26 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	fabric.BaseURL = h.server.URL + "/fabric"
 	mr := modrinth.New(f)
 	mr.BaseURL = h.server.URL + "/modrinth"
+	runtimes := meta.NewRuntimes(f)
+	runtimes.IndexURL = h.server.URL + "/jrt/all.json"
 	a.d = &deps{
 		fetch:     f,
 		cache:     &cache.Cache{Dir: h.cache},
 		providers: map[string]provider.Provider{"modrinth": mr},
 		meta:      &resolve.Meta{Piston: piston, Fabric: fabric},
+		runtimes:  runtimes,
 	}
 	code := a.run(args)
 	return code, stdout.String(), stderr.String()
+}
+
+func (h *harness) mustRunStderr(t *testing.T, args ...string) (string, string) {
+	t.Helper()
+	code, stdout, stderr := h.run(t, args...)
+	if code != 0 {
+		t.Fatalf("%v: exit %d\nstdout: %s\nstderr: %s", args, code, stdout, stderr)
+	}
+	return stdout, stderr
 }
 
 func (h *harness) mustRun(t *testing.T, args ...string) string {

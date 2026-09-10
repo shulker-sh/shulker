@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/project"
 	"github.com/andrewmast/shulker/internal/server"
 	"github.com/spf13/cobra"
 )
@@ -27,6 +29,21 @@ type serveResult struct {
 	ExitCode int         `json:"exitCode"`
 }
 
+func (a *app) serveJava(ctx context.Context, p *project.Project) (server.Java, error) {
+	if p.Manifest.Java != "" {
+		return server.FindJava(p.Manifest.Java, p.Lock.Java.Major)
+	}
+	rt, err := a.managedJava(ctx, p, false)
+	if err != nil {
+		if out.CodeOf(err) != "runtime-unavailable" {
+			return server.Java{}, err
+		}
+		a.progress("%s; using java on PATH", err)
+		return server.FindJava("", p.Lock.Java.Major)
+	}
+	return server.JavaAt(rt.Home)
+}
+
 func (a *app) serveCmd() *cobra.Command {
 	var target string
 	var force, acceptEula bool
@@ -34,7 +51,7 @@ func (a *app) serveCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "Build a server target and run it in the foreground",
 		Args:  cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			p, err := a.openProject()
 			if err != nil {
 				return err
@@ -75,7 +92,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			java, err := server.FindJava(p.Manifest.Java, p.Lock.Java.Major)
+			java, err := a.serveJava(cmd.Context(), p)
 			if err != nil {
 				return err
 			}

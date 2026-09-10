@@ -23,7 +23,7 @@ func TestServerTargetBuild(t *testing.T) {
 	})
 
 	stdout := h.mustRun(t, "install")
-	if !strings.Contains(stdout, "fetched 1 file(s)") {
+	if !strings.Contains(stdout, "fetched 2 file(s)") {
 		t.Fatalf("install output: %s", stdout)
 	}
 	var l lock.Lock

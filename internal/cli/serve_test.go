@@ -10,33 +10,6 @@ import (
 	"testing"
 )
 
-const fakeJava = `#!/bin/sh
-if [ "$1" = "-version" ]; then
-  echo 'openjdk version "@VERSION@" 2025-10-21' >&2
-  exit 0
-fi
-printf '%s\n' "$@" > args.txt
-echo "[Server] Done"
-while read -r line; do
-  echo "[Server] got: $line"
-  [ "$line" = "stop" ] && exit @EXIT@
-done
-exit 1
-`
-
-func (h *harness) fakeJDK(t *testing.T, version, exit string) string {
-	t.Helper()
-	jdk := filepath.Join(t.TempDir(), "jdk")
-	if err := os.MkdirAll(filepath.Join(jdk, "bin"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	script := strings.NewReplacer("@VERSION@", version, "@EXIT@", exit).Replace(fakeJava)
-	if err := os.WriteFile(filepath.Join(jdk, "bin", "java"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return jdk
-}
-
 func TestServeRunsServerAndStops(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
@@ -154,5 +127,111 @@ func TestServeErrors(t *testing.T) {
 	code, _, stderr = h.run(t, "serve", "--target", "nope")
 	if code == 0 || !strings.Contains(stderr, "candidates: server") {
 		t.Fatalf("expected target-not-found, got %d: %s", code, stderr)
+	}
+}
+
+func TestManagedJava(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "add", "fabric-api")
+
+	code, stdout, _ := h.run(t, "--json", "install")
+	if code != 0 {
+		t.Fatal(stdout)
+	}
+	var res struct {
+		Data struct {
+			Fetched []string `json:"fetched"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &res); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(res.Data.Fetched, ",") != "fabric-server-launcher,java-runtime-epsilon 25.0.1" {
+		t.Fatalf("fetched: %v", res.Data.Fetched)
+	}
+	home := filepath.Join(h.managedJavaDir(), filepath.FromSlash(runtimeHome))
+	info, err := os.Stat(filepath.Join(home, "bin", "java"))
+	if err != nil || info.Mode()&0o111 == 0 {
+		t.Fatalf("managed java missing or not executable: %v %v", err, info)
+	}
+	if target, err := os.Readlink(filepath.Join(home, "legal", "LICENSE")); err != nil || target != filepath.FromSlash("../lib/modules") {
+		t.Fatalf("symlink: %q %v", target, err)
+	}
+	if marker := h.readRuntimeMarker(t); marker["version"] != "25.0.1" || marker["home"] != filepath.FromSlash(runtimeHome) {
+		t.Fatalf("marker: %v", marker)
+	}
+	if h.runtime.hits != 2 {
+		t.Fatalf("expected 2 object downloads, got %d", h.runtime.hits)
+	}
+
+	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, "fetched 0 file(s)") || h.runtime.hits != 2 {
+		t.Fatalf("second install re-downloaded the runtime: %s (hits %d)", stdout, h.runtime.hits)
+	}
+
+	h.runtime.corrupt = runtimeHome + "/lib/modules"
+	h.runtime.files[runtimeHome+"/lib/modules"] = "modules v2"
+	h.runtime.version = "25.0.2"
+	code, _, stderr := h.run(t, "install")
+	if code == 0 || !strings.Contains(stderr, "sha1 mismatch") {
+		t.Fatalf("corrupt download should fail: %d %s", code, stderr)
+	}
+	if marker := h.readRuntimeMarker(t); marker["version"] != "25.0.1" {
+		t.Fatalf("failed refresh replaced the runtime: %v", marker)
+	}
+	h.runtime.corrupt = ""
+	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, "fetched 1 file(s)") {
+		t.Fatalf("changed runtime should be refetched: %s", stdout)
+	}
+	if marker := h.readRuntimeMarker(t); marker["version"] != "25.0.2" {
+		t.Fatalf("marker after refresh: %v", marker)
+	}
+	if data, _ := os.ReadFile(filepath.Join(home, "lib", "modules")); string(data) != "modules v2" {
+		t.Fatalf("refreshed file: %q", data)
+	}
+
+	h.stdin = strings.NewReader("stop\n")
+	code, stdout, stderr = h.run(t, "--json", "serve", "--accept-eula")
+	if code != 0 {
+		t.Fatalf("serve: %d %s %s", code, stdout, stderr)
+	}
+	var served struct {
+		Data struct {
+			Java struct {
+				Path  string `json:"path"`
+				Major int    `json:"major"`
+			} `json:"java"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &served); err != nil {
+		t.Fatal(err)
+	}
+	if served.Data.Java.Path != filepath.Join(home, "bin", "java") || served.Data.Java.Major != 25 {
+		t.Fatalf("serve used %+v", served.Data.Java)
+	}
+
+	if err := os.RemoveAll(h.managedJavaDir()); err != nil {
+		t.Fatal(err)
+	}
+	hits := h.runtime.hits
+	h.stdin = strings.NewReader("stop\n")
+	_, stderr = h.mustRunStderr(t, "serve")
+	if h.runtime.hits != hits+2 || !strings.Contains(stderr, "downloading Java runtime java-runtime-epsilon 25.0.2 (2 files") {
+		t.Fatalf("serve should download a missing runtime: %s", stderr)
+	}
+}
+
+func TestManagedJavaUnavailable(t *testing.T) {
+	h := newHarness(t)
+	h.runtime.missing = true
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	_, stderr := h.mustRunStderr(t, "install")
+	if !strings.Contains(stderr, "runtime") || !strings.Contains(stderr, "shulker.json") {
+		t.Fatalf("install should warn about the missing runtime: %s", stderr)
+	}
+	h.stdin = strings.NewReader("stop\n")
+	_, _, stderr = h.run(t, "serve", "--accept-eula")
+	if !strings.Contains(stderr, "using java on PATH") {
+		t.Fatalf("serve should fall back to PATH java: %s", stderr)
 	}
 }

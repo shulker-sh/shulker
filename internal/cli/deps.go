@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/andrewmast/shulker/internal/provider"
 	"github.com/andrewmast/shulker/internal/provider/modrinth"
 	"github.com/andrewmast/shulker/internal/resolve"
+	"github.com/andrewmast/shulker/internal/server"
 )
 
 type deps struct {
@@ -19,6 +21,7 @@ type deps struct {
 	cache     *cache.Cache
 	providers map[string]provider.Provider
 	meta      *resolve.Meta
+	runtimes  *meta.Runtimes
 }
 
 func (a *app) deps() (*deps, error) {
@@ -35,6 +38,7 @@ func (a *app) deps() (*deps, error) {
 		cache:     c,
 		providers: map[string]provider.Provider{"modrinth": modrinth.New(f)},
 		meta:      &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f)},
+		runtimes:  meta.NewRuntimes(f),
 	}
 	return a.d, nil
 }
@@ -76,6 +80,15 @@ func (a *app) builder(p *project.Project) (*build.Builder, error) {
 		return nil, err
 	}
 	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache}, nil
+}
+
+func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool) (server.Runtime, error) {
+	d, err := a.deps()
+	if err != nil {
+		return server.Runtime{}, err
+	}
+	opts := server.RuntimeOptions{Refresh: refresh, Progress: func(msg string) { a.progress("%s", msg) }}
+	return server.EnsureRuntime(ctx, d.fetch, d.runtimes, d.cache.Dir, p.Lock.Java.Component, opts)
 }
 
 func (a *app) progress(format string, args ...any) {

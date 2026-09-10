@@ -7,6 +7,7 @@ import (
 
 	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/manifest"
+	"github.com/andrewmast/shulker/internal/out"
 	"github.com/spf13/cobra"
 )
 
@@ -44,6 +45,7 @@ func (a *app) installCmd() *cobra.Command {
 			if fetched == nil {
 				fetched = []string{}
 			}
+			var runtimeWarning string
 			if hasServerTarget(p.Manifest.Targets) {
 				d, err := a.deps()
 				if err != nil {
@@ -61,6 +63,17 @@ func (a *app) installCmd() *cobra.Command {
 						return err
 					}
 				}
+				if p.Manifest.Java == "" {
+					rt, err := a.managedJava(cmd.Context(), p, true)
+					if err != nil && out.CodeOf(err) != "runtime-unavailable" {
+						return err
+					}
+					if err != nil {
+						runtimeWarning = err.Error()
+					} else if rt.Fetched {
+						fetched = append(fetched, rt.Component+" "+rt.Version)
+					}
+				}
 			}
 			v, err := r.Validate()
 			if err != nil {
@@ -68,6 +81,9 @@ func (a *app) installCmd() *cobra.Command {
 			}
 			if err := v.Err(); err != nil {
 				return err
+			}
+			if runtimeWarning != "" {
+				v.Warnings = append(v.Warnings, runtimeWarning)
 			}
 			a.warn(v.Warnings)
 			b, err := a.builder(p)

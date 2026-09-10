@@ -21,17 +21,39 @@ type Java struct {
 
 var versionLine = regexp.MustCompile(`version "([^"]+)"`)
 
-func FindJava(override string, required int) (Java, error) {
-	path, err := javaPath(override)
+func JavaAt(home string) (Java, error) {
+	bin := filepath.Join(home, "bin", "java")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
+	if _, err := exec.LookPath(bin); err != nil {
+		return Java{}, out.Errorf("java-not-found", "no java executable under %s (looked for %s)", home, bin)
+	}
+	major, err := javaMajor(bin)
 	if err != nil {
 		return Java{}, err
+	}
+	return Java{Path: bin, Major: major}, nil
+}
+
+func FindJava(override string, required int) (Java, error) {
+	if filepath.IsAbs(override) {
+		j, err := JavaAt(override)
+		if err != nil {
+			return Java{}, err
+		}
+		return j, requireMajor(j, required)
+	}
+	path, err := exec.LookPath("java")
+	if err != nil {
+		return Java{}, out.Errorf("java-not-found", "no java on PATH; install a JDK or set \"java\" in shulker.json to a JDK path")
 	}
 	major, err := javaMajor(path)
 	if err != nil {
 		return Java{}, err
 	}
 	j := Java{Path: path, Major: major}
-	if override != "" && !filepath.IsAbs(override) {
+	if override != "" {
 		r, err := mcver.ParseRange(override)
 		if err != nil {
 			return j, out.Errorf("java-range", "manifest java %q is neither an absolute path nor a version range", override)
@@ -41,28 +63,14 @@ func FindJava(override string, required int) (Java, error) {
 		}
 		return j, nil
 	}
-	if major < required {
-		return j, out.Errorf("java-version", "java at %s is version %d; this Minecraft version needs Java %d or newer. Set \"java\" in shulker.json to a JDK path or put a newer java on PATH", path, major, required)
-	}
-	return j, nil
+	return j, requireMajor(j, required)
 }
 
-func javaPath(override string) (string, error) {
-	if override != "" && filepath.IsAbs(override) {
-		bin := filepath.Join(override, "bin", "java")
-		if runtime.GOOS == "windows" {
-			bin += ".exe"
-		}
-		if _, err := exec.LookPath(bin); err != nil {
-			return "", out.Errorf("java-not-found", "no java executable under manifest java path %s (looked for %s)", override, bin)
-		}
-		return bin, nil
+func requireMajor(j Java, required int) error {
+	if j.Major < required {
+		return out.Errorf("java-version", "java at %s is version %d; this Minecraft version needs Java %d or newer. Set \"java\" in shulker.json to a JDK path or put a newer java on PATH", j.Path, j.Major, required)
 	}
-	path, err := exec.LookPath("java")
-	if err != nil {
-		return "", out.Errorf("java-not-found", "no java on PATH; install a JDK or set \"java\" in shulker.json to a JDK path")
-	}
-	return path, nil
+	return nil
 }
 
 func javaMajor(path string) (int, error) {

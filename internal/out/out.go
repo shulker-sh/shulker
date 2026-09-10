@@ -35,6 +35,14 @@ func Errorf(code string, format string, args ...any) *Error {
 	return &Error{Code: code, Message: fmt.Sprintf(format, args...), Exit: ExitError}
 }
 
+func CodeOf(err error) string {
+	var e *Error
+	if errors.As(err, &e) {
+		return e.Code
+	}
+	return ""
+}
+
 func AsError(err error) *Error {
 	var e *Error
 	if errors.As(err, &e) {
