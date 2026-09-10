@@ -175,7 +175,7 @@ func TestPlayerCommand(t *testing.T) {
 	setPlayers(t, h, map[string]any{"whitelist": []any{map[string]any{"name": "Alice"}, map[string]any{"name": "Bob"}}})
 	h.mustRun(t, "build")
 
-	stdout := h.mustRun(t, "player")
+	stdout := h.mustRun(t, "player", "--all")
 	if !strings.Contains(stdout, "ok         Alice            "+aliceUUID) || !strings.Contains(stdout, "ok         Bob") {
 		t.Fatalf("player: %s", stdout)
 	}
@@ -205,5 +205,12 @@ func TestPlayerCommand(t *testing.T) {
 	code, stdout, _ := h.run(t, "--json", "player", "no spaces")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "invalid-player" {
 		t.Fatalf("expected invalid-player, got %d %s", code, stdout)
+	}
+
+	for _, args := range [][]string{{"--json", "player"}, {"--json", "player", "--all", "Bobby"}} {
+		code, stdout, _ := h.run(t, args...)
+		if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
+			t.Fatalf("%v: expected usage, got %d %s", args, code, stdout)
+		}
 	}
 }

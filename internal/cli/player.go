@@ -9,24 +9,30 @@ import (
 
 	"github.com/andrewmast/shulker/internal/lock"
 	"github.com/andrewmast/shulker/internal/manifest"
+	"github.com/andrewmast/shulker/internal/out"
 	"github.com/andrewmast/shulker/internal/player"
 	"github.com/andrewmast/shulker/internal/project"
 	"github.com/spf13/cobra"
 )
 
 func (a *app) playerCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "player [name|uuid]...",
+	var all bool
+	cmd := &cobra.Command{
+		Use:   "player [name|uuid]... | --all",
 		Short: "Check player names and uuids against Mojang and the lock",
-		Long:  "Reports one state per player: ok, renamed (same uuid, new name), reassigned (same name, different account), or unknown. With no arguments every player in the manifest is checked. Renames are recorded in the lock; reassignments wait for `build --accept-player-change`.",
+		Long:  "Reports one state per player: ok, renamed (same uuid, new name), reassigned (same name, different account), or unknown. Pass names or uuids, or --all for every player in the manifest. Renames are recorded in the lock; reassignments wait for `build --accept-player-change`.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if all == (len(args) > 0) {
+				return out.Errorf("usage", "pass player names or uuids, or --all for every player in the manifest")
+			}
 			p, err := a.openProject()
 			if err != nil {
 				return err
 			}
-			refs := manifestPlayerRefs(p.Manifest)
-			if len(args) > 0 {
-				refs = refs[:0]
+			var refs []player.Ref
+			if all {
+				refs = manifestPlayerRefs(p.Manifest)
+			} else {
 				for _, arg := range args {
 					ref, err := player.ParseRef(arg)
 					if err != nil {
@@ -57,6 +63,8 @@ func (a *app) playerCmd() *cobra.Command {
 			})
 		},
 	}
+	cmd.Flags().BoolVar(&all, "all", false, "check every player in the manifest")
+	return cmd
 }
 
 func describePlayer(r player.Result) string {
