@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/launcher"
 	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/andrewmast/shulker/internal/out"
@@ -98,7 +100,9 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			return a.printer.Emit(rep, func(w io.Writer) {
 				fmt.Fprintf(w, "Installed %s into %s\n", versionID, filepath.Join(launcherDir, "versions"))
 				fmt.Fprintf(w, "Linked launcher profile %q to %s\n", p.Manifest.Name, gameDir)
-				fmt.Fprintln(w, "Run `shulker install` before launching.")
+				if _, err := os.Stat(filepath.Join(gameDir, build.StateFile)); err != nil {
+					fmt.Fprintln(w, "Run `shulker install` before launching.")
+				}
 			})
 		},
 	}
