@@ -14,7 +14,7 @@ const ProfilesFile = "launcher_profiles.json"
 
 var ErrNotFound = errors.New("launcher not found")
 
-type Vanilla struct {
+type Mojang struct {
 	Dir string
 	Now func() time.Time
 }
@@ -26,7 +26,7 @@ type Profile struct {
 	GameDir   string
 }
 
-func DefaultVanillaDir() (string, error) {
+func DefaultMojangDir() (string, error) {
 	switch runtime.GOOS {
 	case "darwin":
 		home, err := os.UserHomeDir()
@@ -49,7 +49,7 @@ func DefaultVanillaDir() (string, error) {
 	}
 }
 
-func (v *Vanilla) Check() error {
+func (v *Mojang) Check() error {
 	info, err := os.Stat(v.Dir)
 	if err != nil || !info.IsDir() {
 		return fmt.Errorf("%w at %s", ErrNotFound, v.Dir)
@@ -57,7 +57,7 @@ func (v *Vanilla) Check() error {
 	return nil
 }
 
-func (v *Vanilla) InstallVersion(profile json.RawMessage) (string, error) {
+func (v *Mojang) InstallVersion(profile json.RawMessage) (string, error) {
 	var head struct {
 		ID string `json:"id"`
 	}
@@ -74,7 +74,7 @@ func (v *Vanilla) InstallVersion(profile json.RawMessage) (string, error) {
 	return head.ID, writeAtomic(filepath.Join(dir, head.ID+".json"), profile)
 }
 
-func (v *Vanilla) WriteProfile(p Profile) error {
+func (v *Mojang) WriteProfile(p Profile) error {
 	path := filepath.Join(v.Dir, ProfilesFile)
 	top := map[string]json.RawMessage{}
 	data, err := os.ReadFile(path)
@@ -123,7 +123,7 @@ func (v *Vanilla) WriteProfile(p Profile) error {
 	return writeAtomic(path, append(out, '\n'))
 }
 
-func (v *Vanilla) now() time.Time {
+func (v *Mojang) now() time.Time {
 	if v.Now != nil {
 		return v.Now()
 	}

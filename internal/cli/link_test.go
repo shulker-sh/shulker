@@ -10,7 +10,7 @@ import (
 	"github.com/andrewmast/shulker/internal/out"
 )
 
-func TestLinkVanilla(t *testing.T) {
+func TestLinkMojang(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
@@ -28,7 +28,7 @@ func TestLinkVanilla(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
+	stdout := h.mustRun(t, "link", "vanilla", "--launcher-dir", launcherDir)
 	if !strings.Contains(stdout, "Installed fabric-loader-0.17.3-26.2 into") || !strings.Contains(stdout, "Run `shulker install` before launching.") {
 		t.Fatalf("link output: %s", stdout)
 	}
@@ -63,7 +63,7 @@ func TestLinkVanilla(t *testing.T) {
 	profiles.Profiles["shulker-pack"]["icon"] = "Furnace"
 	writeProfiles(t, launcherDir, profiles)
 
-	code, stdout, _ := h.run(t, "link", "vanilla", "--launcher-dir", launcherDir, "--json")
+	code, stdout, _ := h.run(t, "link", "mojang", "--launcher-dir", launcherDir, "--json")
 	if code != 0 {
 		t.Fatalf("relink exit %d: %s", code, stdout)
 	}
@@ -74,7 +74,7 @@ func TestLinkVanilla(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Command != "link vanilla" || env.Data.Profile != "shulker-pack" || env.Data.Target != "client" || env.Data.GameDir != wantGameDir {
+	if env.Command != "link mojang" || env.Data.Profile != "shulker-pack" || env.Data.Target != "client" || env.Data.GameDir != wantGameDir {
 		t.Fatalf("relink envelope: %s", stdout)
 	}
 	profiles = readProfiles(t, launcherDir)
@@ -87,17 +87,17 @@ func TestLinkVanilla(t *testing.T) {
 	}
 }
 
-func TestLinkVanillaErrors(t *testing.T) {
+func TestLinkMojangErrors(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
-	code, stdout, _ := h.run(t, "link", "vanilla", "--launcher-dir", filepath.Join(t.TempDir(), "missing"), "--json")
+	code, stdout, _ := h.run(t, "link", "mojang", "--launcher-dir", filepath.Join(t.TempDir(), "missing"), "--json")
 	if code == 0 || failureCode(t, stdout).Code != "launcher-not-found" {
 		t.Fatalf("missing launcher: exit %d %s", code, stdout)
 	}
 
-	code, stdout, _ = h.run(t, "link", "vanilla", "--launcher-dir", t.TempDir(), "--target", "nope", "--json")
+	code, stdout, _ = h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--target", "nope", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "target-not-found" || strings.Join(e.Candidates, ",") != "client" {
 		t.Fatalf("unknown target: exit %d %s", code, stdout)
 	}

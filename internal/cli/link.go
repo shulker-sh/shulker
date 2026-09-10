@@ -30,15 +30,15 @@ func (a *app) linkCmd() *cobra.Command {
 		Use:   "link",
 		Short: "Point a launcher at this project's client build",
 	}
-	cmd.AddCommand(a.linkVanillaCmd())
+	cmd.AddCommand(a.linkMojangCmd())
 	return cmd
 }
 
-func (a *app) linkVanillaCmd() *cobra.Command {
+func (a *app) linkMojangCmd() *cobra.Command {
 	var launcherDir, target string
 	cmd := &cobra.Command{
-		Use:     "vanilla",
-		Aliases: []string{"mojang"},
+		Use:     "mojang",
+		Aliases: []string{"vanilla"},
 		Short:   "Install the loader into the official launcher and add a profile for the client build",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -50,18 +50,18 @@ func (a *app) linkVanillaCmd() *cobra.Command {
 				return err
 			}
 			if p.Lock.Loader.Type != "fabric" {
-				return out.Errorf("unsupported-loader", "link vanilla supports only the fabric loader for now, not %s", p.Lock.Loader.Type)
+				return out.Errorf("unsupported-loader", "link mojang supports only the fabric loader for now, not %s", p.Lock.Loader.Type)
 			}
 			name, t, err := clientTarget(p.Manifest, target)
 			if err != nil {
 				return err
 			}
 			if launcherDir == "" {
-				if launcherDir, err = launcher.DefaultVanillaDir(); err != nil {
+				if launcherDir, err = launcher.DefaultMojangDir(); err != nil {
 					return err
 				}
 			}
-			v := &launcher.Vanilla{Dir: launcherDir}
+			v := &launcher.Mojang{Dir: launcherDir}
 			if err := v.Check(); errors.Is(err, launcher.ErrNotFound) {
 				return out.Errorf("launcher-not-found", "no Minecraft launcher directory at %s; run the launcher once or pass --launcher-dir", launcherDir)
 			} else if err != nil {
@@ -85,7 +85,7 @@ func (a *app) linkVanillaCmd() *cobra.Command {
 				return err
 			}
 			rep := linkReport{
-				Launcher:    "vanilla",
+				Launcher:    "mojang",
 				LauncherDir: launcherDir,
 				Profile:     profileKey(p.Manifest.Name),
 				VersionID:   versionID,
