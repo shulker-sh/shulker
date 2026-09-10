@@ -284,7 +284,7 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "install")
-	if !strings.Contains(stdout, "fetched 0 file(s)") || !strings.Contains(stdout, "client: 3 written") {
+	if !strings.Contains(stdout, "fetched 0 file(s)") || !strings.Contains(stdout, "client: 4 written") {
 		t.Fatalf("install output: %s", stdout)
 	}
 	buildDir := filepath.Join(h.dir, "build", "client")
@@ -295,12 +295,12 @@ func TestVerticalSlice(t *testing.T) {
 	}
 	var state build.State
 	h.readJSON(t, "build/client/.shulker-state.json", &state)
-	if state.Target != "client" || len(state.Files) != 3 {
+	if state.Target != "client" || len(state.Files) != 4 {
 		t.Fatalf("state: %+v", state)
 	}
 
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "0 written, 3 unchanged") {
+	if !strings.Contains(stdout, "0 written, 4 unchanged") {
 		t.Fatalf("rebuild output: %s", stdout)
 	}
 
@@ -511,7 +511,7 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 		t.Fatalf("suggestions: %v", sg)
 	}
 	stdout = h.mustRun(t, "install")
-	if !strings.Contains(stdout, "client: 2 written") {
+	if !strings.Contains(stdout, "client: 3 written") {
 		t.Fatalf("install: %s", stdout)
 	}
 }

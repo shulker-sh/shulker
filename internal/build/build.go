@@ -180,6 +180,13 @@ func (b *Builder) collect(target manifest.Target) (map[string]source, error) {
 			return nil, err
 		}
 	}
+	if target.Side == "client" {
+		jar, err := b.markerJar(target.Side)
+		if err != nil {
+			return nil, err
+		}
+		desired[markerJarPath(b.Manifest.Name)] = source{data: jar}
+	}
 	for _, layer := range target.Overrides {
 		root := filepath.Join(b.Dir, layer)
 		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
