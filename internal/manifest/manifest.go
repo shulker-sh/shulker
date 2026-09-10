@@ -13,7 +13,7 @@ import (
 
 const (
 	FileName  = "shulker.json"
-	SchemaURL = "https://shulker.sh/schema/manifest-v1.json"
+	SchemaURL = "https://shulker.sh/schema/v1/manifest.json"
 )
 
 var DefaultProviders = []string{"modrinth", "curseforge"}

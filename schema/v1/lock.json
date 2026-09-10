@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://shulker.sh/schema/lock-v1.json",
+  "$id": "https://shulker.sh/schema/v1/lock.json",
   "title": "shulker.lock",
   "description": "Shulker lock file. Tool-owned, key-sorted, pretty-printed. Records the exact resolution of shulker.json; install and build read only this file.",
   "type": "object",

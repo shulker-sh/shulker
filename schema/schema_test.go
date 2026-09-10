@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -53,4 +54,28 @@ func hex(n int) string {
 		b[i] = 'a'
 	}
 	return string(b)
+}
+
+func TestIDMatchesHostedURL(t *testing.T) {
+	for _, kind := range []Kind{Manifest, Lock} {
+		t.Run(string(kind), func(t *testing.T) {
+			raw, err := files.ReadFile(string(kind))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var doc struct {
+				ID string `json:"$id"`
+			}
+			if err := json.Unmarshal(raw, &doc); err != nil {
+				t.Fatal(err)
+			}
+			want := "https://shulker.sh/schema/" + string(kind)
+			if doc.ID != want {
+				t.Fatalf("$id = %q, want %q", doc.ID, want)
+			}
+			if _, err := Compile(kind); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }

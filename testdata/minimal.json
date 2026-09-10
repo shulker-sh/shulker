@@ -1,5 +1,5 @@
 {
-  "$schema": "https://shulker.sh/schema/manifest-v1.json",
+  "$schema": "https://shulker.sh/schema/v1/manifest.json",
   "name": "my-client",
   "minecraft": "26.2",
   "loader": { "type": "fabric", "version": "*" },

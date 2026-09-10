@@ -8,14 +8,14 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-//go:embed manifest-v1.json lock-v1.json
+//go:embed v1/manifest.json v1/lock.json
 var files embed.FS
 
 type Kind string
 
 const (
-	Manifest Kind = "manifest-v1.json"
-	Lock     Kind = "lock-v1.json"
+	Manifest Kind = "v1/manifest.json"
+	Lock     Kind = "v1/lock.json"
 )
 
 func Compile(kind Kind) (*jsonschema.Schema, error) {
