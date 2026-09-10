@@ -67,7 +67,7 @@ func (a *app) initCmd() *cobra.Command {
 				Mods:      map[string]manifest.Mod{},
 			}
 			if target == "server" {
-				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory}
+				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
 			}
 			d, err := a.deps()
 			if err != nil {

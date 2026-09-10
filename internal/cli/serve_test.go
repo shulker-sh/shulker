@@ -42,7 +42,9 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
 	var m map[string]any
 	h.readJSON(t, "shulker.json", &m)
-	if srv, _ := m["server"].(map[string]any); srv == nil || srv["eula"] != false || srv["memory"] != "4G" {
+	srv, _ := m["server"].(map[string]any)
+	props, _ := srv["properties"].(map[string]any)
+	if srv == nil || srv["eula"] != false || srv["memory"] != "4G" || props["difficulty"] != "easy" {
 		t.Fatalf("init did not seed the server block: %v", m["server"])
 	}
 	h.mustRun(t, "add", "fabric-api")
