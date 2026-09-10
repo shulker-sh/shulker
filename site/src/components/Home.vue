@@ -56,12 +56,16 @@ h1 {
 }
 .install {
   margin: 2rem auto;
-  max-width: 34rem;
+  width: fit-content;
+  max-width: 100%;
   text-align: left;
 }
 .install :deep(div[class*='language-']) {
   margin: 0;
   border: 1px solid var(--vp-c-divider);
+}
+.install :deep(div[class*='language-'] code) {
+  padding-right: 4.5rem;
 }
 .actions {
   display: flex;
