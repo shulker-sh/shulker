@@ -298,7 +298,6 @@
         "pause-when-empty-seconds": {"type": "integer"},
         "player-idle-timeout": {"type": "integer", "minimum": 0},
         "prevent-proxy-connections": {"type": "boolean"},
-        "pvp": {"type": "boolean"},
         "query.port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "rate-limit": {"type": "integer", "minimum": 0},
         "rcon.password": {"type": "string"},

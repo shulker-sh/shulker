@@ -17,7 +17,9 @@ import (
 	"github.com/andrewmast/shulker/internal/cache"
 	"github.com/andrewmast/shulker/internal/lock"
 	"github.com/andrewmast/shulker/internal/manifest"
+	"github.com/andrewmast/shulker/internal/mcver"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/server"
 )
 
 const (
@@ -43,6 +45,7 @@ type Report struct {
 	Kept      []string `json:"kept"`
 	Removed   []string `json:"removed"`
 	Conflicts []string `json:"conflicts"`
+	Warnings  []string `json:"warnings"`
 	Forced    bool     `json:"forced"`
 }
 
@@ -71,12 +74,12 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		return nil, out.Errorf("unknown-target", "target %q is not in the manifest", name)
 	}
 	dir := filepath.Join(b.Dir, target.Build)
-	desired, err := b.collect(target)
+	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Conflicts: []string{}, Warnings: []string{}, Forced: opts.Force}
+	desired, err := b.collect(target, report)
 	if err != nil {
 		return nil, err
 	}
 	prev := b.loadState(dir)
-	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Conflicts: []string{}, Forced: opts.Force}
 	next := State{Target: name, Files: map[string]string{}}
 
 	paths := make([]string, 0, len(desired))
@@ -167,7 +170,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	return report, nil
 }
 
-func (b *Builder) collect(target manifest.Target) (map[string]source, error) {
+func (b *Builder) collect(target manifest.Target, report *Report) (map[string]source, error) {
 	desired := map[string]source{}
 	for id, m := range b.Lock.Mods {
 		if m.Side != "both" && m.Side != target.Side {
@@ -186,7 +189,7 @@ func (b *Builder) collect(target manifest.Target) (map[string]source, error) {
 		vars[k] = v
 	}
 	if target.Side == "server" {
-		if err := b.collectServer(desired, vars); err != nil {
+		if err := b.collectServer(desired, vars, report); err != nil {
 			return nil, err
 		}
 	}
@@ -237,7 +240,7 @@ func (b *Builder) collect(target manifest.Target) (map[string]source, error) {
 	return desired, nil
 }
 
-func (b *Builder) collectServer(desired map[string]source, vars map[string]string) error {
+func (b *Builder) collectServer(desired map[string]source, vars map[string]string, report *Report) error {
 	jar := b.Lock.Loader.Server
 	if jar == nil || !b.Cache.Has(jar.Sha512) {
 		return out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
@@ -249,6 +252,9 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	}
 	if srv.Eula {
 		desired[EulaFile] = source{data: []byte("eula=true\n")}
+	}
+	if err := b.checkPropertyKeys(srv.Properties, report); err != nil {
+		return err
 	}
 	props, err := renderProperties(PropertiesFile, srv.Properties, vars)
 	if err != nil {
@@ -268,6 +274,25 @@ func (b *Builder) collectClient(desired map[string]source, vars map[string]strin
 		return err
 	}
 	desired[OptionsFile] = source{props: options, sep: ":"}
+	return nil
+}
+
+func (b *Builder) checkPropertyKeys(raw map[string]any, report *Report) error {
+	minecraft, err := mcver.Parse(b.Lock.Minecraft)
+	if err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(raw))
+	for k := range raw {
+		keys = append(keys, k)
+	}
+	check := server.CheckPropertyKeys(keys, minecraft)
+	report.Warnings = append(report.Warnings, check.Warnings...)
+	if len(check.Problems) > 0 {
+		e := out.Errorf("invalid-properties", "%d server.properties key(s) are not valid for Minecraft %s", len(check.Problems), b.Lock.Minecraft)
+		e.Candidates = check.Problems
+		return e
+	}
 	return nil
 }
 

@@ -18,7 +18,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["variables"] = map[string]any{"motd": "Welcome"}
 		m["server"] = map[string]any{
 			"eula":       true,
-			"properties": map[string]any{"motd": "${motd} to pack", "max-players": 8, "pvp": false},
+			"properties": map[string]any{"motd": "${motd} to pack", "max-players": 8, "online-mode": false},
 		}
 	})
 
@@ -43,7 +43,7 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatalf("eula.txt: %q", got)
 	}
 	propsPath := filepath.Join(buildDir, "server.properties")
-	if got := readFile(t, propsPath); got != "max-players=8\nmotd=Welcome to pack\npvp=false\n" {
+	if got := readFile(t, propsPath); got != "max-players=8\nmotd=Welcome to pack\nonline-mode=false\n" {
 		t.Fatalf("server.properties: %q", got)
 	}
 
@@ -52,7 +52,7 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatalf("server jar downloaded %d times", h.serverJarHits)
 	}
 
-	gameRewritten := "#Minecraft server properties\n#Thu Sep 10 00:00:00 UTC 2026\npvp=false\nmotd=Welcome to pack\nview-distance=10\nmax-players=8\n"
+	gameRewritten := "#Minecraft server properties\n#Thu Sep 10 00:00:00 UTC 2026\nonline-mode=false\nmotd=Welcome to pack\nview-distance=10\nmax-players=8\n"
 	if err := os.WriteFile(propsPath, []byte(gameRewritten), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatalf("merged server.properties: %q", got)
 	}
 
-	if err := os.WriteFile(propsPath, []byte(strings.Replace(readFile(t, propsPath), "pvp=false", "pvp=true", 1)), 0o644); err != nil {
+	if err := os.WriteFile(propsPath, []byte(strings.Replace(readFile(t, propsPath), "online-mode=false", "online-mode=true", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
@@ -84,7 +84,7 @@ func TestServerTargetBuild(t *testing.T) {
 	}
 
 	h.editManifest(t, func(m map[string]any) {
-		m["server"].(map[string]any)["properties"].(map[string]any)["pvp"] = true
+		m["server"].(map[string]any)["properties"].(map[string]any)["online-mode"] = true
 	})
 	h.editManifest(t, func(m map[string]any) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["motd"] = "Changed"
@@ -135,7 +135,7 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 		t.Fatalf("expected the seeded server.properties, got %q, %v", data, err)
 	}
 
-	gameWritten := "#Minecraft server properties\ndifficulty=easy\nmotd=A Minecraft Server\npvp=true\n"
+	gameWritten := "#Minecraft server properties\ndifficulty=easy\nmotd=A Minecraft Server\nonline-mode=true\n"
 	if err := os.WriteFile(path, []byte(gameWritten), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -148,13 +148,36 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 	}
 
 	h.editManifest(t, func(m map[string]any) {
-		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"difficulty": "easy", "pvp": false}}
+		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"difficulty": "easy", "online-mode": false}}
 	})
 	stdout = h.mustRun(t, "build")
 	if !strings.Contains(stdout, "2 written, 1 unchanged") {
 		t.Fatalf("rebuild with owned key: %s", stdout)
 	}
-	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\ndifficulty=easy\nmotd=A Minecraft Server\npvp=false\n" {
+	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\ndifficulty=easy\nmotd=A Minecraft Server\nonline-mode=false\n" {
 		t.Fatalf("merged file: %q", data)
+	}
+}
+
+func TestServerBuildValidatesPropertyKeys(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.editManifest(t, func(m map[string]any) {
+		m["server"] = map[string]any{"properties": map[string]any{"difficulty": "easy", "pvp": false, "vew-distance": 8}}
+	})
+	code, stdout, _ := h.run(t, "install", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "invalid-properties" || len(e.Candidates) != 1 || e.Candidates[0] != "pvp (removed in 1.21.9; use the pvp game rule)" {
+		t.Fatalf("removed key: exit %d %s", code, stdout)
+	}
+
+	h.editManifest(t, func(m map[string]any) {
+		delete(m["server"].(map[string]any)["properties"].(map[string]any), "pvp")
+	})
+	code, stdout, stderr := h.run(t, "install")
+	if code != 0 || !strings.Contains(stderr, `warning: server.properties key "vew-distance" is not a known key; did you mean "view-distance"?`) {
+		t.Fatalf("unknown key: exit %d %s %s", code, stdout, stderr)
+	}
+	if got := readFile(t, filepath.Join(h.dir, "build", "server", "server.properties")); got != "difficulty=easy\nvew-distance=8\n" {
+		t.Fatalf("server.properties: %q", got)
 	}
 }

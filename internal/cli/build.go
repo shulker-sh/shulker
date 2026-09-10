@@ -40,6 +40,7 @@ func (a *app) buildCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
+				a.warn(rep.Warnings)
 				reports = append(reports, rep)
 			}
 			return a.printer.Emit(reports, func(w io.Writer) {

@@ -97,6 +97,7 @@ func (a *app) installCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
+				a.warn(rep.Warnings)
 				res.Builds = append(res.Builds, rep)
 			}
 			return a.printer.Emit(res, func(w io.Writer) {
