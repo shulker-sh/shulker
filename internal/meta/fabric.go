@@ -2,6 +2,7 @@ package meta
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/andrewmast/shulker/internal/fetch"
@@ -38,4 +39,13 @@ func (f *Fabric) LoaderVersions(ctx context.Context, game string) ([]LoaderVersi
 		out = append(out, LoaderVersion{Version: e.Loader.Version, Stable: e.Loader.Stable})
 	}
 	return out, nil
+}
+
+func (f *Fabric) LoaderProfile(ctx context.Context, game, loader string) (json.RawMessage, error) {
+	var raw json.RawMessage
+	url := fmt.Sprintf("%s/versions/loader/%s/%s/profile/json", f.BaseURL, game, loader)
+	if err := f.Client.GetJSON(ctx, url, &raw); err != nil {
+		return nil, fmt.Errorf("fabric profile for %s with loader %s: %w", game, loader, err)
+	}
+	return raw, nil
 }

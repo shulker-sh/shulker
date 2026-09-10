@@ -2,6 +2,7 @@ package cli
 
 import (
 	"io"
+	"strings"
 
 	"github.com/andrewmast/shulker/internal/out"
 	"github.com/spf13/cobra"
@@ -42,12 +43,12 @@ func (a *app) root() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
-			a.printer.Command = cmd.Name()
+			a.printer.Command = strings.TrimPrefix(cmd.CommandPath(), "shulker ")
 		},
 	}
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
-	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd())
+	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.linkCmd())
 	return root
 }
 

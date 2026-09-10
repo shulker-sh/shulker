@@ -92,6 +92,13 @@ func newHarness(t *testing.T) *harness {
 			{"loader": map[string]any{"version": "0.17.2", "stable": true}},
 		})
 	})
+	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/profile/json", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{
+			"id": "fabric-loader-0.17.3-26.2", "inheritsFrom": "26.2", "type": "release",
+			"mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
+			"libraries": []map[string]any{{"name": "net.fabricmc:fabric-loader:0.17.3", "url": "https://maven.fabricmc.net/"}},
+		})
+	})
 	projects := map[string]map[string]any{
 		"sodium":     {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},
 		"AANobbMI":   {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},
