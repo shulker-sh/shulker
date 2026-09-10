@@ -306,11 +306,11 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if srv.Eula {
 		desired[EulaFile] = source{data: []byte("eula=true\n")}
 	}
-	if err := b.checkPropertyKeys(srv.Properties, report); err != nil {
-		return "", err
-	}
 	props, err := renderProperties(PropertiesFile, srv.Properties, vars)
 	if err != nil {
+		return "", err
+	}
+	if err := b.checkProperties(props, report); err != nil {
 		return "", err
 	}
 	desired[PropertiesFile] = source{owned: propsFile{props, "="}}
@@ -337,16 +337,12 @@ func (b *Builder) collectClient(desired map[string]source, vars map[string]strin
 	return nil
 }
 
-func (b *Builder) checkPropertyKeys(raw map[string]any, report *Report) error {
+func (b *Builder) checkProperties(props properties, report *Report) error {
 	minecraft, err := mcver.Parse(b.Lock.Minecraft)
 	if err != nil {
 		return err
 	}
-	keys := make([]string, 0, len(raw))
-	for k := range raw {
-		keys = append(keys, k)
-	}
-	check := server.CheckPropertyKeys(keys, minecraft)
+	check := server.CheckProperties(props, minecraft)
 	report.Warnings = append(report.Warnings, check.Warnings...)
 	if len(check.Problems) > 0 {
 		e := out.Errorf("invalid-properties", "%d server.properties key(s) are not valid for Minecraft %s", len(check.Problems), b.Lock.Minecraft)

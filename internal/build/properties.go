@@ -89,8 +89,14 @@ func (f propsFile) current(existing []byte, recordedKeys []string) []byte {
 	return owned.restrict(parseProperties(existing)).canonical()
 }
 
-func (f propsFile) merge(existing []byte, _ []string) ([]byte, error) {
-	return f.props.mergeInto(existing, f.sep), nil
+func (f propsFile) merge(existing []byte, recordedKeys []string) ([]byte, error) {
+	dropped := map[string]bool{}
+	for _, k := range recordedKeys {
+		if _, owned := f.props[k]; !owned {
+			dropped[k] = true
+		}
+	}
+	return f.props.mergeInto(existing, f.sep, dropped), nil
 }
 
 func (p properties) restrict(existing properties) properties {
@@ -103,7 +109,7 @@ func (p properties) restrict(existing properties) properties {
 	return sub
 }
 
-func (p properties) mergeInto(existing []byte, sep string) []byte {
+func (p properties) mergeInto(existing []byte, sep string, dropped map[string]bool) []byte {
 	if len(existing) == 0 {
 		var buf bytes.Buffer
 		for _, k := range p.keys() {
@@ -115,14 +121,17 @@ func (p properties) mergeInto(existing []byte, sep string) []byte {
 	for k := range p {
 		pending[k] = true
 	}
-	lines := strings.Split(strings.TrimRight(string(existing), "\n"), "\n")
-	for i, line := range lines {
+	lines := []string{}
+	for _, line := range strings.Split(strings.TrimRight(string(existing), "\n"), "\n") {
 		key, _, ok := splitProperty(line)
-		if !ok || !pending[key] {
+		switch {
+		case ok && dropped[key]:
 			continue
+		case ok && pending[key]:
+			line = key + sep + p[key]
+			delete(pending, key)
 		}
-		lines[i] = key + sep + p[key]
-		delete(pending, key)
+		lines = append(lines, line)
 	}
 	for _, k := range p.keys() {
 		if pending[k] {

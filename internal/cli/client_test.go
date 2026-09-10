@@ -41,7 +41,7 @@ func TestClientBuildMergesOptions(t *testing.T) {
 	if !strings.Contains(stdout, "2 written, 0 unchanged") {
 		t.Fatalf("rebuild with changed keys: %s", stdout)
 	}
-	want := "version:4325\nfov:0.5\njoinedFirstServer:true\nlastServer:play.example.org:25565\nonboardAccessibility:false\nresourcePacks:[\"fabric\",\"sodium\"]\nskipMultiplayerWarning:true\ntutorialStep:none\n"
+	want := "version:4325\nfov:0.5\nlastServer:play.example.org:25565\nresourcePacks:[\"fabric\",\"sodium\"]\ntutorialStep:none\n"
 	if data, _ := os.ReadFile(path); string(data) != want {
 		t.Fatalf("merged options.txt: %q", data)
 	}

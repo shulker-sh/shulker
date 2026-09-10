@@ -157,6 +157,20 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\ndifficulty=easy\nmotd=A Minecraft Server\nonline-mode=false\n" {
 		t.Fatalf("merged file: %q", data)
 	}
+
+	h.editManifest(t, func(m map[string]any) {
+		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"online-mode": false}}
+	})
+	stdout = h.mustRun(t, "build")
+	if !strings.Contains(stdout, "1 written, 2 unchanged") {
+		t.Fatalf("rebuild after dropping a key: %s", stdout)
+	}
+	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\n" {
+		t.Fatalf("file after dropping difficulty: %q", data)
+	}
+	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "0 written, 3 unchanged") {
+		t.Fatalf("rebuild after drop should be clean: %s", stdout)
+	}
 }
 
 func TestServerBuildValidatesPropertyKeys(t *testing.T) {
@@ -171,13 +185,18 @@ func TestServerBuildValidatesPropertyKeys(t *testing.T) {
 	}
 
 	h.editManifest(t, func(m map[string]any) {
-		delete(m["server"].(map[string]any)["properties"].(map[string]any), "pvp")
+		props := m["server"].(map[string]any)["properties"].(map[string]any)
+		delete(props, "pvp")
+		props["view-distance"] = 64
 	})
 	code, stdout, stderr := h.run(t, "install")
+	if !strings.Contains(stderr, `warning: server.properties key "view-distance" is 64, outside 3-32; the game clamps it`) {
+		t.Fatalf("out of range: %s", stderr)
+	}
 	if code != 0 || !strings.Contains(stderr, `warning: server.properties key "vew-distance" is not a known key; did you mean "view-distance"?`) {
 		t.Fatalf("unknown key: exit %d %s %s", code, stdout, stderr)
 	}
-	if got := readFile(t, filepath.Join(h.dir, "build", "server", "server.properties")); got != "difficulty=easy\nvew-distance=8\n" {
+	if got := readFile(t, filepath.Join(h.dir, "build", "server", "server.properties")); got != "difficulty=easy\nvew-distance=8\nview-distance=64\n" {
 		t.Fatalf("server.properties: %q", got)
 	}
 }
