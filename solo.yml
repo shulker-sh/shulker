@@ -15,3 +15,10 @@ processes:
     auto_restart: false
     restart_when_changed: []
     env: {}
+  Schema Check:
+    command: for f in testdata/minimal.json testdata/two-target.json; do npx --yes --package ajv-cli --package ajv-formats ajv validate -s schema/v1/manifest.json -d "$f" --spec=draft2020 -c ajv-formats --strict=false || exit 1; done && npx --yes --package ajv-cli --package ajv-formats ajv validate -s schema/v1/lock.json -d testdata/lock.json --spec=draft2020 -c ajv-formats --strict=false
+    working_dir: null
+    auto_start: false
+    auto_restart: false
+    restart_when_changed: []
+    env: {}
