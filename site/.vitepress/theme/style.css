@@ -3,12 +3,32 @@
   --vp-c-brand-2: #c2661f;
   --vp-c-brand-3: #a35216;
   --vp-c-brand-soft: rgba(217, 119, 43, 0.16);
+
+  --vp-c-bg: #fffcf9;
+  --vp-c-bg-alt: #faf3ec;
+  --vp-c-bg-soft: #f6ede4;
+  --vp-c-bg-elv: #fffcf9;
+  --vp-c-divider: #ecdfd2;
+  --vp-c-gutter: #e6d6c6;
+  --vp-code-block-bg: #faf3ec;
+  --vp-code-bg: #f3e6d9;
+  --vp-code-color: #a35216;
 }
 
 .dark {
   --vp-c-brand-1: #f08a3a;
   --vp-c-brand-2: #d9772b;
   --vp-c-brand-3: #c2661f;
+
+  --vp-c-bg: #1a1512;
+  --vp-c-bg-alt: #141110;
+  --vp-c-bg-soft: #241d18;
+  --vp-c-bg-elv: #241d18;
+  --vp-c-divider: #33281f;
+  --vp-c-gutter: #0f0c0a;
+  --vp-code-block-bg: #141110;
+  --vp-code-bg: #2c221b;
+  --vp-code-color: #f0a86a;
 }
 
 .VPNavBarTitle .logo,

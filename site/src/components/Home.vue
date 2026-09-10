@@ -10,7 +10,9 @@ import { VPButton } from 'vitepress/theme'
       <p class="tagline">
         One manifest for your Minecraft mods, client instances, and servers.
       </p>
-      <pre class="install"><code>curl -fsSL https://shulker.sh/install.sh | sh</code></pre>
+      <div class="install">
+        <slot />
+      </div>
       <div class="actions">
         <VPButton text="Get started" href="/docs/getting-started" />
         <VPButton text="GitHub" href="https://github.com/shulker-sh/shulker" theme="alt" />
@@ -25,7 +27,9 @@ import { VPButton } from 'vitepress/theme'
   display: grid;
   place-items: center;
   padding: 4rem 1.5rem;
-  background: var(--vp-c-bg);
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, var(--vp-c-brand-soft), transparent 70%),
+    var(--vp-c-bg);
   color: var(--vp-c-text-1);
 }
 .hero {
@@ -54,13 +58,12 @@ h1 {
 }
 .install {
   margin: 2rem auto;
-  display: inline-block;
-  padding: 0.75rem 1.25rem;
-  border-radius: 8px;
-  background: var(--vp-c-bg-alt);
+  max-width: 34rem;
+  text-align: left;
+}
+.install :deep(div[class*='language-']) {
+  margin: 0;
   border: 1px solid var(--vp-c-divider);
-  font-family: var(--vp-font-family-mono);
-  font-size: 0.9rem;
 }
 .actions {
   display: flex;

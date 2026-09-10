@@ -7,4 +7,10 @@ title: Shulker
 import Home from './src/components/Home.vue'
 </script>
 
-<Home />
+<Home>
+
+```sh
+curl -fsSL https://shulker.sh/install.sh | sh
+```
+
+</Home>
