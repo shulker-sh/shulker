@@ -203,23 +203,24 @@ func markerLangKey(label string) string {
 }
 
 func (b *Builder) markerDescription(direct, deps []string) string {
-	lines := func(ids []string) []string {
-		out := make([]string, len(ids))
-		for i, id := range ids {
-			out[i] = id + " " + b.Lock.Mods[id].VersionNumber
+	section := func(title string, ids []string) string {
+		lines := make([]string, 0, len(ids)+1)
+		lines = append(lines, title)
+		for _, id := range ids {
+			lines = append(lines, "  \u2022 "+id+"  "+b.Lock.Mods[id].VersionNumber)
 		}
-		return out
+		return strings.Join(lines, "\n")
 	}
-	var sb strings.Builder
+	var parts []string
 	if b.Manifest.Description != "" {
-		sb.WriteString(strings.TrimSpace(b.Manifest.Description) + "\n\n")
+		parts = append(parts, strings.TrimSpace(b.Manifest.Description))
 	}
-	fmt.Fprintf(&sb, "Minecraft %s, %s %s, %d mods.", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
+	parts = append(parts, fmt.Sprintf("Minecraft %s \u00b7 %s %s \u00b7 %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps)))
 	if len(direct) > 0 {
-		sb.WriteString("\n\nMods:\n" + strings.Join(lines(direct), "\n"))
+		parts = append(parts, section("Mods", direct))
 	}
 	if len(deps) > 0 {
-		sb.WriteString("\n\nDependencies:\n" + strings.Join(lines(deps), "\n"))
+		parts = append(parts, section("Dependencies", deps))
 	}
-	return sb.String()
+	return strings.Join(parts, "\n\n")
 }

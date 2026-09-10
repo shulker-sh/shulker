@@ -47,7 +47,7 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 	if meta.SchemaVersion != 1 || meta.ID != "shulker_my_pack" || meta.Name != "my.pack" || meta.Environment != "*" || len(meta.Version) != 8 || meta.Custom.ModMenu.UpdateChecker {
 		t.Fatalf("fabric.mod.json: %+v", meta)
 	}
-	want := "Minecraft 26.2, fabric 0.17.3, 2 mods.\n\nMods:\nsodium 1.0.0+mc26.2\n\nDependencies:\nfabric-api 1.0.0+mc26.2"
+	want := "Minecraft 26.2 \u00b7 fabric 0.17.3 \u00b7 2 mods\n\nMods\n  \u2022 sodium  1.0.0+mc26.2\n\nDependencies\n  \u2022 fabric-api  1.0.0+mc26.2"
 	if meta.Description != want {
 		t.Fatalf("description:\n%s", meta.Description)
 	}
@@ -139,7 +139,7 @@ func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
 	if err := json.Unmarshal(entries["fabric.mod.json"], &meta); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(meta.Description, "Survival with friends.\n\nMinecraft 26.2, ") {
+	if !strings.HasPrefix(meta.Description, "Survival with friends.\n\nMinecraft 26.2 \u00b7 ") {
 		t.Fatalf("description:\n%s", meta.Description)
 	}
 	if strings.Join(meta.Authors, ",") != "Alice,shulker.sh" {
