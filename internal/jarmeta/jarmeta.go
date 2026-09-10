@@ -53,7 +53,11 @@ func readFile(f *zip.File) ([]byte, error) {
 		return nil, err
 	}
 	defer rc.Close()
-	return io.ReadAll(rc)
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")), nil
 }
 
 func readFabric(zr *zip.Reader, f *zip.File) (*Info, error) {
