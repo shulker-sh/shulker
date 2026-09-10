@@ -8,3 +8,10 @@ processes:
     auto_restart: false
     restart_when_changed: []
     env: {}
+  Site Dev:
+    command: npm run dev -- --host --open
+    working_dir: site
+    auto_start: false
+    auto_restart: false
+    restart_when_changed: []
+    env: {}

@@ -10,7 +10,7 @@ import { VPButton } from 'vitepress/theme'
       <p class="tagline">
         One manifest for your Minecraft mods, client instances, and servers.
       </p>
-      <div class="install">
+      <div class="install vp-doc">
         <slot />
       </div>
       <div class="actions">

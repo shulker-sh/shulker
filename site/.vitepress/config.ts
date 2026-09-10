@@ -1,6 +1,8 @@
 import { defineConfig } from 'vitepress'
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
+import gruvboxLight from '@shikijs/themes/gruvbox-light-medium'
+import gruvboxDark from '@shikijs/themes/gruvbox-dark-medium'
 
 export default defineConfig({
   title: 'Shulker',
@@ -41,6 +43,7 @@ export default defineConfig({
     },
   },
   markdown: {
+    theme: { light: gruvboxLight, dark: gruvboxDark },
     codeTransformers: [transformerTwoslash()],
     config(md) {
       md.use(groupIconMdPlugin)
