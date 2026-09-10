@@ -65,6 +65,10 @@ func (a *app) openProject() (*project.Project, error) {
 			return nil, err
 		}
 	}
+	return a.openProjectAt(dir)
+}
+
+func (a *app) openProjectAt(dir string) (*project.Project, error) {
 	p, err := project.Open(dir)
 	if err != nil {
 		return nil, err

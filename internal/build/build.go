@@ -55,6 +55,7 @@ type Report struct {
 
 type Options struct {
 	Force bool
+	Dir   string
 }
 
 type Builder struct {
@@ -84,7 +85,10 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	if !ok {
 		return nil, out.Errorf("unknown-target", "target %q is not in the manifest", name)
 	}
-	dir := filepath.Join(b.Dir, target.Build)
+	dir := opts.Dir
+	if dir == "" {
+		dir = filepath.Join(b.Dir, target.Build)
+	}
 	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, Conflicts: []string{}, Warnings: []string{}, Forced: opts.Force}
 	desired, dirs, err := b.collect(name, target, report)
 	if err != nil {
