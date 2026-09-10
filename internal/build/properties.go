@@ -70,6 +70,29 @@ func (p properties) canonical() []byte {
 	return buf.Bytes()
 }
 
+type propsFile struct {
+	props properties
+	sep   string
+}
+
+func (f propsFile) keys() []string    { return f.props.keys() }
+func (f propsFile) canonical() []byte { return f.props.canonical() }
+
+func (f propsFile) current(existing []byte, recordedKeys []string) []byte {
+	owned := f.props
+	if recordedKeys != nil {
+		owned = properties{}
+		for _, k := range recordedKeys {
+			owned[k] = ""
+		}
+	}
+	return owned.restrict(parseProperties(existing)).canonical()
+}
+
+func (f propsFile) merge(existing []byte, _ []string) ([]byte, error) {
+	return f.props.mergeInto(existing, f.sep), nil
+}
+
 func (p properties) restrict(existing properties) properties {
 	sub := properties{}
 	for k := range p {

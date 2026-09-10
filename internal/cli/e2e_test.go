@@ -20,6 +20,7 @@ import (
 	"github.com/andrewmast/shulker/internal/fetch"
 	"github.com/andrewmast/shulker/internal/meta"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/player"
 	"github.com/andrewmast/shulker/internal/provider"
 	"github.com/andrewmast/shulker/internal/provider/modrinth"
 	"github.com/andrewmast/shulker/internal/resolve"
@@ -66,6 +67,8 @@ type harness struct {
 	stdin         io.Reader
 	tty           bool
 	runtime       *fakeRuntime
+	mojang        map[string]string
+	mojangHits    int
 }
 
 func newHarness(t *testing.T) *harness {
@@ -182,6 +185,32 @@ func newHarness(t *testing.T) *harness {
 		}
 		http.NotFound(w, r)
 	})
+	h.mojang = map[string]string{}
+	mux.HandleFunc("/mojang/profiles/minecraft", func(w http.ResponseWriter, r *http.Request) {
+		h.mojangHits++
+		var names []string
+		_ = json.NewDecoder(r.Body).Decode(&names)
+		profiles := []map[string]string{}
+		for _, n := range names {
+			for name, id := range h.mojang {
+				if strings.EqualFold(name, n) {
+					profiles = append(profiles, map[string]string{"id": strings.ReplaceAll(id, "-", ""), "name": name})
+				}
+			}
+		}
+		writeJSON(w, profiles)
+	})
+	mux.HandleFunc("/session/session/minecraft/profile/", func(w http.ResponseWriter, r *http.Request) {
+		h.mojangHits++
+		want := strings.TrimPrefix(r.URL.Path, "/session/session/minecraft/profile/")
+		for name, id := range h.mojang {
+			if strings.ReplaceAll(id, "-", "") == want {
+				writeJSON(w, map[string]string{"id": want, "name": name})
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 	h.runtime.register(mux, func() string { return base })
 	h.server = httptest.NewServer(mux)
 	base = h.server.URL
@@ -210,12 +239,16 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	mr.BaseURL = h.server.URL + "/modrinth"
 	runtimes := meta.NewRuntimes(f)
 	runtimes.IndexURL = h.server.URL + "/jrt/all.json"
+	players := player.New(f)
+	players.APIURL = h.server.URL + "/mojang"
+	players.SessionURL = h.server.URL + "/session"
 	a.d = &deps{
 		fetch:     f,
 		cache:     &cache.Cache{Dir: h.cache},
 		providers: map[string]provider.Provider{"modrinth": mr},
 		meta:      &resolve.Meta{Piston: piston, Fabric: fabric},
 		runtimes:  runtimes,
+		players:   players,
 	}
 	code := a.run(args)
 	return code, stdout.String(), stderr.String()

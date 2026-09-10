@@ -9,6 +9,7 @@ import (
 	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/player"
 	"github.com/spf13/cobra"
 )
 
@@ -87,6 +88,9 @@ func (a *app) installCmd() *cobra.Command {
 				v.Warnings = append(v.Warnings, runtimeWarning)
 			}
 			a.warn(v.Warnings)
+			if err := a.syncPlayers(cmd.Context(), p, player.MissingOnly, false); err != nil {
+				return err
+			}
 			b, err := a.builder(cmd.Context(), p)
 			if err != nil {
 				return err

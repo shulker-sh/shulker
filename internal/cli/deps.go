@@ -10,6 +10,7 @@ import (
 	"github.com/andrewmast/shulker/internal/fetch"
 	"github.com/andrewmast/shulker/internal/meta"
 	"github.com/andrewmast/shulker/internal/pack"
+	"github.com/andrewmast/shulker/internal/player"
 	"github.com/andrewmast/shulker/internal/project"
 	"github.com/andrewmast/shulker/internal/provider"
 	"github.com/andrewmast/shulker/internal/provider/modrinth"
@@ -23,6 +24,7 @@ type deps struct {
 	providers map[string]provider.Provider
 	meta      *resolve.Meta
 	runtimes  *meta.Runtimes
+	players   *player.Client
 }
 
 func (a *app) deps() (*deps, error) {
@@ -40,6 +42,7 @@ func (a *app) deps() (*deps, error) {
 		providers: map[string]provider.Provider{"modrinth": modrinth.New(f)},
 		meta:      &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f)},
 		runtimes:  meta.NewRuntimes(f),
+		players:   player.New(f),
 	}
 	return a.d, nil
 }

@@ -36,12 +36,50 @@ type Manifest struct {
 }
 
 type Server struct {
-	Eula       bool            `json:"eula"`
-	Memory     string          `json:"memory,omitempty"`
-	JvmFlags   string          `json:"jvmFlags,omitempty"`
-	JvmArgs    []string        `json:"jvmArgs,omitempty"`
-	Properties map[string]any  `json:"properties,omitempty"`
-	Players    json.RawMessage `json:"players,omitempty"`
+	Eula       bool           `json:"eula"`
+	Memory     string         `json:"memory,omitempty"`
+	JvmFlags   string         `json:"jvmFlags,omitempty"`
+	JvmArgs    []string       `json:"jvmArgs,omitempty"`
+	Properties map[string]any `json:"properties,omitempty"`
+	Players    *Players       `json:"players,omitempty"`
+}
+
+type Players struct {
+	Whitelist []Player `json:"whitelist,omitempty"`
+	Ops       []Op     `json:"ops,omitempty"`
+	Bans      []Ban    `json:"bans,omitempty"`
+}
+
+type Player struct {
+	Name string `json:"name,omitempty"`
+	UUID string `json:"uuid,omitempty"`
+	Note string `json:"note,omitempty"`
+}
+
+type Op struct {
+	Player
+	Level               int  `json:"level,omitempty"`
+	BypassesPlayerLimit bool `json:"bypassesPlayerLimit,omitempty"`
+}
+
+type Ban struct {
+	Player
+	Reason  string `json:"reason,omitempty"`
+	Expires string `json:"expires,omitempty"`
+}
+
+func (p *Players) All() []Player {
+	if p == nil {
+		return nil
+	}
+	all := append([]Player{}, p.Whitelist...)
+	for _, o := range p.Ops {
+		all = append(all, o.Player)
+	}
+	for _, b := range p.Bans {
+		all = append(all, b.Player)
+	}
+	return all
 }
 
 type Client struct {

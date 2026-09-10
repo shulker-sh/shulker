@@ -69,8 +69,14 @@ type Builder struct {
 type source struct {
 	sha512 string
 	data   []byte
-	props  properties
-	sep    string
+	owned  ownedFile
+}
+
+type ownedFile interface {
+	keys() []string
+	canonical() []byte
+	current(existing []byte, recordedKeys []string) []byte
+	merge(existing []byte, recordedKeys []string) ([]byte, error)
 }
 
 func (b *Builder) Build(name string, opts Options) (*Report, error) {
@@ -115,7 +121,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 			writes = append(writes, rel)
 		case current == newHash:
 			report.Unchanged++
-		case recorded == "" && src.props != nil:
+		case recorded == "" && src.owned != nil:
 			writes = append(writes, rel)
 		case recorded == "" && !opts.Force:
 			report.Conflicts = append(report.Conflicts, rel+" (not written by shulker)")
@@ -129,11 +135,11 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 			continue
 		}
 		next.Files[rel] = newHash
-		if src.props != nil {
+		if src.owned != nil {
 			if next.Keys == nil {
 				next.Keys = map[string][]string{}
 			}
-			next.Keys[rel] = src.props.keys()
+			next.Keys[rel] = src.owned.keys()
 		}
 	}
 	for rel, recorded := range prev.Files {
@@ -160,7 +166,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		return report, e
 	}
 	for _, rel := range writes {
-		if err := b.write(filepath.Join(dir, filepath.FromSlash(rel)), desired[rel]); err != nil {
+		if err := b.write(filepath.Join(dir, filepath.FromSlash(rel)), desired[rel], prev.Keys[rel]); err != nil {
 			return nil, err
 		}
 		report.Written = append(report.Written, rel)
@@ -270,8 +276,10 @@ func (b *Builder) layer(root, label string, vars map[string]string, desired map[
 				return err
 			}
 		}
-		if owned := desired[rel]; owned.props != nil {
-			data = owned.props.mergeInto(data, owned.sep)
+		if owned := desired[rel].owned; owned != nil {
+			if data, err = owned.merge(data, nil); err != nil {
+				return err
+			}
 		}
 		desired[rel] = source{data: data}
 		return nil
@@ -298,7 +306,10 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if err != nil {
 		return "", err
 	}
-	desired[PropertiesFile] = source{props: props, sep: "="}
+	desired[PropertiesFile] = source{owned: propsFile{props, "="}}
+	if err := b.collectPlayers(srv.Players, desired); err != nil {
+		return "", err
+	}
 	levelName := props["level-name"]
 	if levelName == "" {
 		levelName = "world"
@@ -315,7 +326,7 @@ func (b *Builder) collectClient(desired map[string]source, vars map[string]strin
 	if err != nil {
 		return err
 	}
-	desired[OptionsFile] = source{props: options, sep: ":"}
+	desired[OptionsFile] = source{owned: propsFile{options, ":"}}
 	return nil
 }
 
@@ -355,14 +366,7 @@ func renderProperties(file string, raw map[string]any, vars map[string]string) (
 }
 
 func (b *Builder) currentHash(abs string, s source, recordedKeys []string) (string, bool, error) {
-	owned := s.props
-	if recordedKeys != nil {
-		owned = properties{}
-		for _, k := range recordedKeys {
-			owned[k] = ""
-		}
-	}
-	if owned == nil {
+	if s.owned == nil {
 		return fileSha256(abs)
 	}
 	data, err := os.ReadFile(abs)
@@ -372,12 +376,12 @@ func (b *Builder) currentHash(abs string, s source, recordedKeys []string) (stri
 	if err != nil {
 		return "", false, err
 	}
-	return sha256Hex(owned.restrict(parseProperties(data)).canonical()), true, nil
+	return sha256Hex(s.owned.current(data, recordedKeys)), true, nil
 }
 
 func (b *Builder) hashSource(s source) (string, error) {
-	if s.props != nil {
-		return sha256Hex(s.props.canonical()), nil
+	if s.owned != nil {
+		return sha256Hex(s.owned.canonical()), nil
 	}
 	if s.sha512 != "" {
 		data, err := os.ReadFile(b.Cache.Path(s.sha512))
@@ -389,7 +393,7 @@ func (b *Builder) hashSource(s source) (string, error) {
 	return sha256Hex(s.data), nil
 }
 
-func (b *Builder) write(abs string, s source) error {
+func (b *Builder) write(abs string, s source, recordedKeys []string) error {
 	if s.sha512 != "" {
 		return b.Cache.CopyTo(s.sha512, abs)
 	}
@@ -397,12 +401,14 @@ func (b *Builder) write(abs string, s source) error {
 		return err
 	}
 	data := s.data
-	if s.props != nil {
+	if s.owned != nil {
 		existing, err := os.ReadFile(abs)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		data = s.props.mergeInto(existing, s.sep)
+		if data, err = s.owned.merge(existing, recordedKeys); err != nil {
+			return err
+		}
 	}
 	return os.WriteFile(abs, data, 0o644)
 }

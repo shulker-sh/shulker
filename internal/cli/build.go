@@ -7,11 +7,12 @@ import (
 
 	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/player"
 	"github.com/spf13/cobra"
 )
 
 func (a *app) buildCmd() *cobra.Command {
-	var force bool
+	var force, acceptPlayerChange bool
 	cmd := &cobra.Command{
 		Use:   "build [target]",
 		Short: "Assemble build directories from the lock and overrides",
@@ -26,6 +27,9 @@ func (a *app) buildCmd() *cobra.Command {
 			}
 			if a.printer.LockStale && !force {
 				return out.Errorf("lock-stale", "shulker.lock does not match shulker.json; run `shulker add`, `remove`, or `update`, or pass --force")
+			}
+			if err := a.syncPlayers(cmd.Context(), p, player.Recheck, acceptPlayerChange); err != nil {
+				return err
 			}
 			b, err := a.builder(cmd.Context(), p)
 			if err != nil {
@@ -58,5 +62,6 @@ func (a *app) buildCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory and ignore a stale lock")
+	cmd.Flags().BoolVar(&acceptPlayerChange, "accept-player-change", false, "relock a player name that now belongs to a different account")
 	return cmd
 }

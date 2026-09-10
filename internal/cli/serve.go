@@ -14,6 +14,7 @@ import (
 	"github.com/andrewmast/shulker/internal/build"
 	"github.com/andrewmast/shulker/internal/manifest"
 	"github.com/andrewmast/shulker/internal/out"
+	"github.com/andrewmast/shulker/internal/player"
 	"github.com/andrewmast/shulker/internal/project"
 	"github.com/andrewmast/shulker/internal/server"
 	"github.com/spf13/cobra"
@@ -94,6 +95,9 @@ func (a *app) serveCmd() *cobra.Command {
 			}
 			java, err := a.serveJava(cmd.Context(), p)
 			if err != nil {
+				return err
+			}
+			if err := a.syncPlayers(cmd.Context(), p, player.MissingOnly, false); err != nil {
 				return err
 			}
 			b, err := a.builder(cmd.Context(), p)
