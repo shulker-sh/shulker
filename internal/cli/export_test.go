@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/shulker-sh/shulker/internal/build"
+	"github.com/shulker-sh/shulker/internal/mrpack"
 	"github.com/shulker-sh/shulker/internal/out"
 )
 
@@ -51,7 +52,7 @@ func readMrpack(t *testing.T, path string) (mrpackIndex, map[string]string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f.Name == build.MrpackIndexFile {
+		if f.Name == mrpack.IndexName {
 			if err := json.Unmarshal(data, &index); err != nil {
 				t.Fatal(err)
 			}

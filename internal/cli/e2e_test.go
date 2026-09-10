@@ -166,6 +166,20 @@ func newHarness(t *testing.T) *harness {
 		}
 		http.NotFound(w, r)
 	})
+	mux.HandleFunc("/modrinth/version_file/", func(w http.ResponseWriter, r *http.Request) {
+		sha1 := strings.TrimPrefix(r.URL.Path, "/modrinth/version_file/")
+		for _, projectID := range []string{"AANobbMI", "P7dR8mSH"} {
+			for _, v := range versions(projectID) {
+				for _, jar := range h.jars {
+					if jar.sha1 == sha1 && v["files"].([]map[string]any)[0]["filename"] == jar.filename {
+						writeJSON(w, v)
+						return
+					}
+				}
+			}
+		}
+		http.NotFound(w, r)
+	})
 	mux.HandleFunc("/modrinth/project/", func(w http.ResponseWriter, r *http.Request) {
 		rest := strings.TrimPrefix(r.URL.Path, "/modrinth/project/")
 		if strings.HasSuffix(rest, "/version") {

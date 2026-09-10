@@ -14,19 +14,11 @@ import (
 	"strings"
 
 	"github.com/shulker-sh/shulker/internal/manifest"
+	"github.com/shulker-sh/shulker/internal/mrpack"
 	"github.com/shulker-sh/shulker/internal/out"
 )
 
-const MrpackIndexFile = "modrinth.index.json"
-
 var MrpackHosts = []string{"cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"}
-
-var mrpackLoaderKeys = map[string]string{
-	"fabric":   "fabric-loader",
-	"quilt":    "quilt-loader",
-	"neoforge": "neoforge",
-	"forge":    "forge",
-}
 
 type MrpackOptions struct {
 	Targets   []string
@@ -44,24 +36,6 @@ type MrpackReport struct {
 	Bundled   []string `json:"bundled"`
 	Overrides []string `json:"overrides"`
 	Warnings  []string `json:"warnings"`
-}
-
-type mrpackIndex struct {
-	FormatVersion int               `json:"formatVersion"`
-	Game          string            `json:"game"`
-	VersionID     string            `json:"versionId"`
-	Name          string            `json:"name"`
-	Summary       string            `json:"summary,omitempty"`
-	Files         []mrpackFile      `json:"files"`
-	Dependencies  map[string]string `json:"dependencies"`
-}
-
-type mrpackFile struct {
-	Path      string            `json:"path"`
-	Hashes    map[string]string `json:"hashes"`
-	Env       map[string]string `json:"env"`
-	Downloads []string          `json:"downloads"`
-	FileSize  int64             `json:"fileSize"`
 }
 
 type mrpackTarget struct {
@@ -91,20 +65,20 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		report.Overrides = append(report.Overrides, path)
 	}
 	sort.Strings(report.Overrides)
-	index := mrpackIndex{
-		FormatVersion: 1,
-		Game:          "minecraft",
+	index := mrpack.Index{
+		FormatVersion: mrpack.FormatVersion,
+		Game:          mrpack.Game,
 		VersionID:     opts.VersionID,
 		Name:          report.Name,
 		Summary:       b.Manifest.Note,
 		Files:         files,
-		Dependencies:  map[string]string{"minecraft": b.Lock.Minecraft, mrpackLoaderKeys[b.Lock.Loader.Type]: b.Lock.Loader.Version},
+		Dependencies:  map[string]string{"minecraft": b.Lock.Minecraft, mrpack.LoaderKeys[b.Lock.Loader.Type]: b.Lock.Loader.Version},
 	}
 	indexData, err := json.MarshalIndent(index, "", "  ")
 	if err != nil {
 		return nil, err
 	}
-	entries[MrpackIndexFile] = append(indexData, '\n')
+	entries[mrpack.IndexName] = append(indexData, '\n')
 	if err := writeMrpack(opts.Output, entries); err != nil {
 		return nil, err
 	}
@@ -178,8 +152,8 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, report *MrpackReport) error {
 	return nil
 }
 
-func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpackFile, error) {
-	files := []mrpackFile{}
+func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpack.File, error) {
+	files := []mrpack.File{}
 	var blocked []string
 	ids := make([]string, 0, len(b.Lock.Mods))
 	for id := range b.Lock.Mods {
@@ -203,10 +177,10 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 		}
 		if m.URL != nil && mrpackHostAllowed(*m.URL) {
 			sum := sha1.Sum(data)
-			files = append(files, mrpackFile{
+			files = append(files, mrpack.File{
 				Path:      "mods/" + m.Filename,
 				Hashes:    map[string]string{"sha1": hex.EncodeToString(sum[:]), "sha512": m.Sha512},
-				Env:       mrpackEnv(m.Side),
+				Env:       mrpack.Env(m.Side),
 				Downloads: []string{*m.URL},
 				FileSize:  int64(len(data)),
 			})
@@ -255,17 +229,6 @@ func mrpackHostAllowed(raw string) bool {
 	return false
 }
 
-func mrpackEnv(side string) map[string]string {
-	env := map[string]string{"client": "required", "server": "required"}
-	switch side {
-	case "client":
-		env["server"] = "unsupported"
-	case "server":
-		env["client"] = "unsupported"
-	}
-	return env
-}
-
 func mrpackSplit(targets []*mrpackTarget) map[string][]byte {
 	entries := map[string][]byte{}
 	if len(targets) == 1 {
@@ -303,12 +266,12 @@ func writeMrpack(output string, entries map[string][]byte) error {
 	}
 	names := make([]string, 0, len(entries))
 	for n := range entries {
-		if n != MrpackIndexFile {
+		if n != mrpack.IndexName {
 			names = append(names, n)
 		}
 	}
 	sort.Strings(names)
-	names = append([]string{MrpackIndexFile}, names...)
+	names = append([]string{mrpack.IndexName}, names...)
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	for _, n := range names {

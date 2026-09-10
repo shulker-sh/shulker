@@ -96,6 +96,22 @@ func (m *Modrinth) Version(ctx context.Context, versionID string) (*provider.Ver
 	return &pv, nil
 }
 
+func (m *Modrinth) VersionByHash(ctx context.Context, sha1 string) (*provider.Version, bool, error) {
+	var raw version
+	found, err := m.Client.GetJSONIfFound(ctx, m.BaseURL+"/version_file/"+url.PathEscape(sha1)+"?algorithm=sha1", &raw)
+	if err != nil {
+		return nil, false, fmt.Errorf("modrinth version_file %s: %w", sha1, err)
+	}
+	if !found {
+		return nil, false, nil
+	}
+	pv, err := convert(raw)
+	if err != nil {
+		return nil, false, err
+	}
+	return &pv, true, nil
+}
+
 func convert(v version) (provider.Version, error) {
 	pv := provider.Version{ID: v.ID, ProjectID: v.ProjectID, Number: v.VersionNumber, Channel: v.VersionType, GameVersions: v.GameVersions, Loaders: v.Loaders}
 	pv.Published, _ = time.Parse(time.RFC3339, v.DatePublished)
