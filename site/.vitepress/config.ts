@@ -37,7 +37,7 @@ export default defineConfig({
     socialLinks: [{ icon: 'github', link: 'https://github.com/shulker-sh/shulker' }],
     search: { provider: 'local' },
     editLink: {
-      pattern: 'https://github.com/shulker-sh/shulker/edit/main/site/:path',
+      pattern: 'https://github.com/shulker-sh/shulker/edit/master/site/:path',
     },
   },
   markdown: {
