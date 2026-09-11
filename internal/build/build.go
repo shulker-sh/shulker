@@ -485,24 +485,24 @@ func vanillaServerPath(l loader.Loader, minecraft string) string {
 
 // LaunchArgs start the server from its dir: the launch jar, or the args file a loader's installer
 // wrote.
-func LaunchArgs(l lock.Loader) []string {
-	if file := InstallerArgsFile(l); file != "" {
+func LaunchArgs(lk *lock.Lock) []string {
+	if file := InstallerArgsFile(lk); file != "" {
 		return []string{"@" + file}
 	}
-	info, _ := loader.Lookup(l.Type)
+	info, _ := loader.Lookup(lk.Loader.Type)
 	return []string{"-jar", info.ServerLaunchJar}
 }
 
-func InstallerArgsFile(l lock.Loader) string {
+func InstallerArgsFile(lk *lock.Lock) string {
+	l, _ := loader.Lookup(lk.Loader.Type)
+	if l.InstallServerFlag == "" {
+		return ""
+	}
 	name := "unix_args.txt"
 	if runtime.GOOS == "windows" {
 		name = "win_args.txt"
 	}
-	switch l.Type {
-	case "neoforge":
-		return "libraries/net/neoforged/neoforge/" + l.Version + "/" + name
-	}
-	return ""
+	return "libraries/" + l.MavenPath + "/" + l.ArtifactVersion(lk.Minecraft, lk.Loader.Version) + "/" + name
 }
 
 func RecordLoader(dir string, l InstalledLoader) error {

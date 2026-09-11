@@ -41,12 +41,12 @@
           "properties": {
             "installer": { "type": "string", "minLength": 1, "description": "Fabric: installer version whose bundled server launcher is locked." },
             "url": { "type": "string", "format": "uri", "description": "Download url of the jar in sha512. The quilt-server-launch.jar shulker generates has none." },
-            "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates. NeoForge: its installer jar, which shulker runs offline into each server dir that doesn't have this loader version yet." },
-            "minecraft": { "$ref": "#/$defs/download", "description": "Quilt, NeoForge: the vanilla server jar. Quilt's launcher starts it; NeoForge's installer patches it." },
+            "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates. NeoForge and Forge: their installer jar, which shulker runs offline into each server dir that doesn't have this loader version yet." },
+            "minecraft": { "$ref": "#/$defs/download", "description": "Quilt, NeoForge, Forge: the vanilla server jar. Quilt's launcher starts it; the FML installers patch it." },
             "libraries": {
               "type": "object",
               "additionalProperties": { "$ref": "#/$defs/download" },
-              "description": "Quilt: the loader's libraries. NeoForge: every library its installer would download, so the installer runs offline. Keyed by Maven coordinate, placed under libraries/."
+              "description": "Quilt: the loader's libraries. NeoForge and Forge: every library their installer would download, so it runs offline. Keyed by Maven coordinate, placed under libraries/."
             }
           }
         }

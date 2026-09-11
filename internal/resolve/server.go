@@ -22,20 +22,21 @@ type ServerJarResult struct {
 }
 
 func (r *Resolver) EnsureServerJar(ctx context.Context, mt *Meta) (ServerJarResult, error) {
-	if _, err := loader.Require(r.Lock.Loader.Type); err != nil {
+	l, err := loader.Require(r.Lock.Loader.Type)
+	if err != nil {
 		return ServerJarResult{}, err
 	}
-	switch r.Lock.Loader.Type {
-	case "quilt":
+	if l.Name == "quilt" {
 		return r.ensureQuiltServer(ctx, mt)
-	case "neoforge":
-		url, err := mt.InstallerURL(r.Lock.Loader)
-		if err != nil {
-			return ServerJarResult{}, err
-		}
-		return r.ensureInstallerServer(ctx, mt, url)
 	}
-	return r.ensureFabricServer(ctx, mt.Fabric)
+	if l.InstallServerFlag == "" {
+		return r.ensureFabricServer(ctx, mt.Fabric)
+	}
+	url, err := mt.InstallerURL(r.Lock)
+	if err != nil {
+		return ServerJarResult{}, err
+	}
+	return r.ensureInstallerServer(ctx, mt, url)
 }
 
 type InstallerJar struct {
@@ -52,7 +53,7 @@ func (r *Resolver) EnsureClientInstaller(ctx context.Context, mt *Meta) (Install
 		path, err := r.Cache.Ensure(ctx, r.Fetch, locked.URL, locked.Sha512)
 		return InstallerJar{Path: path}, err
 	}
-	url, err := mt.InstallerURL(*l)
+	url, err := mt.InstallerURL(r.Lock)
 	if err != nil {
 		return InstallerJar{}, err
 	}

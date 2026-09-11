@@ -26,6 +26,7 @@ type Meta struct {
 	Fabric   *meta.Fabric
 	Quilt    *meta.Quilt
 	NeoForge *meta.NeoForge
+	Forge    *meta.Forge
 	Cache    *cache.Cache
 }
 
@@ -83,6 +84,8 @@ func (mt *Meta) versions(name string) (loaderVersions, error) {
 		return mt.Quilt, nil
 	case "neoforge":
 		return mt.NeoForge, nil
+	case "forge":
+		return mt.Forge, nil
 	}
 	return nil, fmt.Errorf("no version list for the %s loader", name)
 }
@@ -97,12 +100,14 @@ func (mt *Meta) LoaderProfile(ctx context.Context, l lock.Loader, game string) (
 	return nil, fmt.Errorf("no launcher profile for the %s loader", l.Type)
 }
 
-func (mt *Meta) InstallerURL(l lock.Loader) (string, error) {
-	switch l.Type {
+func (mt *Meta) InstallerURL(lk *lock.Lock) (string, error) {
+	switch lk.Loader.Type {
 	case "neoforge":
-		return mt.NeoForge.InstallerURL(l.Version), nil
+		return mt.NeoForge.InstallerURL(lk.Loader.Version), nil
+	case "forge":
+		return mt.Forge.InstallerURL(lk.Minecraft, lk.Loader.Version), nil
 	}
-	return "", fmt.Errorf("no installer for the %s loader", l.Type)
+	return "", fmt.Errorf("no installer for the %s loader", lk.Loader.Type)
 }
 
 func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game string) (string, error) {

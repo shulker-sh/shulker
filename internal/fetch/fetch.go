@@ -6,6 +6,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -116,6 +117,18 @@ func (c *Client) GetJSON(ctx context.Context, url string, v any) error {
 	}
 	defer resp.Body.Close()
 	if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+		return fmt.Errorf("%s: decode: %w", url, err)
+	}
+	return nil
+}
+
+func (c *Client) GetXML(ctx context.Context, url string, v any) error {
+	resp, err := c.get(ctx, url, "application/xml")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if err := xml.NewDecoder(resp.Body).Decode(v); err != nil {
 		return fmt.Errorf("%s: decode: %w", url, err)
 	}
 	return nil
