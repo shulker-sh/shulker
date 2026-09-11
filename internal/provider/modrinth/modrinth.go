@@ -65,9 +65,9 @@ func (m *Modrinth) Project(ctx context.Context, slugOrID string) (*provider.Proj
 	return &provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide)}, nil
 }
 
-func (m *Modrinth) Versions(ctx context.Context, projectID, game, loader string) ([]provider.Version, error) {
+func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {
 	q := url.Values{}
-	q.Set("loaders", jsonList(loader))
+	q.Set("loaders", jsonList(loaders...))
 	q.Set("game_versions", jsonList(game))
 	var raw []version
 	if err := m.Client.GetJSON(ctx, m.BaseURL+"/project/"+url.PathEscape(projectID)+"/version?"+q.Encode(), &raw); err != nil {

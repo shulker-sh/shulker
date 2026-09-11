@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
@@ -84,11 +85,11 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 		if err != nil {
 			return nil, err
 		}
-		versions, err := p.Versions(ctx, fmt.Sprint(m.Project), r.Lock.Minecraft, r.Lock.Loader.Type)
+		versions, err := p.Versions(ctx, fmt.Sprint(m.Project), r.Lock.Minecraft, loader.ProviderLoaders(r.Lock.Loader.Type))
 		if err != nil {
 			return nil, err
 		}
-		newest, ok := provider.Newest(versions, r.channelFor(id))
+		newest, ok := provider.Newest(versions, r.channelFor(id), r.Lock.Loader.Type)
 		if !ok || newest.ID == fmt.Sprint(m.Version) {
 			continue
 		}

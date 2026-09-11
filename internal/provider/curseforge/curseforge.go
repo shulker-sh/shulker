@@ -118,34 +118,38 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID string) (*provider.Pr
 	return nil, fmt.Errorf("curseforge project %s: %w", slugOrID, provider.ErrNotFound)
 }
 
-func (c *CurseForge) Versions(ctx context.Context, projectID, game, loaderName string) ([]provider.Version, error) {
-	l, ok := loader.Lookup(loaderName)
-	if !ok {
-		return nil, fmt.Errorf("curseforge has no loader type for %q", loaderName)
-	}
+func (c *CurseForge) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {
 	var out []provider.Version
-	for index := 0; ; {
-		q := url.Values{"gameVersion": {game}, "modLoaderType": {l.CurseForgeType}, "index": {strconv.Itoa(index)}, "pageSize": {strconv.Itoa(pageSize)}}
-		var res struct {
-			Data       []file     `json:"data"`
-			Pagination pagination `json:"pagination"`
+	seen := map[int]bool{}
+	for _, name := range loaders {
+		l, ok := loader.Lookup(name)
+		if !ok {
+			return nil, fmt.Errorf("curseforge has no loader type for %q", name)
 		}
-		if err := c.Client.GetJSON(ctx, c.BaseURL+"/mods/"+url.PathEscape(projectID)+"/files?"+q.Encode(), &res); err != nil {
-			return nil, c.wrap("files for "+projectID, err)
-		}
-		for _, f := range res.Data {
-			if !f.IsAvailable || !contains(f.GameVersions, game) || !containsFold(f.GameVersions, loaderName) {
-				continue
+		for index := 0; ; {
+			q := url.Values{"gameVersion": {game}, "modLoaderType": {l.CurseForgeType}, "index": {strconv.Itoa(index)}, "pageSize": {strconv.Itoa(pageSize)}}
+			var res struct {
+				Data       []file     `json:"data"`
+				Pagination pagination `json:"pagination"`
 			}
-			v, err := convertFile(f)
-			if err != nil {
-				continue
+			if err := c.Client.GetJSON(ctx, c.BaseURL+"/mods/"+url.PathEscape(projectID)+"/files?"+q.Encode(), &res); err != nil {
+				return nil, c.wrap("files for "+projectID, err)
 			}
-			out = append(out, v)
-		}
-		index += len(res.Data)
-		if len(res.Data) == 0 || index >= res.Pagination.TotalCount {
-			break
+			for _, f := range res.Data {
+				if seen[f.ID] || !f.IsAvailable || !contains(f.GameVersions, game) || !containsFold(f.GameVersions, name) {
+					continue
+				}
+				v, err := convertFile(f)
+				if err != nil {
+					continue
+				}
+				seen[f.ID] = true
+				out = append(out, v)
+			}
+			index += len(res.Data)
+			if len(res.Data) == 0 || index >= res.Pagination.TotalCount {
+				break
+			}
 		}
 	}
 	return c.withPages(ctx, out)

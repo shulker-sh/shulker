@@ -10,12 +10,13 @@ type Loader struct {
 	PrismUID       string
 	MrpackKey      string
 	CurseForgeType string
+	AlsoRuns       []string
 	Supported      bool
 }
 
 var All = []Loader{
 	{Name: "fabric", DependencyID: "fabricloader", PrismUID: "net.fabricmc.fabric-loader", MrpackKey: "fabric-loader", CurseForgeType: "4", Supported: true},
-	{Name: "quilt", DependencyID: "quilt_loader", PrismUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5"},
+	{Name: "quilt", DependencyID: "quilt_loader", PrismUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}},
 	{Name: "neoforge", DependencyID: "neoforge", PrismUID: "net.neoforged", MrpackKey: "neoforge", CurseForgeType: "6"},
 	{Name: "forge", DependencyID: "forge", PrismUID: "net.minecraftforge", MrpackKey: "forge", CurseForgeType: "1"},
 }
@@ -36,6 +37,13 @@ func ByPrismUID(uid string) (Loader, bool) {
 		}
 	}
 	return Loader{}, false
+}
+
+func ProviderLoaders(name string) []string {
+	if l, ok := Lookup(name); ok {
+		return append([]string{l.Name}, l.AlsoRuns...)
+	}
+	return []string{name}
 }
 
 func Names() []string {

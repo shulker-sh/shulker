@@ -3,7 +3,12 @@ package provider
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"time"
+	"unicode"
+
+	"shulker.sh/shulker/internal/loader"
 )
 
 var ErrNotFound = errors.New("project not found")
@@ -44,7 +49,7 @@ type Version struct {
 type Provider interface {
 	Name() string
 	Project(ctx context.Context, slugOrID string) (*Project, error)
-	Versions(ctx context.Context, projectID, game, loader string) ([]Version, error)
+	Versions(ctx context.Context, projectID, game string, loaders []string) ([]Version, error)
 	Version(ctx context.Context, versionID string) (*Version, error)
 }
 
@@ -57,11 +62,29 @@ func ChannelAllows(accepted, actual string) bool {
 	return channelRank[actual] <= channelRank[accepted]
 }
 
-func Newest(versions []Version, channel string) (Version, bool) {
+// Newest picks the newest version the channel allows. When that is another
+// loader's build of a release that also ships a build for loaderName, it
+// picks that build instead.
+func Newest(versions []Version, channel, loaderName string) (Version, bool) {
+	best, found := newest(versions, channel, func(Version) bool { return true })
+	if !found || slices.Contains(best.Loaders, loaderName) {
+		return best, found
+	}
+	release := releaseKey(best.Number)
+	own, ok := newest(versions, channel, func(v Version) bool {
+		return slices.Contains(v.Loaders, loaderName) && releaseKey(v.Number) == release
+	})
+	if ok {
+		return own, true
+	}
+	return best, true
+}
+
+func newest(versions []Version, channel string, keep func(Version) bool) (Version, bool) {
 	var best Version
 	found := false
 	for _, v := range versions {
-		if !ChannelAllows(channel, v.Channel) {
+		if !ChannelAllows(channel, v.Channel) || !keep(v) {
 			continue
 		}
 		if !found || v.Published.After(best.Published) {
@@ -69,4 +92,15 @@ func Newest(versions []Version, channel string) (Version, bool) {
 		}
 	}
 	return best, found
+}
+
+func releaseKey(number string) string {
+	fields := strings.FieldsFunc(strings.ToLower(number), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	fields = slices.DeleteFunc(fields, func(f string) bool {
+		_, isLoader := loader.Lookup(f)
+		return isLoader
+	})
+	return strings.Join(fields, ".")
 }

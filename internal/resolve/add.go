@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/jarmeta"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -154,11 +155,11 @@ func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider
 		}
 		return v, nil
 	}
-	versions, err := p.Versions(ctx, proj.ID, r.Lock.Minecraft, r.Lock.Loader.Type)
+	versions, err := p.Versions(ctx, proj.ID, r.Lock.Minecraft, loader.ProviderLoaders(r.Lock.Loader.Type))
 	if err != nil {
 		return nil, err
 	}
-	v, ok := provider.Newest(versions, channel)
+	v, ok := provider.Newest(versions, channel, r.Lock.Loader.Type)
 	if !ok {
 		e := out.Errorf("no-compatible-version", "%s has no %s version for Minecraft %s with %s", proj.Slug, channelLabel(channel), r.Lock.Minecraft, r.Lock.Loader.Type)
 		e.Candidates = otherChannels(versions)
