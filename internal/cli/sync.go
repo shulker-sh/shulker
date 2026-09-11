@@ -201,7 +201,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		return syncResult{}, err
 	}
 	origin := build.Origin{Source: src.name, Ref: req.ref, Commit: src.Commit}
-	rep, err := b.Build(name, build.Options{Force: req.force, Dir: into, NoDataLinks: remote, OS: req.os, Features: overrides, Origin: origin})
+	rep, err := b.Build(name, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin})
 	if err != nil {
 		return syncResult{}, err
 	}

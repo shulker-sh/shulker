@@ -92,10 +92,26 @@ func (b *Builder) applyLinks(dir, target string, plan linkPlan, report *Report) 
 		report.Moved = append(report.Moved, rel)
 	}
 	for _, rel := range plan.remove {
-		if err := os.Remove(filepath.Join(dir, rel)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		abs := filepath.Join(dir, rel)
+		data, err := os.Readlink(abs)
+		if err != nil {
+			return err
+		}
+		if !filepath.IsAbs(data) {
+			data = filepath.Join(filepath.Dir(abs), data)
+		}
+		if err := os.Remove(abs); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 		report.Removed = append(report.Removed, rel)
+		if empty, err := isEmptyDir(data); err != nil || empty {
+			continue
+		}
+		if err := os.Rename(data, abs); err != nil {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s stays in %s; move it into %s by hand (%v)", rel, data, abs, err))
+			continue
+		}
+		report.MovedBack = append(report.MovedBack, rel)
 	}
 	for _, rel := range plan.link {
 		abs := filepath.Join(dir, rel)

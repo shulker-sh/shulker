@@ -31,13 +31,11 @@ func TestSyncIntoDirectory(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {
 		t.Fatalf("sync must not touch the project build directory: %v", err)
 	}
-	link, err := os.Readlink(filepath.Join(into, "saves"))
-	if err != nil {
-		t.Fatal(err)
+	if _, err := os.Lstat(filepath.Join(into, "saves")); !os.IsNotExist(err) {
+		t.Fatalf("a synced directory keeps its own saves, unlinked: %v", err)
 	}
-	want, _ := filepath.Rel(into, filepath.Join(h.dir, build.DataDir, "client", "saves"))
-	if link != want {
-		t.Fatalf("saves link = %q, want %q", link, want)
+	if _, err := os.Stat(filepath.Join(h.dir, build.DataDir)); !os.IsNotExist(err) {
+		t.Fatalf("sync must not write into the source project: %v", err)
 	}
 
 	stdout = h.mustRun(t, "sync", h.dir, "--into", into)
@@ -466,5 +464,48 @@ func TestSyncFromLocalProjectReadsInstanceDecisions(t *testing.T) {
 	}
 	if st := build.LoadState(into); st.Origin != (build.Origin{Source: h.dir}) {
 		t.Fatalf("state origin: %+v", st.Origin)
+	}
+}
+
+func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	into := filepath.Join(t.TempDir(), "instance", "minecraft")
+	h.mustRun(t, "sync", h.dir, "--into", into)
+
+	world := filepath.Join(h.dir, build.DataDir, "client", "saves", "New World", "level.dat")
+	if err := os.MkdirAll(filepath.Dir(world), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(world, []byte("level"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rel, _ := filepath.Rel(into, filepath.Join(h.dir, build.DataDir, "client", "saves"))
+	if err := os.Symlink(rel, filepath.Join(into, "saves")); err != nil {
+		t.Fatal(err)
+	}
+	statePath := filepath.Join(into, build.StateFile)
+	var state map[string]any
+	if err := json.Unmarshal([]byte(readFile(t, statePath)), &state); err != nil {
+		t.Fatal(err)
+	}
+	state["links"] = []string{"saves"}
+	data, _ := json.Marshal(state)
+	if err := os.WriteFile(statePath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := h.mustRun(t, "sync", h.dir, "--into", into)
+	if !strings.Contains(stdout, "moved saves back into "+into) {
+		t.Fatalf("sync output: %s", stdout)
+	}
+	if info, err := os.Lstat(filepath.Join(into, "saves")); err != nil || !info.IsDir() {
+		t.Fatalf("saves should be a directory again: %v", err)
+	}
+	if got := readFile(t, filepath.Join(into, "saves", "New World", "level.dat")); got != "level" {
+		t.Fatalf("world data: %q", got)
+	}
+	if _, err := os.Stat(filepath.Dir(world)); !os.IsNotExist(err) {
+		t.Fatalf("the world should have left the project: %v", err)
 	}
 }

@@ -403,7 +403,7 @@ shulker link multimc --launcher-dir ~/MultiMC
 
 ### `shulker sync`
 
-Download and build one target of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL.
+Download and build one target of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<target>/`.
 
 ```sh
 shulker sync https://github.com/shulker-sh/base-pack.git --target server --into /srv/minecraft

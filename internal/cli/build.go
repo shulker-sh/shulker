@@ -85,6 +85,9 @@ func printReportDetails(w io.Writer, rep *build.Report) {
 	for _, m := range rep.Moved {
 		fmt.Fprintf(w, "  moved %s into %s\n", m, filepath.Join(build.DataDir, rep.Target, m))
 	}
+	for _, m := range rep.MovedBack {
+		fmt.Fprintf(w, "  moved %s back into %s\n", m, rep.Dir)
+	}
 	for _, e := range rep.Excluded {
 		fmt.Fprintf(w, "  excluded %s\n", e)
 	}

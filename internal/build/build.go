@@ -87,6 +87,7 @@ type Report struct {
 	Removed   []string `json:"removed"`
 	Linked    []string `json:"linked"`
 	Moved     []string `json:"moved"`
+	MovedBack []string `json:"movedBack"`
 	Conflicts []string `json:"conflicts"`
 	Excluded  []string `json:"excluded"`
 	Warnings  []string `json:"-"`
@@ -209,7 +210,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	if dir == "" {
 		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
 	}
-	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
+	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
 	desired, dirs, err := b.collect(name, target, opts, report)
 	if err != nil {
 		return nil, err
