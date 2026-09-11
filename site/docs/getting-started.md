@@ -44,18 +44,10 @@ This works with Prism Launcher. For the official launcher, use `shulker link moj
 
 ## Run a server
 
-Add a server target to `shulker.json`:
-
-```json
-"targets": {
-  "client": { "side": "client", "overrides": ["overrides"], "build": "build/client" },
-  "server": { "side": "server", "overrides": ["overrides"], "build": "build/server" }
-}
-```
-
-Then build and start it in one step:
+Add a server target, then build and start it in one step:
 
 ```sh
+shulker target add server
 shulker serve
 ```
 

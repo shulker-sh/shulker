@@ -13,6 +13,9 @@ outline: [2, 3]
 | [`shulker outdated [mod...]`](#shulker-outdated) | Show mods with a newer compatible version |
 | [`shulker pin <mod> [version]`](#shulker-pin) | Pin a mod to a provider version id |
 | [`shulker unpin <mod>`](#shulker-unpin) | Remove a mod's pin and re-resolve it |
+| [`shulker target add <name>`](#shulker-target-add) | Add a build target |
+| [`shulker target remove <name>`](#shulker-target-remove) | Remove a target, leaving its build directory |
+| [`shulker target list`](#shulker-target-list) | List targets |
 | [`shulker install`](#shulker-install) | Download everything in the lock and build all targets |
 | [`shulker build [target]`](#shulker-build) | Assemble build directories from the lock and overrides |
 | [`shulker diff [target]`](#shulker-diff) | Show build files that differ from what build would write |
@@ -148,6 +151,45 @@ Remove a mod's pin and re-resolve it.
 
 ```sh
 shulker unpin iris
+```
+
+## Targets
+
+A target is one build of the project: a client instance or a server directory. Targets never change the lock.
+
+### `shulker target add`
+
+Add a target to `shulker.json`. It doesn't build anything; run `shulker build <name>` next. A target named `client` or `server` gets that side; any other name needs `--side`.
+
+```sh
+shulker target add server
+shulker target add shaders --side client --feature shaders --name "Shaders Client"
+```
+
+| Flag | Description |
+| --- | --- |
+| `--side <side>` | `client` or `server` (default: the target name when it is `client` or `server`) |
+| `--build <dir>` | Output directory (default: `build/<name>`) |
+| `--overrides <dir>` | Override layer, applied in order; repeat for more (default: `overrides`) |
+| `--feature <name>` | Feature on by default for this target; repeat for more |
+| `--name <name>` | Display name launchers show (default: the manifest name) |
+| `--var <key=value>` | Template variable; repeat for more |
+| `--note <text>` | Free-form note kept in `shulker.json` |
+
+### `shulker target remove`
+
+Remove a target from `shulker.json`. Its build directory stays on disk. The last target can't be removed; add its replacement first. Alias: `rm`.
+
+```sh
+shulker target remove shaders
+```
+
+### `shulker target list`
+
+List targets with their side, build directory, overrides, features, and display name. Alias: `ls`.
+
+```sh
+shulker target list
 ```
 
 ## Builds

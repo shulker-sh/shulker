@@ -10,7 +10,7 @@
 
 ## Targets
 
-A target is a build output: a client instance or a server directory.
+A target is a build output: a client instance or a server directory. Manage them with [`shulker target`](/docs/cli#shulker-target-add).
 
 ## Packs
 
