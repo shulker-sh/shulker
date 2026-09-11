@@ -107,14 +107,8 @@ func (a *app) syncCmd() *cobra.Command {
 				return err
 			}
 			a.warn(rep.Warnings)
-			if !remote && into != buildDir && lf.RecordSyncDir(name, into) {
-				err = a.saveLocal(lf, true)
-			} else {
-				err = a.refreshLocal(lf, !remote)
-			}
-			if err != nil {
-				return err
-			}
+			recorded := !remote && into != buildDir && lf.RecordSyncDir(name, into)
+			a.refreshLocal(lf, !remote, recorded)
 			res := syncResult{Source: source, Kind: co.Kind, Commit: co.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: warnings, Build: rep}
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))

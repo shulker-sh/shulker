@@ -72,9 +72,7 @@ func (a *app) installCmd() *cobra.Command {
 				a.warn(rep.Warnings)
 				res.Builds = append(res.Builds, rep)
 			}
-			if err := a.refreshLocal(lf, true); err != nil {
-				return err
-			}
+			a.refreshLocal(lf, true, false)
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
 				for _, rep := range res.Builds {

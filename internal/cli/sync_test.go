@@ -294,3 +294,27 @@ func TestPullPicksTheDriftedSyncDir(t *testing.T) {
 		t.Fatalf("diff must drop a missing sync dir: %s", stdout)
 	}
 }
+
+func TestSyncDoesNotFailOnUnwritableLocalFile(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	into := filepath.Join(t.TempDir(), "one")
+	h.mustRun(t, "sync", h.dir, "--into", into)
+
+	localPath := filepath.Join(h.dir, "shulker.local.json")
+	if err := os.Chmod(localPath, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(localPath, 0o644) })
+	if _, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", into); strings.Contains(stderr, "not updated") {
+		t.Fatalf("an unchanged local file must not be rewritten: %s", stderr)
+	}
+	if _, stderr := h.mustRunStderr(t, "build"); strings.Contains(stderr, "not updated") {
+		t.Fatalf("an unchanged local file must not be rewritten by build: %s", stderr)
+	}
+
+	if _, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "two")); !strings.Contains(stderr, "warning: shulker.local.json not updated") {
+		t.Fatalf("a failed write should warn: %s", stderr)
+	}
+}

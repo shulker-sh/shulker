@@ -103,11 +103,13 @@ func (a *app) saveLocal(lf *local.File, inProject bool) error {
 	return err
 }
 
-func (a *app) refreshLocal(lf *local.File, inProject bool) error {
-	if !lf.Exists() {
-		return nil
+func (a *app) refreshLocal(lf *local.File, inProject, changed bool) {
+	if !changed && (!lf.Exists() || lf.DetectedOS == build.DetectOS()) {
+		return
 	}
-	return a.saveLocal(lf, inProject)
+	if err := a.saveLocal(lf, inProject); err != nil {
+		a.progress("warning: %s not updated: %v", local.FileName, err)
+	}
 }
 
 type featureStatus struct {

@@ -62,9 +62,7 @@ func (a *app) buildCmd() *cobra.Command {
 				a.warn(rep.Warnings)
 				reports = append(reports, rep)
 			}
-			if err := a.refreshLocal(lf, true); err != nil {
-				return err
-			}
+			a.refreshLocal(lf, true, false)
 			return a.printer.Emit(reports, func(w io.Writer) {
 				for _, rep := range reports {
 					fmt.Fprintln(w, rep.Summary())
