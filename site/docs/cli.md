@@ -12,6 +12,7 @@ outline: [2, 3]
 | [`shulker remove <mod>...`](#shulker-remove) | Remove mods from the manifest and lock |
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
 | [`shulker outdated [mod...]`](#shulker-outdated) | Show mods with a newer compatible version |
+| [`shulker suggests`](#shulker-suggests) | List mods that locked mods recommend and that aren't installed |
 | [`shulker pin <mod> [version]`](#shulker-pin) | Pin a mod to a provider version id |
 | [`shulker unpin <mod>`](#shulker-unpin) | Remove a mod's pin and re-resolve it |
 | [`shulker target add <name>`](#shulker-target-add) | Add a build target |
@@ -144,6 +145,21 @@ Show mods with a newer compatible version without changing anything, like a dry 
 ```sh
 shulker outdated
 ```
+
+### `shulker suggests`
+
+List the mods that locked mods recommend or suggest in their metadata and that aren't installed, grouped by the mod that names them. Optional dependencies, mostly integrations with other mods, are left out unless you pass `--optional`. An optional dependency that is installed must still match its version range, or `add` and `install` report a problem.
+
+```sh
+shulker suggests
+shulker suggests --optional
+```
+
+| Flag | Description |
+| --- | --- |
+| `--optional` | Also list optional dependencies, labelled `optional` |
+
+With `--json`, `data.suggestions` lists each one as `{ "mod", "kind", "on", "declared" }`, where `kind` is `recommends`, `suggests`, or `optional`.
 
 ### `shulker pin`
 

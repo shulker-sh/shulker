@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -27,9 +28,29 @@ type Problem struct {
 }
 
 type Validation struct {
-	Problems    []Problem `json:"problems"`
-	Warnings    []string  `json:"-"`
-	Suggestions []string  `json:"suggestions"`
+	Problems    []Problem
+	Warnings    []string
+	Suggestions []Suggestion
+}
+
+type Suggestion struct {
+	Mod      string `json:"mod"`
+	Kind     string `json:"kind"`
+	On       string `json:"on"`
+	Declared string `json:"declared"`
+}
+
+var suggestionKinds = []string{"recommends", "suggests", "optional"}
+
+// Recommended leaves optional dependencies out: they are mostly integrations and would bury the rest.
+func (v *Validation) Recommended() []string {
+	lines := []string{}
+	for _, s := range v.Suggestions {
+		if s.Kind != "optional" {
+			lines = append(lines, fmt.Sprintf("%s %s %s", s.Mod, s.Kind, s.On))
+		}
+	}
+	return lines
 }
 
 func builtin(id string) bool {
@@ -45,7 +66,7 @@ func builtin(id string) bool {
 }
 
 func (r *Resolver) Validate() (*Validation, error) {
-	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []string{}}
+	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []Suggestion{}}
 	installed := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
 	if l, ok := loader.Lookup(r.Lock.Loader.Type); ok {
 		installed[l.DependencyID] = r.Lock.Loader.Version
@@ -95,6 +116,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 			declared := info.Optional[on]
 			found, ok := installed[on]
 			if !ok {
+				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared})
 				continue
 			}
 			match, err := satisfies(found, declared)
@@ -133,7 +155,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 		for kind, set := range map[string]map[string]string{"recommends": info.Recommends, "suggests": info.Suggests} {
 			for _, on := range sortedKeys(set) {
 				if _, ok := installed[on]; !ok {
-					v.Suggestions = append(v.Suggestions, fmt.Sprintf("%s %s %s", id, kind, on))
+					v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: kind, On: on, Declared: set[on]})
 				}
 			}
 		}
@@ -143,7 +165,16 @@ func (r *Resolver) Validate() (*Validation, error) {
 			v.Warnings = append(v.Warnings, fmt.Sprintf("ignore entry %d (%s: %s on %s) matched nothing", i+1, ig.Rule, ig.Mod, ig.On))
 		}
 	}
-	sort.Strings(v.Suggestions)
+	sort.Slice(v.Suggestions, func(i, j int) bool {
+		a, b := v.Suggestions[i], v.Suggestions[j]
+		if a.Mod != b.Mod {
+			return a.Mod < b.Mod
+		}
+		if a.Kind != b.Kind {
+			return slices.Index(suggestionKinds, a.Kind) < slices.Index(suggestionKinds, b.Kind)
+		}
+		return a.On < b.On
+	})
 	return v, nil
 }
 

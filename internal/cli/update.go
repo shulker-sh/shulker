@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -127,7 +128,13 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	}
 	a.printer.LockStale = false
 	a.warn(v.Warnings)
-	res := lockChanges{Changes: r.Changes(before), Pin: pin, Suggestions: v.Suggestions}
+	res := lockChanges{Changes: r.Changes(before), Pin: pin, Suggestions: v.Recommended()}
+	optional := 0
+	for _, s := range v.Suggestions {
+		if s.Kind == "optional" && slices.ContainsFunc(res.Added, func(m resolve.AddedMod) bool { return m.ID == s.Mod }) {
+			optional++
+		}
+	}
 	return a.printer.Emit(res, func(w io.Writer) {
 		if cmd.Name() == "pin" {
 			fmt.Fprintf(w, "pinned %s to %s\n", cmd.Flags().Arg(0), pin)
@@ -138,6 +145,9 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		printChanges(w, res.Changes)
 		for _, s := range res.Suggestions {
 			fmt.Fprintf(w, "  %s (not installed)\n", s)
+		}
+		if optional > 0 {
+			fmt.Fprintln(w, optionalHint(optional))
 		}
 		if res.Empty() {
 			fmt.Fprintln(w, "Already up to date.")

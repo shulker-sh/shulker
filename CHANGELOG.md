@@ -10,6 +10,7 @@ All notable changes to shulker are documented here. The format is based on
 - `init` creates a `shulker.json` manifest; `add`, `remove`, `update`, `outdated`, `pin` and `unpin` manage mods, with exact versions and hashes recorded in `shulker.lock`.
 - Mods from Modrinth and CurseForge, with provider fallthrough, manual downloads for files CurseForge won't serve, and `add --provider` to switch a locked mod.
 - Dependency checks from each jar's own metadata on `add` and `install`; `remove` prunes dependencies nothing else needs.
+- `suggests` lists the mods locked mods recommend and that aren't installed; `--optional` adds their optional integrations.
 - Client and server targets (`target add|remove|list`), built with `install` and `build` into `build/<name>`.
 - Server builds with the locked server jar, `eula.txt` and validated `server.properties`; `serve` runs them on Mojang's Java runtime.
 - `player` resolves names against Mojang and writes the whitelist, ops and bans.

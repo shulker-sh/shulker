@@ -45,14 +45,18 @@ func makeJarWith(t *testing.T, id, filename, env, extra string) fakeJar {
 }
 
 func makeJarVersion(t *testing.T, id, filename, env, version, extra string) fakeJar {
+	return makeJarFile(t, id, filename, "fabric.mod.json", fmt.Sprintf(`{"id":%q,"version":%q,"environment":%q,%s}`, id, version, env, extra))
+}
+
+func makeJarFile(t *testing.T, id, filename, name, content string) fakeJar {
 	t.Helper()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	w, err := zw.Create("fabric.mod.json")
+	w, err := zw.Create(name)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Fprintf(w, `{"id":%q,"version":%q,"environment":%q,%s}`, id, version, env, extra)
+	fmt.Fprint(w, content)
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
