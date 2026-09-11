@@ -19,36 +19,27 @@ type Quilt struct {
 	MavenURL string
 }
 
-type LoaderJar struct {
-	URL    string
-	Sha512 string
-}
-
 func NewQuilt(c *fetch.Client) *Quilt {
 	return &Quilt{Client: c, BaseURL: QuiltMetaURL, MavenURL: QuiltMavenURL}
 }
 
-func (q *Quilt) LoaderJar(ctx context.Context, game, loader string) (LoaderJar, error) {
+// LoaderJarURL points at the loader jar on Quilt's Maven. Quilt meta's loader hashes don't match
+// the jars Maven serves, so callers hash the download themselves.
+func (q *Quilt) LoaderJarURL(ctx context.Context, game, loader string) (string, error) {
 	var entry struct {
 		Loader struct {
-			Maven  string `json:"maven"`
-			Hashes struct {
-				Sha512 string `json:"sha512"`
-			} `json:"hashes"`
+			Maven string `json:"maven"`
 		} `json:"loader"`
 	}
 	if err := q.Client.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s", q.BaseURL, game, loader), &entry); err != nil {
-		return LoaderJar{}, fmt.Errorf("quilt loader %s for %s: %w", loader, game, err)
+		return "", fmt.Errorf("quilt loader %s for %s: %w", loader, game, err)
 	}
 	parts := strings.Split(entry.Loader.Maven, ":")
-	if len(parts) != 3 || entry.Loader.Hashes.Sha512 == "" {
-		return LoaderJar{}, fmt.Errorf("quilt loader %s for %s: meta has no maven coordinate or sha512", loader, game)
+	if len(parts) != 3 {
+		return "", fmt.Errorf("quilt loader %s for %s: meta has no maven coordinate", loader, game)
 	}
 	group, artifact, version := strings.ReplaceAll(parts[0], ".", "/"), parts[1], parts[2]
-	return LoaderJar{
-		URL:    fmt.Sprintf("%s/%s/%s/%s/%s-%s.jar", q.MavenURL, group, artifact, version, artifact, version),
-		Sha512: entry.Loader.Hashes.Sha512,
-	}, nil
+	return fmt.Sprintf("%s/%s/%s/%s/%s-%s.jar", q.MavenURL, group, artifact, version, artifact, version), nil
 }
 
 // LoaderVersions lists every Quilt loader for a game. Quilt meta has no stable flag and doesn't

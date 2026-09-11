@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
@@ -83,7 +84,7 @@ func TestQuiltLoaderProvides(t *testing.T) {
 		case "/versions/loader/26.2/0.31.0-beta.4":
 			json.NewEncoder(w).Encode(map[string]any{"loader": map[string]any{
 				"maven":  "org.quiltmc:quilt-loader:0.31.0-beta.4",
-				"hashes": map[string]string{"sha512": sha},
+				"hashes": map[string]string{"sha512": strings.Repeat("0", 128)},
 			}})
 		case "/maven/org/quiltmc/quilt-loader/0.31.0-beta.4/quilt-loader-0.31.0-beta.4.jar":
 			w.Write(jar)

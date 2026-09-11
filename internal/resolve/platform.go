@@ -113,15 +113,15 @@ func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) 
 	if name != "quilt" {
 		return nil, nil
 	}
-	jar, err := mt.Quilt.LoaderJar(ctx, game, version)
+	url, err := mt.Quilt.LoaderJarURL(ctx, game, version)
 	if err != nil {
 		return nil, err
 	}
-	path, err := mt.Cache.Ensure(ctx, mt.Quilt.Client, jar.URL, jar.Sha512)
+	sha, err := mt.Cache.Fetch(ctx, mt.Quilt.Client, url)
 	if err != nil {
 		return nil, err
 	}
-	info, err := jarmeta.Read(path)
+	info, err := jarmeta.Read(mt.Cache.Path(sha))
 	if err != nil {
 		return nil, err
 	}
