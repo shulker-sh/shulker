@@ -91,19 +91,21 @@ func launcherRank(launcher string) int {
 	return len(launcherOrder)
 }
 
+func compareLinks(x, y config.Link) int {
+	if d := launcherRank(x.Launcher) - launcherRank(y.Launcher); d != 0 {
+		return d
+	}
+	if c := strings.Compare(x.Launcher, y.Launcher); c != 0 {
+		return c
+	}
+	if c := strings.Compare(strings.ToLower(x.Name), strings.ToLower(y.Name)); c != 0 {
+		return c
+	}
+	return strings.Compare(x.Dir, y.Dir)
+}
+
 func sortLinkEntries(entries []linkEntry) {
-	slices.SortStableFunc(entries, func(x, y linkEntry) int {
-		if d := launcherRank(x.Launcher) - launcherRank(y.Launcher); d != 0 {
-			return d
-		}
-		if c := strings.Compare(x.Launcher, y.Launcher); c != 0 {
-			return c
-		}
-		if c := strings.Compare(strings.ToLower(x.Name), strings.ToLower(y.Name)); c != 0 {
-			return c
-		}
-		return strings.Compare(x.Dir, y.Dir)
-	})
+	slices.SortStableFunc(entries, func(x, y linkEntry) int { return compareLinks(x.Link, y.Link) })
 }
 
 func launcherTitle(launcher string) string {

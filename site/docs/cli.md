@@ -27,7 +27,7 @@ outline: [2, 3]
 | [`shulker serve`](#shulker-serve) | Build a server target and run it in the foreground |
 | [`shulker link mojang`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
 | [`shulker link prism`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
-| [`shulker sync <source>`](#shulker-sync) | Download and build one target of a project into a directory |
+| [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
 | [`shulker links`](#shulker-links) | List linked launcher instances and synced directories |
 | [`shulker pack add <source>`](#shulker-pack-add) | Add a pack from a local path, git URL, or manifest URL |
 | [`shulker pack remove <name>`](#shulker-pack-remove) | Remove a pack |
@@ -204,7 +204,7 @@ shulker target list
 
 A feature is a name that mods opt into with a `feature` condition, like `shaders`. Each target can turn features on by default. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, and `export mrpack` use your choices over the target defaults, and their `--with` and `--without` flags override both for one run.
 
-A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into`. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
+A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into <dir>`, or with `--instance <name>` for anything [`shulker links`](#shulker-links) lists. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
 
 ### `shulker feature on|off`
 
@@ -216,12 +216,16 @@ With `--into`, the choice is saved for that synced directory only. shulker check
 shulker feature on shaders
 shulker feature off fancy
 shulker feature on shaders --into ~/instances/my-pack --sync
+shulker feature on shaders --instance "Friends SMP"
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | Change the choice for a directory you synced into, instead of this project |
-| `--sync` | Sync the `--into` directory from its source right away, instead of at the next sync |
+| `--instance <name>` | Change the choice for a linked instance or synced directory, by name or directory |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--side <side>` | Only match `--instance` against `client` or `server` entries |
+| `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
 ### `shulker feature reset`
 
@@ -235,7 +239,10 @@ shulker feature reset shaders --into ~/instances/my-pack
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | Forget the choice for a directory you synced into, instead of this project |
-| `--sync` | Sync the `--into` directory from its source right away, instead of at the next sync |
+| `--instance <name>` | Forget the choice for a linked instance or synced directory, by name or directory |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--side <side>` | Only match `--instance` against `client` or `server` entries |
+| `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
 ### `shulker feature list`
 
@@ -249,6 +256,9 @@ shulker feature list --into ~/instances/my-pack
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | List the choices that apply to a directory you synced into |
+| `--instance <name>` | List the choices that apply to a linked instance or synced directory, by name or directory |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--side <side>` | Only match `--instance` against `client` or `server` entries |
 
 ## Builds
 
@@ -380,17 +390,26 @@ Download and build one target of a project straight into a directory, without se
 ```sh
 shulker sync https://github.com/shulker-sh/base-pack.git --target server --into /srv/minecraft
 shulker sync ../my-pack --target client --into ~/instances/my-pack
+shulker sync --instance "Friends SMP"
+shulker sync --all --side server
+shulker sync
 ```
 
 If a git or manifest URL can't be reached, `sync` warns and builds from the copy it fetched last time, so an instance still launches offline. It fails only when that source has never been fetched.
 
 shulker keeps a list of the directories it syncs into, in its `config.json`. A `sync --into` adds the directory to that list, named after the target's display name (or `--name`), along with its source, target, and ref. `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker links`](#shulker-links) shows the list.
 
+To update something on that list, name it instead of a source. `--instance` takes an entry's name or directory and syncs it from its recorded source, target, and ref. If several entries have that name, narrow it with `--launcher` or `--side`, or pass `--all` to sync them all. `--all` alone syncs every entry. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` asks which entry to sync when run in a terminal, and fails with the list otherwise.
+
 | Flag | Description |
 | --- | --- |
 | `--target <name>` | Target to build (default: the only target) |
 | `--into <path>` | Output directory (default: the target's build directory) |
 | `--name <name>` | Name to list the `--into` directory under (default: the target's display name; kept on later syncs) |
+| `--instance <name>` | Sync a linked instance or synced directory, by name or directory, instead of a source |
+| `--all` | Sync every entry `--instance` matches, or every entry when there's no `--instance` |
+| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--side <side>` | Only `client` or `server` entries |
 | `--force` | Overwrite files edited in the output directory |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |

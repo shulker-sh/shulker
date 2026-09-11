@@ -151,6 +151,141 @@ func TestLinksList(t *testing.T) {
 	}
 }
 
+func TestSyncInstance(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
+	plain := filepath.Join(t.TempDir(), "plain")
+	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "friends")
+
+	syncDir := func(args ...string) string {
+		t.Helper()
+		var env struct {
+			Data syncResult `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(h.mustRun(t, append(args, "--json")...)), &env); err != nil {
+			t.Fatal(err)
+		}
+		return env.Data.Dir
+	}
+	if dir := syncDir("sync", "--instance", "Friends", "--launcher", "prism"); dir != gameDir {
+		t.Fatalf("--launcher narrows the name: %s", dir)
+	}
+	if dir := syncDir("sync", "--instance", plain); dir != plain {
+		t.Fatalf("a directory selects its entry: %s", dir)
+	}
+	if dir := syncDir("sync", "--instance", "FRIENDS", "--side", "client", "--launcher", "prism"); dir != gameDir {
+		t.Fatalf("names match case-insensitively: %s", dir)
+	}
+
+	for _, c := range []struct {
+		args []string
+		code string
+	}{
+		{[]string{"sync", "--instance", "Friends"}, "ambiguous-instance"},
+		{[]string{"sync", "--instance", "nope"}, "instance-not-found"},
+		{[]string{"sync", "--instance", "Friends", "--side", "server"}, "instance-not-found"},
+		{[]string{"sync"}, "ambiguous-instance"},
+		{[]string{"sync", h.dir, "--instance", "Friends"}, "usage"},
+		{[]string{"sync", h.dir, "--launcher", "prism"}, "usage"},
+		{[]string{"sync", "--instance", "Friends", "--into", plain}, "usage"},
+		{[]string{"sync", "--all", "--launcher", "gdlauncher"}, "usage"},
+	} {
+		code, stdout, _ := h.run(t, append(c.args, "--json")...)
+		if e := failureCode(t, stdout); code == 0 || e.Code != c.code {
+			t.Fatalf("%v: exit %d, want %s: %s", c.args, code, c.code, stdout)
+		}
+		if c.code == "ambiguous-instance" && len(failureCode(t, stdout).Candidates) != 2 {
+			t.Fatalf("%v should list both entries: %s", c.args, stdout)
+		}
+	}
+
+	h.tty, h.stdin = true, strings.NewReader("2\n")
+	stdout, stderr := h.mustRunStderr(t, "sync")
+	if !strings.Contains(stderr, "  2) friends (client)  "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "into "+plain) {
+		t.Fatalf("picker:\nstdout: %s\nstderr: %s", stdout, stderr)
+	}
+	h.tty = false
+
+	stdout = h.mustRun(t, "sync", "--all")
+	if !strings.Contains(stdout, "Friends (client, Prism Launcher)\nfetched 0 file(s)\n") || !strings.Contains(stdout, "\n\nfriends (client)\n") {
+		t.Fatalf("sync --all output: %s", stdout)
+	}
+	var all struct {
+		Data []syncLinkResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", "--all", "--launcher", "prism", "--json")), &all); err != nil || len(all.Data) != 1 || all.Data[0].Dir != gameDir {
+		t.Fatalf("--all returns a list even for one entry: %+v %v", all.Data, err)
+	}
+
+	if err := os.RemoveAll(filepath.Dir(gameDir)); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, _ := h.run(t, "sync", "--all", "--json")
+	var env struct {
+		OK    bool             `json:"ok"`
+		Data  []syncLinkResult `json:"data"`
+		Error struct{ Code string }
+	}
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	if code == 0 || env.OK || env.Error.Code != "sync-failed" || len(env.Data) != 2 || env.Data[0].OK || env.Data[0].Error.Code != "instance-missing" || !env.Data[1].OK || env.Data[1].Sync == nil {
+		t.Fatalf("a failed entry doesn't stop the others: exit %d %s", code, stdout)
+	}
+}
+
+func TestSyncInstanceLinkedBySymlink(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "build")
+	h.mustRun(t, "link", "prism", "--launcher-dir", t.TempDir(), "--mode", "symlink")
+	h.mustRun(t, "sync", "--instance", "pack")
+	if links := readLinks(t, h); len(links) != 1 {
+		t.Fatalf("syncing through the symlink must not add an entry: %+v", links)
+	}
+	if data, err := os.ReadFile(filepath.Join(h.dir, "shulker.local.json")); err == nil && strings.Contains(string(data), "syncDirs") {
+		t.Fatalf("the build directory reached through a symlink is not a sync dir: %s", data)
+	}
+}
+
+func TestFeatureInstance(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
+	sodium := filepath.Join(gameDir, "mods", h.jars["sodium"].filename)
+	if _, err := os.Stat(sodium); !os.IsNotExist(err) {
+		t.Fatalf("sodium is gated off by default: %v", err)
+	}
+
+	if stdout := h.mustRun(t, "feature", "on", "fancy", "--instance", "friends", "--launcher", "prism", "--sync"); !strings.Contains(stdout, "fancy on in "+gameDir) {
+		t.Fatalf("feature on --instance: %s", stdout)
+	}
+	if _, err := os.Stat(sodium); err != nil {
+		t.Fatalf("--sync should ship the mod: %v", err)
+	}
+	if stdout := h.mustRun(t, "feature", "list", "--instance", "Friends"); !strings.Contains(stdout, "on (your choice)") {
+		t.Fatalf("feature list --instance: %s", stdout)
+	}
+	for _, args := range [][]string{
+		{"feature", "on", "fancy", "--instance", "Friends", "--into", gameDir},
+		{"feature", "list", "--launcher", "prism"},
+	} {
+		code, stdout, _ := h.run(t, append(args, "--json")...)
+		if code == 0 || failureCode(t, stdout).Code != "usage" {
+			t.Fatalf("%v: exit %d %s", args, code, stdout)
+		}
+	}
+}
+
 func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack")

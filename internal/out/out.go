@@ -27,6 +27,8 @@ type Error struct {
 	Message    string   `json:"message"`
 	Candidates []string `json:"candidates,omitempty"`
 	Exit       int      `json:"-"`
+	// Data is the partial result of a command that failed part-way; it goes in the envelope's data.
+	Data any `json:"-"`
 }
 
 func (e *Error) Error() string { return e.Message }
@@ -73,7 +75,7 @@ func (p *Printer) Emit(data any, human func(w io.Writer)) error {
 func (p *Printer) Fail(err error) int {
 	e := AsError(err)
 	if p.JSON {
-		_ = p.encode(Envelope{OK: false, Command: p.Command, LockStale: p.LockStale, Error: e})
+		_ = p.encode(Envelope{OK: false, Command: p.Command, LockStale: p.LockStale, Data: e.Data, Error: e})
 		return e.Exit
 	}
 	fmt.Fprintf(p.Stderr, "shulker: %s\n", e.Message)

@@ -38,13 +38,45 @@ type syncRequest struct {
 
 func (a *app) syncCmd() *cobra.Command {
 	var req syncRequest
+	var instance string
+	var sel linkSelection
 	cmd := &cobra.Command{
-		Use:   "sync <project-dir | git-url | manifest-url>",
+		Use:   "sync [project-dir | git-url | manifest-url]",
 		Short: "Download and build one target of a project straight into a directory",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkOS(req.os); err != nil {
 				return err
+			}
+			if len(args) == 0 {
+				if req.target != "" || req.into != "" || req.ref != "" || req.name != "" {
+					return out.Errorf("usage", "--target, --into, --ref, and --name need a source; a registered entry already has them")
+				}
+				links, err := a.selectLinks(instance, sel)
+				if err != nil {
+					return err
+				}
+				if instance == "" && !sel.all {
+					l, err := a.pickLink(links)
+					if err != nil {
+						return err
+					}
+					links = []config.Link{l}
+				}
+				if sel.all {
+					return a.syncLinks(cmd, links, req)
+				}
+				res, err := a.syncLink(cmd, links[0], req)
+				if err != nil {
+					return err
+				}
+				return a.printer.Emit(res, res.print)
+			}
+			if instance != "" || sel.all {
+				return out.Errorf("usage", "pass a source or --instance/--all, not both")
+			}
+			if sel.narrows() {
+				return out.Errorf("usage", "--launcher and --side narrow --instance, --all, or the picker; they don't apply to a source")
 			}
 			src, err := a.openSource(cmd.Context(), args[0], req.ref)
 			if err != nil {
@@ -63,6 +95,8 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd.Flags().StringVar(&req.ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.os, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the target's display name)")
+	cmd.Flags().StringVar(&instance, "instance", "", "sync a linked instance or synced directory, by name or directory, from its recorded source")
+	sel.register(cmd, "sync every linked instance and synced directory (narrow with --launcher or --side)")
 	req.features.register(cmd, "for this run only")
 	return cmd
 }
@@ -135,7 +169,8 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if into, err = filepath.Abs(into); err != nil {
 		return syncResult{}, err
 	}
-	register := req.into != "" && into != buildDir
+	ownBuild := sameDir(into, buildDir)
+	register := req.into != "" && !ownBuild
 	if req.name != "" && !register {
 		return syncResult{}, out.Errorf("usage", "--name needs --into a directory other than the build directory")
 	}
@@ -164,7 +199,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		return syncResult{}, err
 	}
 	a.warn(rep.Warnings)
-	recorded := !remote && into != buildDir && lf.RecordSyncDir(name, into)
+	recorded := !remote && !ownBuild && lf.RecordSyncDir(name, into)
 	a.refreshLocal(lf, !remote, recorded)
 	if !remote {
 		a.refreshLocal(inst, false, false)
@@ -177,6 +212,16 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		}
 	}
 	return res, nil
+}
+
+// sameDir also treats a symlink to dir as dir, e.g. a Prism instance linked in symlink mode.
+func sameDir(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	return errA == nil && errB == nil && ra == rb
 }
 
 func sourceLocalFiles(src *syncSource, into string) (proj, inst *local.File, err error) {
