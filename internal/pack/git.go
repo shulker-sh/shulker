@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/out"
 )
 
 func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {

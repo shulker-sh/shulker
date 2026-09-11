@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 )
 
 //go:generate sh modmenu/compile.sh

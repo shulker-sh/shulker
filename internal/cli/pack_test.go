@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/out"
 )
 
 func writePack(t *testing.T, dir, minecraft, mods string, files map[string]string) {

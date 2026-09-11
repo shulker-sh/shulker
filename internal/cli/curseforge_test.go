@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 )
 
 const curseForgeTestKey = "test-key"

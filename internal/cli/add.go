@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/resolve"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/resolve"
 )
 
 type addResult struct {

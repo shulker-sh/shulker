@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mrpack"
 )
 
 func readProject(t *testing.T, dir string) (*manifest.Manifest, *lock.Lock) {

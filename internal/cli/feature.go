@@ -7,11 +7,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/shulker-sh/shulker/internal/build"
-	"github.com/shulker-sh/shulker/internal/local"
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/project"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/local"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 type featureFlags struct {

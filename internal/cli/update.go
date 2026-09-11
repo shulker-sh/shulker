@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/project"
-	"github.com/shulker-sh/shulker/internal/resolve"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/resolve"
 )
 
 type updateResult struct {

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/shulker-sh/shulker/internal/cli"
+	"shulker.sh/shulker/internal/cli"
 )
 
 func main() {

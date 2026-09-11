@@ -2,3 +2,5 @@
 /schema/lock.json      /schema/v1/lock.json      308
 /docs                  /docs/getting-started     302
 /docs/                 /docs/getting-started     302
+/shulker                /go-import/shulker/       200
+/shulker/*              /go-import/shulker/       200

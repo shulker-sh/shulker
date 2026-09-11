@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shulker-sh/shulker/internal/fetch"
-	"github.com/shulker-sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/provider"
 )
 
 const (

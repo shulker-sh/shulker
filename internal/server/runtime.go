@@ -14,9 +14,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/shulker-sh/shulker/internal/fetch"
-	"github.com/shulker-sh/shulker/internal/meta"
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/out"
 )
 
 const (

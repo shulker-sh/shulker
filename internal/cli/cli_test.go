@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/out"
 )
 
 func run(t *testing.T, args ...string) (int, string, string) {

@@ -11,13 +11,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/shulker-sh/shulker/internal/build"
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/player"
-	"github.com/shulker-sh/shulker/internal/project"
-	"github.com/shulker-sh/shulker/internal/server"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/player"
+	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/server"
 )
 
 const eulaURL = "https://aka.ms/MinecraftEULA"

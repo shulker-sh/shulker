@@ -9,10 +9,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/build"
-	"github.com/shulker-sh/shulker/internal/launcher"
-	"github.com/shulker-sh/shulker/internal/out"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/out"
 )
 
 type prismReport struct {

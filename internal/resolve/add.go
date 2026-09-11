@@ -8,15 +8,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/cache"
-	"github.com/shulker-sh/shulker/internal/fetch"
-	"github.com/shulker-sh/shulker/internal/jarmeta"
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/pack"
-	"github.com/shulker-sh/shulker/internal/provider"
-	"github.com/shulker-sh/shulker/internal/provider/curseforge"
+	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/jarmeta"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/provider/curseforge"
 )
 
 type Resolver struct {

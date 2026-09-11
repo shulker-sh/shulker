@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/build"
-	"github.com/shulker-sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/launcher"
 )
 
 type localView struct {

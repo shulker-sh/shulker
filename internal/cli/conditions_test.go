@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/build"
 )
 
 func setMod(t *testing.T, h *harness, id string, entry map[string]any) {

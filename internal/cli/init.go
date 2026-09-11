@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/project"
-	"github.com/shulker-sh/shulker/internal/server"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/server"
 )
 
 type initResult struct {

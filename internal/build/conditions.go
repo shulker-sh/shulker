@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/manifest"
 )
 
 func DetectOS() string {

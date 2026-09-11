@@ -15,13 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shulker-sh/shulker/internal/cache"
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/mcver"
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/pack"
-	"github.com/shulker-sh/shulker/internal/server"
+	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/server"
 )
 
 const (

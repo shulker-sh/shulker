@@ -8,15 +8,15 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/build"
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/mrpack"
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/project"
-	"github.com/shulker-sh/shulker/internal/resolve"
-	"github.com/shulker-sh/shulker/internal/server"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/server"
 )
 
 type importResult struct {

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/mcver"
-	"github.com/shulker-sh/shulker/internal/near"
+	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/near"
 )
 
 type Type string

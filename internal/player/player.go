@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shulker-sh/shulker/internal/fetch"
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/near"
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/near"
+	"shulker.sh/shulker/internal/out"
 )
 
 const (

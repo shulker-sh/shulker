@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/pack"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 )
 
 var version = "dev"

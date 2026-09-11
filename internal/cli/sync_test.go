@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/build"
 )
 
 func TestSyncIntoDirectory(t *testing.T) {

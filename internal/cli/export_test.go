@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/build"
-	"github.com/shulker-sh/shulker/internal/mrpack"
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/out"
 )
 
 type mrpackIndex struct {

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
 )
 
 type Change struct {

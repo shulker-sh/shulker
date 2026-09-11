@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestTargetAddRemoveList(t *testing.T) {

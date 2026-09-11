@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/shulker-sh/shulker/schema"
+	"shulker.sh/shulker/schema"
 )
 
 const (

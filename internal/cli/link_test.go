@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestLinkMojang(t *testing.T) {

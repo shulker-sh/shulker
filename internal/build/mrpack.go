@@ -13,9 +13,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/mrpack"
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/out"
 )
 
 var MrpackHosts = []string{"cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"}

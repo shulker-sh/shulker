@@ -5,10 +5,10 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/shulker-sh/shulker/internal/build"
-	"github.com/shulker-sh/shulker/internal/local"
-	"github.com/shulker-sh/shulker/internal/out"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/local"
+	"shulker.sh/shulker/internal/out"
 )
 
 func (a *app) exportCmd() *cobra.Command {

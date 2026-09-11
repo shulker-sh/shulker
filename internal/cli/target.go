@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/out"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 var targetNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)

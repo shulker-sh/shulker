@@ -11,10 +11,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/mrpack"
-	"github.com/shulker-sh/shulker/internal/out"
-	"github.com/shulker-sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
 )
 
 type hashLookup interface {

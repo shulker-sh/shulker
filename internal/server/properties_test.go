@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/mcver"
 )
 
 func TestCheckProperties(t *testing.T) {

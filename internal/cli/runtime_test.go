@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/shulker-sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/meta"
 )
 
 const fakeJava = `#!/bin/sh

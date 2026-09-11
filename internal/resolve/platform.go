@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/manifest"
-	"github.com/shulker-sh/shulker/internal/mcver"
-	"github.com/shulker-sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/meta"
 )
 
 type Platform struct {

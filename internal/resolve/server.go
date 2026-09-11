@@ -3,9 +3,9 @@ package resolve
 import (
 	"context"
 
-	"github.com/shulker-sh/shulker/internal/lock"
-	"github.com/shulker-sh/shulker/internal/meta"
-	"github.com/shulker-sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/out"
 )
 
 type ServerJarResult struct {
