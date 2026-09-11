@@ -166,12 +166,57 @@ func TestSyncFromGit(t *testing.T) {
 	}
 }
 
+func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	gitRun(t, h.dir, "init", "-q", "-b", "main")
+	gitRun(t, h.dir, "add", ".")
+	gitRun(t, h.dir, "commit", "-q", "-m", "one")
+	commit := gitRun(t, h.dir, "rev-parse", "HEAD")
+	remote := filepath.Join(t.TempDir(), "remote.git")
+	gitRun(t, h.dir, "clone", "-q", "--bare", h.dir, remote)
+	source := "file://" + remote
+	into := filepath.Join(t.TempDir(), "minecraft")
+	h.mustRun(t, "sync", source, "--into", into)
+
+	if err := os.Rename(remote, remote+".gone"); err != nil {
+		t.Fatal(err)
+	}
+	var env struct {
+		Data syncResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	want := "couldn't reach " + source + "; using the cached copy from commit " + commit[:12]
+	if res := env.Data; res.Commit != commit || len(res.Warnings) == 0 || res.Warnings[0] != want {
+		t.Fatalf("offline sync: %+v", res)
+	}
+	code, stdout, _ := h.run(t, "sync", source, "--into", into, "--ref", "nope", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "source-ref" {
+		t.Fatalf("offline unknown ref: exit %d %s", code, stdout)
+	}
+	code, stdout, _ = h.run(t, "sync", "file://"+filepath.Join(t.TempDir(), "never.git"), "--into", into, "--json")
+	if code == 0 || failureCode(t, stdout).Code != "source-fetch" {
+		t.Fatalf("unreachable source with nothing cached: exit %d %s", code, stdout)
+	}
+}
+
 func TestSyncFromManifestURL(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	files := map[string]bool{"shulker.json": true, "shulker.lock": true}
+	down := false
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if down {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		name := strings.TrimPrefix(r.URL.Path, "/pack/")
 		if !files[name] {
 			http.NotFound(w, r)
@@ -199,8 +244,21 @@ func TestSyncFromManifestURL(t *testing.T) {
 		t.Fatalf("remote sync must not create data links: %v", err)
 	}
 
+	down = true
+	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if res := env.Data; len(res.Warnings) == 0 || !strings.HasPrefix(res.Warnings[0], "couldn't reach "+source+"; using the cached copy from ") {
+		t.Fatalf("offline sync: %+v", res)
+	}
+	code, stdout, _ := h.run(t, "sync", srv.URL+"/other/shulker.json", "--into", into, "--json")
+	if code == 0 || failureCode(t, stdout).Code != "source-fetch" {
+		t.Fatalf("unreachable url with nothing cached: exit %d %s", code, stdout)
+	}
+	down = false
+
 	files["shulker.lock"] = false
-	code, stdout, _ := h.run(t, "sync", source, "--into", into, "--json")
+	code, stdout, _ = h.run(t, "sync", source, "--into", into, "--json")
 	if code == 0 || failureCode(t, stdout).Code != "source-lock" {
 		t.Fatalf("missing lock: exit %d %s", code, stdout)
 	}

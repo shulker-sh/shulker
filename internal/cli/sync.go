@@ -44,6 +44,11 @@ func (a *app) syncCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			var checkoutWarnings []string
+			if co.Warning != "" {
+				checkoutWarnings = []string{co.Warning}
+				a.warn(checkoutWarnings)
+			}
 			source := co.Source
 			if co.Kind == pack.Local {
 				source = co.Dir
@@ -115,7 +120,7 @@ func (a *app) syncCmd() *cobra.Command {
 			if !remote {
 				a.refreshLocal(inst, false, false)
 			}
-			res := syncResult{Source: source, Kind: co.Kind, Commit: co.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: warnings, Build: rep}
+			res := syncResult{Source: source, Kind: co.Kind, Commit: co.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: append(checkoutWarnings, warnings...), Build: rep}
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
 				fmt.Fprintf(w, "%s into %s\n", rep.Summary(), into)

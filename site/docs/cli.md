@@ -349,6 +349,8 @@ shulker sync https://github.com/shulker-sh/base-pack.git --target server --into 
 shulker sync ../my-pack --target client --into ~/instances/my-pack
 ```
 
+If a git or manifest URL can't be reached, `sync` warns and builds from the copy it fetched last time, so an instance still launches offline. It fails only when that source has never been fetched.
+
 | Flag | Description |
 | --- | --- |
 | `--target <name>` | Target to build (default: the only target) |
