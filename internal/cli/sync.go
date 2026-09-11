@@ -119,12 +119,7 @@ func (a *app) syncCmd() *cobra.Command {
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
 				fmt.Fprintf(w, "%s into %s\n", rep.Summary(), into)
-				for _, m := range rep.Moved {
-					fmt.Fprintf(w, "  moved %s into %s\n", m, filepath.Join(build.DataDir, rep.Target, m))
-				}
-				for _, e := range rep.Excluded {
-					fmt.Fprintf(w, "  excluded %s\n", e)
-				}
+				printReportDetails(w, rep)
 			})
 		},
 	}

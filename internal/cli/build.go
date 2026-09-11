@@ -68,15 +68,7 @@ func (a *app) buildCmd() *cobra.Command {
 			return a.printer.Emit(reports, func(w io.Writer) {
 				for _, rep := range reports {
 					fmt.Fprintln(w, rep.Summary())
-					for _, m := range rep.Moved {
-						fmt.Fprintf(w, "  moved %s into %s\n", m, filepath.Join(build.DataDir, rep.Target, m))
-					}
-					for _, e := range rep.Excluded {
-						fmt.Fprintf(w, "  excluded %s\n", e)
-					}
-					for _, k := range rep.Kept {
-						fmt.Fprintf(w, "  kept %s\n", k)
-					}
+					printReportDetails(w, rep)
 				}
 			})
 		},
@@ -86,4 +78,16 @@ func (a *app) buildCmd() *cobra.Command {
 	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	ff.register(cmd, "for this run only")
 	return cmd
+}
+
+func printReportDetails(w io.Writer, rep *build.Report) {
+	for _, m := range rep.Moved {
+		fmt.Fprintf(w, "  moved %s into %s\n", m, filepath.Join(build.DataDir, rep.Target, m))
+	}
+	for _, e := range rep.Excluded {
+		fmt.Fprintf(w, "  excluded %s\n", e)
+	}
+	for _, k := range rep.Kept {
+		fmt.Fprintf(w, "  kept %s\n", k)
+	}
 }

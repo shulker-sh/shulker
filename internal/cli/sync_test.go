@@ -45,6 +45,19 @@ func TestSyncIntoDirectory(t *testing.T) {
 		t.Fatalf("second sync output: %s", stdout)
 	}
 
+	options := filepath.Join(into, "options.txt")
+	data, err := os.ReadFile(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(options, []byte(strings.Replace(string(data), "tutorialStep:none", "tutorialStep:movement", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout = h.mustRun(t, "sync", h.dir, "--into", into)
+	if !strings.Contains(stdout, "1 kept") || !strings.Contains(stdout, "  kept options.txt tutorialStep") {
+		t.Fatalf("sync should list the kept key: %s", stdout)
+	}
+
 	var env struct {
 		Data syncResult `json:"data"`
 	}
