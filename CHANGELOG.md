@@ -8,7 +8,8 @@ All notable changes to shulker are documented here. The format is based on
 
 ### Added
 - `init` creates a `shulker.json` manifest; `add`, `remove`, `update`, `outdated`, `pin` and `unpin` manage mods, with exact versions and hashes recorded in `shulker.lock`.
-- Fabric and Quilt projects (`init --loader`); on Quilt, mods without a Quilt build use their Fabric one.
+- Fabric, Quilt and NeoForge projects (`init --loader`); on Quilt, mods without a Quilt build use their Fabric one.
+- NeoForge servers and launcher profiles set up by NeoForge's own installer: servers run it offline from files recorded in `shulker.lock`, and `link mojang` installs the client into the official launcher without leaving the installer's own profile behind.
 - Mods from Modrinth and CurseForge, with provider fallthrough, manual downloads for files CurseForge won't serve, and `add --provider` to switch a locked mod.
 - Dependency checks from each jar's own metadata on `add` and `install`; `remove` prunes dependencies nothing else needs.
 - `suggests` lists the mods locked mods recommend and that aren't installed; `--optional` adds their optional integrations.
@@ -19,7 +20,7 @@ All notable changes to shulker are documented here. The format is based on
 - Per-target data directories linked into builds, so worlds, logs and screenshots survive rebuilds.
 - `pack add|remove|list` layers other projects in from local paths, git repositories or manifest URLs.
 - Mods gated on OS or a named feature; `feature on|off|reset|list` saves per-machine choices in `shulker.local.json`, and `--with`, `--without` and `--os` override them for one run.
-- A ModMenu entry with the pack's name, version, description, authors and links, which badges managed mods and turns off their update checks.
+- A ModMenu entry with the pack's name, version, description, authors and links, which badges managed mods and turns off their update checks; NeoForge packs get the same summary in the mod list.
 - `sync` builds a target of a local project, git repository or manifest URL into any directory, and falls back to the last successful sync when the network is down (`--offline` skips the network).
 - `link prism`, `link multimc` and `link mojang` (alias `vanilla`) create instances or profiles that sync before each launch; `link prism` also takes a git or manifest URL.
 - `links` lists linked instances and synced directories; `sync --instance`, `sync --all` and a picker update them by name; `unlink` stops syncing one.

@@ -201,7 +201,6 @@ func TestInitSeedsAuthors(t *testing.T) {
 }
 
 func TestNeoForgeMarkerJar(t *testing.T) {
-	enableLoader(t, "neoforge")
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
 	h.editManifest(t, func(m map[string]any) {

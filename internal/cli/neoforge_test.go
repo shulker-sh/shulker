@@ -11,23 +11,11 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
 )
 
-func enableLoader(t *testing.T, name string) {
-	t.Helper()
-	for i := range loader.All {
-		if loader.All[i].Name == name && !loader.All[i].Supported {
-			loader.All[i].Supported = true
-			t.Cleanup(func() { loader.All[i].Supported = false })
-		}
-	}
-}
-
 func TestNeoForgeServer(t *testing.T) {
-	enableLoader(t, "neoforge")
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge", "--target", "server")
 	h.editManifest(t, func(m map[string]any) {
@@ -138,7 +126,6 @@ func TestNeoForgeServer(t *testing.T) {
 }
 
 func TestNeoForgeLinkMojang(t *testing.T) {
-	enableLoader(t, "neoforge")
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
 
@@ -185,7 +172,6 @@ func TestNeoForgeLinkMojang(t *testing.T) {
 
 // A launcher that has never run has no launcher_profiles.json, which the installers refuse.
 func TestNeoForgeLinkMojangFreshLauncher(t *testing.T) {
-	enableLoader(t, "neoforge")
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
 
