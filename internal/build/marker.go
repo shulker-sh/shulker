@@ -228,20 +228,16 @@ func (b *Builder) markerDescription(direct, deps []string, cond conditions) stri
 	if b.Manifest.Description != "" {
 		parts = append(parts, strings.ReplaceAll(strings.TrimSpace(b.Manifest.Description), "<", "\\<"))
 	}
-	summary := fmt.Sprintf("Minecraft %s \u00b7 %s %s \u00b7 %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
+	summary := fmt.Sprintf("Minecraft %s \u2022 %s %s \u2022 %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
 	var variation []string
 	if b.mentionsOS() {
 		variation = append(variation, "<gray><bold>OS:</bold></gray> "+cond.osLabel())
 	}
-	if b.mentionsFeatures() {
-		features := "none"
-		if on := cond.featureLabels(); len(on) > 0 {
-			features = strings.Join(on, ", ")
-		}
-		variation = append(variation, "<gray><bold>Features:</bold></gray> "+features)
+	if on := cond.featureLabels(); len(on) > 0 {
+		variation = append(variation, "<gray><bold>Features:</bold></gray> "+strings.Join(on, ", "))
 	}
 	if len(variation) > 0 {
-		summary += "\n" + strings.Join(variation, " \u00b7 ")
+		summary += "\n" + strings.Join(variation, " \u2022 ")
 	}
 	parts = append(parts, summary)
 	if len(direct) > 0 {

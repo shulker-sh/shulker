@@ -163,10 +163,6 @@ func (b *Builder) mentionsOS() bool {
 	return false
 }
 
-func (b *Builder) mentionsFeatures() bool {
-	return len(b.Features()) > 0
-}
-
 func (c conditions) osLabel() string {
 	switch c.os {
 	case "macos":
