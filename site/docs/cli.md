@@ -29,6 +29,7 @@ outline: [2, 3]
 | [`shulker link prism`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
 | [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
 | [`shulker links`](#shulker-links) | List linked launcher instances and synced directories |
+| [`shulker unlink <name>`](#shulker-unlink) | Stop syncing a linked instance or synced directory, keeping its files |
 | [`shulker pack add <source>`](#shulker-pack-add) | Add a pack from a local path, git URL, or manifest URL |
 | [`shulker pack remove <name>`](#shulker-pack-remove) | Remove a pack |
 | [`shulker pack list`](#shulker-pack-list) | List packs and their local drift state |
@@ -435,6 +436,24 @@ Other directories
     /srv/minecraft
     from https://github.com/shulker-sh/base-pack.git, ref v3, target server
 ```
+
+### `shulker unlink`
+
+Stop syncing a linked instance or synced directory and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the build directory and the installed loader. A plain synced directory is just forgotten.
+
+Name the entry the way [`shulker links`](#shulker-links) shows it, or pass its directory. A name several entries share needs `--launcher`, `--side`, or `--all`. `unlink` prints the command that sets the entry up again.
+
+```sh
+shulker unlink "Friends SMP"
+shulker unlink "My Pack" --launcher prism
+shulker unlink --all --side server
+```
+
+| Flag | Description |
+| --- | --- |
+| `--all` | Unlink every entry the name matches, or every entry when there's no name |
+| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--side <side>` | Only `client` or `server` entries |
 
 ## Packs
 

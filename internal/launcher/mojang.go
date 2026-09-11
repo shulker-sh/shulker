@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -121,6 +122,49 @@ func (v *Mojang) WriteProfile(p Profile) error {
 		return err
 	}
 	return writeAtomic(path, append(out, '\n'))
+}
+
+// RemoveProfiles drops the shulker-made profiles (keys starting "shulker-") that point at gameDir.
+func (v *Mojang) RemoveProfiles(gameDir string) (int, error) {
+	path := filepath.Join(v.Dir, ProfilesFile)
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	top := map[string]json.RawMessage{}
+	if err := json.Unmarshal(data, &top); err != nil {
+		return 0, fmt.Errorf("%s: %w", path, err)
+	}
+	profiles := map[string]json.RawMessage{}
+	if raw, ok := top["profiles"]; ok {
+		if err := json.Unmarshal(raw, &profiles); err != nil {
+			return 0, fmt.Errorf("%s: profiles: %w", path, err)
+		}
+	}
+	removed := 0
+	for key, raw := range profiles {
+		var p struct {
+			GameDir string `json:"gameDir"`
+		}
+		if strings.HasPrefix(key, "shulker-") && json.Unmarshal(raw, &p) == nil && p.GameDir != "" && filepath.Clean(p.GameDir) == filepath.Clean(gameDir) {
+			delete(profiles, key)
+			removed++
+		}
+	}
+	if removed == 0 {
+		return 0, nil
+	}
+	if top["profiles"], err = json.Marshal(profiles); err != nil {
+		return 0, err
+	}
+	out, err := json.MarshalIndent(top, "", "  ")
+	if err != nil {
+		return 0, err
+	}
+	return removed, writeAtomic(path, append(out, '\n'))
 }
 
 func (v *Mojang) now() time.Time {

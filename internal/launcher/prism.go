@@ -282,6 +282,36 @@ func writeInstanceConfig(path string, inst Instance, multimc bool) error {
 	return writeAtomic(path, buf.Bytes())
 }
 
+// IsSyncCommand reports whether a pre-launch command is the shulker sync that linking writes.
+func IsSyncCommand(command string) bool {
+	return strings.Contains(command, " sync ") && strings.HasSuffix(command, `--into "$INST_MC_DIR"`)
+}
+
+// RemovePreLaunch drops an instance's pre-launch command, but only a shulker sync; any other
+// command is the player's and is kept. It reports whether a command was removed.
+func RemovePreLaunch(instanceDir string, multimc bool) (bool, error) {
+	path := filepath.Join(instanceDir, InstanceConfigFile)
+	values, err := readINI(path, multimc)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil || !IsSyncCommand(values["PreLaunchCommand"]) {
+		return false, err
+	}
+	lines, err := readINILines(path)
+	if err != nil {
+		return false, err
+	}
+	var buf bytes.Buffer
+	for _, line := range lines {
+		if key, _, ok := splitINILine(line); ok && key == "PreLaunchCommand" {
+			continue
+		}
+		buf.WriteString(line + "\n")
+	}
+	return true, writeAtomic(path, buf.Bytes())
+}
+
 func readINILines(path string) ([]string, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
