@@ -54,7 +54,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if p.Lock.Loader.Type != "fabric" {
 				return out.Errorf("unsupported-loader", "link mojang supports only the fabric loader for now, not %s", p.Lock.Loader.Type)
 			}
-			name, t, err := sideTarget(p.Manifest, target, "client", "link")
+			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {
 				return err
 			}
@@ -82,7 +82,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			gameDir, err := filepath.Abs(filepath.Join(p.Dir, t.Build))
+			gameDir, err := filepath.Abs(filepath.Join(p.Dir, p.Manifest.BuildDir(name)))
 			if err != nil {
 				return err
 			}
@@ -112,18 +112,18 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	return cmd
 }
 
-func sideTarget(m *manifest.Manifest, want, side, verb string) (string, manifest.Target, error) {
+func sideTarget(m *manifest.Manifest, want, side, verb string) (string, error) {
 	if want != "" {
 		t, ok := m.Targets[want]
 		if !ok {
 			e := out.Errorf("target-not-found", "no target %q in shulker.json", want)
 			e.Candidates = targetNames(m.Targets)
-			return "", t, e
+			return "", e
 		}
 		if t.Side != side {
-			return "", t, out.Errorf("not-"+side+"-target", "target %q is a %s target; %s needs a %s target", want, t.Side, verb, side)
+			return "", out.Errorf("not-"+side+"-target", "target %q is a %s target; %s needs a %s target", want, t.Side, verb, side)
 		}
-		return want, t, nil
+		return want, nil
 	}
 	var matches []string
 	for name, t := range m.Targets {
@@ -134,13 +134,13 @@ func sideTarget(m *manifest.Manifest, want, side, verb string) (string, manifest
 	sort.Strings(matches)
 	switch len(matches) {
 	case 0:
-		return "", manifest.Target{}, out.Errorf("no-"+side+"-target", "shulker.json has no %s target to %s", side, verb)
+		return "", out.Errorf("no-"+side+"-target", "shulker.json has no %s target to %s", side, verb)
 	case 1:
-		return matches[0], m.Targets[matches[0]], nil
+		return matches[0], nil
 	}
 	e := out.Errorf("ambiguous-target", "shulker.json has several %s targets; pass --target", side)
 	e.Candidates = matches
-	return "", manifest.Target{}, e
+	return "", e
 }
 
 var unsafeKeyChars = regexp.MustCompile(`[^a-z0-9]+`)

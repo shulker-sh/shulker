@@ -100,7 +100,7 @@ type Target struct {
 	Name      string            `json:"name,omitempty"`
 	Side      string            `json:"side"`
 	Overrides []string          `json:"overrides"`
-	Build     string            `json:"build"`
+	Build     string            `json:"build,omitempty"`
 	Variables map[string]string `json:"variables,omitempty"`
 	Features  []string          `json:"features,omitempty"`
 	Note      string            `json:"note,omitempty"`
@@ -211,6 +211,13 @@ func (m *Manifest) DisplayName(target string) string {
 		return t.Name
 	}
 	return m.Name
+}
+
+func (m *Manifest) BuildDir(target string) string {
+	if t, ok := m.Targets[target]; ok && t.Build != "" {
+		return t.Build
+	}
+	return "build/" + target
 }
 
 func (m *Manifest) ProviderOrder() []string {

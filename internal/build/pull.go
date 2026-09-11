@@ -189,7 +189,7 @@ func (b *Builder) drift(name string, opts Options) (*drift, error) {
 	}
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, target.Build)
+		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
 	}
 	report := &Report{Warnings: []string{}}
 	desired, _, err := b.collect(name, target, opts, report)

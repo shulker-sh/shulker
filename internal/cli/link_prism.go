@@ -52,7 +52,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			if _, ok := launcher.LoaderUID(p.Lock.Loader.Type); !ok {
 				return out.Errorf("unsupported-loader", "link prism does not know the %s loader", p.Lock.Loader.Type)
 			}
-			name, t, err := sideTarget(p.Manifest, target, "client", "link")
+			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {
 				return err
 			}
@@ -74,7 +74,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			buildDir := filepath.Join(projectDir, t.Build)
+			buildDir := filepath.Join(projectDir, p.Manifest.BuildDir(name))
 			display := p.Manifest.DisplayName(name)
 			inst := launcher.Instance{
 				ID:            profileKey(display),

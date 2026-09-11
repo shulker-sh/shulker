@@ -65,7 +65,7 @@ func (a *app) syncCmd() *cobra.Command {
 				return out.Errorf("into-required", "--into is required when syncing from %s", source)
 			}
 			if into == "" {
-				into = filepath.Join(co.Dir, t.Build)
+				into = filepath.Join(co.Dir, p.Manifest.BuildDir(name))
 			}
 			if into, err = filepath.Abs(into); err != nil {
 				return err

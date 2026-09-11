@@ -185,7 +185,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	}
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, target.Build)
+		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
 	}
 	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
 	desired, dirs, err := b.collect(name, target, opts, report)

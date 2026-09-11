@@ -113,3 +113,29 @@ func TestTargetErrors(t *testing.T) {
 		t.Fatalf("a failed command changed targets: %v", m.Targets)
 	}
 }
+
+func TestTargetWithoutBuildDir(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.editManifest(t, func(m map[string]any) {
+		delete(m["targets"].(map[string]any)["client"].(map[string]any), "build")
+	})
+	h.mustRun(t, "install")
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", ".shulker-state.json")); err != nil {
+		t.Fatalf("client not built into build/client: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, ".shulker-state.json")); err == nil {
+		t.Fatal("client built into the project directory")
+	}
+	if stdout := h.mustRun(t, "target", "list"); !strings.HasPrefix(stdout, "client client build/client ") {
+		t.Fatalf("list output: %s", stdout)
+	}
+	h.mustRun(t, "target", "add", "server")
+	data, err := os.ReadFile(filepath.Join(h.dir, "shulker.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(data), `"build"`) != 1 {
+		t.Fatalf("saved manifest should keep client's build omitted:\n%s", data)
+	}
+}

@@ -63,7 +63,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if a.printer.LockStale && !force {
 				return out.Errorf("lock-stale", "shulker.lock does not match shulker.json; run `shulker add`, `remove`, or `update`, or pass --force")
 			}
-			name, t, err := sideTarget(p.Manifest, target, "server", "serve")
+			name, err := sideTarget(p.Manifest, target, "server", "serve")
 			if err != nil {
 				return err
 			}
@@ -109,7 +109,7 @@ func (a *app) serveCmd() *cobra.Command {
 				return err
 			}
 			a.progress("%s", rep.Summary())
-			dir := filepath.Join(p.Dir, t.Build)
+			dir := filepath.Join(p.Dir, p.Manifest.BuildDir(name))
 			args := server.Command(jvm, build.ServerJarFile)
 			a.progress("starting %s in %s with %s", name, dir, java)
 
