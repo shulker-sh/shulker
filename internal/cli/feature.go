@@ -25,17 +25,6 @@ func (f *featureFlags) register(cmd *cobra.Command, scope string) {
 	cmd.Flags().StringArrayVar(&f.without, "without", nil, "turn a feature off "+scope+"; repeat for more")
 }
 
-func (f featureFlags) args() []string {
-	var args []string
-	for _, name := range f.with {
-		args = append(args, "--with", name)
-	}
-	for _, name := range f.without {
-		args = append(args, "--without", name)
-	}
-	return args
-}
-
 func (f featureFlags) check(b *build.Builder) error {
 	for _, name := range f.with {
 		if slices.Contains(f.without, name) {

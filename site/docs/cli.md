@@ -347,8 +347,16 @@ shulker link mojang
 
 Create a Prism Launcher or MultiMC instance that syncs the client build before each launch. Alias: `multimc`.
 
+With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. Nothing is created in the directory you ran it from.
+
+`--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game dir>`, or run `link` again with new flags.
+
+If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one. On the next sync, files the old source put there are removed, unless you changed them in-game.
+
 ```sh
 shulker link prism
+shulker link prism https://github.com/shulker-sh/base-pack.git
+shulker link prism https://example.com/pack/shulker.json --name "Friends SMP" --with shaders
 shulker link prism --mode symlink
 shulker link multimc --launcher-dir ~/MultiMC
 ```
@@ -357,9 +365,12 @@ shulker link multimc --launcher-dir ~/MultiMC
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: Prism Launcher's; required for MultiMC) |
 | `--target <name>` | Client target to link (default: the only client target) |
-| `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory |
-| `--with <feature>` | Turn a feature on in every pre-launch sync of this instance; repeat for more (sync mode only) |
-| `--without <feature>` | Turn a feature off in every pre-launch sync of this instance; repeat for more (sync mode only) |
+| `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
+| `--name <name>` | Instance name (default: the target's display name) |
+| `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--force` | Repoint an instance that syncs from a different source |
+| `--with <feature>` | Turn a feature on for this instance; repeat for more (sync mode only) |
+| `--without <feature>` | Turn a feature off for this instance; repeat for more (sync mode only) |
 
 ### `shulker sync`
 

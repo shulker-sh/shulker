@@ -123,14 +123,23 @@ func (l *Prism) WriteInstance(inst Instance) (InstanceResult, error) {
 	return res, writeInstanceConfig(cfgPath, inst, l.MultiMC)
 }
 
-func (l *Prism) prepareGameDir(dir, link string) (string, error) {
+func (l *Prism) GameDir(id string) string {
+	return gameDirIn(filepath.Join(l.InstancesDir(), id))
+}
+
+func gameDirIn(dir string) string {
 	gameDir := filepath.Join(dir, "minecraft")
 	dotDir := filepath.Join(dir, ".minecraft")
 	if _, err := os.Lstat(dotDir); err == nil {
 		if _, err := os.Lstat(gameDir); errors.Is(err, os.ErrNotExist) {
-			gameDir = dotDir
+			return dotDir
 		}
 	}
+	return gameDir
+}
+
+func (l *Prism) prepareGameDir(dir, link string) (string, error) {
+	gameDir := gameDirIn(dir)
 	info, err := os.Lstat(gameDir)
 	switch {
 	case errors.Is(err, os.ErrNotExist):

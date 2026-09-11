@@ -46,6 +46,12 @@ shulker link prism
 
 This works with Prism Launcher. For the official launcher, use `shulker link mojang`.
 
+To play someone else's pack, give `link prism` its git or manifest URL. You don't need a project of your own. The instance syncs from that URL before each launch:
+
+```sh
+shulker link prism https://github.com/shulker-sh/base-pack.git
+```
+
 ## Run a server
 
 Add a server target, then build and start it in one step:

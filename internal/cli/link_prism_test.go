@@ -3,13 +3,76 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 )
+
+func TestLinkPrismFromRemoteSource(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "my-pack")
+	h.mustRun(t, "add", "sodium")
+	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
+	gitRun(t, h.dir, "init", "-q", "-b", "main")
+	gitRun(t, h.dir, "add", ".")
+	gitRun(t, h.dir, "commit", "-q", "-m", "one")
+	source := "file://" + h.dir
+
+	launcherDir := t.TempDir()
+	var env struct {
+		Data prismReport `json:"data"`
+	}
+	stdout := h.mustRun(t, "link", "prism", source, "--launcher-dir", launcherDir, "--name", "Friends", "--with", "fancy", "--ref", "main", "--json")
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	instDir := filepath.Join(launcherDir, "instances", "shulker-friends")
+	gameDir := filepath.Join(instDir, "minecraft")
+	if rep := env.Data; rep.Source != source || rep.Name != "Friends" || rep.GameDir != gameDir || rep.Sync == nil {
+		t.Fatalf("link report: %+v", rep)
+	}
+	exe, _ := os.Executable()
+	wantCmd := launcher.CommandArg(exe) + " sync " + launcher.CommandArg(source) + " --ref " + launcher.CommandArg("main") + ` --target client --into "$INST_MC_DIR"`
+	if cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile)); cfg["PreLaunchCommand"] != wantCmd {
+		t.Fatalf("PreLaunchCommand = %q, want %q", cfg["PreLaunchCommand"], wantCmd)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("the first sync should ship the mod turned on by --with: %v", err)
+	}
+	if st := build.LoadState(gameDir); st.Source != source || st.Ref != "main" {
+		t.Fatalf("state origin: %+v", st.Origin)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {
+		t.Fatalf("linking a remote source must not build in the current directory: %v", err)
+	}
+
+	h.mustRun(t, "link", "prism", source, "--launcher-dir", launcherDir, "--name", "Friends")
+	code, stdout, _ := h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--name", "Friends", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-exists" || !strings.Contains(e.Message, source) {
+		t.Fatalf("linking another source into the instance: exit %d %s", code, stdout)
+	}
+	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--name", "Friends", "--force")
+	if cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile)); !strings.Contains(cfg["PreLaunchCommand"], " sync "+launcher.CommandArg(h.dir)+" ") {
+		t.Fatalf("--force should repoint the instance: %q", cfg["PreLaunchCommand"])
+	}
+
+	code, stdout, _ = h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--ref", "main", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "usage" {
+		t.Fatalf("--ref without a source: exit %d %s", code, stdout)
+	}
+	code, stdout, _ = h.run(t, "link", "prism", source, "--launcher-dir", launcherDir, "--mode", "symlink", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "usage" {
+		t.Fatalf("symlink from a remote source: exit %d %s", code, stdout)
+	}
+}
 
 func TestLinkPrism(t *testing.T) {
 	h := newHarness(t)

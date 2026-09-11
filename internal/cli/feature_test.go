@@ -217,9 +217,22 @@ func TestLinkPrismKeepsFeatureFlags(t *testing.T) {
 
 	launcherDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--with", "fancy")
-	cfg := readINIFile(t, filepath.Join(launcherDir, "instances", "shulker-my-pack", launcher.InstanceConfigFile))
-	if !strings.HasSuffix(cfg["PreLaunchCommand"], ` --into "$INST_MC_DIR" --with fancy`) {
+	instDir := filepath.Join(launcherDir, "instances", "shulker-my-pack")
+	cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
+	if !strings.HasSuffix(cfg["PreLaunchCommand"], ` --into "$INST_MC_DIR"`) {
 		t.Fatalf("PreLaunchCommand = %q", cfg["PreLaunchCommand"])
+	}
+	gameDir := filepath.Join(instDir, "minecraft")
+	if lf := readLocal(t, gameDir); !lf.Features["fancy"] {
+		t.Fatalf("instance local file: %+v", lf)
+	}
+	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--without", "fancy")
+	if lf := readLocal(t, gameDir); lf.Features["fancy"] {
+		t.Fatalf("re-linking with --without should update the choice: %+v", lf)
+	}
+	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir)
+	if lf := readLocal(t, gameDir); len(lf.Features) != 1 {
+		t.Fatalf("re-linking without flags keeps the choices: %+v", lf)
 	}
 	code, stdout, _ := h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--mode", "symlink", "--with", "fancy", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
