@@ -184,7 +184,7 @@ func TestMarkerDescribesTheVariation(t *testing.T) {
 	h.mustRun(t, "install")
 
 	desc := markerDescription(t, h)
-	want := "Fast \\<3 and \\<b>plain\\</b>.\n\nMinecraft 26.2 \u00b7 fabric 0.17.3 \u00b7 0 mods\n<gray><bold>OS:</bold></gray> <bold>" + osLabel() + "</bold> \u00b7 <gray><bold>Features:</bold></gray> <bold>fancy</bold>"
+	want := "Fast \\<3 and \\<b>plain\\</b>.\n\nMinecraft 26.2 \u00b7 fabric 0.17.3 \u00b7 0 mods\n<gray><bold>OS:</bold></gray> " + osLabel() + " \u00b7 <gray><bold>Features:</bold></gray> fancy"
 	if desc != want {
 		t.Fatalf("excluded build description:\n%s", desc)
 	}
@@ -199,7 +199,7 @@ func TestMarkerDescribesTheVariation(t *testing.T) {
 	setFeatures(t, h, nil)
 	h.mustRun(t, "build")
 	desc = markerDescription(t, h)
-	if !strings.Contains(desc, "\u00b7 2 mods\n<gray><bold>OS:</bold></gray> <bold>"+osLabel()+"</bold> \u00b7 <gray><bold>Features:</bold></gray> none\n\n<bold>Mods</bold>\n  \u2022 sodium <gray>("+osLabel()+")</gray>\n\n<bold>Dependencies</bold>\n  \u2022 fabric-api") {
+	if !strings.Contains(desc, "\u00b7 2 mods\n<gray><bold>OS:</bold></gray> "+osLabel()+" \u00b7 <gray><bold>Features:</bold></gray> none\n\n<bold>Mods</bold>\n  \u2022 sodium <gray>("+osLabel()+")</gray>\n\n<bold>Dependencies</bold>\n  \u2022 fabric-api") {
 		t.Fatalf("os-gated build description:\n%s", desc)
 	}
 
@@ -213,7 +213,7 @@ func TestMarkerDescribesTheVariation(t *testing.T) {
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	setFeatures(t, h, []string{"fancy"})
 	h.mustRun(t, "build")
-	if desc = markerDescription(t, h); strings.Contains(desc, "OS:") || !strings.Contains(desc, "\u00b7 2 mods\n<gray><bold>Features:</bold></gray> <bold>fancy</bold>\n\n<bold>Mods</bold>\n  \u2022 sodium <gray>(feature: fancy)</gray>\n") {
+	if desc = markerDescription(t, h); strings.Contains(desc, "OS:") || !strings.Contains(desc, "\u00b7 2 mods\n<gray><bold>Features:</bold></gray> fancy\n\n<bold>Mods</bold>\n  \u2022 sodium <gray>(feature: fancy)</gray>\n") {
 		t.Fatalf("universal build description:\n%s", desc)
 	}
 }

@@ -231,12 +231,12 @@ func (b *Builder) markerDescription(direct, deps []string, cond conditions) stri
 	summary := fmt.Sprintf("Minecraft %s \u00b7 %s %s \u00b7 %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
 	var variation []string
 	if b.mentionsOS() {
-		variation = append(variation, "<gray><bold>OS:</bold></gray> <bold>"+cond.osLabel()+"</bold>")
+		variation = append(variation, "<gray><bold>OS:</bold></gray> "+cond.osLabel())
 	}
 	if b.mentionsFeatures() {
 		features := "none"
 		if on := cond.featureLabels(); len(on) > 0 {
-			features = "<bold>" + strings.Join(on, "</bold>, <bold>") + "</bold>"
+			features = strings.Join(on, ", ")
 		}
 		variation = append(variation, "<gray><bold>Features:</bold></gray> "+features)
 	}
