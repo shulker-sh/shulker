@@ -300,7 +300,7 @@
         "on": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_-]{1,63}$",
-          "description": "Subject of the constraint: a mod id or one of the built-ins minecraft, fabricloader, neoforge, java."
+          "description": "Subject of the constraint: a mod id or one of the built-ins minecraft, java, fabricloader, quilt_loader, neoforge, forge."
         },
         "declared": {
           "type": "string",

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
@@ -69,6 +70,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		report.Overrides = append(report.Overrides, path)
 	}
 	sort.Strings(report.Overrides)
+	l, _ := loader.Lookup(b.Lock.Loader.Type)
 	index := mrpack.Index{
 		FormatVersion: mrpack.FormatVersion,
 		Game:          mrpack.Game,
@@ -76,7 +78,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		Name:          report.Name,
 		Summary:       mrpackSummary(b.Manifest),
 		Files:         files,
-		Dependencies:  map[string]string{"minecraft": b.Lock.Minecraft, mrpack.LoaderKeys[b.Lock.Loader.Type]: b.Lock.Loader.Version},
+		Dependencies:  map[string]string{"minecraft": b.Lock.Minecraft, l.MrpackKey: b.Lock.Loader.Version},
 	}
 	indexData, err := json.MarshalIndent(index, "", "  ")
 	if err != nil {

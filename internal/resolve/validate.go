@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/jarmeta"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
@@ -31,15 +32,23 @@ type Validation struct {
 	Suggestions []string  `json:"suggestions"`
 }
 
-var builtins = map[string]bool{"minecraft": true, "fabricloader": true, "neoforge": true, "java": true}
+func builtin(id string) bool {
+	if id == "minecraft" || id == "java" {
+		return true
+	}
+	for _, l := range loader.All {
+		if l.DependencyID == id {
+			return true
+		}
+	}
+	return false
+}
 
 func (r *Resolver) Validate() (*Validation, error) {
 	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []string{}}
 	installed := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
-	if r.Lock.Loader.Type == "fabric" {
-		installed["fabricloader"] = r.Lock.Loader.Version
-	} else {
-		installed[r.Lock.Loader.Type] = r.Lock.Loader.Version
+	if l, ok := loader.Lookup(r.Lock.Loader.Type); ok {
+		installed[l.DependencyID] = r.Lock.Loader.Version
 	}
 	infos := map[string]*jarmeta.Info{}
 	for _, id := range r.lockIDs() {
@@ -166,7 +175,7 @@ func (v *Validation) Err() error {
 		if p.StaleNote != "" {
 			fmt.Fprintf(&b, "\n      %s", p.StaleNote)
 		}
-		if p.Rule == "depends" && p.Found == "" && !builtins[p.On] {
+		if p.Rule == "depends" && p.Found == "" && !builtin(p.On) {
 			fmt.Fprintf(&b, "\n      Fix: shulker add %s", p.On)
 		}
 		fmt.Fprintf(&b, "\n      Ignore: %s", p.ignoreEntry())

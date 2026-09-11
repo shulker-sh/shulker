@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/loader"
 )
 
 const (
@@ -20,13 +21,6 @@ const (
 )
 
 var ErrGameDirNotEmpty = errors.New("instance game directory is not empty")
-
-var loaderUIDs = map[string]string{
-	"fabric":   "net.fabricmc.fabric-loader",
-	"quilt":    "org.quiltmc.quilt-loader",
-	"neoforge": "net.neoforged",
-	"forge":    "net.minecraftforge",
-}
 
 type Prism struct {
 	Dir     string
@@ -73,11 +67,6 @@ func DefaultPrismDir() (string, error) {
 		}
 		return filepath.Join(home, ".local", "share", "PrismLauncher"), nil
 	}
-}
-
-func LoaderUID(loaderType string) (string, bool) {
-	uid, ok := loaderUIDs[loaderType]
-	return uid, ok
 }
 
 func (l *Prism) Check() error {
@@ -187,14 +176,15 @@ func writePack(path string, inst Instance) error {
 		}
 	}
 	pack.FormatVersion = 1
-	loaderUID, _ := LoaderUID(inst.LoaderType)
+	l, _ := loader.Lookup(inst.LoaderType)
+	loaderUID := l.PrismUID
 	wanted := map[string]string{"net.minecraft": inst.Minecraft, loaderUID: inst.LoaderVersion}
 	var components []map[string]json.RawMessage
 	seen := map[string]bool{}
 	for _, c := range pack.Components {
 		var uid string
 		_ = json.Unmarshal(c["uid"], &uid)
-		if _, other := loaderUIDs[uidLoader(uid)]; other && uid != loaderUID {
+		if _, other := loader.ByPrismUID(uid); other && uid != loaderUID {
 			continue
 		}
 		if version, ok := wanted[uid]; ok {
@@ -215,15 +205,6 @@ func writePack(path string, inst Instance) error {
 		return err
 	}
 	return fsutil.Write(path, append(data, '\n'))
-}
-
-func uidLoader(uid string) string {
-	for loader, candidate := range loaderUIDs {
-		if candidate == uid {
-			return loader
-		}
-	}
-	return ""
 }
 
 func jsonString(s string) json.RawMessage {

@@ -3,9 +3,9 @@ package resolve
 import (
 	"context"
 
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/meta"
-	"shulker.sh/shulker/internal/out"
 )
 
 type ServerJarResult struct {
@@ -16,8 +16,8 @@ type ServerJarResult struct {
 func (r *Resolver) EnsureServerJar(ctx context.Context, fabric *meta.Fabric) (ServerJarResult, error) {
 	var res ServerJarResult
 	l := &r.Lock.Loader
-	if l.Type != "fabric" {
-		return res, out.Errorf("unsupported-loader", "server targets support only the fabric loader for now, not %s", l.Type)
+	if _, err := loader.Require(l.Type); err != nil {
+		return res, err
 	}
 	if l.Server == nil {
 		installer, err := fabric.InstallerVersion(ctx)

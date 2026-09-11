@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -31,7 +32,7 @@ func (a *app) initCmd() *cobra.Command {
 		yes           bool
 		name          string
 		minecraft     string
-		loader        string
+		loaderName    string
 		loaderVersion string
 		target        string
 	)
@@ -53,6 +54,11 @@ func (a *app) initCmd() *cobra.Command {
 			if !yes && (minecraft == "" || name == "") {
 				return out.Errorf("usage", "pass --yes for defaults or set --name and --minecraft; interactive prompts are not implemented yet")
 			}
+			if _, ok := loader.Lookup(loaderName); !ok {
+				e := out.Errorf("usage", "unknown loader %q; use one of %s", loaderName, strings.Join(loader.Names(), ", "))
+				e.Candidates = loader.Names()
+				return e
+			}
 			if name == "" {
 				name = slugify(filepath.Base(dir))
 			}
@@ -64,7 +70,7 @@ func (a *app) initCmd() *cobra.Command {
 				Name:      name,
 				Authors:   defaultAuthors(),
 				Minecraft: minecraft,
-				Loader:    manifest.Loader{Type: loader, Version: loaderVersion},
+				Loader:    manifest.Loader{Type: loaderName, Version: loaderVersion},
 				Targets:   map[string]manifest.Target{target: {Side: target, Overrides: []string{"overrides"}, Build: "build/" + target}},
 				Mods:      map[string]manifest.Mod{},
 			}
@@ -83,7 +89,7 @@ func (a *app) initCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			a.progress("resolving Minecraft %s with %s %s", minecraft, loader, loaderVersion)
+			a.progress("resolving Minecraft %s with %s %s", minecraft, loaderName, loaderVersion)
 			platform, err := d.meta.Platform(cmd.Context(), m)
 			if err != nil {
 				return err
@@ -114,7 +120,7 @@ func (a *app) initCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "accept defaults: latest release, fabric, client target")
 	cmd.Flags().StringVar(&name, "name", "", "project name (default: directory name)")
 	cmd.Flags().StringVar(&minecraft, "minecraft", "", "Minecraft version or range (default: latest release)")
-	cmd.Flags().StringVar(&loader, "loader", "fabric", "mod loader: fabric, quilt, neoforge, forge")
+	cmd.Flags().StringVar(&loaderName, "loader", "fabric", "mod loader: "+strings.Join(loader.Names(), ", "))
 	cmd.Flags().StringVar(&loaderVersion, "loader-version", "*", "loader version range")
 	cmd.Flags().StringVar(&target, "target", "client", "first target: client or server")
 	return cmd

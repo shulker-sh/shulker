@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -21,8 +22,6 @@ const (
 )
 
 var Layers = []string{"overrides", "client-overrides", "server-overrides"}
-
-var LoaderKeys = map[string]string{"fabric": "fabric-loader", "quilt": "quilt-loader", "neoforge": "neoforge", "forge": "forge"}
 
 type Index struct {
 	FormatVersion int               `json:"formatVersion"`
@@ -93,9 +92,9 @@ type Archive struct {
 }
 
 func (a *Archive) Loader() (string, string, bool) {
-	for loaderType, key := range LoaderKeys {
-		if v, ok := a.Index.Dependencies[key]; ok {
-			return loaderType, v, true
+	for _, l := range loader.All {
+		if v, ok := a.Index.Dependencies[l.MrpackKey]; ok {
+			return l.Name, v, true
 		}
 	}
 	return "", "", false

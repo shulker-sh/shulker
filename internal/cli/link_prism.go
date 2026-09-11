@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
@@ -65,8 +66,8 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				return out.Errorf("usage", "--mode symlink needs a local project; a remote source can only be synced")
 			}
 			p := src.project
-			if _, ok := launcher.LoaderUID(p.Lock.Loader.Type); !ok {
-				return out.Errorf("unsupported-loader", "link prism does not know the %s loader", p.Lock.Loader.Type)
+			if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
+				return err
 			}
 			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {

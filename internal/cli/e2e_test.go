@@ -596,6 +596,21 @@ func TestInterruptedCommandFails(t *testing.T) {
 	}
 }
 
+func TestInitChecksTheLoader(t *testing.T) {
+	h := newHarness(t)
+	code, stdout, _ := h.run(t, "init", "--yes", "--loader", "rift", "--json")
+	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || len(e.Candidates) != 4 {
+		t.Fatalf("unknown loader: code=%d %s", code, stdout)
+	}
+	code, stdout, _ = h.run(t, "init", "--yes", "--loader", "forge", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "unsupported-loader" {
+		t.Fatalf("forge: code=%d %s", code, stdout)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "shulker.json")); err == nil {
+		t.Fatal("a failed init must not write shulker.json")
+	}
+}
+
 func TestValidationFailsAndIgnores(t *testing.T) {
 	h := newHarness(t)
 	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "client",

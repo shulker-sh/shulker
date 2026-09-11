@@ -680,7 +680,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `target-not-found` | No such target. `candidates`: the targets |
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | An override uses a variable that isn't set |
-| `unsupported-loader` | The command doesn't support the project's loader yet |
+| `unsupported-loader` | shulker doesn't support the loader yet |
 | `unsupported-mode` | `--mode symlink` isn't supported on Windows yet |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems. `items`: the problems |

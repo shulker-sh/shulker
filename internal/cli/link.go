@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
@@ -51,8 +52,8 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := p.RequireLock(); err != nil {
 				return err
 			}
-			if p.Lock.Loader.Type != "fabric" {
-				return out.Errorf("unsupported-loader", "link mojang supports only the fabric loader for now, not %s", p.Lock.Loader.Type)
+			if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
+				return err
 			}
 			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {

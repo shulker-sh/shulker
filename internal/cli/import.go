@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
@@ -123,7 +124,7 @@ func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []str
 	}
 	loaderType, loaderVersion, ok := arc.Loader()
 	if !ok {
-		return nil, nil, out.Errorf("mrpack-unsupported", "the index names no supported loader (fabric, quilt, neoforge, forge)")
+		return nil, nil, out.Errorf("mrpack-unsupported", "the index names no known loader (%s)", strings.Join(loader.Names(), ", "))
 	}
 	var warnings []string
 	if arc.Marker == nil {

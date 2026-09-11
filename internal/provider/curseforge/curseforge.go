@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -24,8 +25,6 @@ const (
 )
 
 var embeddedKey string
-
-var loaderTypes = map[string]string{"forge": "1", "fabric": "4", "quilt": "5", "neoforge": "6"}
 
 var channels = map[int]string{1: "release", 2: "beta", 3: "alpha"}
 
@@ -119,14 +118,14 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID string) (*provider.Pr
 	return nil, fmt.Errorf("curseforge project %s: %w", slugOrID, provider.ErrNotFound)
 }
 
-func (c *CurseForge) Versions(ctx context.Context, projectID, game, loader string) ([]provider.Version, error) {
-	loaderType, ok := loaderTypes[loader]
+func (c *CurseForge) Versions(ctx context.Context, projectID, game, loaderName string) ([]provider.Version, error) {
+	l, ok := loader.Lookup(loaderName)
 	if !ok {
-		return nil, fmt.Errorf("curseforge has no loader type for %q", loader)
+		return nil, fmt.Errorf("curseforge has no loader type for %q", loaderName)
 	}
 	var out []provider.Version
 	for index := 0; ; {
-		q := url.Values{"gameVersion": {game}, "modLoaderType": {loaderType}, "index": {strconv.Itoa(index)}, "pageSize": {strconv.Itoa(pageSize)}}
+		q := url.Values{"gameVersion": {game}, "modLoaderType": {l.CurseForgeType}, "index": {strconv.Itoa(index)}, "pageSize": {strconv.Itoa(pageSize)}}
 		var res struct {
 			Data       []file     `json:"data"`
 			Pagination pagination `json:"pagination"`
@@ -135,7 +134,7 @@ func (c *CurseForge) Versions(ctx context.Context, projectID, game, loader strin
 			return nil, c.wrap("files for "+projectID, err)
 		}
 		for _, f := range res.Data {
-			if !f.IsAvailable || !contains(f.GameVersions, game) || !containsFold(f.GameVersions, loader) {
+			if !f.IsAvailable || !contains(f.GameVersions, game) || !containsFold(f.GameVersions, loaderName) {
 				continue
 			}
 			v, err := convertFile(f)
@@ -232,7 +231,7 @@ func convertFile(f file) (provider.Version, error) {
 		return v, fmt.Errorf("curseforge file %d has no downloadable file", f.ID)
 	}
 	for _, g := range f.GameVersions {
-		if _, isLoader := loaderTypes[strings.ToLower(g)]; isLoader {
+		if _, isLoader := loader.Lookup(strings.ToLower(g)); isLoader {
 			v.Loaders = append(v.Loaders, strings.ToLower(g))
 		} else {
 			v.GameVersions = append(v.GameVersions, g)

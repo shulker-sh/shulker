@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
@@ -57,8 +58,8 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, 
 }
 
 func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game string) (string, error) {
-	if l.Type != "fabric" {
-		return "", fmt.Errorf("loader %s is not supported yet; fabric only for now", l.Type)
+	if _, err := loader.Require(l.Type); err != nil {
+		return "", err
 	}
 	rng, err := mcver.ParseRange(l.Version)
 	if err != nil {
