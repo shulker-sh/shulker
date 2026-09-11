@@ -211,8 +211,8 @@ func TestDiffAndPullInto(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if code, _, stderr := h.run(t, "diff"); code == 0 || !strings.Contains(stderr, "no build directory") {
-		t.Fatalf("diff without --into must look at the project build dir: %d %s", code, stderr)
+	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "1 file(s) changed in "+into) || !strings.Contains(stdout, "-a=2") {
+		t.Fatalf("diff without --into must look at the recorded sync dir: %s", stdout)
 	}
 	stdout := h.mustRun(t, "diff", "client", "--into", into)
 	if !strings.Contains(stdout, "config/plain.txt") || !strings.Contains(stdout, "-a=2") {
@@ -225,5 +225,59 @@ func TestDiffAndPullInto(t *testing.T) {
 	}
 	if stdout := h.mustRun(t, "diff", "client", "--into", into); !strings.Contains(stdout, "no changes") {
 		t.Fatalf("diff after pull: %s", stdout)
+	}
+}
+
+func TestPullPicksTheDriftedSyncDir(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	overrides := filepath.Join(h.dir, "overrides", "config")
+	if err := os.MkdirAll(overrides, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(overrides, "plain.txt"), []byte("a=1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "build")
+	one := filepath.Join(t.TempDir(), "one")
+	two := filepath.Join(t.TempDir(), "two")
+	h.mustRun(t, "sync", h.dir, "--into", one)
+	h.mustRun(t, "sync", h.dir, "--into", two)
+	var lf struct {
+		Targets map[string]struct {
+			SyncDirs []string `json:"syncDirs"`
+		} `json:"targets"`
+	}
+	h.readJSON(t, "shulker.local.json", &lf)
+	if got := strings.Join(lf.Targets["client"].SyncDirs, ","); got != one+","+two {
+		t.Fatalf("syncDirs = %s", got)
+	}
+	if data, _ := os.ReadFile(filepath.Join(h.dir, ".gitignore")); !strings.Contains(string(data), "/shulker.local.json\n") {
+		t.Fatalf(".gitignore: %q", data)
+	}
+
+	if err := os.WriteFile(filepath.Join(two, "config", "plain.txt"), []byte("a=2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "pull")
+	if data, _ := os.ReadFile(filepath.Join(overrides, "plain.txt")); string(data) != "a=2\n" {
+		t.Fatalf("pull did not take the edit from the drifted sync dir: %q", data)
+	}
+
+	for _, dir := range []string{one, two} {
+		if err := os.WriteFile(filepath.Join(dir, "config", "plain.txt"), []byte("a=3\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, stdout, _ := h.run(t, "pull", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-into" || strings.Join(e.Candidates, ",") != one+","+two {
+		t.Fatalf("pull with two drifted dirs: exit %d %s", code, stdout)
+	}
+
+	if err := os.RemoveAll(one); err != nil {
+		t.Fatal(err)
+	}
+	if stdout := h.mustRun(t, "diff"); strings.Contains(stdout, one) || !strings.Contains(stdout, "changed in "+two) {
+		t.Fatalf("diff must drop a missing sync dir: %s", stdout)
 	}
 }

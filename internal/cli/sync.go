@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/shulker-sh/shulker/internal/build"
+	"github.com/shulker-sh/shulker/internal/local"
 	"github.com/shulker-sh/shulker/internal/manifest"
 	"github.com/shulker-sh/shulker/internal/out"
 	"github.com/shulker-sh/shulker/internal/pack"
@@ -28,13 +29,17 @@ type syncResult struct {
 }
 
 func (a *app) syncCmd() *cobra.Command {
-	var target, into, ref string
+	var target, into, ref, osName string
 	var force bool
+	var ff featureFlags
 	cmd := &cobra.Command{
 		Use:   "sync <project-dir | git-url | manifest-url>",
 		Short: "Download and build one target of a project straight into a directory",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := checkOS(osName); err != nil {
+				return err
+			}
 			co, err := a.checkout(cmd.Context(), args[0], ref)
 			if err != nil {
 				return err
@@ -64,10 +69,22 @@ func (a *app) syncCmd() *cobra.Command {
 			if into == "" && remote {
 				return out.Errorf("into-required", "--into is required when syncing from %s", source)
 			}
+			buildDir, err := filepath.Abs(filepath.Join(co.Dir, p.Manifest.BuildDir(name)))
+			if err != nil {
+				return err
+			}
 			if into == "" {
-				into = filepath.Join(co.Dir, p.Manifest.BuildDir(name))
+				into = buildDir
 			}
 			if into, err = filepath.Abs(into); err != nil {
+				return err
+			}
+			localDir := co.Dir
+			if remote {
+				localDir = into
+			}
+			lf, err := local.Load(localDir)
+			if err != nil {
 				return err
 			}
 			fetched, warnings, err := a.fetchLocked(cmd.Context(), p, t.Side == "server")
@@ -81,11 +98,23 @@ func (a *app) syncCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep, err := b.Build(name, build.Options{Force: force, Dir: into, NoDataLinks: remote})
+			overrides, err := featureOverrides(b, lf.Features, ff)
+			if err != nil {
+				return err
+			}
+			rep, err := b.Build(name, build.Options{Force: force, Dir: into, NoDataLinks: remote, OS: osName, Features: overrides})
 			if err != nil {
 				return err
 			}
 			a.warn(rep.Warnings)
+			if !remote && into != buildDir && lf.RecordSyncDir(name, into) {
+				err = a.saveLocal(lf, true)
+			} else {
+				err = a.refreshLocal(lf, !remote)
+			}
+			if err != nil {
+				return err
+			}
 			res := syncResult{Source: source, Kind: co.Kind, Commit: co.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: warnings, Build: rep}
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
@@ -103,6 +132,8 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd.Flags().StringVar(&into, "into", "", "output directory (default: the target's build directory)")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the output directory")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
+	ff.register(cmd, "for this run only")
 	return cmd
 }
 

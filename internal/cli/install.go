@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/shulker-sh/shulker/internal/build"
+	"github.com/shulker-sh/shulker/internal/local"
 	"github.com/shulker-sh/shulker/internal/manifest"
 	"github.com/shulker-sh/shulker/internal/out"
 	"github.com/shulker-sh/shulker/internal/player"
@@ -23,6 +24,8 @@ type installResult struct {
 
 func (a *app) installCmd() *cobra.Command {
 	var force bool
+	var osName string
+	var ff featureFlags
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Download everything in the lock and build all targets",
@@ -30,6 +33,9 @@ func (a *app) installCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			p, err := a.openProject()
 			if err != nil {
+				return err
+			}
+			if err := checkOS(osName); err != nil {
 				return err
 			}
 			if err := p.RequireLock(); err != nil {
@@ -49,15 +55,26 @@ func (a *app) installCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			lf, err := local.Load(p.Dir)
+			if err != nil {
+				return err
+			}
+			overrides, err := featureOverrides(b, lf.Features, ff)
+			if err != nil {
+				return err
+			}
 			names := targetNames(p.Manifest.Targets)
 			res := installResult{Fetched: fetched, Warnings: warnings}
 			for _, name := range names {
-				rep, err := b.Build(name, build.Options{Force: force})
+				rep, err := b.Build(name, build.Options{Force: force, OS: osName, Features: overrides})
 				if err != nil {
 					return err
 				}
 				a.warn(rep.Warnings)
 				res.Builds = append(res.Builds, rep)
+			}
+			if err := a.refreshLocal(lf, true); err != nil {
+				return err
 			}
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
@@ -74,6 +91,8 @@ func (a *app) installCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory")
+	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
+	ff.register(cmd, "for this run only")
 	return cmd
 }
 

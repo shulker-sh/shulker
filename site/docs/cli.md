@@ -16,6 +16,9 @@ outline: [2, 3]
 | [`shulker target add <name>`](#shulker-target-add) | Add a build target |
 | [`shulker target remove <name>`](#shulker-target-remove) | Remove a target, leaving its build directory |
 | [`shulker target list`](#shulker-target-list) | List targets |
+| [`shulker feature on\|off <feature>`](#shulker-feature-on-off) | Turn a feature on or off on this machine |
+| [`shulker feature reset <feature>`](#shulker-feature-reset) | Go back to the target defaults for a feature |
+| [`shulker feature list`](#shulker-feature-list) | List features and whether they're on |
 | [`shulker install`](#shulker-install) | Download everything in the lock and build all targets |
 | [`shulker build [target]`](#shulker-build) | Assemble build directories from the lock and overrides |
 | [`shulker diff [target]`](#shulker-diff) | Show build files that differ from what build would write |
@@ -90,6 +93,8 @@ shulker export mrpack --target client -o dist/my-pack.mrpack
 | `-o, --output <path>` | Archive path (default: `build/<name>-<version>.mrpack`) |
 | `--target <name>` | Export one target only (default: every target) |
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
+| `--with <feature>` | Turn a feature on for this run only; repeat for more |
+| `--without <feature>` | Turn a feature off for this run only; repeat for more |
 | `--bundle` | Put mods that Modrinth launchers can't download inside the archive |
 
 ## Mods
@@ -192,6 +197,35 @@ List targets with their side, build directory, overrides, features, and display 
 shulker target list
 ```
 
+## Features
+
+A feature is a name that mods opt into with a `feature` condition, like `shaders`. Each target can turn features on by default. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, and `export mrpack` use your choices over the target defaults, and their `--with` and `--without` flags override both for one run.
+
+### `shulker feature on|off`
+
+Turn a feature on or off for every target on this machine. It takes effect on the next build or sync, including a launcher's pre-launch sync. Naming a feature nothing in `shulker.json` uses is an error.
+
+```sh
+shulker feature on shaders
+shulker feature off fancy
+```
+
+### `shulker feature reset`
+
+Forget your choice for a feature so it follows the target defaults again.
+
+```sh
+shulker feature reset shaders
+```
+
+### `shulker feature list`
+
+List each feature with its state and the mods it gates. A `!` before a mod means the mod ships only while the feature is off. Alias: `ls`.
+
+```sh
+shulker feature list
+```
+
 ## Builds
 
 ### `shulker install`
@@ -205,6 +239,9 @@ shulker install
 | Flag | Description |
 | --- | --- |
 | `--force` | Overwrite files edited in the build directory |
+| `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
+| `--with <feature>` | Turn a feature on for this run only; repeat for more |
+| `--without <feature>` | Turn a feature off for this run only; repeat for more |
 
 ### `shulker build`
 
@@ -219,6 +256,9 @@ shulker build client
 | --- | --- |
 | `--force` | Overwrite files edited in the build directory and ignore a stale lock |
 | `--accept-player-change` | Relock a player name that now belongs to a different account |
+| `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
+| `--with <feature>` | Turn a feature on for this run only; repeat for more |
+| `--without <feature>` | Turn a feature off for this run only; repeat for more |
 
 ### `shulker diff`
 
@@ -232,7 +272,7 @@ shulker diff server --into /srv/minecraft
 
 | Flag | Description |
 | --- | --- |
-| `--into <path>` | Directory the target was synced into (default: the target's build directory) |
+| `--into <path>` | Directory the target was synced into (default: the build directory and every directory `sync` recorded) |
 
 ### `shulker pull`
 
@@ -246,7 +286,7 @@ shulker pull config/sodium-options.json --target client
 | Flag | Description |
 | --- | --- |
 | `--target <name>` | Target whose build directory to pull from (default: the only target) |
-| `--into <path>` | Directory the target was synced into (default: the target's build directory) |
+| `--into <path>` | Directory the target was synced into (default: the build directory and every directory `sync` recorded) |
 
 ## Running
 
@@ -293,6 +333,8 @@ shulker link multimc --launcher-dir ~/MultiMC
 | `--launcher-dir <path>` | Launcher data directory (default: Prism Launcher's; required for MultiMC) |
 | `--target <name>` | Client target to link (default: the only client target) |
 | `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory |
+| `--with <feature>` | Turn a feature on in every pre-launch sync of this instance; repeat for more (sync mode only) |
+| `--without <feature>` | Turn a feature off in every pre-launch sync of this instance; repeat for more (sync mode only) |
 
 ### `shulker sync`
 
@@ -309,6 +351,9 @@ shulker sync ../my-pack --target client --into ~/instances/my-pack
 | `--into <path>` | Output directory (default: the target's build directory) |
 | `--force` | Overwrite files edited in the output directory |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
+| `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
+| `--with <feature>` | Turn a feature on for this run only; repeat for more |
+| `--without <feature>` | Turn a feature off for this run only; repeat for more |
 
 ## Packs
 

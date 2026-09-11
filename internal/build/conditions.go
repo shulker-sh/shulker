@@ -3,6 +3,7 @@ package build
 import (
 	"fmt"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -21,18 +22,78 @@ type conditions struct {
 	features map[string]bool
 }
 
+func ValidOS(name string) bool {
+	return name == "macos" || name == "windows" || name == "linux"
+}
+
 func (b *Builder) conditions(target manifest.Target, opts Options) conditions {
-	c := conditions{os: opts.OS, features: opts.Features}
+	c := conditions{os: opts.OS, features: map[string]bool{}}
 	if !opts.NoOS && c.os == "" {
 		c.os = DetectOS()
 	}
-	if c.features == nil {
-		c.features = map[string]bool{}
-		for _, f := range target.Features {
-			c.features[f] = true
-		}
+	for _, f := range target.Features {
+		c.features[f] = true
+	}
+	for name, on := range opts.Features {
+		c.features[name] = on
 	}
 	return c
+}
+
+type Feature struct {
+	Name     string   `json:"name"`
+	Mods     []string `json:"mods"`
+	Defaults []string `json:"defaultTargets"`
+}
+
+func (b *Builder) Features() []Feature {
+	byName := map[string]*Feature{}
+	get := func(name string) *Feature {
+		if f, ok := byName[name]; ok {
+			return f
+		}
+		f := &Feature{Name: name, Mods: []string{}, Defaults: []string{}}
+		byName[name] = f
+		return f
+	}
+	gate := func(id string, m manifest.Mod) {
+		for _, item := range m.Feature {
+			name, negated := strings.CutPrefix(item, "!")
+			label := id
+			if negated {
+				label = "!" + id
+			}
+			f := get(name)
+			if !slices.Contains(f.Mods, label) {
+				f.Mods = append(f.Mods, label)
+			}
+		}
+	}
+	for id, m := range b.Manifest.Mods {
+		gate(id, m)
+	}
+	for _, p := range b.Packs {
+		for id, m := range p.Manifest.Mods {
+			if _, ok := b.Manifest.Mods[id]; !ok {
+				gate(id, m)
+			}
+		}
+	}
+	for name, t := range b.Manifest.Targets {
+		for _, f := range t.Features {
+			get(f).Defaults = append(get(f).Defaults, name)
+		}
+	}
+	res := make([]Feature, 0, len(byName))
+	for _, f := range byName {
+		sort.Slice(f.Mods, func(i, j int) bool {
+			return strings.TrimPrefix(f.Mods[i], "!") < strings.TrimPrefix(f.Mods[j], "!")
+		})
+		sort.Strings(f.Defaults)
+		res = append(res, *f)
+	}
+	sort.Slice(res, func(i, j int) bool { return res[i].Name < res[j].Name })
+	return res
 }
 
 func (c conditions) admits(m manifest.Mod) (bool, string) {
@@ -103,17 +164,7 @@ func (b *Builder) mentionsOS() bool {
 }
 
 func (b *Builder) mentionsFeatures() bool {
-	for _, m := range b.directEntries(conditions{}) {
-		if len(m.Feature) > 0 {
-			return true
-		}
-	}
-	for _, t := range b.Manifest.Targets {
-		if len(t.Features) > 0 {
-			return true
-		}
-	}
-	return false
+	return len(b.Features()) > 0
 }
 
 func (c conditions) osLabel() string {

@@ -30,6 +30,7 @@ type prismReport struct {
 
 func (a *app) linkPrismCmd() *cobra.Command {
 	var launcherDir, target, mode string
+	var ff featureFlags
 	cmd := &cobra.Command{
 		Use:     "prism",
 		Aliases: []string{"multimc"},
@@ -55,6 +56,18 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {
 				return err
+			}
+			if len(ff.args()) > 0 {
+				if mode != "sync" {
+					return out.Errorf("usage", "--with and --without need --mode sync; a symlinked instance uses the build directory as built")
+				}
+				b, err := a.builder(cmd.Context(), p)
+				if err != nil {
+					return err
+				}
+				if err := ff.check(b); err != nil {
+					return err
+				}
 			}
 			if launcherDir == "" {
 				if cmd.CalledAs() == "multimc" {
@@ -88,7 +101,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				inst.PreLaunch = strings.Join([]string{launcher.CommandArg(exe), "sync", launcher.CommandArg(projectDir), "--target", name, "--into", `"$INST_MC_DIR"`}, " ")
+				inst.PreLaunch = strings.Join(append([]string{launcher.CommandArg(exe), "sync", launcher.CommandArg(projectDir), "--target", name, "--into", `"$INST_MC_DIR"`}, ff.args()...), " ")
 			} else {
 				inst.GameDirLink = buildDir
 			}
@@ -134,5 +147,6 @@ func (a *app) linkPrismCmd() *cobra.Command {
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: Prism Launcher's; required for MultiMC)")
 	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
 	cmd.Flags().StringVar(&mode, "mode", "sync", "sync: build into the instance before each launch; symlink: point the instance at the build directory")
+	ff.register(cmd, "in every pre-launch sync of this instance")
 	return cmd
 }

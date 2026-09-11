@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/shulker-sh/shulker/internal/build"
+	"github.com/shulker-sh/shulker/internal/local"
 	"github.com/shulker-sh/shulker/internal/out"
 	"github.com/shulker-sh/shulker/internal/player"
 	"github.com/spf13/cobra"
@@ -13,6 +14,8 @@ import (
 
 func (a *app) buildCmd() *cobra.Command {
 	var force, acceptPlayerChange bool
+	var osName string
+	var ff featureFlags
 	cmd := &cobra.Command{
 		Use:   "build [target]",
 		Short: "Assemble build directories from the lock and overrides",
@@ -20,6 +23,9 @@ func (a *app) buildCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {
+				return err
+			}
+			if err := checkOS(osName); err != nil {
 				return err
 			}
 			if err := p.RequireLock(); err != nil {
@@ -35,18 +41,29 @@ func (a *app) buildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			lf, err := local.Load(p.Dir)
+			if err != nil {
+				return err
+			}
+			overrides, err := featureOverrides(b, lf.Features, ff)
+			if err != nil {
+				return err
+			}
 			names := targetNames(p.Manifest.Targets)
 			if len(args) == 1 {
 				names = args
 			}
 			var reports []*build.Report
 			for _, name := range names {
-				rep, err := b.Build(name, build.Options{Force: force})
+				rep, err := b.Build(name, build.Options{Force: force, OS: osName, Features: overrides})
 				if err != nil {
 					return err
 				}
 				a.warn(rep.Warnings)
 				reports = append(reports, rep)
+			}
+			if err := a.refreshLocal(lf, true); err != nil {
+				return err
 			}
 			return a.printer.Emit(reports, func(w io.Writer) {
 				for _, rep := range reports {
@@ -66,5 +83,7 @@ func (a *app) buildCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory and ignore a stale lock")
 	cmd.Flags().BoolVar(&acceptPlayerChange, "accept-player-change", false, "relock a player name that now belongs to a different account")
+	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
+	ff.register(cmd, "for this run only")
 	return cmd
 }

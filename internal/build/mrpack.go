@@ -26,6 +26,7 @@ type MrpackOptions struct {
 	Output    string
 	Bundle    bool
 	OS        string
+	Features  map[string]bool
 }
 
 type MrpackReport struct {
@@ -54,7 +55,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, Bundled: []string{}, Overrides: []string{}, Warnings: []string{}}
 	for _, t := range targets {
 		report.Targets = append(report.Targets, t.name)
-		if err := b.mrpackCollect(t, opts.OS, report); err != nil {
+		if err := b.mrpackCollect(t, opts, report); err != nil {
 			return nil, err
 		}
 	}
@@ -130,9 +131,9 @@ func (b *Builder) mrpackName(targets []*mrpackTarget) string {
 	return b.Manifest.Name
 }
 
-func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, report *MrpackReport) error {
+func (b *Builder) mrpackCollect(t *mrpackTarget, opts MrpackOptions, report *MrpackReport) error {
 	rep := &Report{}
-	desired, _, err := b.collect(t.name, b.Manifest.Targets[t.name], Options{OS: osName, NoOS: osName == ""}, rep)
+	desired, _, err := b.collect(t.name, b.Manifest.Targets[t.name], Options{OS: opts.OS, NoOS: opts.OS == "", Features: opts.Features}, rep)
 	if err != nil {
 		return err
 	}
