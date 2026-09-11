@@ -1,6 +1,14 @@
 package resolve
 
-import "testing"
+import (
+	"bytes"
+	"reflect"
+	"testing"
+
+	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+)
 
 func TestSatisfies(t *testing.T) {
 	cases := []struct {
@@ -54,5 +62,30 @@ func TestSatisfiesUnparsable(t *testing.T) {
 		if _, err := satisfies(c[0], c[1]); err == nil {
 			t.Errorf("satisfies(%q, %q) should not parse", c[0], c[1])
 		}
+	}
+}
+
+func TestValidateOptionalAndLoaderProvides(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	jars := map[string][2]string{
+		"shiny":  {"quilt.mod.json", `{"schema_version":1,"quilt_loader":{"id":"shiny","version":"1.0.0","depends":[{"id":"sodium","versions":"^0.9","optional":true},{"id":"iris","versions":"^1.8","optional":true}]}}`},
+		"sodium": {"fabric.mod.json", `{"id":"sodium","version":"1.0.0","depends":{"fabricloader":">=0.19"}}`},
+	}
+	l := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "quilt", Version: "0.31.0-beta.4", Provides: map[string]string{"fabricloader": "0.19.5"}}, Mods: map[string]lock.Mod{}}
+	for id, jar := range jars {
+		sha, err := c.Put(bytes.NewReader(zipBytes(t, jar[0], jar[1])))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Mods[id] = lock.Mod{Sha512: sha}
+	}
+	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{{Rule: "depends", Mod: "shiny", ModVersion: "1.0.0", On: "sodium", Declared: "^0.9", Found: "1.0.0"}}
+	if !reflect.DeepEqual(v.Problems, want) {
+		t.Fatalf("problems %+v, want %+v", v.Problems, want)
 	}
 }

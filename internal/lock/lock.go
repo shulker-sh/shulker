@@ -27,9 +27,10 @@ type Lock struct {
 }
 
 type Loader struct {
-	Type    string     `json:"type"`
-	Version string     `json:"version"`
-	Server  *ServerJar `json:"server,omitempty"`
+	Type     string            `json:"type"`
+	Version  string            `json:"version"`
+	Provides map[string]string `json:"provides,omitempty"`
+	Server   *ServerJar        `json:"server,omitempty"`
 }
 
 type ServerJar struct {

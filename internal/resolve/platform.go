@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
@@ -22,6 +24,7 @@ type Meta struct {
 	Piston *meta.Piston
 	Fabric *meta.Fabric
 	Quilt  *meta.Quilt
+	Cache  *cache.Cache
 }
 
 func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, error) {
@@ -55,9 +58,13 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, 
 	if err != nil {
 		return nil, err
 	}
+	provides, err := mt.loaderProvides(ctx, m.Loader.Type, game.ID, loaderVersion)
+	if err != nil {
+		return nil, err
+	}
 	return &Platform{
 		Minecraft: game.ID,
-		Loader:    lock.Loader{Type: m.Loader.Type, Version: loaderVersion},
+		Loader:    lock.Loader{Type: m.Loader.Type, Version: loaderVersion, Provides: provides},
 		Java:      lock.Java{Major: java.Major, Component: java.Component},
 	}, nil
 }
@@ -100,4 +107,23 @@ func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game strin
 		return "", fmt.Errorf("no %s loader version matches %q for Minecraft %s", l.Type, l.Version, game)
 	}
 	return v.ID, nil
+}
+
+func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) (map[string]string, error) {
+	if name != "quilt" {
+		return nil, nil
+	}
+	jar, err := mt.Quilt.LoaderJar(ctx, game, version)
+	if err != nil {
+		return nil, err
+	}
+	path, err := mt.Cache.Ensure(ctx, mt.Quilt.Client, jar.URL, jar.Sha512)
+	if err != nil {
+		return nil, err
+	}
+	info, err := jarmeta.Read(path)
+	if err != nil {
+		return nil, err
+	}
+	return info.Provides, nil
 }

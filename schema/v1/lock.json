@@ -24,6 +24,11 @@
       "properties": {
         "type": { "type": "string", "enum": ["fabric", "quilt", "neoforge", "forge"] },
         "version": { "type": "string", "minLength": 1, "description": "Resolved loader version, exactly as the loader's meta names it." },
+        "provides": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 1 },
+          "description": "Mod ids the loader jar provides, with their versions, e.g. the fabricloader version the Quilt loader stands in for. Validation treats them as installed."
+        },
         "server": {
           "type": "object",
           "required": ["installer", "sha512"],

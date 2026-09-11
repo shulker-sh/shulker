@@ -284,11 +284,12 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 		cf.BaseURL = h.server.URL + "/curseforge"
 		providers["curseforge"] = cf
 	}
+	c := &cache.Cache{Dir: h.cache}
 	a.d = &deps{
 		fetch:     f,
-		cache:     &cache.Cache{Dir: h.cache},
+		cache:     c,
 		providers: providers,
-		meta:      &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt},
+		meta:      &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt, Cache: c},
 		runtimes:  runtimes,
 		players:   players,
 	}

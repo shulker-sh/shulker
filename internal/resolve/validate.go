@@ -50,6 +50,9 @@ func (r *Resolver) Validate() (*Validation, error) {
 	if l, ok := loader.Lookup(r.Lock.Loader.Type); ok {
 		installed[l.DependencyID] = r.Lock.Loader.Version
 	}
+	for id, version := range r.Lock.Loader.Provides {
+		installed[id] = version
+	}
 	infos := map[string]*jarmeta.Info{}
 	for _, id := range r.lockIDs() {
 		m := r.Lock.Mods[id]
@@ -87,6 +90,21 @@ func (r *Resolver) Validate() (*Validation, error) {
 				}
 			}
 			v.record(ignores, used, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+		}
+		for _, on := range sortedKeys(info.Optional) {
+			declared := info.Optional[on]
+			found, ok := installed[on]
+			if !ok {
+				continue
+			}
+			match, err := satisfies(found, declared)
+			if err != nil {
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s optionally depends on %s %s but %s: not checked", id, on, declared, err))
+				continue
+			}
+			if !match {
+				v.record(ignores, used, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+			}
 		}
 		for _, on := range sortedKeys(info.Breaks) {
 			declared := info.Breaks[on]
