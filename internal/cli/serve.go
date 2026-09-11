@@ -113,7 +113,7 @@ func (a *app) serveCmd() *cobra.Command {
 				return err
 			}
 			dir := filepath.Join(p.Dir, p.Manifest.BuildDir(name))
-			args := server.Command(jvm, build.ServerJarFile)
+			args := server.Command(jvm, build.LaunchJar(p.Lock.Loader.Type))
 			a.progress("starting %s in %s with %s", name, dir, java)
 
 			interrupt := make(chan os.Signal, 2)

@@ -74,6 +74,10 @@ type harness struct {
 	newer         bool
 	serverJar     fakeJar
 	serverJarHits int
+	quiltLoader   fakeJar
+	mixin         fakeJar
+	vanilla       fakeJar
+	quiltHits     int
 	stdin         io.Reader
 	tty           bool
 	runtime       *fakeRuntime
@@ -105,8 +109,46 @@ func newHarness(t *testing.T) *harness {
 			},
 		})
 	})
+	h.vanilla = makeJarFile(t, "minecraft", "server.jar", "version.json", `{"id":"26.2"}`)
 	mux.HandleFunc("/piston/", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"javaVersion": map[string]any{"component": "java-runtime-epsilon", "majorVersion": 25}})
+		writeJSON(w, map[string]any{
+			"javaVersion": map[string]any{"component": "java-runtime-epsilon", "majorVersion": 25},
+			"downloads":   map[string]any{"server": map[string]any{"url": base + "/piston-data/server.jar", "sha1": h.vanilla.sha1}},
+		})
+	})
+	h.quiltLoader = makeJarFile(t, "quilt_loader", "quilt-loader-0.30.1.jar", "quilt.mod.json",
+		`{"schema_version":1,"quilt_loader":{"id":"quilt_loader","version":"0.30.1","provides":[{"id":"fabricloader","version":"0.19.5"}]}}`)
+	h.mixin = makeJarFile(t, "mixin", "sponge-mixin-0.17.3.jar", "mixin.txt", "mixin")
+	mavenFiles := map[string][]byte{
+		"/piston-data/server.jar": h.vanilla.data,
+		"/qmaven/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar":  h.quiltLoader.data,
+		"/fmaven/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar": h.mixin.data,
+	}
+	for path, data := range mavenFiles {
+		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			h.quiltHits++
+			w.Write(data)
+		})
+	}
+	mux.HandleFunc("/quilt/versions/loader/26.2/0.30.1", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"loader": map[string]any{"maven": "org.quiltmc:quilt-loader:0.30.1", "hashes": map[string]string{"sha512": h.quiltLoader.sha512}}})
+	})
+	mux.HandleFunc("/quilt/versions/loader/26.2/0.30.1/server/json", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{
+			"id": "quilt-loader-0.30.1-26.2", "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotServer",
+			"launcherMainClass": "org.quiltmc.loader.impl.launch.server.QuiltServerLauncher",
+			"libraries": []map[string]string{
+				{"name": "net.fabricmc:sponge-mixin:0.17.3", "url": base + "/fmaven/"},
+				{"name": "org.quiltmc:quilt-loader:0.30.1", "url": base + "/qmaven/"},
+			},
+		})
+	})
+	mux.HandleFunc("/quilt/versions/loader/26.2/0.30.1/profile/json", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{
+			"id": "quilt-loader-0.30.1-26.2", "inheritsFrom": "26.2", "type": "release",
+			"mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
+			"libraries": []map[string]any{{"name": "org.quiltmc:quilt-loader:0.30.1", "url": base + "/qmaven/"}},
+		})
 	})
 	mux.HandleFunc("/fabric/versions/loader/26.2", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, []map[string]any{
@@ -275,6 +317,7 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	fabric.BaseURL = h.server.URL + "/fabric"
 	quilt := meta.NewQuilt(f)
 	quilt.BaseURL = h.server.URL + "/quilt"
+	quilt.MavenURL = h.server.URL + "/qmaven"
 	mr := modrinth.New(f)
 	mr.BaseURL = h.server.URL + "/modrinth"
 	runtimes := meta.NewRuntimes(f)

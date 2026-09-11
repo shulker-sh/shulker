@@ -8,6 +8,7 @@ All notable changes to shulker are documented here. The format is based on
 
 ### Added
 - `init` creates a `shulker.json` manifest; `add`, `remove`, `update`, `outdated`, `pin` and `unpin` manage mods, with exact versions and hashes recorded in `shulker.lock`.
+- Fabric and Quilt projects (`init --loader`); on Quilt, mods without a Quilt build use their Fabric one.
 - Mods from Modrinth and CurseForge, with provider fallthrough, manual downloads for files CurseForge won't serve, and `add --provider` to switch a locked mod.
 - Dependency checks from each jar's own metadata on `add` and `install`; `remove` prunes dependencies nothing else needs.
 - `suggests` lists the mods locked mods recommend and that aren't installed; `--optional` adds their optional integrations.

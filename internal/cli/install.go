@@ -103,12 +103,12 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 		if err != nil {
 			return nil, err
 		}
-		jar, err := r.EnsureServerJar(ctx, d.meta.Fabric)
+		jar, err := r.EnsureServerJar(ctx, d.meta)
 		if err != nil {
 			return nil, err
 		}
 		if jar.Fetched {
-			fetched = append(fetched, "fabric-server-launcher")
+			fetched = append(fetched, p.Lock.Loader.Type+"-server-launcher")
 		}
 		if jar.Locked {
 			if err := p.Lock.Save(p.LockPath()); err != nil {

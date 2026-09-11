@@ -2,6 +2,7 @@ package meta
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -34,12 +35,62 @@ func (q *Quilt) LoaderJarURL(ctx context.Context, game, loader string) (string, 
 	if err := q.Client.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s", q.BaseURL, game, loader), &entry); err != nil {
 		return "", fmt.Errorf("quilt loader %s for %s: %w", loader, game, err)
 	}
-	parts := strings.Split(entry.Loader.Maven, ":")
-	if len(parts) != 3 {
+	path, err := MavenPath(entry.Loader.Maven)
+	if err != nil {
 		return "", fmt.Errorf("quilt loader %s for %s: meta has no maven coordinate", loader, game)
 	}
+	return q.MavenURL + "/" + path, nil
+}
+
+type Library struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+type ServerProfile struct {
+	MainClass         string    `json:"mainClass"`
+	LauncherMainClass string    `json:"launcherMainClass"`
+	Libraries         []Library `json:"libraries"`
+}
+
+func (q *Quilt) ServerProfile(ctx context.Context, game, loader string) (*ServerProfile, error) {
+	var p ServerProfile
+	if err := q.Client.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s/server/json", q.BaseURL, game, loader), &p); err != nil {
+		return nil, fmt.Errorf("quilt server profile for %s with loader %s: %w", game, loader, err)
+	}
+	if p.MainClass == "" || p.LauncherMainClass == "" || len(p.Libraries) == 0 {
+		return nil, fmt.Errorf("quilt server profile for %s with loader %s is incomplete", game, loader)
+	}
+	return &p, nil
+}
+
+func (q *Quilt) LoaderProfile(ctx context.Context, game, loader string) (json.RawMessage, error) {
+	var raw json.RawMessage
+	if err := q.Client.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s/profile/json", q.BaseURL, game, loader), &raw); err != nil {
+		return nil, fmt.Errorf("quilt profile for %s with loader %s: %w", game, loader, err)
+	}
+	return raw, nil
+}
+
+func (l Library) JarURL() (string, error) {
+	path, err := MavenPath(l.Name)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(l.URL, "/") + "/" + path, nil
+}
+
+func MavenPath(name string) (string, error) {
+	parts := strings.Split(name, ":")
+	if len(parts) < 3 || len(parts) > 4 {
+		return "", fmt.Errorf("maven coordinate %q is not group:artifact:version[:classifier]", name)
+	}
 	group, artifact, version := strings.ReplaceAll(parts[0], ".", "/"), parts[1], parts[2]
-	return fmt.Sprintf("%s/%s/%s/%s/%s-%s.jar", q.MavenURL, group, artifact, version, artifact, version), nil
+	file := artifact + "-" + version
+	if len(parts) == 4 {
+		file += "-" + parts[3]
+	}
+	return group + "/" + artifact + "/" + version + "/" + file + ".jar", nil
 }
 
 // LoaderVersions lists every Quilt loader for a game. Quilt meta has no stable flag and doesn't

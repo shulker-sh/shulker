@@ -31,12 +31,18 @@
         },
         "server": {
           "type": "object",
-          "required": ["installer", "sha512"],
+          "required": ["sha512"],
           "additionalProperties": false,
-          "description": "Server launcher jar, present once a server target has been installed.",
+          "description": "Server launcher, present once a server target has been installed.",
           "properties": {
-            "installer": { "type": "string", "minLength": 1, "description": "Loader installer version whose bundled server launcher is locked." },
-            "sha512": { "$ref": "#/$defs/sha512" }
+            "installer": { "type": "string", "minLength": 1, "description": "Fabric: installer version whose bundled server launcher is locked." },
+            "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates." },
+            "minecraft": { "$ref": "#/$defs/sha512", "description": "Quilt: the vanilla server.jar the launcher starts." },
+            "libraries": {
+              "type": "object",
+              "additionalProperties": { "$ref": "#/$defs/sha512" },
+              "description": "Quilt: the loader's libraries, keyed by Maven coordinate, placed under libraries/."
+            }
           }
         }
       }

@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"shulker.sh/shulker/internal/cache"
@@ -81,6 +82,16 @@ func (mt *Meta) versions(name string) (loaderVersions, error) {
 		return mt.Quilt, nil
 	}
 	return nil, fmt.Errorf("no version list for the %s loader", name)
+}
+
+func (mt *Meta) LoaderProfile(ctx context.Context, l lock.Loader, game string) (json.RawMessage, error) {
+	switch l.Type {
+	case "fabric":
+		return mt.Fabric.LoaderProfile(ctx, game, l.Version)
+	case "quilt":
+		return mt.Quilt.LoaderProfile(ctx, game, l.Version)
+	}
+	return nil, fmt.Errorf("no launcher profile for the %s loader", l.Type)
 }
 
 func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game string) (string, error) {

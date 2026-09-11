@@ -134,7 +134,7 @@
     "modId": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_-]{1,63}$",
-      "description": "In-jar mod id as declared in fabric.mod.json or neoforge.mods.toml."
+      "description": "In-jar mod id as declared in fabric.mod.json, quilt.mod.json or neoforge.mods.toml."
     },
     "projectId": {
       "description": "Provider project id. Modrinth ids are base62 strings, CurseForge ids are integers.",

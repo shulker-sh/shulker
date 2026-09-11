@@ -17,19 +17,21 @@ import (
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/server"
 )
 
 const (
-	StateFile      = ".shulker-state.json"
-	TemplateSuffix = ".tmpl"
-	ServerJarFile  = "fabric-server-launch.jar"
-	EulaFile       = "eula.txt"
+	StateFile         = ".shulker-state.json"
+	TemplateSuffix    = ".tmpl"
+	VanillaServerFile = "server.jar"
+	EulaFile          = "eula.txt"
 )
 
 type Origin struct {
@@ -403,11 +405,9 @@ func (b *Builder) layer(root, label, pack string, vars map[string]string, whole 
 }
 
 func (b *Builder) collectServer(desired map[string]source, vars map[string]string, report *Report) (string, error) {
-	jar := b.Lock.Loader.Server
-	if jar == nil || !b.Cache.Has(jar.Sha512) {
-		return "", out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
+	if err := b.collectLauncher(desired); err != nil {
+		return "", err
 	}
-	desired[ServerJarFile] = source{sha512: jar.Sha512}
 	srv := b.Manifest.Server
 	if srv == nil {
 		srv = &manifest.Server{}
@@ -431,6 +431,38 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 		levelName = "world"
 	}
 	return levelName, nil
+}
+
+func (b *Builder) collectLauncher(desired map[string]source) error {
+	notInstalled := out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
+	jar := b.Lock.Loader.Server
+	if jar == nil || !b.Cache.Has(jar.Sha512) {
+		return notInstalled
+	}
+	desired[LaunchJar(b.Lock.Loader.Type)] = source{sha512: jar.Sha512}
+	if b.Lock.Loader.Type != "quilt" {
+		return nil
+	}
+	if jar.Minecraft == "" || !b.Cache.Has(jar.Minecraft) {
+		return notInstalled
+	}
+	desired[VanillaServerFile] = source{sha512: jar.Minecraft}
+	for name, sha := range jar.Libraries {
+		path, err := meta.MavenPath(name)
+		if err != nil {
+			return err
+		}
+		if !b.Cache.Has(sha) {
+			return notInstalled
+		}
+		desired["libraries/"+path] = source{sha512: sha}
+	}
+	return nil
+}
+
+func LaunchJar(loaderType string) string {
+	l, _ := loader.Lookup(loaderType)
+	return l.ServerLaunchJar
 }
 
 func (b *Builder) collectClient(desired map[string]source, vars map[string]string) error {

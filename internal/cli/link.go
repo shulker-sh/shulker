@@ -77,8 +77,8 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			a.progress("Fetching Fabric loader %s profile for %s", p.Lock.Loader.Version, p.Lock.Minecraft)
-			profile, err := d.meta.Fabric.LoaderProfile(cmd.Context(), p.Lock.Minecraft, p.Lock.Loader.Version)
+			a.progress("Fetching %s loader %s profile for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
+			profile, err := d.meta.LoaderProfile(cmd.Context(), p.Lock.Loader, p.Lock.Minecraft)
 			if err != nil {
 				return err
 			}

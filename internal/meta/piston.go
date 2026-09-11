@@ -55,6 +55,34 @@ func (m *GameManifest) Find(id string) (GameVersion, bool) {
 	return GameVersion{}, false
 }
 
+type Download struct {
+	URL  string `json:"url"`
+	Sha1 string `json:"sha1"`
+}
+
+func (p *Piston) ServerDownload(ctx context.Context, game string) (Download, error) {
+	m, err := p.Manifest(ctx)
+	if err != nil {
+		return Download{}, err
+	}
+	v, ok := m.Find(game)
+	if !ok {
+		return Download{}, fmt.Errorf("minecraft %s is not in the version list", game)
+	}
+	var detail struct {
+		Downloads struct {
+			Server Download `json:"server"`
+		} `json:"downloads"`
+	}
+	if err := p.Client.GetJSON(ctx, v.URL, &detail); err != nil {
+		return Download{}, fmt.Errorf("minecraft %s version json: %w", v.ID, err)
+	}
+	if detail.Downloads.Server.URL == "" || detail.Downloads.Server.Sha1 == "" {
+		return Download{}, fmt.Errorf("minecraft %s has no server download", v.ID)
+	}
+	return detail.Downloads.Server, nil
+}
+
 func (p *Piston) Java(ctx context.Context, v GameVersion) (JavaRuntime, error) {
 	var detail struct {
 		JavaVersion JavaRuntime `json:"javaVersion"`

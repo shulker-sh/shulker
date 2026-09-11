@@ -34,8 +34,10 @@ type Loader struct {
 }
 
 type ServerJar struct {
-	Installer string `json:"installer"`
-	Sha512    string `json:"sha512"`
+	Installer string            `json:"installer,omitempty"`
+	Sha512    string            `json:"sha512"`
+	Minecraft string            `json:"minecraft,omitempty"`
+	Libraries map[string]string `json:"libraries,omitempty"`
 }
 
 type Java struct {
