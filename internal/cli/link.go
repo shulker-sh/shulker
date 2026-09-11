@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -63,6 +64,9 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					return err
 				}
 			}
+			if launcherDir, err = filepath.Abs(launcherDir); err != nil {
+				return err
+			}
 			v := &launcher.Mojang{Dir: launcherDir}
 			if err := v.Check(); errors.Is(err, launcher.ErrNotFound) {
 				return out.Errorf("launcher-not-found", "no Minecraft launcher directory at %s; run the launcher once or pass --launcher-dir", launcherDir)
@@ -98,6 +102,11 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := v.WriteProfile(launcher.Profile{Key: rep.Profile, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
+			projectDir, err := filepath.Abs(p.Dir)
+			if err != nil {
+				return err
+			}
+			a.registerLink(config.Link{Launcher: "mojang", LauncherDir: launcherDir, Side: "client", Name: display, Dir: gameDir, Source: projectDir, Target: name})
 			return a.printer.Emit(rep, func(w io.Writer) {
 				fmt.Fprintf(w, "Installed %s into %s\n", versionID, filepath.Join(launcherDir, "versions"))
 				fmt.Fprintf(w, "Linked launcher profile %q to %s\n", display, gameDir)

@@ -65,6 +65,7 @@ type harness struct {
 	jars          map[string]fakeJar
 	dir           string
 	cache         string
+	config        string
 	newer         bool
 	serverJar     fakeJar
 	serverJarHits int
@@ -80,7 +81,7 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	h := &harness{dir: t.TempDir(), cache: t.TempDir(), jars: map[string]fakeJar{}, runtime: newFakeRuntime()}
+	h := &harness{dir: t.TempDir(), cache: t.TempDir(), config: filepath.Join(t.TempDir(), "config.json"), jars: map[string]fakeJar{}, runtime: newFakeRuntime()}
 	sodium := makeJar(t, "sodium", "sodium-fabric-0.9.2+mc26.2.jar", "client")
 	fabricAPI := makeJar(t, "fabric-api", "fabric-api-0.130.0+26.2.jar", "*")
 	h.jars["sodium"], h.jars["fabric-api"] = sodium, fabricAPI
@@ -250,6 +251,7 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	var stdout, stderr bytes.Buffer
 	a := newApp(&stdout, &stderr)
 	a.dir = h.dir
+	a.configPath = h.config
 	a.stdin = h.stdin
 	a.tty = func() bool { return h.tty }
 	f := fetch.New("test")

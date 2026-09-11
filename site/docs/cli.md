@@ -383,10 +383,13 @@ shulker sync ../my-pack --target client --into ~/instances/my-pack
 
 If a git or manifest URL can't be reached, `sync` warns and builds from the copy it fetched last time, so an instance still launches offline. It fails only when that source has never been fetched.
 
+shulker keeps a list of the directories it syncs into, in its `config.json`. A `sync --into` adds the directory to that list, named after the target's display name (or `--name`), along with its source, target, and ref. `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing.
+
 | Flag | Description |
 | --- | --- |
 | `--target <name>` | Target to build (default: the only target) |
 | `--into <path>` | Output directory (default: the target's build directory) |
+| `--name <name>` | Name to list the `--into` directory under (default: the target's display name; kept on later syncs) |
 | `--force` | Overwrite files edited in the output directory |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |

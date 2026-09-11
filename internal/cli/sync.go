@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -18,20 +19,21 @@ import (
 )
 
 type syncResult struct {
-	Source   string        `json:"source"`
-	Kind     pack.Kind     `json:"kind"`
-	Commit   string        `json:"commit,omitempty"`
-	Target   string        `json:"target"`
-	Dir      string        `json:"dir"`
-	Fetched  []string      `json:"fetched"`
-	Warnings []string      `json:"warnings"`
-	Build    *build.Report `json:"build"`
+	Source     string        `json:"source"`
+	Kind       pack.Kind     `json:"kind"`
+	Commit     string        `json:"commit,omitempty"`
+	Target     string        `json:"target"`
+	Dir        string        `json:"dir"`
+	Fetched    []string      `json:"fetched"`
+	Warnings   []string      `json:"warnings"`
+	Build      *build.Report `json:"build"`
+	Registered *config.Link  `json:"registered,omitempty"`
 }
 
 type syncRequest struct {
-	ref, target, into, os string
-	force                 bool
-	features              featureFlags
+	ref, target, into, os, name string
+	force                       bool
+	features                    featureFlags
 }
 
 func (a *app) syncCmd() *cobra.Command {
@@ -60,6 +62,7 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&req.force, "force", false, "overwrite files edited in the output directory")
 	cmd.Flags().StringVar(&req.ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.os, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
+	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the target's display name)")
 	req.features.register(cmd, "for this run only")
 	return cmd
 }
@@ -68,6 +71,9 @@ func (res syncResult) print(w io.Writer) {
 	fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
 	fmt.Fprintf(w, "%s into %s\n", res.Build.Summary(), res.Dir)
 	printReportDetails(w, res.Build)
+	if l := res.Registered; l != nil {
+		fmt.Fprintf(w, "registered %q (%s)\n", l.Name, l.Side)
+	}
 }
 
 type syncSource struct {
@@ -129,6 +135,10 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if into, err = filepath.Abs(into); err != nil {
 		return syncResult{}, err
 	}
+	register := req.into != "" && into != buildDir
+	if req.name != "" && !register {
+		return syncResult{}, out.Errorf("usage", "--name needs --into a directory other than the build directory")
+	}
 	lf, inst, err := sourceLocalFiles(src, into)
 	if err != nil {
 		return syncResult{}, err
@@ -159,7 +169,14 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if !remote {
 		a.refreshLocal(inst, false, false)
 	}
-	return syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: append(src.warnings, warnings...), Build: rep}, nil
+	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: append(src.warnings, warnings...), Build: rep}
+	if register {
+		entry := config.Link{Side: t.Side, Name: req.name, Dir: into, Source: src.name, Target: name, Ref: req.ref}
+		if entry, changed := a.registerSync(entry, p.Manifest.DisplayName(name)); changed {
+			res.Registered = &entry
+		}
+	}
+	return res, nil
 }
 
 func sourceLocalFiles(src *syncSource, into string) (proj, inst *local.File, err error) {

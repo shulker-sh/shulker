@@ -19,12 +19,13 @@ For agents: https://shulker.sh/llms.txt
 `
 
 type app struct {
-	printer *out.Printer
-	stdin   io.Reader
-	tty     func() bool
-	dir     string
-	d       *deps
-	packs   []*pack.Loaded
+	printer    *out.Printer
+	stdin      io.Reader
+	tty        func() bool
+	dir        string
+	d          *deps
+	configPath string
+	packs      []*pack.Loaded
 }
 
 func Execute(args []string, stdout, stderr io.Writer) int {

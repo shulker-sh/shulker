@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
@@ -92,6 +93,9 @@ func (a *app) linkPrismCmd() *cobra.Command {
 					return err
 				}
 			}
+			if launcherDir, err = filepath.Abs(launcherDir); err != nil {
+				return err
+			}
 			l := &launcher.Prism{Dir: launcherDir, MultiMC: cmd.CalledAs() == "multimc"}
 			if err := l.Check(); errors.Is(err, launcher.ErrNotFound) {
 				return out.Errorf("launcher-not-found", "no launcher directory at %s; run the launcher once or pass --launcher-dir", launcherDir)
@@ -138,6 +142,11 @@ func (a *app) linkPrismCmd() *cobra.Command {
 					return err
 				}
 			}
+			launcherName := "prism"
+			if l.MultiMC {
+				launcherName = "multimc"
+			}
+			a.registerLink(config.Link{Launcher: launcherName, LauncherDir: launcherDir, Side: "client", Name: display, Dir: res.GameDir, Source: src.name, Target: name, Ref: ref})
 			var synced *syncResult
 			if len(args) == 1 && mode == "sync" {
 				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: name, into: res.GameDir})
@@ -147,7 +156,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				synced = &r
 			}
 			rep := prismReport{
-				Launcher:    "prism",
+				Launcher:    launcherName,
 				LauncherDir: launcherDir,
 				Instance:    inst.ID,
 				InstanceDir: res.Dir,
