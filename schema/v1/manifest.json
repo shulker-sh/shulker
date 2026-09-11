@@ -212,6 +212,12 @@
           "items": { "$ref": "#/$defs/featureName" },
           "description": "Features on by default for this target. A mod gated with feature ships when one of its names is on."
         },
+        "wholeFiles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/relativePath" },
+          "description": "Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone."
+        },
         "note": { "$ref": "#/$defs/note" }
       }
     },

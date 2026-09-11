@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -315,6 +316,14 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 		}
 		desired[markerJarPath(b.Manifest.Name)] = source{data: jar}
 	}
+	whole := func(rel string) bool {
+		for _, pattern := range target.WholeFiles {
+			if ok, _ := path.Match(pattern, rel); ok {
+				return true
+			}
+		}
+		return false
+	}
 	for _, pk := range b.Packs {
 		pt, err := pk.Target(name, target.Side)
 		if err != nil {
@@ -330,20 +339,20 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 			}
 		}
 		for _, layer := range pt.Overrides {
-			if err := b.layer(filepath.Join(pk.Dir, layer), pk.Name+":"+layer, pk.Name, packVars, desired); err != nil {
+			if err := b.layer(filepath.Join(pk.Dir, layer), pk.Name+":"+layer, pk.Name, packVars, whole, desired); err != nil {
 				return nil, nil, err
 			}
 		}
 	}
 	for _, layer := range target.Overrides {
-		if err := b.layer(filepath.Join(b.Dir, layer), layer, "", vars, desired); err != nil {
+		if err := b.layer(filepath.Join(b.Dir, layer), layer, "", vars, whole, desired); err != nil {
 			return nil, nil, err
 		}
 	}
 	return desired, dirs, nil
 }
 
-func (b *Builder) layer(root, label, pack string, vars map[string]string, desired map[string]source) error {
+func (b *Builder) layer(root, label, pack string, vars map[string]string, whole func(string) bool, desired map[string]source) error {
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && path == root {
@@ -367,6 +376,10 @@ func (b *Builder) layer(root, label, pack string, vars map[string]string, desire
 			if data, err = render(label+"/"+rel+TemplateSuffix, data, vars); err != nil {
 				return err
 			}
+		}
+		if strings.HasSuffix(rel, ".properties") && !whole(rel) {
+			desired[rel] = mergedProperties(desired[rel], data, keySource{path: path, pack: pack, template: src.template}, src)
+			return nil
 		}
 		if owned := desired[rel].owned; owned != nil {
 			src.managed = owned
@@ -400,7 +413,7 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if err := b.checkProperties(props, report); err != nil {
 		return "", err
 	}
-	desired[PropertiesFile] = source{owned: propsFile{props, "="}}
+	desired[PropertiesFile] = source{owned: propsFile{props: props, sep: "="}}
 	if err := b.collectPlayers(srv.Players, desired); err != nil {
 		return "", err
 	}
@@ -420,7 +433,7 @@ func (b *Builder) collectClient(desired map[string]source, vars map[string]strin
 	if err != nil {
 		return err
 	}
-	desired[OptionsFile] = source{owned: propsFile{options, ":"}}
+	desired[OptionsFile] = source{owned: propsFile{props: options, sep: ":"}}
 	return nil
 }
 

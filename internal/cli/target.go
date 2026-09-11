@@ -84,6 +84,7 @@ func (a *app) targetAddCmd() *cobra.Command {
 	cmd.Flags().StringVar(&t.Build, "build", "", "output directory (default: build/<name>)")
 	cmd.Flags().StringArrayVar(&t.Overrides, "overrides", []string{"overrides"}, "override layer, applied in order; repeat for more")
 	cmd.Flags().StringArrayVar(&t.Features, "feature", nil, "feature on by default for this target; repeat for more")
+	cmd.Flags().StringArrayVar(&t.WholeFiles, "whole-file", nil, ".properties override path or glob to copy whole instead of merging per key; repeat for more")
 	cmd.Flags().StringVar(&t.Name, "name", "", "display name launchers show (default: the manifest name)")
 	cmd.Flags().StringArrayVar(&vars, "var", nil, "template variable as key=value; repeat for more")
 	cmd.Flags().StringVar(&t.Note, "note", "", "free-form note kept in shulker.json")

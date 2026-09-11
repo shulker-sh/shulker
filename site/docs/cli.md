@@ -177,6 +177,7 @@ shulker target add shaders --side client --feature shaders --name "Shaders Clien
 | `--build <dir>` | Output directory (default: `build/<name>`) |
 | `--overrides <dir>` | Override layer, applied in order; repeat for more (default: `overrides`) |
 | `--feature <name>` | Feature on by default for this target; repeat for more |
+| `--whole-file <path>` | `.properties` override path or glob to copy whole instead of merging per key; repeat for more |
 | `--name <name>` | Display name launchers show (default: the manifest name) |
 | `--var <key=value>` | Template variable; repeat for more |
 | `--note <text>` | Free-form note kept in `shulker.json` |
@@ -276,17 +277,19 @@ shulker diff server --into /srv/minecraft
 
 ### `shulker pull`
 
-Copy edits made in a build directory back into their source, an override file or keys in shulker.json, so the next build keeps them. With no files, pulls every changed file. Paths are relative to the build directory.
+Copy edits made in a build directory back into their source, an override file or keys in shulker.json, so the next build keeps them. With no files, pulls every changed file. Paths are relative to the build directory. For a `.properties` override, only the keys it lists are pulled; name more with `--key` to start managing them.
 
 ```sh
 shulker pull
 shulker pull config/sodium-options.json --target client
+shulker pull config/iris.properties --key colorSpace
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--target <name>` | Target whose build directory to pull from (default: the only target) |
 | `--into <path>` | Directory the target was synced into (default: the build directory and every directory `sync` recorded) |
+| `--key <key>` | Start managing this key of the one named `.properties` file, copying its current value into the override; repeat for more |
 
 ## Running
 

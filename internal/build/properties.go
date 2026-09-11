@@ -71,8 +71,16 @@ func (p properties) canonical() []byte {
 }
 
 type propsFile struct {
-	props properties
-	sep   string
+	props   properties
+	sep     string
+	base    []byte
+	origins map[string]keySource
+}
+
+type keySource struct {
+	path     string
+	pack     string
+	template bool
 }
 
 func (f propsFile) keys() []string            { return f.props.keys() }
@@ -83,6 +91,9 @@ func (f propsFile) existingValues(existing []byte) map[string]string {
 }
 
 func (f propsFile) render(existing []byte, kept, dropped map[string]bool) ([]byte, error) {
+	if len(existing) == 0 {
+		existing = f.base
+	}
 	write := properties{}
 	for k, v := range f.props {
 		if !kept[k] {
@@ -122,4 +133,31 @@ func (p properties) mergeInto(existing []byte, sep string, dropped map[string]bo
 		}
 	}
 	return []byte(strings.Join(lines, "\n") + "\n")
+}
+
+// Keys already set by the manifest (no origin path) stay on top; later layers
+// replace keys from earlier ones.
+func mergedProperties(prev source, data []byte, from keySource, src source) source {
+	merged := properties{}
+	origins := map[string]keySource{}
+	sep := "="
+	if pf, ok := prev.owned.(propsFile); ok {
+		for k, v := range pf.props {
+			merged[k] = v
+		}
+		for k, o := range pf.origins {
+			origins[k] = o
+		}
+		sep = pf.sep
+	}
+	for k, v := range parseProperties(data) {
+		if _, set := merged[k]; set && origins[k].path == "" {
+			continue
+		}
+		merged[k] = v
+		origins[k] = from
+	}
+	src.owned = propsFile{props: merged, sep: sep, base: data, origins: origins}
+	src.data = nil
+	return src
 }

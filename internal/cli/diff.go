@@ -118,6 +118,7 @@ func (a *app) diffCmd() *cobra.Command {
 
 func (a *app) pullCmd() *cobra.Command {
 	var target, into string
+	var keys []string
 	cmd := &cobra.Command{
 		Use:   "pull [file...]",
 		Short: "Copy edits made in a build directory back into their source",
@@ -151,7 +152,7 @@ func (a *app) pullCmd() *cobra.Command {
 			} else if into, err = a.pullSource(b, p, lf, name); err != nil {
 				return err
 			}
-			rep, err := b.Pull(name, args, build.Options{Dir: into, Features: lf.Features})
+			rep, err := b.Pull(name, args, keys, build.Options{Dir: into, Features: lf.Features})
 			if err != nil {
 				return err
 			}
@@ -169,6 +170,9 @@ func (a *app) pullCmd() *cobra.Command {
 				for _, k := range rep.Keys {
 					fmt.Fprintf(w, "  set %s\n", k)
 				}
+				for _, k := range rep.Adopted {
+					fmt.Fprintf(w, "  adopted %s\n", k)
+				}
 				for _, s := range rep.Skipped {
 					fmt.Fprintf(w, "  skipped %s\n", s)
 				}
@@ -177,6 +181,7 @@ func (a *app) pullCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&target, "target", "", "target whose build directory to pull from (default: the only target)")
 	cmd.Flags().StringVar(&into, "into", "", "directory the target was synced into (default: whichever of the build directory and its sync directories has edits)")
+	cmd.Flags().StringArrayVar(&keys, "key", nil, "start managing this key of the named .properties file; repeat for more")
 	return cmd
 }
 

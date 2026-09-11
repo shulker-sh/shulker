@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/shulker-sh/shulker/internal/out"
 )
@@ -30,6 +33,7 @@ type PullReport struct {
 	Dir             string   `json:"dir"`
 	Pulled          []string `json:"pulled"`
 	Keys            []string `json:"keys"`
+	Adopted         []string `json:"adopted"`
 	Skipped         []string `json:"skipped"`
 	Warnings        []string `json:"warnings"`
 	ManifestChanged bool     `json:"manifestChanged"`
@@ -61,14 +65,25 @@ func (b *Builder) Diff(name string, opts Options) (*DiffReport, error) {
 	return report, nil
 }
 
-func (b *Builder) Pull(name string, files []string, opts Options) (*PullReport, error) {
+func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullReport, error) {
 	d, err := b.drift(name, opts)
 	if err != nil {
 		return nil, err
 	}
 	dir, desired, prev, plans := d.dir, d.desired, d.prev, d.plans
 	target := b.Manifest.Targets[name]
-	report := &PullReport{Target: name, Dir: dir, Pulled: []string{}, Keys: []string{}, Skipped: []string{}, Warnings: d.warnings}
+	report := &PullReport{Target: name, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Skipped: []string{}, Warnings: d.warnings}
+	var pulled []string
+	if len(adopt) > 0 {
+		if len(files) != 1 {
+			return nil, out.Errorf("usage", "--key needs exactly one file")
+		}
+		rel := filepath.ToSlash(filepath.Clean(files[0]))
+		if err := b.adoptKeys(name, rel, adopt, d, report); err != nil {
+			return nil, err
+		}
+		files, plans, pulled = nil, nil, []string{rel}
+	}
 	named := map[string]bool{}
 	for _, f := range files {
 		named[filepath.ToSlash(filepath.Clean(f))] = true
@@ -84,7 +99,6 @@ func (b *Builder) Pull(name string, files []string, opts Options) (*PullReport, 
 			return nil, e
 		}
 	}
-	var pulled []string
 	for _, f := range plans {
 		if !drifted(f) || (len(named) > 0 && !named[f.rel]) {
 			continue
@@ -113,6 +127,16 @@ func (b *Builder) Pull(name string, files []string, opts Options) (*PullReport, 
 		case src.owned != nil:
 			if _, ok := src.owned.(propsFile); !ok {
 				report.Skipped = append(report.Skipped, f.rel+" (player files are managed by `shulker player`)")
+				continue
+			}
+			if pf := src.owned.(propsFile); pf.origins != nil {
+				wrote, err := b.pullOverrideKeys(f.rel, pf, f.merge.kept, existing, report)
+				if err != nil {
+					return nil, err
+				}
+				if wrote {
+					pulled = append(pulled, f.rel)
+				}
 				continue
 			}
 			keys := b.pullKeys(f.rel, src.owned.(propsFile), existing)
@@ -222,6 +246,100 @@ func driftedPaths(plans []planned) []string {
 		}
 	}
 	return paths
+}
+
+func (b *Builder) pullOverrideKeys(rel string, pf propsFile, kept map[string]bool, existing []byte, report *PullReport) (bool, error) {
+	current := parseProperties(existing)
+	byFile := map[string]properties{}
+	wrote := false
+	for _, k := range sortedKeys(kept) {
+		o := pf.origins[k]
+		switch {
+		case o.path == "":
+			if raw := b.manifestBlock(rel); raw != nil {
+				raw[k] = typedProperty(raw[k], current[k])
+				report.Keys = append(report.Keys, rel+" "+k+"="+current[k])
+				report.ManifestChanged = true
+				wrote = true
+			}
+		case o.pack != "":
+			report.Skipped = append(report.Skipped, fmt.Sprintf("%s %s (comes from pack %s)", rel, k, o.pack))
+		case o.template:
+			report.Skipped = append(report.Skipped, fmt.Sprintf("%s %s (rendered from template %s)", rel, k, b.relPath(o.path)))
+		default:
+			if byFile[o.path] == nil {
+				byFile[o.path] = properties{}
+			}
+			byFile[o.path][k] = current[k]
+		}
+	}
+	for _, dest := range slices.Sorted(maps.Keys(byFile)) {
+		if err := writeProperties(dest, byFile[dest]); err != nil {
+			return false, err
+		}
+		for _, k := range byFile[dest].keys() {
+			report.Pulled = append(report.Pulled, rel+" "+k+" -> "+b.relPath(dest))
+		}
+		wrote = true
+	}
+	return wrote, nil
+}
+
+func writeProperties(dest string, set properties) error {
+	data, err := os.ReadFile(dest)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(dest, set.mergeInto(data, "=", nil), 0o644)
+}
+
+func (b *Builder) adoptKeys(name, rel string, keys []string, d *drift, report *PullReport) error {
+	target := b.Manifest.Targets[name]
+	if !strings.HasSuffix(rel, ".properties") {
+		return out.Errorf("usage", "--key works on .properties files, not %s", rel)
+	}
+	src := d.desired[rel]
+	if _, merged := src.owned.(propsFile); !merged && src.origin != "" {
+		return out.Errorf("usage", "%s is copied whole (wholeFiles); edit the override instead", rel)
+	}
+	if src.template && src.pack == "" {
+		return out.Errorf("usage", "%s is rendered from template %s; add the keys there by hand", rel, b.relPath(src.origin))
+	}
+	existing, err := os.ReadFile(filepath.Join(d.dir, filepath.FromSlash(rel)))
+	if errors.Is(err, fs.ErrNotExist) {
+		return out.Errorf("not-found", "%s is not in %s", rel, d.dir)
+	}
+	if err != nil {
+		return err
+	}
+	current := parseProperties(existing)
+	set := properties{}
+	for _, k := range keys {
+		v, ok := current[k]
+		if !ok {
+			e := out.Errorf("key-not-found", "%s has no key %q", rel, k)
+			e.Candidates = current.keys()
+			return e
+		}
+		set[k] = v
+	}
+	dest := src.origin
+	if dest == "" || src.pack != "" {
+		if len(target.Overrides) == 0 {
+			return out.Errorf("no-overrides", "target %s has no overrides directory to adopt %s into", name, rel)
+		}
+		dest = filepath.Join(b.Dir, target.Overrides[0], filepath.FromSlash(rel))
+	}
+	if err := writeProperties(dest, set); err != nil {
+		return err
+	}
+	for _, k := range set.keys() {
+		report.Adopted = append(report.Adopted, rel+" "+k+" -> "+b.relPath(dest))
+	}
+	return nil
 }
 
 func (b *Builder) pullKeys(rel string, f propsFile, existing []byte) []string {

@@ -97,13 +97,14 @@ type Loader struct {
 }
 
 type Target struct {
-	Name      string            `json:"name,omitempty"`
-	Side      string            `json:"side"`
-	Overrides []string          `json:"overrides"`
-	Build     string            `json:"build,omitempty"`
-	Variables map[string]string `json:"variables,omitempty"`
-	Features  []string          `json:"features,omitempty"`
-	Note      string            `json:"note,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	Side       string            `json:"side"`
+	Overrides  []string          `json:"overrides"`
+	Build      string            `json:"build,omitempty"`
+	Variables  map[string]string `json:"variables,omitempty"`
+	Features   []string          `json:"features,omitempty"`
+	WholeFiles []string          `json:"wholeFiles,omitempty"`
+	Note       string            `json:"note,omitempty"`
 }
 
 type Pack struct {
