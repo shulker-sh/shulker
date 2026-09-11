@@ -28,6 +28,7 @@ outline: [2, 3]
 | [`shulker link mojang`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
 | [`shulker link prism`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
 | [`shulker sync <source>`](#shulker-sync) | Download and build one target of a project into a directory |
+| [`shulker links`](#shulker-links) | List linked launcher instances and synced directories |
 | [`shulker pack add <source>`](#shulker-pack-add) | Add a pack from a local path, git URL, or manifest URL |
 | [`shulker pack remove <name>`](#shulker-pack-remove) | Remove a pack |
 | [`shulker pack list`](#shulker-pack-list) | List packs and their local drift state |
@@ -383,7 +384,7 @@ shulker sync ../my-pack --target client --into ~/instances/my-pack
 
 If a git or manifest URL can't be reached, `sync` warns and builds from the copy it fetched last time, so an instance still launches offline. It fails only when that source has never been fetched.
 
-shulker keeps a list of the directories it syncs into, in its `config.json`. A `sync --into` adds the directory to that list, named after the target's display name (or `--name`), along with its source, target, and ref. `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing.
+shulker keeps a list of the directories it syncs into, in its `config.json`. A `sync --into` adds the directory to that list, named after the target's display name (or `--name`), along with its source, target, and ref. `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker links`](#shulker-links) shows the list.
 
 | Flag | Description |
 | --- | --- |
@@ -395,6 +396,26 @@ shulker keeps a list of the directories it syncs into, in its `config.json`. A `
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
+
+### `shulker links`
+
+List the launcher instances and directories shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each entry shows its side, when it was last synced, its directory, and the source and target it syncs from. A directory that is gone or can't be read is flagged.
+
+```sh
+shulker links
+```
+
+```
+Prism Launcher
+  Friends SMP (client), synced 2026-09-11 14:02
+    ~/Library/Application Support/PrismLauncher/instances/shulker-friends-smp/minecraft
+    from https://github.com/shulker-sh/base-pack.git, target client
+
+Other directories
+  My Pack server (server), synced 2026-09-10 21:40
+    /srv/minecraft
+    from https://github.com/shulker-sh/base-pack.git, ref v3, target server
+```
 
 ## Packs
 

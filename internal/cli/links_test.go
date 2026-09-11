@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,6 +90,64 @@ func TestLinkRegisters(t *testing.T) {
 	h.mustRun(t, "link", "multimc", "--launcher-dir", multimcDir)
 	if links := readLinks(t, h); len(links) != 3 || links[2].Launcher != "multimc" {
 		t.Fatalf("multimc entry: %+v", links)
+	}
+}
+
+func TestLinksList(t *testing.T) {
+	h := newHarness(t)
+	if stdout := h.mustRun(t, "links"); !strings.Contains(stdout, "Nothing is linked yet") {
+		t.Fatalf("empty registry: %s", stdout)
+	}
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Zed")
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Alpha")
+	h.mustRun(t, "link", "mojang", "--launcher-dir", t.TempDir())
+	plain := filepath.Join(t.TempDir(), "plain")
+	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "Plain")
+	gone := filepath.Join(t.TempDir(), "gone")
+	h.mustRun(t, "sync", h.dir, "--into", gone, "--name", "Gone")
+	if err := os.RemoveAll(gone); err != nil {
+		t.Fatal(err)
+	}
+	locked := filepath.Join(t.TempDir(), "locked")
+	h.mustRun(t, "sync", h.dir, "--into", locked, "--name", "Locked")
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+
+	var env struct {
+		Data []linkEntry `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "links", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, e := range env.Data {
+		got = append(got, e.Launcher+":"+e.Name+":"+e.Status)
+	}
+	want := "prism:Alpha:synced prism:Zed:not-synced mojang:pack:missing :Gone:missing :Locked:unreadable :Plain:synced"
+	if strings.Join(got, " ") != want {
+		t.Fatalf("entries:\n got %s\nwant %s", strings.Join(got, " "), want)
+	}
+	if env.Data[0].SyncedAt == "" || env.Data[1].SyncedAt != "" {
+		t.Fatalf("syncedAt comes from the state file: %+v", env.Data[:2])
+	}
+
+	stdout := h.mustRun(t, "links")
+	for _, part := range []string{
+		"Prism Launcher\n  Alpha (client), synced ",
+		"  Zed (client), not synced yet\n    " + filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n    from " + h.dir + ", target client\n",
+		"\n\nMinecraft Launcher\n  pack (client), directory is missing\n",
+		"\n\nOther directories\n  Gone (client), directory is missing\n",
+		"  Locked (client), can't read the directory\n",
+	} {
+		if !strings.Contains(stdout, part) {
+			t.Fatalf("links output lacks %q:\n%s", part, stdout)
+		}
 	}
 }
 
