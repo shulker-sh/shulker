@@ -15,6 +15,7 @@ import (
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
@@ -304,11 +305,11 @@ func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
 	if pm.Loader.Type != loader.Type {
 		return out.Errorf("pack-mismatch", "pack %s uses the %s loader; this project uses %s", l.Name, pm.Loader.Type, loader.Type)
 	}
-	lrng, err := mcver.ParseRange(pm.Loader.Version)
+	lrng, err := loaderver.ParseRange(pm.Loader.Version)
 	if err != nil {
 		return fmt.Errorf("pack %s loader version: %w", l.Name, err)
 	}
-	lv, err := mcver.Parse(loader.Version)
+	lv, err := loaderver.Parse(loader.Version)
 	if err != nil {
 		return err
 	}

@@ -111,6 +111,14 @@ func newHarness(t *testing.T) *harness {
 			{"loader": map[string]any{"version": "0.17.2", "stable": true}},
 		})
 	})
+	mux.HandleFunc("/quilt/versions/loader/26.2", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, []map[string]any{
+			{"loader": map[string]any{"version": "0.20.0-beta.9"}},
+			{"loader": map[string]any{"version": "0.30.1"}},
+			{"loader": map[string]any{"version": "0.31.0-beta.4"}},
+			{"loader": map[string]any{"version": "0.30.0"}},
+		})
+	})
 	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/profile/json", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{
 			"id": "fabric-loader-0.17.3-26.2", "inheritsFrom": "26.2", "type": "release",
@@ -261,6 +269,8 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"
 	fabric := meta.NewFabric(f)
 	fabric.BaseURL = h.server.URL + "/fabric"
+	quilt := meta.NewQuilt(f)
+	quilt.BaseURL = h.server.URL + "/quilt"
 	mr := modrinth.New(f)
 	mr.BaseURL = h.server.URL + "/modrinth"
 	runtimes := meta.NewRuntimes(f)
@@ -278,7 +288,7 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 		fetch:     f,
 		cache:     &cache.Cache{Dir: h.cache},
 		providers: providers,
-		meta:      &resolve.Meta{Piston: piston, Fabric: fabric},
+		meta:      &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt},
 		runtimes:  runtimes,
 		players:   players,
 	}

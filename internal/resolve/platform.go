@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
@@ -20,6 +21,7 @@ type Platform struct {
 type Meta struct {
 	Piston *meta.Piston
 	Fabric *meta.Fabric
+	Quilt  *meta.Quilt
 }
 
 func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, error) {
@@ -41,6 +43,9 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, 
 	if !ok {
 		return nil, fmt.Errorf("no Minecraft version matches %q (latest release is %s)", m.Minecraft, games.Latest.Release)
 	}
+	if _, err := loader.Require(m.Loader.Type); err != nil {
+		return nil, err
+	}
 	entry, _ := games.Find(game.ID)
 	java, err := mt.Piston.Java(ctx, entry)
 	if err != nil {
@@ -57,27 +62,42 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, 
 	}, nil
 }
 
-func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game string) (string, error) {
-	if _, err := loader.Require(l.Type); err != nil {
-		return "", err
+type loaderVersions interface {
+	LoaderVersions(ctx context.Context, game string) ([]meta.LoaderVersion, error)
+}
+
+func (mt *Meta) versions(name string) (loaderVersions, error) {
+	switch name {
+	case "fabric":
+		return mt.Fabric, nil
+	case "quilt":
+		return mt.Quilt, nil
 	}
-	rng, err := mcver.ParseRange(l.Version)
+	return nil, fmt.Errorf("no version list for the %s loader", name)
+}
+
+func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game string) (string, error) {
+	rng, err := loaderver.ParseRange(l.Version)
 	if err != nil {
 		return "", fmt.Errorf("manifest loader version: %w", err)
 	}
-	versions, err := mt.Fabric.LoaderVersions(ctx, game)
+	src, err := mt.versions(l.Type)
 	if err != nil {
 		return "", err
 	}
-	var candidates []mcver.Version
+	versions, err := src.LoaderVersions(ctx, game)
+	if err != nil {
+		return "", err
+	}
+	var candidates []loaderver.Version
 	for _, lv := range versions {
-		if v, err := mcver.Parse(lv.Version); err == nil && (lv.Stable || !rng.IsAny()) {
+		if v, err := loaderver.Parse(lv.Version); err == nil && (lv.Stable || !rng.IsAny()) {
 			candidates = append(candidates, v)
 		}
 	}
-	v, ok := mcver.Newest(candidates, rng)
+	v, ok := loaderver.Newest(candidates, rng)
 	if !ok {
-		return "", fmt.Errorf("no fabric loader version matches %q for Minecraft %s", l.Version, game)
+		return "", fmt.Errorf("no %s loader version matches %q for Minecraft %s", l.Type, l.Version, game)
 	}
 	return v.ID, nil
 }
