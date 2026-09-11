@@ -93,6 +93,15 @@ func (b *Builder) directEntries(c conditions) map[string]manifest.Mod {
 	return direct
 }
 
+func (b *Builder) mentionsOS() bool {
+	for _, m := range b.directEntries(conditions{}) {
+		if len(m.OS) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (b *Builder) mentionsFeatures() bool {
 	for _, m := range b.directEntries(conditions{}) {
 		if len(m.Feature) > 0 {
@@ -132,15 +141,28 @@ func (c conditions) featureLabels() []string {
 	return on
 }
 
-func conditionText(m manifest.Mod) string {
+func (c conditions) admittedBy(m manifest.Mod) string {
 	var parts []string
-	if len(m.OS) > 0 {
-		parts = append(parts, "os: "+strings.Join(m.OS, ", "))
+	for _, name := range m.OS {
+		if name == c.os {
+			parts = append(parts, c.osLabel())
+			break
+		}
 	}
-	if len(m.Feature) > 0 {
-		parts = append(parts, "feature: "+strings.Join(m.Feature, ", "))
+	var features []string
+	for _, name := range m.Feature {
+		if c.features[name] {
+			features = append(features, name)
+		}
 	}
-	return strings.Join(parts, " \u00b7 ")
+	switch len(features) {
+	case 0:
+	case 1:
+		parts = append(parts, "feature: "+features[0])
+	default:
+		parts = append(parts, "features: "+strings.Join(features, ", "))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (b *Builder) selectMods(c conditions) selection {

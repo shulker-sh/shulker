@@ -199,7 +199,21 @@ func TestMarkerDescribesTheVariation(t *testing.T) {
 	setFeatures(t, h, nil)
 	h.mustRun(t, "build")
 	desc = markerDescription(t, h)
-	if !strings.Contains(desc, "\u00b7 2 mods\n<gray>OS:</gray> <bold>"+osLabel()+"</bold> \u00b7 <gray>Features:</gray> none\n\nMods\n  \u2022 sodium  <gray>(os: "+strings.Join(others, ", ")+", "+build.DetectOS()+" \u00b7 feature: !shaders)</gray>\n\nDependencies\n  \u2022 fabric-api") {
-		t.Fatalf("gated build description:\n%s", desc)
+	if !strings.Contains(desc, "\u00b7 2 mods\n<gray>OS:</gray> <bold>"+osLabel()+"</bold> \u00b7 <gray>Features:</gray> none\n\nMods\n  \u2022 sodium  <gray>("+osLabel()+")</gray>\n\nDependencies\n  \u2022 fabric-api") {
+		t.Fatalf("os-gated build description:\n%s", desc)
+	}
+
+	setMod(t, h, "sodium", map[string]any{"os": build.DetectOS(), "feature": []string{"fancy", "shaders", "!potato"}})
+	setFeatures(t, h, []string{"fancy", "shaders"})
+	h.mustRun(t, "build")
+	if desc = markerDescription(t, h); !strings.Contains(desc, "  \u2022 sodium  <gray>("+osLabel()+", features: fancy, shaders)</gray>\n") {
+		t.Fatalf("feature-gated build description:\n%s", desc)
+	}
+
+	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
+	setFeatures(t, h, []string{"fancy"})
+	h.mustRun(t, "build")
+	if desc = markerDescription(t, h); strings.Contains(desc, "OS:") || !strings.Contains(desc, "\u00b7 2 mods\n<gray>Features:</gray> <bold>fancy</bold>\n\nMods\n  \u2022 sodium  <gray>(feature: fancy)</gray>\n") {
+		t.Fatalf("universal build description:\n%s", desc)
 	}
 }

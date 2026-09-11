@@ -217,7 +217,7 @@ func (b *Builder) markerDescription(direct, deps []string, cond conditions) stri
 		lines = append(lines, title)
 		for _, id := range ids {
 			line := "  \u2022 " + id
-			if text := conditionText(entries[id]); text != "" {
+			if text := cond.admittedBy(entries[id]); text != "" {
 				line += "  <gray>(" + text + ")</gray>"
 			}
 			lines = append(lines, line)
@@ -229,15 +229,21 @@ func (b *Builder) markerDescription(direct, deps []string, cond conditions) stri
 		parts = append(parts, strings.ReplaceAll(strings.TrimSpace(b.Manifest.Description), "<", "\\<"))
 	}
 	summary := fmt.Sprintf("Minecraft %s \u00b7 %s %s \u00b7 %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
-	variation := "<gray>OS:</gray> <bold>" + cond.osLabel() + "</bold>"
+	var variation []string
+	if b.mentionsOS() {
+		variation = append(variation, "<gray>OS:</gray> <bold>"+cond.osLabel()+"</bold>")
+	}
 	if b.mentionsFeatures() {
 		features := "none"
 		if on := cond.featureLabels(); len(on) > 0 {
 			features = "<bold>" + strings.Join(on, "</bold>, <bold>") + "</bold>"
 		}
-		variation += " \u00b7 <gray>Features:</gray> " + features
+		variation = append(variation, "<gray>Features:</gray> "+features)
 	}
-	parts = append(parts, summary+"\n"+variation)
+	if len(variation) > 0 {
+		summary += "\n" + strings.Join(variation, " \u00b7 ")
+	}
+	parts = append(parts, summary)
 	if len(direct) > 0 {
 		parts = append(parts, section("Mods", direct))
 	}
