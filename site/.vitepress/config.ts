@@ -66,6 +66,7 @@ export default defineConfig({
       { text: 'Guide', link: '/docs/getting-started' },
       { text: 'CLI', link: '/docs/cli' },
       { text: 'Schema', link: '/docs/manifest' },
+      { text: 'Changelog', link: '/docs/changelog' },
     ],
     sidebar: {
       '/docs/': [
@@ -82,6 +83,7 @@ export default defineConfig({
             { text: 'CLI', link: '/docs/cli' },
             { text: 'Manifest (shulker.json)', link: '/docs/manifest' },
             { text: 'Lock (shulker.lock)', link: '/docs/lock' },
+            { text: 'Changelog', link: '/docs/changelog' },
           ],
         },
       ],

@@ -3,3 +3,4 @@ node_modules/
 .vitepress/cache/
 docs/manifest.md
 docs/lock.md
+docs/changelog.md

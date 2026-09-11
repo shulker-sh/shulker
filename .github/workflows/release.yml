@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Changelog gate
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! grep -qE "^## \[${version}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md is missing a dated '## [${version}] - <date>' entry for ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          chmod +x scripts/extract-changelog.sh
+          # Write notes outside the repo so GoReleaser doesn't see a dirty tree.
+          scripts/extract-changelog.sh "$version" > "$RUNNER_TEMP/RELEASE_NOTES.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/RELEASE_NOTES.md"; then
+            echo "::error::extracted release notes are empty for ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          echo "Release notes:"
+          cat "$RUNNER_TEMP/RELEASE_NOTES.md"
+
+      - name: Test
+        run: go test ./...
+
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean --release-notes=${{ runner.temp }}/RELEASE_NOTES.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+
+      - name: Attach attestation bundle to the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp "${{ steps.attest.outputs.bundle-path }}" shulker.attestation.jsonl
+          gh release upload "${GITHUB_REF_NAME}" shulker.attestation.jsonl --clobber

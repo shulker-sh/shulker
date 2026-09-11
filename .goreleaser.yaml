@@ -1,0 +1,42 @@
+version: 2
+
+project_name: shulker
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: shulker
+    main: ./cmd/shulker
+    binary: shulker
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X shulker.sh/shulker/internal/cli.version={{ .Version }}
+
+archives:
+  - id: shulker
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "shulker_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - CHANGELOG.md
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: shulker-sh
+    name: shulker
