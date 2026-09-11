@@ -7,6 +7,7 @@ import iconChevron from './icons/chevron.svg?raw'
 import iconClaude from './icons/claude.svg?raw'
 import iconCopy from './icons/copy.svg?raw'
 import iconDownload from './icons/download.svg?raw'
+import iconDownloadTray from './icons/download-tray.svg?raw'
 import iconExternal from './icons/external.svg?raw'
 import iconMarkdown from './icons/markdown.svg?raw'
 
@@ -56,16 +57,17 @@ onUnmounted(() => {
         <button @click="choose(viewAsMarkdown)">
           <span class="icon" v-html="iconMarkdown" />
           View as Markdown
-          <span class="icon external" v-html="iconExternal" />
+          <span class="icon trailing" v-html="iconExternal" />
         </button>
         <button @click="choose(downloadMarkdown)">
           <span class="icon" v-html="iconDownload" />
-          Download as Markdown
+          Download Markdown
+          <span class="icon trailing" v-html="iconDownloadTray" />
         </button>
         <button v-for="provider in aiProviders" :key="provider.name" @click="choose(() => openInAI(provider))">
           <span class="icon" v-html="providerIcons[provider.name] ?? iconExternal" />
           Open in {{ provider.name }}
-          <span class="icon external" v-html="iconExternal" />
+          <span class="icon trailing" v-html="iconExternal" />
         </button>
       </div>
     </Transition>
@@ -83,7 +85,6 @@ onUnmounted(() => {
   border-radius: 6px;
   overflow: hidden;
   font-size: 14px;
-  transition: border-color 0.25s;
 }
 .trigger:hover {
   border-color: var(--vp-c-brand-1);
@@ -92,7 +93,6 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   color: var(--vp-c-text-1);
-  transition: background-color 0.25s;
 }
 .trigger button:hover {
   background: var(--vp-c-bg-soft);
@@ -112,51 +112,78 @@ onUnmounted(() => {
   right: 0;
   z-index: 100;
   min-width: 240px;
-  padding: 4px 0;
+  overflow: hidden;
   background: var(--vp-c-bg-elv);
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
   box-shadow: var(--vp-shadow-3);
 }
 .menu button {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 16px;
+  padding: 10px 16px;
   color: var(--vp-c-text-1);
   font-size: 14px;
   text-align: left;
 }
+.menu button::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--vp-c-brand-1);
+}
 .menu button:hover {
+  padding-left: 20px;
   background: var(--vp-c-bg-soft);
+}
+.menu button:hover::before {
+  width: 3px;
 }
 .icon {
   display: inline-flex;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 .icon :deep(svg) {
   width: 100%;
   height: 100%;
 }
-.external {
+.trailing {
   margin-left: auto;
   opacity: 0.6;
 }
-.chevron {
-  transition: transform 0.25s;
+.menu button:hover .trailing {
+  opacity: 1;
+  transform: translateX(2px);
 }
 .chevron.open {
   transform: rotate(180deg);
-}
-.menu-enter-active,
-.menu-leave-active {
-  transition: opacity 0.15s, transform 0.15s;
 }
 .menu-enter-from,
 .menu-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .trigger,
+  .trigger button,
+  .menu button,
+  .menu button::before,
+  .trailing,
+  .chevron {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .trigger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  .menu-enter-active,
+  .menu-leave-active {
+    transition: opacity 0.15s, transform 0.15s;
+  }
 }
 </style>
