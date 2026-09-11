@@ -396,7 +396,7 @@ shulker sync --all --side server
 shulker sync
 ```
 
-If a git or manifest URL can't be reached, `sync` warns and builds from the copy it fetched last time, so an instance still launches offline. It fails only when that source has never been fetched.
+If a git or manifest URL can't be reached because the network is down, `sync` warns and builds from the copy used by the last sync from that source that succeeded, so an instance still launches offline. The warning names the commit and says how old that copy is. A server that answers with an error, a missing ref, or a failed login still fails the sync, and so does a source that has never synced successfully here. `--offline` skips the network entirely, which is quicker than waiting for timeouts on a network that drops traffic. For a server target, an installed Java runtime is kept when its update check can't reach the network.
 
 shulker keeps a list of the directories it syncs into, in its `config.json`. A `sync --into` adds the directory to that list, named after the target's display name (or `--name`), along with its source, target, and ref. `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker links`](#shulker-links) shows the list.
 
@@ -411,6 +411,7 @@ To update something on that list, name it instead of a source. `--instance` take
 | `--all` | Sync every entry `--instance` matches, or every entry when there's no `--instance` |
 | `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, or `mojang` |
 | `--side <side>` | Only `client` or `server` entries |
+| `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |

@@ -176,33 +176,71 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
 	gitRun(t, h.dir, "add", ".")
 	gitRun(t, h.dir, "commit", "-q", "-m", "one")
-	commit := gitRun(t, h.dir, "rev-parse", "HEAD")
-	remote := filepath.Join(t.TempDir(), "remote.git")
+	good := gitRun(t, h.dir, "rev-parse", "HEAD")
+	served := t.TempDir()
+	remote := filepath.Join(served, "remote.git")
 	gitRun(t, h.dir, "clone", "-q", "--bare", h.dir, remote)
-	source := "file://" + remote
+	gitRun(t, remote, "update-server-info")
+	failing := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if failing {
+			http.Error(w, "broken", http.StatusInternalServerError)
+			return
+		}
+		http.FileServer(http.Dir(served)).ServeHTTP(w, r)
+	}))
+	source := srv.URL + "/remote.git"
 	into := filepath.Join(t.TempDir(), "minecraft")
 	h.mustRun(t, "sync", source, "--into", into)
 
-	if err := os.Rename(remote, remote+".gone"); err != nil {
+	if err := os.WriteFile(filepath.Join(h.dir, "shulker.json"), []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	gitRun(t, h.dir, "commit", "-q", "-am", "broken")
+	gitRun(t, h.dir, "push", "-q", remote, "main")
+	gitRun(t, remote, "update-server-info")
+	if code, stdout, _ := h.run(t, "sync", source, "--into", into, "--json"); code == 0 {
+		t.Fatalf("a broken manifest must fail the sync: %s", stdout)
+	}
+	failing = true
+	if code, stdout, _ := h.run(t, "sync", source, "--into", into, "--json"); code == 0 || failureCode(t, stdout).Code != "source-fetch" {
+		t.Fatalf("an HTTP error is not a reason to fall back: exit %d %s", code, stdout)
+	}
+	srv.Close()
+
 	var env struct {
 		Data syncResult `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	want := "couldn't reach " + source + "; using the cached copy from commit " + commit[:12]
-	if res := env.Data; res.Commit != commit || len(res.Warnings) == 0 || res.Warnings[0] != want {
-		t.Fatalf("offline sync: %+v", res)
+	want := "offline, using " + source + " at " + good[:12] + " from the last successful sync just now"
+	if res := env.Data; res.Commit != good || !res.Offline || res.LastGoodAt == "" || len(res.Warnings) == 0 || res.Warnings[0] != want {
+		t.Fatalf("offline sync falls back to the last good build, not the broken commit: %+v", res)
 	}
-	code, stdout, _ := h.run(t, "sync", source, "--into", into, "--ref", "nope", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "source-ref" {
-		t.Fatalf("offline unknown ref: exit %d %s", code, stdout)
+	if _, stderr := h.mustRunStderr(t, "sync", source, "--into", into, "--ref", good); !strings.Contains(stderr, "offline, using "+source+" at "+good[:12]+", already downloaded") {
+		t.Fatalf("an exported commit works offline: %s", stderr)
 	}
-	code, stdout, _ = h.run(t, "sync", "file://"+filepath.Join(t.TempDir(), "never.git"), "--into", into, "--json")
-	if code == 0 || failureCode(t, stdout).Code != "source-fetch" {
-		t.Fatalf("unreachable source with nothing cached: exit %d %s", code, stdout)
+	for _, args := range [][]string{
+		{"sync", source, "--into", into, "--ref", "main"},
+		{"sync", srv.URL + "/never.git", "--into", into},
+	} {
+		code, stdout, _ := h.run(t, append(args, "--json")...)
+		if e := failureCode(t, stdout); code == 0 || e.Code != "source-offline" {
+			t.Fatalf("%v: nothing synced to fall back to: exit %d %s", args, code, stdout)
+		}
+	}
+}
+
+func TestSyncOfflineKeepsTheInstalledRuntime(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "add", "fabric-api")
+	into := filepath.Join(t.TempDir(), "server")
+	h.mustRun(t, "sync", h.dir, "--into", into)
+	_, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", into, "--offline")
+	if !strings.Contains(stderr, "warning: offline, keeping the installed Java runtime java-runtime-epsilon 25.0.1") {
+		t.Fatalf("offline runtime refresh: %s", stderr)
 	}
 }
 
@@ -211,10 +249,15 @@ func TestSyncFromManifestURL(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	files := map[string]bool{"shulker.json": true, "shulker.lock": true}
-	down := false
+	down, broken, hits := false, false, 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
 		if down {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		if broken && strings.HasSuffix(r.URL.Path, "/shulker.json") {
+			w.Write([]byte("{"))
 			return
 		}
 		name := strings.TrimPrefix(r.URL.Path, "/pack/")
@@ -244,27 +287,47 @@ func TestSyncFromManifestURL(t *testing.T) {
 		t.Fatalf("remote sync must not create data links: %v", err)
 	}
 
-	down = true
-	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
+	good := env.Data.Sha256
+
+	hits = 0
+	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--offline", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if res := env.Data; len(res.Warnings) == 0 || !strings.HasPrefix(res.Warnings[0], "couldn't reach "+source+"; using the cached copy from ") {
-		t.Fatalf("offline sync: %+v", res)
+	if res := env.Data; !res.Offline || res.Sha256 != good || len(res.Warnings) == 0 || res.Warnings[0] != "--offline, using "+source+" from the last successful sync just now" || hits != 0 {
+		t.Fatalf("--offline must not touch the network (%d requests): %+v", hits, res)
 	}
-	code, stdout, _ := h.run(t, "sync", srv.URL+"/other/shulker.json", "--into", into, "--json")
-	if code == 0 || failureCode(t, stdout).Code != "source-fetch" {
-		t.Fatalf("unreachable url with nothing cached: exit %d %s", code, stdout)
+
+	broken = true
+	if code, stdout, _ := h.run(t, "sync", source, "--into", into, "--json"); code == 0 {
+		t.Fatalf("a broken manifest must fail the sync: %s", stdout)
+	}
+	broken, down = false, true
+	if code, stdout, _ := h.run(t, "sync", source, "--into", into, "--json"); code == 0 || failureCode(t, stdout).Code != "source-fetch" {
+		t.Fatalf("an HTTP error is not a reason to fall back: exit %d %s", code, stdout)
 	}
 	down = false
 
 	files["shulker.lock"] = false
-	code, stdout, _ = h.run(t, "sync", source, "--into", into, "--json")
+	code, stdout, _ := h.run(t, "sync", source, "--into", into, "--json")
 	if code == 0 || failureCode(t, stdout).Code != "source-lock" {
 		t.Fatalf("missing lock: exit %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "sync", srv.URL+"/pack/other.json", "--into", into, "--json")
 	if code == 0 || failureCode(t, stdout).Code != "source-fetch" {
 		t.Fatalf("missing manifest: exit %d %s", code, stdout)
+	}
+	files["shulker.lock"] = true
+
+	srv.Close()
+	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if res := env.Data; !res.Offline || res.Sha256 != good || res.Warnings[0] != "offline, using "+source+" from the last successful sync just now" {
+		t.Fatalf("unreachable url falls back to the last good copy: %+v", res)
+	}
+	code, stdout, _ = h.run(t, "sync", srv.URL+"/other/shulker.json", "--into", into, "--json")
+	if code == 0 || failureCode(t, stdout).Code != "source-offline" {
+		t.Fatalf("unreachable url with nothing synced: exit %d %s", code, stdout)
 	}
 }
 

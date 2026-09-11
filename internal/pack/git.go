@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -46,6 +47,9 @@ func (s *Store) exportDir(commit string) string {
 }
 
 func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (string, error) {
+	if s.offline() {
+		return "", fmt.Errorf("%s: %s: %w", what.label, source, fetch.ErrOffline)
+	}
 	dir := s.mirrorDir(source)
 	if _, err := os.Stat(dir); err == nil {
 		s.log("fetching %s", what.label)
@@ -63,6 +67,33 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 		return "", gitFailure(err, what.code, "%s: cloning %s failed: %v", what.label, source, err)
 	}
 	return dir, nil
+}
+
+var gitNetworkErrors = []string{
+	"could not resolve host",
+	"could not resolve hostname",
+	"failed to connect",
+	"couldn't connect to server",
+	"connection refused",
+	"connection timed out",
+	"operation timed out",
+	"network is unreachable",
+	"no route to host",
+	"connection reset",
+	"ssl_connect",
+	"ssl_error_syscall",
+	"gnutls_handshake",
+	"tls handshake",
+}
+
+func gitNetworkError(msg string) bool {
+	msg = strings.ToLower(msg)
+	for _, s := range gitNetworkErrors {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) revParse(ctx context.Context, mirror, ref string) (string, error) {
@@ -159,6 +190,9 @@ func packOrigin(name string) origin { return origin{label: "pack " + name, code:
 func gitFailure(err error, code, format string, args ...any) error {
 	if out.CodeOf(err) == "git-missing" {
 		return err
+	}
+	if gitNetworkError(err.Error()) {
+		return fetch.Unreachable(out.Errorf(code, format, args...))
 	}
 	return out.Errorf(code, format, args...)
 }

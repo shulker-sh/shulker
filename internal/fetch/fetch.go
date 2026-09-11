@@ -9,14 +9,41 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
 var (
 	ErrNotFound  = errors.New("not found")
 	ErrForbidden = errors.New("forbidden")
+	ErrOffline   = errors.New("not using the network (--offline)")
 )
+
+type unreachableError struct{ err error }
+
+func (e *unreachableError) Error() string { return e.err.Error() }
+func (e *unreachableError) Unwrap() error { return e.err }
+
+// Unreachable marks err as a network failure for IsNetwork, for callers that learn it from
+// something other than a Go network error, such as git's stderr.
+func Unreachable(err error) error { return &unreachableError{err} }
+
+// IsNetwork reports whether err means the network couldn't be reached (DNS, connect, TLS,
+// timeout, or --offline), as opposed to a server that answered with an error.
+func IsNetwork(err error) bool {
+	var ue *unreachableError
+	if errors.Is(err, ErrOffline) || errors.As(err, &ue) {
+		return true
+	}
+	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	var urlErr *url.Error
+	var netErr net.Error
+	return errors.As(err, &urlErr) || errors.As(err, &netErr)
+}
 
 type StatusError struct {
 	URL    string
@@ -39,6 +66,7 @@ type Client struct {
 	HTTP      *http.Client
 	UserAgent string
 	Header    http.Header
+	Offline   bool
 }
 
 func New(version string) *Client {
@@ -53,6 +81,9 @@ func (c *Client) get(ctx context.Context, url string, accept string) (*http.Resp
 }
 
 func (c *Client) do(ctx context.Context, method, url, accept string, body io.Reader) (*http.Response, error) {
+	if c.Offline {
+		return nil, fmt.Errorf("%s: %w", url, ErrOffline)
+	}
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -22,6 +23,9 @@ type syncResult struct {
 	Source     string        `json:"source"`
 	Kind       pack.Kind     `json:"kind"`
 	Commit     string        `json:"commit,omitempty"`
+	Sha256     string        `json:"sha256,omitempty"`
+	Offline    bool          `json:"offline,omitempty"`
+	LastGoodAt string        `json:"lastGoodAt,omitempty"`
 	Target     string        `json:"target"`
 	Dir        string        `json:"dir"`
 	Fetched    []string      `json:"fetched"`
@@ -40,6 +44,7 @@ func (a *app) syncCmd() *cobra.Command {
 	var req syncRequest
 	var instance string
 	var sel linkSelection
+	var offline bool
 	cmd := &cobra.Command{
 		Use:   "sync [project-dir | git-url | manifest-url]",
 		Short: "Download and build one target of a project straight into a directory",
@@ -47,6 +52,13 @@ func (a *app) syncCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkOS(req.os); err != nil {
 				return err
+			}
+			if offline {
+				d, err := a.deps()
+				if err != nil {
+					return err
+				}
+				d.fetch.Offline = true
 			}
 			if len(args) == 0 {
 				if req.target != "" || req.into != "" || req.ref != "" || req.name != "" {
@@ -97,6 +109,7 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the target's display name)")
 	cmd.Flags().StringVar(&instance, "instance", "", "sync a linked instance or synced directory, by name or directory, from its recorded source")
 	sel.register(cmd, "sync every linked instance and synced directory (narrow with --launcher or --side)")
+	cmd.Flags().BoolVar(&offline, "offline", false, "don't use the network; build from the last successful sync and cached files")
 	req.features.register(cmd, "for this run only")
 	return cmd
 }
@@ -204,7 +217,15 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if !remote {
 		a.refreshLocal(inst, false, false)
 	}
-	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: append(src.warnings, warnings...), Build: rep}
+	if remote && !src.Offline {
+		if err := a.sourceStore().RecordGood(src.Checkout); err != nil {
+			a.progress("warning: couldn't record %s as the offline fallback: %v", src.name, err)
+		}
+	}
+	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Target: name, Dir: into, Fetched: fetched, Warnings: append(src.warnings, warnings...), Build: rep}
+	if !src.LastGood.IsZero() {
+		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
+	}
 	if register {
 		entry := config.Link{Side: t.Side, Name: req.name, Dir: into, Source: src.name, Target: name, Ref: req.ref}
 		if entry, changed := a.registerSync(entry, p.Manifest.DisplayName(name)); changed {
@@ -237,13 +258,15 @@ func sourceLocalFiles(src *syncSource, into string) (proj, inst *local.File, err
 	return proj, inst, nil
 }
 
+func (a *app) sourceStore() *pack.Store {
+	return &pack.Store{CacheDir: a.d.cache.Dir, Fetch: a.d.fetch, Log: a.progress}
+}
+
 func (a *app) checkout(ctx context.Context, source, ref string) (*pack.Checkout, error) {
-	d, err := a.deps()
-	if err != nil {
+	if _, err := a.deps(); err != nil {
 		return nil, err
 	}
-	store := &pack.Store{CacheDir: d.cache.Dir, Fetch: d.fetch, Log: a.progress}
-	return store.Checkout(ctx, source, ref)
+	return a.sourceStore().Checkout(ctx, source, ref)
 }
 
 func singleTarget(p *project.Project, want string) (string, manifest.Target, error) {

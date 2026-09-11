@@ -4,11 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
@@ -17,12 +20,15 @@ import (
 )
 
 type Checkout struct {
-	Source  string `json:"source"`
-	Kind    Kind   `json:"kind"`
-	Dir     string `json:"dir"`
-	Commit  string `json:"commit,omitempty"`
-	Sha256  string `json:"sha256,omitempty"`
-	Warning string `json:"-"`
+	Source   string    `json:"source"`
+	Kind     Kind      `json:"kind"`
+	Dir      string    `json:"dir"`
+	Commit   string    `json:"commit,omitempty"`
+	Sha256   string    `json:"sha256,omitempty"`
+	Offline  bool      `json:"offline,omitempty"`
+	LastGood time.Time `json:"-"`
+	Warning  string    `json:"-"`
+	ref      string
 }
 
 var projectOrigin = origin{label: "project", code: "source-fetch"}
@@ -32,7 +38,7 @@ func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, er
 	if ref != "" && kind != Git {
 		return nil, out.Errorf("source-ref", "--ref only applies to git sources")
 	}
-	c := &Checkout{Source: source, Kind: kind}
+	c := &Checkout{Source: source, Kind: kind, ref: ref}
 	var err error
 	switch kind {
 	case Local:
@@ -40,21 +46,14 @@ func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, er
 		return c, err
 	case Git:
 		mirror, err := s.ensureMirror(ctx, projectOrigin, source)
-		cached := false
 		if err != nil {
-			if mirror = s.cachedMirror(source); mirror == "" || !unreachable(ctx, err) {
-				return nil, err
+			if ctx.Err() == nil && fetch.IsNetwork(err) {
+				return s.gitFallback(c, err)
 			}
-			cached = true
+			return nil, err
 		}
 		if c.Commit, err = s.revParse(ctx, mirror, ref); err != nil {
-			if cached {
-				return nil, out.Errorf("source-ref", "couldn't reach %s, and ref %q isn't in the cached copy", source, refOrHead(ref))
-			}
 			return nil, out.Errorf("source-ref", "ref %q not found in %s: %v", refOrHead(ref), source, err)
-		}
-		if cached {
-			c.Warning = fmt.Sprintf("couldn't reach %s; using the cached copy from commit %s", source, c.Commit[:12])
 		}
 		c.Dir, err = s.export(ctx, projectOrigin, mirror, c.Commit)
 		return c, err
@@ -63,87 +62,166 @@ func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, er
 	}
 }
 
-func (s *Store) cachedMirror(source string) string {
-	dir := s.mirrorDir(source)
-	if _, err := os.Stat(dir); err != nil {
-		return ""
-	}
-	return dir
-}
-
-func unreachable(ctx context.Context, err error) bool {
-	return ctx.Err() == nil && out.CodeOf(err) != "git-missing"
-}
-
 func (s *Store) checkoutURL(ctx context.Context, c *Checkout) (*Checkout, error) {
 	s.log("fetching project")
 	manifestData, err := s.download(ctx, c.Source)
-	if errors.Is(err, fetch.ErrNotFound) {
+	if err == nil {
+		lockURL := c.Source[:strings.LastIndex(c.Source, "/")+1] + lock.FileName
+		var lockData []byte
+		if lockData, err = s.download(ctx, lockURL); errors.Is(err, fetch.ErrNotFound) {
+			return nil, out.Errorf("source-lock", "no %s beside %s; the project must be locked before it can be synced", lock.FileName, c.Source)
+		} else if err == nil {
+			return c, s.storeURL(c, manifestData, lockData)
+		}
+	} else if errors.Is(err, fetch.ErrNotFound) {
 		return nil, out.Errorf("source-fetch", "no %s at %s", manifest.FileName, c.Source)
 	}
-	if err != nil {
-		return s.cachedURL(ctx, c, out.Errorf("source-fetch", "%v", err))
+	if ctx.Err() == nil && fetch.IsNetwork(err) {
+		return s.urlFallback(c, err)
 	}
-	lockURL := c.Source[:strings.LastIndex(c.Source, "/")+1] + lock.FileName
-	lockData, err := s.download(ctx, lockURL)
-	if errors.Is(err, fetch.ErrNotFound) {
-		return nil, out.Errorf("source-lock", "no %s beside %s; the project must be locked before it can be synced", lock.FileName, c.Source)
-	}
-	if err != nil {
-		return s.cachedURL(ctx, c, out.Errorf("source-fetch", "%v", err))
-	}
+	return nil, out.Errorf("source-fetch", "%v", err)
+}
+
+func (s *Store) storeURL(c *Checkout, manifestData, lockData []byte) error {
 	h := sha256.New()
 	h.Write(manifestData)
 	h.Write(lockData)
 	c.Sha256 = hex.EncodeToString(h.Sum(nil))
-	c.Dir = filepath.Join(s.CacheDir, "projects", "url", c.Sha256)
-	if _, err := os.Stat(filepath.Join(c.Dir, lock.FileName)); err != nil {
-		if err := os.MkdirAll(c.Dir, 0o755); err != nil {
-			return nil, err
-		}
-		if err := os.WriteFile(filepath.Join(c.Dir, manifest.FileName), manifestData, 0o644); err != nil {
-			return nil, err
-		}
-		if err := os.WriteFile(filepath.Join(c.Dir, lock.FileName), lockData, 0o644); err != nil {
-			return nil, err
-		}
+	c.Dir = s.urlDir(c.Sha256)
+	if _, err := os.Stat(filepath.Join(c.Dir, lock.FileName)); err == nil {
+		return nil
 	}
-	return c, s.rememberURL(c)
+	if err := os.MkdirAll(c.Dir, 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(c.Dir, manifest.FileName), manifestData, 0o644); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(c.Dir, lock.FileName), lockData, 0o644)
 }
 
-func (s *Store) lastURLPath(source string) string {
-	sum := sha256.Sum256([]byte(source))
-	return filepath.Join(s.CacheDir, "projects", "url-last", hex.EncodeToString(sum[:]))
+func (s *Store) urlDir(sha string) string {
+	return filepath.Join(s.CacheDir, "projects", "url", sha)
 }
 
-func (s *Store) rememberURL(c *Checkout) error {
-	path := s.lastURLPath(c.Source)
+// lastGood records what a remote source looked like the last time a sync from it built
+// successfully; it is what a sync falls back to when the source can't be reached.
+type lastGood struct {
+	Source string    `json:"source"`
+	Ref    string    `json:"ref,omitempty"`
+	Commit string    `json:"commit,omitempty"`
+	Sha256 string    `json:"sha256,omitempty"`
+	At     time.Time `json:"at"`
+}
+
+func (s *Store) lastGoodPath(source, ref string) string {
+	sum := sha256.Sum256([]byte(source + "\x00" + ref))
+	return filepath.Join(s.CacheDir, "projects", "last-good", hex.EncodeToString(sum[:])+".json")
+}
+
+func (s *Store) readLastGood(source, ref string) (lastGood, bool) {
+	var rec lastGood
+	data, err := os.ReadFile(s.lastGoodPath(source, ref))
+	if err != nil || json.Unmarshal(data, &rec) != nil || rec.Source != source {
+		return lastGood{}, false
+	}
+	return rec, true
+}
+
+// RecordGood marks c as the copy to fall back to. Call it only after a build from c succeeded,
+// so a broken remote seen while online never becomes the offline fallback.
+func (s *Store) RecordGood(c *Checkout) error {
+	if c.Offline || (c.Kind != Git && c.Kind != URL) {
+		return nil
+	}
+	rec := lastGood{Source: c.Source, Ref: c.ref, Commit: c.Commit, Sha256: c.Sha256, At: time.Now().UTC()}
+	data, err := json.MarshalIndent(rec, "", "  ")
+	if err != nil {
+		return err
+	}
+	path := s.lastGoodPath(c.Source, c.ref)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(c.Sha256+"\n"), 0o644)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
-func (s *Store) cachedURL(ctx context.Context, c *Checkout, fetchErr error) (*Checkout, error) {
-	if ctx.Err() != nil {
-		return nil, fetchErr
+var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
+	c.Offline = true
+	if fullCommit.MatchString(c.ref) {
+		if dir := s.exportDir(c.ref); exists(dir) {
+			c.Commit, c.Dir = c.ref, dir
+			c.Warning = fmt.Sprintf("%s, using %s at %s, already downloaded", offlineReason(cause), c.Source, c.ref[:12])
+			return c, nil
+		}
+		return nil, neverSynced(c, cause)
 	}
-	path := s.lastURLPath(c.Source)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fetchErr
+	rec, ok := s.readLastGood(c.Source, c.ref)
+	if !ok || rec.Commit == "" || !exists(s.exportDir(rec.Commit)) {
+		return nil, neverSynced(c, cause)
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, fetchErr
-	}
-	c.Sha256 = strings.TrimSpace(string(data))
-	c.Dir = filepath.Join(s.CacheDir, "projects", "url", c.Sha256)
-	if _, err := os.Stat(filepath.Join(c.Dir, lock.FileName)); err != nil {
-		return nil, fetchErr
-	}
-	c.Warning = fmt.Sprintf("couldn't reach %s; using the cached copy from %s", c.Source, info.ModTime().Format("2006-01-02 15:04"))
+	c.Commit, c.Dir, c.LastGood = rec.Commit, s.exportDir(rec.Commit), rec.At
+	c.Warning = fmt.Sprintf("%s, using %s at %s from the last successful sync %s", offlineReason(cause), c.Source, rec.Commit[:12], ago(rec.At))
 	return c, nil
+}
+
+func (s *Store) urlFallback(c *Checkout, cause error) (*Checkout, error) {
+	c.Offline = true
+	rec, ok := s.readLastGood(c.Source, "")
+	if !ok || rec.Sha256 == "" || !exists(filepath.Join(s.urlDir(rec.Sha256), lock.FileName)) {
+		return nil, neverSynced(c, cause)
+	}
+	c.Sha256, c.Dir, c.LastGood = rec.Sha256, s.urlDir(rec.Sha256), rec.At
+	c.Warning = fmt.Sprintf("%s, using %s from the last successful sync %s", offlineReason(cause), c.Source, ago(rec.At))
+	return c, nil
+}
+
+func offlineReason(cause error) string {
+	if errors.Is(cause, fetch.ErrOffline) {
+		return "--offline"
+	}
+	return "offline"
+}
+
+func neverSynced(c *Checkout, cause error) error {
+	what := c.Source
+	if c.ref != "" {
+		what = fmt.Sprintf("%s (ref %s)", c.Source, c.ref)
+	}
+	if errors.Is(cause, fetch.ErrOffline) {
+		return out.Errorf("source-offline", "--offline, but %s has never synced successfully here, so there's no copy to use", what)
+	}
+	return out.Errorf("source-offline", "couldn't reach %s, and it has never synced successfully here, so there's no copy to fall back to: %v", what, cause)
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func ago(t time.Time) string {
+	d := time.Since(t)
+	plural := func(n int, unit string) string {
+		if n == 1 {
+			return "1 " + unit + " ago"
+		}
+		return fmt.Sprintf("%d %ss ago", n, unit)
+	}
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return plural(int(d/time.Minute), "minute")
+	case d < 48*time.Hour:
+		return plural(int(d/time.Hour), "hour")
+	}
+	return plural(int(d/(24*time.Hour)), "day")
 }
 
 func (s *Store) download(ctx context.Context, url string) ([]byte, error) {

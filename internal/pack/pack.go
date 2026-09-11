@@ -46,6 +46,8 @@ type Store struct {
 	Log        func(format string, args ...any)
 }
 
+func (s *Store) offline() bool { return s.Fetch != nil && s.Fetch.Offline }
+
 func (s *Store) log(format string, args ...any) {
 	if s.Log != nil {
 		s.Log(format, args...)
