@@ -60,7 +60,7 @@ func (a *app) buildCmd() *cobra.Command {
 					return err
 				}
 				a.warnFor(name, len(names) > 1, rep.Warnings)
-				if _, err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
+				if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 					return err
 				}
 				reports = append(reports, rep)

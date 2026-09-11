@@ -36,12 +36,13 @@
           "description": "Server launcher, present once a server target has been installed.",
           "properties": {
             "installer": { "type": "string", "minLength": 1, "description": "Fabric: installer version whose bundled server launcher is locked." },
-            "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates. NeoForge: its installer jar, which shulker runs into each server dir that doesn't have this loader version yet." },
-            "minecraft": { "$ref": "#/$defs/sha512", "description": "Quilt: the vanilla server.jar the launcher starts." },
+            "url": { "type": "string", "format": "uri", "description": "Download url of the jar in sha512. The quilt-server-launch.jar shulker generates has none." },
+            "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates. NeoForge: its installer jar, which shulker runs offline into each server dir that doesn't have this loader version yet." },
+            "minecraft": { "$ref": "#/$defs/download", "description": "Quilt, NeoForge: the vanilla server jar. Quilt's launcher starts it; NeoForge's installer patches it." },
             "libraries": {
               "type": "object",
-              "additionalProperties": { "$ref": "#/$defs/sha512" },
-              "description": "Quilt: the loader's libraries, keyed by Maven coordinate, placed under libraries/."
+              "additionalProperties": { "$ref": "#/$defs/download" },
+              "description": "Quilt: the loader's libraries. NeoForge: every library its installer would download, so the installer runs offline. Keyed by Maven coordinate, placed under libraries/."
             }
           }
         }
@@ -76,6 +77,15 @@
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "sha512": { "type": "string", "pattern": "^[0-9a-f]{128}$" },
+    "download": {
+      "type": "object",
+      "required": ["url", "sha512"],
+      "additionalProperties": false,
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "sha512": { "$ref": "#/$defs/sha512" }
+      }
+    },
     "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
     "modId": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },

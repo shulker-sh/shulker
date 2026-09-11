@@ -108,7 +108,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
+			if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 				return err
 			}
 			a.progress("%s", rep.Summary())

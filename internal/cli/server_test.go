@@ -28,8 +28,18 @@ func TestServerTargetBuild(t *testing.T) {
 	}
 	var l lock.Lock
 	h.readJSON(t, "shulker.lock", &l)
-	if l.Loader.Server == nil || l.Loader.Server.Installer != "1.1.2" || l.Loader.Server.Sha512 != h.serverJar.sha512 {
+	launcherURL := h.server.URL + "/fabric/versions/loader/26.2/0.17.3/1.1.2/server/jar"
+	if l.Loader.Server == nil || l.Loader.Server.Installer != "1.1.2" || l.Loader.Server.URL != launcherURL || l.Loader.Server.Sha512 != h.serverJar.sha512 {
 		t.Fatalf("lock loader: %+v", l.Loader)
+	}
+	lockWithURL := readFile(t, filepath.Join(h.dir, "shulker.lock"))
+	l.Loader.Server.URL = ""
+	if err := l.Save(filepath.Join(h.dir, "shulker.lock")); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "install")
+	if got := readFile(t, filepath.Join(h.dir, "shulker.lock")); got != lockWithURL {
+		t.Fatalf("install should write the launcher url back:\n%s", got)
 	}
 
 	buildDir := filepath.Join(h.dir, "build", "server")

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -42,30 +43,47 @@ func TestNeoForgeServer(t *testing.T) {
 	if !strings.Contains(stdout, "installed neoforge 26.2.0.87") {
 		t.Fatalf("install output:\n%s", stdout)
 	}
+	base := h.server.URL
 	h.readJSON(t, "shulker.lock", &l)
-	if s := l.Loader.Server; s == nil || s.Sha512 != h.neoInstaller.sha512 || s.Installer != "" || s.Minecraft != "" {
-		t.Fatalf("lock server: %+v", s)
+	want := &lock.ServerJar{
+		URL:       base + "/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar",
+		Sha512:    h.neoInstaller.sha512,
+		Minecraft: &lock.Download{URL: base + "/piston-data/server.jar", Sha512: h.vanilla.sha512},
+		Libraries: map[string]lock.Download{
+			"net.neoforged:neoforge:26.2.0.87:universal": {URL: base + "/neomaven/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar", Sha512: h.neoLibs["net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"].sha512},
+			"org.ow2.asm:asm:9.10.1":                     {URL: base + "/neomaven/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", Sha512: h.neoLibs["org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"].sha512},
+		},
+	}
+	if !reflect.DeepEqual(l.Loader.Server, want) {
+		t.Fatalf("lock server:\n%+v\nwant\n%+v", l.Loader.Server, want)
 	}
 	buildDir := filepath.Join(h.dir, "build", "server")
-	if len(h.installs) != 1 || strings.Join(h.installs[0], " ") != "--install-server "+buildDir {
+	if len(h.installs) != 1 || strings.Join(h.installs[0], " ") != "--install-server "+buildDir+" --offline" {
 		t.Fatalf("installer runs: %v", h.installs)
 	}
-	if got := build.LoadState(buildDir).Loader; got == nil || *got != (build.InstalledLoader{Type: "neoforge", Version: "26.2.0.87"}) {
+	state := build.LoadState(buildDir)
+	if got := state.Loader; got == nil || *got != (build.InstalledLoader{Type: "neoforge", Version: "26.2.0.87"}) {
 		t.Fatalf("state loader: %+v", got)
 	}
-	for _, name := range []string{"fabric-server-launch.jar", "neoforge-26.2.0.87-installer.jar", "installer.jar.log"} {
+	for _, rel := range []string{"libraries/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "libraries/net/minecraft/server/26.2/server-26.2.jar"} {
+		if _, ok := state.Files[rel]; !ok {
+			t.Fatalf("%s is not tracked by build state", rel)
+		}
+	}
+	for _, name := range []string{"fabric-server-launch.jar", "server.jar", "neoforge-26.2.0.87-installer.jar", "installer.jar.log"} {
 		if _, err := os.Stat(filepath.Join(buildDir, name)); err == nil {
 			t.Fatalf("%s should not be in the server dir", name)
 		}
 	}
 
+	hits := h.neoHits
 	h.mustRun(t, "install")
-	h.mustRun(t, "build")
-	if len(h.installs) != 1 || h.neoHits != 1 {
-		t.Fatalf("an installed loader ran the installer again (%d runs, %d downloads)", len(h.installs), h.neoHits)
+	stdout = h.mustRun(t, "build")
+	if len(h.installs) != 1 || h.neoHits != hits {
+		t.Fatalf("an installed loader ran the installer again (%d runs, %d downloads)", len(h.installs), h.neoHits-hits)
 	}
-	if build.LoadState(buildDir).Loader == nil {
-		t.Fatal("a rebuild dropped the installed loader from build state")
+	if !strings.Contains(stdout, "0 kept") || build.LoadState(buildDir).Loader == nil {
+		t.Fatalf("rebuild: %s", stdout)
 	}
 
 	h.stdin = strings.NewReader("stop\n")
@@ -75,7 +93,7 @@ func TestNeoForgeServer(t *testing.T) {
 		t.Fatalf("serve args:\n%s", args)
 	}
 
-	if err := os.RemoveAll(filepath.Join(buildDir, "libraries")); err != nil {
+	if err := os.Remove(filepath.Join(buildDir, "libraries/net/neoforged/neoforge/26.2.0.87/unix_args.txt")); err != nil {
 		t.Fatal(err)
 	}
 	h.mustRun(t, "build")
@@ -83,7 +101,7 @@ func TestNeoForgeServer(t *testing.T) {
 		t.Fatalf("a missing args file should reinstall (%d runs)", len(h.installs))
 	}
 
-	if err := os.RemoveAll(filepath.Join(buildDir, "libraries")); err != nil {
+	if err := os.Remove(filepath.Join(buildDir, "libraries/net/neoforged/neoforge/26.2.0.87/unix_args.txt")); err != nil {
 		t.Fatal(err)
 	}
 	h.installErr = out.Errorf("installer-failed", "the loader installer failed")
@@ -98,15 +116,23 @@ func TestNeoForgeServer(t *testing.T) {
 	}
 	h.installErr = nil
 
-	if err := build.RecordLoader(buildDir, build.InstalledLoader{Type: "neoforge", Version: "26.2.0.56-beta"}); err != nil {
-		t.Fatal(err)
+	for _, dir := range []string{filepath.Join(h.cache, "objects"), buildDir} {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if err := os.RemoveAll(h.cache); err != nil {
+	lockBefore := readFile(t, filepath.Join(h.dir, "shulker.lock"))
+	h.mustRun(t, "install")
+	if got := readFile(t, filepath.Join(h.dir, "shulker.lock")); got != lockBefore {
+		t.Fatalf("a fresh cache changed the lock:\n%s", got)
+	}
+
+	if err := os.RemoveAll(buildDir); err != nil {
 		t.Fatal(err)
 	}
 	h.server.Close()
-	code, _, stderr := h.run(t, "build")
-	if code != 0 || !strings.Contains(stderr, "offline, keeping neoforge 26.2.0.56-beta installed in") {
-		t.Fatalf("offline build: %d %s", code, stderr)
+	h.mustRun(t, "build")
+	if len(h.installs) != 5 {
+		t.Fatalf("a new server dir should install offline from the cache (%d runs)", len(h.installs))
 	}
 }

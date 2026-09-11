@@ -10,10 +10,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -50,13 +52,20 @@ func makeJarVersion(t *testing.T, id, filename, env, version, extra string) fake
 
 func makeJarFile(t *testing.T, id, filename, name, content string) fakeJar {
 	t.Helper()
+	return makeJarFiles(t, id, filename, map[string]string{name: content})
+}
+
+func makeJarFiles(t *testing.T, id, filename string, files map[string]string) fakeJar {
+	t.Helper()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	w, err := zw.Create(name)
-	if err != nil {
-		t.Fatal(err)
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Fprint(w, files[name])
 	}
-	fmt.Fprint(w, content)
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -79,6 +88,7 @@ type harness struct {
 	vanilla       fakeJar
 	quiltHits     int
 	neoInstaller  fakeJar
+	neoLibs       map[string]fakeJar
 	neoHits       int
 	installs      [][]string
 	installErr    error
@@ -185,10 +195,22 @@ func newHarness(t *testing.T) *harness {
 	mux.HandleFunc("/neoforge/api/maven/versions/releases/net/neoforged/neoforge", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"isSnapshot": false, "versions": []string{"26.1.2.40", "26.2.0.56-beta", "26.2.0.87"}})
 	})
-	h.neoInstaller = makeJarFile(t, "neoforge-installer", "neoforge-26.2.0.87-installer.jar", "install_profile.json", `{"version":"neoforge-26.2.0.87"}`)
 	mux.HandleFunc("/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar", func(w http.ResponseWriter, r *http.Request) {
 		h.neoHits++
 		w.Write(h.neoInstaller.data)
+	})
+	h.neoLibs = map[string]fakeJar{
+		"net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar": makeJarFile(t, "neoforge", "neoforge-26.2.0.87-universal.jar", "META-INF/neoforge.mods.toml", "[[mods]]\nmodId=\"neoforge\"\n"),
+		"org/ow2/asm/asm/9.10.1/asm-9.10.1.jar":                             makeJarFile(t, "asm", "asm-9.10.1.jar", "asm.txt", "asm"),
+	}
+	mux.HandleFunc("/neomaven/", func(w http.ResponseWriter, r *http.Request) {
+		jar, ok := h.neoLibs[strings.TrimPrefix(r.URL.Path, "/neomaven/")]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		h.neoHits++
+		w.Write(jar.data)
 	})
 	h.serverJar = makeJar(t, "fabric-server-launch", "fabric-server-launch.jar", "server")
 	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/1.1.2/server/jar", func(w http.ResponseWriter, r *http.Request) {
@@ -305,6 +327,19 @@ func newHarness(t *testing.T) *harness {
 	h.registerCurseForge(t, mux, func() string { return base })
 	h.server = httptest.NewServer(mux)
 	base = h.server.URL
+	library := func(name, path string) map[string]any {
+		jar := h.neoLibs[path]
+		return map[string]any{"name": name, "downloads": map[string]any{"artifact": map[string]any{"path": path, "url": base + "/neomaven/" + path, "sha1": jar.sha1}}}
+	}
+	profile, _ := json.Marshal(map[string]any{"minecraft": "26.2", "libraries": []any{
+		library("org.ow2.asm:asm:9.10.1", "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"),
+		map[string]any{"name": "net.neoforged:bundled:1.0", "downloads": map[string]any{"artifact": map[string]any{"path": "net/neoforged/bundled/1.0/bundled-1.0.jar", "url": ""}}},
+	}})
+	version, _ := json.Marshal(map[string]any{"libraries": []any{
+		library("net.neoforged:neoforge:26.2.0.87:universal", "net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"),
+		library("org.ow2.asm:asm:9.10.1", "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"),
+	}})
+	h.neoInstaller = makeJarFiles(t, "neoforge-installer", "neoforge-26.2.0.87-installer.jar", map[string]string{"install_profile.json": string(profile), "version.json": string(version)})
 	t.Cleanup(h.server.Close)
 	return h
 }
@@ -999,8 +1034,8 @@ func TestDiffAndPull(t *testing.T) {
 	}
 }
 
-// fakeInstaller stands in for NeoForge's and Forge's installers: it writes the files a server
-// install leaves behind for the one NeoForge version the fakes serve.
+// fakeInstaller stands in for NeoForge's and Forge's installers run offline: it checks that the
+// build placed what the installer would download, then writes what its processors generate.
 func (h *harness) fakeInstaller(_ context.Context, java, jar string, args []string) error {
 	h.installs = append(h.installs, args)
 	if h.installErr != nil {
@@ -1012,10 +1047,19 @@ func (h *harness) fakeInstaller(_ context.Context, java, jar string, args []stri
 	if _, err := os.Stat(java); err != nil {
 		return err
 	}
+	if len(args) != 3 || args[2] != "--offline" {
+		return fmt.Errorf("installer args %v", args)
+	}
 	dir := args[1]
+	for _, rel := range append(slices.Collect(maps.Keys(h.neoLibs)), "net/minecraft/server/26.2/server-26.2.jar") {
+		if _, err := os.Stat(filepath.Join(dir, "libraries", filepath.FromSlash(rel))); err != nil {
+			return fmt.Errorf("offline install without a download: %w", err)
+		}
+	}
 	files := map[string]string{
-		"libraries/net/neoforged/neoforge/26.2.0.87/unix_args.txt": "-DlibraryDirectory=libraries\n",
-		"libraries/net/neoforged/neoforge/26.2.0.87/win_args.txt":  "-DlibraryDirectory=libraries\n",
+		"libraries/net/neoforged/minecraft-server-patched/26.2.0.87/minecraft-server-patched-26.2.0.87.jar": "patched",
+		"libraries/net/neoforged/neoforge/26.2.0.87/unix_args.txt":                                          "-DlibraryDirectory=libraries\n",
+		"libraries/net/neoforged/neoforge/26.2.0.87/win_args.txt":                                           "-DlibraryDirectory=libraries\n",
 		"run.sh":            "java @user_jvm_args.txt @libraries/net/neoforged/neoforge/26.2.0.87/unix_args.txt \"$@\"\n",
 		"user_jvm_args.txt": "# JVM arguments\n",
 	}

@@ -206,12 +206,8 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		return syncResult{}, err
 	}
 	a.warn(rep.Warnings)
-	downloaded, err := a.installServerLoader(ctx, p, rep)
-	if err != nil {
+	if err := a.installServerLoader(ctx, p, rep); err != nil {
 		return syncResult{}, err
-	}
-	if downloaded {
-		fetched = append(fetched, p.Lock.Loader.Type+"-installer")
 	}
 	recorded := !remote && !ownBuild && lf.RecordSyncDir(name, into)
 	a.refreshLocal(lf, !remote, recorded)

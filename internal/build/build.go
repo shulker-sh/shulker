@@ -446,32 +446,40 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 func (b *Builder) collectLauncher(desired map[string]source) error {
 	notInstalled := out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
 	l, _ := loader.Lookup(b.Lock.Loader.Type)
-	if l.InstallServerFlag != "" {
-		return nil
-	}
 	jar := b.Lock.Loader.Server
 	if jar == nil || !b.Cache.Has(jar.Sha512) {
 		return notInstalled
 	}
-	desired[l.ServerLaunchJar] = source{sha512: jar.Sha512}
-	if b.Lock.Loader.Type != "quilt" {
+	if l.InstallServerFlag == "" {
+		desired[l.ServerLaunchJar] = source{sha512: jar.Sha512}
+	}
+	if l.Name == "fabric" {
 		return nil
 	}
-	if jar.Minecraft == "" || !b.Cache.Has(jar.Minecraft) {
+	if jar.Minecraft == nil || !b.Cache.Has(jar.Minecraft.Sha512) {
 		return notInstalled
 	}
-	desired[VanillaServerFile] = source{sha512: jar.Minecraft}
-	for name, sha := range jar.Libraries {
+	desired[vanillaServerPath(l, b.Lock.Minecraft)] = source{sha512: jar.Minecraft.Sha512}
+	for name, dl := range jar.Libraries {
 		path, err := meta.MavenPath(name)
 		if err != nil {
 			return err
 		}
-		if !b.Cache.Has(sha) {
+		if !b.Cache.Has(dl.Sha512) {
 			return notInstalled
 		}
-		desired["libraries/"+path] = source{sha512: sha}
+		desired["libraries/"+path] = source{sha512: dl.Sha512}
 	}
 	return nil
+}
+
+// vanillaServerPath is where a loader looks for the vanilla server jar: Quilt's launcher next to
+// itself, NeoForge's and Forge's installers under libraries/.
+func vanillaServerPath(l loader.Loader, minecraft string) string {
+	if l.InstallServerFlag != "" {
+		return "libraries/net/minecraft/server/" + minecraft + "/server-" + minecraft + ".jar"
+	}
+	return VanillaServerFile
 }
 
 // LaunchArgs start the server from its dir: the launch jar, or the args file a loader's installer

@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/fetch"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -68,12 +67,8 @@ func (a *app) installCmd() *cobra.Command {
 					return err
 				}
 				a.warnFor(name, len(names) > 1, rep.Warnings)
-				downloaded, err := a.installServerLoader(cmd.Context(), p, rep)
-				if err != nil {
+				if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 					return err
-				}
-				if downloaded {
-					res.Fetched = append(res.Fetched, p.Lock.Loader.Type+"-installer")
 				}
 				res.Builds = append(res.Builds, rep)
 			}
@@ -111,18 +106,16 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 		if err != nil {
 			return nil, err
 		}
-		if l, _ := loader.Lookup(p.Lock.Loader.Type); l.InstallServerFlag == "" {
-			jar, err := r.EnsureServerJar(ctx, d.meta)
-			if err != nil {
+		jar, err := r.EnsureServerJar(ctx, d.meta)
+		if err != nil {
+			return nil, err
+		}
+		if jar.Fetched {
+			fetched = append(fetched, p.Lock.Loader.Type+"-server-launcher")
+		}
+		if jar.Locked {
+			if err := p.Lock.Save(p.LockPath()); err != nil {
 				return nil, err
-			}
-			if jar.Fetched {
-				fetched = append(fetched, p.Lock.Loader.Type+"-server-launcher")
-			}
-			if jar.Locked {
-				if err := p.Lock.Save(p.LockPath()); err != nil {
-					return nil, err
-				}
 			}
 		}
 		if p.Manifest.Java == "" {

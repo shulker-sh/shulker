@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
-	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -30,31 +29,49 @@ func (r *Resolver) EnsureServerJar(ctx context.Context, mt *Meta) (ServerJarResu
 	case "quilt":
 		return r.ensureQuiltServer(ctx, mt)
 	case "neoforge":
-		return r.ensureInstaller(ctx, mt.NeoForge.InstallerURL(r.Lock.Loader.Version))
+		return r.ensureInstallerServer(ctx, mt, mt.NeoForge.InstallerURL(r.Lock.Loader.Version))
 	}
 	return r.ensureFabricServer(ctx, mt.Fabric)
 }
 
-// ensureInstaller locks and caches a loader's own installer jar, which sets up the server when run.
-func (r *Resolver) ensureInstaller(ctx context.Context, url string) (ServerJarResult, error) {
+// ensureInstallerServer locks a loader's own installer jar plus everything it would download: the
+// libraries its profiles list and the vanilla server jar. The build places those, so the installer
+// runs offline and only builds what it generates.
+func (r *Resolver) ensureInstallerServer(ctx context.Context, mt *Meta, installerURL string) (ServerJarResult, error) {
 	var res ServerJarResult
 	l := &r.Lock.Loader
-	if l.Server != nil && r.Cache.Has(l.Server.Sha512) {
-		return res, nil
-	}
-	r.log("downloading %s installer %s", l.Type, l.Version)
-	if l.Server != nil {
-		if _, err := r.Cache.Ensure(ctx, r.Fetch, url, l.Server.Sha512); err != nil {
+	if locked := l.Server; locked != nil && locked.URL != "" && locked.Minecraft != nil {
+		if r.serverCached(locked) {
+			return res, nil
+		}
+		r.log("downloading %s server files (loader %s)", l.Type, l.Version)
+		if _, err := r.Cache.Ensure(ctx, r.Fetch, locked.URL, locked.Sha512); err != nil {
 			return res, err
 		}
 		res.Fetched = true
-		return res, nil
+		return res, r.ensureDownloads(ctx, locked)
 	}
-	sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
+	r.log("downloading %s server files (loader %s)", l.Type, l.Version)
+	sha, err := r.Cache.Fetch(ctx, r.Fetch, installerURL)
 	if err != nil {
 		return res, err
 	}
-	l.Server = &lock.ServerJar{Sha512: sha}
+	libs, err := meta.InstallerLibraries(r.Cache.Path(sha))
+	if err != nil {
+		return res, err
+	}
+	next := &lock.ServerJar{URL: installerURL, Sha512: sha, Libraries: map[string]lock.Download{}}
+	for _, lib := range libs {
+		sha, err := r.fetchChecked(ctx, lib.URL, lib.Sha1)
+		if err != nil {
+			return res, err
+		}
+		next.Libraries[lib.Name] = lock.Download{URL: lib.URL, Sha512: sha}
+	}
+	if next.Minecraft, err = r.lockVanillaServer(ctx, mt.Piston); err != nil {
+		return res, err
+	}
+	l.Server = next
 	res.Locked, res.Fetched = true, true
 	return res, nil
 }
@@ -68,19 +85,24 @@ func (r *Resolver) ensureFabricServer(ctx context.Context, fabric *meta.Fabric) 
 			return res, err
 		}
 		r.log("downloading fabric server launcher (installer %s)", installer)
-		sha, err := r.Cache.Fetch(ctx, r.Fetch, fabric.ServerJarURL(r.Lock.Minecraft, l.Version, installer))
+		url := fabric.ServerJarURL(r.Lock.Minecraft, l.Version, installer)
+		sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
 		if err != nil {
 			return res, err
 		}
-		l.Server = &lock.ServerJar{Installer: installer, Sha512: sha}
+		l.Server = &lock.ServerJar{Installer: installer, URL: url, Sha512: sha}
 		res.Locked, res.Fetched = true, true
 		return res, nil
+	}
+	if l.Server.URL == "" {
+		l.Server.URL = fabric.ServerJarURL(r.Lock.Minecraft, l.Version, l.Server.Installer)
+		res.Locked = true
 	}
 	if r.Cache.Has(l.Server.Sha512) {
 		return res, nil
 	}
 	r.log("downloading fabric server launcher (installer %s)", l.Server.Installer)
-	if _, err := r.Cache.Ensure(ctx, r.Fetch, fabric.ServerJarURL(r.Lock.Minecraft, l.Version, l.Server.Installer), l.Server.Sha512); err != nil {
+	if _, err := r.Cache.Ensure(ctx, r.Fetch, l.Server.URL, l.Server.Sha512); err != nil {
 		return res, err
 	}
 	res.Fetched = true
@@ -90,11 +112,29 @@ func (r *Resolver) ensureFabricServer(ctx context.Context, fabric *meta.Fabric) 
 func (r *Resolver) ensureQuiltServer(ctx context.Context, mt *Meta) (ServerJarResult, error) {
 	var res ServerJarResult
 	l := &r.Lock.Loader
-	locked := l.Server
-	if locked != nil && (locked.Minecraft == "" || len(locked.Libraries) == 0) {
-		locked = nil
-	}
-	if locked != nil && r.quiltServerCached(locked) {
+	if locked := l.Server; locked != nil && locked.Minecraft != nil && len(locked.Libraries) > 0 {
+		if r.serverCached(locked) {
+			return res, nil
+		}
+		r.log("downloading quilt server (loader %s)", l.Version)
+		if err := r.ensureDownloads(ctx, locked); err != nil {
+			return res, err
+		}
+		res.Fetched = true
+		if r.Cache.Has(locked.Sha512) {
+			return res, nil
+		}
+		profile, err := mt.Quilt.ServerProfile(ctx, r.Lock.Minecraft, l.Version)
+		if err != nil {
+			return res, err
+		}
+		sha, err := r.putQuiltLaunchJar(profile, locked.Libraries)
+		if err != nil {
+			return res, err
+		}
+		if sha != locked.Sha512 {
+			return res, errors.New("the generated quilt server launch jar doesn't match shulker.lock; remove loader.server from shulker.lock to relock it")
+		}
 		return res, nil
 	}
 	r.log("downloading quilt server (loader %s)", l.Version)
@@ -102,93 +142,91 @@ func (r *Resolver) ensureQuiltServer(ctx context.Context, mt *Meta) (ServerJarRe
 	if err != nil {
 		return res, err
 	}
-	next := &lock.ServerJar{Libraries: map[string]string{}}
-	if locked != nil {
-		next.Libraries = maps.Clone(locked.Libraries)
-	} else {
-		for _, lib := range profile.Libraries {
-			next.Libraries[lib.Name] = ""
-		}
-	}
-	urls := map[string]string{}
+	next := &lock.ServerJar{Libraries: map[string]lock.Download{}}
 	for _, lib := range profile.Libraries {
-		if urls[lib.Name], err = lib.JarURL(); err != nil {
+		url, err := lib.JarURL()
+		if err != nil {
 			return res, err
 		}
-	}
-	for _, name := range sortedKeys(next.Libraries) {
-		url, ok := urls[name]
-		if !ok {
-			return res, fmt.Errorf("quilt meta no longer lists the locked library %s for loader %s", name, l.Version)
-		}
-		if next.Libraries[name], err = r.ensureFile(ctx, url, next.Libraries[name]); err != nil {
+		sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
+		if err != nil {
 			return res, err
 		}
+		next.Libraries[lib.Name] = lock.Download{URL: url, Sha512: sha}
 	}
-	if next.Minecraft, err = r.ensureVanillaServer(ctx, mt.Piston, locked); err != nil {
+	if next.Minecraft, err = r.lockVanillaServer(ctx, mt.Piston); err != nil {
 		return res, err
 	}
-	jar, err := quiltLaunchJar(profile.LauncherMainClass, profile.MainClass, sortedKeys(next.Libraries))
-	if err != nil {
+	if next.Sha512, err = r.putQuiltLaunchJar(profile, next.Libraries); err != nil {
 		return res, err
 	}
-	if next.Sha512, err = r.Cache.Put(bytes.NewReader(jar)); err != nil {
-		return res, err
-	}
-	if locked != nil && next.Sha512 != locked.Sha512 {
-		return res, errors.New("the generated quilt server launch jar doesn't match shulker.lock; remove loader.server from shulker.lock to relock it")
-	}
-	res.Fetched = true
-	if locked == nil {
-		l.Server = next
-		res.Locked = true
-	}
+	l.Server = next
+	res.Locked, res.Fetched = true, true
 	return res, nil
 }
 
-func (r *Resolver) quiltServerCached(s *lock.ServerJar) bool {
-	if !r.Cache.Has(s.Sha512) || !r.Cache.Has(s.Minecraft) {
+func (r *Resolver) putQuiltLaunchJar(profile *meta.ServerProfile, libraries map[string]lock.Download) (string, error) {
+	jar, err := quiltLaunchJar(profile.LauncherMainClass, profile.MainClass, sortedKeys(libraries))
+	if err != nil {
+		return "", err
+	}
+	return r.Cache.Put(bytes.NewReader(jar))
+}
+
+func (r *Resolver) serverCached(s *lock.ServerJar) bool {
+	if !r.Cache.Has(s.Sha512) || s.Minecraft != nil && !r.Cache.Has(s.Minecraft.Sha512) {
 		return false
 	}
-	for _, sha := range s.Libraries {
-		if !r.Cache.Has(sha) {
+	for _, dl := range s.Libraries {
+		if !r.Cache.Has(dl.Sha512) {
 			return false
 		}
 	}
 	return true
 }
 
-func (r *Resolver) ensureFile(ctx context.Context, url, sha string) (string, error) {
-	if sha == "" {
-		return r.Cache.Fetch(ctx, r.Fetch, url)
+func (r *Resolver) ensureDownloads(ctx context.Context, s *lock.ServerJar) error {
+	downloads := make([]lock.Download, 0, len(s.Libraries)+1)
+	if s.Minecraft != nil {
+		downloads = append(downloads, *s.Minecraft)
 	}
-	_, err := r.Cache.Ensure(ctx, r.Fetch, url, sha)
-	return sha, err
+	for _, name := range sortedKeys(s.Libraries) {
+		downloads = append(downloads, s.Libraries[name])
+	}
+	for _, dl := range downloads {
+		if _, err := r.Cache.Ensure(ctx, r.Fetch, dl.URL, dl.Sha512); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (r *Resolver) ensureVanillaServer(ctx context.Context, piston *meta.Piston, locked *lock.ServerJar) (string, error) {
-	if locked != nil && r.Cache.Has(locked.Minecraft) {
-		return locked.Minecraft, nil
-	}
-	dl, err := piston.ServerDownload(ctx, r.Lock.Minecraft)
-	if err != nil {
-		return "", err
-	}
-	if locked != nil {
-		return r.ensureFile(ctx, dl.URL, locked.Minecraft)
-	}
-	sha, err := r.Cache.Fetch(ctx, r.Fetch, dl.URL)
-	if err != nil {
-		return "", err
+// fetchChecked downloads a file the first time it is locked, checking the sha1 its source publishes.
+func (r *Resolver) fetchChecked(ctx context.Context, url, sha1 string) (string, error) {
+	sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
+	if err != nil || sha1 == "" {
+		return sha, err
 	}
 	got, err := sha1Of(r.Cache.Path(sha))
 	if err != nil {
 		return "", err
 	}
-	if got != dl.Sha1 {
-		return "", fmt.Errorf("%s: sha1 mismatch (expected %s, got %s)", dl.URL, dl.Sha1, got)
+	if got != sha1 {
+		return "", fmt.Errorf("%s: sha1 mismatch (expected %s, got %s)", url, sha1, got)
 	}
 	return sha, nil
+}
+
+func (r *Resolver) lockVanillaServer(ctx context.Context, piston *meta.Piston) (*lock.Download, error) {
+	dl, err := piston.ServerDownload(ctx, r.Lock.Minecraft)
+	if err != nil {
+		return nil, err
+	}
+	sha, err := r.fetchChecked(ctx, dl.URL, dl.Sha1)
+	if err != nil {
+		return nil, err
+	}
+	return &lock.Download{URL: dl.URL, Sha512: sha}, nil
 }
 
 func quiltLaunchJar(launcherMainClass, mainClass string, libraries []string) ([]byte, error) {
