@@ -3,7 +3,10 @@ package jarmeta
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"maps"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -32,7 +35,7 @@ func readBytes(t *testing.T, data []byte) *Info {
 	if err != nil {
 		t.Fatal(err)
 	}
-	info, err := readZip(zr)
+	info, err := readZip(zr, allFiles)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,5 +112,126 @@ func TestQuiltRange(t *testing.T) {
 		if got := quiltRange(c.versions); got != c.want {
 			t.Errorf("quiltRange(%v) = %q, want %q", c.versions, got, c.want)
 		}
+	}
+}
+
+func TestReadNeoForge(t *testing.T) {
+	nested := buildZip(t, map[string]string{
+		"META-INF/neoforge.mods.toml": "[[mods]]\nmodId=\"inner\"\nversion=\"3.1\"\n",
+	})
+	info := readBytes(t, buildZip(t, map[string]string{
+		"META-INF/MANIFEST.MF":          "Manifest-Version: 1.0\r\nImplementation-Version: 0.8.1+mc26.2-build.12345678901234567890123456789012345678901234567890\r\n 123\r\n\r\n",
+		"META-INF/jarjar/metadata.json": `{"jars":[{"identifier":{"group":"g","artifact":"inner"},"version":{"range":"[3,)","artifactVersion":"3.1"},"path":"META-INF/jarjar/inner.jar"},{"path":"META-INF/jarjar/missing.jar"}]}`,
+		"META-INF/jarjar/inner.jar":     string(nested),
+		"META-INF/neoforge.mods.toml": `
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MIT"
+
+[[mods]]
+modId="sodium"
+version="${file.jarVersion}"
+
+[[mods]]
+modId="sodium_extra_api"
+version="2.0"
+
+[[dependencies.sodium]]
+modId="neoforge"
+type="required"
+versionRange="[26.1.2.10-beta,)"
+[[dependencies.sodium]]
+modId="minecraft"
+type="REQUIRED"
+versionRange="[26.2,26.3)"
+[[dependencies.sodium]]
+modId="iris"
+type="optional"
+versionRange="[1.9,)"
+[[dependencies.sodium]]
+modId="optifine"
+type="incompatible"
+[[dependencies.sodium]]
+modId="rubidium"
+type="discouraged"
+versionRange="*"
+[[dependencies.sodium_extra_api]]
+modId="sodium"
+type="required"
+[[dependencies.somebody_else]]
+modId="ignored"
+type="required"
+`,
+	}))
+	if info.ID != "sodium" || info.Loader != "neoforge" || info.Side != "both" || !info.MavenRanges {
+		t.Fatalf("parsed %+v", info)
+	}
+	if want := "0.8.1+mc26.2-build.12345678901234567890123456789012345678901234567890123"; info.Version != want {
+		t.Errorf("version %q, want %q", info.Version, want)
+	}
+	if want := map[string]string{"neoforge": "[26.1.2.10-beta,)", "minecraft": "[26.2,26.3)"}; !maps.Equal(info.Depends, want) {
+		t.Errorf("depends %v, want %v", info.Depends, want)
+	}
+	if want := map[string]string{"iris": "[1.9,)"}; !maps.Equal(info.Optional, want) {
+		t.Errorf("optional %v, want %v", info.Optional, want)
+	}
+	if want := map[string]string{"optifine": "*"}; !maps.Equal(info.Breaks, want) {
+		t.Errorf("breaks %v, want %v", info.Breaks, want)
+	}
+	if want := map[string]string{"rubidium": "*"}; !maps.Equal(info.Conflicts, want) {
+		t.Errorf("conflicts %v, want %v", info.Conflicts, want)
+	}
+	if want := map[string]string{"sodium_extra_api": "2.0", "inner": "3.1"}; !maps.Equal(info.Provides, want) {
+		t.Errorf("provides %v, want %v", info.Provides, want)
+	}
+}
+
+func TestReadForgeMandatory(t *testing.T) {
+	info := readBytes(t, buildZip(t, map[string]string{
+		"META-INF/mods.toml": `
+modLoader="javafml"
+loaderVersion="65"
+[[mods]]
+modId="geckolib"
+[[dependencies.geckolib]]
+modId="minecraft"
+mandatory=true
+versionRange="[26.2,)"
+[[dependencies.geckolib]]
+modId="forge"
+mandatory=false
+versionRange="[65.1,)"
+`,
+	}))
+	if info.ID != "geckolib" || info.Loader != "forge" || info.Version != "1" {
+		t.Fatalf("parsed %+v", info)
+	}
+	if want := map[string]string{"minecraft": "[26.2,)"}; !maps.Equal(info.Depends, want) {
+		t.Errorf("depends %v, want %v", info.Depends, want)
+	}
+	if want := map[string]string{"forge": "[65.1,)"}; !maps.Equal(info.Optional, want) {
+		t.Errorf("optional %v, want %v", info.Optional, want)
+	}
+}
+
+func TestReadPrefersTheProjectLoader(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "multi.jar")
+	if err := os.WriteFile(path, buildZip(t, map[string]string{
+		"fabric.mod.json":             `{"id":"multi_fabric","version":"1.0"}`,
+		"META-INF/neoforge.mods.toml": "[[mods]]\nmodId=\"multi_neo\"\nversion=\"1.0\"\n",
+	}), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for loaderName, want := range map[string]string{"fabric": "multi_fabric", "quilt": "multi_fabric", "neoforge": "multi_neo", "": "multi_fabric"} {
+		info, err := Read(path, loaderName)
+		if err != nil {
+			t.Fatalf("%s: %v", loaderName, err)
+		}
+		if info.ID != want {
+			t.Errorf("%s read %s, want %s", loaderName, info.ID, want)
+		}
+	}
+	if _, err := Read(path, "forge"); !errors.Is(err, ErrNoMetadata) {
+		t.Errorf("forge: %v, want no metadata", err)
 	}
 }

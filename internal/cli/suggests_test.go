@@ -14,7 +14,7 @@ func TestSuggestsKeepsOptionalIntegrationsBehindAFlag(t *testing.T) {
 	h.jars["sodium"] = makeJarFile(t, "sodium", h.jars["sodium"].filename, "quilt.mod.json",
 		`{"schema_version":1,"quilt_loader":{"id":"sodium","version":"1.0.0","depends":[{"id":"iris","versions":"^1.8","optional":true},{"id":"modmenu","optional":true}]}}`)
 	h.jars["fabric-api"] = makeJarWith(t, "fabric-api", h.jars["fabric-api"].filename, "*", `"depends":{"fabricloader":">=0.17"},"recommends":{"indium":"*"}`)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "quilt")
 
 	stdout := h.mustRun(t, "add", "sodium", "fabric-api")
 	if !strings.Contains(stdout, "fabric-api recommends indium (not installed)") || !strings.Contains(stdout, "2 optional integrations; see shulker suggests --optional") {

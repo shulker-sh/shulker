@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mavenver"
 	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
 )
@@ -81,7 +82,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 			v.Warnings = append(v.Warnings, fmt.Sprintf("%s is not downloaded; its metadata was not checked", id))
 			continue
 		}
-		info, err := jarmeta.Read(r.Cache.Path(m.Sha512))
+		info, err := jarmeta.Read(r.Cache.Path(m.Sha512), r.Lock.Loader.Type)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +102,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 			declared := info.Depends[on]
 			found, ok := installed[on]
 			if ok {
-				match, err := satisfies(found, declared)
+				match, err := satisfies(info, found, declared)
 				if err != nil {
 					v.Warnings = append(v.Warnings, fmt.Sprintf("%s depends on %s %s but %s: not checked", id, on, declared, err))
 					continue
@@ -119,7 +120,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared})
 				continue
 			}
-			match, err := satisfies(found, declared)
+			match, err := satisfies(info, found, declared)
 			if err != nil {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s optionally depends on %s %s but %s: not checked", id, on, declared, err))
 				continue
@@ -134,7 +135,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 			if !ok {
 				continue
 			}
-			match, err := satisfies(found, declared)
+			match, err := satisfies(info, found, declared)
 			if err != nil {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s breaks %s %s but %s: not checked", id, on, declared, err))
 				continue
@@ -148,7 +149,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 			if !ok {
 				continue
 			}
-			if match, err := satisfies(found, info.Conflicts[on]); err == nil && match {
+			if match, err := satisfies(info, found, info.Conflicts[on]); err == nil && match {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s)", id, info.Version, on, info.Conflicts[on], found))
 			}
 		}
@@ -259,7 +260,18 @@ var (
 	rangeOps = []string{">=", "<=", ">", "<", "=", "~", "^"}
 )
 
-func satisfies(version, declared string) (bool, error) {
+func satisfies(info *jarmeta.Info, version, declared string) (bool, error) {
+	if info.MavenRanges {
+		rng, err := mavenver.ParseRange(declared)
+		if err != nil {
+			return false, err
+		}
+		return rng.Contains(mavenver.Parse(version)), nil
+	}
+	return fabricSatisfies(version, declared)
+}
+
+func fabricSatisfies(version, declared string) (bool, error) {
 	v, err := mcver.Parse(normalizeVersion(version))
 	if err != nil {
 		return false, fmt.Errorf("installed version %q is not semver", version)

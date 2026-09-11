@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"shulker.sh/shulker/internal/loader"
 )
 
 var ErrNoMetadata = errors.New("no mod metadata found in jar")
@@ -25,27 +27,44 @@ type Info struct {
 	// Optional dependencies aren't required, but a present mod must match the range.
 	Optional map[string]string
 	Provides map[string]string
+	// MavenRanges marks ranges written in Maven syntax (NeoForge and Forge) rather than Fabric's.
+	MavenRanges bool
 }
 
-func Read(path string) (*Info, error) {
+var allFiles = []string{"quilt.mod.json", "fabric.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml"}
+
+// Read reads the metadata the named loader would, so a jar built for several loaders yields the
+// right one. An unknown loader reads whichever metadata the jar has.
+func Read(path, loaderName string) (*Info, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	defer zr.Close()
-	info, err := readZip(&zr.Reader)
+	files := allFiles
+	if l, ok := loader.Lookup(loaderName); ok {
+		files = l.MetadataFiles
+	}
+	info, err := readZip(&zr.Reader, files)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return info, nil
 }
 
-func readZip(zr *zip.Reader) (*Info, error) {
-	if f := lookup(zr, "quilt.mod.json"); f != nil {
-		return readQuilt(zr, f)
-	}
-	if f := lookup(zr, "fabric.mod.json"); f != nil {
-		return readFabric(zr, f)
+func readZip(zr *zip.Reader, files []string) (*Info, error) {
+	for _, name := range files {
+		f := lookup(zr, name)
+		if f == nil {
+			continue
+		}
+		switch name {
+		case "quilt.mod.json":
+			return readQuilt(zr, f, files)
+		case "fabric.mod.json":
+			return readFabric(zr, f, files)
+		}
+		return readModsTOML(zr, f, files)
 	}
 	return nil, ErrNoMetadata
 }
@@ -63,7 +82,7 @@ func readFile(f *zip.File) ([]byte, error) {
 	return bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")), nil
 }
 
-func readFabric(zr *zip.Reader, f *zip.File) (*Info, error) {
+func readFabric(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	data, err := readFile(f)
 	if err != nil {
 		return nil, err
@@ -105,12 +124,12 @@ func readFabric(zr *zip.Reader, f *zip.File) (*Info, error) {
 		info.Provides[id] = raw.Version
 	}
 	for _, nested := range raw.Jars {
-		addNested(zr, info, nested.File)
+		addNested(zr, info, nested.File, files)
 	}
 	return info, nil
 }
 
-func readQuilt(zr *zip.Reader, f *zip.File) (*Info, error) {
+func readQuilt(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	data, err := readFile(f)
 	if err != nil {
 		return nil, err
@@ -175,7 +194,7 @@ func readQuilt(zr *zip.Reader, f *zip.File) (*Info, error) {
 		info.Provides[stripGroup(p.ID)] = p.Version
 	}
 	for _, file := range raw.Loader.Jars {
-		addNested(zr, info, file)
+		addNested(zr, info, file, files)
 	}
 	return info, nil
 }
@@ -252,7 +271,7 @@ func quiltSide(env string) string {
 	return "both"
 }
 
-func addNested(zr *zip.Reader, info *Info, name string) {
+func addNested(zr *zip.Reader, info *Info, name string, files []string) {
 	nf := lookup(zr, name)
 	if nf == nil {
 		return
@@ -265,7 +284,7 @@ func addNested(zr *zip.Reader, info *Info, name string) {
 	if err != nil {
 		return
 	}
-	child, err := readZip(inner)
+	child, err := readZip(inner, files)
 	if err != nil {
 		return
 	}

@@ -237,7 +237,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	if err != nil {
 		return "", nil, err
 	}
-	info, err := jarmeta.Read(got.path)
+	info, err := jarmeta.Read(got.path, r.Lock.Loader.Type)
 	if err != nil {
 		return "", nil, err
 	}
