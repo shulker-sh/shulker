@@ -119,7 +119,7 @@ func (a *app) unlink(configPath string, l config.Link) (unlinkResult, error) {
 			}
 			if removed {
 				r.Removed = removedPreLaunch
-				r.summary = fmt.Sprintf("unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay", l.Name, title)
+				r.summary = fmt.Sprintf("unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay\nRestart the launcher if it is open so the change is picked up.", l.Name, title)
 			} else {
 				r.summary = fmt.Sprintf("unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept", l.Name, title)
 			}
