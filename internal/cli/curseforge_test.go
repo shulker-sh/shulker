@@ -183,7 +183,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	h.mustRun(t, "init", "--yes")
 
 	stdout := h.mustRun(t, "add", "jei")
-	if !strings.Contains(stdout, "+ jei jei-26.2-fabric-1.0.0 (both) with fabric-api") {
+	if !strings.Contains(stdout, "+ jei jei-26.2-fabric-1.0.0 (both)\n") || !strings.Contains(stdout, "+ fabric-api fabric-api-0.130.0+26.2 (both), required by jei") {
 		t.Fatalf("add: %s", stdout)
 	}
 	l := h.readLock(t)
@@ -239,10 +239,11 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 	_, stdout, _ := h.run(t, "--json", "add", "sodium", "--provider", "curseforge")
 	var env struct {
 		Data struct {
-			Added []map[string]any `json:"added"`
+			Added   []map[string]any `json:"added"`
+			Updated []map[string]any `json:"updated"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &env); err != nil || len(env.Data.Added) != 1 || env.Data.Added[0]["alreadyLocked"] != true || env.Data.Added[0]["switchedFrom"] != "modrinth" {
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil || len(env.Data.Added) != 0 || len(env.Data.Updated) != 1 || env.Data.Updated[0]["fromProvider"] != "modrinth" || env.Data.Updated[0]["toProvider"] != "curseforge" {
 		t.Fatalf("add via curseforge: %s", stdout)
 	}
 	sodium := h.readLock(t).Mods["sodium"]
@@ -270,7 +271,7 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth -> curseforge") {
 		t.Fatalf("second switch: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "add", "sodium"); !strings.HasPrefix(stdout, "+ sodium ") || h.readLock(t).Mods["sodium"].Provider != "curseforge" {
+	if stdout = h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "Already up to date.") || h.readLock(t).Mods["sodium"].Provider != "curseforge" {
 		t.Fatalf("plain add after switch should keep the curseforge entry: %s", stdout)
 	}
 

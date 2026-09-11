@@ -564,6 +564,29 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 `serve` exits with the server's own status when the server fails (`server-exit`).
 
+### Lock changes
+
+`add`, `remove`, `update`, `pin`, `unpin`, `pack add`, and `pack remove` all return the same `data`: what changed in `shulker.lock` and `shulker.json`.
+
+```json
+{
+  "added": [{ "id": "fabric-api", "versionNumber": "0.119.0", "side": "both", "provider": "modrinth", "requiredBy": ["sodium"] }],
+  "updated": [{ "id": "lithium", "from": "0.14.1", "to": "0.14.3" }],
+  "removed": [{ "id": "iris", "versionNumber": "1.8.0", "requiredBy": [] }],
+  "packs": [{ "name": "base", "from": "abc1234", "to": "def5678" }],
+  "suggestions": []
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `added` | Mods newly locked. `requiredBy` names the mods and packs that pulled one in; empty when only `shulker.json` lists it. `alreadyLocked` marks a dependency that `add` just listed in `shulker.json` |
+| `updated` | Mods whose locked version changed. `fromProvider` and `toProvider` appear when the provider changed |
+| `removed` | Mods no longer locked, with the `requiredBy` they had. `stillLocked` marks a mod taken out of `shulker.json` that a pack still provides |
+| `packs` | Packs added, removed, or moved to another commit. `from` is empty for a new pack, `to` for a removed one |
+| `suggestions` | Recommended mods that aren't installed |
+| `pin` | `pin` only: the version it pinned to |
+
 ### Error codes
 
 | Code | Meaning |

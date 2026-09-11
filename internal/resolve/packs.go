@@ -67,12 +67,12 @@ func (r *Resolver) CheckPacks() error {
 	return nil
 }
 
-func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) (*Updated, error) {
+func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
 	before := r.directMods()
 	r.Packs = append(r.Packs, l)
 	if err := r.CheckPacks(); err != nil {
 		r.Packs = r.Packs[:len(r.Packs)-1]
-		return nil, err
+		return err
 	}
 	r.Lock.Packs[l.Source] = l.Pin
 	var targets []string
@@ -84,17 +84,17 @@ func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) (*Updated, error
 		targets = append(targets, id)
 	}
 	if len(targets) == 0 {
-		return &Updated{Updated: []Change{}, Added: []string{}, Removed: []string{}, Packs: []PackChange{}}, nil
+		return nil
 	}
 	return r.Update(ctx, targets)
 }
 
-func (r *Resolver) RemovePack(name string) (*Removed, error) {
+func (r *Resolver) RemovePack(name string) error {
 	idx := -1
 	for i, p := range r.Manifest.Packs {
 		n, err := pack.Name(p)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if n == name {
 			idx = i
@@ -108,7 +108,7 @@ func (r *Resolver) RemovePack(name string) (*Removed, error) {
 				e.Candidates = append(e.Candidates, n)
 			}
 		}
-		return nil, e
+		return e
 	}
 	source := r.Manifest.Packs[idx].Source
 	r.Manifest.Packs = append(r.Manifest.Packs[:idx:idx], r.Manifest.Packs[idx+1:]...)
@@ -124,8 +124,8 @@ func (r *Resolver) RemovePack(name string) (*Removed, error) {
 	}
 	r.Packs = kept
 	r.dropRequiredBy(name)
-	res := &Removed{Removed: []string{}, Pruned: r.pruneOrphans()}
-	return res, nil
+	r.pruneOrphans()
+	return nil
 }
 
 func (r *Resolver) RefreshPacks(loaded []*pack.Loaded) error {

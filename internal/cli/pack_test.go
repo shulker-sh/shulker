@@ -162,7 +162,7 @@ func TestLocalPack(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "pack", "remove", "base")
-	if !strings.Contains(stdout, "pruned fabric-api") || !strings.Contains(stdout, "pruned sodium") {
+	if !strings.Contains(stdout, "- fabric-api, was required by sodium") || !strings.Contains(stdout, "- sodium, was required by base") {
 		t.Fatalf("pack remove output: %s", stdout)
 	}
 	l = readLock(t, h)

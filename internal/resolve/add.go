@@ -37,19 +37,6 @@ type AddOptions struct {
 	Provider string
 }
 
-type Added struct {
-	ID            string   `json:"id"`
-	Provider      string   `json:"provider"`
-	Project       string   `json:"project"`
-	VersionNumber string   `json:"versionNumber"`
-	Filename      string   `json:"filename"`
-	Side          string   `json:"side"`
-	Dependencies  []string `json:"dependencies"`
-	AlreadyLocked bool     `json:"alreadyLocked"`
-	SwitchedFrom  string   `json:"switchedFrom,omitempty"`
-	Pruned        []string `json:"pruned,omitempty"`
-}
-
 func (r *Resolver) log(format string, args ...any) {
 	if r.Log != nil {
 		r.Log(format, args...)
@@ -104,27 +91,26 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provi
 	return nil, nil, out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(missed, " or "))
 }
 
-func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Added, error) {
+func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error {
 	explicit := opts.Provider != ""
 	if prev, ok := r.Manifest.Mods[slug]; !explicit && ok && prev.Provider != "" {
 		opts.Provider = prev.Provider
 	}
 	p, proj, err := r.lookup(ctx, slug, opts.Provider)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	v, err := r.pick(ctx, p, proj, opts.Pin, opts.Channel)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	id, prior, err := r.place(ctx, p, proj, v, "", opts.Side, explicit)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	added := &Added{ID: id, Provider: p.Name(), Project: proj.ID, VersionNumber: v.Number, Filename: v.File.Filename, Side: r.Lock.Mods[id].Side, Dependencies: []string{}, AlreadyLocked: prior != nil}
 	previous := r.Manifest.Mods[id]
-	if explicit && prior != nil && prior.Provider != p.Name() {
-		added.SwitchedFrom = prior.Provider
+	switched := explicit && prior != nil && prior.Provider != p.Name()
+	if switched {
 		r.dropRequiredBy(id)
 		if opts.Side == "" {
 			opts.Side = previous.Side
@@ -134,10 +120,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Adde
 		}
 	}
 	visited := map[string]bool{proj.ID: true}
-	if err := r.addDeps(ctx, p, v, id, opts.Channel, added, visited); err != nil {
-		return nil, err
+	if err := r.addDeps(ctx, p, v, id, opts.Channel, visited); err != nil {
+		return err
 	}
-	sort.Strings(added.Dependencies)
 	entry := manifest.Mod{Side: opts.Side}
 	if opts.Channel != "" && opts.Channel != "release" {
 		entry.Channel = opts.Channel
@@ -152,10 +137,10 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) (*Adde
 		entry.Provider = p.Name()
 	}
 	r.Manifest.Mods[id] = entry
-	if added.SwitchedFrom != "" {
-		added.Pruned = r.pruneOrphans()
+	if switched {
+		r.pruneOrphans()
 	}
-	return added, nil
+	return nil
 }
 
 func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider.Project, pin, channel string) (*provider.Version, error) {
@@ -330,7 +315,7 @@ func setAlias(m *lock.Mod, providerName, projectID string) {
 	}
 }
 
-func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider.Version, parentID, channel string, added *Added, visited map[string]bool) error {
+func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider.Version, parentID, channel string, visited map[string]bool) error {
 	for _, d := range v.Dependencies {
 		if d.Type != "required" {
 			continue
@@ -362,10 +347,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 		if err != nil {
 			return err
 		}
-		if !contains(added.Dependencies, id) && id != added.ID {
-			added.Dependencies = append(added.Dependencies, id)
-		}
-		if err := r.addDeps(ctx, p, dv, id, channel, added, visited); err != nil {
+		if err := r.addDeps(ctx, p, dv, id, channel, visited); err != nil {
 			return err
 		}
 	}

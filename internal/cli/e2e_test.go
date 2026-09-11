@@ -337,8 +337,9 @@ func TestVerticalSlice(t *testing.T) {
 	if !env.OK || env.LockStale {
 		t.Fatalf("add envelope: %+v", env)
 	}
-	added := env.Data.(map[string]any)["added"].([]any)[0].(map[string]any)
-	if added["id"] != "sodium" || added["side"] != "client" || added["dependencies"].([]any)[0] != "fabric-api" {
+	added := env.Data.(map[string]any)["added"].([]any)
+	dep, direct := added[0].(map[string]any), added[1].(map[string]any)
+	if len(added) != 2 || direct["id"] != "sodium" || direct["side"] != "client" || len(direct["requiredBy"].([]any)) != 0 || dep["id"] != "fabric-api" || dep["requiredBy"].([]any)[0] != "sodium" {
 		t.Fatalf("added: %v", added)
 	}
 	var l struct {
@@ -518,7 +519,8 @@ func TestRemovePrunesOrphans(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := env.Data.(map[string]any)
-	if !env.OK || env.LockStale || data["removed"].([]any)[0] != "sodium" || data["pruned"].([]any)[0] != "fabric-api" {
+	removed := data["removed"].([]any)
+	if !env.OK || env.LockStale || len(removed) != 2 || removed[0].(map[string]any)["id"] != "fabric-api" || removed[0].(map[string]any)["requiredBy"].([]any)[0] != "sodium" || removed[1].(map[string]any)["id"] != "sodium" {
 		t.Fatalf("remove envelope: %+v", env)
 	}
 	var l struct {
@@ -535,7 +537,7 @@ func TestRemovePrunesOrphans(t *testing.T) {
 
 	h.mustRun(t, "add", "sodium", "fabric-api")
 	stdout = h.mustRun(t, "remove", "sodium")
-	if strings.Contains(stdout, "pruned") {
+	if strings.Contains(stdout, "fabric-api") {
 		t.Fatalf("direct fabric-api must survive: %s", stdout)
 	}
 	var kept struct {
@@ -549,6 +551,25 @@ func TestRemovePrunesOrphans(t *testing.T) {
 	}
 	if code, _, _ := h.run(t, "build"); code != 0 {
 		t.Fatal("lock should not be stale after remove")
+	}
+}
+
+func TestRemoveValidatesBeforeSaving(t *testing.T) {
+	h := newHarness(t)
+	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "client", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
+	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "add", "sodium", "fabric-api")
+	lockBefore, _ := os.ReadFile(filepath.Join(h.dir, "shulker.lock"))
+	manifestBefore, _ := os.ReadFile(filepath.Join(h.dir, "shulker.json"))
+
+	code, stdout, _ := h.run(t, "remove", "fabric-api", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "validation-failed" {
+		t.Fatalf("removing a jar dependency: code=%d %s", code, stdout)
+	}
+	lockAfter, _ := os.ReadFile(filepath.Join(h.dir, "shulker.lock"))
+	manifestAfter, _ := os.ReadFile(filepath.Join(h.dir, "shulker.json"))
+	if !bytes.Equal(lockBefore, lockAfter) || !bytes.Equal(manifestBefore, manifestAfter) {
+		t.Fatal("a failed remove must not write the manifest or lock")
 	}
 }
 

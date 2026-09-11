@@ -7,39 +7,29 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
-type Removed struct {
-	Removed []string `json:"removed"`
-	Pruned  []string `json:"pruned"`
-}
-
-func (r *Resolver) Remove(ids []string) (*Removed, error) {
+func (r *Resolver) Remove(ids []string) error {
 	direct := r.directMods()
 	for _, id := range ids {
 		if _, ok := r.Manifest.Mods[id]; ok {
 			continue
 		}
 		if d, ok := direct[id]; ok {
-			return nil, out.Errorf("pack-provided", "%s is provided by pack %s; remove the pack or list the mod in shulker.json yourself", id, strings.Join(d.packs, ", "))
+			return out.Errorf("pack-provided", "%s is provided by pack %s; remove the pack or list the mod in shulker.json yourself", id, strings.Join(d.packs, ", "))
 		}
 		if m, ok := r.Lock.Mods[id]; ok {
 			e := out.Errorf("not-direct", "%s is not in the manifest; it is required by %v", id, m.RequiredBy)
 			e.Items = m.RequiredBy
-			return nil, e
+			return e
 		}
 		e := out.Errorf("mod-not-found", "%s is not in the manifest", id)
 		e.Candidates = r.manifestIDs()
-		return nil, e
+		return e
 	}
-	res := &Removed{Removed: []string{}, Pruned: []string{}}
 	for _, id := range ids {
-		if contains(res.Removed, id) {
-			continue
-		}
 		delete(r.Manifest.Mods, id)
-		res.Removed = append(res.Removed, id)
 	}
 	direct = r.directMods()
-	for _, id := range res.Removed {
+	for _, id := range ids {
 		if _, stillDirect := direct[id]; stillDirect {
 			continue
 		}
@@ -47,12 +37,11 @@ func (r *Resolver) Remove(ids []string) (*Removed, error) {
 			r.dropLocked(id)
 		}
 	}
-	res.Pruned = r.pruneOrphans()
-	return res, nil
+	r.pruneOrphans()
+	return nil
 }
 
-func (r *Resolver) pruneOrphans() []string {
-	pruned := []string{}
+func (r *Resolver) pruneOrphans() {
 	direct := r.directMods()
 	for changed := true; changed; {
 		changed = false
@@ -61,12 +50,9 @@ func (r *Resolver) pruneOrphans() []string {
 				continue
 			}
 			r.dropLocked(id)
-			pruned = append(pruned, id)
 			changed = true
 		}
 	}
-	sort.Strings(pruned)
-	return pruned
 }
 
 func (r *Resolver) dropLocked(id string) {

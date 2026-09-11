@@ -10,19 +10,6 @@ import (
 	"shulker.sh/shulker/internal/provider"
 )
 
-type Change struct {
-	ID   string `json:"id"`
-	From string `json:"from"`
-	To   string `json:"to"`
-}
-
-type Updated struct {
-	Updated []Change     `json:"updated"`
-	Added   []string     `json:"added"`
-	Removed []string     `json:"removed"`
-	Packs   []PackChange `json:"packs"`
-}
-
 type Outdated struct {
 	ID      string `json:"id"`
 	Current string `json:"current"`
@@ -30,10 +17,10 @@ type Outdated struct {
 	Pinned  bool   `json:"pinned"`
 }
 
-func (r *Resolver) Update(ctx context.Context, ids []string) (*Updated, error) {
+func (r *Resolver) Update(ctx context.Context, ids []string) error {
 	targets, err := r.directTargets(ids)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	scope := r.scope(targets)
 	before := map[string]lock.Mod{}
@@ -55,7 +42,7 @@ func (r *Resolver) Update(ctx context.Context, ids []string) (*Updated, error) {
 	}
 	for _, id := range targets {
 		if err := r.relock(ctx, id); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	for id := range scope {
@@ -81,22 +68,7 @@ func (r *Resolver) Update(ctx context.Context, ids []string) (*Updated, error) {
 		}
 	}
 	r.pruneOrphans()
-	res := &Updated{Updated: []Change{}, Added: []string{}, Removed: []string{}, Packs: []PackChange{}}
-	for _, id := range r.lockIDs() {
-		old, existed := before[id]
-		switch {
-		case !existed:
-			res.Added = append(res.Added, id)
-		case old.Sha512 != r.Lock.Mods[id].Sha512:
-			res.Updated = append(res.Updated, Change{ID: id, From: old.VersionNumber, To: r.Lock.Mods[id].VersionNumber})
-		}
-	}
-	for _, id := range sortedKeys(before) {
-		if _, present := r.Lock.Mods[id]; !present {
-			res.Removed = append(res.Removed, id)
-		}
-	}
-	return res, nil
+	return nil
 }
 
 func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, error) {
@@ -129,9 +101,9 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 	return res, nil
 }
 
-func (r *Resolver) Pin(ctx context.Context, id string, version string) (*Updated, string, error) {
+func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, error) {
 	if _, err := r.directTargets([]string{id}); err != nil {
-		return nil, "", err
+		return "", err
 	}
 	if version == "" {
 		version = fmt.Sprint(r.Lock.Mods[id].Version)
@@ -139,17 +111,16 @@ func (r *Resolver) Pin(ctx context.Context, id string, version string) (*Updated
 	entry := r.Manifest.Mods[id]
 	entry.Pin = lockID(r.Lock.Mods[id].Provider, version)
 	r.Manifest.Mods[id] = entry
-	res, err := r.Update(ctx, []string{id})
-	return res, version, err
+	return version, r.Update(ctx, []string{id})
 }
 
-func (r *Resolver) Unpin(ctx context.Context, id string) (*Updated, error) {
+func (r *Resolver) Unpin(ctx context.Context, id string) error {
 	if _, err := r.directTargets([]string{id}); err != nil {
-		return nil, err
+		return err
 	}
 	entry := r.Manifest.Mods[id]
 	if entry.Pin == nil {
-		return nil, out.Errorf("not-pinned", "%s is not pinned", id)
+		return out.Errorf("not-pinned", "%s is not pinned", id)
 	}
 	entry.Pin = nil
 	r.Manifest.Mods[id] = entry
@@ -190,7 +161,7 @@ func (r *Resolver) relock(ctx context.Context, id string) error {
 		r.Lock.AddRequiredBy(id, name)
 	}
 	visited := map[string]bool{proj.ID: true}
-	return r.addDeps(ctx, p, v, id, entry.Channel, &Added{ID: id}, visited)
+	return r.addDeps(ctx, p, v, id, entry.Channel, visited)
 }
 
 func (r *Resolver) directTargets(ids []string) ([]string, error) {
