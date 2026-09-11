@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -140,5 +142,64 @@ func TestExportMrpackLeavesOutOSGatedMods(t *testing.T) {
 	index, _ = readMrpack(t, filepath.Join(h.dir, "build", "pack-0.2.mrpack"))
 	if len(index.Files) != 2 {
 		t.Fatalf("expected sodium and fabric-api with --os macos, got %+v", index.Files)
+	}
+}
+
+func osLabel() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "macOS"
+	case "windows":
+		return "Windows"
+	case "linux":
+		return "Linux"
+	}
+	return runtime.GOOS
+}
+
+func markerDescription(t *testing.T, h *harness) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-pack.jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta struct {
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(readZip(t, data)["fabric.mod.json"], &meta); err != nil {
+		t.Fatal(err)
+	}
+	return meta.Description
+}
+
+func TestMarkerDescribesTheVariation(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.editManifest(t, func(m map[string]any) {
+		m["description"] = "Fast <3 and <b>plain</b>."
+	})
+	setMod(t, h, "sodium", map[string]any{"os": []string{"!windows", "!linux", "!macos"}, "feature": "!shaders"})
+	setFeatures(t, h, []string{"fancy"})
+	h.mustRun(t, "install")
+
+	desc := markerDescription(t, h)
+	want := "Fast \\<3 and \\<b>plain\\</b>.\n\nMinecraft 26.2 \u00b7 fabric 0.17.3 \u00b7 0 mods\n<gray>OS:</gray> <bold>" + osLabel() + "</bold> \u00b7 <gray>Features:</gray> <bold>fancy</bold>"
+	if desc != want {
+		t.Fatalf("excluded build description:\n%s", desc)
+	}
+
+	var others []string
+	for _, name := range []string{"windows", "linux", "macos"} {
+		if name != build.DetectOS() {
+			others = append(others, "!"+name)
+		}
+	}
+	setMod(t, h, "sodium", map[string]any{"os": append(others, build.DetectOS()), "feature": "!shaders"})
+	setFeatures(t, h, nil)
+	h.mustRun(t, "build")
+	desc = markerDescription(t, h)
+	if !strings.Contains(desc, "\u00b7 2 mods\n<gray>OS:</gray> <bold>"+osLabel()+"</bold> \u00b7 <gray>Features:</gray> none\n\nMods\n  \u2022 sodium  <gray>(os: "+strings.Join(others, ", ")+", "+build.DetectOS()+" \u00b7 feature: !shaders)</gray>\n\nDependencies\n  \u2022 fabric-api") {
+		t.Fatalf("gated build description:\n%s", desc)
 	}
 }

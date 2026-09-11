@@ -72,7 +72,7 @@ type selection struct {
 	warnings []string
 }
 
-func (b *Builder) selectMods(c conditions) selection {
+func (b *Builder) directEntries(c conditions) map[string]manifest.Mod {
 	direct := map[string]manifest.Mod{}
 	for id, m := range b.Manifest.Mods {
 		direct[id] = m
@@ -90,6 +90,61 @@ func (b *Builder) selectMods(c conditions) selection {
 			direct[id] = m
 		}
 	}
+	return direct
+}
+
+func (b *Builder) mentionsFeatures() bool {
+	for _, m := range b.directEntries(conditions{}) {
+		if len(m.Feature) > 0 {
+			return true
+		}
+	}
+	for _, t := range b.Manifest.Targets {
+		if len(t.Features) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (c conditions) osLabel() string {
+	switch c.os {
+	case "macos":
+		return "macOS"
+	case "windows":
+		return "Windows"
+	case "linux":
+		return "Linux"
+	case "":
+		return "any"
+	}
+	return c.os
+}
+
+func (c conditions) featureLabels() []string {
+	var on []string
+	for name, enabled := range c.features {
+		if enabled {
+			on = append(on, name)
+		}
+	}
+	sort.Strings(on)
+	return on
+}
+
+func conditionText(m manifest.Mod) string {
+	var parts []string
+	if len(m.OS) > 0 {
+		parts = append(parts, "os: "+strings.Join(m.OS, ", "))
+	}
+	if len(m.Feature) > 0 {
+		parts = append(parts, "feature: "+strings.Join(m.Feature, ", "))
+	}
+	return strings.Join(parts, " \u00b7 ")
+}
+
+func (b *Builder) selectMods(c conditions) selection {
+	direct := b.directEntries(c)
 	admitted := map[string]bool{}
 	reasons := map[string]string{}
 	for id := range b.Lock.Mods {

@@ -54,7 +54,7 @@ type markerEntry struct {
 	data []byte
 }
 
-func (b *Builder) markerJar(targetName, side string) ([]byte, error) {
+func (b *Builder) markerJar(targetName, side string, cond conditions, sel selection) ([]byte, error) {
 	lockData, err := os.ReadFile(b.LockPath)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (b *Builder) markerJar(targetName, side string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	direct, deps := b.markerMods(side)
+	direct, deps := b.markerMods(side, sel)
 	id := markerModID(b.Manifest.Name)
 	contact, links, labels := markerLinks(b.Manifest.Links)
 	modmenu := map[string]any{"update_checker": false}
@@ -76,7 +76,7 @@ func (b *Builder) markerJar(targetName, side string) ([]byte, error) {
 		"id":            id,
 		"version":       markerVersion(b.Manifest.Version, lockHash),
 		"name":          b.Manifest.DisplayName(targetName),
-		"description":   b.markerDescription(direct, deps),
+		"description":   b.markerDescription(direct, deps, cond),
 		"icon":          "assets/" + id + "/icon.png",
 		"environment":   "*",
 		"entrypoints":   map[string]any{"modmenu": []string{markerEntrypoint}},
@@ -149,9 +149,9 @@ func markerClassEntries() ([]markerEntry, error) {
 	return entries, err
 }
 
-func (b *Builder) markerMods(side string) (direct, deps []string) {
+func (b *Builder) markerMods(side string, sel selection) (direct, deps []string) {
 	for id, m := range b.Lock.Mods {
-		if m.Side != "both" && m.Side != side {
+		if !sel.included[id] || (m.Side != "both" && m.Side != side) {
 			continue
 		}
 		if _, ok := b.Manifest.Mods[id]; ok {
@@ -210,20 +210,34 @@ func markerLangKey(label string) string {
 	return sb.String()
 }
 
-func (b *Builder) markerDescription(direct, deps []string) string {
+func (b *Builder) markerDescription(direct, deps []string, cond conditions) string {
+	entries := b.directEntries(cond)
 	section := func(title string, ids []string) string {
 		lines := make([]string, 0, len(ids)+1)
 		lines = append(lines, title)
 		for _, id := range ids {
-			lines = append(lines, "  \u2022 "+id)
+			line := "  \u2022 " + id
+			if text := conditionText(entries[id]); text != "" {
+				line += "  <gray>(" + text + ")</gray>"
+			}
+			lines = append(lines, line)
 		}
 		return strings.Join(lines, "\n")
 	}
 	var parts []string
 	if b.Manifest.Description != "" {
-		parts = append(parts, strings.TrimSpace(b.Manifest.Description))
+		parts = append(parts, strings.ReplaceAll(strings.TrimSpace(b.Manifest.Description), "<", "\\<"))
 	}
-	parts = append(parts, fmt.Sprintf("Minecraft %s \u00b7 %s %s \u00b7 %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps)))
+	summary := fmt.Sprintf("Minecraft %s \u00b7 %s %s \u00b7 %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
+	variation := "<gray>OS:</gray> <bold>" + cond.osLabel() + "</bold>"
+	if b.mentionsFeatures() {
+		features := "none"
+		if on := cond.featureLabels(); len(on) > 0 {
+			features = "<bold>" + strings.Join(on, "</bold>, <bold>") + "</bold>"
+		}
+		variation += " \u00b7 <gray>Features:</gray> " + features
+	}
+	parts = append(parts, summary+"\n"+variation)
 	if len(direct) > 0 {
 		parts = append(parts, section("Mods", direct))
 	}

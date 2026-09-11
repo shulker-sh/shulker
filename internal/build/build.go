@@ -278,7 +278,8 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 func (b *Builder) collect(name string, target manifest.Target, opts Options, report *Report) (map[string]source, []string, error) {
 	desired := map[string]source{}
 	dirs := dataDirs(target.Side, "world")
-	sel := b.selectMods(b.conditions(target, opts))
+	cond := b.conditions(target, opts)
+	sel := b.selectMods(cond)
 	report.Excluded = append(report.Excluded, sel.excluded...)
 	report.Warnings = append(report.Warnings, sel.warnings...)
 	for id, m := range b.Lock.Mods {
@@ -308,7 +309,7 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 		if err := b.collectClient(desired, vars); err != nil {
 			return nil, nil, err
 		}
-		jar, err := b.markerJar(name, target.Side)
+		jar, err := b.markerJar(name, target.Side, cond, sel)
 		if err != nil {
 			return nil, nil, err
 		}
