@@ -8,9 +8,19 @@ Install the CLI, create a project, add mods, and build a client or server.
 
 ## Install
 
-```sh
+::: code-group
+
+```sh [macOS / Linux]
 curl -fsSL https://shulker.sh/install.sh | sh
 ```
+
+```powershell [Windows]
+irm https://shulker.sh/install.ps1 | iex
+```
+
+:::
+
+The installer downloads the latest release, checks it against the published SHA256 checksums, and installs `shulker` to `~/.local/bin` (on Windows, `%LOCALAPPDATA%\Programs\shulker`), adding that directory to your PATH.
 
 ## Create a project
 

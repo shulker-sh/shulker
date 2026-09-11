@@ -9,6 +9,22 @@ import llmstxt from 'vitepress-plugin-llms'
 
 const siteUrl = 'https://shulker.sh'
 const schemaDir = fileURLToPath(new URL('../../schema/v1', import.meta.url))
+const repoRoot = fileURLToPath(new URL('../..', import.meta.url))
+const installers = ['install.sh', 'install.ps1']
+
+function serveInstallers(): Plugin {
+  return {
+    name: 'shulker-installers',
+    configureServer(server) {
+      for (const name of installers) {
+        server.middlewares.use(`/${name}`, (req, res) => {
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+          createReadStream(join(repoRoot, name)).pipe(res)
+        })
+      }
+    },
+  }
+}
 
 function serveSchema(): Plugin {
   return {
@@ -106,6 +122,7 @@ export default defineConfig({
     plugins: [
       groupIconVitePlugin(),
       serveSchema(),
+      serveInstallers(),
       llmstxt({
         domain: siteUrl,
         details: [
@@ -117,5 +134,6 @@ export default defineConfig({
   },
   buildEnd(site) {
     cpSync(schemaDir, resolve(site.outDir, 'schema/v1'), { recursive: true })
+    for (const name of installers) cpSync(join(repoRoot, name), resolve(site.outDir, name))
   },
 })
