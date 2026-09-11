@@ -52,7 +52,8 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := p.RequireLock(); err != nil {
 				return err
 			}
-			if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
+			l, err := loader.Require(p.Lock.Loader.Type)
+			if err != nil {
 				return err
 			}
 			name, err := sideTarget(p.Manifest, target, "client", "link")
@@ -73,18 +74,24 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			} else if err != nil {
 				return err
 			}
-			d, err := a.deps()
-			if err != nil {
-				return err
-			}
-			a.progress("Fetching %s loader %s profile for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
-			profile, err := d.meta.LoaderProfile(cmd.Context(), p.Lock.Loader, p.Lock.Minecraft)
-			if err != nil {
-				return err
-			}
-			versionID, err := v.InstallVersion(profile)
-			if err != nil {
-				return err
+			var versionID string
+			if l.InstallClientFlag != "" {
+				if versionID, err = a.installClientLoader(cmd.Context(), p, v, l); err != nil {
+					return err
+				}
+			} else {
+				d, err := a.deps()
+				if err != nil {
+					return err
+				}
+				a.progress("Fetching %s loader %s profile for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
+				profile, err := d.meta.LoaderProfile(cmd.Context(), p.Lock.Loader, p.Lock.Minecraft)
+				if err != nil {
+					return err
+				}
+				if versionID, err = v.InstallVersion(profile); err != nil {
+					return err
+				}
 			}
 			gameDir, err := filepath.Abs(filepath.Join(p.Dir, p.Manifest.BuildDir(name)))
 			if err != nil {

@@ -136,3 +136,66 @@ func TestNeoForgeServer(t *testing.T) {
 		t.Fatalf("a new server dir should install offline from the cache (%d runs)", len(h.installs))
 	}
 }
+
+func TestNeoForgeLinkMojang(t *testing.T) {
+	enableLoader(t, "neoforge")
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
+
+	launcherDir := t.TempDir()
+	writeProfiles(t, launcherDir, launcherProfiles{
+		Profiles: map[string]map[string]any{"NeoForge": {"name": "my own", "lastVersionId": "neoforge-26.1.2.40"}},
+		Version:  3,
+	})
+
+	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
+	if !strings.Contains(stdout, "Installed neoforge-26.2.0.87 into") {
+		t.Fatalf("link output:\n%s", stdout)
+	}
+	if len(h.installs) != 1 || strings.Join(h.installs[0], " ") != "--install-client "+launcherDir {
+		t.Fatalf("installer runs: %v", h.installs)
+	}
+
+	var l lock.Lock
+	h.readJSON(t, "shulker.lock", &l)
+	want := &lock.Download{
+		URL:    h.server.URL + "/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar",
+		Sha512: h.neoInstaller.sha512,
+	}
+	if !reflect.DeepEqual(l.Loader.Client, want) {
+		t.Fatalf("lock client:\n%+v\nwant\n%+v", l.Loader.Client, want)
+	}
+
+	profiles := readProfiles(t, launcherDir)
+	if own := profiles.Profiles["NeoForge"]; own["name"] != "my own" || own["lastVersionId"] != "neoforge-26.1.2.40" {
+		t.Fatalf("the installer's profile was not put back: %v", own)
+	}
+	linked := profiles.Profiles["shulker-pack"]
+	wantGameDir, _ := filepath.Abs(filepath.Join(h.dir, "build", "client"))
+	if linked == nil || linked["lastVersionId"] != "neoforge-26.2.0.87" || linked["gameDir"] != wantGameDir {
+		t.Fatalf("linked profile: %v", linked)
+	}
+
+	hits := h.neoHits
+	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
+	if h.neoHits != hits {
+		t.Fatalf("a locked installer should come from the cache (%d downloads)", h.neoHits-hits)
+	}
+}
+
+// A launcher that has never run has no launcher_profiles.json, which the installers refuse.
+func TestNeoForgeLinkMojangFreshLauncher(t *testing.T) {
+	enableLoader(t, "neoforge")
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
+
+	launcherDir := t.TempDir()
+	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
+	profiles := readProfiles(t, launcherDir)
+	if _, ok := profiles.Profiles["NeoForge"]; ok {
+		t.Fatalf("the installer's profile was not removed: %v", profiles.Profiles)
+	}
+	if linked := profiles.Profiles["shulker-pack"]; linked["lastVersionId"] != "neoforge-26.2.0.87" {
+		t.Fatalf("linked profile: %v", linked)
+	}
+}

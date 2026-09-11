@@ -30,6 +30,7 @@ type Loader struct {
 	Type     string            `json:"type"`
 	Version  string            `json:"version"`
 	Provides map[string]string `json:"provides,omitempty"`
+	Client   *Download         `json:"client,omitempty"`
 	Server   *ServerJar        `json:"server,omitempty"`
 }
 

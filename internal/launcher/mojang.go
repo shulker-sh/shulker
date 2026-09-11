@@ -1,12 +1,14 @@
 package launcher
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -77,23 +79,42 @@ func (v *Mojang) InstallVersion(profile json.RawMessage) (string, error) {
 	return head.ID, fsutil.Write(filepath.Join(dir, head.ID+".json"), profile)
 }
 
-func (v *Mojang) WriteProfile(p Profile) error {
-	path := filepath.Join(v.Dir, ProfilesFile)
-	top := map[string]json.RawMessage{}
+func (v *Mojang) profilesPath() string { return filepath.Join(v.Dir, ProfilesFile) }
+
+func (v *Mojang) readProfiles() (top, profiles map[string]json.RawMessage, err error) {
+	path := v.profilesPath()
+	top, profiles = map[string]json.RawMessage{}, map[string]json.RawMessage{}
 	data, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
+		return nil, nil, err
 	}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &top); err != nil {
-			return fmt.Errorf("%s: %w", path, err)
+			return nil, nil, fmt.Errorf("%s: %w", path, err)
 		}
 	}
-	profiles := map[string]json.RawMessage{}
 	if raw, ok := top["profiles"]; ok {
 		if err := json.Unmarshal(raw, &profiles); err != nil {
-			return fmt.Errorf("%s: profiles: %w", path, err)
+			return nil, nil, fmt.Errorf("%s: profiles: %w", path, err)
 		}
+	}
+	return top, profiles, nil
+}
+
+func (v *Mojang) writeProfiles(top, profiles map[string]json.RawMessage) error {
+	raw, err := json.Marshal(profiles)
+	if err != nil {
+		return err
+	}
+	top["profiles"] = raw
+	return fsutil.WriteJSON(v.profilesPath(), top)
+}
+
+func (v *Mojang) WriteProfile(p Profile) error {
+	path := v.profilesPath()
+	top, profiles, err := v.readProfiles()
+	if err != nil {
+		return err
 	}
 	entry := map[string]any{}
 	if raw, ok := profiles[p.Key]; ok {
@@ -116,31 +137,77 @@ func (v *Mojang) WriteProfile(p Profile) error {
 	if profiles[p.Key], err = json.Marshal(entry); err != nil {
 		return err
 	}
-	if top["profiles"], err = json.Marshal(profiles); err != nil {
+	return v.writeProfiles(top, profiles)
+}
+
+// EnsureProfilesFile writes an empty launcher_profiles.json when the launcher has never run, because
+// the NeoForge and Forge installers refuse a directory without one.
+func (v *Mojang) EnsureProfilesFile() error {
+	_, err := os.Stat(v.profilesPath())
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	return fsutil.WriteJSON(path, top)
+	return v.writeProfiles(map[string]json.RawMessage{}, map[string]json.RawMessage{})
+}
+
+// Profiles snapshots launcher_profiles.json so RestoreProfiles can undo what an installer run
+// writes into it.
+func (v *Mojang) Profiles() (map[string]json.RawMessage, error) {
+	_, profiles, err := v.readProfiles()
+	return profiles, err
+}
+
+// RestoreProfiles puts the profiles back the way the snapshot had them — dropping what an installer
+// added, restoring what it overwrote — and returns the lastVersionId of the entry it wrote, which
+// is the version id it installed.
+func (v *Mojang) RestoreProfiles(before map[string]json.RawMessage) (string, error) {
+	top, profiles, err := v.readProfiles()
+	if err != nil {
+		return "", err
+	}
+	var touched []string
+	for key, raw := range profiles {
+		if old, had := before[key]; !had || !bytes.Equal(old, raw) {
+			touched = append(touched, key)
+		}
+	}
+	sort.Strings(touched)
+	var versionID string
+	for _, key := range touched {
+		if versionID == "" {
+			var p struct {
+				LastVersionID string `json:"lastVersionId"`
+			}
+			if json.Unmarshal(profiles[key], &p) == nil {
+				versionID = p.LastVersionID
+			}
+		}
+		if old, had := before[key]; had {
+			profiles[key] = old
+		} else {
+			delete(profiles, key)
+		}
+	}
+	for key, old := range before {
+		if _, ok := profiles[key]; !ok {
+			profiles[key] = old
+			touched = append(touched, key)
+		}
+	}
+	if len(touched) == 0 {
+		return versionID, nil
+	}
+	return versionID, v.writeProfiles(top, profiles)
 }
 
 // RemoveProfiles drops the shulker-made profiles (keys starting "shulker-") that point at gameDir.
 func (v *Mojang) RemoveProfiles(gameDir string) (int, error) {
-	path := filepath.Join(v.Dir, ProfilesFile)
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return 0, nil
-	}
+	top, profiles, err := v.readProfiles()
 	if err != nil {
 		return 0, err
-	}
-	top := map[string]json.RawMessage{}
-	if err := json.Unmarshal(data, &top); err != nil {
-		return 0, fmt.Errorf("%s: %w", path, err)
-	}
-	profiles := map[string]json.RawMessage{}
-	if raw, ok := top["profiles"]; ok {
-		if err := json.Unmarshal(raw, &profiles); err != nil {
-			return 0, fmt.Errorf("%s: profiles: %w", path, err)
-		}
 	}
 	removed := 0
 	for key, raw := range profiles {
@@ -155,10 +222,7 @@ func (v *Mojang) RemoveProfiles(gameDir string) (int, error) {
 	if removed == 0 {
 		return 0, nil
 	}
-	if top["profiles"], err = json.Marshal(profiles); err != nil {
-		return 0, err
-	}
-	return removed, fsutil.WriteJSON(path, top)
+	return removed, v.writeProfiles(top, profiles)
 }
 
 func (v *Mojang) now() time.Time {

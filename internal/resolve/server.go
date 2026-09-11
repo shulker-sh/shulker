@@ -29,9 +29,44 @@ func (r *Resolver) EnsureServerJar(ctx context.Context, mt *Meta) (ServerJarResu
 	case "quilt":
 		return r.ensureQuiltServer(ctx, mt)
 	case "neoforge":
-		return r.ensureInstallerServer(ctx, mt, mt.NeoForge.InstallerURL(r.Lock.Loader.Version))
+		url, err := mt.InstallerURL(r.Lock.Loader)
+		if err != nil {
+			return ServerJarResult{}, err
+		}
+		return r.ensureInstallerServer(ctx, mt, url)
 	}
 	return r.ensureFabricServer(ctx, mt.Fabric)
+}
+
+type InstallerJar struct {
+	Path   string
+	Locked bool
+}
+
+// EnsureClientInstaller caches the loader's own installer jar for a client install and locks it as
+// loader.client, so later links verify it and hit the cache. The client libraries the installer
+// downloads itself stay unlocked, so it runs online.
+func (r *Resolver) EnsureClientInstaller(ctx context.Context, mt *Meta) (InstallerJar, error) {
+	l := &r.Lock.Loader
+	if locked := l.Client; locked != nil {
+		path, err := r.Cache.Ensure(ctx, r.Fetch, locked.URL, locked.Sha512)
+		return InstallerJar{Path: path}, err
+	}
+	url, err := mt.InstallerURL(*l)
+	if err != nil {
+		return InstallerJar{}, err
+	}
+	if s := l.Server; s != nil && s.URL == url && r.Cache.Has(s.Sha512) {
+		l.Client = &lock.Download{URL: url, Sha512: s.Sha512}
+		return InstallerJar{Path: r.Cache.Path(s.Sha512), Locked: true}, nil
+	}
+	r.log("downloading the %s installer (loader %s)", l.Type, l.Version)
+	sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
+	if err != nil {
+		return InstallerJar{}, err
+	}
+	l.Client = &lock.Download{URL: url, Sha512: sha}
+	return InstallerJar{Path: r.Cache.Path(sha), Locked: true}, nil
 }
 
 // ensureInstallerServer locks a loader's own installer jar plus everything it would download: the

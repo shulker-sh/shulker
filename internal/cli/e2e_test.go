@@ -1034,6 +1034,45 @@ func TestDiffAndPull(t *testing.T) {
 	}
 }
 
+// fakeClientInstall stands in for the installer's client install: it writes the version it
+// installed into the launcher and, like the real one, leaves a launcher profile of its own behind.
+func (h *harness) fakeClientInstall(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("installer args %v", args)
+	}
+	dir, id := args[1], "neoforge-26.2.0.87"
+	if err := os.MkdirAll(filepath.Join(dir, "versions", id), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "versions", id, id+".json"), []byte(`{"id":"`+id+`"}`), 0o644); err != nil {
+		return err
+	}
+	path := filepath.Join(dir, "launcher_profiles.json")
+	top := map[string]json.RawMessage{}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &top); err != nil {
+		return err
+	}
+	profiles := map[string]json.RawMessage{}
+	if raw, ok := top["profiles"]; ok {
+		if err := json.Unmarshal(raw, &profiles); err != nil {
+			return err
+		}
+	}
+	profiles["NeoForge"] = json.RawMessage(`{"name":"NeoForge","type":"custom","lastVersionId":"` + id + `"}`)
+	if top["profiles"], err = json.Marshal(profiles); err != nil {
+		return err
+	}
+	written, err := json.Marshal(top)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, written, 0o644)
+}
+
 // fakeInstaller stands in for NeoForge's and Forge's installers run offline: it checks that the
 // build placed what the installer would download, then writes what its processors generate.
 func (h *harness) fakeInstaller(_ context.Context, java, jar string, args []string) error {
@@ -1046,6 +1085,9 @@ func (h *harness) fakeInstaller(_ context.Context, java, jar string, args []stri
 	}
 	if _, err := os.Stat(java); err != nil {
 		return err
+	}
+	if args[0] == "--install-client" {
+		return h.fakeClientInstall(args)
 	}
 	if len(args) != 3 || args[2] != "--offline" {
 		return fmt.Errorf("installer args %v", args)

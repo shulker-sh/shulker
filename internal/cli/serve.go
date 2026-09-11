@@ -30,7 +30,7 @@ type serveResult struct {
 	ExitCode int         `json:"exitCode"`
 }
 
-func (a *app) serveJava(ctx context.Context, p *project.Project) (server.Java, error) {
+func (a *app) projectJava(ctx context.Context, p *project.Project) (server.Java, error) {
 	if p.Manifest.Java != "" {
 		return server.FindJava(p.Manifest.Java, p.Lock.Java.Major)
 	}
@@ -93,7 +93,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			java, err := a.serveJava(cmd.Context(), p)
+			java, err := a.projectJava(cmd.Context(), p)
 			if err != nil {
 				return err
 			}

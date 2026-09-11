@@ -635,6 +635,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `last-target` | The only target can't be removed |
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-not-found` | No launcher directory where shulker looked |
+| `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-invalid` | `shulker.local.json` isn't valid JSON |
 | `lock-invalid` | `shulker.lock` doesn't parse or match its schema, or a change would make it invalid |
 | `lock-not-found` | No `shulker.lock`; run `shulker install` |

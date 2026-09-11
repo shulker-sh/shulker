@@ -29,7 +29,7 @@ func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *
 	if err != nil {
 		return err
 	}
-	java, err := a.serveJava(ctx, p)
+	java, err := a.projectJava(ctx, p)
 	if err != nil {
 		return err
 	}

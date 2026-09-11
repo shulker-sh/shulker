@@ -29,6 +29,10 @@
           "additionalProperties": { "type": "string", "minLength": 1 },
           "description": "Mod ids the loader jar provides, with their versions, e.g. the fabricloader version the Quilt loader stands in for. Validation treats them as installed."
         },
+        "client": {
+          "$ref": "#/$defs/download",
+          "description": "NeoForge, Forge: the installer jar, locked the first time `link mojang` runs its client install. The client libraries the installer downloads itself stay unlocked, like the files Fabric's launcher fetches."
+        },
         "server": {
           "type": "object",
           "required": ["sha512"],

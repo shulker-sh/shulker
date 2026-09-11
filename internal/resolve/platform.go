@@ -97,6 +97,14 @@ func (mt *Meta) LoaderProfile(ctx context.Context, l lock.Loader, game string) (
 	return nil, fmt.Errorf("no launcher profile for the %s loader", l.Type)
 }
 
+func (mt *Meta) InstallerURL(l lock.Loader) (string, error) {
+	switch l.Type {
+	case "neoforge":
+		return mt.NeoForge.InstallerURL(l.Version), nil
+	}
+	return "", fmt.Errorf("no installer for the %s loader", l.Type)
+}
+
 func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game string) (string, error) {
 	rng, err := loaderver.ParseRange(l.Version)
 	if err != nil {
