@@ -1,3 +1,7 @@
+---
+description: How manifests, locks, targets, sides, overrides, build edits, packs, and providers fit together.
+---
+
 # Concepts
 
 ## Manifest

@@ -7,8 +7,18 @@ const schemaDir = resolve(root, '..', 'schema', 'v1')
 const outDir = resolve(root, 'docs')
 
 const pages = [
-  { file: 'manifest.json', out: 'manifest.md', intro: 'The project manifest. Hand-edited, committed, and read by every command.' },
-  { file: 'lock.json', out: 'lock.md', intro: 'The lock file. Written by the CLI, committed alongside the manifest, never hand-edited.' },
+  {
+    file: 'manifest.json',
+    out: 'manifest.md',
+    intro: 'The project manifest. Hand-edited, committed, and read by every command.',
+    description: 'Every field in shulker.json, the project manifest, generated from its JSON Schema.',
+  },
+  {
+    file: 'lock.json',
+    out: 'lock.md',
+    intro: 'The lock file. Written by the CLI, committed alongside the manifest, never hand-edited.',
+    description: 'Every field in shulker.lock, which records exact mod versions and hashes, generated from its JSON Schema.',
+  },
 ]
 
 const code = (s) => '`' + String(s).replace(/`/g, '\\`') + '`'
@@ -91,9 +101,10 @@ function describe(s) {
   return lines
 }
 
-function render(schema, intro) {
+function render(schema, intro, description) {
   const lines = [
     '---',
+    `description: ${JSON.stringify(description)}`,
     'editLink: false',
     '---',
     '',
@@ -120,8 +131,8 @@ function render(schema, intro) {
 }
 
 mkdirSync(outDir, { recursive: true })
-for (const { file, out, intro } of pages) {
+for (const { file, out, intro, description } of pages) {
   const schema = JSON.parse(readFileSync(resolve(schemaDir, file), 'utf8'))
-  writeFileSync(resolve(outDir, out), render(schema, intro))
+  writeFileSync(resolve(outDir, out), render(schema, intro, description))
   console.log(`wrote docs/${out} from schema/v1/${file}`)
 }

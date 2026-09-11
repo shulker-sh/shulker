@@ -1,3 +1,7 @@
+---
+description: Install Shulker, create a project, add mods, and build a Minecraft client or server.
+---
+
 # Getting started
 
 Install the CLI, create a project, add mods, and build a client or server.
