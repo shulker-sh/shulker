@@ -2,10 +2,10 @@ import { cpSync, createReadStream, existsSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Plugin } from 'vite'
-import { defineConfig } from 'vitepress'
+import { defineConfig, type MarkdownRenderer } from 'vitepress'
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
-import llmstxt, { copyOrDownloadAsMarkdownButtons } from 'vitepress-plugin-llms'
+import llmstxt from 'vitepress-plugin-llms'
 
 const siteUrl = 'https://shulker.sh'
 const schemaDir = fileURLToPath(new URL('../../schema/v1', import.meta.url))
@@ -22,6 +22,18 @@ function serveSchema(): Plugin {
       })
     },
   }
+}
+
+function titleWithCopyPage(md: MarkdownRenderer) {
+  const rules = md.renderer.rules
+  const renderToken: NonNullable<typeof rules.heading_open> = (tokens, idx, options, _env, self) =>
+    self.renderToken(tokens, idx, options)
+  const open = rules.heading_open ?? renderToken
+  const close = rules.heading_close ?? renderToken
+  rules.heading_open = (tokens, idx, ...rest) =>
+    (tokens[idx].tag === 'h1' ? '<div class="page-title">' : '') + open(tokens, idx, ...rest)
+  rules.heading_close = (tokens, idx, ...rest) =>
+    close(tokens, idx, ...rest) + (tokens[idx].tag === 'h1' ? '<CopyPage /></div>' : '')
 }
 
 export default defineConfig({
@@ -85,7 +97,7 @@ export default defineConfig({
     codeTransformers: [transformerTwoslash()],
     config(md) {
       md.use(groupIconMdPlugin)
-      md.use(copyOrDownloadAsMarkdownButtons)
+      md.use(titleWithCopyPage)
     },
   },
   vite: {
