@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -168,7 +169,7 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(dest, existing, 0o644); err != nil {
+		if err := fsutil.Write(dest, existing); err != nil {
 			return nil, err
 		}
 		report.Pulled = append(report.Pulled, f.rel+" -> "+b.relPath(dest))
@@ -293,7 +294,7 @@ func writeProperties(dest string, set properties) error {
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(dest, set.mergeInto(data, "=", nil), 0o644)
+	return fsutil.Write(dest, set.mergeInto(data, "=", nil))
 }
 
 func (b *Builder) adoptKeys(name, rel string, keys []string, d *drift, report *PullReport) error {

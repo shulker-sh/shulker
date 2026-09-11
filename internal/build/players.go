@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
@@ -95,13 +96,7 @@ func (f *playerFile) render(existing []byte, kept, dropped map[string]bool) ([]b
 			merged = append(merged, f.stamped(f.entries[u], nil))
 		}
 	}
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(merged); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return fsutil.MarshalJSON(merged)
 }
 
 func (f *playerFile) stamped(own, previous playerEntry) playerEntry {

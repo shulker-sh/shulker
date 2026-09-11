@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
@@ -295,7 +296,7 @@ func writeMrpack(output string, entries map[string][]byte) error {
 	if err := zw.Close(); err != nil {
 		return err
 	}
-	return os.WriteFile(output, buf.Bytes(), 0o644)
+	return fsutil.Write(output, buf.Bytes())
 }
 
 func MrpackFileName(m *manifest.Manifest, versionID string) string {

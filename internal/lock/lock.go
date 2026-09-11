@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
@@ -122,14 +123,7 @@ func (l *Lock) Encode() ([]byte, error) {
 	if l.Players == nil {
 		l.Players = []Player{}
 	}
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(l); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return fsutil.MarshalJSON(l)
 }
 
 func (l *Lock) Save(path string) error {
@@ -140,7 +134,7 @@ func (l *Lock) Save(path string) error {
 	if err := schema.Validate(schema.Lock, data); err != nil {
 		return out.Errorf("lock-invalid", "refusing to write invalid %s: %v", FileName, err)
 	}
-	return os.WriteFile(path, data, 0o644)
+	return fsutil.Write(path, data)
 }
 
 func (l *Lock) AddRequiredBy(id, by string) {

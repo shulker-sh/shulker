@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
@@ -579,7 +580,7 @@ func (b *Builder) write(abs string, s source, m keyMerge) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(abs, data, 0o644)
+	return fsutil.Write(abs, data)
 }
 
 func (b *Builder) output(abs string, s source, m keyMerge) ([]byte, error) {
@@ -626,13 +627,7 @@ func (b *Builder) saveState(dir string, s State) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(s); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(dir, StateFile), buf.Bytes(), 0o644)
+	return fsutil.WriteJSON(filepath.Join(dir, StateFile), s)
 }
 
 func fileSha256(path string) (string, bool, error) {

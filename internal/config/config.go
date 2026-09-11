@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -105,28 +106,13 @@ func UpdateLinks(path string, update func([]Link) []Link) (bool, error) {
 	} else if top["links"], err = json.Marshal(next); err != nil {
 		return false, err
 	}
-	out, err := json.MarshalIndent(top, "", "  ")
-	if err != nil {
-		return false, err
-	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return false, err
 	}
-	return true, writeAtomic(path, append(out, '\n'))
-}
-
-func writeAtomic(path string, data []byte) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
-	if err != nil {
-		return err
+	// The file can hold an API key; creating it 0600 first keeps it private,
+	// since fsutil keeps an existing file's mode.
+	if f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL, 0o600); err == nil {
+		f.Close()
 	}
-	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
+	return true, fsutil.WriteJSON(path, top)
 }

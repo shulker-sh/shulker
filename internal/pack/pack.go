@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
@@ -263,7 +264,7 @@ func (s *Store) storeManifest(data []byte) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
-	return sha, os.WriteFile(path, data, 0o644)
+	return sha, fsutil.Write(path, data)
 }
 
 func (l *Loaded) Target(name, side string) (*manifest.Target, error) {

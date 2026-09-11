@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -94,10 +95,10 @@ func (s *Store) storeURL(c *Checkout, manifestData, lockData []byte) error {
 	if err := os.MkdirAll(c.Dir, 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(c.Dir, manifest.FileName), manifestData, 0o644); err != nil {
+	if err := fsutil.Write(filepath.Join(c.Dir, manifest.FileName), manifestData); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(c.Dir, lock.FileName), lockData, 0o644)
+	return fsutil.Write(filepath.Join(c.Dir, lock.FileName), lockData)
 }
 
 func (s *Store) urlDir(sha string) string {
@@ -135,19 +136,11 @@ func (s *Store) RecordGood(c *Checkout) error {
 		return nil
 	}
 	rec := lastGood{Source: c.Source, Ref: c.ref, Commit: c.Commit, Sha256: c.Sha256, At: time.Now().UTC()}
-	data, err := json.MarshalIndent(rec, "", "  ")
-	if err != nil {
-		return err
-	}
 	path := s.lastGoodPath(c.Source, c.ref)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return fsutil.WriteJSON(path, rec)
 }
 
 var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)

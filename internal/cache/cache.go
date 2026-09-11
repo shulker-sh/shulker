@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/fsutil"
 )
 
 type Cache struct {
@@ -117,13 +118,5 @@ func (c *Cache) CopyTo(sha, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(out, src); err != nil {
-		out.Close()
-		return err
-	}
-	return out.Close()
+	return fsutil.WriteFrom(dst, src)
 }

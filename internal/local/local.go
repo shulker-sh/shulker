@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -46,14 +47,7 @@ func Load(dir string) (*File, error) {
 func (f *File) Exists() bool { return f.exists }
 
 func (f *File) Save() error {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(f); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(f.dir, FileName), buf.Bytes(), 0o644); err != nil {
+	if err := fsutil.WriteJSON(filepath.Join(f.dir, FileName), f); err != nil {
 		return err
 	}
 	f.exists = true
@@ -118,7 +112,7 @@ func AddToGitignore(dir string) (bool, error) {
 		data = append(data, '\n')
 	}
 	data = append(data, "/"+FileName+"\n"...)
-	return true, os.WriteFile(path, data, 0o644)
+	return true, fsutil.Write(path, data)
 }
 
 func (f *File) Dir() string { return f.dir }

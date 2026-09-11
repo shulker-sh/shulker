@@ -9,6 +9,7 @@ import (
 	"os"
 	"slices"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
@@ -188,14 +189,7 @@ func Parse(data []byte) (*Manifest, error) {
 }
 
 func (m *Manifest) Encode() ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(m); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return fsutil.MarshalJSON(m)
 }
 
 func (m *Manifest) Save(path string) error {
@@ -206,7 +200,7 @@ func (m *Manifest) Save(path string) error {
 	if err := schema.Validate(schema.Manifest, data); err != nil {
 		return out.Errorf("manifest-invalid", "refusing to write invalid %s: %v", FileName, err)
 	}
-	return os.WriteFile(path, data, 0o644)
+	return fsutil.Write(path, data)
 }
 
 func (m *Manifest) Target(name string) (Target, error) {

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"shulker.sh/shulker/internal/fsutil"
 )
 
 const (
@@ -212,7 +214,7 @@ func writePack(path string, inst Instance) error {
 	if err != nil {
 		return err
 	}
-	return writeAtomic(path, append(data, '\n'))
+	return fsutil.Write(path, append(data, '\n'))
 }
 
 func uidLoader(uid string) string {
@@ -279,7 +281,7 @@ func writeInstanceConfig(path string, inst Instance, multimc bool) error {
 			fmt.Fprintf(&buf, "%s=%s\n", key, escape(value))
 		}
 	}
-	return writeAtomic(path, buf.Bytes())
+	return fsutil.Write(path, buf.Bytes())
 }
 
 // IsSyncCommand reports whether a pre-launch command is the shulker sync that linking writes.
@@ -309,7 +311,7 @@ func RemovePreLaunch(instanceDir string, multimc bool) (bool, error) {
 		}
 		buf.WriteString(line + "\n")
 	}
-	return true, writeAtomic(path, buf.Bytes())
+	return true, fsutil.Write(path, buf.Bytes())
 }
 
 func readINILines(path string) ([]string, error) {

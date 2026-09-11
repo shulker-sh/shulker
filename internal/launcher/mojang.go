@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"shulker.sh/shulker/internal/fsutil"
 )
 
 const ProfilesFile = "launcher_profiles.json"
@@ -72,7 +74,7 @@ func (v *Mojang) InstallVersion(profile json.RawMessage) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	return head.ID, writeAtomic(filepath.Join(dir, head.ID+".json"), profile)
+	return head.ID, fsutil.Write(filepath.Join(dir, head.ID+".json"), profile)
 }
 
 func (v *Mojang) WriteProfile(p Profile) error {
@@ -117,11 +119,7 @@ func (v *Mojang) WriteProfile(p Profile) error {
 	if top["profiles"], err = json.Marshal(profiles); err != nil {
 		return err
 	}
-	out, err := json.MarshalIndent(top, "", "  ")
-	if err != nil {
-		return err
-	}
-	return writeAtomic(path, append(out, '\n'))
+	return fsutil.WriteJSON(path, top)
 }
 
 // RemoveProfiles drops the shulker-made profiles (keys starting "shulker-") that point at gameDir.
@@ -160,11 +158,7 @@ func (v *Mojang) RemoveProfiles(gameDir string) (int, error) {
 	if top["profiles"], err = json.Marshal(profiles); err != nil {
 		return 0, err
 	}
-	out, err := json.MarshalIndent(top, "", "  ")
-	if err != nil {
-		return 0, err
-	}
-	return removed, writeAtomic(path, append(out, '\n'))
+	return removed, fsutil.WriteJSON(path, top)
 }
 
 func (v *Mojang) now() time.Time {
@@ -172,12 +166,4 @@ func (v *Mojang) now() time.Time {
 		return v.Now()
 	}
 	return time.Now()
-}
-
-func writeAtomic(path string, data []byte) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
 }
