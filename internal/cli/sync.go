@@ -79,13 +79,15 @@ func (a *app) syncCmd() *cobra.Command {
 			if into, err = filepath.Abs(into); err != nil {
 				return err
 			}
-			localDir := co.Dir
-			if remote {
-				localDir = into
-			}
-			lf, err := local.Load(localDir)
+			inst, err := local.Load(into)
 			if err != nil {
 				return err
+			}
+			lf := inst
+			if !remote {
+				if lf, err = local.Load(co.Dir); err != nil {
+					return err
+				}
 			}
 			fetched, warnings, err := a.fetchLocked(cmd.Context(), p, t.Side == "server")
 			if err != nil {
@@ -98,17 +100,21 @@ func (a *app) syncCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			overrides, err := featureOverrides(b, lf.Features, ff)
+			overrides, err := featureOverrides(b, mergeDecisions(lf.Features, inst.Features), ff)
 			if err != nil {
 				return err
 			}
-			rep, err := b.Build(name, build.Options{Force: force, Dir: into, NoDataLinks: remote, OS: osName, Features: overrides})
+			origin := build.Origin{Source: source, Ref: ref, Commit: co.Commit}
+			rep, err := b.Build(name, build.Options{Force: force, Dir: into, NoDataLinks: remote, OS: osName, Features: overrides, Origin: origin})
 			if err != nil {
 				return err
 			}
 			a.warn(rep.Warnings)
 			recorded := !remote && into != buildDir && lf.RecordSyncDir(name, into)
 			a.refreshLocal(lf, !remote, recorded)
+			if !remote {
+				a.refreshLocal(inst, false, false)
+			}
 			res := syncResult{Source: source, Kind: co.Kind, Commit: co.Commit, Target: name, Dir: into, Fetched: fetched, Warnings: warnings, Build: rep}
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))

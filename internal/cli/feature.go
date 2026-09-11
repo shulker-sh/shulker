@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -101,6 +102,14 @@ func (a *app) saveLocal(lf *local.File, inProject bool) error {
 		a.progress("added /%s to .gitignore", local.FileName)
 	}
 	return err
+}
+
+func mergeDecisions(layers ...map[string]bool) map[string]bool {
+	merged := map[string]bool{}
+	for _, l := range layers {
+		maps.Copy(merged, l)
+	}
+	return merged
 }
 
 func (a *app) refreshLocal(lf *local.File, inProject, changed bool) {

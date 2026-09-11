@@ -152,6 +152,9 @@ func TestSyncFromGit(t *testing.T) {
 	if got, _ := os.ReadFile(filepath.Join(into, "config", "x.txt")); string(got) != "v1\n" {
 		t.Fatalf("--ref v1 content: %q", got)
 	}
+	if st := build.LoadState(into); st.Origin != (build.Origin{Source: source, Ref: "v1", Commit: first}) {
+		t.Fatalf("state origin: %+v", st.Origin)
+	}
 
 	code, stdout, _ = h.run(t, "sync", source, "--into", into, "--ref", "nope", "--json")
 	if code == 0 || failureCode(t, stdout).Code != "source-ref" {
@@ -316,5 +319,27 @@ func TestSyncDoesNotFailOnUnwritableLocalFile(t *testing.T) {
 
 	if _, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "two")); !strings.Contains(stderr, "warning: shulker.local.json not updated") {
 		t.Fatalf("a failed write should warn: %s", stderr)
+	}
+}
+
+func TestSyncFromLocalProjectReadsInstanceDecisions(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
+	h.mustRun(t, "feature", "on", "fancy")
+
+	into := filepath.Join(t.TempDir(), "instance")
+	if err := os.MkdirAll(into, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(into, "shulker.local.json"), []byte(`{"features":{"fancy":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); !strings.Contains(stdout, "excluded sodium") {
+		t.Fatalf("the instance decision should beat the project one: %s", stdout)
+	}
+	if st := build.LoadState(into); st.Origin != (build.Origin{Source: h.dir}) {
+		t.Fatalf("state origin: %+v", st.Origin)
 	}
 }

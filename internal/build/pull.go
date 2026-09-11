@@ -223,7 +223,7 @@ func (b *Builder) drift(name string, opts Options) (*drift, error) {
 	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
 		return nil, out.Errorf("not-built", "target %s has no build directory; run `shulker build`", name)
 	}
-	prev := b.loadState(dir)
+	prev := LoadState(dir)
 	plans, err := b.plan(dir, desired, prev, false)
 	if err != nil {
 		return nil, err

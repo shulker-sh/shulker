@@ -31,8 +31,15 @@ const (
 	EulaFile       = "eula.txt"
 )
 
+type Origin struct {
+	Source string `json:"source,omitempty"`
+	Ref    string `json:"ref,omitempty"`
+	Commit string `json:"commit,omitempty"`
+}
+
 type State struct {
-	Target     string                       `json:"target"`
+	Target string `json:"target"`
+	Origin
 	BuiltAt    string                       `json:"builtAt"`
 	LockSha256 string                       `json:"lockSha256"`
 	Files      map[string]string            `json:"files"`
@@ -82,6 +89,7 @@ type Options struct {
 	OS          string
 	NoOS        bool
 	Features    map[string]bool
+	Origin      Origin
 }
 
 type Builder struct {
@@ -196,8 +204,8 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	if opts.NoDataLinks {
 		dirs = nil
 	}
-	prev := b.loadState(dir)
-	next := State{Target: name, Files: map[string]string{}}
+	prev := LoadState(dir)
+	next := State{Target: name, Origin: opts.Origin, Files: map[string]string{}}
 	links, err := b.planLinks(dir, name, dirs, prev, report)
 	if err != nil {
 		return nil, err
@@ -601,7 +609,7 @@ func canonicalValues(values map[string]string) []byte {
 	return buf.Bytes()
 }
 
-func (b *Builder) loadState(dir string) State {
+func LoadState(dir string) State {
 	s := State{Files: map[string]string{}}
 	data, err := os.ReadFile(filepath.Join(dir, StateFile))
 	if err != nil {
