@@ -60,6 +60,9 @@ func (a *app) buildCmd() *cobra.Command {
 					return err
 				}
 				a.warnFor(name, len(names) > 1, rep.Warnings)
+				if _, err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
+					return err
+				}
 				reports = append(reports, rep)
 			}
 			a.refreshLocal(lf, true, false)
@@ -87,5 +90,8 @@ func printReportDetails(w io.Writer, rep *build.Report) {
 	}
 	for _, k := range rep.Kept {
 		fmt.Fprintf(w, "  kept %s\n", k)
+	}
+	if l := rep.InstalledLoader; l != nil {
+		fmt.Fprintf(w, "  installed %s %s\n", l.Type, l.Version)
 	}
 }

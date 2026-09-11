@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/selfupdate"
+	"shulker.sh/shulker/internal/server"
 )
 
 var version = "dev"
@@ -33,6 +34,7 @@ type app struct {
 	packs      []*pack.Loaded
 	releases   *selfupdate.Releases
 	exe        func() (string, error)
+	installer  func(ctx context.Context, java, jar string, args []string) error
 	running    bool
 }
 
@@ -48,7 +50,7 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 }
 
 func newApp(stdout, stderr io.Writer) *app {
-	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal, exe: selfupdate.Executable}
+	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal, exe: selfupdate.Executable, installer: server.RunInstaller}
 }
 
 func (a *app) run(ctx context.Context, args []string) int {

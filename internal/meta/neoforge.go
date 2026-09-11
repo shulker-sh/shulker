@@ -42,6 +42,10 @@ func (n *NeoForge) LoaderVersions(ctx context.Context, game string) ([]LoaderVer
 	return out, nil
 }
 
+func (n *NeoForge) InstallerURL(version string) string {
+	return fmt.Sprintf("%s/releases/net/neoforged/neoforge/%s/neoforge-%s-installer.jar", n.BaseURL, version, version)
+}
+
 func neoForgePrefix(game string) (string, bool) {
 	parts := strings.Split(game, ".")
 	for _, p := range parts {

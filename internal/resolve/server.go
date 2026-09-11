@@ -26,10 +26,37 @@ func (r *Resolver) EnsureServerJar(ctx context.Context, mt *Meta) (ServerJarResu
 	if _, err := loader.Require(r.Lock.Loader.Type); err != nil {
 		return ServerJarResult{}, err
 	}
-	if r.Lock.Loader.Type == "quilt" {
+	switch r.Lock.Loader.Type {
+	case "quilt":
 		return r.ensureQuiltServer(ctx, mt)
+	case "neoforge":
+		return r.ensureInstaller(ctx, mt.NeoForge.InstallerURL(r.Lock.Loader.Version))
 	}
 	return r.ensureFabricServer(ctx, mt.Fabric)
+}
+
+// ensureInstaller locks and caches a loader's own installer jar, which sets up the server when run.
+func (r *Resolver) ensureInstaller(ctx context.Context, url string) (ServerJarResult, error) {
+	var res ServerJarResult
+	l := &r.Lock.Loader
+	if l.Server != nil && r.Cache.Has(l.Server.Sha512) {
+		return res, nil
+	}
+	r.log("downloading %s installer %s", l.Type, l.Version)
+	if l.Server != nil {
+		if _, err := r.Cache.Ensure(ctx, r.Fetch, url, l.Server.Sha512); err != nil {
+			return res, err
+		}
+		res.Fetched = true
+		return res, nil
+	}
+	sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
+	if err != nil {
+		return res, err
+	}
+	l.Server = &lock.ServerJar{Sha512: sha}
+	res.Locked, res.Fetched = true, true
+	return res, nil
 }
 
 func (r *Resolver) ensureFabricServer(ctx context.Context, fabric *meta.Fabric) (ServerJarResult, error) {

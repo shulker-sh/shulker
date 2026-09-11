@@ -78,6 +78,10 @@ type harness struct {
 	mixin         fakeJar
 	vanilla       fakeJar
 	quiltHits     int
+	neoInstaller  fakeJar
+	neoHits       int
+	installs      [][]string
+	installErr    error
 	stdin         io.Reader
 	tty           bool
 	runtime       *fakeRuntime
@@ -177,6 +181,14 @@ func newHarness(t *testing.T) *harness {
 			{"version": "1.2.0-beta.1", "stable": false},
 			{"version": "1.1.2", "stable": true},
 		})
+	})
+	mux.HandleFunc("/neoforge/api/maven/versions/releases/net/neoforged/neoforge", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"isSnapshot": false, "versions": []string{"26.1.2.40", "26.2.0.56-beta", "26.2.0.87"}})
+	})
+	h.neoInstaller = makeJarFile(t, "neoforge-installer", "neoforge-26.2.0.87-installer.jar", "install_profile.json", `{"version":"neoforge-26.2.0.87"}`)
+	mux.HandleFunc("/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar", func(w http.ResponseWriter, r *http.Request) {
+		h.neoHits++
+		w.Write(h.neoInstaller.data)
 	})
 	h.serverJar = makeJar(t, "fabric-server-launch", "fabric-server-launch.jar", "server")
 	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/1.1.2/server/jar", func(w http.ResponseWriter, r *http.Request) {
@@ -310,6 +322,7 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	a.configPath = h.config
 	a.stdin = h.stdin
 	a.tty = func() bool { return h.tty }
+	a.installer = h.fakeInstaller
 	f := fetch.New("test")
 	piston := meta.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"
@@ -984,4 +997,36 @@ func TestDiffAndPull(t *testing.T) {
 	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "0 written, 6 unchanged, 1 kept") {
 		t.Fatalf("build after conflict pull: %s", stdout)
 	}
+}
+
+// fakeInstaller stands in for NeoForge's and Forge's installers: it writes the files a server
+// install leaves behind for the one NeoForge version the fakes serve.
+func (h *harness) fakeInstaller(_ context.Context, java, jar string, args []string) error {
+	h.installs = append(h.installs, args)
+	if h.installErr != nil {
+		return h.installErr
+	}
+	if got, err := os.ReadFile(jar); err != nil || string(got) != string(h.neoInstaller.data) {
+		return fmt.Errorf("installer jar %s is not the locked one (%v)", jar, err)
+	}
+	if _, err := os.Stat(java); err != nil {
+		return err
+	}
+	dir := args[1]
+	files := map[string]string{
+		"libraries/net/neoforged/neoforge/26.2.0.87/unix_args.txt": "-DlibraryDirectory=libraries\n",
+		"libraries/net/neoforged/neoforge/26.2.0.87/win_args.txt":  "-DlibraryDirectory=libraries\n",
+		"run.sh":            "java @user_jvm_args.txt @libraries/net/neoforged/neoforge/26.2.0.87/unix_args.txt \"$@\"\n",
+		"user_jvm_args.txt": "# JVM arguments\n",
+	}
+	for rel, content := range files {
+		path := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }

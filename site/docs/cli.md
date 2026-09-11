@@ -619,6 +619,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `file-not-found` | A file named to `pull` isn't in the build directory |
 | `git-missing` | A git source needs `git` on PATH |
 | `id-changed` | A new version of a mod identifies itself as a different mod |
+| `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir; the message ends with its last output |
 | `instance-dir-not-empty` | The instance directory already has files |
 | `instance-exists` | An instance already syncs from this source; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |

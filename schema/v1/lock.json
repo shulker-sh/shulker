@@ -36,7 +36,7 @@
           "description": "Server launcher, present once a server target has been installed.",
           "properties": {
             "installer": { "type": "string", "minLength": 1, "description": "Fabric: installer version whose bundled server launcher is locked." },
-            "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates." },
+            "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates. NeoForge: its installer jar, which shulker runs into each server dir that doesn't have this loader version yet." },
             "minecraft": { "$ref": "#/$defs/sha512", "description": "Quilt: the vanilla server.jar the launcher starts." },
             "libraries": {
               "type": "object",

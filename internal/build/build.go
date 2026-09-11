@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -49,6 +50,13 @@ type State struct {
 	Keys       map[string][]string          `json:"propertyKeys,omitempty"`
 	Values     map[string]map[string]string `json:"managedValues,omitempty"`
 	Links      []string                     `json:"links,omitempty"`
+	// Loader is the loader its own installer set up in the dir; the installer's files aren't tracked.
+	Loader *InstalledLoader `json:"loader,omitempty"`
+}
+
+type InstalledLoader struct {
+	Type    string `json:"type"`
+	Version string `json:"version"`
 }
 
 func (s State) recordedKeys(rel string) []string {
@@ -83,6 +91,8 @@ type Report struct {
 	Excluded  []string `json:"excluded"`
 	Warnings  []string `json:"-"`
 	Forced    bool     `json:"forced"`
+	// InstalledLoader is set when the loader's own installer ran into the dir after the build.
+	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
 }
 
 type Options struct {
@@ -208,7 +218,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		dirs = nil
 	}
 	prev := LoadState(dir)
-	next := State{Target: name, Origin: opts.Origin, Files: map[string]string{}}
+	next := State{Target: name, Origin: opts.Origin, Files: map[string]string{}, Loader: prev.Loader}
 	links, err := b.planLinks(dir, name, dirs, prev, report)
 	if err != nil {
 		return nil, err
@@ -435,11 +445,15 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 
 func (b *Builder) collectLauncher(desired map[string]source) error {
 	notInstalled := out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
+	l, _ := loader.Lookup(b.Lock.Loader.Type)
+	if l.InstallServerFlag != "" {
+		return nil
+	}
 	jar := b.Lock.Loader.Server
 	if jar == nil || !b.Cache.Has(jar.Sha512) {
 		return notInstalled
 	}
-	desired[LaunchJar(b.Lock.Loader.Type)] = source{sha512: jar.Sha512}
+	desired[l.ServerLaunchJar] = source{sha512: jar.Sha512}
 	if b.Lock.Loader.Type != "quilt" {
 		return nil
 	}
@@ -460,9 +474,32 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 	return nil
 }
 
-func LaunchJar(loaderType string) string {
-	l, _ := loader.Lookup(loaderType)
-	return l.ServerLaunchJar
+// LaunchArgs start the server from its dir: the launch jar, or the args file a loader's installer
+// wrote.
+func LaunchArgs(l lock.Loader) []string {
+	if file := InstallerArgsFile(l); file != "" {
+		return []string{"@" + file}
+	}
+	info, _ := loader.Lookup(l.Type)
+	return []string{"-jar", info.ServerLaunchJar}
+}
+
+func InstallerArgsFile(l lock.Loader) string {
+	name := "unix_args.txt"
+	if runtime.GOOS == "windows" {
+		name = "win_args.txt"
+	}
+	switch l.Type {
+	case "neoforge":
+		return "libraries/net/neoforged/neoforge/" + l.Version + "/" + name
+	}
+	return ""
+}
+
+func RecordLoader(dir string, l InstalledLoader) error {
+	s := LoadState(dir)
+	s.Loader = &l
+	return fsutil.WriteJSON(filepath.Join(dir, StateFile), s)
 }
 
 func (b *Builder) collectClient(desired map[string]source, vars map[string]string) error {
