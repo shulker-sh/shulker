@@ -13,6 +13,11 @@ import (
 
 var version = "dev"
 
+const helpFooter = `
+Docs: https://shulker.sh/docs
+For agents: https://shulker.sh/llms.txt
+`
+
 type app struct {
 	printer *out.Printer
 	stdin   io.Reader
@@ -52,6 +57,7 @@ func (a *app) root() *cobra.Command {
 			a.printer.Command = strings.TrimPrefix(cmd.CommandPath(), "shulker ")
 		},
 	}
+	root.SetHelpTemplate(root.HelpTemplate() + helpFooter)
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.featureCmd(), a.playerCmd())

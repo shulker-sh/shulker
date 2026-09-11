@@ -44,6 +44,15 @@ func TestVersionJSON(t *testing.T) {
 	}
 }
 
+func TestHelpLinksDocs(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"add", "--help"}, {"target", "add", "--help"}} {
+		code, stdout, _ := run(t, args...)
+		if code != out.ExitOK || !strings.HasSuffix(stdout, helpFooter) {
+			t.Fatalf("%v: code=%d stdout=%q", args, code, stdout)
+		}
+	}
+}
+
 func TestUnknownCommandJSON(t *testing.T) {
 	code, stdout, stderr := run(t, "bogus", "--json")
 	if code != out.ExitError {
