@@ -6,10 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/BurntSushi/toml"
 )
 
 func TestClientBuildWritesMarkerJar(t *testing.T) {
@@ -193,5 +197,69 @@ func TestInitSeedsAuthors(t *testing.T) {
 	m := h.readManifest(t)
 	if len(m.Authors) == 0 || m.Authors[len(m.Authors)-1] != "shulker.sh" {
 		t.Fatalf("authors: %v", m.Authors)
+	}
+}
+
+func TestNeoForgeMarkerJar(t *testing.T) {
+	enableLoader(t, "neoforge")
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
+	h.editManifest(t, func(m map[string]any) {
+		m["description"] = "Survival with <friends>."
+		m["authors"] = []string{"Alice", "shulker.sh"}
+		m["links"] = map[string]any{"website": "https://example.com", "issues": "https://example.com/issues"}
+	})
+	h.mustRun(t, "install")
+
+	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-pack.jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := readZip(t, data)
+	for _, name := range []string{"META-INF/neoforge.mods.toml", "pack.mcmeta", "icon.png", "shulker.json", "shulker.lock", "shulker/mods.txt"} {
+		if _, ok := entries[name]; !ok {
+			t.Fatalf("marker has no %s (%v)", name, slices.Sorted(maps.Keys(entries)))
+		}
+	}
+	for name := range entries {
+		if strings.HasSuffix(name, ".class") || name == "fabric.mod.json" {
+			t.Fatalf("neoforge marker should carry no fabric metadata or classes: %s", name)
+		}
+	}
+	var meta struct {
+		ModLoader       string `toml:"modLoader"`
+		LoaderVersion   string `toml:"loaderVersion"`
+		License         string `toml:"license"`
+		IssueTrackerURL string `toml:"issueTrackerURL"`
+		Mods            []struct {
+			ModID       string `toml:"modId"`
+			DisplayName string `toml:"displayName"`
+			LogoFile    string `toml:"logoFile"`
+			Authors     string `toml:"authors"`
+			DisplayURL  string `toml:"displayURL"`
+			Description string `toml:"description"`
+		} `toml:"mods"`
+	}
+	if err := toml.Unmarshal(entries["META-INF/neoforge.mods.toml"], &meta); err != nil {
+		t.Fatal(err)
+	}
+	if meta.ModLoader != "lowcodefml" || meta.LoaderVersion != "[1,)" || meta.License == "" {
+		t.Fatalf("marker toml: %+v", meta)
+	}
+	if meta.IssueTrackerURL != "https://example.com/issues" || len(meta.Mods) != 1 {
+		t.Fatalf("marker toml: %+v", meta)
+	}
+	mod := meta.Mods[0]
+	if mod.ModID != "shulker_pack" || mod.DisplayName != "pack" || mod.LogoFile != "icon.png" {
+		t.Fatalf("marker mod: %+v", mod)
+	}
+	if mod.Authors != "Alice, shulker.sh" || mod.DisplayURL != "https://example.com" {
+		t.Fatalf("marker mod: %+v", mod)
+	}
+	if !strings.HasPrefix(mod.Description, "Survival with <friends>.\n\nMinecraft 26.2 • neoforge ") {
+		t.Fatalf("description should be plain text:\n%s", mod.Description)
+	}
+	if strings.ContainsAny(mod.Description, "\\") || strings.Contains(mod.Description, "<bold>") {
+		t.Fatalf("description should carry no QuickText tags:\n%s", mod.Description)
 	}
 }

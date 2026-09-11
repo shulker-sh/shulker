@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BurntSushi/toml"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 )
@@ -68,6 +70,40 @@ func (b *Builder) markerJar(targetName, side string, cond conditions, sel select
 		return nil, err
 	}
 	direct, deps := b.markerMods(side, sel)
+	l, _ := loader.Lookup(b.Lock.Loader.Type)
+	var entries []markerEntry
+	// The marker declares itself in the file its loader reads, and that file decides the format.
+	if metaFile := l.MetadataFiles[0]; metaFile == "fabric.mod.json" {
+		entries, err = b.fabricMarker(targetName, lockHash, direct, deps, cond)
+	} else {
+		entries, err = b.tomlMarker(metaFile, targetName, lockHash, direct, deps, cond)
+	}
+	if err != nil {
+		return nil, err
+	}
+	entries = append(entries,
+		markerEntry{manifest.FileName, manifestData},
+		markerEntry{lock.FileName, lockData},
+		markerEntry{markerModsPath, markerModList(direct, deps)},
+	)
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, e := range entries {
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: e.name, Method: zip.Deflate, Modified: markerTime})
+		if err != nil {
+			return nil, err
+		}
+		if _, err := w.Write(e.data); err != nil {
+			return nil, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (b *Builder) fabricMarker(targetName, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
 	id := markerModID(b.Manifest.Name)
 	contact, links, labels := markerLinks(b.Manifest.Links)
 	modmenu := map[string]any{"update_checker": false}
@@ -76,7 +112,7 @@ func (b *Builder) markerJar(targetName, side string, cond conditions, sel select
 		"id":            id,
 		"version":       markerVersion(b.Manifest.Version, lockHash),
 		"name":          b.Manifest.DisplayName(targetName),
-		"description":   b.markerDescription(direct, deps, cond),
+		"description":   b.markerDescription(direct, deps, cond, quickText),
 		"icon":          "assets/" + id + "/icon.png",
 		"environment":   "*",
 		"entrypoints":   map[string]any{"modmenu": []string{markerEntrypoint}},
@@ -106,31 +142,68 @@ func (b *Builder) markerJar(targetName, side string, cond conditions, sel select
 		}
 		entries = append(entries, markerEntry{"assets/" + id + "/lang/en_us.json", lang})
 	}
-	entries = append(entries,
-		markerEntry{manifest.FileName, manifestData},
-		markerEntry{lock.FileName, lockData},
-		markerEntry{markerModsPath, markerModList(direct, deps)},
-	)
 	classes, err := markerClassEntries()
 	if err != nil {
 		return nil, err
 	}
-	entries = append(entries, classes...)
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for _, e := range entries {
-		w, err := zw.CreateHeader(&zip.FileHeader{Name: e.name, Method: zip.Deflate, Modified: markerTime})
-		if err != nil {
-			return nil, err
-		}
-		if _, err := w.Write(e.data); err != nil {
-			return nil, err
-		}
+	return append(entries, classes...), nil
+}
+
+const markerLogo = "icon.png"
+
+type markerToml struct {
+	ModLoader       string          `toml:"modLoader"`
+	LoaderVersion   string          `toml:"loaderVersion"`
+	License         string          `toml:"license"`
+	IssueTrackerURL string          `toml:"issueTrackerURL,omitempty"`
+	Mods            []markerTomlMod `toml:"mods"`
+}
+
+type markerTomlMod struct {
+	ModID       string `toml:"modId"`
+	Version     string `toml:"version"`
+	DisplayName string `toml:"displayName"`
+	LogoFile    string `toml:"logoFile"`
+	Authors     string `toml:"authors,omitempty"`
+	DisplayURL  string `toml:"displayURL,omitempty"`
+	Description string `toml:"description"`
+}
+
+// tomlMarker builds the NeoForge and Forge marker: no classes, since a code-less lowcodefml mod
+// loads on both, and a pack.mcmeta so Forge doesn't warn that the mod's pack metadata is missing.
+func (b *Builder) tomlMarker(metaFile, targetName, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
+	meta := markerToml{
+		ModLoader:       "lowcodefml",
+		LoaderVersion:   "[1,)",
+		License:         "All rights reserved",
+		IssueTrackerURL: b.Manifest.Links["issues"],
+		Mods: []markerTomlMod{{
+			ModID:       markerModID(b.Manifest.Name),
+			Version:     markerVersion(b.Manifest.Version, lockHash),
+			DisplayName: b.Manifest.DisplayName(targetName),
+			LogoFile:    markerLogo,
+			Authors:     strings.Join(b.Manifest.Authors, ", "),
+			DisplayURL:  b.Manifest.Links["website"],
+			Description: b.markerDescription(direct, deps, cond, plainText),
+		}},
 	}
-	if err := zw.Close(); err != nil {
+	var metaData bytes.Buffer
+	if err := toml.NewEncoder(&metaData).Encode(meta); err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	pack, err := json.MarshalIndent(map[string]any{"pack": map[string]any{
+		"description":       b.Manifest.DisplayName(targetName),
+		"pack_format":       15,
+		"supported_formats": map[string]int{"min_inclusive": 1, "max_inclusive": 99},
+	}}, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return []markerEntry{
+		{metaFile, metaData.Bytes()},
+		{"pack.mcmeta", pack},
+		{markerLogo, markerIcon},
+	}, nil
 }
 
 func markerClassEntries() ([]markerEntry, error) {
@@ -210,15 +283,35 @@ func markerLangKey(label string) string {
 	return sb.String()
 }
 
-func (b *Builder) markerDescription(direct, deps []string, cond conditions) string {
+// markerStyle renders a description for ModMenu, which parses it as QuickText, or as the plain text
+// the FML loaders show verbatim.
+type markerStyle struct{ rich bool }
+
+var quickText, plainText = markerStyle{rich: true}, markerStyle{}
+
+func (s markerStyle) tag(name, text string) string {
+	if !s.rich {
+		return text
+	}
+	return "<" + name + ">" + text + "</" + name + ">"
+}
+
+func (s markerStyle) escape(text string) string {
+	if !s.rich {
+		return text
+	}
+	return strings.ReplaceAll(text, "<", "\\<")
+}
+
+func (b *Builder) markerDescription(direct, deps []string, cond conditions, style markerStyle) string {
 	entries := b.directEntries(cond)
 	section := func(title string, ids []string) string {
 		lines := make([]string, 0, len(ids)+1)
-		lines = append(lines, "<bold>"+title+"</bold>")
+		lines = append(lines, style.tag("bold", title))
 		for _, id := range ids {
 			line := "  \u2022 " + id
 			if text := cond.admittedBy(entries[id]); text != "" {
-				line += " <gray>(" + text + ")</gray>"
+				line += " " + style.tag("gray", "("+text+")")
 			}
 			lines = append(lines, line)
 		}
@@ -226,15 +319,15 @@ func (b *Builder) markerDescription(direct, deps []string, cond conditions) stri
 	}
 	var parts []string
 	if b.Manifest.Description != "" {
-		parts = append(parts, strings.ReplaceAll(strings.TrimSpace(b.Manifest.Description), "<", "\\<"))
+		parts = append(parts, style.escape(strings.TrimSpace(b.Manifest.Description)))
 	}
 	summary := fmt.Sprintf("Minecraft %s \u2022 %s %s \u2022 %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps))
 	var variation []string
 	if b.mentionsOS() {
-		variation = append(variation, "<gray><bold>OS:</bold></gray> "+cond.osLabel())
+		variation = append(variation, style.tag("gray", style.tag("bold", "OS:"))+" "+cond.osLabel())
 	}
 	if on := cond.featureLabels(); len(on) > 0 {
-		variation = append(variation, "<gray><bold>Features:</bold></gray> "+strings.Join(on, ", "))
+		variation = append(variation, style.tag("gray", style.tag("bold", "Features:"))+" "+strings.Join(on, ", "))
 	}
 	if len(variation) > 0 {
 		summary += "\n" + strings.Join(variation, " \u2022 ")
