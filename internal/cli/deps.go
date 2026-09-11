@@ -50,7 +50,7 @@ func (a *app) deps() (*deps, error) {
 		fetch:     f,
 		cache:     c,
 		providers: providers,
-		meta:      &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f), Quilt: meta.NewQuilt(f), Cache: c},
+		meta:      &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f), Quilt: meta.NewQuilt(f), NeoForge: meta.NewNeoForge(f), Cache: c},
 		runtimes:  meta.NewRuntimes(f),
 		players:   player.New(f),
 	}

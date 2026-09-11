@@ -318,6 +318,8 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	quilt := meta.NewQuilt(f)
 	quilt.BaseURL = h.server.URL + "/quilt"
 	quilt.MavenURL = h.server.URL + "/qmaven"
+	neoforge := meta.NewNeoForge(f)
+	neoforge.BaseURL = h.server.URL + "/neoforge"
 	mr := modrinth.New(f)
 	mr.BaseURL = h.server.URL + "/modrinth"
 	runtimes := meta.NewRuntimes(f)
@@ -336,7 +338,7 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 		fetch:     f,
 		cache:     c,
 		providers: providers,
-		meta:      &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt, Cache: c},
+		meta:      &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt, NeoForge: neoforge, Cache: c},
 		runtimes:  runtimes,
 		players:   players,
 	}

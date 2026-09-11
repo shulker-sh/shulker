@@ -58,6 +58,49 @@ func TestQuiltLoaderVersion(t *testing.T) {
 	}
 }
 
+func TestNeoForgeLoaderVersion(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/maven/versions/releases/net/neoforged/neoforge" {
+			http.NotFound(w, r)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"isSnapshot": false, "versions": []string{
+			"21.1.200", "26.1.0.0-alpha.11+snapshot-7", "26.1.2.40", "26.2.0.0-beta", "26.2.0.56-beta", "26.2.0.57", "26.2.0.87",
+		}})
+	}))
+	defer srv.Close()
+	n := meta.NewNeoForge(fetch.New("test"))
+	n.BaseURL = srv.URL
+	mt := &Meta{NeoForge: n}
+	cases := map[string]string{
+		"*":                  "26.2.0.87",
+		"^26.2.0":            "26.2.0.87",
+		"<26.2.0.60":         "26.2.0.57",
+		">=26.2.0.0-beta":    "26.2.0.87",
+		"26.2.0.56-beta":     "26.2.0.56-beta",
+		"~26.2.0 <26.2.0.57": "",
+	}
+	for rng, want := range cases {
+		got, err := mt.loaderVersion(context.Background(), manifest.Loader{Type: "neoforge", Version: rng}, "26.2")
+		if want == "" {
+			if err == nil {
+				t.Errorf("%s resolved %s, want no match", rng, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("%s: %v", rng, err)
+			continue
+		}
+		if got != want {
+			t.Errorf("%s resolved %s, want %s", rng, got, want)
+		}
+	}
+	if got, err := mt.loaderVersion(context.Background(), manifest.Loader{Type: "neoforge", Version: "*"}, "1.21.1"); err != nil || got != "21.1.200" {
+		t.Errorf("1.21.1 resolved %s, %v", got, err)
+	}
+}
+
 func zipBytes(t *testing.T, name, content string) []byte {
 	t.Helper()
 	var buf bytes.Buffer

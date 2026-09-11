@@ -22,10 +22,11 @@ type Platform struct {
 }
 
 type Meta struct {
-	Piston *meta.Piston
-	Fabric *meta.Fabric
-	Quilt  *meta.Quilt
-	Cache  *cache.Cache
+	Piston   *meta.Piston
+	Fabric   *meta.Fabric
+	Quilt    *meta.Quilt
+	NeoForge *meta.NeoForge
+	Cache    *cache.Cache
 }
 
 func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, error) {
@@ -80,6 +81,8 @@ func (mt *Meta) versions(name string) (loaderVersions, error) {
 		return mt.Fabric, nil
 	case "quilt":
 		return mt.Quilt, nil
+	case "neoforge":
+		return mt.NeoForge, nil
 	}
 	return nil, fmt.Errorf("no version list for the %s loader", name)
 }
