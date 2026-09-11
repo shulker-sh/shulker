@@ -13,6 +13,8 @@ const (
 	ExitOK    = 0
 	ExitError = 1
 	ExitUsage = 2
+	// ExitInterrupted follows the shell's 128+SIGINT.
+	ExitInterrupted = 130
 )
 
 type Envelope struct {

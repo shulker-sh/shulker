@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"context"
 	"io"
 	"os"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -37,22 +40,29 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 	if runtime.GOOS == "windows" {
 		selfupdate.RemoveOld()
 	}
-	return newApp(stdout, stderr).run(args)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	// After the first signal cancels ctx, a second one ends the process at once.
+	context.AfterFunc(ctx, stop)
+	return newApp(stdout, stderr).run(ctx, args)
 }
 
 func newApp(stdout, stderr io.Writer) *app {
 	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal, exe: selfupdate.Executable}
 }
 
-func (a *app) run(args []string) int {
+func (a *app) run(ctx context.Context, args []string) int {
 	a.printer.JSON = jsonRequested(args)
 	root := a.root()
 	root.SetArgs(args)
 	root.SetOut(a.printer.Stdout)
 	root.SetErr(a.printer.Stderr)
-	if err := root.Execute(); err != nil {
+	if err := root.ExecuteContext(ctx); err != nil {
 		if !a.running && out.CodeOf(err) == "" {
 			err = out.Errorf("usage", "%s", err)
+		}
+		if ctx.Err() != nil {
+			err = &out.Error{Code: "interrupted", Message: "interrupted", Exit: out.ExitInterrupted, Data: out.AsError(err).Data}
 		}
 		return a.printer.Fail(err)
 	}

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -78,7 +77,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				return err
 			}
 			a.progress("Fetching Fabric loader %s profile for %s", p.Lock.Loader.Version, p.Lock.Minecraft)
-			profile, err := d.meta.Fabric.LoaderProfile(context.Background(), p.Lock.Minecraft, p.Lock.Loader.Version)
+			profile, err := d.meta.Fabric.LoaderProfile(cmd.Context(), p.Lock.Minecraft, p.Lock.Loader.Version)
 			if err != nil {
 				return err
 			}

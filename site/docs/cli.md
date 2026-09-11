@@ -561,6 +561,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `0` | Success |
 | `1` | Failure; `error.code` says which |
 | `2` | Usage: an unknown command or flag, wrong arguments, or a flag value that isn't allowed |
+| `130` | Interrupted (`interrupted`) |
 
 `serve` exits with the server's own status when the server fails (`server-exit`).
 
@@ -606,6 +607,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `instance-exists` | An instance already syncs from this source; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
 | `instance-not-found` | Nothing linked matches. `candidates`: the linked entries |
+| `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-required` | Syncing from a remote source needs `--into` |
 | `into-target` | `--into` applies to one target; name it |
 | `java-not-found` | No working Java at the configured path or on PATH |

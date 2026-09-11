@@ -3,6 +3,7 @@ package cli
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"crypto/sha512"
 	"encoding/hex"
@@ -77,6 +78,7 @@ type harness struct {
 	noCurseForge  bool
 	cfMods        map[int]*cfMod
 	cfHits        int
+	ctx           context.Context
 }
 
 func newHarness(t *testing.T) *harness {
@@ -280,7 +282,11 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 		runtimes:  runtimes,
 		players:   players,
 	}
-	code := a.run(args)
+	ctx := h.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	code := a.run(ctx, args)
 	return code, stdout.String(), stderr.String()
 }
 
@@ -570,6 +576,23 @@ func TestRemoveValidatesBeforeSaving(t *testing.T) {
 	manifestAfter, _ := os.ReadFile(filepath.Join(h.dir, "shulker.json"))
 	if !bytes.Equal(lockBefore, lockAfter) || !bytes.Equal(manifestBefore, manifestAfter) {
 		t.Fatal("a failed remove must not write the manifest or lock")
+	}
+}
+
+func TestInterruptedCommandFails(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	lockBefore, _ := os.ReadFile(filepath.Join(h.dir, "shulker.lock"))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	h.ctx = ctx
+	code, stdout, _ := h.run(t, "add", "sodium", "--json")
+	if e := failureCode(t, stdout); code != out.ExitInterrupted || e.Code != "interrupted" {
+		t.Fatalf("add after an interrupt: code=%d %s", code, stdout)
+	}
+	if lockAfter, _ := os.ReadFile(filepath.Join(h.dir, "shulker.lock")); !bytes.Equal(lockBefore, lockAfter) {
+		t.Fatal("an interrupted add must not write the lock")
 	}
 }
 

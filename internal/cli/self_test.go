@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -67,7 +68,7 @@ func newSelfUpdateHarness(t *testing.T, current, tag string, corrupt bool) *self
 }
 
 func (h *selfUpdateHarness) run(args ...string) int {
-	return h.app.run(append([]string{"self", "update"}, args...))
+	return h.app.run(context.Background(), append([]string{"self", "update"}, args...))
 }
 
 func (h *selfUpdateHarness) binary(t *testing.T) string {
