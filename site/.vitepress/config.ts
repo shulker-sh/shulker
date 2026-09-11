@@ -5,6 +5,7 @@ import type { Plugin } from 'vite'
 import { defineConfig } from 'vitepress'
 import { transformerTwoslash } from '@shikijs/vitepress-twoslash'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
+import llmstxt from 'vitepress-plugin-llms'
 
 const siteUrl = 'https://shulker.sh'
 const schemaDir = fileURLToPath(new URL('../../schema/v1', import.meta.url))
@@ -87,7 +88,17 @@ export default defineConfig({
     },
   },
   vite: {
-    plugins: [groupIconVitePlugin(), serveSchema()],
+    plugins: [
+      groupIconVitePlugin(),
+      serveSchema(),
+      llmstxt({
+        domain: siteUrl,
+        details: [
+          `Validate shulker.json against ${siteUrl}/schema/v1/manifest.json and shulker.lock against ${siteUrl}/schema/v1/lock.json.`,
+          'Every command accepts `--json` for machine-readable output and errors.',
+        ].join(' '),
+      }),
+    ],
   },
   buildEnd(site) {
     cpSync(schemaDir, resolve(site.outDir, 'schema/v1'), { recursive: true })
