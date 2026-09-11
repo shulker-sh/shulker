@@ -3,12 +3,14 @@ package cli
 import (
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/selfupdate"
 )
 
 var version = "dev"
@@ -26,14 +28,19 @@ type app struct {
 	d          *deps
 	configPath string
 	packs      []*pack.Loaded
+	releases   *selfupdate.Releases
+	exe        func() (string, error)
 }
 
 func Execute(args []string, stdout, stderr io.Writer) int {
+	if runtime.GOOS == "windows" {
+		selfupdate.RemoveOld()
+	}
 	return newApp(stdout, stderr).run(args)
 }
 
 func newApp(stdout, stderr io.Writer) *app {
-	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal}
+	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal, exe: selfupdate.Executable}
 }
 
 func (a *app) run(args []string) int {
@@ -61,7 +68,7 @@ func (a *app) root() *cobra.Command {
 	root.SetHelpTemplate(root.HelpTemplate() + helpFooter)
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
-	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.linksCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.featureCmd(), a.playerCmd())
+	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.linksCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd())
 	return root
 }
 

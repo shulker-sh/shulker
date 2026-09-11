@@ -37,6 +37,7 @@ outline: [2, 3]
 | [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
 | [`shulker export mrpack`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker version`](#shulker-version) | Print the shulker version |
+| [`shulker self update`](#shulker-self-update) | Update shulker to the latest release |
 
 ## Global flags
 
@@ -514,3 +515,18 @@ Print the shulker version.
 ```sh
 shulker version
 ```
+
+### `shulker self update`
+
+Replace the running shulker with the latest release from GitHub. It checks the download against the release's SHA256 checksums and, when the [GitHub CLI](https://cli.github.com) (`gh`) is installed, verifies its build provenance. Without `gh`, it installs on the checksum alone.
+
+```sh
+shulker self update
+shulker self update --check
+```
+
+| Flag | Description |
+| --- | --- |
+| `--check` | Only report whether a newer release is available |
+| `--without-attestation` | Skip the build provenance check |
+| `--require-attestation` | Fail unless `gh` verifies the build provenance |
