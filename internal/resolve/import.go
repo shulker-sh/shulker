@@ -27,7 +27,7 @@ type Imported struct {
 	Reused    []string          `json:"reused"`
 	Dropped   []string          `json:"dropped"`
 	Unmanaged []string          `json:"unmanaged"`
-	Warnings  []string          `json:"warnings"`
+	Warnings  []string          `json:"-"`
 	Overrides []mrpack.Override `json:"-"`
 }
 

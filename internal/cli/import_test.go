@@ -162,7 +162,8 @@ func TestImportMrpackTamperedMarker(t *testing.T) {
 
 	dir := filepath.Join(t.TempDir(), "imported")
 	var env struct {
-		Data importResult `json:"data"`
+		Warnings []string     `json:"warnings"`
+		Data     importResult `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", tampered, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
@@ -171,8 +172,8 @@ func TestImportMrpackTamperedMarker(t *testing.T) {
 	if strings.Join(res.Mods.Reused, ",") != "fabric-api" || strings.Join(res.Mods.Dropped, ",") != "sodium" {
 		t.Fatalf("mods: %+v", res.Mods)
 	}
-	if len(res.Warnings) != 0 {
-		t.Fatalf("result: %+v", res)
+	if len(env.Warnings) != 0 {
+		t.Fatalf("warnings: %v", env.Warnings)
 	}
 	m, l := readProject(t, dir)
 	if len(m.Mods) != 0 || m.Minecraft != "26.2" {

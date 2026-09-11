@@ -25,7 +25,7 @@ type DiffReport struct {
 	Target   string     `json:"target"`
 	Dir      string     `json:"dir"`
 	Files    []FileDiff `json:"files"`
-	Warnings []string   `json:"warnings"`
+	Warnings []string   `json:"-"`
 }
 
 type PullReport struct {
@@ -35,7 +35,7 @@ type PullReport struct {
 	Keys            []string `json:"keys"`
 	Adopted         []string `json:"adopted"`
 	Skipped         []string `json:"skipped"`
-	Warnings        []string `json:"warnings"`
+	Warnings        []string `json:"-"`
 	ManifestChanged bool     `json:"manifestChanged"`
 }
 

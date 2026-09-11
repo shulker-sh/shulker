@@ -37,7 +37,7 @@ type MrpackReport struct {
 	Mods      []string `json:"mods"`
 	Bundled   []string `json:"bundled"`
 	Overrides []string `json:"overrides"`
-	Warnings  []string `json:"warnings"`
+	Warnings  []string `json:"-"`
 }
 
 type mrpackTarget struct {

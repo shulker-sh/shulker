@@ -39,7 +39,7 @@ func (a *app) serveJava(ctx context.Context, p *project.Project) (server.Java, e
 		if out.CodeOf(err) != "runtime-unavailable" {
 			return server.Java{}, err
 		}
-		a.progress("%s; using java on PATH", err)
+		a.printer.Warn("%s; using java on PATH", err)
 		return server.FindJava("", p.Lock.Java.Major)
 	}
 	return server.JavaAt(rt.Home)

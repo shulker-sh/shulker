@@ -134,7 +134,7 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 		pinned, ok := p.Lock.Packs[mp.Source]
 		if !ok {
 			name, _ := pack.Name(mp)
-			a.progress("warning: pack %s is not in the lock yet; resolving it", name)
+			a.printer.Warn("pack %s is not in the lock yet; resolving it", name)
 			l, err := store.Resolve(ctx, mp)
 			if err != nil {
 				return nil, err
@@ -147,7 +147,7 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 			return nil, err
 		}
 		if warning != "" {
-			a.progress("warning: %s", warning)
+			a.printer.Warn("%s", warning)
 		}
 		loaded = append(loaded, l)
 	}
@@ -192,8 +192,31 @@ func (a *app) progress(format string, args ...any) {
 
 func (a *app) warn(warnings []string) {
 	for _, w := range warnings {
-		a.progress("warning: %s", w)
+		a.printer.Warn("%s", w)
 	}
+}
+
+func (a *app) warnFor(name string, several bool, warnings []string) {
+	if several {
+		defer a.scopeWarnings(name)()
+	}
+	a.warn(warnings)
+}
+
+func (a *app) scopeWarnings(name string) (restore func()) {
+	prev := a.printer.WarnPrefix
+	a.printer.WarnPrefix = name + ": "
+	return func() { a.printer.WarnPrefix = prev }
+}
+
+func (a *app) requireLock(p *project.Project) error {
+	if err := p.RequireLock(); err != nil {
+		return err
+	}
+	if a.printer.LockStale {
+		a.printer.Warn("shulker.lock is out of date with shulker.json; run `shulker add`, `remove`, or `update` to refresh it")
+	}
+	return nil
 }
 
 func (a *app) commit(p *project.Project, r *resolve.Resolver) (*resolve.Validation, error) {

@@ -11,7 +11,6 @@ import (
 
 type addResult struct {
 	Added       []*resolve.Added `json:"added"`
-	Warnings    []string         `json:"warnings"`
 	Suggestions []string         `json:"suggestions"`
 }
 
@@ -48,7 +47,7 @@ func (a *app) addCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res := addResult{Added: results, Warnings: v.Warnings, Suggestions: v.Suggestions}
+			res := addResult{Added: results, Suggestions: v.Suggestions}
 			return a.printer.Emit(res, func(w io.Writer) {
 				for _, r := range res.Added {
 					if r.SwitchedFrom != "" {

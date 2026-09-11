@@ -13,7 +13,6 @@ import (
 type updateResult struct {
 	*resolve.Updated
 	Pin         string   `json:"pin,omitempty"`
-	Warnings    []string `json:"warnings"`
 	Suggestions []string `json:"suggestions"`
 }
 
@@ -120,7 +119,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		return err
 	}
 	updated.Packs = resolve.PackChanges(pinsBefore, p.Lock.Packs)
-	res := updateResult{Updated: updated, Pin: pin, Warnings: v.Warnings, Suggestions: v.Suggestions}
+	res := updateResult{Updated: updated, Pin: pin, Suggestions: v.Suggestions}
 	return a.printer.Emit(res, func(w io.Writer) {
 		if cmd.Name() == "pin" {
 			fmt.Fprintf(w, "pinned %s to %s\n", cmd.Flags().Arg(0), pin)

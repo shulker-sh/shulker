@@ -29,7 +29,6 @@ type syncResult struct {
 	Target     string        `json:"target"`
 	Dir        string        `json:"dir"`
 	Fetched    []string      `json:"fetched"`
-	Warnings   []string      `json:"warnings"`
 	Build      *build.Report `json:"build"`
 	Registered *config.Link  `json:"registered,omitempty"`
 }
@@ -125,9 +124,8 @@ func (res syncResult) print(w io.Writer) {
 
 type syncSource struct {
 	*pack.Checkout
-	name     string
-	project  *project.Project
-	warnings []string
+	name    string
+	project *project.Project
 }
 
 func (s *syncSource) remote() bool { return s.Kind != pack.Local }
@@ -142,8 +140,7 @@ func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, er
 		s.name = co.Dir
 	}
 	if co.Warning != "" {
-		s.warnings = []string{co.Warning}
-		a.warn(s.warnings)
+		a.printer.Warn("%s", co.Warning)
 	}
 	s.project, err = a.openProjectAt(co.Dir)
 	if errors.Is(err, project.ErrNoManifest) {
@@ -152,11 +149,8 @@ func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, er
 	if err != nil {
 		return nil, err
 	}
-	if err := s.project.RequireLock(); err != nil {
+	if err := a.requireLock(s.project); err != nil {
 		return nil, err
-	}
-	if a.printer.LockStale {
-		a.progress("warning: shulker.lock is out of date with shulker.json; run `shulker add`, `remove`, or `update` to refresh it")
 	}
 	return s, nil
 }
@@ -191,7 +185,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if err != nil {
 		return syncResult{}, err
 	}
-	fetched, warnings, err := a.fetchLocked(ctx, p, t.Side == "server")
+	fetched, err := a.fetchLocked(ctx, p, t.Side == "server")
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -219,10 +213,10 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	}
 	if remote && !src.Offline {
 		if err := a.sourceStore().RecordGood(src.Checkout); err != nil {
-			a.progress("warning: couldn't record %s as the offline fallback: %v", src.name, err)
+			a.printer.Warn("couldn't record %s as the offline fallback: %v", src.name, err)
 		}
 	}
-	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Target: name, Dir: into, Fetched: fetched, Warnings: append(src.warnings, warnings...), Build: rep}
+	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Target: name, Dir: into, Fetched: fetched, Build: rep}
 	if !src.LastGood.IsZero() {
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}

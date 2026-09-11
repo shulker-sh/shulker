@@ -59,7 +59,8 @@ func TestSyncIntoDirectory(t *testing.T) {
 	}
 
 	var env struct {
-		Data syncResult `json:"data"`
+		Warnings []string   `json:"warnings"`
+		Data     syncResult `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", h.dir, "--into", into, "--target", "client", "--json")), &env); err != nil {
 		t.Fatal(err)
@@ -110,7 +111,8 @@ func TestSyncFromGit(t *testing.T) {
 
 	into := filepath.Join(t.TempDir(), "minecraft")
 	var env struct {
-		Data syncResult `json:"data"`
+		Warnings []string   `json:"warnings"`
+		Data     syncResult `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
@@ -209,13 +211,14 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 	srv.Close()
 
 	var env struct {
-		Data syncResult `json:"data"`
+		Warnings []string   `json:"warnings"`
+		Data     syncResult `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	want := "offline, using " + source + " at " + good[:12] + " from the last successful sync just now"
-	if res := env.Data; res.Commit != good || !res.Offline || res.LastGoodAt == "" || len(res.Warnings) == 0 || res.Warnings[0] != want {
+	if res := env.Data; res.Commit != good || !res.Offline || res.LastGoodAt == "" || len(env.Warnings) == 0 || env.Warnings[0] != want {
 		t.Fatalf("offline sync falls back to the last good build, not the broken commit: %+v", res)
 	}
 	if _, stderr := h.mustRunStderr(t, "sync", source, "--into", into, "--ref", good); !strings.Contains(stderr, "offline, using "+source+" at "+good[:12]+", already downloaded") {
@@ -272,7 +275,8 @@ func TestSyncFromManifestURL(t *testing.T) {
 
 	into := filepath.Join(t.TempDir(), "minecraft")
 	var env struct {
-		Data syncResult `json:"data"`
+		Warnings []string   `json:"warnings"`
+		Data     syncResult `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
@@ -293,7 +297,7 @@ func TestSyncFromManifestURL(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--offline", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if res := env.Data; !res.Offline || res.Sha256 != good || len(res.Warnings) == 0 || res.Warnings[0] != "--offline, using "+source+" from the last successful sync just now" || hits != 0 {
+	if res := env.Data; !res.Offline || res.Sha256 != good || len(env.Warnings) == 0 || env.Warnings[0] != "--offline, using "+source+" from the last successful sync just now" || hits != 0 {
 		t.Fatalf("--offline must not touch the network (%d requests): %+v", hits, res)
 	}
 
@@ -322,7 +326,7 @@ func TestSyncFromManifestURL(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if res := env.Data; !res.Offline || res.Sha256 != good || res.Warnings[0] != "offline, using "+source+" from the last successful sync just now" {
+	if res := env.Data; !res.Offline || res.Sha256 != good || len(env.Warnings) == 0 || env.Warnings[0] != "offline, using "+source+" from the last successful sync just now" {
 		t.Fatalf("unreachable url falls back to the last good copy: %+v", res)
 	}
 	code, stdout, _ = h.run(t, "sync", srv.URL+"/other/shulker.json", "--into", into, "--json")

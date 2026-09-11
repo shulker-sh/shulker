@@ -116,7 +116,7 @@ func (a *app) checkProvenance(ctx context.Context, r *selfupdate.Releases, tag, 
 		if require {
 			return "", out.Errorf("update-provenance", "--require-attestation is set but gh is not installed")
 		}
-		a.progress("gh not found, skipping build provenance check")
+		a.printer.Warn("gh not found, skipping build provenance check")
 		return "skipped", nil
 	}
 	a.progress("verifying build provenance with gh")
@@ -124,7 +124,7 @@ func (a *app) checkProvenance(ctx context.Context, r *selfupdate.Releases, tag, 
 		if require {
 			return "", out.Errorf("update-provenance", "build provenance could not be verified: %v", err)
 		}
-		a.progress("build provenance could not be verified, continuing on the checksum")
+		a.printer.Warn("build provenance could not be verified, continuing on the checksum")
 		return "unverified", nil
 	}
 	a.progress("build provenance verified")

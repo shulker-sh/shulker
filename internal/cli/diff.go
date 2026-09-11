@@ -42,11 +42,8 @@ func (a *app) diffCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := p.RequireLock(); err != nil {
+			if err := a.requireLock(p); err != nil {
 				return err
-			}
-			if a.printer.LockStale {
-				a.progress("warning: shulker.lock is out of date with shulker.json; run `shulker add`, `remove`, or `update` to refresh it")
 			}
 			b, err := a.builder(cmd.Context(), p)
 			if err != nil {
@@ -83,13 +80,13 @@ func (a *app) diffCmd() *cobra.Command {
 				for _, dir := range dirs {
 					rep, err := b.Diff(name, build.Options{Dir: dir, Features: lf.Features})
 					if err != nil && dir != "" && dir != buildDir && into == "" {
-						a.progress("warning: skipped %s: %v", dir, err)
+						a.printer.Warn("skipped %s: %v", dir, err)
 						continue
 					}
 					if err != nil {
 						return err
 					}
-					a.warn(rep.Warnings)
+					a.warnFor(name, len(names) > 1, rep.Warnings)
 					reports = append(reports, rep)
 					where[rep] = "the build directory"
 					if dir != "" && dir != buildDir {
@@ -127,11 +124,8 @@ func (a *app) pullCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := p.RequireLock(); err != nil {
+			if err := a.requireLock(p); err != nil {
 				return err
-			}
-			if a.printer.LockStale {
-				a.progress("warning: shulker.lock is out of date with shulker.json; run `shulker add`, `remove`, or `update` to refresh it")
 			}
 			name, _, err := singleTarget(p, target)
 			if err != nil {
@@ -200,7 +194,7 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, n
 			if dir == buildDir {
 				return "", err
 			}
-			a.progress("warning: skipped %s: %v", dir, err)
+			a.printer.Warn("skipped %s: %v", dir, err)
 			continue
 		}
 		if len(rep.Files) > 0 {

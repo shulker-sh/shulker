@@ -17,9 +17,8 @@ import (
 )
 
 type installResult struct {
-	Fetched  []string        `json:"fetched"`
-	Warnings []string        `json:"warnings"`
-	Builds   []*build.Report `json:"builds"`
+	Fetched []string        `json:"fetched"`
+	Builds  []*build.Report `json:"builds"`
 }
 
 func (a *app) installCmd() *cobra.Command {
@@ -38,13 +37,10 @@ func (a *app) installCmd() *cobra.Command {
 			if err := checkOS(osName); err != nil {
 				return err
 			}
-			if err := p.RequireLock(); err != nil {
+			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			if a.printer.LockStale {
-				a.progress("warning: shulker.lock is out of date with shulker.json; run `shulker add`, `remove`, or `update` to refresh it")
-			}
-			fetched, warnings, err := a.fetchLocked(cmd.Context(), p, hasServerTarget(p.Manifest.Targets))
+			fetched, err := a.fetchLocked(cmd.Context(), p, hasServerTarget(p.Manifest.Targets))
 			if err != nil {
 				return err
 			}
@@ -64,13 +60,13 @@ func (a *app) installCmd() *cobra.Command {
 				return err
 			}
 			names := targetNames(p.Manifest.Targets)
-			res := installResult{Fetched: fetched, Warnings: warnings}
+			res := installResult{Fetched: fetched}
 			for _, name := range names {
 				rep, err := b.Build(name, build.Options{Force: force, OS: osName, Features: overrides})
 				if err != nil {
 					return err
 				}
-				a.warn(rep.Warnings)
+				a.warnFor(name, len(names) > 1, rep.Warnings)
 				res.Builds = append(res.Builds, rep)
 			}
 			a.refreshLocal(lf, true, false)
@@ -89,34 +85,34 @@ func (a *app) installCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bool) ([]string, []string, error) {
+func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bool) ([]string, error) {
 	r, err := a.resolver(ctx, p)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	fetched, dropWarnings, err := r.Install(ctx)
+	a.warn(dropWarnings)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if fetched == nil {
 		fetched = []string{}
 	}
-	var runtimeWarning string
 	if wantServer {
 		d, err := a.deps()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		jar, err := r.EnsureServerJar(ctx, d.meta.Fabric)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if jar.Fetched {
 			fetched = append(fetched, "fabric-server-launcher")
 		}
 		if jar.Locked {
 			if err := p.Lock.Save(p.LockPath()); err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 		}
 		if p.Manifest.Java == "" {
@@ -124,14 +120,14 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 			if err != nil && fetch.IsNetwork(err) {
 				if kept, keptErr := a.managedJava(ctx, p, false); keptErr == nil {
 					rt, err = kept, nil
-					runtimeWarning = fmt.Sprintf("offline, keeping the installed Java runtime %s %s", kept.Component, kept.Version)
+					a.printer.Warn("offline, keeping the installed Java runtime %s %s", kept.Component, kept.Version)
 				}
 			}
 			if err != nil && out.CodeOf(err) != "runtime-unavailable" {
-				return nil, nil, err
+				return nil, err
 			}
 			if err != nil {
-				runtimeWarning = err.Error()
+				a.printer.Warn("%s", err)
 			} else if rt.Fetched {
 				fetched = append(fetched, rt.Component+" "+rt.Version)
 			}
@@ -139,17 +135,13 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 	}
 	v, err := r.Validate()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if err := v.Err(); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	warnings := append(dropWarnings, v.Warnings...)
-	if runtimeWarning != "" {
-		warnings = append(warnings, runtimeWarning)
-	}
-	a.warn(warnings)
-	return fetched, warnings, nil
+	a.warn(v.Warnings)
+	return fetched, nil
 }
 
 func hasServerTarget(targets map[string]manifest.Target) bool {

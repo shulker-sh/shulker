@@ -181,7 +181,12 @@ func (a *app) syncLinks(cmd *cobra.Command, links []config.Link, req syncRequest
 			fmt.Fprintln(w, linkHeading(l))
 		}
 		r := syncLinkResult{Link: l, OK: true}
+		restore := func() {}
+		if len(links) > 1 {
+			restore = a.scopeWarnings(l.Name)
+		}
 		res, err := a.syncLink(cmd, l, req)
+		restore()
 		if err != nil {
 			failed++
 			r.OK, r.Error = false, out.AsError(err)

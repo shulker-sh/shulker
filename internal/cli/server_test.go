@@ -119,15 +119,15 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatalf("both-changed key must not fail the build: %s", stdout)
 	}
 	var env struct {
-		Data []struct {
-			Written  []string `json:"written"`
-			Warnings []string `json:"warnings"`
+		Warnings []string `json:"warnings"`
+		Data     []struct {
+			Written []string `json:"written"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if len(env.Data) != 1 || len(env.Data[0].Written) != 1 || len(env.Data[0].Warnings) != 1 || !strings.Contains(env.Data[0].Warnings[0], "motd was edited in the build and changed in the manifest") {
+	if len(env.Data) != 1 || len(env.Data[0].Written) != 1 || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "motd was edited in the build and changed in the manifest") {
 		t.Fatalf("both-changed key: %+v", env.Data)
 	}
 	if got := readFile(t, propsPath); !strings.Contains(got, "motd=Theirs") || !strings.Contains(got, "online-mode=false") {

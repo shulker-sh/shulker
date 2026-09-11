@@ -78,7 +78,7 @@ type Report struct {
 	Moved     []string `json:"moved"`
 	Conflicts []string `json:"conflicts"`
 	Excluded  []string `json:"excluded"`
-	Warnings  []string `json:"warnings"`
+	Warnings  []string `json:"-"`
 	Forced    bool     `json:"forced"`
 }
 

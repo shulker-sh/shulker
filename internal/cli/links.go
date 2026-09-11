@@ -201,6 +201,6 @@ func (a *app) updateLinks(update func([]config.Link) []config.Link) bool {
 			return changed
 		}
 	}
-	a.progress("warning: config.json not updated: %v", err)
+	a.printer.Warn("config.json not updated: %v", err)
 	return false
 }

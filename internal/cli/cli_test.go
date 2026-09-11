@@ -35,7 +35,7 @@ func TestVersionJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if !env.OK || env.Command != "version" || env.Error != nil {
+	if !env.OK || env.Command != "version" || env.Error != nil || env.Warnings == nil {
 		t.Fatalf("unexpected envelope %+v", env)
 	}
 	data := env.Data.(map[string]any)

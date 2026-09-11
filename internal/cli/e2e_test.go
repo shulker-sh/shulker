@@ -489,6 +489,13 @@ func TestStaleLockBlocksBuild(t *testing.T) {
 	if code == 0 || !env.LockStale || env.Error.Code != "lock-stale" {
 		t.Fatalf("code=%d env=%+v", code, env)
 	}
+	env = out.Envelope{}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "install", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "shulker.lock is out of date") {
+		t.Fatalf("install warns about the stale lock in the envelope: %+v", env)
+	}
 }
 
 func TestRemovePrunesOrphans(t *testing.T) {
@@ -605,7 +612,7 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 		t.Fatalf("matching ignore should pass: %s %s", stdout, stderr)
 	}
 	data := env.Data.(map[string]any)
-	if w := data["warnings"].([]any); len(w) != 1 || !strings.Contains(w[0].(string), "conflicts with fabric-api 1.x") {
+	if w := env.Warnings; len(w) != 1 || !strings.Contains(w[0], "conflicts with fabric-api 1.x") {
 		t.Fatalf("conflict should warn: %v", w)
 	}
 	if sg := data["suggestions"].([]any); len(sg) != 1 || sg[0] != "sodium recommends iris" {

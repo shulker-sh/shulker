@@ -107,7 +107,7 @@ func (a *app) refreshLocal(lf *local.File, inProject, changed bool) {
 		return
 	}
 	if err := a.saveLocal(lf, inProject); err != nil {
-		a.progress("warning: %s not updated: %v", local.FileName, err)
+		a.printer.Warn("%s not updated: %v", local.FileName, err)
 	}
 }
 

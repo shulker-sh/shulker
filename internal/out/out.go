@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -15,11 +16,12 @@ const (
 )
 
 type Envelope struct {
-	OK        bool   `json:"ok"`
-	Command   string `json:"command"`
-	LockStale bool   `json:"lockStale"`
-	Data      any    `json:"data,omitempty"`
-	Error     *Error `json:"error,omitempty"`
+	OK        bool     `json:"ok"`
+	Command   string   `json:"command"`
+	LockStale bool     `json:"lockStale"`
+	Warnings  []string `json:"warnings"`
+	Data      any      `json:"data,omitempty"`
+	Error     *Error   `json:"error,omitempty"`
 }
 
 type Error struct {
@@ -62,11 +64,33 @@ type Printer struct {
 	LockStale bool
 	Stdout    io.Writer
 	Stderr    io.Writer
+	// WarnPrefix names the target or instance a multi-part run is on.
+	WarnPrefix string
+	warnings   []string
+}
+
+func (p *Printer) Warn(format string, args ...any) {
+	msg := p.WarnPrefix + fmt.Sprintf(format, args...)
+	if slices.Contains(p.warnings, msg) {
+		return
+	}
+	p.warnings = append(p.warnings, msg)
+	if !p.JSON {
+		fmt.Fprintf(p.Stderr, "warning: %s\n", msg)
+	}
+}
+
+func (p *Printer) envelope(ok bool, data any, e *Error) Envelope {
+	warnings := p.warnings
+	if warnings == nil {
+		warnings = []string{}
+	}
+	return Envelope{OK: ok, Command: p.Command, LockStale: p.LockStale, Warnings: warnings, Data: data, Error: e}
 }
 
 func (p *Printer) Emit(data any, human func(w io.Writer)) error {
 	if p.JSON {
-		return p.encode(Envelope{OK: true, Command: p.Command, LockStale: p.LockStale, Data: data})
+		return p.encode(p.envelope(true, data, nil))
 	}
 	human(p.Stdout)
 	return nil
@@ -75,7 +99,7 @@ func (p *Printer) Emit(data any, human func(w io.Writer)) error {
 func (p *Printer) Fail(err error) int {
 	e := AsError(err)
 	if p.JSON {
-		_ = p.encode(Envelope{OK: false, Command: p.Command, LockStale: p.LockStale, Data: e.Data, Error: e})
+		_ = p.encode(p.envelope(false, e.Data, e))
 		return e.Exit
 	}
 	fmt.Fprintf(p.Stderr, "shulker: %s\n", e.Message)

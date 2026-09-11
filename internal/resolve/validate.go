@@ -27,7 +27,7 @@ type Problem struct {
 
 type Validation struct {
 	Problems    []Problem `json:"problems"`
-	Warnings    []string  `json:"warnings"`
+	Warnings    []string  `json:"-"`
 	Suggestions []string  `json:"suggestions"`
 }
 
