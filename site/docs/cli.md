@@ -45,7 +45,7 @@ These work with every command.
 
 ### `shulker init`
 
-Create `shulker.json` and `shulker.lock.json` in the current directory. Pass `--yes` for the defaults, or set at least `--name` and `--minecraft`.
+Create `shulker.json` and `shulker.lock` in the current directory. Pass `--yes` for the defaults, or set at least `--name` and `--minecraft`.
 
 ```sh
 shulker init --yes

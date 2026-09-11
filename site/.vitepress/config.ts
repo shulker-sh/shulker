@@ -68,7 +68,7 @@ export default defineConfig({
           items: [
             { text: 'CLI', link: '/docs/cli' },
             { text: 'Manifest (shulker.json)', link: '/docs/manifest' },
-            { text: 'Lock (shulker.lock.json)', link: '/docs/lock' },
+            { text: 'Lock (shulker.lock)', link: '/docs/lock' },
           ],
         },
       ],

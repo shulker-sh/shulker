@@ -6,7 +6,7 @@
 
 ## Lock
 
-`shulker.lock.json` records the exact resolved versions, hashes, and pack commits. See the [lock reference](/docs/lock).
+`shulker.lock` records the exact resolved versions, hashes, and pack commits. See the [lock reference](/docs/lock).
 
 ## Targets
 
