@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -136,95 +137,212 @@ func (a *app) featureCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) openFeatures(cmd *cobra.Command) (*project.Project, *build.Builder, *local.File, error) {
+type featureScope struct {
+	project   *project.Project
+	file      *local.File
+	decisions map[string]bool
+	into      string
+	source    *syncSource
+	state     build.State
+}
+
+func (a *app) openFeatures(cmd *cobra.Command, into string) (*featureScope, *build.Builder, error) {
+	var sc *featureScope
+	var err error
+	if into == "" {
+		sc, err = a.projectFeatures()
+	} else {
+		sc, err = a.instanceFeatures(cmd, into, true)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	b, err := a.builder(cmd.Context(), sc.project)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sc, b, nil
+}
+
+func (a *app) projectFeatures() (*featureScope, error) {
 	p, err := a.openProject()
 	if err != nil {
-		return nil, nil, nil, err
-	}
-	b, err := a.builder(cmd.Context(), p)
-	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	lf, err := local.Load(p.Dir)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
-	return p, b, lf, nil
+	return &featureScope{project: p, file: lf, decisions: lf.Features}, nil
+}
+
+func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool) (*featureScope, error) {
+	dir, err := filepath.Abs(into)
+	if err != nil {
+		return nil, err
+	}
+	sc := &featureScope{into: dir, state: build.LoadState(dir)}
+	if sc.file, err = local.Load(dir); err != nil {
+		return nil, err
+	}
+	sc.decisions = sc.file.Features
+	if !withSource {
+		return sc, nil
+	}
+	if sc.state.Source == "" {
+		return nil, out.Errorf("not-synced", "%s has no record of the source it was synced from; run `shulker sync <source> --into %s` once", dir, dir)
+	}
+	if sc.source, err = a.openSource(cmd.Context(), sc.state.Source, sc.state.Ref); err != nil {
+		return nil, err
+	}
+	sc.project = sc.source.project
+	proj, _, err := sourceLocalFiles(sc.source, dir)
+	if err != nil {
+		return nil, err
+	}
+	sc.decisions = mergeDecisions(proj.Features, sc.file.Features)
+	return sc, nil
+}
+
+func (a *app) resync(cmd *cobra.Command, sc *featureScope) (*syncResult, error) {
+	if sc.source == nil {
+		var err error
+		if sc, err = a.instanceFeatures(cmd, sc.into, true); err != nil {
+			return nil, err
+		}
+	}
+	res, err := a.sync(cmd.Context(), sc.source, syncRequest{ref: sc.state.Ref, target: sc.state.Target, into: sc.into})
+	return &res, err
+}
+
+func registerFeatureChange(cmd *cobra.Command) {
+	cmd.Flags().String("into", "", "change the choice for a synced directory instead of this project")
+	cmd.Flags().Bool("sync", false, "sync the --into directory from its recorded source right away")
+}
+
+func featureChangeFlags(cmd *cobra.Command) (into string, sync bool, err error) {
+	into, _ = cmd.Flags().GetString("into")
+	sync, _ = cmd.Flags().GetBool("sync")
+	if sync && into == "" {
+		return "", false, out.Errorf("usage", "--sync needs --into; in a project, run `shulker build`")
+	}
+	return into, sync, nil
+}
+
+func (a *app) emitFeatureChange(cmd *cobra.Command, sc *featureScope, sync, changed bool, res map[string]any, line string) error {
+	var synced *syncResult
+	if sync {
+		var err error
+		if synced, err = a.resync(cmd, sc); err != nil {
+			return err
+		}
+		res["sync"] = synced
+	}
+	if sc.into != "" {
+		res["into"] = sc.into
+	}
+	return a.printer.Emit(res, func(w io.Writer) {
+		switch {
+		case sc.into == "":
+			fmt.Fprintln(w, line)
+		case changed && synced == nil:
+			fmt.Fprintf(w, "%s in %s; takes effect on the next sync (a linked Prism instance syncs on launch)\n", line, sc.into)
+		default:
+			fmt.Fprintf(w, "%s in %s\n", line, sc.into)
+		}
+		if synced != nil {
+			synced.print(w)
+		}
+	})
 }
 
 func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   verb + " <feature>",
 		Short: fmt.Sprintf("Turn a feature %s for every target on this machine", verb),
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			_, b, lf, err := a.openFeatures(cmd)
+			into, sync, err := featureChangeFlags(cmd)
+			if err != nil {
+				return err
+			}
+			sc, b, err := a.openFeatures(cmd, into)
 			if err != nil {
 				return err
 			}
 			if known := featureNames(b.Features()); !slices.Contains(known, name) {
 				return unknownFeature(name, known)
 			}
-			lf.SetFeature(name, on)
-			if err := a.saveLocal(lf, true); err != nil {
+			sc.file.SetFeature(name, on)
+			if err := a.saveLocal(sc.file, into == ""); err != nil {
 				return err
 			}
-			return a.printer.Emit(map[string]any{"feature": name, "on": on}, func(w io.Writer) {
-				fmt.Fprintf(w, "%s %s; takes effect on the next build or sync\n", name, verb)
-			})
+			line := name + " " + verb
+			if into == "" {
+				line += "; takes effect on the next build or sync"
+			}
+			return a.emitFeatureChange(cmd, sc, sync, true, map[string]any{"feature": name, "on": on}, line)
 		},
 	}
+	registerFeatureChange(cmd)
+	return cmd
 }
 
 func (a *app) featureResetCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "reset <feature>",
 		Short: "Forget your choice for a feature and follow the target defaults again",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			p, err := a.openProject()
+			into, sync, err := featureChangeFlags(cmd)
 			if err != nil {
 				return err
 			}
-			lf, err := local.Load(p.Dir)
+			var sc *featureScope
+			if into == "" {
+				sc, err = a.projectFeatures()
+			} else {
+				sc, err = a.instanceFeatures(cmd, into, false)
+			}
 			if err != nil {
 				return err
 			}
-			had := lf.ResetFeature(name)
+			had := sc.file.ResetFeature(name)
 			if had {
-				if err := a.saveLocal(lf, true); err != nil {
+				if err := a.saveLocal(sc.file, into == ""); err != nil {
 					return err
 				}
 			}
-			return a.printer.Emit(map[string]any{"feature": name, "reset": had}, func(w io.Writer) {
-				if had {
-					fmt.Fprintf(w, "%s follows the target defaults again\n", name)
-				} else {
-					fmt.Fprintf(w, "%s had no choice to reset\n", name)
-				}
-			})
+			line := name + " follows the target defaults again"
+			if !had {
+				line = name + " had no choice to reset"
+			}
+			return a.emitFeatureChange(cmd, sc, sync, had, map[string]any{"feature": name, "reset": had}, line)
 		},
 	}
+	registerFeatureChange(cmd)
+	return cmd
 }
 
 func (a *app) featureListCmd() *cobra.Command {
-	return &cobra.Command{
+	var into string
+	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List features with the mods they gate, target defaults, and your choices",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p, b, lf, err := a.openFeatures(cmd)
+			sc, b, err := a.openFeatures(cmd, into)
 			if err != nil {
 				return err
 			}
-			targets := targetNames(p.Manifest.Targets)
+			targets := targetNames(sc.project.Manifest.Targets)
 			res := []featureStatus{}
 			for _, f := range b.Features() {
 				st := featureStatus{Feature: f, Effective: map[string]bool{}}
-				if on, ok := lf.Features[f.Name]; ok {
+				if on, ok := sc.decisions[f.Name]; ok {
 					st.Choice = &on
 				}
 				for _, t := range targets {
@@ -248,6 +366,8 @@ func (a *app) featureListCmd() *cobra.Command {
 			})
 		},
 	}
+	cmd.Flags().StringVar(&into, "into", "", "list the choices for a synced directory instead of this project")
+	return cmd
 }
 
 func (st featureStatus) state(targets int) string {

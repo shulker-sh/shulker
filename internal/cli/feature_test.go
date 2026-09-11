@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +15,96 @@ import (
 type localView struct {
 	Features   map[string]bool `json:"features"`
 	DetectedOS string          `json:"detectedOs"`
+}
+
+func readLocal(t *testing.T, dir string) localView {
+	t.Helper()
+	var lf localView
+	data, err := os.ReadFile(filepath.Join(dir, "shulker.local.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &lf); err != nil {
+		t.Fatal(err)
+	}
+	return lf
+}
+
+func TestFeatureIntoSyncedDir(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
+	into := filepath.Join(t.TempDir(), "instance")
+	jar := filepath.Join(into, "mods", h.jars["sodium"].filename)
+	h.mustRun(t, "sync", h.dir, "--into", into)
+
+	stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into)
+	if stdout != "fancy on in "+into+"; takes effect on the next sync (a linked Prism instance syncs on launch)\n" {
+		t.Fatalf("feature on --into: %q", stdout)
+	}
+	if lf := readLocal(t, into); !lf.Features["fancy"] {
+		t.Fatalf("instance local file: %+v", lf)
+	}
+	if lf := readLocal(t, h.dir); len(lf.Features) != 0 {
+		t.Fatalf("the project local file must not change: %+v", lf)
+	}
+	if _, err := os.Stat(jar); !os.IsNotExist(err) {
+		t.Fatalf("feature --into without --sync must not sync: %v", err)
+	}
+	if stdout := h.mustRun(t, "feature", "list", "--into", into); stdout != "fancy  on (your choice)  gates: sodium\n" {
+		t.Fatalf("list --into: %q", stdout)
+	}
+
+	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "fancy on in "+into+"\nfetched ") {
+		t.Fatalf("feature on --sync: %q", stdout)
+	}
+	if _, err := os.Stat(jar); err != nil {
+		t.Fatalf("--sync should ship the gated mod: %v", err)
+	}
+	if stdout := h.mustRun(t, "feature", "reset", "fancy", "--into", into, "--sync"); !strings.Contains(stdout, "excluded sodium") {
+		t.Fatalf("feature reset --sync: %q", stdout)
+	}
+	if _, err := os.Stat(jar); !os.IsNotExist(err) {
+		t.Fatalf("reset --sync should drop the gated mod: %v", err)
+	}
+
+	code, stdout, _ := h.run(t, "feature", "on", "fanci", "--into", into, "--json")
+	if code == 0 || failureCode(t, stdout).Code != "feature-not-found" {
+		t.Fatalf("unknown feature --into: exit %d %s", code, stdout)
+	}
+	code, stdout, _ = h.run(t, "feature", "on", "fancy", "--sync", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "usage" {
+		t.Fatalf("--sync without --into: exit %d %s", code, stdout)
+	}
+	code, stdout, _ = h.run(t, "feature", "on", "fancy", "--into", t.TempDir(), "--json")
+	if code == 0 || failureCode(t, stdout).Code != "not-synced" {
+		t.Fatalf("--into a dir never synced: exit %d %s", code, stdout)
+	}
+}
+
+func TestFeatureIntoGitSyncedDir(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
+	gitRun(t, h.dir, "init", "-q", "-b", "main")
+	gitRun(t, h.dir, "add", ".")
+	gitRun(t, h.dir, "commit", "-q", "-m", "one")
+	source := "file://" + h.dir
+	into := filepath.Join(t.TempDir(), "instance")
+	h.mustRun(t, "sync", source, "--into", into)
+
+	h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync")
+	if _, err := os.Stat(filepath.Join(into, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("--sync from the recorded git source should ship the gated mod: %v", err)
+	}
+	if st := build.LoadState(into); st.Source != source {
+		t.Fatalf("state origin: %+v", st.Origin)
+	}
 }
 
 func TestFeatureChoicesAndOneOffFlags(t *testing.T) {

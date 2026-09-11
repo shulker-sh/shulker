@@ -203,14 +203,24 @@ shulker target list
 
 A feature is a name that mods opt into with a `feature` condition, like `shaders`. Each target can turn features on by default. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, and `export mrpack` use your choices over the target defaults, and their `--with` and `--without` flags override both for one run.
 
+A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into`. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
+
 ### `shulker feature on|off`
 
 Turn a feature on or off for every target on this machine. It takes effect on the next build or sync, including a launcher's pre-launch sync. Naming a feature nothing in `shulker.json` uses is an error.
 
+With `--into`, the choice is saved for that synced directory only. shulker checks the name against the project that directory was synced from.
+
 ```sh
 shulker feature on shaders
 shulker feature off fancy
+shulker feature on shaders --into ~/instances/my-pack --sync
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--into <path>` | Change the choice for a directory you synced into, instead of this project |
+| `--sync` | Sync the `--into` directory from its source right away, instead of at the next sync |
 
 ### `shulker feature reset`
 
@@ -218,7 +228,13 @@ Forget your choice for a feature so it follows the target defaults again.
 
 ```sh
 shulker feature reset shaders
+shulker feature reset shaders --into ~/instances/my-pack
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--into <path>` | Forget the choice for a directory you synced into, instead of this project |
+| `--sync` | Sync the `--into` directory from its source right away, instead of at the next sync |
 
 ### `shulker feature list`
 
@@ -226,7 +242,12 @@ List each feature with its state and the mods it gates. A `!` before a mod means
 
 ```sh
 shulker feature list
+shulker feature list --into ~/instances/my-pack
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--into <path>` | List the choices that apply to a directory you synced into |
 
 ## Builds
 
