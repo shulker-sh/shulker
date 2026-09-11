@@ -207,9 +207,9 @@ type drift struct {
 }
 
 func (b *Builder) drift(name string, opts Options) (*drift, error) {
-	target, ok := b.Manifest.Targets[name]
-	if !ok {
-		return nil, out.Errorf("unknown-target", "target %q is not in the manifest", name)
+	target, err := b.Manifest.Target(name)
+	if err != nil {
+		return nil, err
 	}
 	dir := opts.Dir
 	if dir == "" {
@@ -310,7 +310,7 @@ func (b *Builder) adoptKeys(name, rel string, keys []string, d *drift, report *P
 	}
 	existing, err := os.ReadFile(filepath.Join(d.dir, filepath.FromSlash(rel)))
 	if errors.Is(err, fs.ErrNotExist) {
-		return out.Errorf("not-found", "%s is not in %s", rel, d.dir)
+		return out.Errorf("file-not-found", "%s is not in %s", rel, d.dir)
 	}
 	if err != nil {
 		return err

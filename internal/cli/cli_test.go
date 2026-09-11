@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -55,7 +57,7 @@ func TestHelpLinksDocs(t *testing.T) {
 
 func TestUnknownCommandJSON(t *testing.T) {
 	code, stdout, stderr := run(t, "bogus", "--json")
-	if code != out.ExitError {
+	if code != out.ExitUsage {
 		t.Fatalf("exit %d", code)
 	}
 	if stderr != "" {
@@ -65,14 +67,14 @@ func TestUnknownCommandJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.OK || env.Error == nil || env.Error.Code != "error" {
+	if env.OK || env.Error == nil || env.Error.Code != "usage" {
 		t.Fatalf("unexpected envelope %+v", env)
 	}
 }
 
 func TestUnknownCommandHuman(t *testing.T) {
 	code, stdout, stderr := run(t, "bogus")
-	if code != out.ExitError || stdout != "" || !strings.HasPrefix(stderr, "shulker: ") {
+	if code != out.ExitUsage || stdout != "" || !strings.HasPrefix(stderr, "shulker: ") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }
@@ -83,5 +85,18 @@ func TestSlugify(t *testing.T) {
 		if got := slugify(in); got != want {
 			t.Errorf("slugify(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestProjectFileCodes(t *testing.T) {
+	dir := t.TempDir()
+	if code, stdout, _ := run(t, "build", "-C", dir, "--json"); code != out.ExitError || failureCode(t, stdout).Code != "manifest-not-found" {
+		t.Fatalf("no shulker.json: exit %d %s", code, stdout)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "shulker.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code, stdout, _ := run(t, "build", "-C", dir, "--json"); code != out.ExitError || failureCode(t, stdout).Code != "manifest-invalid" {
+		t.Fatalf("invalid shulker.json: exit %d %s", code, stdout)
 	}
 }

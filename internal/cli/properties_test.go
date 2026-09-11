@@ -107,7 +107,7 @@ func TestPropertiesLayersAndWholeFiles(t *testing.T) {
 		m["targets"].(map[string]any)["client"].(map[string]any)["wholeFiles"] = []string{"config/strict.*"}
 	})
 	code, stdout, _ := h.run(t, "build", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "build-conflict" || strings.Join(e.Candidates, ",") != "config/strict.properties (not written by shulker)" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "build-conflict" || strings.Join(e.Items, ",") != "config/strict.properties (not written by shulker)" {
 		t.Fatalf("a whole file must still conflict with one shulker never wrote: exit %d %s", code, stdout)
 	}
 	if got := readFile(t, filepath.Join(built, "mod.properties")); got != "a=game\nz=game\n" {

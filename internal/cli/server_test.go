@@ -220,7 +220,7 @@ func TestServerBuildValidatesPropertyKeys(t *testing.T) {
 		m["server"] = map[string]any{"properties": map[string]any{"difficulty": "easy", "pvp": false, "vew-distance": 8}}
 	})
 	code, stdout, _ := h.run(t, "install", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "invalid-properties" || len(e.Candidates) != 1 || e.Candidates[0] != "pvp (removed in 1.21.9; use the pvp game rule)" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "properties-invalid" || len(e.Items) != 1 || e.Items[0] != "pvp (removed in 1.21.9; use the pvp game rule)" {
 		t.Fatalf("removed key: exit %d %s", code, stdout)
 	}
 

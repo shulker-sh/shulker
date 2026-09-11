@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 const PathEnv = "SHULKER_CONFIG"
@@ -60,7 +62,7 @@ func LoadFile(path string) (Config, error) {
 		return cfg, err
 	}
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return cfg, fmt.Errorf("%s: %w", path, err)
+		return cfg, out.Errorf("config-invalid", "%s: %v", path, err)
 	}
 	return cfg, nil
 }

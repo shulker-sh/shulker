@@ -5,10 +5,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 const FileName = "shulker.local.json"
@@ -36,7 +37,7 @@ func Load(dir string) (*File, error) {
 		return nil, err
 	}
 	if err := json.Unmarshal(data, f); err != nil {
-		return nil, fmt.Errorf("%s: %w", FileName, err)
+		return nil, out.Errorf("local-invalid", "%s: %v", FileName, err)
 	}
 	f.exists = true
 	return f, nil

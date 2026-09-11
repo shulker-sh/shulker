@@ -103,11 +103,9 @@ func (a *app) targetRemoveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			t, ok := p.Manifest.Targets[name]
-			if !ok {
-				e := out.Errorf("target-not-found", "no target %q in shulker.json", name)
-				e.Candidates = targetNames(p.Manifest.Targets)
-				return e
+			t, err := p.Manifest.Target(name)
+			if err != nil {
+				return err
 			}
 			if len(p.Manifest.Targets) == 1 {
 				return out.Errorf("last-target", "%s is the only target; add another with `shulker target add` before removing it", name)

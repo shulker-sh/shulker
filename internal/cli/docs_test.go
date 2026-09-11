@@ -1,10 +1,16 @@
 package cli
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -15,7 +21,8 @@ var (
 	docsHeading = regexp.MustCompile("^### `(shulker[^`]*)`")
 	// Reading names from FlagUsages avoids importing pflag, which go.mod
 	// only lists as indirect.
-	usageFlag = regexp.MustCompile(`(?m)^\s+(?:-\w, )?--([\w-]+)`)
+	usageFlag   = regexp.MustCompile(`(?m)^\s+(?:-\w, )?--([\w-]+)`)
+	docsCodeRow = regexp.MustCompile("(?m)^\\| `([a-z0-9-]+)` \\|")
 )
 
 func TestCLIReferenceCoversEveryCommand(t *testing.T) {
@@ -90,4 +97,87 @@ func expandAlternatives(heading string) []string {
 		paths = append(paths, prefix+" "+alt)
 	}
 	return paths
+}
+
+func TestJSONReferenceCoversEveryErrorCode(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "site", "docs", "cli.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	documented := map[string]bool{}
+	for _, m := range docsCodeRow.FindAllStringSubmatch(docsSection(string(data), "### Error codes"), -1) {
+		documented[m[1]] = true
+	}
+	used := errorCodes(t, filepath.Join("..", ".."))
+	var problems []string
+	for code := range used {
+		if !documented[code] {
+			problems = append(problems, "no row for "+code)
+		}
+	}
+	for code := range documented {
+		if !used[code] {
+			problems = append(problems, "row for unused "+code)
+		}
+	}
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		t.Fatalf("site/docs/cli.md error codes are out of date:\n  %s", strings.Join(problems, "\n  "))
+	}
+}
+
+// errorCodes finds the string literals passed as the code of out.Errorf or
+// set as a Code or code field, which is how every error code is written.
+func errorCodes(t *testing.T, root string) map[string]bool {
+	codes := map[string]bool{}
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		file, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			var lit ast.Expr
+			switch n := n.(type) {
+			case *ast.CallExpr:
+				if isErrorf(n.Fun) && len(n.Args) > 0 {
+					lit = n.Args[0]
+				}
+			case *ast.KeyValueExpr:
+				if key, ok := n.Key.(*ast.Ident); ok && (key.Name == "Code" || key.Name == "code") {
+					lit = n.Value
+				}
+			}
+			if s, ok := lit.(*ast.BasicLit); ok && s.Kind == token.STRING {
+				code, _ := strconv.Unquote(s.Value)
+				codes[code] = true
+			}
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return codes
+}
+
+func isErrorf(fun ast.Expr) bool {
+	sel, ok := fun.(*ast.SelectorExpr)
+	if !ok || sel.Sel.Name != "Errorf" {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && pkg.Name == "out"
+}
+
+func docsSection(doc, heading string) string {
+	_, rest, _ := strings.Cut(doc, "\n"+heading+"\n")
+	if i := strings.Index(rest, "\n#"); i >= 0 {
+		rest = rest[:i]
+	}
+	return rest
 }

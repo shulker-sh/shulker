@@ -61,7 +61,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 				return err
 			}
 			if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
-				return out.Errorf("exists", "%s already exists in %s", manifest.FileName, dir)
+				return out.Errorf("manifest-exists", "%s already exists in %s", manifest.FileName, dir)
 			}
 			m, warnings, err := importManifest(arc, name)
 			if err != nil {

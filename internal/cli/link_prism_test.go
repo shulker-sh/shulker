@@ -189,7 +189,7 @@ func TestLinkPrismTargetNameAndErrors(t *testing.T) {
 		t.Fatalf("missing launcher: exit %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--mode", "hardlink", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "invalid-mode" {
+	if code == 0 || failureCode(t, stdout).Code != "usage" {
 		t.Fatalf("bad mode: exit %d %s", code, stdout)
 	}
 	gameDir := filepath.Join(launcherDir, "custom", "shulker-pack-dev", "minecraft")

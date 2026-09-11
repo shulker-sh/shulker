@@ -28,6 +28,7 @@ type Error struct {
 	Code       string   `json:"code"`
 	Message    string   `json:"message"`
 	Candidates []string `json:"candidates,omitempty"`
+	Items      []string `json:"items,omitempty"`
 	Exit       int      `json:"-"`
 	// Data is the partial result of a command that failed part-way; it goes in the envelope's data.
 	Data any `json:"-"`
@@ -36,7 +37,11 @@ type Error struct {
 func (e *Error) Error() string { return e.Message }
 
 func Errorf(code string, format string, args ...any) *Error {
-	return &Error{Code: code, Message: fmt.Sprintf(format, args...), Exit: ExitError}
+	exit := ExitError
+	if code == "usage" {
+		exit = ExitUsage
+	}
+	return &Error{Code: code, Message: fmt.Sprintf(format, args...), Exit: exit}
 }
 
 func CodeOf(err error) string {
@@ -105,6 +110,11 @@ func (p *Printer) Fail(err error) int {
 	fmt.Fprintf(p.Stderr, "shulker: %s\n", e.Message)
 	if len(e.Candidates) > 0 {
 		fmt.Fprintf(p.Stderr, "  candidates: %s\n", strings.Join(e.Candidates, ", "))
+	}
+	for _, item := range e.Items {
+		if !strings.Contains(e.Message, item) {
+			fmt.Fprintf(p.Stderr, "  - %s\n", item)
+		}
 	}
 	return e.Exit
 }

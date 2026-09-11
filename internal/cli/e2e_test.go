@@ -408,7 +408,7 @@ func TestVerticalSlice(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Error == nil || env.Error.Code != "build-conflict" || len(env.Error.Candidates) != 1 {
+	if env.Error == nil || env.Error.Code != "build-conflict" || len(env.Error.Items) != 1 {
 		t.Fatalf("conflict envelope: %+v", env)
 	}
 	h.mustRun(t, "build", "--force")
@@ -506,10 +506,10 @@ func TestRemovePrunesOrphans(t *testing.T) {
 	code, stdout, _ := h.run(t, "remove", "fabric-api", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error == nil || env.Error.Code != "not-direct" || env.Error.Candidates[0] != "sodium" {
+	if code == 0 || env.Error == nil || env.Error.Code != "not-direct" || env.Error.Items[0] != "sodium" {
 		t.Fatalf("removing a dependency: code=%d env=%+v", code, env)
 	}
-	if code, stdout, _ = h.run(t, "remove", "nope", "--json"); code == 0 || !strings.Contains(stdout, `"not-found"`) {
+	if code, stdout, _ = h.run(t, "remove", "nope", "--json"); code == 0 || !strings.Contains(stdout, `"mod-not-found"`) {
 		t.Fatalf("removing an unknown mod: code=%d %s", code, stdout)
 	}
 
@@ -566,8 +566,8 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 	if code == 0 || env.Error == nil || env.Error.Code != "validation-failed" {
 		t.Fatalf("expected validation failure: code=%d env=%+v", code, env)
 	}
-	if len(env.Error.Candidates) != 1 || !strings.Contains(env.Error.Candidates[0], "sodium 1.0.0 requires fabric-api >=2.0.0, found fabric-api 1.0.0") {
-		t.Fatalf("candidates: %v", env.Error.Candidates)
+	if len(env.Error.Items) != 1 || !strings.Contains(env.Error.Items[0], "sodium 1.0.0 requires fabric-api >=2.0.0, found fabric-api 1.0.0") {
+		t.Fatalf("candidates: %v", env.Error.Items)
 	}
 	if !strings.Contains(env.Error.Message, `"declared":">=2.0.0"`) {
 		t.Fatalf("message should print the ignore entry: %s", env.Error.Message)

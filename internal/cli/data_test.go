@@ -53,7 +53,7 @@ func TestBuildLinksDataDirs(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, stdout, _ := h.run(t, "build", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "build-conflict" || len(e.Candidates) != 1 || !strings.HasPrefix(e.Candidates[0], "logs (exists in both") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "build-conflict" || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "logs (exists in both") {
 		t.Fatalf("both sides: exit %d %s", code, stdout)
 	}
 	if code, _, _ := h.run(t, "build", "--force"); code == 0 {

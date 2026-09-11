@@ -53,7 +53,7 @@ func ParseRef(s string) (Ref, error) {
 	case namePattern.MatchString(s):
 		return Ref{Name: s}, nil
 	}
-	return Ref{}, out.Errorf("invalid-player", "%q is neither a player name nor a uuid", s)
+	return Ref{}, out.Errorf("player-invalid", "%q is neither a player name nor a uuid", s)
 }
 
 func (r Ref) String() string {
@@ -260,12 +260,12 @@ func Policy(results []Result, acceptChange bool) ([]string, error) {
 	}
 	if len(unknown) > 0 {
 		e := out.Errorf("player-unknown", "%d player(s) do not exist at Mojang", len(unknown))
-		e.Candidates = unknown
+		e.Items = unknown
 		return warnings, e
 	}
 	if len(reassigned) > 0 {
 		e := out.Errorf("player-reassigned", "%d player name(s) now belong to a different account; pass --accept-player-change to relock them", len(reassigned))
-		e.Candidates = reassigned
+		e.Items = reassigned
 		return warnings, e
 	}
 	return warnings, nil

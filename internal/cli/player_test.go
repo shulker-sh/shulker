@@ -125,7 +125,7 @@ func TestPlayersBuild(t *testing.T) {
 
 	h.mojang["Alice"] = alice2UUID
 	code, stdout, _ := h.run(t, "--json", "build")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "player-reassigned" || len(e.Candidates) != 1 || !strings.Contains(e.Candidates[0], alice2UUID) {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "player-reassigned" || len(e.Items) != 1 || !strings.Contains(e.Items[0], alice2UUID) {
 		t.Fatalf("expected player-reassigned, got %d %s", code, stdout)
 	}
 	h.mustRun(t, "build", "--accept-player-change")
@@ -144,7 +144,7 @@ func TestPlayersBuild(t *testing.T) {
 		"whitelist": []any{map[string]any{"name": "Alise"}},
 	})
 	code, stdout, _ = h.run(t, "--json", "build")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "player-unknown" || len(e.Candidates) != 1 || e.Candidates[0] != "Alise (did you mean Alice?)" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "player-unknown" || len(e.Items) != 1 || e.Items[0] != "Alise (did you mean Alice?)" {
 		t.Fatalf("expected player-unknown, got %d %s", code, stdout)
 	}
 
@@ -203,7 +203,7 @@ func TestPlayerCommand(t *testing.T) {
 	}
 
 	code, stdout, _ := h.run(t, "--json", "player", "no spaces")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "invalid-player" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "player-invalid" {
 		t.Fatalf("expected invalid-player, got %d %s", code, stdout)
 	}
 

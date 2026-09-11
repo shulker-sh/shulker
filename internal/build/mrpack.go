@@ -98,14 +98,9 @@ func (b *Builder) mrpackTargets(names []string) ([]*mrpackTarget, error) {
 	var targets []*mrpackTarget
 	bySide := map[string]string{}
 	for _, n := range names {
-		t, ok := b.Manifest.Targets[n]
-		if !ok {
-			e := out.Errorf("target-not-found", "no target %q in shulker.json", n)
-			for c := range b.Manifest.Targets {
-				e.Candidates = append(e.Candidates, c)
-			}
-			sort.Strings(e.Candidates)
-			return nil, e
+		t, err := b.Manifest.Target(n)
+		if err != nil {
+			return nil, err
 		}
 		if other, dup := bySide[t.Side]; dup {
 			e := out.Errorf("ambiguous-target", "targets %s and %s are both %s side; pass --target", other, n, t.Side)
@@ -213,7 +208,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 	}
 	if len(blocked) > 0 {
 		e := out.Errorf("mrpack-host-not-allowed", "Modrinth launchers only download from %s; pass --bundle to ship these mods inside the archive instead: %s", strings.Join(MrpackHosts, ", "), strings.Join(blocked, ", "))
-		e.Candidates = blocked
+		e.Items = blocked
 		return nil, e
 	}
 	return files, nil

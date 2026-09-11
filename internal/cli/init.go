@@ -48,7 +48,7 @@ func (a *app) initCmd() *cobra.Command {
 				}
 			}
 			if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
-				return out.Errorf("exists", "%s already exists here", manifest.FileName)
+				return out.Errorf("manifest-exists", "%s already exists here", manifest.FileName)
 			}
 			if !yes && (minecraft == "" || name == "") {
 				return out.Errorf("usage", "pass --yes for defaults or set --name and --minecraft; interactive prompts are not implemented yet")

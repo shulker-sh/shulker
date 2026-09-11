@@ -73,7 +73,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 func TestSyncErrors(t *testing.T) {
 	h := newHarness(t)
 	code, stdout, _ := h.run(t, "sync", t.TempDir(), "--json")
-	if code == 0 || failureCode(t, stdout).Code != "project-not-found" {
+	if code == 0 || failureCode(t, stdout).Code != "manifest-not-found" {
 		t.Fatalf("missing project: exit %d %s", code, stdout)
 	}
 

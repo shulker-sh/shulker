@@ -123,27 +123,21 @@ func (a *app) linkMojangCmd() *cobra.Command {
 
 func sideTarget(m *manifest.Manifest, want, side, verb string) (string, error) {
 	if want != "" {
-		t, ok := m.Targets[want]
-		if !ok {
-			e := out.Errorf("target-not-found", "no target %q in shulker.json", want)
-			e.Candidates = targetNames(m.Targets)
-			return "", e
+		t, err := m.Target(want)
+		if err != nil {
+			return "", err
 		}
 		if t.Side != side {
-			return "", out.Errorf("not-"+side+"-target", "target %q is a %s target; %s needs a %s target", want, t.Side, verb, side)
+			e := out.Errorf("wrong-side-target", "target %q is a %s target; %s needs a %s target", want, t.Side, verb, side)
+			e.Candidates = sideTargets(m, side)
+			return "", e
 		}
 		return want, nil
 	}
-	var matches []string
-	for name, t := range m.Targets {
-		if t.Side == side {
-			matches = append(matches, name)
-		}
-	}
-	sort.Strings(matches)
+	matches := sideTargets(m, side)
 	switch len(matches) {
 	case 0:
-		return "", out.Errorf("no-"+side+"-target", "shulker.json has no %s target to %s", side, verb)
+		return "", out.Errorf("no-target", "shulker.json has no %s target to %s", side, verb)
 	case 1:
 		return matches[0], nil
 	}
@@ -160,4 +154,15 @@ func profileKey(name string) string {
 		slug = "project"
 	}
 	return "shulker-" + slug
+}
+
+func sideTargets(m *manifest.Manifest, side string) []string {
+	var names []string
+	for name, t := range m.Targets {
+		if t.Side == side {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }

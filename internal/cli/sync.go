@@ -144,7 +144,7 @@ func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, er
 	}
 	s.project, err = a.openProjectAt(co.Dir)
 	if errors.Is(err, project.ErrNoManifest) {
-		return nil, out.Errorf("project-not-found", "no shulker.json in %s", s.name)
+		return nil, out.Errorf("manifest-not-found", "no shulker.json in %s", s.name)
 	}
 	if err != nil {
 		return nil, err
@@ -265,11 +265,9 @@ func (a *app) checkout(ctx context.Context, source, ref string) (*pack.Checkout,
 
 func singleTarget(p *project.Project, want string) (string, manifest.Target, error) {
 	if want != "" {
-		t, ok := p.Manifest.Targets[want]
-		if !ok {
-			e := out.Errorf("target-not-found", "no target %q in shulker.json", want)
-			e.Candidates = targetNames(p.Manifest.Targets)
-			return "", t, e
+		t, err := p.Manifest.Target(want)
+		if err != nil {
+			return "", t, err
 		}
 		return want, t, nil
 	}

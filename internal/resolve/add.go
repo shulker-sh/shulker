@@ -421,7 +421,7 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 	}
 	if len(missing) > 0 {
 		e := out.Errorf("missing-files", "%d mod(s) need a manual download:\n  %s", len(missing), strings.Join(missing, "\n  "))
-		e.Candidates = missing
+		e.Items = missing
 		return fetched, warnings, e
 	}
 	return fetched, warnings, nil

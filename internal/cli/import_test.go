@@ -136,7 +136,7 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 	}
 
 	code, stdout, _ := h.run(t, "import", "mrpack", archive, "--dir", dir, "--json")
-	if code == 0 || failureCode(t, stdout).Code != "exists" {
+	if code == 0 || failureCode(t, stdout).Code != "manifest-exists" {
 		t.Fatalf("import over an existing project: exit %d %s", code, stdout)
 	}
 }

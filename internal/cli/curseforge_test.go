@@ -337,7 +337,7 @@ func TestCurseForgeManualDownloads(t *testing.T) {
 	os.RemoveAll(h.cache)
 	code, stdout, _ = h.run(t, "--json", "install")
 	e = failureCode(t, stdout)
-	if code == 0 || e.Code != "missing-files" || len(e.Candidates) != 2 || !strings.Contains(e.Candidates[0], "mc-mods/locked/files/5200001") || !strings.Contains(e.Candidates[1], "nodist-1.0.0.jar") {
+	if code == 0 || e.Code != "missing-files" || len(e.Items) != 2 || !strings.Contains(e.Items[0], "mc-mods/locked/files/5200001") || !strings.Contains(e.Items[1], "nodist-1.0.0.jar") {
 		t.Fatalf("expected missing-files, got %d %s", code, stdout)
 	}
 }

@@ -2,15 +2,15 @@ package project
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
-var ErrNoManifest = errors.New("no shulker.json here; run `shulker init`")
+var ErrNoManifest = &out.Error{Code: "manifest-not-found", Message: "no shulker.json here; run `shulker init`", Exit: out.ExitError}
 
 type Project struct {
 	Dir      string
@@ -41,7 +41,7 @@ func (p *Project) LockPath() string     { return filepath.Join(p.Dir, lock.FileN
 
 func (p *Project) RequireLock() error {
 	if p.Lock == nil {
-		return fmt.Errorf("no %s; run `shulker install` after `shulker init`", lock.FileName)
+		return out.Errorf("lock-not-found", "no %s; run `shulker install` after `shulker init`", lock.FileName)
 	}
 	return nil
 }

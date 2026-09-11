@@ -46,7 +46,7 @@ These work with every command.
 | Flag | Description |
 | --- | --- |
 | `-C, --dir <path>` | Project directory (default: current directory) |
-| `--json` | Print machine-readable JSON, including errors |
+| `--json` | Print machine-readable JSON, including errors; see [JSON output](#json-output) |
 
 ## Projects
 
@@ -530,3 +530,134 @@ shulker self update --check
 | `--check` | Only report whether a newer release is available |
 | `--without-attestation` | Skip the build provenance check |
 | `--require-attestation` | Fail unless `gh` verifies the build provenance |
+
+## JSON output
+
+With `--json`, every command prints one JSON object on stdout, whether it succeeds or fails:
+
+```json
+{
+  "ok": true,
+  "command": "pack add",
+  "lockStale": false,
+  "warnings": [],
+  "data": {}
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `ok` | `true` when the command succeeded |
+| `command` | The command that ran, like `pack add` |
+| `lockStale` | `shulker.lock` doesn't match `shulker.json`; `add`, `remove`, or `update` refreshes it |
+| `warnings` | Everything shulker would print as `warning:` without `--json`. Always present, empty when there are none |
+| `data` | The command's result. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
+| `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `candidates` or `items` |
+
+`candidates` lists values you could pass instead, like the target names when `--target` matches none of them. `items` lists what the error is about, like the files in conflict. Both are left out when empty.
+
+| Exit status | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Failure; `error.code` says which |
+| `2` | Usage: an unknown command or flag, wrong arguments, or a flag value that isn't allowed |
+
+`serve` exits with the server's own status when the server fails (`server-exit`).
+
+### Error codes
+
+| Code | Meaning |
+| --- | --- |
+| `ambiguous-instance` | Several linked instances or synced directories match. `candidates`: the matches |
+| `ambiguous-into` | The target has edits in several synced directories; pass `--into`. `candidates`: the directories |
+| `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
+| `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
+| `config-invalid` | shulker's `config.json` isn't valid JSON |
+| `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
+| `eula-required` | The server needs the Minecraft EULA accepted |
+| `feature-not-found` | No mod or target uses the feature. `candidates`: the features in use |
+| `file-not-found` | A file named to `pull` isn't in the build directory |
+| `git-missing` | A git source needs `git` on PATH |
+| `id-changed` | A new version of a mod identifies itself as a different mod |
+| `instance-dir-not-empty` | The instance directory already has files |
+| `instance-exists` | An instance already syncs from this source; pass `--name` for a second one, or `--force` |
+| `instance-missing` | A linked instance's directory is gone |
+| `instance-not-found` | Nothing linked matches. `candidates`: the linked entries |
+| `into-required` | Syncing from a remote source needs `--into` |
+| `into-target` | `--into` applies to one target; name it |
+| `java-not-found` | No working Java at the configured path or on PATH |
+| `java-range` | `java` in `shulker.json` is neither a path nor a version range |
+| `java-version` | The Java found is outside the range in `shulker.json` |
+| `jvm-flags` | Unknown `jvmFlags` preset |
+| `key-not-found` | A `--key` isn't in the file. `candidates`: its keys |
+| `last-target` | The only target can't be removed |
+| `launcher-dir-required` | MultiMC needs `--launcher-dir` |
+| `launcher-not-found` | No launcher directory where shulker looked |
+| `local-invalid` | `shulker.local.json` isn't valid JSON |
+| `lock-invalid` | `shulker.lock` doesn't parse or match its schema, or a change would make it invalid |
+| `lock-not-found` | No `shulker.lock`; run `shulker install` |
+| `lock-stale` | The command needs a lock that matches `shulker.json` |
+| `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
+| `manifest-invalid` | `shulker.json` doesn't parse or match its schema, or a change would make it invalid |
+| `manifest-not-found` | No `shulker.json` in the project directory or the sync source |
+| `manual-download` | The provider doesn't distribute this mod; download it into `downloads/` |
+| `memory` | Server memory isn't a whole number of M or G |
+| `missing-files` | Mods that need a manual download are missing. `items`: what to download |
+| `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
+| `mrpack-download` | A file in the modpack couldn't be downloaded |
+| `mrpack-host-not-allowed` | Modrinth launchers won't download these mods; pass `--bundle`. `items`: the mods |
+| `mrpack-invalid` | The modpack is malformed |
+| `mrpack-marker` | The modpack's shulker marker can't be read |
+| `mrpack-unsupported` | The modpack's format or loader isn't supported |
+| `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
+| `no-links` | Nothing is linked yet |
+| `no-overrides` | The target has no overrides directory to adopt a file into |
+| `no-target` | `shulker.json` has no target of the side the command needs |
+| `not-built` | The target has no build directory yet; run `shulker build` |
+| `not-direct` | The mod is only a dependency. `items`: the mods that require it |
+| `not-drifted` | A file named to `pull` has no changes. `candidates`: the changed files |
+| `not-installed` | A file isn't in the cache; run `shulker install` |
+| `not-pinned` | The mod has no pin |
+| `not-synced` | The directory has no record of the source it was synced from |
+| `pack-changed` | A pack no longer matches the lock; run `shulker update` |
+| `pack-conflict` | Two packs list the same mod with different settings |
+| `pack-exists` | The pack is already in `shulker.json` |
+| `pack-fetch` | A pack couldn't be fetched |
+| `pack-manifest` | A pack source has no `shulker.json` |
+| `pack-mismatch` | A pack wants a different Minecraft version or loader |
+| `pack-name` | A pack's name can't be worked out, or two packs share one; set `name` |
+| `pack-not-found` | The pack isn't in `shulker.json`. `candidates`: the packs |
+| `pack-provided` | The mod comes from a pack, so it can't be removed on its own |
+| `pack-ref` | A pack's `ref` doesn't apply to its source, or wasn't found |
+| `pack-target` | A pack has several targets of a side and none named like the project's |
+| `pack-unlocked` | A pack has no commit in the lock; run `shulker update` |
+| `pin-mismatch` | The pinned version belongs to a different project |
+| `player-invalid` | Neither a player name nor a uuid |
+| `player-reassigned` | Player names now belong to different accounts; pass `--accept-player-change`. `items`: the players |
+| `player-unknown` | Players that don't exist at Mojang. `items`: the names |
+| `player-unresolved` | A player isn't in the lock; run `shulker player` |
+| `players-invalid` | A player entry in `shulker.json` is invalid |
+| `properties-invalid` | `server.properties` keys that aren't valid for this Minecraft version. `items`: the keys |
+| `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
+| `runtime-unavailable` | Mojang publishes no Java runtime for this platform; set `java` in `shulker.json` |
+| `self-update-check` | Checking for a release failed, or none is published |
+| `self-update-checksum` | The download doesn't match its checksum |
+| `self-update-download` | The download failed |
+| `self-update-install` | The running binary couldn't be replaced |
+| `self-update-provenance` | `--require-attestation` is set and the build provenance couldn't be verified |
+| `server-exit` | The server exited with an error |
+| `source-fetch` | The sync source couldn't be fetched |
+| `source-lock` | The sync source has no `shulker.lock` |
+| `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
+| `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
+| `sync-failed` | Some entries failed to sync; `data` has each entry's result |
+| `target-exists` | The target is already in `shulker.json` |
+| `target-not-found` | No such target. `candidates`: the targets |
+| `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
+| `unset-variable` | An override uses a variable that isn't set |
+| `unsupported-loader` | The command doesn't support the project's loader yet |
+| `unsupported-mode` | `--mode symlink` isn't supported on Windows yet |
+| `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. Exits 2 |
+| `validation-failed` | The locked mods have dependency problems. `items`: the problems |
+| `version-required` | `export mrpack` needs a version |
+| `wrong-side-target` | The target is on the wrong side for the command. `candidates`: the targets on the right side |

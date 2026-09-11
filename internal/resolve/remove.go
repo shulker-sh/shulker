@@ -23,10 +23,10 @@ func (r *Resolver) Remove(ids []string) (*Removed, error) {
 		}
 		if m, ok := r.Lock.Mods[id]; ok {
 			e := out.Errorf("not-direct", "%s is not in the manifest; it is required by %v", id, m.RequiredBy)
-			e.Candidates = m.RequiredBy
+			e.Items = m.RequiredBy
 			return nil, e
 		}
-		e := out.Errorf("not-found", "%s is not in the manifest", id)
+		e := out.Errorf("mod-not-found", "%s is not in the manifest", id)
 		e.Candidates = r.manifestIDs()
 		return nil, e
 	}

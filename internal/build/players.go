@@ -202,7 +202,7 @@ func (b *Builder) collectPlayers(players *manifest.Players, desired map[string]s
 		if ban.Expires != "" {
 			t, err := time.Parse(time.RFC3339, ban.Expires)
 			if err != nil {
-				return out.Errorf("invalid-players", "ban for %s: expires %q is not an RFC 3339 timestamp", e["name"], ban.Expires)
+				return out.Errorf("players-invalid", "ban for %s: expires %q is not an RFC 3339 timestamp", e["name"], ban.Expires)
 			}
 			e["expires"] = t.UTC().Format(banTimeLayout)
 		}

@@ -102,7 +102,7 @@ func (r *Resolver) RemovePack(name string) (*Removed, error) {
 		}
 	}
 	if idx < 0 {
-		e := out.Errorf("not-found", "pack %s is not in the manifest", name)
+		e := out.Errorf("pack-not-found", "pack %s is not in the manifest", name)
 		for _, p := range r.Manifest.Packs {
 			if n, err := pack.Name(p); err == nil {
 				e.Candidates = append(e.Candidates, n)

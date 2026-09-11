@@ -101,6 +101,12 @@ func TestLinkMojangErrors(t *testing.T) {
 	if e := failureCode(t, stdout); code == 0 || e.Code != "target-not-found" || strings.Join(e.Candidates, ",") != "client" {
 		t.Fatalf("unknown target: exit %d %s", code, stdout)
 	}
+
+	h.mustRun(t, "target", "add", "server")
+	code, stdout, _ = h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--target", "server", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "wrong-side-target" || strings.Join(e.Candidates, ",") != "client" {
+		t.Fatalf("server target: exit %d %s", code, stdout)
+	}
 }
 
 func failureCode(t *testing.T, stdout string) *out.Error {

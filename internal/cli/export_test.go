@@ -108,7 +108,7 @@ func TestExportMrpack(t *testing.T) {
 	code, stdout, _ := h.run(t, "export", "mrpack", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error.Code != "mrpack-host-not-allowed" || len(env.Error.Candidates) != 2 || !strings.HasPrefix(env.Error.Candidates[0], "fabric-api (modrinth, 127.0.0.1") {
+	if code == 0 || env.Error.Code != "mrpack-host-not-allowed" || len(env.Error.Items) != 2 || !strings.HasPrefix(env.Error.Items[0], "fabric-api (modrinth, 127.0.0.1") {
 		t.Fatalf("export with a foreign host: code=%d env=%+v", code, env)
 	}
 

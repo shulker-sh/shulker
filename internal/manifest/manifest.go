@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	"maps"
 	"os"
+	"slices"
 
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
 
@@ -171,13 +173,13 @@ func Load(path string) (*Manifest, error) {
 
 func Parse(data []byte) (*Manifest, error) {
 	if err := schema.Validate(schema.Manifest, data); err != nil {
-		return nil, fmt.Errorf("%s: %w", FileName, err)
+		return nil, out.Errorf("manifest-invalid", "%s: %v", FileName, err)
 	}
 	var m Manifest
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(&m); err != nil {
-		return nil, fmt.Errorf("%s: %w", FileName, err)
+		return nil, out.Errorf("manifest-invalid", "%s: %v", FileName, err)
 	}
 	if m.Mods == nil {
 		m.Mods = map[string]Mod{}
@@ -202,9 +204,19 @@ func (m *Manifest) Save(path string) error {
 		return err
 	}
 	if err := schema.Validate(schema.Manifest, data); err != nil {
-		return fmt.Errorf("refusing to write invalid %s: %w", FileName, err)
+		return out.Errorf("manifest-invalid", "refusing to write invalid %s: %v", FileName, err)
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+func (m *Manifest) Target(name string) (Target, error) {
+	t, ok := m.Targets[name]
+	if !ok {
+		e := out.Errorf("target-not-found", "no target %q in %s", name, FileName)
+		e.Candidates = slices.Sorted(maps.Keys(m.Targets))
+		return Target{}, e
+	}
+	return t, nil
 }
 
 func (m *Manifest) DisplayName(target string) string {

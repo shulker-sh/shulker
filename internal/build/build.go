@@ -188,9 +188,9 @@ func sortedKeys(set map[string]bool) []string {
 }
 
 func (b *Builder) Build(name string, opts Options) (*Report, error) {
-	target, ok := b.Manifest.Targets[name]
-	if !ok {
-		return nil, out.Errorf("unknown-target", "target %q is not in the manifest", name)
+	target, err := b.Manifest.Target(name)
+	if err != nil {
+		return nil, err
 	}
 	dir := opts.Dir
 	if dir == "" {
@@ -253,7 +253,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	}
 	if len(report.Conflicts) > 0 {
 		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the build directory and in the source; run `shulker diff`, or `build --force` to overwrite", name, len(report.Conflicts))
-		e.Candidates = report.Conflicts
+		e.Items = report.Conflicts
 		return report, e
 	}
 	merges := map[string]keyMerge{}
@@ -453,8 +453,8 @@ func (b *Builder) checkProperties(props properties, report *Report) error {
 	check := server.CheckProperties(props, minecraft)
 	report.Warnings = append(report.Warnings, check.Warnings...)
 	if len(check.Problems) > 0 {
-		e := out.Errorf("invalid-properties", "%d server.properties key(s) are not valid for Minecraft %s", len(check.Problems), b.Lock.Minecraft)
-		e.Candidates = check.Problems
+		e := out.Errorf("properties-invalid", "%d server.properties key(s) are not valid for Minecraft %s", len(check.Problems), b.Lock.Minecraft)
+		e.Items = check.Problems
 		return e
 	}
 	return nil

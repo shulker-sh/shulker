@@ -59,11 +59,11 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	tag, err := r.Latest(ctx)
 	switch {
 	case errors.Is(err, fetch.ErrNotFound):
-		return out.Errorf("update-check", "no shulker release has been published yet")
+		return out.Errorf("self-update-check", "no shulker release has been published yet")
 	case fetch.IsNetwork(err):
-		return out.Errorf("update-check", "can't reach GitHub to check for updates: %v", err)
+		return out.Errorf("self-update-check", "can't reach GitHub to check for updates: %v", err)
 	case err != nil:
-		return out.Errorf("update-check", "check for updates: %v", err)
+		return out.Errorf("self-update-check", "check for updates: %v", err)
 	}
 	res := selfUpdateResult{Current: version, Latest: strings.TrimPrefix(tag, "v"), Available: selfupdate.NeedsUpdate(version, tag)}
 	if !res.Available {
@@ -77,7 +77,7 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 
 	exe, err := a.exe()
 	if err != nil {
-		return out.Errorf("update-install", "find the running shulker binary: %v", err)
+		return out.Errorf("self-update-install", "find the running shulker binary: %v", err)
 	}
 	tmp, err := os.MkdirTemp("", "shulker-update-")
 	if err != nil {
@@ -90,16 +90,16 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	if err != nil {
 		var sum *selfupdate.ChecksumError
 		if errors.As(err, &sum) {
-			return out.Errorf("update-checksum", "%v", err)
+			return out.Errorf("self-update-checksum", "%v", err)
 		}
-		return out.Errorf("update-download", "download shulker %s: %v", res.Latest, err)
+		return out.Errorf("self-update-download", "download shulker %s: %v", res.Latest, err)
 	}
 	a.progress("checksum verified")
 	if res.Provenance, err = a.checkProvenance(ctx, r, tag, archive, without, require); err != nil {
 		return err
 	}
 	if err := selfupdate.Install(archive, exe); err != nil {
-		return out.Errorf("update-install", "replace %s: %v", exe, err)
+		return out.Errorf("self-update-install", "replace %s: %v", exe, err)
 	}
 	res.Updated, res.Path = true, exe
 	return a.printer.Emit(res, func(w io.Writer) {
@@ -114,7 +114,7 @@ func (a *app) checkProvenance(ctx context.Context, r *selfupdate.Releases, tag, 
 	}
 	if _, err := exec.LookPath("gh"); err != nil {
 		if require {
-			return "", out.Errorf("update-provenance", "--require-attestation is set but gh is not installed")
+			return "", out.Errorf("self-update-provenance", "--require-attestation is set but gh is not installed")
 		}
 		a.printer.Warn("gh not found, skipping build provenance check")
 		return "skipped", nil
@@ -122,7 +122,7 @@ func (a *app) checkProvenance(ctx context.Context, r *selfupdate.Releases, tag, 
 	a.progress("verifying build provenance with gh")
 	if err := r.VerifyProvenance(ctx, tag, archive); err != nil {
 		if require {
-			return "", out.Errorf("update-provenance", "build provenance could not be verified: %v", err)
+			return "", out.Errorf("self-update-provenance", "build provenance could not be verified: %v", err)
 		}
 		a.printer.Warn("build provenance could not be verified, continuing on the checksum")
 		return "unverified", nil

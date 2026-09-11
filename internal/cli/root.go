@@ -30,6 +30,7 @@ type app struct {
 	packs      []*pack.Loaded
 	releases   *selfupdate.Releases
 	exe        func() (string, error)
+	running    bool
 }
 
 func Execute(args []string, stdout, stderr io.Writer) int {
@@ -50,9 +51,26 @@ func (a *app) run(args []string) int {
 	root.SetOut(a.printer.Stdout)
 	root.SetErr(a.printer.Stderr)
 	if err := root.Execute(); err != nil {
+		if !a.running && out.CodeOf(err) == "" {
+			err = out.Errorf("usage", "%s", err)
+		}
 		return a.printer.Fail(err)
 	}
 	return out.ExitOK
+}
+
+// markRunning tells cobra's own errors (unknown command or flag, bad
+// arguments, flag groups) apart from errors a command returns.
+func (a *app) markRunning(c *cobra.Command) {
+	if run := c.RunE; run != nil {
+		c.RunE = func(cmd *cobra.Command, args []string) error {
+			a.running = true
+			return run(cmd, args)
+		}
+	}
+	for _, sub := range c.Commands() {
+		a.markRunning(sub)
+	}
 }
 
 func (a *app) root() *cobra.Command {
@@ -69,6 +87,7 @@ func (a *app) root() *cobra.Command {
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.updateCmd(), a.outdatedCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.linksCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd())
+	a.markRunning(root)
 	return root
 }
 

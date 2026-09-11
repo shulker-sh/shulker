@@ -161,7 +161,7 @@ func TestSelfUpdateChecksumMismatchKeepsBinary(t *testing.T) {
 	if code := h.run("--json"); code == 0 {
 		t.Fatal("expected a failure")
 	}
-	if h.errorCode(t) != "update-checksum" || h.binary(t) != "old binary" {
+	if h.errorCode(t) != "self-update-checksum" || h.binary(t) != "old binary" {
 		t.Fatalf("stdout %s, binary %q", &h.stdout, h.binary(t))
 	}
 }
@@ -171,7 +171,7 @@ func TestSelfUpdateRequireAttestationWithoutGh(t *testing.T) {
 	if code := h.run("--require-attestation", "--json"); code == 0 {
 		t.Fatal("expected a failure")
 	}
-	if h.errorCode(t) != "update-provenance" || h.binary(t) != "old binary" {
+	if h.errorCode(t) != "self-update-provenance" || h.binary(t) != "old binary" {
 		t.Fatalf("stdout %s, binary %q", &h.stdout, h.binary(t))
 	}
 }

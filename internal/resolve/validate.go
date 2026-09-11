@@ -157,11 +157,11 @@ func (v *Validation) Err() error {
 		return nil
 	}
 	var b strings.Builder
-	var candidates []string
+	var items []string
 	fmt.Fprintf(&b, "%d problem(s) in the locked mods:", len(v.Problems))
 	for i, p := range v.Problems {
 		line := p.line()
-		candidates = append(candidates, line)
+		items = append(items, line)
 		fmt.Fprintf(&b, "\n  Problem %d\n    - %s", i+1, line)
 		if p.StaleNote != "" {
 			fmt.Fprintf(&b, "\n      %s", p.StaleNote)
@@ -172,7 +172,7 @@ func (v *Validation) Err() error {
 		fmt.Fprintf(&b, "\n      Ignore: %s", p.ignoreEntry())
 	}
 	e := out.Errorf("validation-failed", "%s", b.String())
-	e.Candidates = candidates
+	e.Items = items
 	return e
 }
 

@@ -44,7 +44,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if mode != "sync" && mode != "symlink" {
-				return out.Errorf("invalid-mode", "--mode must be sync or symlink, not %q", mode)
+				return out.Errorf("usage", "--mode must be sync or symlink, not %q", mode)
 			}
 			if mode == "symlink" && runtime.GOOS == "windows" {
 				return out.Errorf("unsupported-mode", "symlink mode is not supported on Windows yet; use --mode sync")
