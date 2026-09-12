@@ -180,7 +180,7 @@ func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool)
 	if err != nil {
 		return server.Runtime{}, err
 	}
-	opts := server.RuntimeOptions{Refresh: refresh, Progress: func(msg string) { a.progress("%s", msg) }}
+	opts := server.RuntimeOptions{Refresh: refresh, Log: a.progress}
 	return server.EnsureRuntime(ctx, d.fetch, d.runtimes, d.cache.Dir, p.Lock.Java.Component, opts)
 }
 

@@ -39,8 +39,8 @@ type runtimeMarker struct {
 }
 
 type RuntimeOptions struct {
-	Refresh  bool
-	Progress func(string)
+	Refresh bool
+	Log     func(format string, args ...any)
 }
 
 func RuntimeDir(cacheDir, component string) string {
@@ -75,8 +75,8 @@ func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *meta.Run
 	if err != nil {
 		return Runtime{}, err
 	}
-	if opts.Progress != nil {
-		opts.Progress(fmt.Sprintf("downloading Java runtime %s %s (%d files, %d MB)", component, release.Version, countFiles(files), totalSize(files)/(1<<20)))
+	if opts.Log != nil {
+		opts.Log("downloading Java runtime %s %s (%d files, %d MB)", component, release.Version, countFiles(files), totalSize(files)/(1<<20))
 	}
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return Runtime{}, err
