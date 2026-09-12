@@ -3,6 +3,7 @@ package manifest
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"os"
 	"slices"
@@ -36,7 +37,7 @@ type Manifest struct {
 	Packs       []Pack            `json:"packs,omitempty"`
 	Mods        map[string]Mod    `json:"mods"`
 	Ignore      []Ignore          `json:"ignore,omitempty"`
-	Variables   map[string]string `json:"variables,omitempty"`
+	Variables   Variables         `json:"variables,omitempty"`
 	Server      *Server           `json:"server,omitempty"`
 	Client      *Client           `json:"client,omitempty"`
 }
@@ -48,6 +49,7 @@ type Server struct {
 	JvmArgs    []string       `json:"jvmArgs,omitempty"`
 	Properties map[string]any `json:"properties,omitempty"`
 	Players    *Players       `json:"players,omitempty"`
+	Note       string         `json:"note,omitempty"`
 }
 
 type Players struct {
@@ -91,22 +93,24 @@ func (p *Players) All() []Player {
 type Client struct {
 	Options map[string]any  `json:"options,omitempty"`
 	Servers json.RawMessage `json:"servers,omitempty"`
+	Note    string          `json:"note,omitempty"`
 }
 
 type Loader struct {
 	Type    string `json:"type"`
 	Version string `json:"version"`
+	Note    string `json:"note,omitempty"`
 }
 
 type Target struct {
-	Name       string            `json:"name,omitempty"`
-	Side       string            `json:"side"`
-	Overrides  []string          `json:"overrides"`
-	Build      string            `json:"build,omitempty"`
-	Variables  map[string]string `json:"variables,omitempty"`
-	Features   []string          `json:"features,omitempty"`
-	WholeFiles []string          `json:"wholeFiles,omitempty"`
-	Note       string            `json:"note,omitempty"`
+	Name       string    `json:"name,omitempty"`
+	Side       string    `json:"side"`
+	Overrides  []string  `json:"overrides"`
+	Build      string    `json:"build,omitempty"`
+	Variables  Variables `json:"variables,omitempty"`
+	Features   []string  `json:"features,omitempty"`
+	WholeFiles []string  `json:"wholeFiles,omitempty"`
+	Note       string    `json:"note,omitempty"`
 }
 
 type Pack struct {
@@ -148,6 +152,16 @@ func (l StringList) MarshalJSON() ([]byte, error) {
 		return json.Marshal(l[0])
 	}
 	return json.Marshal([]string(l))
+}
+
+type Variables map[string]any
+
+func (v Variables) Text() map[string]string {
+	text := make(map[string]string, len(v))
+	for k, value := range v {
+		text[k] = fmt.Sprint(value)
+	}
+	return text
 }
 
 type Ignore struct {

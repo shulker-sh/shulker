@@ -63,7 +63,7 @@ func (a *app) targetAddCmd() *cobra.Command {
 					return out.Errorf("usage", "--var takes key=value, got %q", kv)
 				}
 				if t.Variables == nil {
-					t.Variables = map[string]string{}
+					t.Variables = manifest.Variables{}
 				}
 				t.Variables[key] = value
 			}

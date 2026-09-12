@@ -310,11 +310,8 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 		}
 		desired["mods/"+m.Filename] = source{sha512: m.Sha512}
 	}
-	vars := map[string]string{}
-	for k, v := range b.Manifest.Variables {
-		vars[k] = v
-	}
-	for k, v := range target.Variables {
+	vars := b.Manifest.Variables.Text()
+	for k, v := range target.Variables.Text() {
 		vars[k] = v
 	}
 	if target.Side == "server" {
@@ -351,7 +348,7 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 			continue
 		}
 		packVars := map[string]string{}
-		for _, layer := range []map[string]string{pk.Manifest.Variables, pt.Variables, vars} {
+		for _, layer := range []map[string]string{pk.Manifest.Variables.Text(), pt.Variables.Text(), vars} {
 			for k, v := range layer {
 				packVars[k] = v
 			}

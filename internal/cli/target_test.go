@@ -38,7 +38,7 @@ func TestTargetAddRemoveList(t *testing.T) {
 		Build:     "out/fancy",
 		Overrides: []string{"overrides", "fancy-overrides"},
 		Features:  []string{"shaders", "zoom"},
-		Variables: map[string]string{"motd": "Hi, there", "level": "3"},
+		Variables: manifest.Variables{"motd": "Hi, there", "level": "3"},
 		Note:      "for screenshots",
 	}
 	if got := m.Targets["fancy"]; !reflect.DeepEqual(got, want) {

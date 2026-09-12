@@ -1,0 +1,81 @@
+{
+  "$schema": "https://shulker.sh/schema/v1/manifest.json",
+  "name": "every-field",
+  "version": "1.0",
+  "description": "Sets every property the manifest schema allows.",
+  "authors": ["Someone"],
+  "license": "MIT",
+  "links": {
+    "website": "https://example.com",
+    "chat": "https://example.com/chat"
+  },
+  "note": "top",
+  "minecraft": "26.2",
+  "loader": { "type": "fabric", "version": "*", "note": "loader" },
+  "java": ">=25",
+  "providers": ["modrinth", "curseforge"],
+  "targets": {
+    "client": {
+      "name": "Client",
+      "side": "client",
+      "overrides": ["overrides", "client-overrides"],
+      "build": "build/client",
+      "variables": { "level": 3, "fancy": true, "greeting": "hi" },
+      "features": ["fancy"],
+      "wholeFiles": ["config/*.properties"],
+      "note": "target"
+    }
+  },
+  "packs": [{ "source": "../base", "ref": "main", "name": "base", "note": "pack" }],
+  "mods": {
+    "sodium": {
+      "project": "AANobbMI",
+      "pin": "4TkX2p9Z",
+      "channel": "beta",
+      "side": "client",
+      "provider": "modrinth",
+      "os": "macos",
+      "feature": ["fancy", "!shaders"],
+      "note": "mod"
+    },
+    "jei": { "project": 238222, "pin": 5101366, "provider": "curseforge", "os": ["macos", "!linux"] }
+  },
+  "ignore": [
+    { "rule": "depends", "mod": "sodium", "on": "minecraft", "declared": ">=26.3", "note": "works" }
+  ],
+  "variables": { "motd": "Welcome", "port": 25565, "hardcore": false, "ratio": 1.50 },
+  "server": {
+    "eula": true,
+    "memory": "6G",
+    "jvmFlags": "aikars",
+    "jvmArgs": ["-XX:+UseZGC"],
+    "properties": { "motd": "${motd}", "max-players": 20, "hardcore": false },
+    "players": {
+      "whitelist": [{ "name": "Notch", "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5", "note": "whitelist" }],
+      "ops": [
+        {
+          "name": "Notch",
+          "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5",
+          "note": "op",
+          "level": 3,
+          "bypassesPlayerLimit": true
+        }
+      ],
+      "bans": [
+        {
+          "name": "Griefer",
+          "uuid": "11111111-2222-3333-4444-555555555555",
+          "note": "ban",
+          "reason": "griefing",
+          "expires": "2027-01-01T00:00:00Z"
+        }
+      ]
+    },
+    "note": "server"
+  },
+  "client": {
+    "options": { "fov": 0.5, "lang": "en_us", "autoJump": false },
+    "servers": [{ "name": "Home", "ip": "example.com:25565", "note": "servers" }],
+    "note": "client"
+  }
+}
