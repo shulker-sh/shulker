@@ -46,13 +46,17 @@ func (a *app) projectJava(ctx context.Context, p *project.Project) (server.Java,
 }
 
 func (a *app) serveCmd() *cobra.Command {
-	var target string
+	var tf targetFlag
 	var force, acceptEula bool
 	cmd := &cobra.Command{
-		Use:   "serve",
+		Use:   "serve [target]",
 		Short: "Build a server target and run it in the foreground",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, err := tf.resolve(args)
+			if err != nil {
+				return err
+			}
 			p, err := a.openProject()
 			if err != nil {
 				return err
@@ -116,7 +120,7 @@ func (a *app) serveCmd() *cobra.Command {
 				return err
 			}
 			dir := filepath.Join(p.Dir, p.Manifest.BuildDir(name))
-			args := server.Command(jvm, build.LaunchArgs(p.Lock))
+			launchArgs := server.Command(jvm, build.LaunchArgs(p.Lock))
 			a.progress("starting %s in %s with %s", name, dir, java)
 
 			interrupt := make(chan os.Signal, 2)
@@ -129,7 +133,7 @@ func (a *app) serveCmd() *cobra.Command {
 			r := &server.Runner{
 				Java:      java.Path,
 				Dir:       dir,
-				Args:      args,
+				Args:      launchArgs,
 				Stdin:     stdin,
 				Stdout:    gameOut,
 				Stderr:    a.printer.Stderr,
@@ -140,7 +144,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res := serveResult{Target: name, Dir: dir, Java: java, Args: args, ExitCode: code}
+			res := serveResult{Target: name, Dir: dir, Java: java, Args: launchArgs, ExitCode: code}
 			if code != 0 {
 				if a.printer.JSON {
 					_ = a.printer.Emit(res, func(io.Writer) {})
@@ -152,7 +156,7 @@ func (a *app) serveCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&target, "target", "", "server target to run (default: the only server target)")
+	tf.register(cmd, "server target to run (default: the only server target)")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory and ignore a stale lock")
 	cmd.Flags().BoolVar(&acceptEula, "accept-eula", false, "record acceptance of the Minecraft EULA in shulker.json without prompting")
 	return cmd

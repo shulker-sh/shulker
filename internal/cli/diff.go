@@ -33,6 +33,7 @@ func buildDirs(p *project.Project, lf *local.File, name string) (string, []strin
 
 func (a *app) diffCmd() *cobra.Command {
 	var into string
+	var tf targetFlag
 	cmd := &cobra.Command{
 		Use:   "diff [target]",
 		Short: "Show build files that differ from what build would write",
@@ -53,9 +54,13 @@ func (a *app) diffCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			name, err := tf.resolve(args)
+			if err != nil {
+				return err
+			}
 			names := targetNames(p.Manifest.Targets)
-			if len(args) == 1 {
-				names = args
+			if name != "" {
+				names = []string{name}
 			}
 			if into != "" {
 				if len(names) != 1 {
@@ -109,6 +114,7 @@ func (a *app) diffCmd() *cobra.Command {
 			})
 		},
 	}
+	tf.register(cmd, "target to diff (default: every target)")
 	cmd.Flags().StringVar(&into, "into", "", "directory the target was synced into (default: the build directory and every directory it was synced into)")
 	return cmd
 }

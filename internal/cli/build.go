@@ -16,6 +16,7 @@ func (a *app) buildCmd() *cobra.Command {
 	var force, acceptPlayerChange bool
 	var osName string
 	var ff featureFlags
+	var tf targetFlag
 	cmd := &cobra.Command{
 		Use:   "build [target]",
 		Short: "Assemble build directories from the lock and overrides",
@@ -49,9 +50,13 @@ func (a *app) buildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			name, err := tf.resolve(args)
+			if err != nil {
+				return err
+			}
 			names := targetNames(p.Manifest.Targets)
-			if len(args) == 1 {
-				names = args
+			if name != "" {
+				names = []string{name}
 			}
 			var reports []*build.Report
 			for _, name := range names {
@@ -77,6 +82,7 @@ func (a *app) buildCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory and ignore a stale lock")
 	cmd.Flags().BoolVar(&acceptPlayerChange, "accept-player-change", false, "relock a player name that now belongs to a different account")
 	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
+	tf.register(cmd, "target to build (default: every target)")
 	ff.register(cmd, "for this run only")
 	return cmd
 }

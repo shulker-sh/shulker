@@ -42,7 +42,7 @@ func (a *app) importCmd() *cobra.Command {
 }
 
 func (a *app) importMrpackCmd() *cobra.Command {
-	var dir, name string
+	var name string
 	cmd := &cobra.Command{
 		Use:   "mrpack <file>",
 		Short: "Create a project from a Modrinth modpack (.mrpack)",
@@ -55,6 +55,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			if name == "" {
 				name = slugify(arc.Index.Name)
 			}
+			dir := a.dir
 			if dir == "" {
 				dir = name
 			}
@@ -112,7 +113,6 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&dir, "dir", "", "project directory to create (default: ./<name>)")
 	cmd.Flags().StringVar(&name, "name", "", "project name (default: the pack name, slugified)")
 	return cmd
 }

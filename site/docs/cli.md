@@ -25,7 +25,7 @@ outline: [2, 3]
 | [`shulker build [target]`](#shulker-build) | Assemble build directories from the lock and overrides |
 | [`shulker diff [target]`](#shulker-diff) | Show build files that differ from what build would write |
 | [`shulker pull [file...]`](#shulker-pull) | Copy edits made in a build directory back into their source |
-| [`shulker serve`](#shulker-serve) | Build a server target and run it in the foreground |
+| [`shulker serve [target]`](#shulker-serve) | Build a server target and run it in the foreground |
 | [`shulker link mojang`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
 | [`shulker link prism`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
 | [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
@@ -75,12 +75,11 @@ Create a project from a Modrinth modpack (`.mrpack`).
 
 ```sh
 shulker import mrpack ~/Downloads/fabulously-optimized.mrpack
-shulker import mrpack pack.mrpack --dir my-pack --name my-pack
+shulker import mrpack pack.mrpack -C my-pack --name my-pack
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--dir <path>` | Project directory to create (default: `./<name>`) |
 | `--name <name>` | Project name (default: the pack name, slugified) |
 
 ### `shulker export mrpack`
@@ -306,6 +305,7 @@ shulker build client
 
 | Flag | Description |
 | --- | --- |
+| `--target <name>` | Target to build (default: every target); the same as the argument, and passing both is an error |
 | `--force` | Overwrite files edited in the build directory and ignore a stale lock |
 | `--accept-player-change` | Relock a player name that now belongs to a different account |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
@@ -324,6 +324,7 @@ shulker diff server --into /srv/minecraft
 
 | Flag | Description |
 | --- | --- |
+| `--target <name>` | Target to diff (default: every target); the same as the argument, and passing both is an error |
 | `--into <path>` | Directory the target was synced into (default: the build directory and every directory `sync` recorded) |
 
 ### `shulker pull`
@@ -350,12 +351,12 @@ Build a server target and run it in the foreground.
 
 ```sh
 shulker serve
-shulker serve --target server --accept-eula
+shulker serve server --accept-eula
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--target <name>` | Server target to run (default: the only server target) |
+| `--target <name>` | Server target to run (default: the only server target); the same as the argument, and passing both is an error |
 | `--force` | Overwrite files edited in the build directory and ignore a stale lock |
 | `--accept-eula` | Record acceptance of the Minecraft EULA in shulker.json without prompting |
 
