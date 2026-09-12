@@ -104,7 +104,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			}
 			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Targets: targetNames(m.Targets), Mods: mods, Overrides: overridePaths(mods.Overrides)}
 			return a.printer.Emit(res, func(w io.Writer) {
-				fmt.Fprintf(w, "Imported %s %s into %s (Minecraft %s, %s %s)\n", res.Name, res.Version, dir, res.Minecraft, res.Loader.Type, res.Loader.Version)
+				fmt.Fprintf(w, "Imported %s %s into %s (Minecraft %s, %s %s).\n", res.Name, res.Version, dir, res.Minecraft, res.Loader.Type, res.Loader.Version)
 				fmt.Fprintf(w, "  %d mod(s) locked from Modrinth, %d reused from the shulker marker, %d unmanaged file(s), %d override file(s)\n", len(mods.Locked), len(mods.Reused), len(mods.Unmanaged), len(res.Overrides))
 				if len(mods.Dropped) > 0 {
 					fmt.Fprintf(w, "  dropped from the marker (not in the pack): %s\n", strings.Join(mods.Dropped, ", "))

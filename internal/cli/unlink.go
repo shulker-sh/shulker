@@ -61,16 +61,16 @@ func (a *app) unlinkCmd() *cobra.Command {
 						fmt.Fprintln(w)
 					}
 					if !r.OK {
-						fmt.Fprintf(w, "couldn't unlink %q: %s\n", r.Name, r.Error.Message)
+						fmt.Fprintf(w, "Couldn't unlink %q: %s\n", r.Name, r.Error.Message)
 						continue
 					}
 					fmt.Fprintln(w, r.summary)
 					if r.RelinkIn != "" {
-						fmt.Fprintf(w, "to link it again, in %s: %s\n", r.RelinkIn, r.Relink)
+						fmt.Fprintf(w, "To link it again, in %s: %s\n", r.RelinkIn, r.Relink)
 					} else if r.Launcher != "" {
-						fmt.Fprintf(w, "to link it again: %s\n", r.Relink)
+						fmt.Fprintf(w, "To link it again: %s\n", r.Relink)
 					} else {
-						fmt.Fprintf(w, "to register it again: %s\n", r.Relink)
+						fmt.Fprintf(w, "To register it again: %s\n", r.Relink)
 					}
 				}
 			}

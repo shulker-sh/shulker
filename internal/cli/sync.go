@@ -114,11 +114,11 @@ func (a *app) syncCmd() *cobra.Command {
 }
 
 func (res syncResult) print(w io.Writer) {
-	fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
+	fmt.Fprintf(w, "Fetched %d file(s).\n", len(res.Fetched))
 	fmt.Fprintf(w, "%s into %s\n", res.Build.Summary(), res.Dir)
 	printReportDetails(w, res.Build)
 	if l := res.Registered; l != nil {
-		fmt.Fprintf(w, "registered %q (%s)\n", l.Name, l.Side)
+		fmt.Fprintf(w, "Registered %q (%s).\n", l.Name, l.Side)
 	}
 }
 

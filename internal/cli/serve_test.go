@@ -57,7 +57,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("serve: %d\n%s\n%s", code, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "[Server] got: say hi") || !strings.Contains(stdout, "server stopped") {
+	if !strings.Contains(stdout, "[Server] got: say hi") || !strings.Contains(stdout, "Server stopped.") {
 		t.Fatalf("stdout: %s", stdout)
 	}
 	if !strings.Contains(stderr, "starting server in") || !strings.Contains(stderr, "Java 25") {
@@ -165,7 +165,7 @@ func TestManagedJava(t *testing.T) {
 		t.Fatalf("expected 2 object downloads, got %d", h.runtime.hits)
 	}
 
-	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, "fetched 0 file(s)") || h.runtime.hits != 2 {
+	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, "Fetched 0 file(s).") || h.runtime.hits != 2 {
 		t.Fatalf("second install re-downloaded the runtime: %s (hits %d)", stdout, h.runtime.hits)
 	}
 
@@ -180,7 +180,7 @@ func TestManagedJava(t *testing.T) {
 		t.Fatalf("failed refresh replaced the runtime: %v", marker)
 	}
 	h.runtime.corrupt = ""
-	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, "fetched 1 file(s)") {
+	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, "Fetched 1 file(s).") {
 		t.Fatalf("changed runtime should be refetched: %s", stdout)
 	}
 	if marker := h.readRuntimeMarker(t); marker["version"] != "25.0.2" {

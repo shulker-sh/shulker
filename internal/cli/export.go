@@ -76,7 +76,7 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 			}
 			a.warn(rep.Warnings)
 			return a.printer.Emit(rep, func(w io.Writer) {
-				fmt.Fprintf(w, "wrote %s: %s %s, %d mod(s) by download, %d bundled, %d override file(s)\n", output, rep.Name, rep.VersionID, len(rep.Mods), len(rep.Bundled), len(rep.Overrides))
+				fmt.Fprintf(w, "Wrote %s: %s %s, %d mod(s) by download, %d bundled, %d override file(s).\n", output, rep.Name, rep.VersionID, len(rep.Mods), len(rep.Bundled), len(rep.Overrides))
 			})
 		},
 	}

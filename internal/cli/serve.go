@@ -149,7 +149,7 @@ func (a *app) serveCmd() *cobra.Command {
 				return &out.Error{Code: "server-exit", Message: fmt.Sprintf("server exited with status %d", code), Exit: code}
 			}
 			return a.printer.Emit(res, func(w io.Writer) {
-				fmt.Fprintln(w, "server stopped")
+				fmt.Fprintln(w, "Server stopped.")
 			})
 		},
 	}

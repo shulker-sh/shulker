@@ -56,7 +56,7 @@ func TestFeatureIntoSyncedDir(t *testing.T) {
 		t.Fatalf("list --into: %q", stdout)
 	}
 
-	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "fancy on in "+into+"\nfetched ") {
+	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "fancy on in "+into+"\nFetched ") {
 		t.Fatalf("feature on --sync: %q", stdout)
 	}
 	if _, err := os.Stat(jar); err != nil {

@@ -113,7 +113,7 @@ func (a *app) initCmd() *cobra.Command {
 			}
 			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Target: target}
 			return a.printer.Emit(res, func(w io.Writer) {
-				fmt.Fprintf(w, "Created %s for Minecraft %s with %s %s (Java %d)\nNext: shulker add <mod>\n", manifest.FileName, res.Minecraft, res.Loader, res.Version, res.Java)
+				fmt.Fprintf(w, "Created %s for Minecraft %s with %s %s (Java %d).\nNext: shulker add <mod>\n", manifest.FileName, res.Minecraft, res.Loader, res.Version, res.Java)
 			})
 		},
 	}

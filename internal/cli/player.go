@@ -54,7 +54,7 @@ func (a *app) playerCmd() *cobra.Command {
 			}
 			return a.printer.Emit(results, func(w io.Writer) {
 				if len(results) == 0 {
-					fmt.Fprintln(w, "no players to check")
+					fmt.Fprintln(w, "No players to check.")
 					return
 				}
 				for _, r := range results {

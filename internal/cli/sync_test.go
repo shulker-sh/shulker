@@ -39,7 +39,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "sync", h.dir, "--into", into)
-	if !strings.Contains(stdout, "fetched 0 file(s)") || !strings.Contains(stdout, "0 written") {
+	if !strings.Contains(stdout, "Fetched 0 file(s).") || !strings.Contains(stdout, "0 written") {
 		t.Fatalf("second sync output: %s", stdout)
 	}
 

@@ -121,7 +121,7 @@ func Relink(l config.Link) (command, in string) {
 func Forget(l config.Link) (Forgotten, error) {
 	e := Find(l.Launcher)
 	if e == nil {
-		return Forgotten{Summary: fmt.Sprintf("forgot %q (%s); its files stay", l.Name, l.Dir)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Forgot %q (%s); its files stay.", l.Name, l.Dir)}, nil
 	}
 	return e.forget(e, l)
 }
@@ -157,20 +157,20 @@ func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
 	_, statErr := os.Stat(instanceDir)
 	switch info, err := os.Lstat(l.Dir); {
 	case errors.Is(statErr, os.ErrNotExist):
-		return Forgotten{Summary: fmt.Sprintf("unlinked %q (%s); its instance was already gone", l.Name, e.Title)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its instance was already gone.", l.Name, e.Title)}, nil
 	case err == nil && info.Mode()&os.ModeSymlink != 0:
-		return Forgotten{Summary: fmt.Sprintf("unlinked %q (%s); the instance stays and still uses the build directory", l.Name, e.Title)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance stays and still uses the build directory.", l.Name, e.Title)}, nil
 	}
 	removed, err := RemovePreLaunch(instanceDir, e.Name == "multimc")
 	if err != nil {
 		return Forgotten{}, err
 	}
 	if !removed {
-		return Forgotten{Summary: fmt.Sprintf("unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept", l.Name, e.Title)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept.", l.Name, e.Title)}, nil
 	}
 	return Forgotten{
 		Removed: RemovedPreLaunch,
-		Summary: fmt.Sprintf("unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay\nRestart the launcher if it is open so the change is picked up.", l.Name, e.Title),
+		Summary: fmt.Sprintf("Unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay.\nRestart the launcher if it is open so the change is picked up.", l.Name, e.Title),
 	}, nil
 }
 
@@ -180,11 +180,11 @@ func forgetMojang(e *Entry, l config.Link) (Forgotten, error) {
 		return Forgotten{}, err
 	}
 	if n == 0 {
-		return Forgotten{Summary: fmt.Sprintf("unlinked %q (%s); it had no launcher profile left", l.Name, e.Title)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); it had no launcher profile left.", l.Name, e.Title)}, nil
 	}
 	return Forgotten{
 		Removed: RemovedProfile,
-		Summary: fmt.Sprintf("unlinked %q (%s): removed its launcher profile; the build directory and the loader stay", l.Name, e.Title),
+		Summary: fmt.Sprintf("Unlinked %q (%s): removed its launcher profile; the build directory and the loader stay.", l.Name, e.Title),
 	}, nil
 }
 

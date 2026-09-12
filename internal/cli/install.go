@@ -74,7 +74,7 @@ func (a *app) installCmd() *cobra.Command {
 			}
 			a.refreshLocal(lf, true, false)
 			return a.printer.Emit(res, func(w io.Writer) {
-				fmt.Fprintf(w, "fetched %d file(s)\n", len(res.Fetched))
+				fmt.Fprintf(w, "Fetched %d file(s).\n", len(res.Fetched))
 				for _, rep := range res.Builds {
 					fmt.Fprintln(w, rep.Summary())
 					printReportDetails(w, rep)

@@ -70,7 +70,7 @@ func TestUnlink(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "unlink", "Sym")
-	if !strings.Contains(stdout, "still uses the build directory") || !strings.Contains(stdout, "to link it again, in "+h.dir+": shulker link prism --mode symlink --target client --name Sym --launcher-dir "+prismDir) {
+	if !strings.Contains(stdout, "still uses the build directory") || !strings.Contains(stdout, "To link it again, in "+h.dir+": shulker link prism --mode symlink --target client --name Sym --launcher-dir "+prismDir) {
 		t.Fatalf("unlink symlink instance: %s", stdout)
 	}
 
@@ -87,7 +87,7 @@ func TestUnlink(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "unlink", "Server Copy")
-	if !strings.Contains(stdout, `forgot "Server Copy" (`+plain+`); its files stay`) || !strings.Contains(stdout, "to register it again: shulker sync "+h.dir+" --target client --into "+plain+` --name "Server Copy"`) {
+	if !strings.Contains(stdout, `Forgot "Server Copy" (`+plain+`); its files stay.`) || !strings.Contains(stdout, "To register it again: shulker sync "+h.dir+" --target client --into "+plain+` --name "Server Copy"`) {
 		t.Fatalf("unlink plain: %s", stdout)
 	}
 	if _, err := os.Stat(filepath.Join(plain, "mods")); err != nil {

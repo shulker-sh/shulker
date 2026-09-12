@@ -137,10 +137,10 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	}
 	return a.printer.Emit(res, func(w io.Writer) {
 		if cmd.Name() == "pin" {
-			fmt.Fprintf(w, "pinned %s to %s\n", cmd.Flags().Arg(0), pin)
+			fmt.Fprintf(w, "Pinned %s to %s.\n", cmd.Flags().Arg(0), pin)
 		}
 		if cmd.Name() == "unpin" {
-			fmt.Fprintf(w, "unpinned %s\n", cmd.Flags().Arg(0))
+			fmt.Fprintf(w, "Unpinned %s.\n", cmd.Flags().Arg(0))
 		}
 		printChanges(w, res.Changes)
 		for _, s := range res.Suggestions {

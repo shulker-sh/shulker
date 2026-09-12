@@ -530,7 +530,7 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "install")
-	if !strings.Contains(stdout, "fetched 0 file(s)") || !strings.Contains(stdout, "client: 4 written") {
+	if !strings.Contains(stdout, "Fetched 0 file(s).") || !strings.Contains(stdout, "client: 4 written") {
 		t.Fatalf("install output: %s", stdout)
 	}
 	buildDir := filepath.Join(h.dir, "build", "client")

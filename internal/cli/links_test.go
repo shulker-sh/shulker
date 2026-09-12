@@ -41,14 +41,14 @@ func TestSyncIntoRegisters(t *testing.T) {
 	if len(links) != 1 || links[0] != want || want.Name == "" {
 		t.Fatalf("entry: %+v", links)
 	}
-	if !strings.Contains(stdout, `registered "`+want.Name+`" (client)`) {
+	if !strings.Contains(stdout, `Registered "`+want.Name+`" (client).`) {
 		t.Fatalf("sync should say it registered the directory: %s", stdout)
 	}
-	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); strings.Contains(stdout, "registered") {
+	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); strings.Contains(stdout, "Registered") {
 		t.Fatalf("an unchanged entry is not registered again: %s", stdout)
 	}
 
-	if stdout := h.mustRun(t, "sync", h.dir, "--into", into, "--name", "Mine"); !strings.Contains(stdout, `registered "Mine" (client)`) {
+	if stdout := h.mustRun(t, "sync", h.dir, "--into", into, "--name", "Mine"); !strings.Contains(stdout, `Registered "Mine" (client).`) {
 		t.Fatalf("--name renames the entry: %s", stdout)
 	}
 	h.mustRun(t, "sync", h.dir, "--into", into)
@@ -64,7 +64,7 @@ func TestLinkRegisters(t *testing.T) {
 
 	prismDir := t.TempDir()
 	stdout := h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
-	if strings.Contains(stdout, "registered") {
+	if strings.Contains(stdout, "Registered") {
 		t.Fatalf("the first sync matches the entry link just wrote: %s", stdout)
 	}
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
@@ -72,7 +72,7 @@ func TestLinkRegisters(t *testing.T) {
 	if links := readLinks(t, h); len(links) != 1 || links[0] != prism {
 		t.Fatalf("prism entry: %+v", links)
 	}
-	if stdout := h.mustRun(t, "sync", h.dir, "--target", "client", "--into", gameDir); strings.Contains(stdout, "registered") {
+	if stdout := h.mustRun(t, "sync", h.dir, "--target", "client", "--into", gameDir); strings.Contains(stdout, "Registered") {
 		t.Fatalf("a pre-launch sync must not change the entry: %s", stdout)
 	}
 
@@ -211,7 +211,7 @@ func TestSyncInstance(t *testing.T) {
 	h.tty = false
 
 	stdout = h.mustRun(t, "sync", "--all")
-	if !strings.Contains(stdout, "Friends (client, Prism Launcher)\nfetched 0 file(s)\n") || !strings.Contains(stdout, "\n\nfriends (client)\n") {
+	if !strings.Contains(stdout, "Friends (client, Prism Launcher)\nFetched 0 file(s).\n") || !strings.Contains(stdout, "\n\nfriends (client)\n") {
 		t.Fatalf("sync --all output: %s", stdout)
 	}
 	var all struct {
@@ -296,7 +296,7 @@ func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 	}
 	h.config = filepath.Join(blocker, "config.json")
 	stdout, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "one"))
-	if !strings.Contains(stderr, "warning: config.json not updated") || strings.Contains(stdout, "registered") {
+	if !strings.Contains(stderr, "warning: config.json not updated") || strings.Contains(stdout, "Registered") {
 		t.Fatalf("stdout: %s\nstderr: %s", stdout, stderr)
 	}
 }

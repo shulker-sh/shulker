@@ -67,11 +67,11 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	}
 	res := selfUpdateResult{Current: version, Latest: strings.TrimPrefix(tag, "v"), Available: selfupdate.NeedsUpdate(version, tag)}
 	if !res.Available {
-		return a.printer.Emit(res, func(w io.Writer) { fmt.Fprintf(w, "shulker is up to date (%s)\n", version) })
+		return a.printer.Emit(res, func(w io.Writer) { fmt.Fprintf(w, "shulker is up to date (%s).\n", version) })
 	}
 	if check {
 		return a.printer.Emit(res, func(w io.Writer) {
-			fmt.Fprintf(w, "shulker %s is available (you have %s); run shulker self update to install it\n", res.Latest, version)
+			fmt.Fprintf(w, "shulker %s is available (you have %s); run shulker self update to install it.\n", res.Latest, version)
 		})
 	}
 
@@ -103,7 +103,7 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	}
 	res.Updated, res.Path = true, exe
 	return a.printer.Emit(res, func(w io.Writer) {
-		fmt.Fprintf(w, "updated shulker %s -> %s at %s\n", version, res.Latest, exe)
+		fmt.Fprintf(w, "Updated shulker %s -> %s at %s\n", version, res.Latest, exe)
 	})
 }
 
