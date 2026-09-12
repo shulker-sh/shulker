@@ -32,10 +32,22 @@ func RunInstaller(ctx context.Context, java, jar string, args []string) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return out.Errorf("installer-failed", "the loader installer failed (%v); its last output:\n%s", err, lastLines(output.String(), 15))
+		e := out.Errorf("installer-failed", "the loader installer failed (%v); its last output:\n%s", err, lastLines(output.String(), 15))
+		return &InstallerFailure{Err: e, Output: output.String()}
 	}
 	return nil
 }
+
+// InstallerFailure carries the installer's whole output so the caller can save it; errors.As
+// still finds the installer-failed *out.Error inside.
+type InstallerFailure struct {
+	Err    *out.Error
+	Output string
+}
+
+func (f *InstallerFailure) Error() string { return f.Err.Message }
+
+func (f *InstallerFailure) Unwrap() error { return f.Err }
 
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)

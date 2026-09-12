@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/near"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -66,7 +67,60 @@ func (b *Builder) Diff(name string, opts Options) (*DiffReport, error) {
 	return report, nil
 }
 
+// checkNamed runs before any build work, so a file name that isn't in the directory at all is
+// reported as missing rather than as unchanged.
+func (b *Builder) checkNamed(name string, files []string, opts Options) error {
+	dir := opts.Dir
+	if dir == "" {
+		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
+	}
+	if _, err := os.Stat(dir); err != nil {
+		return nil
+	}
+	var present []string
+	for _, f := range files {
+		rel := filepath.ToSlash(filepath.Clean(f))
+		_, err := os.Stat(filepath.Join(dir, filepath.FromSlash(rel)))
+		if err == nil {
+			continue
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		if present == nil {
+			if present, err = listFiles(dir); err != nil {
+				return err
+			}
+		}
+		msg := fmt.Sprintf("%s is not in %s", rel, dir)
+		if hits := near.Closest(rel, present, 1); len(hits) > 0 {
+			msg += fmt.Sprintf("; did you mean %s?", hits[0])
+		}
+		return out.Errorf("file-not-found", "%s", msg)
+	}
+	return nil
+}
+
+func listFiles(dir string) ([]string, error) {
+	files := []string{}
+	err := filepath.WalkDir(dir, func(path string, e fs.DirEntry, err error) error {
+		if err != nil || e.IsDir() || e.Name() == StateFile {
+			return err
+		}
+		rel, err := filepath.Rel(dir, path)
+		files = append(files, filepath.ToSlash(rel))
+		return err
+	})
+	return files, err
+}
+
 func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullReport, error) {
+	if len(adopt) > 0 && len(files) != 1 {
+		return nil, out.Errorf("usage", "--key needs exactly one file")
+	}
+	if err := b.checkNamed(name, files, opts); err != nil {
+		return nil, err
+	}
 	d, err := b.drift(name, opts)
 	if err != nil {
 		return nil, err
@@ -76,9 +130,6 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 	report := &PullReport{Target: name, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Skipped: []string{}, Warnings: d.warnings}
 	var pulled []string
 	if len(adopt) > 0 {
-		if len(files) != 1 {
-			return nil, out.Errorf("usage", "--key needs exactly one file")
-		}
 		rel := filepath.ToSlash(filepath.Clean(files[0]))
 		if err := b.adoptKeys(name, rel, adopt, d, report); err != nil {
 			return nil, err
@@ -224,7 +275,10 @@ func (b *Builder) drift(name string, opts Options) (*drift, error) {
 	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
 		return nil, out.Errorf("not-built", "target %s has no build directory; run `shulker build`", name)
 	}
-	prev := LoadState(dir)
+	prev, stateErr := ReadState(dir)
+	if stateErr != nil {
+		report.Warnings = append(report.Warnings, stateErr.Error())
+	}
 	plans, err := b.plan(dir, desired, prev, false)
 	if err != nil {
 		return nil, err

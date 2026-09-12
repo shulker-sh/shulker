@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/server"
 )
 
 func TestNeoForgeServer(t *testing.T) {
@@ -92,15 +93,20 @@ func TestNeoForgeServer(t *testing.T) {
 	if err := os.Remove(filepath.Join(buildDir, "libraries/net/neoforged/neoforge/26.2.0.87/unix_args.txt")); err != nil {
 		t.Fatal(err)
 	}
-	h.installErr = out.Errorf("installer-failed", "the loader installer failed")
+	h.installErr = &server.InstallerFailure{Err: out.Errorf("installer-failed", "the loader installer failed"), Output: "every line the installer printed\n"}
 	code, stdout, _ := h.run(t, "--json", "build")
 	var env struct {
 		Error struct {
-			Code string `json:"code"`
+			Code    string `json:"code"`
+			Message string `json:"message"`
 		} `json:"error"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil || code != 1 || env.Error.Code != "installer-failed" {
 		t.Fatalf("failed installer: %d %s", code, stdout)
+	}
+	_, logPath, found := strings.Cut(env.Error.Message, "\nFull output: ")
+	if data, err := os.ReadFile(logPath); !found || err != nil || string(data) != "every line the installer printed\n" {
+		t.Fatalf("installer output not saved: %q (%v)", env.Error.Message, err)
 	}
 	h.installErr = nil
 

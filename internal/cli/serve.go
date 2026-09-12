@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -23,11 +24,37 @@ import (
 const eulaURL = "https://aka.ms/MinecraftEULA"
 
 type serveResult struct {
-	Target   string      `json:"target"`
-	Dir      string      `json:"dir"`
-	Java     server.Java `json:"java"`
-	Args     []string    `json:"args"`
-	ExitCode int         `json:"exitCode"`
+	Target      string      `json:"target"`
+	Dir         string      `json:"dir"`
+	Java        server.Java `json:"java"`
+	Args        []string    `json:"args"`
+	ExitCode    int         `json:"exitCode"`
+	Log         string      `json:"log,omitempty"`
+	CrashReport string      `json:"crashReport,omitempty"`
+}
+
+// serverFailureFiles returns the server's log and the newest crash report written since started,
+// each empty when there isn't one.
+func serverFailureFiles(dir string, started time.Time) (log, crashReport string) {
+	if path := filepath.Join(dir, "logs", "latest.log"); fileExists(path) {
+		log = path
+	}
+	entries, _ := os.ReadDir(filepath.Join(dir, "crash-reports"))
+	var newest time.Time
+	for _, e := range entries {
+		info, err := e.Info()
+		if err != nil || e.IsDir() || info.ModTime().Before(started) || !info.ModTime().After(newest) {
+			continue
+		}
+		newest = info.ModTime()
+		crashReport = filepath.Join(dir, "crash-reports", e.Name())
+	}
+	return log, crashReport
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func (a *app) projectJava(ctx context.Context, p *project.Project) (server.Java, error) {
@@ -140,16 +167,26 @@ func (a *app) serveCmd() *cobra.Command {
 				Interrupt: interrupt,
 				Log:       a.printer.Stderr,
 			}
+			// File times can be coarser than the clock, so a crash report from this run's first second counts.
+			started := time.Now().Truncate(time.Second)
 			code, err := r.Run()
 			if err != nil {
 				return err
 			}
 			res := serveResult{Target: name, Dir: dir, Java: java, Args: launchArgs, ExitCode: code}
 			if code != 0 {
+				res.Log, res.CrashReport = serverFailureFiles(dir, started)
 				if a.printer.JSON {
 					_ = a.printer.Emit(res, func(io.Writer) {})
 				}
-				return &out.Error{Code: "server-exit", Message: fmt.Sprintf("server exited with status %d", code), Exit: code}
+				e := &out.Error{Code: "server-exit", Message: fmt.Sprintf("server exited with status %d", code), Exit: code}
+				if res.Log != "" {
+					e.Items = append(e.Items, "log: "+res.Log)
+				}
+				if res.CrashReport != "" {
+					e.Items = append(e.Items, "crash report: "+res.CrashReport)
+				}
+				return e
 			}
 			return a.printer.Emit(res, func(w io.Writer) {
 				fmt.Fprintln(w, "Server stopped.")

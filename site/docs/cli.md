@@ -729,7 +729,7 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `ambiguous-into` | The target has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
-| `config-invalid` | shulker's `config.json` isn't valid JSON |
+| `config-invalid` | shulker's `config.json` isn't valid JSON. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `registry-has-links` | `config set` or `config unset` would move the registry away from linked instances or synced directories the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON |
@@ -739,7 +739,7 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `file-not-found` | A file named to `pull` isn't in the build directory |
 | `git-missing` | A git source needs `git` on PATH |
 | `id-changed` | A new version of a mod identifies itself as a different mod |
-| `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir; the message ends with its last output |
+| `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-dir-not-empty` | The instance directory already has files |
 | `instance-exists` | An instance already syncs from this source; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
@@ -803,7 +803,7 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `player-unknown` | Players that don't exist at Mojang. `items`: the names |
 | `player-unresolved` | A player isn't in the lock; run `shulker player` |
 | `players-invalid` | A player entry in `shulker.json` is invalid |
-| `properties-invalid` | `server.properties` keys that aren't valid for this Minecraft version. `items`: the keys |
+| `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform; set `java` in `shulker.json` |
 | `self-update-check` | Checking for a release failed, or none is published |
@@ -811,7 +811,7 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `self-update-download` | The download failed |
 | `self-update-install` | The running binary couldn't be replaced |
 | `self-update-provenance` | `--require-attestation` is set and the build provenance couldn't be verified |
-| `server-exit` | The server exited with an error |
+| `server-exit` | The server exited with an error. `items`: its `logs/latest.log` and, when the server wrote one during the run, its crash report; `data` carries them as `log` and `crashReport` |
 | `source-fetch` | The sync source couldn't be fetched |
 | `source-lock` | The sync source has no `shulker.lock` |
 | `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
@@ -825,5 +825,6 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `unsupported-mode` | `--mode symlink` isn't supported on Windows yet |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems. `items`: the problems |
+| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
 | `version-required` | `export mrpack` needs a version |
 | `wrong-side-target` | The target is on the wrong side for the command. `candidates`: the targets on the right side |

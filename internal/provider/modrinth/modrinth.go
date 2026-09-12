@@ -86,8 +86,12 @@ func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders
 
 func (m *Modrinth) Version(ctx context.Context, versionID string) (*provider.Version, error) {
 	var raw version
-	if err := m.Client.GetJSON(ctx, m.BaseURL+"/version/"+url.PathEscape(versionID), &raw); err != nil {
+	found, err := m.Client.GetJSONIfFound(ctx, m.BaseURL+"/version/"+url.PathEscape(versionID), &raw)
+	if err != nil {
 		return nil, fmt.Errorf("modrinth version %s: %w", versionID, err)
+	}
+	if !found {
+		return nil, fmt.Errorf("modrinth version %s: %w", versionID, provider.ErrNotFound)
 	}
 	pv, err := convert(raw)
 	if err != nil {

@@ -162,6 +162,13 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider.Project, pin, channel string) (*provider.Version, error) {
 	if pin != "" {
 		v, err := p.Version(ctx, pin)
+		if errors.Is(err, provider.ErrNotFound) {
+			page := "https://modrinth.com/mod/" + proj.Slug + "/versions"
+			if p.Name() == "curseforge" {
+				page = "https://www.curseforge.com/minecraft/mc-mods/" + proj.Slug + "/files"
+			}
+			return nil, out.Errorf("version-not-found", "%s has no version %s for %s; list versions at %s", p.Name(), pin, proj.Slug, page)
+		}
 		if err != nil {
 			return nil, err
 		}

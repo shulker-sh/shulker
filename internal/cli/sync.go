@@ -255,7 +255,10 @@ func (a *app) syncRecorded(cmd *cobra.Command, req syncRequest) (syncResult, err
 	if err != nil {
 		return syncResult{}, err
 	}
-	st := build.LoadState(into)
+	st, stateErr := build.ReadState(into)
+	if stateErr != nil {
+		a.printer.Warn("%v", stateErr)
+	}
 	if st.Source == "" {
 		return syncResult{}, out.Errorf("source-unknown", "%s has no record of what it was synced from; name the source", into)
 	}

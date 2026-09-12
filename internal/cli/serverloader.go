@@ -2,12 +2,16 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"time"
 
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/server"
 )
 
 // installServerLoader runs the loader's own installer into a built server dir when the locked
@@ -39,8 +43,31 @@ func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *
 	}
 	a.progress("installing %s %s into %s", want.Type, want.Version, rep.Dir)
 	if err := a.installer(ctx, java.Path, d.cache.Object(p.Lock.Loader.Server.Sha512), []string{l.InstallServerFlag, dir, "--offline"}); err != nil {
-		return err
+		return a.keepInstallerOutput(err)
 	}
 	rep.InstalledLoader = &want
 	return build.RecordLoader(rep.Dir, want)
+}
+
+// keepInstallerOutput saves a failed installer's whole output in shulker's cache and names the file
+// at the end of the error.
+func (a *app) keepInstallerOutput(err error) error {
+	var failure *server.InstallerFailure
+	if !errors.As(err, &failure) {
+		return err
+	}
+	d, err := a.deps()
+	if err != nil {
+		return failure.Err
+	}
+	path, err := d.cache.InstallerLog(time.Now())
+	if err == nil {
+		err = fsutil.Write(path, []byte(failure.Output))
+	}
+	if err != nil {
+		a.printer.Warn("installer output not saved: %v", err)
+		return failure.Err
+	}
+	failure.Err.Message += "\nFull output: " + path
+	return failure.Err
 }

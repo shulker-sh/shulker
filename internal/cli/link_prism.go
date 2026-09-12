@@ -117,7 +117,11 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				LoaderVersion: p.Lock.Loader.Version,
 			}
 			if mode == "sync" {
-				if prev := build.LoadState(l.GameDir(inst.ID)).Source; prev != "" && prev != src.name && !force {
+				prevState, stateErr := build.ReadState(l.GameDir(inst.ID))
+				if stateErr != nil {
+					a.printer.Warn("%v", stateErr)
+				}
+				if prev := prevState.Source; prev != "" && prev != src.name && !force {
 					return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev)
 				}
 				exe, err := shulkerPath()

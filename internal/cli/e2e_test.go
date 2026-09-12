@@ -743,6 +743,12 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	if out := h.mustRun(t, "lock"); !strings.Contains(out, "Already up to date") {
 		t.Fatalf("second lock: %s", out)
 	}
+	for _, args := range [][]string{{"add", "sodium", "--pin", "nope"}, {"pin", "sodium", "nope"}} {
+		code, stdout, _ := h.run(t, append(args, "--json")...)
+		if code != 1 || !strings.Contains(stdout, `"version-not-found"`) || !strings.Contains(stdout, "modrinth.com/mod/sodium/versions") {
+			t.Fatalf("%v with an unknown version id: %d %s", args, code, stdout)
+		}
+	}
 }
 
 func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
@@ -1162,8 +1168,8 @@ func TestDiffAndPull(t *testing.T) {
 		t.Fatalf("manifest option should be the bool false: %#v", v)
 	}
 
-	if code, _, stderr := h.run(t, "pull", "config/missing.txt"); code == 0 || !strings.Contains(stderr, "is not changed in the build directory") {
-		t.Fatalf("pull of an unchanged path should fail: %d %s", code, stderr)
+	if code, _, stderr := h.run(t, "pull", "config/missing.txt"); code == 0 || !strings.Contains(stderr, "config/missing.txt is not in ") || !strings.Contains(stderr, "(file-not-found)") {
+		t.Fatalf("pull of a file that isn't there should fail with file-not-found: %d %s", code, stderr)
 	}
 	stdout = h.mustRun(t, "pull", "config/new.txt")
 	if !strings.Contains(stdout, "pulled config/new.txt -> overrides/config/new.txt") {

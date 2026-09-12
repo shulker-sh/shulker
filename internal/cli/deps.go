@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
@@ -39,7 +40,10 @@ func (a *app) deps() (*deps, error) {
 		return nil, err
 	}
 	cfg, err := config.Load()
-	if err != nil {
+	if out.CodeOf(err) == "config-invalid" {
+		a.printer.Warn("%s; ignoring it", out.AsError(err).Message)
+		cfg = config.Config{}
+	} else if err != nil {
 		return nil, err
 	}
 	f := fetch.New(version)

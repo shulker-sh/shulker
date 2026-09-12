@@ -5,12 +5,14 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // The cache holds everything shulker can fetch again, shared by every project:
 //
 //	objects/<aa>/<sha512>          mods, jars, and every other downloaded file
 //	tmp/                           partial writes, on the same filesystem so a rename lands
+//	logs/installer-<time>.log      the whole output of a loader installer that failed
 //	packs/git/<sha>.git            bare mirrors of git pack sources
 //	packs/src/<commit>             a commit exported as a tree, what a build reads
 //	packs/url/<sha>.json           a manifest fetched from a raw URL
@@ -18,6 +20,11 @@ import (
 //	projects/last-good/<sha>.json  the last sync from a source that built
 //
 // Paths are built here and nowhere else.
+
+func (c *Cache) InstallerLog(at time.Time) (string, error) {
+	dir := filepath.Join(c.Dir, "logs")
+	return filepath.Join(dir, "installer-"+at.Format("20060102-150405")+".log"), os.MkdirAll(dir, 0o755)
+}
 
 func (c *Cache) Object(sha string) string {
 	return filepath.Join(c.Dir, "objects", sha[:2], sha)

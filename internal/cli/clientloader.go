@@ -44,7 +44,7 @@ func (a *app) installClientLoader(ctx context.Context, p *project.Project, v *la
 	}
 	a.progress("Installing %s %s into %s", l.Name, p.Lock.Loader.Version, v.Dir)
 	if err := a.installer(ctx, java.Path, jar.Path, []string{l.InstallClientFlag, v.Dir}); err != nil {
-		return "", err
+		return "", a.keepInstallerOutput(err)
 	}
 	versionID, err := v.RestoreProfiles(before)
 	if err != nil {

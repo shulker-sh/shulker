@@ -214,7 +214,10 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	if opts.NoDataLinks {
 		dirs = nil
 	}
-	prev := LoadState(dir)
+	prev, stateErr := ReadState(dir)
+	if stateErr != nil {
+		report.Warnings = append(report.Warnings, stateErr.Error())
+	}
 	next := State{Target: name, Origin: opts.Origin, Files: map[string]string{}, Loader: prev.Loader}
 	links, err := b.planLinks(dir, name, dirs, prev, report)
 	if err != nil {
@@ -686,16 +689,29 @@ func canonicalValues(values map[string]string) []byte {
 }
 
 func LoadState(dir string) State {
-	s := State{Files: map[string]string{}}
-	data, err := os.ReadFile(filepath.Join(dir, StateFile))
-	if err != nil {
-		return s
+	s, _ := ReadState(dir)
+	return s
+}
+
+// ReadState treats a state file it can't read as empty, like LoadState, and also returns why,
+// worded as the warning to show.
+func ReadState(dir string) (State, error) {
+	path := filepath.Join(dir, StateFile)
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return State{Files: map[string]string{}}, nil
 	}
-	_ = json.Unmarshal(data, &s)
+	var s State
+	if err == nil {
+		err = json.Unmarshal(data, &s)
+	}
+	if err != nil {
+		return State{Files: map[string]string{}}, fmt.Errorf("%s is unreadable (%v); treating every file as not written by shulker. Rebuild with --force to take them over", path, err)
+	}
 	if s.Files == nil {
 		s.Files = map[string]string{}
 	}
-	return s
+	return s, nil
 }
 
 func (b *Builder) saveState(dir string, s State) error {
