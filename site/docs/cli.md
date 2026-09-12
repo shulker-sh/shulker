@@ -410,9 +410,12 @@ Download and build one target of a project straight into a directory, without se
 shulker sync https://github.com/shulker-sh/base-pack.git --target server --into /srv/minecraft
 shulker sync ../my-pack --target client --into ~/instances/my-pack
 shulker sync --instance "Friends SMP"
+shulker sync --into ~/instances/my-pack
 shulker sync --all --side server
 shulker sync
 ```
+
+With `--into` and no source, shulker reads what the directory was last synced from out of its own `.shulker-state.json`, so a synced directory keeps working even if the links registry is gone.
 
 If a git or manifest URL can't be reached because the network is down, `sync` warns and builds from the copy used by the last sync from that source that succeeded, so an instance still launches offline. The warning names the commit and says how old that copy is. A server that answers with an error, a missing ref, or a failed login still fails the sync, and so does a source that has never synced successfully here. `--offline` skips the network entirely, which is quicker than waiting for timeouts on a network that drops traffic. For a server target, an installed Java runtime is kept when its update check can't reach the network.
 
@@ -624,6 +627,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `instance-dir-not-empty` | The instance directory already has files |
 | `instance-exists` | An instance already syncs from this source; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
+| `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `instance-not-found` | Nothing linked matches. `candidates`: the linked entries |
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-required` | Syncing from a remote source needs `--into` |

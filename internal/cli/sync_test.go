@@ -440,8 +440,12 @@ func TestSyncDoesNotFailOnUnwritableLocalFile(t *testing.T) {
 		t.Fatalf("an unchanged local file must not be rewritten by build: %s", stderr)
 	}
 
-	if _, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "two")); !strings.Contains(stderr, "warning: shulker.local.json not updated") {
-		t.Fatalf("a failed write should warn: %s", stderr)
+	two := filepath.Join(t.TempDir(), "two")
+	if _, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", two); strings.Contains(stderr, "not updated") {
+		t.Fatalf("a source project nobody can write to must not warn every sync: %s", stderr)
+	}
+	if links := readLinks(t, h); len(links) != 2 {
+		t.Fatalf("the links registry still knows both directories: %+v", links)
 	}
 }
 
@@ -507,5 +511,29 @@ func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Dir(world)); !os.IsNotExist(err) {
 		t.Fatalf("the world should have left the project: %v", err)
+	}
+}
+
+func TestSyncIntoRecoversTheSourceWithoutTheRegistry(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	into := filepath.Join(t.TempDir(), "instance")
+	h.mustRun(t, "sync", h.dir, "--into", into)
+
+	if err := os.Remove(h.config); err != nil {
+		t.Fatal(err)
+	}
+	if stdout := h.mustRun(t, "sync", "--into", into); !strings.Contains(stdout, "unchanged") {
+		t.Fatalf("sync --into must rebuild from the recorded source: %s", stdout)
+	}
+	if links := readLinks(t, h); len(links) != 1 || links[0].Dir != into || links[0].Source != h.dir {
+		t.Fatalf("the entry is registered again: %+v", links)
+	}
+
+	bare := t.TempDir()
+	code, stdout, _ := h.run(t, "sync", "--into", bare, "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "source-unknown" {
+		t.Fatalf("a directory with no state: code=%d %s", code, stdout)
 	}
 }

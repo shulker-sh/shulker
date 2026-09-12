@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -102,11 +104,14 @@ func mergeDecisions(layers ...map[string]bool) map[string]bool {
 	return merged
 }
 
+// refreshLocal saves the bookkeeping a build or sync collected. It is best
+// effort: a project nobody can write to (someone else's, synced from) keeps its
+// directories in the links registry instead, so there is nothing to report.
 func (a *app) refreshLocal(lf *local.File, inProject, changed bool) {
 	if !changed && (!lf.Exists() || lf.DetectedOS == build.DetectOS()) {
 		return
 	}
-	if err := a.saveLocal(lf, inProject); err != nil {
+	if err := a.saveLocal(lf, inProject); err != nil && !errors.Is(err, fs.ErrPermission) {
 		a.printer.Warn("%s not updated: %v", local.FileName, err)
 	}
 }

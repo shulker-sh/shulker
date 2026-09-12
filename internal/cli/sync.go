@@ -60,6 +60,13 @@ func (a *app) syncCmd() *cobra.Command {
 				d.fetch.Offline = true
 			}
 			if len(args) == 0 {
+				if req.into != "" && req.target == "" && req.ref == "" && req.name == "" && instance == "" && !sel.all && !sel.narrows() {
+					res, err := a.syncRecorded(cmd, req)
+					if err != nil {
+						return err
+					}
+					return a.printer.Emit(res, res.print)
+				}
 				if req.target != "" || req.into != "" || req.ref != "" || req.name != "" {
 					return out.Errorf("usage", "--target, --into, --ref, and --name need a source; a registered entry already has them")
 				}
@@ -230,6 +237,20 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		}
 	}
 	return res, nil
+}
+
+// syncRecorded syncs a directory from the source its own state file records, so
+// a synced directory stays usable after the links registry is gone.
+func (a *app) syncRecorded(cmd *cobra.Command, req syncRequest) (syncResult, error) {
+	into, err := filepath.Abs(req.into)
+	if err != nil {
+		return syncResult{}, err
+	}
+	st := build.LoadState(into)
+	if st.Source == "" {
+		return syncResult{}, out.Errorf("source-unknown", "%s has no record of what it was synced from; name the source", into)
+	}
+	return a.syncLink(cmd, config.Link{Dir: into, Source: st.Source, Ref: st.Ref, Target: st.Target}, req)
 }
 
 // sameDir also treats a symlink to dir as dir, e.g. a Prism instance linked in symlink mode.

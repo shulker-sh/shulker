@@ -14,19 +14,38 @@ import (
 	"shulker.sh/shulker/internal/project"
 )
 
-func buildDirs(p *project.Project, lf *local.File, name string) (string, []string, error) {
+// buildDirs is the build directory plus every directory this target was synced
+// into: the links registry first, then any left in shulker.local.json by a
+// shulker that recorded them there. Directories that are gone are skipped.
+func (a *app) buildDirs(p *project.Project, lf *local.File, name string) (string, []string, error) {
 	buildDir, err := filepath.Abs(filepath.Join(p.Dir, p.Manifest.BuildDir(name)))
 	if err != nil {
 		return "", nil, err
 	}
 	var dirs []string
-	if _, err := os.Stat(buildDir); !errors.Is(err, os.ErrNotExist) {
-		dirs = append(dirs, buildDir)
+	seen := map[string]bool{}
+	add := func(dir string) {
+		if dir == "" || seen[dir] {
+			return
+		}
+		if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+			return
+		}
+		seen[dir] = true
+		dirs = append(dirs, dir)
+	}
+	add(buildDir)
+	links, err := a.loadLinks()
+	if err != nil {
+		return "", nil, err
+	}
+	for _, l := range links {
+		if l.Target == name && sameDir(l.Source, p.Dir) {
+			add(l.Dir)
+		}
 	}
 	for _, d := range lf.ExistingSyncDirs(name) {
-		if d != buildDir {
-			dirs = append(dirs, d)
-		}
+		add(d)
 	}
 	return buildDir, dirs, nil
 }
@@ -75,7 +94,7 @@ func (a *app) diffCmd() *cobra.Command {
 			for _, name := range names {
 				buildDir, dirs := "", []string{into}
 				if into == "" {
-					if buildDir, dirs, err = buildDirs(p, lf, name); err != nil {
+					if buildDir, dirs, err = a.buildDirs(p, lf, name); err != nil {
 						return err
 					}
 					if len(dirs) == 0 {
@@ -186,7 +205,7 @@ func (a *app) pullCmd() *cobra.Command {
 }
 
 func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, name string) (string, error) {
-	buildDir, dirs, err := buildDirs(p, lf, name)
+	buildDir, dirs, err := a.buildDirs(p, lf, name)
 	if err != nil || len(dirs) == 0 {
 		return "", err
 	}
