@@ -145,3 +145,18 @@ func TestConfigRegistry(t *testing.T) {
 	}
 	h.mustRun(t, "config", "set", "registry", copied)
 }
+
+func TestConfigUnsetRegistryCreatesDefault(t *testing.T) {
+	h := newHarness(t)
+	defaultRegistry := filepath.Join(filepath.Dir(h.config), "registry.json")
+	moved := filepath.Join(t.TempDir(), "registry.json")
+	h.mustRun(t, "config", "set", "registry", moved)
+
+	want := fmt.Sprintf("registry: %q -> (unset)\ncreated %s\n", moved, defaultRegistry)
+	if stdout := h.mustRun(t, "config", "unset", "registry"); stdout != want {
+		t.Errorf("unset output = %q, want %q", stdout, want)
+	}
+	if data, _ := os.ReadFile(defaultRegistry); string(data) != "{}\n" {
+		t.Errorf("default registry = %q", data)
+	}
+}

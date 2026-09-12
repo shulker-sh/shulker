@@ -283,7 +283,7 @@ shulker get server.properties
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
 | `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
 
-The CurseForge key is always shown as its last four characters, like `••••c123`, unless you pass `config get --reveal`. With `--json`, `config set` and `config unset` return `{ "path", "from", "to" }` like `set`, plus `created` when `set` made a new registry file.
+The CurseForge key is always shown as its last four characters, like `••••c123`, unless you pass `config get --reveal`. With `--json`, `config set` and `config unset` return `{ "path", "from", "to" }` like `set`, plus `created` when they made a new registry file.
 
 ### `shulker config get`
 
@@ -314,7 +314,7 @@ shulker config set registry ~/Dropbox/shulker/registry.json
 
 ### `shulker config unset`
 
-Remove a key. Without `registry`, shulker goes back to `registry.json` beside `config.json`, with the same check as `set`. Removing a key that isn't set succeeds and says so.
+Remove a key. Without `registry`, shulker goes back to `registry.json` beside `config.json`, created when missing, with the same check as `set`. Removing a key that isn't set succeeds and says so.
 
 ```sh
 shulker config unset curseforge.key
@@ -730,7 +730,6 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `config-invalid` | shulker's `config.json` isn't valid JSON |
-| `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `registry-has-links` | `config set` or `config unset` would move the registry away from linked instances or synced directories the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |

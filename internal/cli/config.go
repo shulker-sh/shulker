@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/provider/curseforge"
 )
 
 const curseForgeKey = "curseforge.key"
@@ -63,7 +61,6 @@ func (a *app) configGetCmd() *cobra.Command {
 			case "registry":
 				value = config.RegistryPath(path, cfg)
 			default:
-				a.warnKeyEnv()
 				secret, ok := configLookup(doc, key)
 				if !ok {
 					return out.Errorf("path-not-set", "%s is not set", key)
@@ -102,16 +99,13 @@ func (a *app) configSetCmd() *cobra.Command {
 			if key == "registry" {
 				next := cfg
 				next.Registry = value
-				if change.Created, err = a.switchRegistry(path, cfg, next, force, true); err != nil {
+				if change.Created, err = a.switchRegistry(path, cfg, next, force); err != nil {
 					return err
 				}
 			}
 			configPut(doc, key, value)
 			if err := config.SaveDocument(path, doc); err != nil {
 				return err
-			}
-			if key == curseForgeKey {
-				a.warnKeyEnv()
 			}
 			return a.emitConfigChange(change)
 		},
@@ -138,10 +132,11 @@ func (a *app) configUnsetCmd() *cobra.Command {
 					fmt.Fprintf(w, "%s was not set.\n", key)
 				})
 			}
+			change := configChange{Path: key, From: from}
 			if key == "registry" {
 				next := cfg
 				next.Registry = ""
-				if _, err := a.switchRegistry(path, cfg, next, force, false); err != nil {
+				if change.Created, err = a.switchRegistry(path, cfg, next, force); err != nil {
 					return err
 				}
 			}
@@ -149,7 +144,7 @@ func (a *app) configUnsetCmd() *cobra.Command {
 			if err := config.SaveDocument(path, doc); err != nil {
 				return err
 			}
-			return a.emitConfigChange(configChange{Path: key, From: from})
+			return a.emitConfigChange(change)
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "change the registry even if it leaves linked instances behind")
@@ -175,10 +170,10 @@ func (a *app) openConfig(key string) (string, config.Config, map[string]any, err
 	return path, cfg, doc, nil
 }
 
-// switchRegistry checks the registry next resolves to and returns its path when it had to create
-// it. Without force it refuses when the current registry holds entries the new one lacks, because
-// shulker would stop syncing them.
-func (a *app) switchRegistry(configPath string, current, next config.Config, force, create bool) (string, error) {
+// switchRegistry checks the registry next resolves to, creating it when missing, and returns its
+// path when it did. Without force it refuses when the current registry holds entries the new one
+// lacks, because shulker would stop syncing them.
+func (a *app) switchRegistry(configPath string, current, next config.Config, force bool) (string, error) {
 	from := config.RegistryPath(configPath, current)
 	to := config.RegistryPath(configPath, next)
 	if filepath.Clean(from) == filepath.Clean(to) {
@@ -209,9 +204,6 @@ func (a *app) switchRegistry(configPath string, current, next config.Config, for
 			return "", e
 		}
 	}
-	if !create {
-		return "", nil
-	}
 	created, err := config.CreateRegistry(to)
 	if err != nil || !created {
 		return "", err
@@ -234,12 +226,6 @@ func (a *app) emitConfigChange(change configChange) error {
 			fmt.Fprintf(w, "created %s\n", change.Created)
 		}
 	})
-}
-
-func (a *app) warnKeyEnv() {
-	if os.Getenv(curseforge.KeyEnv) != "" {
-		a.printer.Warn("%s is set and takes priority over curseforge.key", curseforge.KeyEnv)
-	}
 }
 
 func maskKey(key string) string {
