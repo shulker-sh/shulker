@@ -73,10 +73,10 @@ func (b *Builder) markerJar(targetName, side string, cond conditions, sel select
 	l, _ := loader.Lookup(b.Lock.Loader.Type)
 	var entries []markerEntry
 	// The marker declares itself in the file its loader reads, and that file decides the format.
-	if metaFile := l.MetadataFiles[0]; metaFile == "fabric.mod.json" {
+	if strings.HasSuffix(l.MarkerFile, ".json") {
 		entries, err = b.fabricMarker(targetName, lockHash, direct, deps, cond)
 	} else {
-		entries, err = b.tomlMarker(metaFile, targetName, lockHash, direct, deps, cond)
+		entries, err = b.tomlMarker(l.MarkerFile, targetName, lockHash, direct, deps, cond)
 	}
 	if err != nil {
 		return nil, err

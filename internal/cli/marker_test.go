@@ -262,3 +262,30 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 		t.Fatalf("description should carry no QuickText tags:\n%s", mod.Description)
 	}
 }
+
+func TestQuiltMarkerJarIsFabricMetadata(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "quilt")
+	h.mustRun(t, "install")
+
+	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-pack.jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := readZip(t, data)
+	// Quilt reads fabric.mod.json as is; a quilt.mod.json holding TOML stops the game loading.
+	if _, ok := entries["quilt.mod.json"]; ok {
+		t.Fatalf("quilt marker must not carry quilt.mod.json (%v)", slices.Sorted(maps.Keys(entries)))
+	}
+	meta, ok := entries["fabric.mod.json"]
+	if !ok {
+		t.Fatalf("quilt marker has no fabric.mod.json (%v)", slices.Sorted(maps.Keys(entries)))
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(meta, &parsed); err != nil {
+		t.Fatalf("fabric.mod.json must be JSON: %v\n%s", err, meta)
+	}
+	if parsed["id"] != "shulker_pack" {
+		t.Fatalf("marker id: %v", parsed["id"])
+	}
+}
