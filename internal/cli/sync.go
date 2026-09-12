@@ -70,6 +70,15 @@ func (a *app) syncCmd() *cobra.Command {
 				if req.target != "" || req.into != "" || req.ref != "" || req.name != "" {
 					return out.Errorf("usage", "--target, --into, --ref, and --name need a source; a registered entry already has them")
 				}
+				if instance == "" && !sel.all {
+					links, inProject, err := a.projectLinks(sel)
+					if err != nil {
+						return err
+					}
+					if inProject {
+						return a.syncLinks(cmd, links, req)
+					}
+				}
 				links, err := a.selectLinks(instance, sel)
 				if err != nil {
 					return err

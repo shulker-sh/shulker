@@ -82,6 +82,23 @@ func (f *File) RecordSyncDir(target, dir string) bool {
 	return true
 }
 
+func (f *File) RemoveSyncDir(target, dir string) bool {
+	t := f.Targets[target]
+	for i, d := range t.SyncDirs {
+		if d != dir {
+			continue
+		}
+		t.SyncDirs = append(t.SyncDirs[:i:i], t.SyncDirs[i+1:]...)
+		if len(t.SyncDirs) == 0 {
+			delete(f.Targets, target)
+		} else {
+			f.Targets[target] = t
+		}
+		return true
+	}
+	return false
+}
+
 func (f *File) ExistingSyncDirs(target string) []string {
 	var dirs []string
 	for _, d := range f.Targets[target].SyncDirs {

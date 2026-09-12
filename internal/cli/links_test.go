@@ -188,7 +188,7 @@ func TestSyncInstance(t *testing.T) {
 		{[]string{"sync", "--instance", "Friends"}, "ambiguous-instance"},
 		{[]string{"sync", "--instance", "nope"}, "instance-not-found"},
 		{[]string{"sync", "--instance", "Friends", "--side", "server"}, "instance-not-found"},
-		{[]string{"sync"}, "ambiguous-instance"},
+		{[]string{"sync", "-C", t.TempDir()}, "ambiguous-instance"},
 		{[]string{"sync", h.dir, "--instance", "Friends"}, "usage"},
 		{[]string{"sync", h.dir, "--launcher", "prism"}, "usage"},
 		{[]string{"sync", "--instance", "Friends", "--into", plain}, "usage"},
@@ -204,7 +204,7 @@ func TestSyncInstance(t *testing.T) {
 	}
 
 	h.tty, h.stdin = true, strings.NewReader("2\n")
-	stdout, stderr := h.mustRunStderr(t, "sync")
+	stdout, stderr := h.mustRunStderr(t, "sync", "-C", t.TempDir())
 	if !strings.Contains(stderr, "  2) friends (client)  "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "into "+plain) {
 		t.Fatalf("picker:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}

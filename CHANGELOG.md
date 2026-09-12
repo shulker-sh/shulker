@@ -25,9 +25,9 @@ All notable changes to shulker are documented here. The format is based on
 - A ModMenu entry with the pack's name, version, description, authors and links, which badges managed mods and turns off their update checks; NeoForge and Forge packs get the same summary in the mod list.
 - `sync` builds a target of a local project, git repository or manifest URL into any directory, and falls back to the last successful sync when the network is down (`--offline` skips the network).
 - `link prism`, `link multimc` and `link mojang` (alias `vanilla`) create instances or profiles that sync before each launch; `link prism` also takes a git or manifest URL.
-- `links` lists linked instances and synced directories; `sync --instance`, `sync --all` and a picker update them by name; `unlink` stops syncing one.
+- `links` lists linked instances and synced directories; `sync --instance`, `sync --all` and a picker update them by name, and a bare `sync` inside a project updates just that project's entries; `unlink` stops syncing one.
 - `export mrpack` and `import mrpack` for Modrinth modpacks.
-- `--json` on every command: one envelope with the result, every warning and, on failure, a stable error code; the codes are listed in the CLI reference.
+- `--json` on every command: one envelope with the result, every warning and, on failure, a stable error code; the codes are listed in the CLI reference, and the plain error line ends with the same code.
 - JSON Schemas for `shulker.json` and `shulker.lock` at `https://shulker.sh/schema/v1/`.
 - Installers for macOS and Linux (`curl -fsSL https://shulker.sh/install.sh | sh`) and Windows (`irm https://shulker.sh/install.ps1 | iex`), and `self update`, all checking releases against their SHA256 checksums and, when `gh` is installed, their build provenance.
 

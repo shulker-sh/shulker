@@ -3,10 +3,12 @@ package cli
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -103,5 +105,17 @@ func (a *app) unlink(configPath string, l config.Link) (unlinkResult, error) {
 		}
 		return links
 	})
-	return r, err
+	if err != nil {
+		return r, err
+	}
+	if filepath.IsAbs(l.Source) {
+		lf, err := local.Load(l.Source)
+		if err == nil && lf.RemoveSyncDir(l.Target, l.Dir) {
+			err = lf.Save()
+		}
+		if err != nil {
+			a.printer.Warn("couldn't drop %s from %s in %s: %v", l.Dir, local.FileName, l.Source, err)
+		}
+	}
+	return r, nil
 }
