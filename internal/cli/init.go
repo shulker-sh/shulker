@@ -54,6 +54,11 @@ func (a *app) initCmd() *cobra.Command {
 			if !yes && (minecraft == "" || name == "") {
 				return out.Errorf("usage", "pass --yes for defaults or set --name and --minecraft; interactive prompts are not implemented yet")
 			}
+			if target != "client" && target != "server" {
+				e := out.Errorf("usage", "--target must be client or server, not %q", target)
+				e.Candidates = []string{"client", "server"}
+				return e
+			}
 			if _, ok := loader.Lookup(loaderName); !ok {
 				e := out.Errorf("usage", "unknown loader %q; use one of %s", loaderName, strings.Join(loader.Names(), ", "))
 				e.Candidates = loader.Names()
@@ -102,13 +107,14 @@ func (a *app) initCmd() *cobra.Command {
 			l.Loader = platform.Loader
 			l.Java = platform.Java
 			p := &project.Project{Dir: dir, Manifest: m, Lock: l}
-			if err := scaffold(dir); err != nil {
-				return err
-			}
 			if err := p.SaveManifest(); err != nil {
 				return err
 			}
 			if err := p.SaveLock(); err != nil {
+				os.Remove(filepath.Join(dir, manifest.FileName))
+				return err
+			}
+			if err := scaffold(dir); err != nil {
 				return err
 			}
 			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Target: target}
