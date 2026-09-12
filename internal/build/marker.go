@@ -76,7 +76,7 @@ func (b *Builder) markerJar(targetName, side string, cond conditions, sel select
 	if strings.HasSuffix(l.MarkerFile, ".json") {
 		entries, err = b.fabricMarker(targetName, lockHash, direct, deps, cond)
 	} else {
-		entries, err = b.tomlMarker(l.MarkerFile, targetName, lockHash, direct, deps, cond)
+		entries, err = b.tomlMarker(l, targetName, lockHash, direct, deps, cond)
 	}
 	if err != nil {
 		return nil, err
@@ -164,6 +164,8 @@ type markerTomlMod struct {
 	Version     string `toml:"version"`
 	DisplayName string `toml:"displayName"`
 	LogoFile    string `toml:"logoFile"`
+	IconFile    string `toml:"iconFile,omitempty"`
+	IconBlur    bool   `toml:"iconBlur,omitempty"`
 	Authors     string `toml:"authors,omitempty"`
 	DisplayURL  string `toml:"displayURL,omitempty"`
 	Description string `toml:"description"`
@@ -171,21 +173,29 @@ type markerTomlMod struct {
 
 // tomlMarker builds the NeoForge and Forge marker: no classes, since a code-less lowcodefml mod
 // loads on both, and a pack.mcmeta so Forge doesn't warn that the mod's pack metadata is missing.
-func (b *Builder) tomlMarker(metaFile, targetName, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
+func (b *Builder) tomlMarker(l loader.Loader, targetName, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
+	mod := markerTomlMod{
+		ModID:       markerModID(b.Manifest.Name),
+		Version:     markerVersion(b.Manifest.Version, lockHash),
+		DisplayName: b.Manifest.DisplayName(targetName),
+		LogoFile:    markerLogo,
+		Authors:     strings.Join(b.Manifest.Authors, ", "),
+		DisplayURL:  b.Manifest.Links["website"],
+		Description: b.markerDescription(direct, deps, cond, plainText),
+	}
+	// NeoForge reads logoFile only as the wide banner on the detail pane; the square icon beside the
+	// name in the list comes from iconFile, which has no fallback, so a mod that sets just logoFile
+	// shows no icon at all. Forge has only logoFile, hence both. iconBlur scales the 128px icon into
+	// the 24px slot smoothly instead of by nearest neighbour.
+	if l.Name == "neoforge" {
+		mod.IconFile, mod.IconBlur = markerLogo, true
+	}
 	meta := markerToml{
 		ModLoader:       "lowcodefml",
 		LoaderVersion:   "[1,)",
 		License:         "All rights reserved",
 		IssueTrackerURL: b.Manifest.Links["issues"],
-		Mods: []markerTomlMod{{
-			ModID:       markerModID(b.Manifest.Name),
-			Version:     markerVersion(b.Manifest.Version, lockHash),
-			DisplayName: b.Manifest.DisplayName(targetName),
-			LogoFile:    markerLogo,
-			Authors:     strings.Join(b.Manifest.Authors, ", "),
-			DisplayURL:  b.Manifest.Links["website"],
-			Description: b.markerDescription(direct, deps, cond, plainText),
-		}},
+		Mods:            []markerTomlMod{mod},
 	}
 	var metaData bytes.Buffer
 	if err := toml.NewEncoder(&metaData).Encode(meta); err != nil {
@@ -208,7 +218,7 @@ func (b *Builder) tomlMarker(metaFile, targetName, lockHash string, direct, deps
 		return nil, err
 	}
 	return []markerEntry{
-		{metaFile, metaData.Bytes()},
+		{l.MarkerFile, metaData.Bytes()},
 		{"pack.mcmeta", pack},
 		{markerLogo, markerIcon},
 	}, nil

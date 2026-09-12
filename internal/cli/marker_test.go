@@ -234,6 +234,8 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 			ModID       string `toml:"modId"`
 			DisplayName string `toml:"displayName"`
 			LogoFile    string `toml:"logoFile"`
+			IconFile    string `toml:"iconFile"`
+			IconBlur    bool   `toml:"iconBlur"`
 			Authors     string `toml:"authors"`
 			DisplayURL  string `toml:"displayURL"`
 			Description string `toml:"description"`
@@ -251,6 +253,10 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 	mod := meta.Mods[0]
 	if mod.ModID != "shulker_pack" || mod.DisplayName != "pack" || mod.LogoFile != "icon.png" {
 		t.Fatalf("marker mod: %+v", mod)
+	}
+	// NeoForge draws the mod list icon from iconFile alone, and falls back to nothing without it.
+	if mod.IconFile != "icon.png" || !mod.IconBlur {
+		t.Fatalf("neoforge marker needs an icon of its own: %+v", mod)
 	}
 	if mod.Authors != "Alice, shulker.sh" || mod.DisplayURL != "https://example.com" {
 		t.Fatalf("marker mod: %+v", mod)

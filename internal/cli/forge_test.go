@@ -84,4 +84,7 @@ func TestForgeLinkMojangAndMarker(t *testing.T) {
 	if _, ok := entries["META-INF/neoforge.mods.toml"]; ok {
 		t.Fatal("forge marker should not carry neoforge.mods.toml")
 	}
+	if strings.Contains(string(entries["META-INF/mods.toml"]), "iconFile") {
+		t.Fatal("iconFile is a NeoForge key; Forge reads logoFile")
+	}
 }
