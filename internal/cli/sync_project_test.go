@@ -52,7 +52,7 @@ func TestBareSyncInProjectSyncsItsOwnEntries(t *testing.T) {
 		t.Fatalf("an unlinked directory stays unlinked:\n%s", got)
 	}
 	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "friends")
-	if err := os.Remove(h.config); err != nil {
+	if err := os.Remove(registryPath(h)); err != nil {
 		t.Fatal(err)
 	}
 	if got := dirs("sync"); got != gameDir+"\n"+plain && got != plain+"\n"+gameDir {

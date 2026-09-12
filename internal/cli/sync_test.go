@@ -521,7 +521,7 @@ func TestSyncIntoRecoversTheSourceWithoutTheRegistry(t *testing.T) {
 	into := filepath.Join(t.TempDir(), "instance")
 	h.mustRun(t, "sync", h.dir, "--into", into)
 
-	if err := os.Remove(h.config); err != nil {
+	if err := os.Remove(registryPath(h)); err != nil {
 		t.Fatal(err)
 	}
 	if stdout := h.mustRun(t, "sync", "--into", into); !strings.Contains(stdout, "unchanged") {

@@ -12,11 +12,14 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
-const PathEnv = "SHULKER_CONFIG"
+const (
+	PathEnv          = "SHULKER_CONFIG"
+	RegistryFileName = "registry.json"
+)
 
 type Config struct {
 	CurseForge CurseForge `json:"curseforge"`
-	Links      []Link     `json:"links,omitempty"`
+	Registry   string     `json:"registry,omitempty"`
 }
 
 type CurseForge struct {
@@ -68,6 +71,34 @@ func LoadFile(path string) (Config, error) {
 	return cfg, nil
 }
 
+func RegistryPath(configPath string, cfg Config) string {
+	switch {
+	case cfg.Registry == "":
+		return filepath.Join(filepath.Dir(configPath), RegistryFileName)
+	case filepath.IsAbs(cfg.Registry):
+		return cfg.Registry
+	default:
+		return filepath.Join(filepath.Dir(configPath), cfg.Registry)
+	}
+}
+
+func LoadLinks(path string) ([]Link, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var registry struct {
+		Links []Link `json:"links"`
+	}
+	if err := json.Unmarshal(data, &registry); err != nil {
+		return nil, out.Errorf("registry-invalid", "%s: %v", path, err)
+	}
+	return registry.Links, nil
+}
+
 func FindLink(links []Link, dir string) (int, bool) {
 	dir = filepath.Clean(dir)
 	for i, l := range links {
@@ -78,7 +109,7 @@ func FindLink(links []Link, dir string) (int, bool) {
 	return -1, false
 }
 
-// UpdateLinks rereads the file right before writing and rewrites only the links key, so another
+// UpdateLinks rereads the registry right before writing and rewrites only the links key, so another
 // writer's entries and keys shulker doesn't know survive.
 func UpdateLinks(path string, update func([]Link) []Link) (bool, error) {
 	top := map[string]json.RawMessage{}
@@ -88,7 +119,7 @@ func UpdateLinks(path string, update func([]Link) []Link) (bool, error) {
 	}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &top); err != nil {
-			return false, fmt.Errorf("%s: %w", path, err)
+			return false, out.Errorf("registry-invalid", "%s: %v", path, err)
 		}
 	}
 	var links []Link
@@ -108,11 +139,6 @@ func UpdateLinks(path string, update func([]Link) []Link) (bool, error) {
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return false, err
-	}
-	// The file can hold an API key; creating it 0600 first keeps it private,
-	// since fsutil keeps an existing file's mode.
-	if f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL, 0o600); err == nil {
-		f.Close()
 	}
 	return true, fsutil.WriteJSON(path, top)
 }

@@ -40,7 +40,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			path, err := a.configFile()
+			path, err := a.registryFile()
 			if err != nil {
 				return err
 			}

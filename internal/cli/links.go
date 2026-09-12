@@ -50,12 +50,11 @@ func (a *app) linksCmd() *cobra.Command {
 }
 
 func (a *app) loadLinks() ([]config.Link, error) {
-	path, err := a.configFile()
+	path, err := a.registryFile()
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := config.LoadFile(path)
-	return cfg.Links, err
+	return config.LoadLinks(path)
 }
 
 func inspectLink(l config.Link) linkEntry {
@@ -177,13 +176,25 @@ func (a *app) registerSync(l config.Link, defaultName string) (config.Link, bool
 }
 
 func (a *app) updateLinks(update func([]config.Link) []config.Link) bool {
-	path, err := a.configFile()
+	path, err := a.registryFile()
 	if err == nil {
 		var changed bool
 		if changed, err = config.UpdateLinks(path, update); err == nil {
 			return changed
 		}
 	}
-	a.printer.Warn("config.json not updated: %v", err)
+	a.printer.Warn("registry not updated: %v", err)
 	return false
+}
+
+func (a *app) registryFile() (string, error) {
+	path, err := a.configFile()
+	if err != nil {
+		return "", err
+	}
+	cfg, err := config.LoadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return config.RegistryPath(path, cfg), nil
 }

@@ -10,13 +10,17 @@ import (
 	"shulker.sh/shulker/internal/config"
 )
 
+func registryPath(h *harness) string {
+	return filepath.Join(filepath.Dir(h.config), config.RegistryFileName)
+}
+
 func readLinks(t *testing.T, h *harness) []config.Link {
 	t.Helper()
-	cfg, err := config.LoadFile(h.config)
+	links, err := config.LoadLinks(registryPath(h))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return cfg.Links
+	return links
 }
 
 func TestSyncIntoRegisters(t *testing.T) {
@@ -296,7 +300,7 @@ func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 	}
 	h.config = filepath.Join(blocker, "config.json")
 	stdout, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "one"))
-	if !strings.Contains(stderr, "warning: config.json not updated") || strings.Contains(stdout, "Registered") {
+	if !strings.Contains(stderr, "warning: registry not updated") || strings.Contains(stdout, "Registered") {
 		t.Fatalf("stdout: %s\nstderr: %s", stdout, stderr)
 	}
 }
@@ -311,7 +315,7 @@ func TestSyncDetectsAPrismInstance(t *testing.T) {
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
 
 	// An entry an older shulker wrote, with no launcher recorded.
-	if _, err := config.UpdateLinks(h.config, func(links []config.Link) []config.Link {
+	if _, err := config.UpdateLinks(registryPath(h), func(links []config.Link) []config.Link {
 		links[0].Launcher, links[0].LauncherDir = "", ""
 		return links
 	}); err != nil {

@@ -476,7 +476,7 @@ With `--into` and no source, shulker reads what the directory was last synced fr
 
 If a git or manifest URL can't be reached because the network is down, `sync` warns and builds from the copy used by the last sync from that source that succeeded, so an instance still launches offline. The warning names the commit and says how old that copy is. A server that answers with an error, a missing ref, or a failed login still fails the sync, and so does a source that has never synced successfully here. `--offline` skips the network entirely, which is quicker than waiting for timeouts on a network that drops traffic. For a server target, an installed Java runtime is kept when its update check can't reach the network.
 
-shulker keeps a list of the directories it syncs into, in its `config.json`. A `sync --into` adds the directory to that list, named after the target's display name (or `--name`), along with its source, target, and ref. `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker links`](#shulker-links) shows the list.
+shulker keeps a list of the directories it syncs into, in `registry.json` beside its `config.json` (a `registry` path in `config.json`, relative to that file, moves it). A `sync --into` adds the directory to that list, named after the target's display name (or `--name`), along with its source, target, and ref. `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker links`](#shulker-links) shows the list.
 
 To update something on that list, name it instead of a source. `--instance` takes an entry's name or directory and syncs it from its recorded source, target, and ref. If several entries have that name, narrow it with `--launcher` or `--side`, or pass `--all` to sync them all. `--all` alone syncs every entry. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` run inside a project syncs every entry synced from that project, narrowed by `--launcher` or `--side`, and nothing else. Outside a project it asks which entry to sync when run in a terminal, and fails with the list otherwise.
 
@@ -680,6 +680,7 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `config-invalid` | shulker's `config.json` isn't valid JSON |
+| `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or target uses the feature. `candidates`: the features in use |
