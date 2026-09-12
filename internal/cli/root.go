@@ -24,6 +24,10 @@ Docs: https://shulker.sh/docs
 For agents: https://shulker.sh/llms.txt
 `
 
+const agentHelp = `Scripts and agents: pass --json. Every command then prints one JSON object on
+stdout, errors included. Act on error.code rather than the message, and run
+"shulker lock" when lockStale is true.`
+
 type app struct {
 	printer    *out.Printer
 	stdin      io.Reader
@@ -89,6 +93,7 @@ func (a *app) root() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "shulker",
 		Short:         "Manage Minecraft mods, client instances, and servers",
+		Long:          "Manage Minecraft mods, client instances, and servers.\n\n" + agentHelp,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {

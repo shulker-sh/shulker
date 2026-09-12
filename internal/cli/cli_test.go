@@ -77,6 +77,15 @@ func TestHelpLinksDocs(t *testing.T) {
 	}
 }
 
+func TestRootHelpTellsAgentsToUseJSON(t *testing.T) {
+	if _, stdout, _ := run(t, "--help"); !strings.Contains(stdout, agentHelp) {
+		t.Fatalf("root help = %q", stdout)
+	}
+	if _, stdout, _ := run(t, "add", "--help"); strings.Contains(stdout, agentHelp) {
+		t.Fatalf("add help = %q", stdout)
+	}
+}
+
 func TestUnknownCommandJSON(t *testing.T) {
 	code, stdout, stderr := run(t, "bogus", "--json")
 	if code != out.ExitUsage {
