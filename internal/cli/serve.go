@@ -98,6 +98,9 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if _, err := a.fetchLocked(cmd.Context(), p, true); err != nil {
+				return err
+			}
 			if err := a.syncPlayers(cmd.Context(), p, player.MissingOnly, false, true); err != nil {
 				return err
 			}

@@ -347,7 +347,7 @@ shulker pull config/iris.properties --key colorSpace
 
 ### `shulker serve`
 
-Build a server target and run it in the foreground.
+Build a server target and run it in the foreground. It downloads whatever the lock needs first, the way `install` does, so a fresh clone reaches a running server in one command.
 
 ```sh
 shulker serve

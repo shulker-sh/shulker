@@ -235,3 +235,14 @@ func TestManagedJavaUnavailable(t *testing.T) {
 		t.Fatalf("serve should fall back to PATH java: %s", stderr)
 	}
 }
+
+func TestServeInstallsWhatTheLockNeeds(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server", "--loader", "neoforge")
+	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
+	h.stdin = strings.NewReader("stop\n")
+	stdout, _ := h.mustRunStderr(t, "serve", "--accept-eula")
+	if !strings.Contains(stdout, "Server stopped.") {
+		t.Fatalf("serve must fetch the server files itself, not stop at `shulker install`: %s", stdout)
+	}
+}
