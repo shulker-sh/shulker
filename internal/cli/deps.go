@@ -215,8 +215,12 @@ func (a *app) requireLock(p *project.Project) error {
 	if err := p.RequireLock(); err != nil {
 		return err
 	}
+	a.warnLockDifferences(p)
+	return nil
+}
+
+func (a *app) warnLockDifferences(p *project.Project) {
 	if diffs := p.LockDifferences(); len(diffs) > 0 {
 		a.printer.Warn("shulker.lock is out of date with shulker.json (%s); run `shulker lock`", strings.Join(diffs, "; "))
 	}
-	return nil
 }

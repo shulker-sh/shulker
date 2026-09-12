@@ -19,6 +19,9 @@ outline: [2, 3]
 | [`shulker target add <name>`](#shulker-target-add) | Add a build target |
 | [`shulker target remove <name>`](#shulker-target-remove) | Remove a target, leaving its build directory |
 | [`shulker target list`](#shulker-target-list) | List targets |
+| [`shulker set <path> <value>`](#shulker-set) | Set a field in shulker.json |
+| [`shulker unset <path>`](#shulker-unset) | Remove a field from shulker.json |
+| [`shulker get [path]`](#shulker-get) | Print a field of shulker.json, or all of it |
 | [`shulker feature on\|off <feature>`](#shulker-feature-on-off) | Turn a feature on or off on this machine |
 | [`shulker feature reset <feature>`](#shulker-feature-reset) | Go back to the target defaults for a feature |
 | [`shulker feature list`](#shulker-feature-list) | List features and whether they're on |
@@ -226,6 +229,49 @@ List targets with their side, build directory, overrides, features, and display 
 
 ```sh
 shulker target list
+```
+
+## Settings
+
+`set`, `unset`, and `get` edit and read any field of `shulker.json` by its dotted path, like `server.eula` or `mods.sodium.channel`. They never change `shulker.lock`. When an edit leaves the lock out of date, they warn and name each difference; `shulker lock` brings it back in line.
+
+Inside a map of plain values (`server.properties`, `variables`, `client.options`, `links`), everything after the map's name is the key, so `server.properties.rcon.port` needs no escaping.
+
+With `--json`, `set` and `unset` return `{ "path", "from", "to" }`, leaving out `from` when the field wasn't set and `to` after `unset`. `get` returns the value itself.
+
+### `shulker set`
+
+Set a field. A plain value becomes the most specific type the field allows: `true` and `false` are booleans and `25565` is a number where the field takes one; anything else is a string. Lists, objects, and a value that must stay a string take JSON with `--literal`. For `server.players.whitelist`, `ops`, and `bans`, a player name or uuid adds that player to the list.
+
+The edited `shulker.json` is checked against the schema before anything is written, and the error names the field.
+
+```sh
+shulker set server.eula true
+shulker set server.properties.max-players 20
+shulker set variables.zip --literal '"02134"'
+shulker set server.jvmArgs --literal '["-XX:+UseZGC"]'
+shulker set server.players.ops Notch
+```
+
+| Flag | Description |
+| --- | --- |
+| `--literal` | Parse the value as JSON |
+
+### `shulker unset`
+
+Remove a field. Removing a field that isn't set succeeds and says so.
+
+```sh
+shulker unset server.memory
+```
+
+### `shulker get`
+
+Print a field: a string as it is, anything else as JSON. With no path, print all of `shulker.json`. A field that isn't set fails with `path-not-set`.
+
+```sh
+shulker get name
+shulker get server.properties
 ```
 
 ## Features
@@ -694,6 +740,8 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `pack-ref` | A pack's `ref` doesn't apply to its source, or wasn't found |
 | `pack-target` | A pack has several targets of a side and none named like the project's |
 | `pack-unlocked` | A pack has no commit in the lock; run `shulker update` |
+| `path-invalid` | `shulker.json` has no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
+| `path-not-set` | `get` names a field that isn't set |
 | `pin-mismatch` | The pinned version belongs to a different project |
 | `player-invalid` | Neither a player name nor a uuid |
 | `player-reassigned` | Player names now belong to different accounts; pass `--accept-player-change`. `items`: the players |

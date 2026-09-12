@@ -98,7 +98,7 @@ func (a *app) root() *cobra.Command {
 	root.SetHelpTemplate(root.HelpTemplate() + helpFooter)
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
-	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.linksCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd())
+	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.linksCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd())
 	a.markRunning(root)
 	return root
 }

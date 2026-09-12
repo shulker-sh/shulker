@@ -57,6 +57,10 @@ func compile(kind Kind) (*jsonschema.Schema, error) {
 	return c.Compile(id)
 }
 
+func Raw(kind Kind) ([]byte, error) {
+	return files.ReadFile(string(kind))
+}
+
 func Validate(kind Kind, data []byte) error {
 	s, err := Compile(kind)
 	if err != nil {
