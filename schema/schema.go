@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -18,7 +19,24 @@ const (
 	Lock     Kind = "v1/lock.json"
 )
 
+type compiled struct {
+	schema *jsonschema.Schema
+	err    error
+}
+
+var compiledSchemas sync.Map
+
+// Compile returns the compiled schema, compiling each kind once.
 func Compile(kind Kind) (*jsonschema.Schema, error) {
+	if c, ok := compiledSchemas.Load(kind); ok {
+		return c.(compiled).schema, c.(compiled).err
+	}
+	s, err := compile(kind)
+	compiledSchemas.Store(kind, compiled{s, err})
+	return s, err
+}
+
+func compile(kind Kind) (*jsonschema.Schema, error) {
 	raw, err := files.ReadFile(string(kind))
 	if err != nil {
 		return nil, err
