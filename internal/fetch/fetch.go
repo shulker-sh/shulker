@@ -68,6 +68,21 @@ type Client struct {
 	UserAgent string
 	Header    http.Header
 	Offline   bool
+	// Progress, when set, receives every chunk of download body bytes.
+	Progress func(n int64)
+}
+
+type countingWriter struct {
+	w io.Writer
+	f func(n int64)
+}
+
+func (c countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	if n > 0 && c.f != nil {
+		c.f(int64(n))
+	}
+	return n, err
 }
 
 func New(version string) *Client {
@@ -175,7 +190,11 @@ func (c *Client) Download(ctx context.Context, url string, dst io.Writer) (strin
 	}
 	defer resp.Body.Close()
 	h := sha512.New()
-	if _, err := io.Copy(io.MultiWriter(dst, h), resp.Body); err != nil {
+	var w io.Writer = io.MultiWriter(dst, h)
+	if c.Progress != nil {
+		w = countingWriter{w, c.Progress}
+	}
+	if _, err := io.Copy(w, resp.Body); err != nil {
 		return "", fmt.Errorf("%s: %w", url, err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil

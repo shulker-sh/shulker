@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"reflect"
 	"strings"
 
@@ -52,14 +50,16 @@ func (a *app) playerCmd() *cobra.Command {
 			if err := a.savePlayers(p, player.Update(results, p.Lock.Players)); err != nil {
 				return err
 			}
-			return a.printer.Emit(results, func(w io.Writer) {
+			return a.printer.Emit(results, func(l *out.Lines) {
 				if len(results) == 0 {
-					fmt.Fprintln(w, "No players to check.")
+					l.Info("No players to check.")
 					return
 				}
+				var items []out.Item
 				for _, r := range results {
-					fmt.Fprintln(w, describePlayer(r))
+					items = append(items, describePlayer(r))
 				}
+				l.Items(items...)
 			})
 		},
 	}
@@ -67,20 +67,20 @@ func (a *app) playerCmd() *cobra.Command {
 	return cmd
 }
 
-func describePlayer(r player.Result) string {
-	line := fmt.Sprintf("%-10s %-16s %s", r.State, r.Name, r.UUID)
+func describePlayer(r player.Result) out.Item {
+	it := out.Item{Kind: out.Good, Name: r.Name, Version: r.UUID}
 	switch r.State {
-	case player.Renamed:
-		line += "  (was " + r.Previous + ")"
-	case player.Reassigned:
-		line += "  (was " + r.Previous + ")"
+	case player.Renamed, player.Reassigned:
+		it.Kind = out.Change
+		it.Aside = []string{string(r.State), "was " + r.Previous}
 	case player.Unknown:
-		line = fmt.Sprintf("%-10s %s", r.State, r.Input)
+		it.Kind = out.Drop
+		it.Name, it.Version, it.Aside = r.Input, "", []string{string(r.State)}
 		if len(r.Candidates) > 0 {
-			line += "  (did you mean " + strings.Join(r.Candidates, ", ") + "?)"
+			it.Aside = append(it.Aside, "did you mean "+strings.Join(r.Candidates, ", ")+"?")
 		}
 	}
-	return strings.TrimRight(line, " ")
+	return it
 }
 
 func manifestPlayerRefs(m *manifest.Manifest) []player.Ref {

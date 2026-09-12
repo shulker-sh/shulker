@@ -30,6 +30,8 @@ type Resolver struct {
 	Packs     []*pack.Loaded
 	Meta      *Meta
 	Log       func(format string, args ...any)
+	// Progress starts a download bar for the named files.
+	Progress func(verb string, names []string) *out.Progress
 }
 
 type AddOptions struct {
@@ -417,6 +419,7 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 	sort.Strings(ids)
 	var fetched []string
 	var missing []string
+	var wanted, names []string
 	for _, id := range ids {
 		m := r.Lock.Mods[id]
 		if r.Cache.Has(m.Sha512) {
@@ -426,17 +429,32 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", id, m.Filename, m.Page, DownloadsDir))
 			continue
 		}
-		r.log("downloading %s %s", id, m.VersionNumber)
+		wanted, names = append(wanted, id), append(names, m.Filename)
+	}
+	var progress *out.Progress
+	if r.Progress != nil && len(wanted) > 0 {
+		progress = r.Progress("fetching", names)
+		if r.Fetch != nil {
+			r.Fetch.Progress = progress.Bytes
+			defer func() { r.Fetch.Progress = nil }()
+		}
+	}
+	for i, id := range wanted {
+		m := r.Lock.Mods[id]
+		progress.File(names[i])
 		_, err := r.Cache.Ensure(ctx, r.Fetch, *m.URL, m.Sha512)
 		if errors.Is(err, fetch.ErrForbidden) {
 			missing = append(missing, fmt.Sprintf("%s: download forbidden; download %s from %s and place it in %s/", id, m.Filename, pageFor(m), DownloadsDir))
 			continue
 		}
 		if err != nil {
+			progress.Abort()
 			return fetched, warnings, err
 		}
+		progress.Advance()
 		fetched = append(fetched, id)
 	}
+	progress.Finish()
 	if len(missing) > 0 {
 		e := out.Errorf("missing-files", "%d mod(s) need a manual download:\n  %s", len(missing), strings.Join(missing, "\n  "))
 		e.Items = missing

@@ -40,7 +40,7 @@ func TestFeatureIntoSyncedDir(t *testing.T) {
 	h.mustRun(t, "sync", h.dir, "--into", into)
 
 	stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into)
-	if stdout != "fancy on in "+into+"; takes effect on the next sync (a linked Prism instance syncs on launch)\n" {
+	if stdout != "  ✔ fancy on » "+into+" (takes effect on the next sync; a linked Prism instance syncs on launch)\n" {
 		t.Fatalf("feature on --into: %q", stdout)
 	}
 	if lf := readLocal(t, into); !lf.Features["fancy"] {
@@ -52,17 +52,17 @@ func TestFeatureIntoSyncedDir(t *testing.T) {
 	if _, err := os.Stat(jar); !os.IsNotExist(err) {
 		t.Fatalf("feature --into without --sync must not sync: %v", err)
 	}
-	if stdout := h.mustRun(t, "feature", "list", "--into", into); stdout != "fancy  on (your choice)  gates: sodium\n" {
+	if stdout := h.mustRun(t, "feature", "list", "--into", into); stdout != "  i fancy on (your choice, gates: sodium)\n" {
 		t.Fatalf("list --into: %q", stdout)
 	}
 
-	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "fancy on in "+into+"\nFetched ") {
+	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "  ✔ fancy on » "+into+"\n  ✔ synced client » ") {
 		t.Fatalf("feature on --sync: %q", stdout)
 	}
 	if _, err := os.Stat(jar); err != nil {
 		t.Fatalf("--sync should ship the gated mod: %v", err)
 	}
-	if stdout := h.mustRun(t, "feature", "reset", "fancy", "--into", into, "--sync"); !strings.Contains(stdout, "excluded sodium") {
+	if stdout := h.mustRun(t, "feature", "reset", "fancy", "--into", into, "--sync"); !strings.Contains(stdout, "excluded: sodium") {
 		t.Fatalf("feature reset --sync: %q", stdout)
 	}
 	if _, err := os.Stat(jar); !os.IsNotExist(err) {
@@ -118,7 +118,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 	if _, err := os.Stat(localPath); !os.IsNotExist(err) {
 		t.Fatalf("a plain build must not create the local file: %v", err)
 	}
-	if stdout := h.mustRun(t, "feature", "list"); stdout != "fancy  off  gates: sodium\n" {
+	if stdout := h.mustRun(t, "feature", "list"); stdout != "  i fancy off (gates: sodium)\n" {
 		t.Fatalf("list: %q", stdout)
 	}
 	code, stdout, _ := h.run(t, "feature", "on", "fanci", "--json")
@@ -140,7 +140,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 	if !lf.Features["fancy"] || lf.DetectedOS != build.DetectOS() {
 		t.Fatalf("local file: %+v", lf)
 	}
-	if stdout := h.mustRun(t, "feature", "list"); stdout != "fancy  on (your choice)  gates: sodium\n" {
+	if stdout := h.mustRun(t, "feature", "list"); stdout != "  i fancy on (your choice, gates: sodium)\n" {
 		t.Fatalf("list after on: %q", stdout)
 	}
 	h.mustRun(t, "build")
@@ -148,7 +148,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 		t.Fatalf("fancy on should ship sodium and fabric-api, got %v", jars)
 	}
 
-	if stdout := h.mustRun(t, "build", "--without", "fancy"); !strings.Contains(stdout, "excluded sodium (needs feature fancy)") {
+	if stdout := h.mustRun(t, "build", "--without", "fancy"); !strings.Contains(stdout, "excluded: sodium (needs feature fancy)") {
 		t.Fatalf("--without: %s", stdout)
 	}
 	h.readJSON(t, "shulker.local.json", &lf)
@@ -173,7 +173,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 		t.Fatalf("second reset: %s", stdout)
 	}
 	setFeatures(t, h, []string{"fancy"})
-	if stdout := h.mustRun(t, "feature", "list"); stdout != "fancy  on (target default)  gates: sodium\n" {
+	if stdout := h.mustRun(t, "feature", "list"); stdout != "  i fancy on (target default, gates: sodium)\n" {
 		t.Fatalf("list with a target default: %q", stdout)
 	}
 
@@ -204,7 +204,7 @@ func TestBuildForAnotherOS(t *testing.T) {
 	if jars := modsDir(t, h); len(jars) != 2 {
 		t.Fatalf("--os windows should ship sodium, got %v", jars)
 	}
-	if stdout := h.mustRun(t, "build", "--os", "linux"); !strings.Contains(stdout, "excluded sodium (needs os windows)") {
+	if stdout := h.mustRun(t, "build", "--os", "linux"); !strings.Contains(stdout, "excluded: sodium (needs os windows)") {
 		t.Fatalf("--os linux: %s", stdout)
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strings"
 )
 
 const (
@@ -34,6 +33,15 @@ type Error struct {
 	Exit       int      `json:"-"`
 	// Data is the partial result of a command that failed part-way; it goes in the envelope's data.
 	Data any `json:"-"`
+	// Help is the human-only "help:" row under the error line.
+	Help string `json:"-"`
+	// Nudge is the human-only command to run next, with its lead-in.
+	Nudge Nudge `json:"-"`
+}
+
+type Nudge struct {
+	Lead    string
+	Command string
 }
 
 func (e *Error) Error() string { return e.Message }
@@ -74,7 +82,13 @@ type Printer struct {
 	// WarnPrefix names the target or instance a multi-part run is on.
 	WarnPrefix string
 	warnings   []string
+	Theme      Theme
+	ErrTheme   Theme
 }
+
+// Out is the results stream; Err carries warnings, errors, and progress.
+func (p *Printer) Out() *Lines { return &Lines{W: p.Stdout, T: p.Theme} }
+func (p *Printer) Err() *Lines { return &Lines{W: p.Stderr, T: p.ErrTheme} }
 
 func (p *Printer) Warn(format string, args ...any) {
 	msg := p.WarnPrefix + fmt.Sprintf(format, args...)
@@ -83,7 +97,11 @@ func (p *Printer) Warn(format string, args ...any) {
 	}
 	p.warnings = append(p.warnings, msg)
 	if !p.JSON {
-		fmt.Fprintf(p.Stderr, "warning: %s\n", msg)
+		text := fmt.Sprintf(format, args...)
+		if p.WarnPrefix != "" {
+			text = p.ErrTheme.Grey(p.WarnPrefix) + text
+		}
+		p.Err().Warn(text)
 	}
 }
 
@@ -95,11 +113,11 @@ func (p *Printer) envelope(ok bool, data any, e *Error) Envelope {
 	return Envelope{OK: ok, Command: p.Command, LockStale: p.LockStale, Warnings: warnings, Data: data, Error: e}
 }
 
-func (p *Printer) Emit(data any, human func(w io.Writer)) error {
+func (p *Printer) Emit(data any, human func(l *Lines)) error {
 	if p.JSON {
 		return p.encode(p.envelope(true, data, nil))
 	}
-	human(p.Stdout)
+	human(p.Out())
 	return nil
 }
 
@@ -109,19 +127,7 @@ func (p *Printer) Fail(err error) int {
 		_ = p.encode(p.envelope(false, e.Data, e))
 		return e.Exit
 	}
-	code := e.Code
-	if code == "" {
-		code = "error"
-	}
-	fmt.Fprintf(p.Stderr, "shulker: %s (%s)\n", e.Message, code)
-	if len(e.Candidates) > 0 {
-		fmt.Fprintf(p.Stderr, "  candidates: %s\n", strings.Join(e.Candidates, ", "))
-	}
-	for _, item := range e.Items {
-		if !strings.Contains(e.Message, item) {
-			fmt.Fprintf(p.Stderr, "  - %s\n", item)
-		}
-	}
+	p.Err().Error(e)
 	return e.Exit
 }
 

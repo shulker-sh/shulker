@@ -57,7 +57,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("serve: %d\n%s\n%s", code, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "[Server] got: say hi") || !strings.Contains(stdout, "Server stopped.") {
+	if !strings.Contains(stdout, "[Server] got: say hi") || !strings.Contains(stdout, "server stopped") {
 		t.Fatalf("stdout: %s", stdout)
 	}
 	if !strings.Contains(stderr, "starting server in") || !strings.Contains(stderr, "Java 25") {
@@ -125,7 +125,7 @@ func TestServeErrors(t *testing.T) {
 	}
 
 	code, _, stderr = h.run(t, "serve", "--target", "nope")
-	if code == 0 || !strings.Contains(stderr, "candidates: server") {
+	if code == 0 || !strings.Contains(stderr, "‣ server") {
 		t.Fatalf("expected target-not-found, got %d: %s", code, stderr)
 	}
 }
@@ -165,7 +165,7 @@ func TestManagedJava(t *testing.T) {
 		t.Fatalf("expected 2 object downloads, got %d", h.runtime.hits)
 	}
 
-	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, "Fetched 0 file(s).") || h.runtime.hits != 2 {
+	if stdout := h.mustRun(t, "install"); h.runtime.hits != 2 {
 		t.Fatalf("second install re-downloaded the runtime: %s (hits %d)", stdout, h.runtime.hits)
 	}
 
@@ -180,8 +180,8 @@ func TestManagedJava(t *testing.T) {
 		t.Fatalf("failed refresh replaced the runtime: %v", marker)
 	}
 	h.runtime.corrupt = ""
-	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, "Fetched 1 file(s).") {
-		t.Fatalf("changed runtime should be refetched: %s", stdout)
+	if _, stderr := h.mustRunStderr(t, "install"); !strings.Contains(stderr, "downloading Java runtime") {
+		t.Fatalf("changed runtime should be refetched: %s", stderr)
 	}
 	if marker := h.readRuntimeMarker(t); marker["version"] != "25.0.2" {
 		t.Fatalf("marker after refresh: %v", marker)
@@ -242,7 +242,7 @@ func TestServeInstallsWhatTheLockNeeds(t *testing.T) {
 	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
 	h.stdin = strings.NewReader("stop\n")
 	stdout, _ := h.mustRunStderr(t, "serve", "--accept-eula")
-	if !strings.Contains(stdout, "Server stopped.") {
+	if !strings.Contains(stdout, "server stopped") {
 		t.Fatalf("serve must fetch the server files itself, not stop at `shulker install`: %s", stdout)
 	}
 }

@@ -2,8 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -175,28 +173,32 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				Source:      src.name,
 				Sync:        synced,
 			}
-			return a.printer.Emit(rep, func(w io.Writer) {
-				verb := "Created"
+			return a.printer.Emit(rep, func(l *out.Lines) {
+				verb := "created"
 				if !res.Created {
-					verb = "Updated"
+					verb = "updated"
 				}
-				fmt.Fprintf(w, "%s instance %q in %s\n", verb, display, res.Dir)
+				l.OKInto(verb+" instance "+display, res.Dir, "")
+				var rows []out.Row
 				if mode == "sync" {
-					fmt.Fprintf(w, "The launcher runs `shulker sync` for target %s before each launch.\n", name)
+					rows = append(rows, out.Row{Text: "the launcher runs `shulker sync` for target " + name + " before each launch"})
 				} else {
-					fmt.Fprintf(w, "Linked the instance game directory to %s\n", buildDir)
-					if _, err := os.Stat(filepath.Join(buildDir, build.StateFile)); err != nil {
-						fmt.Fprintln(w, "Run `shulker install` before launching.")
-					}
+					rows = append(rows, out.Row{Text: "the instance game directory links to " + buildDir})
 				}
 				if hasFeatures {
-					fmt.Fprintf(w, "Saved the feature choices for this instance; change them with `shulker feature on|off <feature> --into %s`.\n", launcher.CommandArg(res.GameDir))
+					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
 				}
 				if !res.Created {
-					fmt.Fprintln(w, "Restart the launcher if it is open so the change is picked up.")
+					rows = append(rows, out.Row{Text: "restart the launcher if it is open so the change is picked up"})
+				}
+				l.Tree(rows...)
+				if mode != "sync" {
+					if _, err := os.Stat(filepath.Join(buildDir, build.StateFile)); err != nil {
+						l.Nudge("Download and build before launching", "shulker install")
+					}
 				}
 				if synced != nil {
-					synced.print(w)
+					synced.print(l)
 				}
 			})
 		},

@@ -52,7 +52,7 @@ func TestFeatureConditionsFilterModsAndDependencies(t *testing.T) {
 
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	stdout := h.mustRun(t, "build")
-	if !strings.Contains(stdout, "2 excluded") || !strings.Contains(stdout, "  excluded sodium (needs feature fancy)\n") || !strings.Contains(stdout, "  excluded fabric-api (only required by sodium)\n") {
+	if !strings.Contains(stdout, "2 excluded") || !strings.Contains(stdout, "excluded: sodium (needs feature fancy)\n") || !strings.Contains(stdout, "excluded: fabric-api (only required by sodium)\n") {
 		t.Fatalf("gated build: %s", stdout)
 	}
 	if jars := modsDir(t, h); len(jars) != 0 {
@@ -68,7 +68,7 @@ func TestFeatureConditionsFilterModsAndDependencies(t *testing.T) {
 	setMod(t, h, "sodium", map[string]any{"feature": []string{"fancy", "!shaders"}})
 	setFeatures(t, h, []string{"fancy", "shaders"})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "  excluded sodium (feature shaders is on)\n") || len(modsDir(t, h)) != 0 {
+	if !strings.Contains(stdout, "excluded: sodium (feature shaders is on)\n") || len(modsDir(t, h)) != 0 {
 		t.Fatalf("negated feature: %s", stdout)
 	}
 
@@ -95,11 +95,11 @@ func TestOSConditionsUseTheBuildMachine(t *testing.T) {
 		t.Fatalf("matching os: %s", stdout)
 	}
 	setMod(t, h, "sodium", map[string]any{"os": []string{other, "!" + here}})
-	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "  excluded sodium (os is "+here+")\n") {
+	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "excluded: sodium (os is "+here+")\n") {
 		t.Fatalf("negated os: %s", stdout)
 	}
 	setMod(t, h, "sodium", map[string]any{"os": other})
-	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "  excluded sodium (needs os "+other+")\n") {
+	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "excluded: sodium (needs os "+other+")\n") {
 		t.Fatalf("other os: %s", stdout)
 	}
 }

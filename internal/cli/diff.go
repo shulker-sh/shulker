@@ -3,9 +3,9 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -118,16 +118,16 @@ func (a *app) diffCmd() *cobra.Command {
 					}
 				}
 			}
-			return a.printer.Emit(reports, func(w io.Writer) {
+			return a.printer.Emit(reports, func(l *out.Lines) {
 				for _, rep := range reports {
 					if len(rep.Files) == 0 {
-						fmt.Fprintf(w, "%s: no changes in %s\n", rep.Target, where[rep])
+						l.OK("no changes in "+rep.Target, where[rep])
 						continue
 					}
-					fmt.Fprintf(w, "%s: %d file(s) changed in %s\n", rep.Target, len(rep.Files), where[rep])
+					l.Heading(rep.Target + " " + l.T.Grey(fmt.Sprintf("(%s in %s)", plural(len(rep.Files), "file changed", "files changed"), where[rep])))
 					for _, f := range rep.Files {
-						fmt.Fprintf(w, "%s %s\n", f.State, f.Path)
-						fmt.Fprint(w, f.Diff)
+						l.Items(out.Item{Kind: diffKind(f.State), Name: f.Path, Aside: []string{f.State}})
+						l.Raw(strings.TrimRight(f.Diff, "\n"))
 					}
 				}
 			})
@@ -181,20 +181,23 @@ func (a *app) pullCmd() *cobra.Command {
 					return err
 				}
 			}
-			return a.printer.Emit(rep, func(w io.Writer) {
-				fmt.Fprintf(w, "%s: %d file(s) pulled, %d key(s) written to shulker.json, %d skipped\n", rep.Target, len(rep.Pulled), len(rep.Keys), len(rep.Skipped))
+			return a.printer.Emit(rep, func(l *out.Lines) {
+				l.OK("pulled "+rep.Target, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", plural(len(rep.Pulled), "file", "files"), plural(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
+				var rows []out.Row
+				arrow := " " + l.T.ArrowBump() + " "
 				for _, f := range rep.Pulled {
-					fmt.Fprintf(w, "  pulled %s\n", f)
+					rows = append(rows, out.Row{Label: "pulled", Text: strings.ReplaceAll(f, " -> ", arrow)})
 				}
 				for _, k := range rep.Keys {
-					fmt.Fprintf(w, "  set %s\n", k)
+					rows = append(rows, out.Row{Label: "set", Text: k})
 				}
 				for _, k := range rep.Adopted {
-					fmt.Fprintf(w, "  adopted %s\n", k)
+					rows = append(rows, out.Row{Label: "adopted", Text: strings.ReplaceAll(k, " -> ", arrow)})
 				}
 				for _, s := range rep.Skipped {
-					fmt.Fprintf(w, "  skipped %s\n", s)
+					rows = append(rows, out.Row{Label: "skipped", Text: s})
 				}
+				l.Tree(rows...)
 			})
 		},
 	}
@@ -235,4 +238,21 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, n
 	e := out.Errorf("ambiguous-into", "target %s has edits in several directories; pass --into", name)
 	e.Candidates = drifted
 	return "", e
+}
+
+func diffKind(state string) out.Kind {
+	switch state {
+	case "write":
+		return out.Add
+	case "remove", "orphan":
+		return out.Drop
+	}
+	return out.Change
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, one)
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }

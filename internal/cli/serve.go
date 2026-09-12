@@ -177,7 +177,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if code != 0 {
 				res.Log, res.CrashReport = serverFailureFiles(dir, started)
 				if a.printer.JSON {
-					_ = a.printer.Emit(res, func(io.Writer) {})
+					_ = a.printer.Emit(res, func(*out.Lines) {})
 				}
 				e := &out.Error{Code: "server-exit", Message: fmt.Sprintf("server exited with status %d", code), Exit: code}
 				if res.Log != "" {
@@ -188,8 +188,8 @@ func (a *app) serveCmd() *cobra.Command {
 				}
 				return e
 			}
-			return a.printer.Emit(res, func(w io.Writer) {
-				fmt.Fprintln(w, "Server stopped.")
+			return a.printer.Emit(res, func(l *out.Lines) {
+				l.OK("server stopped", "")
 			})
 		},
 	}
@@ -206,7 +206,9 @@ func (a *app) acceptEula(stdin *bufio.Reader, flag bool) (bool, error) {
 	if a.printer.JSON || a.tty == nil || !a.tty() {
 		return false, nil
 	}
-	fmt.Fprintf(a.printer.Stderr, "Running a Minecraft server requires accepting the EULA: %s\nAccept and record \"eula\": true in shulker.json? [y/N] ", eulaURL)
+	l := a.printer.Err()
+	l.Text("Running a Minecraft server requires accepting the EULA: " + l.T.Cyan(eulaURL))
+	fmt.Fprint(a.printer.Stderr, "  Accept and record \"eula\": true in shulker.json? "+l.T.Grey("[y/N]")+" ")
 	line, err := stdin.ReadString('\n')
 	if err != nil && line == "" {
 		return false, nil

@@ -2,12 +2,13 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/local"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 )
 
@@ -67,10 +68,9 @@ func (a *app) buildCmd() *cobra.Command {
 				reports = append(reports, rep)
 			}
 			a.refreshLocal(lf, true, false)
-			return a.printer.Emit(reports, func(w io.Writer) {
+			return a.printer.Emit(reports, func(l *out.Lines) {
 				for _, rep := range reports {
-					fmt.Fprintln(w, rep.Summary())
-					printReportDetails(w, rep)
+					printReport(l, rep)
 				}
 			})
 		},
@@ -83,20 +83,47 @@ func (a *app) buildCmd() *cobra.Command {
 	return cmd
 }
 
-func printReportDetails(w io.Writer, rep *build.Report) {
+func printReport(l *out.Lines, rep *build.Report) {
+	l.OK("built "+rep.Target, reportAside(rep))
+	printReportDetails(l, rep)
+}
+
+func reportAside(rep *build.Report) string {
+	var parts []string
+	count := func(n int, what string) {
+		if n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n, what))
+		}
+	}
+	count(len(rep.Written), "written")
+	count(rep.Unchanged, "unchanged")
+	count(len(rep.Kept), "kept")
+	count(len(rep.Removed), "removed")
+	count(len(rep.Linked), "linked")
+	count(len(rep.Moved), "moved")
+	count(len(rep.Excluded), "excluded")
+	if len(parts) == 0 {
+		return "nothing to do"
+	}
+	return strings.Join(parts, ", ")
+}
+
+func printReportDetails(l *out.Lines, rep *build.Report) {
+	var rows []out.Row
 	for _, m := range rep.Moved {
-		fmt.Fprintf(w, "  moved %s into %s\n", m, filepath.Join(build.DataDir, rep.Target, m))
+		rows = append(rows, out.Row{Label: "moved", Text: m + " " + l.T.Grey(l.T.ArrowInto()) + " " + filepath.Join(build.DataDir, rep.Target, m)})
 	}
 	for _, m := range rep.MovedBack {
-		fmt.Fprintf(w, "  moved %s back into %s\n", m, rep.Dir)
+		rows = append(rows, out.Row{Label: "moved back", Text: m + " " + l.T.Grey(l.T.ArrowInto()) + " " + rep.Dir})
 	}
 	for _, e := range rep.Excluded {
-		fmt.Fprintf(w, "  excluded %s\n", e)
+		rows = append(rows, out.Row{Label: "excluded", Text: e})
 	}
 	for _, k := range rep.Kept {
-		fmt.Fprintf(w, "  kept %s\n", k)
+		rows = append(rows, out.Row{Label: "kept", Text: k})
 	}
-	if l := rep.InstalledLoader; l != nil {
-		fmt.Fprintf(w, "  installed %s %s\n", l.Type, l.Version)
+	if ld := rep.InstalledLoader; ld != nil {
+		rows = append(rows, out.Row{Label: "installed", Text: ld.Type + " " + ld.Version})
 	}
+	l.Tree(rows...)
 }

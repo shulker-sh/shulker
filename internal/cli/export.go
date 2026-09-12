@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 
@@ -41,7 +40,8 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 				return err
 			}
 			if diffs := p.LockDifferences(); len(diffs) > 0 {
-				e := out.Errorf("lock-stale", "shulker.lock does not match shulker.json (%s); run `shulker lock`", strings.Join(diffs, "; "))
+				e := out.Errorf("lock-stale", "shulker.lock does not match shulker.json (%s)", strings.Join(diffs, "; "))
+				e.Help = "run `shulker lock`"
 				e.Items = diffs
 				return e
 			}
@@ -78,8 +78,8 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 				return err
 			}
 			a.warn(rep.Warnings)
-			return a.printer.Emit(rep, func(w io.Writer) {
-				fmt.Fprintf(w, "Wrote %s: %s %s, %d mod(s) by download, %d bundled, %d override file(s).\n", output, rep.Name, rep.VersionID, len(rep.Mods), len(rep.Bundled), len(rep.Overrides))
+			return a.printer.Emit(rep, func(l *out.Lines) {
+				l.OKInto("wrote "+rep.Name+" "+rep.VersionID, output, fmt.Sprintf("%s by download, %d bundled, %s", plural(len(rep.Mods), "mod", "mods"), len(rep.Bundled), plural(len(rep.Overrides), "override file", "override files")))
 			})
 		},
 	}

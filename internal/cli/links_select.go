@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -121,11 +120,15 @@ func linkCandidates(links []config.Link) []string {
 	return names
 }
 
-func linkHeading(l config.Link) string {
+func linkAside(t out.Theme, l config.Link) string {
 	if l.Launcher == "" {
-		return fmt.Sprintf("%s (%s)", l.Name, l.Side)
+		return ""
 	}
-	return fmt.Sprintf("%s (%s, %s)", l.Name, l.Side, launcher.Title(l.Launcher))
+	return t.Aside(launcher.Title(l.Launcher))
+}
+
+func linkHeading(t out.Theme, l config.Link) string {
+	return t.Bold(l.Name) + " " + t.Cyan(l.Side) + linkAside(t, l)
 }
 
 func (a *app) pickLink(links []config.Link) (config.Link, error) {
@@ -134,11 +137,13 @@ func (a *app) pickLink(links []config.Link) (config.Link, error) {
 		e.Candidates = linkCandidates(links)
 		return config.Link{}, e
 	}
-	w := a.printer.Stderr
+	lines := a.printer.Err()
+	t := lines.T
 	for i, l := range links {
-		fmt.Fprintf(w, "%3d) %s  %s\n", i+1, linkHeading(l), l.Dir)
+		lines.Text(t.Cyan(fmt.Sprintf("%2d", i+1)) + " " + t.Bold(l.Name) + " " + t.Cyan(l.Side) + linkAside(t, l))
+		lines.Text("   " + t.Link(t.Grey(l.Dir), l.Dir))
 	}
-	fmt.Fprintf(w, "Sync which one? [1-%d] ", len(links))
+	fmt.Fprintf(a.printer.Stderr, "  Sync which one? %s ", t.Grey(fmt.Sprintf("[1-%d]", len(links))))
 	line, _ := bufio.NewReader(a.stdin).ReadString('\n')
 	n, err := strconv.Atoi(strings.TrimSpace(line))
 	if err != nil || n < 1 || n > len(links) {
@@ -170,15 +175,15 @@ type syncLinkResult struct {
 }
 
 func (a *app) syncLinks(cmd *cobra.Command, links []config.Link, req syncRequest) error {
-	w := a.printer.Stdout
+	lines := a.printer.Out()
 	results := []syncLinkResult{}
 	failed := 0
 	for i, l := range links {
 		if !a.printer.JSON {
 			if i > 0 {
-				fmt.Fprintln(w)
+				lines.Blank()
 			}
-			fmt.Fprintln(w, linkHeading(l))
+			lines.Heading(linkHeading(lines.T, l))
 		}
 		r := syncLinkResult{Link: l, OK: true}
 		restore := func() {}
@@ -190,11 +195,13 @@ func (a *app) syncLinks(cmd *cobra.Command, links []config.Link, req syncRequest
 		if err != nil {
 			failed++
 			r.OK, r.Error = false, out.AsError(err)
-			a.progress("error: %s", r.Error.Message)
+			if !a.printer.JSON {
+				a.printer.Err().Error(r.Error)
+			}
 		} else {
 			r.Sync = &res
 			if !a.printer.JSON {
-				res.print(w)
+				res.print(lines)
 			}
 		}
 		results = append(results, r)
@@ -204,5 +211,5 @@ func (a *app) syncLinks(cmd *cobra.Command, links []config.Link, req syncRequest
 		e.Data = results
 		return e
 	}
-	return a.printer.Emit(results, func(io.Writer) {})
+	return a.printer.Emit(results, func(*out.Lines) {})
 }

@@ -20,7 +20,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 
 	into := filepath.Join(t.TempDir(), "instance", "minecraft")
 	stdout := h.mustRun(t, "sync", h.dir, "--into", into)
-	if !strings.Contains(stdout, "client: ") || !strings.Contains(stdout, "into "+into) {
+	if !strings.Contains(stdout, "synced client » "+into) {
 		t.Fatalf("sync output: %s", stdout)
 	}
 	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", build.StateFile} {
@@ -39,7 +39,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "sync", h.dir, "--into", into)
-	if !strings.Contains(stdout, "Fetched 0 file(s).") || !strings.Contains(stdout, "0 written") {
+	if !strings.Contains(stdout, "(4 unchanged)") {
 		t.Fatalf("second sync output: %s", stdout)
 	}
 
@@ -52,7 +52,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "sync", h.dir, "--into", into)
-	if !strings.Contains(stdout, "1 kept") || !strings.Contains(stdout, "  kept options.txt tutorialStep") {
+	if !strings.Contains(stdout, "1 kept") || !strings.Contains(stdout, "kept: options.txt tutorialStep") {
 		t.Fatalf("sync should list the kept key: %s", stdout)
 	}
 
@@ -240,7 +240,7 @@ func TestSyncOfflineKeepsTheInstalledRuntime(t *testing.T) {
 	into := filepath.Join(t.TempDir(), "server")
 	h.mustRun(t, "sync", h.dir, "--into", into)
 	_, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", into, "--offline")
-	if !strings.Contains(stderr, "warning: offline, keeping the installed Java runtime java-runtime-epsilon 25.0.1") {
+	if !strings.Contains(stderr, "! offline, keeping the installed Java runtime java-runtime-epsilon 25.0.1") {
 		t.Fatalf("offline runtime refresh: %s", stderr)
 	}
 }
@@ -350,7 +350,7 @@ func TestDiffAndPullInto(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "1 file(s) changed in "+into) || !strings.Contains(stdout, "-a=2") {
+	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "1 file changed in "+into) || !strings.Contains(stdout, "-a=2") {
 		t.Fatalf("diff without --into must look at the recorded sync dir: %s", stdout)
 	}
 	stdout := h.mustRun(t, "diff", "client", "--into", into)
@@ -463,7 +463,7 @@ func TestSyncFromLocalProjectReadsInstanceDecisions(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(into, "shulker.local.json"), []byte(`{"features":{"fancy":false}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); !strings.Contains(stdout, "excluded sodium") {
+	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); !strings.Contains(stdout, "excluded: sodium") {
 		t.Fatalf("the instance decision should beat the project one: %s", stdout)
 	}
 	if st := build.LoadState(into); st.Origin != (build.Origin{Source: h.dir}) {
@@ -500,7 +500,7 @@ func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "sync", h.dir, "--into", into)
-	if !strings.Contains(stdout, "moved saves back into "+into) {
+	if !strings.Contains(stdout, "moved back: saves » "+into) {
 		t.Fatalf("sync output: %s", stdout)
 	}
 	if info, err := os.Lstat(filepath.Join(into, "saves")); err != nil || !info.IsDir() {

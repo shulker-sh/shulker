@@ -3,8 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"path/filepath"
 	"time"
 
@@ -129,12 +127,11 @@ func (a *app) syncCmd() *cobra.Command {
 	return cmd
 }
 
-func (res syncResult) print(w io.Writer) {
-	fmt.Fprintf(w, "Fetched %d file(s).\n", len(res.Fetched))
-	fmt.Fprintf(w, "%s into %s\n", res.Build.Summary(), res.Dir)
-	printReportDetails(w, res.Build)
-	if l := res.Registered; l != nil {
-		fmt.Fprintf(w, "Registered %q (%s).\n", l.Name, l.Side)
+func (res syncResult) print(l *out.Lines) {
+	l.OKInto("synced "+res.Target, res.Dir, reportAside(res.Build))
+	printReportDetails(l, res.Build)
+	if r := res.Registered; r != nil {
+		l.OK("registered "+r.Name, r.Side)
 	}
 }
 

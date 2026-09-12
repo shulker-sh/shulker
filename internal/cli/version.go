@@ -2,11 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"runtime"
 	"runtime/debug"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/out"
 )
 
 const devVersion = "dev"
@@ -47,8 +47,8 @@ func (a *app) versionCmd() *cobra.Command {
 			if version == devVersion {
 				info.Commit, info.Modified = buildVCS()
 			}
-			return a.printer.Emit(info, func(w io.Writer) {
-				fmt.Fprintf(w, "shulker %s (%s)\n", info.Version, info.build())
+			return a.printer.Emit(info, func(l *out.Lines) {
+				l.Raw(fmt.Sprintf("shulker %s (%s)", info.Version, info.build()))
 			})
 		},
 	}

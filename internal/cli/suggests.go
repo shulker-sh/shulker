@@ -2,9 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/resolve"
 )
 
@@ -44,24 +44,21 @@ func (a *app) suggestsCmd() *cobra.Command {
 				}
 				res.Suggestions = append(res.Suggestions, s)
 			}
-			return a.printer.Emit(res, func(w io.Writer) {
+			return a.printer.Emit(res, func(l *out.Lines) {
 				if len(res.Suggestions) == 0 {
-					fmt.Fprintln(w, "No suggestions.")
+					l.Info("No suggestions.")
 				}
-				mod := ""
+				var items []out.Item
 				for _, s := range res.Suggestions {
-					if s.Mod != mod {
-						fmt.Fprintln(w, s.Mod)
-						mod = s.Mod
-					}
-					fmt.Fprintf(w, "  %s %s", s.Kind, s.On)
+					aside := s.Kind + " " + s.On
 					if s.Declared != "" && s.Declared != "*" {
-						fmt.Fprintf(w, " %s", s.Declared)
+						aside += " " + s.Declared
 					}
-					fmt.Fprintln(w)
+					items = append(items, out.Item{Kind: out.Note, Name: s.Mod, Aside: []string{aside}})
 				}
+				l.Items(items...)
 				if hidden > 0 {
-					fmt.Fprintln(w, optionalHint(hidden))
+					optionalNudge(l, hidden)
 				}
 			})
 		},
@@ -70,10 +67,10 @@ func (a *app) suggestsCmd() *cobra.Command {
 	return cmd
 }
 
-func optionalHint(n int) string {
+func optionalNudge(l *out.Lines, n int) {
 	noun := "integrations"
 	if n == 1 {
 		noun = "integration"
 	}
-	return fmt.Sprintf("%d optional %s; see shulker suggests --optional", n, noun)
+	l.Nudge(fmt.Sprintf("%d optional %s to see", n, noun), "shulker suggests --optional")
 }

@@ -30,6 +30,7 @@ stdout, errors included. Act on error.code rather than the message, and run
 
 type app struct {
 	printer    *out.Printer
+	style      out.Options
 	stdin      io.Reader
 	tty        func() bool
 	dir        string
@@ -59,7 +60,11 @@ func newApp(stdout, stderr io.Writer) *app {
 }
 
 func (a *app) run(ctx context.Context, args []string) int {
-	a.printer.JSON = jsonRequested(args)
+	a.printer.JSON = flagRequested(args, "json")
+	a.style = out.Options{NoColor: flagRequested(args, "no-color"), ASCII: flagRequested(args, "ascii")}
+	if !a.printer.JSON {
+		a.printer.Theme, a.printer.ErrTheme = out.Detect(a.printer.Stdout, a.printer.Stderr, a.style)
+	}
 	root := a.root()
 	root.SetArgs(args)
 	root.SetOut(a.printer.Stdout)
@@ -104,16 +109,18 @@ func (a *app) root() *cobra.Command {
 	root.SetHelpTemplate(root.HelpTemplate() + helpFooter)
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
+	root.PersistentFlags().BoolVar(&a.style.NoColor, "no-color", a.style.NoColor, "print without colour (NO_COLOR does the same)")
+	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", a.style.ASCII, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ »")
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.linksCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd())
 	a.markRunning(root)
 	return root
 }
 
 // Cobra reports an unknown command before parsing any flags, so the
-// persistent flag cannot be trusted on that path.
-func jsonRequested(args []string) bool {
+// persistent flags cannot be trusted on that path.
+func flagRequested(args []string, name string) bool {
 	for _, arg := range args {
-		if arg == "--json" || arg == "--json=true" {
+		if arg == "--"+name || arg == "--"+name+"=true" {
 			return true
 		}
 		if arg == "--" {

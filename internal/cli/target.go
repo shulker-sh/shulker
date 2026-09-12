@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"fmt"
-	"io"
 	"regexp"
 	"strings"
 
@@ -74,9 +72,9 @@ func (a *app) targetAddCmd() *cobra.Command {
 			if err := p.SaveManifest(); err != nil {
 				return err
 			}
-			return a.printer.Emit(targetEntry{ID: name, Target: t}, func(w io.Writer) {
-				fmt.Fprintf(w, "+ target %s (%s, %s)\n", name, t.Side, t.Build)
-				fmt.Fprintf(w, "Next: shulker build %s\n", name)
+			return a.printer.Emit(targetEntry{ID: name, Target: t}, func(l *out.Lines) {
+				l.Items(out.Item{Kind: out.Add, Name: name, Text: l.T.Grey(l.T.ArrowInto()) + " " + l.T.Grey(t.Build), Aside: []string{t.Side + " target"}})
+				l.Nudge("Build it", "shulker build "+name)
 			})
 		},
 	}
@@ -115,9 +113,8 @@ func (a *app) targetRemoveCmd() *cobra.Command {
 			if err := p.SaveManifest(); err != nil {
 				return err
 			}
-			return a.printer.Emit(targetEntry{ID: name, Target: t}, func(w io.Writer) {
-				fmt.Fprintf(w, "- target %s\n", name)
-				fmt.Fprintf(w, "  left %s on disk\n", t.Build)
+			return a.printer.Emit(targetEntry{ID: name, Target: t}, func(l *out.Lines) {
+				l.Items(out.Item{Kind: out.Drop, Name: name, Aside: []string{"left " + t.Build + " on disk"}})
 			})
 		},
 	}
@@ -140,17 +137,19 @@ func (a *app) targetListCmd() *cobra.Command {
 				t.Build = p.Manifest.BuildDir(name)
 				res = append(res, targetEntry{ID: name, Target: t})
 			}
-			return a.printer.Emit(res, func(w io.Writer) {
+			return a.printer.Emit(res, func(l *out.Lines) {
+				var items []out.Item
 				for _, e := range res {
-					fmt.Fprintf(w, "%s %s %s overrides=%s", e.ID, e.Side, e.Build, strings.Join(e.Overrides, ","))
+					aside := []string{e.Side + " target", "overrides: " + strings.Join(e.Overrides, ", ")}
 					if len(e.Features) > 0 {
-						fmt.Fprintf(w, " features=%s", strings.Join(e.Features, ","))
+						aside = append(aside, "features: "+strings.Join(e.Features, ", "))
 					}
 					if e.Name != "" {
-						fmt.Fprintf(w, " %q", e.Name)
+						aside = append(aside, "shown as "+e.Name)
 					}
-					fmt.Fprintln(w)
+					items = append(items, out.Item{Kind: out.Note, Name: e.ID, Text: l.T.Grey(l.T.ArrowInto()) + " " + l.T.Grey(e.Build), Aside: aside})
 				}
+				l.Items(items...)
 			})
 		},
 	}

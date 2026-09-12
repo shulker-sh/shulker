@@ -29,7 +29,7 @@ func TestNeoForgeServer(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "install")
-	if !strings.Contains(stdout, "installed neoforge 26.2.0.87") {
+	if !strings.Contains(stdout, "installed: neoforge 26.2.0.87") {
 		t.Fatalf("install output:\n%s", stdout)
 	}
 	base := h.server.URL
@@ -71,7 +71,7 @@ func TestNeoForgeServer(t *testing.T) {
 	if len(h.installs) != 1 || h.neoHits != hits {
 		t.Fatalf("an installed loader ran the installer again (%d runs, %d downloads)", len(h.installs), h.neoHits-hits)
 	}
-	if !strings.Contains(stdout, "0 kept") || build.LoadState(buildDir).Loader == nil {
+	if !strings.Contains(stdout, "(5 unchanged)") || build.LoadState(buildDir).Loader == nil {
 		t.Fatalf("rebuild: %s", stdout)
 	}
 
@@ -142,7 +142,7 @@ func TestNeoForgeLinkMojang(t *testing.T) {
 	})
 
 	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
-	if !strings.Contains(stdout, "Installed neoforge-26.2.0.87 into") {
+	if !strings.Contains(stdout, "installed neoforge-26.2.0.87 »") {
 		t.Fatalf("link output:\n%s", stdout)
 	}
 	if len(h.installs) != 1 || strings.Join(h.installs[0], " ") != "--install-client "+launcherDir {

@@ -20,7 +20,7 @@ func TestTargetAddRemoveList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stdout := h.mustRun(t, "target", "add", "server"); !strings.Contains(stdout, "Next: shulker build server") {
+	if stdout := h.mustRun(t, "target", "add", "server"); !strings.Contains(stdout, "$ shulker build server") {
 		t.Fatalf("add output: %s", stdout)
 	}
 	h.mustRun(t, "target", "add", "fancy", "--side", "client", "--build", "out/fancy",
@@ -67,7 +67,7 @@ func TestTargetAddRemoveList(t *testing.T) {
 	if !env.OK || env.LockStale || strings.Join(names, ",") != "client,fancy,server" || env.Data[1].Build != "out/fancy" {
 		t.Fatalf("list: %+v", env)
 	}
-	if stdout := h.mustRun(t, "target", "list"); !strings.Contains(stdout, `fancy client out/fancy overrides=overrides,fancy-overrides features=shaders,zoom "Fancy Client"`) {
+	if stdout := h.mustRun(t, "target", "list"); !strings.Contains(stdout, "i fancy  » out/fancy (client target, overrides: overrides, fancy-overrides, features: shaders, zoom, shown as Fancy Client)") {
 		t.Fatalf("list output: %s", stdout)
 	}
 
@@ -127,7 +127,7 @@ func TestTargetWithoutBuildDir(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(h.dir, ".shulker-state.json")); err == nil {
 		t.Fatal("client built into the project directory")
 	}
-	if stdout := h.mustRun(t, "target", "list"); !strings.HasPrefix(stdout, "client client build/client ") {
+	if stdout := h.mustRun(t, "target", "list"); !strings.HasPrefix(stdout, "  i client » build/client (client target") {
 		t.Fatalf("list output: %s", stdout)
 	}
 	h.mustRun(t, "target", "add", "server")

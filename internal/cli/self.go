@@ -3,8 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -67,11 +65,12 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	}
 	res := selfUpdateResult{Current: version, Latest: strings.TrimPrefix(tag, "v"), Available: selfupdate.NeedsUpdate(version, tag)}
 	if !res.Available {
-		return a.printer.Emit(res, func(w io.Writer) { fmt.Fprintf(w, "shulker is up to date (%s).\n", version) })
+		return a.printer.Emit(res, func(l *out.Lines) { l.OK("shulker is up to date", version) })
 	}
 	if check {
-		return a.printer.Emit(res, func(w io.Writer) {
-			fmt.Fprintf(w, "shulker %s is available (you have %s); run shulker self update to install it.\n", res.Latest, version)
+		return a.printer.Emit(res, func(l *out.Lines) {
+			l.Items(out.Item{Kind: out.Change, Name: "shulker", From: version, To: res.Latest, Aside: []string{"update available"}})
+			l.Nudge("Install it", "shulker self update")
 		})
 	}
 
@@ -102,8 +101,8 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 		return out.Errorf("self-update-install", "replace %s: %v", exe, err)
 	}
 	res.Updated, res.Path = true, exe
-	return a.printer.Emit(res, func(w io.Writer) {
-		fmt.Fprintf(w, "Updated shulker %s -> %s at %s\n", version, res.Latest, exe)
+	return a.printer.Emit(res, func(l *out.Lines) {
+		l.OKInto("updated shulker "+l.T.Bump(version, res.Latest), exe, "")
 	})
 }
 

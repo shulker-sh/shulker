@@ -2,8 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/out"
 )
 
 type linkEntry struct {
@@ -44,7 +43,7 @@ func (a *app) linksCmd() *cobra.Command {
 				res[i] = inspectLink(l)
 			}
 			sortLinkEntries(res)
-			return a.printer.Emit(res, func(w io.Writer) { printLinkEntries(w, res) })
+			return a.printer.Emit(res, func(l *out.Lines) { printLinkEntries(l, res) })
 		},
 	}
 }
@@ -94,26 +93,30 @@ func sortLinkEntries(entries []linkEntry) {
 	slices.SortStableFunc(entries, func(x, y linkEntry) int { return compareLinks(x.Link, y.Link) })
 }
 
-func printLinkEntries(w io.Writer, entries []linkEntry) {
+func printLinkEntries(l *out.Lines, entries []linkEntry) {
 	if len(entries) == 0 {
-		fmt.Fprintln(w, "Nothing is linked yet; `shulker link prism` or `shulker sync --into <dir>` adds an entry.")
+		l.Info("Nothing is linked yet; `shulker link prism` or `shulker sync --into <dir>` adds an entry.")
 		return
 	}
-	for i, e := range entries {
-		if i == 0 || e.Launcher != entries[i-1].Launcher {
-			if i > 0 {
-				fmt.Fprintln(w)
-			}
-			fmt.Fprintln(w, launcher.Title(e.Launcher))
+	var group []out.Entry
+	flush := func(name string) {
+		if len(group) > 0 {
+			l.Entries(launcher.Title(name), group)
+			group = nil
 		}
-		fmt.Fprintf(w, "  %s (%s), %s\n", e.Name, e.Side, e.statusText())
-		fmt.Fprintf(w, "    %s\n", e.Dir)
-		from := "    from " + e.Source
+	}
+	for i, e := range entries {
+		if i > 0 && e.Launcher != entries[i-1].Launcher {
+			flush(entries[i-1].Launcher)
+			l.Blank()
+		}
+		from := "from " + e.Source
 		if e.Ref != "" {
 			from += ", ref " + e.Ref
 		}
-		fmt.Fprintf(w, "%s, target %s\n", from, e.Target)
+		group = append(group, out.Entry{Synced: e.Status == linkSynced, Name: e.Name, Tag: e.Side, Aside: e.statusText(), Path: e.Dir, Detail: from + ", target " + e.Target})
 	}
+	flush(entries[len(entries)-1].Launcher)
 }
 
 func (e linkEntry) statusText() string {

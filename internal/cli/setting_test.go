@@ -42,7 +42,7 @@ func TestSetGetUnset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stdout := h.mustRun(t, "set", "server.eula", "true"); stdout != "server.eula: (unset) -> true\n" {
+	if stdout := h.mustRun(t, "set", "server.eula", "true"); stdout != "  ~ server.eula (unset) ⟶ true\n" {
 		t.Fatalf("set output = %q", stdout)
 	}
 	h.mustRun(t, "set", "server.properties.rcon.port", "25575")
@@ -120,7 +120,7 @@ func TestSetGetUnset(t *testing.T) {
 		t.Fatalf("get server.memory error = %+v", env.Error)
 	}
 
-	if got := h.mustRun(t, "unset", "server.memory"); got != "server.memory was not set.\n" {
+	if got := h.mustRun(t, "unset", "server.memory"); got != "  i server.memory was not set\n" {
 		t.Fatalf("unset of an unset path = %q", got)
 	}
 	var change map[string]any
@@ -133,7 +133,7 @@ func TestSetGetUnset(t *testing.T) {
 	if _, ok := h.readManifest(t).Variables["port"]; ok {
 		t.Fatal("unset left variables.port in shulker.json")
 	}
-	if got := h.mustRun(t, "unset", "server.eula"); got != "server.eula: true -> false\n" {
+	if got := h.mustRun(t, "unset", "server.eula"); got != "  ~ server.eula true ⟶ false\n" {
 		t.Fatalf("unset server.eula reports %q; the saved file keeps eula false", got)
 	}
 }

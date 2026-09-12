@@ -120,7 +120,7 @@ func TestSelfUpdateReplacesBinary(t *testing.T) {
 	if got := h.binary(t); got != "new binary" {
 		t.Fatalf("binary holds %q", got)
 	}
-	if want := "Updated shulker 0.0.1 -> 0.0.2 at " + h.exe + "\n"; h.stdout.String() != want {
+	if want := "  ✔ updated shulker 0.0.1 ⟶ 0.0.2 » " + h.exe + "\n"; h.stdout.String() != want {
 		t.Fatalf("stdout %q, want %q", &h.stdout, want)
 	}
 	for _, line := range []string{"checksum verified", "gh not found, skipping build provenance check"} {
@@ -135,7 +135,7 @@ func TestSelfUpdateUpToDate(t *testing.T) {
 	if code := h.run(); code != 0 {
 		t.Fatalf("exit %d: %s", code, &h.stderr)
 	}
-	if h.stdout.String() != "shulker is up to date (0.0.2).\n" || h.binary(t) != "old binary" {
+	if h.stdout.String() != "  ✔ shulker is up to date (0.0.2)\n" || h.binary(t) != "old binary" {
 		t.Fatalf("stdout %q, binary %q", &h.stdout, h.binary(t))
 	}
 }

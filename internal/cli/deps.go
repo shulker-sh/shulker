@@ -103,6 +103,7 @@ func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolv
 		Packs:     packs,
 		Meta:      d.meta,
 		Log:       a.progress,
+		Progress:  a.printer.Progress,
 	}, nil
 }
 
@@ -197,7 +198,7 @@ func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool)
 
 func (a *app) progress(format string, args ...any) {
 	if !a.printer.JSON {
-		fmt.Fprintf(a.printer.Stderr, format+"\n", args...)
+		a.printer.Err().Muted(fmt.Sprintf(format, args...))
 	}
 }
 

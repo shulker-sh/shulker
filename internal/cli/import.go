@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -103,13 +102,17 @@ func (a *app) importMrpackCmd() *cobra.Command {
 				return err
 			}
 			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Targets: targetNames(m.Targets), Mods: mods, Overrides: overridePaths(mods.Overrides)}
-			return a.printer.Emit(res, func(w io.Writer) {
-				fmt.Fprintf(w, "Imported %s %s into %s (Minecraft %s, %s %s).\n", res.Name, res.Version, dir, res.Minecraft, res.Loader.Type, res.Loader.Version)
-				fmt.Fprintf(w, "  %d mod(s) locked from Modrinth, %d reused from the shulker marker, %d unmanaged file(s), %d override file(s)\n", len(mods.Locked), len(mods.Reused), len(mods.Unmanaged), len(res.Overrides))
-				if len(mods.Dropped) > 0 {
-					fmt.Fprintf(w, "  dropped from the marker (not in the pack): %s\n", strings.Join(mods.Dropped, ", "))
+			return a.printer.Emit(res, func(l *out.Lines) {
+				l.OKInto("imported "+res.Name+" "+res.Version, dir, fmt.Sprintf("Minecraft %s, %s %s", res.Minecraft, res.Loader.Type, res.Loader.Version))
+				rows := []out.Row{
+					{Text: fmt.Sprintf("%s locked from Modrinth, %d reused from the shulker marker", plural(len(mods.Locked), "mod", "mods"), len(mods.Reused))},
+					{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
 				}
-				fmt.Fprintf(w, "Next: cd %s && shulker install\n", dir)
+				if len(mods.Dropped) > 0 {
+					rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
+				}
+				l.Tree(rows...)
+				l.Nudge("Download and build it", "cd "+dir+" && shulker install")
 			})
 		},
 	}

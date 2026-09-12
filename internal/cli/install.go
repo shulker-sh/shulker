@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -73,11 +71,9 @@ func (a *app) installCmd() *cobra.Command {
 				res.Builds = append(res.Builds, rep)
 			}
 			a.refreshLocal(lf, true, false)
-			return a.printer.Emit(res, func(w io.Writer) {
-				fmt.Fprintf(w, "Fetched %d file(s).\n", len(res.Fetched))
+			return a.printer.Emit(res, func(l *out.Lines) {
 				for _, rep := range res.Builds {
-					fmt.Fprintln(w, rep.Summary())
-					printReportDetails(w, rep)
+					printReport(l, rep)
 				}
 			})
 		},

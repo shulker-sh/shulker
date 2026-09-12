@@ -79,8 +79,8 @@ func (a *app) unsetCmd() *cobra.Command {
 			}
 			from, ok := field.get(doc)
 			if !ok {
-				return a.printer.Emit(settingChange{Path: field.path}, func(w io.Writer) {
-					fmt.Fprintf(w, "%s was not set.\n", field.path)
+				return a.printer.Emit(settingChange{Path: field.path}, func(l *out.Lines) {
+					l.Info(field.path + " was not set")
 				})
 			}
 			field.remove(doc)
@@ -110,7 +110,7 @@ func (a *app) getCmd() *cobra.Command {
 					return out.Errorf("path-not-set", "%s is not set", field.path)
 				}
 			}
-			return a.printer.Emit(value, func(w io.Writer) { writeValue(w, value) })
+			return a.printer.Emit(value, func(l *out.Lines) { writeValue(l.W, value) })
 		},
 	}
 }
@@ -181,8 +181,8 @@ func (a *app) saveSettings(p *project.Project, doc map[string]any, field *settin
 	if p.Lock != nil {
 		a.warnLockDifferences(p)
 	}
-	return a.printer.Emit(change, func(w io.Writer) {
-		fmt.Fprintf(w, "%s: %s -> %s\n", change.Path, settingText(change.From), settingText(change.To))
+	return a.printer.Emit(change, func(l *out.Lines) {
+		l.Items(out.Item{Kind: out.Change, Name: change.Path, From: settingText(change.From), To: settingText(change.To)})
 	})
 }
 

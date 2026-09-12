@@ -489,7 +489,7 @@ func TestVerticalSlice(t *testing.T) {
 	h := newHarness(t)
 
 	stdout := h.mustRun(t, "init", "--yes")
-	if !strings.Contains(stdout, "Minecraft 26.2 with fabric 0.17.3 (Java 25)") {
+	if !strings.Contains(stdout, "created shulker.json (Minecraft 26.2, fabric 0.17.3, Java 25)") {
 		t.Fatalf("init output: %s", stdout)
 	}
 	var m map[string]any
@@ -539,7 +539,7 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "install")
-	if !strings.Contains(stdout, "Fetched 0 file(s).") || !strings.Contains(stdout, "client: 4 written") {
+	if !strings.Contains(stdout, "built client (4 written") {
 		t.Fatalf("install output: %s", stdout)
 	}
 	buildDir := filepath.Join(h.dir, "build", "client")
@@ -555,7 +555,7 @@ func TestVerticalSlice(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "0 written, 4 unchanged") {
+	if !strings.Contains(stdout, "built client (4 unchanged)") {
 		t.Fatalf("rebuild output: %s", stdout)
 	}
 
@@ -564,7 +564,7 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "1 kept") || !strings.Contains(stdout, "kept options.txt") {
+	if !strings.Contains(stdout, "1 kept") || !strings.Contains(stdout, "kept: options.txt") {
 		t.Fatalf("edited build file should be kept: %s", stdout)
 	}
 	if data, _ := os.ReadFile(options); !strings.Contains(string(data), "renderDistance:8") {
@@ -593,7 +593,7 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "0 written, 4 unchanged, 0 kept, 0 removed") {
+	if !strings.Contains(stdout, "built client (4 unchanged)") {
 		t.Fatalf("removed override should hand options.txt back to client.options: %s", stdout)
 	}
 	if data, _ := os.ReadFile(options); string(data) != "renderDistance:16\nlang:en_us\njoinedFirstServer:true\nonboardAccessibility:false\nskipMultiplayerWarning:true\ntutorialStep:none\n" {
@@ -737,10 +737,10 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	h.editManifest(t, func(m map[string]any) {
 		m["mods"].(map[string]any)["fabric-api"] = map[string]any{"side": "client"}
 	})
-	if out := h.mustRun(t, "lock"); !strings.Contains(out, "~ fabric-api ") || !strings.Contains(out, "side server -> client") {
+	if out := h.mustRun(t, "lock"); !strings.Contains(out, "~ fabric-api ") || !strings.Contains(out, "(now client only)") {
 		t.Fatalf("lock after a second side change: %s", out)
 	}
-	if out := h.mustRun(t, "lock"); !strings.Contains(out, "Already up to date") {
+	if out := h.mustRun(t, "lock"); !strings.Contains(out, "already up to date") {
 		t.Fatalf("second lock: %s", out)
 	}
 	for _, args := range [][]string{{"add", "sodium", "--pin", "nope"}, {"pin", "sodium", "nope"}} {
@@ -954,7 +954,7 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 		t.Fatalf("suggestions: %v", sg)
 	}
 	stdout = h.mustRun(t, "install")
-	if !strings.Contains(stdout, "client: 4 written") {
+	if !strings.Contains(stdout, "built client (4 written") {
 		t.Fatalf("install: %s", stdout)
 	}
 }
@@ -964,10 +964,10 @@ func TestUpdateOutdatedAndPin(t *testing.T) {
 	h.mustRun(t, "init", "--yes")
 	h.mustRun(t, "add", "sodium")
 
-	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "All mods are up to date") {
+	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "all mods are up to date") {
 		t.Fatalf("outdated before a new release: %s", out)
 	}
-	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
+	if out := h.mustRun(t, "update"); !strings.Contains(out, "already up to date") {
 		t.Fatalf("update before a new release: %s", out)
 	}
 
@@ -999,10 +999,10 @@ func TestUpdateOutdatedAndPin(t *testing.T) {
 	if m.Mods["sodium"].Pin != "QANobbMI" {
 		t.Fatalf("manifest pin: %+v", m.Mods)
 	}
-	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "sodium 1.0.0+mc26.2 -> 1.1.0+mc26.2 (pinned)") {
+	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "sodium 1.0.0+mc26.2 ⟶ 1.1.0+mc26.2 (pinned)") {
 		t.Fatalf("outdated with pin: %s", out)
 	}
-	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
+	if out := h.mustRun(t, "update"); !strings.Contains(out, "already up to date") {
 		t.Fatalf("update must respect the pin: %s", out)
 	}
 
@@ -1077,7 +1077,7 @@ func TestUpdateKeepsPinnedDirectDependency(t *testing.T) {
 	if fa := l.Mods["fabric-api"]; fa.Version != "Q7dR8mSH" || len(fa.RequiredBy) != 1 || fa.RequiredBy[0] != "sodium" {
 		t.Fatalf("fabric-api after update sodium: %+v", l.Mods)
 	}
-	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
+	if out := h.mustRun(t, "update"); !strings.Contains(out, "already up to date") {
 		t.Fatalf("update all: %s", out)
 	}
 	h.readJSON(t, "shulker.lock", &l)
@@ -1100,7 +1100,7 @@ func TestDiffAndPull(t *testing.T) {
 		}
 	}
 	h.mustRun(t, "install")
-	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "client: no changes in the build directory") {
+	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "no changes in client (the build directory)") {
 		t.Fatalf("clean diff: %s", stdout)
 	}
 
@@ -1149,11 +1149,11 @@ func TestDiffAndPull(t *testing.T) {
 
 	stdout = h.mustRun(t, "pull")
 	for _, line := range []string{
-		"client: 1 file(s) pulled, 1 key(s) written to shulker.json, 2 skipped",
-		"pulled config/plain.txt -> overrides/config/plain.txt",
-		"set options.txt joinedFirstServer=false",
-		"skipped config/new.txt (not written by shulker; name it to adopt it)",
-		"skipped config/tpl.txt (rendered from template overrides/config/tpl.txt.tmpl)",
+		"pulled client (1 file, 1 key written to shulker.json, 2 skipped)",
+		"pulled: config/plain.txt ⟶ overrides/config/plain.txt",
+		"set: options.txt joinedFirstServer=false",
+		"skipped: config/new.txt (not written by shulker; name it to adopt it)",
+		"skipped: config/tpl.txt (rendered from template overrides/config/tpl.txt.tmpl)",
 	} {
 		if !strings.Contains(stdout, line) {
 			t.Fatalf("pull output missing %q:\n%s", line, stdout)
@@ -1172,7 +1172,7 @@ func TestDiffAndPull(t *testing.T) {
 		t.Fatalf("pull of a file that isn't there should fail with file-not-found: %d %s", code, stderr)
 	}
 	stdout = h.mustRun(t, "pull", "config/new.txt")
-	if !strings.Contains(stdout, "pulled config/new.txt -> overrides/config/new.txt") {
+	if !strings.Contains(stdout, "pulled: config/new.txt ⟶ overrides/config/new.txt") {
 		t.Fatalf("named untracked file should be adopted: %s", stdout)
 	}
 	if data, _ := os.ReadFile(filepath.Join(overrides, "new.txt")); string(data) != "hand\n" {
@@ -1180,7 +1180,7 @@ func TestDiffAndPull(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "1 written, 5 unchanged, 1 kept, 0 removed") || !strings.Contains(stdout, "kept config/tpl.txt") {
+	if !strings.Contains(stdout, "1 written, 5 unchanged, 1 kept") || !strings.Contains(stdout, "kept: config/tpl.txt") {
 		t.Fatalf("build after pull: %s", stdout)
 	}
 	if data, _ := os.ReadFile(filepath.Join(buildDir, "options.txt")); !strings.Contains(string(data), "joinedFirstServer:false\n") || !strings.Contains(string(data), "foo:bar\n") {
@@ -1190,14 +1190,14 @@ func TestDiffAndPull(t *testing.T) {
 	write(h.dir, "overrides/config/plain.txt", "a=3\n")
 	write(buildDir, "config/plain.txt", "a=4\n")
 	stdout = h.mustRun(t, "diff")
-	if !strings.Contains(stdout, "conflict config/plain.txt\n") || !strings.Contains(stdout, "-a=4\n+a=3\n") {
+	if !strings.Contains(stdout, "~ config/plain.txt (conflict)\n") || !strings.Contains(stdout, "-a=4\n+a=3\n") {
 		t.Fatalf("conflict diff: %s", stdout)
 	}
 	h.mustRun(t, "pull", "config/plain.txt")
 	if data, _ := os.ReadFile(filepath.Join(overrides, "plain.txt")); string(data) != "a=4\n" {
 		t.Fatalf("pulled conflict should take the build file: %q", data)
 	}
-	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "0 written, 6 unchanged, 1 kept") {
+	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "built client (6 unchanged, 1 kept)") {
 		t.Fatalf("build after conflict pull: %s", stdout)
 	}
 }

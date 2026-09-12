@@ -22,9 +22,9 @@ func TestServerTargetBuild(t *testing.T) {
 		}
 	})
 
-	stdout := h.mustRun(t, "install")
-	if !strings.Contains(stdout, "Fetched 2 file(s).") {
-		t.Fatalf("install output: %s", stdout)
+	stdout, stderr := h.mustRunStderr(t, "install")
+	if !strings.Contains(stderr, "downloading fabric server launcher") || !strings.Contains(stderr, "downloading Java runtime") {
+		t.Fatalf("install output: %s\n%s", stdout, stderr)
 	}
 	var l lock.Lock
 	h.readJSON(t, "shulker.lock", &l)
@@ -67,7 +67,7 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "server: 0 written, 4 unchanged, 0 kept, 0 removed") {
+	if !strings.Contains(stdout, "built server (4 unchanged)") {
 		t.Fatalf("rebuild after game rewrite: %s", stdout)
 	}
 	if got := readFile(t, propsPath); got != gameRewritten {
@@ -78,7 +78,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["max-players"] = 12
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "server: 1 written") {
+	if !strings.Contains(stdout, "built server (1 written") {
 		t.Fatalf("rebuild after manifest change: %s", stdout)
 	}
 	if got := readFile(t, propsPath); got != strings.Replace(gameRewritten, "max-players=8", "max-players=12", 1) {
@@ -89,7 +89,7 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "kept server.properties online-mode (edited in place)") {
+	if !strings.Contains(stdout, "kept: server.properties online-mode (edited in place)") {
 		t.Fatalf("rebuild after user edit: %s", stdout)
 	}
 	if got := readFile(t, propsPath); !strings.Contains(got, "online-mode=true") {
@@ -100,7 +100,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["motd"] = "Changed"
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "server: 1 written") || !strings.Contains(stdout, "kept server.properties online-mode (edited in place)") {
+	if !strings.Contains(stdout, "built server (1 written") || !strings.Contains(stdout, "kept: server.properties online-mode (edited in place)") {
 		t.Fatalf("manifest change to another key must keep the edit: %s", stdout)
 	}
 	if got := readFile(t, propsPath); !strings.Contains(got, "online-mode=true") || !strings.Contains(got, "motd=Changed") {
@@ -111,7 +111,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["online-mode"] = true
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "server: 0 written") || strings.Contains(stdout, "kept") && strings.Contains(stdout, "online-mode") {
+	if !strings.Contains(stdout, "built server (4 unchanged)") || strings.Contains(stdout, "kept") && strings.Contains(stdout, "online-mode") {
 		t.Fatalf("manifest catching up to the edit: %s", stdout)
 	}
 
@@ -190,7 +190,7 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "build")
-	if !strings.Contains(stdout, "0 written, 2 unchanged, 0 kept") {
+	if !strings.Contains(stdout, "built server (2 unchanged)") {
 		t.Fatalf("rebuild after game write: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != gameWritten {
@@ -218,7 +218,7 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\n" {
 		t.Fatalf("file after dropping difficulty: %q", data)
 	}
-	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "0 written, 3 unchanged") {
+	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "built server (3 unchanged)") {
 		t.Fatalf("rebuild after drop should be clean: %s", stdout)
 	}
 }
@@ -240,10 +240,10 @@ func TestServerBuildValidatesPropertyKeys(t *testing.T) {
 		props["view-distance"] = 64
 	})
 	code, stdout, stderr := h.run(t, "install")
-	if !strings.Contains(stderr, `warning: server.properties key "view-distance" is 64, outside 3-32; the game clamps it`) {
+	if !strings.Contains(stderr, `! server.properties key "view-distance" is 64, outside 3-32; the game clamps it`) {
 		t.Fatalf("out of range: %s", stderr)
 	}
-	if code != 0 || !strings.Contains(stderr, `warning: server.properties key "vew-distance" is not a known key; did you mean "view-distance"?`) {
+	if code != 0 || !strings.Contains(stderr, `! server.properties key "vew-distance" is not a known key; did you mean "view-distance"?`) {
 		t.Fatalf("unknown key: exit %d %s %s", code, stdout, stderr)
 	}
 	if got := readFile(t, filepath.Join(h.dir, "build", "server", "server.properties")); got != "difficulty=easy\nvew-distance=8\nview-distance=64\n" {

@@ -82,7 +82,7 @@ func TestLinkPrism(t *testing.T) {
 	launcherDir := t.TempDir()
 	stdout := h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir)
 	instDir := filepath.Join(launcherDir, "instances", "shulker-my-pack")
-	if !strings.Contains(stdout, "Created instance \"my-pack\" in "+instDir) || !strings.Contains(stdout, "before each launch") {
+	if !strings.Contains(stdout, "created instance my-pack » "+instDir) || !strings.Contains(stdout, "before each launch") {
 		t.Fatalf("link output: %s", stdout)
 	}
 	cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
@@ -117,7 +117,7 @@ func TestLinkPrism(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--mode", "symlink")
-	if !strings.Contains(stdout, "Updated instance") || !strings.Contains(stdout, "Restart the launcher") || !strings.Contains(stdout, "Run `shulker install` before launching.") {
+	if !strings.Contains(stdout, "updated instance") || !strings.Contains(stdout, "restart the launcher") || !strings.Contains(stdout, "$ shulker install") {
 		t.Fatalf("second link output: %s", stdout)
 	}
 	cfg = readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"maps"
 	"path/filepath"
 	"slices"
@@ -70,7 +69,7 @@ func (a *app) configGetCmd() *cobra.Command {
 				}
 				value = secret
 			}
-			return a.printer.Emit(value, func(w io.Writer) { writeValue(w, value) })
+			return a.printer.Emit(value, func(l *out.Lines) { writeValue(l.W, value) })
 		},
 	}
 	cmd.Flags().BoolVar(&reveal, "reveal", false, "print curseforge.key in full")
@@ -128,8 +127,8 @@ func (a *app) configUnsetCmd() *cobra.Command {
 			}
 			from, ok := configLookup(doc, key)
 			if !ok {
-				return a.printer.Emit(configChange{Path: key}, func(w io.Writer) {
-					fmt.Fprintf(w, "%s was not set.\n", key)
+				return a.printer.Emit(configChange{Path: key}, func(l *out.Lines) {
+					l.Info(key + " was not set")
 				})
 			}
 			change := configChange{Path: key, From: from}
@@ -220,10 +219,10 @@ func (a *app) emitConfigChange(change configChange) error {
 			change.To = maskKey(s)
 		}
 	}
-	return a.printer.Emit(change, func(w io.Writer) {
-		fmt.Fprintf(w, "%s: %s -> %s\n", change.Path, settingText(change.From), settingText(change.To))
+	return a.printer.Emit(change, func(l *out.Lines) {
+		l.Items(out.Item{Kind: out.Change, Name: change.Path, From: settingText(change.From), To: settingText(change.To)})
 		if change.Created != "" {
-			fmt.Fprintf(w, "created %s\n", change.Created)
+			l.OK("created "+change.Created, "")
 		}
 	})
 }

@@ -2,8 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -114,11 +112,11 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				return err
 			}
 			a.registerLink(config.Link{Launcher: "mojang", LauncherDir: launcherDir, Side: "client", Name: display, Dir: gameDir, Source: projectDir, Target: name})
-			return a.printer.Emit(rep, func(w io.Writer) {
-				fmt.Fprintf(w, "Installed %s into %s\n", versionID, filepath.Join(launcherDir, "versions"))
-				fmt.Fprintf(w, "Linked launcher profile %q to %s\n", display, gameDir)
+			return a.printer.Emit(rep, func(l *out.Lines) {
+				l.OKInto("installed "+versionID, filepath.Join(launcherDir, "versions"), "")
+				l.OKInto("linked launcher profile "+display, gameDir, "")
 				if _, err := os.Stat(filepath.Join(gameDir, build.StateFile)); err != nil {
-					fmt.Fprintln(w, "Run `shulker install` before launching.")
+					l.Nudge("Download and build before launching", "shulker install")
 				}
 			})
 		},

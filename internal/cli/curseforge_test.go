@@ -183,7 +183,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	h.mustRun(t, "init", "--yes")
 
 	stdout := h.mustRun(t, "add", "jei")
-	if !strings.Contains(stdout, "+ jei jei-26.2-fabric-1.0.0 (both)\n") || !strings.Contains(stdout, "+ fabric-api fabric-api-0.130.0+26.2 (both), required by jei") {
+	if !strings.Contains(stdout, "+ jei ") || !strings.Contains(stdout, "» all targets\n") || !strings.Contains(stdout, "+ fabric-api fabric-api-0.130.0+26.2 » all targets (required by jei)") {
 		t.Fatalf("add: %s", stdout)
 	}
 	l := h.readLock(t)
@@ -200,7 +200,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	}
 	h.mustRun(t, "install")
 
-	if stdout := h.mustRun(t, "outdated"); !strings.Contains(stdout, "All mods are up to date") {
+	if stdout := h.mustRun(t, "outdated"); !strings.Contains(stdout, "all mods are up to date") {
 		t.Fatalf("outdated before a new file: %s", stdout)
 	}
 	h.newer = true
@@ -261,17 +261,17 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 		t.Fatalf("manifest after switch: %v", m.Mods["sodium"])
 	}
 	stdout = h.mustRun(t, "add", "sodium", "--provider", "modrinth")
-	if !strings.HasPrefix(stdout, "~ sodium ") || !strings.Contains(stdout, "curseforge -> modrinth") {
+	if !strings.HasPrefix(stdout, "  ~ sodium ") || !strings.Contains(stdout, "curseforge ⟶ modrinth") {
 		t.Fatalf("switch back: %s", stdout)
 	}
 	sodium = h.readLock(t).Mods["sodium"]
 	if sodium.Provider != "modrinth" || sodium.Aliases.CurseForge != 394468 || sodium.Aliases.Modrinth != "" {
 		t.Fatalf("switched back entry: %+v", sodium)
 	}
-	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth -> curseforge") {
+	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth ⟶ curseforge") {
 		t.Fatalf("second switch: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "Already up to date.") || h.readLock(t).Mods["sodium"].Provider != "curseforge" {
+	if stdout = h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "already up to date") || h.readLock(t).Mods["sodium"].Provider != "curseforge" {
 		t.Fatalf("plain add after switch should keep the curseforge entry: %s", stdout)
 	}
 
@@ -303,7 +303,7 @@ func TestCurseForgeManualDownloads(t *testing.T) {
 	os.MkdirAll(downloads, 0o755)
 	os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
 	stdout = h.mustRun(t, "add", "nodist")
-	if !strings.Contains(stdout, "+ nodist nodist-1.0.0 (client)") {
+	if !strings.Contains(stdout, "+ nodist nodist-1.0.0 » all targets (client only)") {
 		t.Fatalf("add after drop: %s", stdout)
 	}
 	nodist := h.readLock(t).Mods["nodist"]

@@ -1,9 +1,8 @@
 package cli
 
 import (
-	"fmt"
-	"io"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
@@ -57,28 +56,32 @@ func (a *app) unlinkCmd() *cobra.Command {
 			if failed > 0 && len(links) == 1 {
 				return results[0].Error
 			}
-			printResults := func(w io.Writer) {
+			printResults := func(l *out.Lines) {
 				for i, r := range results {
 					if i > 0 {
-						fmt.Fprintln(w)
+						l.Blank()
 					}
 					if !r.OK {
-						fmt.Fprintf(w, "Couldn't unlink %q: %s\n", r.Name, r.Error.Message)
+						l.Error(r.Error)
 						continue
 					}
-					fmt.Fprintln(w, r.summary)
+					summary, rest, _ := strings.Cut(strings.TrimSuffix(r.summary, "."), "\n")
+					l.OK(strings.ToLower(summary[:1])+summary[1:], "")
+					if rest != "" {
+						l.Tree(out.Row{Text: strings.TrimSuffix(rest, ".")})
+					}
 					if r.RelinkIn != "" {
-						fmt.Fprintf(w, "To link it again, in %s: %s\n", r.RelinkIn, r.Relink)
+						l.Nudge("To link it again, in "+r.RelinkIn, r.Relink)
 					} else if r.Launcher != "" {
-						fmt.Fprintf(w, "To link it again: %s\n", r.Relink)
+						l.Nudge("To link it again", r.Relink)
 					} else {
-						fmt.Fprintf(w, "To register it again: %s\n", r.Relink)
+						l.Nudge("To register it again", r.Relink)
 					}
 				}
 			}
 			if failed > 0 {
 				if !a.printer.JSON {
-					printResults(a.printer.Stdout)
+					printResults(a.printer.Out())
 				}
 				e := out.Errorf("unlink-failed", "%d of %d entries couldn't be unlinked", failed, len(links))
 				e.Data = results

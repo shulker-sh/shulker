@@ -3,13 +3,11 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -281,17 +279,17 @@ func (a *app) emitFeatureChange(cmd *cobra.Command, sc *featureScope, sync, chan
 		res.Sync = synced
 	}
 	res.Into = sc.into
-	return a.printer.Emit(res, func(w io.Writer) {
+	return a.printer.Emit(res, func(l *out.Lines) {
 		switch {
 		case sc.into == "":
-			fmt.Fprintln(w, line)
+			l.OK(line, "")
 		case changed && synced == nil:
-			fmt.Fprintf(w, "%s in %s; takes effect on the next sync (a linked Prism instance syncs on launch)\n", line, sc.into)
+			l.OKInto(line, sc.into, "takes effect on the next sync; a linked Prism instance syncs on launch")
 		default:
-			fmt.Fprintf(w, "%s in %s\n", line, sc.into)
+			l.OKInto(line, sc.into, "")
 		}
 		if synced != nil {
-			synced.print(w)
+			synced.print(l)
 		}
 	})
 }
@@ -321,7 +319,7 @@ func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
 			}
 			line := name + " " + verb
 			if into == "" {
-				line += "; takes effect on the next build or sync"
+				line += " (takes effect on the next build or sync)"
 			}
 			return a.emitFeatureChange(cmd, sc, where.sync, true, featureChange{Feature: name, On: &on}, line)
 		},
@@ -399,16 +397,21 @@ func (a *app) featureListCmd() *cobra.Command {
 				}
 				res = append(res, st)
 			}
-			return a.printer.Emit(res, func(w io.Writer) {
+			return a.printer.Emit(res, func(l *out.Lines) {
 				if len(res) == 0 {
-					fmt.Fprintln(w, "No features.")
+					l.Info("No features.")
 					return
 				}
-				tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+				var items []out.Item
 				for _, st := range res {
-					fmt.Fprintf(tw, "%s\t%s\tgates: %s\n", st.Name, st.state(len(targets)), strings.Join(st.Mods, ", "))
+					state, reason, _ := strings.Cut(st.state(len(targets)), " (")
+					aside := []string{"gates: " + strings.Join(st.Mods, ", ")}
+					if reason != "" {
+						aside = append([]string{strings.TrimSuffix(reason, ")")}, aside...)
+					}
+					items = append(items, out.Item{Kind: out.Note, Name: st.Name, Text: state, Aside: aside})
 				}
-				tw.Flush()
+				l.Items(items...)
 			})
 		},
 	}

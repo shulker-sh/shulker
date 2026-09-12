@@ -39,7 +39,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	}
 
 	writeFile(t, built, "#Iris config\ncolorSpace=DISPLAY_P3\nenableShaders=false\nmaxShadowRenderDistance=32\nshaderPack=pack.zip\n")
-	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "kept config/iris.properties enableShaders (edited in place)") {
+	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "kept: config/iris.properties enableShaders (edited in place)") {
 		t.Fatalf("an in-game edit of a managed key should be kept: %s", stdout)
 	}
 	if got := readFile(t, built); !strings.Contains(got, "enableShaders=false") || !strings.Contains(got, "colorSpace=DISPLAY_P3") {
@@ -49,7 +49,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 		t.Fatalf("diff should show only the managed key: %s", stdout)
 	}
 
-	if stdout := h.mustRun(t, "pull"); !strings.Contains(stdout, "pulled config/iris.properties enableShaders -> overrides/config/iris.properties") {
+	if stdout := h.mustRun(t, "pull"); !strings.Contains(stdout, "pulled: config/iris.properties enableShaders ⟶ overrides/config/iris.properties") {
 		t.Fatalf("pull: %s", stdout)
 	}
 	if got := readFile(t, override); got != "# shaders on by default\nenableShaders=false\nshaderPack=pack.zip\n" {
@@ -59,7 +59,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 		t.Fatalf("diff after pull: %s", stdout)
 	}
 
-	if stdout := h.mustRun(t, "pull", "config/iris.properties", "--key", "colorSpace"); !strings.Contains(stdout, "adopted config/iris.properties colorSpace -> overrides/config/iris.properties") {
+	if stdout := h.mustRun(t, "pull", "config/iris.properties", "--key", "colorSpace"); !strings.Contains(stdout, "adopted: config/iris.properties colorSpace ⟶ overrides/config/iris.properties") {
 		t.Fatalf("pull --key: %s", stdout)
 	}
 	if got := readFile(t, override); got != "# shaders on by default\nenableShaders=false\nshaderPack=pack.zip\ncolorSpace=DISPLAY_P3\n" {

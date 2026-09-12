@@ -45,14 +45,14 @@ func TestSyncIntoRegisters(t *testing.T) {
 	if len(links) != 1 || links[0] != want || want.Name == "" {
 		t.Fatalf("entry: %+v", links)
 	}
-	if !strings.Contains(stdout, `Registered "`+want.Name+`" (client).`) {
+	if !strings.Contains(stdout, "registered "+want.Name+" (client)") {
 		t.Fatalf("sync should say it registered the directory: %s", stdout)
 	}
 	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); strings.Contains(stdout, "Registered") {
 		t.Fatalf("an unchanged entry is not registered again: %s", stdout)
 	}
 
-	if stdout := h.mustRun(t, "sync", h.dir, "--into", into, "--name", "Mine"); !strings.Contains(stdout, `Registered "Mine" (client).`) {
+	if stdout := h.mustRun(t, "sync", h.dir, "--into", into, "--name", "Mine"); !strings.Contains(stdout, "registered Mine (client)") {
 		t.Fatalf("--name renames the entry: %s", stdout)
 	}
 	h.mustRun(t, "sync", h.dir, "--into", into)
@@ -143,11 +143,11 @@ func TestLinksList(t *testing.T) {
 
 	stdout := h.mustRun(t, "links")
 	for _, part := range []string{
-		"Prism Launcher\n  Alpha (client), synced ",
-		"  Zed (client), not synced yet\n    " + filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n    from " + h.dir + ", target client\n",
-		"\n\nMinecraft Launcher\n  pack (client), directory is missing\n",
-		"\n\nOther directories\n  Gone (client), directory is missing\n",
-		"  Locked (client), can't read the directory\n",
+		"Prism Launcher\n    ├─ • Alpha client (synced ",
+		"• Zed client (not synced yet)\n         " + filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         from " + h.dir + ", target client\n",
+		"\n\n  Minecraft Launcher\n    └─ • pack client (directory is missing)\n",
+		"\n\n  Other directories\n    ├─ • Gone client (directory is missing)\n",
+		"• Locked client (can't read the directory)\n",
 	} {
 		if !strings.Contains(stdout, part) {
 			t.Fatalf("links output lacks %q:\n%s", part, stdout)
@@ -209,13 +209,13 @@ func TestSyncInstance(t *testing.T) {
 
 	h.tty, h.stdin = true, strings.NewReader("2\n")
 	stdout, stderr := h.mustRunStderr(t, "sync", "-C", t.TempDir())
-	if !strings.Contains(stderr, "  2) friends (client)  "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "into "+plain) {
+	if !strings.Contains(stderr, " 2 friends client\n     "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "» "+plain) {
 		t.Fatalf("picker:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
 	h.tty = false
 
 	stdout = h.mustRun(t, "sync", "--all")
-	if !strings.Contains(stdout, "Friends (client, Prism Launcher)\nFetched 0 file(s).\n") || !strings.Contains(stdout, "\n\nfriends (client)\n") {
+	if !strings.Contains(stdout, "  Friends client (Prism Launcher)\n  ✔ synced client") || !strings.Contains(stdout, "\n\n  friends client\n") {
 		t.Fatalf("sync --all output: %s", stdout)
 	}
 	var all struct {
@@ -270,13 +270,13 @@ func TestFeatureInstance(t *testing.T) {
 		t.Fatalf("sodium is gated off by default: %v", err)
 	}
 
-	if stdout := h.mustRun(t, "feature", "on", "fancy", "--instance", "friends", "--launcher", "prism", "--sync"); !strings.Contains(stdout, "fancy on in "+gameDir) {
+	if stdout := h.mustRun(t, "feature", "on", "fancy", "--instance", "friends", "--launcher", "prism", "--sync"); !strings.Contains(stdout, "fancy on » "+gameDir) {
 		t.Fatalf("feature on --instance: %s", stdout)
 	}
 	if _, err := os.Stat(sodium); err != nil {
 		t.Fatalf("--sync should ship the mod: %v", err)
 	}
-	if stdout := h.mustRun(t, "feature", "list", "--instance", "Friends"); !strings.Contains(stdout, "on (your choice)") {
+	if stdout := h.mustRun(t, "feature", "list", "--instance", "Friends"); !strings.Contains(stdout, "fancy on (your choice") {
 		t.Fatalf("feature list --instance: %s", stdout)
 	}
 	for _, args := range [][]string{
@@ -300,7 +300,7 @@ func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 	}
 	h.config = filepath.Join(blocker, "config.json")
 	stdout, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "one"))
-	if !strings.Contains(stderr, "warning: registry not updated") || strings.Contains(stdout, "Registered") {
+	if !strings.Contains(stderr, "! registry not updated") || strings.Contains(stdout, "registered") {
 		t.Fatalf("stdout: %s\nstderr: %s", stdout, stderr)
 	}
 }

@@ -52,6 +52,8 @@ These work with every command.
 | --- | --- |
 | `-C, --dir <path>` | Project directory (default: current directory) |
 | `--json` | Print machine-readable JSON, including errors; see [JSON output](#json-output) |
+| `--no-color` | Print without colour. Setting `NO_COLOR` or `TERM=dumb` does the same, and colour is off whenever the output is not a terminal |
+| `--ascii` | Print with ASCII glyphs (`*`, `x`, `|-`, `->`, `>>`) in place of `✔`, `✘`, `├─`, `⟶`, and `»` |
 
 ## Projects
 
@@ -677,7 +679,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `ok` | `true` when the command succeeded |
 | `command` | The command that ran, like `pack add` |
 | `lockStale` | `shulker.lock` doesn't match `shulker.json`; `shulker lock` brings it in line. Commands that build from the lock warn, naming each difference, and carry on; `export` refuses |
-| `warnings` | Everything shulker would print as `warning:` without `--json`. Always present, empty when there are none |
+| `warnings` | Everything shulker would print as a `!` line without `--json`. Always present, empty when there are none |
 | `data` | The command's result. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
 | `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `candidates` or `items` |
 
@@ -721,7 +723,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 ### Error codes
 
-Without `--json`, the error line ends with its code, like `shulker: sodium is not in the manifest (mod-not-found)`.
+Without `--json`, the error line ends with its code, like `✘ error: sodium is not in the manifest (mod-not-found)`, with the items and candidates in a tree underneath.
 
 | Code | Meaning |
 | --- | --- |

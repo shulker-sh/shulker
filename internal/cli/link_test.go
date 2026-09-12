@@ -29,7 +29,7 @@ func TestLinkMojang(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "link", "vanilla", "--launcher-dir", launcherDir)
-	if !strings.Contains(stdout, "Installed fabric-loader-0.17.3-26.2 into") || !strings.Contains(stdout, "Run `shulker install` before launching.") {
+	if !strings.Contains(stdout, "installed fabric-loader-0.17.3-26.2 »") || !strings.Contains(stdout, "$ shulker install") {
 		t.Fatalf("link output: %s", stdout)
 	}
 

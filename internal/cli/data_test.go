@@ -19,7 +19,7 @@ func TestBuildLinksDataDirs(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "install")
-	if !strings.Contains(stdout, "4 linked, 1 moved") || !strings.Contains(stdout, "moved saves into data/client/saves") {
+	if !strings.Contains(stdout, "4 linked, 1 moved") || !strings.Contains(stdout, "moved: saves » data/client/saves") {
 		t.Fatalf("first build: %s", stdout)
 	}
 	for _, rel := range []string{"saves", "screenshots", "logs", "crash-reports"} {

@@ -80,7 +80,7 @@ func TestLocalPack(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "pack", "add", "./base")
-	if !strings.Contains(stdout, "+ pack base ") || !strings.Contains(stdout, "+ sodium") || !strings.Contains(stdout, "+ fabric-api") {
+	if !strings.Contains(stdout, "+ base ") || !strings.Contains(stdout, "+ sodium") || !strings.Contains(stdout, "+ fabric-api") {
 		t.Fatalf("pack add output: %s", stdout)
 	}
 	l := readLock(t, h)
@@ -132,21 +132,21 @@ func TestLocalPack(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.dir, "base", "overrides", "config", "base.txt"), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if stdout = h.mustRun(t, "pack", "list"); !strings.HasPrefix(stdout, "base local changed "+l.Packs["./base"]["dirSha256"][:12]+" ./base\n") {
+	if stdout = h.mustRun(t, "pack", "list"); !strings.HasPrefix(stdout, "  i base ./base (local, changed, pinned "+l.Packs["./base"]["dirSha256"][:12]+")\n") {
 		t.Fatalf("pack list after edit: %s", stdout)
 	}
 	_, stderr := h.mustRunStderr(t, "build")
-	if !strings.Contains(stderr, "pack base has changed since the lock; run `shulker lock`") {
+	if !strings.Contains(stderr, "pack base has changed since the lock; run shulker lock") {
 		t.Fatalf("drift warning missing: %s", stderr)
 	}
 	if got := readBuilt(t, h, "config/base.txt"); got != "edited\n" {
 		t.Fatalf("base.txt after edit: %q", got)
 	}
 	stdout, stderr = h.mustRunStderr(t, "lock")
-	if !strings.Contains(stdout, "~ pack base ") || strings.Contains(stderr, "changed since the lock") {
+	if !strings.Contains(stdout, "~ base ") || strings.Contains(stderr, "changed since the lock") {
 		t.Fatalf("lock after a local pack edit: %s\n%s", stdout, stderr)
 	}
-	if stdout = h.mustRun(t, "lock"); !strings.Contains(stdout, "Already up to date.") {
+	if stdout = h.mustRun(t, "lock"); !strings.Contains(stdout, "already up to date") {
 		t.Fatalf("second lock: %s", stdout)
 	}
 
@@ -162,7 +162,7 @@ func TestLocalPack(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "pack", "remove", "base")
-	if !strings.Contains(stdout, "- fabric-api, was required by sodium") || !strings.Contains(stdout, "- sodium, was required by base") {
+	if !strings.Contains(stdout, "- fabric-api (was required by sodium)") || !strings.Contains(stdout, "- sodium (was required by base)") {
 		t.Fatalf("pack remove output: %s", stdout)
 	}
 	l = readLock(t, h)
@@ -239,10 +239,10 @@ func TestGitPack(t *testing.T) {
 	source := "file://" + repo
 
 	stdout := h.mustRun(t, "pack", "add", source, "--ref", "main")
-	if !strings.Contains(stdout, "+ pack shared-pack "+first[:12]) {
+	if !strings.Contains(stdout, "+ shared-pack "+first[:12]+" (pack)") {
 		t.Fatalf("pack add output: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "pack", "list"); stdout != "shared-pack git ok "+first[:12]+" "+source+" (ref main)\n" {
+	if stdout = h.mustRun(t, "pack", "list"); stdout != "  i shared-pack "+source+" (git, ok, pinned "+first[:12]+", ref main)\n" {
 		t.Fatalf("pack list: %s", stdout)
 	}
 	l := readLock(t, h)
@@ -267,7 +267,7 @@ func TestGitPack(t *testing.T) {
 		t.Fatalf("build must stay on the locked commit: %q", got)
 	}
 	stdout = h.mustRun(t, "update", "shared-pack")
-	if !strings.Contains(stdout, "~ pack shared-pack "+first[:12]+" -> "+second[:12]) {
+	if !strings.Contains(stdout, "~ shared-pack "+first[:12]+" ⟶ "+second[:12]+" (pack)") {
 		t.Fatalf("update output: %s", stdout)
 	}
 	h.mustRun(t, "build")
@@ -298,7 +298,7 @@ func TestURLPackAndHandEdits(t *testing.T) {
 	source := srv.URL + "/tiny.json"
 
 	stdout := h.mustRun(t, "pack", "add", source)
-	if !strings.Contains(stdout, "+ pack tiny ") {
+	if !strings.Contains(stdout, "+ tiny ") {
 		t.Fatalf("pack add output: %s", stdout)
 	}
 	l := readLock(t, h)
@@ -329,7 +329,7 @@ func TestURLPackAndHandEdits(t *testing.T) {
 		t.Fatalf("stale build: code=%d env=%+v", code, env)
 	}
 	stdout = h.mustRun(t, "update", "fabric-api")
-	if !strings.Contains(stdout, "+ pack local ") {
+	if !strings.Contains(stdout, "+ local ") {
 		t.Fatalf("update after hand edit: %s", stdout)
 	}
 	l = readLock(t, h)
@@ -344,7 +344,7 @@ func TestURLPackAndHandEdits(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "update")
-	if !strings.Contains(stdout, "- pack tiny") || !strings.Contains(stdout, "- pack local") || !strings.Contains(stdout, "- sodium") {
+	if !strings.Contains(stdout, "- tiny (pack)") || !strings.Contains(stdout, "- local (pack)") || !strings.Contains(stdout, "- sodium") {
 		t.Fatalf("update after removing packs: %s", stdout)
 	}
 	if l = readLock(t, h); len(l.Packs) != 0 || len(l.Mods) != 0 {

@@ -112,7 +112,7 @@ func TestPlayersBuild(t *testing.T) {
 	delete(h.mojang, "Bob")
 	h.mojang["Bobby"] = bobUUID
 	_, stderr := h.mustRunStderr(t, "build")
-	if !strings.Contains(stderr, "warning: player Bob is now named Bobby") {
+	if !strings.Contains(stderr, "! player Bob is now named Bobby") {
 		t.Fatalf("rename warning missing: %s", stderr)
 	}
 	entries = playerEntries(t, whitelist)
@@ -176,7 +176,7 @@ func TestPlayerCommand(t *testing.T) {
 	h.mustRun(t, "build")
 
 	stdout := h.mustRun(t, "player", "--all")
-	if !strings.Contains(stdout, "ok         Alice            "+aliceUUID) || !strings.Contains(stdout, "ok         Bob") {
+	if !strings.Contains(stdout, "✔ Alice "+aliceUUID) || !strings.Contains(stdout, "✔ Bob") {
 		t.Fatalf("player: %s", stdout)
 	}
 
@@ -184,7 +184,7 @@ func TestPlayerCommand(t *testing.T) {
 	h.mojang["Bobby"] = bobUUID
 	h.mojang["Alice"] = alice2UUID
 	stdout = h.mustRun(t, "player", bobUUID, "Alice", "Nobody", "alise")
-	for _, want := range []string{"renamed    Bobby            " + bobUUID + "  (was Bob)", "reassigned Alice            " + alice2UUID + "  (was " + aliceUUID + ")", "unknown    Nobody\n", "unknown    alise  (did you mean Alice?)"} {
+	for _, want := range []string{"~ Bobby " + bobUUID + " (renamed, was Bob)", "~ Alice " + alice2UUID + " (reassigned, was " + aliceUUID + ")", "- Nobody (unknown)\n", "- alise (unknown, did you mean Alice?)"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("player output missing %q:\n%s", want, stdout)
 		}

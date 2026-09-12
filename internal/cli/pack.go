@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"fmt"
-	"io"
-
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -102,22 +99,23 @@ func (a *app) packListCmd() *cobra.Command {
 				}
 				res = append(res, st)
 			}
-			return a.printer.Emit(res, func(w io.Writer) {
+			return a.printer.Emit(res, func(l *out.Lines) {
 				if len(res) == 0 {
-					fmt.Fprintln(w, "No packs.")
+					l.Info("No packs yet; add one with `shulker pack add <source>`.")
 					return
 				}
+				var items []out.Item
 				for _, st := range res {
-					fmt.Fprintf(w, "%s %s %s", st.Name, st.Kind, st.State)
+					aside := []string{string(st.Kind), st.State}
 					if st.Pin != "" {
-						fmt.Fprintf(w, " %s", st.Pin)
+						aside = append(aside, "pinned "+st.Pin)
 					}
-					fmt.Fprintf(w, " %s", st.Source)
 					if st.Ref != "" {
-						fmt.Fprintf(w, " (ref %s)", st.Ref)
+						aside = append(aside, "ref "+st.Ref)
 					}
-					fmt.Fprintln(w)
+					items = append(items, out.Item{Kind: out.Note, Name: st.Name, Text: l.T.Grey(st.Source), Aside: aside})
 				}
+				l.Items(items...)
 			})
 		},
 	}

@@ -85,7 +85,7 @@ func TestQuiltLinkMojang(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
-	if !strings.Contains(stdout, "Installed quilt-loader-0.30.1-26.2 into") {
+	if !strings.Contains(stdout, "installed quilt-loader-0.30.1-26.2 »") {
 		t.Fatalf("link output: %s", stdout)
 	}
 	if _, err := os.Stat(filepath.Join(launcherDir, "versions", "quilt-loader-0.30.1-26.2", "quilt-loader-0.30.1-26.2.json")); err != nil {

@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -118,8 +117,9 @@ func (a *app) initCmd() *cobra.Command {
 				return err
 			}
 			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Target: target}
-			return a.printer.Emit(res, func(w io.Writer) {
-				fmt.Fprintf(w, "Created %s for Minecraft %s with %s %s (Java %d).\nNext: shulker add <mod>\n", manifest.FileName, res.Minecraft, res.Loader, res.Version, res.Java)
+			return a.printer.Emit(res, func(l *out.Lines) {
+				l.OK("created "+manifest.FileName, fmt.Sprintf("Minecraft %s, %s %s, Java %d", res.Minecraft, res.Loader, res.Version, res.Java))
+				l.Nudge("Add a mod", "shulker add <mod>")
 			})
 		},
 	}

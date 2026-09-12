@@ -2,13 +2,13 @@ package cli
 
 import (
 	"context"
-	"fmt"
-	"io"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -152,28 +152,25 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 			optional++
 		}
 	}
-	return a.printer.Emit(res, func(w io.Writer) {
+	return a.printer.Emit(res, func(l *out.Lines) {
 		if cmd.Name() == "pin" {
-			fmt.Fprintf(w, "Pinned %s to %s.\n", cmd.Flags().Arg(0), pin)
+			l.OK("pinned "+cmd.Flags().Arg(0), pin)
 		}
 		if cmd.Name() == "unpin" {
-			fmt.Fprintf(w, "Unpinned %s.\n", cmd.Flags().Arg(0))
+			l.OK("unpinned "+cmd.Flags().Arg(0), "")
 		}
 		if len(res.Reresolved) > 0 {
-			fmt.Fprintf(w, "Re-resolved every mod: %s\n", strings.Join(res.Reresolved, "; "))
+			l.Info("re-resolved every mod: " + strings.Join(res.Reresolved, "; "))
 		}
-		printChanges(w, res.Changes)
-		for _, s := range res.Suggestions {
-			fmt.Fprintf(w, "  %s (not installed)\n", s)
-		}
+		printChanges(l, res.Changes, v.Suggestions, p.Manifest.Targets)
 		if optional > 0 {
-			fmt.Fprintln(w, optionalHint(optional))
+			optionalNudge(l, optional)
 		}
 		if res.Empty() {
-			fmt.Fprintln(w, "Already up to date.")
+			l.OK("already up to date", "")
 			return
 		}
-		fmt.Fprintln(w, "Next: shulker install")
+		l.Nudge("Download and build what changed", "shulker install")
 	})
 }
 
@@ -216,76 +213,105 @@ func (a *app) outdatedCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return a.printer.Emit(res, func(w io.Writer) {
+			return a.printer.Emit(res, func(l *out.Lines) {
 				if len(res) == 0 {
-					fmt.Fprintln(w, "All mods are up to date.")
+					l.OK("all mods are up to date", "")
 					return
 				}
+				var items []out.Item
 				for _, o := range res {
-					fmt.Fprintf(w, "%s %s -> %s", o.ID, o.Current, o.Latest)
+					it := out.Item{Kind: out.Change, Name: o.ID, From: o.Current, To: o.Latest}
 					if o.Pinned {
-						fmt.Fprint(w, " (pinned)")
+						it.Aside = []string{"pinned"}
 					}
-					fmt.Fprintln(w)
+					items = append(items, it)
 				}
-				fmt.Fprintln(w, "Next: shulker update")
+				l.Items(items...)
+				l.Nudge("Move the lock to these versions", "shulker update")
 			})
 		},
 	}
 }
 
-func printChanges(w io.Writer, c *resolve.Changes) {
+func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Suggestion, targets map[string]manifest.Target) {
+	var items []out.Item
 	for _, p := range c.Platform {
 		if p.From == "" {
-			fmt.Fprintf(w, "+ %s %s\n", p.ID, p.To)
+			items = append(items, out.Item{Kind: out.Add, Name: p.ID, Version: p.To})
 			continue
 		}
-		fmt.Fprintf(w, "~ %s %s -> %s\n", p.ID, p.From, p.To)
+		items = append(items, out.Item{Kind: out.Change, Name: p.ID, From: p.From, To: p.To})
 	}
 	for _, p := range c.Packs {
 		switch {
 		case p.From == "":
-			fmt.Fprintf(w, "+ pack %s %s\n", p.Name, p.To)
+			items = append(items, out.Item{Kind: out.Add, Name: p.Name, Version: p.To, Aside: []string{"pack"}})
 		case p.To == "":
-			fmt.Fprintf(w, "- pack %s\n", p.Name)
+			items = append(items, out.Item{Kind: out.Drop, Name: p.Name, Aside: []string{"pack"}})
 		default:
-			fmt.Fprintf(w, "~ pack %s %s -> %s\n", p.Name, p.From, p.To)
+			items = append(items, out.Item{Kind: out.Change, Name: p.Name, From: p.From, To: p.To, Aside: []string{"pack"}})
 		}
 	}
 	for _, m := range c.Added {
-		fmt.Fprintf(w, "+ %s %s (%s)", m.ID, m.VersionNumber, m.Side)
+		it := out.Item{Kind: out.Add, Name: m.ID, Version: m.VersionNumber, Targets: targetsForSide(targets, m.Side), OfTargets: len(targets)}
+		if m.Side != "" && m.Side != "both" {
+			it.Aside = append(it.Aside, m.Side+" only")
+		}
 		switch {
 		case m.AlreadyLocked:
-			fmt.Fprint(w, ", already locked")
+			it.Aside = append(it.Aside, "already locked")
 		case len(m.RequiredBy) > 0:
-			fmt.Fprintf(w, ", required by %s", strings.Join(m.RequiredBy, ", "))
+			it.Aside = append(it.Aside, "required by "+strings.Join(m.RequiredBy, ", "))
 		}
-		fmt.Fprintln(w)
+		items = append(items, it)
 	}
 	for _, u := range c.Updated {
-		fmt.Fprintf(w, "~ %s", u.ID)
+		it := out.Item{Kind: out.Change, Name: u.ID}
 		if u.From != u.To || (u.FromSide == "" && u.FromChannel == "") {
-			fmt.Fprintf(w, " %s -> %s", u.From, u.To)
+			it.From, it.To = u.From, u.To
 		}
 		if u.FromProvider != "" {
-			fmt.Fprintf(w, " (%s -> %s)", u.FromProvider, u.ToProvider)
+			it.Aside = append(it.Aside, u.FromProvider+" "+l.T.ArrowBump()+" "+u.ToProvider)
 		}
 		if u.FromSide != "" {
-			fmt.Fprintf(w, " side %s -> %s", u.FromSide, u.ToSide)
+			it.Aside = append(it.Aside, "now "+sideText(u.ToSide))
 		}
 		if u.FromChannel != "" {
-			fmt.Fprintf(w, " channel %s -> %s", u.FromChannel, u.ToChannel)
+			it.Aside = append(it.Aside, "channel: "+u.FromChannel+" "+l.T.ArrowBump()+" "+u.ToChannel)
 		}
-		fmt.Fprintln(w)
+		items = append(items, it)
 	}
 	for _, m := range c.Removed {
-		fmt.Fprintf(w, "- %s", m.ID)
+		it := out.Item{Kind: out.Drop, Name: m.ID}
 		switch {
 		case m.StillLocked:
-			fmt.Fprint(w, " from shulker.json, still locked")
+			it.Aside = []string{"from shulker.json, still locked"}
 		case len(m.RequiredBy) > 0:
-			fmt.Fprintf(w, ", was required by %s", strings.Join(m.RequiredBy, ", "))
+			it.Aside = []string{"was required by " + strings.Join(m.RequiredBy, ", ")}
 		}
-		fmt.Fprintln(w)
+		items = append(items, it)
 	}
+	for _, s := range suggestions {
+		if s.Kind != "optional" {
+			items = append(items, out.Item{Kind: out.Note, Name: s.Mod, Aside: []string{s.Kind + " " + s.On + ", not installed"}})
+		}
+	}
+	l.Items(items...)
+}
+
+func targetsForSide(targets map[string]manifest.Target, side string) []string {
+	var names []string
+	for _, name := range targetNames(targets) {
+		if side == "" || side == "both" || targets[name].Side == side {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+func sideText(side string) string {
+	if side == "" || side == "both" {
+		return "client and server"
+	}
+	return side + " only"
 }

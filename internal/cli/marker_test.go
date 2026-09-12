@@ -82,7 +82,7 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "build")
-	if !strings.Contains(stdout, "0 written, 4 unchanged") {
+	if !strings.Contains(stdout, "built client (4 unchanged)") {
 		t.Fatalf("rebuild should be a no-op: %s", stdout)
 	}
 	second, _ := os.ReadFile(jarPath)
