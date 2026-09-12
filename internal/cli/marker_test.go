@@ -263,6 +263,33 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 	}
 }
 
+func TestFMLMarkerPackMetadataIsCompatible(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
+	h.mustRun(t, "install")
+
+	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-pack.jar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta struct {
+		Pack struct {
+			MaxFormat        int   `json:"max_format"`
+			MinFormat        []int `json:"min_format"`
+			SupportedFormats struct {
+				MaxInclusive int `json:"max_inclusive"`
+			} `json:"supported_formats"`
+		} `json:"pack"`
+	}
+	if err := json.Unmarshal(readZip(t, data)["pack.mcmeta"], &meta); err != nil {
+		t.Fatal(err)
+	}
+	// 26.2 is resource format 88 and data format 107; both schemas have to admit numbers that big.
+	if meta.Pack.MaxFormat < 107 || meta.Pack.SupportedFormats.MaxInclusive < 107 || len(meta.Pack.MinFormat) != 2 {
+		t.Fatalf("pack.mcmeta must read as compatible with a current game: %+v", meta.Pack)
+	}
+}
+
 func TestQuiltMarkerJarIsFabricMetadata(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "quilt")

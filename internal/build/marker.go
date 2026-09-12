@@ -191,10 +191,18 @@ func (b *Builder) tomlMarker(metaFile, targetName, lockHash string, direct, deps
 	if err := toml.NewEncoder(&metaData).Encode(meta); err != nil {
 		return nil, err
 	}
+	// The marker ships no assets or data; the pack metadata only exists so FML doesn't report it as
+	// a mod with missing pack metadata, and it has to read as compatible or the game leaves the mod
+	// out of its pack list. Both schemas are written because the field names changed: Minecraft
+	// read `pack_format` with a `supported_formats` range until 26.x, which reads `min_format` and
+	// `max_format` (26.2 is resource format 88, data format 107 — well past the old 1–99 range
+	// this used to declare). The ranges say "whatever is running", since there is nothing to break.
 	pack, err := json.MarshalIndent(map[string]any{"pack": map[string]any{
 		"description":       b.Manifest.DisplayName(targetName),
-		"pack_format":       15,
-		"supported_formats": map[string]int{"min_inclusive": 1, "max_inclusive": 99},
+		"pack_format":       markerPackFormat,
+		"supported_formats": map[string]int{"min_inclusive": 1, "max_inclusive": markerPackFormatMax},
+		"min_format":        []int{1, 0},
+		"max_format":        markerPackFormatMax,
 	}}, "", "  ")
 	if err != nil {
 		return nil, err
@@ -205,6 +213,11 @@ func (b *Builder) tomlMarker(metaFile, targetName, lockHash string, direct, deps
 		{markerLogo, markerIcon},
 	}, nil
 }
+
+const (
+	markerPackFormat    = 15
+	markerPackFormatMax = 9999
+)
 
 func markerClassEntries() ([]markerEntry, error) {
 	var entries []markerEntry
