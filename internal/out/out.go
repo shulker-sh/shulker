@@ -109,7 +109,11 @@ func (p *Printer) Fail(err error) int {
 		_ = p.encode(p.envelope(false, e.Data, e))
 		return e.Exit
 	}
-	fmt.Fprintf(p.Stderr, "shulker: %s\n", e.Message)
+	if e.Code == "" || e.Code == "error" {
+		fmt.Fprintf(p.Stderr, "shulker: %s\n", e.Message)
+	} else {
+		fmt.Fprintf(p.Stderr, "shulker: %s (%s)\n", e.Message, e.Code)
+	}
 	if len(e.Candidates) > 0 {
 		fmt.Fprintf(p.Stderr, "  candidates: %s\n", strings.Join(e.Candidates, ", "))
 	}

@@ -671,6 +671,8 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 ### Error codes
 
+Without `--json`, the error line ends with its code, like `shulker: sodium is not in the manifest (mod-not-found)`.
+
 | Code | Meaning |
 | --- | --- |
 | `ambiguous-instance` | Several linked instances or synced directories match. `candidates`: the matches |

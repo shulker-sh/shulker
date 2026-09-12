@@ -95,6 +95,13 @@ func TestAddRejectsBadFlagValues(t *testing.T) {
 	}
 }
 
+func TestHumanErrorNamesCode(t *testing.T) {
+	_, _, stderr := run(t, "add", "sodium", "--side", "top")
+	if stderr != "shulker: --side takes one of client, server, both, not \"top\" (usage)\n" {
+		t.Fatalf("stderr = %q", stderr)
+	}
+}
+
 func TestUnknownCommandJSON(t *testing.T) {
 	code, stdout, stderr := run(t, "bogus", "--json")
 	if code != out.ExitUsage {
