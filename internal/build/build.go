@@ -47,7 +47,6 @@ type State struct {
 	BuiltAt    string                       `json:"builtAt"`
 	LockSha256 string                       `json:"lockSha256"`
 	Files      map[string]string            `json:"files"`
-	Keys       map[string][]string          `json:"propertyKeys,omitempty"`
 	Values     map[string]map[string]string `json:"managedValues,omitempty"`
 	Links      []string                     `json:"links,omitempty"`
 	// Loader is the loader its own installer set up in the dir; the installer's files aren't tracked.
@@ -60,15 +59,12 @@ type InstalledLoader struct {
 }
 
 func (s State) recordedKeys(rel string) []string {
-	if v, ok := s.Values[rel]; ok {
-		keys := make([]string, 0, len(v))
-		for k := range v {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		return keys
+	keys := make([]string, 0, len(s.Values[rel]))
+	for k := range s.Values[rel] {
+		keys = append(keys, k)
 	}
-	return s.Keys[rel]
+	sort.Strings(keys)
+	return keys
 }
 
 func (s *State) record(rel string, f ownedFile) {
