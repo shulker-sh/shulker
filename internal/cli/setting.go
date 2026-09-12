@@ -399,13 +399,7 @@ func (f *settingField) coerce(value string, current any) (any, error) {
 	types := f.s.types(f.schema)
 	if items, ok := f.schema["items"].(map[string]any); ok && types["array"] && isPlayerList(items) {
 		list, _ := current.([]any)
-		for _, entry := range list {
-			e, _ := entry.(map[string]any)
-			if name, _ := e["name"].(string); strings.EqualFold(name, value) || e["uuid"] == value {
-				return list, nil
-			}
-		}
-		return append(slices.Clone(list), f.s.playerEntry(value)), nil
+		return f.addPlayer(list, value)
 	}
 	if types["boolean"] && (value == "true" || value == "false") {
 		return value == "true", nil
@@ -451,14 +445,62 @@ func isPlayerList(items map[string]any) bool {
 	return false
 }
 
-func (s *settingsSchema) playerEntry(value string) map[string]any {
+func (f *settingField) addPlayer(list []any, value string) ([]any, error) {
+	name, uuid := f.s.splitPlayer(value)
+	found := -1
+	var match map[string]any
+	for i, entry := range list {
+		e, _ := entry.(map[string]any)
+		listedName, _ := e["name"].(string)
+		listedUUID, _ := e["uuid"].(string)
+		sameName := name != "" && strings.EqualFold(listedName, name)
+		sameUUID := uuid != "" && listedUUID == uuid
+		if !sameName && !sameUUID {
+			continue
+		}
+		switch {
+		case found >= 0:
+			return nil, out.Errorf("usage", "%s matches two entries in %s", value, f.path)
+		case sameName && uuid != "" && listedUUID != "" && !sameUUID:
+			return nil, out.Errorf("usage", "%s is listed in %s with uuid %s", listedName, f.path, listedUUID)
+		case sameUUID && name != "" && listedName != "" && !sameName:
+			return nil, out.Errorf("usage", "%s is listed in %s as %s", uuid, f.path, listedName)
+		}
+		found, match = i, e
+	}
+	if found < 0 {
+		entry := map[string]any{}
+		if name != "" {
+			entry["name"] = name
+		}
+		if uuid != "" {
+			entry["uuid"] = uuid
+		}
+		return append(slices.Clone(list), entry), nil
+	}
+	filled := maps.Clone(match)
+	if _, ok := filled["name"]; !ok && name != "" {
+		filled["name"] = name
+	}
+	if _, ok := filled["uuid"]; !ok && uuid != "" {
+		filled["uuid"] = uuid
+	}
+	updated := slices.Clone(list)
+	updated[found] = filled
+	return updated, nil
+}
+
+func (s *settingsSchema) splitPlayer(value string) (name, uuid string) {
+	if n, u, ok := strings.Cut(value, ":"); ok {
+		return n, u
+	}
 	player, _ := s.defs["player"].(map[string]any)
 	props, _ := player["properties"].(map[string]any)
-	uuid, _ := props["uuid"].(map[string]any)
-	if pattern, ok := uuid["pattern"].(string); ok && regexp.MustCompile(pattern).MatchString(value) {
-		return map[string]any{"uuid": value}
+	uuidSchema, _ := props["uuid"].(map[string]any)
+	if pattern, ok := uuidSchema["pattern"].(string); ok && regexp.MustCompile(pattern).MatchString(value) {
+		return "", value
 	}
-	return map[string]any{"name": value}
+	return value, ""
 }
 
 func isJSONNumber(s string) bool {

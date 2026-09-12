@@ -54,11 +54,26 @@ func TestSetGetUnset(t *testing.T) {
 	h.mustRun(t, "set", "server.players.ops", "Notch")
 	h.mustRun(t, "set", "server.players.ops", "069a79f4-44e9-4726-a5be-fca90e38aaf5")
 	h.mustRun(t, "set", "server.players.ops", "notch")
+	h.mustRun(t, "set", "server.players.whitelist", "Alice")
+	h.mustRun(t, "set", "server.players.whitelist", "alice:11111111-1111-4111-8111-111111111111")
+	h.mustRun(t, "set", "server.players.whitelist", "Bob:22222222-2222-4222-8222-222222222222")
+	for _, value := range []string{
+		"Alice:33333333-3333-4333-8333-333333333333",
+		"Carol:22222222-2222-4222-8222-222222222222",
+		"Alice:22222222-2222-4222-8222-222222222222",
+	} {
+		if code, _, stderr := h.run(t, "set", "server.players.whitelist", value); code == 0 {
+			t.Errorf("set whitelist %s succeeded; stderr %q", value, stderr)
+		}
+	}
 	h.mustRun(t, "set", "loader.note", "kept on save")
 
 	m := h.readManifest(t)
 	if m.Server == nil || m.Server.Players == nil || len(m.Server.Players.Ops) != 2 {
 		t.Fatalf("server = %+v", m.Server)
+	}
+	if w := m.Server.Players.Whitelist; len(w) != 2 || w[0].Name != "Alice" || w[0].UUID != "11111111-1111-4111-8111-111111111111" || w[1].Name != "Bob" || w[1].UUID != "22222222-2222-4222-8222-222222222222" {
+		t.Errorf("whitelist = %+v", w)
 	}
 	for _, c := range []struct {
 		name      string

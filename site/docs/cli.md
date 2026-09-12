@@ -241,7 +241,7 @@ With `--json`, `set` and `unset` return `{ "path", "from", "to" }`, leaving out 
 
 ### `shulker set`
 
-Set a field. A plain value becomes the most specific type the field allows: `true` and `false` are booleans and `25565` is a number where the field takes one; anything else is a string. Lists, objects, and a value that must stay a string take JSON with `--literal`. For `server.players.whitelist`, `ops`, and `bans`, a player name or uuid adds that player to the list.
+Set a field. A plain value becomes the most specific type the field allows: `true` and `false` are booleans and `25565` is a number where the field takes one; anything else is a string. Lists, objects, and a value that must stay a string take JSON with `--literal`. For `server.players.whitelist`, `ops`, and `bans`, a player name, uuid, or `name:uuid` adds that player to the list. A player already listed is left alone, except that `name:uuid` fills in whichever half the entry lacks; a half that contradicts the entry is an error.
 
 The edited `shulker.json` is checked against the schema before anything is written, and the error names the field.
 
