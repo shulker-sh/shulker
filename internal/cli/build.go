@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/local"
-	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 )
 
@@ -29,11 +28,8 @@ func (a *app) buildCmd() *cobra.Command {
 			if err := checkOS(osName); err != nil {
 				return err
 			}
-			if err := p.RequireLock(); err != nil {
+			if err := a.requireLock(p); err != nil {
 				return err
-			}
-			if a.printer.LockStale && !force {
-				return out.Errorf("lock-stale", "shulker.lock does not match shulker.json; run `shulker add`, `remove`, or `update`, or pass --force")
 			}
 			if err := a.syncPlayers(cmd.Context(), p, player.Recheck, acceptPlayerChange, true); err != nil {
 				return err
@@ -79,7 +75,7 @@ func (a *app) buildCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory and ignore a stale lock")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory")
 	cmd.Flags().BoolVar(&acceptPlayerChange, "accept-player-change", false, "relock a player name that now belongs to a different account")
 	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	tf.register(cmd, "target to build (default: every target)")

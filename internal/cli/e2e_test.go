@@ -636,7 +636,7 @@ func TestAddUnknownMod(t *testing.T) {
 	}
 }
 
-func TestStaleLockBlocksBuild(t *testing.T) {
+func TestStaleLockWarnsAndBuilds(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes")
 	h.mustRun(t, "add", "sodium")
@@ -650,8 +650,14 @@ func TestStaleLockBlocksBuild(t *testing.T) {
 	code, stdout, _ := h.run(t, "build", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || !env.LockStale || env.Error.Code != "lock-stale" {
+	if code != 0 || !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "shulker.lock is out of date") {
 		t.Fatalf("code=%d env=%+v", code, env)
+	}
+	code, stdout, _ = h.run(t, "export", "mrpack", "--version", "1.0.0", "--json")
+	env = out.Envelope{}
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code == 0 || !env.LockStale || env.Error.Code != "lock-stale" {
+		t.Fatalf("export must refuse a stale lock: code=%d env=%+v", code, env)
 	}
 	env = out.Envelope{}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "install", "--json")), &env); err != nil {

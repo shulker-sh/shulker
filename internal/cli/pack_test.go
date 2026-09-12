@@ -318,7 +318,7 @@ func TestURLPackAndHandEdits(t *testing.T) {
 	code, stdout, _ := h.run(t, "build", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error.Code != "lock-stale" {
+	if code != 0 || !env.LockStale {
 		t.Fatalf("stale build: code=%d env=%+v", code, env)
 	}
 	stdout = h.mustRun(t, "update", "fabric-api")

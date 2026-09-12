@@ -306,7 +306,7 @@ shulker build client
 | Flag | Description |
 | --- | --- |
 | `--target <name>` | Target to build (default: every target); the same as the argument, and passing both is an error |
-| `--force` | Overwrite files edited in the build directory and ignore a stale lock |
+| `--force` | Overwrite files edited in the build directory |
 | `--accept-player-change` | Relock a player name that now belongs to a different account |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
@@ -357,7 +357,7 @@ shulker serve server --accept-eula
 | Flag | Description |
 | --- | --- |
 | `--target <name>` | Server target to run (default: the only server target); the same as the argument, and passing both is an error |
-| `--force` | Overwrite files edited in the build directory and ignore a stale lock |
+| `--force` | Overwrite files edited in the build directory |
 | `--accept-eula` | Record acceptance of the Minecraft EULA in shulker.json without prompting |
 
 ### `shulker link mojang`
@@ -566,7 +566,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | --- | --- |
 | `ok` | `true` when the command succeeded |
 | `command` | The command that ran, like `pack add` |
-| `lockStale` | `shulker.lock` doesn't match `shulker.json`; `add`, `remove`, or `update` refreshes it |
+| `lockStale` | `shulker.lock` doesn't match `shulker.json`; `add`, `remove`, or `update` refreshes it. Commands that build from the lock warn and carry on; `export` refuses |
 | `warnings` | Everything shulker would print as `warning:` without `--json`. Always present, empty when there are none |
 | `data` | The command's result. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
 | `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `candidates` or `items` |
@@ -640,7 +640,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `local-invalid` | `shulker.local.json` isn't valid JSON |
 | `lock-invalid` | `shulker.lock` doesn't parse or match its schema, or a change would make it invalid |
 | `lock-not-found` | No `shulker.lock`; run `shulker install` |
-| `lock-stale` | The command needs a lock that matches `shulker.json` |
+| `lock-stale` | `export` needs a lock that matches `shulker.json`; other commands only warn |
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
 | `manifest-invalid` | `shulker.json` doesn't parse or match its schema, or a change would make it invalid |
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |

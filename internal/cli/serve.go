@@ -61,11 +61,8 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := p.RequireLock(); err != nil {
+			if err := a.requireLock(p); err != nil {
 				return err
-			}
-			if a.printer.LockStale && !force {
-				return out.Errorf("lock-stale", "shulker.lock does not match shulker.json; run `shulker add`, `remove`, or `update`, or pass --force")
 			}
 			name, err := sideTarget(p.Manifest, target, "server", "serve")
 			if err != nil {
@@ -157,7 +154,7 @@ func (a *app) serveCmd() *cobra.Command {
 		},
 	}
 	tf.register(cmd, "server target to run (default: the only server target)")
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory and ignore a stale lock")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory")
 	cmd.Flags().BoolVar(&acceptEula, "accept-eula", false, "record acceptance of the Minecraft EULA in shulker.json without prompting")
 	return cmd
 }
