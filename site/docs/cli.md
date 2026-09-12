@@ -274,6 +274,56 @@ shulker get name
 shulker get server.properties
 ```
 
+## Configuration
+
+`config get`, `config set`, and `config unset` read and change shulker's own `config.json`, which applies to every project. It lives in your user config directory, or wherever `SHULKER_CONFIG` points. It has two keys:
+
+| Key | Description |
+| --- | --- |
+| `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
+| `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
+
+The CurseForge key is always shown as its last four characters, like `••••c123`, unless you pass `config get --reveal`. With `--json`, `config set` and `config unset` return `{ "path", "from", "to" }` like `set`, plus `created` when `set` made a new registry file.
+
+### `shulker config get`
+
+Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry` shows the file shulker actually uses, even when the key isn't set. A `curseforge.key` that isn't set fails with `path-not-set`.
+
+```sh
+shulker config get
+shulker config get registry
+shulker config get curseforge.key --reveal
+```
+
+| Flag | Description |
+| --- | --- |
+| `--reveal` | Print `curseforge.key` in full |
+
+### `shulker config set`
+
+Set a key. When `registry` points at a file that doesn't exist, `set` creates it as an empty registry; an existing file must be a valid registry, and an empty file counts. If the current registry has entries the new one lacks, shulker would stop syncing them, so `set` fails with `registry-has-links` and lists them; `--force` changes it anyway.
+
+```sh
+shulker config set curseforge.key "$CURSEFORGE_KEY"
+shulker config set registry ~/Dropbox/shulker/registry.json
+```
+
+| Flag | Description |
+| --- | --- |
+| `--force` | Change the registry even if it leaves linked instances or synced directories behind |
+
+### `shulker config unset`
+
+Remove a key. Without `registry`, shulker goes back to `registry.json` beside `config.json`, with the same check as `set`. Removing a key that isn't set succeeds and says so.
+
+```sh
+shulker config unset curseforge.key
+```
+
+| Flag | Description |
+| --- | --- |
+| `--force` | Change the registry even if it leaves linked instances or synced directories behind |
+
 ## Features
 
 A feature is a name that mods opt into with a `feature` condition, like `shaders`. Each target can turn features on by default. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, and `export mrpack` use your choices over the target defaults, and their `--with` and `--without` flags override both for one run.
@@ -680,6 +730,7 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `config-invalid` | shulker's `config.json` isn't valid JSON |
+| `registry-has-links` | `config set` or `config unset` would move the registry away from linked instances or synced directories the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
@@ -743,8 +794,8 @@ Without `--json`, the error line ends with its code, like `shulker: sodium is no
 | `pack-ref` | A pack's `ref` doesn't apply to its source, or wasn't found |
 | `pack-target` | A pack has several targets of a side and none named like the project's |
 | `pack-unlocked` | A pack has no commit in the lock; run `shulker update` |
-| `path-invalid` | `shulker.json` has no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
-| `path-not-set` | `get` names a field that isn't set |
+| `path-invalid` | `shulker.json` or `config.json` has no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
+| `path-not-set` | `get` or `config get` names a field that isn't set |
 | `pin-mismatch` | The pinned version belongs to a different project |
 | `player-invalid` | Neither a player name nor a uuid |
 | `player-reassigned` | Player names now belong to different accounts; pass `--accept-player-change`. `items`: the players |

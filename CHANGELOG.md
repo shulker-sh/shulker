@@ -10,6 +10,7 @@ All notable changes to shulker are documented here. The format is based on
 - `init` creates a `shulker.json` manifest; `add`, `remove`, `update`, `outdated`, `pin` and `unpin` manage mods, with exact versions and hashes recorded in `shulker.lock`.
 - `lock` brings `shulker.lock` in line with hand edits to `shulker.json` without upgrading anything, and the out-of-date warning names each difference.
 - `set`, `unset` and `get` edit and read any field of `shulker.json` by dotted path, checked against the schema before anything is written.
+- `config get|set|unset` read and change shulker's own `config.json`: the CurseForge key, masked unless `--reveal`, and where the registry lives, which needs `--force` when linked instances would be left behind.
 - Fabric, Quilt, NeoForge and Forge projects (`init --loader`); on Quilt, mods without a Quilt build use their Fabric one.
 - NeoForge and Forge servers and launcher profiles set up by the loader's own installer: servers run it offline from files recorded in `shulker.lock`, and `link mojang` installs the client into the official launcher without leaving the installer's own profile behind.
 - Mods from Modrinth and CurseForge, with provider fallthrough, manual downloads for files CurseForge won't serve, and `add --provider` to switch a locked mod.

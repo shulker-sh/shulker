@@ -1,9 +1,11 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +18,8 @@ const (
 	PathEnv          = "SHULKER_CONFIG"
 	RegistryFileName = "registry.json"
 )
+
+var Keys = []string{"curseforge.key", "registry"}
 
 type Config struct {
 	CurseForge CurseForge `json:"curseforge"`
@@ -71,6 +75,50 @@ func LoadFile(path string) (Config, error) {
 	return cfg, nil
 }
 
+func LoadDocument(path string) (map[string]any, error) {
+	doc := map[string]any{}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return doc, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode(&doc); err != nil {
+		return nil, out.Errorf("config-invalid", "%s: %v", path, err)
+	}
+	if doc == nil {
+		doc = map[string]any{}
+	}
+	return doc, nil
+}
+
+// SaveDocument creates a missing config.json readable by its owner only, since it can hold an API
+// key; fsutil keeps the mode of an existing file.
+func SaveDocument(path string, doc map[string]any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	created := false
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	switch {
+	case err == nil:
+		f.Close()
+		created = true
+	case !errors.Is(err, fs.ErrExist):
+		return err
+	}
+	if err := fsutil.WriteJSON(path, doc); err != nil {
+		if created {
+			os.Remove(path)
+		}
+		return err
+	}
+	return nil
+}
+
 func RegistryPath(configPath string, cfg Config) string {
 	switch {
 	case cfg.Registry == "":
@@ -90,6 +138,9 @@ func LoadLinks(path string) ([]Link, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(bytes.TrimSpace(data)) == 0 {
+		return nil, nil
+	}
 	var registry struct {
 		Links []Link `json:"links"`
 	}
@@ -97,6 +148,17 @@ func LoadLinks(path string) ([]Link, error) {
 		return nil, out.Errorf("registry-invalid", "%s: %v", path, err)
 	}
 	return registry.Links, nil
+}
+
+// CreateRegistry writes an empty registry at path when nothing is there yet.
+func CreateRegistry(path string) (bool, error) {
+	if _, err := os.Stat(path); err == nil || !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return false, err
+	}
+	return true, fsutil.WriteJSON(path, map[string]any{})
 }
 
 func FindLink(links []Link, dir string) (int, bool) {
@@ -117,7 +179,7 @@ func UpdateLinks(path string, update func([]Link) []Link) (bool, error) {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, err
 	}
-	if len(data) > 0 {
+	if len(bytes.TrimSpace(data)) > 0 {
 		if err := json.Unmarshal(data, &top); err != nil {
 			return false, out.Errorf("registry-invalid", "%s: %v", path, err)
 		}

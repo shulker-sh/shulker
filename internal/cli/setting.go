@@ -110,19 +110,21 @@ func (a *app) getCmd() *cobra.Command {
 					return out.Errorf("path-not-set", "%s is not set", field.path)
 				}
 			}
-			return a.printer.Emit(value, func(w io.Writer) {
-				if text, ok := value.(string); ok {
-					fmt.Fprintln(w, text)
-					return
-				}
-				data, err := fsutil.MarshalJSON(value)
-				if err != nil {
-					data = []byte(settingText(value))
-				}
-				fmt.Fprintf(w, "%s\n", bytes.TrimRight(data, "\n"))
-			})
+			return a.printer.Emit(value, func(w io.Writer) { writeValue(w, value) })
 		},
 	}
+}
+
+func writeValue(w io.Writer, value any) {
+	if text, ok := value.(string); ok {
+		fmt.Fprintln(w, text)
+		return
+	}
+	data, err := fsutil.MarshalJSON(value)
+	if err != nil {
+		data = []byte(settingText(value))
+	}
+	fmt.Fprintf(w, "%s\n", bytes.TrimRight(data, "\n"))
 }
 
 func (a *app) openSettings() (*project.Project, map[string]any, *settingsSchema, error) {

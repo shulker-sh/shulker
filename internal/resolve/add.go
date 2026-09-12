@@ -65,7 +65,7 @@ func (r *Resolver) provider(name string) (provider.Provider, error) {
 
 func unavailable(name string) string {
 	if name == "curseforge" {
-		return "curseforge needs an API key; set " + curseforge.KeyEnv + " or curseforge.key in the config file"
+		return "curseforge needs an API key; set " + curseforge.KeyEnv + " or run `shulker config set curseforge.key <key>`"
 	}
 	return name + " is not a known provider"
 }
