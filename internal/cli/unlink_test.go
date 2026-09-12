@@ -49,7 +49,7 @@ func TestUnlink(t *testing.T) {
 
 	friendsDir := filepath.Join(prismDir, "instances", "shulker-friends")
 	r := unlinkJSON(t, h, "friends")
-	if len(r) != 1 || r[0].Removed != removedPreLaunch || r[0].Relink != "shulker link prism "+h.dir+" --target client --name Friends --launcher-dir "+prismDir || r[0].RelinkIn != "" {
+	if len(r) != 1 || r[0].Removed != launcher.RemovedPreLaunch || r[0].Relink != "shulker link prism "+h.dir+" --target client --name Friends --launcher-dir "+prismDir || r[0].RelinkIn != "" {
 		t.Fatalf("unlink prism: %+v", r)
 	}
 	if cfg := readINIFile(t, filepath.Join(friendsDir, launcher.InstanceConfigFile)); cfg["PreLaunchCommand"] != "" || cfg["name"] != "Friends" {
@@ -75,7 +75,7 @@ func TestUnlink(t *testing.T) {
 	}
 
 	r = unlinkJSON(t, h, "pack", "--launcher", "mojang")
-	if r[0].Removed != removedProfile || r[0].RelinkIn != h.dir || r[0].Relink != "shulker link mojang --target client --launcher-dir "+mojangDir {
+	if r[0].Removed != launcher.RemovedProfile || r[0].RelinkIn != h.dir || r[0].Relink != "shulker link mojang --target client --launcher-dir "+mojangDir {
 		t.Fatalf("unlink mojang: %+v", r)
 	}
 	var profiles struct {

@@ -23,7 +23,7 @@ type linkSelection struct {
 }
 
 func (s *linkSelection) register(cmd *cobra.Command, all string) {
-	cmd.Flags().StringVar(&s.launcher, "launcher", "", "only entries linked in this launcher: prism, multimc, or mojang")
+	cmd.Flags().StringVar(&s.launcher, "launcher", "", "only entries linked in this launcher: "+launcher.NameList())
 	cmd.Flags().StringVar(&s.side, "side", "", "only client or server entries")
 	if all != "" {
 		cmd.Flags().BoolVar(&s.all, "all", false, all)
@@ -33,8 +33,8 @@ func (s *linkSelection) register(cmd *cobra.Command, all string) {
 func (s linkSelection) narrows() bool { return s.launcher != "" || s.side != "" }
 
 func (s linkSelection) check() error {
-	if s.launcher != "" && !slices.Contains(launcherOrder, s.launcher) {
-		return out.Errorf("usage", "--launcher must be prism, multimc, or mojang, not %q", s.launcher)
+	if s.launcher != "" && launcher.Find(s.launcher) == nil {
+		return out.Errorf("usage", "--launcher must be %s, not %q", launcher.NameList(), s.launcher)
 	}
 	if s.side != "" && s.side != "client" && s.side != "server" {
 		return out.Errorf("usage", "--side must be client or server, not %q", s.side)
@@ -125,7 +125,7 @@ func linkHeading(l config.Link) string {
 	if l.Launcher == "" {
 		return fmt.Sprintf("%s (%s)", l.Name, l.Side)
 	}
-	return fmt.Sprintf("%s (%s, %s)", l.Name, l.Side, launcherTitle(l.Launcher))
+	return fmt.Sprintf("%s (%s, %s)", l.Name, l.Side, launcher.Title(l.Launcher))
 }
 
 func (a *app) pickLink(links []config.Link) (config.Link, error) {
@@ -148,9 +148,9 @@ func (a *app) pickLink(links []config.Link) (config.Link, error) {
 }
 
 func (a *app) syncLink(cmd *cobra.Command, l config.Link, req syncRequest) (syncResult, error) {
-	if l.Launcher == "prism" || l.Launcher == "multimc" {
+	if e := launcher.Find(l.Launcher); e != nil && e.Instanced {
 		if _, err := os.Stat(filepath.Dir(l.Dir)); errors.Is(err, os.ErrNotExist) {
-			return syncResult{}, out.Errorf("instance-missing", "the %s instance %q is gone (%s); `shulker unlink %s` forgets it", launcherTitle(l.Launcher), l.Name, filepath.Dir(l.Dir), launcher.CommandArg(l.Name))
+			return syncResult{}, out.Errorf("instance-missing", "the %s instance %q is gone (%s); `shulker unlink %s` forgets it", launcher.Title(l.Launcher), l.Name, filepath.Dir(l.Dir), launcher.CommandArg(l.Name))
 		}
 	}
 	a.packs = nil

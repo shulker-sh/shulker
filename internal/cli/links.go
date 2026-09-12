@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/launcher"
 )
 
 type linkEntry struct {
@@ -27,10 +28,6 @@ const (
 	linkMissing    = "missing"
 	linkUnreadable = "unreadable"
 )
-
-var launcherOrder = []string{"prism", "multimc", "mojang"}
-
-var launcherTitles = map[string]string{"prism": "Prism Launcher", "multimc": "MultiMC", "mojang": "Minecraft Launcher"}
 
 func (a *app) linksCmd() *cobra.Command {
 	return &cobra.Command{
@@ -81,18 +78,8 @@ func inspectLink(l config.Link) linkEntry {
 	return e
 }
 
-func launcherRank(launcher string) int {
-	if launcher == "" {
-		return len(launcherOrder) + 1
-	}
-	if i := slices.Index(launcherOrder, launcher); i >= 0 {
-		return i
-	}
-	return len(launcherOrder)
-}
-
 func compareLinks(x, y config.Link) int {
-	if d := launcherRank(x.Launcher) - launcherRank(y.Launcher); d != 0 {
+	if d := launcher.Rank(x.Launcher) - launcher.Rank(y.Launcher); d != 0 {
 		return d
 	}
 	if c := strings.Compare(x.Launcher, y.Launcher); c != 0 {
@@ -108,16 +95,6 @@ func sortLinkEntries(entries []linkEntry) {
 	slices.SortStableFunc(entries, func(x, y linkEntry) int { return compareLinks(x.Link, y.Link) })
 }
 
-func launcherTitle(launcher string) string {
-	if launcher == "" {
-		return "Other directories"
-	}
-	if t, ok := launcherTitles[launcher]; ok {
-		return t
-	}
-	return launcher
-}
-
 func printLinkEntries(w io.Writer, entries []linkEntry) {
 	if len(entries) == 0 {
 		fmt.Fprintln(w, "Nothing is linked yet; `shulker link prism` or `shulker sync --into <dir>` adds an entry.")
@@ -128,7 +105,7 @@ func printLinkEntries(w io.Writer, entries []linkEntry) {
 			if i > 0 {
 				fmt.Fprintln(w)
 			}
-			fmt.Fprintln(w, launcherTitle(e.Launcher))
+			fmt.Fprintln(w, launcher.Title(e.Launcher))
 		}
 		fmt.Fprintf(w, "  %s (%s), %s\n", e.Name, e.Side, e.statusText())
 		fmt.Fprintf(w, "    %s\n", e.Dir)
