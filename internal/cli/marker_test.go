@@ -244,7 +244,9 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 	if err := toml.Unmarshal(entries["META-INF/neoforge.mods.toml"], &meta); err != nil {
 		t.Fatal(err)
 	}
-	if meta.ModLoader != "lowcodefml" || meta.LoaderVersion != "[1,)" || meta.License == "" {
+	// Naming a language loader is what NeoForge warns about; left out, it uses the one that loads a
+	// mod declaring no code.
+	if meta.ModLoader != "" || meta.LoaderVersion != "" || meta.License == "" {
 		t.Fatalf("marker toml: %+v", meta)
 	}
 	if meta.IssueTrackerURL != "https://example.com/issues" || len(meta.Mods) != 1 {

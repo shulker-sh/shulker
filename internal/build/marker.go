@@ -152,8 +152,8 @@ func (b *Builder) fabricMarker(targetName, lockHash string, direct, deps []strin
 const markerLogo = "icon.png"
 
 type markerToml struct {
-	ModLoader       string          `toml:"modLoader"`
-	LoaderVersion   string          `toml:"loaderVersion"`
+	ModLoader       string          `toml:"modLoader,omitempty"`
+	LoaderVersion   string          `toml:"loaderVersion,omitempty"`
 	License         string          `toml:"license"`
 	IssueTrackerURL string          `toml:"issueTrackerURL,omitempty"`
 	Mods            []markerTomlMod `toml:"mods"`
@@ -171,8 +171,8 @@ type markerTomlMod struct {
 	Description string `toml:"description"`
 }
 
-// tomlMarker builds the NeoForge and Forge marker: no classes, since a code-less lowcodefml mod
-// loads on both, and a pack.mcmeta so Forge doesn't warn that the mod's pack metadata is missing.
+// tomlMarker builds the NeoForge and Forge marker: no classes, since both loaders load a mod that
+// declares none, and a pack.mcmeta so Forge doesn't warn that the mod's pack metadata is missing.
 func (b *Builder) tomlMarker(l loader.Loader, targetName, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
 	mod := markerTomlMod{
 		ModID:       markerModID(b.Manifest.Name),
@@ -183,20 +183,24 @@ func (b *Builder) tomlMarker(l loader.Loader, targetName, lockHash string, direc
 		DisplayURL:  b.Manifest.Links["website"],
 		Description: b.markerDescription(direct, deps, cond, plainText),
 	}
-	// NeoForge reads logoFile only as the wide banner on the detail pane; the square icon beside the
-	// name in the list comes from iconFile, which has no fallback, so a mod that sets just logoFile
-	// shows no icon at all. Forge has only logoFile, hence both. iconBlur scales the 128px icon into
-	// the 24px slot smoothly instead of by nearest neighbour.
-	if l.Name == "neoforge" {
-		mod.IconFile, mod.IconBlur = markerLogo, true
-	}
 	meta := markerToml{
 		ModLoader:       "lowcodefml",
 		LoaderVersion:   "[1,)",
 		License:         "All rights reserved",
 		IssueTrackerURL: b.Manifest.Links["issues"],
-		Mods:            []markerTomlMod{mod},
 	}
+	if l.Name == "neoforge" {
+		// NeoForge reads logoFile only as the wide banner on the detail pane; the square icon beside
+		// the name in the list comes from iconFile, which has no fallback, so a mod that sets just
+		// logoFile shows no icon at all. iconBlur scales the 128px icon into the 24px slot smoothly
+		// rather than by nearest neighbour.
+		mod.IconFile, mod.IconBlur = markerLogo, true
+		// It also deprecated lowcodefml, mapping it to javafml, which loads a mod that declares no
+		// code; naming it only earns a warning. Both keys go together, since a loaderVersion without
+		// a modLoader is rejected. Forge has no such default and refuses a file missing either key.
+		meta.ModLoader, meta.LoaderVersion = "", ""
+	}
+	meta.Mods = []markerTomlMod{mod}
 	var metaData bytes.Buffer
 	if err := toml.NewEncoder(&metaData).Encode(meta); err != nil {
 		return nil, err

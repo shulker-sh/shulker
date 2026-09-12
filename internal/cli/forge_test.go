@@ -84,7 +84,12 @@ func TestForgeLinkMojangAndMarker(t *testing.T) {
 	if _, ok := entries["META-INF/neoforge.mods.toml"]; ok {
 		t.Fatal("forge marker should not carry neoforge.mods.toml")
 	}
-	if strings.Contains(string(entries["META-INF/mods.toml"]), "iconFile") {
+	toml := string(entries["META-INF/mods.toml"])
+	if strings.Contains(toml, "iconFile") {
 		t.Fatal("iconFile is a NeoForge key; Forge reads logoFile")
+	}
+	// Forge rejects a mod file that names no language loader, or names one without a version.
+	if !strings.Contains(toml, `modLoader = "lowcodefml"`) || !strings.Contains(toml, `loaderVersion = "[1,)"`) {
+		t.Fatalf("forge marker must name its language loader:\n%s", toml)
 	}
 }
