@@ -136,18 +136,18 @@ func TestLocalPack(t *testing.T) {
 		t.Fatalf("pack list after edit: %s", stdout)
 	}
 	_, stderr := h.mustRunStderr(t, "build")
-	if !strings.Contains(stderr, "pack base has changed since the lock") {
+	if !strings.Contains(stderr, "pack base has changed since the lock; run `shulker lock`") {
 		t.Fatalf("drift warning missing: %s", stderr)
 	}
 	if got := readBuilt(t, h, "config/base.txt"); got != "edited\n" {
 		t.Fatalf("base.txt after edit: %q", got)
 	}
-	stdout = h.mustRun(t, "update")
-	if !strings.Contains(stdout, "~ pack base ") {
-		t.Fatalf("update output: %s", stdout)
+	stdout, stderr = h.mustRunStderr(t, "lock")
+	if !strings.Contains(stdout, "~ pack base ") || strings.Contains(stderr, "changed since the lock") {
+		t.Fatalf("lock after a local pack edit: %s\n%s", stdout, stderr)
 	}
-	if stdout = h.mustRun(t, "update"); !strings.Contains(stdout, "Already up to date.") {
-		t.Fatalf("second update: %s", stdout)
+	if stdout = h.mustRun(t, "lock"); !strings.Contains(stdout, "Already up to date.") {
+		t.Fatalf("second lock: %s", stdout)
 	}
 
 	h.mustRun(t, "add", "sodium")

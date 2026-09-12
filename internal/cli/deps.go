@@ -136,9 +136,12 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 	loaded := []*pack.Loaded{}
 	for _, mp := range p.Manifest.Packs {
 		pinned, ok := p.Lock.Packs[mp.Source]
-		if !ok {
-			name, _ := pack.Name(mp)
-			a.printer.Warn("pack %s is not in the lock yet; resolving it", name)
+		// A relock reads local packs as they are on disk: they have no version to hold back.
+		if !ok || (a.relocking && pack.Classify(mp.Source) == pack.Local) {
+			if !ok {
+				name, _ := pack.Name(mp)
+				a.printer.Warn("pack %s is not in the lock yet; resolving it", name)
+			}
 			l, err := store.Resolve(ctx, mp)
 			if err != nil {
 				return nil, err

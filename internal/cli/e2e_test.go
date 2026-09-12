@@ -724,9 +724,21 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	if code != 0 || !env.LockStale || !strings.Contains(strings.Join(env.Warnings, "\n"), "(fabric-api: side both -> server)") {
 		t.Fatalf("stale warning: code=%d env=%+v", code, env)
 	}
-	h.mustRun(t, "lock")
+	code, stdout, _ = h.run(t, "lock", "--json")
+	env = out.Envelope{}
+	_ = json.Unmarshal([]byte(stdout), &env)
+	updated, _ := env.Data.(map[string]any)["updated"].([]any)
+	if code != 0 || len(updated) != 1 || updated[0].(map[string]any)["fromSide"] != "both" || updated[0].(map[string]any)["toSide"] != "server" {
+		t.Fatalf("lock must report the side change: %s", stdout)
+	}
 	if l := h.readLock(t); l.Mods["sodium"].VersionNumber != "1.0.0+mc26.2" || l.Mods["fabric-api"].Side != "server" {
 		t.Fatalf("lock must re-pick only fabric-api: %+v", l.Mods)
+	}
+	h.editManifest(t, func(m map[string]any) {
+		m["mods"].(map[string]any)["fabric-api"] = map[string]any{"side": "client"}
+	})
+	if out := h.mustRun(t, "lock"); !strings.Contains(out, "~ fabric-api ") || !strings.Contains(out, "side server -> client") {
+		t.Fatalf("lock after a second side change: %s", out)
 	}
 	if out := h.mustRun(t, "lock"); !strings.Contains(out, "Already up to date") {
 		t.Fatalf("second lock: %s", out)

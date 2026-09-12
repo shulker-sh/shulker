@@ -107,6 +107,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	if err := p.RequireLock(); err != nil {
 		return err
 	}
+	a.relocking = true
 	r, err := a.resolver(cmd.Context(), p)
 	if err != nil {
 		return err
@@ -262,9 +263,18 @@ func printChanges(w io.Writer, c *resolve.Changes) {
 		fmt.Fprintln(w)
 	}
 	for _, u := range c.Updated {
-		fmt.Fprintf(w, "~ %s %s -> %s", u.ID, u.From, u.To)
+		fmt.Fprintf(w, "~ %s", u.ID)
+		if u.From != u.To || (u.FromSide == "" && u.FromChannel == "") {
+			fmt.Fprintf(w, " %s -> %s", u.From, u.To)
+		}
 		if u.FromProvider != "" {
 			fmt.Fprintf(w, " (%s -> %s)", u.FromProvider, u.ToProvider)
+		}
+		if u.FromSide != "" {
+			fmt.Fprintf(w, " side %s -> %s", u.FromSide, u.ToSide)
+		}
+		if u.FromChannel != "" {
+			fmt.Fprintf(w, " channel %s -> %s", u.FromChannel, u.ToChannel)
 		}
 		fmt.Fprintln(w)
 	}

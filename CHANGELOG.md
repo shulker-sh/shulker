@@ -8,7 +8,7 @@ All notable changes to shulker are documented here. The format is based on
 
 ### Added
 - `init` creates a `shulker.json` manifest; `add`, `remove`, `update`, `outdated`, `pin` and `unpin` manage mods, with exact versions and hashes recorded in `shulker.lock`.
-- `lock` brings `shulker.lock` in line with hand edits to `shulker.json` without upgrading anything, and the out-of-date warning names each difference.
+- `lock` brings `shulker.lock` in line with hand edits to `shulker.json` and changes to local packs without upgrading anything, and the out-of-date warning names each difference.
 - `set`, `unset` and `get` edit and read any field of `shulker.json` by dotted path, checked against the schema before anything is written.
 - `config get|set|unset` read and change shulker's own `config.json`: the CurseForge key, masked unless `--reveal`, and where the registry lives, which needs `--force` when linked instances would be left behind.
 - Fabric, Quilt, NeoForge and Forge projects (`init --loader`); on Quilt, mods without a Quilt build use their Fabric one.

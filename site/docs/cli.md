@@ -713,7 +713,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `reresolved` | Why every mod was resolved again, one difference per entry, like `minecraft: locked 26.1 is outside ~26.2`. Empty when only some mods changed |
 | `platform` | `minecraft` and `loader` when their locked version changed, as `{ "id", "from", "to" }`. `from` is empty for a new lock |
 | `added` | Mods newly locked. `requiredBy` names the mods and packs that pulled one in; empty when only `shulker.json` lists it. `alreadyLocked` marks a dependency that `add` just listed in `shulker.json` |
-| `updated` | Mods whose locked version changed. `fromProvider` and `toProvider` appear when the provider changed |
+| `updated` | Mods whose locked version, provider, side, or channel changed. `fromProvider`/`toProvider`, `fromSide`/`toSide`, and `fromChannel`/`toChannel` appear when that field changed |
 | `removed` | Mods no longer locked, with the `requiredBy` they had. `stillLocked` marks a mod taken out of `shulker.json` that a pack still provides |
 | `packs` | Packs added, removed, or moved to another commit. `from` is empty for a new pack, `to` for a removed one |
 | `suggestions` | Recommended mods that aren't installed |

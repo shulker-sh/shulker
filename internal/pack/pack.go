@@ -178,7 +178,7 @@ func (s *Store) Open(ctx context.Context, p manifest.Pack, pinned lock.Pack) (*L
 			return nil, "", err
 		}
 		if current != pinned.DirSha256 {
-			warning = fmt.Sprintf("pack %s has changed since the lock; run `shulker update`", name)
+			warning = fmt.Sprintf("pack %s has changed since the lock; run `shulker lock`", name)
 		}
 	case Git:
 		if pinned.Commit == "" {

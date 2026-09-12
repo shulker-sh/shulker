@@ -29,6 +29,10 @@ type Change struct {
 	To           string `json:"to"`
 	FromProvider string `json:"fromProvider,omitempty"`
 	ToProvider   string `json:"toProvider,omitempty"`
+	FromSide     string `json:"fromSide,omitempty"`
+	ToSide       string `json:"toSide,omitempty"`
+	FromChannel  string `json:"fromChannel,omitempty"`
+	ToChannel    string `json:"toChannel,omitempty"`
 }
 
 type RemovedMod struct {
@@ -81,10 +85,16 @@ func (r *Resolver) Changes(before Snapshot) *Changes {
 		switch {
 		case !existed || (listed && !before.listed[id]):
 			c.Added = append(c.Added, AddedMod{ID: id, VersionNumber: now.VersionNumber, Side: now.Side, Provider: now.Provider, RequiredBy: nonNil(now.RequiredBy), AlreadyLocked: existed})
-		case old.Sha512 != now.Sha512 || old.Provider != now.Provider:
+		case old.Sha512 != now.Sha512 || old.Provider != now.Provider || old.Side != now.Side || old.Channel != now.Channel:
 			ch := Change{ID: id, From: old.VersionNumber, To: now.VersionNumber}
 			if old.Provider != now.Provider {
 				ch.FromProvider, ch.ToProvider = old.Provider, now.Provider
+			}
+			if old.Side != now.Side {
+				ch.FromSide, ch.ToSide = old.Side, now.Side
+			}
+			if old.Channel != now.Channel {
+				ch.FromChannel, ch.ToChannel = old.Channel, now.Channel
 			}
 			c.Updated = append(c.Updated, ch)
 		}

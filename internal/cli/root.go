@@ -36,6 +36,7 @@ type app struct {
 	d          *deps
 	configPath string
 	packs      []*pack.Loaded
+	relocking  bool
 	releases   *selfupdate.Releases
 	exe        func() (string, error)
 	installer  func(ctx context.Context, java, jar string, args []string) error
