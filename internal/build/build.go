@@ -238,7 +238,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 				report.Kept = append(report.Kept, f.rel)
 			}
 		case stateConflict:
-			report.Conflicts = append(report.Conflicts, f.rel+" (changed in both build and source)")
+			report.Conflicts = append(report.Conflicts, f.rel+" (changed in place and in the source)")
 			continue
 		case stateUntracked:
 			report.Conflicts = append(report.Conflicts, f.rel+" (not written by shulker)")
@@ -254,15 +254,15 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		if f.src.owned != nil {
 			next.record(f.rel, f.src.owned)
 			for _, k := range sortedKeys(f.merge.kept) {
-				report.Kept = append(report.Kept, f.rel+" "+k+" (edited in build)")
+				report.Kept = append(report.Kept, f.rel+" "+k+" (edited in place)")
 			}
 			for _, k := range f.merge.overrode {
-				report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was edited in the build and changed in the manifest; the manifest value was written", f.rel, k))
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was edited in place and changed in the manifest; the manifest value was written", f.rel, k))
 			}
 		}
 	}
 	if len(report.Conflicts) > 0 {
-		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the build directory and in the source; run `shulker diff`, or `build --force` to overwrite", name, len(report.Conflicts))
+		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the output directory and in the source; run `shulker diff`, or `build --force` to overwrite", name, len(report.Conflicts))
 		e.Items = report.Conflicts
 		return report, e
 	}

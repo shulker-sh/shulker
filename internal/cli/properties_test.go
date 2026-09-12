@@ -39,7 +39,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	}
 
 	writeFile(t, built, "#Iris config\ncolorSpace=DISPLAY_P3\nenableShaders=false\nmaxShadowRenderDistance=32\nshaderPack=pack.zip\n")
-	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "kept config/iris.properties enableShaders (edited in build)") {
+	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "kept config/iris.properties enableShaders (edited in place)") {
 		t.Fatalf("an in-game edit of a managed key should be kept: %s", stdout)
 	}
 	if got := readFile(t, built); !strings.Contains(got, "enableShaders=false") || !strings.Contains(got, "colorSpace=DISPLAY_P3") {
@@ -65,7 +65,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	if got := readFile(t, override); got != "# shaders on by default\nenableShaders=false\nshaderPack=pack.zip\ncolorSpace=DISPLAY_P3\n" {
 		t.Fatalf("adopted key: %q", got)
 	}
-	if stdout := h.mustRun(t, "build"); strings.Contains(stdout, "edited in build") {
+	if stdout := h.mustRun(t, "build"); strings.Contains(stdout, "edited in place") {
 		t.Fatalf("an adopted key should be in step with the build: %s", stdout)
 	}
 

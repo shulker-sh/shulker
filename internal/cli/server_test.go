@@ -89,7 +89,7 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "kept server.properties online-mode (edited in build)") {
+	if !strings.Contains(stdout, "kept server.properties online-mode (edited in place)") {
 		t.Fatalf("rebuild after user edit: %s", stdout)
 	}
 	if got := readFile(t, propsPath); !strings.Contains(got, "online-mode=true") {
@@ -100,7 +100,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["motd"] = "Changed"
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "server: 1 written") || !strings.Contains(stdout, "kept server.properties online-mode (edited in build)") {
+	if !strings.Contains(stdout, "server: 1 written") || !strings.Contains(stdout, "kept server.properties online-mode (edited in place)") {
 		t.Fatalf("manifest change to another key must keep the edit: %s", stdout)
 	}
 	if got := readFile(t, propsPath); !strings.Contains(got, "online-mode=true") || !strings.Contains(got, "motd=Changed") {
@@ -137,7 +137,7 @@ func TestServerTargetBuild(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if len(env.Data) != 1 || len(env.Data[0].Written) != 1 || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "motd was edited in the build and changed in the manifest") {
+	if len(env.Data) != 1 || len(env.Data[0].Written) != 1 || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "motd was edited in place and changed in the manifest") {
 		t.Fatalf("both-changed key: %+v", env.Data)
 	}
 	if got := readFile(t, propsPath); !strings.Contains(got, "motd=Theirs") || !strings.Contains(got, "online-mode=false") {
