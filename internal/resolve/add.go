@@ -49,16 +49,25 @@ func (r *Resolver) provider(name string) (provider.Provider, error) {
 	if name != "" {
 		p, ok := r.Providers[name]
 		if !ok {
-			return nil, out.Errorf("provider-unavailable", "provider %q is not available", name)
+			return nil, out.Errorf("provider-unavailable", "%s", unavailable(name))
 		}
 		return p, nil
 	}
+	var reasons []string
 	for _, n := range r.Manifest.ProviderOrder() {
 		if p, ok := r.Providers[n]; ok {
 			return p, nil
 		}
+		reasons = append(reasons, unavailable(n))
 	}
-	return nil, out.Errorf("provider-unavailable", "none of the manifest providers %v are available", r.Manifest.ProviderOrder())
+	return nil, out.Errorf("provider-unavailable", "no manifest provider is available: %s", strings.Join(reasons, "; "))
+}
+
+func unavailable(name string) string {
+	if name == "curseforge" {
+		return "curseforge needs an API key; set " + curseforge.KeyEnv + " or curseforge.key in the config file"
+	}
+	return name + " is not a known provider"
 }
 
 func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provider.Provider, *provider.Project, error) {
@@ -70,10 +79,11 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provi
 		proj, err := p.Project(ctx, slug)
 		return p, proj, err
 	}
-	var missed []string
+	var missed, skipped []string
 	for _, n := range r.Manifest.ProviderOrder() {
 		p, ok := r.Providers[n]
 		if !ok {
+			skipped = append(skipped, unavailable(n))
 			continue
 		}
 		proj, err := p.Project(ctx, slug)
@@ -89,6 +99,9 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provi
 	if len(missed) == 0 {
 		_, err := r.provider("")
 		return nil, nil, err
+	}
+	if len(skipped) > 0 {
+		return nil, nil, out.Errorf("mod-not-found", "%s was not found on %s (skipped: %s)", slug, strings.Join(missed, " or "), strings.Join(skipped, "; "))
 	}
 	return nil, nil, out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(missed, " or "))
 }

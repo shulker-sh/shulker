@@ -277,12 +277,12 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 
 	h.noCurseForge = true
 	code, stdout, _ := h.run(t, "--json", "add", "jei", "--provider", "curseforge")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "provider-unavailable" {
-		t.Fatalf("expected provider-unavailable, got %d %s", code, stdout)
+	if e := failureCode(t, stdout); code == 0 || e.Code != "provider-unavailable" || !strings.Contains(e.Message, "SHULKER_CURSEFORGE_KEY") {
+		t.Fatalf("expected provider-unavailable naming the key, got %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "--json", "add", "jei")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || strings.Contains(e.Message, "curseforge") {
-		t.Fatalf("expected a modrinth-only miss, got %d %s", code, stdout)
+	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || !strings.Contains(e.Message, "not found on modrinth (skipped: curseforge needs an API key") {
+		t.Fatalf("expected a modrinth miss naming the skipped curseforge, got %d %s", code, stdout)
 	}
 }
 

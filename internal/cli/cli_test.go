@@ -86,6 +86,15 @@ func TestRootHelpTellsAgentsToUseJSON(t *testing.T) {
 	}
 }
 
+func TestAddRejectsBadFlagValues(t *testing.T) {
+	for _, flag := range [][]string{{"--side", "top"}, {"--channel", "nightly"}, {"--provider", "github"}} {
+		code, stdout, _ := run(t, append([]string{"--json", "add", "sodium"}, flag...)...)
+		if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || !strings.Contains(e.Message, flag[0]) {
+			t.Errorf("%v: exit %d %s", flag, code, stdout)
+		}
+	}
+}
+
 func TestUnknownCommandJSON(t *testing.T) {
 	code, stdout, stderr := run(t, "bogus", "--json")
 	if code != out.ExitUsage {
