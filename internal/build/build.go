@@ -474,7 +474,11 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 // itself, NeoForge's and Forge's installers under libraries/.
 func vanillaServerPath(l loader.Loader, minecraft string) string {
 	if l.InstallServerFlag != "" {
-		return "libraries/net/minecraft/server/" + minecraft + "/server-" + minecraft + ".jar"
+		name := "server-" + minecraft
+		if l.MinecraftJarClassifier != "" {
+			name += "-" + l.MinecraftJarClassifier
+		}
+		return "libraries/net/minecraft/server/" + minecraft + "/" + name + ".jar"
 	}
 	return VanillaServerFile
 }

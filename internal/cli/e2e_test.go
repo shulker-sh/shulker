@@ -376,15 +376,24 @@ func newHarness(t *testing.T) *harness {
 		library("net.minecraftforge:forge:26.2-65.1.3:universal", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"),
 	}})
 	h.forgeInstaller = makeJarFiles(t, "forge-installer", "forge-26.2-65.1.3-installer.jar", map[string]string{"install_profile.json": string(forgeProfile), "version.json": string(forgeVersion)})
-	vanillaLib := "net/minecraft/server/26.2/server-26.2.jar"
+	// The vanilla jar name comes off the real table, so the fake can't disagree with the code
+	// about which name a loader's installer looks for.
+	vanillaLib := func(name string) string {
+		l, _ := loader.Lookup(name)
+		jar := "server-26.2"
+		if l.MinecraftJarClassifier != "" {
+			jar += "-" + l.MinecraftJarClassifier
+		}
+		return "net/minecraft/server/26.2/" + jar + ".jar"
+	}
 	h.loaders = map[string]fakeLoaderInstall{
 		"neoforge": {
 			installer: h.neoInstaller, version: "26.2.0.87", versionID: "neoforge-26.2.0.87", profileKey: "NeoForge",
-			libs: append(slices.Sorted(maps.Keys(h.neoLibs)), vanillaLib),
+			libs: append(slices.Sorted(maps.Keys(h.neoLibs)), vanillaLib("neoforge")),
 		},
 		"forge": {
 			installer: h.forgeInstaller, version: "65.1.3", versionID: "26.2-forge-65.1.3", profileKey: "forge",
-			libs: []string{"org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", vanillaLib},
+			libs: []string{"org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", vanillaLib("forge")},
 		},
 	}
 	t.Cleanup(h.server.Close)
