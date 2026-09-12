@@ -46,6 +46,28 @@ func TestVersionJSON(t *testing.T) {
 	}
 }
 
+func TestVersionBuildString(t *testing.T) {
+	base := versionInfo{Go: "go1.26.4", OS: "darwin", Arch: "arm64"}
+	platform := "go1.26.4 darwin/arm64"
+	for _, tc := range []struct {
+		name string
+		info versionInfo
+		want string
+	}{
+		{"released", base, platform},
+		{"committed", versionInfo{Commit: "c2f0ca96de074c005b69009b87c24a4978944bd6"}, "c2f0ca9, " + platform},
+		{"dirty", versionInfo{Commit: "c2f0ca96de074c005b69009b87c24a4978944bd6", Modified: true}, "c2f0ca9-dirty, " + platform},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			info := tc.info
+			info.Go, info.OS, info.Arch = base.Go, base.OS, base.Arch
+			if got := info.build(); got != tc.want {
+				t.Fatalf("build() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestHelpLinksDocs(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"add", "--help"}, {"target", "add", "--help"}} {
 		code, stdout, _ := run(t, args...)

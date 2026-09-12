@@ -17,7 +17,7 @@ import (
 	"shulker.sh/shulker/internal/server"
 )
 
-var version = "dev"
+var version = devVersion
 
 const helpFooter = `
 Docs: https://shulker.sh/docs
