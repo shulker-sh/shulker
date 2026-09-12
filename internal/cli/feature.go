@@ -204,64 +204,74 @@ func (a *app) resync(cmd *cobra.Command, sc *featureScope) (*syncResult, error) 
 	return &res, err
 }
 
-func registerFeatureChange(cmd *cobra.Command) {
-	registerFeatureScope(cmd, "change the choice for")
-	cmd.Flags().Bool("sync", false, "sync the --into or --instance directory from its recorded source right away")
+// featureWhere is the scope flags every feature command takes: the project
+// itself, a synced directory (--into), or a linked instance (--instance,
+// narrowed by --launcher and --side).
+type featureWhere struct {
+	into     string
+	instance string
+	sync     bool
+	sel      linkSelection
 }
 
-func registerFeatureScope(cmd *cobra.Command, verb string) {
-	cmd.Flags().String("into", "", verb+" a synced directory instead of this project")
-	cmd.Flags().String("instance", "", verb+" a linked instance or synced directory, by name or directory")
-	var sel linkSelection
-	sel.register(cmd, "")
+func (f *featureWhere) register(cmd *cobra.Command, verb string) {
+	cmd.Flags().StringVar(&f.into, "into", "", verb+" a synced directory instead of this project")
+	cmd.Flags().StringVar(&f.instance, "instance", "", verb+" a linked instance or synced directory, by name or directory")
+	f.sel.register(cmd, "")
 }
 
-// featureInto resolves --instance (narrowed by --launcher and --side) to the entry's directory.
-func (a *app) featureInto(cmd *cobra.Command) (string, error) {
-	into, _ := cmd.Flags().GetString("into")
-	instance, _ := cmd.Flags().GetString("instance")
-	var sel linkSelection
-	sel.launcher, _ = cmd.Flags().GetString("launcher")
-	sel.side, _ = cmd.Flags().GetString("side")
-	if instance == "" {
-		if sel.narrows() {
+func (f *featureWhere) registerChange(cmd *cobra.Command) {
+	f.register(cmd, "change the choice for")
+	cmd.Flags().BoolVar(&f.sync, "sync", false, "sync the --into or --instance directory from its recorded source right away")
+}
+
+// dir resolves --instance (narrowed by --launcher and --side) to the entry's directory.
+func (a *app) featureDir(f *featureWhere) (string, error) {
+	if f.instance == "" {
+		if f.sel.narrows() {
 			return "", out.Errorf("usage", "--launcher and --side narrow --instance")
 		}
-		return into, nil
+		return f.into, nil
 	}
-	if into != "" {
+	if f.into != "" {
 		return "", out.Errorf("usage", "pass --into or --instance, not both")
 	}
-	links, err := a.selectLinks(instance, sel)
+	links, err := a.selectLinks(f.instance, f.sel)
 	if err != nil {
 		return "", err
 	}
 	return links[0].Dir, nil
 }
 
-func (a *app) featureChangeFlags(cmd *cobra.Command) (into string, sync bool, err error) {
-	if into, err = a.featureInto(cmd); err != nil {
-		return "", false, err
+func (a *app) featureChangeDir(f *featureWhere) (string, error) {
+	into, err := a.featureDir(f)
+	if err != nil {
+		return "", err
 	}
-	sync, _ = cmd.Flags().GetBool("sync")
-	if sync && into == "" {
-		return "", false, out.Errorf("usage", "--sync needs --into or --instance; in a project, run `shulker build`")
+	if f.sync && into == "" {
+		return "", out.Errorf("usage", "--sync needs --into or --instance; in a project, run `shulker build`")
 	}
-	return into, sync, nil
+	return into, nil
 }
 
-func (a *app) emitFeatureChange(cmd *cobra.Command, sc *featureScope, sync, changed bool, res map[string]any, line string) error {
+type featureChange struct {
+	Feature string      `json:"feature"`
+	On      *bool       `json:"on,omitempty"`
+	Reset   *bool       `json:"reset,omitempty"`
+	Into    string      `json:"into,omitempty"`
+	Sync    *syncResult `json:"sync,omitempty"`
+}
+
+func (a *app) emitFeatureChange(cmd *cobra.Command, sc *featureScope, sync, changed bool, res featureChange, line string) error {
 	var synced *syncResult
 	if sync {
 		var err error
 		if synced, err = a.resync(cmd, sc); err != nil {
 			return err
 		}
-		res["sync"] = synced
+		res.Sync = synced
 	}
-	if sc.into != "" {
-		res["into"] = sc.into
-	}
+	res.Into = sc.into
 	return a.printer.Emit(res, func(w io.Writer) {
 		switch {
 		case sc.into == "":
@@ -278,13 +288,14 @@ func (a *app) emitFeatureChange(cmd *cobra.Command, sc *featureScope, sync, chan
 }
 
 func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
+	var where featureWhere
 	cmd := &cobra.Command{
 		Use:   verb + " <feature>",
 		Short: fmt.Sprintf("Turn a feature %s for every target on this machine", verb),
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			into, sync, err := a.featureChangeFlags(cmd)
+			into, err := a.featureChangeDir(&where)
 			if err != nil {
 				return err
 			}
@@ -303,21 +314,22 @@ func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
 			if into == "" {
 				line += "; takes effect on the next build or sync"
 			}
-			return a.emitFeatureChange(cmd, sc, sync, true, map[string]any{"feature": name, "on": on}, line)
+			return a.emitFeatureChange(cmd, sc, where.sync, true, featureChange{Feature: name, On: &on}, line)
 		},
 	}
-	registerFeatureChange(cmd)
+	where.registerChange(cmd)
 	return cmd
 }
 
 func (a *app) featureResetCmd() *cobra.Command {
+	var where featureWhere
 	cmd := &cobra.Command{
 		Use:   "reset <feature>",
 		Short: "Forget your choice for a feature and follow the target defaults again",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			into, sync, err := a.featureChangeFlags(cmd)
+			into, err := a.featureChangeDir(&where)
 			if err != nil {
 				return err
 			}
@@ -340,21 +352,22 @@ func (a *app) featureResetCmd() *cobra.Command {
 			if !had {
 				line = name + " had no choice to reset"
 			}
-			return a.emitFeatureChange(cmd, sc, sync, had, map[string]any{"feature": name, "reset": had}, line)
+			return a.emitFeatureChange(cmd, sc, where.sync, had, featureChange{Feature: name, Reset: &had}, line)
 		},
 	}
-	registerFeatureChange(cmd)
+	where.registerChange(cmd)
 	return cmd
 }
 
 func (a *app) featureListCmd() *cobra.Command {
+	var where featureWhere
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List features with the mods they gate, target defaults, and your choices",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			into, err := a.featureInto(cmd)
+			into, err := a.featureDir(&where)
 			if err != nil {
 				return err
 			}
@@ -390,7 +403,7 @@ func (a *app) featureListCmd() *cobra.Command {
 			})
 		},
 	}
-	registerFeatureScope(cmd, "list the choices for")
+	where.register(cmd, "list the choices for")
 	return cmd
 }
 
