@@ -38,6 +38,15 @@ jobs:
           echo "Release notes:"
           cat "$RUNNER_TEMP/RELEASE_NOTES.md"
 
+      - name: CurseForge key gate
+        env:
+          SHULKER_CURSEFORGE_KEY: ${{ secrets.SHULKER_CURSEFORGE_KEY }}
+        run: |
+          if [ -z "$SHULKER_CURSEFORGE_KEY" ]; then
+            echo "::error::the SHULKER_CURSEFORGE_KEY repository secret is missing or empty"
+            exit 1
+          fi
+
       - name: Test
         run: go test ./...
 
@@ -48,6 +57,7 @@ jobs:
           args: release --clean --release-notes=${{ runner.temp }}/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHULKER_CURSEFORGE_KEY: ${{ secrets.SHULKER_CURSEFORGE_KEY }}
 
       - name: Attest build provenance
         id: attest

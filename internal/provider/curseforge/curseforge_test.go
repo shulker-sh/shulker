@@ -6,10 +6,88 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
 )
+
+type keyServer struct {
+	accepted   string
+	served     string
+	keyFetches int
+	apiCalls   int
+}
+
+func (k *keyServer) start(t *testing.T) *httptest.Server {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/key" {
+			k.keyFetches++
+			if !strings.HasPrefix(r.UserAgent(), "shulker/") || r.Header.Get("X-Shulker-Client") != "cli" || r.Header.Get("X-Api-Key") != "" {
+				http.NotFound(w, r)
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]string{"key": k.served})
+			return
+		}
+		k.apiCalls++
+		if r.Header.Get("X-Api-Key") != k.accepted {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"id": 10, "name": "Shiny", "slug": "shiny"}})
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestRejectedSharedKeyIsReplacedFromShulker(t *testing.T) {
+	k := &keyServer{accepted: "new", served: "new"}
+	srv := k.start(t)
+	dir := t.TempDir()
+	c := NewShared(fetch.New("test"), "old", dir)
+	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
+	if _, err := c.Project(context.Background(), "10"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Project(context.Background(), "10"); err != nil {
+		t.Fatal(err)
+	}
+	if k.keyFetches != 1 || k.apiCalls != 3 {
+		t.Errorf("key fetches %d, API calls %d; want 1 and 3", k.keyFetches, k.apiCalls)
+	}
+	if got := SharedKey(dir); got != "new" {
+		t.Errorf("saved key %q, want new", got)
+	}
+}
+
+func TestSharedKeyFailsWhenShulkerHasNoNewerKey(t *testing.T) {
+	k := &keyServer{accepted: "other", served: "old"}
+	srv := k.start(t)
+	c := NewShared(fetch.New("test"), "old", t.TempDir())
+	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
+	_, err := c.Project(context.Background(), "10")
+	if err == nil || !strings.Contains(err.Error(), "shulker.sh has no newer one") || !strings.Contains(err.Error(), "report it") {
+		t.Fatalf("error %v", err)
+	}
+	if _, err := c.Project(context.Background(), "10"); err == nil || k.keyFetches != 1 {
+		t.Errorf("second call: error %v, key fetches %d; want an error and 1 fetch", err, k.keyFetches)
+	}
+}
+
+func TestOwnKeyIsNeverReplaced(t *testing.T) {
+	k := &keyServer{accepted: "new", served: "new"}
+	srv := k.start(t)
+	c := New(fetch.New("test"), "mine")
+	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
+	_, err := c.Project(context.Background(), "10")
+	if err == nil || !strings.Contains(err.Error(), "the API key was rejected") {
+		t.Fatalf("error %v", err)
+	}
+	if k.keyFetches != 0 {
+		t.Errorf("fetched a key %d times for the user's own key", k.keyFetches)
+	}
+}
 
 func TestVersionsQueriesEachLoaderType(t *testing.T) {
 	fileJSON := func(id int, loaders ...string) map[string]any {

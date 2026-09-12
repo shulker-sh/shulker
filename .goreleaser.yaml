@@ -21,6 +21,7 @@ builds:
       - arm64
     ldflags:
       - -s -w -X shulker.sh/shulker/internal/cli.version={{ .Version }}
+      - -X shulker.sh/shulker/internal/provider/curseforge.embeddedKey={{ .Env.SHULKER_CURSEFORGE_KEY }}
 
 archives:
   - id: shulker

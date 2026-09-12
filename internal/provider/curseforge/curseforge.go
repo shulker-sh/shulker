@@ -2,22 +2,26 @@ package curseforge
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/provider"
 )
 
 const (
 	APIURL   = "https://api.curseforge.com/v1"
+	KeyURL   = "https://shulker.sh/api/curseforge-key"
 	KeyEnv   = "SHULKER_CURSEFORGE_KEY"
 	gameID   = "432"
 	classMod = "6"
@@ -33,23 +37,52 @@ var relations = map[int]string{1: "embedded", 2: "optional", 3: "required", 4: "
 type CurseForge struct {
 	Client  *fetch.Client
 	BaseURL string
-	slugs   map[string]string
+	KeyURL  string
+	// KeyFile is where a key fetched from KeyURL is saved. It is empty for the user's own key,
+	// which is never replaced.
+	KeyFile    string
+	key        string
+	refreshed  bool
+	refreshErr error
+	slugs      map[string]string
 }
 
 func Key(configured string) string {
 	if k := os.Getenv(KeyEnv); k != "" {
 		return k
 	}
-	if configured != "" {
-		return configured
+	return configured
+}
+
+func SharedKey(cacheDir string) string {
+	var saved struct {
+		Key string `json:"key"`
+	}
+	if data, err := os.ReadFile(keyFile(cacheDir)); err == nil && json.Unmarshal(data, &saved) == nil && saved.Key != "" {
+		return saved.Key
 	}
 	return embeddedKey
 }
 
+func keyFile(cacheDir string) string {
+	return filepath.Join(cacheDir, "curseforge-key.json")
+}
+
 func New(c *fetch.Client, key string) *CurseForge {
+	return &CurseForge{Client: withKey(c, key), BaseURL: APIURL, key: key, slugs: map[string]string{}}
+}
+
+func NewShared(c *fetch.Client, key, cacheDir string) *CurseForge {
+	cf := New(c, key)
+	cf.KeyURL = KeyURL
+	cf.KeyFile = keyFile(cacheDir)
+	return cf
+}
+
+func withKey(c *fetch.Client, key string) *fetch.Client {
 	keyed := *c
 	keyed.Header = http.Header{"X-Api-Key": {key}}
-	return &CurseForge{Client: &keyed, BaseURL: APIURL, slugs: map[string]string{}}
+	return &keyed
 }
 
 func (c *CurseForge) Name() string { return "curseforge" }
@@ -94,9 +127,12 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID string) (*provider.Pr
 		var res struct {
 			Data mod `json:"data"`
 		}
-		found, err := c.Client.GetJSONIfFound(ctx, c.BaseURL+"/mods/"+slugOrID, &res)
-		if err != nil {
-			return nil, c.wrap("project "+slugOrID, err)
+		var found bool
+		if err := c.call(ctx, "project "+slugOrID, func() (err error) {
+			found, err = c.Client.GetJSONIfFound(ctx, c.BaseURL+"/mods/"+slugOrID, &res)
+			return err
+		}); err != nil {
+			return nil, err
 		}
 		if !found {
 			return nil, fmt.Errorf("curseforge project %s: %w", slugOrID, provider.ErrNotFound)
@@ -107,8 +143,10 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID string) (*provider.Pr
 	var res struct {
 		Data []mod `json:"data"`
 	}
-	if err := c.Client.GetJSON(ctx, c.BaseURL+"/mods/search?"+q.Encode(), &res); err != nil {
-		return nil, c.wrap("project "+slugOrID, err)
+	if err := c.call(ctx, "project "+slugOrID, func() error {
+		return c.Client.GetJSON(ctx, c.BaseURL+"/mods/search?"+q.Encode(), &res)
+	}); err != nil {
+		return nil, err
 	}
 	for _, m := range res.Data {
 		if m.Slug == slugOrID {
@@ -132,8 +170,10 @@ func (c *CurseForge) Versions(ctx context.Context, projectID, game string, loade
 				Data       []file     `json:"data"`
 				Pagination pagination `json:"pagination"`
 			}
-			if err := c.Client.GetJSON(ctx, c.BaseURL+"/mods/"+url.PathEscape(projectID)+"/files?"+q.Encode(), &res); err != nil {
-				return nil, c.wrap("files for "+projectID, err)
+			if err := c.call(ctx, "files for "+projectID, func() error {
+				return c.Client.GetJSON(ctx, c.BaseURL+"/mods/"+url.PathEscape(projectID)+"/files?"+q.Encode(), &res)
+			}); err != nil {
+				return nil, err
 			}
 			for _, f := range res.Data {
 				if seen[f.ID] || !f.IsAvailable || !contains(f.GameVersions, game) || !containsFold(f.GameVersions, name) {
@@ -163,8 +203,10 @@ func (c *CurseForge) Version(ctx context.Context, versionID string) (*provider.V
 	var res struct {
 		Data []file `json:"data"`
 	}
-	if err := c.Client.PostJSON(ctx, c.BaseURL+"/mods/files", map[string]any{"fileIds": []int{id}}, &res); err != nil {
-		return nil, c.wrap("file "+versionID, err)
+	if err := c.call(ctx, "file "+versionID, func() error {
+		return c.Client.PostJSON(ctx, c.BaseURL+"/mods/files", map[string]any{"fileIds": []int{id}}, &res)
+	}); err != nil {
+		return nil, err
 	}
 	if len(res.Data) == 0 {
 		return nil, fmt.Errorf("curseforge file %s: %w", versionID, provider.ErrNotFound)
@@ -198,11 +240,58 @@ func (c *CurseForge) remember(m mod) *provider.Project {
 	return p
 }
 
-func (c *CurseForge) wrap(what string, err error) error {
+// call runs request, and when CurseForge rejects shulker's shared key, replaces it from KeyURL
+// once per run and retries.
+func (c *CurseForge) call(ctx context.Context, what string, request func() error) error {
+	err := request()
+	if errors.Is(err, fetch.ErrForbidden) && c.KeyFile != "" {
+		if !c.refreshed {
+			c.refreshed = true
+			if c.refreshErr = c.refreshKey(ctx); c.refreshErr == nil {
+				err = request()
+			}
+		}
+		if c.refreshErr != nil {
+			return fmt.Errorf("curseforge %s: %w", what, c.refreshErr)
+		}
+	}
+	if err == nil {
+		return nil
+	}
 	if errors.Is(err, fetch.ErrForbidden) {
+		if c.KeyFile != "" {
+			return fmt.Errorf("curseforge %s: %w", what, sharedKeyRejected("the newer one from shulker.sh was rejected too"))
+		}
 		return fmt.Errorf("curseforge %s: the API key was rejected; set %s or curseforge.key in the config file", what, KeyEnv)
 	}
 	return fmt.Errorf("curseforge %s: %w", what, err)
+}
+
+func (c *CurseForge) refreshKey(ctx context.Context) error {
+	client := *c.Client
+	client.Header = http.Header{"X-Shulker-Client": {"cli"}}
+	var res struct {
+		Key string `json:"key"`
+	}
+	if err := client.GetJSON(ctx, c.KeyURL, &res); err != nil {
+		return sharedKeyRejected(fmt.Sprintf("getting a new one from shulker.sh failed (%v)", err))
+	}
+	if res.Key == "" || res.Key == c.key {
+		return sharedKeyRejected("shulker.sh has no newer one")
+	}
+	if err := os.MkdirAll(filepath.Dir(c.KeyFile), 0o755); err != nil {
+		return fmt.Errorf("saving the CurseForge key from shulker.sh: %w", err)
+	}
+	if err := fsutil.WriteJSON(c.KeyFile, map[string]string{"key": res.Key}); err != nil {
+		return fmt.Errorf("saving the CurseForge key from shulker.sh: %w", err)
+	}
+	c.key = res.Key
+	c.Client = withKey(c.Client, res.Key)
+	return nil
+}
+
+func sharedKeyRejected(detail string) error {
+	return fmt.Errorf("CurseForge rejected shulker's built-in API key and %s; set %s or curseforge.key in the config file, or report it at https://github.com/shulker-sh/shulker/issues", detail, KeyEnv)
 }
 
 func FilePage(slug, fileID string) string {

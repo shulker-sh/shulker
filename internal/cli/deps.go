@@ -46,6 +46,8 @@ func (a *app) deps() (*deps, error) {
 	providers := map[string]provider.Provider{"modrinth": modrinth.New(f)}
 	if key := curseforge.Key(cfg.CurseForge.Key); key != "" {
 		providers["curseforge"] = curseforge.New(f, key)
+	} else if key := curseforge.SharedKey(c.Dir); key != "" {
+		providers["curseforge"] = curseforge.NewShared(f, key, c.Dir)
 	}
 	a.d = &deps{
 		fetch:     f,

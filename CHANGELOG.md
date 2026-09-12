@@ -13,6 +13,7 @@ All notable changes to shulker are documented here. The format is based on
 - Fabric, Quilt, NeoForge and Forge projects (`init --loader`); on Quilt, mods without a Quilt build use their Fabric one.
 - NeoForge and Forge servers and launcher profiles set up by the loader's own installer: servers run it offline from files recorded in `shulker.lock`, and `link mojang` installs the client into the official launcher without leaving the installer's own profile behind.
 - Mods from Modrinth and CurseForge, with provider fallthrough, manual downloads for files CurseForge won't serve, and `add --provider` to switch a locked mod.
+- CurseForge works without your own API key: release builds include one, and if CurseForge rejects it shulker fetches a replacement from shulker.sh.
 - Dependency checks from each jar's own metadata on `add` and `install`; `remove` prunes dependencies nothing else needs.
 - `suggests` lists the mods locked mods recommend and that aren't installed; `--optional` adds their optional integrations.
 - Client and server targets (`target add|remove|list`), built with `install` and `build` into `build/<name>`.
