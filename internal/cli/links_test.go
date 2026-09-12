@@ -300,3 +300,29 @@ func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 		t.Fatalf("stdout: %s\nstderr: %s", stdout, stderr)
 	}
 }
+
+func TestSyncDetectsAPrismInstance(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
+
+	// An entry an older shulker wrote, with no launcher recorded.
+	if _, err := config.UpdateLinks(h.config, func(links []config.Link) []config.Link {
+		links[0].Launcher, links[0].LauncherDir = "", ""
+		return links
+	}); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "sync", h.dir, "--target", "client", "--into", gameDir)
+	links := readLinks(t, h)
+	if len(links) != 1 || links[0].Launcher != "prism" || links[0].LauncherDir != prismDir {
+		t.Fatalf("a sync into a Prism instance records the launcher: %+v", links)
+	}
+	if stdout := h.mustRun(t, "links"); !strings.Contains(stdout, "Prism Launcher") {
+		t.Fatalf("links groups it under its launcher: %s", stdout)
+	}
+}

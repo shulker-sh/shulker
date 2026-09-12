@@ -150,6 +150,8 @@ func (a *app) registerLink(l config.Link) {
 }
 
 // registerSync keeps the launcher of an entry that a link made, and its name unless l has one.
+// An entry with no launcher is matched against the launcher layouts, so a directory registered
+// before shulker recorded one, or synced into by hand, still lands under its launcher.
 func (a *app) registerSync(l config.Link, defaultName string) (config.Link, bool) {
 	changed := a.updateLinks(func(links []config.Link) []config.Link {
 		i, ok := config.FindLink(links, l.Dir)
@@ -157,10 +159,14 @@ func (a *app) registerSync(l config.Link, defaultName string) (config.Link, bool
 			if l.Name == "" {
 				l.Name = defaultName
 			}
+			l.Launcher, l.LauncherDir = launcher.Detect(l.Dir)
 			return append(links, l)
 		}
 		old := links[i]
 		l.Launcher, l.LauncherDir = old.Launcher, old.LauncherDir
+		if l.Launcher == "" {
+			l.Launcher, l.LauncherDir = launcher.Detect(l.Dir)
+		}
 		if l.Name == "" {
 			l.Name = old.Name
 		}

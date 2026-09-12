@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -195,4 +196,38 @@ func shellArg(s string) string {
 		return s
 	}
 	return CommandArg(s)
+}
+
+// Detect names the launcher that owns a game directory, and the launcher's data
+// directory when the layout gives it away. It reads an instance registered
+// before shulker recorded a launcher, or one a plain `sync --into` found.
+func Detect(gameDir string) (name, dir string) {
+	if base := filepath.Base(gameDir); base != "minecraft" && base != ".minecraft" {
+		return "", ""
+	}
+	instanceDir := filepath.Dir(gameDir)
+	if _, err := os.Stat(filepath.Join(instanceDir, PackFile)); err != nil {
+		return "", ""
+	}
+	cfg, err := os.ReadFile(filepath.Join(instanceDir, InstanceConfigFile))
+	if err != nil {
+		return "", ""
+	}
+	instances := filepath.Dir(instanceDir)
+	if filepath.Base(instances) == "instances" {
+		dir = filepath.Dir(instances)
+	}
+	if dir != "" {
+		if _, err := os.Stat(filepath.Join(dir, "prismlauncher.cfg")); err == nil {
+			return "prism", dir
+		}
+		if _, err := os.Stat(filepath.Join(dir, "multimc.cfg")); err == nil {
+			return "multimc", dir
+		}
+	}
+	// Prism needs ConfigVersion to parse instance.cfg at all; MultiMC has no such key.
+	if bytes.Contains(cfg, []byte("ConfigVersion")) {
+		return "prism", dir
+	}
+	return "multimc", dir
 }
