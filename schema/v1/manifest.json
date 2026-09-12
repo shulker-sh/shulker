@@ -29,6 +29,11 @@
       "uniqueItems": true,
       "description": "Shown by ModMenu as \"by ...\" under the pack name. init seeds the git user.name and shulker.sh; delete entries freely."
     },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The pack's license, e.g. \"MIT\" or \"CC BY-NC-SA 4.0\". Shown on the pack's entry in the mod list, and clickable there when links.license is set. Defaults to \"All rights reserved\", since NeoForge and Forge reject a mod that declares no license."
+    },
     "links": {
       "$ref": "#/$defs/links"
     },
@@ -84,11 +89,12 @@
       "type": "object",
       "propertyNames": { "type": "string", "minLength": 1 },
       "additionalProperties": { "type": "string", "format": "uri" },
-      "description": "Links shown on the pack's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written.",
+      "description": "Links shown on the pack's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written. On NeoForge and Forge, where the entry has room for less, website and issues become the Homepage and Issues buttons and license makes the license clickable.",
       "properties": {
         "website": { "type": "string", "format": "uri" },
         "issues": { "type": "string", "format": "uri" },
         "source": { "type": "string", "format": "uri" },
+        "license": { "type": "string", "format": "uri" },
         "discord": { "type": "string", "format": "uri" },
         "modrinth": { "type": "string", "format": "uri" },
         "curseforge": { "type": "string", "format": "uri" },

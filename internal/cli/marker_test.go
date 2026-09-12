@@ -115,6 +115,7 @@ func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
 	h.editManifest(t, func(m map[string]any) {
 		m["description"] = "Survival with friends."
 		m["authors"] = []string{"Alice", "shulker.sh"}
+		m["license"] = "MIT"
 		m["links"] = map[string]any{
 			"website":      "https://example.com",
 			"issues":       "https://example.com/issues",
@@ -133,6 +134,7 @@ func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
 	var meta struct {
 		Description string            `json:"description"`
 		Authors     []string          `json:"authors"`
+		License     string            `json:"license"`
 		Contact     map[string]string `json:"contact"`
 		Custom      struct {
 			ModMenu struct {
@@ -148,6 +150,9 @@ func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
 	}
 	if strings.Join(meta.Authors, ",") != "Alice,shulker.sh" {
 		t.Fatalf("authors: %v", meta.Authors)
+	}
+	if meta.License != "MIT" {
+		t.Fatalf("license: %q", meta.License)
 	}
 	wantContact := map[string]string{"homepage": "https://example.com", "issues": "https://example.com/issues", "sources": "https://example.com/src"}
 	if fmt.Sprint(meta.Contact) != fmt.Sprint(wantContact) {
@@ -206,7 +211,12 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 	h.editManifest(t, func(m map[string]any) {
 		m["description"] = "Survival with <friends>."
 		m["authors"] = []string{"Alice", "shulker.sh"}
-		m["links"] = map[string]any{"website": "https://example.com", "issues": "https://example.com/issues"}
+		m["license"] = "MIT"
+		m["links"] = map[string]any{
+			"website": "https://example.com",
+			"issues":  "https://example.com/issues",
+			"license": "https://example.com/license",
+		}
 	})
 	h.mustRun(t, "install")
 
@@ -229,6 +239,7 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 		ModLoader       string `toml:"modLoader"`
 		LoaderVersion   string `toml:"loaderVersion"`
 		License         string `toml:"license"`
+		LicenseURL      string `toml:"licenseURL"`
 		IssueTrackerURL string `toml:"issueTrackerURL"`
 		Mods            []struct {
 			ModID       string `toml:"modId"`
@@ -246,7 +257,10 @@ func TestNeoForgeMarkerJar(t *testing.T) {
 	}
 	// Naming a language loader is what NeoForge warns about; left out, it uses the one that loads a
 	// mod declaring no code.
-	if meta.ModLoader != "" || meta.LoaderVersion != "" || meta.License == "" {
+	if meta.ModLoader != "" || meta.LoaderVersion != "" {
+		t.Fatalf("marker toml: %+v", meta)
+	}
+	if meta.License != "MIT" || meta.LicenseURL != "https://example.com/license" {
 		t.Fatalf("marker toml: %+v", meta)
 	}
 	if meta.IssueTrackerURL != "https://example.com/issues" || len(meta.Mods) != 1 {

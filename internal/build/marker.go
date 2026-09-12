@@ -124,6 +124,10 @@ func (b *Builder) fabricMarker(targetName, lockHash string, direct, deps []strin
 	if len(b.Manifest.Authors) > 0 {
 		meta["authors"] = b.Manifest.Authors
 	}
+	// Fabric, unlike FML, is content with a mod that names no license, so this one stays unset.
+	if b.Manifest.License != "" {
+		meta["license"] = b.Manifest.License
+	}
 	if len(contact) > 0 {
 		meta["contact"] = contact
 	}
@@ -151,10 +155,20 @@ func (b *Builder) fabricMarker(targetName, lockHash string, direct, deps []strin
 
 const markerLogo = "icon.png"
 
+// markerLicense falls back rather than leaving the field empty, which both FML loaders read as a
+// mod file declaring no license and refuse to load.
+func (b *Builder) markerLicense() string {
+	if b.Manifest.License == "" {
+		return "All rights reserved"
+	}
+	return b.Manifest.License
+}
+
 type markerToml struct {
 	ModLoader       string          `toml:"modLoader,omitempty"`
 	LoaderVersion   string          `toml:"loaderVersion,omitempty"`
 	License         string          `toml:"license"`
+	LicenseURL      string          `toml:"licenseURL,omitempty"`
 	IssueTrackerURL string          `toml:"issueTrackerURL,omitempty"`
 	Mods            []markerTomlMod `toml:"mods"`
 }
@@ -186,7 +200,8 @@ func (b *Builder) tomlMarker(l loader.Loader, targetName, lockHash string, direc
 	meta := markerToml{
 		ModLoader:       "lowcodefml",
 		LoaderVersion:   "[1,)",
-		License:         "All rights reserved",
+		License:         b.markerLicense(),
+		LicenseURL:      b.Manifest.Links["license"],
 		IssueTrackerURL: b.Manifest.Links["issues"],
 	}
 	if l.Name == "neoforge" {

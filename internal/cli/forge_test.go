@@ -88,8 +88,12 @@ func TestForgeLinkMojangAndMarker(t *testing.T) {
 	if strings.Contains(toml, "iconFile") {
 		t.Fatal("iconFile is a NeoForge key; Forge reads logoFile")
 	}
-	// Forge rejects a mod file that names no language loader, or names one without a version.
+	// Forge rejects a mod file that names no language loader, or names one without a version, and
+	// both loaders reject one with a blank license, which a manifest need not fill in.
 	if !strings.Contains(toml, `modLoader = "lowcodefml"`) || !strings.Contains(toml, `loaderVersion = "[1,)"`) {
 		t.Fatalf("forge marker must name its language loader:\n%s", toml)
+	}
+	if !strings.Contains(toml, `license = "All rights reserved"`) {
+		t.Fatalf("marker with no manifest license must fall back:\n%s", toml)
 	}
 }

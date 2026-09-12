@@ -27,6 +27,7 @@ type Manifest struct {
 	Version     string            `json:"version,omitempty"`
 	Description string            `json:"description,omitempty"`
 	Authors     []string          `json:"authors,omitempty"`
+	License     string            `json:"license,omitempty"`
 	Links       map[string]string `json:"links,omitempty"`
 	Note        string            `json:"note,omitempty"`
 	Minecraft   string            `json:"minecraft"`
