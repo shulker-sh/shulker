@@ -16,6 +16,7 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -252,7 +253,7 @@ func (c *CurseForge) call(ctx context.Context, what string, request func() error
 			}
 		}
 		if c.refreshErr != nil {
-			return fmt.Errorf("curseforge %s: %w", what, c.refreshErr)
+			return c.refreshErr
 		}
 	}
 	if err == nil {
@@ -260,9 +261,9 @@ func (c *CurseForge) call(ctx context.Context, what string, request func() error
 	}
 	if errors.Is(err, fetch.ErrForbidden) {
 		if c.KeyFile != "" {
-			return fmt.Errorf("curseforge %s: %w", what, sharedKeyRejected("the newer one from shulker.sh was rejected too"))
+			return sharedKeyRejected("the newer one from shulker.sh was rejected too")
 		}
-		return fmt.Errorf("curseforge %s: the API key was rejected; set %s or curseforge.key in the config file", what, KeyEnv)
+		return out.Errorf("curseforge-key-rejected", "curseforge %s: the API key was rejected; set %s or run `shulker config set curseforge.key <key>`", what, KeyEnv)
 	}
 	return fmt.Errorf("curseforge %s: %w", what, err)
 }
@@ -291,7 +292,7 @@ func (c *CurseForge) refreshKey(ctx context.Context) error {
 }
 
 func sharedKeyRejected(detail string) error {
-	return fmt.Errorf("CurseForge rejected shulker's built-in API key and %s; set %s or curseforge.key in the config file, or report it at https://github.com/shulker-sh/shulker/issues", detail, KeyEnv)
+	return out.Errorf("curseforge-key-rejected", "CurseForge rejected shulker's built-in API key and %s; set %s or run `shulker config set curseforge.key <key>`, or report it at https://github.com/shulker-sh/shulker/issues", detail, KeyEnv)
 }
 
 func FilePage(slug, fileID string) string {

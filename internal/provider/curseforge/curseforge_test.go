@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/out"
 )
 
 type keyServer struct {
@@ -67,7 +68,7 @@ func TestSharedKeyFailsWhenShulkerHasNoNewerKey(t *testing.T) {
 	c := NewShared(fetch.New("test"), "old", t.TempDir())
 	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
 	_, err := c.Project(context.Background(), "10")
-	if err == nil || !strings.Contains(err.Error(), "shulker.sh has no newer one") || !strings.Contains(err.Error(), "report it") {
+	if out.CodeOf(err) != "curseforge-key-rejected" || !strings.Contains(err.Error(), "shulker.sh has no newer one") || !strings.Contains(err.Error(), "report it") {
 		t.Fatalf("error %v", err)
 	}
 	if _, err := c.Project(context.Background(), "10"); err == nil || k.keyFetches != 1 {
@@ -81,7 +82,7 @@ func TestOwnKeyIsNeverReplaced(t *testing.T) {
 	c := New(fetch.New("test"), "mine")
 	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
 	_, err := c.Project(context.Background(), "10")
-	if err == nil || !strings.Contains(err.Error(), "the API key was rejected") {
+	if out.CodeOf(err) != "curseforge-key-rejected" || !strings.Contains(err.Error(), "the API key was rejected") {
 		t.Fatalf("error %v", err)
 	}
 	if k.keyFetches != 0 {
