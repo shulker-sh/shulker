@@ -148,7 +148,7 @@ func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) 
 	if err != nil {
 		return nil, err
 	}
-	info, err := jarmeta.Read(mt.Cache.Path(sha), name)
+	info, err := jarmeta.Read(mt.Cache.Object(sha), name)
 	if err != nil {
 		return nil, err
 	}

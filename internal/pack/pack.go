@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loaderver"
@@ -42,7 +43,7 @@ type Loaded struct {
 }
 
 type Store struct {
-	CacheDir   string
+	Cache      *cache.Cache
 	ProjectDir string
 	Fetch      *fetch.Client
 	Log        func(format string, args ...any)
@@ -183,7 +184,7 @@ func (s *Store) Open(ctx context.Context, p manifest.Pack, pinned lock.Pack) (*L
 		if pinned.Commit == "" {
 			return nil, "", out.Errorf("pack-unlocked", "pack %s has no commit in the lock; run `shulker update`", name)
 		}
-		dir := s.exportDir(pinned.Commit)
+		dir := s.Cache.PackSource(pinned.Commit)
 		if _, err := os.Stat(dir); err != nil {
 			mirror, err := s.ensureMirror(ctx, packOrigin(name), p.Source)
 			if err != nil {
@@ -201,7 +202,7 @@ func (s *Store) Open(ctx context.Context, p manifest.Pack, pinned lock.Pack) (*L
 		if pinned.Sha256 == "" {
 			return nil, "", out.Errorf("pack-unlocked", "pack %s has no hash in the lock; run `shulker update`", name)
 		}
-		data, err := os.ReadFile(s.manifestPath(pinned.Sha256))
+		data, err := os.ReadFile(s.Cache.PackManifest(pinned.Sha256))
 		if os.IsNotExist(err) {
 			if data, err = s.fetchManifest(ctx, name, p.Source); err != nil {
 				return nil, "", err
@@ -251,14 +252,10 @@ func (s *Store) fetchManifest(ctx context.Context, name, url string) ([]byte, er
 	return []byte(buf.String()), nil
 }
 
-func (s *Store) manifestPath(sha string) string {
-	return filepath.Join(s.CacheDir, "packs", "url", sha+".json")
-}
-
 func (s *Store) storeManifest(data []byte) (string, error) {
 	sum := sha256.Sum256(data)
 	sha := hex.EncodeToString(sum[:])
-	path := s.manifestPath(sha)
+	path := s.Cache.PackManifest(sha)
 	if _, err := os.Stat(path); err == nil {
 		return sha, nil
 	}

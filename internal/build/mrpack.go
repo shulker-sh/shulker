@@ -183,7 +183,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 		if len(owners) == 0 {
 			continue
 		}
-		data, err := os.ReadFile(b.Cache.Path(m.Sha512))
+		data, err := os.ReadFile(b.Cache.Object(m.Sha512))
 		if err != nil {
 			return nil, out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", id)
 		}

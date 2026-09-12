@@ -59,7 +59,7 @@ func (r *Resolver) EnsureClientInstaller(ctx context.Context, mt *Meta) (Install
 	}
 	if s := l.Server; s != nil && s.URL == url && r.Cache.Has(s.Sha512) {
 		l.Client = &lock.Download{URL: url, Sha512: s.Sha512}
-		return InstallerJar{Path: r.Cache.Path(s.Sha512), Locked: true}, nil
+		return InstallerJar{Path: r.Cache.Object(s.Sha512), Locked: true}, nil
 	}
 	r.log("downloading the %s installer (loader %s)", l.Type, l.Version)
 	sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
@@ -67,7 +67,7 @@ func (r *Resolver) EnsureClientInstaller(ctx context.Context, mt *Meta) (Install
 		return InstallerJar{}, err
 	}
 	l.Client = &lock.Download{URL: url, Sha512: sha}
-	return InstallerJar{Path: r.Cache.Path(sha), Locked: true}, nil
+	return InstallerJar{Path: r.Cache.Object(sha), Locked: true}, nil
 }
 
 // ensureInstallerServer locks a loader's own installer jar plus everything it would download: the
@@ -92,7 +92,7 @@ func (r *Resolver) ensureInstallerServer(ctx context.Context, mt *Meta, installe
 	if err != nil {
 		return res, err
 	}
-	libs, err := meta.InstallerLibraries(r.Cache.Path(sha))
+	libs, err := meta.InstallerLibraries(r.Cache.Object(sha))
 	if err != nil {
 		return res, err
 	}
@@ -243,7 +243,7 @@ func (r *Resolver) fetchChecked(ctx context.Context, url, sha1 string) (string, 
 	if err != nil || sha1 == "" {
 		return sha, err
 	}
-	got, err := sha1Of(r.Cache.Path(sha))
+	got, err := sha1Of(r.Cache.Object(sha))
 	if err != nil {
 		return "", err
 	}

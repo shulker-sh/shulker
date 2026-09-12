@@ -82,7 +82,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 			v.Warnings = append(v.Warnings, fmt.Sprintf("%s is not downloaded; its metadata was not checked", id))
 			continue
 		}
-		info, err := jarmeta.Read(r.Cache.Path(m.Sha512), r.Lock.Loader.Type)
+		info, err := jarmeta.Read(r.Cache.Object(m.Sha512), r.Lock.Loader.Type)
 		if err != nil {
 			return nil, err
 		}

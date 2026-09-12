@@ -4,8 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -37,20 +35,11 @@ func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
-func (s *Store) mirrorDir(source string) string {
-	sum := sha256.Sum256([]byte(source))
-	return filepath.Join(s.CacheDir, "packs", "git", hex.EncodeToString(sum[:8])+".git")
-}
-
-func (s *Store) exportDir(commit string) string {
-	return filepath.Join(s.CacheDir, "packs", "src", commit)
-}
-
 func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (string, error) {
 	if s.offline() {
 		return "", fmt.Errorf("%s: %s: %w", what.label, source, fetch.ErrOffline)
 	}
-	dir := s.mirrorDir(source)
+	dir := s.Cache.PackMirror(source)
 	if _, err := os.Stat(dir); err == nil {
 		s.log("fetching %s", what.label)
 		if _, err := s.git(ctx, "--git-dir="+dir, "fetch", "--quiet", "origin"); err != nil {
@@ -105,7 +94,7 @@ func (s *Store) revParse(ctx context.Context, mirror, ref string) (string, error
 }
 
 func (s *Store) export(ctx context.Context, what origin, mirror, commit string) (string, error) {
-	dir := s.exportDir(commit)
+	dir := s.Cache.PackSource(commit)
 	if _, err := os.Stat(dir); err == nil {
 		return dir, nil
 	}
@@ -113,10 +102,7 @@ func (s *Store) export(ctx context.Context, what origin, mirror, commit string) 
 	if err != nil {
 		return "", gitFailure(err, what.code, "%s: commit %s is not available from the repository: %v", what.label, commit, err)
 	}
-	if err := os.MkdirAll(filepath.Join(s.CacheDir, "packs", "tmp"), 0o755); err != nil {
-		return "", err
-	}
-	tmp, err := os.MkdirTemp(filepath.Join(s.CacheDir, "packs", "tmp"), "src-*")
+	tmp, err := s.Cache.TempDir("src")
 	if err != nil {
 		return "", err
 	}

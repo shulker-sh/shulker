@@ -115,7 +115,7 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &pack.Store{CacheDir: d.cache.Dir, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress}, nil
+	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress}, nil
 }
 
 func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded, error) {

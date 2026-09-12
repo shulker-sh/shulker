@@ -556,7 +556,7 @@ func (b *Builder) hashSource(s source) (string, error) {
 		return sha256Hex(canonicalValues(s.owned.values())), nil
 	}
 	if s.sha512 != "" {
-		data, err := os.ReadFile(b.Cache.Path(s.sha512))
+		data, err := os.ReadFile(b.Cache.Object(s.sha512))
 		if err != nil {
 			return "", err
 		}
@@ -659,7 +659,7 @@ func (b *Builder) write(abs string, s source, m keyMerge) error {
 
 func (b *Builder) output(abs string, s source, m keyMerge) ([]byte, error) {
 	if s.sha512 != "" {
-		return os.ReadFile(b.Cache.Path(s.sha512))
+		return os.ReadFile(b.Cache.Object(s.sha512))
 	}
 	if s.owned == nil {
 		return s.data, nil

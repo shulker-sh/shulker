@@ -204,7 +204,7 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	if v.File.URL != "" {
 		sha, err := r.Cache.Fetch(ctx, r.Fetch, v.File.URL)
 		if err == nil {
-			got, err := sha1Of(r.Cache.Path(sha))
+			got, err := sha1Of(r.Cache.Object(sha))
 			if err != nil {
 				return obtained{}, err
 			}
@@ -212,7 +212,7 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 				return obtained{}, fmt.Errorf("%s: sha1 mismatch (expected %s…, got %s…)", v.File.URL, v.File.Sha1[:12], got[:12])
 			}
 			url := v.File.URL
-			return obtained{path: r.Cache.Path(sha), sha512: sha, url: &url}, nil
+			return obtained{path: r.Cache.Object(sha), sha512: sha, url: &url}, nil
 		}
 		if !errors.Is(err, fetch.ErrForbidden) {
 			return obtained{}, err
@@ -225,7 +225,7 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	}
 	for _, f := range files {
 		if f.Sha1 == v.File.Sha1 {
-			return obtained{path: r.Cache.Path(f.Sha512), sha512: f.Sha512, page: v.Page}, nil
+			return obtained{path: r.Cache.Object(f.Sha512), sha512: f.Sha512, page: v.Page}, nil
 		}
 	}
 	return obtained{}, out.Errorf("manual-download", "%s %s is not distributed by its provider: download %s from %s into %s/ and run the command again", proj.Slug, v.Number, v.File.Filename, v.Page, DownloadsDir)

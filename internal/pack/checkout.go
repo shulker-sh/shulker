@@ -88,7 +88,7 @@ func (s *Store) storeURL(c *Checkout, manifestData, lockData []byte) error {
 	h.Write(manifestData)
 	h.Write(lockData)
 	c.Sha256 = hex.EncodeToString(h.Sum(nil))
-	c.Dir = s.urlDir(c.Sha256)
+	c.Dir = s.Cache.ProjectCheckout(c.Sha256)
 	if _, err := os.Stat(filepath.Join(c.Dir, lock.FileName)); err == nil {
 		return nil
 	}
@@ -101,10 +101,6 @@ func (s *Store) storeURL(c *Checkout, manifestData, lockData []byte) error {
 	return fsutil.Write(filepath.Join(c.Dir, lock.FileName), lockData)
 }
 
-func (s *Store) urlDir(sha string) string {
-	return filepath.Join(s.CacheDir, "projects", "url", sha)
-}
-
 // lastGood records what a remote source looked like the last time a sync from it built
 // successfully; it is what a sync falls back to when the source can't be reached.
 type lastGood struct {
@@ -115,14 +111,9 @@ type lastGood struct {
 	At     time.Time `json:"at"`
 }
 
-func (s *Store) lastGoodPath(source, ref string) string {
-	sum := sha256.Sum256([]byte(source + "\x00" + ref))
-	return filepath.Join(s.CacheDir, "projects", "last-good", hex.EncodeToString(sum[:])+".json")
-}
-
 func (s *Store) readLastGood(source, ref string) (lastGood, bool) {
 	var rec lastGood
-	data, err := os.ReadFile(s.lastGoodPath(source, ref))
+	data, err := os.ReadFile(s.Cache.LastGood(source, ref))
 	if err != nil || json.Unmarshal(data, &rec) != nil || rec.Source != source {
 		return lastGood{}, false
 	}
@@ -136,7 +127,7 @@ func (s *Store) RecordGood(c *Checkout) error {
 		return nil
 	}
 	rec := lastGood{Source: c.Source, Ref: c.ref, Commit: c.Commit, Sha256: c.Sha256, At: time.Now().UTC()}
-	path := s.lastGoodPath(c.Source, c.ref)
+	path := s.Cache.LastGood(c.Source, c.ref)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -148,7 +139,7 @@ var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)
 func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 	c.Offline = true
 	if fullCommit.MatchString(c.ref) {
-		if dir := s.exportDir(c.ref); exists(dir) {
+		if dir := s.Cache.PackSource(c.ref); exists(dir) {
 			c.Commit, c.Dir = c.ref, dir
 			c.Warning = fmt.Sprintf("%s, using %s at %s, already downloaded", offlineReason(cause), c.Source, c.ref[:12])
 			return c, nil
@@ -156,10 +147,10 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 		return nil, neverSynced(c, cause)
 	}
 	rec, ok := s.readLastGood(c.Source, c.ref)
-	if !ok || rec.Commit == "" || !exists(s.exportDir(rec.Commit)) {
+	if !ok || rec.Commit == "" || !exists(s.Cache.PackSource(rec.Commit)) {
 		return nil, neverSynced(c, cause)
 	}
-	c.Commit, c.Dir, c.LastGood = rec.Commit, s.exportDir(rec.Commit), rec.At
+	c.Commit, c.Dir, c.LastGood = rec.Commit, s.Cache.PackSource(rec.Commit), rec.At
 	c.Warning = fmt.Sprintf("%s, using %s at %s from the last successful sync %s", offlineReason(cause), c.Source, rec.Commit[:12], ago(rec.At))
 	return c, nil
 }
@@ -167,10 +158,10 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 func (s *Store) urlFallback(c *Checkout, cause error) (*Checkout, error) {
 	c.Offline = true
 	rec, ok := s.readLastGood(c.Source, "")
-	if !ok || rec.Sha256 == "" || !exists(filepath.Join(s.urlDir(rec.Sha256), lock.FileName)) {
+	if !ok || rec.Sha256 == "" || !exists(filepath.Join(s.Cache.ProjectCheckout(rec.Sha256), lock.FileName)) {
 		return nil, neverSynced(c, cause)
 	}
-	c.Sha256, c.Dir, c.LastGood = rec.Sha256, s.urlDir(rec.Sha256), rec.At
+	c.Sha256, c.Dir, c.LastGood = rec.Sha256, s.Cache.ProjectCheckout(rec.Sha256), rec.At
 	c.Warning = fmt.Sprintf("%s, using %s from the last successful sync %s", offlineReason(cause), c.Source, ago(rec.At))
 	return c, nil
 }
