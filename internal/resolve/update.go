@@ -151,13 +151,14 @@ func (r *Resolver) relock(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	placed, _, err := r.place(ctx, p, proj, v, "", entry.Side, false)
+	placed, _, err := r.place(ctx, p, proj, v, "", entry.Side, entry.Channel, false)
 	if err != nil {
 		return err
 	}
 	if placed != id {
 		return out.Errorf("id-changed", "%s %s identifies itself as %s; remove it and add it again", id, v.Number, placed)
 	}
+	r.settle(id, entry.Side, entry.Channel)
 	for _, name := range direct.packs {
 		r.Lock.AddRequiredBy(id, name)
 	}

@@ -1,11 +1,17 @@
 package resolve
 
-import "shulker.sh/shulker/internal/lock"
+import (
+	"strings"
+
+	"shulker.sh/shulker/internal/lock"
+)
 
 type Snapshot struct {
-	mods   map[string]lock.Mod
-	listed map[string]bool
-	packs  map[string]lock.Pack
+	minecraft string
+	loader    lock.Loader
+	mods      map[string]lock.Mod
+	listed    map[string]bool
+	packs     map[string]lock.Pack
 }
 
 type AddedMod struct {
@@ -33,19 +39,20 @@ type RemovedMod struct {
 }
 
 type Changes struct {
-	Added   []AddedMod   `json:"added"`
-	Updated []Change     `json:"updated"`
-	Removed []RemovedMod `json:"removed"`
-	Packs   []PackChange `json:"packs"`
+	Platform []Change     `json:"platform"`
+	Added    []AddedMod   `json:"added"`
+	Updated  []Change     `json:"updated"`
+	Removed  []RemovedMod `json:"removed"`
+	Packs    []PackChange `json:"packs"`
 }
 
 func (c *Changes) Empty() bool {
-	return len(c.Added)+len(c.Updated)+len(c.Removed)+len(c.Packs) == 0
+	return len(c.Platform)+len(c.Added)+len(c.Updated)+len(c.Removed)+len(c.Packs) == 0
 }
 
 // Snapshot copies each RequiredBy because the resolver filters those slices in place.
 func (r *Resolver) Snapshot() Snapshot {
-	s := Snapshot{mods: map[string]lock.Mod{}, listed: map[string]bool{}, packs: map[string]lock.Pack{}}
+	s := Snapshot{minecraft: r.Lock.Minecraft, loader: r.Lock.Loader, mods: map[string]lock.Mod{}, listed: map[string]bool{}, packs: map[string]lock.Pack{}}
 	for id, m := range r.Lock.Mods {
 		m.RequiredBy = append([]string{}, m.RequiredBy...)
 		s.mods[id] = m
@@ -60,7 +67,13 @@ func (r *Resolver) Snapshot() Snapshot {
 }
 
 func (r *Resolver) Changes(before Snapshot) *Changes {
-	c := &Changes{Added: []AddedMod{}, Updated: []Change{}, Removed: []RemovedMod{}, Packs: PackChanges(before.packs, r.Lock.Packs)}
+	c := &Changes{Platform: []Change{}, Added: []AddedMod{}, Updated: []Change{}, Removed: []RemovedMod{}, Packs: PackChanges(before.packs, r.Lock.Packs)}
+	if before.minecraft != r.Lock.Minecraft {
+		c.Platform = append(c.Platform, Change{ID: "minecraft", From: before.minecraft, To: r.Lock.Minecraft})
+	}
+	if from, to := loaderLabel(before.loader), loaderLabel(r.Lock.Loader); from != to {
+		c.Platform = append(c.Platform, Change{ID: "loader", From: from, To: to})
+	}
 	for _, id := range r.lockIDs() {
 		now := r.Lock.Mods[id]
 		old, existed := before.mods[id]
@@ -88,6 +101,10 @@ func (r *Resolver) Changes(before Snapshot) *Changes {
 		}
 	}
 	return c
+}
+
+func loaderLabel(l lock.Loader) string {
+	return strings.TrimSpace(l.Type + " " + l.Version)
 }
 
 func nonNil(s []string) []string {

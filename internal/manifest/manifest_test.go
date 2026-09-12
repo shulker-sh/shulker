@@ -17,33 +17,9 @@ func TestRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		again, err := Parse(data)
-		if err != nil {
+		if _, err := Parse(data); err != nil {
 			t.Fatalf("%s: re-parse: %v", name, err)
 		}
-		h1, _ := m.ResolutionSha256()
-		h2, _ := again.ResolutionSha256()
-		if h1 != h2 {
-			t.Fatalf("%s: hash changed across round trip", name)
-		}
-	}
-}
-
-func TestResolutionHashIgnoresNonResolutionFields(t *testing.T) {
-	m, err := Load(filepath.Join("..", "..", "testdata", "two-target.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	before, _ := m.ResolutionSha256()
-	m.Name = "renamed"
-	m.Variables["motd"] = "changed"
-	after, _ := m.ResolutionSha256()
-	if before != after {
-		t.Fatal("name and variables must not affect the resolution hash")
-	}
-	m.Mods["lithium"] = Mod{Channel: "beta"}
-	if changed, _ := m.ResolutionSha256(); changed == before {
-		t.Fatal("mods must affect the resolution hash")
 	}
 }
 
@@ -62,7 +38,7 @@ func TestSaveRefusesInvalid(t *testing.T) {
 	}
 }
 
-func TestConditionsRoundTripAndSkipTheResolutionHash(t *testing.T) {
+func TestConditionsRoundTrip(t *testing.T) {
 	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"],"features":["fancy"]}},"mods":{"aa":{"os":"macos"},"bb":{"feature":["fancy","!shaders"]}}}`))
 	if err != nil {
 		t.Fatal(err)
@@ -76,10 +52,5 @@ func TestConditionsRoundTripAndSkipTheResolutionHash(t *testing.T) {
 	}
 	if s := string(data); !strings.Contains(s, `"os": "macos"`) || !strings.Contains(s, "\"feature\": [\n") {
 		t.Fatalf("encoded conditions: %s", s)
-	}
-	before, _ := m.ResolutionSha256()
-	m.Mods["aa"] = Mod{OS: StringList{"linux"}, Feature: StringList{"x"}}
-	if after, _ := m.ResolutionSha256(); after != before {
-		t.Fatal("conditions must not affect the resolution hash")
 	}
 }

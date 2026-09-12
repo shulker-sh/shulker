@@ -1,6 +1,5 @@
 {
   "lockVersion": 1,
-  "manifestSha256": "5d8a1f0c3b7e9a2d4c6f8e0b1a3d5c7e9f0a2b4c6d8e0f1a3b5c7d9e1f2a4b6c",
   "minecraft": "26.2",
   "loader": { "type": "fabric", "version": "0.17.3" },
   "java": { "major": 25, "component": "java-runtime-epsilon" },
@@ -17,6 +16,7 @@
     "appleskin": {
       "provider": "modrinth",
       "project": "EsAfCjCV",
+      "channel": "release",
       "version": "Qm3xP7Lr",
       "versionNumber": "3.0.10+mc26.2",
       "filename": "appleskin-fabric-mc26.2-3.0.10.jar",
@@ -29,6 +29,7 @@
     "betterthirdperson": {
       "provider": "curseforge",
       "project": 355424,
+      "channel": "release",
       "version": 6721093,
       "versionNumber": "1.9.2",
       "filename": "BetterThirdPerson-Fabric-26.2-1.9.2.jar",
@@ -42,6 +43,7 @@
     "fabric-api": {
       "provider": "modrinth",
       "project": "P7dR8mSH",
+      "channel": "release",
       "version": "b2Xw9NzT",
       "versionNumber": "0.160.2+26.2",
       "filename": "fabric-api-0.160.2+26.2.jar",
@@ -54,6 +56,7 @@
     "iris": {
       "provider": "modrinth",
       "project": "YL57xq9U",
+      "channel": "beta",
       "version": "k9RhZq2X",
       "versionNumber": "1.11.3+mc26.2-fabric",
       "filename": "iris-fabric-1.11.3+mc26.2.jar",
@@ -66,6 +69,7 @@
     "lithium": {
       "provider": "modrinth",
       "project": "gvQqBUqZ",
+      "channel": "release",
       "version": "Hs4dV1Wn",
       "versionNumber": "mc26.2-0.25.3-fabric",
       "filename": "lithium-fabric-0.25.3+mc26.2.jar",
@@ -78,6 +82,7 @@
     "sodium": {
       "provider": "modrinth",
       "project": "AANobbMI",
+      "channel": "beta",
       "version": "Zp8uK3Fy",
       "versionNumber": "mc26.2-0.9.2-beta.1-fabric",
       "filename": "sodium-fabric-0.9.2-beta.1+mc26.2.jar",

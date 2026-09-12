@@ -1,18 +1,21 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
 
 type lockChanges struct {
 	*resolve.Changes
+	Reresolved  []string `json:"reresolved"`
 	Suggestions []string `json:"suggestions"`
 	Pin         string   `json:"pin,omitempty"`
 }
@@ -98,6 +101,9 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	if err != nil {
 		return err
 	}
+	if p.Lock == nil && cmd.Name() == "lock" {
+		p.Lock = lock.New()
+	}
 	if err := p.RequireLock(); err != nil {
 		return err
 	}
@@ -106,11 +112,21 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		return err
 	}
 	before := r.Snapshot()
+	if err := a.resolveMovedRefs(cmd.Context(), p, r); err != nil {
+		return err
+	}
+	reresolved, err := r.Reconcile(cmd.Context())
+	if err != nil {
+		return err
+	}
+	if reresolved == nil {
+		reresolved = []string{}
+	}
 	pin, err := run(p, r)
 	if err != nil {
 		return err
 	}
-	if err := r.RefreshPacks(r.Packs); err != nil {
+	if _, err := r.Reconcile(cmd.Context()); err != nil {
 		return err
 	}
 	v, err := r.Validate()
@@ -128,7 +144,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	}
 	a.printer.LockStale = false
 	a.warn(v.Warnings)
-	res := lockChanges{Changes: r.Changes(before), Pin: pin, Suggestions: v.Recommended()}
+	res := lockChanges{Changes: r.Changes(before), Reresolved: reresolved, Pin: pin, Suggestions: v.Recommended()}
 	optional := 0
 	for _, s := range v.Suggestions {
 		if s.Kind == "optional" && slices.ContainsFunc(res.Added, func(m resolve.AddedMod) bool { return m.ID == s.Mod }) {
@@ -141,6 +157,9 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		}
 		if cmd.Name() == "unpin" {
 			fmt.Fprintf(w, "Unpinned %s.\n", cmd.Flags().Arg(0))
+		}
+		if len(res.Reresolved) > 0 {
+			fmt.Fprintf(w, "Re-resolved every mod: %s\n", strings.Join(res.Reresolved, "; "))
 		}
 		printChanges(w, res.Changes)
 		for _, s := range res.Suggestions {
@@ -155,6 +174,25 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		}
 		fmt.Fprintln(w, "Next: shulker install")
 	})
+}
+
+func (a *app) resolveMovedRefs(ctx context.Context, p *project.Project, r *resolve.Resolver) error {
+	for i, mp := range p.Manifest.Packs {
+		pinned, locked := p.Lock.Packs[mp.Source]
+		if !locked || pinned.Ref == mp.Ref {
+			continue
+		}
+		store, err := a.packStore(p)
+		if err != nil {
+			return err
+		}
+		loaded, err := store.Resolve(ctx, mp)
+		if err != nil {
+			return err
+		}
+		r.Packs[i] = loaded
+	}
+	return nil
 }
 
 func (a *app) outdatedCmd() *cobra.Command {
@@ -196,6 +234,13 @@ func (a *app) outdatedCmd() *cobra.Command {
 }
 
 func printChanges(w io.Writer, c *resolve.Changes) {
+	for _, p := range c.Platform {
+		if p.From == "" {
+			fmt.Fprintf(w, "+ %s %s\n", p.ID, p.To)
+			continue
+		}
+		fmt.Fprintf(w, "~ %s %s -> %s\n", p.ID, p.From, p.To)
+	}
 	for _, p := range c.Packs {
 		switch {
 		case p.From == "":

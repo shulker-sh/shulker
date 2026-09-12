@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -39,8 +40,10 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 			if err := p.RequireLock(); err != nil {
 				return err
 			}
-			if a.printer.LockStale {
-				return out.Errorf("lock-stale", "shulker.lock does not match shulker.json; run `shulker add`, `remove`, or `update`")
+			if diffs := p.LockDifferences(); len(diffs) > 0 {
+				e := out.Errorf("lock-stale", "shulker.lock does not match shulker.json (%s); run `shulker lock`", strings.Join(diffs, "; "))
+				e.Items = diffs
+				return e
 			}
 			if version == "" {
 				version = p.Manifest.Version

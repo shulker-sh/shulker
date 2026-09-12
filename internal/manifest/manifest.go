@@ -2,8 +2,6 @@ package manifest
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"maps"
 	"os"
@@ -129,11 +127,6 @@ type Mod struct {
 	Note     string     `json:"note,omitempty"`
 }
 
-func (m Mod) WithoutConditions() Mod {
-	m.OS, m.Feature = nil, nil
-	return m
-}
-
 type StringList []string
 
 func (l *StringList) UnmarshalJSON(data []byte) error {
@@ -233,24 +226,4 @@ func (m *Manifest) ProviderOrder() []string {
 		return DefaultProviders
 	}
 	return m.Providers
-}
-
-func (m *Manifest) ResolutionSha256() (string, error) {
-	fields := struct {
-		Minecraft string         `json:"minecraft"`
-		Loader    Loader         `json:"loader"`
-		Providers []string       `json:"providers"`
-		Packs     []Pack         `json:"packs"`
-		Mods      map[string]Mod `json:"mods"`
-		Ignore    []Ignore       `json:"ignore"`
-	}{m.Minecraft, m.Loader, m.ProviderOrder(), m.Packs, map[string]Mod{}, m.Ignore}
-	for id, mod := range m.Mods {
-		fields.Mods[id] = mod.WithoutConditions()
-	}
-	data, err := json.Marshal(fields)
-	if err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:]), nil
 }

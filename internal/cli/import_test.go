@@ -125,7 +125,7 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 	if got := m.Targets["client"].Overrides; strings.Join(got, ",") != "overrides" {
 		t.Fatalf("target overrides: %v", got)
 	}
-	if l.ManifestSha256 == "" || len(l.Mods) != 2 || strings.Join(l.Mods["fabric-api"].RequiredBy, ",") != "sodium" {
+	if len(l.Mods) != 2 || strings.Join(l.Mods["fabric-api"].RequiredBy, ",") != "sodium" {
 		t.Fatalf("lock: %+v", l)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "overrides", "options.txt")); !os.IsNotExist(err) {

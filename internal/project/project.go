@@ -41,26 +41,11 @@ func (p *Project) LockPath() string     { return filepath.Join(p.Dir, lock.FileN
 
 func (p *Project) RequireLock() error {
 	if p.Lock == nil {
-		return out.Errorf("lock-not-found", "no %s; run `shulker install` after `shulker init`", lock.FileName)
+		return out.Errorf("lock-not-found", "no %s; run `shulker lock`", lock.FileName)
 	}
 	return nil
 }
 
-func (p *Project) LockStale() bool {
-	if p.Lock == nil {
-		return true
-	}
-	h, err := p.Manifest.ResolutionSha256()
-	return err != nil || h != p.Lock.ManifestSha256
-}
-
 func (p *Project) SaveManifest() error { return p.Manifest.Save(p.ManifestPath()) }
 
-func (p *Project) SaveLock() error {
-	h, err := p.Manifest.ResolutionSha256()
-	if err != nil {
-		return err
-	}
-	p.Lock.ManifestSha256 = h
-	return p.Lock.Save(p.LockPath())
-}
+func (p *Project) SaveLock() error { return p.Lock.Save(p.LockPath()) }

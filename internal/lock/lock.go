@@ -16,14 +16,13 @@ import (
 const FileName = "shulker.lock"
 
 type Lock struct {
-	LockVersion    int             `json:"lockVersion"`
-	ManifestSha256 string          `json:"manifestSha256"`
-	Minecraft      string          `json:"minecraft"`
-	Loader         Loader          `json:"loader"`
-	Java           Java            `json:"java"`
-	Packs          map[string]Pack `json:"packs"`
-	Mods           map[string]Mod  `json:"mods"`
-	Players        []Player        `json:"players"`
+	LockVersion int             `json:"lockVersion"`
+	Minecraft   string          `json:"minecraft"`
+	Loader      Loader          `json:"loader"`
+	Java        Java            `json:"java"`
+	Packs       map[string]Pack `json:"packs"`
+	Mods        map[string]Mod  `json:"mods"`
+	Players     []Player        `json:"players"`
 }
 
 type Loader struct {
@@ -82,6 +81,7 @@ type Mod struct {
 	Page          string   `json:"page,omitempty"`
 	Sha512        string   `json:"sha512"`
 	Side          string   `json:"side"`
+	Channel       string   `json:"channel"`
 	RequiredBy    []string `json:"requiredBy"`
 	Aliases       Aliases  `json:"aliases"`
 }

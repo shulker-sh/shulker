@@ -10,6 +10,7 @@ outline: [2, 3]
 | [`shulker init`](#shulker-init) | Create shulker.json and a lock in the current directory |
 | [`shulker add <mod>...`](#shulker-add) | Add mods to the manifest and lock |
 | [`shulker remove <mod>...`](#shulker-remove) | Remove mods from the manifest and lock |
+| [`shulker lock`](#shulker-lock) | Bring the lock in line with shulker.json without upgrading |
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
 | [`shulker outdated [mod...]`](#shulker-outdated) | Show mods with a newer compatible version |
 | [`shulker suggests`](#shulker-suggests) | List mods that locked mods recommend and that aren't installed |
@@ -126,6 +127,16 @@ Remove mods from the manifest and prune dependencies nothing else needs. Alias: 
 
 ```sh
 shulker remove lithium
+```
+
+### `shulker lock`
+
+Bring `shulker.lock` in line with `shulker.json` after you edit it by hand, without upgrading anything. Mods new to `shulker.json` are resolved, mods nothing lists or requires are dropped, and a mod whose channel, pin, side, provider, or project changed is picked again. Every other mod keeps its locked version, and packs stay at their locked commit unless their `ref` changed. When the locked Minecraft or loader version no longer matches `shulker.json`, or a mod is locked from a provider `shulker.json` no longer lists, every mod is resolved again and `reresolved` says why. Without a `shulker.lock`, `lock` creates one.
+
+`add`, `remove`, `update`, `pin`, `unpin`, `pack add`, and `pack remove` do the same before their own change, so a hand edit is never left out of the lock. What they bring in shows up in their output.
+
+```sh
+shulker lock
 ```
 
 ### `shulker update`
@@ -569,7 +580,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | --- | --- |
 | `ok` | `true` when the command succeeded |
 | `command` | The command that ran, like `pack add` |
-| `lockStale` | `shulker.lock` doesn't match `shulker.json`; `add`, `remove`, or `update` refreshes it. Commands that build from the lock warn and carry on; `export` refuses |
+| `lockStale` | `shulker.lock` doesn't match `shulker.json`; `shulker lock` brings it in line. Commands that build from the lock warn, naming each difference, and carry on; `export` refuses |
 | `warnings` | Everything shulker would print as `warning:` without `--json`. Always present, empty when there are none |
 | `data` | The command's result. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
 | `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `candidates` or `items` |
@@ -587,10 +598,12 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 ### Lock changes
 
-`add`, `remove`, `update`, `pin`, `unpin`, `pack add`, and `pack remove` all return the same `data`: what changed in `shulker.lock` and `shulker.json`.
+`lock`, `add`, `remove`, `update`, `pin`, `unpin`, `pack add`, and `pack remove` all return the same `data`: what changed in `shulker.lock` and `shulker.json`.
 
 ```json
 {
+  "reresolved": [],
+  "platform": [],
   "added": [{ "id": "fabric-api", "versionNumber": "0.119.0", "side": "both", "provider": "modrinth", "requiredBy": ["sodium"] }],
   "updated": [{ "id": "lithium", "from": "0.14.1", "to": "0.14.3" }],
   "removed": [{ "id": "iris", "versionNumber": "1.8.0", "requiredBy": [] }],
@@ -601,6 +614,8 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 | Field | Description |
 | --- | --- |
+| `reresolved` | Why every mod was resolved again, one difference per entry, like `minecraft: locked 26.1 is outside ~26.2`. Empty when only some mods changed |
+| `platform` | `minecraft` and `loader` when their locked version changed, as `{ "id", "from", "to" }`. `from` is empty for a new lock |
 | `added` | Mods newly locked. `requiredBy` names the mods and packs that pulled one in; empty when only `shulker.json` lists it. `alreadyLocked` marks a dependency that `add` just listed in `shulker.json` |
 | `updated` | Mods whose locked version changed. `fromProvider` and `toProvider` appear when the provider changed |
 | `removed` | Mods no longer locked, with the `requiredBy` they had. `stillLocked` marks a mod taken out of `shulker.json` that a pack still provides |
@@ -643,8 +658,8 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-invalid` | `shulker.local.json` isn't valid JSON |
 | `lock-invalid` | `shulker.lock` doesn't parse or match its schema, or a change would make it invalid |
-| `lock-not-found` | No `shulker.lock`; run `shulker install` |
-| `lock-stale` | `export` needs a lock that matches `shulker.json`; other commands only warn |
+| `lock-not-found` | No `shulker.lock`; run `shulker lock` |
+| `lock-stale` | `export` needs a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
 | `manifest-invalid` | `shulker.json` doesn't parse or match its schema, or a change would make it invalid |
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |

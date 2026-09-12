@@ -4,14 +4,10 @@
   "title": "shulker.lock",
   "description": "Shulker lock file. Tool-owned, key-sorted, pretty-printed. Records the exact resolution of shulker.json; install and build read only this file.",
   "type": "object",
-  "required": ["lockVersion", "manifestSha256", "minecraft", "loader", "java", "packs", "mods", "players"],
+  "required": ["lockVersion", "minecraft", "loader", "java", "packs", "mods", "players"],
   "additionalProperties": false,
   "properties": {
     "lockVersion": { "type": "integer", "const": 1 },
-    "manifestSha256": {
-      "$ref": "#/$defs/sha256",
-      "description": "Hash of the resolution-relevant manifest fields (minecraft, loader, providers, packs, mods, ignore). install warns on mismatch; build and serve refuse unless forced."
-    },
     "minecraft": {
       "type": "string",
       "minLength": 1,
@@ -115,7 +111,7 @@
     },
     "mod": {
       "type": "object",
-      "required": ["provider", "project", "version", "versionNumber", "filename", "url", "sha512", "side", "requiredBy", "aliases"],
+      "required": ["provider", "project", "version", "versionNumber", "filename", "url", "sha512", "side", "channel", "requiredBy", "aliases"],
       "additionalProperties": false,
       "properties": {
         "provider": { "type": "string", "enum": ["modrinth", "curseforge"] },
@@ -135,6 +131,7 @@
         },
         "sha512": { "$ref": "#/$defs/sha512", "description": "Cache key and install verification hash." },
         "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Effective side after any manifest override." },
+        "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked: the manifest's channel for a mod listed there or in a pack, the requiring mod's for a dependency. A listed mod whose manifest channel differs makes the lock out of date." },
         "requiredBy": {
           "type": "array",
           "uniqueItems": true,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
@@ -94,6 +95,7 @@ func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolv
 		Cache:     d.cache,
 		Fetch:     d.fetch,
 		Packs:     packs,
+		Meta:      d.meta,
 		Log:       a.progress,
 	}, nil
 }
@@ -213,8 +215,8 @@ func (a *app) requireLock(p *project.Project) error {
 	if err := p.RequireLock(); err != nil {
 		return err
 	}
-	if a.printer.LockStale {
-		a.printer.Warn("shulker.lock is out of date with shulker.json; run `shulker add`, `remove`, or `update` to refresh it")
+	if diffs := p.LockDifferences(); len(diffs) > 0 {
+		a.printer.Warn("shulker.lock is out of date with shulker.json (%s); run `shulker lock`", strings.Join(diffs, "; "))
 	}
 	return nil
 }

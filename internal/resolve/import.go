@@ -91,7 +91,7 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if err != nil {
 		return err
 	}
-	id, prior, err := im.r.place(ctx, im.modrinth, proj, v, "", "", false)
+	id, prior, err := im.r.place(ctx, im.modrinth, proj, v, "", "", "", false)
 	if err != nil {
 		return err
 	}

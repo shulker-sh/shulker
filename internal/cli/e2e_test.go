@@ -659,13 +659,13 @@ func TestStaleLockWarnsAndBuilds(t *testing.T) {
 	code, stdout, _ := h.run(t, "build", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code != 0 || !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "shulker.lock is out of date") {
+	if code != 0 || !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "shulker.lock is out of date with shulker.json (sodium: channel release -> beta); run `shulker lock`") {
 		t.Fatalf("code=%d env=%+v", code, env)
 	}
 	code, stdout, _ = h.run(t, "export", "mrpack", "--version", "1.0.0", "--json")
 	env = out.Envelope{}
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || !env.LockStale || env.Error.Code != "lock-stale" {
+	if code == 0 || !env.LockStale || env.Error.Code != "lock-stale" || len(env.Error.Items) != 1 || env.Error.Items[0] != "sodium: channel release -> beta" {
 		t.Fatalf("export must refuse a stale lock: code=%d env=%+v", code, env)
 	}
 	env = out.Envelope{}
@@ -674,6 +674,96 @@ func TestStaleLockWarnsAndBuilds(t *testing.T) {
 	}
 	if !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "shulker.lock is out of date") {
 		t.Fatalf("install warns about the stale lock in the envelope: %+v", env)
+	}
+	h.mustRun(t, "lock")
+	if l := h.readLock(t); l.Mods["sodium"].Channel != "beta" {
+		t.Fatalf("lock records the new channel: %+v", l.Mods["sodium"])
+	}
+	env = out.Envelope{}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "build", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.LockStale || len(env.Warnings) != 0 {
+		t.Fatalf("build after lock: %+v", env)
+	}
+}
+
+func TestAddLocksHandAddedMods(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.editManifest(t, func(m map[string]any) {
+		m["mods"] = map[string]any{"sodium": map[string]any{}}
+	})
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(h.mustRun(t, "add", "fabric-api", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	added := env.Data.(map[string]any)["added"].([]any)
+	if env.LockStale || len(added) != 2 || added[1].(map[string]any)["id"] != "sodium" {
+		t.Fatalf("add after a hand-added mod: %+v", env)
+	}
+	if l := h.readLock(t); l.Mods["sodium"].Channel != "release" || len(l.Mods["fabric-api"].RequiredBy) != 1 {
+		t.Fatalf("lock: %+v", l.Mods)
+	}
+	if _, stderr := h.mustRunStderr(t, "build"); strings.Contains(stderr, "out of date") {
+		t.Fatalf("build after add: %s", stderr)
+	}
+}
+
+func TestLockOnlyRepicksWhatChanged(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "add", "sodium", "fabric-api")
+	h.newer = true
+	h.editManifest(t, func(m map[string]any) {
+		m["mods"].(map[string]any)["fabric-api"] = map[string]any{"side": "server"}
+	})
+	code, stdout, _ := h.run(t, "install", "--json")
+	var env out.Envelope
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code != 0 || !env.LockStale || !strings.Contains(strings.Join(env.Warnings, "\n"), "(fabric-api: side both -> server)") {
+		t.Fatalf("stale warning: code=%d env=%+v", code, env)
+	}
+	h.mustRun(t, "lock")
+	if l := h.readLock(t); l.Mods["sodium"].VersionNumber != "1.0.0+mc26.2" || l.Mods["fabric-api"].Side != "server" {
+		t.Fatalf("lock must re-pick only fabric-api: %+v", l.Mods)
+	}
+	if out := h.mustRun(t, "lock"); !strings.Contains(out, "Already up to date") {
+		t.Fatalf("second lock: %s", out)
+	}
+}
+
+func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "add", "sodium")
+	h.editManifest(t, func(m map[string]any) { m["mods"] = map[string]any{} })
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if removed := env.Data.(map[string]any)["removed"].([]any); len(removed) != 2 {
+		t.Fatalf("lock after removing sodium by hand: %+v", env.Data)
+	}
+
+	h.editManifest(t, func(m map[string]any) { m["mods"] = map[string]any{"sodium": map[string]any{}} })
+	if err := os.Remove(filepath.Join(h.dir, "shulker.lock")); err != nil {
+		t.Fatal(err)
+	}
+	if code, stdout, _ := h.run(t, "build", "--json"); code == 0 || !strings.Contains(stdout, "run `shulker lock`") {
+		t.Fatalf("build without a lock: code=%d %s", code, stdout)
+	}
+	env = out.Envelope{}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	data := env.Data.(map[string]any)
+	platform := data["platform"].([]any)
+	if len(platform) != 2 || platform[0].(map[string]any)["to"] != "26.2" || len(data["added"].([]any)) != 2 || len(data["reresolved"].([]any)) != 2 {
+		t.Fatalf("lock from scratch: %+v", data)
+	}
+	if l := h.readLock(t); l.Minecraft != "26.2" || len(l.Mods) != 2 {
+		t.Fatalf("recreated lock: %+v", l)
 	}
 }
 

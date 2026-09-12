@@ -28,6 +28,7 @@ type Resolver struct {
 	Cache     *cache.Cache
 	Fetch     *fetch.Client
 	Packs     []*pack.Loaded
+	Meta      *Meta
 	Log       func(format string, args ...any)
 }
 
@@ -105,7 +106,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if err != nil {
 		return err
 	}
-	id, prior, err := r.place(ctx, p, proj, v, "", opts.Side, explicit)
+	id, prior, err := r.place(ctx, p, proj, v, "", opts.Side, opts.Channel, explicit)
 	if err != nil {
 		return err
 	}
@@ -120,6 +121,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 			opts.Channel = previous.Channel
 		}
 	}
+	r.settle(id, opts.Side, opts.Channel)
 	visited := map[string]bool{proj.ID: true}
 	if err := r.addDeps(ctx, p, v, id, opts.Channel, visited); err != nil {
 		return err
@@ -231,7 +233,19 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	return obtained{}, out.Errorf("manual-download", "%s %s is not distributed by its provider: download %s from %s into %s/ and run the command again", proj.Slug, v.Number, v.File.Filename, v.Page, DownloadsDir)
 }
 
-func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, requiredBy, sideOverride string, replace bool) (string, *lock.Mod, error) {
+func (r *Resolver) settle(id, side, channel string) {
+	m, ok := r.Lock.Mods[id]
+	if !ok {
+		return
+	}
+	m.Channel = channelLabel(channel)
+	if side != "" {
+		m.Side = side
+	}
+	r.Lock.Mods[id] = m
+}
+
+func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, requiredBy, sideOverride, channel string, replace bool) (string, *lock.Mod, error) {
 	r.log("fetching %s %s", proj.Slug, v.Number)
 	got, err := r.obtain(ctx, proj, v)
 	if err != nil {
@@ -280,6 +294,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		Page:          got.page,
 		Sha512:        got.sha512,
 		Side:          side,
+		Channel:       channelLabel(channel),
 		RequiredBy:    []string{},
 	}
 	if requiredBy != "" {
@@ -344,7 +359,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 				return fmt.Errorf("dependency of %s: %w", parentID, err)
 			}
 		}
-		id, _, err := r.place(ctx, p, dproj, dv, parentID, "", false)
+		id, _, err := r.place(ctx, p, dproj, dv, parentID, "", channel, false)
 		if err != nil {
 			return err
 		}

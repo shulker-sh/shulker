@@ -28,7 +28,6 @@ func TestRoundTrip(t *testing.T) {
 
 func TestNewSaves(t *testing.T) {
 	l := New()
-	l.ManifestSha256 = "5d8a1f0c3b7e9a2d4c6f8e0b1a3d5c7e9f0a2b4c6d8e0f1a3b5c7d9e1f2a4b6c"
 	l.Minecraft = "26.2"
 	l.Loader = Loader{Type: "fabric", Version: "0.17.3"}
 	l.Java = Java{Major: 25, Component: "java-runtime-epsilon"}
