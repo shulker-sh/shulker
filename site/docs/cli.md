@@ -866,7 +866,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `missing-files` | Mods that need a manual download are missing. `items`: what to download |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
-| `mrpack-host-not-allowed` | Modrinth launchers won't download these mods; pass `--bundle`. `items`: the mods |
+| `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these mods; pass `--bundle`. `items`: the mods |
 | `mrpack-invalid` | The modpack is malformed |
 | `mrpack-marker` | The modpack's shulker marker can't be read |
 | `mrpack-unsupported` | The modpack's format or loader isn't supported |
