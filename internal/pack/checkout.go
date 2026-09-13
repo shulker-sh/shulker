@@ -179,9 +179,32 @@ func neverSynced(c *Checkout, cause error) error {
 		what = fmt.Sprintf("%s (ref %s)", c.Source, c.ref)
 	}
 	if errors.Is(cause, fetch.ErrOffline) {
-		return out.Errorf("source-offline", "--offline, but %s has never synced successfully here, so there's no copy to use", what)
+		e := out.Errorf("source-offline", "--offline, and %s has never synced here", what)
+		e.Help = "run it once without --offline to fetch a copy"
+		return e
 	}
-	return out.Errorf("source-offline", "couldn't reach %s, and it has never synced successfully here, so there's no copy to fall back to: %v", what, cause)
+	const noCopy = "it has never synced here, so there's no copy to fall back to"
+	e := out.Errorf("source-offline", "couldn't reach %s\n%s", what, noCopy)
+	if label, reason := unreachableReason(c, cause); reason != "" {
+		e.Rows = append(e.Rows, out.Detail{Label: label, Text: reason})
+	}
+	e.Rows = append(e.Rows, out.Detail{Text: noCopy})
+	e.Help = "check the address and that the server is running, then try again"
+	return e
+}
+
+var (
+	gitReasonPrefix  = regexp.MustCompile(`(?s)^.*? failed: (?:fatal: )?(?:unable to access '[^']*': )?`)
+	httpReasonPrefix = regexp.MustCompile(`(?s)^.*?(?:Get|Head) "[^"]*": `)
+)
+
+// unreachableReason is git's or the HTTP client's own words for the failure, without the
+// source URL they repeat.
+func unreachableReason(c *Checkout, cause error) (string, string) {
+	if c.Kind == Git {
+		return "git", strings.TrimSpace(gitReasonPrefix.ReplaceAllString(cause.Error(), ""))
+	}
+	return "http", strings.TrimSpace(httpReasonPrefix.ReplaceAllString(cause.Error(), ""))
 }
 
 func exists(path string) bool {

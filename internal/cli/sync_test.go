@@ -231,6 +231,10 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 			t.Fatalf("%v: nothing synced to fall back to: exit %d %s", args, code, stdout)
 		}
 	}
+	_, _, offlineErr := h.run(t, "sync", srv.URL+"/never.git", "--into", into)
+	if !strings.Contains(offlineErr, "couldn't reach "+srv.URL+"/never.git") || !strings.Contains(offlineErr, "git: ") || strings.Contains(offlineErr, "fatal:") || strings.Contains(offlineErr, "cloning") || !strings.Contains(offlineErr, "help: check the address") {
+		t.Fatalf("unreachable git source rows: %s", offlineErr)
+	}
 }
 
 func TestSyncOfflineKeepsTheInstalledRuntime(t *testing.T) {
@@ -330,6 +334,10 @@ func TestSyncFromManifestURL(t *testing.T) {
 	code, stdout, _ = h.run(t, "sync", srv.URL+"/other/shulker.json", "--into", into, "--json")
 	if code == 0 || failureCode(t, stdout).Code != "source-offline" {
 		t.Fatalf("unreachable url with nothing synced: exit %d %s", code, stdout)
+	}
+	_, _, offlineErr := h.run(t, "sync", srv.URL+"/other/shulker.json", "--into", into)
+	if !strings.Contains(offlineErr, "http: dial tcp") || strings.Contains(offlineErr, `Get "`) {
+		t.Fatalf("unreachable url rows: %s", offlineErr)
 	}
 }
 
