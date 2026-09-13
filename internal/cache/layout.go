@@ -18,7 +18,6 @@ import (
 //	packs/url/<sha>.json           a manifest fetched from a raw URL
 //	projects/url/<sha>             a project source fetched from a URL
 //	projects/last-good/<sha>.json  the last sync from a source that built
-//	mrpack/<slug>.mrpack           the pack handed to Modrinth App by `link modrinth`
 //
 // Paths are built here and nowhere else.
 
@@ -46,10 +45,6 @@ func (c *Cache) PackManifest(sha string) string {
 
 func (c *Cache) ProjectCheckout(sha string) string {
 	return filepath.Join(c.Dir, "projects", "url", sha)
-}
-
-func (c *Cache) Mrpack(slug string) string {
-	return filepath.Join(c.Dir, "mrpack", slug+".mrpack")
 }
 
 func (c *Cache) LastGood(source, ref string) string {

@@ -29,7 +29,6 @@ All notable changes to shulker are documented here. The format is based on
 - A ModMenu entry with the pack's name, version, description, authors and links, which badges managed mods and turns off their update checks; NeoForge and Forge packs get the same summary in the mod list.
 - `sync` builds a target of a local project, git repository or manifest URL into any directory, and falls back to the last successful sync when the network is down (`--offline` skips the network).
 - `link prism`, `link multimc` and `link mojang` (alias `vanilla`) create instances or profiles for the client build; a Prism instance syncs before each launch. Every `link` takes a project directory, git URL, or manifest URL, so a pack can be played without a project of your own; a remote `link mojang` keeps its game directory under `shulker/` in the launcher folder.
-- `link modrinth` exports the pack as an `.mrpack` and opens it in Modrinth App, which creates the instance and installs everything; shulker records the instance folder so `sync --instance` and `sync --all` update it later.
 - `links` lists linked instances and synced directories; `sync --instance`, `sync --all` and a picker update them by name, and a bare `sync` inside a project updates just that project's entries; `unlink` stops syncing one.
 - `export mrpack` and `import mrpack` for Modrinth modpacks.
 - `--json` on every command: one envelope with the result, every warning and, on failure, a stable error code; the codes are listed in the CLI reference, and the plain error line ends with the same code.

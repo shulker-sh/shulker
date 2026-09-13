@@ -24,14 +24,11 @@ var MrpackHosts = []string{"cdn.modrinth.com", "github.com", "raw.githubusercont
 
 type MrpackOptions struct {
 	Targets   []string
-	Name      string
 	VersionID string
 	Output    string
 	Bundle    bool
-	// Local means the archive is opened on this machine, so bundling needs no warning.
-	Local    bool
-	OS       string
-	Features map[string]bool
+	OS        string
+	Features  map[string]bool
 }
 
 type MrpackReport struct {
@@ -57,14 +54,14 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets, opts.Name), Targets: []string{}, Mods: []string{}, Bundled: []string{}, Overrides: []string{}, Warnings: []string{}}
+	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, Bundled: []string{}, Overrides: []string{}, Warnings: []string{}}
 	for _, t := range targets {
 		report.Targets = append(report.Targets, t.name)
 		if err := b.mrpackCollect(t, opts, report); err != nil {
 			return nil, err
 		}
 	}
-	files, err := b.mrpackMods(targets, opts, report)
+	files, err := b.mrpackMods(targets, opts.Bundle, report)
 	if err != nil {
 		return nil, err
 	}
@@ -119,10 +116,7 @@ func (b *Builder) mrpackTargets(names []string) ([]*mrpackTarget, error) {
 	return targets, nil
 }
 
-func (b *Builder) mrpackName(targets []*mrpackTarget, want string) string {
-	if want != "" {
-		return want
-	}
+func (b *Builder) mrpackName(targets []*mrpackTarget) string {
 	pick := targets[0]
 	for _, t := range targets {
 		if t.side == "client" {
@@ -170,7 +164,7 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, opts MrpackOptions, report *Mrp
 	return nil
 }
 
-func (b *Builder) mrpackMods(targets []*mrpackTarget, opts MrpackOptions, report *MrpackReport) ([]mrpack.File, error) {
+func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpack.File, error) {
 	files := []mrpack.File{}
 	var blocked []string
 	ids := make([]string, 0, len(b.Lock.Mods))
@@ -205,7 +199,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, opts MrpackOptions, report
 			report.Mods = append(report.Mods, id)
 			continue
 		}
-		if !opts.Bundle {
+		if !bundle {
 			blocked = append(blocked, id+" ("+mrpackOrigin(m.Provider, m.URL)+")")
 			continue
 		}
@@ -213,9 +207,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, opts MrpackOptions, report
 			t.files["mods/"+m.Filename] = data
 		}
 		report.Bundled = append(report.Bundled, id)
-		if !opts.Local {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s from %s into the archive; recipients receive the file itself, not a download link", id, mrpackOrigin(m.Provider, m.URL)))
-		}
+		report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s from %s into the archive; recipients receive the file itself, not a download link", id, mrpackOrigin(m.Provider, m.URL)))
 	}
 	if len(blocked) > 0 {
 		e := out.Errorf("mrpack-host-not-allowed", "Modrinth launchers only download from %s; pass --bundle to ship these mods inside the archive instead: %s", strings.Join(MrpackHosts, ", "), strings.Join(blocked, ", "))

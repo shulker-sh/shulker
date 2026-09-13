@@ -34,7 +34,6 @@ outline: [2, 3]
 | [`shulker serve [target]`](#shulker-serve) | Build a server target and run it in the foreground |
 | [`shulker link mojang [source]`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
 | [`shulker link prism [source]`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
-| [`shulker link modrinth [source]`](#shulker-link-modrinth) | Create a Modrinth App instance for the client build |
 | [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
 | [`shulker links`](#shulker-links) | List linked launcher instances and synced directories |
 | [`shulker unlink <name>`](#shulker-unlink) | Stop syncing a linked instance or synced directory, keeping its files |
@@ -380,7 +379,7 @@ shulker feature on shaders --instance "Friends SMP"
 | --- | --- |
 | `--into <path>` | Change the choice for a directory you synced into, instead of this project |
 | `--instance <name>` | Change the choice for a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `modrinth` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
@@ -397,7 +396,7 @@ shulker feature reset shaders --into ~/instances/my-pack
 | --- | --- |
 | `--into <path>` | Forget the choice for a directory you synced into, instead of this project |
 | `--instance <name>` | Forget the choice for a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `modrinth` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
@@ -414,7 +413,7 @@ shulker feature list --into ~/instances/my-pack
 | --- | --- |
 | `--into <path>` | List the choices that apply to a directory you synced into |
 | `--instance <name>` | List the choices that apply to a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `modrinth` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 
 ## Builds
@@ -551,30 +550,6 @@ shulker link multimc --launcher-dir ~/MultiMC
 | `--with <feature>` | Turn a feature on for this instance; repeat for more (sync mode only) |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more (sync mode only) |
 
-### `shulker link modrinth`
-
-Create a Modrinth App instance for the client build. shulker exports the pack as an `.mrpack` and opens it in the app, which creates the instance and installs Minecraft, the loader, and every mod in the pack. Once the app has made the instance folder, shulker records it and returns; play from the app once its install finishes.
-
-With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. The app has no pre-launch hook shulker can set, so the instance doesn't update itself; run `shulker sync --instance <name>` (or `shulker sync --all`) to bring it up to date. Running `link modrinth` again for an instance shulker already made updates it in place rather than creating a second one.
-
-The app must be installed and have been opened once. If it asks whether to install the pack, confirm there; shulker waits up to two minutes for the instance folder to appear, and if it doesn't, the error prints the `shulker sync` command that adopts the folder once it exists.
-
-If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one.
-
-```sh
-shulker link modrinth
-shulker link modrinth https://github.com/shulker-sh/base-pack.git
-shulker link modrinth https://example.com/pack/shulker.json --name "Friends SMP"
-```
-
-| Flag | Description |
-| --- | --- |
-| `--launcher-dir <path>` | Modrinth App data directory (default: the app's own) |
-| `--target <name>` | Client target to link (default: the only client target) |
-| `--name <name>` | Instance name (default: the target's display name) |
-| `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Repoint an instance that syncs from a different source |
-
 ### `shulker sync`
 
 Download and build one target of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<target>/`.
@@ -603,7 +578,7 @@ To update something on that list, name it instead of a source. `--instance` take
 | `--name <name>` | Name to list the `--into` directory under (default: the target's display name; kept on later syncs) |
 | `--instance <name>` | Sync a linked instance or synced directory, by name or directory, instead of a source |
 | `--all` | Sync every entry `--instance` matches, or every entry when there's no `--instance` |
-| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, or `modrinth` |
+| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, or `mojang` |
 | `--side <side>` | Only `client` or `server` entries |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
@@ -647,7 +622,7 @@ shulker unlink --all --side server
 | Flag | Description |
 | --- | --- |
 | `--all` | Unlink every entry the name matches, or every entry when there's no name |
-| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, or `modrinth` |
+| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, or `mojang` |
 | `--side <side>` | Only `client` or `server` entries |
 
 ## Packs
@@ -810,7 +785,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `instance-dir-not-empty` | The instance directory already has files |
 | `instance-exists` | An instance already syncs from this source; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
-| `instance-not-created` | Modrinth App didn't create an instance folder for the pack it was handed within two minutes; the help names the `sync` command that adopts it once it exists |
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `instance-not-found` | Nothing linked matches. `candidates`: the linked entries |
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
@@ -850,7 +824,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `not-built` | The target has no build directory yet; run `shulker build` |
 | `not-direct` | The mod is only a dependency. `items`: the mods that require it |
 | `not-drifted` | A file named to `pull` has no changes. `candidates`: the changed files |
-| `open-failed` | The `.mrpack` couldn't be opened in Modrinth App; the help names the file to open yourself |
 | `not-ignored` | The pair has no ignore in `shulker.json`. `candidates`: the pairs that do |
 | `not-installed` | A file isn't in the cache; run `shulker install` |
 | `not-pinned` | The mod has no pin |

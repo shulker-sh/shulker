@@ -40,7 +40,6 @@ var All = []*Entry{
 	{Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir, relink: relinkInstance, forget: forgetInstance},
 	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkInstance, forget: forgetInstance},
 	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkMojang, forget: forgetMojang},
-	{Name: "modrinth", Title: "Modrinth App", DefaultDir: DefaultModrinthDir, relink: relinkModrinth, forget: forgetModrinth},
 }
 
 func Find(name string) *Entry {
@@ -114,7 +113,7 @@ func Relink(l config.Link) (command, in string) {
 	}
 	args, in := e.relink(e, l)
 	if l.LauncherDir != "" && l.LauncherDir != e.defaultDir() {
-		args = append(args, "--launcher-dir", ShellArg(l.LauncherDir))
+		args = append(args, "--launcher-dir", shellArg(l.LauncherDir))
 	}
 	return strings.Join(args, " "), in
 }
@@ -129,11 +128,11 @@ func Forget(l config.Link) (Forgotten, error) {
 }
 
 func relinkSync(l config.Link) (args []string, in string) {
-	args = []string{"shulker", "sync", ShellArg(l.Source)}
+	args = []string{"shulker", "sync", shellArg(l.Source)}
 	if l.Ref != "" {
-		args = append(args, "--ref", ShellArg(l.Ref))
+		args = append(args, "--ref", shellArg(l.Ref))
 	}
-	return append(args, "--target", ShellArg(l.Target), "--into", ShellArg(l.Dir), "--name", ShellArg(l.Name)), ""
+	return append(args, "--target", shellArg(l.Target), "--into", shellArg(l.Dir), "--name", shellArg(l.Name)), ""
 }
 
 func relinkInstance(e *Entry, l config.Link) (args []string, in string) {
@@ -142,20 +141,20 @@ func relinkInstance(e *Entry, l config.Link) (args []string, in string) {
 		in = l.Source
 		args = append(args, "--mode", "symlink")
 	} else {
-		args = append(args, ShellArg(l.Source))
+		args = append(args, shellArg(l.Source))
 		if l.Ref != "" {
-			args = append(args, "--ref", ShellArg(l.Ref))
+			args = append(args, "--ref", shellArg(l.Ref))
 		}
 	}
-	return append(args, "--target", ShellArg(l.Target), "--name", ShellArg(l.Name)), in
+	return append(args, "--target", shellArg(l.Target), "--name", shellArg(l.Name)), in
 }
 
 func relinkMojang(e *Entry, l config.Link) (args []string, in string) {
-	args = []string{"shulker", "link", e.Name, ShellArg(l.Source)}
+	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
 	if l.Ref != "" {
-		args = append(args, "--ref", ShellArg(l.Ref))
+		args = append(args, "--ref", shellArg(l.Ref))
 	}
-	return append(args, "--target", ShellArg(l.Target), "--name", ShellArg(l.Name)), ""
+	return append(args, "--target", shellArg(l.Target), "--name", shellArg(l.Name)), ""
 }
 
 func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
@@ -196,7 +195,7 @@ func forgetMojang(e *Entry, l config.Link) (Forgotten, error) {
 
 var plainShellArg = regexp.MustCompile(`^[A-Za-z0-9_./:@%+=,-]+$`)
 
-func ShellArg(s string) string {
+func shellArg(s string) string {
 	if plainShellArg.MatchString(s) {
 		return s
 	}
@@ -207,9 +206,6 @@ func ShellArg(s string) string {
 // directory when the layout gives it away. It reads an instance registered
 // before shulker recorded a launcher, or one a plain `sync --into` found.
 func Detect(gameDir string) (name, dir string) {
-	if dir, ok := detectModrinth(gameDir); ok {
-		return "modrinth", dir
-	}
 	if base := filepath.Base(gameDir); base != "minecraft" && base != ".minecraft" {
 		return "", ""
 	}
