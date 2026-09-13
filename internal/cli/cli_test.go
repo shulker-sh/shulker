@@ -23,8 +23,14 @@ func TestVersionHuman(t *testing.T) {
 	if code != out.ExitOK {
 		t.Fatalf("exit %d", code)
 	}
-	if !strings.HasPrefix(stdout, "shulker dev (") {
+	lines := strings.Split(stdout, "\n")
+	if len(lines) < 5 || lines[0] != "" || !strings.HasPrefix(lines[1], "  shulker dev") || lines[2] != "" {
 		t.Fatalf("unexpected output %q", stdout)
+	}
+	for _, label := range []string{"Go        go", "Binary    ", "Config    ", "Cache     "} {
+		if !strings.Contains(stdout, "\n  "+label) {
+			t.Fatalf("missing %q row in %q", strings.TrimSpace(label), stdout)
+		}
 	}
 }
 
@@ -46,25 +52,28 @@ func TestVersionJSON(t *testing.T) {
 	}
 }
 
-func TestVersionBuildString(t *testing.T) {
-	base := versionInfo{Go: "go1.26.4", OS: "darwin", Arch: "arm64"}
-	platform := "go1.26.4 darwin/arm64"
-	for _, tc := range []struct {
-		name string
-		info versionInfo
-		want string
-	}{
-		{"released", base, platform},
-		{"committed", versionInfo{Commit: "c2f0ca96de074c005b69009b87c24a4978944bd6"}, "c2f0ca9, " + platform},
-		{"dirty", versionInfo{Commit: "c2f0ca96de074c005b69009b87c24a4978944bd6", Modified: true}, "c2f0ca9-dirty, " + platform},
+func TestVersionShortCommit(t *testing.T) {
+	for _, tc := range []struct{ commit, want string }{
+		{"", ""},
+		{"c2f0ca9", "c2f0ca9"},
+		{"c2f0ca96de074c005b69009b87c24a4978944bd6", "c2f0ca9"},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			info := tc.info
-			info.Go, info.OS, info.Arch = base.Go, base.OS, base.Arch
-			if got := info.build(); got != tc.want {
-				t.Fatalf("build() = %q, want %q", got, tc.want)
-			}
-		})
+		if got := (versionInfo{Commit: tc.commit}).shortCommit(); got != tc.want {
+			t.Fatalf("shortCommit(%q) = %q, want %q", tc.commit, got, tc.want)
+		}
+	}
+}
+
+func TestHomeTilde(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip(err)
+	}
+	if got := homeTilde(filepath.Join(home, "x", "y")); got != "~"+string(filepath.Separator)+filepath.Join("x", "y") {
+		t.Fatalf("homeTilde = %q", got)
+	}
+	if got := homeTilde(home + "-other"); got != home+"-other" {
+		t.Fatalf("homeTilde = %q", got)
 	}
 }
 
