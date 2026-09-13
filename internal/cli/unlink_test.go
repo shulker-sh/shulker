@@ -98,6 +98,36 @@ func TestUnlink(t *testing.T) {
 	}
 }
 
+func TestUnlinkLauncherNameInProject(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	mojangDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(mojangDir, launcher.ProfilesFile), []byte(`{"profiles":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "A")
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "B")
+	plain := filepath.Join(t.TempDir(), "plain")
+	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "atlauncher")
+
+	if r := unlinkJSON(t, h, "vanilla"); len(r) != 1 || r[0].Removed != launcher.RemovedProfile {
+		t.Fatalf("unlink vanilla in the project: %+v", r)
+	}
+	code, stdout, _ := h.run(t, "unlink", "prism", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-instance" || len(e.Candidates) != 2 {
+		t.Fatalf("two prism entries: exit %d %s", code, stdout)
+	}
+	if r := unlinkJSON(t, h, "prism", "--all"); len(r) != 2 {
+		t.Fatalf("unlink prism --all: %+v", r)
+	}
+	if r := unlinkJSON(t, h, "atlauncher"); len(r) != 1 || r[0].Dir != plain {
+		t.Fatalf("an entry named like a launcher comes first: %+v", r)
+	}
+}
+
 func TestUnlinkAll(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack")

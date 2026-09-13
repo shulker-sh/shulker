@@ -136,6 +136,56 @@ func linkDirs(links []config.Link) []string {
 	return dirs
 }
 
+// unlinkTargets is what unlink's argument picks. Inside a project, a launcher name that no entry is
+// called picks the project's entries in that launcher, the reverse of `link <launcher>`.
+func (a *app) unlinkTargets(query string, s linkSelection) ([]config.Link, error) {
+	name := launcherArg(query)
+	if name == "" || s.launcher != "" {
+		return a.selectLinks(query, s)
+	}
+	registry, err := a.loadLinks()
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range registry {
+		if strings.EqualFold(l.Name, query) {
+			return a.selectLinks(query, s)
+		}
+	}
+	inLauncher := s
+	inLauncher.launcher = name
+	links, inProject, err := a.projectLinks(inLauncher)
+	if err != nil {
+		return nil, err
+	}
+	if !inProject {
+		return a.selectLinks(query, s)
+	}
+	var matches []config.Link
+	for _, l := range links {
+		if inLauncher.admits(l) {
+			matches = append(matches, l)
+		}
+	}
+	if len(matches) > 1 && !s.all {
+		e := out.Errorf("ambiguous-instance", "this project has %d entries in %s; name one, or pass --all", len(matches), launcher.Title(name))
+		e.Candidates, e.Pass, e.Given = linkCandidates(matches), linkDirs(matches), query
+		return nil, e
+	}
+	return matches, nil
+}
+
+func launcherArg(arg string) string {
+	arg = strings.ToLower(arg)
+	if arg == "vanilla" {
+		return "mojang"
+	}
+	if launcher.Find(arg) != nil {
+		return arg
+	}
+	return ""
+}
+
 func linkAside(t out.Theme, l config.Link) string {
 	if l.Launcher == "" {
 		return ""

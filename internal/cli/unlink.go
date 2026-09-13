@@ -24,7 +24,7 @@ type unlinkResult struct {
 func (a *app) unlinkCmd() *cobra.Command {
 	var sel linkSelection
 	cmd := &cobra.Command{
-		Use:   "unlink [name | dir]",
+		Use:   "unlink [name | dir | launcher]",
 		Short: "Stop syncing a linked instance or synced directory and forget it, keeping its files",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -35,7 +35,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 			if query == "" && !sel.all {
 				return out.Errorf("usage", "name the entry to unlink, or pass --all; `shulker links` lists them")
 			}
-			links, err := a.selectLinks(query, sel)
+			links, err := a.unlinkTargets(query, sel)
 			if err != nil {
 				return err
 			}

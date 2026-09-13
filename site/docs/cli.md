@@ -640,9 +640,10 @@ Other directories
 
 Stop syncing a linked instance or synced directory and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the build directory and the installed loader. A plain synced directory is just forgotten. When the entry syncs from a project directory, `unlink` also drops it from that project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it.
 
-Name the entry the way [`shulker links`](#shulker-links) shows it, or pass its directory. A name several entries share needs `--launcher`, `--side`, or `--all`. `unlink` prints the command that sets the entry up again.
+Name the entry the way [`shulker links`](#shulker-links) shows it, or pass its directory. Inside a project, a launcher name (`mojang`, `prism`, `multimc`, `atlauncher`) unlinks that project's entry in that launcher, the reverse of `shulker link <launcher>`; an entry actually called that name comes first. A name several entries share needs `--launcher`, `--side`, or `--all`. `unlink` prints the command that sets the entry up again.
 
 ```sh
+shulker unlink mojang
 shulker unlink "Friends SMP"
 shulker unlink "My Pack" --launcher prism
 shulker unlink --all --side server
