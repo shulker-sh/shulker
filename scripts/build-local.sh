@@ -31,5 +31,5 @@ cd "$tmp"
 unset SHULKER_CURSEFORGE_KEY
 export SHULKER_CONFIG="$tmp/config.json"
 "$bin" init --yes >/dev/null
-"$bin" add --provider curseforge jei
+"$bin" add --provider curseforge fabric-api jei
 echo "embedded key works"
