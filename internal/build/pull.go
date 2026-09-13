@@ -292,6 +292,11 @@ func (b *Builder) drift(name string, opts Options) (*drift, error) {
 		return nil, err
 	}
 	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
+		if opts.Dir != "" {
+			e := out.Errorf("into-missing", "%s does not exist", dir)
+			e.Flag = "--into"
+			return nil, e
+		}
 		return nil, out.Errorf("not-built", "target %s has no build directory; run `shulker build`", name)
 	}
 	prev, stateErr := ReadState(dir)

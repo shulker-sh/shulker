@@ -421,6 +421,62 @@ func TestPullPicksTheDriftedSyncDir(t *testing.T) {
 	}
 }
 
+func TestPullNamedFileNarrowsTheSyncDirs(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	overrides := filepath.Join(h.dir, "overrides", "config")
+	if err := os.MkdirAll(overrides, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"plain.txt", "other.txt"} {
+		if err := os.WriteFile(filepath.Join(overrides, f), []byte("a=1\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.mustRun(t, "build")
+	one := filepath.Join(t.TempDir(), "one")
+	two := filepath.Join(t.TempDir(), "two")
+	h.mustRun(t, "sync", h.dir, "--into", one)
+	h.mustRun(t, "sync", h.dir, "--into", two)
+	if err := os.WriteFile(filepath.Join(one, "config", "plain.txt"), []byte("a=2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(two, "config", "other.txt"), []byte("b=2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	code, stdout, _ := h.run(t, "pull", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-into" {
+		t.Fatalf("pull with edits in both dirs: exit %d %s", code, stdout)
+	}
+	h.mustRun(t, "pull", "config/plain.txt")
+	if data, _ := os.ReadFile(filepath.Join(overrides, "plain.txt")); string(data) != "a=2\n" {
+		t.Fatalf("pull <file> did not take the only dir that edited it: %q", data)
+	}
+
+	code, stdout, _ = h.run(t, "pull", "--json", "config/plain.txt")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "not-drifted" {
+		t.Fatalf("pull of an unchanged file: exit %d %s", code, stdout)
+	}
+}
+
+func TestPullIntoMissingDirNamesThePath(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "build")
+	missing := filepath.Join(t.TempDir(), "gone")
+	for _, cmd := range []string{"pull", "diff"} {
+		code, stdout, _ := h.run(t, cmd, "--json", "--into", missing)
+		if e := failureCode(t, stdout); code == 0 || e.Code != "into-missing" || !strings.Contains(e.Message, missing) {
+			t.Fatalf("%s --into a missing dir: exit %d %s", cmd, code, stdout)
+		}
+	}
+	code, stdout, _ := h.run(t, "pull", "--json", "--into", missing, "config/plain.txt")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "into-missing" {
+		t.Fatalf("pull <file> --into a missing dir: exit %d %s", code, stdout)
+	}
+}
+
 func TestSyncDoesNotFailOnUnwritableLocalFile(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack")

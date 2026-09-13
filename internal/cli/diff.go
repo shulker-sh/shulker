@@ -171,7 +171,7 @@ func (a *app) pullCmd() *cobra.Command {
 				if into, err = filepath.Abs(into); err != nil {
 					return err
 				}
-			} else if into, err = a.pullSource(b, p, lf, name); err != nil {
+			} else if into, err = a.pullSource(b, p, lf, name, args); err != nil {
 				return err
 			}
 			rep, err := b.Pull(name, args, keys, build.Options{Dir: into, Features: lf.Features})
@@ -210,7 +210,7 @@ func (a *app) pullCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, name string) (string, error) {
+func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, name string, files []string) (string, error) {
 	buildDir, dirs, err := a.buildDirs(p, lf, name)
 	if err != nil || len(dirs) == 0 {
 		return "", err
@@ -228,7 +228,7 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, n
 			a.printer.Warn("skipped %s: %v", dir, err)
 			continue
 		}
-		if len(rep.Files) > 0 {
+		if driftsNamed(rep, files) {
 			drifted = append(drifted, dir)
 		}
 	}
@@ -241,6 +241,21 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, n
 	e := out.Errorf("ambiguous-into", "target %s has edits in several directories; pass --into", name)
 	e.Candidates, e.Flag = drifted, "--into"
 	return "", e
+}
+
+func driftsNamed(rep *build.DiffReport, files []string) bool {
+	if len(files) == 0 {
+		return len(rep.Files) > 0
+	}
+	for _, f := range files {
+		rel := filepath.ToSlash(filepath.Clean(f))
+		for _, d := range rep.Files {
+			if d.Path == rel {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // diffAside says what happened to a file in words; JSON keeps the state name.

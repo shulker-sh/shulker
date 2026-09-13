@@ -748,6 +748,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `instance-not-found` | Nothing linked matches. `candidates`: the linked entries |
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
+| `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |
 | `into-target` | `--into` applies to one target; name it |
 | `java-not-found` | No working Java at the configured path or on PATH |
