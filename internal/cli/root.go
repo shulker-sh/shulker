@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -67,7 +68,7 @@ func (a *app) run(ctx context.Context, args []string) int {
 	root.SetErr(a.printer.Stderr)
 	if err := root.ExecuteContext(ctx); err != nil {
 		if !a.running && out.CodeOf(err) == "" {
-			err = out.Errorf("usage", "%s", err)
+			err = usageError(root, err)
 		}
 		if ctx.Err() != nil {
 			err = &out.Error{Code: "interrupted", Message: "interrupted", Exit: out.ExitInterrupted, Data: out.AsError(err).Data}
@@ -93,11 +94,12 @@ func (a *app) markRunning(c *cobra.Command) {
 
 func (a *app) root() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "shulker",
-		Short:         "Manage Minecraft mods, client instances, and servers",
-		Long:          agentHelp,
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:                "shulker",
+		Short:              "Manage Minecraft mods, client instances, and servers",
+		Long:               agentHelp,
+		SilenceUsage:       true,
+		SilenceErrors:      true,
+		DisableSuggestions: true,
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 			a.printer.Command = strings.TrimPrefix(cmd.CommandPath(), "shulker ")
 		},
@@ -110,6 +112,33 @@ func (a *app) root() *cobra.Command {
 	a.installHelp(root)
 	a.markRunning(root)
 	return root
+}
+
+var unknownCommand = regexp.MustCompile(`^unknown command "([^"]+)" for "([^"]+)"`)
+
+// usageError turns cobra's own error into the usage error. An unknown command carries the
+// parent's subcommands as candidates, so it gets the same picks and example as any other typo.
+func usageError(root *cobra.Command, err error) error {
+	e := out.Errorf("usage", "%s", err)
+	m := unknownCommand.FindStringSubmatch(err.Error())
+	if m == nil {
+		return e
+	}
+	parent := root
+	if path := strings.Fields(m[2]); len(path) > 1 {
+		found, _, findErr := root.Find(path[1:])
+		if findErr != nil || found == nil {
+			return e
+		}
+		parent = found
+	}
+	for _, c := range parent.Commands() {
+		if c.IsAvailableCommand() {
+			e.Candidates = append(e.Candidates, c.Name())
+		}
+	}
+	e.Given = m[1]
+	return e
 }
 
 // Cobra reports an unknown command before parsing any flags, so the

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -131,6 +132,26 @@ func TestUnknownCommandJSON(t *testing.T) {
 	}
 	if env.OK || env.Error == nil || env.Error.Code != "usage" {
 		t.Fatalf("unexpected envelope %+v", env)
+	}
+}
+
+func TestUnknownCommandPicks(t *testing.T) {
+	code, stdout, _ := run(t, "mod", "add", "--json")
+	if code != out.ExitUsage {
+		t.Fatalf("exit %d", code)
+	}
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Error == nil || env.Error.Code != "usage" || env.Error.Message != `unknown command "mod" for "shulker"` || !slices.Contains(env.Error.Candidates, "add") {
+		t.Fatalf("unexpected envelope %+v", env)
+	}
+	_, _, stderr := run(t, "mod", "add")
+	for _, want := range []string{"did you mean:", "\u2023 add", "For example:", "$ shulker add add"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("stderr lacks %q:\n%s", want, stderr)
+		}
 	}
 }
 
