@@ -3,7 +3,6 @@ package out
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 )
 
@@ -254,12 +253,7 @@ func (l *Lines) Error(e *Error) {
 	}
 	message, extra, _ := strings.Cut(e.Message, "\n")
 	l.line(t.paint(t.GlyphError(), sgrRed, sgrBold) + " " + t.paint("error:", sgrRed, sgrBold) + " " + t.Bold(t.Markup(strings.TrimSuffix(message, ":"))) + t.Aside(code))
-	rows, covered := l.messageRows(extra)
-	for _, item := range e.Items {
-		if !covered[item] {
-			rows = append(rows, Row{Text: t.Grey(item)})
-		}
-	}
+	rows := l.detailRows(e, extra)
 	if label, picks := e.picks(); len(picks) > 0 {
 		var children []string
 		for _, p := range picks {
@@ -276,38 +270,40 @@ func (l *Lines) Error(e *Error) {
 	}
 }
 
-var problemHeading = regexp.MustCompile(`^Problem \d+$`)
-
-// messageRows turns the lines after an error's first line into tree rows:
-// a line indented deeper than the one before nests under it, "Problem N"
-// headings are dropped, and a leading "- " is the tree's job.
-func (l *Lines) messageRows(extra string) ([]Row, map[string]bool) {
+// detailRows paints what sits under the error line: the rows the site set,
+// else the items, else the message's remaining lines, plain.
+func (l *Lines) detailRows(e *Error, extra string) []Row {
 	t := l.T
 	var rows []Row
-	covered := map[string]bool{}
-	indent := -1
-	for _, raw := range strings.Split(extra, "\n") {
-		line := strings.TrimSpace(raw)
-		if line == "" || problemHeading.MatchString(line) {
-			continue
-		}
-		depth := len(raw) - len(strings.TrimLeft(raw, " "))
-		line = strings.TrimPrefix(line, "- ")
-		if len(rows) > 0 && depth > indent {
-			label, rest, labelled := strings.Cut(line, ": ")
-			child := t.Grey(line)
-			if labelled && !strings.Contains(label, " ") {
-				child = t.Grey(label+":") + " " + rest
-				if label == "Fix" {
-					child = t.Grey(label+":") + " " + t.Command(rest)
+	switch {
+	case len(e.Rows) > 0:
+		for _, d := range e.Rows {
+			row := Row{Label: d.Label, Text: d.Text}
+			if d.Label == "" {
+				row.Text = t.Grey(d.Text)
+			}
+			for _, c := range d.Children {
+				switch {
+				case c.Label == "":
+					row.Children = append(row.Children, t.Grey(c.Text))
+				case c.Command:
+					row.Children = append(row.Children, t.Grey(c.Label+":")+" "+t.Command(c.Text))
+				default:
+					row.Children = append(row.Children, t.Grey(c.Label+":")+" "+c.Text)
 				}
 			}
-			rows[len(rows)-1].Children = append(rows[len(rows)-1].Children, child)
-			continue
+			rows = append(rows, row)
 		}
-		indent = depth
-		covered[line] = true
-		rows = append(rows, Row{Text: t.Grey(line)})
+	case len(e.Items) > 0:
+		for _, item := range e.Items {
+			rows = append(rows, Row{Text: t.Grey(item)})
+		}
+	default:
+		for _, line := range strings.Split(extra, "\n") {
+			if line = strings.TrimSpace(line); line != "" {
+				rows = append(rows, Row{Text: t.Grey(line)})
+			}
+		}
 	}
-	return rows, covered
+	return rows
 }

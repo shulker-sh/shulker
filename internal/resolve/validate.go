@@ -217,21 +217,28 @@ func (v *Validation) Err() error {
 	}
 	var b strings.Builder
 	var items []string
+	var rows []out.Detail
 	fmt.Fprintf(&b, "%d problem(s) in the locked mods:", len(v.Problems))
 	for i, p := range v.Problems {
 		line := p.line()
 		items = append(items, line)
+		row := out.Detail{Text: line}
 		fmt.Fprintf(&b, "\n  Problem %d\n    - %s", i+1, line)
 		if p.StaleNote != "" {
 			fmt.Fprintf(&b, "\n      %s", p.StaleNote)
+			row.Children = append(row.Children, out.Detail{Text: p.StaleNote})
 		}
 		if p.Rule == "depends" && p.Found == "" && !builtin(p.On) {
 			fmt.Fprintf(&b, "\n      Fix: shulker add %s", p.On)
+			row.Children = append(row.Children, out.Detail{Label: "fix", Text: "shulker add " + p.On, Command: true})
 		}
 		fmt.Fprintf(&b, "\n      Ignore: %s", p.ignoreEntry())
+		row.Children = append(row.Children, out.Detail{Label: "ignore", Text: p.ignoreEntry()})
+		rows = append(rows, row)
 	}
 	e := out.Errorf("validation-failed", "%s", b.String())
 	e.Items = items
+	e.Rows = rows
 	return e
 }
 

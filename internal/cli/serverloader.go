@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/server"
 )
@@ -69,5 +70,6 @@ func (a *app) keepInstallerOutput(err error) error {
 		return failure.Err
 	}
 	failure.Err.Message += "\nFull output: " + path
+	failure.Err.Rows = append(failure.Err.Rows, out.Detail{Label: "full output", Text: path})
 	return failure.Err
 }

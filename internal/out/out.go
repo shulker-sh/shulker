@@ -43,6 +43,18 @@ type Error struct {
 	Flag string `json:"-"`
 	// Pass is what to type for each candidate, when that differs from how it reads.
 	Pass []string `json:"-"`
+	// Rows are the human-only tree rows under the error line. Without them the
+	// items show, and without those the message's remaining lines.
+	Rows []Detail `json:"-"`
+}
+
+// Detail is one row under an error line; Children nest one level beneath it.
+// Command marks Text as something to type.
+type Detail struct {
+	Label    string
+	Text     string
+	Command  bool
+	Children []Detail
 }
 
 type Nudge struct {
