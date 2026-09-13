@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"crypto/rand"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +16,16 @@ import (
 	"shulker.sh/shulker/internal/fsutil"
 )
 
-const ATLauncherInstanceFile = "instance.json"
+const (
+	ATLauncherInstanceFile = "instance.json"
+	ATLauncherImageFile    = "instance.png"
+)
+
+// ATLauncher stretches a non-square image to its 300×150 card, so the logo is pre-placed on a
+// canvas of that size to stay sharp.
+//
+//go:embed assets/atlauncher-instance.png
+var ATLauncherImage []byte
 
 type ATLauncher struct {
 	Dir string
@@ -156,6 +166,14 @@ func (l *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, err
 		return res, err
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return res, err
+	}
+	image := filepath.Join(dir, ATLauncherImageFile)
+	if _, err := os.Stat(image); errors.Is(err, os.ErrNotExist) {
+		if err := fsutil.Write(image, ATLauncherImage); err != nil {
+			return res, err
+		}
+	} else if err != nil {
 		return res, err
 	}
 	return res, fsutil.WriteJSON(path, top)

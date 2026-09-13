@@ -504,7 +504,7 @@ shulker serve server --accept-eula
 
 Create an ATLauncher instance that syncs the client build before each launch.
 
-shulker writes the instance itself: the Minecraft version, the loader, and a pre-launch command that runs `shulker sync`. ATLauncher downloads the game, its libraries and Java the first time you press Play. For NeoForge and Forge, shulker runs the loader's installer once per loader version and copies what it builds into ATLauncher's `libraries` folder. ATLauncher only reads its instances when it starts, so restart it if it is open.
+shulker writes the instance itself: the Minecraft version, the loader, and a pre-launch command that runs `shulker sync`. ATLauncher downloads the game, its libraries and Java the first time you press Play. For NeoForge and Forge, shulker runs the loader's installer once per loader version and copies what it builds into ATLauncher's `libraries` folder. A new instance gets the shulker image; an image you pick in ATLauncher is kept when you link again. ATLauncher only reads its instances when it starts, so restart it if it is open.
 
 With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named after the letters and digits in the instance name. Running `link` again keeps the settings you changed in ATLauncher, such as memory and Java arguments.
 

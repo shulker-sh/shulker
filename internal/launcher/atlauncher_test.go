@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -107,6 +108,28 @@ func TestATLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	}
 	if _, ok := settings["enableCommands"]; ok {
 		t.Fatalf("unlink should drop enableCommands: %v", settings)
+	}
+}
+
+func TestATLauncherWriteInstanceKeepsPlayerImage(t *testing.T) {
+	l := &ATLauncher{Dir: t.TempDir()}
+	inst := ATLauncherInstance{Name: "Pack", Minecraft: "26.2", LoaderType: "fabric", LoaderVersion: "0.17.3", Version: json.RawMessage(`{"id":"26.2"}`)}
+	res, err := l.WriteInstance(inst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	image := filepath.Join(res.Dir, ATLauncherImageFile)
+	if data, err := os.ReadFile(image); err != nil || !bytes.Equal(data, ATLauncherImage) {
+		t.Fatalf("new instance should get the shulker image: %v", err)
+	}
+	if err := os.WriteFile(image, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := l.WriteInstance(inst); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(image); string(data) != "mine" {
+		t.Fatalf("relink replaced the player's image")
 	}
 }
 
