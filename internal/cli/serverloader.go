@@ -70,6 +70,6 @@ func (a *app) keepInstallerOutput(err error) error {
 		return failure.Err
 	}
 	failure.Err.Message += "\nFull output: " + path
-	failure.Err.Rows = append(failure.Err.Rows, out.Detail{Label: "full output", Text: path})
+	failure.Err.Rows = append(failure.Err.Rows, out.Detail{Label: "Full output", Text: path})
 	return failure.Err
 }

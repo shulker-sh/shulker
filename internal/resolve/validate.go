@@ -230,10 +230,10 @@ func (v *Validation) Err() error {
 		}
 		if p.Rule == "depends" && p.Found == "" && !builtin(p.On) {
 			fmt.Fprintf(&b, "\n      Fix: shulker add %s", p.On)
-			row.Children = append(row.Children, out.Detail{Label: "fix", Text: "shulker add " + p.On, Command: true})
+			row.Children = append(row.Children, out.Detail{Label: "Fix", Text: "shulker add " + p.On, Command: true})
 		}
 		fmt.Fprintf(&b, "\n      Ignore: %s", p.ignoreEntry())
-		row.Children = append(row.Children, out.Detail{Label: "ignore", Text: p.ignoreEntry()})
+		row.Children = append(row.Children, out.Detail{Label: "Ignore", Text: p.ignoreEntry()})
 		rows = append(rows, row)
 	}
 	e := out.Errorf("validation-failed", "%s", b.String())

@@ -104,16 +104,16 @@ func TestErrorRowsRenderStructured(t *testing.T) {
 	e := &Error{Code: "validation-failed", Message: "1 problem(s) in the locked mods:\n  Problem 1\n    - ignored text", Items: []string{"ignored text"}}
 	e.Rows = []Detail{{Text: "sodium 1.0 requires fabric-api >=2, not installed", Children: []Detail{
 		{Text: "the ignore is stale"},
-		{Label: "fix", Text: "shulker add fabric-api", Command: true},
-		{Label: "ignore", Text: `{"rule":"depends"}`},
+		{Label: "Fix", Text: "shulker add fabric-api", Command: true},
+		{Label: "Ignore", Text: `{"rule":"depends"}`},
 	}}}
 	lines := render(Theme{}, func(l *Lines) { l.Error(e) })
 	want := []string{
 		"  ✘ error: 1 problem(s) in the locked mods (validation-failed)",
 		"    └─ sodium 1.0 requires fabric-api >=2, not installed",
 		"         the ignore is stale",
-		"         fix: shulker add fabric-api",
-		`         ignore: {"rule":"depends"}`,
+		"         Fix: shulker add fabric-api",
+		`         Ignore: {"rule":"depends"}`,
 	}
 	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("got\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
