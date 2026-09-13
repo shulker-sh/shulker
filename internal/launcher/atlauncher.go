@@ -144,6 +144,9 @@ func (l *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, err
 	settings["version"] = jsonString(inst.Minecraft)
 	settings["vanillaInstance"] = json.RawMessage("true")
 	settings["isPlayable"] = json.RawMessage("true")
+	// ATLauncher unboxes both when Play is pressed, so a missing one throws before launch.
+	settings["requiredMemory"] = json.RawMessage("0")
+	settings["requiredPermGen"] = json.RawMessage("0")
 	settings["loaderVersion"] = loaderVersion
 	if inst.PreLaunch != "" {
 		settings["enableCommands"] = json.RawMessage("true")

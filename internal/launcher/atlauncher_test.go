@@ -91,6 +91,9 @@ func TestATLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	if again["uuid"] != first["uuid"] || settings["maximumMemory"] != float64(8192) || settings["enableCommands"] != true {
 		t.Fatalf("relink should keep uuid and player settings: %v", again)
 	}
+	if settings["requiredMemory"] != float64(0) || settings["requiredPermGen"] != float64(0) {
+		t.Fatalf("ATLauncher unboxes requiredMemory and requiredPermGen on launch: %v", settings)
+	}
 	if lv := settings["loaderVersion"].(map[string]any); lv["type"] != "NeoForge" || lv["version"] != "26.2.0.87" {
 		t.Fatalf("loaderVersion: %v", lv)
 	}
