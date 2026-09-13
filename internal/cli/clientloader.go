@@ -14,6 +14,38 @@ import (
 // puts launcher_profiles.json back the way it was afterwards, so only shulker's profile shows, and
 // reads the version id it installed off the entry it wrote.
 func (a *app) installClientLoader(ctx context.Context, p *project.Project, v *launcher.Mojang, l loader.Loader) (string, error) {
+	jar, err := a.clientInstaller(ctx, p)
+	if err != nil {
+		return "", err
+	}
+	java, err := a.projectJava(ctx, p)
+	if err != nil {
+		return "", err
+	}
+	if err := v.EnsureProfilesFile(); err != nil {
+		return "", err
+	}
+	before, err := v.Profiles()
+	if err != nil {
+		return "", err
+	}
+	a.progress("Installing %s %s into %s", l.Name, p.Lock.Loader.Version, v.Dir)
+	if err := a.installer(ctx, java.Path, jar, []string{l.InstallClientFlag, v.Dir}); err != nil {
+		return "", a.keepInstallerOutput(err)
+	}
+	versionID, err := v.RestoreProfiles(before)
+	if err != nil {
+		return "", err
+	}
+	if versionID == "" {
+		return "", out.Errorf("loader-install-incomplete", "the %s installer wrote no launcher profile, so shulker can't tell which version it installed", l.Name)
+	}
+	return versionID, nil
+}
+
+// clientInstaller is the path to the locked client installer jar, recording it in the lock the first
+// time.
+func (a *app) clientInstaller(ctx context.Context, p *project.Project) (string, error) {
 	d, err := a.deps()
 	if err != nil {
 		return "", err
@@ -31,27 +63,5 @@ func (a *app) installClientLoader(ctx context.Context, p *project.Project, v *la
 			return "", err
 		}
 	}
-	java, err := a.projectJava(ctx, p)
-	if err != nil {
-		return "", err
-	}
-	if err := v.EnsureProfilesFile(); err != nil {
-		return "", err
-	}
-	before, err := v.Profiles()
-	if err != nil {
-		return "", err
-	}
-	a.progress("Installing %s %s into %s", l.Name, p.Lock.Loader.Version, v.Dir)
-	if err := a.installer(ctx, java.Path, jar.Path, []string{l.InstallClientFlag, v.Dir}); err != nil {
-		return "", a.keepInstallerOutput(err)
-	}
-	versionID, err := v.RestoreProfiles(before)
-	if err != nil {
-		return "", err
-	}
-	if versionID == "" {
-		return "", out.Errorf("loader-install-incomplete", "the %s installer wrote no launcher profile, so shulker can't tell which version it installed", l.Name)
-	}
-	return versionID, nil
+	return jar.Path, nil
 }

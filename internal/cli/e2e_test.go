@@ -131,6 +131,9 @@ func newHarness(t *testing.T) *harness {
 	h.vanilla = makeJarFile(t, "minecraft", "server.jar", "version.json", `{"id":"26.2"}`)
 	mux.HandleFunc("/piston/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{
+			"id":          strings.TrimSuffix(filepath.Base(r.URL.Path), ".json"),
+			"mainClass":   "net.minecraft.client.main.Main",
+			"libraries":   []map[string]any{{"name": "com.mojang:brigadier:1.3.10", "downloads": map[string]any{"artifact": map[string]any{"path": "com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar", "url": base + "/mojang-libs/brigadier-1.3.10.jar"}}}},
 			"javaVersion": map[string]any{"component": "java-runtime-epsilon", "majorVersion": 25},
 			"downloads":   map[string]any{"server": map[string]any{"url": base + "/piston-data/server.jar", "sha1": h.vanilla.sha1}},
 		})
@@ -1283,6 +1286,13 @@ func (h *harness) fakeClientInstall(args []string, fake fakeLoaderInstall) error
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "versions", id, id+".json"), []byte(`{"id":"`+id+`"}`), 0o644); err != nil {
+		return err
+	}
+	patched := filepath.Join(dir, "libraries", "fake", id, "client-patched.jar")
+	if err := os.MkdirAll(filepath.Dir(patched), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(patched, []byte("patched"), 0o644); err != nil {
 		return err
 	}
 	path := filepath.Join(dir, "launcher_profiles.json")

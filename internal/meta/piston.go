@@ -2,6 +2,7 @@ package meta
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -81,6 +82,23 @@ func (p *Piston) ServerDownload(ctx context.Context, game string) (Download, err
 		return Download{}, fmt.Errorf("minecraft %s has no server download", v.ID)
 	}
 	return detail.Downloads.Server, nil
+}
+
+// Version is a game version's own JSON, as a launcher reads it to install and start the client.
+func (p *Piston) Version(ctx context.Context, game string) (json.RawMessage, error) {
+	m, err := p.Manifest(ctx)
+	if err != nil {
+		return nil, err
+	}
+	v, ok := m.Find(game)
+	if !ok {
+		return nil, fmt.Errorf("minecraft %s is not in the version list", game)
+	}
+	var detail json.RawMessage
+	if err := p.Client.GetJSON(ctx, v.URL, &detail); err != nil {
+		return nil, fmt.Errorf("minecraft %s version json: %w", v.ID, err)
+	}
+	return detail, nil
 }
 
 func (p *Piston) Java(ctx context.Context, v GameVersion) (JavaRuntime, error) {

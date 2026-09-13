@@ -32,14 +32,26 @@ type Entry struct {
 	// they own, so the instance going away is the entry going away.
 	Instanced  bool
 	DefaultDir func() (string, error)
-	relink     func(e *Entry, l config.Link) (args []string, in string)
-	forget     func(e *Entry, l config.Link) (Forgotten, error)
+	// gameDirIsInstance marks launchers whose instance folder is the game directory itself,
+	// rather than holding it as minecraft/.
+	gameDirIsInstance bool
+	relink            func(e *Entry, l config.Link) (args []string, in string)
+	forget            func(e *Entry, l config.Link) (Forgotten, error)
 }
 
 var All = []*Entry{
 	{Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir, relink: relinkInstance, forget: forgetInstance},
 	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkInstance, forget: forgetInstance},
 	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkMojang, forget: forgetMojang},
+	{Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, relink: relinkMojang, forget: forgetInstance},
+}
+
+// InstanceDir is the instance folder that holds an instanced launcher's game directory.
+func (e *Entry) InstanceDir(gameDir string) string {
+	if e.gameDirIsInstance {
+		return gameDir
+	}
+	return filepath.Dir(gameDir)
 }
 
 func Find(name string) *Entry {
@@ -158,7 +170,7 @@ func relinkMojang(e *Entry, l config.Link) (args []string, in string) {
 }
 
 func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
-	instanceDir := filepath.Dir(l.Dir)
+	instanceDir := e.InstanceDir(l.Dir)
 	_, statErr := os.Stat(instanceDir)
 	switch info, err := os.Lstat(l.Dir); {
 	case errors.Is(statErr, os.ErrNotExist):
@@ -166,7 +178,13 @@ func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
 	case err == nil && info.Mode()&os.ModeSymlink != 0:
 		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance stays and still uses the build directory.", l.Name, e.Title)}, nil
 	}
-	removed, err := RemovePreLaunch(instanceDir, e.Name == "multimc")
+	var removed bool
+	var err error
+	if e.gameDirIsInstance {
+		removed, err = RemoveATLauncherPreLaunch(instanceDir)
+	} else {
+		removed, err = RemovePreLaunch(instanceDir, e.Name == "multimc")
+	}
 	if err != nil {
 		return Forgotten{}, err
 	}
@@ -206,6 +224,11 @@ func shellArg(s string) string {
 // directory when the layout gives it away. It reads an instance registered
 // before shulker recorded a launcher, or one a plain `sync --into` found.
 func Detect(gameDir string) (name, dir string) {
+	if instances := filepath.Dir(gameDir); filepath.Base(instances) == "instances" {
+		if _, err := os.Stat(filepath.Join(gameDir, ATLauncherInstanceFile)); err == nil {
+			return "atlauncher", filepath.Dir(instances)
+		}
+	}
 	if base := filepath.Base(gameDir); base != "minecraft" && base != ".minecraft" {
 		return "", ""
 	}

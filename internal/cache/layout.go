@@ -18,8 +18,13 @@ import (
 //	packs/url/<sha>.json           a manifest fetched from a raw URL
 //	projects/url/<sha>             a project source fetched from a URL
 //	projects/last-good/<sha>.json  the last sync from a source that built
+//	atlauncher/<loader>-<version>/ a loader installer's client install, whose libraries ATLauncher gets
 //
 // Paths are built here and nowhere else.
+
+func (c *Cache) ATLauncherInstall(loader, version string) string {
+	return filepath.Join(c.Dir, "atlauncher", loader+"-"+version)
+}
 
 func (c *Cache) InstallerLog(at time.Time) (string, error) {
 	dir := filepath.Join(c.Dir, "logs")

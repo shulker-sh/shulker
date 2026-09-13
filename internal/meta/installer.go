@@ -60,3 +60,25 @@ func InstallerLibraries(path string) ([]InstallerLibrary, error) {
 	sort.Slice(libs, func(i, j int) bool { return libs[i].Name < libs[j].Name })
 	return libs, nil
 }
+
+// InstallerVersion is the version.json a NeoForge or Forge installer writes into a launcher.
+func InstallerVersion(path string) (json.RawMessage, error) {
+	zr, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, fmt.Errorf("installer %s: %w", path, err)
+	}
+	defer zr.Close()
+	f, err := zr.Open("version.json")
+	if err != nil {
+		return nil, fmt.Errorf("installer %s: %w", path, err)
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("installer %s: %w", path, err)
+	}
+	if !json.Valid(data) {
+		return nil, fmt.Errorf("installer %s: version.json is not valid JSON", path)
+	}
+	return data, nil
+}

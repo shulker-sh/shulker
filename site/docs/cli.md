@@ -32,6 +32,7 @@ outline: [2, 3]
 | [`shulker diff [target]`](#shulker-diff) | Show build files that differ from what build would write |
 | [`shulker pull [file...]`](#shulker-pull) | Copy edits made in a build directory back into their source |
 | [`shulker serve [target]`](#shulker-serve) | Build a server target and run it in the foreground |
+| [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
 | [`shulker link mojang [source]`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
 | [`shulker link prism [source]`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
 | [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
@@ -379,7 +380,7 @@ shulker feature on shaders --instance "Friends SMP"
 | --- | --- |
 | `--into <path>` | Change the choice for a directory you synced into, instead of this project |
 | `--instance <name>` | Change the choice for a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
@@ -396,7 +397,7 @@ shulker feature reset shaders --into ~/instances/my-pack
 | --- | --- |
 | `--into <path>` | Forget the choice for a directory you synced into, instead of this project |
 | `--instance <name>` | Forget the choice for a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
@@ -413,7 +414,7 @@ shulker feature list --into ~/instances/my-pack
 | --- | --- |
 | `--into <path>` | List the choices that apply to a directory you synced into |
 | `--instance <name>` | List the choices that apply to a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 
 ## Builds
@@ -499,6 +500,34 @@ shulker serve server --accept-eula
 | `--force` | Overwrite files edited in the build directory |
 | `--accept-eula` | Record acceptance of the Minecraft EULA in shulker.json without prompting |
 
+### `shulker link atlauncher`
+
+Create an ATLauncher instance that syncs the client build before each launch.
+
+shulker writes the instance itself: the Minecraft version, the loader, and a pre-launch command that runs `shulker sync`. ATLauncher downloads the game, its libraries and Java the first time you press Play. For NeoForge and Forge, shulker runs the loader's installer once per loader version and copies what it builds into ATLauncher's `libraries` folder. ATLauncher only reads its instances when it starts, so restart it if it is open.
+
+With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named after the letters and digits in the instance name. Running `link` again keeps the settings you changed in ATLauncher, such as memory and Java arguments.
+
+`--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <instance folder>`, or run `link` again with new flags.
+
+If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one.
+
+```sh
+shulker link atlauncher
+shulker link atlauncher https://github.com/shulker-sh/base-pack.git
+shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SMP" --with shaders
+```
+
+| Flag | Description |
+| --- | --- |
+| `--launcher-dir <path>` | Launcher data directory (default: ATLauncher's) |
+| `--target <name>` | Client target to link (default: the only client target) |
+| `--name <name>` | Instance name (default: the target's display name) |
+| `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--force` | Repoint an instance that syncs from a different source |
+| `--with <feature>` | Turn a feature on for this instance; repeat for more |
+| `--without <feature>` | Turn a feature off for this instance; repeat for more |
+
 ### `shulker link mojang`
 
 Install the loader into the official launcher and add a profile that points at the client build. Alias: `vanilla`.
@@ -578,7 +607,7 @@ To update something on that list, name it instead of a source. `--instance` take
 | `--name <name>` | Name to list the `--into` directory under (default: the target's display name; kept on later syncs) |
 | `--instance <name>` | Sync a linked instance or synced directory, by name or directory, instead of a source |
 | `--all` | Sync every entry `--instance` matches, or every entry when there's no `--instance` |
-| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
 | `--side <side>` | Only `client` or `server` entries |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
@@ -622,7 +651,7 @@ shulker unlink --all --side server
 | Flag | Description |
 | --- | --- |
 | `--all` | Unlink every entry the name matches, or every entry when there's no name |
-| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, or `mojang` |
+| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
 | `--side <side>` | Only `client` or `server` entries |
 
 ## Packs

@@ -173,8 +173,8 @@ func (a *app) pickLink(links []config.Link) (config.Link, error) {
 
 func (a *app) syncLink(cmd *cobra.Command, l config.Link, req syncRequest) (syncResult, error) {
 	if e := launcher.Find(l.Launcher); e != nil && e.Instanced {
-		if _, err := os.Stat(filepath.Dir(l.Dir)); errors.Is(err, os.ErrNotExist) {
-			return syncResult{}, out.Errorf("instance-missing", "the %s instance %q is gone (%s); `shulker unlink %s` forgets it", launcher.Title(l.Launcher), l.Name, filepath.Dir(l.Dir), launcher.CommandArg(l.Name))
+		if _, err := os.Stat(e.InstanceDir(l.Dir)); errors.Is(err, os.ErrNotExist) {
+			return syncResult{}, out.Errorf("instance-missing", "the %s instance %q is gone (%s); `shulker unlink %s` forgets it", launcher.Title(l.Launcher), l.Name, e.InstanceDir(l.Dir), launcher.CommandArg(l.Name))
 		}
 	}
 	a.packs = nil
