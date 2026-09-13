@@ -42,7 +42,7 @@ func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *
 	if err != nil {
 		return err
 	}
-	a.progress("installing %s %s into %s", want.Type, want.Version, rep.Dir)
+	a.progress("installing %s %s", want.Type, want.Version)
 	if err := a.installer(ctx, java.Path, d.cache.Object(p.Lock.Loader.Server.Sha512), []string{l.InstallServerFlag, dir, "--offline"}); err != nil {
 		return a.keepInstallerOutput(err)
 	}

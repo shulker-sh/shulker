@@ -64,7 +64,7 @@ func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, er
 }
 
 func (s *Store) checkoutURL(ctx context.Context, c *Checkout) (*Checkout, error) {
-	s.log("fetching project")
+	s.log("fetching %s", c.Source)
 	manifestData, err := s.download(ctx, c.Source)
 	if err == nil {
 		lockURL := c.Source[:strings.LastIndex(c.Source, "/")+1] + lock.FileName

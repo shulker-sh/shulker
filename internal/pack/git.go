@@ -41,7 +41,7 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 	}
 	dir := s.Cache.PackMirror(source)
 	if _, err := os.Stat(dir); err == nil {
-		s.log("fetching %s", what.label)
+		s.log("fetching %s", source)
 		if _, err := s.git(ctx, "--git-dir="+dir, "fetch", "--quiet", "origin"); err != nil {
 			return "", gitFailure(err, what.code, "%s: fetching %s failed: %v", what.label, source, err)
 		}
@@ -50,7 +50,7 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return "", err
 	}
-	s.log("cloning %s", what.label)
+	s.log("cloning %s", source)
 	if _, err := s.git(ctx, "clone", "--quiet", "--mirror", source, dir); err != nil {
 		os.RemoveAll(dir)
 		return "", gitFailure(err, what.code, "%s: cloning %s failed: %v", what.label, source, err)

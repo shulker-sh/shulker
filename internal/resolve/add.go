@@ -242,7 +242,7 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 		if !errors.Is(err, fetch.ErrForbidden) {
 			return obtained{}, err
 		}
-		r.log("%s %s: download forbidden, treating it as distribution-disabled", proj.Slug, v.Number)
+		r.log("treating %s %s as distribution-disabled: download forbidden", proj.Slug, v.Number)
 	}
 	files, err := r.sweepDownloads()
 	if err != nil {

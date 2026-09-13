@@ -61,7 +61,7 @@ func (r *Resolver) EnsureClientInstaller(ctx context.Context, mt *Meta) (Install
 		l.Client = &lock.Download{URL: url, Sha512: s.Sha512}
 		return InstallerJar{Path: r.Cache.Object(s.Sha512), Locked: true}, nil
 	}
-	r.log("downloading the %s installer (loader %s)", l.Type, l.Version)
+	r.log("downloading the %s installer %s", l.Type, l.Version)
 	sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
 	if err != nil {
 		return InstallerJar{}, err
@@ -80,7 +80,7 @@ func (r *Resolver) ensureInstallerServer(ctx context.Context, mt *Meta, installe
 		if r.serverCached(locked) {
 			return res, nil
 		}
-		r.log("downloading %s server files (loader %s)", l.Type, l.Version)
+		r.log("downloading %s server files %s", l.Type, l.Version)
 		if _, err := r.Cache.Ensure(ctx, r.Fetch, locked.URL, locked.Sha512); err != nil {
 			return res, err
 		}
@@ -120,7 +120,7 @@ func (r *Resolver) ensureFabricServer(ctx context.Context, fabric *meta.Fabric) 
 		if err != nil {
 			return res, err
 		}
-		r.log("downloading fabric server launcher (installer %s)", installer)
+		r.log("downloading the fabric server launcher %s", installer)
 		url := fabric.ServerJarURL(r.Lock.Minecraft, l.Version, installer)
 		sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
 		if err != nil {
@@ -137,7 +137,7 @@ func (r *Resolver) ensureFabricServer(ctx context.Context, fabric *meta.Fabric) 
 	if r.Cache.Has(l.Server.Sha512) {
 		return res, nil
 	}
-	r.log("downloading fabric server launcher (installer %s)", l.Server.Installer)
+	r.log("downloading the fabric server launcher %s", l.Server.Installer)
 	if _, err := r.Cache.Ensure(ctx, r.Fetch, l.Server.URL, l.Server.Sha512); err != nil {
 		return res, err
 	}
@@ -152,7 +152,7 @@ func (r *Resolver) ensureQuiltServer(ctx context.Context, mt *Meta) (ServerJarRe
 		if r.serverCached(locked) {
 			return res, nil
 		}
-		r.log("downloading quilt server (loader %s)", l.Version)
+		r.log("downloading the quilt server %s", l.Version)
 		if err := r.ensureDownloads(ctx, locked); err != nil {
 			return res, err
 		}

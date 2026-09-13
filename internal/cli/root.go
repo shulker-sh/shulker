@@ -75,6 +75,7 @@ func (a *app) run(ctx context.Context, args []string) int {
 		}
 		return a.printer.Fail(err)
 	}
+	a.printer.Settle()
 	return out.ExitOK
 }
 

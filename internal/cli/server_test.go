@@ -23,7 +23,7 @@ func TestServerTargetBuild(t *testing.T) {
 	})
 
 	stdout, stderr := h.mustRunStderr(t, "install")
-	if !strings.Contains(stderr, "downloading fabric server launcher") || !strings.Contains(stderr, "downloading Java runtime") {
+	if !strings.Contains(stderr, "downloaded the fabric server launcher") || !strings.Contains(stderr, "downloaded Java runtime") {
 		t.Fatalf("install output: %s\n%s", stdout, stderr)
 	}
 	var l lock.Lock

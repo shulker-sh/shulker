@@ -60,7 +60,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if !strings.Contains(stdout, "[Server] got: say hi") || !strings.Contains(stdout, "server stopped") {
 		t.Fatalf("stdout: %s", stdout)
 	}
-	if !strings.Contains(stderr, "starting server in") || !strings.Contains(stderr, "Java 25") {
+	if !strings.Contains(stderr, "started server in") || !strings.Contains(stderr, "Java 25") {
 		t.Fatalf("stderr: %s", stderr)
 	}
 	args, err := os.ReadFile(filepath.Join(h.dir, "build", "server", "args.txt"))
@@ -180,7 +180,7 @@ func TestManagedJava(t *testing.T) {
 		t.Fatalf("failed refresh replaced the runtime: %v", marker)
 	}
 	h.runtime.corrupt = ""
-	if _, stderr := h.mustRunStderr(t, "install"); !strings.Contains(stderr, "downloading Java runtime") {
+	if _, stderr := h.mustRunStderr(t, "install"); !strings.Contains(stderr, "downloaded Java runtime") {
 		t.Fatalf("changed runtime should be refetched: %s", stderr)
 	}
 	if marker := h.readRuntimeMarker(t); marker["version"] != "25.0.2" {
@@ -216,7 +216,7 @@ func TestManagedJava(t *testing.T) {
 	hits := h.runtime.hits
 	h.stdin = strings.NewReader("stop\n")
 	_, stderr = h.mustRunStderr(t, "serve")
-	if h.runtime.hits != hits+2 || !strings.Contains(stderr, "downloading Java runtime java-runtime-epsilon 25.0.2 (2 files") {
+	if h.runtime.hits != hits+2 || !strings.Contains(stderr, "downloaded Java runtime 25.0.2 (2 files") {
 		t.Fatalf("serve should download a missing runtime: %s", stderr)
 	}
 }

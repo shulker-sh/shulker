@@ -29,7 +29,7 @@ func (a *app) installClientLoader(ctx context.Context, p *project.Project, v *la
 	if err != nil {
 		return "", err
 	}
-	a.progress("Installing %s %s into %s", l.Name, p.Lock.Loader.Version, v.Dir)
+	a.progress("installing %s %s", l.Name, p.Lock.Loader.Version)
 	if err := a.installer(ctx, java.Path, jar, []string{l.InstallClientFlag, v.Dir}); err != nil {
 		return "", a.keepInstallerOutput(err)
 	}

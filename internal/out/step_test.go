@@ -1,0 +1,55 @@
+package out
+
+import (
+	"bytes"
+	"errors"
+	"strings"
+	"testing"
+)
+
+func TestStepsSettleOffTerminal(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	p := &Printer{Stdout: &stdout, Stderr: &stderr}
+	p.Step("fetching Minecraft %s", "26.2")
+	p.Step("installing neoforge 26.2.0.87")
+	p.Step("fetching Minecraft %s", "26.2")
+	p.Out().Text("result")
+	want := "  ✔ fetched Minecraft 26.2\n  ✔ installed neoforge 26.2.0.87\n"
+	if stderr.String() != want || stdout.String() != "  result\n" {
+		t.Fatalf("stderr %q stdout %q", stderr.String(), stdout.String())
+	}
+}
+
+func TestStepWording(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	p.Step("keeping sodium 0.9 already in lock")
+	p.Step("verifying build provenance with gh")
+	p.Step("checksum verified")
+	p.Settle()
+	want := "  ✔ kept sodium 0.9 already in lock\n  ✔ verified build provenance with gh\n  ✔ checksum verified\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr: %q", stderr.String())
+	}
+}
+
+func TestFailedStepIsNotMarkedDone(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	p.Step("fetching a")
+	p.Step("cloning b")
+	p.Fail(errors.New("boom"))
+	if got := stderr.String(); !strings.HasPrefix(got, "  ✔ fetched a\n") || strings.Contains(got, "cloned b") {
+		t.Fatalf("stderr: %q", got)
+	}
+}
+
+func TestStepsStayQuietInJSON(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{JSON: true, Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	p.Step("fetching a")
+	p.Settle()
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr: %q", stderr.String())
+	}
+}

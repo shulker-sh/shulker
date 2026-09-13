@@ -76,7 +76,7 @@ func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *meta.Run
 		return Runtime{}, err
 	}
 	if opts.Log != nil {
-		opts.Log("downloading Java runtime %s %s (%d files, %d MB)", component, release.Version, countFiles(files), totalSize(files)/(1<<20))
+		opts.Log("downloading Java runtime %s (%d files, %d MB)", release.Version, countFiles(files), totalSize(files)/(1<<20))
 	}
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return Runtime{}, err

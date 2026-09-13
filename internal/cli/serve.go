@@ -142,13 +142,14 @@ func (a *app) serveCmd() *cobra.Command {
 			if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 				return err
 			}
-			a.progress("%s", rep.Summary())
+			a.printer.Err().Muted(rep.Summary())
 			if err := cmd.Context().Err(); err != nil {
 				return err
 			}
 			dir := filepath.Join(p.Dir, p.Manifest.BuildDir(name))
 			launchArgs := server.Command(jvm, build.LaunchArgs(p.Lock))
 			a.progress("starting %s in %s with %s", name, dir, java)
+			a.printer.Settle()
 
 			interrupt := make(chan os.Signal, 2)
 			signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)

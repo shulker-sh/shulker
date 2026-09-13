@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 
@@ -197,9 +196,7 @@ func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool)
 }
 
 func (a *app) progress(format string, args ...any) {
-	if !a.printer.JSON {
-		a.printer.Err().Muted(fmt.Sprintf(format, args...))
-	}
+	a.printer.Step(format, args...)
 }
 
 func (a *app) warn(warnings []string) {

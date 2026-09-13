@@ -167,14 +167,14 @@ func (a *app) atlauncherVersion(ctx context.Context, p *project.Project, l loade
 	if err != nil {
 		return nil, err
 	}
-	a.progress("Fetching Minecraft %s version", p.Lock.Minecraft)
+	a.progress("fetching Minecraft %s", p.Lock.Minecraft)
 	vanilla, err := d.meta.Piston.Version(ctx, p.Lock.Minecraft)
 	if err != nil {
 		return nil, err
 	}
 	var loaderVersion json.RawMessage
 	if l.InstallClientFlag == "" {
-		a.progress("Fetching %s loader %s profile for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
+		a.progress("fetching %s loader %s for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
 		if loaderVersion, err = d.meta.LoaderProfile(ctx, p.Lock.Loader, p.Lock.Minecraft); err != nil {
 			return nil, err
 		}

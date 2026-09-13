@@ -102,13 +102,14 @@ type Printer struct {
 	// WarnPrefix names the target or instance a multi-part run is on.
 	WarnPrefix string
 	warnings   []string
+	steps      stepState
 	Theme      Theme
 	ErrTheme   Theme
 }
 
 // Out is the results stream; Err carries warnings, errors, and progress.
-func (p *Printer) Out() *Lines { return &Lines{W: p.Stdout, T: p.Theme} }
-func (p *Printer) Err() *Lines { return &Lines{W: p.Stderr, T: p.ErrTheme} }
+func (p *Printer) Out() *Lines { return &Lines{W: settling{p, p.Stdout}, T: p.Theme} }
+func (p *Printer) Err() *Lines { return &Lines{W: settling{p, p.Stderr}, T: p.ErrTheme} }
 
 func (p *Printer) Warn(format string, args ...any) {
 	msg := p.WarnPrefix + fmt.Sprintf(format, args...)
@@ -142,6 +143,7 @@ func (p *Printer) Emit(data any, human func(l *Lines)) error {
 }
 
 func (p *Printer) Fail(err error) int {
+	p.settle(false)
 	e := AsError(err)
 	if p.JSON {
 		_ = p.encode(p.envelope(false, e.Data, e))
