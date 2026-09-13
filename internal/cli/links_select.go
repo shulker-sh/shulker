@@ -155,10 +155,13 @@ func (a *app) pickLink(links []config.Link) (config.Link, error) {
 	}
 	lines := a.printer.Err()
 	t := lines.T
+	width := len(strconv.Itoa(len(links)))
 	for i, l := range links {
-		lines.Text(t.Cyan(fmt.Sprintf("%2d", i+1)) + " " + t.Bold(l.Name) + " " + t.Cyan(l.Side) + linkAside(t, l))
-		lines.Text("   " + t.Link(t.Grey(l.Dir), l.Dir))
+		label := fmt.Sprintf("%*d)", width, i+1)
+		lines.Text(t.Cyan(label) + " " + t.Bold(l.Name) + " " + t.Cyan(l.Side) + linkAside(t, l))
+		lines.Text(strings.Repeat(" ", len(label)+1) + t.Link(t.Grey(l.Dir), l.Dir))
 	}
+	lines.Blank()
 	fmt.Fprintf(a.printer.Stderr, "  Sync which one? %s ", t.Grey(fmt.Sprintf("[1-%d]", len(links))))
 	line, _ := bufio.NewReader(a.stdin).ReadString('\n')
 	n, err := strconv.Atoi(strings.TrimSpace(line))

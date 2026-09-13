@@ -209,7 +209,7 @@ func TestSyncInstance(t *testing.T) {
 
 	h.tty, h.stdin = true, strings.NewReader("2\n")
 	stdout, stderr := h.mustRunStderr(t, "sync", "-C", t.TempDir())
-	if !strings.Contains(stderr, " 2 friends client\n     "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "» "+plain) {
+	if !strings.Contains(stderr, " 2) friends client\n     "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "» "+plain) {
 		t.Fatalf("picker:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
 	h.tty = false
