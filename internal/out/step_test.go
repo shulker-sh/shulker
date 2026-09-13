@@ -20,6 +20,18 @@ func TestStepsSettleOffTerminal(t *testing.T) {
 	}
 }
 
+func TestDownloadBarSettlesTheRunningStep(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	p.Step("fetching fabric loader 0.19.5 for 26.2")
+	pr := p.Progress("fetching", []Download{{Name: "a.jar", Size: 1}})
+	if stderr.String() != "  ✔ fetched fabric loader 0.19.5 for 26.2\n" {
+		t.Fatalf("the step must settle before the bar draws: %q", stderr.String())
+	}
+	pr.Advance()
+	pr.Finish()
+}
+
 func TestStepWording(t *testing.T) {
 	var stderr bytes.Buffer
 	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}

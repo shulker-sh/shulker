@@ -52,6 +52,7 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 	if p.JSON {
 		return nil
 	}
+	p.Settle()
 	pr := &Progress{l: p.Err(), verb: verb, total: len(files), sizes: map[string]int64{}, start: time.Now()}
 	known := true
 	for _, f := range files {
