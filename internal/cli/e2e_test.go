@@ -905,8 +905,8 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 	if len(env.Error.Items) != 1 || !strings.Contains(env.Error.Items[0], "sodium 1.0.0 requires fabric-api >=2.0.0, found fabric-api 1.0.0") {
 		t.Fatalf("candidates: %v", env.Error.Items)
 	}
-	if !strings.Contains(env.Error.Message, `"declared":">=2.0.0"`) {
-		t.Fatalf("message should print the ignore entry: %s", env.Error.Message)
+	if !strings.Contains(env.Error.Message, `Ignore: shulker ignore sodium fabric-api --rule depends --declared ">=2.0.0" --note "why this is safe"`) {
+		t.Fatalf("message should print the ignore command: %s", env.Error.Message)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "shulker.lock")); err != nil {
 		t.Fatal("lock from init should still exist")

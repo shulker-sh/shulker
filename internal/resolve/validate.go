@@ -1,8 +1,6 @@
 package resolve
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -232,8 +230,9 @@ func (v *Validation) Err() error {
 			fmt.Fprintf(&b, "\n      Fix: shulker add %s", p.On)
 			row.Children = append(row.Children, out.Detail{Label: "Fix", Text: "shulker add " + p.On, Command: true})
 		}
-		fmt.Fprintf(&b, "\n      Ignore: %s", p.ignoreEntry())
-		row.Children = append(row.Children, out.Detail{Label: "Ignore", Text: p.ignoreEntry()})
+		ignore := p.ignoreCommand()
+		fmt.Fprintf(&b, "\n      Ignore: %s", ignore)
+		row.Children = append(row.Children, out.Detail{Label: "Ignore", Text: ignore, Command: true})
 		rows = append(rows, row)
 	}
 	e := out.Errorf("validation-failed", "%s", b.String())
@@ -252,12 +251,8 @@ func (p Problem) line() string {
 	return fmt.Sprintf("%s %s requires %s %s, found %s %s", p.Mod, p.ModVersion, p.On, p.Declared, p.On, p.Found)
 }
 
-func (p Problem) ignoreEntry() string {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	_ = enc.Encode(manifest.Ignore{Rule: p.Rule, Mod: p.Mod, On: p.On, Declared: p.Declared, Note: "why this is safe"})
-	return strings.TrimSpace(buf.String())
+func (p Problem) ignoreCommand() string {
+	return fmt.Sprintf(`shulker ignore %s %s --rule %s --declared "%s" --note "why this is safe"`, p.Mod, p.On, p.Rule, p.Declared)
 }
 
 var (

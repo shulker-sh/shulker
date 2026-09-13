@@ -16,6 +16,8 @@ outline: [2, 3]
 | [`shulker suggests`](#shulker-suggests) | List mods that locked mods recommend and that aren't installed |
 | [`shulker pin <mod> [version]`](#shulker-pin) | Pin a mod to a provider version id |
 | [`shulker unpin <mod>`](#shulker-unpin) | Remove a mod's pin and re-resolve it |
+| [`shulker ignore <mod> <on>`](#shulker-ignore) | Record that a dependency problem is safe to ignore |
+| [`shulker unignore <mod> <on>`](#shulker-unignore) | Drop an ignored dependency problem |
 | [`shulker target add <name>`](#shulker-target-add) | Add a build target |
 | [`shulker target remove <name>`](#shulker-target-remove) | Remove a target, leaving its build directory |
 | [`shulker target list`](#shulker-target-list) | List targets |
@@ -192,6 +194,34 @@ Remove a mod's pin and re-resolve it.
 ```sh
 shulker unpin iris
 ```
+
+### `shulker ignore`
+
+Record that a dependency problem between a mod and what its jar declares about another is safe to ignore. A problem reported by `add`, `remove`, `update`, `lock` or `install` prints the exact command to run, with the rule and the range the jar declares. The entry lands in `ignore` in `shulker.json` and the problem stops failing validation for as long as the jar declares that range; a new version that declares a different range makes the entry stale and the problem comes back. Without `--declared`, the command reads the rule and range from a matching problem in the locked mods. An existing entry for the pair is only replaced with `--force`.
+
+```sh
+shulker ignore sodium fabric-api --rule depends --declared ">=2.0.0" --note "works on fabric-api 1.x"
+shulker ignore sodium fabric-api --note "works on fabric-api 1.x"
+```
+
+| Flag | Description |
+| --- | --- |
+| `--note <why>` | Why the constraint is safe to ignore; required |
+| `--rule <rule>` | The problem's rule, `depends` or `breaks`, as printed with the problem |
+| `--declared <range>` | The range the jar declares, as printed with the problem; with it nothing is resolved |
+| `--force` | Replace an existing ignore for the pair |
+
+With `--json`, `data` is the entry written, `{ "rule", "mod", "on", "declared", "note" }`, plus `replaced`.
+
+### `shulker unignore`
+
+Drop the ignore for a pair so the problem is checked again. Ignores that come from a pack are left alone.
+
+```sh
+shulker unignore sodium fabric-api
+```
+
+With `--json`, `data` is the entry removed.
 
 ## Targets
 
@@ -727,6 +757,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 
 | Code | Meaning |
 | --- | --- |
+| `already-ignored` | The pair already has an ignore in `shulker.json`; pass `--force` to replace it |
 | `ambiguous-instance` | Several linked instances or synced directories match. `candidates`: the matches |
 | `ambiguous-into` | The target has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
@@ -779,10 +810,12 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
 | `no-links` | Nothing is linked yet |
 | `no-overrides` | The target has no overrides directory to adopt a file into |
+| `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
 | `no-target` | `shulker.json` has no target of the side the command needs |
 | `not-built` | The target has no build directory yet; run `shulker build` |
 | `not-direct` | The mod is only a dependency. `items`: the mods that require it |
 | `not-drifted` | A file named to `pull` has no changes. `candidates`: the changed files |
+| `not-ignored` | The pair has no ignore in `shulker.json`. `candidates`: the pairs that do |
 | `not-installed` | A file isn't in the cache; run `shulker install` |
 | `not-pinned` | The mod has no pin |
 | `not-synced` | The directory has no record of the source it was synced from |
@@ -827,7 +860,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `unsupported-loader` | shulker doesn't support the loader yet |
 | `unsupported-mode` | `--mode symlink` isn't supported on Windows yet |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. Exits 2 |
-| `validation-failed` | The locked mods have dependency problems. `items`: the problems |
+| `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
 | `version-required` | `export mrpack` needs a version |
 | `wrong-side-target` | The target is on the wrong side for the command. `candidates`: the targets on the right side |
