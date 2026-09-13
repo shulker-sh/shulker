@@ -55,12 +55,12 @@ func (a *app) initCmd() *cobra.Command {
 			}
 			if target != "client" && target != "server" {
 				e := out.Errorf("usage", "--target must be client or server, not %q", target)
-				e.Candidates = []string{"client", "server"}
+				e.Candidates, e.Given, e.Flag = []string{"client", "server"}, target, "--target"
 				return e
 			}
 			if _, ok := loader.Lookup(loaderName); !ok {
 				e := out.Errorf("usage", "unknown loader %q; use one of %s", loaderName, strings.Join(loader.Names(), ", "))
-				e.Candidates = loader.Names()
+				e.Candidates, e.Given, e.Flag = loader.Names(), loaderName, "--loader"
 				return e
 			}
 			if name == "" {

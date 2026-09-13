@@ -215,7 +215,7 @@ func (m *Manifest) Target(name string) (Target, error) {
 	t, ok := m.Targets[name]
 	if !ok {
 		e := out.Errorf("target-not-found", "no target %q in %s", name, FileName)
-		e.Candidates = slices.Sorted(maps.Keys(m.Targets))
+		e.Candidates, e.Given = slices.Sorted(maps.Keys(m.Targets)), name
 		return Target{}, e
 	}
 	return t, nil

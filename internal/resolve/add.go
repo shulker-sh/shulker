@@ -186,7 +186,8 @@ func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider
 	v, ok := provider.Newest(versions, channel, r.Lock.Loader.Type)
 	if !ok {
 		e := out.Errorf("no-compatible-version", "%s has no %s version for Minecraft %s with %s", proj.Slug, channelLabel(channel), r.Lock.Minecraft, r.Lock.Loader.Type)
-		e.Candidates = otherChannels(versions)
+		e.Candidates, e.Pass = otherChannels(versions)
+		e.Flag = "--channel"
 		return nil, e
 	}
 	return &v, nil
@@ -199,17 +200,17 @@ func channelLabel(channel string) string {
 	return channel
 }
 
-func otherChannels(versions []provider.Version) []string {
+func otherChannels(versions []provider.Version) (shown, channels []string) {
 	seen := map[string]bool{}
-	var out []string
 	for _, v := range versions {
 		key := v.Number + " (" + v.Channel + ")"
 		if !seen[key] {
 			seen[key] = true
-			out = append(out, key)
+			shown = append(shown, key)
+			channels = append(channels, v.Channel)
 		}
 	}
-	return out
+	return shown, channels
 }
 
 type obtained struct {

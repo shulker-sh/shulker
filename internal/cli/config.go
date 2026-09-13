@@ -152,7 +152,9 @@ func (a *app) configUnsetCmd() *cobra.Command {
 
 func (a *app) openConfig(key string) (string, config.Config, map[string]any, error) {
 	if key != "" && !slices.Contains(config.Keys, key) {
-		return "", config.Config{}, nil, pathInvalid("config.json", key, config.Keys)
+		e := out.Errorf("path-invalid", "config.json has no %q", key)
+		e.Candidates, e.Given = config.Keys, key
+		return "", config.Config{}, nil, e
 	}
 	path, err := a.configFile()
 	if err != nil {

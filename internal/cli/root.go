@@ -61,6 +61,7 @@ func newApp(stdout, stderr io.Writer) *app {
 
 func (a *app) run(ctx context.Context, args []string) int {
 	a.printer.JSON = flagRequested(args, "json")
+	a.printer.Args = args
 	a.style = out.Options{NoColor: flagRequested(args, "no-color"), ASCII: flagRequested(args, "ascii")}
 	if !a.printer.JSON {
 		a.printer.Theme, a.printer.ErrTheme = out.Detect(a.printer.Stdout, a.printer.Stderr, a.style)

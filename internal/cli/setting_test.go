@@ -147,7 +147,7 @@ func TestSetRejectsBadPathsAndValues(t *testing.T) {
 	}
 
 	env := h.runSetting(t, 1, "set", "sever.eula", "true")
-	if env.Error.Code != "path-invalid" || !strings.Contains(env.Error.Message, "did you mean server?") || !slices.Contains(env.Error.Candidates, "server") {
+	if env.Error.Code != "path-invalid" || strings.Contains(env.Error.Message, "did you mean") || !slices.Contains(env.Error.Candidates, "server") {
 		t.Fatalf("typo error = %+v", env.Error)
 	}
 	for _, c := range []struct {

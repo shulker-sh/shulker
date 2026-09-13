@@ -22,7 +22,7 @@ func (r *Resolver) Remove(ids []string) error {
 			return e
 		}
 		e := out.Errorf("mod-not-found", "%s is not in the manifest", id)
-		e.Candidates = r.manifestIDs()
+		e.Candidates, e.Given = r.manifestIDs(), id
 		return e
 	}
 	for _, id := range ids {

@@ -185,7 +185,7 @@ func (r *Resolver) directTargets(ids []string) ([]string, error) {
 			return nil, e
 		}
 		e := out.Errorf("mod-not-found", "%s is not in the manifest", id)
-		e.Candidates = r.directIDs()
+		e.Candidates, e.Given = r.directIDs(), id
 		return nil, e
 	}
 	sort.Strings(targets)

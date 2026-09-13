@@ -107,7 +107,7 @@ func (b *Builder) mrpackTargets(names []string) ([]*mrpackTarget, error) {
 		}
 		if other, dup := bySide[t.Side]; dup {
 			e := out.Errorf("ambiguous-target", "targets %s and %s are both %s side; pass --target", other, n, t.Side)
-			e.Candidates = names
+			e.Candidates, e.Flag = names, "--target"
 			return nil, e
 		}
 		bySide[t.Side] = n

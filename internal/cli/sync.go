@@ -309,6 +309,6 @@ func singleTarget(p *project.Project, want string) (string, manifest.Target, err
 		return names[0], p.Manifest.Targets[names[0]], nil
 	}
 	e := out.Errorf("ambiguous-target", "shulker.json has several targets; pass --target")
-	e.Candidates = names
+	e.Candidates, e.Flag = names, "--target"
 	return "", manifest.Target{}, e
 }

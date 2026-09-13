@@ -37,6 +37,12 @@ type Error struct {
 	Help string `json:"-"`
 	// Nudge is the human-only command to run next, with its lead-in.
 	Nudge Nudge `json:"-"`
+	// Given is the argument the user typed that a pick replaces in the example command.
+	Given string `json:"-"`
+	// Flag receives the pick in the example command when no typed argument is replaced.
+	Flag string `json:"-"`
+	// Pass is what to type for each candidate, when that differs from how it reads.
+	Pass []string `json:"-"`
 }
 
 type Nudge struct {
@@ -79,6 +85,8 @@ type Printer struct {
 	LockStale bool
 	Stdout    io.Writer
 	Stderr    io.Writer
+	// Args is the command line as typed, for example commands under errors.
+	Args []string
 	// WarnPrefix names the target or instance a multi-part run is on.
 	WarnPrefix string
 	warnings   []string
@@ -126,6 +134,13 @@ func (p *Printer) Fail(err error) int {
 	if p.JSON {
 		_ = p.encode(p.envelope(false, e.Data, e))
 		return e.Exit
+	}
+	if e.Nudge.Command == "" {
+		if _, picks := e.picks(); len(picks) > 0 {
+			if command, ok := exampleCommand(p.Args, e, picks[0].Pass); ok {
+				e.Nudge = Nudge{Lead: "For example", Command: command}
+			}
+		}
 	}
 	p.Err().Error(e)
 	return e.Exit

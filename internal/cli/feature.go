@@ -67,7 +67,7 @@ func featureNames(features []build.Feature) []string {
 
 func unknownFeature(name string, known []string) error {
 	e := out.Errorf("feature-not-found", "no mod or target in shulker.json uses feature %q", name)
-	e.Candidates = known
+	e.Candidates, e.Given = known, name
 	return e
 }
 

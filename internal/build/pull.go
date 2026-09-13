@@ -147,7 +147,7 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 	for rel := range named {
 		if !drifted(byPath[rel]) {
 			e := out.Errorf("not-drifted", "%s is not changed in the build directory of %s", rel, name)
-			e.Candidates = driftedPaths(plans)
+			e.Candidates, e.Given = driftedPaths(plans), rel
 			return nil, e
 		}
 	}
@@ -376,7 +376,7 @@ func (b *Builder) adoptKeys(name, rel string, keys []string, d *drift, report *P
 		v, ok := current[k]
 		if !ok {
 			e := out.Errorf("key-not-found", "%s has no key %q", rel, k)
-			e.Candidates = current.keys()
+			e.Candidates, e.Given = current.keys(), k
 			return e
 		}
 		set[k] = v

@@ -81,15 +81,15 @@ func (a *app) selectLinks(query string, s linkSelection) ([]config.Link, error) 
 	}
 	if len(matches) == 0 {
 		e := out.Errorf("instance-not-found", "no linked instance or synced directory matches %s", describeSelection(query, s))
-		e.Candidates = linkCandidates(pool)
+		e.Candidates, e.Pass, e.Given = linkCandidates(pool), linkNames(pool), query
 		if len(pool) == 0 {
-			e.Candidates = linkCandidates(links)
+			e.Candidates, e.Pass = linkCandidates(links), linkNames(links)
 		}
 		return nil, e
 	}
 	if len(matches) > 1 && query != "" && !s.all {
 		e := out.Errorf("ambiguous-instance", "%d entries match %s; narrow it with --launcher, --side, or the directory, or pass --all", len(matches), describeSelection(query, s))
-		e.Candidates = linkCandidates(matches)
+		e.Candidates, e.Pass, e.Given = linkCandidates(matches), linkDirs(matches), query
 		return nil, e
 	}
 	return matches, nil
@@ -120,6 +120,22 @@ func linkCandidates(links []config.Link) []string {
 	return names
 }
 
+func linkNames(links []config.Link) []string {
+	names := make([]string, len(links))
+	for i, l := range links {
+		names[i] = l.Name
+	}
+	return names
+}
+
+func linkDirs(links []config.Link) []string {
+	dirs := make([]string, len(links))
+	for i, l := range links {
+		dirs[i] = l.Dir
+	}
+	return dirs
+}
+
 func linkAside(t out.Theme, l config.Link) string {
 	if l.Launcher == "" {
 		return ""
@@ -134,7 +150,7 @@ func linkHeading(t out.Theme, l config.Link) string {
 func (a *app) pickLink(links []config.Link) (config.Link, error) {
 	if a.printer.JSON || a.tty == nil || !a.tty() {
 		e := out.Errorf("ambiguous-instance", "pass a source, --instance <name>, or --all to choose what to sync")
-		e.Candidates = linkCandidates(links)
+		e.Candidates, e.Pass, e.Flag = linkCandidates(links), linkNames(links), "--instance"
 		return config.Link{}, e
 	}
 	lines := a.printer.Err()

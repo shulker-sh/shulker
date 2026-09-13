@@ -236,7 +236,7 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, n
 		return drifted[0], nil
 	}
 	e := out.Errorf("ambiguous-into", "target %s has edits in several directories; pass --into", name)
-	e.Candidates = drifted
+	e.Candidates, e.Flag = drifted, "--into"
 	return "", e
 }
 

@@ -260,12 +260,12 @@ func (l *Lines) Error(e *Error) {
 			rows = append(rows, Row{Text: t.Grey(item)})
 		}
 	}
-	if len(e.Candidates) > 0 {
-		var picks []string
-		for _, c := range e.Candidates {
-			picks = append(picks, t.Grey(t.ArrowPick())+" "+t.Cyan(c))
+	if label, picks := e.picks(); len(picks) > 0 {
+		var children []string
+		for _, p := range picks {
+			children = append(children, t.Grey(t.ArrowPick())+" "+t.Cyan(p.Show))
 		}
-		rows = append(rows, Row{Label: "did you mean", Children: picks})
+		rows = append(rows, Row{Label: label, Children: children})
 	}
 	if e.Help != "" {
 		rows = append(rows, Row{Label: "help", Text: e.Help})

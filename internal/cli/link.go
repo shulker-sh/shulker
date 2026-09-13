@@ -134,7 +134,7 @@ func sideTarget(m *manifest.Manifest, want, side, verb string) (string, error) {
 		}
 		if t.Side != side {
 			e := out.Errorf("wrong-side-target", "target %q is a %s target; %s needs a %s target", want, t.Side, verb, side)
-			e.Candidates = sideTargets(m, side)
+			e.Candidates, e.Flag = sideTargets(m, side), "--target"
 			return "", e
 		}
 		return want, nil
@@ -147,7 +147,7 @@ func sideTarget(m *manifest.Manifest, want, side, verb string) (string, error) {
 		return matches[0], nil
 	}
 	e := out.Errorf("ambiguous-target", "shulker.json has several %s targets; pass --target", side)
-	e.Candidates = matches
+	e.Candidates, e.Flag = matches, "--target"
 	return "", e
 }
 

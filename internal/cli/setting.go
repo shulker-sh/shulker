@@ -18,7 +18,6 @@ import (
 	"golang.org/x/text/message"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/near"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/schema"
@@ -332,7 +331,7 @@ func (s *settingsSchema) lookup(path string) (*settingField, error) {
 		case props != nil:
 			child, ok := props[seg].(map[string]any)
 			if !ok {
-				return nil, pathInvalid(parent, seg, slices.Sorted(maps.Keys(props)))
+				return nil, pathInvalid(segs, i, slices.Sorted(maps.Keys(props)))
 			}
 			keys, node = append(keys, seg), child
 		case s.types(node)["array"]:
@@ -344,17 +343,16 @@ func (s *settingsSchema) lookup(path string) (*settingField, error) {
 	return &settingField{path: path, keys: keys, schema: s.deref(node), s: s}, nil
 }
 
-func pathInvalid(parent, seg string, allowed []string) error {
+func pathInvalid(segs []string, i int, allowed []string) error {
 	where := manifest.FileName
-	if parent != "" {
+	if parent := strings.Join(segs[:i], "."); parent != "" {
 		where = parent
 	}
-	msg := fmt.Sprintf("%s has no %q", where, seg)
-	if hits := near.Closest(seg, allowed, 1); len(hits) > 0 {
-		msg += fmt.Sprintf("; did you mean %s?", hits[0])
+	e := out.Errorf("path-invalid", "%s has no %q", where, segs[i])
+	e.Candidates, e.Given = allowed, strings.Join(segs, ".")
+	for _, key := range allowed {
+		e.Pass = append(e.Pass, strings.Join(slices.Concat(segs[:i], []string{key}, segs[i+1:]), "."))
 	}
-	e := out.Errorf("path-invalid", "%s", msg)
-	e.Candidates = allowed
 	return e
 }
 
