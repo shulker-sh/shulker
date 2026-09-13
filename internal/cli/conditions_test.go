@@ -217,3 +217,30 @@ func TestMarkerDescribesTheVariation(t *testing.T) {
 		t.Fatalf("universal build description:\n%s", desc)
 	}
 }
+
+func TestLockShowsWhereGatedModsLand(t *testing.T) {
+	other := "windows"
+	if build.DetectOS() == other {
+		other = "linux"
+	}
+
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	setMod(t, h, "sodium", map[string]any{"feature": "fancy", "os": other})
+	stdout := h.mustRun(t, "lock")
+	if !strings.Contains(stdout, "» no targets (") || !strings.Contains(stdout, "os: "+other+", feature: fancy, off in every target)") {
+		t.Fatalf("feature off in every target, os reported not checked: %s", stdout)
+	}
+	if !strings.Contains(stdout, "» no targets (required by sodium)") {
+		t.Fatalf("a dependency lands where its requirer does: %s", stdout)
+	}
+
+	h = newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	setFeatures(t, h, []string{"fancy"})
+	setMod(t, h, "sodium", map[string]any{"feature": []string{"fancy", "!lowend"}})
+	stdout = h.mustRun(t, "lock")
+	if !strings.Contains(stdout, "» all targets (") || !strings.Contains(stdout, "feature: fancy and not lowend)") || strings.Contains(stdout, "off in every target") {
+		t.Fatalf("feature on by target default: %s", stdout)
+	}
+}

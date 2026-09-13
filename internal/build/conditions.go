@@ -2,6 +2,7 @@ package build
 
 import (
 	"fmt"
+	"maps"
 	"runtime"
 	"slices"
 	"sort"
@@ -19,6 +20,7 @@ func DetectOS() string {
 
 type conditions struct {
 	os       string
+	anyOS    bool
 	features map[string]bool
 }
 
@@ -97,7 +99,7 @@ func (b *Builder) Features() []Feature {
 }
 
 func (c conditions) admits(m manifest.Mod) (bool, string) {
-	if ok, why := matches(m.OS, "os", func(name string) bool { return name == c.os }); !ok {
+	if ok, why := matches(m.OS, "os", func(name string) bool { return name == c.os }); !ok && !c.anyOS {
 		return false, why
 	}
 	return matches(m.Feature, "feature", func(name string) bool { return c.features[name] })
@@ -275,4 +277,41 @@ func includedRequirers(by []string, included map[string]bool) []string {
 		}
 	}
 	return names
+}
+
+// Placement is where a locked mod lands by the project's own settings: each
+// target's default features, with OS conditions reported rather than checked,
+// so every machine gives the same answer.
+type Placement struct {
+	Targets []string
+	OS      manifest.StringList
+	Feature manifest.StringList
+}
+
+func (b *Builder) Placements() map[string]Placement {
+	placements := map[string]Placement{}
+	for _, name := range slices.Sorted(maps.Keys(b.Manifest.Targets)) {
+		target := b.Manifest.Targets[name]
+		c := conditions{anyOS: true, features: map[string]bool{}}
+		for _, f := range target.Features {
+			c.features[f] = true
+		}
+		for id := range b.selectMods(c).included {
+			if m := b.Lock.Mods[id]; m.Side != "both" && m.Side != target.Side {
+				continue
+			}
+			p := placements[id]
+			p.Targets = append(p.Targets, name)
+			placements[id] = p
+		}
+	}
+	for id, m := range b.directEntries(conditions{anyOS: true}) {
+		if _, locked := b.Lock.Mods[id]; !locked {
+			continue
+		}
+		p := placements[id]
+		p.OS, p.Feature = m.OS, m.Feature
+		placements[id] = p
+	}
+	return placements
 }

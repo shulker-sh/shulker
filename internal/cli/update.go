@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -162,7 +163,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		if len(res.Reresolved) > 0 {
 			l.Info("re-resolved every mod: " + strings.Join(res.Reresolved, "; "))
 		}
-		printChanges(l, res.Changes, v.Suggestions, p.Manifest.Targets)
+		printChanges(l, res.Changes, v.Suggestions, p.Manifest.Targets, (&build.Builder{Manifest: r.Manifest, Lock: r.Lock, Packs: r.Packs}).Placements())
 		if optional > 0 {
 			optionalNudge(l, optional)
 		}
@@ -233,7 +234,7 @@ func (a *app) outdatedCmd() *cobra.Command {
 	}
 }
 
-func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Suggestion, targets map[string]manifest.Target) {
+func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Suggestion, targets map[string]manifest.Target, placements map[string]build.Placement) {
 	var items []out.Item
 	for _, p := range c.Platform {
 		if p.From == "" {
@@ -253,9 +254,19 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 		}
 	}
 	for _, m := range c.Added {
-		it := out.Item{Kind: out.Add, Name: m.ID, Version: m.VersionNumber, Targets: targetsForSide(targets, m.Side), OfTargets: len(targets)}
+		place := placements[m.ID]
+		it := out.Item{Kind: out.Add, Name: m.ID, Version: m.VersionNumber, Targets: place.Targets, OfTargets: len(targets)}
 		if m.Side != "" && m.Side != "both" {
 			it.Aside = append(it.Aside, m.Side+" only")
+		}
+		if text := conditionText("os", place.OS); text != "" {
+			it.Aside = append(it.Aside, text)
+		}
+		if text := conditionText("feature", place.Feature); text != "" {
+			if len(place.Targets) == 0 && sideHasTarget(targets, m.Side) {
+				text += ", off in every target"
+			}
+			it.Aside = append(it.Aside, text)
 		}
 		switch {
 		case m.AlreadyLocked:
@@ -299,14 +310,33 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 	l.Items(items...)
 }
 
-func targetsForSide(targets map[string]manifest.Target, side string) []string {
-	var names []string
-	for _, name := range targetNames(targets) {
-		if side == "" || side == "both" || targets[name].Side == side {
-			names = append(names, name)
+func sideHasTarget(targets map[string]manifest.Target, side string) bool {
+	for _, t := range targets {
+		if side == "" || side == "both" || t.Side == side {
+			return true
 		}
 	}
-	return names
+	return false
+}
+
+// conditionText reads a condition list back as the manifest means it: any of
+// the plain names, and none of the negated ones.
+func conditionText(kind string, list manifest.StringList) string {
+	var wanted, parts []string
+	for _, item := range list {
+		if name, negated := strings.CutPrefix(item, "!"); negated {
+			parts = append(parts, "not "+name)
+		} else {
+			wanted = append(wanted, item)
+		}
+	}
+	if len(wanted) > 0 {
+		parts = append([]string{strings.Join(wanted, " or ")}, parts...)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return kind + ": " + strings.Join(parts, " and ")
 }
 
 func sideText(side string) string {
