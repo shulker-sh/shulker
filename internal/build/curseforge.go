@@ -141,7 +141,7 @@ func (b *Builder) curseForgeMods(t *mrpackTarget, opts CurseForgeOptions, report
 		case err == nil:
 			matches = found
 		case opts.Bundle:
-			report.Warnings = append(report.Warnings, fmt.Sprintf("couldn't look mods up on CurseForge (%s), so every mod not from CurseForge is bundled", out.AsError(err).Message))
+			report.Warnings = append(report.Warnings, fmt.Sprintf("CurseForge lookup failed, so these are bundled: %s", out.AsError(err).Message))
 		default:
 			e := out.AsError(err)
 			e.Items = lookup

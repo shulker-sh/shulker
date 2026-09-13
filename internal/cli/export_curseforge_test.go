@@ -168,7 +168,7 @@ func TestExportCurseForgeWithoutKey(t *testing.T) {
 		t.Fatalf("no key: code=%d %+v", code, e)
 	}
 	_, stderr := h.mustRunStderr(t, "export", "curseforge", "--bundle")
-	if !strings.Contains(stderr, "couldn't look mods up on CurseForge") || !strings.Contains(stderr, "bundled fabric-api") || !strings.Contains(stderr, "bundled sodium") {
+	if !strings.Contains(stderr, "CurseForge lookup failed, so these are bundled: curseforge needs an API key") || !strings.Contains(stderr, "bundled fabric-api") || !strings.Contains(stderr, "bundled sodium") {
 		t.Fatalf("no key with --bundle: %s", stderr)
 	}
 }
