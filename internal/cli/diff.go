@@ -125,9 +125,12 @@ func (a *app) diffCmd() *cobra.Command {
 						continue
 					}
 					l.Heading(rep.Target + " " + l.T.Grey(fmt.Sprintf("(%s in %s)", plural(len(rep.Files), "file changed", "files changed"), where[rep])))
-					for _, f := range rep.Files {
-						l.Items(out.Item{Kind: diffKind(f.State), Name: f.Path, Aside: []string{f.State}})
-						l.Raw(strings.TrimRight(f.Diff, "\n"))
+					for i, f := range rep.Files {
+						if i > 0 {
+							l.Blank()
+						}
+						l.Items(out.Item{Kind: diffKind(f.State), Name: f.Path, Aside: []string{diffAside(f.State)}})
+						l.Diff(f.Diff)
 					}
 				}
 			})
@@ -238,6 +241,21 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, n
 	e := out.Errorf("ambiguous-into", "target %s has edits in several directories; pass --into", name)
 	e.Candidates, e.Flag = drifted, "--into"
 	return "", e
+}
+
+// diffAside says what happened to a file in words; JSON keeps the state name.
+func diffAside(state string) string {
+	switch state {
+	case "kept":
+		return "edited here"
+	case "conflict":
+		return "edited on both sides"
+	case "untracked":
+		return "not from shulker"
+	case "orphan":
+		return "no longer in overrides"
+	}
+	return state
 }
 
 func diffKind(state string) out.Kind {

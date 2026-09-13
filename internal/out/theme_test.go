@@ -123,3 +123,18 @@ func TestErrorRowsRenderStructured(t *testing.T) {
 		t.Fatalf("remaining message lines should render plain: %q", plain)
 	}
 }
+
+func TestDiffPaintsInsideTheGutter(t *testing.T) {
+	lines := render(coloured(), func(l *Lines) {
+		l.Diff("--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a = 3\n+a = 2\n b\n")
+	})
+	want := []string{
+		"    " + sgrCyan + "@@ -1 +1 @@" + sgrReset,
+		"    " + sgrRed + "-a = 3" + sgrReset,
+		"    " + sgrGreen + "+a = 2" + sgrReset,
+		"     b",
+	}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got %q\nwant %q", lines, want)
+	}
+}

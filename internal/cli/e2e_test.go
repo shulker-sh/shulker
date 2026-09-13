@@ -1191,7 +1191,7 @@ func TestDiffAndPull(t *testing.T) {
 	write(h.dir, "overrides/config/plain.txt", "a=3\n")
 	write(buildDir, "config/plain.txt", "a=4\n")
 	stdout = h.mustRun(t, "diff")
-	if !strings.Contains(stdout, "~ config/plain.txt (conflict)\n") || !strings.Contains(stdout, "-a=4\n+a=3\n") {
+	if !strings.Contains(stdout, "~ config/plain.txt (edited on both sides)\n") || !strings.Contains(stdout, "    -a=4\n    +a=3\n") {
 		t.Fatalf("conflict diff: %s", stdout)
 	}
 	h.mustRun(t, "pull", "config/plain.txt")

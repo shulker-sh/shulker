@@ -48,6 +48,26 @@ func (l *Lines) Blank() { fmt.Fprintln(l.W) }
 // Raw prints text with no gutter or styling, for values scripts read back.
 func (l *Lines) Raw(text string) { fmt.Fprintln(l.W, text) }
 
+// Diff prints a unified diff inside the gutter: the file header pair is
+// dropped, hunk headers cyan, removed lines red, added lines green.
+func (l *Lines) Diff(text string) {
+	t := l.T
+	for i, line := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
+		if i < 2 && (strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ")) {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, "@@"):
+			line = t.Cyan(line)
+		case strings.HasPrefix(line, "-"):
+			line = t.Red(line)
+		case strings.HasPrefix(line, "+"):
+			line = t.Green(line)
+		}
+		fmt.Fprintln(l.W, gutter+gutter+line)
+	}
+}
+
 func (l *Lines) Text(text string) { l.line(l.T.Markup(text)) }
 
 func (l *Lines) Heading(text string) { l.line(l.T.Bold(text)) }
