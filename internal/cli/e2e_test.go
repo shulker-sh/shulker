@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
@@ -76,6 +77,8 @@ func makeJarFiles(t *testing.T, id, filename string, files map[string]string) fa
 }
 
 type harness struct {
+	openFile       func(path string) error
+	waitFor        time.Duration
 	server         *httptest.Server
 	jars           map[string]fakeJar
 	dir            string
@@ -414,6 +417,8 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	a.stdin = h.stdin
 	a.tty = func() bool { return h.tty }
 	a.installer = h.fakeInstaller
+	a.openFile = h.openFile
+	a.waitFor = h.waitFor
 	f := fetch.New("test")
 	piston := meta.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"

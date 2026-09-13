@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -18,12 +19,16 @@ import (
 )
 
 type linkReport struct {
-	Launcher    string `json:"launcher"`
-	LauncherDir string `json:"launcherDir"`
-	Profile     string `json:"profile"`
-	VersionID   string `json:"versionId"`
-	Target      string `json:"target"`
-	GameDir     string `json:"gameDir"`
+	Launcher    string      `json:"launcher"`
+	LauncherDir string      `json:"launcherDir"`
+	Profile     string      `json:"profile"`
+	Name        string      `json:"name"`
+	VersionID   string      `json:"versionId"`
+	Target      string      `json:"target"`
+	GameDir     string      `json:"gameDir"`
+	Source      string      `json:"source"`
+	Ref         string      `json:"ref,omitempty"`
+	Sync        *syncResult `json:"sync,omitempty"`
 }
 
 func (a *app) linkCmd() *cobra.Command {
@@ -31,25 +36,24 @@ func (a *app) linkCmd() *cobra.Command {
 		Use:   "link",
 		Short: "Point a launcher at this project's client build",
 	}
-	cmd.AddCommand(a.linkMojangCmd(), a.linkPrismCmd())
+	cmd.AddCommand(a.linkMojangCmd(), a.linkPrismCmd(), a.linkModrinthCmd())
 	return cmd
 }
 
 func (a *app) linkMojangCmd() *cobra.Command {
-	var launcherDir, target string
+	var launcherDir, target, instanceName, ref string
+	var force bool
 	cmd := &cobra.Command{
-		Use:     "mojang",
+		Use:     "mojang [project-dir | git-url | manifest-url]",
 		Aliases: []string{"vanilla"},
 		Short:   "Install the loader into the official launcher and add a profile for the client build",
-		Args:    cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			p, err := a.openProject()
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			src, err := a.linkSource(cmd.Context(), args, ref)
 			if err != nil {
 				return err
 			}
-			if err := p.RequireLock(); err != nil {
-				return err
-			}
+			p := src.project
 			l, err := loader.Require(p.Lock.Loader.Type)
 			if err != nil {
 				return err
@@ -72,6 +76,21 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			} else if err != nil {
 				return err
 			}
+			display := p.Manifest.DisplayName(name)
+			if instanceName != "" {
+				display = instanceName
+			}
+			key := profileKey(display)
+			if prev, ok := a.findLauncherLink("mojang", launcherDir, display); ok && prev.Source != src.name && !force {
+				return out.Errorf("instance-exists", "profile %q already syncs from %s; pass --name to create a second profile, or --force to repoint this one", display, prev.Source)
+			}
+			gameDir := filepath.Join(src.Dir, p.Manifest.BuildDir(name))
+			if src.remote() {
+				gameDir = filepath.Join(launcherDir, "shulker", strings.TrimPrefix(key, "shulker-"))
+			}
+			if gameDir, err = filepath.Abs(gameDir); err != nil {
+				return err
+			}
 			var versionID string
 			if l.InstallClientFlag != "" {
 				if versionID, err = a.installClientLoader(cmd.Context(), p, v, l); err != nil {
@@ -91,30 +110,35 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					return err
 				}
 			}
-			gameDir, err := filepath.Abs(filepath.Join(p.Dir, p.Manifest.BuildDir(name)))
-			if err != nil {
-				return err
-			}
-			display := p.Manifest.DisplayName(name)
 			rep := linkReport{
 				Launcher:    "mojang",
 				LauncherDir: launcherDir,
-				Profile:     profileKey(display),
+				Profile:     key,
+				Name:        display,
 				VersionID:   versionID,
 				Target:      name,
 				GameDir:     gameDir,
+				Source:      src.name,
+				Ref:         ref,
 			}
-			if err := v.WriteProfile(launcher.Profile{Key: rep.Profile, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
+			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
-			projectDir, err := filepath.Abs(p.Dir)
-			if err != nil {
-				return err
+			a.registerLink(config.Link{Launcher: "mojang", LauncherDir: launcherDir, Side: "client", Name: display, Dir: gameDir, Source: src.name, Target: name, Ref: ref})
+			if src.remote() {
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: name, into: gameDir})
+				if err != nil {
+					return err
+				}
+				rep.Sync = &r
 			}
-			a.registerLink(config.Link{Launcher: "mojang", LauncherDir: launcherDir, Side: "client", Name: display, Dir: gameDir, Source: projectDir, Target: name})
 			return a.printer.Emit(rep, func(l *out.Lines) {
 				l.OKInto("installed "+versionID, filepath.Join(launcherDir, "versions"), "")
 				l.OKInto("linked launcher profile "+display, gameDir, "")
+				if rep.Sync != nil {
+					rep.Sync.print(l)
+					return
+				}
 				if _, err := os.Stat(filepath.Join(gameDir, build.StateFile)); err != nil {
 					l.Nudge("Download and build before launching", "shulker install")
 				}
@@ -123,7 +147,40 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher directory (default: the official launcher's .minecraft folder)")
 	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
+	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the target's display name)")
+	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().BoolVar(&force, "force", false, "repoint a profile that syncs from a different source")
 	return cmd
+}
+
+// findLauncherLink is the registry entry a launcher already has under a name,
+// when its directory is still there.
+func (a *app) findLauncherLink(launcherName, launcherDir, name string) (config.Link, bool) {
+	links, err := a.loadLinks()
+	if err != nil {
+		return config.Link{}, false
+	}
+	for _, l := range links {
+		if l.Launcher != launcherName || l.Name != name || !sameDir(l.LauncherDir, launcherDir) {
+			continue
+		}
+		if _, err := os.Stat(l.Dir); err == nil {
+			return l, true
+		}
+	}
+	return config.Link{}, false
+}
+
+// linkSource is the project a link command works from: the argument when there
+// is one, else the project in the current directory.
+func (a *app) linkSource(ctx context.Context, args []string, ref string) (*syncSource, error) {
+	if len(args) == 1 {
+		return a.openSource(ctx, args[0], ref)
+	}
+	if ref != "" {
+		return nil, out.Errorf("usage", "--ref needs a git source argument")
+	}
+	return a.projectSource()
 }
 
 func sideTarget(m *manifest.Manifest, want, side, verb string) (string, error) {

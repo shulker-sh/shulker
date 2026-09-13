@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -37,6 +38,8 @@ type app struct {
 	releases   *selfupdate.Releases
 	exe        func() (string, error)
 	installer  func(ctx context.Context, java, jar string, args []string) error
+	openFile   func(path string) error
+	waitFor    time.Duration
 	running    bool
 }
 

@@ -49,15 +49,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			if mode == "symlink" && runtime.GOOS == "windows" {
 				return out.Errorf("unsupported-mode", "symlink mode is not supported on Windows yet; use --mode sync")
 			}
-			var src *syncSource
-			var err error
-			if len(args) == 1 {
-				src, err = a.openSource(cmd.Context(), args[0], ref)
-			} else if ref != "" {
-				err = out.Errorf("usage", "--ref needs a git source argument")
-			} else {
-				src, err = a.projectSource()
-			}
+			src, err := a.linkSource(cmd.Context(), args, ref)
 			if err != nil {
 				return err
 			}

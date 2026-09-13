@@ -75,7 +75,7 @@ func TestUnlink(t *testing.T) {
 	}
 
 	r = unlinkJSON(t, h, "pack", "--launcher", "mojang")
-	if r[0].Removed != launcher.RemovedProfile || r[0].RelinkIn != h.dir || r[0].Relink != "shulker link mojang --target client --launcher-dir "+mojangDir {
+	if r[0].Removed != launcher.RemovedProfile || r[0].RelinkIn != "" || r[0].Relink != "shulker link mojang "+h.dir+" --target client --name pack --launcher-dir "+mojangDir {
 		t.Fatalf("unlink mojang: %+v", r)
 	}
 	var profiles struct {

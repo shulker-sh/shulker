@@ -54,12 +54,13 @@ This assembles the mods and everything in `overrides/` into `build/client`. To p
 shulker link prism
 ```
 
-This works with Prism Launcher. For the official launcher, use `shulker link mojang`.
+This works with Prism Launcher. For the official launcher, use `shulker link mojang`; for Modrinth App, `shulker link modrinth`.
 
-To play someone else's pack, give `link prism` its git or manifest URL. You don't need a project of your own. The instance syncs from that URL before each launch:
+To play someone else's pack, give `link` its git or manifest URL. You don't need a project of your own. A Prism instance syncs from that URL before each launch; the official launcher and Modrinth App have no pre-launch hook, so those update when you run `shulker sync --all`:
 
 ```sh
 shulker link prism https://github.com/shulker-sh/base-pack.git
+shulker link mojang https://github.com/shulker-sh/base-pack.git
 ```
 
 ## Run a server
