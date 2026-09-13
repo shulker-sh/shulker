@@ -59,7 +59,9 @@ func (l *Lines) Items(items ...Item) {
 		if it.Version != "" || it.From != "" || it.Text != "" || it.OfTargets > 0 {
 			nameWidth = max(nameWidth, Width(it.Name))
 		}
-		versionWidth = max(versionWidth, Width(it.Version))
+		if afterVersion(it) {
+			versionWidth = max(versionWidth, Width(it.Version))
+		}
 	}
 	for _, it := range items {
 		l.line(l.item(it, nameWidth, versionWidth))
@@ -71,7 +73,11 @@ func (l *Lines) item(it Item, nameWidth, versionWidth int) string {
 	var parts []string
 	rest := []string{}
 	if it.Version != "" {
-		rest = append(rest, t.Grey(pad(it.Version, versionWidth)))
+		version := it.Version
+		if afterVersion(it) {
+			version = pad(version, versionWidth)
+		}
+		rest = append(rest, t.Grey(version))
 	}
 	if it.From != "" || it.To != "" {
 		rest = append(rest, t.Bump(it.From, it.To))
@@ -88,7 +94,11 @@ func (l *Lines) item(it Item, nameWidth, versionWidth int) string {
 	}
 	parts = append(parts, l.glyph(it.Kind), t.Bold(name))
 	parts = append(parts, rest...)
-	return strings.TrimRight(strings.Join(parts, " "), " ") + t.Aside(strings.Join(it.Aside, ", "))
+	return strings.Join(parts, " ") + t.Aside(strings.Join(it.Aside, ", "))
+}
+
+func afterVersion(it Item) bool {
+	return it.From != "" || it.To != "" || it.OfTargets > 0 || it.Text != ""
 }
 
 func (l *Lines) glyph(k Kind) string {

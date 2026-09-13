@@ -131,7 +131,10 @@ func (t Theme) paint(text string, codes ...string) string {
 	if !t.Color || text == "" {
 		return text
 	}
-	return strings.Join(codes, "") + text + sgrReset
+	open := strings.Join(codes, "")
+	// A reset inside text, from a styled command say, would end this style early.
+	inner := strings.ReplaceAll(strings.TrimSuffix(text, sgrReset), sgrReset, sgrReset+open)
+	return open + inner + sgrReset
 }
 
 func (t Theme) grey() string { return "\x1b[38;5;" + strconv.Itoa(t.GreyIndex) + "m" }
