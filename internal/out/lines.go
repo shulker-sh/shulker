@@ -132,7 +132,7 @@ func (l *Lines) glyph(k Kind) string {
 	case Good:
 		return t.paint(t.GlyphOK(), sgrGreen, sgrBold)
 	}
-	return t.paint("i", sgrCyan, sgrBold)
+	return t.Grey(t.GlyphDot())
 }
 
 func pad(s string, width int) string {

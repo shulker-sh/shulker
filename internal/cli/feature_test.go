@@ -52,7 +52,7 @@ func TestFeatureIntoSyncedDir(t *testing.T) {
 	if _, err := os.Stat(jar); !os.IsNotExist(err) {
 		t.Fatalf("feature --into without --sync must not sync: %v", err)
 	}
-	if stdout := h.mustRun(t, "feature", "list", "--into", into); stdout != "  i fancy on (your choice, gates: sodium)\n" {
+	if stdout := h.mustRun(t, "feature", "list", "--into", into); stdout != "  • fancy on (your choice, gates: sodium)\n" {
 		t.Fatalf("list --into: %q", stdout)
 	}
 
@@ -118,7 +118,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 	if _, err := os.Stat(localPath); !os.IsNotExist(err) {
 		t.Fatalf("a plain build must not create the local file: %v", err)
 	}
-	if stdout := h.mustRun(t, "feature", "list"); stdout != "  i fancy off (gates: sodium)\n" {
+	if stdout := h.mustRun(t, "feature", "list"); stdout != "  • fancy off (gates: sodium)\n" {
 		t.Fatalf("list: %q", stdout)
 	}
 	code, stdout, _ := h.run(t, "feature", "on", "fanci", "--json")
@@ -140,7 +140,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 	if !lf.Features["fancy"] || lf.DetectedOS != build.DetectOS() {
 		t.Fatalf("local file: %+v", lf)
 	}
-	if stdout := h.mustRun(t, "feature", "list"); stdout != "  i fancy on (your choice, gates: sodium)\n" {
+	if stdout := h.mustRun(t, "feature", "list"); stdout != "  • fancy on (your choice, gates: sodium)\n" {
 		t.Fatalf("list after on: %q", stdout)
 	}
 	h.mustRun(t, "build")
@@ -173,7 +173,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 		t.Fatalf("second reset: %s", stdout)
 	}
 	setFeatures(t, h, []string{"fancy"})
-	if stdout := h.mustRun(t, "feature", "list"); stdout != "  i fancy on (target default, gates: sodium)\n" {
+	if stdout := h.mustRun(t, "feature", "list"); stdout != "  • fancy on (target default, gates: sodium)\n" {
 		t.Fatalf("list with a target default: %q", stdout)
 	}
 

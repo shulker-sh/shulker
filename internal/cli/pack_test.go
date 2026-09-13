@@ -132,7 +132,7 @@ func TestLocalPack(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.dir, "base", "overrides", "config", "base.txt"), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if stdout = h.mustRun(t, "pack", "list"); !strings.HasPrefix(stdout, "  i base ./base (local, changed, pinned "+l.Packs["./base"]["dirSha256"][:12]+")\n") {
+	if stdout = h.mustRun(t, "pack", "list"); !strings.HasPrefix(stdout, "  • base ./base (local, changed, pinned "+l.Packs["./base"]["dirSha256"][:12]+")\n") {
 		t.Fatalf("pack list after edit: %s", stdout)
 	}
 	_, stderr := h.mustRunStderr(t, "build")
@@ -242,7 +242,7 @@ func TestGitPack(t *testing.T) {
 	if !strings.Contains(stdout, "+ shared-pack "+first[:12]+" (pack)") {
 		t.Fatalf("pack add output: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "pack", "list"); stdout != "  i shared-pack "+source+" (git, ok, pinned "+first[:12]+", ref main)\n" {
+	if stdout = h.mustRun(t, "pack", "list"); stdout != "  • shared-pack "+source+" (git, ok, pinned "+first[:12]+", ref main)\n" {
 		t.Fatalf("pack list: %s", stdout)
 	}
 	l := readLock(t, h)
