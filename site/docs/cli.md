@@ -43,7 +43,8 @@ outline: [2, 3]
 | [`shulker pack list`](#shulker-pack-list) | List packs and their local drift state |
 | [`shulker player [name\|uuid]...`](#shulker-player) | Check player names and uuids against Mojang and the lock |
 | [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
-| [`shulker export mrpack`](#shulker-export-mrpack) | Export a Modrinth modpack |
+| [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
+| [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
 | [`shulker version`](#shulker-version) | Print the shulker version |
 | [`shulker self update`](#shulker-self-update) | Update shulker to the latest release |
 
@@ -93,22 +94,44 @@ shulker import mrpack pack.mrpack -C my-pack --name my-pack
 
 ### `shulker export mrpack`
 
-Export the project as a Modrinth modpack for the Modrinth app and other launchers.
+Export the project as a Modrinth modpack for the Modrinth app and other launchers. The source is the project in the current directory, or a project directory, git URL, or manifest URL; a git or URL source is downloaded first and the archive is written to the current directory.
 
 ```sh
 shulker export mrpack
 shulker export mrpack --target client -o dist/my-pack.mrpack
+shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--version <version>` | Version id written into the pack (default: `version` in shulker.json) |
-| `-o, --output <path>` | Archive path (default: `build/<name>-<version>.mrpack`) |
+| `--version <version>` | Version written into the pack (default: `version` in shulker.json) |
+| `-o, --output <path>` | Archive path (default: `build/<name>-<version>.mrpack`, or the current directory for a git or URL source) |
 | `--target <name>` | Export one target only (default: every target) |
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
 | `--bundle` | Put mods that Modrinth launchers can't download inside the archive |
+| `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
+
+### `shulker export curseforge`
+
+Export the client target as a CurseForge profile `.zip` for the CurseForge app's Import Profile. Mods locked from CurseForge go in by file ID. Every other mod is looked up on CurseForge by its fingerprint, and matches go in by file ID too. Mods that aren't on CurseForge fail the export unless `--bundle` ships them inside the archive, which the CurseForge app warns about on import. Server-only mods and files are left out. The source works as in [`export mrpack`](#shulker-export-mrpack).
+
+```sh
+shulker export curseforge
+shulker export curseforge --bundle -o dist/my-pack.zip
+```
+
+| Flag | Description |
+| --- | --- |
+| `--version <version>` | Version written into the pack (default: `version` in shulker.json) |
+| `-o, --output <path>` | Archive path (default: `build/<name>-<version>.zip`, or the current directory for a git or URL source) |
+| `--target <name>` | Client target to export (default: the only client target) |
+| `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
+| `--with <feature>` | Turn a feature on for this run only; repeat for more |
+| `--without <feature>` | Turn a feature off for this run only; repeat for more |
+| `--bundle` | Put mods that aren't on CurseForge inside the archive, and bundle every mod not from CurseForge when the lookup can't run |
+| `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
 
 ## Mods
 
@@ -359,7 +382,7 @@ shulker config unset curseforge.key
 
 ## Features
 
-A feature is a name that mods opt into with a `feature` condition, like `shaders`. Each target can turn features on by default. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, and `export mrpack` use your choices over the target defaults, and their `--with` and `--without` flags override both for one run.
+A feature is a name that mods opt into with a `feature` condition, like `shaders`. Each target can turn features on by default. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, `export mrpack`, and `export curseforge` use your choices over the target defaults, and their `--with` and `--without` flags override both for one run.
 
 A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into <dir>`, or with `--instance <name>` for anything [`shulker links`](#shulker-links) lists. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
 
@@ -803,6 +826,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
+| `curseforge-not-found` | `export curseforge` found no CurseForge file for these mods; pass `--bundle`. `items`: the mods |
 | `registry-has-links` | `config set` or `config unset` would move the registry away from linked instances or synced directories the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON; the message names the line and column |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
@@ -901,5 +925,5 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
-| `version-required` | `export mrpack` needs a version |
+| `version-required` | `export mrpack` and `export curseforge` need a version |
 | `wrong-side-target` | The target is on the wrong side for the command. `candidates`: the targets on the right side |

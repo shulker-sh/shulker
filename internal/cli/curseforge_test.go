@@ -85,6 +85,16 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		}
 		return true
 	}
+	mux.HandleFunc("/curseforge/fingerprints", func(w http.ResponseWriter, r *http.Request) {
+		if !authed(w, r) {
+			return
+		}
+		var body struct {
+			Fingerprints []uint32 `json:"fingerprints"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		writeJSON(w, map[string]any{"data": map[string]any{"exactMatches": h.fingerprintMatches(body.Fingerprints)}})
+	})
 	mux.HandleFunc("/curseforge/mods/search", func(w http.ResponseWriter, r *http.Request) {
 		if !authed(w, r) {
 			return

@@ -87,10 +87,16 @@ func exampleCommand(args []string, e *Error, value string) (string, bool) {
 	default:
 		return "", false
 	}
-	for i, w := range words {
-		words[i] = shellQuote(w)
+	return CommandLine(words), true
+}
+
+// CommandLine is a shulker command with its arguments quoted for the shell.
+func CommandLine(args []string) string {
+	words := []string{"shulker"}
+	for _, w := range args {
+		words = append(words, shellQuote(w))
 	}
-	return strings.Join(append([]string{"shulker"}, words...), " "), true
+	return strings.Join(words, " ")
 }
 
 var plainArg = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)

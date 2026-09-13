@@ -57,9 +57,11 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, Bundled: []string{}, Overrides: []string{}, Warnings: []string{}}
 	for _, t := range targets {
 		report.Targets = append(report.Targets, t.name)
-		if err := b.mrpackCollect(t, opts, report); err != nil {
+		warnings, err := b.mrpackCollect(t, opts.OS, opts.Features)
+		if err != nil {
 			return nil, err
 		}
+		report.Warnings = append(report.Warnings, warnings...)
 	}
 	files, err := b.mrpackMods(targets, opts.Bundle, report)
 	if err != nil {
@@ -85,7 +87,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		return nil, err
 	}
 	entries[mrpack.IndexName] = append(indexData, '\n')
-	if err := writeMrpack(opts.Output, entries); err != nil {
+	if err := writeArchive(opts.Output, mrpack.IndexName, entries); err != nil {
 		return nil, err
 	}
 	return report, nil
@@ -129,13 +131,14 @@ func (b *Builder) mrpackName(targets []*mrpackTarget) string {
 	return b.Manifest.Name
 }
 
-func (b *Builder) mrpackCollect(t *mrpackTarget, opts MrpackOptions, report *MrpackReport) error {
+// mrpackCollect fills a target's override files and the mods it ships, returning the warnings.
+func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, features map[string]bool) ([]string, error) {
 	rep := &Report{}
-	desired, _, err := b.collect(t.name, b.Manifest.Targets[t.name], Options{OS: opts.OS, NoOS: opts.OS == "", Features: opts.Features}, rep)
+	desired, _, err := b.collect(t.name, b.Manifest.Targets[t.name], Options{OS: osName, NoOS: osName == "", Features: features}, rep)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	report.Warnings = append(report.Warnings, rep.Warnings...)
+	warnings := append([]string{}, rep.Warnings...)
 	t.mods = map[string]bool{}
 	for id, m := range b.Lock.Mods {
 		if _, ok := desired["mods/"+m.Filename]; ok {
@@ -144,7 +147,7 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, opts MrpackOptions, report *Mrp
 	}
 	for _, e := range rep.Excluded {
 		if strings.Contains(e, "(needs os ") {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: left out of %s; pass --os to export that variation", e, t.name))
+			warnings = append(warnings, fmt.Sprintf("%s: left out of %s; pass --os to export that variation", e, t.name))
 		}
 	}
 	for path, s := range desired {
@@ -154,14 +157,14 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, opts MrpackOptions, report *Mrp
 		if s.owned != nil {
 			data, err := s.owned.render(nil, nil, nil)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			t.files[path] = data
 			continue
 		}
 		t.files[path] = s.data
 	}
-	return nil
+	return warnings, nil
 }
 
 func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpack.File, error) {
@@ -210,9 +213,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 		report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s from %s into the archive; recipients receive the file itself, not a download link", id, mrpackOrigin(m.Provider, m.URL)))
 	}
 	if len(blocked) > 0 {
-		e := out.Errorf("mrpack-host-not-allowed", "Modrinth launchers only download from %s; pass --bundle to ship these mods inside the archive instead: %s", strings.Join(MrpackHosts, ", "), strings.Join(blocked, ", "))
-		e.Items = blocked
-		return nil, e
+		return nil, bundleNudge(out.Errorf("mrpack-host-not-allowed", "%s be downloaded by Modrinth launchers", modCount(len(blocked), "can't", "can't")), blocked, "shulker export mrpack --bundle")
 	}
 	return files, nil
 }
@@ -272,18 +273,19 @@ func mrpackSplit(targets []*mrpackTarget) map[string][]byte {
 	return entries
 }
 
-func writeMrpack(output string, entries map[string][]byte) error {
+// writeArchive zips entries with first at the front and the rest in name order.
+func writeArchive(output, first string, entries map[string][]byte) error {
 	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return err
 	}
 	names := make([]string, 0, len(entries))
 	for n := range entries {
-		if n != mrpack.IndexName {
+		if n != first {
 			names = append(names, n)
 		}
 	}
 	sort.Strings(names)
-	names = append([]string{mrpack.IndexName}, names...)
+	names = append([]string{first}, names...)
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	for _, n := range names {
@@ -303,6 +305,10 @@ func writeMrpack(output string, entries map[string][]byte) error {
 
 func MrpackFileName(m *manifest.Manifest, versionID string) string {
 	return m.Name + "-" + versionID + ".mrpack"
+}
+
+func CurseForgeFileName(m *manifest.Manifest, version string) string {
+	return m.Name + "-" + version + ".zip"
 }
 
 func mrpackSummary(m *manifest.Manifest) string {

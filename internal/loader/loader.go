@@ -43,6 +43,15 @@ func (l Loader) ArtifactVersion(minecraft, version string) string {
 	return version
 }
 
+// CurseForgeModLoader is the loader id a CurseForge modpack manifest names. NeoForge's 1.20.1 builds
+// kept Forge's numbering, and CurseForge tells them apart by the game version in the id.
+func (l Loader) CurseForgeModLoader(minecraft, version string) string {
+	if l.Name == "neoforge" && minecraft == "1.20.1" {
+		return l.Name + "-1.20.1-" + version
+	}
+	return l.Name + "-" + version
+}
+
 var All = []Loader{
 	{Name: "fabric", DependencyID: "fabricloader", PrismUID: "net.fabricmc.fabric-loader", MrpackKey: "fabric-loader", CurseForgeType: "4", ServerLaunchJar: "fabric-server-launch.jar", MetadataFiles: []string{"fabric.mod.json"}, MarkerFile: "fabric.mod.json"},
 	{Name: "quilt", DependencyID: "quilt_loader", PrismUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}, ServerLaunchJar: "quilt-server-launch.jar", MetadataFiles: []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json"},
