@@ -137,8 +137,11 @@ func TestNeoForgeLinkMojang(t *testing.T) {
 
 	launcherDir := t.TempDir()
 	writeProfiles(t, launcherDir, launcherProfiles{
-		Profiles: map[string]map[string]any{"NeoForge": {"name": "my own", "lastVersionId": "neoforge-26.1.2.40"}},
-		Version:  3,
+		Profiles: map[string]map[string]any{
+			"5433c688": {"name": "", "type": "latest-release", "lastVersionId": "latest-release"},
+			"NeoForge": {"name": "my own", "lastVersionId": "neoforge-26.1.2.40"},
+		},
+		Version: 3,
 	})
 
 	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)

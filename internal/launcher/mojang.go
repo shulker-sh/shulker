@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"sort"
 	"strings"
@@ -162,19 +163,27 @@ func (v *Mojang) Profiles() (map[string]json.RawMessage, error) {
 
 // RestoreProfiles puts the profiles back the way the snapshot had them — dropping what an installer
 // added, restoring what it overwrote — and returns the lastVersionId of the entry it wrote, which
-// is the version id it installed.
+// is the version id it installed. The installers rewrite the whole file in their own layout, so
+// profiles are compared as values, not bytes, and an entry the installer added outranks one it
+// merely rewrote.
 func (v *Mojang) RestoreProfiles(before map[string]json.RawMessage) (string, error) {
 	top, profiles, err := v.readProfiles()
 	if err != nil {
 		return "", err
 	}
-	var touched []string
+	var added, changed []string
 	for key, raw := range profiles {
-		if old, had := before[key]; !had || !bytes.Equal(old, raw) {
-			touched = append(touched, key)
+		old, had := before[key]
+		switch {
+		case !had:
+			added = append(added, key)
+		case !sameJSON(old, raw):
+			changed = append(changed, key)
 		}
 	}
-	sort.Strings(touched)
+	sort.Strings(added)
+	sort.Strings(changed)
+	touched := append(added, changed...)
 	var versionID string
 	for _, key := range touched {
 		if versionID == "" {
@@ -201,6 +210,17 @@ func (v *Mojang) RestoreProfiles(before map[string]json.RawMessage) (string, err
 		return versionID, nil
 	}
 	return versionID, v.writeProfiles(top, profiles)
+}
+
+func sameJSON(a, b json.RawMessage) bool {
+	if bytes.Equal(a, b) {
+		return true
+	}
+	var va, vb any
+	if json.Unmarshal(a, &va) != nil || json.Unmarshal(b, &vb) != nil {
+		return false
+	}
+	return reflect.DeepEqual(va, vb)
 }
 
 // RemoveProfiles drops the shulker-made profiles (keys starting "shulker-") that point at gameDir.

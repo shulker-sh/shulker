@@ -1301,10 +1301,10 @@ func (h *harness) fakeClientInstall(args []string, fake fakeLoaderInstall) error
 		}
 	}
 	profiles[fake.profileKey] = json.RawMessage(`{"name":"` + fake.profileKey + `","type":"custom","lastVersionId":"` + id + `"}`)
-	if top["profiles"], err = json.Marshal(profiles); err != nil {
+	if top["profiles"], err = json.MarshalIndent(profiles, "", "  "); err != nil {
 		return err
 	}
-	written, err := json.Marshal(top)
+	written, err := json.MarshalIndent(top, "", "  ")
 	if err != nil {
 		return err
 	}
