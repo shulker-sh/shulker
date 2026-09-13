@@ -127,7 +127,8 @@ func TestJSONReferenceCoversEveryErrorCode(t *testing.T) {
 }
 
 // errorCodes finds the string literals passed as the code of out.Errorf or
-// set as a Code or code field, which is how every error code is written.
+// schema.Invalid, or set as a Code or code field, which is how every error
+// code is written.
 func errorCodes(t *testing.T, root string) map[string]bool {
 	codes := map[string]bool{}
 	fset := token.NewFileSet()
@@ -167,11 +168,11 @@ func errorCodes(t *testing.T, root string) map[string]bool {
 
 func isErrorf(fun ast.Expr) bool {
 	sel, ok := fun.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "Errorf" {
+	if !ok {
 		return false
 	}
 	pkg, ok := sel.X.(*ast.Ident)
-	return ok && pkg.Name == "out"
+	return ok && (pkg.Name == "out" && sel.Sel.Name == "Errorf" || pkg.Name == "schema" && sel.Sel.Name == "Invalid")
 }
 
 func docsSection(doc, heading string) string {

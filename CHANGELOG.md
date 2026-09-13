@@ -11,6 +11,7 @@ All notable changes to shulker are documented here. The format is based on
 - Dependency problems found in jar metadata fail the command that would lock them and print the `shulker ignore` line that accepts each one; `unignore` drops it again. An ignore records the range the jar declared, so a new version that declares something else brings the problem back.
 - `lock` brings `shulker.lock` in line with hand edits to `shulker.json` and changes to local packs without upgrading anything, and the out-of-date warning names each difference.
 - `set`, `unset` and `get` edit and read any field of `shulker.json` by dotted path, checked against the schema before anything is written.
+- A `shulker.json`, `shulker.lock`, `shulker.local.json`, `config.json` or `registry.json` that doesn't parse is reported with its line and column and what was expected there, and a manifest or lock that doesn't match its schema lists each failing field by dotted path.
 - `config get|set|unset` read and change shulker's own `config.json`: the CurseForge key, masked unless `--reveal`, and where the registry lives, which needs `--force` when linked instances would be left behind.
 - Fabric, Quilt, NeoForge and Forge projects (`init --loader`); on Quilt, mods without a Quilt build use their Fabric one.
 - NeoForge and Forge servers and launcher profiles set up by the loader's own installer: servers run it offline from files recorded in `shulker.lock`, and `link mojang` installs the client into the official launcher without leaving the installer's own profile behind.

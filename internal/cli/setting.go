@@ -3,7 +3,6 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -12,10 +11,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
-	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -154,7 +150,7 @@ func (a *app) saveSettings(p *project.Project, doc map[string]any, field *settin
 		return err
 	}
 	if err := schema.Validate(schema.Manifest, data); err != nil {
-		return settingInvalid(err)
+		return schema.Invalid("manifest-invalid", manifest.FileName, data, err)
 	}
 	m, err := manifest.Parse(data)
 	if err != nil {
@@ -183,35 +179,6 @@ func (a *app) saveSettings(p *project.Project, doc map[string]any, field *settin
 	return a.printer.Emit(change, func(l *out.Lines) {
 		l.Items(out.Item{Kind: out.Change, Name: change.Path, From: settingText(change.From), To: settingText(change.To)})
 	})
-}
-
-func settingInvalid(err error) error {
-	var ve *jsonschema.ValidationError
-	if !errors.As(err, &ve) {
-		return out.Errorf("manifest-invalid", "%s: %v", manifest.FileName, err)
-	}
-	printer := message.NewPrinter(language.English)
-	var problems []string
-	var collect func(*jsonschema.ValidationError)
-	collect = func(e *jsonschema.ValidationError) {
-		if len(e.Causes) > 0 {
-			for _, cause := range e.Causes {
-				collect(cause)
-			}
-			return
-		}
-		where := strings.Join(e.InstanceLocation, ".")
-		if where == "" {
-			where = manifest.FileName
-		}
-		problems = append(problems, where+": "+e.ErrorKind.LocalizedString(printer))
-	}
-	collect(ve)
-	slices.Sort(problems)
-	problems = slices.Compact(problems)
-	e := out.Errorf("manifest-invalid", "%s", strings.Join(problems, "; "))
-	e.Items = problems
-	return e
 }
 
 func decodeLiteral(path, value string) (any, error) {

@@ -182,13 +182,13 @@ func Load(path string) (*Manifest, error) {
 
 func Parse(data []byte) (*Manifest, error) {
 	if err := schema.Validate(schema.Manifest, data); err != nil {
-		return nil, out.Errorf("manifest-invalid", "%s: %v", FileName, err)
+		return nil, schema.Invalid("manifest-invalid", FileName, data, err)
 	}
 	var m Manifest
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(&m); err != nil {
-		return nil, out.Errorf("manifest-invalid", "%s: %v", FileName, err)
+		return nil, schema.Invalid("manifest-invalid", FileName, data, err)
 	}
 	if m.Mods == nil {
 		m.Mods = map[string]Mod{}
@@ -206,7 +206,9 @@ func (m *Manifest) Save(path string) error {
 		return err
 	}
 	if err := schema.Validate(schema.Manifest, data); err != nil {
-		return out.Errorf("manifest-invalid", "refusing to write invalid %s: %v", FileName, err)
+		e := schema.Invalid("manifest-invalid", FileName, data, err)
+		e.Message = "refusing to write " + e.Message
+		return e
 	}
 	return fsutil.Write(path, data)
 }

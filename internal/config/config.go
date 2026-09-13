@@ -11,7 +11,7 @@ import (
 	"slices"
 
 	"shulker.sh/shulker/internal/fsutil"
-	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/schema"
 )
 
 const (
@@ -70,7 +70,7 @@ func LoadFile(path string) (Config, error) {
 		return cfg, err
 	}
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return cfg, out.Errorf("config-invalid", "%s: %v", path, err)
+		return cfg, schema.Invalid("config-invalid", path, data, err)
 	}
 	return cfg, nil
 }
@@ -87,7 +87,7 @@ func LoadDocument(path string) (map[string]any, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(&doc); err != nil {
-		return nil, out.Errorf("config-invalid", "%s: %v", path, err)
+		return nil, schema.Invalid("config-invalid", path, data, err)
 	}
 	if doc == nil {
 		doc = map[string]any{}
@@ -145,7 +145,7 @@ func LoadLinks(path string) ([]Link, error) {
 		Links []Link `json:"links"`
 	}
 	if err := json.Unmarshal(data, &registry); err != nil {
-		return nil, out.Errorf("registry-invalid", "%s: %v", path, err)
+		return nil, schema.Invalid("registry-invalid", path, data, err)
 	}
 	return registry.Links, nil
 }
@@ -181,7 +181,7 @@ func UpdateLinks(path string, update func([]Link) []Link) (bool, error) {
 	}
 	if len(bytes.TrimSpace(data)) > 0 {
 		if err := json.Unmarshal(data, &top); err != nil {
-			return false, out.Errorf("registry-invalid", "%s: %v", path, err)
+			return false, schema.Invalid("registry-invalid", path, data, err)
 		}
 	}
 	var links []Link

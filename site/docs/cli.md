@@ -762,10 +762,10 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-into` | The target has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
-| `config-invalid` | shulker's `config.json` isn't valid JSON. Only commands that need its registry location fail; the rest warn and go on without it |
+| `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `registry-has-links` | `config set` or `config unset` would move the registry away from linked instances or synced directories the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
-| `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON |
+| `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON; the message names the line and column |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or target uses the feature. `candidates`: the features in use |
@@ -791,12 +791,12 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-not-found` | No launcher directory where shulker looked |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
-| `local-invalid` | `shulker.local.json` isn't valid JSON |
-| `lock-invalid` | `shulker.lock` doesn't parse or match its schema, or a change would make it invalid |
+| `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
+| `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock` |
 | `lock-stale` | `export` needs a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
-| `manifest-invalid` | `shulker.json` doesn't parse or match its schema, or a change would make it invalid |
+| `manifest-invalid` | `shulker.json` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |
 | `manual-download` | The provider doesn't distribute this mod; download it into `downloads/` |
 | `memory` | Server memory isn't a whole number of M or G |

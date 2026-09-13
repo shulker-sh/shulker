@@ -9,7 +9,6 @@ import (
 	"sort"
 
 	"shulker.sh/shulker/internal/fsutil"
-	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
 
@@ -112,13 +111,13 @@ func Load(path string) (*Lock, error) {
 
 func Parse(data []byte) (*Lock, error) {
 	if err := schema.Validate(schema.Lock, data); err != nil {
-		return nil, out.Errorf("lock-invalid", "%s: %v", FileName, err)
+		return nil, schema.Invalid("lock-invalid", FileName, data, err)
 	}
 	l := New()
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(l); err != nil {
-		return nil, out.Errorf("lock-invalid", "%s: %v", FileName, err)
+		return nil, schema.Invalid("lock-invalid", FileName, data, err)
 	}
 	return l, nil
 }
@@ -143,7 +142,9 @@ func (l *Lock) Save(path string) error {
 		return err
 	}
 	if err := schema.Validate(schema.Lock, data); err != nil {
-		return out.Errorf("lock-invalid", "refusing to write invalid %s: %v", FileName, err)
+		e := schema.Invalid("lock-invalid", FileName, data, err)
+		e.Message = "refusing to write " + e.Message
+		return e
 	}
 	return fsutil.Write(path, data)
 }

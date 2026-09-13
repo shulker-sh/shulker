@@ -66,7 +66,7 @@ func Validate(kind Kind, data []byte) error {
 	if err != nil {
 		return err
 	}
-	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
+	doc, err := Decode(data)
 	if err != nil {
 		return err
 	}
