@@ -31,7 +31,7 @@ type Resolver struct {
 	Meta      *Meta
 	Log       func(format string, args ...any)
 	// Progress starts a download bar for the named files.
-	Progress func(verb string, names []string) *out.Progress
+	Progress func(verb string, files []out.Download) *out.Progress
 }
 
 type AddOptions struct {
@@ -316,6 +316,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		URL:           got.url,
 		Page:          got.page,
 		Sha512:        got.sha512,
+		Size:          v.File.Size,
 		Side:          side,
 		Channel:       channelLabel(channel),
 		RequiredBy:    []string{},
@@ -420,7 +421,8 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 	sort.Strings(ids)
 	var fetched []string
 	var missing []string
-	var wanted, names []string
+	var wanted []string
+	var downloads []out.Download
 	for _, id := range ids {
 		m := r.Lock.Mods[id]
 		if r.Cache.Has(m.Sha512) {
@@ -430,11 +432,11 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", id, m.Filename, m.Page, DownloadsDir))
 			continue
 		}
-		wanted, names = append(wanted, id), append(names, m.Filename)
+		wanted, downloads = append(wanted, id), append(downloads, out.Download{Name: m.Filename, Size: m.Size})
 	}
 	var progress *out.Progress
 	if r.Progress != nil && len(wanted) > 0 {
-		progress = r.Progress("fetching", names)
+		progress = r.Progress("fetching", downloads)
 		if r.Fetch != nil {
 			r.Fetch.Progress = progress.Bytes
 			defer func() { r.Fetch.Progress = nil }()
@@ -442,7 +444,7 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 	}
 	for i, id := range wanted {
 		m := r.Lock.Mods[id]
-		progress.File(names[i])
+		progress.File(downloads[i].Name)
 		_, err := r.Cache.Ensure(ctx, r.Fetch, *m.URL, m.Sha512)
 		if errors.Is(err, fetch.ErrForbidden) {
 			missing = append(missing, fmt.Sprintf("%s: download forbidden; download %s from %s and place it in %s/", id, m.Filename, pageFor(m), DownloadsDir))

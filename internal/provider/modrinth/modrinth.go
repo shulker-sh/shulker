@@ -46,6 +46,7 @@ type version struct {
 		Filename string            `json:"filename"`
 		Primary  bool              `json:"primary"`
 		Hashes   map[string]string `json:"hashes"`
+		Size     int64             `json:"size"`
 	} `json:"files"`
 	Dependencies []struct {
 		ProjectID      string `json:"project_id"`
@@ -122,7 +123,7 @@ func convert(v version) (provider.Version, error) {
 	found := false
 	for _, f := range v.Files {
 		if f.Primary || !found {
-			pv.File = provider.File{URL: f.URL, Filename: f.Filename, Sha512: f.Hashes["sha512"]}
+			pv.File = provider.File{URL: f.URL, Filename: f.Filename, Sha512: f.Hashes["sha512"], Size: f.Size}
 			found = true
 			if f.Primary {
 				break

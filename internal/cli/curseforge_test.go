@@ -61,7 +61,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		}
 		return map[string]any{
 			"id": f.id, "modId": modID, "displayName": strings.TrimSuffix(f.jar.filename, ".jar"), "fileName": f.jar.filename,
-			"releaseType": f.channel, "fileDate": f.date, "downloadUrl": url, "isAvailable": !f.hidden,
+			"releaseType": f.channel, "fileDate": f.date, "downloadUrl": url, "isAvailable": !f.hidden, "fileLength": len(f.jar.data),
 			"gameVersions": []string{"26.2", "Fabric"},
 			"hashes":       []map[string]any{{"value": f.jar.sha1, "algo": 1}, {"value": "00", "algo": 2}},
 			"dependencies": deps,
@@ -188,7 +188,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	}
 	l := h.readLock(t)
 	jei := l.Mods["jei"]
-	if jei.Provider != "curseforge" || jei.Project.(json.Number) != "238222" || jei.Version.(json.Number) != "5000001" || jei.Sha512 != h.jars["jei"].sha512 || jei.URL == nil || jei.Page != "" || jei.Side != "both" {
+	if jei.Provider != "curseforge" || jei.Project.(json.Number) != "238222" || jei.Version.(json.Number) != "5000001" || jei.Sha512 != h.jars["jei"].sha512 || jei.Size != int64(len(h.jars["jei"].data)) || jei.URL == nil || jei.Page != "" || jei.Side != "both" {
 		t.Fatalf("jei lock entry: %+v", jei)
 	}
 	if dep := l.Mods["fabric-api"]; dep.Provider != "curseforge" || dep.RequiredBy[0] != "jei" {

@@ -29,6 +29,8 @@ type Progress struct {
 	total   int
 	done    int
 	bytes   int64
+	sizes   map[string]int64
+	totalBy int64
 	current string
 	longest int
 	drawn   []int
@@ -38,14 +40,28 @@ type Progress struct {
 	stopped chan struct{}
 }
 
-// Progress starts a bar for total files; names sizes the name column.
-func (p *Printer) Progress(verb string, names []string) *Progress {
+// Download names one file the bar will cover; Size is 0 when unknown.
+type Download struct {
+	Name string
+	Size int64
+}
+
+// Progress starts a bar for the files. It fills by bytes when every size is
+// known and by file count otherwise; the longest name sizes the name column.
+func (p *Printer) Progress(verb string, files []Download) *Progress {
 	if p.JSON {
 		return nil
 	}
-	pr := &Progress{l: p.Err(), verb: verb, total: len(names), start: time.Now()}
-	for _, n := range names {
-		pr.longest = max(pr.longest, len([]rune(n)))
+	pr := &Progress{l: p.Err(), verb: verb, total: len(files), sizes: map[string]int64{}, start: time.Now()}
+	known := true
+	for _, f := range files {
+		pr.longest = max(pr.longest, len([]rune(f.Name)))
+		pr.sizes[f.Name] = f.Size
+		pr.totalBy += f.Size
+		known = known && f.Size > 0
+	}
+	if !known {
+		pr.totalBy = 0
 	}
 	if f, ok := p.Stderr.(*os.File); ok && isTerminal(f) {
 		pr.tty = f
@@ -190,7 +206,11 @@ func (pr *Progress) render(width int) []string {
 	if room >= need {
 		return []string{head + " " + t.Grey(clip(name, room, t.Ellipsis()))}
 	}
-	return []string{head, gutter + gutter + t.Grey(clip(name, width-len(gutter)*2, t.Ellipsis()))}
+	aside := ""
+	if size := pr.sizes[name]; size > 0 {
+		aside = t.Aside(humanBytes(size))
+	}
+	return []string{head, gutter + gutter + t.Grey(clip(name, width-len(gutter)*2-Width(aside), t.Ellipsis())) + aside}
 }
 
 // head renders the spinner, verb, bar, and count. Level drops the byte aside
@@ -211,13 +231,24 @@ func (pr *Progress) head(width, level int, widest bool) string {
 	}
 	line += t.Bold(count)
 	if level == 0 || level == 2 {
-		if widest {
-			line += t.Aside(widestBytes)
-		} else {
-			line += t.Aside(humanBytes(pr.bytes))
-		}
+		line += t.Aside(pr.aside(widest))
 	}
 	return line
+}
+
+// aside is the byte count, "so far of total" when every size was known.
+// widest asks for the longest form the aside can take, for measuring.
+func (pr *Progress) aside(widest bool) string {
+	if pr.totalBy == 0 {
+		if widest {
+			return widestBytes
+		}
+		return humanBytes(pr.bytes)
+	}
+	if widest {
+		return widestBytes + " of " + humanBytes(pr.totalBy)
+	}
+	return humanBytes(min(pr.bytes, pr.totalBy)) + " of " + humanBytes(pr.totalBy)
 }
 
 func (pr *Progress) bar() string {
@@ -227,7 +258,10 @@ func (pr *Progress) bar() string {
 		full, tip, empty = "=", ">", "-"
 	}
 	n := 0
-	if pr.total > 0 {
+	switch {
+	case pr.totalBy > 0:
+		n = int(int64(barWidth) * min(pr.bytes, pr.totalBy) / pr.totalBy)
+	case pr.total > 0:
 		n = barWidth * pr.done / pr.total
 	}
 	filled := strings.Repeat(full, n)

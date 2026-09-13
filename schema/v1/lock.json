@@ -130,6 +130,7 @@
           "description": "Provider file page for manual download. Present only when url is null."
         },
         "sha512": { "$ref": "#/$defs/sha512", "description": "Cache key and install verification hash." },
+        "size": { "type": "integer", "minimum": 1, "description": "Jar size in bytes as the provider reports it, for the download bar. Absent on entries locked before shulker recorded sizes; filled in when the mod is next resolved." },
         "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Effective side after any manifest override." },
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked: the manifest's channel for a mod listed there or in a pack, the requiring mod's for a dependency. A listed mod whose manifest channel differs makes the lock out of date." },
         "requiredBy": {

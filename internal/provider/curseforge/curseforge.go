@@ -105,6 +105,7 @@ type file struct {
 	ReleaseType  int      `json:"releaseType"`
 	FileDate     string   `json:"fileDate"`
 	DownloadURL  string   `json:"downloadUrl"`
+	FileLength   int64    `json:"fileLength"`
 	IsAvailable  bool     `json:"isAvailable"`
 	GameVersions []string `json:"gameVersions"`
 	Hashes       []struct {
@@ -313,7 +314,7 @@ func convertFile(f file) (provider.Version, error) {
 		ProjectID: strconv.Itoa(f.ModID),
 		Number:    f.DisplayName,
 		Channel:   channels[f.ReleaseType],
-		File:      provider.File{URL: f.DownloadURL, Filename: f.FileName},
+		File:      provider.File{URL: f.DownloadURL, Filename: f.FileName, Size: f.FileLength},
 	}
 	v.Published, _ = time.Parse(time.RFC3339, f.FileDate)
 	for _, h := range f.Hashes {

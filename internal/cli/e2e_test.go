@@ -253,7 +253,7 @@ func newHarness(t *testing.T) *harness {
 		return map[string]any{
 			"id": id, "project_id": projectID, "version_number": number, "version_type": "release",
 			"date_published": published, "game_versions": []string{"26.2"}, "loaders": []string{"fabric"},
-			"files":        []map[string]any{{"url": base + "/cdn/" + jar.filename, "filename": jar.filename, "primary": true, "hashes": map[string]string{"sha512": jar.sha512}}},
+			"files":        []map[string]any{{"url": base + "/cdn/" + jar.filename, "filename": jar.filename, "primary": true, "hashes": map[string]string{"sha512": jar.sha512}, "size": len(jar.data)}},
 			"dependencies": deps,
 		}
 	}
@@ -518,10 +518,11 @@ func TestVerticalSlice(t *testing.T) {
 		Mods map[string]struct {
 			Side       string   `json:"side"`
 			RequiredBy []string `json:"requiredBy"`
+			Size       int64    `json:"size"`
 		} `json:"mods"`
 	}
 	h.readJSON(t, "shulker.lock", &l)
-	if l.Mods["fabric-api"].Side != "both" || l.Mods["fabric-api"].RequiredBy[0] != "sodium" || len(l.Mods["sodium"].RequiredBy) != 0 {
+	if l.Mods["fabric-api"].Side != "both" || l.Mods["fabric-api"].RequiredBy[0] != "sodium" || len(l.Mods["sodium"].RequiredBy) != 0 || l.Mods["sodium"].Size != int64(len(h.jars["sodium"].data)) {
 		t.Fatalf("lock mods: %+v", l.Mods)
 	}
 	h.readJSON(t, "shulker.json", &m)

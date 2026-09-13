@@ -80,6 +80,7 @@ type Mod struct {
 	URL           *string  `json:"url"`
 	Page          string   `json:"page,omitempty"`
 	Sha512        string   `json:"sha512"`
+	Size          int64    `json:"size,omitempty"`
 	Side          string   `json:"side"`
 	Channel       string   `json:"channel"`
 	RequiredBy    []string `json:"requiredBy"`

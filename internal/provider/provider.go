@@ -25,6 +25,7 @@ type File struct {
 	Filename string
 	Sha512   string
 	Sha1     string
+	Size     int64
 }
 
 type Dependency struct {
