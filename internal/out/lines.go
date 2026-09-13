@@ -174,9 +174,9 @@ func (l *Lines) Warn(text string) {
 	l.line(l.T.paint("!", sgrYellow, sgrBold) + " " + l.T.Markup(text))
 }
 
-// Info is the empty state or a passing remark: a grey i and the message.
+// Info is the empty state or a passing remark: a cyan i and the message.
 func (l *Lines) Info(text string) {
-	l.line(l.T.paint("i", l.T.grey(), sgrBold) + " " + l.T.Markup(text))
+	l.line(l.T.paint("i", sgrCyan, sgrBold) + " " + l.T.Markup(text))
 }
 
 // Muted is a whole line in grey, for progress notes that carry no result.
