@@ -19,11 +19,6 @@ import (
 
 var version = devVersion
 
-const helpFooter = `
-Docs: https://shulker.sh/docs
-For agents: https://shulker.sh/llms.txt
-`
-
 const agentHelp = `Scripts and agents: pass --json. Every command then prints one JSON object on
 stdout, errors included. Act on error.code rather than the message, and run
 "shulker lock" when lockStale is true.`
@@ -100,19 +95,19 @@ func (a *app) root() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "shulker",
 		Short:         "Manage Minecraft mods, client instances, and servers",
-		Long:          "Manage Minecraft mods, client instances, and servers.\n\n" + agentHelp,
+		Long:          agentHelp,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 			a.printer.Command = strings.TrimPrefix(cmd.CommandPath(), "shulker ")
 		},
 	}
-	root.SetHelpTemplate(root.HelpTemplate() + helpFooter)
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", a.printer.JSON, "print machine-readable JSON, including errors")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", a.dir, "project directory (default: current directory)")
 	root.PersistentFlags().BoolVar(&a.style.NoColor, "no-color", a.style.NoColor, "print without colour (NO_COLOR does the same)")
 	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", a.style.ASCII, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ »")
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.linksCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd())
+	a.installHelp(root)
 	a.markRunning(root)
 	return root
 }

@@ -71,17 +71,23 @@ func TestVersionBuildString(t *testing.T) {
 func TestHelpLinksDocs(t *testing.T) {
 	for _, args := range [][]string{{"--help"}, {"add", "--help"}, {"target", "add", "--help"}} {
 		code, stdout, _ := run(t, args...)
-		if code != out.ExitOK || !strings.HasSuffix(stdout, helpFooter) {
+		if code != out.ExitOK || !strings.HasSuffix(stdout, "  Docs "+docsURL+"\n  For agents "+agentsURL+"\n") {
 			t.Fatalf("%v: code=%d stdout=%q", args, code, stdout)
 		}
 	}
 }
 
 func TestRootHelpTellsAgentsToUseJSON(t *testing.T) {
-	if _, stdout, _ := run(t, "--help"); !strings.Contains(stdout, agentHelp) {
-		t.Fatalf("root help = %q", stdout)
+	_, stdout, _ := run(t, "--help")
+	for _, line := range strings.Split(agentHelp, "\n") {
+		if !strings.Contains(stdout, "  "+line+"\n") {
+			t.Fatalf("root help lacks %q:\n%s", line, stdout)
+		}
 	}
-	if _, stdout, _ := run(t, "add", "--help"); strings.Contains(stdout, agentHelp) {
+	if strings.Contains(stdout, "Other commands") {
+		t.Fatalf("a root command is missing from helpGroups:\n%s", stdout)
+	}
+	if _, stdout, _ := run(t, "add", "--help"); strings.Contains(stdout, "Scripts and agents") {
 		t.Fatalf("add help = %q", stdout)
 	}
 }
