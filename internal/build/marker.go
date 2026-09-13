@@ -39,10 +39,12 @@ func markerModID(name string) string {
 	return "shulker_" + strings.NewReplacer(".", "_", "-", "_").Replace(name)
 }
 
+// markerVersion has to start with a digit: both FML loaders reject a mod whose version does not,
+// so a manifest without a version gets a zero version with the lock hash as build metadata.
 func markerVersion(packVersion, lockHash string) string {
 	build := lockHash[:8]
 	if packVersion == "" {
-		return build
+		packVersion = "0.0.0"
 	}
 	return packVersion + "+" + build
 }

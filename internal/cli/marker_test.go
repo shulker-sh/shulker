@@ -48,7 +48,7 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 	if err := json.Unmarshal(entries["fabric.mod.json"], &meta); err != nil {
 		t.Fatal(err)
 	}
-	if meta.SchemaVersion != 1 || meta.ID != "shulker_my_pack" || meta.Name != "my.pack" || meta.Environment != "*" || len(meta.Version) != 8 || meta.Custom.ModMenu.UpdateChecker {
+	if meta.SchemaVersion != 1 || meta.ID != "shulker_my_pack" || meta.Name != "my.pack" || meta.Environment != "*" || !strings.HasPrefix(meta.Version, "0.0.0+") || len(meta.Version) != len("0.0.0+")+8 || meta.Custom.ModMenu.UpdateChecker {
 		t.Fatalf("fabric.mod.json: %+v", meta)
 	}
 	want := "Minecraft 26.2 \u2022 fabric 0.17.3 \u2022 2 mods\n\n<bold>Mods</bold>\n  \u2022 sodium\n\n<bold>Dependencies</bold>\n  \u2022 fabric-api"
