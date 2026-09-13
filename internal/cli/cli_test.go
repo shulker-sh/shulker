@@ -148,7 +148,7 @@ func TestUnknownCommandPicks(t *testing.T) {
 		t.Fatalf("unexpected envelope %+v", env)
 	}
 	_, _, stderr := run(t, "mod", "add")
-	for _, want := range []string{"did you mean:", "\u2023 add", "For example:", "$ shulker add add"} {
+	for _, want := range []string{"did you mean:", "\u2023 add", "For example:", "$ shulker add\n"} {
 		if !strings.Contains(stderr, want) {
 			t.Fatalf("stderr lacks %q:\n%s", want, stderr)
 		}

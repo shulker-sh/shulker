@@ -45,6 +45,7 @@ func TestExampleCommand(t *testing.T) {
 	}{
 		{"replaces the typed argument", []string{"remove", "sodim"}, Error{Given: "sodim"}, "sodium", "shulker remove sodium"},
 		{"replaces a flag value written with =", []string{"sync", "--target=dve"}, Error{Given: "dve"}, "dev", "shulker sync --target=dev"},
+		{"drops the typo when the pick is already typed", []string{"mod", "add"}, Error{Given: "mod"}, "add", "shulker add"},
 		{"sets a flag that was given", []string{"export", "--target", "client", "-o", "x.mrpack"}, Error{Flag: "--target"}, "server", "shulker export --target server -o x.mrpack"},
 		{"adds a flag that was missing", []string{"sync"}, Error{Flag: "--target"}, "client", "shulker sync --target client"},
 		{"the typed argument wins over the flag", []string{"init", "--yes", "--target", "clint"}, Error{Given: "clint", Flag: "--target"}, "client", "shulker init --yes --target client"},

@@ -60,6 +60,10 @@ func exampleCommand(args []string, e *Error, value string) (string, bool) {
 		if at < 0 {
 			return "", false
 		}
+		if words[at] == e.Given && slices.Contains(slices.Delete(slices.Clone(words), at, at+1), value) {
+			words = slices.Delete(words, at, at+1)
+			break
+		}
 		if flag, _, ok := strings.Cut(words[at], "="); ok && words[at] != e.Given {
 			words[at] = flag + "=" + value
 		} else {
