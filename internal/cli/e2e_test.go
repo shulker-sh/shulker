@@ -1141,10 +1141,10 @@ func TestDiffAndPull(t *testing.T) {
 			t.Fatalf("diff state of %s: %q want %q (%v)", p, states[p], s, states)
 		}
 	}
-	if d := diffs["options.txt"]; !strings.Contains(d, "-joinedFirstServer:false\n+joinedFirstServer:true\n") || strings.Contains(d, "foo") {
+	if d := diffs["options.txt"]; !strings.Contains(d, "-joinedFirstServer:true\n+joinedFirstServer:false\n") || strings.Contains(d, "foo") {
 		t.Fatalf("options diff should cover managed keys only: %s", d)
 	}
-	if d := diffs["config/plain.txt"]; !strings.Contains(d, "@@ -1 +1 @@\n-a=2\n+a=1\n") {
+	if d := diffs["config/plain.txt"]; !strings.Contains(d, "@@ -1 +1 @@\n-a=1\n+a=2\n") {
 		t.Fatalf("plain diff: %s", d)
 	}
 
@@ -1191,7 +1191,7 @@ func TestDiffAndPull(t *testing.T) {
 	write(h.dir, "overrides/config/plain.txt", "a=3\n")
 	write(buildDir, "config/plain.txt", "a=4\n")
 	stdout = h.mustRun(t, "diff")
-	if !strings.Contains(stdout, "~ config/plain.txt (edited on both sides)\n") || !strings.Contains(stdout, "    -a=4\n    +a=3\n") {
+	if !strings.Contains(stdout, "~ config/plain.txt (edited on both sides)\n") || !strings.Contains(stdout, "    -a=3\n    +a=4\n") {
 		t.Fatalf("conflict diff: %s", stdout)
 	}
 	h.mustRun(t, "pull", "config/plain.txt")

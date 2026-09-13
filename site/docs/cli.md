@@ -423,7 +423,7 @@ shulker build client
 
 ### `shulker diff`
 
-Show files in a build directory that differ from what `build` would write, such as config changed in-game. With no target, checks all of them.
+Show what was edited in a build directory since `build` wrote it, such as config changed in-game, as a diff from the project to the directory. `build` leaves these files alone and `pull` copies the edits back. A per-key file shows only its managed keys. With no target, checks all of them.
 
 ```sh
 shulker diff

@@ -45,7 +45,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	if got := readFile(t, built); !strings.Contains(got, "enableShaders=false") || !strings.Contains(got, "colorSpace=DISPLAY_P3") {
 		t.Fatalf("build overwrote in-game edits: %q", got)
 	}
-	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "+enableShaders=true") || strings.Contains(stdout, "+colorSpace") || strings.Contains(stdout, "-colorSpace") {
+	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "-enableShaders=true\n") || !strings.Contains(stdout, "+enableShaders=false\n") || strings.Contains(stdout, "+colorSpace") || strings.Contains(stdout, "-colorSpace") {
 		t.Fatalf("diff should show only the managed key: %s", stdout)
 	}
 

@@ -56,15 +56,34 @@ func (b *Builder) Diff(name string, opts Options) (*DiffReport, error) {
 		if err != nil {
 			return nil, err
 		}
-		var want []byte
+		var project []byte
+		state := f.state
 		if f.state != stateOrphan {
-			if want, err = b.output(abs, d.desired[f.rel], keyMerge{dropped: f.merge.dropped}); err != nil {
+			if project, err = b.output(abs, d.desired[f.rel], projectSide(f)); err != nil {
 				return nil, err
 			}
 		}
-		report.Files = append(report.Files, FileDiff{Path: f.rel, State: string(f.state), Diff: unifiedDiff(f.rel, existing, want)})
+		if f.src.owned != nil {
+			state = stateKept
+		}
+		report.Files = append(report.Files, FileDiff{Path: f.rel, State: string(state), Diff: unifiedDiff(f.rel, project, existing)})
 	}
 	return report, nil
+}
+
+// projectSide renders what the project says for the keys edited on disk and leaves every other
+// key as it is, so the diff of an owned file shows only the in-game edits.
+func projectSide(f planned) keyMerge {
+	if f.src.owned == nil {
+		return keyMerge{}
+	}
+	m := keyMerge{kept: map[string]bool{}}
+	for _, k := range f.src.owned.keys() {
+		if !f.merge.kept[k] {
+			m.kept[k] = true
+		}
+	}
+	return m
 }
 
 // checkNamed runs before any build work, so a file name that isn't in the directory at all is

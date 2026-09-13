@@ -350,11 +350,11 @@ func TestDiffAndPullInto(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "1 file changed in "+into) || !strings.Contains(stdout, "-a=2") {
+	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "1 file changed in "+into) || !strings.Contains(stdout, "+a=2") {
 		t.Fatalf("diff without --into must look at the recorded sync dir: %s", stdout)
 	}
 	stdout := h.mustRun(t, "diff", "client", "--into", into)
-	if !strings.Contains(stdout, "config/plain.txt") || !strings.Contains(stdout, "-a=2") {
+	if !strings.Contains(stdout, "config/plain.txt") || !strings.Contains(stdout, "+a=2") {
 		t.Fatalf("diff --into: %s", stdout)
 	}
 
