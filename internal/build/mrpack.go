@@ -218,6 +218,10 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 	return files, nil
 }
 
+// providerDomains are where a provider serves its own files; a mod downloaded from one of them is
+// named by its provider alone.
+var providerDomains = map[string][]string{"modrinth": {"modrinth.com"}, "curseforge": {"forgecdn.net", "curseforge.com"}}
+
 func mrpackOrigin(provider string, u *string) string {
 	if u == nil {
 		return provider + ", manual download"
@@ -225,6 +229,12 @@ func mrpackOrigin(provider string, u *string) string {
 	parsed, err := url.Parse(*u)
 	if err != nil || parsed.Host == "" {
 		return provider
+	}
+	host := parsed.Hostname()
+	for _, domain := range providerDomains[provider] {
+		if host == domain || strings.HasSuffix(host, "."+domain) {
+			return provider
+		}
 	}
 	return provider + ", " + parsed.Host
 }
