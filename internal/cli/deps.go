@@ -47,6 +47,7 @@ func (a *app) deps() (*deps, error) {
 		return nil, err
 	}
 	f := fetch.New(version)
+	f.Waiting = a.printer.Waiting
 	providers := map[string]provider.Provider{"modrinth": modrinth.New(f)}
 	if key := curseforge.Key(cfg.CurseForge.Key); key != "" {
 		providers["curseforge"] = curseforge.New(f, key)

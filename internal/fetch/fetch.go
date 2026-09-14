@@ -70,6 +70,19 @@ type Client struct {
 	Offline   bool
 	// Progress, when set, receives every chunk of download body bytes.
 	Progress func(n int64)
+	// Waiting, when set, is told the host of each request as it starts; the func it returns is
+	// called once the response body is closed, or at once when the request fails.
+	Waiting func(host string) (done func())
+}
+
+type waitingBody struct {
+	io.ReadCloser
+	done func()
+}
+
+func (b waitingBody) Close() error {
+	b.done()
+	return b.ReadCloser.Close()
 }
 
 type countingWriter struct {
@@ -114,10 +127,16 @@ func (c *Client) do(ctx context.Context, method, url, accept string, body io.Rea
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	done := func() {}
+	if c.Waiting != nil {
+		done = c.Waiting(req.URL.Hostname())
+	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+		done()
 		return nil, err
 	}
+	resp.Body = waitingBody{resp.Body, done}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		resp.Body.Close()
 		return nil, &StatusError{URL: url, Status: resp.StatusCode}

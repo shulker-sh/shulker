@@ -23,6 +23,54 @@ type step struct {
 	stopped chan struct{}
 }
 
+// slowAfter is how long a step runs before its spinner says how long it has waited, and on what.
+const slowAfter = 3 * time.Second
+
+// waits has its own lock because settling a step holds the step lock while the spinner, which
+// reads waits, finishes its last frame.
+type waits struct {
+	mu    sync.Mutex
+	hosts []string
+}
+
+// Waiting records a request in flight to host, which a slow step's spinner names; done ends it.
+func (p *Printer) Waiting(host string) (done func()) {
+	w := &p.waits
+	w.mu.Lock()
+	w.hosts = append(w.hosts, host)
+	w.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			w.mu.Lock()
+			defer w.mu.Unlock()
+			if i := slices.Index(w.hosts, host); i >= 0 {
+				w.hosts = slices.Delete(w.hosts, i, i+1)
+			}
+		})
+	}
+}
+
+func (w *waits) latest() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.hosts) == 0 {
+		return ""
+	}
+	return w.hosts[len(w.hosts)-1]
+}
+
+func slowAside(elapsed time.Duration, host string) string {
+	if elapsed < slowAfter {
+		return ""
+	}
+	seconds := int(elapsed / time.Second)
+	if host == "" {
+		return fmt.Sprintf(" (%ds)", seconds)
+	}
+	return fmt.Sprintf(" (%ds, waiting on %s)", seconds, host)
+}
+
 // Step shows a piece of work under way. On a terminal it spins until the next step or any other
 // output, then settles into a grey ok line in the past tense; off a terminal only that line prints.
 // A step already shown in this run is skipped.
@@ -46,7 +94,7 @@ func (p *Printer) Step(format string, args ...any) {
 	if f, ok := p.Stderr.(*os.File); ok && isTerminal(f) {
 		s.tty = f
 		s.stop, s.stopped = make(chan struct{}), make(chan struct{})
-		go s.spin(p.ErrTheme)
+		go s.spin(p.ErrTheme, &p.waits)
 	}
 	p.steps.running = s
 }
@@ -77,17 +125,19 @@ func (p *Printer) settleLocked(done bool) {
 	}
 }
 
-func (s *step) spin(t Theme) {
+func (s *step) spin(t Theme, w *waits) {
 	defer close(s.stopped)
 	tick := time.NewTicker(frameEvery)
 	defer tick.Stop()
+	start := time.Now()
 	for frame := 0; ; frame++ {
 		spinner := spinnerFrames[frame%len(spinnerFrames)]
 		if t.ASCII {
 			spinner = string(spinnerASCII[frame%len(spinnerASCII)])
 		}
 		room := terminalWidth(s.tty) - len(gutter) - 3
-		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+t.paint(spinner, sgrCyan, sgrBold)+" "+t.Grey(clip(s.text, room, t.Ellipsis())))
+		text := s.text + slowAside(time.Since(start), w.latest())
+		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+t.paint(spinner, sgrCyan, sgrBold)+" "+t.Grey(clip(text, room, t.Ellipsis())))
 		select {
 		case <-s.stop:
 			return

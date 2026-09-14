@@ -52,7 +52,9 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 func (a *app) selfUpdate(ctx context.Context, check, without, require bool) error {
 	r := a.releases
 	if r == nil {
-		r = selfupdate.New(fetch.New(version))
+		f := fetch.New(version)
+		f.Waiting = a.printer.Waiting
+		r = selfupdate.New(f)
 	}
 	tag, err := r.Latest(ctx)
 	switch {

@@ -103,6 +103,7 @@ type Printer struct {
 	WarnPrefix string
 	warnings   []string
 	steps      stepState
+	waits      waits
 	Theme      Theme
 	ErrTheme   Theme
 }
