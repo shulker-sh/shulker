@@ -117,6 +117,24 @@ func TestHelpShowsTheReferenceDescriptionAndExamples(t *testing.T) {
 	}
 }
 
+func TestCompletionScripts(t *testing.T) {
+	for shell, marker := range map[string]string{"bash": "bash completion V2 for shulker", "zsh": "#compdef shulker", "fish": "fish completion for shulker", "powershell": "powershell completion for shulker"} {
+		code, stdout, _ := run(t, "completion", shell)
+		if code != out.ExitOK || !strings.Contains(stdout, marker) {
+			t.Errorf("%s: exit %d, script lacks %q", shell, code, marker)
+		}
+		if code, stdout, _ := run(t, "completion", shell, "--no-descriptions"); code != out.ExitOK || stdout == "" {
+			t.Errorf("%s --no-descriptions: exit %d", shell, code)
+		}
+	}
+	if _, stdout, _ := run(t, "completion", "zsh", "--help"); !strings.HasPrefix(stdout, "  Print the zsh completion script, so Tab completes") || !strings.Contains(stdout, "$ source <(shulker completion zsh)\n") {
+		t.Fatalf("completion zsh help:\n%s", stdout)
+	}
+	if _, stdout, _ := run(t, "__complete", "target", "l"); !strings.Contains(stdout, "list") {
+		t.Fatalf("__complete target l = %q", stdout)
+	}
+}
+
 func TestHelpCommandReportsUnknownTopics(t *testing.T) {
 	for args, want := range map[string]string{
 		"help nosuch":     `unknown command "nosuch"`,

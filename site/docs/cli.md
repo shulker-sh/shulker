@@ -49,6 +49,10 @@ outline: [2, 3]
 | [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
 | [`shulker version`](#shulker-version) | Print the shulker version |
 | [`shulker self update`](#shulker-self-update) | Update shulker to the latest release |
+| [`shulker completion bash`](#shulker-completion-bash) | Print the bash completion script |
+| [`shulker completion zsh`](#shulker-completion-zsh) | Print the zsh completion script |
+| [`shulker completion fish`](#shulker-completion-fish) | Print the fish completion script |
+| [`shulker completion powershell`](#shulker-completion-powershell) | Print the PowerShell completion script |
 
 ## Global flags
 
@@ -798,6 +802,56 @@ shulker self update --check
 | `--check` | Only report whether a newer release is available |
 | `--without-attestation` | Skip the build provenance check |
 | `--require-attestation` | Fail unless `gh` verifies the build provenance |
+
+### `shulker completion bash`
+
+Print the bash completion script, so Tab completes shulker's commands, flags, and arguments. Load it in the current shell, or add that line to `~/.bashrc` to have it in every new shell. It needs the bash-completion package.
+
+```sh
+source <(shulker completion bash)
+```
+
+| Flag | Description |
+| --- | --- |
+| `--no-descriptions` | Leave command descriptions out of the completions |
+
+### `shulker completion zsh`
+
+Print the zsh completion script, so Tab completes shulker's commands, flags, and arguments. Load it in the current shell, or save it where zsh looks for completions to have it in every new shell. It needs `compinit`, which most zsh setups already run.
+
+```sh
+source <(shulker completion zsh)
+shulker completion zsh > "${fpath[1]}/_shulker"
+```
+
+| Flag | Description |
+| --- | --- |
+| `--no-descriptions` | Leave command descriptions out of the completions |
+
+### `shulker completion fish`
+
+Print the fish completion script, so Tab completes shulker's commands, flags, and arguments. Load it in the current shell, or save it in fish's completions directory to have it in every new shell.
+
+```sh
+shulker completion fish | source
+shulker completion fish > ~/.config/fish/completions/shulker.fish
+```
+
+| Flag | Description |
+| --- | --- |
+| `--no-descriptions` | Leave command descriptions out of the completions |
+
+### `shulker completion powershell`
+
+Print the PowerShell completion script, so Tab completes shulker's commands, flags, and arguments. Load it in the current session, or add that line to your PowerShell profile to have it in every new session.
+
+```powershell
+shulker completion powershell | Out-String | Invoke-Expression
+```
+
+| Flag | Description |
+| --- | --- |
+| `--no-descriptions` | Leave command descriptions out of the completions |
 
 ## JSON output
 

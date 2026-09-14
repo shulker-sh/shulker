@@ -43,7 +43,6 @@ func (a *app) installHelp(root *cobra.Command) {
 	for _, c := range root.Commands() {
 		c.GroupID = byName[c.Name()]
 	}
-	root.SetCompletionCommandGroupID("shulker")
 	help := helpCommand()
 	root.SetHelpCommand(help)
 	root.AddCommand(help)
