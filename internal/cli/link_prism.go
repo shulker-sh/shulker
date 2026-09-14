@@ -41,7 +41,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 		Use:     "prism [project-dir | git-url | manifest-url]",
 		Aliases: []string{"multimc"},
 		Short:   "Create a Prism Launcher or MultiMC instance that syncs the client build before each launch",
-		Args:    cobra.MaximumNArgs(1),
+		Args:    maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if mode != "sync" && mode != "symlink" {
 				return out.Errorf("usage", "--mode must be sync or symlink, not %q", mode)

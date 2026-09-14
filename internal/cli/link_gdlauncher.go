@@ -24,7 +24,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gdlauncher [project-dir | git-url | manifest-url]",
 		Short: "Create a GDLauncher instance that syncs the client build before each launch",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, err := a.linkSource(cmd.Context(), args, ref)
 			if err != nil {

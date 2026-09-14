@@ -299,7 +299,7 @@ func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   verb + " <feature>",
 		Short: fmt.Sprintf("Turn a feature %s for every target on this machine", verb),
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			into, err := a.featureChangeDir(&where)
@@ -333,7 +333,7 @@ func (a *app) featureResetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reset <feature>",
 		Short: "Forget your choice for a feature and follow the target defaults again",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			into, err := a.featureChangeDir(&where)
@@ -372,7 +372,7 @@ func (a *app) featureListCmd() *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List features with the mods they gate, target defaults, and your choices",
-		Args:    cobra.NoArgs,
+		Args:    noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			into, err := a.featureDir(&where)
 			if err != nil {

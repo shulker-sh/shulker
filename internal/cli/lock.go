@@ -10,7 +10,7 @@ func (a *app) lockCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "lock",
 		Short: "Bring shulker.lock in line with shulker.json without upgrading anything",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.relock(cmd, func(*project.Project, *resolve.Resolver) (string, error) {
 				return "", nil

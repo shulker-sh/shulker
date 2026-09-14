@@ -27,7 +27,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "unlink [name | dir | launcher]",
 		Short: "Stop syncing a linked instance or synced directory and forget it, keeping its files",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			query := ""
 			if len(args) == 1 {

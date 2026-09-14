@@ -71,7 +71,7 @@ func (a *app) pinCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "pin <mod> [version]",
 		Short: "Pin a mod to a provider version id, or to its locked version",
-		Args:  cobra.RangeArgs(1, 2),
+		Args:  rangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := ""
 			if len(args) == 2 {
@@ -88,7 +88,7 @@ func (a *app) unpinCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "unpin <mod>",
 		Short: "Remove a mod's pin and re-resolve it",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				return "", r.Unpin(cmd.Context(), args[0])

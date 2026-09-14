@@ -45,7 +45,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mrpack <file>",
 		Short: "Create a project from a Modrinth modpack (.mrpack)",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arc, err := mrpack.Read(args[0])
 			if err != nil {

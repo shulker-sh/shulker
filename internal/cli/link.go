@@ -47,7 +47,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 		Use:     "mojang [project-dir | git-url | manifest-url]",
 		Aliases: []string{"vanilla"},
 		Short:   "Install the loader into the official launcher and add a profile for the client build",
-		Args:    cobra.MaximumNArgs(1),
+		Args:    maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, err := a.linkSource(cmd.Context(), args, ref)
 			if err != nil {

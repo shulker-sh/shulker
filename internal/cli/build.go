@@ -20,7 +20,7 @@ func (a *app) buildCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "build [target]",
 		Short: "Assemble build directories from the lock and overrides",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {

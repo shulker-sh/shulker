@@ -26,7 +26,7 @@ func (a *app) installCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Download everything in the lock and build all targets",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			p, err := a.openProject()
 			if err != nil {

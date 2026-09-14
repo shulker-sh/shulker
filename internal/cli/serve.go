@@ -78,7 +78,7 @@ func (a *app) serveCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve [target]",
 		Short: "Build a server target and run it in the foreground",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target, err := tf.resolve(args)
 			if err != nil {

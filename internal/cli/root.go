@@ -128,6 +128,9 @@ var unknownCommand = regexp.MustCompile(`^unknown command "([^"]+)" for "([^"]+)
 // usageError turns cobra's own error into the usage error. An unknown command carries the
 // parent's subcommands as candidates, so it gets the same picks and example as any other typo.
 func usageError(root *cobra.Command, err error) error {
+	if e, ok := flagError(err); ok {
+		return e
+	}
 	e := out.Errorf("usage", "%s", err)
 	m := unknownCommand.FindStringSubmatch(err.Error())
 	if m == nil {

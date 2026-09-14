@@ -33,7 +33,7 @@ func (a *app) targetAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a build target to shulker.json",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			if !targetNamePattern.MatchString(name) {
@@ -94,7 +94,7 @@ func (a *app) targetRemoveCmd() *cobra.Command {
 		Use:     "remove <name>",
 		Aliases: []string{"rm"},
 		Short:   "Remove a target from shulker.json, leaving its build directory in place",
-		Args:    cobra.ExactArgs(1),
+		Args:    exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			p, err := a.openProject()
@@ -125,7 +125,7 @@ func (a *app) targetListCmd() *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List targets with their side, build directory, overrides, and features",
-		Args:    cobra.NoArgs,
+		Args:    noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {

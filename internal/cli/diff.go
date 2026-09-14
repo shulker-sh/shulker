@@ -56,7 +56,7 @@ func (a *app) diffCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diff [target]",
 		Short: "Show build files that differ from what build would write",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {

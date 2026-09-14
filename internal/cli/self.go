@@ -26,7 +26,7 @@ func (a *app) selfCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "self",
 		Short: "Manage the shulker binary itself",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 	}
 	cmd.AddCommand(a.selfUpdateCmd())
 	return cmd
@@ -37,15 +37,17 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update shulker to the latest release",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if without && require {
+				return out.Errorf("usage", "--without-attestation and --require-attestation can't be used together")
+			}
 			return a.selfUpdate(cmd.Context(), check, without, require)
 		},
 	}
 	cmd.Flags().BoolVar(&check, "check", false, "only report whether a newer release is available")
 	cmd.Flags().BoolVar(&without, "without-attestation", false, "skip the build provenance check")
 	cmd.Flags().BoolVar(&require, "require-attestation", false, "fail unless gh verifies the build provenance")
-	cmd.MarkFlagsMutuallyExclusive("without-attestation", "require-attestation")
 	return cmd
 }
 

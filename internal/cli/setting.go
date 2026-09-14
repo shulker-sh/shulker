@@ -30,7 +30,7 @@ func (a *app) setCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <path> <value>",
 		Short: "Set a field in shulker.json by its dotted path",
-		Args:  cobra.ExactArgs(2),
+		Args:  exactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, doc, s, err := a.openSettings()
 			if err != nil {
@@ -62,7 +62,7 @@ func (a *app) unsetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "unset <path>",
 		Short: "Remove a field from shulker.json by its dotted path",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, doc, s, err := a.openSettings()
 			if err != nil {
@@ -88,7 +88,7 @@ func (a *app) getCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get [path]",
 		Short: "Print a field of shulker.json, or all of it",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, doc, s, err := a.openSettings()
 			if err != nil {

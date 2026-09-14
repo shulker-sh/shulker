@@ -24,7 +24,7 @@ func (a *app) packAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <source>",
 		Short: "Add a pack from a local path, git URL, or raw manifest URL",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			entry.Source = args[0]
 			return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
@@ -62,7 +62,7 @@ func (a *app) packRemoveCmd() *cobra.Command {
 		Use:     "remove <name>",
 		Aliases: []string{"rm"},
 		Short:   "Remove a pack and prune the mods only it provided",
-		Args:    cobra.ExactArgs(1),
+		Args:    exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				return "", r.RemovePack(args[0])
@@ -76,7 +76,7 @@ func (a *app) packListCmd() *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List packs with their locked ref and whether a local pack has changed",
-		Args:    cobra.NoArgs,
+		Args:    noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {

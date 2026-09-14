@@ -970,7 +970,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `unset-variable` | An override uses a variable that isn't set |
 | `unsupported-loader` | shulker doesn't support the loader yet |
 | `unsupported-mode` | `--mode symlink` isn't supported on Windows yet |
-| `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. Exits 2 |
+| `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |

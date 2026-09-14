@@ -45,7 +45,7 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync [project-dir | git-url | manifest-url]",
 		Short: "Download and build one target of a project straight into a directory",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkOS(req.os); err != nil {
 				return err

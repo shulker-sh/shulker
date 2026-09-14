@@ -16,7 +16,7 @@ func (a *app) addCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <mod>...",
 		Short: "Add mods to the manifest and lock",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  minimumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Pin != "" && len(args) > 1 {
 				return fmt.Errorf("--pin applies to a single mod")

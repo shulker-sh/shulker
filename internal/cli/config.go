@@ -25,7 +25,7 @@ func (a *app) configCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Read and change shulker's own config.json",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 	}
 	cmd.AddCommand(a.configGetCmd(), a.configSetCmd(), a.configUnsetCmd())
 	return cmd
@@ -36,7 +36,7 @@ func (a *app) configGetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get [key]",
 		Short: "Print a key of config.json, or all of it",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var key string
 			if len(args) == 1 {
@@ -81,7 +81,7 @@ func (a *app) configSetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <key> <value>",
 		Short: "Set a key in config.json",
-		Args:  cobra.ExactArgs(2),
+		Args:  exactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
 			path, cfg, doc, err := a.openConfig(key)
@@ -118,7 +118,7 @@ func (a *app) configUnsetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "unset <key>",
 		Short: "Remove a key from config.json",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 			path, cfg, doc, err := a.openConfig(key)

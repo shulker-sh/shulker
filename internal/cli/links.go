@@ -32,7 +32,7 @@ func (a *app) linksCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "links",
 		Short: "List linked launcher instances and synced directories",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			links, err := a.loadLinks()
 			if err != nil {

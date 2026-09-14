@@ -119,7 +119,7 @@ func TestHelpShowsTheReferenceDescriptionAndExamples(t *testing.T) {
 
 func TestUsageErrorsShowUsageAndFlags(t *testing.T) {
 	_, _, stderr := run(t, "add")
-	if !strings.Contains(stderr, "(usage)\n\n  Usage\n    $ shulker add <mod>... [flags]\n\n  Flags\n") {
+	if !strings.Contains(stderr, "\n\n  Usage\n    $ shulker add <mod>... [flags]\n\n  Flags\n") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
 	if strings.Contains(stderr, "Global flags") || strings.Contains(stderr, "Examples") || strings.HasSuffix(stderr, "\n\n") {

@@ -51,7 +51,7 @@ func (a *app) versionCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Print the shulker version",
-		Args:  cobra.NoArgs,
+		Args:  noArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			info := versionInfo{Version: version, Go: runtime.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH}
 			commit, modified, built := buildVCS()
