@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -43,14 +44,57 @@ func (a *app) installHelp(root *cobra.Command) {
 		c.GroupID = byName[c.Name()]
 	}
 	root.SetCompletionCommandGroupID("shulker")
-	root.InitDefaultHelpCmd()
-	for _, c := range root.Commands() {
-		if c.Name() == "help" {
-			c.Hidden = true
-		}
-	}
+	help := helpCommand()
+	root.SetHelpCommand(help)
+	root.AddCommand(help)
 	root.SetHelpFunc(func(cmd *cobra.Command, _ []string) { a.help(cmd) })
 	root.SetUsageFunc(func(cmd *cobra.Command) error { a.help(cmd); return nil })
+}
+
+// helpCommand replaces cobra's, which prints a plain "Unknown help topic" and
+// exits 0, and ignores words after the last command it recognises.
+func helpCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:    "help [command]...",
+		Short:  "Show help for a command",
+		Hidden: true,
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+			parent := cmd.Root()
+			for _, word := range args {
+				if parent = subcommand(parent, word); parent == nil {
+					return nil, cobra.ShellCompDirectiveNoFileComp
+				}
+			}
+			var names []cobra.Completion
+			for _, sub := range parent.Commands() {
+				if sub.IsAvailableCommand() && strings.HasPrefix(sub.Name(), toComplete) {
+					names = append(names, cobra.CompletionWithDesc(sub.Name(), sub.Short))
+				}
+			}
+			return names, cobra.ShellCompDirectiveNoFileComp
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target := cmd.Root()
+			for _, word := range args {
+				next := subcommand(target, word)
+				if next == nil {
+					return unknownSubcommand(target, word)
+				}
+				target = next
+			}
+			target.InitDefaultHelpFlag()
+			return target.Help()
+		},
+	}
+}
+
+func subcommand(parent *cobra.Command, word string) *cobra.Command {
+	for _, c := range parent.Commands() {
+		if c.IsAvailableCommand() && (c.Name() == word || slices.Contains(c.Aliases, word)) {
+			return c
+		}
+	}
+	return nil
 }
 
 func (a *app) help(cmd *cobra.Command) {

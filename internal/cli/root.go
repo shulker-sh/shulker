@@ -136,18 +136,27 @@ func groupCommands(c *cobra.Command) {
 				if len(args) == 0 {
 					return cmd.Help()
 				}
-				e := out.Errorf("usage", "unknown command %q for %q", args[0], cmd.CommandPath())
-				for _, s := range cmd.Commands() {
-					if s.IsAvailableCommand() {
-						e.Candidates = append(e.Candidates, s.Name())
-					}
-				}
-				e.Given = args[0]
-				return e
+				return unknownSubcommand(cmd, args[0])
 			}
 		}
 		groupCommands(sub)
 	}
+}
+
+// unknownSubcommand is the usage error for a word that names none of parent's
+// commands, with those commands as picks.
+func unknownSubcommand(parent *cobra.Command, word string) *out.Error {
+	e := out.Errorf("usage", "unknown command %q for %q", word, parent.CommandPath())
+	if !parent.HasParent() {
+		e = out.Errorf("usage", "unknown command %q", word)
+	}
+	for _, c := range parent.Commands() {
+		if c.IsAvailableCommand() {
+			e.Candidates = append(e.Candidates, c.Name())
+		}
+	}
+	e.Given = word
+	return e
 }
 
 var unknownCommand = regexp.MustCompile(`^unknown command "([^"]+)" for "([^"]+)"`)

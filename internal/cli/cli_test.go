@@ -117,6 +117,34 @@ func TestHelpShowsTheReferenceDescriptionAndExamples(t *testing.T) {
 	}
 }
 
+func TestHelpCommandReportsUnknownTopics(t *testing.T) {
+	for args, want := range map[string]string{
+		"help nosuch":     `unknown command "nosuch"`,
+		"help target lst": `unknown command "lst" for "shulker target"`,
+	} {
+		code, stdout, _ := run(t, append([]string{"--json"}, strings.Fields(args)...)...)
+		if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || e.Message != want {
+			t.Errorf("%s: exit %d, %+v", args, code, e)
+		}
+	}
+	if _, _, stderr := run(t, "help", "target", "lst"); !strings.Contains(stderr, "$ shulker help target list\n") {
+		t.Fatalf("stderr:\n%s", stderr)
+	}
+	for help, flag := range map[string]string{"help add": "add --help", "help rm": "remove --help", "help target list": "target list --help"} {
+		_, viaHelp, _ := run(t, strings.Fields(help)...)
+		_, viaFlag, _ := run(t, strings.Fields(flag)...)
+		if viaHelp == "" || viaHelp != viaFlag {
+			t.Errorf("%q differs from %q:\n%s", help, flag, viaHelp)
+		}
+	}
+	if code, stdout, _ := run(t, "help"); code != out.ExitOK || !strings.Contains(stdout, "  Usage\n") {
+		t.Fatalf("help alone: exit %d\n%s", code, stdout)
+	}
+	if _, stdout, _ := run(t, "--help"); strings.Contains(stdout, "    help ") {
+		t.Fatalf("help is listed:\n%s", stdout)
+	}
+}
+
 func TestGroupCommandsReportUnknownSubcommands(t *testing.T) {
 	for _, args := range [][]string{{"target", "lst"}, {"self", "updte"}, {"config", "st", "key"}} {
 		code, stdout, _ := run(t, append([]string{"--json"}, args...)...)
