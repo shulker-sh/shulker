@@ -113,6 +113,15 @@ func GDLauncherFolder(name string) string {
 	}, folder)
 }
 
+// GDLauncherLoaderVersion is the loader version as GDLauncher's meta names it. Forge builds are named
+// <game>-<build> there, the way Forge's maven publishes them.
+func GDLauncherLoaderVersion(minecraft, loaderType, version string) string {
+	if loaderType == "forge" {
+		return minecraft + "-" + version
+	}
+	return version
+}
+
 func (l *GDLauncher) InstanceDir(name string) string {
 	return filepath.Join(l.Dir, "instances", GDLauncherFolder(name))
 }
@@ -148,7 +157,7 @@ func (l *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, err
 	}
 	modloaders := []map[string]string{}
 	if loaderType, ok := gdlauncherLoaderTypes[inst.LoaderType]; ok {
-		modloaders = append(modloaders, map[string]string{"type": loaderType, "version": inst.LoaderVersion})
+		modloaders = append(modloaders, map[string]string{"type": loaderType, "version": GDLauncherLoaderVersion(inst.Minecraft, inst.LoaderType, inst.LoaderVersion)})
 	}
 	if config["version"], err = json.Marshal(map[string]any{"release": inst.Minecraft, "modloaders": modloaders}); err != nil {
 		return res, err

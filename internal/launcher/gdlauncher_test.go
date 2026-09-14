@@ -122,6 +122,18 @@ func TestGDLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	}
 }
 
+func TestGDLauncherForgeVersion(t *testing.T) {
+	l := &GDLauncher{Dir: t.TempDir()}
+	res, err := l.WriteInstance(GDLauncherInstance{Name: "Forge", Minecraft: "26.2", LoaderType: "forge", LoaderVersion: "65.1.3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := readInstanceJSON(t, filepath.Join(res.Dir, GDLauncherInstanceFile))["game_configuration"].(map[string]any)["version"].(map[string]any)
+	if lv := version["modloaders"].([]any)[0].(map[string]any); lv["type"] != "Forge" || lv["version"] != "26.2-65.1.3" {
+		t.Fatalf("GDLauncher's meta names Forge builds <game>-<build>: %v", version)
+	}
+}
+
 func TestGDLauncherRelinkLeavesDefaultIcon(t *testing.T) {
 	l := &GDLauncher{Dir: t.TempDir()}
 	inst := GDLauncherInstance{Name: "Pack", Minecraft: "26.2", LoaderType: "fabric", LoaderVersion: "0.17.3"}
