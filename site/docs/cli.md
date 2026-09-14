@@ -115,7 +115,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 
 ### `shulker export curseforge`
 
-Export the client target as a CurseForge profile `.zip` for the CurseForge app's Import Profile. Mods locked from CurseForge go in by file ID. Every other mod is looked up on CurseForge by its fingerprint, and matches go in by file ID too. Mods that aren't on CurseForge fail the export unless `--bundle` ships them inside the archive, which the CurseForge app warns about on import. Server-only mods and files are left out. The source works as in [`export mrpack`](#shulker-export-mrpack).
+Export the client target as a CurseForge profile `.zip` for the CurseForge app's Import Profile. Mods locked from CurseForge go in by file ID. Every other mod is looked up on CurseForge by its fingerprint, and matches go in by file ID too. Mods that aren't on CurseForge fail the export unless `--bundle` ships them inside the archive, which the CurseForge app warns about on import. Server-only mods and files are left out. The profile gets shulker's logo as its image. The source works as in [`export mrpack`](#shulker-export-mrpack).
 
 ```sh
 shulker export curseforge

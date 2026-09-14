@@ -49,6 +49,7 @@ type curseForgeManifest struct {
 	Author          string              `json:"author,omitempty"`
 	Files           []curseForgeFile    `json:"files"`
 	Overrides       string              `json:"overrides"`
+	Image           string              `json:"image"`
 }
 
 type curseForgeMinecraft struct {
@@ -97,12 +98,14 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 		Author:          strings.Join(b.Manifest.Authors, ", "),
 		Files:           files,
 		Overrides:       "overrides",
+		Image:           "profileImage/" + markerLogo,
 	}
 	data, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return nil, err
 	}
 	entries[curseForgeManifestName] = append(data, '\n')
+	entries[manifest.Image] = markerIcon
 	entries["modlist.html"] = curseForgeModlist(report.Mods, files)
 	if err := writeArchive(opts.Output, curseForgeManifestName, entries); err != nil {
 		return nil, err

@@ -32,6 +32,7 @@ type curseForgePack struct {
 		Required  bool `json:"required"`
 	} `json:"files"`
 	Overrides string `json:"overrides"`
+	Image     string `json:"image"`
 }
 
 func (h *harness) fingerprintMatches(fingerprints []uint32) []map[string]any {
@@ -103,8 +104,11 @@ func TestExportCurseForge(t *testing.T) {
 	if err := json.Unmarshal([]byte(entries["manifest.json"]), &pack); err != nil {
 		t.Fatal(err)
 	}
-	if pack.ManifestType != "minecraftModpack" || pack.ManifestVersion != 1 || pack.Name != "Demo Pack" || pack.Version != "1.0" || pack.Author != "Ann, Bo" || pack.Overrides != "overrides" {
+	if pack.ManifestType != "minecraftModpack" || pack.ManifestVersion != 1 || pack.Name != "Demo Pack" || pack.Version != "1.0" || pack.Author != "Ann, Bo" || pack.Overrides != "overrides" || pack.Image != "profileImage/icon.png" {
 		t.Fatalf("manifest header: %+v", pack)
+	}
+	if image := entries["profileImage/icon.png"]; !strings.HasPrefix(image, "\x89PNG") {
+		t.Fatalf("profile image entry: %d bytes", len(image))
 	}
 	if pack.Minecraft.Version != "26.2" || len(pack.Minecraft.ModLoaders) != 1 || pack.Minecraft.ModLoaders[0].ID != "fabric-0.17.3" || !pack.Minecraft.ModLoaders[0].Primary {
 		t.Fatalf("minecraft: %+v", pack.Minecraft)
