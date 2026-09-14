@@ -174,6 +174,25 @@ func (l *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, err
 	return res, fsutil.WriteJSON(path, top)
 }
 
+// GDLauncherPreLaunch reads an instance's pre-launch hook, and whether the instance exists at all.
+func GDLauncherPreLaunch(instanceDir string) (hook string, found bool, err error) {
+	path := filepath.Join(instanceDir, GDLauncherInstanceFile)
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	var inst struct {
+		Hook string `json:"pre_launch_hook"`
+	}
+	if err := json.Unmarshal(data, &inst); err != nil {
+		return "", true, fmt.Errorf("%s: %w", path, err)
+	}
+	return inst.Hook, true, nil
+}
+
 // RemoveGDLauncherPreLaunch drops an instance's pre-launch hook when it is a shulker sync. It reports
 // whether a hook was removed.
 func RemoveGDLauncherPreLaunch(instanceDir string) (bool, error) {

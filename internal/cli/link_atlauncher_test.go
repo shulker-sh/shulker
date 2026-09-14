@@ -134,6 +134,17 @@ func TestLinkATLauncherNeoForge(t *testing.T) {
 	if len(h.installs) != 1 {
 		t.Fatalf("a relink should reuse the scratch install: %v", h.installs)
 	}
+
+	foreign := filepath.Join(launcherDir, "instances", "Mine")
+	if err := os.MkdirAll(foreign, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeATLInstance(t, foreign, map[string]any{"launcher": map[string]any{"name": "Mine"}})
+	code, stdout, _ := h.run(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "instance-exists" {
+		t.Fatalf("linking over the player's own instance: exit %d %s", code, stdout)
+	}
+	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--force")
 }
 
 func readATLInstance(t *testing.T, instDir string) map[string]any {

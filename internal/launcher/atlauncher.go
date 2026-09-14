@@ -179,6 +179,27 @@ func (l *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, err
 	return res, fsutil.WriteJSON(path, top)
 }
 
+// ATLauncherPreLaunch reads an instance's pre-launch command, and whether the instance exists at all.
+func ATLauncherPreLaunch(instanceDir string) (command string, found bool, err error) {
+	path := filepath.Join(instanceDir, ATLauncherInstanceFile)
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	var inst struct {
+		Launcher struct {
+			PreLaunchCommand string `json:"preLaunchCommand"`
+		} `json:"launcher"`
+	}
+	if err := json.Unmarshal(data, &inst); err != nil {
+		return "", true, fmt.Errorf("%s: %w", path, err)
+	}
+	return inst.Launcher.PreLaunchCommand, true, nil
+}
+
 // RemoveATLauncherPreLaunch drops an instance's pre-launch command when it is a shulker sync, and the
 // per-instance switch that turned commands on for it. It reports whether a command was removed.
 func RemoveATLauncherPreLaunch(instanceDir string) (bool, error) {

@@ -79,6 +79,15 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			if prev := prevState.Source; prev != "" && prev != src.name && !force {
 				return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev)
 			}
+			if prevState.Source == "" && !force {
+				hook, found, err := launcher.GDLauncherPreLaunch(gdl.InstanceDir(display))
+				if err != nil {
+					return err
+				}
+				if found && !launcher.IsSyncCommand(hook) {
+					return out.Errorf("instance-exists", "GDLauncher already has an instance %q that shulker didn't link; pass --name to create a second instance, or --force to link this one", display)
+				}
+			}
 			exe, err := shulkerPath()
 			if err != nil {
 				return err
@@ -148,7 +157,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the target's display name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "repoint an instance that syncs from a different source")
+	cmd.Flags().BoolVar(&force, "force", false, "link over an instance that syncs from a different source or that shulker didn't link")
 	ff.register(cmd, "for this instance")
 	return cmd
 }

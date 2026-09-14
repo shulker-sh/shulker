@@ -534,7 +534,7 @@ With no source, it links the project in the current directory. Pass a project di
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <instance folder>`, or run `link` again with new flags.
 
-If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one.
+If the instance already syncs from a different source, or is an ATLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one.
 
 ```sh
 shulker link atlauncher
@@ -548,7 +548,7 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--target <name>` | Client target to link (default: the only client target) |
 | `--name <name>` | Instance name (default: the target's display name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Repoint an instance that syncs from a different source |
+| `--force` | Link over an instance that syncs from a different source or that shulker didn't link |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -564,7 +564,7 @@ Renaming the instance in GDLauncher moves its folder. It keeps syncing before ea
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game folder>`, or run `link` again with new flags.
 
-If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one.
+If the instance already syncs from a different source, or is a GDLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one.
 
 ```sh
 shulker link gdlauncher
@@ -578,7 +578,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--target <name>` | Client target to link (default: the only client target) |
 | `--name <name>` | Instance name (default: the target's display name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Repoint an instance that syncs from a different source |
+| `--force` | Link over an instance that syncs from a different source or that shulker didn't link |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -868,7 +868,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `id-changed` | A new version of a mod identifies itself as a different mod |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-dir-not-empty` | The instance directory already has files |
-| `instance-exists` | An instance already syncs from this source; pass `--name` for a second one, or `--force` |
+| `instance-exists` | An instance already syncs from a different source, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `instance-not-found` | Nothing linked matches. `candidates`: the linked entries |

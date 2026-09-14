@@ -126,6 +126,18 @@ func TestLinkGDLauncherNeoForge(t *testing.T) {
 	if lv := version["modloaders"].([]any)[0].(map[string]any); version["release"] != "26.2" || lv["type"] != "Neoforge" || lv["version"] != "26.2.0.87" {
 		t.Fatalf("version: %v", version)
 	}
+	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Neo")
+
+	foreign := filepath.Join(launcherDir, "instances", "Mine")
+	if err := os.MkdirAll(foreign, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeGDLInstance(t, foreign, map[string]any{"_version": "1", "name": "Mine", "game_configuration": map[string]any{}})
+	code, stdout, _ := h.run(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "instance-exists" {
+		t.Fatalf("linking over the player's own instance: exit %d %s", code, stdout)
+	}
+	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--force")
 }
 
 func readGDLInstance(t *testing.T, instDir string) map[string]any {
