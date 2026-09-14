@@ -195,9 +195,13 @@ func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
 	if !removed {
 		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept.", l.Name, e.Title)}, nil
 	}
+	restart := "Restart the launcher if it is open so the change is picked up."
+	if e.Name == "gdlauncher" {
+		restart = "Quit GDLauncher before unlinking, then open it."
+	}
 	return Forgotten{
 		Removed: RemovedPreLaunch,
-		Summary: fmt.Sprintf("Unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay.\nRestart the launcher if it is open so the change is picked up.", l.Name, e.Title),
+		Summary: fmt.Sprintf("Unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay.\n%s", l.Name, e.Title, restart),
 	}, nil
 }
 

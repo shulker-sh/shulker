@@ -106,7 +106,9 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatalf("missing launcher dir: exit %d %s", code, stdout)
 	}
 
-	h.mustRun(t, "unlink", "gdlauncher")
+	if stdout := h.mustRun(t, "unlink", "gdlauncher"); !strings.Contains(stdout, "Quit GDLauncher before unlinking, then open it") {
+		t.Fatalf("unlink output:\n%s", stdout)
+	}
 	after := readGDLInstance(t, instDir)
 	if _, ok := after["pre_launch_hook"]; ok || after["game_configuration"].(map[string]any)["memory"] == nil {
 		t.Fatalf("unlink should drop only the hook: %v", after)
