@@ -36,7 +36,7 @@ func (a *app) linkCmd() *cobra.Command {
 		Use:   "link",
 		Short: "Point a launcher at this project's client build",
 	}
-	cmd.AddCommand(a.linkMojangCmd(), a.linkPrismCmd(), a.linkATLauncherCmd())
+	cmd.AddCommand(a.linkMojangCmd(), a.linkPrismCmd(), a.linkATLauncherCmd(), a.linkGDLauncherCmd())
 	return cmd
 }
 

@@ -33,6 +33,7 @@ outline: [2, 3]
 | [`shulker pull [file...]`](#shulker-pull) | Copy edits made in a build directory back into their source |
 | [`shulker serve [target]`](#shulker-serve) | Build a server target and run it in the foreground |
 | [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
+| [`shulker link gdlauncher [source]`](#shulker-link-gdlauncher) | Create a GDLauncher instance for the client build |
 | [`shulker link mojang [source]`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
 | [`shulker link prism [source]`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
 | [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
@@ -403,7 +404,7 @@ shulker feature on shaders --instance "Friends SMP"
 | --- | --- |
 | `--into <path>` | Change the choice for a directory you synced into, instead of this project |
 | `--instance <name>` | Change the choice for a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
@@ -420,7 +421,7 @@ shulker feature reset shaders --into ~/instances/my-pack
 | --- | --- |
 | `--into <path>` | Forget the choice for a directory you synced into, instead of this project |
 | `--instance <name>` | Forget the choice for a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
@@ -437,7 +438,7 @@ shulker feature list --into ~/instances/my-pack
 | --- | --- |
 | `--into <path>` | List the choices that apply to a directory you synced into |
 | `--instance <name>` | List the choices that apply to a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
+| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only match `--instance` against `client` or `server` entries |
 
 ## Builds
@@ -551,6 +552,36 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
+### `shulker link gdlauncher`
+
+Create a GDLauncher instance that syncs the client build before each launch.
+
+shulker writes the instance's `instance.json` itself: the Minecraft version, the loader, and a pre-launch hook that runs `shulker sync`. GDLauncher downloads the game, the loader and Java the first time you press Play, NeoForge and Forge included. A new instance gets the shulker icon; an icon you pick in GDLauncher is kept when you link again. GDLauncher only reads its instances when it starts, so restart it if it is open.
+
+With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named the way GDLauncher names it. Running `link` again keeps the settings you changed in GDLauncher, such as memory and Java arguments. If you moved GDLauncher's runtime path in its settings, shulker follows it.
+
+Renaming the instance in GDLauncher moves its folder. It keeps syncing before each launch, but `shulker links` reports it missing; run `link` again with the new `--name`, and `shulker unlink` the old one.
+
+`--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game folder>`, or run `link` again with new flags.
+
+If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one.
+
+```sh
+shulker link gdlauncher
+shulker link gdlauncher https://github.com/shulker-sh/base-pack.git
+shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SMP" --with shaders
+```
+
+| Flag | Description |
+| --- | --- |
+| `--launcher-dir <path>` | Launcher runtime directory (default: GDLauncher's) |
+| `--target <name>` | Client target to link (default: the only client target) |
+| `--name <name>` | Instance name (default: the target's display name) |
+| `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--force` | Repoint an instance that syncs from a different source |
+| `--with <feature>` | Turn a feature on for this instance; repeat for more |
+| `--without <feature>` | Turn a feature off for this instance; repeat for more |
+
 ### `shulker link mojang`
 
 Install the loader into the official launcher and add a profile that points at the client build. Alias: `vanilla`.
@@ -630,7 +661,7 @@ To update something on that list, name it instead of a source. `--instance` take
 | `--name <name>` | Name to list the `--into` directory under (default: the target's display name; kept on later syncs) |
 | `--instance <name>` | Sync a linked instance or synced directory, by name or directory, instead of a source |
 | `--all` | Sync every entry `--instance` matches, or every entry when there's no `--instance` |
-| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
+| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only `client` or `server` entries |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
@@ -663,7 +694,7 @@ Other directories
 
 Stop syncing a linked instance or synced directory and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the build directory and the installed loader. A plain synced directory is just forgotten. When the entry syncs from a project directory, `unlink` also drops it from that project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it.
 
-Name the entry the way [`shulker links`](#shulker-links) shows it, or pass its directory. Inside a project, a launcher name (`mojang`, `prism`, `multimc`, `atlauncher`) unlinks that project's entry in that launcher, the reverse of `shulker link <launcher>`; an entry actually called that name comes first. A name several entries share needs `--launcher`, `--side`, or `--all`. `unlink` prints the command that sets the entry up again.
+Name the entry the way [`shulker links`](#shulker-links) shows it, or pass its directory. Inside a project, a launcher name (`mojang`, `prism`, `multimc`, `atlauncher`, `gdlauncher`) unlinks that project's entry in that launcher, the reverse of `shulker link <launcher>`; an entry actually called that name comes first. A name several entries share needs `--launcher`, `--side`, or `--all`. `unlink` prints the command that sets the entry up again.
 
 ```sh
 shulker unlink mojang
@@ -675,7 +706,7 @@ shulker unlink --all --side server
 | Flag | Description |
 | --- | --- |
 | `--all` | Unlink every entry the name matches, or every entry when there's no name |
-| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, or `atlauncher` |
+| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only `client` or `server` entries |
 
 ## Packs

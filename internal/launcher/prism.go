@@ -265,9 +265,10 @@ func writeInstanceConfig(path string, inst Instance, multimc bool) error {
 	return fsutil.Write(path, buf.Bytes())
 }
 
-// IsSyncCommand reports whether a pre-launch command is the shulker sync that linking writes.
+// IsSyncCommand reports whether a pre-launch command is the shulker sync that linking writes. GDLauncher
+// runs hooks in the game directory without setting variables, so its sync goes into ".".
 func IsSyncCommand(command string) bool {
-	return strings.Contains(command, " sync ") && strings.HasSuffix(command, `--into "$INST_MC_DIR"`)
+	return strings.Contains(command, " sync ") && (strings.HasSuffix(command, `--into "$INST_MC_DIR"`) || strings.HasSuffix(command, " --into ."))
 }
 
 // RemovePreLaunch drops an instance's pre-launch command, but only a shulker sync; any other

@@ -44,6 +44,7 @@ var All = []*Entry{
 	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkInstance, forget: forgetInstance},
 	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkMojang, forget: forgetMojang},
 	{Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, relink: relinkMojang, forget: forgetInstance},
+	{Name: "gdlauncher", Title: "GDLauncher", Instanced: true, DefaultDir: DefaultGDLauncherDir, relink: relinkMojang, forget: forgetInstance},
 }
 
 // InstanceDir is the instance folder that holds an instanced launcher's game directory.
@@ -180,9 +181,12 @@ func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
 	}
 	var removed bool
 	var err error
-	if e.gameDirIsInstance {
+	switch e.Name {
+	case "atlauncher":
 		removed, err = RemoveATLauncherPreLaunch(instanceDir)
-	} else {
+	case "gdlauncher":
+		removed, err = RemoveGDLauncherPreLaunch(instanceDir)
+	default:
 		removed, err = RemovePreLaunch(instanceDir, e.Name == "multimc")
 	}
 	if err != nil {
@@ -224,6 +228,14 @@ func shellArg(s string) string {
 // directory when the layout gives it away. It reads an instance registered
 // before shulker recorded a launcher, or one a plain `sync --into` found.
 func Detect(gameDir string) (name, dir string) {
+	if filepath.Base(gameDir) == GDLauncherGameDir {
+		instanceDir := filepath.Dir(gameDir)
+		if instances := filepath.Dir(instanceDir); filepath.Base(instances) == "instances" {
+			if _, err := os.Stat(filepath.Join(instanceDir, GDLauncherInstanceFile)); err == nil {
+				return "gdlauncher", filepath.Dir(instances)
+			}
+		}
+	}
 	if instances := filepath.Dir(gameDir); filepath.Base(instances) == "instances" {
 		if _, err := os.Stat(filepath.Join(gameDir, ATLauncherInstanceFile)); err == nil {
 			return "atlauncher", filepath.Dir(instances)

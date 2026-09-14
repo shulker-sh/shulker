@@ -196,7 +196,7 @@ func TestSyncInstance(t *testing.T) {
 		{[]string{"sync", h.dir, "--instance", "Friends"}, "usage"},
 		{[]string{"sync", h.dir, "--launcher", "prism"}, "usage"},
 		{[]string{"sync", "--instance", "Friends", "--into", plain}, "usage"},
-		{[]string{"sync", "--all", "--launcher", "gdlauncher"}, "usage"},
+		{[]string{"sync", "--all", "--launcher", "technic"}, "usage"},
 	} {
 		code, stdout, _ := h.run(t, append(c.args, "--json")...)
 		if e := failureCode(t, stdout); code == 0 || e.Code != c.code {
