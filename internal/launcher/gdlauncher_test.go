@@ -72,6 +72,13 @@ func TestGDLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	if info, err := os.Stat(res.GameDir); err != nil || !info.IsDir() {
 		t.Fatalf("game dir: %v", err)
 	}
+	setup := filepath.Join(res.Dir, GDLauncherSetupDir)
+	if info, err := os.Stat(setup); err != nil || !info.IsDir() {
+		t.Fatalf("a new instance needs the setup marker, or GDLauncher skips the loader install: %v", err)
+	}
+	if err := os.Remove(setup); err != nil {
+		t.Fatal(err)
+	}
 	if data, err := os.ReadFile(filepath.Join(res.Dir, GDLauncherIconFile)); err != nil || !bytes.Equal(data, GDLauncherIcon) {
 		t.Fatalf("new instance should get the shulker icon: %v", err)
 	}
@@ -92,6 +99,9 @@ func TestGDLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	inst.Minecraft, inst.LoaderVersion = "26.3", "26.3.0.1"
 	if res, err = l.WriteInstance(inst); err != nil || res.Created {
 		t.Fatalf("relink: %+v %v", res, err)
+	}
+	if info, err := os.Stat(setup); err != nil || !info.IsDir() {
+		t.Fatalf("a relink should mark the instance for setup again: %v", err)
 	}
 	again := readInstanceJSON(t, path)
 	config := again["game_configuration"].(map[string]any)

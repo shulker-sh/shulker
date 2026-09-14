@@ -20,6 +20,9 @@ const (
 	GDLauncherIconFile     = "icon.png"
 	// GDLauncherGameDir is the folder inside a GDLauncher instance that Minecraft runs in.
 	GDLauncherGameDir = "instance"
+	// GDLauncherSetupDir marks an instance for first-time setup. GDLauncher runs Forge's and NeoForge's
+	// install processors only while it exists, and removes it once the install finishes.
+	GDLauncherSetupDir = ".setup"
 )
 
 //go:embed assets/gdlauncher-icon.png
@@ -200,6 +203,9 @@ func (l *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, err
 		top["pre_launch_hook"] = jsonString(inst.PreLaunch)
 	}
 	if err := os.MkdirAll(res.GameDir, 0o755); err != nil {
+		return res, err
+	}
+	if err := os.MkdirAll(filepath.Join(dir, GDLauncherSetupDir), 0o755); err != nil {
 		return res, err
 	}
 	if res.Created {
