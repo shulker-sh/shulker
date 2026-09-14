@@ -122,19 +122,24 @@ func TestGDLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	}
 }
 
-func TestGDLauncherWriteInstanceNullIcon(t *testing.T) {
+func TestGDLauncherRelinkLeavesDefaultIcon(t *testing.T) {
 	l := &GDLauncher{Dir: t.TempDir()}
-	dir := l.InstanceDir("Pack")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	inst := GDLauncherInstance{Name: "Pack", Minecraft: "26.2", LoaderType: "fabric", LoaderVersion: "0.17.3"}
+	res, err := l.WriteInstance(inst)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, GDLauncherInstanceFile), []byte(`{"_version":"1","name":"Pack","icon":null,"game_configuration":{}}`), 0o644); err != nil {
+	path := filepath.Join(res.Dir, GDLauncherInstanceFile)
+	reset := readInstanceJSON(t, path)
+	reset["icon"] = nil
+	data, _ := json.Marshal(reset)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := l.WriteInstance(GDLauncherInstance{Name: "Pack", Minecraft: "26.2", LoaderType: "fabric", LoaderVersion: "0.17.3"}); err != nil {
+	if _, err := l.WriteInstance(inst); err != nil {
 		t.Fatal(err)
 	}
-	if got := readInstanceJSON(t, filepath.Join(dir, GDLauncherInstanceFile)); got["icon"] != GDLauncherIconFile {
-		t.Fatalf("a default icon should become shulker's: %v", got)
+	if got := readInstanceJSON(t, path); got["icon"] != nil {
+		t.Fatalf("a relink should leave an icon reset to default alone: %v", got)
 	}
 }

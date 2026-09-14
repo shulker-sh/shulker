@@ -164,8 +164,7 @@ func (l *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, err
 	if err := os.MkdirAll(res.GameDir, 0o755); err != nil {
 		return res, err
 	}
-	// GDLauncher writes a default icon back as null.
-	if icon, ok := top["icon"]; !ok || string(icon) == "null" {
+	if res.Created {
 		if err := fsutil.Write(filepath.Join(dir, GDLauncherIconFile), GDLauncherIcon); err != nil {
 			return res, err
 		}

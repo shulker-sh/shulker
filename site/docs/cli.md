@@ -556,7 +556,7 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 
 Create a GDLauncher instance that syncs the client build before each launch.
 
-shulker writes the instance's `instance.json` itself: the Minecraft version, the loader, and a pre-launch hook that runs `shulker sync`. GDLauncher downloads the game, the loader and Java the first time you press Play, NeoForge and Forge included. A new instance gets the shulker icon; an icon you pick in GDLauncher is kept when you link again. GDLauncher only reads its instances when it starts, so restart it if it is open.
+shulker writes the instance's `instance.json` itself: the Minecraft version, the loader, and a pre-launch hook that runs `shulker sync`. GDLauncher downloads the game, the loader and Java the first time you press Play, NeoForge and Forge included. A new instance gets the shulker icon; linking again never changes the icon, so one you pick in GDLauncher, or the default, stays. GDLauncher only reads its instances when it starts, so restart it if it is open.
 
 With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named the way GDLauncher names it. Running `link` again keeps the settings you changed in GDLauncher, such as memory and Java arguments. If you moved GDLauncher's runtime path in its settings, shulker follows it.
 
