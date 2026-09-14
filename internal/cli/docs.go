@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,8 +13,6 @@ const (
 	docsExcerptWidth = 100
 	docsExcerptLines = 20
 )
-
-var markdownLink = regexp.MustCompile(`\[((?:[^\[\]]|\[[^\]]*\])*)\]\([^)]*\)`)
 
 type docsPageInfo struct {
 	Name        string `json:"name"`
@@ -213,7 +210,7 @@ func (a *app) emitDocsSearch(pages []*docs.Page, query string, hits []docs.Hit) 
 // excerpt trims a line to about docsExcerptWidth runes around the first match
 // of the phrase, which it bolds.
 func excerpt(t out.Theme, line, phrase string) string {
-	runes := []rune(strings.TrimSpace(markdownLink.ReplaceAllString(line, "$1")))
+	runes := []rune(strings.TrimSpace(docs.PlainLinks(line)))
 	lower := []rune(strings.ToLower(string(runes)))
 	if len(lower) != len(runes) {
 		lower = runes

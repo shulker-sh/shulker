@@ -16,8 +16,10 @@ const siteURL = "https://shulker.sh"
 var pageNames = []string{"getting-started", "concepts", "cli", "manifest", "lock"}
 
 var (
-	headingLine = regexp.MustCompile("^(#{1,6}) +(.+?) *$")
-	blankRuns   = regexp.MustCompile(`\n{3,}`)
+	headingLine  = regexp.MustCompile("^(#{1,6}) +(.+?) *$")
+	blankRuns    = regexp.MustCompile(`\n{3,}`)
+	markdownLink = regexp.MustCompile(`\[((?:[^\[\]]|\[[^\]]*\])*)\]\([^)]*\)`)
+	nonSlug      = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
 type Page struct {
@@ -257,4 +259,84 @@ func CommandFor(pages []*Page, s *Section) string {
 
 func normalize(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
+}
+
+func PlainLinks(markdown string) string {
+	return markdownLink.ReplaceAllString(markdown, "$1")
+}
+
+type CommandHelp struct {
+	Description []string
+	Examples    []string
+	More        bool
+	Anchor      string
+}
+
+// HelpFor reads a command's cli.md section into what --help shows: the
+// paragraphs before its example block and the example lines. More is set when
+// the section goes on past them with anything but a flag table.
+func HelpFor(commandPath string) (CommandHelp, bool) {
+	pages, err := Pages()
+	if err != nil {
+		return CommandHelp{}, false
+	}
+	name := strings.TrimPrefix(commandPath, "shulker ")
+	for _, p := range pages {
+		if p.Name != "cli" {
+			continue
+		}
+		for _, s := range p.Sections {
+			if s.Command != "" && slices.Contains(s.names, name) {
+				return s.help(), true
+			}
+		}
+	}
+	return CommandHelp{}, false
+}
+
+func (s *Section) help() CommandHelp {
+	h := CommandHelp{Anchor: anchor(s.Heading)}
+	lines := strings.Split(strings.TrimSuffix(s.Markdown, "\n"), "\n")[1:]
+	var paragraph []string
+	i := 0
+	for ; i < len(lines) && !isFence(lines[i]); i++ {
+		if line := strings.TrimSpace(lines[i]); line != "" {
+			paragraph = append(paragraph, line)
+		} else if len(paragraph) > 0 {
+			h.Description = append(h.Description, strings.Join(paragraph, " "))
+			paragraph = nil
+		}
+	}
+	if len(paragraph) > 0 {
+		h.Description = append(h.Description, strings.Join(paragraph, " "))
+	}
+	if i < len(lines) {
+		for i++; i < len(lines) && !isFence(lines[i]); i++ {
+			if line := strings.TrimSpace(lines[i]); line != "" {
+				h.Examples = append(h.Examples, line)
+			}
+		}
+		i++
+	}
+	flagTable := false
+	for ; i < len(lines); i++ {
+		switch line := strings.TrimSpace(lines[i]); {
+		case line == "":
+			flagTable = false
+		case strings.HasPrefix(line, "| Flag |"):
+			flagTable = true
+		case !flagTable:
+			h.More = true
+		}
+	}
+	return h
+}
+
+func isFence(line string) bool {
+	return strings.HasPrefix(strings.TrimSpace(line), "```")
+}
+
+// anchor is the id VitePress gives a heading.
+func anchor(heading string) string {
+	return strings.Trim(nonSlug.ReplaceAllString(strings.ToLower(heading), "-"), "-")
 }

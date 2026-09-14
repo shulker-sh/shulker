@@ -79,11 +79,53 @@ func TestHomeTilde(t *testing.T) {
 }
 
 func TestHelpLinksDocs(t *testing.T) {
-	for _, args := range [][]string{{"--help"}, {"add", "--help"}, {"target", "add", "--help"}} {
-		code, stdout, _ := run(t, args...)
-		if code != out.ExitOK || !strings.HasSuffix(stdout, "  Docs "+docsURL+"\n  For agents "+agentsURL+"\n") {
+	for args, url := range map[string]string{
+		"--help":            docsURL,
+		"add --help":        docsURL + "/cli#shulker-add",
+		"target add --help": docsURL + "/cli#shulker-target-add",
+	} {
+		code, stdout, _ := run(t, strings.Fields(args)...)
+		if code != out.ExitOK || !strings.HasSuffix(stdout, "  Docs "+url+"\n  For agents "+agentsURL+"\n") {
 			t.Fatalf("%v: code=%d stdout=%q", args, code, stdout)
 		}
+	}
+}
+
+func TestHelpShowsTheReferenceDescriptionAndExamples(t *testing.T) {
+	_, stdout, _ := run(t, "add", "--help", "--no-color")
+	if !strings.HasPrefix(stdout, "  Add mods to the manifest, resolve them") || !strings.Contains(stdout, "  Examples\n    $ shulker add sodium lithium\n") {
+		t.Fatalf("add help:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "(default: true)") || strings.Contains(stdout, "More:") {
+		t.Fatalf("add help:\n%s", stdout)
+	}
+	_, lock, _ := run(t, "lock", "--help")
+	description, _, _ := strings.Cut(lock, "\n  Usage\n")
+	if !strings.Contains(description, "\n\n") {
+		t.Fatalf("lock help lacks its second paragraph:\n%s", lock)
+	}
+	for _, line := range strings.Split(description, "\n") {
+		if out.Width(line) > helpColumns || strings.Count(line, "`") > 0 {
+			t.Fatalf("lock help line %q", line)
+		}
+	}
+	if _, sync, _ := run(t, "sync", "--help"); !strings.Contains(sync, "  More:\n    $ shulker docs sync\n") {
+		t.Fatalf("sync help:\n%s", sync)
+	}
+	if _, link, _ := run(t, "link", "--help"); strings.HasPrefix(link, "  shulker") || strings.HasPrefix(link, "\n") {
+		t.Fatalf("link help:\n%s", link)
+	}
+}
+
+func TestWrapWordsKeepsCodeSpansPaired(t *testing.T) {
+	lines := wrapWords("run `shulker lock --force now` to fix it", 18)
+	for _, line := range lines {
+		if strings.Count(line, "`")%2 != 0 || out.Width(strings.ReplaceAll(line, "`", "")) > 18 {
+			t.Fatalf("lines %q", lines)
+		}
+	}
+	if strings.Join(lines, " ") != "run `shulker lock` `--force now` to fix it" {
+		t.Fatalf("lines %q", lines)
 	}
 }
 

@@ -1,6 +1,7 @@
 package docs
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -109,6 +110,49 @@ func TestPagesAreCleaned(t *testing.T) {
 	cli := Lookup(pages, []string{"cli"}).Page
 	if !strings.Contains(cli.Markdown, "](https://shulker.sh/docs/cli#shulker-init)") {
 		t.Error("cli anchor links are not absolute")
+	}
+}
+
+func TestHelpFor(t *testing.T) {
+	add, ok := HelpFor("shulker add")
+	if !ok || len(add.Description) != 1 || !strings.HasPrefix(add.Description[0], "Add mods to the manifest") || len(add.Examples) != 3 || add.Examples[0] != "shulker add sodium lithium" || add.More || add.Anchor != "shulker-add" {
+		t.Fatalf("add %+v", add)
+	}
+	if lock, _ := HelpFor("shulker lock"); len(lock.Description) != 2 {
+		t.Errorf("lock description %q", lock.Description)
+	}
+	if sync, _ := HelpFor("shulker sync"); !sync.More {
+		t.Error("sync goes on past its example but More is false")
+	}
+	if off, ok := HelpFor("shulker feature off"); !ok || off.Anchor != "shulker-feature-on-off" {
+		t.Errorf("feature off %v %+v", ok, off)
+	}
+	if _, ok := HelpFor("shulker link"); ok {
+		t.Error("link has no section of its own")
+	}
+}
+
+func TestAnchorsMatchTheSite(t *testing.T) {
+	cli := Lookup(mustPages(t), []string{"cli"}).Page
+	anchors := map[string]bool{}
+	for _, s := range cli.Sections {
+		anchors[anchor(s.Heading)] = true
+	}
+	links := regexp.MustCompile(`/docs/cli#([a-z0-9-]+)\)`).FindAllStringSubmatch(cli.Markdown, -1)
+	if len(links) == 0 {
+		t.Fatal("cli.md links no anchors")
+	}
+	for _, m := range links {
+		if !anchors[m[1]] {
+			t.Errorf("no heading has the anchor %s", m[1])
+		}
+	}
+}
+
+func TestPlainLinks(t *testing.T) {
+	got := PlainLinks("see [`shulker pull [file...]`](https://shulker.sh/docs/cli#shulker-pull) and [gh](https://cli.github.com)")
+	if got != "see `shulker pull [file...]` and gh" {
+		t.Fatalf("PlainLinks = %q", got)
 	}
 }
 

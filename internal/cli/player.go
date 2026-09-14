@@ -18,7 +18,6 @@ func (a *app) playerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "player [name|uuid]... | --all",
 		Short: "Check player names and uuids against Mojang and the lock",
-		Long:  "Reports one state per player: ok, renamed (same uuid, new name), reassigned (same name, different account), or unknown. Pass names or uuids, or --all for every player in the manifest. Renames are recorded in the lock; reassignments wait for `build --accept-player-change`.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if all == (len(args) > 0) {
 				return out.Errorf("usage", "pass player names or uuids, or --all for every player in the manifest")

@@ -1,6 +1,7 @@
 package out
 
 import (
+	"io"
 	"math"
 	"os"
 	"regexp"
@@ -38,6 +39,14 @@ func luminance(rgb [3]float64) float64 {
 		return math.Pow((v+0.055)/1.055, 2.4)
 	}
 	return 0.2126*lin(rgb[0]) + 0.7152*lin(rgb[1]) + 0.0722*lin(rgb[2])
+}
+
+// TerminalWidth is w's column count, or 80 when w isn't a terminal.
+func TerminalWidth(w io.Writer) int {
+	if f, ok := w.(*os.File); ok && isTerminal(w) {
+		return terminalWidth(f)
+	}
+	return 80
 }
 
 func terminalWidth(f *os.File) int {
