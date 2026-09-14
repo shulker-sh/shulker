@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
@@ -57,6 +58,33 @@ func DefaultGDLauncherDir() (string, error) {
 		return string(data), nil
 	}
 	return filepath.Join(appData, "data"), nil
+}
+
+// GDLauncherRunning reports whether GDLauncher is open, and whether that can be told at all. Electron's
+// single-instance lock leaves SingletonLock in GDLauncher's app data folder, a symlink to
+// "<hostname>-<pid>"; Windows gets no such file. The hostname isn't compared, because Chromium and Go
+// can name the same Mac differently.
+func GDLauncherRunning() (running, detectable bool) {
+	if runtime.GOOS == "windows" {
+		return false, false
+	}
+	appData, err := gdlauncherAppData()
+	if err != nil {
+		return false, false
+	}
+	target, err := os.Readlink(filepath.Join(appData, "SingletonLock"))
+	if err != nil {
+		return false, true
+	}
+	i := strings.LastIndex(target, "-")
+	if i < 0 {
+		return false, true
+	}
+	pid, err := strconv.Atoi(target[i+1:])
+	if err != nil {
+		return false, true
+	}
+	return processAlive(pid), true
 }
 
 func gdlauncherAppData() (string, error) {

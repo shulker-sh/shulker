@@ -96,6 +96,10 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			running, detectable := launcher.GDLauncherRunning()
+			if running {
+				a.printer.Warn("GDLauncher is open; it may overwrite this instance's changes. Quit it and run this link again")
+			}
 			exe, err := shulkerPath()
 			if err != nil {
 				return err
@@ -153,7 +157,9 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				if hasFeatures {
 					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
 				}
-				rows = append(rows, out.Row{Text: "quit GDLauncher before linking, then open it"})
+				if !detectable {
+					rows = append(rows, out.Row{Text: "restart GDLauncher if it is open so the instance shows up"})
+				}
 				l.Tree(rows...)
 				if synced != nil {
 					synced.print(l)

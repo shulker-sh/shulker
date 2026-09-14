@@ -71,7 +71,7 @@ func TestLinkGDLauncher(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Friends: SMP")
-	if !strings.Contains(stdout, "updated instance Friends: SMP") || !strings.Contains(stdout, "quit GDLauncher before linking, then open it") {
+	if !strings.Contains(stdout, "updated instance Friends: SMP") || strings.Contains(stdout, "quit GDLauncher") {
 		t.Fatalf("relink output:\n%s", stdout)
 	}
 	again := readGDLInstance(t, instDir)
@@ -110,7 +110,7 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatalf("missing launcher dir: exit %d %s", code, stdout)
 	}
 
-	if stdout := h.mustRun(t, "unlink", "gdlauncher"); !strings.Contains(stdout, "Quit GDLauncher before unlinking, then open it") {
+	if stdout := h.mustRun(t, "unlink", "gdlauncher"); !strings.Contains(stdout, "removed its pre-launch sync") || strings.Contains(stdout, "Quit GDLauncher") {
 		t.Fatalf("unlink output:\n%s", stdout)
 	}
 	after := readGDLInstance(t, instDir)
