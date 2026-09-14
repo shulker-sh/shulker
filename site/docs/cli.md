@@ -556,7 +556,7 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 
 Create a GDLauncher instance that syncs the client build before each launch.
 
-shulker writes the instance's `instance.json` itself: the Minecraft version, the loader, and a pre-launch hook that runs `shulker sync`. GDLauncher downloads the game, the loader and Java the first time you press Play, NeoForge and Forge included. A new instance gets the shulker icon; linking again never changes the icon, so one you pick in GDLauncher, or the default, stays. GDLauncher only reads its instances when it starts, and while open it writes its own copy back over them when you change settings or play, so quit it before linking and open it afterwards.
+shulker writes the instance's `instance.json` itself: the Minecraft version, the loader, and a pre-launch hook that runs `shulker sync`. GDLauncher downloads the game, the loader and Java the first time you press Play, NeoForge and Forge included. It can only install loader versions on its own list, which trails new releases by a few days. When the locked loader version isn't on that list yet, the instance uses the newest one GDLauncher has and `link` warns you; run `link` again once GDLauncher adds it, or pass `--force` to use the locked version anyway. A new instance gets the shulker icon; linking again never changes the icon, so one you pick in GDLauncher, or the default, stays. GDLauncher only reads its instances when it starts, and while open it writes its own copy back over them when you change settings or play, so quit it before linking and open it afterwards.
 
 With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named the way GDLauncher names it. Running `link` again keeps the settings you changed in GDLauncher, such as memory and Java arguments. If you moved GDLauncher's runtime path in its settings, shulker follows it.
 
@@ -578,7 +578,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--target <name>` | Client target to link (default: the only client target) |
 | `--name <name>` | Instance name (default: the target's display name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Link over an instance that syncs from a different source or that shulker didn't link |
+| `--force` | Link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 

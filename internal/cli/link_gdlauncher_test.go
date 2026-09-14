@@ -22,11 +22,15 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	var env struct {
-		Data prismReport `json:"data"`
+		Data     prismReport `json:"data"`
+		Warnings []string    `json:"warnings"`
 	}
 	stdout := h.mustRun(t, "link", "gdlauncher", "--launcher-dir", unresolved, "--name", "Friends: SMP", "--json")
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
+	}
+	if len(env.Warnings) != 0 {
+		t.Fatalf("GDLauncher lists the locked Fabric loader: %q", env.Warnings)
 	}
 	instDir := filepath.Join(launcherDir, "instances", "Friends_ SMP")
 	gameDir := filepath.Join(instDir, "instance")
@@ -120,13 +124,24 @@ func TestLinkGDLauncherNeoForge(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
 
 	launcherDir := t.TempDir()
-	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Neo")
+	instDir := filepath.Join(launcherDir, "instances", "Neo")
+	warnings := gdlWarnings(t, h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Neo", "--json"))
 	if len(h.installs) != 0 {
 		t.Fatalf("GDLauncher runs the NeoForge installer itself: %v", h.installs)
 	}
-	version := readGDLInstance(t, filepath.Join(launcherDir, "instances", "Neo"))["game_configuration"].(map[string]any)["version"].(map[string]any)
-	if lv := version["modloaders"].([]any)[0].(map[string]any); version["release"] != "26.2" || lv["type"] != "Neoforge" || lv["version"] != "26.2.0.87" {
-		t.Fatalf("version: %v", version)
+	if release, lv := gdlLoader(t, instDir); release != "26.2" || lv["type"] != "Neoforge" || lv["version"] != "26.2.0.82" {
+		t.Fatalf("a loader GDLauncher can't install yet should give way to the newest it has: %s %v", release, lv)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "GDLauncher can't install neoforge 26.2.0.87 yet, so the instance uses 26.2.0.82") {
+		t.Fatalf("warnings: %q", warnings)
+	}
+
+	warnings = gdlWarnings(t, h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Neo", "--force", "--json"))
+	if _, lv := gdlLoader(t, instDir); lv["version"] != "26.2.0.87" {
+		t.Fatalf("--force should keep the locked loader: %v", lv)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "without --force it would use 26.2.0.82") {
+		t.Fatalf("warnings: %q", warnings)
 	}
 	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Neo")
 
@@ -140,6 +155,42 @@ func TestLinkGDLauncherNeoForge(t *testing.T) {
 		t.Fatalf("linking over the player's own instance: exit %d %s", code, stdout)
 	}
 	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--force")
+}
+
+func TestLinkGDLauncherForge(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "forge")
+
+	launcherDir := t.TempDir()
+	warnings := gdlWarnings(t, h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Forge", "--json"))
+	if release, lv := gdlLoader(t, filepath.Join(launcherDir, "instances", "Forge")); release != "26.2" || lv["type"] != "Forge" || lv["version"] != "26.2-65.1.3" {
+		t.Fatalf("GDLauncher's meta names Forge builds <game>-<build>: %s %v", release, lv)
+	}
+	if len(warnings) != 0 || len(h.installs) != 0 {
+		t.Fatalf("warnings %q, installs %v", warnings, h.installs)
+	}
+}
+
+func gdlWarnings(t *testing.T, stdout string) []string {
+	t.Helper()
+	var env struct {
+		Warnings []string `json:"warnings"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	return env.Warnings
+}
+
+func gdlLoader(t *testing.T, instDir string) (release string, loader map[string]any) {
+	t.Helper()
+	version := readGDLInstance(t, instDir)["game_configuration"].(map[string]any)["version"].(map[string]any)
+	loaders := version["modloaders"].([]any)
+	if len(loaders) != 1 {
+		t.Fatalf("modloaders: %v", loaders)
+	}
+	release, _ = version["release"].(string)
+	return release, loaders[0].(map[string]any)
 }
 
 func readGDLInstance(t *testing.T, instDir string) map[string]any {

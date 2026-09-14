@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -10,7 +12,9 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/mavenver"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 func (a *app) linkGDLauncherCmd() *cobra.Command {
@@ -88,6 +92,10 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 					return out.Errorf("instance-exists", "GDLauncher already has an instance %q that shulker didn't link; pass --name to create a second instance, or --force to link this one", display)
 				}
 			}
+			loaderVersion, err := a.gdlauncherLoaderVersion(cmd.Context(), p, force)
+			if err != nil {
+				return err
+			}
 			exe, err := shulkerPath()
 			if err != nil {
 				return err
@@ -101,7 +109,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				Name:          display,
 				Minecraft:     p.Lock.Minecraft,
 				LoaderType:    p.Lock.Loader.Type,
-				LoaderVersion: p.Lock.Loader.Version,
+				LoaderVersion: loaderVersion,
 				PreLaunch:     preLaunch,
 			})
 			if err != nil {
@@ -157,7 +165,40 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the target's display name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "link over an instance that syncs from a different source or that shulker didn't link")
+	cmd.Flags().BoolVar(&force, "force", false, "link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet")
 	ff.register(cmd, "for this instance")
 	return cmd
+}
+
+// gdlauncherLoaderVersion is the loader version the instance asks GDLauncher for. GDLauncher installs
+// loaders only from its own meta, which lags behind new releases, so a locked version it doesn't list
+// yet gives way to the newest one it has, unless force.
+func (a *app) gdlauncherLoaderVersion(ctx context.Context, p *project.Project, force bool) (string, error) {
+	locked := p.Lock.Loader
+	want := launcher.GDLauncherLoaderVersion(p.Lock.Minecraft, locked.Type, locked.Version)
+	d, err := a.deps()
+	if err != nil {
+		return "", err
+	}
+	a.progress("checking which %s versions GDLauncher can install", locked.Type)
+	listed, err := d.gdlauncher.LoaderVersions(ctx, locked.Type, p.Lock.Minecraft)
+	switch {
+	case err != nil:
+		a.printer.Warn("couldn't check whether GDLauncher can install %s %s (%v); the instance asks for it anyway", locked.Type, want, err)
+		return want, nil
+	case slices.Contains(listed, want):
+		return want, nil
+	case len(listed) == 0:
+		a.printer.Warn("GDLauncher can't install %s for Minecraft %s yet, so the instance won't start until it can", locked.Type, p.Lock.Minecraft)
+		return want, nil
+	}
+	newest := slices.MaxFunc(listed, func(x, y string) int {
+		return mavenver.Compare(mavenver.Parse(x), mavenver.Parse(y))
+	})
+	if force {
+		a.printer.Warn("GDLauncher can't install %s %s yet, so the instance won't start until it can; without --force it would use %s", locked.Type, want, newest)
+		return want, nil
+	}
+	a.printer.Warn("GDLauncher can't install %s %s yet, so the instance uses %s, the newest it has; run this link again once GDLauncher adds %s, or pass --force to use it anyway", locked.Type, want, newest, want)
+	return newest, nil
 }

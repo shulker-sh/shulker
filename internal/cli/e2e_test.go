@@ -341,6 +341,28 @@ func newHarness(t *testing.T) *harness {
 		}
 		writeJSON(w, profiles)
 	})
+	mux.HandleFunc("/gdl/", func(w http.ResponseWriter, r *http.Request) {
+		listed := map[string]map[string][]string{
+			"fabric":   {"${gdlauncher.gameVersion}": {"0.17.3"}},
+			"quilt":    {"${gdlauncher.gameVersion}": {"0.30.1"}, "26.2": {}},
+			"neoforge": {"26.2": {"26.2.0.81", "26.2.0.82"}},
+			"forge":    {"26.2": {"26.2-65.1.3"}},
+		}
+		loader, rest, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/gdl/"), "/")
+		if rest != "v2/manifest.json" || listed[loader] == nil {
+			http.NotFound(w, r)
+			return
+		}
+		var games []map[string]any
+		for game, ids := range listed[loader] {
+			loaders := []map[string]string{}
+			for _, id := range ids {
+				loaders = append(loaders, map[string]string{"id": id})
+			}
+			games = append(games, map[string]any{"id": game, "loaders": loaders})
+		}
+		writeJSON(w, map[string]any{"gameVersions": games})
+	})
 	mux.HandleFunc("/session/session/minecraft/profile/", func(w http.ResponseWriter, r *http.Request) {
 		h.mojangHits++
 		want := strings.TrimPrefix(r.URL.Path, "/session/session/minecraft/profile/")
@@ -444,12 +466,13 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	}
 	c := &cache.Cache{Dir: h.cache}
 	a.d = &deps{
-		fetch:     f,
-		cache:     c,
-		providers: providers,
-		meta:      &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt, NeoForge: neoforge, Forge: forge, Cache: c},
-		runtimes:  runtimes,
-		players:   players,
+		fetch:      f,
+		cache:      c,
+		providers:  providers,
+		meta:       &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt, NeoForge: neoforge, Forge: forge, Cache: c},
+		runtimes:   runtimes,
+		players:    players,
+		gdlauncher: &meta.GDLauncher{Client: f, BaseURL: h.server.URL + "/gdl"},
 	}
 	ctx := h.ctx
 	if ctx == nil {

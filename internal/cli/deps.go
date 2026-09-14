@@ -22,12 +22,13 @@ import (
 )
 
 type deps struct {
-	fetch     *fetch.Client
-	cache     *cache.Cache
-	providers map[string]provider.Provider
-	meta      *resolve.Meta
-	runtimes  *meta.Runtimes
-	players   *player.Client
+	fetch      *fetch.Client
+	cache      *cache.Cache
+	providers  map[string]provider.Provider
+	meta       *resolve.Meta
+	runtimes   *meta.Runtimes
+	players    *player.Client
+	gdlauncher *meta.GDLauncher
 }
 
 func (a *app) deps() (*deps, error) {
@@ -53,12 +54,13 @@ func (a *app) deps() (*deps, error) {
 		providers["curseforge"] = curseforge.NewShared(f, key, c.Dir)
 	}
 	a.d = &deps{
-		fetch:     f,
-		cache:     c,
-		providers: providers,
-		meta:      &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f), Quilt: meta.NewQuilt(f), NeoForge: meta.NewNeoForge(f), Forge: meta.NewForge(f), Cache: c},
-		runtimes:  meta.NewRuntimes(f),
-		players:   player.New(f),
+		fetch:      f,
+		cache:      c,
+		providers:  providers,
+		meta:       &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f), Quilt: meta.NewQuilt(f), NeoForge: meta.NewNeoForge(f), Forge: meta.NewForge(f), Cache: c},
+		runtimes:   meta.NewRuntimes(f),
+		players:    player.New(f),
+		gdlauncher: meta.NewGDLauncher(f),
 	}
 	return a.d, nil
 }

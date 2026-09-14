@@ -29,9 +29,10 @@ type GDLauncher struct {
 }
 
 type GDLauncherInstance struct {
-	Name          string
-	Minecraft     string
-	LoaderType    string
+	Name       string
+	Minecraft  string
+	LoaderType string
+	// LoaderVersion is named the way GDLauncher's meta names it; see GDLauncherLoaderVersion.
 	LoaderVersion string
 	PreLaunch     string
 }
@@ -157,7 +158,7 @@ func (l *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, err
 	}
 	modloaders := []map[string]string{}
 	if loaderType, ok := gdlauncherLoaderTypes[inst.LoaderType]; ok {
-		modloaders = append(modloaders, map[string]string{"type": loaderType, "version": GDLauncherLoaderVersion(inst.Minecraft, inst.LoaderType, inst.LoaderVersion)})
+		modloaders = append(modloaders, map[string]string{"type": loaderType, "version": inst.LoaderVersion})
 	}
 	if config["version"], err = json.Marshal(map[string]any{"release": inst.Minecraft, "modloaders": modloaders}); err != nil {
 		return res, err

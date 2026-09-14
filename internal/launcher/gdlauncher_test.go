@@ -122,15 +122,12 @@ func TestGDLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	}
 }
 
-func TestGDLauncherForgeVersion(t *testing.T) {
-	l := &GDLauncher{Dir: t.TempDir()}
-	res, err := l.WriteInstance(GDLauncherInstance{Name: "Forge", Minecraft: "26.2", LoaderType: "forge", LoaderVersion: "65.1.3"})
-	if err != nil {
-		t.Fatal(err)
+func TestGDLauncherLoaderVersion(t *testing.T) {
+	if got := GDLauncherLoaderVersion("26.2", "forge", "65.1.3"); got != "26.2-65.1.3" {
+		t.Errorf("GDLauncher's meta names Forge builds <game>-<build>: %s", got)
 	}
-	version := readInstanceJSON(t, filepath.Join(res.Dir, GDLauncherInstanceFile))["game_configuration"].(map[string]any)["version"].(map[string]any)
-	if lv := version["modloaders"].([]any)[0].(map[string]any); lv["type"] != "Forge" || lv["version"] != "26.2-65.1.3" {
-		t.Fatalf("GDLauncher's meta names Forge builds <game>-<build>: %v", version)
+	if got := GDLauncherLoaderVersion("26.2", "neoforge", "26.2.0.87"); got != "26.2.0.87" {
+		t.Errorf("neoforge: %s", got)
 	}
 }
 
