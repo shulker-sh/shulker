@@ -46,6 +46,8 @@ type Error struct {
 	// Rows are the human-only tree rows under the error line. Without them the
 	// items show, and without those the message's remaining lines.
 	Rows []Detail `json:"-"`
+	// Usage prints under a human error that suggests nothing else to run.
+	Usage func(l *Lines) `json:"-"`
 }
 
 // Detail is one row under an error line; Children nest one level beneath it.
@@ -150,14 +152,19 @@ func (p *Printer) Fail(err error) int {
 		_ = p.encode(p.envelope(false, e.Data, e))
 		return e.Exit
 	}
+	picked := false
 	if e.Nudge.Command == "" {
 		if _, picks := e.picks(); len(picks) > 0 {
+			picked = true
 			if command, ok := exampleCommand(p.Args, e, picks[0].Pass); ok {
 				e.Nudge = Nudge{Lead: "For example", Command: command}
 			}
 		}
 	}
 	p.Err().Error(e)
+	if e.Usage != nil && !picked && e.Nudge.Command == "" {
+		e.Usage(p.Err())
+	}
 	return e.Exit
 }
 

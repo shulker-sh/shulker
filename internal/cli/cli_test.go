@@ -117,6 +117,22 @@ func TestHelpShowsTheReferenceDescriptionAndExamples(t *testing.T) {
 	}
 }
 
+func TestUsageErrorsShowUsageAndFlags(t *testing.T) {
+	_, _, stderr := run(t, "add")
+	if !strings.Contains(stderr, "(usage)\n\n  Usage\n    $ shulker add <mod>... [flags]\n\n  Flags\n") {
+		t.Fatalf("stderr:\n%s", stderr)
+	}
+	if strings.Contains(stderr, "Global flags") || strings.Contains(stderr, "Examples") || strings.HasSuffix(stderr, "\n\n") {
+		t.Fatalf("stderr:\n%s", stderr)
+	}
+	if _, _, stderr := run(t, "player"); !strings.Contains(stderr, "$ shulker player") || !strings.Contains(stderr, "--all") {
+		t.Fatalf("player stderr:\n%s", stderr)
+	}
+	if _, stdout, stderr := run(t, "add", "--json"); stderr != "" || strings.Contains(stdout, "Usage") {
+		t.Fatalf("add --json stdout %q stderr %q", stdout, stderr)
+	}
+}
+
 func TestWrapWordsKeepsCodeSpansPaired(t *testing.T) {
 	lines := wrapWords("run `shulker lock --force now` to fix it", 18)
 	for _, line := range lines {
@@ -155,7 +171,7 @@ func TestAddRejectsBadFlagValues(t *testing.T) {
 
 func TestHumanErrorNamesCode(t *testing.T) {
 	_, _, stderr := run(t, "add", "sodium", "--side", "top")
-	if stderr != "  ✘ error: --side takes one of client, server, both, not \"top\" (usage)\n" {
+	if !strings.HasPrefix(stderr, "  ✘ error: --side takes one of client, server, both, not \"top\" (usage)\n\n  Usage\n") {
 		t.Fatalf("stderr = %q", stderr)
 	}
 }
@@ -186,10 +202,13 @@ func TestUnknownCommandPicks(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Error == nil || env.Error.Code != "usage" || env.Error.Message != `unknown command "mod" for "shulker"` || !slices.Contains(env.Error.Candidates, "add") {
+	if env.Error == nil || env.Error.Code != "usage" || env.Error.Message != `unknown command "mod"` || !slices.Contains(env.Error.Candidates, "add") {
 		t.Fatalf("unexpected envelope %+v", env)
 	}
 	_, _, stderr := run(t, "mod", "add")
+	if strings.Contains(stderr, "Usage") {
+		t.Fatalf("an unknown command with picks printed usage:\n%s", stderr)
+	}
 	for _, want := range []string{"did you mean:", "\u2023 add", "For example:", "$ shulker add\n"} {
 		if !strings.Contains(stderr, want) {
 			t.Fatalf("stderr lacks %q:\n%s", want, stderr)

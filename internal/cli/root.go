@@ -66,9 +66,12 @@ func (a *app) run(ctx context.Context, args []string) int {
 	root.SetArgs(args)
 	root.SetOut(a.printer.Stdout)
 	root.SetErr(a.printer.Stderr)
-	if err := root.ExecuteContext(ctx); err != nil {
+	if cmd, err := root.ExecuteContextC(ctx); err != nil {
 		if !a.running && out.CodeOf(err) == "" {
 			err = usageError(root, err)
+		}
+		if out.CodeOf(err) == "usage" && cmd != nil {
+			out.AsError(err).Usage = func(l *out.Lines) { helpUsage(l, cmd) }
 		}
 		if ctx.Err() != nil {
 			err = &out.Error{Code: "interrupted", Message: "interrupted", Exit: out.ExitInterrupted, Data: out.AsError(err).Data}
@@ -137,6 +140,9 @@ func usageError(root *cobra.Command, err error) error {
 			return e
 		}
 		parent = found
+	}
+	if parent == root {
+		e.Message = `unknown command "` + m[1] + `"`
 	}
 	for _, c := range parent.Commands() {
 		if c.IsAvailableCommand() {

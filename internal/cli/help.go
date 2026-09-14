@@ -71,12 +71,7 @@ func (a *app) help(cmd *cobra.Command) {
 		}
 	}
 	l.Blank()
-	l.Heading("Usage")
-	usage := cmd.UseLine()
-	if cmd.HasAvailableSubCommands() {
-		usage = cmd.CommandPath() + " <command> [flags]"
-	}
-	l.Text(helpIndent + t.Grey("$") + " " + t.Command(usage))
+	helpUsageLine(l, cmd)
 	l.Blank()
 	if !cmd.HasParent() {
 		helpRoot(l, cmd)
@@ -208,8 +203,35 @@ type helpFlag struct {
 	width              int
 }
 
-func helpFlags(l *out.Lines, title string, flags *pflag.FlagSet) {
+// helpUsage is what a usage error prints under itself: the usage line and the
+// command's own flags, with no trailing blank line.
+func helpUsage(l *out.Lines, cmd *cobra.Command) {
+	l.Blank()
+	helpUsageLine(l, cmd)
+	if rows := flagRows(l.T, cmd.NonInheritedFlags()); cmd.HasParent() && len(rows) > 0 {
+		l.Blank()
+		printFlagRows(l, "Flags", rows)
+	}
+}
+
+func helpUsageLine(l *out.Lines, cmd *cobra.Command) {
 	t := l.T
+	l.Heading("Usage")
+	usage := cmd.UseLine()
+	if cmd.HasAvailableSubCommands() {
+		usage = cmd.CommandPath() + " <command> [flags]"
+	}
+	l.Text(helpIndent + t.Grey("$") + " " + t.Command(usage))
+}
+
+func helpFlags(l *out.Lines, title string, flags *pflag.FlagSet) {
+	if rows := flagRows(l.T, flags); len(rows) > 0 {
+		printFlagRows(l, title, rows)
+		l.Blank()
+	}
+}
+
+func flagRows(t out.Theme, flags *pflag.FlagSet) []helpFlag {
 	var rows []helpFlag
 	flags.VisitAll(func(f *pflag.Flag) {
 		if f.Name == "help" || f.Hidden {
@@ -233,9 +255,10 @@ func helpFlags(l *out.Lines, title string, flags *pflag.FlagSet) {
 		}
 		rows = append(rows, row)
 	})
-	if len(rows) == 0 {
-		return
-	}
+	return rows
+}
+
+func printFlagRows(l *out.Lines, title string, rows []helpFlag) {
 	width := 0
 	for _, r := range rows {
 		width = max(width, r.width)
@@ -244,5 +267,4 @@ func helpFlags(l *out.Lines, title string, flags *pflag.FlagSet) {
 	for _, r := range rows {
 		l.Text(helpIndent + r.head + strings.Repeat(" ", width-r.width+2) + r.usage + r.aside)
 	}
-	l.Blank()
 }
