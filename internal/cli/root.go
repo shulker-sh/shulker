@@ -118,9 +118,36 @@ func (a *app) root() *cobra.Command {
 	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ »")
 	a.printer.JSON, a.dir, a.style.NoColor, a.style.ASCII = jsonOut, dir, noColor, ascii
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.ignoreCmd(), a.unignoreCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.linksCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.packCmd(), a.targetCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd(), a.docsCmd())
+	groupCommands(root)
 	a.installHelp(root)
 	a.markRunning(root)
 	return root
+}
+
+// groupCommands gives every command that only groups others an action: its
+// help when called alone, otherwise the unknown subcommand as a usage error
+// with picks, the way the root reports one. Cobra would print the help and exit
+// 0 for both. The group takes any arguments so the action sees the typo.
+func groupCommands(c *cobra.Command) {
+	for _, sub := range c.Commands() {
+		if sub.HasSubCommands() && sub.Run == nil && sub.RunE == nil {
+			sub.Args = nil
+			sub.RunE = func(cmd *cobra.Command, args []string) error {
+				if len(args) == 0 {
+					return cmd.Help()
+				}
+				e := out.Errorf("usage", "unknown command %q for %q", args[0], cmd.CommandPath())
+				for _, s := range cmd.Commands() {
+					if s.IsAvailableCommand() {
+						e.Candidates = append(e.Candidates, s.Name())
+					}
+				}
+				e.Given = args[0]
+				return e
+			}
+		}
+		groupCommands(sub)
+	}
 }
 
 var unknownCommand = regexp.MustCompile(`^unknown command "([^"]+)" for "([^"]+)"`)

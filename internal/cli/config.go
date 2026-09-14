@@ -25,7 +25,6 @@ func (a *app) configCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
 		Short: "Read and change shulker's own config.json",
-		Args:  noArgs,
 	}
 	cmd.AddCommand(a.configGetCmd(), a.configSetCmd(), a.configUnsetCmd())
 	return cmd

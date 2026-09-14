@@ -117,6 +117,26 @@ func TestHelpShowsTheReferenceDescriptionAndExamples(t *testing.T) {
 	}
 }
 
+func TestGroupCommandsReportUnknownSubcommands(t *testing.T) {
+	for _, args := range [][]string{{"target", "lst"}, {"self", "updte"}, {"config", "st", "key"}} {
+		code, stdout, _ := run(t, append([]string{"--json"}, args...)...)
+		e := failureCode(t, stdout)
+		want := `unknown command "` + args[1] + `" for "shulker ` + args[0] + `"`
+		if code != out.ExitUsage || e.Code != "usage" || e.Message != want || len(e.Candidates) == 0 {
+			t.Errorf("%v: exit %d, %+v", args, code, e)
+		}
+	}
+	_, _, stderr := run(t, "target", "lst")
+	for _, want := range []string{"did you mean:", "\u2023 list", "$ shulker target list\n"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("stderr lacks %q:\n%s", want, stderr)
+		}
+	}
+	if code, stdout, _ := run(t, "target"); code != out.ExitOK || !strings.Contains(stdout, "  Commands\n") {
+		t.Fatalf("target alone: exit %d\n%s", code, stdout)
+	}
+}
+
 func TestUsageErrorsShowUsageAndFlags(t *testing.T) {
 	_, _, stderr := run(t, "add")
 	if !strings.Contains(stderr, "\n\n  Usage\n    $ shulker add <mod>... [flags]\n\n  Flags\n") {

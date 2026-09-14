@@ -26,7 +26,6 @@ func (a *app) selfCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "self",
 		Short: "Manage the shulker binary itself",
-		Args:  noArgs,
 	}
 	cmd.AddCommand(a.selfUpdateCmd())
 	return cmd
