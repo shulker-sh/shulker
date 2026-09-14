@@ -182,6 +182,9 @@ func (l *Lines) Info(text string) {
 // Muted is a whole line in grey, for progress notes that carry no result.
 func (l *Lines) Muted(text string) { l.line(l.T.Grey(text)) }
 
+// Plain is a line in the gutter exactly as given, with no backtick markup.
+func (l *Lines) Plain(text string) { l.line(text) }
+
 // Done is a finished step: the ok glyph and the text, all grey, so the result line stays the only green one.
 func (l *Lines) Done(text string) { l.line(l.T.Grey(l.T.GlyphOK() + " " + text)) }
 

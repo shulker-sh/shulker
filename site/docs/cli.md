@@ -46,6 +46,7 @@ outline: [2, 3]
 | [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
+| [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
 | [`shulker version`](#shulker-version) | Print the shulker version |
 | [`shulker self update`](#shulker-self-update) | Update shulker to the latest release |
 
@@ -760,6 +761,21 @@ shulker player --all
 
 ## Other
 
+### `shulker docs`
+
+Print the documentation built into this shulker, so it always matches the installed version and works offline. With no arguments it lists the pages. A page name prints that page, a command prints its section (`shulker docs add`), and any other heading prints its section (`shulker docs sides`). A page name followed by more words looks only inside that page (`shulker docs manifest pack`). When several sections match, it lists the command that prints each one; when none does, it searches every page for the words. Pages and sections print as markdown, which `--json` returns in `markdown`.
+
+```sh
+shulker docs
+shulker docs add
+shulker docs manifest pack
+shulker docs --search build directory
+```
+
+| Flag | Description |
+| --- | --- |
+| `-s, --search` | Search every page for the words instead of looking up a page or heading |
+
 ### `shulker version`
 
 Print the shulker version.
@@ -949,6 +965,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
 | `target-exists` | The target is already in `shulker.json` |
 | `target-not-found` | No such target. `candidates`: the targets |
+| `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | An override uses a variable that isn't set |
 | `unsupported-loader` | shulker doesn't support the loader yet |

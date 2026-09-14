@@ -24,7 +24,7 @@ var helpGroups = []struct {
 	{"builds", "Targets and builds", []string{"target", "install", "build", "diff", "pull", "feature"}},
 	{"launchers", "Launchers", []string{"link", "links", "sync", "unlink"}},
 	{"servers", "Packs and servers", []string{"pack", "serve", "player"}},
-	{"shulker", "Shulker", []string{"config", "self", "version", "completion"}},
+	{"shulker", "Shulker", []string{"docs", "config", "self", "version", "completion"}},
 }
 
 // installHelp files the root's commands into groups and renders every --help
