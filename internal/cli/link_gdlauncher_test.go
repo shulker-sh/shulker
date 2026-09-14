@@ -110,7 +110,7 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatalf("missing launcher dir: exit %d %s", code, stdout)
 	}
 
-	if stdout := h.mustRun(t, "unlink", "gdlauncher"); !strings.Contains(stdout, "removed its pre-launch sync") || strings.Contains(stdout, "Quit GDLauncher") {
+	if stdout := h.mustRun(t, "unlink", "gdlauncher"); !strings.Contains(stdout, "removed its pre-launch sync") || strings.Contains(stdout, "Quit GDLauncher") || strings.Contains(stdout, "--force") {
 		t.Fatalf("unlink output:\n%s", stdout)
 	}
 	after := readGDLInstance(t, instDir)
@@ -155,6 +155,14 @@ func TestLinkGDLauncherNeoForge(t *testing.T) {
 		t.Fatalf("linking over the player's own instance: exit %d %s", code, stdout)
 	}
 	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--force")
+
+	if r := unlinkJSON(t, h, "Neo"); len(r) != 1 || !strings.HasSuffix(r[0].Relink, " --force") {
+		t.Fatalf("an instance that never synced needs --force to link again: %+v", r)
+	}
+	code, stdout, _ = h.run(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Neo", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "instance-exists" {
+		t.Fatalf("relinking without --force: exit %d %s", code, stdout)
+	}
 }
 
 func TestLinkGDLauncherForge(t *testing.T) {

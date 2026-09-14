@@ -145,6 +145,10 @@ func TestLinkATLauncherNeoForge(t *testing.T) {
 		t.Fatalf("linking over the player's own instance: exit %d %s", code, stdout)
 	}
 	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--force")
+
+	if r := unlinkJSON(t, h, "Neo"); len(r) != 1 || !strings.HasSuffix(r[0].Relink, " --force") {
+		t.Fatalf("an instance that never synced needs --force to link again: %+v", r)
+	}
 }
 
 func readATLInstance(t *testing.T, instDir string) map[string]any {
