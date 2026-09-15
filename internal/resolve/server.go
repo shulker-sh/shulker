@@ -22,22 +22,7 @@ type ServerJarResult struct {
 }
 
 func (r *Resolver) EnsureServerJar(ctx context.Context, mt *Meta) (ServerJarResult, error) {
-	l, err := loader.Require(r.Lock.Loader.Type)
-	if err != nil {
-		return ServerJarResult{}, err
-	}
-	var res ServerJarResult
-	switch {
-	case l.Name == "quilt":
-		res, err = r.ensureQuiltServer(ctx, mt)
-	case l.InstallServerFlag == "":
-		res, err = r.ensureFabricServer(ctx, mt.Fabric)
-	default:
-		var url string
-		if url, err = mt.InstallerURL(r.Lock); err == nil {
-			res, err = r.ensureInstallerServer(ctx, mt, url)
-		}
-	}
+	res, err := r.ensureLoaderServer(ctx, mt)
 	if err != nil {
 		return res, err
 	}
@@ -45,6 +30,27 @@ func (r *Resolver) EnsureServerJar(ctx context.Context, mt *Meta) (ServerJarResu
 	res.Locked = res.Locked || vanilla.Locked
 	res.Fetched = res.Fetched || vanilla.Fetched
 	return res, err
+}
+
+func (r *Resolver) ensureLoaderServer(ctx context.Context, mt *Meta) (ServerJarResult, error) {
+	if r.Lock.Loader.Type == "" {
+		return ServerJarResult{}, nil
+	}
+	l, err := loader.Require(r.Lock.Loader.Type)
+	if err != nil {
+		return ServerJarResult{}, err
+	}
+	switch {
+	case l.Name == "quilt":
+		return r.ensureQuiltServer(ctx, mt)
+	case l.InstallServerFlag == "":
+		return r.ensureFabricServer(ctx, mt.Fabric)
+	}
+	url, err := mt.InstallerURL(r.Lock)
+	if err != nil {
+		return ServerJarResult{}, err
+	}
+	return r.ensureInstallerServer(ctx, mt, url)
 }
 
 func (r *Resolver) ensureVanillaServer(ctx context.Context, piston *meta.Piston) (ServerJarResult, error) {

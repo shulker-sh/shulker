@@ -47,7 +47,7 @@ func modsDir(t *testing.T, h *harness) []string {
 
 func TestFeatureConditionsFilterModsAndDependencies(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
@@ -82,7 +82,7 @@ func TestFeatureConditionsFilterModsAndDependencies(t *testing.T) {
 
 func TestOSConditionsUseTheBuildMachine(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	here := build.DetectOS()
 	other := "windows"
@@ -106,7 +106,7 @@ func TestOSConditionsUseTheBuildMachine(t *testing.T) {
 
 func TestGatedDependencyStillShipsWhenRequired(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium", "fabric-api")
 
 	setMod(t, h, "fabric-api", map[string]any{"feature": "api"})
@@ -121,7 +121,7 @@ func TestGatedDependencyStillShipsWhenRequired(t *testing.T) {
 
 func TestExportMrpackLeavesOutOSGatedMods(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.allowMrpackHost(t)
 	setMod(t, h, "sodium", map[string]any{"os": "macos"})
@@ -174,7 +174,7 @@ func markerDescription(t *testing.T, h *harness) string {
 
 func TestMarkerDescribesTheVariation(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["description"] = "Fast <3 and <b>plain</b>."
@@ -225,7 +225,7 @@ func TestLockShowsWhereGatedModsLand(t *testing.T) {
 	}
 
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy", "os": other})
 	stdout := h.mustRun(t, "lock")
 	if !strings.Contains(stdout, "» no targets (") || !strings.Contains(stdout, "os: "+other+", feature: fancy, off in every target)") {
@@ -236,7 +236,7 @@ func TestLockShowsWhereGatedModsLand(t *testing.T) {
 	}
 
 	h = newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	setFeatures(t, h, []string{"fancy"})
 	setMod(t, h, "sodium", map[string]any{"feature": []string{"fancy", "!lowend"}})
 	stdout = h.mustRun(t, "lock")

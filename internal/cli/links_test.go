@@ -25,7 +25,7 @@ func readLinks(t *testing.T, h *harness) []config.Link {
 
 func TestSyncIntoRegisters(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	h.mustRun(t, "sync", h.dir)
@@ -63,7 +63,7 @@ func TestSyncIntoRegisters(t *testing.T) {
 
 func TestLinkRegisters(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	prismDir := t.TempDir()
@@ -102,7 +102,7 @@ func TestLinksList(t *testing.T) {
 	if stdout := h.mustRun(t, "links"); !strings.Contains(stdout, "Nothing is linked yet") {
 		t.Fatalf("empty registry: %s", stdout)
 	}
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	prismDir := t.TempDir()
@@ -157,7 +157,7 @@ func TestLinksList(t *testing.T) {
 
 func TestSyncInstance(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
@@ -244,7 +244,7 @@ func TestSyncInstance(t *testing.T) {
 
 func TestSyncInstanceLinkedBySymlink(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "build")
 	h.mustRun(t, "link", "prism", "--launcher-dir", t.TempDir(), "--mode", "symlink")
@@ -259,7 +259,7 @@ func TestSyncInstanceLinkedBySymlink(t *testing.T) {
 
 func TestFeatureInstance(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	prismDir := t.TempDir()
@@ -292,7 +292,7 @@ func TestFeatureInstance(t *testing.T) {
 
 func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	blocker := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
@@ -307,7 +307,7 @@ func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 
 func TestSyncDetectsAPrismInstance(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	prismDir := t.TempDir()

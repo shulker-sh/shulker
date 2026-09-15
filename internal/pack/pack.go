@@ -281,7 +281,10 @@ func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
 		return out.Errorf("pack-mismatch", "pack %s wants minecraft %s; this project locked %s", l.Name, pm.Minecraft, minecraft)
 	}
 	if pm.Loader.Type != loader.Type {
-		return out.Errorf("pack-mismatch", "pack %s uses the %s loader; this project uses %s", l.Name, pm.Loader.Type, loader.Type)
+		return out.Errorf("pack-mismatch", "pack %s uses %s; this project uses %s", l.Name, describeLoader(pm.Loader.Type), describeLoader(loader.Type))
+	}
+	if loader.Type == "" {
+		return nil
 	}
 	lrng, err := loaderver.ParseRange(pm.Loader.Version)
 	if err != nil {
@@ -295,6 +298,13 @@ func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
 		return out.Errorf("pack-mismatch", "pack %s wants %s %s; this project locked %s", l.Name, pm.Loader.Type, pm.Loader.Version, loader.Version)
 	}
 	return nil
+}
+
+func describeLoader(name string) string {
+	if name == "" {
+		return "no loader"
+	}
+	return name
 }
 
 func dirSha256(dir string, m *manifest.Manifest) (string, error) {

@@ -15,7 +15,7 @@ import (
 
 func TestLinkMojang(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := t.TempDir()
@@ -95,7 +95,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "my-pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
 	gitRun(t, h.dir, "add", ".")
@@ -151,7 +151,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 
 func TestLinkMojangErrors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	code, stdout, _ := h.run(t, "link", "mojang", "--launcher-dir", filepath.Join(t.TempDir(), "missing"), "--json")

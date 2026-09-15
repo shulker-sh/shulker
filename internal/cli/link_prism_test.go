@@ -18,7 +18,7 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "my-pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
@@ -76,7 +76,7 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 
 func TestLinkPrism(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "my-pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := t.TempDir()
@@ -150,7 +150,7 @@ func TestLinkPrism(t *testing.T) {
 
 func TestLinkPrismTargetNameAndErrors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	path := filepath.Join(h.dir, manifest.FileName)
 	data, _ := os.ReadFile(path)
@@ -224,7 +224,7 @@ func readINIFile(t *testing.T, path string) map[string]string {
 
 func TestLinkPrismConfigFormats(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "my-pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 	exe, _ := os.Executable()
 	cmdValue := launcher.CommandArg(exe) + " sync " + launcher.CommandArg(h.dir) + ` --target client --into "$INST_MC_DIR"`

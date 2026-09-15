@@ -49,13 +49,19 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, 
 	if !ok {
 		return nil, fmt.Errorf("no Minecraft version matches %q (latest release is %s)", m.Minecraft, games.Latest.Release)
 	}
-	if _, err := loader.Require(m.Loader.Type); err != nil {
-		return nil, err
+	if m.Loader.Type != "" {
+		if _, err := loader.Require(m.Loader.Type); err != nil {
+			return nil, err
+		}
 	}
 	entry, _ := games.Find(game.ID)
 	java, err := mt.Piston.Java(ctx, entry)
 	if err != nil {
 		return nil, err
+	}
+	platform := &Platform{Minecraft: game.ID, Java: lock.Java{Major: java.Major, Component: java.Component}}
+	if m.Loader.Type == "" {
+		return platform, nil
 	}
 	loaderVersion, err := mt.loaderVersion(ctx, m.Loader, game.ID)
 	if err != nil {
@@ -65,11 +71,8 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest) (*Platform, 
 	if err != nil {
 		return nil, err
 	}
-	return &Platform{
-		Minecraft: game.ID,
-		Loader:    lock.Loader{Type: m.Loader.Type, Version: loaderVersion, Provides: provides},
-		Java:      lock.Java{Major: java.Major, Component: java.Component},
-	}, nil
+	platform.Loader = lock.Loader{Type: m.Loader.Type, Version: loaderVersion, Provides: provides}
+	return platform, nil
 }
 
 type loaderVersions interface {

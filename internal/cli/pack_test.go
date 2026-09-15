@@ -60,7 +60,7 @@ type lockView struct {
 
 func TestLocalPack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	writePack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, map[string]string{
 		"config/base.txt":       "from pack\n",
 		"config/shared.txt":     "pack\n",
@@ -184,7 +184,7 @@ func TestLocalPack(t *testing.T) {
 
 func TestPackMismatchAndConflict(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	writePack(t, filepath.Join(h.dir, "old"), "~26.1", `"sodium": {}`, nil)
 	code, stdout, _ := h.run(t, "pack", "add", "./old", "--json")
 	var env out.Envelope
@@ -215,7 +215,7 @@ func TestPackMismatchAndConflict(t *testing.T) {
 
 func TestPackSourceMovedUnderTheSameName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	writePack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
 	h.mustRun(t, "pack", "add", "./base")
 	if err := os.Rename(filepath.Join(h.dir, "base"), filepath.Join(h.dir, "moved")); err != nil {
@@ -252,7 +252,7 @@ func TestGitPack(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	repo := filepath.Join(t.TempDir(), "shared-pack")
 	writePack(t, repo, "^26.1", `"sodium": {}`, map[string]string{"config/git.txt": "v1\n"})
 	gitRun(t, repo, "init", "-q", "-b", "main")
@@ -308,7 +308,7 @@ func TestGitPack(t *testing.T) {
 
 func TestURLPackAndHandEdits(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tiny.json" {
 			http.NotFound(w, r)

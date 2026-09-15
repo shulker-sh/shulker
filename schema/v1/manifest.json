@@ -4,7 +4,7 @@
   "title": "shulker.json",
   "description": "Shulker project manifest. Lists direct mods, targets, and first-class configuration. Resolution results live in shulker.lock.",
   "type": "object",
-  "required": ["name", "minecraft", "loader", "targets"],
+  "required": ["name", "minecraft", "targets"],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string", "format": "uri" },
@@ -157,13 +157,14 @@
     },
     "loader": {
       "type": "object",
-      "required": ["type", "version"],
+      "required": ["type"],
       "additionalProperties": false,
+      "description": "The mod loader. Omitted means no loader: vanilla Minecraft, which takes no mods.",
       "properties": {
         "type": { "type": "string", "enum": ["fabric", "quilt", "neoforge", "forge"] },
         "version": {
           "$ref": "#/$defs/semverRange",
-          "description": "Semver range over the loader's own version. \"*\" selects the newest for the locked Minecraft version."
+          "description": "Semver range over the loader's own version. \"*\", the default when omitted, selects the newest for the locked Minecraft version."
         },
         "note": { "$ref": "#/$defs/note" }
       }

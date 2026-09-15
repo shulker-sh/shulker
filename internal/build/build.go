@@ -328,11 +328,13 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 		if err := b.collectClient(desired, vars); err != nil {
 			return nil, nil, err
 		}
-		jar, err := b.markerJar(name, target.Side, cond, sel)
-		if err != nil {
-			return nil, nil, err
+		if b.Lock.Loader.Type != "" {
+			jar, err := b.markerJar(name, target.Side, cond, sel)
+			if err != nil {
+				return nil, nil, err
+			}
+			desired[markerJarPath(b.Manifest.Name)] = source{data: jar}
 		}
-		desired[markerJarPath(b.Manifest.Name)] = source{data: jar}
 	}
 	whole := func(rel string) bool {
 		for _, pattern := range target.WholeFiles {
@@ -444,13 +446,19 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 	notInstalled := out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
 	l, _ := loader.Lookup(b.Lock.Loader.Type)
 	jar, vanilla := b.Lock.Loader.Server, b.Lock.Server
-	if jar == nil || !b.Cache.Has(jar.Sha512) || vanilla == nil || !b.Cache.Has(vanilla.Sha512) {
+	if vanilla == nil || !b.Cache.Has(vanilla.Sha512) {
+		return notInstalled
+	}
+	desired[vanillaServerPath(l, b.Lock.Minecraft)] = source{sha512: vanilla.Sha512}
+	if b.Lock.Loader.Type == "" {
+		return nil
+	}
+	if jar == nil || !b.Cache.Has(jar.Sha512) {
 		return notInstalled
 	}
 	if l.InstallServerFlag == "" {
 		desired[l.ServerLaunchJar] = source{sha512: jar.Sha512}
 	}
-	desired[vanillaServerPath(l, b.Lock.Minecraft)] = source{sha512: vanilla.Sha512}
 	for name, dl := range jar.Libraries {
 		path, err := meta.MavenPath(name)
 		if err != nil {
@@ -465,8 +473,8 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 }
 
 // vanillaServerPath is where a loader looks for the vanilla server jar: Fabric's launcher in its data
-// dir, where it downloads the jar only when missing; Quilt's launcher next to itself; NeoForge's and
-// Forge's installers under libraries/.
+// dir, where it downloads the jar only when missing; Quilt's launcher next to itself, which is also
+// where a project without a loader runs it; NeoForge's and Forge's installers under libraries/.
 func vanillaServerPath(l loader.Loader, minecraft string) string {
 	switch {
 	case l.InstallServerFlag != "":
@@ -481,13 +489,16 @@ func vanillaServerPath(l loader.Loader, minecraft string) string {
 	return VanillaServerFile
 }
 
-// LaunchArgs start the server from its dir: the launch jar, or the args file a loader's installer
-// wrote.
+// LaunchArgs start the server from its dir: the launch jar, the args file a loader's installer
+// wrote, or the vanilla jar when there is no loader.
 func LaunchArgs(lk *lock.Lock) []string {
 	if file := InstallerArgsFile(lk); file != "" {
 		return []string{"@" + file}
 	}
-	info, _ := loader.Lookup(lk.Loader.Type)
+	info, ok := loader.Lookup(lk.Loader.Type)
+	if !ok {
+		return []string{"-jar", VanillaServerFile}
+	}
 	return []string{"-jar", info.ServerLaunchJar}
 }
 

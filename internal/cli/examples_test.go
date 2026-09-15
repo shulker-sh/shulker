@@ -7,7 +7,7 @@ import (
 
 func TestErrorsShowAnExampleCommand(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	fresh := newHarness(t)
 

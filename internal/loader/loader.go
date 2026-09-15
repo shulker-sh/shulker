@@ -84,6 +84,16 @@ func ProviderLoaders(name string) []string {
 	return []string{name}
 }
 
+func Describe(name, version string) string {
+	switch {
+	case name == "":
+		return "no loader"
+	case version == "":
+		return name
+	}
+	return name + " " + version
+}
+
 func Names() []string {
 	names := make([]string, len(All))
 	for i, l := range All {

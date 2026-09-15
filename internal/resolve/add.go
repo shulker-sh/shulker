@@ -109,6 +109,9 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provi
 }
 
 func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error {
+	if r.Manifest.Loader.Type == "" {
+		return out.Errorf("loader-required", "mods need a loader; pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
+	}
 	explicit := opts.Provider != ""
 	if prev, ok := r.Manifest.Mods()[slug]; !explicit && ok && prev.Provider != "" {
 		opts.Provider = prev.Provider

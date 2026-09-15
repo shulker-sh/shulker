@@ -30,7 +30,7 @@ type Manifest struct {
 	Links       map[string]string  `json:"links,omitempty"`
 	Note        string             `json:"note,omitempty"`
 	Minecraft   string             `json:"minecraft"`
-	Loader      Loader             `json:"loader"`
+	Loader      Loader             `json:"loader,omitzero"`
 	Java        string             `json:"java,omitempty"`
 	Providers   []string           `json:"providers,omitempty"`
 	Targets     map[string]Target  `json:"targets"`
@@ -97,7 +97,7 @@ type Client struct {
 
 type Loader struct {
 	Type    string `json:"type"`
-	Version string `json:"version"`
+	Version string `json:"version,omitempty"`
 	Note    string `json:"note,omitempty"`
 }
 

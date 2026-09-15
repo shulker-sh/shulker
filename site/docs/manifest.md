@@ -25,7 +25,7 @@ Required properties are marked with *.
 | `license` | `string` | The pack's license, e.g. "MIT" or "CC BY-NC-SA 4.0". Shown on the pack's entry in the mod list, and clickable there when links.license is set. Defaults to "All rights reserved", since NeoForge and Forge reject a mod that declares no license.<br>min length 1 |
 | `links` | [`links`](#links) |  |
 | `minecraft` * | [`semverRange`](#semverrange) | Semver range over Minecraft version ids, e.g. "~26.2", "^26.1", or an exact version. Pre-release order is snapshot &lt; pre &lt; rc &lt; release. |
-| `loader` * | [`loader`](#loader) |  |
+| `loader` | [`loader`](#loader) |  |
 | `java` | `string` | Optional override. Either an absolute path to a JDK/JRE home or a semver range over the Java major version, e.g. "&gt;=25". Omit to derive from the Minecraft version json and use the managed runtime.<br>min length 1 |
 | `providers` | [`provider`](#provider)[] | Provider preference order. A single entry makes the tool single-provider.<br>min items 1, unique items, default `["modrinth","curseforge"]` |
 | `targets` * | map of [`target`](#target) | Build targets. Each lists its override layers explicitly; paths are never inferred.<br>min properties 1, keys match `^[a-z][a-z0-9_-]*$` |
@@ -118,10 +118,12 @@ Type: `"client"` \| `"server"` \| `"both"`
 
 ### loader
 
+The mod loader. Omitted means no loader: vanilla Minecraft, which takes no mods.
+
 | Property | Type | Description |
 | --- | --- | --- |
 | `type` * | `"fabric"` \| `"quilt"` \| `"neoforge"` \| `"forge"` |  |
-| `version` * | [`semverRange`](#semverrange) | Semver range over the loader's own version. "*" selects the newest for the locked Minecraft version. |
+| `version` | [`semverRange`](#semverrange) | Semver range over the loader's own version. "*", the default when omitted, selects the newest for the locked Minecraft version. |
 | `note` | [`note`](#note) |  |
 
 No other properties are allowed.

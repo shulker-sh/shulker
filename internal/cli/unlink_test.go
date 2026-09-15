@@ -23,7 +23,7 @@ func unlinkJSON(t *testing.T, h *harness, args ...string) []unlinkResult {
 
 func TestUnlink(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	prismDir := t.TempDir()
@@ -100,7 +100,7 @@ func TestUnlink(t *testing.T) {
 
 func TestUnlinkLauncherNameInProject(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	mojangDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(mojangDir, launcher.ProfilesFile), []byte(`{"profiles":{}}`), 0o644); err != nil {
@@ -130,7 +130,7 @@ func TestUnlinkLauncherNameInProject(t *testing.T) {
 
 func TestUnlinkAll(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "a"), "--name", "Twin")
 	h.mustRun(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "b"), "--name", "Twin")

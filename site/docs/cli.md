@@ -78,11 +78,11 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --target serv
 
 | Flag | Description |
 | --- | --- |
-| `-y, --yes` | Accept defaults: latest release, fabric, client target |
+| `-y, --yes` | Accept defaults: latest release, no loader, client target |
 | `--name <name>` | Project name (default: directory name) |
 | `--minecraft <version>` | Minecraft version or range (default: latest release) |
-| `--loader <loader>` | Mod loader: `fabric`, `quilt`, `neoforge`, `forge` |
-| `--loader-version <range>` | Loader version range (default: `*`) |
+| `--loader <loader>` | Mod loader: `none` (the default, vanilla Minecraft), `fabric`, `quilt`, `neoforge`, `forge` |
+| `--loader-version <range>` | Loader version range (default: `*`); needs `--loader` |
 | `--target <side>` | First target: `client` or `server` |
 
 ### `shulker import mrpack`
@@ -954,6 +954,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `last-target` | The only target can't be removed |
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-not-found` | No launcher directory where shulker looked |
+| `loader-required` | `add` of a mod in a project without a loader; set one with `shulker set loader.type <loader>` |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
 | `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
@@ -970,7 +971,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these mods; pass `--bundle`. `items`: the mods |
 | `mrpack-invalid` | The modpack is malformed |
 | `mrpack-marker` | The modpack's shulker marker can't be read |
-| `mrpack-unsupported` | The modpack's format or loader isn't supported |
+| `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
 | `no-links` | Nothing is linked yet |
 | `no-overrides` | The target has no overrides directory to adopt a file into |

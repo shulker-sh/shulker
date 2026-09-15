@@ -106,7 +106,9 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 		if err != nil {
 			return nil, err
 		}
-		if jar.Fetched {
+		if jar.Fetched && p.Lock.Loader.Type == "" {
+			fetched = append(fetched, "minecraft-server")
+		} else if jar.Fetched {
 			fetched = append(fetched, p.Lock.Loader.Type+"-server-launcher")
 		}
 		if jar.Locked {

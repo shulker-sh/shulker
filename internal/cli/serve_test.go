@@ -12,7 +12,7 @@ import (
 
 func TestServeRunsServerAndStops(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
 	var m map[string]any
 	h.readJSON(t, "shulker.json", &m)
 	srv, _ := m["server"].(map[string]any)
@@ -101,7 +101,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 
 func TestServeErrors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
 	h.mustRun(t, "install")
 
 	old := h.fakeJDK(t, "17.0.12", "0")
@@ -132,7 +132,7 @@ func TestServeErrors(t *testing.T) {
 
 func TestManagedJava(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
 	h.mustRun(t, "add", "fabric-api")
 
 	code, stdout, _ := h.run(t, "--json", "install")
@@ -224,7 +224,7 @@ func TestManagedJava(t *testing.T) {
 func TestManagedJavaUnavailable(t *testing.T) {
 	h := newHarness(t)
 	h.runtime.missing = true
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
 	_, stderr := h.mustRunStderr(t, "install")
 	if !strings.Contains(stderr, "runtime") || !strings.Contains(stderr, "shulker.json") {
 		t.Fatalf("install should warn about the missing runtime: %s", stderr)

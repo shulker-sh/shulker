@@ -13,7 +13,7 @@ import (
 
 func TestLinkATLauncher(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "my-pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := t.TempDir()

@@ -72,7 +72,10 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		report.Overrides = append(report.Overrides, path)
 	}
 	sort.Strings(report.Overrides)
-	l, _ := loader.Lookup(b.Lock.Loader.Type)
+	dependencies := map[string]string{"minecraft": b.Lock.Minecraft}
+	if l, ok := loader.Lookup(b.Lock.Loader.Type); ok {
+		dependencies[l.MrpackKey] = b.Lock.Loader.Version
+	}
 	index := mrpack.Index{
 		FormatVersion: mrpack.FormatVersion,
 		Game:          mrpack.Game,
@@ -80,7 +83,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		Name:          report.Name,
 		Summary:       mrpackSummary(b.Manifest),
 		Files:         files,
-		Dependencies:  map[string]string{"minecraft": b.Lock.Minecraft, l.MrpackKey: b.Lock.Loader.Version},
+		Dependencies:  dependencies,
 	}
 	indexData, err := json.MarshalIndent(index, "", "  ")
 	if err != nil {

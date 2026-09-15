@@ -14,7 +14,7 @@ import (
 
 func TestTargetAddRemoveList(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	lockBefore, err := os.ReadFile(filepath.Join(h.dir, "shulker.lock"))
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +86,7 @@ func TestTargetAddRemoveList(t *testing.T) {
 
 func TestTargetErrors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	for _, tc := range []struct {
 		args       []string
 		code       string
@@ -116,7 +116,7 @@ func TestTargetErrors(t *testing.T) {
 
 func TestTargetWithoutBuildDir(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.editManifest(t, func(m map[string]any) {
 		delete(m["targets"].(map[string]any)["client"].(map[string]any), "build")
 	})

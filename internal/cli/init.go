@@ -20,8 +20,8 @@ import (
 type initResult struct {
 	Name      string `json:"name"`
 	Minecraft string `json:"minecraft"`
-	Loader    string `json:"loader"`
-	Version   string `json:"loaderVersion"`
+	Loader    string `json:"loader,omitempty"`
+	Version   string `json:"loaderVersion,omitempty"`
 	Java      int    `json:"java"`
 	Target    string `json:"target"`
 }
@@ -58,10 +58,17 @@ func (a *app) initCmd() *cobra.Command {
 				e.Candidates, e.Given, e.Flag = []string{"client", "server"}, target, "--target"
 				return e
 			}
-			if _, ok := loader.Lookup(loaderName); !ok {
-				e := out.Errorf("usage", "unknown loader %q; use one of %s", loaderName, strings.Join(loader.Names(), ", "))
-				e.Candidates, e.Given, e.Flag = loader.Names(), loaderName, "--loader"
+			loaders := append([]string{noLoader}, loader.Names()...)
+			if _, ok := loader.Lookup(loaderName); !ok && loaderName != noLoader {
+				e := out.Errorf("usage", "unknown loader %q; use one of %s", loaderName, strings.Join(loaders, ", "))
+				e.Candidates, e.Given, e.Flag = loaders, loaderName, "--loader"
 				return e
+			}
+			var projectLoader manifest.Loader
+			if loaderName != noLoader {
+				projectLoader = manifest.Loader{Type: loaderName, Version: loaderVersion}
+			} else if cmd.Flags().Changed("loader-version") {
+				return out.Errorf("usage", "--loader-version needs --loader")
 			}
 			if name == "" {
 				name = slugify(filepath.Base(dir))
@@ -74,7 +81,7 @@ func (a *app) initCmd() *cobra.Command {
 				Name:      name,
 				Authors:   defaultAuthors(),
 				Minecraft: minecraft,
-				Loader:    manifest.Loader{Type: loaderName, Version: loaderVersion},
+				Loader:    projectLoader,
 				Targets:   map[string]manifest.Target{target: {Side: target, Overrides: []string{"overrides"}, Build: "build/" + target}},
 				Requires:  map[string]manifest.Require{},
 			}
@@ -93,7 +100,7 @@ func (a *app) initCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			a.progress("resolving Minecraft %s with %s %s", minecraft, loaderName, loaderVersion)
+			a.progress("%s", resolvingLine(minecraft, projectLoader))
 			platform, err := d.meta.Platform(cmd.Context(), m)
 			if err != nil {
 				return err
@@ -118,18 +125,41 @@ func (a *app) initCmd() *cobra.Command {
 			}
 			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Target: target}
 			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OK("created "+manifest.FileName, fmt.Sprintf("Minecraft %s, %s %s, Java %d", res.Minecraft, res.Loader, res.Version, res.Java))
-				l.Nudge("Add a mod", "shulker add <mod>")
+				l.OK("created "+manifest.FileName, fmt.Sprintf("%s, Java %d", platformLabel(res.Minecraft, res.Loader, res.Version), res.Java))
+				switch {
+				case res.Loader != "":
+					l.Nudge("Add a mod", "shulker add <mod>")
+				case target == "server":
+					l.Nudge("Download and build it", "shulker install")
+				default:
+					l.Nudge("Play it in a launcher", "shulker link <launcher>")
+				}
 			})
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "accept defaults: latest release, fabric, client target")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "accept defaults: latest release, no loader, client target")
 	cmd.Flags().StringVar(&name, "name", "", "project name (default: directory name)")
 	cmd.Flags().StringVar(&minecraft, "minecraft", "", "Minecraft version or range (default: latest release)")
-	cmd.Flags().StringVar(&loaderName, "loader", "fabric", "mod loader: "+strings.Join(loader.Names(), ", "))
+	cmd.Flags().StringVar(&loaderName, "loader", noLoader, "mod loader: "+noLoader+", "+strings.Join(loader.Names(), ", "))
 	cmd.Flags().StringVar(&loaderVersion, "loader-version", "*", "loader version range")
 	cmd.Flags().StringVar(&target, "target", "client", "first target: client or server")
 	return cmd
+}
+
+const noLoader = "none"
+
+func resolvingLine(minecraft string, l manifest.Loader) string {
+	if l.Type == "" {
+		return "resolving Minecraft " + minecraft
+	}
+	return fmt.Sprintf("resolving Minecraft %s with %s %s", minecraft, l.Type, l.Version)
+}
+
+func platformLabel(minecraft, loaderType, loaderVersion string) string {
+	if loaderType == "" {
+		return "Minecraft " + minecraft
+	}
+	return fmt.Sprintf("Minecraft %s, %s %s", minecraft, loaderType, loaderVersion)
 }
 
 func slugify(s string) string {

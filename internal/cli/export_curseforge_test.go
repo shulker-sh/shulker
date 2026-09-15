@@ -76,7 +76,7 @@ func readArchive(t *testing.T, path string) map[string]string {
 func newCurseForgeExport(t *testing.T) *harness {
 	t.Helper()
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "add", "jei", "--provider", "curseforge")
 	h.editManifest(t, func(m map[string]any) {

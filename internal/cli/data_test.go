@@ -9,7 +9,7 @@ import (
 
 func TestBuildLinksDataDirs(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	buildDir := filepath.Join(h.dir, "build", "client")
 	if err := os.MkdirAll(filepath.Join(buildDir, "saves", "First"), 0o755); err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestBuildLinksDataDirs(t *testing.T) {
 
 func TestServerBuildLinksWorldByLevelName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
 	buildDir := filepath.Join(h.dir, "build", "server")
 
 	stdout := h.mustRun(t, "install")

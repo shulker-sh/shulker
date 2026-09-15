@@ -11,7 +11,7 @@ import (
 
 func TestRegistryFollowsTheConfigRegistryPath(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	if err := os.MkdirAll(filepath.Dir(h.config), 0o755); err != nil {
 		t.Fatal(err)

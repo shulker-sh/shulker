@@ -31,13 +31,13 @@ func TestInvalidNamesLineColumnAndPlainWords(t *testing.T) {
 }
 
 func TestInvalidListsSchemaProblemsByPath(t *testing.T) {
-	data := []byte(`{"name": "x", "minecraft": "26.2", "loader": {"type": "fabric"}, "targets": {"client": {"side": "clientt", "overrides": "o"}}, "requires": {}}`)
+	data := []byte(`{"name": "x", "minecraft": "26.2", "loader": {"version": "*"}, "targets": {"client": {"side": "clientt", "overrides": "o"}}, "requires": {}}`)
 	err := Validate(Manifest, data)
 	if err == nil {
 		t.Fatal("expected schema failure")
 	}
 	e := Invalid("manifest-invalid", "shulker.json", data, err)
-	if e.Message != "shulker.json has 3 problems" || len(e.Items) != 3 || e.Items[0] != "loader: missing property 'version'" || !strings.HasPrefix(e.Items[2], "targets.client.side: value must be one of") {
+	if e.Message != "shulker.json has 3 problems" || len(e.Items) != 3 || e.Items[0] != "loader: missing property 'type'" || !strings.HasPrefix(e.Items[2], "targets.client.side: value must be one of") {
 		t.Fatalf("three problems: %q %v", e.Message, e.Items)
 	}
 	data = []byte(`{"name": "x", "minecraft": "26.2", "loader": {"type": "fabric", "version": "0.17.3"}, "targets": {"client": {"side": "clientt", "overrides": ["o"]}}, "requires": {}}`)

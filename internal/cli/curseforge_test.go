@@ -190,7 +190,7 @@ func (h *harness) readManifest(t *testing.T) *manifest.Manifest {
 
 func TestCurseForgeAddFallsThrough(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 
 	stdout := h.mustRun(t, "add", "jei")
 	if !strings.Contains(stdout, "+ jei ") || !strings.Contains(stdout, "» all targets\n") || !strings.Contains(stdout, "+ fabric-api fabric-api-0.130.0+26.2 » all targets (required by jei)") {
@@ -243,7 +243,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 
 func TestCurseForgeAliasAndAbsence(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 
 	_, stdout, _ := h.run(t, "--json", "add", "sodium", "--provider", "curseforge")
@@ -298,7 +298,7 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 
 func TestCurseForgeManualDownloads(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	if gi, _ := os.ReadFile(filepath.Join(h.dir, ".gitignore")); !strings.Contains(string(gi), "/downloads/") {
 		t.Fatalf(".gitignore: %s", gi)
 	}

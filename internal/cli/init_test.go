@@ -9,7 +9,7 @@ import (
 
 func TestInitChecksTheTarget(t *testing.T) {
 	h := newHarness(t)
-	code, stdout, _ := h.run(t, "init", "--yes", "--target", "weird", "--json")
+	code, stdout, _ := h.run(t, "init", "--yes", "--loader", "fabric", "--target", "weird", "--json")
 	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || len(e.Candidates) != 2 {
 		t.Fatalf("unknown target: code=%d %s", code, stdout)
 	}
@@ -17,7 +17,7 @@ func TestInitChecksTheTarget(t *testing.T) {
 
 func TestFailedInitLeavesNothingBehind(t *testing.T) {
 	h := newHarness(t)
-	if code, _, _ := h.run(t, "init", "--yes", "--name", "..."); code == 0 {
+	if code, _, _ := h.run(t, "init", "--yes", "--loader", "fabric", "--name", "..."); code == 0 {
 		t.Fatal("an invalid name must fail")
 	}
 	entries, err := os.ReadDir(h.dir)

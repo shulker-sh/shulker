@@ -4,7 +4,7 @@
   "title": "shulker.lock",
   "description": "Shulker lock file. Tool-owned, key-sorted, pretty-printed. Records the exact resolution of shulker.json; install and build read only this file.",
   "type": "object",
-  "required": ["lockVersion", "minecraft", "loader", "java", "modpacks", "mods", "players"],
+  "required": ["lockVersion", "minecraft", "java", "modpacks", "mods", "players"],
   "additionalProperties": false,
   "properties": {
     "lockVersion": { "type": "integer", "const": 1 },
@@ -17,6 +17,7 @@
       "type": "object",
       "required": ["type", "version"],
       "additionalProperties": false,
+      "description": "The resolved mod loader. Omitted when the project has no loader.",
       "properties": {
         "type": { "type": "string", "enum": ["fabric", "quilt", "neoforge", "forge"] },
         "version": { "type": "string", "minLength": 1, "description": "Resolved loader version, exactly as the loader's meta names it." },

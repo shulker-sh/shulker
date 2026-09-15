@@ -27,10 +27,10 @@ The installer downloads the latest release, checks it against the published SHA2
 In an empty directory, create a manifest with the latest Minecraft release, Fabric, and a client target:
 
 ```sh
-shulker init --yes
+shulker init --yes --loader fabric
 ```
 
-This writes `shulker.json`, which you edit and commit, and `shulker.lock`, which shulker keeps up to date. Pass `--minecraft`, `--loader`, or `--target server` to start from something else. See [`shulker init`](/docs/cli#shulker-init).
+This writes `shulker.json`, which you edit and commit, and `shulker.lock`, which shulker keeps up to date. Pass `--minecraft`, another `--loader`, or `--target server` to start from something else; without `--loader` the project is vanilla Minecraft, which takes no mods. See [`shulker init`](/docs/cli#shulker-init).
 
 ## Add mods
 

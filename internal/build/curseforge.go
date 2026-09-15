@@ -88,9 +88,12 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 		report.Overrides = append(report.Overrides, path)
 	}
 	sort.Strings(report.Overrides)
-	l, _ := loader.Lookup(b.Lock.Loader.Type)
+	modLoaders := []curseForgeModLoader{}
+	if l, ok := loader.Lookup(b.Lock.Loader.Type); ok {
+		modLoaders = append(modLoaders, curseForgeModLoader{ID: l.CurseForgeModLoader(b.Lock.Minecraft, b.Lock.Loader.Version), Primary: true})
+	}
 	manifest := curseForgeManifest{
-		Minecraft:       curseForgeMinecraft{Version: b.Lock.Minecraft, ModLoaders: []curseForgeModLoader{{ID: l.CurseForgeModLoader(b.Lock.Minecraft, b.Lock.Loader.Version), Primary: true}}},
+		Minecraft:       curseForgeMinecraft{Version: b.Lock.Minecraft, ModLoaders: modLoaders},
 		ManifestType:    "minecraftModpack",
 		ManifestVersion: 1,
 		Name:            report.Name,

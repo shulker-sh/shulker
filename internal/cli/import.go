@@ -78,7 +78,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			exact := *m
 			exact.Minecraft = arc.Index.Dependencies["minecraft"]
 			_, exact.Loader.Version, _ = arc.Loader()
-			a.progress("resolving Minecraft %s with %s %s", exact.Minecraft, exact.Loader.Type, exact.Loader.Version)
+			a.progress("%s", resolvingLine(exact.Minecraft, exact.Loader))
 			platform, err := d.meta.Platform(cmd.Context(), &exact)
 			if err != nil {
 				return err
@@ -105,7 +105,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			}
 			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Targets: targetNames(m.Targets), Mods: mods, Overrides: overridePaths(mods.Overrides)}
 			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OKInto("imported "+res.Name+" "+res.Version, dir, fmt.Sprintf("Minecraft %s, %s %s", res.Minecraft, res.Loader.Type, res.Loader.Version))
+				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
 				rows := []out.Row{
 					{Text: fmt.Sprintf("%s locked from Modrinth, %d reused from the shulker marker", plural(len(mods.Locked), "mod", "mods"), len(mods.Reused))},
 					{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
@@ -127,10 +127,7 @@ func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []str
 	if minecraft == "" {
 		return nil, nil, out.Errorf("mrpack-invalid", "the index has no minecraft dependency")
 	}
-	loaderType, loaderVersion, ok := arc.Loader()
-	if !ok {
-		return nil, nil, out.Errorf("mrpack-unsupported", "the index names no known loader (%s)", strings.Join(loader.Names(), ", "))
-	}
+	loaderType, loaderVersion, _ := arc.Loader()
 	var warnings []string
 	if arc.Marker == nil {
 		m := &manifest.Manifest{
@@ -157,7 +154,7 @@ func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []str
 		m.Minecraft = minecraft
 	}
 	if ml.Loader.Type != loaderType || ml.Loader.Version != loaderVersion {
-		warnings = append(warnings, fmt.Sprintf("the marker was locked to %s %s but the pack targets %s %s; using the pack's", ml.Loader.Type, ml.Loader.Version, loaderType, loaderVersion))
+		warnings = append(warnings, fmt.Sprintf("the marker was locked to %s but the pack targets %s; using the pack's", loader.Describe(ml.Loader.Type, ml.Loader.Version), loader.Describe(loaderType, loaderVersion)))
 		m.Loader = manifest.Loader{Type: loaderType, Version: loaderVersion}
 	}
 	if m.Version != arc.Index.VersionID {

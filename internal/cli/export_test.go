@@ -87,7 +87,7 @@ func writeOverride(t *testing.T, dir, rel, content string) {
 
 func TestExportMrpack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"
@@ -175,7 +175,7 @@ func TestExportMrpack(t *testing.T) {
 
 func TestExportMrpackBundlesForeignHosts(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
 

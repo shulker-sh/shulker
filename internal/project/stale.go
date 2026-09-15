@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -49,11 +50,9 @@ func PlatformDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 		diffs = append(diffs, fmt.Sprintf("minecraft: locked %s is outside %s", l.Minecraft, m.Minecraft))
 	}
 	switch {
-	case l.Loader.Type == "":
-		diffs = append(diffs, "loader: not in shulker.lock")
 	case l.Loader.Type != m.Loader.Type:
-		diffs = append(diffs, fmt.Sprintf("loader: locked %s, shulker.json asks for %s", l.Loader.Type, m.Loader.Type))
-	case !loaderMatches(m.Loader.Version, l.Loader.Version):
+		diffs = append(diffs, fmt.Sprintf("loader: locked %s, shulker.json asks for %s", loader.Describe(l.Loader.Type, ""), loader.Describe(m.Loader.Type, "")))
+	case l.Loader.Type != "" && !loaderMatches(m.Loader.Version, l.Loader.Version):
 		diffs = append(diffs, fmt.Sprintf("loader: locked %s %s is outside %s", l.Loader.Type, l.Loader.Version, m.Loader.Version))
 	}
 	return diffs

@@ -514,7 +514,7 @@ func (h *harness) readJSON(t *testing.T, rel string, v any) {
 func TestVerticalSlice(t *testing.T) {
 	h := newHarness(t)
 
-	stdout := h.mustRun(t, "init", "--yes")
+	stdout := h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	if !strings.Contains(stdout, "created shulker.json (Minecraft 26.2, fabric 0.17.3, Java 25)") {
 		t.Fatalf("init output: %s", stdout)
 	}
@@ -523,7 +523,7 @@ func TestVerticalSlice(t *testing.T) {
 	if m["minecraft"] != "26.2" || m["name"] != filepath.Base(h.dir) {
 		t.Fatalf("manifest: %v", m)
 	}
-	if code, _, _ := h.run(t, "init", "--yes"); code == 0 {
+	if code, _, _ := h.run(t, "init", "--yes", "--loader", "fabric"); code == 0 {
 		t.Fatal("second init should fail")
 	}
 
@@ -658,7 +658,7 @@ func TestVerticalSlice(t *testing.T) {
 
 func TestAddUnknownMod(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	code, stdout, _ := h.run(t, "add", "nope", "--json")
 	if code == 0 {
 		t.Fatal("expected failure")
@@ -674,7 +674,7 @@ func TestAddUnknownMod(t *testing.T) {
 
 func TestStaleLockWarnsAndBuilds(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
 	path := filepath.Join(h.dir, "shulker.json")
@@ -717,7 +717,7 @@ func TestStaleLockWarnsAndBuilds(t *testing.T) {
 
 func TestAddLocksHandAddedMods(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.editManifest(t, func(m map[string]any) {
 		m["requires"] = map[string]any{"sodium": map[string]any{}}
 	})
@@ -739,7 +739,7 @@ func TestAddLocksHandAddedMods(t *testing.T) {
 
 func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium", "fabric-api")
 	h.newer = true
 	h.editManifest(t, func(m map[string]any) {
@@ -780,7 +780,7 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 
 func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) { m["requires"] = map[string]any{} })
 	var env out.Envelope
@@ -814,7 +814,7 @@ func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
 
 func TestRemovePrunesOrphans(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 
 	code, stdout, _ := h.run(t, "remove", "fabric-api", "--json")
@@ -870,7 +870,7 @@ func TestRemovePrunesOrphans(t *testing.T) {
 func TestRemoveValidatesBeforeSaving(t *testing.T) {
 	h := newHarness(t)
 	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "client", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium", "fabric-api")
 	lockBefore, _ := os.ReadFile(filepath.Join(h.dir, "shulker.lock"))
 	manifestBefore, _ := os.ReadFile(filepath.Join(h.dir, "shulker.json"))
@@ -888,7 +888,7 @@ func TestRemoveValidatesBeforeSaving(t *testing.T) {
 
 func TestInterruptedCommandFails(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	lockBefore, _ := os.ReadFile(filepath.Join(h.dir, "shulker.lock"))
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -906,7 +906,7 @@ func TestInterruptedCommandFails(t *testing.T) {
 func TestInitChecksTheLoader(t *testing.T) {
 	h := newHarness(t)
 	code, stdout, _ := h.run(t, "init", "--yes", "--loader", "rift", "--json")
-	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || len(e.Candidates) != 4 {
+	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || len(e.Candidates) != 5 {
 		t.Fatalf("unknown loader: code=%d %s", code, stdout)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "shulker.json")); err == nil {
@@ -918,7 +918,7 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 	h := newHarness(t)
 	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "client",
 		`"depends":{"fabricloader":">=0.17","fabric-api":">=2.0.0","minecraft":"26.x"},"recommends":{"iris":"*"},"conflicts":{"fabric-api":"1.x"}`)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 
 	code, stdout, _ := h.run(t, "add", "sodium", "--json")
 	var env out.Envelope
@@ -988,7 +988,7 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 
 func TestUpdateOutdatedAndPin(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 
 	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "all mods are up to date") {
@@ -1080,7 +1080,7 @@ func TestUpdateOutdatedAndPin(t *testing.T) {
 
 func TestUpdateKeepsPinnedDirectDependency(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium", "fabric-api")
 	h.mustRun(t, "pin", "fabric-api")
 	h.newer = true
@@ -1115,7 +1115,7 @@ func TestUpdateKeepsPinnedDirectDependency(t *testing.T) {
 
 func TestDiffAndPull(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	overrides := filepath.Join(h.dir, "overrides", "config")
 	if err := os.MkdirAll(overrides, 0o755); err != nil {

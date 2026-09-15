@@ -19,7 +19,7 @@ func writeFile(t *testing.T, path, content string) {
 
 func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	override := filepath.Join(h.dir, "overrides", "config", "iris.properties")
 	built := filepath.Join(h.dir, "build", "client", "config", "iris.properties")
 	writeFile(t, override, "# shaders on by default\nenableShaders=true\nshaderPack=pack.zip\n")
@@ -92,7 +92,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 
 func TestPropertiesLayersAndWholeFiles(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.editManifest(t, func(m map[string]any) {
 		m["targets"].(map[string]any)["client"].(map[string]any)["overrides"] = []string{"overrides", "overrides-extra"}
 	})

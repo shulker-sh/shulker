@@ -18,7 +18,7 @@ import (
 
 func TestClientBuildWritesMarkerJar(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "my.pack")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my.pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
 
@@ -111,7 +111,7 @@ func readZip(t *testing.T, data []byte) map[string][]byte {
 
 func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "linked")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "linked")
 	h.editManifest(t, func(m map[string]any) {
 		m["description"] = "Survival with friends."
 		m["authors"] = []string{"Alice", "shulker.sh"}
@@ -170,7 +170,7 @@ func TestMarkerJarCarriesAuthorsAndLinks(t *testing.T) {
 
 func TestMarkerUsesManifestVersionAndDisplayName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "versioned")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "versioned")
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"
 		m["targets"].(map[string]any)["client"].(map[string]any)["name"] = "LAN Party"
@@ -198,7 +198,7 @@ func TestMarkerUsesManifestVersionAndDisplayName(t *testing.T) {
 
 func TestInitSeedsAuthors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "seeded")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "seeded")
 	m := h.readManifest(t)
 	if len(m.Authors) == 0 || m.Authors[len(m.Authors)-1] != "shulker.sh" {
 		t.Fatalf("authors: %v", m.Authors)

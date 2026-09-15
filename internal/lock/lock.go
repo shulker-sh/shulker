@@ -17,7 +17,7 @@ const FileName = "shulker.lock"
 type Lock struct {
 	LockVersion int                `json:"lockVersion"`
 	Minecraft   string             `json:"minecraft"`
-	Loader      Loader             `json:"loader"`
+	Loader      Loader             `json:"loader,omitzero"`
 	Java        Java               `json:"java"`
 	Server      *Download          `json:"server,omitempty"`
 	Modpacks    map[string]Modpack `json:"modpacks"`
