@@ -31,8 +31,10 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				return err
 			}
 			p := src.project
-			if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
-				return err
+			if p.Lock.Loader.Type != "" {
+				if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
+					return err
+				}
 			}
 			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {
@@ -181,6 +183,9 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 // yet gives way to the newest one it has, unless force.
 func (a *app) gdlauncherLoaderVersion(ctx context.Context, p *project.Project, force bool) (string, error) {
 	locked := p.Lock.Loader
+	if locked.Type == "" {
+		return "", nil
+	}
 	want := launcher.GDLauncherLoaderVersion(p.Lock.Minecraft, locked.Type, locked.Version)
 	d, err := a.deps()
 	if err != nil {

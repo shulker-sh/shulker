@@ -33,9 +33,11 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 				return err
 			}
 			p := src.project
-			l, err := loader.Require(p.Lock.Loader.Type)
-			if err != nil {
-				return err
+			var l loader.Loader
+			if p.Lock.Loader.Type != "" {
+				if l, err = loader.Require(p.Lock.Loader.Type); err != nil {
+					return err
+				}
 			}
 			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {
@@ -180,6 +182,9 @@ func (a *app) atlauncherVersion(ctx context.Context, p *project.Project, l loade
 	vanilla, err := d.meta.Piston.Version(ctx, p.Lock.Minecraft)
 	if err != nil {
 		return nil, err
+	}
+	if p.Lock.Loader.Type == "" {
+		return vanilla, nil
 	}
 	var loaderVersion json.RawMessage
 	if l.InstallClientFlag == "" {

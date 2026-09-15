@@ -46,7 +46,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "mojang [project-dir | git-url | manifest-url]",
 		Aliases: []string{"vanilla"},
-		Short:   "Install the loader into the official launcher and add a profile for the client build",
+		Short:   "Add a profile for the client build to the official launcher, installing its loader if it has one",
 		Args:    maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, err := a.linkSource(cmd.Context(), args, ref)
@@ -54,9 +54,11 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				return err
 			}
 			p := src.project
-			l, err := loader.Require(p.Lock.Loader.Type)
-			if err != nil {
-				return err
+			var l loader.Loader
+			if p.Lock.Loader.Type != "" {
+				if l, err = loader.Require(p.Lock.Loader.Type); err != nil {
+					return err
+				}
 			}
 			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {
@@ -91,12 +93,14 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if gameDir, err = filepath.Abs(gameDir); err != nil {
 				return err
 			}
-			var versionID string
-			if l.InstallClientFlag != "" {
+			versionID := p.Lock.Minecraft
+			switch {
+			case p.Lock.Loader.Type == "":
+			case l.InstallClientFlag != "":
 				if versionID, err = a.installClientLoader(cmd.Context(), p, v, l); err != nil {
 					return err
 				}
-			} else {
+			default:
 				d, err := a.deps()
 				if err != nil {
 					return err
@@ -133,7 +137,9 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				rep.Sync = &r
 			}
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OKInto("installed "+versionID, filepath.Join(launcherDir, "versions"), "")
+				if p.Lock.Loader.Type != "" {
+					l.OKInto("installed "+versionID, filepath.Join(launcherDir, "versions"), "")
+				}
 				l.OKInto("linked launcher profile "+display, gameDir, "")
 				if rep.Sync != nil {
 					rep.Sync.print(l)

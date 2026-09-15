@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 )
@@ -109,6 +110,59 @@ func TestClientWithoutALoader(t *testing.T) {
 	}
 	if string(pack.Minecraft.ModLoaders) != "[]" {
 		t.Fatalf("modLoaders: %s", pack.Minecraft.ModLoaders)
+	}
+}
+
+func TestLinkWithoutALoader(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+
+	mojangDir := t.TempDir()
+	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)
+	if strings.Contains(stdout, "installed") || !strings.Contains(stdout, "linked launcher profile pack") {
+		t.Fatalf("link mojang output: %s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(mojangDir, "versions")); err == nil {
+		t.Fatal("a profile without a loader installed a version")
+	}
+	var profile map[string]any
+	for _, p := range readProfiles(t, mojangDir).Profiles {
+		if p["name"] == "pack" {
+			profile = p
+		}
+	}
+	if profile["lastVersionId"] != "26.2" {
+		t.Fatalf("profile: %v", profile)
+	}
+
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir)
+	var pack struct {
+		Components []map[string]any `json:"components"`
+	}
+	readJSONFile(t, filepath.Join(prismDir, "instances", "shulker-pack", launcher.PackFile), &pack)
+	if len(pack.Components) != 1 || pack.Components[0]["uid"] != "net.minecraft" || pack.Components[0]["version"] != "26.2" {
+		t.Fatalf("mmc-pack.json: %+v", pack)
+	}
+
+	atlDir := t.TempDir()
+	h.mustRun(t, "link", "atlauncher", "--launcher-dir", atlDir)
+	inst := readATLInstance(t, filepath.Join(atlDir, "instances", "pack"))
+	if _, has := inst["launcher"].(map[string]any)["loaderVersion"]; has || inst["id"] != "26.2" {
+		t.Fatalf("ATLauncher instance.json: %v", inst)
+	}
+
+	gdlDir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", gdlDir)
+	version := readGDLInstance(t, filepath.Join(gdlDir, "instances", "pack"))["game_configuration"].(map[string]any)["version"].(map[string]any)
+	if loaders := version["modloaders"].([]any); len(loaders) != 0 || version["release"] != "26.2" {
+		t.Fatalf("GDLauncher version: %v", version)
+	}
+	if len(h.installs) != 0 {
+		t.Fatalf("no loader means no installer: %v", h.installs)
 	}
 }
 

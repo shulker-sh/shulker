@@ -57,8 +57,10 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				return out.Errorf("usage", "--mode symlink needs a local project; a remote source can only be synced")
 			}
 			p := src.project
-			if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
-				return err
+			if p.Lock.Loader.Type != "" {
+				if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
+					return err
+				}
 			}
 			name, err := sideTarget(p.Manifest, target, "client", "link")
 			if err != nil {

@@ -157,7 +157,11 @@ func (l *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, err
 	// ATLauncher unboxes both when Play is pressed, so a missing one throws before launch.
 	settings["requiredMemory"] = json.RawMessage("0")
 	settings["requiredPermGen"] = json.RawMessage("0")
-	settings["loaderVersion"] = loaderVersion
+	if inst.LoaderType != "" {
+		settings["loaderVersion"] = loaderVersion
+	} else {
+		delete(settings, "loaderVersion")
+	}
 	if inst.PreLaunch != "" {
 		settings["enableCommands"] = json.RawMessage("true")
 		settings["preLaunchCommand"] = jsonString(inst.PreLaunch)

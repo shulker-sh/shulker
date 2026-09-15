@@ -176,9 +176,12 @@ func writePack(path string, inst Instance) error {
 		}
 	}
 	pack.FormatVersion = 1
-	l, _ := loader.Lookup(inst.LoaderType)
+	l, hasLoader := loader.Lookup(inst.LoaderType)
 	loaderUID := l.PrismUID
-	wanted := map[string]string{"net.minecraft": inst.Minecraft, loaderUID: inst.LoaderVersion}
+	wanted := map[string]string{"net.minecraft": inst.Minecraft}
+	if hasLoader {
+		wanted[loaderUID] = inst.LoaderVersion
+	}
 	var components []map[string]json.RawMessage
 	seen := map[string]bool{}
 	for _, c := range pack.Components {
@@ -196,7 +199,7 @@ func writePack(path string, inst Instance) error {
 	if !seen["net.minecraft"] {
 		components = append([]map[string]json.RawMessage{{"important": json.RawMessage("true"), "uid": jsonString("net.minecraft"), "version": jsonString(inst.Minecraft)}}, components...)
 	}
-	if !seen[loaderUID] {
+	if hasLoader && !seen[loaderUID] {
 		components = append(components, map[string]json.RawMessage{"uid": jsonString(loaderUID), "version": jsonString(inst.LoaderVersion)})
 	}
 	pack.Components = components
