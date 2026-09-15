@@ -205,7 +205,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 		t.Fatalf("fabric-api lock entry: %+v", dep)
 	}
 	m := h.readManifest(t)
-	if entry := m.Mods["jei"]; entry.Project.(json.Number) != "238222" || entry.Provider != "curseforge" {
+	if entry := m.Mods()["jei"]; entry.Project.(json.Number) != "238222" || entry.Provider != "curseforge" {
 		t.Fatalf("jei manifest entry: %+v", entry)
 	}
 	h.mustRun(t, "install")
@@ -223,7 +223,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 		t.Fatalf("update left version %s", v)
 	}
 	h.mustRun(t, "pin", "jei", "5000001")
-	if pin := h.readManifest(t).Mods["jei"].Pin.(json.Number); pin != "5000001" {
+	if pin := h.readManifest(t).Mods()["jei"].Pin.(json.Number); pin != "5000001" {
 		t.Fatalf("pin: %v", pin)
 	}
 	if v := h.readLock(t).Mods["jei"].Version.(json.Number); v != "5000001" {
@@ -264,7 +264,7 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 		t.Fatalf("fabric-api requiredBy after switch: %v", by)
 	}
 	var m struct {
-		Mods map[string]map[string]any `json:"mods"`
+		Mods map[string]map[string]any `json:"requires"`
 	}
 	h.readJSON(t, "shulker.json", &m)
 	if m.Mods["sodium"]["provider"] != "curseforge" || m.Mods["sodium"]["project"] != float64(394468) {

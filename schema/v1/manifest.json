@@ -62,17 +62,12 @@
       "additionalProperties": { "$ref": "#/$defs/target" },
       "description": "Build targets. Each lists its override layers explicitly; paths are never inferred."
     },
-    "packs": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/pack" },
-      "description": "Packs whose mods and overrides merge into this project. A pack's own lock is ignored."
-    },
-    "mods": {
+    "requires": {
       "type": "object",
-      "propertyNames": { "$ref": "#/$defs/modId" },
-      "additionalProperties": { "$ref": "#/$defs/mod" },
+      "propertyNames": { "$ref": "#/$defs/requireKey" },
+      "additionalProperties": { "$ref": "#/$defs/require" },
       "default": {},
-      "description": "Direct mods keyed by in-jar mod id. An empty object selects the newest release-channel file for the locked Minecraft and loader."
+      "description": "Mods and modpacks this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader."
     },
     "ignore": {
       "type": "array",
@@ -227,41 +222,42 @@
         "note": { "$ref": "#/$defs/note" }
       }
     },
-    "pack": {
+    "requireKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "description": "Name of a requires entry, unique across mods and modpacks. Used in messages and requiredBy."
+    },
+    "require": {
       "type": "object",
-      "required": ["source"],
       "additionalProperties": false,
       "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["mod", "modpack", "resourcepack", "shader"],
+          "description": "What the entry is. Omitted means modpack for an entry with source and mod otherwise; when given it must agree with the entry. Resource packs and shaders aren't supported yet."
+        },
         "source": {
           "type": "string",
           "minLength": 1,
-          "description": "Local path, git URL, or raw manifest URL."
+          "description": "Local path, git URL, or raw manifest URL of a modpack."
         },
         "ref": {
           "type": "string",
           "minLength": 1,
-          "description": "Branch, tag, or commit for git sources. The lock records the resolved commit."
-        },
-        "name": {
-          "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$",
-          "description": "Display name used in messages and requiredBy. Defaults to the last path segment of the source minus .git. Must be unique across packs."
+          "description": "Branch, tag, or commit for a git source. The lock records the resolved commit."
         },
         "autoUpdate": {
           "type": "boolean",
-          "description": "Whether sync refreshes this pack from its source. Omitted means true; false pins the pack at its locked state. update refreshes every pack regardless."
+          "description": "Whether sync refreshes this modpack from its source. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless."
         },
         "locked": {
           "type": "boolean",
-          "description": "Whether the pack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock; a source without a lock is always resolved from its manifest."
+          "description": "Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock; a source without a lock is always resolved from its manifest."
         },
-        "note": { "$ref": "#/$defs/note" }
-      }
-    },
-    "mod": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
+        "file": {
+          "$ref": "#/$defs/relativePath",
+          "description": "A local zip or jar that is on no provider. Not supported yet."
+        },
         "project": {
           "$ref": "#/$defs/projectId",
           "description": "Written by add when the provider slug differs from the mod id or the provider is CurseForge."
@@ -299,7 +295,36 @@
           "description": "Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Features default from the target's features list."
         },
         "note": { "$ref": "#/$defs/note" }
-      }
+      },
+      "dependentRequired": { "ref": ["source"], "autoUpdate": ["source"], "locked": ["source"] },
+      "allOf": [
+        {
+          "if": { "required": ["source"] },
+          "then": {
+            "properties": { "type": { "const": "modpack" } },
+            "not": {
+              "anyOf": [
+                { "required": ["file"] },
+                { "required": ["project"] },
+                { "required": ["pin"] },
+                { "required": ["channel"] },
+                { "required": ["side"] },
+                { "required": ["provider"] },
+                { "required": ["os"] },
+                { "required": ["feature"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": { "required": ["file"] },
+          "then": {
+            "not": {
+              "anyOf": [{ "required": ["project"] }, { "required": ["pin"] }, { "required": ["channel"] }, { "required": ["provider"] }]
+            }
+          }
+        }
+      ]
     },
     "ignore": {
       "type": "object",

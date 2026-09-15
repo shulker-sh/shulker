@@ -44,7 +44,7 @@ func TestLookup(t *testing.T) {
 		{[]string{"feature", "off"}, "section cli: shulker feature on|off"},
 		{[]string{"link", "prism"}, "section cli: shulker link prism"},
 		{[]string{"sides"}, "section concepts: Sides"},
-		{[]string{"manifest", "pack"}, "section manifest: pack"},
+		{[]string{"manifest", "require"}, "section manifest: require"},
 		{[]string{"Edits in the build directory"}, "section concepts: Edits in the build directory"},
 		{[]string{"link"}, "matches"},
 		{[]string{"pack"}, "matches"},
@@ -61,12 +61,12 @@ func TestLookup(t *testing.T) {
 func TestLookupListsEveryPlaceANameIsDocumented(t *testing.T) {
 	pages := mustPages(t)
 	var got []string
-	for _, s := range Lookup(pages, []string{"pack"}).Matches {
+	for _, s := range Lookup(pages, []string{"requireKey"}).Matches {
 		got = append(got, s.Page.Name+": "+s.Heading)
 	}
-	for _, want := range []string{"cli: shulker pack add", "cli: shulker pack list", "manifest: pack", "lock: pack"} {
+	for _, want := range []string{"manifest: requireKey", "lock: requireKey"} {
 		if !slices.Contains(got, want) {
-			t.Errorf("matches for pack %q lack %q", got, want)
+			t.Errorf("matches for requireKey %q lack %q", got, want)
 		}
 	}
 }

@@ -52,7 +52,7 @@ func (a *app) updateCmd() *cobra.Command {
 					}
 					for _, l := range loaded {
 						if requested[l.Name] {
-							for id := range l.Manifest.Mods {
+							for id := range l.Manifest.Mods() {
 								targets = append(targets, id)
 							}
 						}
@@ -176,16 +176,18 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 }
 
 func (a *app) resolveMovedRefs(ctx context.Context, p *project.Project, r *resolve.Resolver) error {
-	for i, mp := range p.Manifest.Packs {
-		pinned, locked := p.Lock.Packs[mp.Source]
-		if !locked || pinned.Ref == mp.Ref {
+	modpacks := p.Manifest.Modpacks()
+	for i, l := range r.Packs {
+		mp := modpacks[l.Name]
+		pinned, locked := p.Lock.Modpacks[l.Name]
+		if !locked || pinned.Source != mp.Source || pinned.Ref == mp.Ref {
 			continue
 		}
 		store, err := a.packStore(p)
 		if err != nil {
 			return err
 		}
-		loaded, err := store.Resolve(ctx, mp)
+		loaded, err := store.Resolve(ctx, l.Name, mp)
 		if err != nil {
 			return err
 		}

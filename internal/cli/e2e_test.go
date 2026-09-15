@@ -552,8 +552,8 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatalf("lock mods: %+v", l.Mods)
 	}
 	h.readJSON(t, "shulker.json", &m)
-	if mods := m["mods"].(map[string]any); len(mods) != 1 || len(mods["sodium"].(map[string]any)) != 0 {
-		t.Fatalf("manifest mods: %v", m["mods"])
+	if mods := m["requires"].(map[string]any); len(mods) != 1 || len(mods["sodium"].(map[string]any)) != 0 {
+		t.Fatalf("manifest mods: %v", m["requires"])
 	}
 
 	if err := os.WriteFile(filepath.Join(h.dir, "overrides", "options.txt.tmpl"), []byte("renderDistance:12\nlang:${lang}\n"), 0o644); err != nil {
@@ -719,7 +719,7 @@ func TestAddLocksHandAddedMods(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes")
 	h.editManifest(t, func(m map[string]any) {
-		m["mods"] = map[string]any{"sodium": map[string]any{}}
+		m["requires"] = map[string]any{"sodium": map[string]any{}}
 	})
 	var env out.Envelope
 	if err := json.Unmarshal([]byte(h.mustRun(t, "add", "fabric-api", "--json")), &env); err != nil {
@@ -743,7 +743,7 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	h.mustRun(t, "add", "sodium", "fabric-api")
 	h.newer = true
 	h.editManifest(t, func(m map[string]any) {
-		m["mods"].(map[string]any)["fabric-api"] = map[string]any{"side": "server"}
+		m["requires"].(map[string]any)["fabric-api"] = map[string]any{"side": "server"}
 	})
 	code, stdout, _ := h.run(t, "install", "--json")
 	var env out.Envelope
@@ -762,7 +762,7 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 		t.Fatalf("lock must re-pick only fabric-api: %+v", l.Mods)
 	}
 	h.editManifest(t, func(m map[string]any) {
-		m["mods"].(map[string]any)["fabric-api"] = map[string]any{"side": "client"}
+		m["requires"].(map[string]any)["fabric-api"] = map[string]any{"side": "client"}
 	})
 	if out := h.mustRun(t, "lock"); !strings.Contains(out, "~ fabric-api ") || !strings.Contains(out, "(now client only)") {
 		t.Fatalf("lock after a second side change: %s", out)
@@ -782,7 +782,7 @@ func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes")
 	h.mustRun(t, "add", "sodium")
-	h.editManifest(t, func(m map[string]any) { m["mods"] = map[string]any{} })
+	h.editManifest(t, func(m map[string]any) { m["requires"] = map[string]any{} })
 	var env out.Envelope
 	if err := json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env); err != nil {
 		t.Fatal(err)
@@ -791,7 +791,7 @@ func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
 		t.Fatalf("lock after removing sodium by hand: %+v", env.Data)
 	}
 
-	h.editManifest(t, func(m map[string]any) { m["mods"] = map[string]any{"sodium": map[string]any{}} })
+	h.editManifest(t, func(m map[string]any) { m["requires"] = map[string]any{"sodium": map[string]any{}} })
 	if err := os.Remove(filepath.Join(h.dir, "shulker.lock")); err != nil {
 		t.Fatal(err)
 	}
@@ -1020,7 +1020,7 @@ func TestUpdateOutdatedAndPin(t *testing.T) {
 	var m struct {
 		Mods map[string]struct {
 			Pin string `json:"pin"`
-		} `json:"mods"`
+		} `json:"requires"`
 	}
 	h.readJSON(t, "shulker.json", &m)
 	if m.Mods["sodium"].Pin != "QANobbMI" {

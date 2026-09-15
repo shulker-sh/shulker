@@ -14,7 +14,7 @@ import (
 func setMod(t *testing.T, h *harness, id string, entry map[string]any) {
 	t.Helper()
 	h.editManifest(t, func(m map[string]any) {
-		m["mods"].(map[string]any)[id] = entry
+		m["requires"].(map[string]any)[id] = entry
 	})
 }
 

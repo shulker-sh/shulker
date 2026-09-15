@@ -2,8 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -139,7 +141,7 @@ func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []str
 			Minecraft: minecraft,
 			Loader:    manifest.Loader{Type: loaderType, Version: loaderVersion},
 			Targets:   map[string]manifest.Target{"client": {Side: "client", Build: "build/client"}},
-			Mods:      map[string]manifest.Mod{},
+			Requires:  map[string]manifest.Require{},
 		}
 		if importNeedsServer(arc) {
 			m.Targets["server"] = manifest.Target{Side: "server", Build: "build/server"}
@@ -161,15 +163,14 @@ func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []str
 	if m.Version != arc.Index.VersionID {
 		m.Version = arc.Index.VersionID
 	}
-	if len(m.Packs) > 0 {
-		names := make([]string, 0, len(m.Packs))
-		for _, p := range m.Packs {
-			names = append(names, p.Source)
+	if modpacks := m.Modpacks(); len(modpacks) > 0 {
+		sources := make([]string, 0, len(modpacks))
+		for _, name := range slices.Sorted(maps.Keys(modpacks)) {
+			sources = append(sources, modpacks[name].Source)
 		}
-		warnings = append(warnings, fmt.Sprintf("pack layers were flattened into the overrides: %s", strings.Join(names, ", ")))
-		m.Packs = nil
+		warnings = append(warnings, fmt.Sprintf("pack layers were flattened into the overrides: %s", strings.Join(sources, ", ")))
 	}
-	m.Mods = map[string]manifest.Mod{}
+	m.Requires = map[string]manifest.Require{}
 	return m, warnings, nil
 }
 

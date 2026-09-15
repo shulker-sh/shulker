@@ -4,7 +4,7 @@
   "title": "shulker.lock",
   "description": "Shulker lock file. Tool-owned, key-sorted, pretty-printed. Records the exact resolution of shulker.json; install and build read only this file.",
   "type": "object",
-  "required": ["lockVersion", "minecraft", "loader", "java", "packs", "mods", "players"],
+  "required": ["lockVersion", "minecraft", "loader", "java", "modpacks", "mods", "players"],
   "additionalProperties": false,
   "properties": {
     "lockVersion": { "type": "integer", "const": 1 },
@@ -57,16 +57,17 @@
         "component": { "type": "string", "minLength": 1, "description": "Mojang runtime component name, e.g. java-runtime-epsilon. Used to fetch the managed runtime." }
       }
     },
-    "packs": {
+    "modpacks": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/pack" },
-      "description": "Keyed by manifest source string."
+      "propertyNames": { "$ref": "#/$defs/requireKey" },
+      "additionalProperties": { "$ref": "#/$defs/modpack" },
+      "description": "Every modpack in the manifest's requires, keyed by its requires key."
     },
     "mods": {
       "type": "object",
-      "propertyNames": { "$ref": "#/$defs/modId" },
+      "propertyNames": { "$ref": "#/$defs/requireKey" },
       "additionalProperties": { "$ref": "#/$defs/mod" },
-      "description": "Every mod in the resolved set, direct and transitive, keyed by in-jar mod id."
+      "description": "Every mod in the resolved set, direct and transitive, keyed by its requires key or, for a dependency, its in-jar mod id."
     },
     "players": {
       "type": "array",
@@ -89,21 +90,21 @@
     "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
     "modId": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
-    "packName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+    "requireKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
     "modrinthId": { "type": "string", "pattern": "^[A-Za-z0-9]{8}$" },
     "curseforgeId": { "type": "integer", "minimum": 1 },
-    "pack": {
+    "modpack": {
       "type": "object",
-      "required": ["name"],
+      "required": ["source"],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "#/$defs/packName", "description": "Manifest name or the derived default." },
+        "source": { "type": "string", "minLength": 1, "description": "The manifest source at resolution time. A different source in the manifest makes the lock out of date." },
         "ref": { "type": "string", "minLength": 1, "description": "The manifest ref at resolution time. Git sources only." },
         "commit": { "$ref": "#/$defs/gitCommit", "description": "Resolved commit. Git sources only." },
         "dirSha256": { "$ref": "#/$defs/sha256", "description": "Content hash of the pack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only." },
         "sha256": { "$ref": "#/$defs/sha256", "description": "Hash of the fetched manifest. Raw manifest URL sources only." },
-        "locked": { "type": "boolean", "const": true, "description": "Present when the pack's mods were copied from its lock. Absent means they were resolved from its manifest." },
-        "lockSha256": { "$ref": "#/$defs/sha256", "description": "Hash of the pack's lock at resolution time. Present exactly when locked is." }
+        "locked": { "type": "boolean", "const": true, "description": "Present when the modpack's mods were copied from its lock. Absent means they were resolved from its manifest." },
+        "lockSha256": { "$ref": "#/$defs/sha256", "description": "Hash of the modpack's lock at resolution time. Present exactly when locked is." }
       },
       "oneOf": [
         { "required": ["commit"] },
@@ -136,12 +137,13 @@
         "size": { "type": "integer", "minimum": 1, "description": "Jar size in bytes as the provider reports it, for the download bar. Absent on entries locked before shulker recorded sizes; filled in when the mod is next resolved." },
         "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Effective side after any manifest override." },
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked: the manifest's channel for a mod listed there or in a pack, the requiring mod's for a dependency. A listed mod whose manifest channel differs makes the lock out of date." },
-        "pack": { "type": "string", "minLength": 1, "description": "Key in packs of the locked pack this entry was copied from. Absent for the project's own mods and the dependencies resolved for them." },
+        "modpack": { "$ref": "#/$defs/requireKey", "description": "Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own mods and the dependencies resolved for them." },
+        "modId": { "$ref": "#/$defs/modId", "description": "The jar's in-jar mod id. Present only when it differs from the entry's key; dependencies, validation and requiredBy use it." },
         "requiredBy": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
-          "description": "Mod ids (or pack names) whose jar metadata depends on this mod. Empty plus absent from manifest and packs means orphan."
+          "items": { "$ref": "#/$defs/requireKey" },
+          "description": "Mod ids (or modpack keys) whose jar metadata depends on this mod. Empty plus absent from the manifest's requires and every modpack means orphan."
         },
         "aliases": {
           "type": "object",

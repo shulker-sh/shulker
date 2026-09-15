@@ -116,11 +116,11 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 		t.Fatalf("overrides: %v", res.Overrides)
 	}
 	m, l := readProject(t, dir)
-	if m.Name != "pack" || m.Version != "1.0.0" || len(m.Mods) != 1 || m.Client == nil {
+	if m.Name != "pack" || m.Version != "1.0.0" || len(m.Mods()) != 1 || m.Client == nil {
 		t.Fatalf("manifest: %+v", m)
 	}
-	if _, ok := m.Mods["sodium"]; !ok {
-		t.Fatalf("manifest mods: %v", m.Mods)
+	if _, ok := m.Mods()["sodium"]; !ok {
+		t.Fatalf("manifest mods: %v", m.Mods())
 	}
 	if got := m.Targets["client"].Overrides; strings.Join(got, ",") != "overrides" {
 		t.Fatalf("target overrides: %v", got)
@@ -176,7 +176,7 @@ func TestImportMrpackTamperedMarker(t *testing.T) {
 		t.Fatalf("warnings: %v", env.Warnings)
 	}
 	m, l := readProject(t, dir)
-	if len(m.Mods) != 0 || m.Minecraft != "26.2" {
+	if len(m.Mods()) != 0 || m.Minecraft != "26.2" {
 		t.Fatalf("manifest: %+v", m)
 	}
 	if len(l.Mods) != 1 || len(l.Mods["fabric-api"].RequiredBy) != 0 {
@@ -221,7 +221,7 @@ func TestImportMrpackForeign(t *testing.T) {
 		t.Fatalf("mods: %+v", res.Mods)
 	}
 	m, l := readProject(t, dir)
-	if m.Note != "hello" || m.Minecraft != "26.2" || m.Loader.Version != "0.17.3" || m.Server == nil || len(m.Mods) != 2 {
+	if m.Note != "hello" || m.Minecraft != "26.2" || m.Loader.Version != "0.17.3" || m.Server == nil || len(m.Mods()) != 2 {
 		t.Fatalf("manifest: %+v", m)
 	}
 	if got := m.Targets["client"].Overrides; strings.Join(got, ",") != "overrides,client-overrides" {

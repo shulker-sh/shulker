@@ -16,7 +16,7 @@ func TestPlacementsFollowTargetDefaultsAndIgnoreOS(t *testing.T) {
 				"dev":    {Side: "client", Features: []string{"profiling"}},
 				"server": {Side: "server"},
 			},
-			Mods: map[string]manifest.Mod{
+			Requires: map[string]manifest.Require{
 				"lithium": {},
 				"modmenu": {},
 				"spark":   {Feature: manifest.StringList{"profiling"}},

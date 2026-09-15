@@ -6,7 +6,7 @@
   "targets": {
     "client": { "side": "client", "overrides": ["overrides"], "build": "build/client" }
   },
-  "mods": {
+  "requires": {
     "sodium": {}
   }
 }

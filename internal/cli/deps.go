@@ -2,7 +2,9 @@ package cli
 
 import (
 	"context"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"shulker.sh/shulker/internal/build"
@@ -87,6 +89,9 @@ func (a *app) openProjectAt(dir string) (*project.Project, error) {
 }
 
 func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolver, error) {
+	if err := p.Manifest.CheckSupported(); err != nil {
+		return nil, err
+	}
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
@@ -110,6 +115,9 @@ func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolv
 }
 
 func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, error) {
+	if err := p.Manifest.CheckSupported(); err != nil {
+		return nil, err
+	}
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
@@ -133,30 +141,32 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 	if a.packs != nil {
 		return a.packs, nil
 	}
-	if _, err := pack.Names(p.Manifest.Packs); err != nil {
-		return nil, err
-	}
 	store, err := a.packStore(p)
 	if err != nil {
 		return nil, err
 	}
+	modpacks := p.Manifest.Modpacks()
 	loaded := []*pack.Loaded{}
-	for _, mp := range p.Manifest.Packs {
-		pinned, ok := p.Lock.Packs[mp.Source]
+	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
+		mp := modpacks[name]
+		pinned, ok := p.Lock.Modpacks[name]
+		moved := ok && pinned.Source != mp.Source
 		// A relock reads local packs as they are on disk: they have no version to hold back.
-		if !ok || (a.relocking && pack.Classify(mp.Source) == pack.Local) {
-			if !ok {
-				name, _ := pack.Name(mp)
+		if !ok || moved || (a.relocking && pack.Classify(mp.Source) == pack.Local) {
+			switch {
+			case !ok:
 				a.printer.Warn("pack %s is not in the lock yet; resolving it", name)
+			case moved:
+				a.printer.Warn("pack %s has a new source since the lock; resolving it", name)
 			}
-			l, err := store.Resolve(ctx, mp)
+			l, err := store.Resolve(ctx, name, mp)
 			if err != nil {
 				return nil, err
 			}
 			loaded = append(loaded, l)
 			continue
 		}
-		l, warning, err := store.Open(ctx, mp, pinned)
+		l, warning, err := store.Open(ctx, name, mp, pinned)
 		if err != nil {
 			return nil, err
 		}
@@ -170,16 +180,14 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 }
 
 func (a *app) resolvePacks(ctx context.Context, p *project.Project) ([]*pack.Loaded, error) {
-	if _, err := pack.Names(p.Manifest.Packs); err != nil {
-		return nil, err
-	}
 	store, err := a.packStore(p)
 	if err != nil {
 		return nil, err
 	}
+	modpacks := p.Manifest.Modpacks()
 	loaded := []*pack.Loaded{}
-	for _, mp := range p.Manifest.Packs {
-		l, err := store.Resolve(ctx, mp)
+	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
+		l, err := store.Resolve(ctx, name, modpacks[name])
 		if err != nil {
 			return nil, err
 		}

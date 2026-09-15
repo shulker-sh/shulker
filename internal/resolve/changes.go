@@ -11,7 +11,7 @@ type Snapshot struct {
 	loader    lock.Loader
 	mods      map[string]lock.Mod
 	listed    map[string]bool
-	packs     map[string]lock.Pack
+	packs     map[string]lock.Modpack
 }
 
 type AddedMod struct {
@@ -56,32 +56,33 @@ func (c *Changes) Empty() bool {
 
 // Snapshot copies each RequiredBy because the resolver filters those slices in place.
 func (r *Resolver) Snapshot() Snapshot {
-	s := Snapshot{minecraft: r.Lock.Minecraft, loader: r.Lock.Loader, mods: map[string]lock.Mod{}, listed: map[string]bool{}, packs: map[string]lock.Pack{}}
+	s := Snapshot{minecraft: r.Lock.Minecraft, loader: r.Lock.Loader, mods: map[string]lock.Mod{}, listed: map[string]bool{}, packs: map[string]lock.Modpack{}}
 	for id, m := range r.Lock.Mods {
 		m.RequiredBy = append([]string{}, m.RequiredBy...)
 		s.mods[id] = m
 	}
-	for id := range r.Manifest.Mods {
+	for id := range r.Manifest.Mods() {
 		s.listed[id] = true
 	}
-	for source, pin := range r.Lock.Packs {
+	for source, pin := range r.Lock.Modpacks {
 		s.packs[source] = pin
 	}
 	return s
 }
 
 func (r *Resolver) Changes(before Snapshot) *Changes {
-	c := &Changes{Platform: []Change{}, Added: []AddedMod{}, Updated: []Change{}, Removed: []RemovedMod{}, Packs: PackChanges(before.packs, r.Lock.Packs)}
+	c := &Changes{Platform: []Change{}, Added: []AddedMod{}, Updated: []Change{}, Removed: []RemovedMod{}, Packs: PackChanges(before.packs, r.Lock.Modpacks)}
 	if before.minecraft != r.Lock.Minecraft {
 		c.Platform = append(c.Platform, Change{ID: "minecraft", From: before.minecraft, To: r.Lock.Minecraft})
 	}
 	if from, to := loaderLabel(before.loader), loaderLabel(r.Lock.Loader); from != to {
 		c.Platform = append(c.Platform, Change{ID: "loader", From: from, To: to})
 	}
+	mods := r.Manifest.Mods()
 	for _, id := range r.lockIDs() {
 		now := r.Lock.Mods[id]
 		old, existed := before.mods[id]
-		_, listed := r.Manifest.Mods[id]
+		_, listed := mods[id]
 		switch {
 		case !existed || (listed && !before.listed[id]):
 			c.Added = append(c.Added, AddedMod{ID: id, VersionNumber: now.VersionNumber, Side: now.Side, Provider: now.Provider, RequiredBy: nonNil(now.RequiredBy), AlreadyLocked: existed})
@@ -102,7 +103,7 @@ func (r *Resolver) Changes(before Snapshot) *Changes {
 	for _, id := range sortedKeys(before.mods) {
 		old := before.mods[id]
 		now, locked := r.Lock.Mods[id]
-		_, listed := r.Manifest.Mods[id]
+		_, listed := mods[id]
 		switch {
 		case !locked:
 			c.Removed = append(c.Removed, RemovedMod{ID: id, VersionNumber: old.VersionNumber, RequiredBy: nonNil(old.RequiredBy)})

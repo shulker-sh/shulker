@@ -110,7 +110,7 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provi
 
 func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error {
 	explicit := opts.Provider != ""
-	if prev, ok := r.Manifest.Mods[slug]; !explicit && ok && prev.Provider != "" {
+	if prev, ok := r.Manifest.Mods()[slug]; !explicit && ok && prev.Provider != "" {
 		opts.Provider = prev.Provider
 	}
 	p, proj, err := r.lookup(ctx, slug, opts.Provider)
@@ -125,7 +125,10 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if err != nil {
 		return err
 	}
-	previous := r.Manifest.Mods[id]
+	if held, ok := r.Manifest.Requires[id]; ok && held.Kind() != manifest.TypeMod {
+		return out.Errorf("requires-taken", "requires already has %s as a %s; remove it first", id, held.Kind())
+	}
+	previous := r.Manifest.Requires[id]
 	switched := explicit && prior != nil && prior.Provider != p.Name()
 	if switched {
 		r.dropRequiredBy(id)
@@ -141,7 +144,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if err := r.addDeps(ctx, p, v, id, opts.Channel, visited); err != nil {
 		return err
 	}
-	entry := manifest.Mod{Side: opts.Side}
+	entry := manifest.Require{Side: opts.Side}
 	if opts.Channel != "" && opts.Channel != "release" {
 		entry.Channel = opts.Channel
 	}
@@ -154,7 +157,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if p.Name() != r.Manifest.ProviderOrder()[0] {
 		entry.Provider = p.Name()
 	}
-	r.Manifest.Mods[id] = entry
+	r.Manifest.Requires[id] = entry
 	if switched {
 		r.pruneOrphans()
 	}

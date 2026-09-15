@@ -120,7 +120,7 @@ func schemaCoverage(root, node map[string]any, doc any, path string, want, have 
 }
 
 func TestSaveRefusesInvalid(t *testing.T) {
-	m := &Manifest{Name: "x", Minecraft: "26.2", Loader: Loader{Type: "fabric", Version: "*"}, Targets: map[string]Target{}, Mods: map[string]Mod{}}
+	m := &Manifest{Name: "x", Minecraft: "26.2", Loader: Loader{Type: "fabric", Version: "*"}, Targets: map[string]Target{}, Requires: map[string]Require{}}
 	if err := m.Save(filepath.Join(t.TempDir(), FileName)); err == nil {
 		t.Fatal("expected schema error for empty targets")
 	}
@@ -135,12 +135,12 @@ func TestSaveRefusesInvalid(t *testing.T) {
 }
 
 func TestConditionsRoundTrip(t *testing.T) {
-	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"],"features":["fancy"]}},"mods":{"aa":{"os":"macos"},"bb":{"feature":["fancy","!shaders"]}}}`))
+	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"],"features":["fancy"]}},"requires":{"aa":{"os":"macos"},"bb":{"feature":["fancy","!shaders"]}}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Mods["aa"].OS) != 1 || m.Mods["aa"].OS[0] != "macos" || len(m.Mods["bb"].Feature) != 2 || m.Targets["client"].Features[0] != "fancy" {
-		t.Fatalf("parsed conditions: %+v", m.Mods)
+	if len(m.Mods()["aa"].OS) != 1 || m.Mods()["aa"].OS[0] != "macos" || len(m.Mods()["bb"].Feature) != 2 || m.Targets["client"].Features[0] != "fancy" {
+		t.Fatalf("parsed conditions: %+v", m.Mods())
 	}
 	data, err := m.Encode()
 	if err != nil {
@@ -148,5 +148,48 @@ func TestConditionsRoundTrip(t *testing.T) {
 	}
 	if s := string(data); !strings.Contains(s, `"os": "macos"`) || !strings.Contains(s, "\"feature\": [\n") {
 		t.Fatalf("encoded conditions: %s", s)
+	}
+}
+
+func TestRequiresEntryKinds(t *testing.T) {
+	doc := func(entries string) []byte {
+		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{` + entries + `}}`)
+	}
+	for _, entries := range []string{
+		`"base":{"source":"../base","pin":"AANobbMI"}`,
+		`"base":{"source":"../base","type":"mod"}`,
+		`"sodium":{"ref":"main"}`,
+		`"extras":{"file":"extras.zip","provider":"modrinth"}`,
+		`"Sodium":{}`,
+	} {
+		if _, err := Parse(doc(entries)); err == nil {
+			t.Errorf("%s should be invalid", entries)
+		}
+	}
+	m, err := Parse(doc(`"base":{"source":"../base","ref":"main","autoUpdate":false},"sodium":{"channel":"beta"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m.Modpacks()["base"]; !ok || len(m.Modpacks()) != 1 || len(m.Mods()) != 1 || m.Mods()["sodium"].Channel != "beta" {
+		t.Fatalf("mods %v, modpacks %v", m.Mods(), m.Modpacks())
+	}
+	if err := m.CheckSupported(); err != nil {
+		t.Fatal(err)
+	}
+	for _, entries := range []string{
+		`"extras":{"type":"resourcepack"}`,
+		`"extras":{"type":"mod","file":"mods/extras.jar"}`,
+		`"cozy":{"type":"modpack","provider":"modrinth"}`,
+	} {
+		m, err := Parse(doc(entries))
+		if err != nil {
+			t.Fatalf("%s: %v", entries, err)
+		}
+		if err := m.CheckSupported(); err == nil || !strings.Contains(err.Error(), "aren't supported yet") {
+			t.Errorf("%s: CheckSupported = %v", entries, err)
+		}
+		if len(m.Mods()) != 0 || len(m.Modpacks()) != 0 {
+			t.Errorf("%s: unsupported entry counted as mod or modpack", entries)
+		}
 	}
 }

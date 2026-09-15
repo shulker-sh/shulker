@@ -10,7 +10,6 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
-	"shulker.sh/shulker/internal/pack"
 )
 
 func (p *Project) LockStale() bool {
@@ -24,16 +23,17 @@ func (p *Project) LockDifferences() []string {
 	m, l := p.Manifest, p.Lock
 	diffs := append(PlatformDifferences(m, l), ProviderDifferences(m, l)...)
 	diffs = append(diffs, PackDifferences(m, l)...)
-	for _, id := range slices.Sorted(maps.Keys(m.Mods)) {
+	mods := m.Mods()
+	for _, id := range slices.Sorted(maps.Keys(mods)) {
 		lm, ok := l.Mods[id]
 		if !ok {
 			diffs = append(diffs, id+": in shulker.json, not in shulker.lock")
 			continue
 		}
-		diffs = append(diffs, ModDifferences(id, m.Mods[id], lm)...)
+		diffs = append(diffs, ModDifferences(id, mods[id], lm)...)
 	}
 	for _, id := range slices.Sorted(maps.Keys(l.Mods)) {
-		if _, listed := m.Mods[id]; !listed && len(l.Mods[id].RequiredBy) == 0 {
+		if _, listed := mods[id]; !listed && len(l.Mods[id].RequiredBy) == 0 {
 			diffs = append(diffs, id+": in shulker.lock, not in shulker.json")
 		}
 	}
@@ -72,32 +72,28 @@ func ProviderDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 
 func PackDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 	var diffs []string
-	listed := map[string]bool{}
-	for _, mp := range m.Packs {
-		listed[mp.Source] = true
-		name, err := pack.Name(mp)
-		if err != nil {
-			name = mp.Source
-		}
-		lp, ok := l.Packs[mp.Source]
+	modpacks := m.Modpacks()
+	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
+		mp := modpacks[name]
+		lp, ok := l.Modpacks[name]
 		switch {
 		case !ok:
 			diffs = append(diffs, fmt.Sprintf("pack %s: in shulker.json, not in shulker.lock", name))
+		case lp.Source != mp.Source:
+			diffs = append(diffs, fmt.Sprintf("pack %s: source %s -> %s", name, lp.Source, mp.Source))
 		case lp.Ref != mp.Ref:
 			diffs = append(diffs, fmt.Sprintf("pack %s: ref %q -> %q", name, lp.Ref, mp.Ref))
-		case lp.Name != name:
-			diffs = append(diffs, fmt.Sprintf("pack %s: name %s -> %s", name, lp.Name, name))
 		}
 	}
-	for _, source := range slices.Sorted(maps.Keys(l.Packs)) {
-		if !listed[source] {
-			diffs = append(diffs, fmt.Sprintf("pack %s: in shulker.lock, not in shulker.json", l.Packs[source].Name))
+	for _, name := range slices.Sorted(maps.Keys(l.Modpacks)) {
+		if _, listed := modpacks[name]; !listed {
+			diffs = append(diffs, fmt.Sprintf("pack %s: in shulker.lock, not in shulker.json", name))
 		}
 	}
 	return diffs
 }
 
-func ModDifferences(id string, e manifest.Mod, lm lock.Mod) []string {
+func ModDifferences(id string, e manifest.Require, lm lock.Mod) []string {
 	var diffs []string
 	channel := e.Channel
 	if channel == "" {

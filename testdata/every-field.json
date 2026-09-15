@@ -26,8 +26,9 @@
       "note": "target"
     }
   },
-  "packs": [{ "source": "../base", "ref": "main", "name": "base", "autoUpdate": false, "locked": false, "note": "pack" }],
-  "mods": {
+  "requires": {
+    "base": { "type": "modpack", "source": "../base", "ref": "main", "autoUpdate": false, "locked": false, "note": "modpack" },
+    "extras": { "type": "resourcepack", "file": "packs/extras.zip" },
     "sodium": {
       "project": "AANobbMI",
       "pin": "4TkX2p9Z",

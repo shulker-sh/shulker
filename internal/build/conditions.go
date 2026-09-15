@@ -58,7 +58,7 @@ func (b *Builder) Features() []Feature {
 		byName[name] = f
 		return f
 	}
-	gate := func(id string, m manifest.Mod) {
+	gate := func(id string, m manifest.Require) {
 		for _, item := range m.Feature {
 			name, negated := strings.CutPrefix(item, "!")
 			label := id
@@ -71,12 +71,13 @@ func (b *Builder) Features() []Feature {
 			}
 		}
 	}
-	for id, m := range b.Manifest.Mods {
+	own := b.Manifest.Mods()
+	for id, m := range own {
 		gate(id, m)
 	}
 	for _, p := range b.Packs {
-		for id, m := range p.Manifest.Mods {
-			if _, ok := b.Manifest.Mods[id]; !ok {
+		for id, m := range p.Manifest.Mods() {
+			if _, ok := own[id]; !ok {
 				gate(id, m)
 			}
 		}
@@ -98,7 +99,7 @@ func (b *Builder) Features() []Feature {
 	return res
 }
 
-func (c conditions) admits(m manifest.Mod) (bool, string) {
+func (c conditions) admits(m manifest.Require) (bool, string) {
 	if ok, why := matches(m.OS, "os", func(name string) bool { return name == c.os }); !ok && !c.anyOS {
 		return false, why
 	}
@@ -135,14 +136,15 @@ type selection struct {
 	warnings []string
 }
 
-func (b *Builder) directEntries(c conditions) map[string]manifest.Mod {
-	direct := map[string]manifest.Mod{}
-	for id, m := range b.Manifest.Mods {
+func (b *Builder) directEntries(c conditions) map[string]manifest.Require {
+	own := b.Manifest.Mods()
+	direct := map[string]manifest.Require{}
+	for id, m := range own {
 		direct[id] = m
 	}
 	for _, p := range b.Packs {
-		for id, m := range p.Manifest.Mods {
-			if _, ok := b.Manifest.Mods[id]; ok {
+		for id, m := range p.Manifest.Mods() {
+			if _, ok := own[id]; ok {
 				continue
 			}
 			if cur, seen := direct[id]; seen {
@@ -190,7 +192,7 @@ func (c conditions) featureLabels() []string {
 	return on
 }
 
-func (c conditions) admittedBy(m manifest.Mod) string {
+func (c conditions) admittedBy(m manifest.Require) string {
 	var parts []string
 	for _, name := range m.OS {
 		if name == c.os {

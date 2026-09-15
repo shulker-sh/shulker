@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"maps"
+	"slices"
+
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -20,7 +23,8 @@ func (a *app) packCmd() *cobra.Command {
 }
 
 func (a *app) packAddCmd() *cobra.Command {
-	var entry manifest.Pack
+	var entry manifest.Require
+	var name string
 	cmd := &cobra.Command{
 		Use:   "add <source>",
 		Short: "Add a pack from a local path, git URL, or raw manifest URL",
@@ -28,32 +32,36 @@ func (a *app) packAddCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			entry.Source = args[0]
 			return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
-				for _, existing := range p.Manifest.Packs {
+				for _, existing := range p.Manifest.Modpacks() {
 					if existing.Source == entry.Source {
 						return "", out.Errorf("pack-exists", "pack %s is already in the manifest", entry.Source)
 					}
 				}
-				if _, err := pack.Names(append(append([]manifest.Pack{}, p.Manifest.Packs...), entry)); err != nil {
+				key, err := pack.Key(entry.Source, name)
+				if err != nil {
 					return "", err
+				}
+				if _, taken := p.Manifest.Requires[key]; taken {
+					return "", out.Errorf("pack-name", "requires already has %s; pass --name to pick another name", key)
 				}
 				store, err := a.packStore(p)
 				if err != nil {
 					return "", err
 				}
-				loaded, err := store.Resolve(cmd.Context(), entry)
+				loaded, err := store.Resolve(cmd.Context(), key, entry)
 				if err != nil {
 					return "", err
 				}
 				if err := r.AddPack(cmd.Context(), loaded); err != nil {
 					return "", err
 				}
-				p.Manifest.Packs = append(p.Manifest.Packs, entry)
+				p.Manifest.Requires[key] = entry
 				return "", nil
 			})
 		},
 	}
 	cmd.Flags().StringVar(&entry.Ref, "ref", "", "branch, tag, or commit for git sources")
-	cmd.Flags().StringVar(&entry.Name, "name", "", "name used in messages and requiredBy (default: derived from the source)")
+	cmd.Flags().StringVar(&name, "name", "", "name used in requires, messages and requiredBy (default: derived from the source)")
 	return cmd
 }
 
@@ -87,13 +95,14 @@ func (a *app) packListCmd() *cobra.Command {
 				return err
 			}
 			res := []pack.Status{}
-			for _, entry := range p.Manifest.Packs {
-				var pinned lock.Pack
+			modpacks := p.Manifest.Modpacks()
+			for _, name := range slices.Sorted(maps.Keys(modpacks)) {
+				var pinned lock.Modpack
 				locked := false
 				if p.Lock != nil {
-					pinned, locked = p.Lock.Packs[entry.Source]
+					pinned, locked = p.Lock.Modpacks[name]
 				}
-				st, err := store.Status(entry, pinned, locked)
+				st, err := store.Status(name, modpacks[name], pinned, locked)
 				if err != nil {
 					return err
 				}

@@ -10,7 +10,7 @@ import (
 func (r *Resolver) Remove(ids []string) error {
 	direct := r.directMods()
 	for _, id := range ids {
-		if _, ok := r.Manifest.Mods[id]; ok {
+		if _, ok := r.Manifest.Mods()[id]; ok {
 			continue
 		}
 		if d, ok := direct[id]; ok {
@@ -26,7 +26,7 @@ func (r *Resolver) Remove(ids []string) error {
 		return e
 	}
 	for _, id := range ids {
-		delete(r.Manifest.Mods, id)
+		delete(r.Manifest.Requires, id)
 	}
 	direct = r.directMods()
 	for _, id := range ids {
@@ -61,12 +61,7 @@ func (r *Resolver) dropLocked(id string) {
 }
 
 func (r *Resolver) manifestIDs() []string {
-	ids := make([]string, 0, len(r.Manifest.Mods))
-	for id := range r.Manifest.Mods {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
+	return sortedKeys(r.Manifest.Mods())
 }
 
 func (r *Resolver) lockIDs() []string {

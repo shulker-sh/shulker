@@ -21,7 +21,7 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 	}
 	for _, l := range r.Packs {
 		r.dropRequiredBy(l.Name)
-		for id := range l.Manifest.Mods {
+		for id := range l.Manifest.Mods() {
 			r.Lock.AddRequiredBy(id, l.Name)
 		}
 	}

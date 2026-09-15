@@ -295,7 +295,7 @@ shulker target list
 
 ## Settings
 
-`set`, `unset`, and `get` edit and read any field of `shulker.json` by its dotted path, like `server.eula` or `mods.sodium.channel`. They never change `shulker.lock`. When an edit leaves the lock out of date, they warn and name each difference; `shulker lock` brings it back in line.
+`set`, `unset`, and `get` edit and read any field of `shulker.json` by its dotted path, like `server.eula` or `requires.sodium.channel`. They never change `shulker.lock`. When an edit leaves the lock out of date, they warn and name each difference; `shulker lock` brings it back in line.
 
 Inside a map of plain values (`server.properties`, `variables`, `client.options`, `links`), everything after the map's name is the key, so `server.properties.rcon.port` needs no escaping.
 
@@ -730,7 +730,7 @@ shulker pack add ../base-pack
 | Flag | Description |
 | --- | --- |
 | `--ref <ref>` | Branch, tag, or commit for git sources |
-| `--name <name>` | Name used in messages and `requiredBy` (default: derived from the source) |
+| `--name <name>` | Name used in `requires`, messages, and `requiredBy` (default: derived from the source) |
 
 ### `shulker pack remove`
 
@@ -989,7 +989,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `pack-fetch` | A pack couldn't be fetched |
 | `pack-manifest` | A pack source has no `shulker.json` |
 | `pack-mismatch` | A pack wants a different Minecraft version or loader |
-| `pack-name` | A pack's name can't be worked out, or two packs share one; set `name` |
+| `pack-name` | A pack's name can't be worked out, isn't valid, or is already in `requires`; pass `--name` |
 | `pack-not-found` | The pack isn't in `shulker.json`. `candidates`: the packs |
 | `pack-provided` | The mod comes from a pack, so it can't be removed on its own |
 | `pack-ref` | A pack's `ref` doesn't apply to its source, or wasn't found |
@@ -1005,6 +1005,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `players-invalid` | A player entry in `shulker.json` is invalid |
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
+| `requires-taken` | `add` found the name already in `requires` as something other than a mod |
+| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a resource pack, shader, local `file`, or a modpack without a `source` |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform; set `java` in `shulker.json` |
 | `self-update-check` | Checking for a release failed, or none is published |
 | `self-update-checksum` | The download doesn't match its checksum |

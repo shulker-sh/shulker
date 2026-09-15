@@ -4,9 +4,9 @@
   "loader": { "type": "fabric", "version": "0.17.3" },
   "java": { "major": 25, "component": "java-runtime-epsilon" },
 
-  "packs": {
-    "https://github.com/shulker-sh/base-pack.git": {
-      "name": "shulker-base-pack",
+  "modpacks": {
+    "base-pack": {
+      "source": "https://github.com/shulker-sh/base-pack.git",
       "ref": "v3",
       "commit": "4f2c9a1e7b3d5c8e0a6f1b2d3c4e5f6a7b8c9d0e"
     }

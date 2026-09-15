@@ -187,7 +187,7 @@ func TestSetWarnsOnlyWhenTheLockDiffers(t *testing.T) {
 	if env := h.runSetting(t, 0, "set", "providers", "--literal", `["curseforge","modrinth"]`); env.LockStale || len(env.Warnings) != 0 {
 		t.Fatalf("reordering providers: lockStale=%v warnings=%v", env.LockStale, env.Warnings)
 	}
-	env := h.runSetting(t, 0, "set", "mods.sodium.channel", "beta")
+	env := h.runSetting(t, 0, "set", "requires.sodium.channel", "beta")
 	if !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "sodium") || !strings.Contains(env.Warnings[0], "run `shulker lock`") {
 		t.Fatalf("channel change: lockStale=%v warnings=%v", env.LockStale, env.Warnings)
 	}

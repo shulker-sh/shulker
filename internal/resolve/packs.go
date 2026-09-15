@@ -2,7 +2,9 @@ package resolve
 
 import (
 	"context"
+	"maps"
 	"reflect"
+	"slices"
 	"sort"
 
 	"shulker.sh/shulker/internal/lock"
@@ -18,17 +20,17 @@ type PackChange struct {
 }
 
 type directMod struct {
-	entry manifest.Mod
+	entry manifest.Require
 	packs []string
 }
 
 func (r *Resolver) directMods() map[string]directMod {
 	d := map[string]directMod{}
-	for id, e := range r.Manifest.Mods {
+	for id, e := range r.Manifest.Mods() {
 		d[id] = directMod{entry: e}
 	}
 	for _, p := range r.Packs {
-		for id, e := range p.Manifest.Mods {
+		for id, e := range p.Manifest.Mods() {
 			cur, ok := d[id]
 			if !ok {
 				cur = directMod{entry: e}
@@ -45,13 +47,15 @@ func (r *Resolver) directIDs() []string {
 }
 
 func (r *Resolver) CheckPacks() error {
+	own := r.Manifest.Mods()
 	owner := map[string]*pack.Loaded{}
 	for _, p := range r.Packs {
 		if err := pack.Compatible(p, r.Lock.Minecraft, r.Lock.Loader); err != nil {
 			return err
 		}
-		for _, id := range sortedKeys(p.Manifest.Mods) {
-			if _, project := r.Manifest.Mods[id]; project {
+		mods := p.Manifest.Mods()
+		for _, id := range sortedKeys(mods) {
+			if _, project := own[id]; project {
 				continue
 			}
 			prev, ok := owner[id]
@@ -59,7 +63,7 @@ func (r *Resolver) CheckPacks() error {
 				owner[id] = p
 				continue
 			}
-			if !reflect.DeepEqual(prev.Manifest.Mods[id], p.Manifest.Mods[id]) {
+			if !reflect.DeepEqual(prev.Manifest.Requires[id], mods[id]) {
 				return out.Errorf("pack-conflict", "packs %s and %s both list %s with different settings; list %s in shulker.json to decide", prev.Name, p.Name, id, id)
 			}
 		}
@@ -74,9 +78,9 @@ func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
 		r.Packs = r.Packs[:len(r.Packs)-1]
 		return err
 	}
-	r.Lock.Packs[l.Source] = l.Pin
+	r.Lock.Modpacks[l.Name] = l.Pin
 	var targets []string
-	for _, id := range sortedKeys(l.Manifest.Mods) {
+	for _, id := range sortedKeys(l.Manifest.Mods()) {
 		if _, existed := before[id]; existed {
 			r.Lock.AddRequiredBy(id, l.Name)
 			continue
@@ -90,33 +94,14 @@ func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
 }
 
 func (r *Resolver) RemovePack(name string) error {
-	idx := -1
-	for i, p := range r.Manifest.Packs {
-		n, err := pack.Name(p)
-		if err != nil {
-			return err
-		}
-		if n == name {
-			idx = i
-			break
-		}
-	}
-	if idx < 0 {
+	modpacks := r.Manifest.Modpacks()
+	if _, ok := modpacks[name]; !ok {
 		e := out.Errorf("pack-not-found", "pack %s is not in the manifest", name)
-		e.Given = name
-		for _, p := range r.Manifest.Packs {
-			if n, err := pack.Name(p); err == nil {
-				e.Candidates = append(e.Candidates, n)
-			}
-		}
+		e.Given, e.Candidates = name, slices.Sorted(maps.Keys(modpacks))
 		return e
 	}
-	source := r.Manifest.Packs[idx].Source
-	r.Manifest.Packs = append(r.Manifest.Packs[:idx:idx], r.Manifest.Packs[idx+1:]...)
-	if len(r.Manifest.Packs) == 0 {
-		r.Manifest.Packs = nil
-	}
-	delete(r.Lock.Packs, source)
+	delete(r.Manifest.Requires, name)
+	delete(r.Lock.Modpacks, name)
 	kept := r.Packs[:0]
 	for _, p := range r.Packs {
 		if p.Name != name {
@@ -136,30 +121,30 @@ func (r *Resolver) RefreshPacks(loaded []*pack.Loaded) error {
 	}
 	seen := map[string]bool{}
 	for _, l := range loaded {
-		seen[l.Source] = true
-		r.Lock.Packs[l.Source] = l.Pin
+		seen[l.Name] = true
+		r.Lock.Modpacks[l.Name] = l.Pin
 	}
-	for source, old := range r.Lock.Packs {
-		if seen[source] {
+	for name := range r.Lock.Modpacks {
+		if seen[name] {
 			continue
 		}
-		delete(r.Lock.Packs, source)
-		r.dropRequiredBy(old.Name)
+		delete(r.Lock.Modpacks, name)
+		r.dropRequiredBy(name)
 	}
 	return nil
 }
 
-func PackChanges(before, after map[string]lock.Pack) []PackChange {
+func PackChanges(before, after map[string]lock.Modpack) []PackChange {
 	changes := []PackChange{}
-	for source, now := range after {
-		old, had := before[source]
+	for name, now := range after {
+		old, had := before[name]
 		if !had || old.Label() != now.Label() {
-			changes = append(changes, PackChange{Name: now.Name, From: old.Label(), To: now.Label()})
+			changes = append(changes, PackChange{Name: name, From: old.Label(), To: now.Label()})
 		}
 	}
-	for source, old := range before {
-		if _, still := after[source]; !still {
-			changes = append(changes, PackChange{Name: old.Name, From: old.Label()})
+	for name, old := range before {
+		if _, still := after[name]; !still {
+			changes = append(changes, PackChange{Name: name, From: old.Label()})
 		}
 	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Name < changes[j].Name })

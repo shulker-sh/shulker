@@ -76,7 +76,7 @@ func (a *app) initCmd() *cobra.Command {
 				Minecraft: minecraft,
 				Loader:    manifest.Loader{Type: loaderName, Version: loaderVersion},
 				Targets:   map[string]manifest.Target{target: {Side: target, Overrides: []string{"overrides"}, Build: "build/" + target}},
-				Mods:      map[string]manifest.Mod{},
+				Requires:  map[string]manifest.Require{},
 			}
 			if target == "server" {
 				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}

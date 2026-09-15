@@ -21,25 +21,24 @@ const (
 var DefaultProviders = []string{"modrinth", "curseforge"}
 
 type Manifest struct {
-	Schema      string            `json:"$schema,omitempty"`
-	Name        string            `json:"name"`
-	Version     string            `json:"version,omitempty"`
-	Description string            `json:"description,omitempty"`
-	Authors     []string          `json:"authors,omitempty"`
-	License     string            `json:"license,omitempty"`
-	Links       map[string]string `json:"links,omitempty"`
-	Note        string            `json:"note,omitempty"`
-	Minecraft   string            `json:"minecraft"`
-	Loader      Loader            `json:"loader"`
-	Java        string            `json:"java,omitempty"`
-	Providers   []string          `json:"providers,omitempty"`
-	Targets     map[string]Target `json:"targets"`
-	Packs       []Pack            `json:"packs,omitempty"`
-	Mods        map[string]Mod    `json:"mods"`
-	Ignore      []Ignore          `json:"ignore,omitempty"`
-	Variables   Variables         `json:"variables,omitempty"`
-	Server      *Server           `json:"server,omitempty"`
-	Client      *Client           `json:"client,omitempty"`
+	Schema      string             `json:"$schema,omitempty"`
+	Name        string             `json:"name"`
+	Version     string             `json:"version,omitempty"`
+	Description string             `json:"description,omitempty"`
+	Authors     []string           `json:"authors,omitempty"`
+	License     string             `json:"license,omitempty"`
+	Links       map[string]string  `json:"links,omitempty"`
+	Note        string             `json:"note,omitempty"`
+	Minecraft   string             `json:"minecraft"`
+	Loader      Loader             `json:"loader"`
+	Java        string             `json:"java,omitempty"`
+	Providers   []string           `json:"providers,omitempty"`
+	Targets     map[string]Target  `json:"targets"`
+	Requires    map[string]Require `json:"requires"`
+	Ignore      []Ignore           `json:"ignore,omitempty"`
+	Variables   Variables          `json:"variables,omitempty"`
+	Server      *Server            `json:"server,omitempty"`
+	Client      *Client            `json:"client,omitempty"`
 }
 
 type Server struct {
@@ -113,24 +112,36 @@ type Target struct {
 	Note       string    `json:"note,omitempty"`
 }
 
-type Pack struct {
-	Source     string `json:"source"`
-	Name       string `json:"name,omitempty"`
-	Ref        string `json:"ref,omitempty"`
-	AutoUpdate *bool  `json:"autoUpdate,omitempty"`
-	Locked     *bool  `json:"locked,omitempty"`
-	Note       string `json:"note,omitempty"`
+const (
+	TypeMod     = "mod"
+	TypeModpack = "modpack"
+)
+
+type Require struct {
+	Type       string     `json:"type,omitempty"`
+	Source     string     `json:"source,omitempty"`
+	Ref        string     `json:"ref,omitempty"`
+	AutoUpdate *bool      `json:"autoUpdate,omitempty"`
+	Locked     *bool      `json:"locked,omitempty"`
+	File       string     `json:"file,omitempty"`
+	Project    any        `json:"project,omitempty"`
+	Pin        any        `json:"pin,omitempty"`
+	Channel    string     `json:"channel,omitempty"`
+	Side       string     `json:"side,omitempty"`
+	Provider   string     `json:"provider,omitempty"`
+	OS         StringList `json:"os,omitempty"`
+	Feature    StringList `json:"feature,omitempty"`
+	Note       string     `json:"note,omitempty"`
 }
 
-type Mod struct {
-	Project  any        `json:"project,omitempty"`
-	Pin      any        `json:"pin,omitempty"`
-	Channel  string     `json:"channel,omitempty"`
-	Side     string     `json:"side,omitempty"`
-	Provider string     `json:"provider,omitempty"`
-	OS       StringList `json:"os,omitempty"`
-	Feature  StringList `json:"feature,omitempty"`
-	Note     string     `json:"note,omitempty"`
+func (r Require) Kind() string {
+	switch {
+	case r.Type != "":
+		return r.Type
+	case r.Source != "":
+		return TypeModpack
+	}
+	return TypeMod
 }
 
 type StringList []string
@@ -192,10 +203,45 @@ func Parse(data []byte) (*Manifest, error) {
 	if err := dec.Decode(&m); err != nil {
 		return nil, schema.Invalid("manifest-invalid", FileName, data, err)
 	}
-	if m.Mods == nil {
-		m.Mods = map[string]Mod{}
+	if m.Requires == nil {
+		m.Requires = map[string]Require{}
 	}
 	return &m, nil
+}
+
+func (m *Manifest) Mods() map[string]Require {
+	mods := map[string]Require{}
+	for key, r := range m.Requires {
+		if r.Kind() == TypeMod && r.File == "" {
+			mods[key] = r
+		}
+	}
+	return mods
+}
+
+func (m *Manifest) Modpacks() map[string]Require {
+	modpacks := map[string]Require{}
+	for key, r := range m.Requires {
+		if r.Kind() == TypeModpack && r.Source != "" {
+			modpacks[key] = r
+		}
+	}
+	return modpacks
+}
+
+func (m *Manifest) CheckSupported() error {
+	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
+		r := m.Requires[key]
+		switch {
+		case r.File != "":
+			return out.Errorf("requires-unsupported", "requires.%s: local files aren't supported yet", key)
+		case r.Kind() == TypeModpack && r.Source == "":
+			return out.Errorf("requires-unsupported", "requires.%s: modpacks from a provider aren't supported yet; give a source", key)
+		case r.Kind() != TypeMod && r.Kind() != TypeModpack:
+			return out.Errorf("requires-unsupported", "requires.%s: %s entries aren't supported yet", key, r.Kind())
+		}
+	}
+	return nil
 }
 
 func (m *Manifest) Encode() ([]byte, error) {

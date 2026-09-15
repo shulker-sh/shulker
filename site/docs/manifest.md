@@ -29,8 +29,7 @@ Required properties are marked with *.
 | `java` | `string` | Optional override. Either an absolute path to a JDK/JRE home or a semver range over the Java major version, e.g. "&gt;=25". Omit to derive from the Minecraft version json and use the managed runtime.<br>min length 1 |
 | `providers` | [`provider`](#provider)[] | Provider preference order. A single entry makes the tool single-provider.<br>min items 1, unique items, default `["modrinth","curseforge"]` |
 | `targets` * | map of [`target`](#target) | Build targets. Each lists its override layers explicitly; paths are never inferred.<br>min properties 1, keys match `^[a-z][a-z0-9_-]*$` |
-| `packs` | [`pack`](#pack)[] | Packs whose mods and overrides merge into this project. A pack's own lock is ignored. |
-| `mods` | map of [`mod`](#mod) | Direct mods keyed by in-jar mod id. An empty object selects the newest release-channel file for the locked Minecraft and loader.<br>keys are [`modId`](#modid), default `{}` |
+| `requires` | map of [`require`](#require) | Mods and modpacks this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader.<br>keys are [`requireKey`](#requirekey), default `{}` |
 | `ignore` | [`ignore`](#ignore)[] | Per-pair overrides for unmet depends or matched breaks found in jar metadata. |
 | `variables` | [`variables`](#variables) |  |
 | `server` | [`server`](#server) |  |
@@ -154,23 +153,22 @@ Type: map of `string` \| `number` \| `boolean`. keys match `^[A-Za-z_][A-Za-z0-9
 
 No other properties are allowed.
 
-### pack
+### requireKey
+
+Name of a requires entry, unique across mods and modpacks. Used in messages and requiredBy.
+
+Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
+
+### require
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `source` * | `string` | Local path, git URL, or raw manifest URL.<br>min length 1 |
-| `ref` | `string` | Branch, tag, or commit for git sources. The lock records the resolved commit.<br>min length 1 |
-| `name` | `string` | Display name used in messages and requiredBy. Defaults to the last path segment of the source minus .git. Must be unique across packs.<br>pattern `^[a-z0-9][a-z0-9._-]*$` |
-| `autoUpdate` | `boolean` | Whether sync refreshes this pack from its source. Omitted means true; false pins the pack at its locked state. update refreshes every pack regardless. |
-| `locked` | `boolean` | Whether the pack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock; a source without a lock is always resolved from its manifest. |
-| `note` | [`note`](#note) |  |
-
-No other properties are allowed.
-
-### mod
-
-| Property | Type | Description |
-| --- | --- | --- |
+| `type` | `"mod"` \| `"modpack"` \| `"resourcepack"` \| `"shader"` | What the entry is. Omitted means modpack for an entry with source and mod otherwise; when given it must agree with the entry. Resource packs and shaders aren't supported yet. |
+| `source` | `string` | Local path, git URL, or raw manifest URL of a modpack.<br>min length 1 |
+| `ref` | `string` | Branch, tag, or commit for a git source. The lock records the resolved commit.<br>min length 1 |
+| `autoUpdate` | `boolean` | Whether sync refreshes this modpack from its source. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless. |
+| `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock; a source without a lock is always resolved from its manifest. |
+| `file` | [`relativePath`](#relativepath) | A local zip or jar that is on no provider. Not supported yet. |
 | `project` | [`projectId`](#projectid) | Written by add when the provider slug differs from the mod id or the provider is CurseForge. |
 | `pin` | [`versionId`](#versionid) | Pin to one provider version. update skips pinned mods. |
 | `channel` | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted. A channel admits itself and anything more stable.<br>default `"release"` |

@@ -15,13 +15,13 @@ import (
 const FileName = "shulker.lock"
 
 type Lock struct {
-	LockVersion int             `json:"lockVersion"`
-	Minecraft   string          `json:"minecraft"`
-	Loader      Loader          `json:"loader"`
-	Java        Java            `json:"java"`
-	Packs       map[string]Pack `json:"packs"`
-	Mods        map[string]Mod  `json:"mods"`
-	Players     []Player        `json:"players"`
+	LockVersion int                `json:"lockVersion"`
+	Minecraft   string             `json:"minecraft"`
+	Loader      Loader             `json:"loader"`
+	Java        Java               `json:"java"`
+	Modpacks    map[string]Modpack `json:"modpacks"`
+	Mods        map[string]Mod     `json:"mods"`
+	Players     []Player           `json:"players"`
 }
 
 type Loader struct {
@@ -50,8 +50,8 @@ type Java struct {
 	Component string `json:"component"`
 }
 
-type Pack struct {
-	Name       string `json:"name"`
+type Modpack struct {
+	Source     string `json:"source"`
 	Ref        string `json:"ref,omitempty"`
 	Commit     string `json:"commit,omitempty"`
 	DirSha256  string `json:"dirSha256,omitempty"`
@@ -60,7 +60,7 @@ type Pack struct {
 	LockSha256 string `json:"lockSha256,omitempty"`
 }
 
-func (p Pack) Label() string {
+func (p Modpack) Label() string {
 	switch {
 	case p.Commit != "":
 		return p.Commit[:12]
@@ -84,7 +84,8 @@ type Mod struct {
 	Size          int64    `json:"size,omitempty"`
 	Side          string   `json:"side"`
 	Channel       string   `json:"channel"`
-	Pack          string   `json:"pack,omitempty"`
+	Modpack       string   `json:"modpack,omitempty"`
+	ModID         string   `json:"modId,omitempty"`
 	RequiredBy    []string `json:"requiredBy"`
 	Aliases       Aliases  `json:"aliases"`
 }
@@ -101,7 +102,7 @@ type Player struct {
 }
 
 func New() *Lock {
-	return &Lock{LockVersion: 1, Packs: map[string]Pack{}, Mods: map[string]Mod{}, Players: []Player{}}
+	return &Lock{LockVersion: 1, Modpacks: map[string]Modpack{}, Mods: map[string]Mod{}, Players: []Player{}}
 }
 
 func Load(path string) (*Lock, error) {

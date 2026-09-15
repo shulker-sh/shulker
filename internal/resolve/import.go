@@ -99,7 +99,7 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, im.r.Lock.Mods[id].Filename))
 		return nil
 	}
-	entry := manifest.Mod{}
+	entry := manifest.Require{}
 	if prior, ok := im.markerManifestMod(id); ok {
 		entry = prior
 		if entry.Pin != nil {
@@ -113,7 +113,7 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if im.modrinth.Name() != im.r.Manifest.ProviderOrder()[0] {
 		entry.Provider = im.modrinth.Name()
 	}
-	im.r.Manifest.Mods[id] = entry
+	im.r.Manifest.Requires[id] = entry
 	im.rep.Locked = append(im.rep.Locked, id)
 	return nil
 }
@@ -163,16 +163,16 @@ func (im *importer) reuse(id, side string) {
 	}
 	im.r.Lock.Mods[id] = entry
 	if prior, ok := im.markerManifestMod(id); ok {
-		im.r.Manifest.Mods[id] = prior
+		im.r.Manifest.Requires[id] = prior
 	}
 	im.rep.Reused = append(im.rep.Reused, id)
 }
 
-func (im *importer) markerManifestMod(id string) (manifest.Mod, bool) {
+func (im *importer) markerManifestMod(id string) (manifest.Require, bool) {
 	if im.a.Marker == nil {
-		return manifest.Mod{}, false
+		return manifest.Require{}, false
 	}
-	m, ok := im.a.Marker.Manifest.Mods[id]
+	m, ok := im.a.Marker.Manifest.Mods()[id]
 	return m, ok
 }
 
@@ -187,7 +187,7 @@ func (im *importer) dropUnmatched() {
 		if _, replaced := im.r.Lock.Mods[id]; replaced {
 			continue
 		}
-		delete(im.r.Manifest.Mods, id)
+		delete(im.r.Manifest.Requires, id)
 		im.rep.Dropped = append(im.rep.Dropped, id)
 	}
 	for id, m := range im.r.Lock.Mods {

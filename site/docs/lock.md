@@ -21,8 +21,8 @@ Required properties are marked with *.
 | `minecraft` * | `string` | Resolved Minecraft version id, exactly as Mojang's manifest names it.<br>min length 1 |
 | `loader` * | object |  |
 | `java` * | object |  |
-| `packs` * | map of [`pack`](#pack) | Keyed by manifest source string. |
-| `mods` * | map of [`mod`](#mod) | Every mod in the resolved set, direct and transitive, keyed by in-jar mod id.<br>keys are [`modId`](#modid) |
+| `modpacks` * | map of [`modpack`](#modpack) | Every modpack in the manifest's requires, keyed by its requires key.<br>keys are [`requireKey`](#requirekey) |
+| `mods` * | map of [`mod`](#mod) | Every mod in the resolved set, direct and transitive, keyed by its requires key or, for a dependency, its in-jar mod id.<br>keys are [`requireKey`](#requirekey) |
 | `players` * | [`player`](#player)[] | Every player referenced anywhere in the manifest, fully resolved. uuid is the identity across renames. |
 
 No other properties are allowed.
@@ -58,9 +58,9 @@ Type: `string`. pattern `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 Type: `string`. pattern `^[a-z][a-z0-9_-]{1,63}$`
 
-### packName
+### requireKey
 
-Type: `string`. pattern `^[a-z0-9][a-z0-9._-]*$`
+Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 
 ### modrinthId
 
@@ -70,17 +70,17 @@ Type: `string`. pattern `^[A-Za-z0-9]{8}$`
 
 Type: `integer`. min 1
 
-### pack
+### modpack
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `name` * | [`packName`](#packname) | Manifest name or the derived default. |
+| `source` * | `string` | The manifest source at resolution time. A different source in the manifest makes the lock out of date.<br>min length 1 |
 | `ref` | `string` | The manifest ref at resolution time. Git sources only.<br>min length 1 |
 | `commit` | [`gitCommit`](#gitcommit) | Resolved commit. Git sources only. |
 | `dirSha256` | [`sha256`](#sha256) | Content hash of the pack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only. |
 | `sha256` | [`sha256`](#sha256) | Hash of the fetched manifest. Raw manifest URL sources only. |
-| `locked` | `true` | Present when the pack's mods were copied from its lock. Absent means they were resolved from its manifest. |
-| `lockSha256` | [`sha256`](#sha256) | Hash of the pack's lock at resolution time. Present exactly when locked is. |
+| `locked` | `true` | Present when the modpack's mods were copied from its lock. Absent means they were resolved from its manifest. |
+| `lockSha256` | [`sha256`](#sha256) | Hash of the modpack's lock at resolution time. Present exactly when locked is. |
 
 No other properties are allowed.
 
@@ -99,8 +99,9 @@ No other properties are allowed.
 | `size` | `integer` | Jar size in bytes as the provider reports it, for the download bar. Absent on entries locked before shulker recorded sizes; filled in when the mod is next resolved.<br>min 1 |
 | `side` * | `"client"` \| `"server"` \| `"both"` | Effective side after any manifest override. |
 | `channel` * | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted when this version was picked: the manifest's channel for a mod listed there or in a pack, the requiring mod's for a dependency. A listed mod whose manifest channel differs makes the lock out of date. |
-| `pack` | `string` | Key in packs of the locked pack this entry was copied from. Absent for the project's own mods and the dependencies resolved for them.<br>min length 1 |
-| `requiredBy` * | `string`[] | Mod ids (or pack names) whose jar metadata depends on this mod. Empty plus absent from manifest and packs means orphan.<br>unique items |
+| `modpack` | [`requireKey`](#requirekey) | Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own mods and the dependencies resolved for them. |
+| `modId` | [`modId`](#modid) | The jar's in-jar mod id. Present only when it differs from the entry's key; dependencies, validation and requiredBy use it. |
+| `requiredBy` * | [`requireKey`](#requirekey)[] | Mod ids (or modpack keys) whose jar metadata depends on this mod. Empty plus absent from the manifest's requires and every modpack means orphan.<br>unique items |
 | `aliases` * | object | The same mod's project id on other providers, discovered on first download. |
 
 No other properties are allowed.

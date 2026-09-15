@@ -93,7 +93,7 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 		if !ok || newest.ID == fmt.Sprint(m.Version) {
 			continue
 		}
-		entry := r.Manifest.Mods[id]
+		entry := r.Manifest.Mods()[id]
 		res = append(res, Outdated{ID: id, Current: m.VersionNumber, Latest: newest.Number, Pinned: entry.Pin != nil})
 	}
 	if res == nil {
@@ -109,9 +109,9 @@ func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, 
 	if version == "" {
 		version = fmt.Sprint(r.Lock.Mods[id].Version)
 	}
-	entry := r.Manifest.Mods[id]
+	entry := r.Manifest.Mods()[id]
 	entry.Pin = lockID(r.Lock.Mods[id].Provider, version)
-	r.Manifest.Mods[id] = entry
+	r.Manifest.Requires[id] = entry
 	return version, r.Update(ctx, []string{id})
 }
 
@@ -119,12 +119,12 @@ func (r *Resolver) Unpin(ctx context.Context, id string) error {
 	if _, err := r.directTargets([]string{id}); err != nil {
 		return err
 	}
-	entry := r.Manifest.Mods[id]
+	entry := r.Manifest.Mods()[id]
 	if entry.Pin == nil {
 		return out.Errorf("not-pinned", "%s is not pinned", id)
 	}
 	entry.Pin = nil
-	r.Manifest.Mods[id] = entry
+	r.Manifest.Requires[id] = entry
 	return r.Update(ctx, []string{id})
 }
 
@@ -223,6 +223,7 @@ func (r *Resolver) scope(targets []string) map[string]lock.Mod {
 
 func (r *Resolver) channelFor(id string) string {
 	best := ""
+	mods := r.Manifest.Mods()
 	visited := map[string]bool{}
 	var walk func(string)
 	walk = func(cur string) {
@@ -230,7 +231,7 @@ func (r *Resolver) channelFor(id string) string {
 			return
 		}
 		visited[cur] = true
-		if entry, direct := r.Manifest.Mods[cur]; direct {
+		if entry, direct := mods[cur]; direct {
 			if channelRank(entry.Channel) > channelRank(best) {
 				best = entry.Channel
 			}

@@ -17,7 +17,7 @@ func writePack(t *testing.T, dir, minecraft, mods string, files map[string]strin
 	t.Helper()
 	manifest := `{"name": "base", "minecraft": "` + minecraft + `", "loader": {"type": "fabric", "version": "*"},
   "targets": {"client": {"side": "client", "overrides": ["overrides"], "build": "build/client"}},
-  "mods": {` + mods + `}, "variables": {"greeting": "hello"}}`
+  "requires": {` + mods + `}, "variables": {"greeting": "hello"}}`
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func readBuilt(t *testing.T, h *harness, rel string) string {
 }
 
 type lockView struct {
-	Packs map[string]map[string]string `json:"packs"`
+	Packs map[string]map[string]string `json:"modpacks"`
 	Mods  map[string]struct {
 		RequiredBy []string `json:"requiredBy"`
 	} `json:"mods"`
@@ -74,7 +74,7 @@ func TestLocalPack(t *testing.T) {
 	}
 	path := filepath.Join(h.dir, "shulker.json")
 	data, _ := os.ReadFile(path)
-	data = []byte(strings.Replace(string(data), `"mods": {}`, `"variables": {"who": "world"}, "mods": {}`, 1))
+	data = []byte(strings.Replace(string(data), `"requires": {}`, `"variables": {"who": "world"}, "requires": {}`, 1))
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -84,18 +84,18 @@ func TestLocalPack(t *testing.T) {
 		t.Fatalf("pack add output: %s", stdout)
 	}
 	l := readLock(t, h)
-	if p := l.Packs["./base"]; p["name"] != "base" || len(p["dirSha256"]) != 64 || p["commit"] != "" {
+	if p := l.Packs["base"]; p["source"] != "./base" || len(p["dirSha256"]) != 64 || p["commit"] != "" {
 		t.Fatalf("lock packs: %v", l.Packs)
 	}
 	if by := l.Mods["sodium"].RequiredBy; len(by) != 1 || by[0] != "base" {
 		t.Fatalf("sodium requiredBy: %v", by)
 	}
 	var m struct {
-		Packs []map[string]string `json:"packs"`
+		Requires map[string]map[string]string `json:"requires"`
 	}
 	h.readJSON(t, "shulker.json", &m)
-	if len(m.Packs) != 1 || m.Packs[0]["source"] != "./base" || m.Packs[0]["name"] != "" {
-		t.Fatalf("manifest packs: %v", m.Packs)
+	if len(m.Requires) != 1 || m.Requires["base"]["source"] != "./base" {
+		t.Fatalf("manifest requires: %v", m.Requires)
 	}
 	_, stdout, _ = h.run(t, "pack", "list", "--json")
 	var listEnv struct {
@@ -104,7 +104,7 @@ func TestLocalPack(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &listEnv); err != nil {
 		t.Fatalf("pack list json: %v: %s", err, stdout)
 	}
-	if listed := listEnv.Data; len(listed) != 1 || listed[0]["name"] != "base" || listed[0]["kind"] != "local" || listed[0]["state"] != "ok" || listed[0]["pin"] != l.Packs["./base"]["dirSha256"][:12] {
+	if listed := listEnv.Data; len(listed) != 1 || listed[0]["name"] != "base" || listed[0]["kind"] != "local" || listed[0]["state"] != "ok" || listed[0]["pin"] != l.Packs["base"]["dirSha256"][:12] {
 		t.Fatalf("pack list: %v", listed)
 	}
 
@@ -132,7 +132,7 @@ func TestLocalPack(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.dir, "base", "overrides", "config", "base.txt"), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if stdout = h.mustRun(t, "pack", "list"); !strings.HasPrefix(stdout, "  • base ./base (local, changed, pinned "+l.Packs["./base"]["dirSha256"][:12]+")\n") {
+	if stdout = h.mustRun(t, "pack", "list"); !strings.HasPrefix(stdout, "  • base ./base (local, changed, pinned "+l.Packs["base"]["dirSha256"][:12]+")\n") {
 		t.Fatalf("pack list after edit: %s", stdout)
 	}
 	_, stderr := h.mustRunStderr(t, "build")
@@ -193,11 +193,11 @@ func TestPackMismatchAndConflict(t *testing.T) {
 		t.Fatalf("mismatch: code=%d env=%+v", code, env)
 	}
 	var m struct {
-		Packs []map[string]string `json:"packs"`
+		Requires map[string]any `json:"requires"`
 	}
 	h.readJSON(t, "shulker.json", &m)
-	if len(m.Packs) != 0 {
-		t.Fatalf("manifest should be untouched: %v", m.Packs)
+	if len(m.Requires) != 0 {
+		t.Fatalf("manifest should be untouched: %v", m.Requires)
 	}
 
 	writePack(t, filepath.Join(h.dir, "one"), "~26.2", `"sodium": {}`, nil)
@@ -210,6 +210,29 @@ func TestPackMismatchAndConflict(t *testing.T) {
 	}
 	if code, stdout, _ = h.run(t, "pack", "add", "./one", "--name", "one", "--json"); code == 0 {
 		t.Fatalf("duplicate source should fail: %s", stdout)
+	}
+}
+
+func TestPackSourceMovedUnderTheSameName(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes")
+	writePack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
+	h.mustRun(t, "pack", "add", "./base")
+	if err := os.Rename(filepath.Join(h.dir, "base"), filepath.Join(h.dir, "moved")); err != nil {
+		t.Fatal(err)
+	}
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"].(map[string]any)["base"].(map[string]any)["source"] = "./moved"
+	})
+	code, stdout, _ := h.run(t, "build", "--json")
+	var env out.Envelope
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code != 0 || !env.LockStale || !strings.Contains(strings.Join(env.Warnings, "\n"), "pack base has a new source since the lock") {
+		t.Fatalf("build after moving the source: code=%d env=%+v", code, env)
+	}
+	h.mustRun(t, "lock")
+	if p := readLock(t, h).Packs["base"]; p["source"] != "./moved" {
+		t.Fatalf("lock source after relock: %v", p)
 	}
 }
 
@@ -246,7 +269,7 @@ func TestGitPack(t *testing.T) {
 		t.Fatalf("pack list: %s", stdout)
 	}
 	l := readLock(t, h)
-	if p := l.Packs[source]; p["commit"] != first || p["ref"] != "main" || p["name"] != "shared-pack" {
+	if p := l.Packs["shared-pack"]; p["commit"] != first || p["ref"] != "main" || p["source"] != source {
 		t.Fatalf("lock packs: %v", l.Packs)
 	}
 	h.mustRun(t, "install")
@@ -292,7 +315,7 @@ func TestURLPackAndHandEdits(t *testing.T) {
 			return
 		}
 		w.Write([]byte(`{"name": "tiny", "minecraft": "~26.2", "loader": {"type": "fabric", "version": "*"},
-  "targets": {"client": {"side": "client", "overrides": ["overrides"]}}, "mods": {"sodium": {}}}`))
+  "targets": {"client": {"side": "client", "overrides": ["overrides"]}}, "requires": {"sodium": {}}}`))
 	}))
 	defer srv.Close()
 	source := srv.URL + "/tiny.json"
@@ -302,7 +325,7 @@ func TestURLPackAndHandEdits(t *testing.T) {
 		t.Fatalf("pack add output: %s", stdout)
 	}
 	l := readLock(t, h)
-	if p := l.Packs[source]; p["name"] != "tiny" || len(p["sha256"]) != 64 {
+	if p := l.Packs["tiny"]; p["source"] != source || len(p["sha256"]) != 64 {
 		t.Fatalf("lock packs: %v", l.Packs)
 	}
 	h.mustRun(t, "install")
@@ -314,9 +337,9 @@ func TestURLPackAndHandEdits(t *testing.T) {
 
 	path := filepath.Join(h.dir, "shulker.json")
 	data, _ := os.ReadFile(path)
-	edited := strings.Replace(string(data), `"packs": [`, `"packs": [{"source": "./local"}, `, 1)
+	edited := strings.Replace(string(data), `"requires": {`, `"requires": {"local": {"source": "./local"}, `, 1)
 	if edited == string(data) {
-		t.Fatalf("manifest has no packs array: %s", data)
+		t.Fatalf("manifest has no requires: %s", data)
 	}
 	writePack(t, filepath.Join(h.dir, "local"), "~26.2", `"fabric-api": {}`, nil)
 	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
@@ -337,12 +360,7 @@ func TestURLPackAndHandEdits(t *testing.T) {
 		t.Fatalf("fabric-api requiredBy: %v", by)
 	}
 
-	data, _ = os.ReadFile(path)
-	stripped := strings.Replace(string(data), `{"source": "./local"}, `, ``, 1)
-	stripped = stripped[:strings.Index(stripped, `"packs"`)] + `"packs": [],` + stripped[strings.Index(stripped, `"mods"`):]
-	if err := os.WriteFile(path, []byte(stripped), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	h.editManifest(t, func(m map[string]any) { m["requires"] = map[string]any{} })
 	stdout = h.mustRun(t, "update")
 	if !strings.Contains(stdout, "- tiny (pack)") || !strings.Contains(stdout, "- local (pack)") || !strings.Contains(stdout, "- sodium") {
 		t.Fatalf("update after removing packs: %s", stdout)

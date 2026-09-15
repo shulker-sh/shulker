@@ -31,7 +31,7 @@ const (
 	URL   Kind = "url"
 )
 
-var namePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+var keyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
 type Loaded struct {
 	Name     string
@@ -39,7 +39,7 @@ type Loaded struct {
 	Kind     Kind
 	Dir      string
 	Manifest *manifest.Manifest
-	Pin      lock.Pack
+	Pin      lock.Modpack
 }
 
 type Store struct {
@@ -70,54 +70,39 @@ func Classify(source string) Kind {
 	return Local
 }
 
-func Name(p manifest.Pack) (string, error) {
-	if p.Name != "" {
-		return p.Name, nil
+func Key(source, name string) (string, error) {
+	if name != "" {
+		if !keyPattern.MatchString(name) {
+			return "", out.Errorf("pack-name", "%q can't name a pack: use up to 64 lowercase letters, digits, dots, dashes and underscores, starting with a letter or digit", name)
+		}
+		return name, nil
 	}
-	base := strings.TrimSuffix(p.Source, "/")
-	switch Classify(p.Source) {
+	base := strings.TrimSuffix(source, "/")
+	switch Classify(source) {
 	case Local:
 		base = filepath.Base(filepath.Clean(base))
 		if base == "." || base == ".." || base == string(filepath.Separator) {
-			return "", out.Errorf("pack-name", "cannot derive a pack name from %q; set \"name\" on the pack entry", p.Source)
+			return "", out.Errorf("pack-name", "cannot derive a pack name from %q; pass --name", source)
 		}
 	case Git:
 		base = strings.TrimSuffix(path.Base(base), ".git")
 	case URL:
 		base = strings.TrimSuffix(path.Base(base), path.Ext(base))
 	}
-	name := strings.ToLower(base)
-	if !namePattern.MatchString(name) {
-		return "", out.Errorf("pack-name", "cannot derive a pack name from %q (got %q); set \"name\" on the pack entry", p.Source, name)
+	key := strings.ToLower(base)
+	if !keyPattern.MatchString(key) {
+		return "", out.Errorf("pack-name", "cannot derive a pack name from %q (got %q); pass --name", source, key)
 	}
-	return name, nil
+	return key, nil
 }
 
-func Names(packs []manifest.Pack) (map[string]manifest.Pack, error) {
-	byName := map[string]manifest.Pack{}
-	for _, p := range packs {
-		name, err := Name(p)
-		if err != nil {
-			return nil, err
-		}
-		if other, dup := byName[name]; dup {
-			return nil, out.Errorf("pack-name", "packs %q and %q both resolve to the name %q; set \"name\" on one of them", other.Source, p.Source, name)
-		}
-		byName[name] = p
-	}
-	return byName, nil
-}
-
-func (s *Store) Resolve(ctx context.Context, p manifest.Pack) (*Loaded, error) {
-	name, err := Name(p)
-	if err != nil {
-		return nil, err
-	}
+func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*Loaded, error) {
+	var err error
 	kind := Classify(p.Source)
 	if p.Ref != "" && kind != Git {
 		return nil, out.Errorf("pack-ref", "pack %s: \"ref\" only applies to git sources", name)
 	}
-	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: lock.Pack{Name: name}}
+	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: lock.Modpack{Source: p.Source}}
 	switch kind {
 	case Local:
 		l.Dir = s.localDir(p.Source)
@@ -159,11 +144,7 @@ func (s *Store) Resolve(ctx context.Context, p manifest.Pack) (*Loaded, error) {
 	return l, nil
 }
 
-func (s *Store) Open(ctx context.Context, p manifest.Pack, pinned lock.Pack) (*Loaded, string, error) {
-	name, err := Name(p)
-	if err != nil {
-		return nil, "", err
-	}
+func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinned lock.Modpack) (*Loaded, string, error) {
 	kind := Classify(p.Source)
 	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: pinned}
 	warning := ""
@@ -372,11 +353,7 @@ type Status struct {
 	State  string `json:"state"`
 }
 
-func (s *Store) Status(p manifest.Pack, pinned lock.Pack, locked bool) (Status, error) {
-	name, err := Name(p)
-	if err != nil {
-		return Status{}, err
-	}
+func (s *Store) Status(name string, p manifest.Require, pinned lock.Modpack, locked bool) (Status, error) {
 	st := Status{Name: name, Kind: Classify(p.Source), Source: p.Source, Ref: p.Ref, State: "unlocked"}
 	if !locked {
 		return st, nil

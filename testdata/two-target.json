@@ -20,11 +20,8 @@
     }
   },
 
-  "packs": [
-    { "source": "https://github.com/shulker-sh/base-pack.git", "ref": "v3" }
-  ],
-
-  "mods": {
+  "requires": {
+    "base-pack": { "source": "https://github.com/shulker-sh/base-pack.git", "ref": "v3" },
     "fabric-api": {},
     "sodium": { "channel": "beta" },
     "iris": { "pin": "k9RhZq2X" },

@@ -271,7 +271,7 @@ func (b *Builder) markerMods(side string, sel selection) (direct, deps []string)
 		if !sel.included[id] || (m.Side != "both" && m.Side != side) {
 			continue
 		}
-		if _, ok := b.Manifest.Mods[id]; ok {
+		if _, ok := b.Manifest.Mods()[id]; ok {
 			direct = append(direct, id)
 		} else {
 			deps = append(deps, id)
