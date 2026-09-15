@@ -26,7 +26,7 @@
       "note": "target"
     }
   },
-  "packs": [{ "source": "../base", "ref": "main", "name": "base", "note": "pack" }],
+  "packs": [{ "source": "../base", "ref": "main", "name": "base", "autoUpdate": false, "locked": false, "note": "pack" }],
   "mods": {
     "sodium": {
       "project": "AANobbMI",

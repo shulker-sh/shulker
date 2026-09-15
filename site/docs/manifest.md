@@ -161,6 +161,8 @@ No other properties are allowed.
 | `source` * | `string` | Local path, git URL, or raw manifest URL.<br>min length 1 |
 | `ref` | `string` | Branch, tag, or commit for git sources. The lock records the resolved commit.<br>min length 1 |
 | `name` | `string` | Display name used in messages and requiredBy. Defaults to the last path segment of the source minus .git. Must be unique across packs.<br>pattern `^[a-z0-9][a-z0-9._-]*$` |
+| `autoUpdate` | `boolean` | Whether sync refreshes this pack from its source. Omitted means true; false pins the pack at its locked state. update refreshes every pack regardless. |
+| `locked` | `boolean` | Whether the pack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock; a source without a lock is always resolved from its manifest. |
 | `note` | [`note`](#note) |  |
 
 No other properties are allowed.

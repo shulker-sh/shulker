@@ -114,10 +114,12 @@ type Target struct {
 }
 
 type Pack struct {
-	Source string `json:"source"`
-	Name   string `json:"name,omitempty"`
-	Ref    string `json:"ref,omitempty"`
-	Note   string `json:"note,omitempty"`
+	Source     string `json:"source"`
+	Name       string `json:"name,omitempty"`
+	Ref        string `json:"ref,omitempty"`
+	AutoUpdate *bool  `json:"autoUpdate,omitempty"`
+	Locked     *bool  `json:"locked,omitempty"`
+	Note       string `json:"note,omitempty"`
 }
 
 type Mod struct {

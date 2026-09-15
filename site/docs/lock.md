@@ -79,6 +79,8 @@ Type: `integer`. min 1
 | `commit` | [`gitCommit`](#gitcommit) | Resolved commit. Git sources only. |
 | `dirSha256` | [`sha256`](#sha256) | Content hash of the pack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only. |
 | `sha256` | [`sha256`](#sha256) | Hash of the fetched manifest. Raw manifest URL sources only. |
+| `locked` | `true` | Present when the pack's mods were copied from its lock. Absent means they were resolved from its manifest. |
+| `lockSha256` | [`sha256`](#sha256) | Hash of the pack's lock at resolution time. Present exactly when locked is. |
 
 No other properties are allowed.
 
@@ -97,6 +99,7 @@ No other properties are allowed.
 | `size` | `integer` | Jar size in bytes as the provider reports it, for the download bar. Absent on entries locked before shulker recorded sizes; filled in when the mod is next resolved.<br>min 1 |
 | `side` * | `"client"` \| `"server"` \| `"both"` | Effective side after any manifest override. |
 | `channel` * | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted when this version was picked: the manifest's channel for a mod listed there or in a pack, the requiring mod's for a dependency. A listed mod whose manifest channel differs makes the lock out of date. |
+| `pack` | `string` | Key in packs of the locked pack this entry was copied from. Absent for the project's own mods and the dependencies resolved for them.<br>min length 1 |
 | `requiredBy` * | `string`[] | Mod ids (or pack names) whose jar metadata depends on this mod. Empty plus absent from manifest and packs means orphan.<br>unique items |
 | `aliases` * | object | The same mod's project id on other providers, discovered on first download. |
 

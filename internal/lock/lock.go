@@ -51,11 +51,13 @@ type Java struct {
 }
 
 type Pack struct {
-	Name      string `json:"name"`
-	Ref       string `json:"ref,omitempty"`
-	Commit    string `json:"commit,omitempty"`
-	DirSha256 string `json:"dirSha256,omitempty"`
-	Sha256    string `json:"sha256,omitempty"`
+	Name       string `json:"name"`
+	Ref        string `json:"ref,omitempty"`
+	Commit     string `json:"commit,omitempty"`
+	DirSha256  string `json:"dirSha256,omitempty"`
+	Sha256     string `json:"sha256,omitempty"`
+	Locked     bool   `json:"locked,omitempty"`
+	LockSha256 string `json:"lockSha256,omitempty"`
 }
 
 func (p Pack) Label() string {
@@ -82,6 +84,7 @@ type Mod struct {
 	Size          int64    `json:"size,omitempty"`
 	Side          string   `json:"side"`
 	Channel       string   `json:"channel"`
+	Pack          string   `json:"pack,omitempty"`
 	RequiredBy    []string `json:"requiredBy"`
 	Aliases       Aliases  `json:"aliases"`
 }
