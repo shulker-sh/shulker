@@ -19,6 +19,7 @@ type Lock struct {
 	Minecraft   string             `json:"minecraft"`
 	Loader      Loader             `json:"loader"`
 	Java        Java               `json:"java"`
+	Server      *Download          `json:"server,omitempty"`
 	Modpacks    map[string]Modpack `json:"modpacks"`
 	Mods        map[string]Mod     `json:"mods"`
 	Players     []Player           `json:"players"`
@@ -36,7 +37,6 @@ type ServerJar struct {
 	Installer string              `json:"installer,omitempty"`
 	URL       string              `json:"url,omitempty"`
 	Sha512    string              `json:"sha512"`
-	Minecraft *Download           `json:"minecraft,omitempty"`
 	Libraries map[string]Download `json:"libraries,omitempty"`
 }
 

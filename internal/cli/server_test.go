@@ -32,6 +32,9 @@ func TestServerTargetBuild(t *testing.T) {
 	if l.Loader.Server == nil || l.Loader.Server.Installer != "1.1.2" || l.Loader.Server.URL != launcherURL || l.Loader.Server.Sha512 != h.serverJar.sha512 {
 		t.Fatalf("lock loader: %+v", l.Loader)
 	}
+	if l.Server == nil || *l.Server != (lock.Download{URL: h.server.URL + "/piston-data/server.jar", Sha512: h.vanilla.sha512}) {
+		t.Fatalf("lock server: %+v", l.Server)
+	}
 	lockWithURL := readFile(t, filepath.Join(h.dir, "shulker.lock"))
 	l.Loader.Server.URL = ""
 	if err := l.Save(filepath.Join(h.dir, "shulker.lock")); err != nil {
@@ -45,6 +48,9 @@ func TestServerTargetBuild(t *testing.T) {
 	buildDir := filepath.Join(h.dir, "build", "server")
 	if _, err := os.Stat(filepath.Join(buildDir, "fabric-server-launch.jar")); err != nil {
 		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(buildDir, ".fabric", "server", "26.2-server.jar")); got != string(h.vanilla.data) {
+		t.Fatal(".fabric/server/26.2-server.jar is not the vanilla jar")
 	}
 	if _, err := os.Stat(filepath.Join(buildDir, "mods", "fabric-api-0.130.0+26.2.jar")); err != nil {
 		t.Fatal(err)
@@ -67,7 +73,7 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built server (4 unchanged)") {
+	if !strings.Contains(stdout, "built server (5 unchanged)") {
 		t.Fatalf("rebuild after game rewrite: %s", stdout)
 	}
 	if got := readFile(t, propsPath); got != gameRewritten {
@@ -111,7 +117,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["online-mode"] = true
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built server (4 unchanged)") || strings.Contains(stdout, "kept") && strings.Contains(stdout, "online-mode") {
+	if !strings.Contains(stdout, "built server (5 unchanged)") || strings.Contains(stdout, "kept") && strings.Contains(stdout, "online-mode") {
 		t.Fatalf("manifest catching up to the edit: %s", stdout)
 	}
 
@@ -190,7 +196,7 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built server (2 unchanged)") {
+	if !strings.Contains(stdout, "built server (3 unchanged)") {
 		t.Fatalf("rebuild after game write: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != gameWritten {
@@ -201,7 +207,7 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"difficulty": "easy", "online-mode": false}}
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "2 written, 1 unchanged") {
+	if !strings.Contains(stdout, "2 written, 2 unchanged") {
 		t.Fatalf("rebuild with owned key: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\ndifficulty=easy\nmotd=A Minecraft Server\nonline-mode=false\n" {
@@ -212,13 +218,13 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"online-mode": false}}
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "1 written, 2 unchanged") {
+	if !strings.Contains(stdout, "1 written, 3 unchanged") {
 		t.Fatalf("rebuild after dropping a key: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\n" {
 		t.Fatalf("file after dropping difficulty: %q", data)
 	}
-	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "built server (3 unchanged)") {
+	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "built server (4 unchanged)") {
 		t.Fatalf("rebuild after drop should be clean: %s", stdout)
 	}
 }

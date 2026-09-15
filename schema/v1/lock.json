@@ -38,7 +38,6 @@
             "installer": { "type": "string", "minLength": 1, "description": "Fabric: installer version whose bundled server launcher is locked." },
             "url": { "type": "string", "format": "uri", "description": "Download url of the jar in sha512. The quilt-server-launch.jar shulker generates has none." },
             "sha512": { "$ref": "#/$defs/sha512", "description": "The server launch jar: Fabric's bundled launcher, or the quilt-server-launch.jar shulker generates. NeoForge and Forge: their installer jar, which shulker runs offline into each server dir that doesn't have this loader version yet." },
-            "minecraft": { "$ref": "#/$defs/download", "description": "Quilt, NeoForge, Forge: the vanilla server jar. Quilt's launcher starts it; the FML installers patch it." },
             "libraries": {
               "type": "object",
               "additionalProperties": { "$ref": "#/$defs/download" },
@@ -56,6 +55,10 @@
         "major": { "type": "integer", "minimum": 8, "description": "javaVersion.majorVersion from the Mojang version json, or the override's major." },
         "component": { "type": "string", "minLength": 1, "description": "Mojang runtime component name, e.g. java-runtime-epsilon. Used to fetch the managed runtime." }
       }
+    },
+    "server": {
+      "$ref": "#/$defs/download",
+      "description": "The vanilla server jar, present once a server target has been installed. Fabric's launcher finds it in .fabric/server/, Quilt's starts it as server.jar, and the NeoForge and Forge installers patch it from libraries/."
     },
     "modpacks": {
       "type": "object",

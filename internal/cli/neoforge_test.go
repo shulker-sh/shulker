@@ -35,16 +35,18 @@ func TestNeoForgeServer(t *testing.T) {
 	base := h.server.URL
 	h.readJSON(t, "shulker.lock", &l)
 	want := &lock.ServerJar{
-		URL:       base + "/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar",
-		Sha512:    h.neoInstaller.sha512,
-		Minecraft: &lock.Download{URL: base + "/piston-data/server.jar", Sha512: h.vanilla.sha512},
+		URL:    base + "/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar",
+		Sha512: h.neoInstaller.sha512,
 		Libraries: map[string]lock.Download{
 			"net.neoforged:neoforge:26.2.0.87:universal": {URL: base + "/neomaven/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar", Sha512: h.neoLibs["net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"].sha512},
 			"org.ow2.asm:asm:9.10.1":                     {URL: base + "/neomaven/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", Sha512: h.neoLibs["org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"].sha512},
 		},
 	}
 	if !reflect.DeepEqual(l.Loader.Server, want) {
-		t.Fatalf("lock server:\n%+v\nwant\n%+v", l.Loader.Server, want)
+		t.Fatalf("lock loader server:\n%+v\nwant\n%+v", l.Loader.Server, want)
+	}
+	if l.Server == nil || *l.Server != (lock.Download{URL: base + "/piston-data/server.jar", Sha512: h.vanilla.sha512}) {
+		t.Fatalf("lock server: %+v", l.Server)
 	}
 	buildDir := filepath.Join(h.dir, "build", "server")
 	if len(h.installs) != 1 || strings.Join(h.installs[0], " ") != "--install-server "+buildDir+" --offline" {

@@ -21,6 +21,7 @@ Required properties are marked with *.
 | `minecraft` * | `string` | Resolved Minecraft version id, exactly as Mojang's manifest names it.<br>min length 1 |
 | `loader` * | object |  |
 | `java` * | object |  |
+| `server` | [`download`](#download) | The vanilla server jar, present once a server target has been installed. Fabric's launcher finds it in .fabric/server/, Quilt's starts it as server.jar, and the NeoForge and Forge installers patch it from libraries/. |
 | `modpacks` * | map of [`modpack`](#modpack) | Every modpack in the manifest's requires, keyed by its requires key.<br>keys are [`requireKey`](#requirekey) |
 | `mods` * | map of [`mod`](#mod) | Every mod in the resolved set, direct and transitive, keyed by its requires key or, for a dependency, its in-jar mod id.<br>keys are [`requireKey`](#requirekey) |
 | `players` * | [`player`](#player)[] | Every player referenced anywhere in the manifest, fully resolved. uuid is the identity across renames. |

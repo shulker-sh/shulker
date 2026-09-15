@@ -32,8 +32,11 @@ func TestQuiltServer(t *testing.T) {
 		"org.quiltmc:quilt-loader:0.30.1":  {URL: base + "/qmaven/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar", Sha512: h.quiltLoader.sha512},
 		"net.fabricmc:sponge-mixin:0.17.3": {URL: base + "/fmaven/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar", Sha512: h.mixin.sha512},
 	}
-	if s == nil || s.Installer != "" || s.URL != "" || *s.Minecraft != (lock.Download{URL: base + "/piston-data/server.jar", Sha512: h.vanilla.sha512}) || !maps.Equal(s.Libraries, wantLibs) {
-		t.Fatalf("lock server: %+v", s)
+	if s == nil || s.Installer != "" || s.URL != "" || !maps.Equal(s.Libraries, wantLibs) {
+		t.Fatalf("lock loader server: %+v", s)
+	}
+	if l.Server == nil || *l.Server != (lock.Download{URL: base + "/piston-data/server.jar", Sha512: h.vanilla.sha512}) {
+		t.Fatalf("lock server: %+v", l.Server)
 	}
 
 	buildDir := filepath.Join(h.dir, "build", "server")
