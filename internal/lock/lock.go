@@ -105,6 +105,15 @@ func New() *Lock {
 	return &Lock{LockVersion: 1, Modpacks: map[string]Modpack{}, Mods: map[string]Mod{}, Players: []Player{}}
 }
 
+// JarID is the in-jar mod id dependencies name, which is the entry's key unless
+// --as gave it another one.
+func (l *Lock) JarID(key string) string {
+	if m, ok := l.Mods[key]; ok && m.ModID != "" {
+		return m.ModID
+	}
+	return key
+}
+
 func Load(path string) (*Lock, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

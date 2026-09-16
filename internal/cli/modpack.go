@@ -20,7 +20,7 @@ var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.Typ
 // flag and refuse the ones the chosen type has no use for, so a group command
 // and its `--type` spelling take the same flags.
 var typeFlags = map[string][]string{
-	manifest.TypeMod:          {"side", "channel", "pin", "provider"},
+	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as"},
 	manifest.TypeModpack:      {"ref", "as"},
 	manifest.TypeResourcePack: {"as"},
 	manifest.TypeShader:       {"as"},
@@ -98,12 +98,16 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string) 
 					return "", out.Errorf("modpack-exists", "modpack %s is already in the manifest", source)
 				}
 			}
-			key, err := pack.Key(source, as)
-			if err != nil {
-				return "", err
+			key := as
+			if key == "" {
+				derived, err := pack.Key(source)
+				if err != nil {
+					return "", err
+				}
+				key = derived
 			}
-			if _, taken := p.Manifest.Requires[key]; taken {
-				return "", out.Errorf("modpack-name", "requires already has %s; pass --as to pick another name", key)
+			if held, taken := p.Manifest.Requires[key]; taken {
+				return "", manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
 			}
 			store, err := a.packStore(p)
 			if err != nil {

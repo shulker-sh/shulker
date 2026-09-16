@@ -115,7 +115,7 @@ func TestPagesAreCleaned(t *testing.T) {
 
 func TestHelpFor(t *testing.T) {
 	add, ok := HelpFor("shulker add")
-	if !ok || len(add.Description) != 1 || !strings.HasPrefix(add.Description[0], "Add mods to the manifest") || len(add.Examples) != 4 || add.Examples[0] != "shulker add sodium lithium" || add.More || add.Anchor != "shulker-add" {
+	if !ok || len(add.Description) != 1 || !strings.HasPrefix(add.Description[0], "Add mods to the manifest") || len(add.Examples) != 5 || add.Examples[0] != "shulker add sodium lithium" || add.More || add.Anchor != "shulker-add" {
 		t.Fatalf("add %+v", add)
 	}
 	if lock, _ := HelpFor("shulker lock"); len(lock.Description) != 2 {

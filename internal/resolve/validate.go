@@ -85,7 +85,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 			return nil, err
 		}
 		infos[id] = info
-		installed[id] = info.Version
+		installed[r.Lock.JarID(id)] = info.Version
 		for pid, pv := range info.Provides {
 			if _, taken := installed[pid]; !taken {
 				installed[pid] = pv

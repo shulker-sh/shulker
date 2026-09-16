@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -30,8 +29,6 @@ const (
 	Git   Kind = "git"
 	URL   Kind = "url"
 )
-
-var keyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
 type Loaded struct {
 	Name     string
@@ -70,13 +67,7 @@ func Classify(source string) Kind {
 	return Local
 }
 
-func Key(source, name string) (string, error) {
-	if name != "" {
-		if !keyPattern.MatchString(name) {
-			return "", out.Errorf("modpack-name", "%q can't name a modpack: use up to 64 lowercase letters, digits, dots, dashes and underscores, starting with a letter or digit", name)
-		}
-		return name, nil
-	}
+func Key(source string) (string, error) {
 	base := strings.TrimSuffix(source, "/")
 	switch Classify(source) {
 	case Local:
@@ -90,7 +81,7 @@ func Key(source, name string) (string, error) {
 		base = strings.TrimSuffix(path.Base(base), path.Ext(base))
 	}
 	key := strings.ToLower(base)
-	if !keyPattern.MatchString(key) {
+	if !manifest.ValidKey(key) {
 		return "", out.Errorf("modpack-name", "cannot derive a modpack name from %q (got %q); pass --as", source, key)
 	}
 	return key, nil

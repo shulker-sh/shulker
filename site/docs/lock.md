@@ -101,8 +101,8 @@ No other properties are allowed.
 | `side` * | `"client"` \| `"server"` \| `"both"` | Effective side after any manifest override. |
 | `channel` * | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted when this version was picked: the manifest's channel for a mod listed there or in a pack, the requiring mod's for a dependency. A listed mod whose manifest channel differs makes the lock out of date. |
 | `modpack` | [`requireKey`](#requirekey) | Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own mods and the dependencies resolved for them. |
-| `modId` | [`modId`](#modid) | The jar's in-jar mod id. Present only when it differs from the entry's key; dependencies, validation and requiredBy use it. |
-| `requiredBy` * | [`requireKey`](#requirekey)[] | Mod ids (or modpack keys) whose jar metadata depends on this mod. Empty plus absent from the manifest's requires and every modpack means orphan.<br>unique items |
+| `modId` | [`modId`](#modid) | The jar's in-jar mod id. Present only when it differs from the entry's key; dependency matching and validation use it, while requiredBy and every other reference use the key. |
+| `requiredBy` * | [`requireKey`](#requirekey)[] | Requires keys of the mods, or modpacks, that depend on this mod. Empty plus absent from the manifest's requires and every modpack means orphan.<br>unique items |
 | `aliases` * | object | The same mod's project id on other providers, discovered on first download. |
 
 No other properties are allowed.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"regexp"
 	"slices"
 
 	"shulker.sh/shulker/internal/fsutil"
@@ -118,6 +119,14 @@ const (
 	TypeResourcePack = "resourcepack"
 	TypeShader       = "shader"
 )
+
+var keyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
+
+func ValidKey(key string) bool { return keyPattern.MatchString(key) }
+
+func KeyTaken(key, held, adding string) error {
+	return out.Errorf("requires-taken", "requires already has %s as a %s; pass `--as <key>` to give this %s another key", key, held, adding)
+}
 
 type Require struct {
 	Type       string     `json:"type,omitempty"`

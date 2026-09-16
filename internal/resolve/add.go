@@ -39,6 +39,7 @@ type AddOptions struct {
 	Channel  string
 	Pin      string
 	Provider string
+	As       string
 }
 
 func (r *Resolver) log(format string, args ...any) {
@@ -113,7 +114,11 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 		return out.Errorf("loader-required", "mods need a loader; pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
 	}
 	explicit := opts.Provider != ""
-	if prev, ok := r.Manifest.Mods()[slug]; !explicit && ok && prev.Provider != "" {
+	listed := opts.As
+	if listed == "" {
+		listed = slug
+	}
+	if prev, ok := r.Manifest.Mods()[listed]; !explicit && ok && prev.Provider != "" {
 		opts.Provider = prev.Provider
 	}
 	p, proj, err := r.lookup(ctx, slug, opts.Provider)
@@ -124,12 +129,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if err != nil {
 		return err
 	}
-	id, prior, err := r.place(ctx, p, proj, v, "", opts.Side, opts.Channel, explicit)
+	id, prior, err := r.place(ctx, p, proj, v, opts.As, "", opts.Side, opts.Channel, explicit)
 	if err != nil {
 		return err
-	}
-	if held, ok := r.Manifest.Requires[id]; ok && held.Kind() != manifest.TypeMod {
-		return out.Errorf("requires-taken", "requires already has %s as a %s; remove it first", id, held.Kind())
 	}
 	previous := r.Manifest.Requires[id]
 	switched := explicit && prior != nil && prior.Provider != p.Name()
@@ -274,7 +276,7 @@ func (r *Resolver) settle(id, side, channel string) {
 	r.Lock.Mods[id] = m
 }
 
-func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, requiredBy, sideOverride, channel string, replace bool) (string, *lock.Mod, error) {
+func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, key, requiredBy, sideOverride, channel string, replace bool) (string, *lock.Mod, error) {
 	r.log("fetching %s %s", proj.Slug, v.Number)
 	got, err := r.obtain(ctx, proj, v)
 	if err != nil {
@@ -284,26 +286,41 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	if err != nil {
 		return "", nil, err
 	}
+	id := key
+	if id == "" {
+		id = info.ID
+	}
+	if held, ok := r.Manifest.Requires[id]; ok && held.Kind() != manifest.TypeMod {
+		return "", nil, manifest.KeyTaken(id, held.Kind(), manifest.TypeMod)
+	}
+	for _, other := range r.lockIDs() {
+		if other != id && r.Lock.JarID(other) == info.ID {
+			return "", nil, out.Errorf("requires-taken", "mod id %s is already locked as %s; a mod id can only be locked once", info.ID, other)
+		}
+	}
 	var prior *lock.Mod
-	if existing, ok := r.Lock.Mods[info.ID]; ok {
+	if existing, ok := r.Lock.Mods[id]; ok {
+		if !sameMod(existing, r.Lock.JarID(id), p.Name(), proj.ID, info.ID) {
+			return "", nil, out.Errorf("requires-taken", "requires already has %s as %s; pass `--as <key>` to give %s another key", id, r.Lock.JarID(id), info.ID)
+		}
 		prior = &existing
 		if requiredBy != "" {
-			r.Lock.AddRequiredBy(info.ID, requiredBy)
+			r.Lock.AddRequiredBy(id, requiredBy)
 		}
 		switch {
 		case existing.Provider != p.Name() && replace:
-			r.log("switching %s from %s to %s", info.ID, existing.Provider, p.Name())
+			r.log("switching %s from %s to %s", id, existing.Provider, p.Name())
 		case existing.Provider != p.Name():
-			aliased := r.Lock.Mods[info.ID]
+			aliased := r.Lock.Mods[id]
 			setAlias(&aliased, p.Name(), proj.ID)
-			r.Lock.Mods[info.ID] = aliased
-			r.log("keeping %s %s from %s (%s project %s recorded as an alias)", info.ID, existing.VersionNumber, existing.Provider, p.Name(), proj.ID)
-			return info.ID, prior, nil
+			r.Lock.Mods[id] = aliased
+			r.log("keeping %s %s from %s (%s project %s recorded as an alias)", id, existing.VersionNumber, existing.Provider, p.Name(), proj.ID)
+			return id, prior, nil
 		case fmt.Sprint(existing.Version) != v.ID:
-			r.log("keeping %s %s already in lock", info.ID, existing.VersionNumber)
-			return info.ID, prior, nil
+			r.log("keeping %s %s already in lock", id, existing.VersionNumber)
+			return id, prior, nil
 		default:
-			return info.ID, prior, nil
+			return id, prior, nil
 		}
 	}
 	side := proj.Side
@@ -339,8 +356,33 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		setAlias(&entry, prior.Provider, fmt.Sprint(prior.Project))
 		clearAlias(&entry, p.Name())
 	}
-	r.Lock.Mods[info.ID] = entry
-	return info.ID, prior, nil
+	if info.ID != id {
+		entry.ModID = info.ID
+	}
+	if was := r.Lock.JarID(id); prior != nil && was != info.ID {
+		r.log("%s %s now identifies itself as %s", id, v.Number, info.ID)
+	}
+	r.Lock.Mods[id] = entry
+	return id, prior, nil
+}
+
+// sameMod reports whether a lock entry and a freshly resolved jar are the same
+// mod: the provider's own project id where it can be compared, an alias where
+// the entry came from another provider, and the jar's id otherwise.
+func sameMod(existing lock.Mod, jarID, providerName, projectID, resolvedJarID string) bool {
+	if jarID == resolvedJarID {
+		return true
+	}
+	if existing.Provider == providerName {
+		return fmt.Sprint(existing.Project) == projectID
+	}
+	switch providerName {
+	case "modrinth":
+		return existing.Aliases.Modrinth != "" && existing.Aliases.Modrinth == projectID
+	case "curseforge":
+		return existing.Aliases.CurseForge != 0 && strconv.Itoa(existing.Aliases.CurseForge) == projectID
+	}
+	return false
 }
 
 func clearAlias(m *lock.Mod, providerName string) {
@@ -389,7 +431,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 				return fmt.Errorf("dependency of %s: %w", parentID, err)
 			}
 		}
-		id, _, err := r.place(ctx, p, dproj, dv, parentID, "", channel, false)
+		id, _, err := r.place(ctx, p, dproj, dv, "", parentID, "", channel, false)
 		if err != nil {
 			return err
 		}

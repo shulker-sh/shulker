@@ -7,7 +7,7 @@ All notable changes to shulker are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
-- `init` creates a `shulker.json` manifest; `add`, `remove`, `update`, `outdated`, `pin` and `unpin` manage mods, with exact versions and hashes recorded in `shulker.lock`.
+- `init` creates a `shulker.json` manifest; `add`, `remove`, `update`, `outdated`, `pin` and `unpin` manage mods, with exact versions and hashes recorded in `shulker.lock`. `--as` gives an entry a key of your own, recorded against the jar's own mod id, and a key another entry already holds is refused rather than taken over.
 - Dependency problems found in jar metadata fail the command that would lock them and print the `shulker ignore` line that accepts each one; `unignore` drops it again. An ignore records the range the jar declared, so a new version that declares something else brings the problem back.
 - `lock` brings `shulker.lock` in line with hand edits to `shulker.json` and changes to local packs without upgrading anything, and the out-of-date warning names each difference.
 - `set`, `unset` and `get` edit and read any field of `shulker.json` by dotted path, checked against the schema before anything is written.
@@ -24,7 +24,7 @@ All notable changes to shulker are documented here. The format is based on
 - `player` resolves names against Mojang and writes the whitelist, ops and bans.
 - `client.options` merges into `options.txt`, and `.properties` and other owned files merge per key, so in-game edits survive a rebuild; `diff` and `pull` bring them back into the project.
 - Per-target data directories linked into builds, so worlds, logs and screenshots survive rebuilds.
-- `pack add|remove|list` layers other projects in from local paths, git repositories or manifest URLs.
+- `modpack add|remove|list` layers other projects in from local paths, git repositories or manifest URLs.
 - Mods gated on OS or a named feature; `feature on|off|reset|list` saves per-machine choices in `shulker.local.json`, and `--with`, `--without` and `--os` override them for one run.
 - A ModMenu entry with the pack's name, version, description, authors and links, which badges managed mods and turns off their update checks; NeoForge and Forge packs get the same summary in the mod list.
 - `sync` builds a target of a local project, git repository or manifest URL into any directory, and falls back to the last successful sync when the network is down (`--offline` skips the network).

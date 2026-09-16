@@ -151,6 +151,7 @@ Add mods to the manifest, resolve them and their dependencies, and write the loc
 shulker add sodium lithium
 shulker add iris --channel beta
 shulker add betterthirdperson --provider curseforge --side client
+shulker add sodium --as speed
 shulker add ../base-pack --type modpack --as base
 ```
 
@@ -162,7 +163,7 @@ shulker add ../base-pack --type modpack --as base
 | `--pin <version-id>` | Pin to a provider version id (one mod only) |
 | `--provider <provider>` | Provider to use for this mod: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
-| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: derived from the modpack source) |
+| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a modpack source's name) |
 
 ### `shulker remove`
 
@@ -744,7 +745,7 @@ shulker unlink --all --side server
 
 ### `shulker mod add|remove|list`
 
-`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`.
+`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`.
 
 ```sh
 shulker mod add sodium
@@ -965,7 +966,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `feature-not-found` | No mod or target uses the feature. `candidates`: the features in use |
 | `file-not-found` | A file named to `pull` isn't in the build directory |
 | `git-missing` | A git source needs `git` on PATH |
-| `id-changed` | A new version of a mod identifies itself as a different mod |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-dir-not-empty` | The instance directory already has files |
 | `instance-exists` | An instance already syncs from a different source, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
@@ -1020,7 +1020,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-fetch` | A modpack couldn't be fetched |
 | `modpack-manifest` | A modpack source has no `shulker.json` |
 | `modpack-mismatch` | A modpack wants a different Minecraft version or loader |
-| `modpack-name` | A modpack's name can't be worked out, isn't valid, or is already in `requires`; pass `--as` |
+| `modpack-name` | A modpack's name can't be worked out from its source; pass `--as` |
 | `modpack-not-found` | The modpack isn't in `shulker.json`. `candidates`: the modpacks |
 | `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
@@ -1036,7 +1036,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `players-invalid` | A player entry in `shulker.json` is invalid |
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
-| `requires-taken` | `add` found the name already in `requires` as something other than a mod |
+| `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a resource pack, shader, local `file`, or a modpack without a `source` |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform; set `java` in `shulker.json` |
 | `self-update-check` | Checking for a release failed, or none is published |

@@ -26,6 +26,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if as != "" && !manifest.ValidKey(as) {
+				return out.Errorf("usage", "--as takes up to 64 lowercase letters, digits, dots, dashes and underscores, starting with a letter or digit, not %q", as)
+			}
 			switch chosen {
 			case manifest.TypeModpack:
 				return a.addModpacks(cmd, args, as, ref)
@@ -36,6 +39,10 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			if opts.Pin != "" && len(args) > 1 {
 				return fmt.Errorf("--pin applies to a single mod")
 			}
+			if as != "" && len(args) > 1 {
+				return out.Errorf("usage", "--as applies to a single mod")
+			}
+			opts.As = as
 			for _, flag := range []struct {
 				name, value string
 				allowed     []string
@@ -77,7 +84,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit for git sources")
 	}
 	if applies(kind, "as") {
-		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: derived from the source)")
+		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a modpack source's name)")
 	}
 	return cmd
 }
