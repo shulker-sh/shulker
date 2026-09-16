@@ -245,14 +245,14 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 		}
 		items = append(items, out.Item{Kind: out.Change, Name: p.ID, From: p.From, To: p.To})
 	}
-	for _, p := range c.Packs {
+	for _, p := range c.Modpacks {
 		switch {
 		case p.From == "":
-			items = append(items, out.Item{Kind: out.Add, Name: p.Name, Version: p.To, Aside: []string{"pack"}})
+			items = append(items, out.Item{Kind: out.Add, Name: p.Name, Version: p.To, Aside: []string{"modpack"}})
 		case p.To == "":
-			items = append(items, out.Item{Kind: out.Drop, Name: p.Name, Aside: []string{"pack"}})
+			items = append(items, out.Item{Kind: out.Drop, Name: p.Name, Aside: []string{"modpack"}})
 		default:
-			items = append(items, out.Item{Kind: out.Change, Name: p.Name, From: p.From, To: p.To, Aside: []string{"pack"}})
+			items = append(items, out.Item{Kind: out.Change, Name: p.Name, From: p.From, To: p.To, Aside: []string{"modpack"}})
 		}
 	}
 	for _, m := range c.Added {

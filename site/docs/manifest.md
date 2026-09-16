@@ -21,8 +21,8 @@ Required properties are marked with *.
 | `name` * | `string` | Project name. Used in messages and as the default instance name for launchers.<br>pattern `^[a-z0-9][a-z0-9._-]*$` |
 | `version` | `string` | Pack version shown to people, e.g. "1.0" or "2026-09". Never parsed. Used as the versionId of an exported .mrpack and in its file name.<br>min length 1 |
 | `description` | `string` | One paragraph about the pack, shown to players. First paragraph of the ModMenu entry and, joined with note, the summary of an exported .mrpack.<br>min length 1 |
-| `authors` | `string`[] | Shown by ModMenu as "by ..." under the pack name. init seeds the git user.name and shulker.sh; delete entries freely.<br>unique items |
-| `license` | `string` | The pack's license, e.g. "MIT" or "CC BY-NC-SA 4.0". Shown on the pack's entry in the mod list, and clickable there when links.license is set. Defaults to "All rights reserved", since NeoForge and Forge reject a mod that declares no license.<br>min length 1 |
+| `authors` | `string`[] | Shown by ModMenu as "by ..." under the project name. init seeds the git user.name and shulker.sh; delete entries freely.<br>unique items |
+| `license` | `string` | The project's license, e.g. "MIT" or "CC BY-NC-SA 4.0". Shown on the project's entry in the mod list, and clickable there when links.license is set. Defaults to "All rights reserved", since NeoForge and Forge reject a mod that declares no license.<br>min length 1 |
 | `links` | [`links`](#links) |  |
 | `minecraft` * | [`semverRange`](#semverrange) | Semver range over Minecraft version ids, e.g. "~26.2", "^26.1", or an exact version. Pre-release order is snapshot &lt; pre &lt; rc &lt; release. |
 | `loader` | [`loader`](#loader) |  |
@@ -42,7 +42,7 @@ No other properties are allowed.
 
 ### links
 
-Links shown on the pack's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written. On NeoForge and Forge, where the entry has room for less, website and issues become the Homepage and Issues buttons and license makes the license clickable.
+Links shown on the project's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written. On NeoForge and Forge, where the entry has room for less, website and issues become the Homepage and Issues buttons and license makes the license clickable.
 
 | Property | Type | Description |
 | --- | --- | --- |
@@ -146,7 +146,7 @@ Type: map of `string` \| `number` \| `boolean`. keys match `^[A-Za-z_][A-Za-z0-9
 | --- | --- | --- |
 | `name` | `string` | Display name launchers show for this target (Prism instance name, official launcher profile name). Defaults to the manifest name.<br>min length 1 |
 | `side` * | `"client"` \| `"server"` | Which side this target builds. Mods with side "both" are included in every target. |
-| `overrides` * | [`relativePath`](#relativepath)[] | Override layers applied in order; later layers win. Pack overrides sit beneath all of these.<br>min items 1, unique items |
+| `overrides` * | [`relativePath`](#relativepath)[] | Override layers applied in order; later layers win. Modpack overrides sit beneath all of these.<br>min items 1, unique items |
 | `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;target&gt;. |
 | `variables` | [`variables`](#variables) |  |
 | `features` | [`featureName`](#featurename)[] | Features on by default for this target. A mod gated with feature ships when one of its names is on.<br>unique items |

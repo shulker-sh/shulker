@@ -56,7 +56,7 @@ shulker link prism
 
 This works with Prism Launcher. For the official launcher, use `shulker link mojang`.
 
-To play someone else's pack, give `link` its git or manifest URL. You don't need a project of your own. A Prism instance syncs from that URL before each launch; the official launcher has no pre-launch hook, so that profile updates when you run `shulker sync --all`:
+To play someone else's modpack, give `link` its git or manifest URL. You don't need a project of your own. A Prism instance syncs from that URL before each launch; the official launcher has no pre-launch hook, so that profile updates when you run `shulker sync --all`:
 
 ```sh
 shulker link prism https://github.com/shulker-sh/base-pack.git
@@ -76,6 +76,6 @@ The first run asks you to accept the [Minecraft EULA](https://aka.ms/MinecraftEU
 
 ## Next steps
 
-- [Concepts](/docs/concepts) explains manifests, locks, targets, and packs.
+- [Concepts](/docs/concepts) explains manifests, locks, targets, and modpacks.
 - The [CLI reference](/docs/cli) covers every command.
 - The [manifest reference](/docs/manifest) lists every field in `shulker.json`.

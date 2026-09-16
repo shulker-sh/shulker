@@ -189,7 +189,7 @@ func (r *Resolver) ignores() []ignoreEntry {
 	}
 	for _, p := range r.Packs {
 		for i, ig := range p.Manifest.Ignore {
-			list = append(list, ignoreEntry{ig, fmt.Sprintf("ignore entry %d of pack %s", i+1, p.Name)})
+			list = append(list, ignoreEntry{ig, fmt.Sprintf("ignore entry %d of modpack %s", i+1, p.Name)})
 		}
 	}
 	return list

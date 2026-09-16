@@ -73,7 +73,7 @@ func Classify(source string) Kind {
 func Key(source, name string) (string, error) {
 	if name != "" {
 		if !keyPattern.MatchString(name) {
-			return "", out.Errorf("pack-name", "%q can't name a pack: use up to 64 lowercase letters, digits, dots, dashes and underscores, starting with a letter or digit", name)
+			return "", out.Errorf("modpack-name", "%q can't name a modpack: use up to 64 lowercase letters, digits, dots, dashes and underscores, starting with a letter or digit", name)
 		}
 		return name, nil
 	}
@@ -82,7 +82,7 @@ func Key(source, name string) (string, error) {
 	case Local:
 		base = filepath.Base(filepath.Clean(base))
 		if base == "." || base == ".." || base == string(filepath.Separator) {
-			return "", out.Errorf("pack-name", "cannot derive a pack name from %q; pass --name", source)
+			return "", out.Errorf("modpack-name", "cannot derive a modpack name from %q; pass --as", source)
 		}
 	case Git:
 		base = strings.TrimSuffix(path.Base(base), ".git")
@@ -91,7 +91,7 @@ func Key(source, name string) (string, error) {
 	}
 	key := strings.ToLower(base)
 	if !keyPattern.MatchString(key) {
-		return "", out.Errorf("pack-name", "cannot derive a pack name from %q (got %q); pass --name", source, key)
+		return "", out.Errorf("modpack-name", "cannot derive a modpack name from %q (got %q); pass --as", source, key)
 	}
 	return key, nil
 }
@@ -100,7 +100,7 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 	var err error
 	kind := Classify(p.Source)
 	if p.Ref != "" && kind != Git {
-		return nil, out.Errorf("pack-ref", "pack %s: \"ref\" only applies to git sources", name)
+		return nil, out.Errorf("modpack-ref", "modpack %s: \"ref\" only applies to git sources", name)
 	}
 	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: lock.Modpack{Source: p.Source}}
 	switch kind {
@@ -119,7 +119,7 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		}
 		commit, err := s.revParse(ctx, mirror, p.Ref)
 		if err != nil {
-			return nil, out.Errorf("pack-ref", "pack %s: ref %q not found in %s: %v", name, refOrHead(p.Ref), p.Source, err)
+			return nil, out.Errorf("modpack-ref", "modpack %s: ref %q not found in %s: %v", name, refOrHead(p.Ref), p.Source, err)
 		}
 		l.Pin.Ref = p.Ref
 		l.Pin.Commit = commit
@@ -135,7 +135,7 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 			return nil, err
 		}
 		if l.Manifest, err = manifest.Parse(data); err != nil {
-			return nil, fmt.Errorf("pack %s: %w", name, err)
+			return nil, fmt.Errorf("modpack %s: %w", name, err)
 		}
 		if l.Pin.Sha256, err = s.storeManifest(data); err != nil {
 			return nil, err
@@ -159,11 +159,11 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 			return nil, "", err
 		}
 		if current != pinned.DirSha256 {
-			warning = fmt.Sprintf("pack %s has changed since the lock; run `shulker lock`", name)
+			warning = fmt.Sprintf("modpack %s has changed since the lock; run `shulker lock`", name)
 		}
 	case Git:
 		if pinned.Commit == "" {
-			return nil, "", out.Errorf("pack-unlocked", "pack %s has no commit in the lock; run `shulker update`", name)
+			return nil, "", out.Errorf("modpack-unlocked", "modpack %s has no commit in the lock; run `shulker update`", name)
 		}
 		dir := s.Cache.PackSource(pinned.Commit)
 		if _, err := os.Stat(dir); err != nil {
@@ -181,7 +181,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 		}
 	case URL:
 		if pinned.Sha256 == "" {
-			return nil, "", out.Errorf("pack-unlocked", "pack %s has no hash in the lock; run `shulker update`", name)
+			return nil, "", out.Errorf("modpack-unlocked", "modpack %s has no hash in the lock; run `shulker update`", name)
 		}
 		data, err := os.ReadFile(s.Cache.PackManifest(pinned.Sha256))
 		if os.IsNotExist(err) {
@@ -190,7 +190,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 			}
 			sum := sha256.Sum256(data)
 			if hex.EncodeToString(sum[:]) != pinned.Sha256 {
-				return nil, "", out.Errorf("pack-changed", "pack %s at %s no longer matches the lock; run `shulker update`", name, p.Source)
+				return nil, "", out.Errorf("modpack-changed", "modpack %s at %s no longer matches the lock; run `shulker update`", name, p.Source)
 			}
 			if _, err := s.storeManifest(data); err != nil {
 				return nil, "", err
@@ -199,7 +199,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 			return nil, "", err
 		}
 		if l.Manifest, err = manifest.Parse(data); err != nil {
-			return nil, "", fmt.Errorf("pack %s: %w", name, err)
+			return nil, "", fmt.Errorf("modpack %s: %w", name, err)
 		}
 	}
 	return l, warning, nil
@@ -216,9 +216,9 @@ func (s *Store) loadDir(l *Loaded) error {
 	m, err := manifest.Load(filepath.Join(l.Dir, manifest.FileName))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return out.Errorf("pack-manifest", "pack %s: no %s in %s", l.Name, manifest.FileName, l.Source)
+			return out.Errorf("modpack-manifest", "modpack %s: no %s in %s", l.Name, manifest.FileName, l.Source)
 		}
-		return fmt.Errorf("pack %s: %w", l.Name, err)
+		return fmt.Errorf("modpack %s: %w", l.Name, err)
 	}
 	l.Manifest = m
 	return nil
@@ -228,7 +228,7 @@ func (s *Store) fetchManifest(ctx context.Context, name, url string) ([]byte, er
 	s.log("fetching pack %s", name)
 	var buf strings.Builder
 	if _, err := s.Fetch.Download(ctx, url, &buf); err != nil {
-		return nil, out.Errorf("pack-fetch", "pack %s: %v", name, err)
+		return nil, out.Errorf("modpack-fetch", "modpack %s: %v", name, err)
 	}
 	return []byte(buf.String()), nil
 }
@@ -264,7 +264,7 @@ func (l *Loaded) Target(name, side string) (*manifest.Target, error) {
 		t := l.Manifest.Targets[matches[0]]
 		return &t, nil
 	}
-	return nil, out.Errorf("pack-target", "pack %s has several %s targets (%s) and none named %q; rename the project target to match one", l.Name, side, strings.Join(matches, ", "), name)
+	return nil, out.Errorf("modpack-target", "modpack %s has several %s targets (%s) and none named %q; rename the project target to match one", l.Name, side, strings.Join(matches, ", "), name)
 }
 
 func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
@@ -275,27 +275,27 @@ func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
 	}
 	rng, err := mcver.ParseRange(pm.Minecraft)
 	if err != nil {
-		return fmt.Errorf("pack %s minecraft: %w", l.Name, err)
+		return fmt.Errorf("modpack %s minecraft: %w", l.Name, err)
 	}
 	if !rng.Matches(game) {
-		return out.Errorf("pack-mismatch", "pack %s wants minecraft %s; this project locked %s", l.Name, pm.Minecraft, minecraft)
+		return out.Errorf("modpack-mismatch", "modpack %s wants minecraft %s; this project locked %s", l.Name, pm.Minecraft, minecraft)
 	}
 	if pm.Loader.Type != loader.Type {
-		return out.Errorf("pack-mismatch", "pack %s uses %s; this project uses %s", l.Name, describeLoader(pm.Loader.Type), describeLoader(loader.Type))
+		return out.Errorf("modpack-mismatch", "modpack %s uses %s; this project uses %s", l.Name, describeLoader(pm.Loader.Type), describeLoader(loader.Type))
 	}
 	if loader.Type == "" {
 		return nil
 	}
 	lrng, err := loaderver.ParseRange(pm.Loader.Version)
 	if err != nil {
-		return fmt.Errorf("pack %s loader version: %w", l.Name, err)
+		return fmt.Errorf("modpack %s loader version: %w", l.Name, err)
 	}
 	lv, err := loaderver.Parse(loader.Version)
 	if err != nil {
 		return err
 	}
 	if !lrng.Matches(lv) {
-		return out.Errorf("pack-mismatch", "pack %s wants %s %s; this project locked %s", l.Name, pm.Loader.Type, pm.Loader.Version, loader.Version)
+		return out.Errorf("modpack-mismatch", "modpack %s wants %s %s; this project locked %s", l.Name, pm.Loader.Type, pm.Loader.Version, loader.Version)
 	}
 	return nil
 }
@@ -374,7 +374,7 @@ func (s *Store) Status(name string, p manifest.Require, pinned lock.Modpack, loc
 	}
 	l := &Loaded{Name: name, Source: p.Source, Kind: Local, Dir: s.localDir(p.Source)}
 	if err := s.loadDir(l); err != nil {
-		if out.CodeOf(err) == "pack-manifest" {
+		if out.CodeOf(err) == "modpack-manifest" {
 			st.State = "missing"
 			return st, nil
 		}

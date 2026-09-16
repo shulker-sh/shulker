@@ -113,8 +113,10 @@ type Target struct {
 }
 
 const (
-	TypeMod     = "mod"
-	TypeModpack = "modpack"
+	TypeMod          = "mod"
+	TypeModpack      = "modpack"
+	TypeResourcePack = "resourcepack"
+	TypeShader       = "shader"
 )
 
 type Require struct {

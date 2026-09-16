@@ -171,7 +171,7 @@ type origin struct {
 	code  string
 }
 
-func packOrigin(name string) origin { return origin{label: "pack " + name, code: "pack-fetch"} }
+func packOrigin(name string) origin { return origin{label: "modpack " + name, code: "modpack-fetch"} }
 
 func gitFailure(err error, code, format string, args ...any) error {
 	if out.CodeOf(err) == "git-missing" {

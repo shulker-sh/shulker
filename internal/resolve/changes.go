@@ -43,15 +43,15 @@ type RemovedMod struct {
 }
 
 type Changes struct {
-	Platform []Change     `json:"platform"`
-	Added    []AddedMod   `json:"added"`
-	Updated  []Change     `json:"updated"`
-	Removed  []RemovedMod `json:"removed"`
-	Packs    []PackChange `json:"packs"`
+	Platform []Change        `json:"platform"`
+	Added    []AddedMod      `json:"added"`
+	Updated  []Change        `json:"updated"`
+	Removed  []RemovedMod    `json:"removed"`
+	Modpacks []ModpackChange `json:"modpacks"`
 }
 
 func (c *Changes) Empty() bool {
-	return len(c.Platform)+len(c.Added)+len(c.Updated)+len(c.Removed)+len(c.Packs) == 0
+	return len(c.Platform)+len(c.Added)+len(c.Updated)+len(c.Removed)+len(c.Modpacks) == 0
 }
 
 // Snapshot copies each RequiredBy because the resolver filters those slices in place.
@@ -71,7 +71,7 @@ func (r *Resolver) Snapshot() Snapshot {
 }
 
 func (r *Resolver) Changes(before Snapshot) *Changes {
-	c := &Changes{Platform: []Change{}, Added: []AddedMod{}, Updated: []Change{}, Removed: []RemovedMod{}, Packs: PackChanges(before.packs, r.Lock.Modpacks)}
+	c := &Changes{Platform: []Change{}, Added: []AddedMod{}, Updated: []Change{}, Removed: []RemovedMod{}, Modpacks: ModpackChanges(before.packs, r.Lock.Modpacks)}
 	if before.minecraft != r.Lock.Minecraft {
 		c.Platform = append(c.Platform, Change{ID: "minecraft", From: before.minecraft, To: r.Lock.Minecraft})
 	}

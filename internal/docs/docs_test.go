@@ -47,7 +47,7 @@ func TestLookup(t *testing.T) {
 		{[]string{"manifest", "require"}, "section manifest: require"},
 		{[]string{"Edits in the build directory"}, "section concepts: Edits in the build directory"},
 		{[]string{"link"}, "matches"},
-		{[]string{"pack"}, "matches"},
+		{[]string{"modpack"}, "matches"},
 		{[]string{"build", "directory"}, "hits"},
 		{[]string{"qqqq-nothing-matches"}, "none"},
 	}
@@ -115,7 +115,7 @@ func TestPagesAreCleaned(t *testing.T) {
 
 func TestHelpFor(t *testing.T) {
 	add, ok := HelpFor("shulker add")
-	if !ok || len(add.Description) != 1 || !strings.HasPrefix(add.Description[0], "Add mods to the manifest") || len(add.Examples) != 3 || add.Examples[0] != "shulker add sodium lithium" || add.More || add.Anchor != "shulker-add" {
+	if !ok || len(add.Description) != 1 || !strings.HasPrefix(add.Description[0], "Add mods to the manifest") || len(add.Examples) != 4 || add.Examples[0] != "shulker add sodium lithium" || add.More || add.Anchor != "shulker-add" {
 		t.Fatalf("add %+v", add)
 	}
 	if lock, _ := HelpFor("shulker lock"); len(lock.Description) != 2 {

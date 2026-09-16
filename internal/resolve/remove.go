@@ -14,7 +14,7 @@ func (r *Resolver) Remove(ids []string) error {
 			continue
 		}
 		if d, ok := direct[id]; ok {
-			return out.Errorf("pack-provided", "%s is provided by pack %s; remove the pack or list the mod in shulker.json yourself", id, strings.Join(d.packs, ", "))
+			return out.Errorf("modpack-provided", "%s is provided by modpack %s; remove the modpack or list the mod in shulker.json yourself", id, strings.Join(d.packs, ", "))
 		}
 		if m, ok := r.Lock.Mods[id]; ok {
 			e := out.Errorf("not-direct", "%s is not in the manifest; it is required by %v", id, m.RequiredBy)

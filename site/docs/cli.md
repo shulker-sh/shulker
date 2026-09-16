@@ -39,9 +39,11 @@ outline: [2, 3]
 | [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
 | [`shulker links`](#shulker-links) | List linked launcher instances and synced directories |
 | [`shulker unlink <name>`](#shulker-unlink) | Stop syncing a linked instance or synced directory, keeping its files |
-| [`shulker pack add <source>`](#shulker-pack-add) | Add a pack from a local path, git URL, or manifest URL |
-| [`shulker pack remove <name>`](#shulker-pack-remove) | Remove a pack |
-| [`shulker pack list`](#shulker-pack-list) | List packs and their local drift state |
+| [`shulker list`](#shulker-list) | List everything in `requires` with its locked version |
+| [`shulker mod add\|remove\|list`](#shulker-mod-add-remove-list) | The plain verbs with `--type mod` |
+| [`shulker modpack add\|remove\|list`](#shulker-modpack-add-remove-list) | Manage modpacks whose mods and overrides merge into this project |
+| [`shulker resourcepack add\|remove\|list`](#shulker-resourcepack-add-remove-list) | The plain verbs with `--type resourcepack` |
+| [`shulker shader add\|remove\|list`](#shulker-shader-add-remove-list) | The plain verbs with `--type shader` |
 | [`shulker player [name\|uuid]...`](#shulker-player) | Check player names and uuids against Mojang and the lock |
 | [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
@@ -96,7 +98,7 @@ shulker import mrpack pack.mrpack -C my-pack --name my-pack
 
 | Flag | Description |
 | --- | --- |
-| `--name <name>` | Project name (default: the pack name, slugified) |
+| `--name <name>` | Project name (default: the modpack name, slugified) |
 
 ### `shulker export mrpack`
 
@@ -110,7 +112,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 
 | Flag | Description |
 | --- | --- |
-| `--version <version>` | Version written into the pack (default: `version` in shulker.json) |
+| `--version <version>` | Version written into the modpack (default: `version` in shulker.json) |
 | `-o, --output <path>` | Archive path (default: `build/<name>-<version>.mrpack`, or the current directory for a git or URL source) |
 | `--target <name>` | Export one target only (default: every target) |
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
@@ -130,7 +132,7 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 
 | Flag | Description |
 | --- | --- |
-| `--version <version>` | Version written into the pack (default: `version` in shulker.json) |
+| `--version <version>` | Version written into the modpack (default: `version` in shulker.json) |
 | `-o, --output <path>` | Archive path (default: `build/<name>-<version>.zip`, or the current directory for a git or URL source) |
 | `--target <name>` | Client target to export (default: the only client target) |
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
@@ -143,34 +145,56 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 
 ### `shulker add`
 
-Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug.
+Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug. With `--type modpack` the argument is a modpack source instead: a local path, git URL, or raw manifest URL. Each type takes only the flags that mean something for it, so `--ref` on a mod or `--side` on a modpack is refused.
 
 ```sh
 shulker add sodium lithium
 shulker add iris --channel beta
 shulker add betterthirdperson --provider curseforge --side client
+shulker add ../base-pack --type modpack --as base
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--type <type>` | What the arguments name: `mod` (default), `modpack`, `resourcepack`, `shader` |
 | `--side <side>` | Override side: `client`, `server`, `both` |
 | `--channel <channel>` | Least stable channel accepted: `release`, `beta`, `alpha` |
 | `--pin <version-id>` | Pin to a provider version id (one mod only) |
 | `--provider <provider>` | Provider to use for this mod: `modrinth` or `curseforge` |
+| `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
+| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: derived from the modpack source) |
 
 ### `shulker remove`
 
-Remove mods from the manifest and prune dependencies nothing else needs. Alias: `rm`.
+Remove mods from the manifest and prune dependencies nothing else needs. A key that names a modpack removes the modpack and the mods only it provided. Alias: `rm`.
 
 ```sh
 shulker remove lithium
+shulker remove base --type modpack
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--type <type>` | What the arguments name: `mod` (default), `modpack`, `resourcepack`, `shader` |
+
+### `shulker list`
+
+List every `requires` entry under a heading per type, with its locked version and where it comes from. Mods a modpack or another mod pulled in are listed too, with `from <modpack>` or `required by <mods>`. Alias: `ls`.
+
+```sh
+shulker list
+shulker list --type modpack
+```
+
+| Flag | Description |
+| --- | --- |
+| `--type <type>` | Only entries of one type: `mod`, `modpack`, `resourcepack`, `shader` |
 
 ### `shulker lock`
 
-Bring `shulker.lock` in line with `shulker.json` after you edit it by hand, without upgrading anything. Mods new to `shulker.json` are resolved, mods nothing lists or requires are dropped, and a mod whose channel, pin, side, provider, or project changed is picked again. Every other mod keeps its locked version, and packs stay at their locked commit unless their `ref` changed. When the locked Minecraft or loader version no longer matches `shulker.json`, or a mod is locked from a provider `shulker.json` no longer lists, every mod is resolved again and `reresolved` says why. Without a `shulker.lock`, `lock` creates one.
+Bring `shulker.lock` in line with `shulker.json` after you edit it by hand, without upgrading anything. Mods new to `shulker.json` are resolved, mods nothing lists or requires are dropped, and a mod whose channel, pin, side, provider, or project changed is picked again. Every other mod keeps its locked version, and modpacks stay at their locked commit unless their `ref` changed. When the locked Minecraft or loader version no longer matches `shulker.json`, or a mod is locked from a provider `shulker.json` no longer lists, every mod is resolved again and `reresolved` says why. Without a `shulker.lock`, `lock` creates one.
 
-`add`, `remove`, `update`, `pin`, `unpin`, `pack add`, and `pack remove` do the same before their own change, so a hand edit is never left out of the lock. What they bring in shows up in their output.
+`add`, `remove`, `update`, `pin`, `unpin`, `modpack add`, and `modpack remove` do the same before their own change, so a hand edit is never left out of the lock. What they bring in shows up in their output.
 
 ```sh
 shulker lock
@@ -245,7 +269,7 @@ With `--json`, `data` is the entry written, `{ "rule", "mod", "on", "declared", 
 
 ### `shulker unignore`
 
-Drop the ignore for a pair so the problem is checked again. Ignores that come from a pack are left alone.
+Drop the ignore for a pair so the problem is checked again. Ignores that come from a modpack are left alone.
 
 ```sh
 shulker unignore sodium fabric-api
@@ -714,38 +738,44 @@ shulker unlink --all --side server
 | `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only `client` or `server` entries |
 
-## Packs
+## Types
 
-A pack is another shulker project whose mods and overrides merge into this one.
+`add`, `remove`, and `list` span every kind of thing a project requires. Each kind also has a group of its own, which is the plain verb with that `--type` and only the flags that kind takes.
 
-### `shulker pack add`
+### `shulker mod add|remove|list`
 
-Add a pack from a local path, git URL, or raw manifest URL.
+`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`.
 
 ```sh
-shulker pack add https://github.com/shulker-sh/base-pack.git --ref v3
-shulker pack add ../base-pack
+shulker mod add sodium
+shulker mod list
 ```
 
-| Flag | Description |
-| --- | --- |
-| `--ref <ref>` | Branch, tag, or commit for git sources |
-| `--name <name>` | Name used in `requires`, messages, and `requiredBy` (default: derived from the source) |
+### `shulker modpack add|remove|list`
 
-### `shulker pack remove`
-
-Remove a pack and prune the mods only it provided. Alias: `rm`.
+A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`.
 
 ```sh
-shulker pack remove base-pack
+shulker modpack add https://github.com/shulker-sh/base-pack.git --ref v3
+shulker modpack add ../base-pack --as base
+shulker modpack list
+shulker modpack remove base-pack
 ```
 
-### `shulker pack list`
+### `shulker resourcepack add|remove|list`
 
-List packs with their locked ref and whether a local pack has changed. Alias: `ls`.
+The plain verbs with `--type resourcepack`. Resolving a resource pack isn't supported yet (`requires-unsupported`). Flags: `--as`.
 
 ```sh
-shulker pack list
+shulker resourcepack list
+```
+
+### `shulker shader add|remove|list`
+
+The plain verbs with `--type shader`. Resolving a shader isn't supported yet (`requires-unsupported`). Flags: `--as`.
+
+```sh
+shulker shader list
 ```
 
 ## Players
@@ -767,12 +797,12 @@ shulker player --all
 
 ### `shulker docs`
 
-Print the documentation built into this shulker, so it always matches the installed version and works offline. With no arguments it lists the pages. A page name prints that page, a command prints its section (`shulker docs add`), and any other heading prints its section (`shulker docs sides`). A page name followed by more words looks only inside that page (`shulker docs manifest pack`). When several sections match, it lists the command that prints each one; when none does, it searches every page for the words. Pages and sections print as markdown, which `--json` returns in `markdown`.
+Print the documentation built into this shulker, so it always matches the installed version and works offline. With no arguments it lists the pages. A page name prints that page, a command prints its section (`shulker docs add`), and any other heading prints its section (`shulker docs sides`). A page name followed by more words looks only inside that page (`shulker docs lock modpack`). When several sections match, it lists the command that prints each one; when none does, it searches every page for the words. Pages and sections print as markdown, which `--json` returns in `markdown`.
 
 ```sh
 shulker docs
 shulker docs add
-shulker docs manifest pack
+shulker docs lock modpack
 shulker docs --search build directory
 ```
 
@@ -860,7 +890,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 ```json
 {
   "ok": true,
-  "command": "pack add",
+  "command": "modpack add",
   "lockStale": false,
   "warnings": [],
   "data": {}
@@ -870,7 +900,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | Field | Description |
 | --- | --- |
 | `ok` | `true` when the command succeeded |
-| `command` | The command that ran, like `pack add` |
+| `command` | The command that ran, like `modpack add` |
 | `lockStale` | `shulker.lock` doesn't match `shulker.json`; `shulker lock` brings it in line. Commands that build from the lock warn, naming each difference, and carry on; `export` refuses |
 | `warnings` | Everything shulker would print as a `!` line without `--json`. Always present, empty when there are none |
 | `data` | The command's result. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
@@ -889,7 +919,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 ### Lock changes
 
-`lock`, `add`, `remove`, `update`, `pin`, `unpin`, `pack add`, and `pack remove` all return the same `data`: what changed in `shulker.lock` and `shulker.json`.
+`lock`, `add`, `remove`, `update`, `pin`, `unpin`, `modpack add`, and `modpack remove` all return the same `data`: what changed in `shulker.lock` and `shulker.json`.
 
 ```json
 {
@@ -898,7 +928,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
   "added": [{ "id": "fabric-api", "versionNumber": "0.119.0", "side": "both", "provider": "modrinth", "requiredBy": ["sodium"] }],
   "updated": [{ "id": "lithium", "from": "0.14.1", "to": "0.14.3" }],
   "removed": [{ "id": "iris", "versionNumber": "1.8.0", "requiredBy": [] }],
-  "packs": [{ "name": "base", "from": "abc1234", "to": "def5678" }],
+  "modpacks": [{ "name": "base", "from": "abc1234", "to": "def5678" }],
   "suggestions": []
 }
 ```
@@ -907,10 +937,10 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | --- | --- |
 | `reresolved` | Why every mod was resolved again, one difference per entry, like `minecraft: locked 26.1 is outside ~26.2`. Empty when only some mods changed |
 | `platform` | `minecraft` and `loader` when their locked version changed, as `{ "id", "from", "to" }`. `from` is empty for a new lock |
-| `added` | Mods newly locked. `requiredBy` names the mods and packs that pulled one in; empty when only `shulker.json` lists it. `alreadyLocked` marks a dependency that `add` just listed in `shulker.json` |
+| `added` | Mods newly locked. `requiredBy` names the mods and modpacks that pulled one in; empty when only `shulker.json` lists it. `alreadyLocked` marks a dependency that `add` just listed in `shulker.json` |
 | `updated` | Mods whose locked version, provider, side, or channel changed. `fromProvider`/`toProvider`, `fromSide`/`toSide`, and `fromChannel`/`toChannel` appear when that field changed |
-| `removed` | Mods no longer locked, with the `requiredBy` they had. `stillLocked` marks a mod taken out of `shulker.json` that a pack still provides |
-| `packs` | Packs added, removed, or moved to another commit. `from` is empty for a new pack, `to` for a removed one |
+| `removed` | Mods no longer locked, with the `requiredBy` they had. `stillLocked` marks a mod taken out of `shulker.json` that a modpack still provides |
+| `modpacks` | Modpacks added, removed, or moved to another commit. `from` is empty for a new modpack, `to` for a removed one |
 | `suggestions` | Recommended mods that aren't installed |
 | `pin` | `pin` only: the version it pinned to |
 
@@ -984,18 +1014,18 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `not-installed` | A file isn't in the cache; run `shulker install` |
 | `not-pinned` | The mod has no pin |
 | `not-synced` | The directory has no record of the source it was synced from |
-| `pack-changed` | A pack no longer matches the lock; run `shulker update` |
-| `pack-conflict` | Two packs list the same mod with different settings |
-| `pack-exists` | The pack is already in `shulker.json` |
-| `pack-fetch` | A pack couldn't be fetched |
-| `pack-manifest` | A pack source has no `shulker.json` |
-| `pack-mismatch` | A pack wants a different Minecraft version or loader |
-| `pack-name` | A pack's name can't be worked out, isn't valid, or is already in `requires`; pass `--name` |
-| `pack-not-found` | The pack isn't in `shulker.json`. `candidates`: the packs |
-| `pack-provided` | The mod comes from a pack, so it can't be removed on its own |
-| `pack-ref` | A pack's `ref` doesn't apply to its source, or wasn't found |
-| `pack-target` | A pack has several targets of a side and none named like the project's |
-| `pack-unlocked` | A pack has no commit in the lock; run `shulker update` |
+| `modpack-changed` | A modpack no longer matches the lock; run `shulker update` |
+| `modpack-conflict` | Two modpacks list the same mod with different settings |
+| `modpack-exists` | The modpack is already in `shulker.json` |
+| `modpack-fetch` | A modpack couldn't be fetched |
+| `modpack-manifest` | A modpack source has no `shulker.json` |
+| `modpack-mismatch` | A modpack wants a different Minecraft version or loader |
+| `modpack-name` | A modpack's name can't be worked out, isn't valid, or is already in `requires`; pass `--as` |
+| `modpack-not-found` | The modpack isn't in `shulker.json`. `candidates`: the modpacks |
+| `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
+| `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
+| `modpack-target` | A modpack has several targets of a side and none named like the project's |
+| `modpack-unlocked` | A modpack has no commit in the lock; run `shulker update` |
 | `path-invalid` | `shulker.json` or `config.json` has no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get` or `config get` names a field that isn't set |
 | `pin-mismatch` | The pinned version belongs to a different project |

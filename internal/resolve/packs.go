@@ -13,7 +13,7 @@ import (
 	"shulker.sh/shulker/internal/pack"
 )
 
-type PackChange struct {
+type ModpackChange struct {
 	Name string `json:"name"`
 	From string `json:"from"`
 	To   string `json:"to"`
@@ -64,7 +64,7 @@ func (r *Resolver) CheckPacks() error {
 				continue
 			}
 			if !reflect.DeepEqual(prev.Manifest.Requires[id], mods[id]) {
-				return out.Errorf("pack-conflict", "packs %s and %s both list %s with different settings; list %s in shulker.json to decide", prev.Name, p.Name, id, id)
+				return out.Errorf("modpack-conflict", "modpacks %s and %s both list %s with different settings; list %s in shulker.json to decide", prev.Name, p.Name, id, id)
 			}
 		}
 	}
@@ -96,7 +96,7 @@ func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
 func (r *Resolver) RemovePack(name string) error {
 	modpacks := r.Manifest.Modpacks()
 	if _, ok := modpacks[name]; !ok {
-		e := out.Errorf("pack-not-found", "pack %s is not in the manifest", name)
+		e := out.Errorf("modpack-not-found", "modpack %s is not in the manifest", name)
 		e.Given, e.Candidates = name, slices.Sorted(maps.Keys(modpacks))
 		return e
 	}
@@ -134,17 +134,17 @@ func (r *Resolver) RefreshPacks(loaded []*pack.Loaded) error {
 	return nil
 }
 
-func PackChanges(before, after map[string]lock.Modpack) []PackChange {
-	changes := []PackChange{}
+func ModpackChanges(before, after map[string]lock.Modpack) []ModpackChange {
+	changes := []ModpackChange{}
 	for name, now := range after {
 		old, had := before[name]
 		if !had || old.Label() != now.Label() {
-			changes = append(changes, PackChange{Name: name, From: old.Label(), To: now.Label()})
+			changes = append(changes, ModpackChange{Name: name, From: old.Label(), To: now.Label()})
 		}
 	}
 	for name, old := range before {
 		if _, still := after[name]; !still {
-			changes = append(changes, PackChange{Name: name, From: old.Label()})
+			changes = append(changes, ModpackChange{Name: name, From: old.Label()})
 		}
 	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Name < changes[j].Name })

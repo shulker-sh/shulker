@@ -1,16 +1,16 @@
 ---
-description: How manifests, locks, targets, sides, overrides, build edits, packs, and providers fit together.
+description: How manifests, locks, targets, sides, overrides, build edits, modpacks, and providers fit together.
 ---
 
 # Concepts
 
 ## Manifest
 
-`shulker.json` declares the Minecraft version, loader, targets, mods, and packs. See the [manifest reference](/docs/manifest).
+`shulker.json` declares the Minecraft version, loader, targets, mods, and modpacks. See the [manifest reference](/docs/manifest).
 
 ## Lock
 
-`shulker.lock` records the exact resolved versions, hashes, and pack commits. See the [lock reference](/docs/lock).
+`shulker.lock` records the exact resolved versions, hashes, and modpack commits. See the [lock reference](/docs/lock).
 
 ## Targets
 
@@ -37,9 +37,9 @@ Each build records what it wrote in `.shulker-state.json` in the build directory
 
 Use [`shulker diff`](/docs/cli#shulker-diff) to see what changed, and [`shulker pull`](/docs/cli#shulker-pull) to copy those edits back into your overrides or `shulker.json` so they're part of the project.
 
-## Packs
+## Modpacks
 
-A pack is another shulker project whose mods and overrides merge into this one. Its overrides sit beneath your own layers, and its own lock is ignored: your `shulker.lock` pins it instead. Add one from a local path, git URL, or manifest URL with [`shulker pack add`](/docs/cli#shulker-pack-add).
+A modpack is another shulker project whose mods and overrides merge into this one. Its overrides sit beneath your own layers, and its own lock is ignored: your `shulker.lock` pins it instead. Add one from a local path, git URL, or manifest URL with [`shulker modpack add`](/docs/cli#shulker-modpack-add-remove-list).
 
 ## Providers
 

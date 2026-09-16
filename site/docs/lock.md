@@ -78,7 +78,7 @@ Type: `integer`. min 1
 | `source` * | `string` | The manifest source at resolution time. A different source in the manifest makes the lock out of date.<br>min length 1 |
 | `ref` | `string` | The manifest ref at resolution time. Git sources only.<br>min length 1 |
 | `commit` | [`gitCommit`](#gitcommit) | Resolved commit. Git sources only. |
-| `dirSha256` | [`sha256`](#sha256) | Content hash of the pack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only. |
+| `dirSha256` | [`sha256`](#sha256) | Content hash of the modpack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only. |
 | `sha256` | [`sha256`](#sha256) | Hash of the fetched manifest. Raw manifest URL sources only. |
 | `locked` | `true` | Present when the modpack's mods were copied from its lock. Absent means they were resolved from its manifest. |
 | `lockSha256` | [`sha256`](#sha256) | Hash of the modpack's lock at resolution time. Present exactly when locked is. |

@@ -185,7 +185,7 @@ func TestGroupCommandsReportUnknownSubcommands(t *testing.T) {
 
 func TestUsageErrorsShowUsageAndFlags(t *testing.T) {
 	_, _, stderr := run(t, "add")
-	if !strings.Contains(stderr, "\n\n  Usage\n    $ shulker add <mod>... [flags]\n\n  Flags\n") {
+	if !strings.Contains(stderr, "\n\n  Usage\n    $ shulker add <mod|source>... [flags]\n\n  Flags\n") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
 	if strings.Contains(stderr, "Global flags") || strings.Contains(stderr, "Examples") || strings.HasSuffix(stderr, "\n\n") {
@@ -260,7 +260,7 @@ func TestUnknownCommandJSON(t *testing.T) {
 }
 
 func TestUnknownCommandPicks(t *testing.T) {
-	code, stdout, _ := run(t, "mod", "add", "--json")
+	code, stdout, _ := run(t, "ad", "add", "--json")
 	if code != out.ExitUsage {
 		t.Fatalf("exit %d", code)
 	}
@@ -268,10 +268,10 @@ func TestUnknownCommandPicks(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Error == nil || env.Error.Code != "usage" || env.Error.Message != `unknown command "mod"` || !slices.Contains(env.Error.Candidates, "add") {
+	if env.Error == nil || env.Error.Code != "usage" || env.Error.Message != `unknown command "ad"` || !slices.Contains(env.Error.Candidates, "add") {
 		t.Fatalf("unexpected envelope %+v", env)
 	}
-	_, _, stderr := run(t, "mod", "add")
+	_, _, stderr := run(t, "ad", "add")
 	if strings.Contains(stderr, "Usage") {
 		t.Fatalf("an unknown command with picks printed usage:\n%s", stderr)
 	}

@@ -16,7 +16,7 @@ func TestArgumentErrorsListWhatIsWrong(t *testing.T) {
 	}{
 		{[]string{"config", "set"}, "missing 2 arguments", []string{"<key>", "<value>"}},
 		{[]string{"config", "set", "registry"}, "missing an argument", []string{"<value>"}},
-		{[]string{"add"}, "missing at least one argument", []string{"<mod>"}},
+		{[]string{"add"}, "missing at least one argument", []string{"<mod|source>"}},
 		{[]string{"export", "mrpack", "a", "b", "c"}, "unexpected arguments", []string{"b", "c"}},
 		{[]string{"version", "extra"}, "unexpected argument", []string{"extra"}},
 	}

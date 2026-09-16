@@ -58,7 +58,7 @@ type lockView struct {
 	} `json:"mods"`
 }
 
-func TestLocalPack(t *testing.T) {
+func TestLocalModpack(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	writePack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, map[string]string{
@@ -79,13 +79,13 @@ func TestLocalPack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stdout := h.mustRun(t, "pack", "add", "./base")
+	stdout := h.mustRun(t, "modpack", "add", "./base")
 	if !strings.Contains(stdout, "+ base ") || !strings.Contains(stdout, "+ sodium") || !strings.Contains(stdout, "+ fabric-api") {
-		t.Fatalf("pack add output: %s", stdout)
+		t.Fatalf("modpack add output: %s", stdout)
 	}
 	l := readLock(t, h)
 	if p := l.Packs["base"]; p["source"] != "./base" || len(p["dirSha256"]) != 64 || p["commit"] != "" {
-		t.Fatalf("lock packs: %v", l.Packs)
+		t.Fatalf("lock modpacks: %v", l.Packs)
 	}
 	if by := l.Mods["sodium"].RequiredBy; len(by) != 1 || by[0] != "base" {
 		t.Fatalf("sodium requiredBy: %v", by)
@@ -97,22 +97,41 @@ func TestLocalPack(t *testing.T) {
 	if len(m.Requires) != 1 || m.Requires["base"]["source"] != "./base" {
 		t.Fatalf("manifest requires: %v", m.Requires)
 	}
-	_, stdout, _ = h.run(t, "pack", "list", "--json")
+	_, stdout, _ = h.run(t, "modpack", "list", "--json")
 	var listEnv struct {
-		Data []map[string]string `json:"data"`
+		Data []map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &listEnv); err != nil {
-		t.Fatalf("pack list json: %v: %s", err, stdout)
+		t.Fatalf("modpack list json: %v: %s", err, stdout)
 	}
-	if listed := listEnv.Data; len(listed) != 1 || listed[0]["name"] != "base" || listed[0]["kind"] != "local" || listed[0]["state"] != "ok" || listed[0]["pin"] != l.Packs["base"]["dirSha256"][:12] {
-		t.Fatalf("pack list: %v", listed)
+	if listed := listEnv.Data; len(listed) != 1 || listed[0]["key"] != "base" || listed[0]["type"] != "modpack" ||
+		listed[0]["kind"] != "local" || listed[0]["state"] != "ok" || listed[0]["version"] != l.Packs["base"]["dirSha256"][:12] {
+		t.Fatalf("modpack list: %v", listEnv.Data)
 	}
 
-	code, stdout, _ := h.run(t, "remove", "sodium", "--json")
+	stdout = h.mustRun(t, "list")
+	for _, want := range []string{"Modpacks\n", "• base ./base (local, ok", "Mods\n", "• sodium", "fabric-api", "from base"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("list output has no %q: %s", want, stdout)
+		}
+	}
+	if stdout = h.mustRun(t, "list", "--type", "mod"); strings.Contains(stdout, "Modpacks") {
+		t.Fatalf("list --type mod should leave modpacks out: %s", stdout)
+	}
+	code, stdout, _ := h.run(t, "list", "--type", "nope", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error.Code != "pack-provided" {
-		t.Fatalf("remove pack mod: code=%d env=%+v", code, env)
+	if code == 0 || env.Error.Code != "usage" {
+		t.Fatalf("unknown type: code=%d env=%+v", code, env)
+	}
+	if code, stdout, _ = h.run(t, "add", "sodium", "--ref", "main", "--json"); code == 0 || !strings.Contains(stdout, "--ref") {
+		t.Fatalf("a modpack flag on a mod should fail: %s", stdout)
+	}
+
+	code, stdout, _ = h.run(t, "remove", "sodium", "--json")
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code == 0 || env.Error.Code != "modpack-provided" {
+		t.Fatalf("remove modpack mod: code=%d env=%+v", code, env)
 	}
 
 	h.mustRun(t, "install")
@@ -132,11 +151,11 @@ func TestLocalPack(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.dir, "base", "overrides", "config", "base.txt"), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if stdout = h.mustRun(t, "pack", "list"); !strings.HasPrefix(stdout, "  • base ./base (local, changed, pinned "+l.Packs["base"]["dirSha256"][:12]+")\n") {
-		t.Fatalf("pack list after edit: %s", stdout)
+	if stdout = h.mustRun(t, "modpack", "list"); !strings.HasPrefix(stdout, "  Modpacks\n  • base ./base (local, changed, pinned "+l.Packs["base"]["dirSha256"][:12]+")\n") {
+		t.Fatalf("modpack list after edit: %s", stdout)
 	}
 	_, stderr := h.mustRunStderr(t, "build")
-	if !strings.Contains(stderr, "pack base has changed since the lock; run shulker lock") {
+	if !strings.Contains(stderr, "modpack base has changed since the lock; run shulker lock") {
 		t.Fatalf("drift warning missing: %s", stderr)
 	}
 	if got := readBuilt(t, h, "config/base.txt"); got != "edited\n" {
@@ -144,7 +163,7 @@ func TestLocalPack(t *testing.T) {
 	}
 	stdout, stderr = h.mustRunStderr(t, "lock")
 	if !strings.Contains(stdout, "~ base ") || strings.Contains(stderr, "changed since the lock") {
-		t.Fatalf("lock after a local pack edit: %s\n%s", stdout, stderr)
+		t.Fatalf("lock after a local modpack edit: %s\n%s", stdout, stderr)
 	}
 	if stdout = h.mustRun(t, "lock"); !strings.Contains(stdout, "already up to date") {
 		t.Fatalf("second lock: %s", stdout)
@@ -158,20 +177,20 @@ func TestLocalPack(t *testing.T) {
 	h.mustRun(t, "remove", "sodium")
 	l = readLock(t, h)
 	if _, ok := l.Mods["sodium"]; !ok {
-		t.Fatal("sodium should stay locked while the pack provides it")
+		t.Fatal("sodium should stay locked while the modpack provides it")
 	}
 
-	stdout = h.mustRun(t, "pack", "remove", "base")
+	stdout = h.mustRun(t, "modpack", "remove", "base")
 	if !strings.Contains(stdout, "- fabric-api (was required by sodium)") || !strings.Contains(stdout, "- sodium (was required by base)") {
-		t.Fatalf("pack remove output: %s", stdout)
+		t.Fatalf("modpack remove output: %s", stdout)
 	}
 	l = readLock(t, h)
 	if len(l.Packs) != 0 || len(l.Mods) != 0 {
-		t.Fatalf("lock after pack remove: %+v", l)
+		t.Fatalf("lock after modpack remove: %+v", l)
 	}
 	h.mustRun(t, "build")
 	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "config", "base.txt")); !os.IsNotExist(err) {
-		t.Fatalf("pack file should be removed from the build: %v", err)
+		t.Fatalf("modpack file should be removed from the build: %v", err)
 	}
 
 	if err := os.WriteFile(filepath.Join(h.dir, "build", "client", ".shulker-state.json"), []byte("{"), 0o644); err != nil {
@@ -182,14 +201,14 @@ func TestLocalPack(t *testing.T) {
 	}
 }
 
-func TestPackMismatchAndConflict(t *testing.T) {
+func TestModpackMismatchAndConflict(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	writePack(t, filepath.Join(h.dir, "old"), "~26.1", `"sodium": {}`, nil)
-	code, stdout, _ := h.run(t, "pack", "add", "./old", "--json")
+	code, stdout, _ := h.run(t, "modpack", "add", "./old", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error.Code != "pack-mismatch" || !strings.Contains(env.Error.Message, "~26.1") {
+	if code == 0 || env.Error.Code != "modpack-mismatch" || !strings.Contains(env.Error.Message, "~26.1") {
 		t.Fatalf("mismatch: code=%d env=%+v", code, env)
 	}
 	var m struct {
@@ -202,22 +221,22 @@ func TestPackMismatchAndConflict(t *testing.T) {
 
 	writePack(t, filepath.Join(h.dir, "one"), "~26.2", `"sodium": {}`, nil)
 	writePack(t, filepath.Join(h.dir, "two"), "~26.2", `"sodium": {"channel": "beta"}`, nil)
-	h.mustRun(t, "pack", "add", "./one")
-	code, stdout, _ = h.run(t, "pack", "add", "./two", "--json")
+	h.mustRun(t, "add", "./one", "--type", "modpack")
+	code, stdout, _ = h.run(t, "modpack", "add", "./two", "--json")
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error.Code != "pack-conflict" {
+	if code == 0 || env.Error.Code != "modpack-conflict" {
 		t.Fatalf("conflict: code=%d env=%+v", code, env)
 	}
-	if code, stdout, _ = h.run(t, "pack", "add", "./one", "--name", "one", "--json"); code == 0 {
+	if code, stdout, _ = h.run(t, "modpack", "add", "./one", "--as", "one", "--json"); code == 0 {
 		t.Fatalf("duplicate source should fail: %s", stdout)
 	}
 }
 
-func TestPackSourceMovedUnderTheSameName(t *testing.T) {
+func TestModpackSourceMovedUnderTheSameName(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	writePack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
-	h.mustRun(t, "pack", "add", "./base")
+	h.mustRun(t, "modpack", "add", "./base")
 	if err := os.Rename(filepath.Join(h.dir, "base"), filepath.Join(h.dir, "moved")); err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +246,7 @@ func TestPackSourceMovedUnderTheSameName(t *testing.T) {
 	code, stdout, _ := h.run(t, "build", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code != 0 || !env.LockStale || !strings.Contains(strings.Join(env.Warnings, "\n"), "pack base has a new source since the lock") {
+	if code != 0 || !env.LockStale || !strings.Contains(strings.Join(env.Warnings, "\n"), "modpack base has a new source since the lock") {
 		t.Fatalf("build after moving the source: code=%d env=%+v", code, env)
 	}
 	h.mustRun(t, "lock")
@@ -247,7 +266,7 @@ func gitRun(t *testing.T, dir string, args ...string) string {
 	return strings.TrimSpace(string(outb))
 }
 
-func TestGitPack(t *testing.T) {
+func TestGitModpack(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
@@ -261,16 +280,16 @@ func TestGitPack(t *testing.T) {
 	first := gitRun(t, repo, "rev-parse", "HEAD")
 	source := "file://" + repo
 
-	stdout := h.mustRun(t, "pack", "add", source, "--ref", "main")
-	if !strings.Contains(stdout, "+ shared-pack "+first[:12]+" (pack)") {
-		t.Fatalf("pack add output: %s", stdout)
+	stdout := h.mustRun(t, "modpack", "add", source, "--ref", "main")
+	if !strings.Contains(stdout, "+ shared-pack "+first[:12]+" (modpack)") {
+		t.Fatalf("modpack add output: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "pack", "list"); stdout != "  • shared-pack "+source+" (git, ok, pinned "+first[:12]+", ref main)\n" {
-		t.Fatalf("pack list: %s", stdout)
+	if stdout = h.mustRun(t, "modpack", "list"); stdout != "  Modpacks\n  • shared-pack "+source+" (git, ok, pinned "+first[:12]+", ref main)\n" {
+		t.Fatalf("modpack list: %s", stdout)
 	}
 	l := readLock(t, h)
 	if p := l.Packs["shared-pack"]; p["commit"] != first || p["ref"] != "main" || p["source"] != source {
-		t.Fatalf("lock packs: %v", l.Packs)
+		t.Fatalf("lock modpacks: %v", l.Packs)
 	}
 	h.mustRun(t, "install")
 	if got := readBuilt(t, h, "config/git.txt"); got != "v1\n" {
@@ -290,7 +309,7 @@ func TestGitPack(t *testing.T) {
 		t.Fatalf("build must stay on the locked commit: %q", got)
 	}
 	stdout = h.mustRun(t, "update", "shared-pack")
-	if !strings.Contains(stdout, "~ shared-pack "+first[:12]+" ⟶ "+second[:12]+" (pack)") {
+	if !strings.Contains(stdout, "~ shared-pack "+first[:12]+" ⟶ "+second[:12]+" (modpack)") {
 		t.Fatalf("update output: %s", stdout)
 	}
 	h.mustRun(t, "build")
@@ -298,15 +317,15 @@ func TestGitPack(t *testing.T) {
 		t.Fatalf("git.txt after update: %q", got)
 	}
 
-	code, stdout, _ := h.run(t, "pack", "add", source+"/", "--name", "missing", "--ref", "nope", "--json")
+	code, stdout, _ := h.run(t, "modpack", "add", source+"/", "--as", "missing", "--ref", "nope", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error.Code != "pack-ref" {
+	if code == 0 || env.Error.Code != "modpack-ref" {
 		t.Fatalf("bad ref: code=%d env=%+v", code, env)
 	}
 }
 
-func TestURLPackAndHandEdits(t *testing.T) {
+func TestURLModpackAndHandEdits(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -320,13 +339,13 @@ func TestURLPackAndHandEdits(t *testing.T) {
 	defer srv.Close()
 	source := srv.URL + "/tiny.json"
 
-	stdout := h.mustRun(t, "pack", "add", source)
+	stdout := h.mustRun(t, "modpack", "add", source)
 	if !strings.Contains(stdout, "+ tiny ") {
-		t.Fatalf("pack add output: %s", stdout)
+		t.Fatalf("modpack add output: %s", stdout)
 	}
 	l := readLock(t, h)
 	if p := l.Packs["tiny"]; p["source"] != source || len(p["sha256"]) != 64 {
-		t.Fatalf("lock packs: %v", l.Packs)
+		t.Fatalf("lock modpacks: %v", l.Packs)
 	}
 	h.mustRun(t, "install")
 	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "mods", h.jars["sodium"].filename)); err != nil {
@@ -362,10 +381,10 @@ func TestURLPackAndHandEdits(t *testing.T) {
 
 	h.editManifest(t, func(m map[string]any) { m["requires"] = map[string]any{} })
 	stdout = h.mustRun(t, "update")
-	if !strings.Contains(stdout, "- tiny (pack)") || !strings.Contains(stdout, "- local (pack)") || !strings.Contains(stdout, "- sodium") {
-		t.Fatalf("update after removing packs: %s", stdout)
+	if !strings.Contains(stdout, "- tiny (modpack)") || !strings.Contains(stdout, "- local (modpack)") || !strings.Contains(stdout, "- sodium") {
+		t.Fatalf("update after removing modpacks: %s", stdout)
 	}
 	if l = readLock(t, h); len(l.Packs) != 0 || len(l.Mods) != 0 {
-		t.Fatalf("lock after removing packs: %+v", l)
+		t.Fatalf("lock after removing modpacks: %+v", l)
 	}
 }

@@ -105,7 +105,7 @@
         "source": { "type": "string", "minLength": 1, "description": "The manifest source at resolution time. A different source in the manifest makes the lock out of date." },
         "ref": { "type": "string", "minLength": 1, "description": "The manifest ref at resolution time. Git sources only." },
         "commit": { "$ref": "#/$defs/gitCommit", "description": "Resolved commit. Git sources only." },
-        "dirSha256": { "$ref": "#/$defs/sha256", "description": "Content hash of the pack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only." },
+        "dirSha256": { "$ref": "#/$defs/sha256", "description": "Content hash of the modpack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only." },
         "sha256": { "$ref": "#/$defs/sha256", "description": "Hash of the fetched manifest. Raw manifest URL sources only." },
         "locked": { "type": "boolean", "const": true, "description": "Present when the modpack's mods were copied from its lock. Absent means they were resolved from its manifest." },
         "lockSha256": { "$ref": "#/$defs/sha256", "description": "Hash of the modpack's lock at resolution time. Present exactly when locked is." }

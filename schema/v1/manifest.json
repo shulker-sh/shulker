@@ -27,12 +27,12 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true,
-      "description": "Shown by ModMenu as \"by ...\" under the pack name. init seeds the git user.name and shulker.sh; delete entries freely."
+      "description": "Shown by ModMenu as \"by ...\" under the project name. init seeds the git user.name and shulker.sh; delete entries freely."
     },
     "license": {
       "type": "string",
       "minLength": 1,
-      "description": "The pack's license, e.g. \"MIT\" or \"CC BY-NC-SA 4.0\". Shown on the pack's entry in the mod list, and clickable there when links.license is set. Defaults to \"All rights reserved\", since NeoForge and Forge reject a mod that declares no license."
+      "description": "The project's license, e.g. \"MIT\" or \"CC BY-NC-SA 4.0\". Shown on the project's entry in the mod list, and clickable there when links.license is set. Defaults to \"All rights reserved\", since NeoForge and Forge reject a mod that declares no license."
     },
     "links": {
       "$ref": "#/$defs/links"
@@ -84,7 +84,7 @@
       "type": "object",
       "propertyNames": { "type": "string", "minLength": 1 },
       "additionalProperties": { "type": "string", "format": "uri" },
-      "description": "Links shown on the pack's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written. On NeoForge and Forge, where the entry has room for less, website and issues become the Homepage and Issues buttons and license makes the license clickable.",
+      "description": "Links shown on the project's ModMenu entry. website, issues, and source become the Website, Issues, and Source buttons. A key ModMenu knows (discord, modrinth, curseforge, wiki, youtube, reddit, twitter, mastodon, twitch, patreon, kofi, paypal, donate, ...) uses its label; any other key is shown as written. On NeoForge and Forge, where the entry has room for less, website and issues become the Homepage and Issues buttons and license makes the license clickable.",
       "properties": {
         "website": { "type": "string", "format": "uri" },
         "issues": { "type": "string", "format": "uri" },
@@ -201,7 +201,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "$ref": "#/$defs/relativePath" },
-          "description": "Override layers applied in order; later layers win. Pack overrides sit beneath all of these."
+          "description": "Override layers applied in order; later layers win. Modpack overrides sit beneath all of these."
         },
         "build": {
           "$ref": "#/$defs/relativePath",
