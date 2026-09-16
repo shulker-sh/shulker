@@ -22,11 +22,16 @@ var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.Typ
 var typeFlags = map[string][]string{
 	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as", "with-deps"},
 	manifest.TypeModpack:      {"ref", "as", "unlocked"},
-	manifest.TypeResourcePack: {"as"},
-	manifest.TypeShader:       {"as"},
+	manifest.TypeResourcePack: {"channel", "pin", "provider", "as"},
+	manifest.TypeShader:       {"channel", "pin", "provider", "as"},
 }
 
 var allTypeFlags = []string{"as", "channel", "pin", "provider", "ref", "side", "unlocked", "with-deps"}
+
+// inferredFlags are the flags an entry may take while its type is still the
+// provider's to settle. A modpack is never inferred — it takes a source, not a
+// provider slug — so the modpack's own flags need --type before they apply.
+var inferredFlags = []string{"side", "channel", "pin", "provider", "as", "with-deps"}
 
 func (a *app) typeGroupCmds() []*cobra.Command {
 	cmds := make([]*cobra.Command, 0, len(contentTypes))
@@ -60,6 +65,9 @@ func chooseType(cmd *cobra.Command, kind, typ, fallback string) (string, error) 
 		chosen = fallback
 	}
 	if chosen == "" {
+		if wrong := changedFlags(cmd, inferredFlags); len(wrong) > 0 {
+			return "", out.Errorf("usage", "%s only applies to a modpack; pass `--type modpack`", strings.Join(wrong, " and "))
+		}
 		return "", nil
 	}
 	if !slices.Contains(contentTypes, chosen) {
@@ -67,19 +75,24 @@ func chooseType(cmd *cobra.Command, kind, typ, fallback string) (string, error) 
 		e.Candidates, e.Given, e.Flag = contentTypes, typ, "--type"
 		return "", e
 	}
+	if wrong := changedFlags(cmd, typeFlags[chosen]); len(wrong) > 0 {
+		return "", out.Errorf("usage", "%s doesn't apply to a %s", strings.Join(wrong, " and "), chosen)
+	}
+	return chosen, nil
+}
+
+// changedFlags lists the type flags the command was given that aren't allowed.
+func changedFlags(cmd *cobra.Command, allowed []string) []string {
 	var wrong []string
 	for _, name := range allTypeFlags {
-		if slices.Contains(typeFlags[chosen], name) {
+		if slices.Contains(allowed, name) {
 			continue
 		}
 		if f := cmd.Flags().Lookup(name); f != nil && f.Changed {
 			wrong = append(wrong, "--"+name)
 		}
 	}
-	if len(wrong) > 0 {
-		return "", out.Errorf("usage", "%s doesn't apply to a %s", strings.Join(wrong, " and "), chosen)
-	}
-	return chosen, nil
+	return wrong
 }
 
 func unsupportedType(kind string) error {

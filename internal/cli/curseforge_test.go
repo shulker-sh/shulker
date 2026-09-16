@@ -99,12 +99,18 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		if !authed(w, r) {
 			return
 		}
-		if r.URL.Query().Get("gameId") != "432" || r.URL.Query().Get("classId") != "6" {
+		if r.URL.Query().Get("gameId") != "432" {
 			http.Error(w, "bad filter", http.StatusBadRequest)
 			return
 		}
+		// A slug search without a classId spans every class, as the real API
+		// does; these fixtures are all mods.
+		class := r.URL.Query().Get("classId")
 		data := []map[string]any{}
 		for _, m := range h.cfMods {
+			if class != "" && class != "6" {
+				continue
+			}
 			if strings.HasPrefix(m.slug, r.URL.Query().Get("slug")) {
 				data = append(data, modJSON(m))
 			}

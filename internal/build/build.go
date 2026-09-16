@@ -325,7 +325,11 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 		dirs = dataDirs(target.Side, levelName)
 	}
 	if target.Side == "client" {
-		if err := b.collectClient(desired, vars); err != nil {
+		if err := b.collectPacks(cond, desired, report); err != nil {
+			return nil, nil, err
+		}
+		b.enableShader(desired)
+		if err := b.collectClient(name, opts, desired, vars, report); err != nil {
 			return nil, nil, err
 		}
 		if b.Lock.Loader.Type != "" {
@@ -520,14 +524,19 @@ func RecordLoader(dir string, l InstalledLoader) error {
 	return fsutil.WriteJSON(filepath.Join(dir, StateFile), s)
 }
 
-func (b *Builder) collectClient(desired map[string]source, vars map[string]string) error {
+func (b *Builder) collectClient(name string, opts Options, desired map[string]source, vars map[string]string, report *Report) error {
 	cl := b.Manifest.Client
-	if cl == nil || len(cl.Options) == 0 {
-		return nil
+	options := properties{}
+	if cl != nil && len(cl.Options) > 0 {
+		rendered, err := renderProperties(OptionsFile, cl.Options, vars)
+		if err != nil {
+			return err
+		}
+		options = rendered
 	}
-	options, err := renderProperties(OptionsFile, cl.Options, vars)
-	if err != nil {
-		return err
+	b.seedResourcePacks(name, opts, desired, options, report)
+	if len(options) == 0 {
+		return nil
 	}
 	desired[OptionsFile] = source{owned: propsFile{props: options, sep: ":"}}
 	return nil

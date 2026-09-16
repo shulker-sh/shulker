@@ -176,8 +176,20 @@ func TestRequiresEntryKinds(t *testing.T) {
 	if err := m.CheckSupported(); err != nil {
 		t.Fatal(err)
 	}
+	packs, err := Parse(doc(`"fresh":{"type":"resourcepack"},"complementary":{"type":"shader"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := packs.CheckSupported(); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := packs.ResourcePacks()["fresh"]; !ok || len(packs.ResourcePacks()) != 1 {
+		t.Errorf("resource packs %v", packs.ResourcePacks())
+	}
+	if _, ok := packs.Shaders()["complementary"]; !ok || len(packs.Shaders()) != 1 {
+		t.Errorf("shaders %v", packs.Shaders())
+	}
 	for _, entries := range []string{
-		`"extras":{"type":"resourcepack"}`,
 		`"extras":{"type":"mod","file":"mods/extras.jar"}`,
 		`"cozy":{"type":"modpack","provider":"modrinth"}`,
 	} {

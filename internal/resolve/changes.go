@@ -12,6 +12,7 @@ type Snapshot struct {
 	mods      map[string]lock.Mod
 	listed    map[string]bool
 	packs     map[string]lock.Modpack
+	zips      map[string]lock.Pack
 }
 
 type AddedMod struct {
@@ -67,6 +68,7 @@ func (r *Resolver) Snapshot() Snapshot {
 	for source, pin := range r.Lock.Modpacks {
 		s.packs[source] = pin
 	}
+	s.zips = r.lockedPacks()
 	return s
 }
 
@@ -109,6 +111,29 @@ func (r *Resolver) Changes(before Snapshot) *Changes {
 			c.Removed = append(c.Removed, RemovedMod{ID: id, VersionNumber: old.VersionNumber, RequiredBy: nonNil(old.RequiredBy)})
 		case before.listed[id] && !listed:
 			c.Removed = append(c.Removed, RemovedMod{ID: id, VersionNumber: now.VersionNumber, RequiredBy: nonNil(now.RequiredBy), StillLocked: true})
+		}
+	}
+	zips := r.lockedPacks()
+	for _, key := range sortedKeys(zips) {
+		p := zips[key]
+		old, existed := before.zips[key]
+		switch {
+		case !existed:
+			c.Added = append(c.Added, AddedMod{ID: key, VersionNumber: p.VersionNumber, Provider: p.Provider, RequiredBy: []string{}})
+		case old.Sha512 != p.Sha512 || old.Provider != p.Provider || old.Channel != p.Channel:
+			ch := Change{ID: key, From: old.VersionNumber, To: p.VersionNumber}
+			if old.Provider != p.Provider {
+				ch.FromProvider, ch.ToProvider = old.Provider, p.Provider
+			}
+			if old.Channel != p.Channel {
+				ch.FromChannel, ch.ToChannel = old.Channel, p.Channel
+			}
+			c.Updated = append(c.Updated, ch)
+		}
+	}
+	for _, key := range sortedKeys(before.zips) {
+		if _, still := zips[key]; !still {
+			c.Removed = append(c.Removed, RemovedMod{ID: key, VersionNumber: before.zips[key].VersionNumber, RequiredBy: []string{}})
 		}
 	}
 	return c

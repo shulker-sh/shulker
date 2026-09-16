@@ -26,11 +26,12 @@ func New(c *fetch.Client) *Modrinth {
 func (m *Modrinth) Name() string { return "modrinth" }
 
 type project struct {
-	ID         string `json:"id"`
-	Slug       string `json:"slug"`
-	Title      string `json:"title"`
-	ClientSide string `json:"client_side"`
-	ServerSide string `json:"server_side"`
+	ID          string `json:"id"`
+	Slug        string `json:"slug"`
+	Title       string `json:"title"`
+	ClientSide  string `json:"client_side"`
+	ServerSide  string `json:"server_side"`
+	ProjectType string `json:"project_type"`
 }
 
 type version struct {
@@ -55,7 +56,8 @@ type version struct {
 	} `json:"dependencies"`
 }
 
-func (m *Modrinth) Project(ctx context.Context, slugOrID string) (*provider.Project, error) {
+// Modrinth slugs are unique across project types, so the kind hint is unused.
+func (m *Modrinth) Project(ctx context.Context, slugOrID, _ string) (*provider.Project, error) {
 	var p project
 	if err := m.Client.GetJSON(ctx, m.BaseURL+"/project/"+url.PathEscape(slugOrID), &p); err != nil {
 		if errors.Is(err, fetch.ErrNotFound) {
@@ -63,7 +65,7 @@ func (m *Modrinth) Project(ctx context.Context, slugOrID string) (*provider.Proj
 		}
 		return nil, fmt.Errorf("modrinth project %s: %w", slugOrID, err)
 	}
-	return &provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide)}, nil
+	return &provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: p.ProjectType}, nil
 }
 
 func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {

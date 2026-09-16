@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -42,6 +41,7 @@ type AddOptions struct {
 	Pin      string
 	Provider string
 	As       string
+	Type     string
 	WithDeps bool
 }
 
@@ -76,13 +76,13 @@ func unavailable(name string) string {
 	return name + " is not a known provider"
 }
 
-func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provider.Provider, *provider.Project, error) {
+func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) (provider.Provider, *provider.Project, error) {
 	if providerName != "" {
 		p, err := r.provider(providerName)
 		if err != nil {
 			return nil, nil, err
 		}
-		proj, err := p.Project(ctx, slug)
+		proj, err := p.Project(ctx, slug, kind)
 		return p, proj, err
 	}
 	var missed, skipped []string
@@ -92,7 +92,7 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provi
 			skipped = append(skipped, unavailable(n))
 			continue
 		}
-		proj, err := p.Project(ctx, slug)
+		proj, err := p.Project(ctx, slug, kind)
 		if errors.Is(err, provider.ErrNotFound) {
 			missed = append(missed, n)
 			continue
@@ -113,10 +113,6 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName string) (provi
 }
 
 func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error {
-	if r.Manifest.Loader.Type == "" {
-		return out.Errorf("loader-required", "mods need a loader; pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
-	}
-	held := holdVersions(r.Lock)
 	explicit := opts.Provider != ""
 	listed := opts.As
 	if listed == "" {
@@ -125,10 +121,27 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if prev, ok := r.Manifest.Mods()[listed]; !explicit && ok && prev.Provider != "" {
 		opts.Provider = prev.Provider
 	}
-	p, proj, err := r.lookup(ctx, slug, opts.Provider)
+	p, proj, err := r.lookup(ctx, slug, opts.Provider, opts.Type)
 	if err != nil {
 		return err
 	}
+	kind, err := addKind(opts.Type, proj, slug)
+	if err != nil {
+		return err
+	}
+	switch kind {
+	case manifest.TypeMod:
+	case manifest.TypeModpack:
+		return out.Errorf("requires-unsupported", "%s is a modpack; modpacks from a provider aren't supported yet, so give a source instead", slug)
+	case manifest.TypeResourcePack, manifest.TypeShader:
+		return r.addPack(ctx, p, proj, kind, opts)
+	default:
+		return out.Errorf("requires-unsupported", "%s is a %s, which shulker can't add yet", slug, kind)
+	}
+	if r.Manifest.Loader.Type == "" {
+		return out.Errorf("loader-required", "mods need a loader; pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
+	}
+	held := holdVersions(r.Lock)
 	v, err := r.pick(ctx, p, proj, opts.Pin, opts.Channel)
 	if err != nil {
 		return err
@@ -428,7 +441,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 			continue
 		}
 		visited[d.ProjectID] = true
-		dproj, err := p.Project(ctx, d.ProjectID)
+		dproj, err := p.Project(ctx, d.ProjectID, "")
 		if err != nil {
 			return err
 		}
@@ -469,25 +482,21 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 			warnings = append(warnings, fmt.Sprintf("%s/%s matches no mod in the lock", DownloadsDir, f.Name))
 		}
 	}
-	ids := make([]string, 0, len(r.Lock.Mods))
-	for id := range r.Lock.Mods {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
 	var fetched []string
 	var missing []string
 	var wanted []string
 	var downloads []out.Download
-	for _, id := range ids {
-		m := r.Lock.Mods[id]
-		if r.Cache.Has(m.Sha512) {
+	byID := map[string]downloadable{}
+	for _, f := range r.lockFiles() {
+		if r.Cache.Has(f.sha512) {
 			continue
 		}
-		if m.URL == nil {
-			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", id, m.Filename, m.Page, DownloadsDir))
+		if f.url == nil {
+			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", f.id, f.filename, f.page, DownloadsDir))
 			continue
 		}
-		wanted, downloads = append(wanted, id), append(downloads, out.Download{Name: m.Filename, Size: m.Size})
+		byID[f.id] = f
+		wanted, downloads = append(wanted, f.id), append(downloads, out.Download{Name: f.filename, Size: f.size})
 	}
 	var progress *out.Progress
 	if r.Progress != nil && len(wanted) > 0 {
@@ -498,11 +507,11 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 		}
 	}
 	for i, id := range wanted {
-		m := r.Lock.Mods[id]
+		f := byID[id]
 		progress.File(downloads[i].Name)
-		_, err := r.Cache.Ensure(ctx, r.Fetch, *m.URL, m.Sha512)
+		_, err := r.Cache.Ensure(ctx, r.Fetch, *f.url, f.sha512)
 		if errors.Is(err, fetch.ErrForbidden) {
-			missing = append(missing, fmt.Sprintf("%s: download forbidden; download %s from %s and place it in %s/", id, m.Filename, pageFor(m), DownloadsDir))
+			missing = append(missing, fmt.Sprintf("%s: download forbidden; download %s from %s and place it in %s/", id, f.filename, f.page, DownloadsDir))
 			continue
 		}
 		if err != nil {
@@ -522,8 +531,8 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 }
 
 func (r *Resolver) lockHas(sha512 string) bool {
-	for _, m := range r.Lock.Mods {
-		if m.Sha512 == sha512 {
+	for _, f := range r.lockFiles() {
+		if f.sha512 == sha512 {
 			return true
 		}
 	}

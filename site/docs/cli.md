@@ -89,7 +89,7 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --target serv
 
 ### `shulker import mrpack`
 
-Create a project from a Modrinth modpack (`.mrpack`).
+Create a project from a Modrinth modpack (`.mrpack`). A pack shulker exported carries its own `shulker.json` and `shulker.lock` at the archive root, and those are read in preference to the marker jar, so the project comes back as it was, resource packs and shaders included. `--ignore-shulker` skips both and imports the archive as any other Modrinth modpack.
 
 ```sh
 shulker import mrpack ~/Downloads/fabulously-optimized.mrpack
@@ -99,10 +99,11 @@ shulker import mrpack pack.mrpack -C my-pack --name my-pack
 | Flag | Description |
 | --- | --- |
 | `--name <name>` | Project name (default: the modpack name, slugified) |
+| `--ignore-shulker` | Ignore the shulker manifest and lock inside the modpack and import it as any other one |
 
 ### `shulker export mrpack`
 
-Export the project as a Modrinth modpack for the Modrinth app and other launchers. The source is the project in the current directory, or a project directory, git URL, or manifest URL; a git or URL source is downloaded first and the archive is written to the current directory.
+Export the project as a Modrinth modpack for the Modrinth app and other launchers. Resource packs and shaders go in alongside the mods, as client-only files. The archive carries the project's own `shulker.json` and `shulker.lock` at its root, so [`import mrpack`](#shulker-import-mrpack) restores the project it came from. The source is the project in the current directory, or a project directory, git URL, or manifest URL; a git or URL source is downloaded first and the archive is written to the current directory.
 
 ```sh
 shulker export mrpack
@@ -118,12 +119,12 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
-| `--bundle` | Put mods that Modrinth launchers can't download inside the archive |
+| `--bundle` | Put files that Modrinth launchers can't download inside the archive |
 | `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
 
 ### `shulker export curseforge`
 
-Export the client target as a CurseForge profile `.zip` for the CurseForge app's Import Profile. Mods locked from CurseForge go in by file ID. Every other mod is looked up on CurseForge by its fingerprint, and matches go in by file ID too. Mods that aren't on CurseForge fail the export unless `--bundle` ships them inside the archive, which the CurseForge app warns about on import. Server-only mods and files are left out. The profile gets shulker's logo as its image. The source works as in [`export mrpack`](#shulker-export-mrpack).
+Export the client target as a CurseForge profile `.zip` for the CurseForge app's Import Profile. Mods, resource packs and shaders locked from CurseForge go in by file ID. Everything else is looked up on CurseForge by its fingerprint, and matches go in by file ID too. Files that aren't on CurseForge fail the export unless `--bundle` ships them inside the archive, which the CurseForge app warns about on import. Server-only mods and files are left out. The profile gets shulker's logo as its image, and the archive carries `shulker.json` and `shulker.lock` at its root. The source works as in [`export mrpack`](#shulker-export-mrpack).
 
 ```sh
 shulker export curseforge
@@ -769,17 +770,19 @@ shulker modpack remove base-pack
 
 ### `shulker resourcepack add|remove|list`
 
-The plain verbs with `--type resourcepack`. Resolving a resource pack isn't supported yet (`requires-unsupported`). Flags: `--as`.
+`shulker resourcepack add fresh-animations` is `shulker add fresh-animations --type resourcepack`, and the same for `remove` and `list`. The provider's own project type decides what an entry is, so the plain `shulker add` usually needs no `--type` at all. A resource pack is placed as `resourcepacks/<key>.zip`, named by its `requires` key rather than the provider's file name, so one you enabled in game stays enabled when it updates. Flags: `--channel`, `--pin`, `--provider`, `--as`.
 
 ```sh
+shulker resourcepack add fresh-animations
 shulker resourcepack list
 ```
 
 ### `shulker shader add|remove|list`
 
-The plain verbs with `--type shader`. Resolving a shader isn't supported yet (`requires-unsupported`). Flags: `--as`.
+`shulker shader add complementary-reimagined` is `shulker add complementary-reimagined --type shader`, and the same for `remove` and `list`. A shader is placed as `shaderpacks/<key>.zip` and enabled through its shader mod's own config: `config/iris.properties`, or `config/oculus.properties` on Forge. One that ships vanilla core shaders needs no shader mod at all, so it is placed in `resourcepacks/` and enabled like a resource pack. Flags: `--channel`, `--pin`, `--provider`, `--as`.
 
 ```sh
+shulker shader add complementary-reimagined
 shulker shader list
 ```
 
@@ -962,7 +965,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
-| `curseforge-not-found` | `export curseforge` found no CurseForge file for these mods; pass `--bundle`. `items`: the mods |
+| `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs or shaders; pass `--bundle`. `items`: what is missing |
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
 | `registry-has-links` | `config set` or `config unset` would move the registry away from linked instances or synced directories the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON; the message names the line and column |
@@ -1004,9 +1007,9 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `missing-files` | Mods that need a manual download are missing. `items`: what to download |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
-| `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these mods; pass `--bundle`. `items`: the mods |
+| `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files; pass `--bundle`. `items`: the files |
 | `mrpack-invalid` | The modpack is malformed |
-| `mrpack-marker` | The modpack's shulker marker can't be read |
+| `mrpack-marker` | The modpack's own `shulker.json` or `shulker.lock` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
 | `no-links` | Nothing is linked yet |
@@ -1045,7 +1048,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
-| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a resource pack, shader, local `file`, or a modpack without a `source` |
+| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a local `file`, or a modpack from a provider rather than a `source` |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform; set `java` in `shulker.json` |
 | `self-update-check` | Checking for a release failed, or none is published |
 | `self-update-checksum` | The download doesn't match its checksum |
@@ -1061,6 +1064,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `target-exists` | The target is already in `shulker.json` |
 | `target-not-found` | No such target. `candidates`: the targets |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
+| `type-ambiguous` | A CurseForge slug matches projects of several types; pass `--type` to choose. `candidates`: the types it matched |
+| `type-mismatch` | `--type` disagrees with what the provider says the project is. `candidates`: the provider's own type |
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | An override uses a variable that isn't set |
 | `unsupported-loader` | shulker doesn't support the loader yet |

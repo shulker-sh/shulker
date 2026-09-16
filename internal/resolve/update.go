@@ -19,7 +19,19 @@ type Outdated struct {
 }
 
 func (r *Resolver) Update(ctx context.Context, ids []string) error {
-	targets, err := r.directTargets(ids)
+	mods, packs, err := r.splitPackTargets(ids)
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 || len(packs) > 0 {
+		if err := r.updatePacks(ctx, packs); err != nil {
+			return err
+		}
+	}
+	if len(ids) > 0 && len(mods) == 0 {
+		return nil
+	}
+	targets, err := r.directTargets(mods)
 	if err != nil {
 		return err
 	}
@@ -73,12 +85,25 @@ func (r *Resolver) Update(ctx context.Context, ids []string) error {
 }
 
 func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, error) {
-	targets, err := r.directTargets(ids)
+	mods, packIDs, err := r.splitPackTargets(ids)
+	if err != nil {
+		return nil, err
+	}
+	res, err := r.outdatedPacks(ctx, packIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) > 0 && len(mods) == 0 {
+		if res == nil {
+			res = []Outdated{}
+		}
+		return res, nil
+	}
+	targets, err := r.directTargets(mods)
 	if err != nil {
 		return nil, err
 	}
 	scope := r.scope(targets)
-	var res []Outdated
 	for _, id := range sortedKeys(scope) {
 		m := r.Lock.Mods[id]
 		p, err := r.provider(m.Provider)
@@ -139,7 +164,7 @@ func (r *Resolver) relock(ctx context.Context, id string) error {
 	if entry.Project != nil {
 		key = fmt.Sprint(entry.Project)
 	}
-	proj, err := p.Project(ctx, key)
+	proj, err := p.Project(ctx, key, "")
 	if err != nil {
 		return err
 	}

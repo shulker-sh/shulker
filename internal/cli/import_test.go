@@ -141,6 +141,61 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 	}
 }
 
+func TestImportMrpackIgnoreShulker(t *testing.T) {
+	h := newHarness(t)
+	h.allowMrpackHost(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "export", "mrpack", "--version", "1.0.0")
+	archive := filepath.Join(h.dir, "build", "pack-1.0.0.mrpack")
+
+	dir := filepath.Join(t.TempDir(), "imported")
+	var env struct {
+		Data importResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--ignore-shulker", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	// The pack's own manifest and lock are ignored, so every mod is looked up
+	// from the index instead of reused.
+	if res := env.Data; res.Marker || len(res.Mods.Reused) != 0 || len(res.Mods.Locked) != 2 {
+		t.Fatalf("result: %+v", res)
+	}
+}
+
+func TestImportMrpackVanillaRoundTrip(t *testing.T) {
+	h := newHarness(t)
+	h.allowMrpackHost(t)
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "add", "fresh-animations")
+	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	h.mustRun(t, "export", "mrpack", "--version", "1.0.0")
+	archive := filepath.Join(h.dir, "build", "pack-1.0.0.mrpack")
+
+	dir := filepath.Join(t.TempDir(), "imported")
+	var env struct {
+		Data importResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	// A project with no loader ships no marker jar, so only the manifest and lock
+	// at the archive root can carry it back.
+	if res := env.Data; !res.Marker || res.Version != "1.0.0" || res.Loader.Type != "" {
+		t.Fatalf("result: %+v", res)
+	}
+	m, l := readProject(t, dir)
+	if m.Loader.Type != "" {
+		t.Fatalf("an imported vanilla pack must stay vanilla: %+v", m.Loader)
+	}
+	if _, ok := l.ResourcePacks["fresh-animations"]; !ok {
+		t.Fatalf("resource packs: %+v", l.ResourcePacks)
+	}
+	if _, ok := l.Shaders["complementary-reimagined"]; !ok {
+		t.Fatalf("shaders: %+v", l.Shaders)
+	}
+}
+
 func TestImportMrpackTamperedMarker(t *testing.T) {
 	h := newHarness(t)
 	h.allowMrpackHost(t)

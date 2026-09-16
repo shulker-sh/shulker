@@ -96,7 +96,7 @@ func TestExportCurseForge(t *testing.T) {
 	h := newCurseForgeExport(t)
 	stdout := h.mustRun(t, "export", "curseforge")
 	archive := filepath.Join(h.dir, "build", "pack-1.0.zip")
-	if !strings.Contains(stdout, "wrote Demo Pack 1.0 » "+archive+" (3 mods by file ID, 0 bundled, ") || !strings.Contains(stdout, "matched on CurseForge: fabric-api, sodium") {
+	if !strings.Contains(stdout, "wrote Demo Pack 1.0 » "+archive) || !strings.Contains(stdout, "3 mods by file ID") || !strings.Contains(stdout, "matched on CurseForge: fabric-api, sodium") {
 		t.Fatalf("export output: %s", stdout)
 	}
 	entries := readArchive(t, archive)
@@ -128,6 +128,9 @@ func TestExportCurseForge(t *testing.T) {
 	if _, ok := entries["overrides/options.txt"]; !ok {
 		t.Fatalf("entries: %v", keys(entries))
 	}
+	if !strings.Contains(entries["shulker.json"], `"sodium"`) || !strings.Contains(entries["shulker.lock"], `"sodium"`) {
+		t.Fatalf("archive identity: %v", keys(entries))
+	}
 	for name := range entries {
 		if strings.HasPrefix(name, "overrides/mods/") && name != "overrides/mods/shulker-pack.jar" {
 			t.Fatalf("a matched mod was bundled: %s", name)
@@ -154,7 +157,7 @@ func TestExportCurseForgeUnmatchedMods(t *testing.T) {
 	}
 
 	stdout, stderr = h.mustRunStderr(t, "export", "curseforge", "--bundle")
-	if !strings.Contains(stderr, "bundled sodium from modrinth") || !strings.Contains(stdout, "(2 mods by file ID, 1 bundled, ") || !strings.Contains(stdout, "matched on CurseForge: fabric-api") || strings.Contains(stdout, "fabric-api, sodium") {
+	if !strings.Contains(stderr, "bundled sodium from modrinth") || !strings.Contains(stdout, "2 mods by file ID") || !strings.Contains(stdout, "1 mod bundled") || !strings.Contains(stdout, "matched on CurseForge: fabric-api") || strings.Contains(stdout, "fabric-api, sodium") {
 		t.Fatalf("bundle output: stdout=%s stderr=%s", stdout, stderr)
 	}
 	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
@@ -188,7 +191,7 @@ func TestExportCurseForgeLockedModsNeedNoLookup(t *testing.T) {
 	h.noCurseForge = true
 
 	stdout, stderr := h.mustRunStderr(t, "export", "curseforge")
-	if !strings.Contains(stdout, "(2 mods by file ID, 0 bundled, ") || strings.Contains(stdout, "matched on CurseForge") || strings.Contains(stderr, "looked up") {
+	if !strings.Contains(stdout, "2 mods by file ID") || strings.Contains(stdout, "matched on CurseForge") || strings.Contains(stderr, "looked up") {
 		t.Fatalf("export of CurseForge-locked mods: stdout=%s stderr=%s", stdout, stderr)
 	}
 }

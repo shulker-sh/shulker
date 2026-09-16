@@ -15,14 +15,16 @@ import (
 const FileName = "shulker.lock"
 
 type Lock struct {
-	LockVersion int                `json:"lockVersion"`
-	Minecraft   string             `json:"minecraft"`
-	Loader      Loader             `json:"loader,omitzero"`
-	Java        Java               `json:"java"`
-	Server      *Download          `json:"server,omitempty"`
-	Modpacks    map[string]Modpack `json:"modpacks"`
-	Mods        map[string]Mod     `json:"mods"`
-	Players     []Player           `json:"players"`
+	LockVersion   int                `json:"lockVersion"`
+	Minecraft     string             `json:"minecraft"`
+	Loader        Loader             `json:"loader,omitzero"`
+	Java          Java               `json:"java"`
+	Server        *Download          `json:"server,omitempty"`
+	Modpacks      map[string]Modpack `json:"modpacks"`
+	Mods          map[string]Mod     `json:"mods"`
+	ResourcePacks map[string]Pack    `json:"resourcepacks"`
+	Shaders       map[string]Pack    `json:"shaders"`
+	Players       []Player           `json:"players"`
 }
 
 type Loader struct {
@@ -95,6 +97,25 @@ type Aliases struct {
 	CurseForge int    `json:"curseforge,omitempty"`
 }
 
+// Pack is a resource pack or shader: a zip placed by its requires key, with no
+// jar metadata to read and nothing depending on it.
+type Pack struct {
+	Provider      string  `json:"provider"`
+	Project       any     `json:"project"`
+	Version       any     `json:"version"`
+	VersionNumber string  `json:"versionNumber"`
+	Filename      string  `json:"filename"`
+	URL           *string `json:"url"`
+	Page          string  `json:"page,omitempty"`
+	Sha512        string  `json:"sha512"`
+	Size          int64   `json:"size,omitempty"`
+	Channel       string  `json:"channel"`
+	Modpack       string  `json:"modpack,omitempty"`
+	// Loader is the shader loader the file targets. A vanilla shader needs no
+	// shader mod and is placed and enabled as a resource pack.
+	Loader string `json:"loader,omitempty"`
+}
+
 type Player struct {
 	Name       string `json:"name"`
 	UUID       string `json:"uuid"`
@@ -102,7 +123,7 @@ type Player struct {
 }
 
 func New() *Lock {
-	return &Lock{LockVersion: 1, Modpacks: map[string]Modpack{}, Mods: map[string]Mod{}, Players: []Player{}}
+	return &Lock{LockVersion: 1, Modpacks: map[string]Modpack{}, Mods: map[string]Mod{}, ResourcePacks: map[string]Pack{}, Shaders: map[string]Pack{}, Players: []Player{}}
 }
 
 // JarID is the in-jar mod id dependencies name, which is the entry's key unless
@@ -142,6 +163,12 @@ func (l *Lock) Encode() ([]byte, error) {
 		}
 		sort.Strings(m.RequiredBy)
 		l.Mods[id] = m
+	}
+	if l.ResourcePacks == nil {
+		l.ResourcePacks = map[string]Pack{}
+	}
+	if l.Shaders == nil {
+		l.Shaders = map[string]Pack{}
 	}
 	if l.Players == nil {
 		l.Players = []Player{}

@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -114,6 +113,41 @@ func (a *app) withBundleNudge(err error) error {
 	return err
 }
 
+// exportTally gives each kind its own row, so a resource pack is never counted
+// as a mod. A row with nothing in it is left out.
+type exportTally struct {
+	how                  string
+	mods                 []string
+	resourcePacks        []string
+	shaders              []string
+	bundledMods          []string
+	bundledResourcePacks []string
+	bundledShaders       []string
+	overrides            []string
+}
+
+func (t exportTally) rows() []out.Row {
+	var rows []out.Row
+	add := func(items []string, one, many, how string) {
+		if len(items) == 0 {
+			return
+		}
+		text := plural(len(items), one, many)
+		if how != "" {
+			text += " " + how
+		}
+		rows = append(rows, out.Row{Text: text})
+	}
+	add(t.mods, "mod", "mods", t.how)
+	add(t.resourcePacks, "resource pack", "resource packs", t.how)
+	add(t.shaders, "shader", "shaders", t.how)
+	add(t.bundledMods, "mod", "mods", "bundled")
+	add(t.bundledResourcePacks, "resource pack", "resource packs", "bundled")
+	add(t.bundledShaders, "shader", "shaders", "bundled")
+	add(t.overrides, "override file", "override files", "")
+	return rows
+}
+
 func (a *app) exportMrpackCmd() *cobra.Command {
 	var f exportFlags
 	cmd := &cobra.Command{
@@ -135,11 +169,12 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 			}
 			a.warn(rep.Warnings)
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OKInto("wrote "+rep.Name+" "+rep.VersionID, rep.Path, fmt.Sprintf("%s by download, %d bundled, %s", plural(len(rep.Mods), "mod", "mods"), len(rep.Bundled), plural(len(rep.Overrides), "override file", "override files")))
+				l.OKInto("wrote "+rep.Name+" "+rep.VersionID, rep.Path, "")
+				l.Tree(exportTally{how: "by download", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, overrides: rep.Overrides}.rows()...)
 			})
 		},
 	}
-	f.register(cmd, ".mrpack", "export one target only (default: every target)", "put mods that Modrinth launchers cannot download inside the archive")
+	f.register(cmd, ".mrpack", "export one target only (default: every target)", "put files that Modrinth launchers cannot download inside the archive")
 	return cmd
 }
 
@@ -174,14 +209,16 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 			}
 			a.warn(rep.Warnings)
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OKInto("wrote "+rep.Name+" "+rep.Version, rep.Path, fmt.Sprintf("%s by file ID, %d bundled, %s", plural(len(rep.Mods), "mod", "mods"), len(rep.Bundled), plural(len(rep.Overrides), "override file", "override files")))
+				l.OKInto("wrote "+rep.Name+" "+rep.Version, rep.Path, "")
+				rows := exportTally{how: "by file ID", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, overrides: rep.Overrides}.rows()
 				if len(rep.Matched) > 0 {
-					l.Tree(out.Row{Label: "matched on CurseForge", Text: strings.Join(rep.Matched, ", ")})
+					rows = append(rows, out.Row{Label: "matched on CurseForge", Text: strings.Join(rep.Matched, ", ")})
 				}
+				l.Tree(rows...)
 			})
 		},
 	}
-	f.register(cmd, ".zip", "client target to export (default: the only client target)", "put mods that aren't on CurseForge inside the archive")
+	f.register(cmd, ".zip", "client target to export (default: the only client target)", "put files that aren't on CurseForge inside the archive")
 	return cmd
 }
 

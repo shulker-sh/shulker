@@ -168,6 +168,22 @@ func (r *Resolver) applyLockedPacks() {
 			entry.RequiredBy = append([]string{}, entry.RequiredBy...)
 			r.Lock.Mods[id] = entry
 		}
+		for _, key := range sortedKeys(p.Lock.ResourcePacks) {
+			if _, listed := r.Manifest.Requires[key]; listed {
+				continue
+			}
+			entry := p.Lock.ResourcePacks[key]
+			entry.Modpack = p.Name
+			r.Lock.ResourcePacks[key] = entry
+		}
+		for _, key := range sortedKeys(p.Lock.Shaders) {
+			if _, listed := r.Manifest.Requires[key]; listed {
+				continue
+			}
+			entry := p.Lock.Shaders[key]
+			entry.Modpack = p.Name
+			r.Lock.Shaders[key] = entry
+		}
 	}
 }
 

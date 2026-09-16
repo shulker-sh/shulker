@@ -23,7 +23,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		Short: addShort(kind),
 		Args:  minimumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			chosen, err := chooseType(cmd, kind, typ, manifest.TypeMod)
+			chosen, err := chooseType(cmd, kind, typ, "")
 			if err != nil {
 				return err
 			}
@@ -33,7 +33,8 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			switch chosen {
 			case manifest.TypeModpack:
 				return a.addModpacks(cmd, args, as, ref, unlocked)
-			case manifest.TypeMod:
+			case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader:
+				// An empty type is settled by the provider during resolution.
 			default:
 				return unsupportedType(chosen)
 			}
@@ -43,7 +44,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			if as != "" && len(args) > 1 {
 				return out.Errorf("usage", "--as applies to a single mod")
 			}
-			opts.As = as
+			opts.As, opts.Type = as, chosen
 			for _, flag := range []struct {
 				name, value string
 				allowed     []string

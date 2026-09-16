@@ -48,10 +48,10 @@ func TestRejectedSharedKeyIsReplacedFromShulker(t *testing.T) {
 	dir := t.TempDir()
 	c := NewShared(fetch.New("test"), "old", dir)
 	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
-	if _, err := c.Project(context.Background(), "10"); err != nil {
+	if _, err := c.Project(context.Background(), "10", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Project(context.Background(), "10"); err != nil {
+	if _, err := c.Project(context.Background(), "10", ""); err != nil {
 		t.Fatal(err)
 	}
 	if k.keyFetches != 1 || k.apiCalls != 3 {
@@ -67,11 +67,11 @@ func TestSharedKeyFailsWhenShulkerHasNoNewerKey(t *testing.T) {
 	srv := k.start(t)
 	c := NewShared(fetch.New("test"), "old", t.TempDir())
 	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
-	_, err := c.Project(context.Background(), "10")
+	_, err := c.Project(context.Background(), "10", "")
 	if out.CodeOf(err) != "curseforge-key-rejected" || !strings.Contains(err.Error(), "shulker.sh has no newer one") || !strings.Contains(err.Error(), "report it") {
 		t.Fatalf("error %v", err)
 	}
-	if _, err := c.Project(context.Background(), "10"); err == nil || k.keyFetches != 1 {
+	if _, err := c.Project(context.Background(), "10", ""); err == nil || k.keyFetches != 1 {
 		t.Errorf("second call: error %v, key fetches %d; want an error and 1 fetch", err, k.keyFetches)
 	}
 }
@@ -81,7 +81,7 @@ func TestOwnKeyIsNeverReplaced(t *testing.T) {
 	srv := k.start(t)
 	c := New(fetch.New("test"), "mine")
 	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
-	_, err := c.Project(context.Background(), "10")
+	_, err := c.Project(context.Background(), "10", "")
 	if out.CodeOf(err) != "curseforge-key-rejected" || !strings.Contains(err.Error(), "the API key was rejected") {
 		t.Fatalf("error %v", err)
 	}

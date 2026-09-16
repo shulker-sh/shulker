@@ -29,6 +29,7 @@
   "requires": {
     "base": { "type": "modpack", "source": "../base", "ref": "main", "autoUpdate": false, "locked": false, "note": "modpack" },
     "extras": { "type": "resourcepack", "file": "packs/extras.zip" },
+    "complementary": { "type": "shader", "project": "HVnmMxH1", "channel": "beta", "provider": "modrinth", "feature": "shaders" },
     "sodium": {
       "project": "AANobbMI",
       "pin": "4TkX2p9Z",

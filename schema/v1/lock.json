@@ -4,7 +4,7 @@
   "title": "shulker.lock",
   "description": "Shulker lock file. Tool-owned, key-sorted, pretty-printed. Records the exact resolution of shulker.json; install and build read only this file.",
   "type": "object",
-  "required": ["lockVersion", "minecraft", "java", "modpacks", "mods", "players"],
+  "required": ["lockVersion", "minecraft", "java", "modpacks", "mods", "resourcepacks", "shaders", "players"],
   "additionalProperties": false,
   "properties": {
     "lockVersion": { "type": "integer", "const": 1 },
@@ -72,6 +72,18 @@
       "propertyNames": { "$ref": "#/$defs/requireKey" },
       "additionalProperties": { "$ref": "#/$defs/mod" },
       "description": "Every mod in the resolved set, direct and transitive, keyed by its requires key or, for a dependency, its in-jar mod id."
+    },
+    "resourcepacks": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/requireKey" },
+      "additionalProperties": { "$ref": "#/$defs/pack" },
+      "description": "Every resource pack in the resolved set, keyed by its requires key. The build places each as resourcepacks/<key>.zip."
+    },
+    "shaders": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/requireKey" },
+      "additionalProperties": { "$ref": "#/$defs/pack" },
+      "description": "Every shader in the resolved set, keyed by its requires key. The build places each as shaderpacks/<key>.zip, or resourcepacks/<key>.zip when it targets vanilla core shaders."
     },
     "players": {
       "type": "array",
@@ -157,6 +169,67 @@
             "curseforge": { "$ref": "#/$defs/curseforgeId" }
           },
           "description": "The same mod's project id on other providers, discovered on first download."
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "provider": { "const": "modrinth" } } },
+          "then": {
+            "properties": {
+              "project": { "$ref": "#/$defs/modrinthId" },
+              "version": { "$ref": "#/$defs/modrinthId" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "provider": { "const": "curseforge" } } },
+          "then": {
+            "properties": {
+              "project": { "$ref": "#/$defs/curseforgeId" },
+              "version": { "$ref": "#/$defs/curseforgeId" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "url": { "type": "null" } } },
+          "then": { "required": ["page"] },
+          "else": { "not": { "required": ["page"] } }
+        }
+      ]
+    },
+    "pack": {
+      "type": "object",
+      "required": ["provider", "project", "version", "versionNumber", "filename", "url", "sha512", "channel"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "enum": ["modrinth", "curseforge"] },
+        "project": { "description": "Provider project id, typed as the provider types it." },
+        "version": { "description": "Provider version id (Modrinth) or file id (CurseForge)." },
+        "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed." },
+        "filename": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/\\\\]+\\.zip$",
+          "description": "The provider's own file name. The build places the file as <key>.zip instead, so a pack enabled in game stays enabled when it updates."
+        },
+        "url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "Download url. null when the author disabled third-party distribution; page is then required."
+        },
+        "page": {
+          "type": "string",
+          "format": "uri",
+          "description": "Provider file page for manual download. Present only when url is null."
+        },
+        "sha512": { "$ref": "#/$defs/sha512", "description": "Cache key and install verification hash." },
+        "size": { "type": "integer", "minimum": 1, "description": "File size in bytes as the provider reports it, for the download bar." },
+        "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked. A listed entry whose manifest channel differs makes the lock out of date." },
+        "modpack": { "$ref": "#/$defs/requireKey", "description": "Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own entries." },
+        "loader": {
+          "type": "string",
+          "enum": ["iris", "oculus", "canvas", "vanilla"],
+          "description": "Shaders only: the shader loader this file targets. vanilla shaders are core-shader resource packs, placed in resourcepacks/ and enabled like one; the rest are placed in shaderpacks/ and enabled through their shader mod's own .properties file."
         }
       },
       "allOf": [

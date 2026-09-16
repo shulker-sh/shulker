@@ -148,7 +148,52 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 			res = append(res, e)
 		}
 	}
+	for _, packKind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
+		if kind == "" || kind == packKind {
+			res = append(res, packEntries(p, packKind)...)
+		}
+	}
 	return res, nil
+}
+
+// packEntries lists the resource packs or shaders, spanning what shulker.json
+// lists and what the lock holds, so one a locked modpack supplied shows up too.
+func packEntries(p *project.Project, kind string) []listEntry {
+	listed := p.Manifest.ResourcePacks()
+	var locked map[string]lock.Pack
+	if kind == manifest.TypeShader {
+		listed = p.Manifest.Shaders()
+	}
+	if p.Lock != nil {
+		locked = p.Lock.ResourcePacks
+		if kind == manifest.TypeShader {
+			locked = p.Lock.Shaders
+		}
+	}
+	keys := map[string]bool{}
+	for key := range listed {
+		keys[key] = true
+	}
+	for key := range locked {
+		keys[key] = true
+	}
+	res := []listEntry{}
+	for _, key := range slices.Sorted(maps.Keys(keys)) {
+		entry, isListed := listed[key]
+		e := listEntry{
+			Key: key, Type: kind, Listed: isListed, Channel: entry.Channel,
+			Provider: entry.Provider, Pinned: entry.Pin != nil, OS: entry.OS, Feature: entry.Feature,
+		}
+		if lp, ok := locked[key]; ok {
+			e.Version = lp.VersionNumber
+			if e.Provider == "" {
+				e.Provider = lp.Provider
+			}
+			e.Modpack = lp.Modpack
+		}
+		res = append(res, e)
+	}
+	return res
 }
 
 // origin splits the mods and modpacks that pulled an entry in, so a row says
@@ -170,6 +215,8 @@ func printList(l *out.Lines, res []listEntry) {
 	blocks := []struct{ heading, kind string }{
 		{"Modpacks", manifest.TypeModpack},
 		{"Mods", manifest.TypeMod},
+		{"Resource packs", manifest.TypeResourcePack},
+		{"Shaders", manifest.TypeShader},
 	}
 	printed := false
 	for _, b := range blocks {

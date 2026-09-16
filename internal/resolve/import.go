@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
@@ -32,22 +33,36 @@ type Imported struct {
 }
 
 type importer struct {
-	r        *Resolver
-	a        *mrpack.Archive
-	rep      *Imported
-	modrinth hashLookup
-	bySha    map[string]string
-	matched  map[string]bool
+	r         *Resolver
+	a         *mrpack.Archive
+	rep       *Imported
+	modrinth  hashLookup
+	bySha     map[string]string
+	packBySha map[string]importedPack
+	matched   map[string]bool
+}
+
+// importedPack is a resource pack or shader the pack's own lock names, found by
+// the digest of the file the archive ships.
+type importedPack struct {
+	key  string
+	kind string
 }
 
 func (r *Resolver) ImportMrpack(ctx context.Context, a *mrpack.Archive) (*Imported, error) {
-	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, matched: map[string]bool{}}
+	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}}
 	if p, ok := r.Providers["modrinth"].(hashLookup); ok {
 		im.modrinth = p
 	}
 	if a.Marker != nil {
 		for id, m := range a.Marker.Lock.Mods {
 			im.bySha[m.Sha512] = id
+		}
+		for key, p := range a.Marker.Lock.ResourcePacks {
+			im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeResourcePack}
+		}
+		for key, p := range a.Marker.Lock.Shaders {
+			im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeShader}
 		}
 	}
 	for _, f := range a.Index.Files {
@@ -77,6 +92,10 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 		im.reuse(id, f.Side())
 		return nil
 	}
+	if p, ok := im.packBySha[sha512Sum]; ok {
+		im.reusePack(p)
+		return nil
+	}
 	if !isModJar(f.Path) || im.modrinth == nil {
 		return im.unmanagedDownload(ctx, f)
 	}
@@ -87,7 +106,7 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if !found {
 		return im.unmanagedDownload(ctx, f)
 	}
-	proj, err := im.modrinth.Project(ctx, v.ProjectID)
+	proj, err := im.modrinth.Project(ctx, v.ProjectID, "")
 	if err != nil {
 		return err
 	}
@@ -134,12 +153,20 @@ func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error 
 }
 
 func (im *importer) override(o mrpack.Override) error {
-	if !isModJar(o.Path) {
+	if !isModJar(o.Path) && !isPackZip(o.Path) {
 		im.rep.Overrides = append(im.rep.Overrides, o)
 		return nil
 	}
 	sum := sha512.Sum512(o.Data)
-	if id, ok := im.bySha[hex.EncodeToString(sum[:])]; ok {
+	digest := hex.EncodeToString(sum[:])
+	if p, ok := im.packBySha[digest]; ok {
+		if _, err := im.r.Cache.Put(bytes.NewReader(o.Data)); err != nil {
+			return err
+		}
+		im.reusePack(p)
+		return nil
+	}
+	if id, ok := im.bySha[digest]; ok {
 		if _, err := im.r.Cache.Put(bytes.NewReader(o.Data)); err != nil {
 			return err
 		}
@@ -168,6 +195,24 @@ func (im *importer) reuse(id, side string) {
 	im.rep.Reused = append(im.rep.Reused, id)
 }
 
+// reusePack puts a pack back exactly as the modpack locked it, in the section
+// its kind belongs to.
+func (im *importer) reusePack(p importedPack) {
+	if im.matched[p.key] {
+		return
+	}
+	im.matched[p.key] = true
+	locked, listed, into := im.a.Marker.Lock.ResourcePacks, im.a.Marker.Manifest.ResourcePacks(), im.r.Lock.ResourcePacks
+	if p.kind == manifest.TypeShader {
+		locked, listed, into = im.a.Marker.Lock.Shaders, im.a.Marker.Manifest.Shaders(), im.r.Lock.Shaders
+	}
+	into[p.key] = locked[p.key]
+	if entry, ok := listed[p.key]; ok {
+		im.r.Manifest.Requires[p.key] = entry
+	}
+	im.rep.Reused = append(im.rep.Reused, p.key)
+}
+
 func (im *importer) markerManifestMod(id string) (manifest.Require, bool) {
 	if im.a.Marker == nil {
 		return manifest.Require{}, false
@@ -190,6 +235,20 @@ func (im *importer) dropUnmatched() {
 		delete(im.r.Manifest.Requires, id)
 		im.rep.Dropped = append(im.rep.Dropped, id)
 	}
+	dropPacks := func(marker, mine map[string]lock.Pack) {
+		for key := range marker {
+			if im.matched[key] {
+				continue
+			}
+			if _, replaced := mine[key]; replaced {
+				continue
+			}
+			delete(im.r.Manifest.Requires, key)
+			im.rep.Dropped = append(im.rep.Dropped, key)
+		}
+	}
+	dropPacks(im.a.Marker.Lock.ResourcePacks, im.r.Lock.ResourcePacks)
+	dropPacks(im.a.Marker.Lock.Shaders, im.r.Lock.Shaders)
 	for id, m := range im.r.Lock.Mods {
 		kept := m.RequiredBy[:0]
 		for _, by := range m.RequiredBy {
@@ -204,6 +263,11 @@ func (im *importer) dropUnmatched() {
 
 func isModJar(p string) bool {
 	return path.Dir(p) == "mods" && strings.EqualFold(path.Ext(p), ".jar")
+}
+
+func isPackZip(p string) bool {
+	dir := path.Dir(p)
+	return (dir == "resourcepacks" || dir == "shaderpacks") && strings.EqualFold(path.Ext(p), ".zip")
 }
 
 func layerSide(layer string) string {

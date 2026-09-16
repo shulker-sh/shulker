@@ -15,6 +15,7 @@ import (
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
@@ -32,14 +33,18 @@ type MrpackOptions struct {
 }
 
 type MrpackReport struct {
-	Path      string   `json:"path"`
-	VersionID string   `json:"versionId"`
-	Name      string   `json:"name"`
-	Targets   []string `json:"targets"`
-	Mods      []string `json:"mods"`
-	Bundled   []string `json:"bundled"`
-	Overrides []string `json:"overrides"`
-	Warnings  []string `json:"-"`
+	Path                 string   `json:"path"`
+	VersionID            string   `json:"versionId"`
+	Name                 string   `json:"name"`
+	Targets              []string `json:"targets"`
+	Mods                 []string `json:"mods"`
+	ResourcePacks        []string `json:"resourcepacks"`
+	Shaders              []string `json:"shaders"`
+	BundledMods          []string `json:"bundledMods"`
+	BundledResourcePacks []string `json:"bundledResourcepacks"`
+	BundledShaders       []string `json:"bundledShaders"`
+	Overrides            []string `json:"overrides"`
+	Warnings             []string `json:"-"`
 }
 
 type mrpackTarget struct {
@@ -47,6 +52,7 @@ type mrpackTarget struct {
 	side  string
 	files map[string][]byte
 	mods  map[string]bool
+	packs map[string]bool
 }
 
 func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
@@ -54,7 +60,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, Bundled: []string{}, Overrides: []string{}, Warnings: []string{}}
+	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}, Warnings: []string{}}
 	for _, t := range targets {
 		report.Targets = append(report.Targets, t.name)
 		warnings, err := b.mrpackCollect(t, opts.OS, opts.Features)
@@ -90,10 +96,30 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		return nil, err
 	}
 	entries[mrpack.IndexName] = append(indexData, '\n')
+	if err := b.addIdentity(entries); err != nil {
+		return nil, err
+	}
 	if err := writeArchive(opts.Output, mrpack.IndexName, entries); err != nil {
 		return nil, err
 	}
 	return report, nil
+}
+
+// addIdentity puts the project's own manifest and lock at the archive root, so an
+// export imports back as the project it came from. The marker jar carries them
+// too, but only a client-side export of a project with a loader has one.
+func (b *Builder) addIdentity(entries map[string][]byte) error {
+	manifestData, err := os.ReadFile(filepath.Join(b.Dir, manifest.FileName))
+	if err != nil {
+		return err
+	}
+	lockData, err := os.ReadFile(b.LockPath)
+	if err != nil {
+		return err
+	}
+	entries[manifest.FileName] = manifestData
+	entries[lock.FileName] = lockData
+	return nil
 }
 
 func (b *Builder) mrpackTargets(names []string) ([]*mrpackTarget, error) {
@@ -148,6 +174,12 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, features map[str
 			t.mods[id] = true
 		}
 	}
+	t.packs = map[string]bool{}
+	for _, ref := range b.packRefs() {
+		if _, ok := desired[ref.path]; ok {
+			t.packs[ref.key] = true
+		}
+	}
 	for _, e := range rep.Excluded {
 		if strings.Contains(e, "(needs os ") {
 			warnings = append(warnings, fmt.Sprintf("%s: left out of %s; pass --os to export that variation", e, t.name))
@@ -172,7 +204,35 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, features map[str
 
 func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpack.File, error) {
 	files := []mrpack.File{}
-	var blocked []string
+	blocked := &kindTally{}
+	add := func(key, kind, filePath, side, provider, sum512 string, u *string, owners []*mrpackTarget, locked, bundled *[]string) error {
+		data, err := os.ReadFile(b.Cache.Object(sum512))
+		if err != nil {
+			return out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", key)
+		}
+		if u != nil && mrpackHostAllowed(*u) {
+			sum := sha1.Sum(data)
+			files = append(files, mrpack.File{
+				Path:      filePath,
+				Hashes:    map[string]string{"sha1": hex.EncodeToString(sum[:]), "sha512": sum512},
+				Env:       mrpack.Env(side),
+				Downloads: []string{*u},
+				FileSize:  int64(len(data)),
+			})
+			*locked = append(*locked, key)
+			return nil
+		}
+		if !bundle {
+			blocked.add(kind, key+" ("+mrpackOrigin(provider, u)+")")
+			return nil
+		}
+		for _, t := range owners {
+			t.files[filePath] = data
+		}
+		*bundled = append(*bundled, key)
+		report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s from %s into the archive; recipients receive the file itself, not a download link", key, mrpackOrigin(provider, u)))
+		return nil
+	}
 	ids := make([]string, 0, len(b.Lock.Mods))
 	for id := range b.Lock.Mods {
 		ids = append(ids, id)
@@ -180,45 +240,41 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 	sort.Strings(ids)
 	for _, id := range ids {
 		m := b.Lock.Mods[id]
-		var owners []*mrpackTarget
-		for _, t := range targets {
-			if t.mods[id] {
-				owners = append(owners, t)
-			}
-		}
+		owners := mrpackOwners(targets, func(t *mrpackTarget) bool { return t.mods[id] })
 		if len(owners) == 0 {
 			continue
 		}
-		data, err := os.ReadFile(b.Cache.Object(m.Sha512))
-		if err != nil {
-			return nil, out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", id)
+		if err := add(id, manifest.TypeMod, "mods/"+m.Filename, m.Side, m.Provider, m.Sha512, m.URL, owners, &report.Mods, &report.BundledMods); err != nil {
+			return nil, err
 		}
-		if m.URL != nil && mrpackHostAllowed(*m.URL) {
-			sum := sha1.Sum(data)
-			files = append(files, mrpack.File{
-				Path:      "mods/" + m.Filename,
-				Hashes:    map[string]string{"sha1": hex.EncodeToString(sum[:]), "sha512": m.Sha512},
-				Env:       mrpack.Env(m.Side),
-				Downloads: []string{*m.URL},
-				FileSize:  int64(len(data)),
-			})
-			report.Mods = append(report.Mods, id)
-			continue
-		}
-		if !bundle {
-			blocked = append(blocked, id+" ("+mrpackOrigin(m.Provider, m.URL)+")")
-			continue
-		}
-		for _, t := range owners {
-			t.files["mods/"+m.Filename] = data
-		}
-		report.Bundled = append(report.Bundled, id)
-		report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s from %s into the archive; recipients receive the file itself, not a download link", id, mrpackOrigin(m.Provider, m.URL)))
 	}
-	if len(blocked) > 0 {
-		return nil, bundleNudge(out.Errorf("mrpack-host-not-allowed", "%s be downloaded by Modrinth launchers", modCount(len(blocked), "can't", "can't")), blocked, "shulker export mrpack --bundle")
+	for _, ref := range b.packRefs() {
+		owners := mrpackOwners(targets, func(t *mrpackTarget) bool { return t.packs[ref.key] })
+		if len(owners) == 0 {
+			continue
+		}
+		locked, bundled := &report.ResourcePacks, &report.BundledResourcePacks
+		if ref.kind == manifest.TypeShader {
+			locked, bundled = &report.Shaders, &report.BundledShaders
+		}
+		if err := add(ref.key, ref.kind, ref.path, "client", ref.pack.Provider, ref.pack.Sha512, ref.pack.URL, owners, locked, bundled); err != nil {
+			return nil, err
+		}
+	}
+	if blocked.total() > 0 {
+		return nil, bundleNudge(out.Errorf("mrpack-host-not-allowed", "%s can't be downloaded by Modrinth launchers", kindCount(blocked.counts)), blocked.items, "shulker export mrpack --bundle")
 	}
 	return files, nil
+}
+
+func mrpackOwners(targets []*mrpackTarget, ships func(*mrpackTarget) bool) []*mrpackTarget {
+	var owners []*mrpackTarget
+	for _, t := range targets {
+		if ships(t) {
+			owners = append(owners, t)
+		}
+	}
+	return owners
 }
 
 // providerDomains are where a provider serves its own files; a mod downloaded from one of them is

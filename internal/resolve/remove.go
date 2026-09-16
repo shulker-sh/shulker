@@ -8,6 +8,13 @@ import (
 )
 
 func (r *Resolver) Remove(ids []string) error {
+	ids, err := r.removePacks(ids)
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return nil
+	}
 	direct := r.directMods()
 	for _, id := range ids {
 		if _, ok := r.Manifest.Mods()[id]; ok {

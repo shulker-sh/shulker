@@ -44,6 +44,7 @@ func (a *app) importCmd() *cobra.Command {
 
 func (a *app) importMrpackCmd() *cobra.Command {
 	var name string
+	var ignoreShulker bool
 	cmd := &cobra.Command{
 		Use:   "mrpack <file>",
 		Short: "Create a project from a Modrinth modpack (.mrpack)",
@@ -52,6 +53,9 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			arc, err := mrpack.Read(args[0])
 			if err != nil {
 				return err
+			}
+			if ignoreShulker {
+				arc.Marker = nil
 			}
 			if name == "" {
 				name = slugify(arc.Index.Name)
@@ -122,6 +126,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "project name (default: the pack name, slugified)")
+	cmd.Flags().BoolVar(&ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
 	return cmd
 }
 

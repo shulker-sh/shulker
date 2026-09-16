@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -25,9 +26,20 @@ const (
 	KeyURL   = "https://shulker.sh/api/curseforge-key"
 	KeyEnv   = "SHULKER_CURSEFORGE_KEY"
 	gameID   = "432"
-	classMod = "6"
 	pageSize = 50
 )
+
+// CurseForge class ids for the Minecraft game, from /v1/categories?classesOnly=true.
+const (
+	classMod          = "6"
+	classModpack      = "4471"
+	classResourcePack = "12"
+	classShader       = "6552"
+)
+
+var classTypes = map[int]string{6: "mod", 4471: "modpack", 12: "resourcepack", 6552: "shader"}
+
+var typeClasses = map[string]string{"mod": classMod, "modpack": classModpack, "resourcepack": classResourcePack, "shader": classShader}
 
 var embeddedKey string
 
@@ -46,6 +58,7 @@ type CurseForge struct {
 	refreshed  bool
 	refreshErr error
 	slugs      map[string]string
+	classes    map[string]int
 }
 
 func Key(configured string) string {
@@ -70,7 +83,7 @@ func keyFile(cacheDir string) string {
 }
 
 func New(c *fetch.Client, key string) *CurseForge {
-	return &CurseForge{Client: withKey(c, key), BaseURL: APIURL, key: key, slugs: map[string]string{}}
+	return &CurseForge{Client: withKey(c, key), BaseURL: APIURL, key: key, slugs: map[string]string{}, classes: map[string]int{}}
 }
 
 func NewShared(c *fetch.Client, key, cacheDir string) *CurseForge {
@@ -89,10 +102,11 @@ func withKey(c *fetch.Client, key string) *fetch.Client {
 func (c *CurseForge) Name() string { return "curseforge" }
 
 type mod struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Slug  string `json:"slug"`
-	Links struct {
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	Slug    string `json:"slug"`
+	ClassID int    `json:"classId"`
+	Links   struct {
 		WebsiteURL string `json:"websiteUrl"`
 	} `json:"links"`
 }
@@ -124,7 +138,7 @@ type pagination struct {
 	TotalCount  int `json:"totalCount"`
 }
 
-func (c *CurseForge) Project(ctx context.Context, slugOrID string) (*provider.Project, error) {
+func (c *CurseForge) Project(ctx context.Context, slugOrID, kind string) (*provider.Project, error) {
 	if _, err := strconv.Atoi(slugOrID); err == nil {
 		var res struct {
 			Data mod `json:"data"`
@@ -141,7 +155,10 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID string) (*provider.Pr
 		}
 		return c.remember(res.Data), nil
 	}
-	q := url.Values{"gameId": {gameID}, "classId": {classMod}, "slug": {slugOrID}}
+	q := url.Values{"gameId": {gameID}, "slug": {slugOrID}}
+	if class, ok := typeClasses[kind]; ok {
+		q.Set("classId", class)
+	}
 	var res struct {
 		Data []mod `json:"data"`
 	}
@@ -150,24 +167,44 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID string) (*provider.Pr
 	}); err != nil {
 		return nil, err
 	}
+	var matched []mod
 	for _, m := range res.Data {
 		if m.Slug == slugOrID {
-			return c.remember(m), nil
+			matched = append(matched, m)
 		}
 	}
-	return nil, fmt.Errorf("curseforge project %s: %w", slugOrID, provider.ErrNotFound)
+	if len(matched) == 0 {
+		return nil, fmt.Errorf("curseforge project %s: %w", slugOrID, provider.ErrNotFound)
+	}
+	if len(matched) > 1 {
+		kinds := make([]string, 0, len(matched))
+		for _, m := range matched {
+			kinds = append(kinds, classTypes[m.ClassID])
+		}
+		sort.Strings(kinds)
+		e := out.Errorf("type-ambiguous", "curseforge has %s as %s; pass `--type` to say which one you mean", slugOrID, strings.Join(kinds, " and "))
+		e.Candidates, e.Given, e.Flag = kinds, slugOrID, "--type"
+		return nil, e
+	}
+	return c.remember(matched[0]), nil
 }
 
 func (c *CurseForge) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {
 	var out []provider.Version
 	seen := map[int]bool{}
-	for _, name := range loaders {
-		l, ok := loader.Lookup(name)
-		if !ok {
-			return nil, fmt.Errorf("curseforge has no loader type for %q", name)
-		}
+	tags := loaders
+	if len(tags) == 0 {
+		// A resource pack's files carry no loader tag at all.
+		tags = []string{""}
+	}
+	for _, name := range tags {
 		for index := 0; ; {
-			q := url.Values{"gameVersion": {game}, "modLoaderType": {l.CurseForgeType}, "index": {strconv.Itoa(index)}, "pageSize": {strconv.Itoa(pageSize)}}
+			q := url.Values{"gameVersion": {game}, "index": {strconv.Itoa(index)}, "pageSize": {strconv.Itoa(pageSize)}}
+			// Mod loaders filter server-side; shader loaders are tagged in
+			// gameVersions instead, alongside the Minecraft versions.
+			if l, ok := loader.Lookup(name); ok {
+				q.Set("modLoaderType", l.CurseForgeType)
+			}
 			var res struct {
 				Data       []file     `json:"data"`
 				Pagination pagination `json:"pagination"`
@@ -178,7 +215,10 @@ func (c *CurseForge) Versions(ctx context.Context, projectID, game string, loade
 				return nil, err
 			}
 			for _, f := range res.Data {
-				if seen[f.ID] || !f.IsAvailable || !contains(f.GameVersions, game) || !containsFold(f.GameVersions, name) {
+				if seen[f.ID] || !f.IsAvailable || !contains(f.GameVersions, game) {
+					continue
+				}
+				if name != "" && !containsFold(f.GameVersions, name) {
 					continue
 				}
 				v, err := convertFile(f)
@@ -227,11 +267,11 @@ func (c *CurseForge) Version(ctx context.Context, versionID string) (*provider.V
 func (c *CurseForge) withPages(ctx context.Context, versions []provider.Version) ([]provider.Version, error) {
 	for i, v := range versions {
 		if _, ok := c.slugs[v.ProjectID]; !ok {
-			if _, err := c.Project(ctx, v.ProjectID); err != nil {
+			if _, err := c.Project(ctx, v.ProjectID, ""); err != nil {
 				return nil, err
 			}
 		}
-		versions[i].Page = FilePage(c.slugs[v.ProjectID], v.ID)
+		versions[i].Page = FilePage(c.slugs[v.ProjectID], v.ID, c.classes[v.ProjectID])
 	}
 	return versions, nil
 }
@@ -239,6 +279,7 @@ func (c *CurseForge) withPages(ctx context.Context, versions []provider.Version)
 func (c *CurseForge) remember(m mod) *provider.Project {
 	p := convertMod(m)
 	c.slugs[p.ID] = p.Slug
+	c.classes[p.ID] = m.ClassID
 	return p
 }
 
@@ -296,8 +337,15 @@ func sharedKeyRejected(detail string) error {
 	return out.Errorf("curseforge-key-rejected", "CurseForge rejected shulker's built-in API key and %s; set %s or run `shulker config set curseforge.key <key>`, or report it at https://github.com/shulker-sh/shulker/issues", detail, KeyEnv)
 }
 
-func FilePage(slug, fileID string) string {
-	return "https://www.curseforge.com/minecraft/mc-mods/" + slug + "/files/" + fileID
+// classPaths are the url segments curseforge.com uses per class.
+var classPaths = map[int]string{6: "mc-mods", 4471: "modpacks", 12: "texture-packs", 6552: "shaders"}
+
+func FilePage(slug, fileID string, class int) string {
+	path, ok := classPaths[class]
+	if !ok {
+		path = "mc-mods"
+	}
+	return "https://www.curseforge.com/minecraft/" + path + "/" + slug + "/files/" + fileID
 }
 
 func ProjectPage(projectID string) string {
@@ -305,7 +353,7 @@ func ProjectPage(projectID string) string {
 }
 
 func convertMod(m mod) *provider.Project {
-	return &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name}
+	return &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Type: classTypes[m.ClassID]}
 }
 
 func convertFile(f file) (provider.Version, error) {

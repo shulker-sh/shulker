@@ -24,6 +24,8 @@ Required properties are marked with *.
 | `server` | [`download`](#download) | The vanilla server jar, present once a server target has been installed. Fabric's launcher finds it in .fabric/server/, Quilt's starts it as server.jar, and the NeoForge and Forge installers patch it from libraries/. |
 | `modpacks` * | map of [`modpack`](#modpack) | Every modpack in the manifest's requires, keyed by its requires key.<br>keys are [`requireKey`](#requirekey) |
 | `mods` * | map of [`mod`](#mod) | Every mod in the resolved set, direct and transitive, keyed by its requires key or, for a dependency, its in-jar mod id.<br>keys are [`requireKey`](#requirekey) |
+| `resourcepacks` * | map of [`pack`](#pack) | Every resource pack in the resolved set, keyed by its requires key. The build places each as resourcepacks/&lt;key&gt;.zip.<br>keys are [`requireKey`](#requirekey) |
+| `shaders` * | map of [`pack`](#pack) | Every shader in the resolved set, keyed by its requires key. The build places each as shaderpacks/&lt;key&gt;.zip, or resourcepacks/&lt;key&gt;.zip when it targets vanilla core shaders.<br>keys are [`requireKey`](#requirekey) |
 | `players` * | [`player`](#player)[] | Every player referenced anywhere in the manifest, fully resolved. uuid is the identity across renames. |
 
 No other properties are allowed.
@@ -104,6 +106,25 @@ No other properties are allowed.
 | `modId` | [`modId`](#modid) | The jar's in-jar mod id. Present only when it differs from the entry's key; dependency matching and validation use it, while requiredBy and every other reference use the key. |
 | `requiredBy` * | [`requireKey`](#requirekey)[] | Requires keys of the mods, or modpacks, that depend on this mod. Empty plus absent from the manifest's requires and every modpack means orphan.<br>unique items |
 | `aliases` * | object | The same mod's project id on other providers, discovered on first download. |
+
+No other properties are allowed.
+
+### pack
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `provider` * | `"modrinth"` \| `"curseforge"` |  |
+| `project` * | [`modrinthId`](#modrinthid) \| [`curseforgeId`](#curseforgeid) | Provider project id, typed as the provider types it. |
+| `version` * | [`modrinthId`](#modrinthid) \| [`curseforgeId`](#curseforgeid) | Provider version id (Modrinth) or file id (CurseForge). |
+| `versionNumber` * | `string` | Provider display string. Never parsed.<br>min length 1 |
+| `filename` * | `string` | The provider's own file name. The build places the file as &lt;key&gt;.zip instead, so a pack enabled in game stays enabled when it updates.<br>pattern `^[^/\\]+\.zip$`, min length 1 |
+| `url` * | `string` \| `null` | Download url. null when the author disabled third-party distribution; page is then required.<br>format `uri` |
+| `page` | `string` | Provider file page for manual download. Present only when url is null.<br>format `uri` |
+| `sha512` * | [`sha512`](#sha512) | Cache key and install verification hash. |
+| `size` | `integer` | File size in bytes as the provider reports it, for the download bar.<br>min 1 |
+| `channel` * | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted when this version was picked. A listed entry whose manifest channel differs makes the lock out of date. |
+| `modpack` | [`requireKey`](#requirekey) | Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own entries. |
+| `loader` | `"iris"` \| `"oculus"` \| `"canvas"` \| `"vanilla"` | Shaders only: the shader loader this file targets. vanilla shaders are core-shader resource packs, placed in resourcepacks/ and enabled like one; the rest are placed in shaderpacks/ and enabled through their shader mod's own .properties file. |
 
 No other properties are allowed.
 

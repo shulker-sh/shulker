@@ -115,7 +115,7 @@ func TestExportMrpack(t *testing.T) {
 	h.allowMrpackHost(t)
 	stdout = h.mustRun(t, "export", "mrpack")
 	archive := filepath.Join(h.dir, "build", "pack-1.0.mrpack")
-	if !strings.Contains(stdout, "wrote Demo Pack 1.0 » "+archive+" (2 mods by download, 0 bundled, 8 override files)") {
+	if !strings.Contains(stdout, "wrote Demo Pack 1.0 » "+archive) || !strings.Contains(stdout, "2 mods by download") || !strings.Contains(stdout, "8 override files") {
 		t.Fatalf("export output: %s", stdout)
 	}
 	index, entries := readMrpack(t, archive)
@@ -150,8 +150,11 @@ func TestExportMrpack(t *testing.T) {
 	if !strings.Contains(entries["server-overrides/server.properties"], "motd=Demo") || !strings.Contains(entries["client-overrides/options.txt"], "tutorialStep:") {
 		t.Fatalf("first-class files: %v", keys(entries))
 	}
-	if _, ok := entries["client-overrides/mods/shulker-pack.jar"]; !ok || len(entries) != 8 {
+	if _, ok := entries["client-overrides/mods/shulker-pack.jar"]; !ok || len(entries) != 10 {
 		t.Fatalf("entries: %v", keys(entries))
+	}
+	if !strings.Contains(entries["shulker.json"], `"sodium"`) || !strings.Contains(entries["shulker.lock"], `"sodium"`) {
+		t.Fatalf("archive identity: %v", keys(entries))
 	}
 	for name := range entries {
 		if strings.Contains(name, "fabric-server-launch") || strings.Contains(name, ".shulker-state") {
@@ -168,8 +171,39 @@ func TestExportMrpack(t *testing.T) {
 		t.Fatalf("server export report: %v", rep)
 	}
 	index, entries = readMrpack(t, filepath.Join(h.dir, "out", "server.mrpack"))
-	if index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename || entries["overrides/config/shared.toml"] != "server\n" || entries["overrides/eula.txt"] == "" || len(entries) != 4 {
+	if index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename || entries["overrides/config/shared.toml"] != "server\n" || entries["overrides/eula.txt"] == "" || len(entries) != 6 {
 		t.Fatalf("server export: files=%+v entries=%v", index.Files, keys(entries))
+	}
+}
+
+func TestExportMrpackCarriesPacks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fresh-animations")
+	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	h.mustRun(t, "install")
+	h.allowMrpackHost(t)
+
+	stdout := h.mustRun(t, "export", "mrpack", "--version", "1.0")
+	for _, want := range []string{"1 resource pack by download", "1 shader by download"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("export output has no %q: %s", want, stdout)
+		}
+	}
+	index, entries := readMrpack(t, filepath.Join(h.dir, "build", "pack-1.0.mrpack"))
+	if len(index.Files) != 2 {
+		t.Fatalf("files: %+v", index.Files)
+	}
+	// Each pack goes in under its requires key, and both are client-only.
+	pack, shader := index.Files[0], index.Files[1]
+	if pack.Path != "resourcepacks/fresh-animations.zip" || pack.Env["client"] != "required" || pack.Env["server"] != "unsupported" {
+		t.Fatalf("resource pack entry: %+v", pack)
+	}
+	if shader.Path != "shaderpacks/complementary-reimagined.zip" || shader.Env["server"] != "unsupported" {
+		t.Fatalf("shader entry: %+v", shader)
+	}
+	if !strings.Contains(entries["shulker.json"], "complementary-reimagined") || !strings.Contains(entries["shulker.lock"], "fresh-animations") {
+		t.Fatalf("archive identity: %v", keys(entries))
 	}
 }
 

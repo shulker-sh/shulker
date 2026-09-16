@@ -107,6 +107,7 @@ func Read(file string) (*Archive, error) {
 	}
 	defer zr.Close()
 	a := &Archive{}
+	root := map[string][]byte{}
 	found := false
 	for _, f := range zr.File {
 		if f.FileInfo().IsDir() {
@@ -125,6 +126,10 @@ func Read(file string) (*Archive, error) {
 			if err := json.Unmarshal(data, &a.Index); err != nil {
 				return nil, out.Errorf("mrpack-invalid", "%s: %s: %v", file, IndexName, err)
 			}
+			continue
+		}
+		if name == manifest.FileName || name == lock.FileName {
+			root[name] = data
 			continue
 		}
 		layer, rel, ok := splitLayer(name)
@@ -148,7 +153,30 @@ func Read(file string) (*Archive, error) {
 	if err := a.findMarker(); err != nil {
 		return nil, err
 	}
+	if err := a.readRootIdentity(file, root); err != nil {
+		return nil, err
+	}
 	return a, nil
+}
+
+// readRootIdentity takes the manifest and lock a shulker export writes at the
+// archive root. They win over a marker jar: every export carries them, while the
+// jar reaches only a client-side export of a project with a loader.
+func (a *Archive) readRootIdentity(file string, root map[string][]byte) error {
+	manifestData, lockData := root[manifest.FileName], root[lock.FileName]
+	if manifestData == nil || lockData == nil {
+		return nil
+	}
+	m, err := manifest.Parse(manifestData)
+	if err != nil {
+		return out.Errorf("mrpack-marker", "%s: %s: %v", file, manifest.FileName, err)
+	}
+	l, err := lock.Parse(lockData)
+	if err != nil {
+		return out.Errorf("mrpack-marker", "%s: %s: %v", file, lock.FileName, err)
+	}
+	a.Marker = &Marker{Path: manifest.FileName, Manifest: m, Lock: l}
+	return nil
 }
 
 func readEntry(f *zip.File) ([]byte, error) {

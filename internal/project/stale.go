@@ -24,6 +24,7 @@ func (p *Project) LockDifferences() []string {
 	m, l := p.Manifest, p.Lock
 	diffs := append(PlatformDifferences(m, l), ProviderDifferences(m, l)...)
 	diffs = append(diffs, PackDifferences(m, l)...)
+	diffs = append(diffs, ZipDifferences(m, l)...)
 	mods := m.Mods()
 	for _, id := range slices.Sorted(maps.Keys(mods)) {
 		lm, ok := l.Mods[id]
@@ -106,6 +107,53 @@ func PackDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 		if _, listed := modpacks[name]; !listed {
 			diffs = append(diffs, fmt.Sprintf("pack %s: in shulker.lock, not in shulker.json", name))
 		}
+	}
+	return diffs
+}
+
+// ZipDifferences compares the resource packs and shaders shulker.json lists with
+// what the lock records. An entry a locked modpack supplied is not listed here,
+// so it never reads as drift.
+func ZipDifferences(m *manifest.Manifest, l *lock.Lock) []string {
+	var diffs []string
+	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
+		listed, locked := m.ResourcePacks(), l.ResourcePacks
+		if kind == manifest.TypeShader {
+			listed, locked = m.Shaders(), l.Shaders
+		}
+		for _, key := range slices.Sorted(maps.Keys(listed)) {
+			lp, ok := locked[key]
+			if !ok {
+				diffs = append(diffs, key+": in shulker.json, not in shulker.lock")
+				continue
+			}
+			diffs = append(diffs, ZipEntryDifferences(key, listed[key], lp)...)
+		}
+		for _, key := range slices.Sorted(maps.Keys(locked)) {
+			if _, ok := listed[key]; !ok && locked[key].Modpack == "" {
+				diffs = append(diffs, key+": in shulker.lock, not in shulker.json")
+			}
+		}
+	}
+	return diffs
+}
+
+// ZipEntryDifferences compares one listed resource pack or shader with what the
+// lock records for it.
+func ZipEntryDifferences(key string, e manifest.Require, lp lock.Pack) []string {
+	var diffs []string
+	channel := e.Channel
+	if channel == "" {
+		channel = "release"
+	}
+	if channel != lp.Channel {
+		diffs = append(diffs, fmt.Sprintf("%s: channel %s -> %s", key, lp.Channel, channel))
+	}
+	if e.Pin != nil && fmt.Sprint(e.Pin) != fmt.Sprint(lp.Version) {
+		diffs = append(diffs, fmt.Sprintf("%s: pinned to %v, locked %v", key, e.Pin, lp.Version))
+	}
+	if name := e.Provider; name != "" && name != lp.Provider {
+		diffs = append(diffs, fmt.Sprintf("%s: provider %s -> %s", key, lp.Provider, name))
 	}
 	return diffs
 }

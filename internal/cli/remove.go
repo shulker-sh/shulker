@@ -22,9 +22,6 @@ func (a *app) removeCmdFor(kind string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if chosen == manifest.TypeResourcePack || chosen == manifest.TypeShader {
-				return unsupportedType(chosen)
-			}
 			return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
 				modpacks := p.Manifest.Modpacks()
 				var mods []string

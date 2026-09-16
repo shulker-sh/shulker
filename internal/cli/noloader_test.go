@@ -17,7 +17,7 @@ import (
 func TestInitWithoutALoader(t *testing.T) {
 	h := newHarness(t)
 	stdout := h.mustRun(t, "init", "--yes", "--name", "pack")
-	if !strings.Contains(stdout, "created shulker.json (Minecraft 26.2, Java 25)") || !strings.Contains(stdout, "Play it in a launcher") || !strings.Contains(stdout, "$ shulker link <launcher>") {
+	if !strings.Contains(stdout, "created shulker.json (Minecraft 26.2, Java 25)") || !strings.Contains(stdout, "Add a resource pack or shader") || !strings.Contains(stdout, "$ shulker add <name>") {
 		t.Fatalf("init output: %s", stdout)
 	}
 	for _, file := range []string{"shulker.json", "shulker.lock"} {

@@ -33,6 +33,9 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 		}
 	}
 	r.applyLockedPacks()
+	if err := r.reconcilePacks(ctx); err != nil {
+		return nil, err
+	}
 	if reasons := append(platform, project.ProviderDifferences(r.Manifest, r.Lock)...); len(reasons) > 0 {
 		return reasons, r.Update(ctx, nil)
 	}

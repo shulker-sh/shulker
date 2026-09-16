@@ -117,6 +117,8 @@ func newHarness(t *testing.T) *harness {
 	h.jars["sodium"], h.jars["fabric-api"] = sodium, fabricAPI
 	h.jars["sodium-next"] = makeJarVersion(t, "sodium", "sodium-fabric-0.9.3+mc26.2.jar", "client", "1.1.0", `"depends":{"fabricloader":">=0.17"}`)
 	h.jars["fabric-api-next"] = makeJarVersion(t, "fabric-api", "fabric-api-0.140.0+26.2.jar", "*", "2.0.0", `"depends":{"fabricloader":">=0.17"}`)
+	h.jars["fresh-animations"] = makeJarFile(t, "fresh-animations", "FreshAnimations_v1.9.4.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"fresh"}}`)
+	h.jars["complementary"] = makeJarFile(t, "complementary", "ComplementaryReimagined_r5.5.1.zip", "shaders/gbuffers_basic.vsh", "// shader")
 
 	mux := http.NewServeMux()
 	var base string
@@ -249,18 +251,25 @@ func newHarness(t *testing.T) *harness {
 		w.Write(h.serverJar.data)
 	})
 	projects := map[string]map[string]any{
-		"sodium":     {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},
-		"AANobbMI":   {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},
-		"fabric-api": {"id": "P7dR8mSH", "slug": "fabric-api", "title": "Fabric API", "client_side": "required", "server_side": "required"},
-		"P7dR8mSH":   {"id": "P7dR8mSH", "slug": "fabric-api", "title": "Fabric API", "client_side": "required", "server_side": "required"},
+		"sodium":                   {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},
+		"AANobbMI":                 {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},
+		"fabric-api":               {"id": "P7dR8mSH", "slug": "fabric-api", "title": "Fabric API", "client_side": "required", "server_side": "required"},
+		"P7dR8mSH":                 {"id": "P7dR8mSH", "slug": "fabric-api", "title": "Fabric API", "client_side": "required", "server_side": "required"},
+		"fresh-animations":         {"id": "50dA9Sha", "slug": "fresh-animations", "title": "Fresh Animations", "client_side": "required", "server_side": "unsupported", "project_type": "resourcepack"},
+		"50dA9Sha":                 {"id": "50dA9Sha", "slug": "fresh-animations", "title": "Fresh Animations", "client_side": "required", "server_side": "unsupported", "project_type": "resourcepack"},
+		"complementary-reimagined": {"id": "HVnmMxH1", "slug": "complementary-reimagined", "title": "Complementary Reimagined", "client_side": "required", "server_side": "unsupported", "project_type": "shader"},
+		"HVnmMxH1":                 {"id": "HVnmMxH1", "slug": "complementary-reimagined", "title": "Complementary Reimagined", "client_side": "required", "server_side": "unsupported", "project_type": "shader"},
 	}
-	versionOf := func(id, projectID, number, published string, jar fakeJar, deps []map[string]any) map[string]any {
+	versionTagged := func(id, projectID, number, published string, jar fakeJar, deps []map[string]any, loaders []string) map[string]any {
 		return map[string]any{
 			"id": id, "project_id": projectID, "version_number": number, "version_type": "release",
-			"date_published": published, "game_versions": []string{"26.2"}, "loaders": []string{"fabric"},
+			"date_published": published, "game_versions": []string{"26.2"}, "loaders": loaders,
 			"files":        []map[string]any{{"url": base + "/cdn/" + jar.filename, "filename": jar.filename, "primary": true, "hashes": map[string]string{"sha512": jar.sha512}, "size": len(jar.data)}},
 			"dependencies": deps,
 		}
+	}
+	versionOf := func(id, projectID, number, published string, jar fakeJar, deps []map[string]any) map[string]any {
+		return versionTagged(id, projectID, number, published, jar, deps, []string{"fabric"})
 	}
 	needsFabricAPI := []map[string]any{{"project_id": "P7dR8mSH", "dependency_type": "required"}}
 	versions := func(projectID string) []map[string]any {
@@ -277,12 +286,16 @@ func newHarness(t *testing.T) *harness {
 				list = append(list, versionOf("Q7dR8mS2", "P7dR8mSH", "2.0.0+mc26.2", "2026-09-05T00:00:00Z", h.jars["fabric-api-next"], nil))
 			}
 			return list
+		case "50dA9Sha":
+			return []map[string]any{versionTagged("Vb7Kq2Xn", "50dA9Sha", "1.9.4", "2026-09-01T00:00:00Z", h.jars["fresh-animations"], nil, []string{"minecraft"})}
+		case "HVnmMxH1":
+			return []map[string]any{versionTagged("pcrMhvuU", "HVnmMxH1", "r5.5.1", "2026-09-01T00:00:00Z", h.jars["complementary"], nil, []string{"iris"})}
 		}
 		return nil
 	}
 	mux.HandleFunc("/modrinth/version/", func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/modrinth/version/")
-		for _, projectID := range []string{"AANobbMI", "P7dR8mSH"} {
+		for _, projectID := range []string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1"} {
 			for _, v := range versions(projectID) {
 				if v["id"] == id {
 					writeJSON(w, v)
@@ -294,7 +307,7 @@ func newHarness(t *testing.T) *harness {
 	})
 	mux.HandleFunc("/modrinth/version_file/", func(w http.ResponseWriter, r *http.Request) {
 		sha1 := strings.TrimPrefix(r.URL.Path, "/modrinth/version_file/")
-		for _, projectID := range []string{"AANobbMI", "P7dR8mSH"} {
+		for _, projectID := range []string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1"} {
 			for _, v := range versions(projectID) {
 				for _, jar := range h.jars {
 					if jar.sha1 == sha1 && v["files"].([]map[string]any)[0]["filename"] == jar.filename {

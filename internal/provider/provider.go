@@ -18,6 +18,9 @@ type Project struct {
 	Slug  string
 	Title string
 	Side  string
+	// Type is the provider's own project type: mod, modpack, resourcepack or
+	// shader. Empty when the provider doesn't say.
+	Type string
 }
 
 type File struct {
@@ -49,7 +52,11 @@ type Version struct {
 
 type Provider interface {
 	Name() string
-	Project(ctx context.Context, slugOrID string) (*Project, error)
+	// Project looks a slug or id up. kind narrows the search to one project
+	// type where the provider needs it to tell projects apart; "" searches every
+	// type. Whether the result's Type agrees with what was asked for is the
+	// caller's to decide.
+	Project(ctx context.Context, slugOrID, kind string) (*Project, error)
 	Versions(ctx context.Context, projectID, game string, loaders []string) ([]Version, error)
 	Version(ctx context.Context, versionID string) (*Version, error)
 }

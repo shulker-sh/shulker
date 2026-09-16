@@ -67,7 +67,7 @@
       "propertyNames": { "$ref": "#/$defs/requireKey" },
       "additionalProperties": { "$ref": "#/$defs/require" },
       "default": {},
-      "description": "Mods and modpacks this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader."
+      "description": "Mods, modpacks, resource packs and shaders this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id; a resource pack's or shader's key is the file name it is placed under, so a pack enabled in game stays enabled when it updates. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader."
     },
     "ignore": {
       "type": "array",
@@ -226,7 +226,7 @@
     "requireKey": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
-      "description": "Name of a requires entry, unique across mods and modpacks. Used in messages and requiredBy."
+      "description": "Name of a requires entry, unique across mods, modpacks, resource packs and shaders. Used in messages and requiredBy, and as the placed file name for a resource pack or shader."
     },
     "require": {
       "type": "object",
@@ -235,7 +235,7 @@
         "type": {
           "type": "string",
           "enum": ["mod", "modpack", "resourcepack", "shader"],
-          "description": "What the entry is. Omitted means modpack for an entry with source and mod otherwise; when given it must agree with the entry. Resource packs and shaders aren't supported yet."
+          "description": "What the entry is. Omitted means modpack for an entry with source and mod otherwise, unless the provider says otherwise; when given it must agree with the entry. Resource packs and shaders are resolved from the provider's own project type and placed in resourcepacks/ or shaderpacks/."
         },
         "source": {
           "type": "string",

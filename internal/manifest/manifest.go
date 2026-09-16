@@ -220,14 +220,20 @@ func Parse(data []byte) (*Manifest, error) {
 	return &m, nil
 }
 
-func (m *Manifest) Mods() map[string]Require {
-	mods := map[string]Require{}
+func (m *Manifest) Mods() map[string]Require { return m.byKind(TypeMod) }
+
+func (m *Manifest) ResourcePacks() map[string]Require { return m.byKind(TypeResourcePack) }
+
+func (m *Manifest) Shaders() map[string]Require { return m.byKind(TypeShader) }
+
+func (m *Manifest) byKind(kind string) map[string]Require {
+	found := map[string]Require{}
 	for key, r := range m.Requires {
-		if r.Kind() == TypeMod && r.File == "" {
-			mods[key] = r
+		if r.Kind() == kind && r.File == "" {
+			found[key] = r
 		}
 	}
-	return mods
+	return found
 }
 
 func (m *Manifest) Modpacks() map[string]Require {
@@ -248,8 +254,6 @@ func (m *Manifest) CheckSupported() error {
 			return out.Errorf("requires-unsupported", "requires.%s: local files aren't supported yet", key)
 		case r.Kind() == TypeModpack && r.Source == "":
 			return out.Errorf("requires-unsupported", "requires.%s: modpacks from a provider aren't supported yet; give a source", key)
-		case r.Kind() != TypeMod && r.Kind() != TypeModpack:
-			return out.Errorf("requires-unsupported", "requires.%s: %s entries aren't supported yet", key, r.Kind())
 		}
 	}
 	return nil
