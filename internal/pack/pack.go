@@ -36,6 +36,8 @@ type Loaded struct {
 	Kind     Kind
 	Dir      string
 	Manifest *manifest.Manifest
+	Lock     *lock.Lock
+	Locked   bool
 	Pin      lock.Modpack
 }
 
@@ -132,6 +134,15 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 			return nil, err
 		}
 	}
+	if err := l.resolveLocked(p); err != nil {
+		return nil, err
+	}
+	if l.Locked {
+		l.Pin.Locked = true
+		if l.Pin.LockSha256, err = lock.FileSha256(filepath.Join(l.Dir, lock.FileName)); err != nil {
+			return nil, err
+		}
+	}
 	return l, nil
 }
 
@@ -193,6 +204,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 			return nil, "", fmt.Errorf("modpack %s: %w", name, err)
 		}
 	}
+	l.Locked = pinned.Locked
 	return l, warning, nil
 }
 
@@ -212,6 +224,31 @@ func (s *Store) loadDir(l *Loaded) error {
 		return fmt.Errorf("modpack %s: %w", l.Name, err)
 	}
 	l.Manifest = m
+	packLock, err := lock.Load(filepath.Join(l.Dir, lock.FileName))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("modpack %s: %w", l.Name, err)
+	}
+	l.Lock = packLock
+	return nil
+}
+
+// resolveLocked settles whether this modpack's mods come from its own lock. An
+// omitted "locked" follows the source: true when it ships a lock, false when it
+// can't have one, like a manifest fetched from a URL.
+func (l *Loaded) resolveLocked(p manifest.Require) error {
+	switch {
+	case l.Lock == nil && p.Locked != nil && *p.Locked:
+		return out.Errorf("modpack-lock-missing", "modpack %s has no %s, so \"locked\": true can't be honoured; run `shulker lock` in the modpack, or set locked false", l.Name, lock.FileName)
+	case l.Lock == nil:
+		l.Locked = false
+	case p.Locked != nil:
+		l.Locked = *p.Locked
+	default:
+		l.Locked = true
+	}
 	return nil
 }
 
@@ -258,7 +295,13 @@ func (l *Loaded) Target(name, side string) (*manifest.Target, error) {
 	return nil, out.Errorf("modpack-target", "modpack %s has several %s targets (%s) and none named %q; rename the project target to match one", l.Name, side, strings.Join(matches, ", "), name)
 }
 
+// Compatible checks a modpack against the project's platform. A locked modpack
+// contributes exact versions, so its own lock has to match; a floating one is
+// resolved here and only has to admit the project's versions in its ranges.
 func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
+	if l.Locked {
+		return compatibleLocked(l, minecraft, loader)
+	}
 	pm := l.Manifest
 	game, err := mcver.Parse(minecraft)
 	if err != nil {
@@ -289,6 +332,23 @@ func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
 		return out.Errorf("modpack-mismatch", "modpack %s wants %s %s; this project locked %s", l.Name, pm.Loader.Type, pm.Loader.Version, loader.Version)
 	}
 	return nil
+}
+
+func compatibleLocked(l *Loaded, minecraft string, loader lock.Loader) error {
+	if l.Lock.Minecraft != minecraft {
+		return out.Errorf("modpack-mismatch", "locked modpack %s is built for minecraft %s; this project locked %s. Unlock it with `shulker set requires.%s.locked false`", l.Name, l.Lock.Minecraft, minecraft, l.Name)
+	}
+	if l.Lock.Loader.Type != loader.Type || l.Lock.Loader.Version != loader.Version {
+		return out.Errorf("modpack-mismatch", "locked modpack %s is built for %s; this project locked %s. Unlock it with `shulker set requires.%s.locked false`", l.Name, lockedLoaderLabel(l.Lock.Loader), lockedLoaderLabel(loader), l.Name)
+	}
+	return nil
+}
+
+func lockedLoaderLabel(l lock.Loader) string {
+	if l.Type == "" {
+		return "no loader"
+	}
+	return l.Type + " " + l.Version
 }
 
 func describeLoader(name string) string {

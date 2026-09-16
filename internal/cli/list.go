@@ -139,6 +139,9 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 					}
 					if !listed {
 						e.Modpack, e.RequiredBy = origin(m.RequiredBy, modpacks)
+						if m.Modpack != "" {
+							e.Modpack = m.Modpack
+						}
 					}
 				}
 			}

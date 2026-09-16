@@ -21,12 +21,12 @@ var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.Typ
 // and its `--type` spelling take the same flags.
 var typeFlags = map[string][]string{
 	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as"},
-	manifest.TypeModpack:      {"ref", "as"},
+	manifest.TypeModpack:      {"ref", "as", "unlocked"},
 	manifest.TypeResourcePack: {"as"},
 	manifest.TypeShader:       {"as"},
 }
 
-var allTypeFlags = []string{"as", "channel", "pin", "provider", "ref", "side"}
+var allTypeFlags = []string{"as", "channel", "pin", "provider", "ref", "side", "unlocked"}
 
 func (a *app) typeGroupCmds() []*cobra.Command {
 	cmds := make([]*cobra.Command, 0, len(contentTypes))
@@ -86,13 +86,17 @@ func unsupportedType(kind string) error {
 	return out.Errorf("requires-unsupported", "%s entries aren't supported yet", kind)
 }
 
-func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string) error {
+func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, unlocked bool) error {
 	if as != "" && len(sources) > 1 {
 		return out.Errorf("usage", "--as applies to a single modpack")
 	}
 	return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
 		for _, source := range sources {
 			entry := manifest.Require{Source: source, Ref: ref}
+			if unlocked {
+				no := false
+				entry.Locked = &no
+			}
 			for _, existing := range p.Manifest.Modpacks() {
 				if existing.Source == source {
 					return "", out.Errorf("modpack-exists", "modpack %s is already in the manifest", source)

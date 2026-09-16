@@ -164,6 +164,7 @@ shulker add ../base-pack --type modpack --as base
 | `--provider <provider>` | Provider to use for this mod: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
 | `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a modpack source's name) |
+| `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
 
 ### `shulker remove`
 
@@ -754,7 +755,9 @@ shulker mod list
 
 ### `shulker modpack add|remove|list`
 
-A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`.
+A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`, `--unlocked`.
+
+A modpack that ships a `shulker.lock` is **locked**: its exact versions, dependencies included, are copied into this project's lock and marked with the modpack they came from, and its Minecraft and loader must match this project's exactly. A modpack without a lock, or one added with `--unlocked`, is **floating**: its mods are resolved here like your own, and its Minecraft and loader only have to admit this project's versions. A mod you list in `shulker.json` yourself always wins over either. Change your mind later with `shulker set requires.<key>.locked true|false`.
 
 ```sh
 shulker modpack add https://github.com/shulker-sh/base-pack.git --ref v3
@@ -1018,6 +1021,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-conflict` | Two modpacks list the same mod with different settings |
 | `modpack-exists` | The modpack is already in `shulker.json` |
 | `modpack-fetch` | A modpack couldn't be fetched |
+| `modpack-lock-missing` | A modpack is set `locked: true` but its source has no `shulker.lock`; run `shulker lock` there, or set locked false |
 | `modpack-manifest` | A modpack source has no `shulker.json` |
 | `modpack-mismatch` | A modpack wants a different Minecraft version or loader |
 | `modpack-name` | A modpack's name can't be worked out from its source; pass `--as` |

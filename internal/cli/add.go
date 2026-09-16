@@ -17,6 +17,7 @@ func (a *app) addCmd() *cobra.Command { return a.addCmdFor("") }
 func (a *app) addCmdFor(kind string) *cobra.Command {
 	var opts resolve.AddOptions
 	var typ, as, ref string
+	var unlocked bool
 	cmd := &cobra.Command{
 		Use:   "add " + addArgs(kind),
 		Short: addShort(kind),
@@ -31,7 +32,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			}
 			switch chosen {
 			case manifest.TypeModpack:
-				return a.addModpacks(cmd, args, as, ref)
+				return a.addModpacks(cmd, args, as, ref, unlocked)
 			case manifest.TypeMod:
 			default:
 				return unsupportedType(chosen)
@@ -82,6 +83,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	}
 	if applies(kind, "ref") {
 		cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit for git sources")
+	}
+	if applies(kind, "unlocked") {
+		cmd.Flags().BoolVar(&unlocked, "unlocked", false, "resolve the modpack's mods here instead of copying the versions its lock pins")
 	}
 	if applies(kind, "as") {
 		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a modpack source's name)")

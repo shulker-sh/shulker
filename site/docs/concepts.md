@@ -39,7 +39,7 @@ Use [`shulker diff`](/docs/cli#shulker-diff) to see what changed, and [`shulker 
 
 ## Modpacks
 
-A modpack is another shulker project whose mods and overrides merge into this one. Its overrides sit beneath your own layers, and its own lock is ignored: your `shulker.lock` pins it instead. Add one from a local path, git URL, or manifest URL with [`shulker modpack add`](/docs/cli#shulker-modpack-add-remove-list).
+A modpack is another shulker project whose mods and overrides merge into this one. Its overrides sit beneath your own layers. A modpack that ships a `shulker.lock` is **locked**: the exact versions it pins, dependencies included, are copied into your lock and marked with the modpack they came from, and its Minecraft and loader have to match yours exactly. One with no lock, or added with `--unlocked`, is **floating**: its mods are resolved here alongside your own, and its versions only have to fit your ranges. A mod you list in `shulker.json` yourself always wins over either. Add one from a local path, git URL, or manifest URL with [`shulker modpack add`](/docs/cli#shulker-modpack-add-remove-list).
 
 ## Providers
 

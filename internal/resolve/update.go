@@ -169,7 +169,10 @@ func (r *Resolver) directTargets(ids []string) ([]string, error) {
 	direct := r.directMods()
 	var targets []string
 	for _, id := range ids {
-		if _, ok := direct[id]; ok {
+		if d, ok := direct[id]; ok {
+			if d.locked != "" {
+				return nil, out.Errorf("modpack-provided", "%s is pinned by locked modpack %s; update the modpack, or list %s in shulker.json to resolve it here", id, d.locked, id)
+			}
 			if !contains(targets, id) {
 				targets = append(targets, id)
 			}

@@ -25,12 +25,16 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 			r.Lock.AddRequiredBy(id, l.Name)
 		}
 	}
+	r.applyLockedPacks()
 	if reasons := append(platform, project.ProviderDifferences(r.Manifest, r.Lock)...); len(reasons) > 0 {
 		return reasons, r.Update(ctx, nil)
 	}
 	r.pruneOrphans()
 	var targets []string
 	for id, d := range r.directMods() {
+		if d.locked != "" {
+			continue
+		}
 		if m, ok := r.Lock.Mods[id]; !ok || len(project.ModDifferences(id, d.entry, m)) > 0 {
 			targets = append(targets, id)
 		}
