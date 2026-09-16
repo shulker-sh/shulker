@@ -20,13 +20,13 @@ var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.Typ
 // flag and refuse the ones the chosen type has no use for, so a group command
 // and its `--type` spelling take the same flags.
 var typeFlags = map[string][]string{
-	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as"},
+	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as", "with-deps"},
 	manifest.TypeModpack:      {"ref", "as", "unlocked"},
 	manifest.TypeResourcePack: {"as"},
 	manifest.TypeShader:       {"as"},
 }
 
-var allTypeFlags = []string{"as", "channel", "pin", "provider", "ref", "side", "unlocked"}
+var allTypeFlags = []string{"as", "channel", "pin", "provider", "ref", "side", "unlocked", "with-deps"}
 
 func (a *app) typeGroupCmds() []*cobra.Command {
 	cmds := make([]*cobra.Command, 0, len(contentTypes))

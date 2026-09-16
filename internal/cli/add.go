@@ -87,6 +87,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	if applies(kind, "unlocked") {
 		cmd.Flags().BoolVar(&unlocked, "unlocked", false, "resolve the modpack's mods here instead of copying the versions its lock pins")
 	}
+	if applies(kind, "with-deps") {
+		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another")
+	}
 	if applies(kind, "as") {
 		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a modpack source's name)")
 	}

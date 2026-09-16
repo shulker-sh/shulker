@@ -30,6 +30,8 @@ type Resolver struct {
 	Packs     []*pack.Loaded
 	Meta      *Meta
 	Log       func(format string, args ...any)
+	// Warnings are raised while resolving, for the command to print when it finishes.
+	Warnings []string
 	// Progress starts a download bar for the named files.
 	Progress func(verb string, files []out.Download) *out.Progress
 }
@@ -40,6 +42,7 @@ type AddOptions struct {
 	Pin      string
 	Provider string
 	As       string
+	WithDeps bool
 }
 
 func (r *Resolver) log(format string, args ...any) {
@@ -113,6 +116,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if r.Manifest.Loader.Type == "" {
 		return out.Errorf("loader-required", "mods need a loader; pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
 	}
+	held := holdVersions(r.Lock)
 	explicit := opts.Provider != ""
 	listed := opts.As
 	if listed == "" {
@@ -147,6 +151,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	r.settle(id, opts.Side, opts.Channel)
 	visited := map[string]bool{proj.ID: true}
 	if err := r.addDeps(ctx, p, v, id, opts.Channel, visited); err != nil {
+		return err
+	}
+	if err := r.settleHeld(ctx, held, p, v, id, opts.Channel, opts.WithDeps); err != nil {
 		return err
 	}
 	entry := manifest.Require{Side: opts.Side}

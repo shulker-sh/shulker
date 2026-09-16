@@ -165,6 +165,7 @@ shulker add ../base-pack --type modpack --as base
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
 | `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a modpack source's name) |
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
+| `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack |
 
 ### `shulker remove`
 
@@ -746,7 +747,7 @@ shulker unlink --all --side server
 
 ### `shulker mod add|remove|list`
 
-`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`.
+`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--with-deps`.
 
 ```sh
 shulker mod add sodium
@@ -962,6 +963,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `curseforge-not-found` | `export curseforge` found no CurseForge file for these mods; pass `--bundle`. `items`: the mods |
+| `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
 | `registry-has-links` | `config set` or `config unset` would move the registry away from linked instances or synced directories the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON; the message names the line and column |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |

@@ -18,6 +18,7 @@ All notable changes to shulker are documented here. The format is based on
 - Mods from Modrinth and CurseForge, with provider fallthrough, manual downloads for files CurseForge won't serve, and `add --provider` to switch a locked mod.
 - CurseForge works without your own API key: release builds include one, and if CurseForge rejects it shulker fetches a replacement from shulker.sh.
 - Dependency checks from each jar's own metadata on `add` and `install`; `remove` prunes dependencies nothing else needs.
+- `add` holds every version already in the lock and resolves only what is new, so adding one mod never quietly upgrades the rest. A mod that needs another version of a held dependency stops the add and names what would have to move; `--with-deps` moves them, and a dependency a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack.
 - `suggests` lists the mods locked mods recommend and that aren't installed; `--optional` adds their optional integrations.
 - Client and server targets (`target add|remove|list`), built with `install` and `build` into `build/<name>`.
 - Server builds with the locked server jar, `eula.txt` and validated `server.properties`; `serve` runs them on Mojang's Java runtime.

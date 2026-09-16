@@ -82,6 +82,7 @@ type harness struct {
 	cache          string
 	config         string
 	newer          bool
+	newerAPI       bool
 	serverJar      fakeJar
 	serverJarHits  int
 	quiltLoader    fakeJar
@@ -115,6 +116,7 @@ func newHarness(t *testing.T) *harness {
 	fabricAPI := makeJar(t, "fabric-api", "fabric-api-0.130.0+26.2.jar", "*")
 	h.jars["sodium"], h.jars["fabric-api"] = sodium, fabricAPI
 	h.jars["sodium-next"] = makeJarVersion(t, "sodium", "sodium-fabric-0.9.3+mc26.2.jar", "client", "1.1.0", `"depends":{"fabricloader":">=0.17"}`)
+	h.jars["fabric-api-next"] = makeJarVersion(t, "fabric-api", "fabric-api-0.140.0+26.2.jar", "*", "2.0.0", `"depends":{"fabricloader":">=0.17"}`)
 
 	mux := http.NewServeMux()
 	var base string
@@ -270,7 +272,11 @@ func newHarness(t *testing.T) *harness {
 			}
 			return list
 		case "P7dR8mSH":
-			return []map[string]any{versionOf("Q7dR8mSH", "P7dR8mSH", "1.0.0+mc26.2", "2026-09-01T00:00:00Z", h.jars["fabric-api"], nil)}
+			list := []map[string]any{versionOf("Q7dR8mSH", "P7dR8mSH", "1.0.0+mc26.2", "2026-09-01T00:00:00Z", h.jars["fabric-api"], nil)}
+			if h.newerAPI {
+				list = append(list, versionOf("Q7dR8mS2", "P7dR8mSH", "2.0.0+mc26.2", "2026-09-05T00:00:00Z", h.jars["fabric-api-next"], nil))
+			}
+			return list
 		}
 		return nil
 	}

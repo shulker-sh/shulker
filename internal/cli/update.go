@@ -145,7 +145,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		return err
 	}
 	a.printer.LockStale = false
-	a.warn(v.Warnings)
+	a.warn(append(r.Warnings, v.Warnings...))
 	res := lockChanges{Changes: r.Changes(before), Reresolved: reresolved, Pin: pin, Suggestions: v.Recommended()}
 	optional := 0
 	for _, s := range v.Suggestions {
