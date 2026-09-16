@@ -193,10 +193,10 @@ func TestLocalModpack(t *testing.T) {
 		t.Fatalf("modpack file should be removed from the build: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(h.dir, "build", "client", ".shulker-state.json"), []byte("{"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(h.dir, "build", "client", ".shulker", "state.json"), []byte("{"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, stderr := h.run(t, "build"); !strings.Contains(stderr, ".shulker-state.json is unreadable") {
+	if _, _, stderr := h.run(t, "build"); !strings.Contains(stderr, "state.json is unreadable") {
 		t.Fatalf("a corrupt state file should warn: %s", stderr)
 	}
 }

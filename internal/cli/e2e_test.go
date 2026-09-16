@@ -589,13 +589,13 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatalf("install output: %s", stdout)
 	}
 	buildDir := filepath.Join(h.dir, "build", "client")
-	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", build.StateFile} {
+	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", filepath.Join(build.StateDir, build.StateFile)} {
 		if _, err := os.Stat(filepath.Join(buildDir, rel)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	var state build.State
-	h.readJSON(t, "build/client/.shulker-state.json", &state)
+	h.readJSON(t, "build/client/.shulker/state.json", &state)
 	if state.Target != "client" || len(state.Files) != 4 {
 		t.Fatalf("state: %+v", state)
 	}

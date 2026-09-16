@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
@@ -29,11 +31,16 @@ import (
 )
 
 const (
-	StateFile         = ".shulker-state.json"
+	StateDir          = ".shulker"
+	StateFile         = "state.json"
 	TemplateSuffix    = ".tmpl"
 	VanillaServerFile = "server.jar"
 	EulaFile          = "eula.txt"
 )
+
+func StatePath(dir string) string {
+	return filepath.Join(dir, StateDir, StateFile)
+}
 
 type Origin struct {
 	Source string `json:"source,omitempty"`
@@ -206,12 +213,18 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	if dir == "" {
 		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
 	}
+	inPlace := sameDir(dir, b.Dir)
 	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
 	desired, dirs, err := b.collect(name, target, opts, report)
 	if err != nil {
 		return nil, err
 	}
-	if opts.NoDataLinks {
+	if inPlace {
+		if err := checkReserved(name, desired, dirs); err != nil {
+			return nil, err
+		}
+	}
+	if opts.NoDataLinks || inPlace {
 		dirs = nil
 	}
 	prev, stateErr := ReadState(dir)
@@ -521,7 +534,7 @@ func InstallerArgsFile(lk *lock.Lock) string {
 func RecordLoader(dir string, l InstalledLoader) error {
 	s := LoadState(dir)
 	s.Loader = &l
-	return fsutil.WriteJSON(filepath.Join(dir, StateFile), s)
+	return writeState(dir, s)
 }
 
 func (b *Builder) collectClient(name string, opts Options, desired map[string]source, vars map[string]string, report *Report) error {
@@ -714,7 +727,7 @@ func LoadState(dir string) State {
 // ReadState treats a state file it can't read as empty, like LoadState, and also returns why,
 // worded as the warning to show.
 func ReadState(dir string) (State, error) {
-	path := filepath.Join(dir, StateFile)
+	path := StatePath(dir)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return State{Files: map[string]string{}}, nil
@@ -736,7 +749,47 @@ func (b *Builder) saveState(dir string, s State) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return fsutil.WriteJSON(filepath.Join(dir, StateFile), s)
+	return writeState(dir, s)
+}
+
+func sameDir(a, b string) bool {
+	x, errA := filepath.Abs(a)
+	y, errB := filepath.Abs(b)
+	return errA == nil && errB == nil && x == y
+}
+
+// checkReserved keeps a build in place off the files the project and the player
+// own: an override layer can write anything except these.
+func checkReserved(target string, desired map[string]source, data []string) error {
+	var bad []string
+	for rel := range desired {
+		if reservedPath(rel, data) {
+			bad = append(bad, rel)
+		}
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	sort.Strings(bad)
+	e := out.Errorf("build-reserved", "%s builds in place, so it can't write %d file(s) it doesn't own", target, len(bad))
+	e.Items = bad
+	return e
+}
+
+func reservedPath(rel string, data []string) bool {
+	switch rel {
+	case manifest.FileName, lock.FileName, local.FileName:
+		return true
+	}
+	top, _, _ := strings.Cut(rel, "/")
+	return top == StateDir || top == DataDir || slices.Contains(data, top)
+}
+
+func writeState(dir string, s State) error {
+	if err := os.MkdirAll(filepath.Join(dir, StateDir), 0o755); err != nil {
+		return err
+	}
+	return fsutil.WriteJSON(StatePath(dir), s)
 }
 
 func fileSha256(path string) (string, bool, error) {

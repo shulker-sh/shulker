@@ -23,7 +23,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 	if !strings.Contains(stdout, "synced client » "+into) {
 		t.Fatalf("sync output: %s", stdout)
 	}
-	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", build.StateFile} {
+	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", filepath.Join(build.StateDir, build.StateFile)} {
 		if _, err := os.Stat(filepath.Join(into, rel)); err != nil {
 			t.Fatalf("expected %s in the sync directory: %v", rel, err)
 		}
@@ -118,7 +118,7 @@ func TestSyncFromGit(t *testing.T) {
 	if res := env.Data; res.Kind != "git" || res.Commit != first || res.Source != source || res.Dir != into {
 		t.Fatalf("json result: %+v", res)
 	}
-	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "config/x.txt", build.StateFile} {
+	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "config/x.txt", filepath.Join(build.StateDir, build.StateFile)} {
 		if _, err := os.Stat(filepath.Join(into, rel)); err != nil {
 			t.Fatalf("expected %s in the sync directory: %v", rel, err)
 		}
@@ -552,7 +552,7 @@ func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
 	if err := os.Symlink(rel, filepath.Join(into, "saves")); err != nil {
 		t.Fatal(err)
 	}
-	statePath := filepath.Join(into, build.StateFile)
+	statePath := build.StatePath(into)
 	var state map[string]any
 	if err := json.Unmarshal([]byte(readFile(t, statePath)), &state); err != nil {
 		t.Fatal(err)

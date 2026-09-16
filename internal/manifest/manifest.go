@@ -300,6 +300,12 @@ func (m *Manifest) BuildDir(target string) string {
 	return "build/" + target
 }
 
+// InPlace reports whether the target builds into the project directory itself,
+// which is what makes a project an instance.
+func (m *Manifest) InPlace(target string) bool {
+	return m.BuildDir(target) == "."
+}
+
 func (m *Manifest) ProviderOrder() []string {
 	if len(m.Providers) == 0 {
 		return DefaultProviders

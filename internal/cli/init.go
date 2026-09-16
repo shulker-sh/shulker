@@ -185,7 +185,7 @@ func scaffold(dir string) error {
 	}
 	gi := filepath.Join(dir, ".gitignore")
 	if _, err := os.Stat(gi); errors.Is(err, os.ErrNotExist) {
-		return os.WriteFile(gi, []byte("/build/\n/data/\n/downloads/\n/shulker.local.json\n"), 0o644)
+		return os.WriteFile(gi, []byte("/build/\n/data/\n/downloads/\n/shulker.local.json\n/.shulker/\n"), 0o644)
 	}
 	return nil
 }

@@ -147,7 +147,7 @@ Type: map of `string` \| `number` \| `boolean`. keys match `^[A-Za-z_][A-Za-z0-9
 | `name` | `string` | Display name launchers show for this target (Prism instance name, official launcher profile name). Defaults to the manifest name.<br>min length 1 |
 | `side` * | `"client"` \| `"server"` | Which side this target builds. Mods with side "both" are included in every target. |
 | `overrides` * | [`relativePath`](#relativepath)[] | Override layers applied in order; later layers win. Modpack overrides sit beneath all of these.<br>min items 1, unique items |
-| `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;target&gt;. |
+| `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;target&gt;; "." builds into the project directory itself. |
 | `variables` | [`variables`](#variables) |  |
 | `features` | [`featureName`](#featurename)[] | Features on by default for this target. A mod gated with feature ships when one of its names is on.<br>unique items |
 | `wholeFiles` | [`relativePath`](#relativepath)[] | Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone.<br>unique items |

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
@@ -121,10 +122,10 @@ func TestTargetWithoutBuildDir(t *testing.T) {
 		delete(m["targets"].(map[string]any)["client"].(map[string]any), "build")
 	})
 	h.mustRun(t, "install")
-	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", ".shulker-state.json")); err != nil {
+	if _, err := os.Stat(build.StatePath(filepath.Join(h.dir, "build", "client"))); err != nil {
 		t.Fatalf("client not built into build/client: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(h.dir, ".shulker-state.json")); err == nil {
+	if _, err := os.Stat(build.StatePath(h.dir)); err == nil {
 		t.Fatal("client built into the project directory")
 	}
 	if stdout := h.mustRun(t, "target", "list"); !strings.HasPrefix(stdout, "  • client » build/client (client target") {

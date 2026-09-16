@@ -187,7 +187,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				}
 				l.Tree(rows...)
 				if mode != "sync" {
-					if _, err := os.Stat(filepath.Join(buildDir, build.StateFile)); err != nil {
+					if _, err := os.Stat(build.StatePath(buildDir)); err != nil {
 						l.Nudge("Download and build before launching", "shulker install")
 					}
 				}

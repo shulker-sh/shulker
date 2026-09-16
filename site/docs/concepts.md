@@ -28,7 +28,7 @@ Some files are generated instead of copied: `server.properties`, `options.txt`, 
 
 ## Edits in the build directory
 
-Each build records what it wrote in `.shulker-state.json` in the build directory, so the next build can tell your edits apart from its own files. That way config you change in-game survives:
+Each build records what it wrote in `.shulker/state.json` in the build directory, so the next build can tell your edits apart from its own files. That way config you change in-game survives:
 
 - A file you edited is kept, as long as its source hasn't changed.
 - If the file changed in both places, or a file shulker didn't write is in the way, the build stops and lists it. Use `shulker build --force` to overwrite.

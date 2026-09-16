@@ -80,7 +80,7 @@ func TestLinkATLauncher(t *testing.T) {
 		t.Fatalf("links: %+v", listed.Data)
 	}
 
-	statePath := filepath.Join(instDir, build.StateFile)
+	statePath := build.StatePath(instDir)
 	state := map[string]any{}
 	if err := json.Unmarshal([]byte(readFile(t, statePath)), &state); err != nil {
 		t.Fatal(err)

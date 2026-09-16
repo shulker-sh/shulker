@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/build"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -30,7 +32,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	}
 
 	writeFile(t, built, "#Iris config\ncolorSpace=SRGB\nenableShaders=false\nmaxShadowRenderDistance=32\n")
-	if err := os.Remove(filepath.Join(h.dir, "build", "client", ".shulker-state.json")); err != nil {
+	if err := os.Remove(build.StatePath(filepath.Join(h.dir, "build", "client"))); err != nil {
 		t.Fatal(err)
 	}
 	h.mustRun(t, "build")

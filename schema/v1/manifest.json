@@ -205,7 +205,7 @@
         },
         "build": {
           "$ref": "#/$defs/relativePath",
-          "description": "Output directory. Defaults to build/<target>."
+          "description": "Output directory. Defaults to build/<target>; \".\" builds into the project directory itself."
         },
         "variables": { "$ref": "#/$defs/variables" },
         "features": {

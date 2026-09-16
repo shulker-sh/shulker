@@ -145,7 +145,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					rep.Sync.print(l)
 					return
 				}
-				if _, err := os.Stat(filepath.Join(gameDir, build.StateFile)); err != nil {
+				if _, err := os.Stat(build.StatePath(gameDir)); err != nil {
 					l.Nudge("Download and build before launching", "shulker install")
 				}
 			})

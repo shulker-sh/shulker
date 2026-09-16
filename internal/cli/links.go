@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -65,7 +64,7 @@ func inspectLink(l config.Link) linkEntry {
 		e.Status = linkUnreadable
 		return e
 	}
-	if _, err := os.Stat(filepath.Join(l.Dir, build.StateFile)); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(build.StatePath(l.Dir)); errors.Is(err, os.ErrNotExist) {
 		e.Status = linkNotSynced
 		return e
 	} else if err != nil {

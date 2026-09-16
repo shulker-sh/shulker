@@ -157,7 +157,7 @@ func TestExportMrpack(t *testing.T) {
 		t.Fatalf("archive identity: %v", keys(entries))
 	}
 	for name := range entries {
-		if strings.Contains(name, "fabric-server-launch") || strings.Contains(name, ".shulker-state") {
+		if strings.Contains(name, "fabric-server-launch") || strings.Contains(name, ".shulker/") {
 			t.Fatalf("unexpected entry %s", name)
 		}
 	}

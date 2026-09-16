@@ -297,7 +297,7 @@ shulker target add shaders --side client --feature shaders --name "Shaders Clien
 | Flag | Description |
 | --- | --- |
 | `--side <side>` | `client` or `server` (default: the target name when it is `client` or `server`) |
-| `--build <dir>` | Output directory (default: `build/<name>`) |
+| `--build <dir>` | Output directory (default: `build/<name>`); `.` builds into the project directory itself |
 | `--overrides <dir>` | Override layer, applied in order; repeat for more (default: `overrides`) |
 | `--feature <name>` | Feature on by default for this target; repeat for more |
 | `--whole-file <path>` | `.properties` override path or glob to copy whole instead of merging per key; repeat for more |
@@ -679,7 +679,7 @@ shulker sync --all --side server
 shulker sync
 ```
 
-With `--into` and no source, shulker reads what the directory was last synced from out of its own `.shulker-state.json`, so a synced directory keeps working even if the links registry is gone.
+With `--into` and no source, shulker reads what the directory was last synced from out of its own `.shulker/state.json`, so a synced directory keeps working even if the links registry is gone.
 
 If a git or manifest URL can't be reached because the network is down, `sync` warns and builds from the copy used by the last sync from that source that succeeded, so an instance still launches offline. The warning names the commit and says how old that copy is. A server that answers with an error, a missing ref, or a failed login still fails the sync, and so does a source that has never synced successfully here. `--offline` skips the network entirely, which is quicker than waiting for timeouts on a network that drops traffic. For a server target, an installed Java runtime is kept when its update check can't reach the network.
 
@@ -963,6 +963,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-into` | The target has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
+| `build-reserved` | A target that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs or shaders; pass `--bundle`. `items`: what is missing |

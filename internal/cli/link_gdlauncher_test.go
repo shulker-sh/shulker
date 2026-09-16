@@ -89,7 +89,7 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatalf("links: %+v", listed.Data)
 	}
 
-	statePath := filepath.Join(gameDir, build.StateFile)
+	statePath := build.StatePath(gameDir)
 	state := map[string]any{}
 	if err := json.Unmarshal([]byte(readFile(t, statePath)), &state); err != nil {
 		t.Fatal(err)
