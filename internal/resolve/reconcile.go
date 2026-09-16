@@ -9,12 +9,19 @@ import (
 
 func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err error) {
 	platform := project.PlatformDifferences(r.Manifest, r.Lock)
+	inherited, err := r.inheritedDifferences()
+	if err != nil {
+		return nil, err
+	}
+	platform = append(platform, inherited...)
 	if len(platform) > 0 {
-		pf, err := r.Meta.Platform(ctx, r.Manifest)
+		pf, err := r.Meta.Platform(ctx, r.Manifest, r.Packs)
 		if err != nil {
 			return nil, err
 		}
-		r.Lock.Minecraft, r.Lock.Loader, r.Lock.Java = pf.Minecraft, pf.Loader, pf.Java
+		if pf != nil {
+			r.Lock.Minecraft, r.Lock.Loader, r.Lock.Java = pf.Minecraft, pf.Loader, pf.Java
+		}
 	}
 	if err := r.RefreshPacks(r.Packs); err != nil {
 		return nil, err

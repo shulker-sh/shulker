@@ -76,8 +76,12 @@ func (r *Resolver) CheckPacks() error {
 	own := r.Manifest.Mods()
 	owner := map[string]*pack.Loaded{}
 	for _, p := range r.Packs {
-		if err := pack.Compatible(p, r.Lock.Minecraft, r.Lock.Loader); err != nil {
-			return err
+		// With no platform yet, the locked modpacks are what supplies one, so there is
+		// nothing to check them against until the next pass.
+		if r.Lock.Minecraft != "" {
+			if err := pack.Compatible(p, r.Lock.Minecraft, r.Lock.Loader); err != nil {
+				return err
+			}
 		}
 		for _, id := range packMods(p) {
 			if _, project := own[id]; project {

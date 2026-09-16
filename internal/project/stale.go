@@ -50,12 +50,28 @@ func PlatformDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 		diffs = append(diffs, fmt.Sprintf("minecraft: locked %s is outside %s", l.Minecraft, m.Minecraft))
 	}
 	switch {
+	case inheritsLoader(m, l):
+		// The loader came from a locked modpack, so shulker.json not naming one is
+		// inheritance rather than drift; a modpack that moves is caught when the
+		// resolver compares what the modpacks now pin.
 	case l.Loader.Type != m.Loader.Type:
 		diffs = append(diffs, fmt.Sprintf("loader: locked %s, shulker.json asks for %s", loader.Describe(l.Loader.Type, ""), loader.Describe(m.Loader.Type, "")))
 	case l.Loader.Type != "" && !loaderMatches(m.Loader.Version, l.Loader.Version):
 		diffs = append(diffs, fmt.Sprintf("loader: locked %s %s is outside %s", l.Loader.Type, l.Loader.Version, m.Loader.Version))
 	}
 	return diffs
+}
+
+func inheritsLoader(m *manifest.Manifest, l *lock.Lock) bool {
+	if m.Loader.Type != "" {
+		return false
+	}
+	for _, mp := range l.Modpacks {
+		if mp.Locked {
+			return true
+		}
+	}
+	return false
 }
 
 func ProviderDifferences(m *manifest.Manifest, l *lock.Lock) []string {

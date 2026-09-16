@@ -30,7 +30,7 @@ type Manifest struct {
 	License     string             `json:"license,omitempty"`
 	Links       map[string]string  `json:"links,omitempty"`
 	Note        string             `json:"note,omitempty"`
-	Minecraft   string             `json:"minecraft"`
+	Minecraft   string             `json:"minecraft,omitempty"`
 	Loader      Loader             `json:"loader,omitzero"`
 	Java        string             `json:"java,omitempty"`
 	Providers   []string           `json:"providers,omitempty"`

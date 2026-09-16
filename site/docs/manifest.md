@@ -24,7 +24,7 @@ Required properties are marked with *.
 | `authors` | `string`[] | Shown by ModMenu as "by ..." under the project name. init seeds the git user.name and shulker.sh; delete entries freely.<br>unique items |
 | `license` | `string` | The project's license, e.g. "MIT" or "CC BY-NC-SA 4.0". Shown on the project's entry in the mod list, and clickable there when links.license is set. Defaults to "All rights reserved", since NeoForge and Forge reject a mod that declares no license.<br>min length 1 |
 | `links` | [`links`](#links) |  |
-| `minecraft` * | [`semverRange`](#semverrange) | Semver range over Minecraft version ids, e.g. "~26.2", "^26.1", or an exact version. Pre-release order is snapshot &lt; pre &lt; rc &lt; release. |
+| `minecraft` | [`semverRange`](#semverrange) | Semver range over Minecraft version ids, e.g. "~26.2", "^26.1", or an exact version. Pre-release order is snapshot &lt; pre &lt; rc &lt; release. Omit it to take the version from the project's locked modpacks, which then all have to agree. |
 | `loader` | [`loader`](#loader) |  |
 | `java` | `string` | Optional override. Either an absolute path to a JDK/JRE home or a semver range over the Java major version, e.g. "&gt;=25". Omit to derive from the Minecraft version json and use the managed runtime.<br>min length 1 |
 | `providers` | [`provider`](#provider)[] | Provider preference order. A single entry makes the tool single-provider.<br>min items 1, unique items, default `["modrinth","curseforge"]` |

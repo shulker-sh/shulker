@@ -101,7 +101,7 @@ func (a *app) initCmd() *cobra.Command {
 				return err
 			}
 			a.progress("%s", resolvingLine(minecraft, projectLoader))
-			platform, err := d.meta.Platform(cmd.Context(), m)
+			platform, err := d.meta.Platform(cmd.Context(), m, nil)
 			if err != nil {
 				return err
 			}

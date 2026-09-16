@@ -65,6 +65,9 @@ func builtin(id string) bool {
 }
 
 func (r *Resolver) Validate() (*Validation, error) {
+	if r.Lock.Minecraft == "" {
+		return nil, out.Errorf("minecraft-required", "this project sets no minecraft and has no locked modpack to take one from; set one with `shulker set minecraft <version>`")
+	}
 	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []Suggestion{}}
 	installed := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
 	if l, ok := loader.Lookup(r.Lock.Loader.Type); ok {

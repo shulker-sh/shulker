@@ -77,9 +77,12 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			}
 			exact := *m
 			exact.Minecraft = arc.Index.Dependencies["minecraft"]
+			if exact.Minecraft == "" {
+				return out.Errorf("mrpack-invalid", "the modpack's index names no minecraft version")
+			}
 			_, exact.Loader.Version, _ = arc.Loader()
 			a.progress("%s", resolvingLine(exact.Minecraft, exact.Loader))
-			platform, err := d.meta.Platform(cmd.Context(), &exact)
+			platform, err := d.meta.Platform(cmd.Context(), &exact, nil)
 			if err != nil {
 				return err
 			}

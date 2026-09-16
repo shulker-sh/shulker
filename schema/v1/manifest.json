@@ -4,7 +4,7 @@
   "title": "shulker.json",
   "description": "Shulker project manifest. Lists direct mods, targets, and first-class configuration. Resolution results live in shulker.lock.",
   "type": "object",
-  "required": ["name", "minecraft", "targets"],
+  "required": ["name", "targets"],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string", "format": "uri" },
@@ -39,7 +39,7 @@
     },
     "minecraft": {
       "$ref": "#/$defs/semverRange",
-      "description": "Semver range over Minecraft version ids, e.g. \"~26.2\", \"^26.1\", or an exact version. Pre-release order is snapshot < pre < rc < release."
+      "description": "Semver range over Minecraft version ids, e.g. \"~26.2\", \"^26.1\", or an exact version. Pre-release order is snapshot < pre < rc < release. Omit it to take the version from the project's locked modpacks, which then all have to agree."
     },
     "loader": { "$ref": "#/$defs/loader" },
     "java": {

@@ -998,6 +998,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |
 | `manual-download` | The provider doesn't distribute this mod; download it into `downloads/` |
 | `memory` | Server memory isn't a whole number of M or G |
+| `minecraft-required` | `shulker.json` sets no `minecraft` and no locked modpack supplies one; set it with `shulker set minecraft <version>` |
 | `missing-files` | Mods that need a manual download are missing. `items`: what to download |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
@@ -1026,6 +1027,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-mismatch` | A modpack wants a different Minecraft version or loader |
 | `modpack-name` | A modpack's name can't be worked out from its source; pass `--as` |
 | `modpack-not-found` | The modpack isn't in `shulker.json`. `candidates`: the modpacks |
+| `modpack-platform` | Locked modpacks disagree about Minecraft or the loader, and `shulker.json` sets neither; set `minecraft`/`loader`, or unlock one |
 | `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
 | `modpack-target` | A modpack has several targets of a side and none named like the project's |
