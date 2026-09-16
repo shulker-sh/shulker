@@ -31,6 +31,10 @@ outline: [2, 3]
 | [`shulker build [target]`](#shulker-build) | Assemble build directories from the lock and overrides |
 | [`shulker diff [target]`](#shulker-diff) | Show build files that differ from what build would write |
 | [`shulker pull [file...]`](#shulker-pull) | Copy edits made in a build directory back into their source |
+| [`shulker history list`](#shulker-history-list) | List the states kept before in-place builds |
+| [`shulker history show [n]`](#shulker-history-show) | Show a history entry and what restoring it would change |
+| [`shulker history prune`](#shulker-history-prune) | Remove history entries beyond the number the manifest keeps |
+| [`shulker rollback [n]`](#shulker-rollback) | Restore a history entry and build it in place |
 | [`shulker serve [target]`](#shulker-serve) | Build a server target and run it in the foreground |
 | [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
 | [`shulker link gdlauncher [source]`](#shulker-link-gdlauncher) | Create a GDLauncher instance for the client build |
@@ -540,6 +544,45 @@ shulker pull config/iris.properties --key colorSpace
 | `--into <path>` | Directory the target was synced into (default: the build directory and every directory `sync` recorded) |
 | `--key <key>` | Start managing this key of the one named `.properties` file, copying its current value into the override; repeat for more |
 
+### `shulker history list`
+
+List the states an instance kept before it changed, newest first. An entry is taken before anything is rewritten: by `add`, `remove`, `update` and `lock` before they save `shulker.json` and `shulker.lock`, and by an in-place build before it writes over anything you changed. A build that only places what the lock already says takes none, because the relock that changed the lock kept that state already. It holds the manifest, the lock, the whole `config` directory and every other file the build manages; mod and pack files aren't copied, since the restored lock brings them back from the cache. Only a project with a target that builds in place keeps history. The number in front of each entry is what `history show` and `rollback` take. Alias: `ls`.
+
+```sh
+shulker history list
+```
+
+### `shulker history show`
+
+Show one entry and what restoring it would do to the mod list: what would come back, what would go, and what would change version. With no number, shows the newest.
+
+```sh
+shulker history show
+shulker history show 3
+```
+
+### `shulker history prune`
+
+Remove every entry beyond the number `history` in `shulker.json` keeps, 5 by default. Nothing else deletes history: a build over the number only warns. With `history` set to `-1` nothing is ever removed and the warning never appears; with `0` no entry is taken at all.
+
+```sh
+shulker history prune
+```
+
+### `shulker rollback`
+
+Restore a history entry and build it in place. The current state is kept as an entry of its own first, so a rollback can itself be rolled back. With no number, restores the newest.
+
+```sh
+shulker rollback
+shulker rollback 2
+shulker rollback --prune
+```
+
+| Flag | Description |
+| --- | --- |
+| `--prune` | Also trim history to the number the manifest keeps |
+
 ## Running
 
 ### `shulker serve`
@@ -975,6 +1018,9 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `feature-not-found` | No mod or target uses the feature. `candidates`: the features in use |
 | `file-not-found` | A file named to `pull` isn't in the build directory |
 | `git-missing` | A git source needs `git` on PATH |
+| `history-empty` | The instance has no history entries yet; one is taken before an in-place build changes anything |
+| `history-invalid` | A history entry's own record is unreadable; `history prune` removes it |
+| `history-missing` | There is no history entry with that number; the message says how many are kept |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-dir-not-empty` | The instance directory already has files |
 | `instance-exists` | An instance already syncs from a different source, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
@@ -1021,6 +1067,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `not-direct` | The mod is only a dependency. `items`: the mods that require it |
 | `not-drifted` | A file named to `pull` has no changes. `candidates`: the changed files |
 | `not-ignored` | The pair has no ignore in `shulker.json`. `candidates`: the pairs that do |
+| `not-in-place` | The project has no target that builds in place, so it keeps no history |
 | `not-installed` | A file isn't in the cache; run `shulker install` |
 | `not-pinned` | The mod has no pin |
 | `not-synced` | The directory has no record of the source it was synced from |

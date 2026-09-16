@@ -34,6 +34,7 @@ Required properties are marked with *.
 | `variables` | [`variables`](#variables) |  |
 | `server` | [`server`](#server) |  |
 | `client` | [`client`](#client) |  |
+| `history` | `integer` | How many history entries `history prune` leaves, and the count a build warns above. An instance takes an entry before anything it manages changes: the manifest and lock before a relock saves them, and the files before a build writes over ones you edited. -1 keeps every entry and never warns; 0 takes none.<br>min -1, default `5` |
 | `note` | [`note`](#note) |  |
 
 No other properties are allowed.

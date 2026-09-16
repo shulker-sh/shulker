@@ -77,6 +77,12 @@
     "variables": { "$ref": "#/$defs/variables" },
     "server": { "$ref": "#/$defs/server" },
     "client": { "$ref": "#/$defs/client" },
+    "history": {
+      "type": "integer",
+      "minimum": -1,
+      "default": 5,
+      "description": "How many history entries `history prune` leaves, and the count a build warns above. An instance takes an entry before anything it manages changes: the manifest and lock before a relock saves them, and the files before a build writes over ones you edited. -1 keeps every entry and never warns; 0 takes none."
+    },
     "note": { "$ref": "#/$defs/note" }
   },
   "$defs": {

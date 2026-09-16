@@ -138,6 +138,21 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	if err := v.Err(); err != nil {
 		return err
 	}
+	// An instance keeps what it had before the manifest and lock are rewritten,
+	// which is the state a rollback puts back.
+	if target, ok := p.Manifest.AnyInPlace(); ok {
+		keep := p.Manifest.HistoryKeep()
+		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Target: target, Reason: cmd.Name()}); err != nil {
+			return err
+		}
+		warning, err := build.HistoryWarning(p.Dir, keep)
+		if err != nil {
+			return err
+		}
+		if warning != "" {
+			a.printer.Warn("%s", warning)
+		}
+	}
 	if err := p.SaveManifest(); err != nil {
 		return err
 	}

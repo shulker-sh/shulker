@@ -34,6 +34,7 @@ type Manifest struct {
 	Loader      Loader             `json:"loader,omitzero"`
 	Java        string             `json:"java,omitempty"`
 	Providers   []string           `json:"providers,omitempty"`
+	History     *int               `json:"history,omitempty"`
 	Targets     map[string]Target  `json:"targets"`
 	Requires    map[string]Require `json:"requires"`
 	Ignore      []Ignore           `json:"ignore,omitempty"`
@@ -304,6 +305,29 @@ func (m *Manifest) BuildDir(target string) string {
 // which is what makes a project an instance.
 func (m *Manifest) InPlace(target string) bool {
 	return m.BuildDir(target) == "."
+}
+
+// AnyInPlace names the target that builds in place, which is what makes the
+// project an instance that keeps history.
+func (m *Manifest) AnyInPlace() (string, bool) {
+	best := ""
+	for name := range m.Targets {
+		if m.InPlace(name) && (best == "" || name < best) {
+			best = name
+		}
+	}
+	return best, best != ""
+}
+
+const DefaultHistory = 5
+
+// HistoryKeep is how many history entries `prune` leaves and the count a build
+// warns above. -1 keeps every entry, 0 takes none at all.
+func (m *Manifest) HistoryKeep() int {
+	if m.History == nil {
+		return DefaultHistory
+	}
+	return *m.History
 }
 
 func (m *Manifest) ProviderOrder() []string {

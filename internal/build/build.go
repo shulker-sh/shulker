@@ -95,6 +95,7 @@ type Report struct {
 	Excluded  []string `json:"excluded"`
 	Warnings  []string `json:"-"`
 	Forced    bool     `json:"forced"`
+	History   string   `json:"history,omitempty"`
 	// InstalledLoader is set when the loader's own installer ran into the dir after the build.
 	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
 }
@@ -103,6 +104,7 @@ type Options struct {
 	Force       bool
 	Dir         string
 	NoDataLinks bool
+	NoHistory   bool
 	OS          string
 	NoOS        bool
 	Features    map[string]bool
@@ -281,6 +283,11 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the output directory and in the source; run `shulker diff`, or `build --force` to overwrite", name, len(report.Conflicts))
 		e.Items = report.Conflicts
 		return report, e
+	}
+	if inPlace && !opts.NoHistory && planDrift(plans) {
+		if err := b.takeHistory(dir, name, "build", len(writes), len(report.Removed), report); err != nil {
+			return nil, err
+		}
 	}
 	merges := map[string]keyMerge{}
 	for _, f := range plans {
