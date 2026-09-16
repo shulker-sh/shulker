@@ -56,3 +56,11 @@ The enabled list in `options.txt` works differently, because it is in priority o
 Mods, resource packs and shaders are resolved from Modrinth or CurseForge. By default Modrinth is tried first, then CurseForge. Set [`providers`](/docs/manifest#properties) to change the order or use only one, or set `provider` on a single mod.
 
 CurseForge needs an API key. Release builds include one, so it works without setup. To use your own, set `SHULKER_CURSEFORGE_KEY` or run [`shulker config set curseforge.key <key>`](/docs/cli#shulker-config-set); your key always takes priority and is never replaced. If CurseForge rejects the included key, shulker fetches a new one from shulker.sh, saves it in its cache, and retries once. If that fails too, it asks you to set your own key or report an issue.
+
+## Cache
+
+Every file shulker downloads is stored once, by hash, in a cache shared by all your projects: `~/Library/Caches/shulker` on macOS, or wherever `SHULKER_CACHE` points. A build places files out of it, so a mod ten instances use is downloaded once, and installing a pack you have built before needs no network at all.
+
+Nothing shulker placed is deleted without its bytes reaching the cache first. That is what makes [`shulker rollback`](/docs/cli#shulker-rollback) work offline: a history entry leaves mod and pack files out and relies on the cache to put them back.
+
+[`shulker cache prune`](/docs/cli#shulker-cache-prune) removes what nothing references. What counts as a reference is every registered instance and the project you run it in — each one's `shulker.lock`, the lock of every history entry it keeps, and the modpack checkouts and offline sync fallbacks its sources need. A registered folder that is gone is skipped; one whose lock can't be read stops the prune instead. Your CurseForge key and the Java runtimes shulker manages for servers are never touched. [`shulker cache info`](/docs/cli#shulker-cache-info) shows what it would free before you run it.

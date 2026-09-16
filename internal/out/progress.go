@@ -284,6 +284,15 @@ func clip(s string, room int, ellipsis string) string {
 	return string(r[:keep]) + ellipsis
 }
 
+// HumanBytes prints a size the way the progress lines do, with GB for the sizes
+// a cache reaches.
+func HumanBytes(n int64) string {
+	if n < 1<<30 {
+		return humanBytes(n)
+	}
+	return fmt.Sprintf("%.1f GB", float64(n)/(1<<30))
+}
+
 func humanBytes(n int64) string {
 	switch {
 	case n < 1<<10:

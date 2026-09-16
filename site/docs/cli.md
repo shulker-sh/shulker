@@ -53,6 +53,8 @@ outline: [2, 3]
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
 | [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
+| [`shulker cache info`](#shulker-cache-info) | Show the cache's size and how much prune would free |
+| [`shulker cache prune`](#shulker-cache-prune) | Remove cached files no instance or project references |
 | [`shulker version`](#shulker-version) | Print the shulker version |
 | [`shulker self update`](#shulker-self-update) | Update shulker to the latest release |
 | [`shulker completion bash`](#shulker-completion-bash) | Print the bash completion script |
@@ -861,6 +863,22 @@ shulker docs --search build directory
 | --- | --- |
 | `-s, --search` | Search every page for the words instead of looking up a page or heading |
 
+### `shulker cache info`
+
+Show where the shared download cache is, how much space it uses, how many files it holds, and how much `cache prune` would free. The roots line names what is keeping files: every instance in the registry, and the project you are standing in when there is one.
+
+```sh
+shulker cache info
+```
+
+### `shulker cache prune`
+
+Remove everything in the cache that no root references. A root is a registered instance or the project you run it in: its `shulker.lock`, the lock of every history entry it keeps, and the modpack checkouts and offline sync fallbacks its sources need. Installer logs and half-finished downloads always go. The managed Java runtimes and your CurseForge key are never touched, and nothing a build placed can be removed from a directory without its bytes reaching the cache first, so rolling an instance back still works offline. A registered folder that no longer exists is skipped; one that is there but whose lock can't be read stops the prune, since it may be an instance that still needs its files.
+
+```sh
+shulker cache prune
+```
+
 ### `shulker version`
 
 Print the shulker version.
@@ -1007,6 +1025,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A target that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
+| `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs or shaders; pass `--bundle`. `items`: what is missing |

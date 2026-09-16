@@ -300,7 +300,13 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		report.Written = append(report.Written, rel)
 	}
 	for _, rel := range report.Removed {
-		if err := os.Remove(filepath.Join(dir, filepath.FromSlash(rel))); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		path := filepath.Join(dir, filepath.FromSlash(rel))
+		// The bytes reach the cache before the file leaves the disk, so a history
+		// entry that left them to the cache can still be restored offline.
+		if err := b.Cache.Ingest(path); err != nil {
+			return nil, err
+		}
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 	}
