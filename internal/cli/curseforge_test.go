@@ -18,7 +18,15 @@ const curseForgeTestKey = "test-key"
 type cfMod struct {
 	id    int
 	slug  string
+	class int
 	files []cfFile
+}
+
+func (m *cfMod) classID() int {
+	if m.class == 0 {
+		return 6
+	}
+	return m.class
 }
 
 type cfFile struct {
@@ -37,6 +45,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 	h.jars["jei"], h.jars["jei-next"] = jei, makeJarVersion(t, "jei", "jei-26.2-fabric-1.1.0.jar", "*", "1.1.0", `"depends":{"fabricloader":">=0.17"}`)
 	h.jars["nodist"] = makeJar(t, "nodist", "nodist-1.0.0.jar", "client")
 	h.jars["locked"] = makeJar(t, "locked", "locked-1.0.0.jar", "*")
+	h.jars["cf-fresh-animations"] = makeJarFile(t, "fresh-animations", "FreshAnimations_CF_v1.9.4.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"fresh"}}`)
 	h.jars["stale"] = makeJarVersion(t, "jei", "jei-26.1-fabric-0.9.0.jar", "*", "0.9.0", `"depends":{"fabricloader":">=0.17"}`)
 	h.cfMods = map[int]*cfMod{
 		238222: {id: 238222, slug: "jei", files: []cfFile{
@@ -47,8 +56,9 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		394468: {id: 394468, slug: "sodium", files: []cfFile{{id: 5000020, jar: h.jars["sodium"], date: "2026-09-01T00:00:00Z", channel: 1, deps: []int{306612}}}},
 		300000: {id: 300000, slug: "nodist", files: []cfFile{{id: 5100001, jar: h.jars["nodist"], date: "2026-09-01T00:00:00Z", channel: 1, url: "null"}}},
 		400000: {id: 400000, slug: "locked", files: []cfFile{{id: 5200001, jar: h.jars["locked"], date: "2026-09-01T00:00:00Z", channel: 1, forbidden: true}}},
+		600000: {id: 600000, slug: "fresh-animations", class: 12, files: []cfFile{{id: 5300001, jar: h.jars["cf-fresh-animations"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 	}
-	fileJSON := func(f cfFile, modID int) map[string]any {
+	fileJSON := func(f cfFile, m *cfMod) map[string]any {
 		var url any = base() + "/cfcdn/" + f.jar.filename
 		if f.url == "null" {
 			url = nil
@@ -59,16 +69,25 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		for _, d := range f.deps {
 			deps = append(deps, map[string]any{"modId": d, "relationType": 3})
 		}
+		// A pack's files carry no loader tag; a shader's names its shader mod
+		// in the same array as the game versions.
+		gameVersions := []string{"26.2", "Fabric"}
+		switch m.classID() {
+		case 12:
+			gameVersions = []string{"26.2"}
+		case 6552:
+			gameVersions = []string{"26.2", "Iris"}
+		}
 		return map[string]any{
-			"id": f.id, "modId": modID, "displayName": strings.TrimSuffix(f.jar.filename, ".jar"), "fileName": f.jar.filename,
+			"id": f.id, "modId": m.id, "displayName": strings.TrimSuffix(f.jar.filename, ".jar"), "fileName": f.jar.filename,
 			"releaseType": f.channel, "fileDate": f.date, "downloadUrl": url, "isAvailable": !f.hidden, "fileLength": len(f.jar.data),
-			"gameVersions": []string{"26.2", "Fabric"},
+			"gameVersions": gameVersions,
 			"hashes":       []map[string]any{{"value": f.jar.sha1, "algo": 1}, {"value": "00", "algo": 2}},
 			"dependencies": deps,
 		}
 	}
 	modJSON := func(m *cfMod) map[string]any {
-		return map[string]any{"id": m.id, "name": strings.ToUpper(m.slug), "slug": m.slug, "links": map[string]any{"websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/" + m.slug}}
+		return map[string]any{"id": m.id, "name": strings.ToUpper(m.slug), "slug": m.slug, "classId": m.classID(), "links": map[string]any{"websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/" + m.slug}}
 	}
 	allFiles := func(m *cfMod) []cfFile {
 		files := m.files
@@ -103,12 +122,11 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 			http.Error(w, "bad filter", http.StatusBadRequest)
 			return
 		}
-		// A slug search without a classId spans every class, as the real API
-		// does; these fixtures are all mods.
+		// A slug search without a classId spans every class, as the real API does.
 		class := r.URL.Query().Get("classId")
 		data := []map[string]any{}
 		for _, m := range h.cfMods {
-			if class != "" && class != "6" {
+			if class != "" && class != strconv.Itoa(m.classID()) {
 				continue
 			}
 			if strings.HasPrefix(m.slug, r.URL.Query().Get("slug")) {
@@ -130,7 +148,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 			for _, f := range allFiles(m) {
 				for _, want := range body.FileIDs {
 					if f.id == want {
-						data = append(data, fileJSON(f, m.id))
+						data = append(data, fileJSON(f, m))
 					}
 				}
 			}
@@ -152,13 +170,13 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 			writeJSON(w, map[string]any{"data": modJSON(m)})
 			return
 		}
-		if r.URL.Query().Get("modLoaderType") != "4" {
+		if m.classID() == 6 && r.URL.Query().Get("modLoaderType") != "4" {
 			writeJSON(w, map[string]any{"data": []any{}, "pagination": map[string]int{"totalCount": 0}})
 			return
 		}
 		data := []map[string]any{}
 		for _, f := range allFiles(m) {
-			data = append(data, fileJSON(f, m.id))
+			data = append(data, fileJSON(f, m))
 		}
 		writeJSON(w, map[string]any{"data": data, "pagination": map[string]int{"index": 0, "resultCount": len(data), "totalCount": len(data)}})
 	})

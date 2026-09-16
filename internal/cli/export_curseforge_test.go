@@ -196,6 +196,41 @@ func TestExportCurseForgeLockedModsNeedNoLookup(t *testing.T) {
 	}
 }
 
+func TestExportCurseForgeCarriesPacks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "jei", "--provider", "curseforge")
+	// No --type: the class the slug matches in settles what it is.
+	h.mustRun(t, "add", "fresh-animations", "--provider", "curseforge")
+	h.mustRun(t, "install")
+
+	stdout := h.mustRun(t, "export", "curseforge", "--version", "1.0")
+	for _, want := range []string{"2 mods by file ID", "1 resource pack by file ID"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("export output has no %q: %s", want, stdout)
+		}
+	}
+	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
+	var pack curseForgePack
+	if err := json.Unmarshal([]byte(entries["manifest.json"]), &pack); err != nil {
+		t.Fatal(err)
+	}
+	want := [][2]int{{306612, 5000010}, {238222, 5000001}, {600000, 5300001}}
+	if len(pack.Files) != len(want) {
+		t.Fatalf("files: %+v", pack.Files)
+	}
+	for i, f := range pack.Files {
+		if f.ProjectID != want[i][0] || f.FileID != want[i][1] || !f.Required {
+			t.Fatalf("file %d: %+v", i, f)
+		}
+	}
+	for name := range entries {
+		if strings.HasPrefix(name, "overrides/resourcepacks/") {
+			t.Fatalf("a pack locked from CurseForge was bundled: %s", name)
+		}
+	}
+}
+
 func TestExportFromRemoteSource(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
