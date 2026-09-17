@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
@@ -23,6 +24,7 @@ type historyRow struct {
 
 type historyChange struct {
 	Mod  string `json:"mod"`
+	Kind string `json:"kind,omitempty"`
 	From string `json:"from,omitempty"`
 	To   string `json:"to,omitempty"`
 }
@@ -146,6 +148,12 @@ func (a *app) historyShowCmd() *cobra.Command {
 					rows = append(rows, out.Row{Label: "platform", Text: historyPlatform(e)})
 				}
 				rows = append(rows, out.Row{Label: "mods", Text: strconv.Itoa(e.Mods)})
+				if e.ResourcePacks > 0 {
+					rows = append(rows, out.Row{Label: "resource packs", Text: strconv.Itoa(e.ResourcePacks)})
+				}
+				if e.Shaders > 0 {
+					rows = append(rows, out.Row{Label: "shaders", Text: strconv.Itoa(e.Shaders)})
+				}
 				l.Tree(rows...)
 				l.Blank()
 				if len(changes) == 0 {
@@ -174,37 +182,65 @@ func changeItem(c historyChange) out.Item {
 	return out.Item{Kind: out.Change, Name: c.Mod, From: c.From, To: c.To}
 }
 
-// historyChanges compares the mods in an entry's lock with the ones locked now,
-// so From is what is installed and To is what restoring would put back.
+// historyChanges compares what an entry's lock holds with what is locked now,
+// across mods, resource packs and shaders, so From is what is installed and To
+// is what restoring would put back.
 func historyChanges(p *project.Project, e build.HistoryEntry) ([]historyChange, error) {
 	was, err := lock.Load(filepath.Join(build.HistoryPath(p.Dir), e.ID, lock.FileName))
 	if err != nil {
 		return nil, err
 	}
-	keys := []string{}
-	for key := range p.Lock.Mods {
-		keys = append(keys, key)
+	sections := []struct {
+		kind string
+		now  map[string]string
+		was  map[string]string
+	}{
+		{"", modVersions(p.Lock.Mods), modVersions(was.Mods)},
+		{manifest.TypeResourcePack, packVersions(p.Lock.ResourcePacks), packVersions(was.ResourcePacks)},
+		{manifest.TypeShader, packVersions(p.Lock.Shaders), packVersions(was.Shaders)},
 	}
-	for key := range was.Mods {
-		if _, both := p.Lock.Mods[key]; !both {
+	changes := []historyChange{}
+	for _, s := range sections {
+		keys := []string{}
+		for key := range s.now {
 			keys = append(keys, key)
 		}
-	}
-	slices.Sort(keys)
-	changes := []historyChange{}
-	for _, key := range keys {
-		now, installed := p.Lock.Mods[key]
-		then, kept := was.Mods[key]
-		switch {
-		case installed && !kept:
-			changes = append(changes, historyChange{Mod: key, From: now.VersionNumber})
-		case !installed && kept:
-			changes = append(changes, historyChange{Mod: key, To: then.VersionNumber})
-		case now.VersionNumber != then.VersionNumber:
-			changes = append(changes, historyChange{Mod: key, From: now.VersionNumber, To: then.VersionNumber})
+		for key := range s.was {
+			if _, both := s.now[key]; !both {
+				keys = append(keys, key)
+			}
+		}
+		slices.Sort(keys)
+		for _, key := range keys {
+			now, installed := s.now[key]
+			then, kept := s.was[key]
+			switch {
+			case installed && !kept:
+				changes = append(changes, historyChange{Mod: key, Kind: s.kind, From: now})
+			case !installed && kept:
+				changes = append(changes, historyChange{Mod: key, Kind: s.kind, To: then})
+			case now != then:
+				changes = append(changes, historyChange{Mod: key, Kind: s.kind, From: now, To: then})
+			}
 		}
 	}
 	return changes, nil
+}
+
+func modVersions(mods map[string]lock.Mod) map[string]string {
+	versions := make(map[string]string, len(mods))
+	for key, m := range mods {
+		versions[key] = m.VersionNumber
+	}
+	return versions
+}
+
+func packVersions(packs map[string]lock.Pack) map[string]string {
+	versions := make(map[string]string, len(packs))
+	for key, p := range packs {
+		versions[key] = p.VersionNumber
+	}
+	return versions
 }
 
 func (a *app) historyPruneCmd() *cobra.Command {
@@ -327,6 +363,12 @@ func (a *app) rollbackCmd() *cobra.Command {
 func historyAside(e build.HistoryEntry) string {
 	parts := []string{"taken " + historyTaken(e)}
 	parts = append(parts, plural(e.Mods, "mod", "mods"))
+	if e.ResourcePacks > 0 {
+		parts = append(parts, plural(e.ResourcePacks, "resource pack", "resource packs"))
+	}
+	if e.Shaders > 0 {
+		parts = append(parts, plural(e.Shaders, "shader", "shaders"))
+	}
 	return "(" + strings.Join(parts, ", ") + ")"
 }
 

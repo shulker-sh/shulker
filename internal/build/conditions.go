@@ -306,6 +306,27 @@ func (b *Builder) Placements() map[string]Placement {
 			p.Targets = append(p.Targets, name)
 			placements[id] = p
 		}
+		if target.Side != "client" {
+			continue
+		}
+		for _, ref := range b.packRefs() {
+			listed := b.Manifest.ResourcePacks()
+			if ref.kind == manifest.TypeShader {
+				listed = b.Manifest.Shaders()
+			}
+			entry, isListed := listed[ref.key]
+			if isListed {
+				if admitted, _ := c.admits(entry); !admitted {
+					continue
+				}
+			}
+			p := placements[ref.key]
+			p.Targets = append(p.Targets, name)
+			if isListed {
+				p.OS, p.Feature = entry.OS, entry.Feature
+			}
+			placements[ref.key] = p
+		}
 	}
 	for id, m := range b.directEntries(conditions{anyOS: true}) {
 		if _, locked := b.Lock.Mods[id]; !locked {

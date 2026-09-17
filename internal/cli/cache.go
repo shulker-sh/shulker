@@ -17,19 +17,23 @@ import (
 
 type cacheInfo struct {
 	cache.Usage
-	Roots     int   `json:"roots"`
-	Instances int   `json:"instances"`
-	Project   bool  `json:"project"`
-	Locks     int   `json:"locks"`
-	Prunable  int64 `json:"prunable"`
+	Roots      int      `json:"roots"`
+	Instances  int      `json:"instances"`
+	Project    bool     `json:"project"`
+	Locks      int      `json:"locks"`
+	Prunable   int64    `json:"prunable"`
+	Unreadable []string `json:"unreadable,omitempty"`
 }
 
 // roots are the locks a prune must not strip: every registered instance's and
 // the project the command runs in, each with the locks of its history entries.
+// A root whose lock won't load is carried as a problem rather than an error, so
+// `cache info` can still report while `cache prune` refuses.
 type roots struct {
-	locks     []cache.Root
-	instances int
-	project   bool
+	locks      []cache.Root
+	instances  int
+	project    bool
+	unreadable []string
 }
 
 func (r roots) count() int {
@@ -70,7 +74,10 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res := cacheInfo{Usage: usage, Roots: r.count(), Instances: r.instances, Project: r.project, Locks: len(r.locks), Prunable: would.Bytes}
+			res := cacheInfo{Usage: usage, Roots: r.count(), Instances: r.instances, Project: r.project, Locks: len(r.locks), Prunable: would.Bytes, Unreadable: r.unreadable}
+			for _, problem := range r.unreadable {
+				a.printer.Warn("%s", problem)
+			}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.Heading("Cache " + usage.Dir)
 				rows := []out.Row{
@@ -83,7 +90,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 					rows = append(rows, out.Row{Text: out.HumanBytes(would.Bytes) + " prunable (" + prunedAside(would) + ")"})
 				}
 				l.Tree(rows...)
-				if !would.Empty() {
+				if !would.Empty() && len(r.unreadable) == 0 {
 					l.Nudge("Free it", "shulker cache prune")
 				}
 			})
@@ -104,6 +111,9 @@ func (a *app) cachePruneCmd() *cobra.Command {
 			r, err := a.cacheRoots()
 			if err != nil {
 				return err
+			}
+			if len(r.unreadable) > 0 {
+				return out.Errorf("cache-root-unreadable", "%s", r.unreadable[0])
 			}
 			pruned, err := d.cache.Prune(r.locks, false)
 			if err != nil {
@@ -133,7 +143,7 @@ func (a *app) cacheRoots() (roots, error) {
 			continue
 		}
 		seen[dir] = true
-		locks, present, err := dirRoots(dir, link.Source, link.Ref)
+		locks, present, unreadable, err := dirRoots(dir, link.Source, link.Ref)
 		if err != nil {
 			return roots{}, err
 		}
@@ -142,6 +152,7 @@ func (a *app) cacheRoots() (roots, error) {
 		}
 		r.instances++
 		r.locks = append(r.locks, locks...)
+		r.unreadable = append(r.unreadable, unreadable...)
 	}
 	dir := a.dir
 	if dir == "" {
@@ -156,47 +167,62 @@ func (a *app) cacheRoots() (roots, error) {
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err != nil {
 		return r, nil
 	}
-	locks, _, err := dirRoots(dir, "", "")
+	locks, _, unreadable, err := dirRoots(dir, "", "")
 	if err != nil {
 		return roots{}, err
 	}
 	r.project = true
 	r.locks = append(r.locks, locks...)
+	r.unreadable = append(r.unreadable, unreadable...)
 	return r, nil
 }
 
 // dirRoots reads the locks one directory keeps alive: its own and one per
 // history entry. A directory that is gone contributes nothing, since the
-// instance it held was deleted; one whose lock is there but can't be read stops
-// the prune, because it may be an instance that still needs its files.
-func dirRoots(dir, source, ref string) ([]cache.Root, bool, error) {
+// instance it held was deleted; one whose lock is there but can't be read is
+// returned as a problem, which stops a prune because it may be an instance that
+// still needs its files, but leaves an inspection free to report.
+func dirRoots(dir, source, ref string) ([]cache.Root, bool, []string, error) {
 	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
-		return nil, false, nil
+		return nil, false, nil, nil
 	} else if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
-	paths := []string{filepath.Join(dir, lock.FileName)}
-	entries, err := build.History(dir)
-	if err != nil {
-		return nil, false, err
+	dirs := []string{dir}
+	// A separate-dir instance keeps its lock in the project it was built from,
+	// not in the game directory the registry records.
+	if src := filepath.Clean(source); src != "." && src != dir {
+		if _, err := os.Stat(filepath.Join(src, manifest.FileName)); err == nil {
+			dirs = append(dirs, src)
+		}
 	}
-	for _, e := range entries {
-		paths = append(paths, filepath.Join(build.HistoryPath(dir), e.ID, lock.FileName))
+	var paths []string
+	for _, d := range dirs {
+		paths = append(paths, filepath.Join(d, lock.FileName))
+		entries, err := build.History(d)
+		if err != nil {
+			return nil, false, nil, err
+		}
+		for _, e := range entries {
+			paths = append(paths, filepath.Join(build.HistoryPath(d), e.ID, lock.FileName))
+		}
 	}
 	var found []cache.Root
+	var unreadable []string
 	for _, path := range paths {
 		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 			continue
 		} else if err != nil {
-			return nil, false, err
+			return nil, false, nil, err
 		}
 		lk, err := lock.Load(path)
 		if err != nil {
-			return nil, false, out.Errorf("cache-root-unreadable", "%s can't be read, so pruning could remove files it needs (%s); fix it, or run `shulker unlink` for that instance", path, out.AsError(err).Message)
+			unreadable = append(unreadable, path+" can't be read, so pruning could remove files it needs ("+out.AsError(err).Message+"); fix it, or run `shulker unlink` for that instance")
+			continue
 		}
 		found = append(found, cache.Root{Lock: lk, Source: source, Ref: ref})
 	}
-	return found, true, nil
+	return found, true, unreadable, nil
 }
 
 func rootsText(r roots) string {

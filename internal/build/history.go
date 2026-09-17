@@ -28,15 +28,17 @@ const (
 // HistoryEntry is one restorable state: the manifest, the lock and the whole
 // config folder as they were before a build changed them.
 type HistoryEntry struct {
-	ID        string `json:"id"`
-	TakenAt   string `json:"takenAt"`
-	Target    string `json:"target"`
-	Reason    string `json:"reason"`
-	Minecraft string `json:"minecraft,omitempty"`
-	Loader    string `json:"loader,omitempty"`
-	Mods      int    `json:"mods"`
-	Written   int    `json:"written,omitempty"`
-	Removed   int    `json:"removed,omitempty"`
+	ID            string `json:"id"`
+	TakenAt       string `json:"takenAt"`
+	Target        string `json:"target"`
+	Reason        string `json:"reason"`
+	Minecraft     string `json:"minecraft,omitempty"`
+	Loader        string `json:"loader,omitempty"`
+	Mods          int    `json:"mods"`
+	ResourcePacks int    `json:"resourcepacks,omitempty"`
+	Shaders       int    `json:"shaders,omitempty"`
+	Written       int    `json:"written,omitempty"`
+	Removed       int    `json:"removed,omitempty"`
 }
 
 func (b *Builder) takeHistory(dir, target, reason string, written, removed int, report *Report) error {
@@ -122,6 +124,7 @@ func TakeHistory(dir string, keep int, e HistoryEntry) (HistoryEntry, error) {
 	lk, lockErr := lock.Load(filepath.Join(dir, lock.FileName))
 	if lockErr == nil {
 		e.Minecraft, e.Loader, e.Mods = lk.Minecraft, lk.Loader.Type, len(lk.Mods)
+		e.ResourcePacks, e.Shaders = len(lk.ResourcePacks), len(lk.Shaders)
 	}
 	for _, name := range []string{manifest.FileName, lock.FileName} {
 		if err := copyFile(filepath.Join(dir, name), filepath.Join(into, name)); err != nil {

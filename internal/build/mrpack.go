@@ -69,12 +69,15 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		}
 		report.Warnings = append(report.Warnings, warnings...)
 	}
-	files, err := b.mrpackMods(targets, opts.Bundle, report)
+	files, bundled, err := b.mrpackMods(targets, opts.Bundle, report)
 	if err != nil {
 		return nil, err
 	}
 	entries := mrpackSplit(targets)
 	for path := range entries {
+		if bundled[path] {
+			continue
+		}
 		report.Overrides = append(report.Overrides, path)
 	}
 	sort.Strings(report.Overrides)
@@ -202,8 +205,9 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, features map[str
 	return warnings, nil
 }
 
-func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpack.File, error) {
+func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpack.File, map[string]bool, error) {
 	files := []mrpack.File{}
+	bundledPaths := map[string]bool{}
 	blocked := &kindTally{}
 	add := func(key, kind, filePath, side, provider, sum512 string, u *string, owners []*mrpackTarget, locked, bundled *[]string) error {
 		data, err := os.ReadFile(b.Cache.Object(sum512))
@@ -228,6 +232,10 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 		}
 		for _, t := range owners {
 			t.files[filePath] = data
+			// Both spellings mrpackSplit can give a bundled file, so the override
+			// tally can drop it either way and no file is counted twice.
+			bundledPaths["overrides/"+filePath] = true
+			bundledPaths[t.side+"-overrides/"+filePath] = true
 		}
 		*bundled = append(*bundled, key)
 		report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s from %s into the archive; recipients receive the file itself, not a download link", key, mrpackOrigin(provider, u)))
@@ -245,7 +253,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 			continue
 		}
 		if err := add(id, manifest.TypeMod, "mods/"+m.Filename, m.Side, m.Provider, m.Sha512, m.URL, owners, &report.Mods, &report.BundledMods); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	for _, ref := range b.packRefs() {
@@ -258,13 +266,13 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 			locked, bundled = &report.Shaders, &report.BundledShaders
 		}
 		if err := add(ref.key, ref.kind, ref.path, "client", ref.pack.Provider, ref.pack.Sha512, ref.pack.URL, owners, locked, bundled); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	if blocked.total() > 0 {
-		return nil, bundleNudge(out.Errorf("mrpack-host-not-allowed", "%s can't be downloaded by Modrinth launchers", kindCount(blocked.counts)), blocked.items, "shulker export mrpack --bundle")
+		return nil, nil, bundleNudge(out.Errorf("mrpack-host-not-allowed", "%s can't be downloaded by Modrinth launchers", kindCount(blocked.counts)), blocked.items, "shulker export mrpack --bundle")
 	}
-	return files, nil
+	return files, bundledPaths, nil
 }
 
 func mrpackOwners(targets []*mrpackTarget, ships func(*mrpackTarget) bool) []*mrpackTarget {

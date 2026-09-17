@@ -130,6 +130,59 @@ func TestCachePruneSkipsAGoneInstance(t *testing.T) {
 	}
 }
 
+// An instance built into its own directory keeps its lock in the project it was
+// built from, not in the game directory the registry records, so the roots have
+// to follow the link's source. The prune runs from elsewhere, because standing
+// in the project would make it a root in its own right and hide the difference.
+func TestCachePruneKeepsASeparateDirInstance(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "install")
+
+	sodium := (&cache.Cache{Dir: h.cache}).Object(h.jars["sodium"].sha512)
+	if _, err := os.Stat(sodium); err != nil {
+		t.Fatalf("sodium should be in the cache after install: %v", err)
+	}
+	registry := map[string]any{"links": []config.Link{{
+		Launcher: "prism", Side: "client", Name: "built", Dir: filepath.Join(h.dir, "build", "client"), Source: h.dir, Target: "client",
+	}}}
+	data, err := json.Marshal(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(filepath.Dir(h.config), "registry.json"), string(data))
+
+	h.mustRun(t, "--dir", t.TempDir(), "cache", "prune")
+	if _, err := os.Stat(sodium); err != nil {
+		t.Fatalf("a registered instance still needs the mods its project locks: %v", err)
+	}
+}
+
+// A root that can't be read stops a prune, but an inspection still reports: it
+// is the command that names which instance is broken.
+func TestCacheInfoReportsAnUnreadableRoot(t *testing.T) {
+	h := newInPlace(t)
+	broken := t.TempDir()
+	writeFile(t, filepath.Join(broken, "shulker.lock"), "{ not a lock")
+	registry := map[string]any{"links": []config.Link{{
+		Launcher: "prism", Side: "client", Name: "broken", Dir: broken, Target: "client",
+	}}}
+	data, err := json.Marshal(registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(filepath.Dir(h.config), "registry.json"), string(data))
+
+	stdout, stderr := h.mustRunStderr(t, "cache", "info")
+	if !strings.Contains(stderr, "can't be read") || !strings.Contains(stdout, "Cache ") {
+		t.Fatalf("info should report and name the broken instance: stdout=%s stderr=%s", stdout, stderr)
+	}
+	if strings.Contains(stdout, "shulker cache prune") {
+		t.Fatalf("a prune that would refuse should not be suggested: %s", stdout)
+	}
+}
+
 func TestBuildIngestsFilesBeforeSweepingThem(t *testing.T) {
 	h := newInPlace(t)
 	override := filepath.Join(h.dir, "overrides", "config", "mine.txt")

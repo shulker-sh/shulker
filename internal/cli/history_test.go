@@ -50,6 +50,25 @@ func TestHistoryRollback(t *testing.T) {
 	}
 }
 
+// An entry holds resource packs and shaders as well as mods, so the rows have to
+// count them and the difference has to name them: a pack-only change once read
+// as "restoring it would change nothing".
+func TestHistoryCountsPacks(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "fresh-animations")
+	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	h.mustRun(t, "install")
+	h.mustRun(t, "remove", "fresh-animations")
+
+	stdout := h.mustRun(t, "history", "list")
+	if !strings.Contains(stdout, "1 resource pack") || !strings.Contains(stdout, "1 shader") {
+		t.Fatalf("history list should count packs: %s", stdout)
+	}
+	if stdout = h.mustRun(t, "history", "show", "1"); !strings.Contains(stdout, "resource packs:") || !strings.Contains(stdout, "+ fresh-animations") {
+		t.Fatalf("history show should offer the pack back: %s", stdout)
+	}
+}
+
 func TestHistoryPruneAndWarning(t *testing.T) {
 	h := newInPlace(t)
 	h.editManifest(t, func(m map[string]any) { m["history"] = 1 })

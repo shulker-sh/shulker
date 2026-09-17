@@ -784,7 +784,11 @@ func checkReserved(target string, desired map[string]source, data []string) erro
 		return nil
 	}
 	sort.Strings(bad)
-	e := out.Errorf("build-reserved", "%s builds in place, so it can't write %d file(s) it doesn't own", target, len(bad))
+	noun := "files"
+	if len(bad) == 1 {
+		noun = "file"
+	}
+	e := out.Errorf("build-reserved", "%s builds in place, so it can't write %d %s it doesn't own", target, len(bad), noun)
 	e.Items = bad
 	return e
 }

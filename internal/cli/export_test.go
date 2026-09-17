@@ -228,6 +228,27 @@ func TestExportMrpackBundlesForeignHosts(t *testing.T) {
 	if entries["overrides/mods/"+h.jars["sodium"].filename] != string(h.jars["sodium"].data) || entries["overrides/mods/"+h.jars["fabric-api"].filename] != string(h.jars["fabric-api"].data) {
 		t.Fatalf("bundled entries: %v", keys(entries))
 	}
+
+	// A bundled file is written into overrides/, but it is already counted as
+	// bundled, so the override tally must not count it a second time.
+	_, stdout, _ := h.run(t, "--json", "export", "mrpack", "--version", "0.1", "--bundle")
+	var report struct {
+		Data struct {
+			Overrides   []string `json:"overrides"`
+			BundledMods []string `json:"bundledMods"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Data.BundledMods) != 2 {
+		t.Fatalf("both mods should be bundled: %+v", report.Data)
+	}
+	for _, path := range report.Data.Overrides {
+		if strings.HasSuffix(path, h.jars["sodium"].filename) || strings.HasSuffix(path, h.jars["fabric-api"].filename) {
+			t.Fatalf("a bundled file must not be counted as an override too: %v", report.Data.Overrides)
+		}
+	}
 }
 
 func keys(m map[string]string) []string {

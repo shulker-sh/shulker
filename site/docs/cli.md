@@ -556,7 +556,7 @@ shulker history list
 
 ### `shulker history show`
 
-Show one entry and what restoring it would do to the mod list: what would come back, what would go, and what would change version. With no number, shows the newest.
+Show one entry and what restoring it would do to the mods, resource packs and shaders it holds: what would come back, what would go, and what would change version. With no number, shows the newest.
 
 ```sh
 shulker history show
@@ -865,7 +865,7 @@ shulker docs --search build directory
 
 ### `shulker cache info`
 
-Show where the shared download cache is, how much space it uses, how many files it holds, and how much `cache prune` would free. The roots line names what is keeping files: every instance in the registry, and the project you are standing in when there is one.
+Show where the shared download cache is, how much space it uses, how many files it holds, and how much `cache prune` would free. The roots line names what is keeping files: every instance in the registry, and the project you are standing in when there is one. A registered instance whose lock can't be read is named as a warning and no prune line is suggested, since `cache prune` refuses while one is unreadable; the prunable figure is then counted as if that instance needed nothing.
 
 ```sh
 shulker cache info
@@ -1025,7 +1025,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A target that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
-| `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need |
+| `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need; `cache info` still reports and names the instance |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs or shaders; pass `--bundle`. `items`: what is missing |

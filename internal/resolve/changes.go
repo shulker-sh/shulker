@@ -119,7 +119,7 @@ func (r *Resolver) Changes(before Snapshot) *Changes {
 		old, existed := before.zips[key]
 		switch {
 		case !existed:
-			c.Added = append(c.Added, AddedMod{ID: key, VersionNumber: p.VersionNumber, Provider: p.Provider, RequiredBy: []string{}})
+			c.Added = append(c.Added, AddedMod{ID: key, VersionNumber: p.VersionNumber, Side: "client", Provider: p.Provider, RequiredBy: []string{}})
 		case old.Sha512 != p.Sha512 || old.Provider != p.Provider || old.Channel != p.Channel:
 			ch := Change{ID: key, From: old.VersionNumber, To: p.VersionNumber}
 			if old.Provider != p.Provider {

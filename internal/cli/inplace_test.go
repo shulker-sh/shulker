@@ -78,4 +78,14 @@ func TestBuildInPlaceRefusesReservedPaths(t *testing.T) {
 	if strings.Join(e.Items, ",") != "saves/world.txt,shulker.json" {
 		t.Fatalf("items: %+v", e.Items)
 	}
+	_, out, errOut := h.run(t, "install")
+	if !strings.Contains(out+errOut, "2 files it doesn't own") {
+		t.Fatalf("two reserved paths: %s", out+errOut)
+	}
+	if err := os.Remove(filepath.Join(h.dir, "overrides", "saves", "world.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if _, out, errOut = h.run(t, "install"); !strings.Contains(out+errOut, "1 file it doesn't own") {
+		t.Fatalf("one reserved path: %s", out+errOut)
+	}
 }
