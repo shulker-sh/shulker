@@ -47,6 +47,23 @@
             }
           }
         },
+        "commands": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "A command shulker found in the launcher's own slot and adopted when it took the slot over, so it keeps running. The generated script runs it before anything else, and a non-zero exit from it still aborts the launch, exactly as it did before shulker was involved. `shulker unlink` puts it back in the launcher and clears this.",
+          "properties": {
+            "preLaunch": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The pre-launch command adopted from the launcher."
+            },
+            "postExit": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The post-exit command adopted from the launcher."
+            }
+          }
+        },
         "marker": {
           "type": "boolean",
           "description": "Include the marker mod, which lists this pack in the in-game mod list and lets an export of it be recognised as this pack again. Off drops both. Default true."

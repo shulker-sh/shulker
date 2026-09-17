@@ -34,8 +34,8 @@ func TestLinkATLauncher(t *testing.T) {
 
 	inst := readATLInstance(t, instDir)
 	settings := inst["launcher"].(map[string]any)
-	exe, _ := os.Executable()
-	wantCmd := launcher.CommandArg(exe) + " sync " + launcher.CommandArg(h.dir) + ` --target client --into "$INST_MC_DIR"`
+	// ATLauncher's instance root is its game directory, so its own token is $INST_DIR.
+	wantCmd := `sh "$INST_DIR/.shulker/pre-launch"`
 	if inst["id"] != "26.2" || inst["mainClass"] != "net.fabricmc.loader.impl.launch.knot.KnotClient" || settings["name"] != "Friends SMP" || settings["preLaunchCommand"] != wantCmd || settings["enableCommands"] != true {
 		t.Fatalf("instance.json: %v", inst)
 	}

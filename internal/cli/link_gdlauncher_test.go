@@ -42,11 +42,13 @@ func TestLinkGDLauncher(t *testing.T) {
 	}
 
 	inst := readGDLInstance(t, instDir)
-	exe, _ := os.Executable()
-	wantHook := launcher.GDLauncherHookArg(exe) + " sync " + launcher.GDLauncherHookArg(h.dir) + " --target client --into ."
+	// GDLauncher substitutes nothing, so its slot carries an absolute path. The temp directory is
+	// compared by suffix because macOS resolves /var to /private/var.
+	wantHookSuffix := `/.shulker/pre-launch"`
 	version := inst["game_configuration"].(map[string]any)["version"].(map[string]any)
 	loaders := version["modloaders"].([]any)
-	if inst["_version"] != "1" || inst["name"] != "Friends: SMP" || inst["pre_launch_hook"] != wantHook || inst["icon"] != launcher.GDLauncherIconFile || version["release"] != "26.2" {
+	hook, _ := inst["pre_launch_hook"].(string)
+	if inst["_version"] != "1" || inst["name"] != "Friends: SMP" || !strings.HasSuffix(hook, wantHookSuffix) || inst["icon"] != launcher.GDLauncherIconFile || version["release"] != "26.2" {
 		t.Fatalf("instance.json: %v", inst)
 	}
 	if lv := loaders[0].(map[string]any); len(loaders) != 1 || lv["type"] != "Fabric" || lv["version"] != "0.17.3" {
@@ -75,7 +77,8 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatalf("relink output:\n%s", stdout)
 	}
 	again := readGDLInstance(t, instDir)
-	if again["icon"] != "mine.png" || again["game_configuration"].(map[string]any)["memory"] == nil || again["pre_launch_hook"] != wantHook {
+	againHook, _ := again["pre_launch_hook"].(string)
+	if again["icon"] != "mine.png" || again["game_configuration"].(map[string]any)["memory"] == nil || !strings.HasSuffix(againHook, wantHookSuffix) {
 		t.Fatalf("relink should keep the player's icon and settings: %v", again)
 	}
 

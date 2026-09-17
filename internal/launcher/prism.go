@@ -33,7 +33,6 @@ type Instance struct {
 	Minecraft     string
 	LoaderType    string
 	LoaderVersion string
-	PreLaunch     string
 	GameDirLink   string
 }
 
@@ -236,13 +235,9 @@ func writeInstanceConfig(path string, inst Instance, multimc bool) error {
 	if !multimc {
 		set["ConfigVersion"] = "1.3"
 	}
+	// The command slots belong to reconcile, which writes them after this, and to ReleaseSlots, which
+	// clears them. Touching them here would delete a command shulker hasn't had the chance to adopt.
 	remove := map[string]bool{}
-	if inst.PreLaunch != "" {
-		set["PreLaunchCommand"] = inst.PreLaunch
-		set["OverrideCommands"] = "true"
-	} else {
-		remove["PreLaunchCommand"] = true
-	}
 	var buf bytes.Buffer
 	if len(lines) == 0 {
 		lines = []string{"[General]"}
@@ -272,36 +267,9 @@ func writeInstanceConfig(path string, inst Instance, multimc bool) error {
 	return fsutil.Write(path, buf.Bytes())
 }
 
-// IsSyncCommand reports whether a pre-launch command is the shulker sync that linking writes. GDLauncher
-// runs hooks in the game directory without setting variables, so its sync goes into ".".
-func IsSyncCommand(command string) bool {
-	return strings.Contains(command, " sync ") && (strings.HasSuffix(command, `--into "$INST_MC_DIR"`) || strings.HasSuffix(command, " --into ."))
-}
-
-// RemovePreLaunch drops an instance's pre-launch command, but only a shulker sync; any other
-// command is the player's and is kept. It reports whether a command was removed.
-func RemovePreLaunch(instanceDir string, multimc bool) (bool, error) {
-	path := filepath.Join(instanceDir, InstanceConfigFile)
-	values, err := readINI(path, multimc)
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	if err != nil || !IsSyncCommand(values["PreLaunchCommand"]) {
-		return false, err
-	}
-	lines, err := readINILines(path)
-	if err != nil {
-		return false, err
-	}
-	var buf bytes.Buffer
-	for _, line := range lines {
-		if key, _, ok := splitINILine(line); ok && key == "PreLaunchCommand" {
-			continue
-		}
-		buf.WriteString(line + "\n")
-	}
-	return true, fsutil.Write(path, buf.Bytes())
-}
+// IsSyncCommand reports whether a slot holds a command shulker owns: the generated script it writes
+// now, or the inline sync it wrote before those existed.
+func IsSyncCommand(command string) bool { return IsShulkerSlot(command) }
 
 func readINILines(path string) ([]string, error) {
 	f, err := os.Open(path)

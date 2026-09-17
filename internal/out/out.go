@@ -37,6 +37,10 @@ type Error struct {
 	Help string `json:"-"`
 	// Nudge is the human-only command to run next, with its lead-in.
 	Nudge Nudge `json:"-"`
+	// Plain renders the error as dialog body text: no glyph, no code aside, no gutter, and the
+	// nudge's command without its prompt. A launcher shows what a hook wrote with no terminal
+	// around it, where that decoration reads as noise.
+	Plain bool `json:"-"`
 	// Given is the argument the user typed that a pick replaces in the example command.
 	Given string `json:"-"`
 	// Flag receives the pick in the example command when no typed argument is replaced.

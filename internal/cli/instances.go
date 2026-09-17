@@ -227,6 +227,15 @@ func (a *app) registerInstance(in config.Instance) {
 		in.ID = uniqueID(instances, in.ID, in.Name, in.Dir)
 		return append(instances, in)
 	})
+	a.reconcileOrWarn(in)
+}
+
+// reconcileOrWarn brings an instance's hooks in line with its instance.json. A launcher shulker
+// couldn't set up is worth saying so about, but never worth failing the command that registered it.
+func (a *app) reconcileOrWarn(in config.Instance) {
+	if err := a.reconcileInstance(in); err != nil {
+		a.printer.Warn("hooks not set up for %q: %v", in.Label(), err)
+	}
 }
 
 // registerSync keeps the launcher of an instance that a link made, and its name unless in has one.
@@ -257,6 +266,7 @@ func (a *app) registerSync(in config.Instance, defaultName string) (config.Insta
 		instances[i] = in
 		return instances
 	})
+	a.reconcileOrWarn(in)
 	return in, changed
 }
 

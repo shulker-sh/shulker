@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -91,15 +90,6 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 					return out.Errorf("instance-exists", "ATLauncher already has an instance %q that shulker didn't link; pass --name to create a second instance, or --force to link this one", display)
 				}
 			}
-			exe, err := shulkerPath()
-			if err != nil {
-				return err
-			}
-			command := []string{launcher.CommandArg(exe), "sync", launcher.CommandArg(src.name)}
-			if ref != "" {
-				command = append(command, "--ref", launcher.CommandArg(ref))
-			}
-			preLaunch := strings.Join(append(command, "--target", name, "--into", `"$INST_MC_DIR"`), " ")
 			version, err := a.atlauncherVersion(cmd.Context(), p, l, atl)
 			if err != nil {
 				return err
@@ -109,7 +99,6 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 				Minecraft:     p.Lock.Minecraft,
 				LoaderType:    p.Lock.Loader.Type,
 				LoaderVersion: p.Lock.Loader.Version,
-				PreLaunch:     preLaunch,
 				Version:       version,
 			})
 			if err != nil {
@@ -144,7 +133,7 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 				Mode:        "sync",
 				Target:      name,
 				GameDir:     res.GameDir,
-				Command:     preLaunch,
+				Command:     launcher.SlotCommand("atlauncher", res.GameDir, launcher.HookPreLaunch),
 				Created:     res.Created,
 				Source:      src.name,
 				Sync:        synced,

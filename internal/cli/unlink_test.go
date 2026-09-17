@@ -65,7 +65,9 @@ func TestUnlink(t *testing.T) {
 	if err := os.WriteFile(customCfg, []byte(custom), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if r := unlinkJSON(t, h, "Custom"); r[0].Removed != "" || readINIFile(t, customCfg)["PreLaunchCommand"] != "echo hi" {
+	// The pre-launch command isn't shulker's, so it stays. The post-exit slot is shulker's, so it
+	// goes, and unlink reports the slot that actually went.
+	if r := unlinkJSON(t, h, "Custom"); r[0].Removed != launcher.RemovedPostExit || readINIFile(t, customCfg)["PreLaunchCommand"] != "echo hi" {
 		t.Fatalf("a pre-launch command that isn't shulker's is kept: %+v", r)
 	}
 

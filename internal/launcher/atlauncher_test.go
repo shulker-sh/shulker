@@ -68,7 +68,7 @@ func TestMergeVersion(t *testing.T) {
 
 func TestATLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	l := &ATLauncher{Dir: t.TempDir()}
-	inst := ATLauncherInstance{Name: "Friends SMP!", Minecraft: "26.2", LoaderType: "neoforge", LoaderVersion: "26.2.0.87", PreLaunch: `/bin/shulker sync /pack --target client --into "$INST_MC_DIR"`, Version: json.RawMessage(`{"id":"26.2"}`)}
+	inst := ATLauncherInstance{Name: "Friends SMP!", Minecraft: "26.2", LoaderType: "neoforge", LoaderVersion: "26.2.0.87", Version: json.RawMessage(`{"id":"26.2"}`)}
 	res, err := l.WriteInstance(inst)
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +89,8 @@ func TestATLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	}
 	again := readInstanceJSON(t, path)
 	settings := again["launcher"].(map[string]any)
-	if again["uuid"] != first["uuid"] || settings["maximumMemory"] != float64(8192) || settings["enableCommands"] != true {
+	// enableCommands belongs to the slots now, so reconcile sets it, not WriteInstance.
+	if again["uuid"] != first["uuid"] || settings["maximumMemory"] != float64(8192) {
 		t.Fatalf("relink should keep uuid and player settings: %v", again)
 	}
 	if settings["requiredMemory"] != float64(0) || settings["requiredPermGen"] != float64(0) {
@@ -97,17 +98,6 @@ func TestATLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	}
 	if lv := settings["loaderVersion"].(map[string]any); lv["type"] != "NeoForge" || lv["version"] != "26.2.0.87" {
 		t.Fatalf("loaderVersion: %v", lv)
-	}
-
-	if removed, err := RemoveATLauncherPreLaunch(res.Dir); err != nil || !removed {
-		t.Fatalf("remove: %v %v", removed, err)
-	}
-	settings = readInstanceJSON(t, path)["launcher"].(map[string]any)
-	if _, ok := settings["preLaunchCommand"]; ok || settings["maximumMemory"] != float64(8192) {
-		t.Fatalf("after unlink: %v", settings)
-	}
-	if _, ok := settings["enableCommands"]; ok {
-		t.Fatalf("unlink should drop enableCommands: %v", settings)
 	}
 }
 

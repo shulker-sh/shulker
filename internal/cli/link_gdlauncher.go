@@ -5,7 +5,6 @@ import (
 	"errors"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -102,21 +101,11 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			if running {
 				a.printer.Warn("GDLauncher is open; it may overwrite this instance's changes. Quit it and run this link again")
 			}
-			exe, err := shulkerPath()
-			if err != nil {
-				return err
-			}
-			command := []string{launcher.GDLauncherHookArg(exe), "sync", launcher.GDLauncherHookArg(src.name)}
-			if ref != "" {
-				command = append(command, "--ref", launcher.GDLauncherHookArg(ref))
-			}
-			preLaunch := strings.Join(append(command, "--target", name, "--into", "."), " ")
 			res, err := gdl.WriteInstance(launcher.GDLauncherInstance{
 				Name:          display,
 				Minecraft:     p.Lock.Minecraft,
 				LoaderType:    p.Lock.Loader.Type,
 				LoaderVersion: loaderVersion,
-				PreLaunch:     preLaunch,
 			})
 			if err != nil {
 				return err
@@ -150,7 +139,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				Mode:        "sync",
 				Target:      name,
 				GameDir:     res.GameDir,
-				Command:     preLaunch,
+				Command:     launcher.SlotCommand("gdlauncher", res.GameDir, launcher.HookPreLaunch),
 				Created:     res.Created,
 				Source:      src.name,
 				Sync:        synced,

@@ -15,6 +15,7 @@ import (
 
 const (
 	RemovedPreLaunch = "pre-launch command"
+	RemovedPostExit  = "post-exit command"
 	RemovedProfile   = "launcher profile"
 )
 
@@ -187,28 +188,25 @@ func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 	case err == nil && info.Mode()&os.ModeSymlink != 0:
 		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance stays and still uses the build directory.", l.Label(), e.Title)}, nil
 	}
-	var removed bool
-	var err error
-	switch e.Name {
-	case "atlauncher":
-		removed, err = RemoveATLauncherPreLaunch(instanceDir)
-	case "gdlauncher":
-		removed, err = RemoveGDLauncherPreLaunch(instanceDir)
-	default:
-		removed, err = RemovePreLaunch(instanceDir, e.Name == "multimc")
-	}
+	tookPreLaunch, tookPostExit, err := ReleaseSlots(e, l.Dir)
 	if err != nil {
 		return Forgotten{}, err
 	}
-	if !removed {
+	if !tookPreLaunch && !tookPostExit {
 		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept.", l.Label(), e.Title)}, nil
 	}
-	summary := fmt.Sprintf("Unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay.", l.Label(), e.Title)
+	// Report the slot that actually went: a pre-launch command shulker never wrote is kept, and then
+	// the post-exit slot is all there was to remove.
+	removed, what := RemovedPreLaunch, "pre-launch sync"
+	if !tookPreLaunch {
+		removed, what = RemovedPostExit, "post-exit command"
+	}
+	summary := fmt.Sprintf("Unlinked %q (%s): removed its %s; the instance and its worlds stay.", l.Label(), e.Title, what)
 	// Unlink warns when GDLauncher is open, so the restart reminder is only for where it can't tell.
 	if _, detectable := GDLauncherRunning(); e.Name != "gdlauncher" || !detectable {
 		summary += "\nRestart the launcher if it is open so the change is picked up."
 	}
-	return Forgotten{Removed: RemovedPreLaunch, Summary: summary}, nil
+	return Forgotten{Removed: removed, Summary: summary}, nil
 }
 
 func forgetMojang(e *Entry, l config.Instance) (Forgotten, error) {

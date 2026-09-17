@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -116,15 +115,6 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				if prev := prevState.Source; prev != "" && prev != src.name && !force {
 					return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev)
 				}
-				exe, err := shulkerPath()
-				if err != nil {
-					return err
-				}
-				command := []string{launcher.CommandArg(exe), "sync", launcher.CommandArg(src.name)}
-				if ref != "" {
-					command = append(command, "--ref", launcher.CommandArg(ref))
-				}
-				inst.PreLaunch = strings.Join(append(command, "--target", name, "--into", `"$INST_MC_DIR"`), " ")
 			} else {
 				inst.GameDirLink = buildDir
 			}
@@ -143,6 +133,15 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			launcherName := "prism"
 			if l.MultiMC {
 				launcherName = "multimc"
+			}
+			// A symlink-mode instance gets no instance file and so no hooks; if it had them before,
+			// this is where it lets go of them.
+			if mode != "sync" {
+				if e := launcher.Find(launcherName); e != nil {
+					if _, _, err := launcher.ReleaseSlots(e, res.GameDir); err != nil {
+						return err
+					}
+				}
 			}
 			if err := a.checkID(as, res.GameDir); err != nil {
 				return err
@@ -172,7 +171,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				Mode:        mode,
 				Target:      name,
 				GameDir:     res.GameDir,
-				Command:     inst.PreLaunch,
+				Command:     linkedSlotCommand(launcherName, mode, res.GameDir),
 				Created:     res.Created,
 				Source:      src.name,
 				Sync:        synced,
@@ -247,7 +246,17 @@ func (a *app) saveInstanceFeatures(gameDir string, ff featureFlags) error {
 	return a.saveLocal(lf, false)
 }
 
-// shulkerPath is the path to write into a pre-launch command: the one shulker
+// linkedSlotCommand is what the launcher's slot holds once reconcile has written it. An instance
+// linked in symlink mode has no instance file and so no hooks, and nothing in its slot.
+func linkedSlotCommand(launcherName, mode, gameDir string) string {
+	if mode != "sync" {
+		return ""
+	}
+	return launcher.SlotCommand(launcherName, gameDir, launcher.HookPreLaunch)
+}
+
+// shulkerPath is the path reconcile records in settings.shulker for the generated scripts to call:
+// the one shulker
 // is installed under on PATH when that is this binary, else this binary's own
 // path. A bare "shulker" would not do, because launchers opened from the Dock
 // never read the shell rc files installers add PATH through.

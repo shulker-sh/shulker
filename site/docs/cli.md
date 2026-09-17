@@ -805,6 +805,20 @@ shulker unlink --all --side server
 | `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only `client` or `server` entries |
 
+### `shulker hook pre-launch`
+
+What a launcher's own pre-launch slot runs. shulker writes the script that calls it into the instance's `.shulker/` folder and points the launcher at that, so there is no reason to run this yourself: outside a launcher slot it would sync whatever directory it was run in. It syncs the instance from its source before the game starts, and a failure never stops the game — the launcher plays what is already on disk.
+
+A launcher that gives shulker no way to show a message gets a deadline instead, so a long update can explain itself rather than looking like a hang. That is GDLauncher only, which discards a hook's output when its own five-minute limit runs out.
+
+| Flag | Description |
+| --- | --- |
+| `--deadline <duration>` | Stop the update after this long and say so, aborting the launch (default: no deadline) |
+
+### `shulker hook post-exit`
+
+What a launcher's own post-exit slot runs, recording how the run ended in the instance's `.shulker/launches.json`: when it started and finished, whether the game left a crash report, and where that report and the log are. `settings.launchHistory` in `.shulker/instance.json` is how many runs are kept — 5 by default, `-1` every one, and `0` none at all, which records nothing.
+
 ## Types
 
 `add`, `remove`, and `list` span every kind of thing a project requires. Each kind also has a group of its own, which is the plain verb with that `--type` and only the flags that kind takes.
@@ -1157,6 +1171,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `unset-variable` | An override uses a variable that isn't set |
 | `unsupported-loader` | shulker doesn't support the loader yet |
 | `unsupported-mode` | `--mode symlink` isn't supported on Windows yet |
+| `update-paused` | The pre-launch hook stopped a GDLauncher update at four minutes so it could explain itself; the launch is aborted, and launching again resumes it. Shown in GDLauncher's own dialog, so it prints without shulker's usual error decoration |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |

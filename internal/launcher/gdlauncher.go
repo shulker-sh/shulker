@@ -38,7 +38,6 @@ type GDLauncherInstance struct {
 	LoaderType string
 	// LoaderVersion is named the way GDLauncher's meta names it; see GDLauncherLoaderVersion.
 	LoaderVersion string
-	PreLaunch     string
 }
 
 var gdlauncherLoaderTypes = map[string]string{"fabric": "Fabric", "quilt": "Quilt", "neoforge": "Neoforge", "forge": "Forge"}
@@ -199,9 +198,6 @@ func (l *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, err
 	}
 	top["_version"] = jsonString("1")
 	top["name"] = jsonString(inst.Name)
-	if inst.PreLaunch != "" {
-		top["pre_launch_hook"] = jsonString(inst.PreLaunch)
-	}
 	if err := os.MkdirAll(res.GameDir, 0o755); err != nil {
 		return res, err
 	}
@@ -234,29 +230,6 @@ func GDLauncherPreLaunch(instanceDir string) (hook string, found bool, err error
 		return "", true, fmt.Errorf("%s: %w", path, err)
 	}
 	return inst.Hook, true, nil
-}
-
-// RemoveGDLauncherPreLaunch drops an instance's pre-launch hook when it is a shulker sync. It reports
-// whether a hook was removed.
-func RemoveGDLauncherPreLaunch(instanceDir string) (bool, error) {
-	path := filepath.Join(instanceDir, GDLauncherInstanceFile)
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	top := map[string]json.RawMessage{}
-	if err := json.Unmarshal(data, &top); err != nil {
-		return false, fmt.Errorf("%s: %w", path, err)
-	}
-	var hook string
-	if json.Unmarshal(top["pre_launch_hook"], &hook) != nil || !IsSyncCommand(hook) {
-		return false, nil
-	}
-	delete(top, "pre_launch_hook")
-	return true, fsutil.WriteJSON(path, top)
 }
 
 // GDLauncherHookArg quotes one argument of a GDLauncher hook. GDLauncher splits a hook POSIX-style with

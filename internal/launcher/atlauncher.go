@@ -36,7 +36,6 @@ type ATLauncherInstance struct {
 	Minecraft     string
 	LoaderType    string
 	LoaderVersion string
-	PreLaunch     string
 	// Version is the merged version JSON the launcher installs and starts the game from.
 	Version json.RawMessage
 }
@@ -162,10 +161,6 @@ func (l *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, err
 	} else {
 		delete(settings, "loaderVersion")
 	}
-	if inst.PreLaunch != "" {
-		settings["enableCommands"] = json.RawMessage("true")
-		settings["preLaunchCommand"] = jsonString(inst.PreLaunch)
-	}
 	if top["launcher"], err = json.Marshal(settings); err != nil {
 		return res, err
 	}
@@ -202,39 +197,6 @@ func ATLauncherPreLaunch(instanceDir string) (command string, found bool, err er
 		return "", true, fmt.Errorf("%s: %w", path, err)
 	}
 	return inst.Launcher.PreLaunchCommand, true, nil
-}
-
-// RemoveATLauncherPreLaunch drops an instance's pre-launch command when it is a shulker sync, and the
-// per-instance switch that turned commands on for it. It reports whether a command was removed.
-func RemoveATLauncherPreLaunch(instanceDir string) (bool, error) {
-	path := filepath.Join(instanceDir, ATLauncherInstanceFile)
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	top := map[string]json.RawMessage{}
-	if err := json.Unmarshal(data, &top); err != nil {
-		return false, fmt.Errorf("%s: %w", path, err)
-	}
-	settings := map[string]json.RawMessage{}
-	if raw, ok := top["launcher"]; ok {
-		if err := json.Unmarshal(raw, &settings); err != nil {
-			return false, fmt.Errorf("%s: launcher: %w", path, err)
-		}
-	}
-	var command string
-	if json.Unmarshal(settings["preLaunchCommand"], &command) != nil || !IsSyncCommand(command) {
-		return false, nil
-	}
-	delete(settings, "preLaunchCommand")
-	delete(settings, "enableCommands")
-	if top["launcher"], err = json.Marshal(settings); err != nil {
-		return false, err
-	}
-	return true, fsutil.WriteJSON(path, top)
 }
 
 // MergeVersion lays a loader's version JSON over the vanilla one the way ATLauncher's own installer

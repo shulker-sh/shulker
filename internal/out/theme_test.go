@@ -124,6 +124,27 @@ func TestErrorRowsRenderStructured(t *testing.T) {
 	}
 }
 
+func TestPlainErrorDropsTerminalDecoration(t *testing.T) {
+	e := &Error{
+		Code:    "update-paused",
+		Message: "This pack's update took longer than 4 minutes, so shulker paused it.",
+		Plain:   true,
+		Nudge:   Nudge{Lead: "Launch again to resume it, or finish the download first with", Command: "shulker sync -i cozy"},
+	}
+	want := []string{
+		"This pack's update took longer than 4 minutes, so shulker paused it.",
+		"",
+		"Launch again to resume it, or finish the download first with:",
+		"    shulker sync -i cozy",
+	}
+	// Rendered with colour on, because a launcher dialog shows the bytes verbatim: no escapes, no
+	// glyph, no code aside, no gutter, and no prompt in front of the command.
+	got := render(coloured(), func(l *Lines) { l.Error(e) })
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got\n%q\nwant\n%q", got, want)
+	}
+}
+
 func TestDiffPaintsInsideTheGutter(t *testing.T) {
 	lines := render(coloured(), func(l *Lines) {
 		l.Diff("--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a = 3\n+a = 2\n b\n")

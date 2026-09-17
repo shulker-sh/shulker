@@ -79,6 +79,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		if wrote {
 			res.Wrote = append(res.Wrote, instance.Path(in.Dir))
 		}
+		a.reconcileOrWarn(*in)
 	}
 	for _, found := range scanLaunchers(launcherName, launcherDir) {
 		if registered[filepath.Clean(found.Dir)] {

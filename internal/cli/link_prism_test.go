@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 )
@@ -39,8 +40,9 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 	if rep := env.Data; rep.Source != source || rep.Name != "Friends" || rep.GameDir != gameDir || rep.Sync == nil {
 		t.Fatalf("link report: %+v", rep)
 	}
-	exe, _ := os.Executable()
-	wantCmd := launcher.CommandArg(exe) + " sync " + launcher.CommandArg(source) + " --ref " + launcher.CommandArg("main") + ` --target client --into "$INST_MC_DIR"`
+	// The slot names the generated script through Prism's own token, so it carries neither the
+	// source nor the binary's path.
+	wantCmd := `sh "$INST_MC_DIR/.shulker/pre-launch"`
 	if cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile)); cfg["PreLaunchCommand"] != wantCmd {
 		t.Fatalf("PreLaunchCommand = %q, want %q", cfg["PreLaunchCommand"], wantCmd)
 	}
@@ -60,8 +62,9 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 		t.Fatalf("linking another source into the instance: exit %d %s", code, stdout)
 	}
 	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--name", "Friends", "--force")
-	if cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile)); !strings.Contains(cfg["PreLaunchCommand"], " sync "+launcher.CommandArg(h.dir)+" ") {
-		t.Fatalf("--force should repoint the instance: %q", cfg["PreLaunchCommand"])
+	// The slot is a fixed script path now, so where the instance syncs from shows in its own file.
+	if intent := readFile(t, filepath.Join(instDir, "minecraft", instance.Dir, instance.FileName)); !strings.Contains(intent, h.dir) {
+		t.Fatalf("--force should repoint the instance: %s", intent)
 	}
 
 	code, stdout, _ = h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--ref", "main", "--json")
@@ -89,8 +92,7 @@ func TestLinkPrism(t *testing.T) {
 	if cfg["InstanceType"] != "OneSix" || cfg["name"] != "my-pack" || cfg["OverrideCommands"] != "true" {
 		t.Fatalf("instance.cfg: %v", cfg)
 	}
-	exe, _ := os.Executable()
-	wantCmd := launcher.CommandArg(exe) + " sync " + launcher.CommandArg(h.dir) + ` --target client --into "$INST_MC_DIR"`
+	wantCmd := `sh "$INST_MC_DIR/.shulker/pre-launch"`
 	if cfg["PreLaunchCommand"] != wantCmd {
 		t.Fatalf("PreLaunchCommand = %q, want %q", cfg["PreLaunchCommand"], wantCmd)
 	}
@@ -226,8 +228,7 @@ func TestLinkPrismConfigFormats(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
-	exe, _ := os.Executable()
-	cmdValue := launcher.CommandArg(exe) + " sync " + launcher.CommandArg(h.dir) + ` --target client --into "$INST_MC_DIR"`
+	cmdValue := `sh "$INST_MC_DIR/.shulker/pre-launch"`
 
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir)

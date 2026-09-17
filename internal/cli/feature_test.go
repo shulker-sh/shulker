@@ -219,7 +219,7 @@ func TestLinkPrismKeepsFeatureFlags(t *testing.T) {
 	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--with", "fancy")
 	instDir := filepath.Join(launcherDir, "instances", "shulker-my-pack")
 	cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
-	if !strings.HasSuffix(cfg["PreLaunchCommand"], ` --into "$INST_MC_DIR"`) {
+	if !strings.HasSuffix(cfg["PreLaunchCommand"], `/.shulker/pre-launch"`) {
 		t.Fatalf("PreLaunchCommand = %q", cfg["PreLaunchCommand"])
 	}
 	gameDir := filepath.Join(instDir, "minecraft")

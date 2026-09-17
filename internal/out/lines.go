@@ -272,6 +272,10 @@ func (l *Lines) Entries(heading string, entries []Entry) {
 // Error renders the error tree: the red line with its code, then the items,
 // candidates, and help underneath.
 func (l *Lines) Error(e *Error) {
+	if e.Plain {
+		l.plainError(e)
+		return
+	}
 	t := l.T
 	code := e.Code
 	if code == "" {
@@ -293,6 +297,27 @@ func (l *Lines) Error(e *Error) {
 	l.Tree(rows...)
 	if e.Nudge.Command != "" {
 		l.Nudge(e.Nudge.Lead, e.Nudge.Command)
+	}
+}
+
+// plainError renders an error as dialog body text. A launcher hook's stderr is shown to the player
+// inside the launcher's own message, with no terminal around it, so the glyph, the code aside, the
+// gutter and the nudge's prompt are all dropped and the command is indented instead.
+func (l *Lines) plainError(e *Error) {
+	message, extra, _ := strings.Cut(e.Message, "\n")
+	l.Raw(message)
+	for _, line := range append(strings.Split(extra, "\n"), e.Items...) {
+		if line = strings.TrimSpace(line); line != "" {
+			l.Raw(line)
+		}
+	}
+	if e.Help != "" {
+		l.Raw(e.Help)
+	}
+	if e.Nudge.Command != "" {
+		l.Blank()
+		l.Raw(e.Nudge.Lead + ":")
+		l.Raw("    " + e.Nudge.Command)
 	}
 }
 

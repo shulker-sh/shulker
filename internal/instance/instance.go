@@ -32,16 +32,25 @@ type File struct {
 }
 
 type Settings struct {
-	Hooks   Hooks    `json:"hooks"`
-	Marker  *bool    `json:"marker,omitempty"`
-	Java    string   `json:"java,omitempty"`
-	Wrapper []string `json:"wrapper,omitempty"`
-	Shulker string   `json:"shulker,omitempty"`
+	Hooks         Hooks     `json:"hooks"`
+	Commands      *Commands `json:"commands,omitempty"`
+	Marker        *bool     `json:"marker,omitempty"`
+	Java          string    `json:"java,omitempty"`
+	Wrapper       []string  `json:"wrapper,omitempty"`
+	Shulker       string    `json:"shulker,omitempty"`
+	LaunchHistory *int      `json:"launchHistory,omitempty"`
 }
 
 type Hooks struct {
 	PreLaunch *bool `json:"preLaunch,omitempty"`
 	PostExit  *bool `json:"postExit,omitempty"`
+}
+
+// Commands are the launcher's own slot commands, moved here when shulker took the slot over. The
+// generated script runs them first, so they keep aborting a launch on a non-zero exit.
+type Commands struct {
+	PreLaunch string `json:"preLaunch,omitempty"`
+	PostExit  string `json:"postExit,omitempty"`
 }
 
 type Resolved struct {

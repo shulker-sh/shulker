@@ -61,7 +61,7 @@ func TestDefaultGDLauncherDirOverride(t *testing.T) {
 
 func TestGDLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	l := &GDLauncher{Dir: t.TempDir()}
-	inst := GDLauncherInstance{Name: "Pack", Minecraft: "26.2", LoaderType: "neoforge", LoaderVersion: "26.2.0.87", PreLaunch: `"/bin/shulker" sync "/pack" --target client --into .`}
+	inst := GDLauncherInstance{Name: "Pack", Minecraft: "26.2", LoaderType: "neoforge", LoaderVersion: "26.2.0.87"}
 	res, err := l.WriteInstance(inst)
 	if err != nil {
 		t.Fatal(err)
@@ -112,23 +112,6 @@ func TestGDLauncherWriteInstanceKeepsSettings(t *testing.T) {
 	}
 	if config["memory"] == nil || again["icon"] != "mine.png" || again["seconds_played"] != float64(60) || again["post_exit_hook"] != "echo bye" {
 		t.Fatalf("relink should keep the player's settings: %v", again)
-	}
-
-	if removed, err := RemoveGDLauncherPreLaunch(res.Dir); err != nil || !removed {
-		t.Fatalf("remove: %v %v", removed, err)
-	}
-	after := readInstanceJSON(t, path)
-	if _, ok := after["pre_launch_hook"]; ok || after["post_exit_hook"] != "echo bye" {
-		t.Fatalf("after unlink: %v", after)
-	}
-
-	after["pre_launch_hook"] = "./prepare.sh"
-	data, _ = json.Marshal(after)
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if removed, err := RemoveGDLauncherPreLaunch(res.Dir); err != nil || removed {
-		t.Fatalf("a hook that isn't shulker's should stay: %v %v", removed, err)
 	}
 }
 
