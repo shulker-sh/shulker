@@ -8,6 +8,5 @@
 /.claude/
 /skills-lock.json
 /CLAUDE.md
-/docs/agents/
 /CONTEXT.md
-/docs/adr/
+/docs/
