@@ -80,12 +80,12 @@ func TestLinkGDLauncher(t *testing.T) {
 	}
 
 	var listed struct {
-		Data []linkEntry `json:"data"`
+		Data []instanceEntry `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "links", "--json")), &listed); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &listed); err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Data) != 1 || listed.Data[0].Launcher != "gdlauncher" || listed.Data[0].Dir != gameDir || listed.Data[0].Status != linkSynced {
+	if len(listed.Data) != 1 || listed.Data[0].Launcher != "gdlauncher" || listed.Data[0].Dir != gameDir || listed.Data[0].Status != instanceSynced {
 		t.Fatalf("links: %+v", listed.Data)
 	}
 

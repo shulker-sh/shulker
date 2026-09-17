@@ -11,7 +11,7 @@ import (
 	"shulker.sh/shulker/internal/project"
 )
 
-func (a *app) projectLinks(s linkSelection) (links []config.Link, inProject bool, err error) {
+func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, inProject bool, err error) {
 	p, err := a.openProject()
 	if errors.Is(err, project.ErrNoManifest) {
 		return nil, false, nil
@@ -26,14 +26,14 @@ func (a *app) projectLinks(s linkSelection) (links []config.Link, inProject bool
 	if err != nil {
 		return nil, true, err
 	}
-	registry, err := a.loadLinks()
+	registry, err := a.loadInstances()
 	if err != nil {
 		return nil, true, err
 	}
-	var all []config.Link
-	for _, l := range registry {
-		if sameDir(l.Source, dir) {
-			all = append(all, l)
+	var all []instanceEntry
+	for _, in := range registry {
+		if sameDir(in.Source, dir) {
+			all = append(all, inspectInstance(in))
 		}
 	}
 	lf, err := local.Load(dir)
@@ -42,24 +42,33 @@ func (a *app) projectLinks(s linkSelection) (links []config.Link, inProject bool
 	}
 	for _, name := range targetNames(p.Manifest.Targets) {
 		for _, d := range lf.ExistingSyncDirs(name) {
-			if !slices.ContainsFunc(all, func(l config.Link) bool { return sameDir(l.Dir, d) }) {
-				all = append(all, config.Link{Side: p.Manifest.Targets[name].Side, Name: p.Manifest.DisplayName(name), Dir: d, Source: dir, Target: name})
+			if slices.ContainsFunc(all, func(e instanceEntry) bool { return sameDir(e.Dir, d) }) {
+				continue
 			}
+			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(name), Dir: d, Source: dir})
+			e.ID = slugID(e.Name)
+			if e.Target == "" {
+				e.Target = name
+			}
+			if e.Side == "" {
+				e.Side = p.Manifest.Targets[name].Side
+			}
+			all = append(all, e)
 		}
 	}
 	if len(all) == 0 {
-		return nil, true, out.Errorf("no-links", "nothing is synced from %s yet; `shulker sync --into <dir>` or `shulker link prism` adds an entry, and `shulker sync --all` syncs every entry", dir)
+		return nil, true, out.Errorf("no-instances", "nothing is synced from %s yet; `shulker sync --into <dir>` or `shulker link prism` adds an instance, and `shulker sync --all` syncs every one", dir)
 	}
-	slices.SortStableFunc(all, compareLinks)
-	for _, l := range all {
-		if s.admits(l) {
-			links = append(links, l)
+	sortInstanceEntries(all)
+	for _, e := range all {
+		if s.admits(e) {
+			entries = append(entries, e)
 		}
 	}
-	if len(links) == 0 {
-		e := out.Errorf("instance-not-found", "no entry synced from %s matches %s", dir, describeSelection("", s))
-		e.Candidates = linkCandidates(all)
+	if len(entries) == 0 {
+		e := out.Errorf("instance-not-found", "no instance synced from %s matches %s", dir, describeSelection("", s))
+		e.Candidates = instanceCandidates(all)
 		return nil, true, e
 	}
-	return links, true, nil
+	return entries, true, nil
 }

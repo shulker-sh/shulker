@@ -41,7 +41,7 @@ func (a *app) linkCmd() *cobra.Command {
 }
 
 func (a *app) linkMojangCmd() *cobra.Command {
-	var launcherDir, target, instanceName, ref string
+	var launcherDir, target, instanceName, ref, as string
 	var force bool
 	cmd := &cobra.Command{
 		Use:     "mojang [project-dir | git-url | manifest-url]",
@@ -83,7 +83,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				display = instanceName
 			}
 			key := profileKey(display)
-			if prev, ok := a.findLauncherLink("mojang", launcherDir, display); ok && prev.Source != src.name && !force {
+			if prev, ok := a.findLauncherInstance("mojang", launcherDir, display); ok && prev.Source != src.name && !force {
 				return out.Errorf("instance-exists", "profile %q already syncs from %s; pass --name to create a second profile, or --force to repoint this one", display, prev.Source)
 			}
 			gameDir := filepath.Join(src.Dir, p.Manifest.BuildDir(name))
@@ -125,10 +125,16 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				Source:      src.name,
 				Ref:         ref,
 			}
+			if err := a.checkID(as, gameDir); err != nil {
+				return err
+			}
 			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
-			a.registerLink(config.Link{Launcher: "mojang", LauncherDir: launcherDir, Side: "client", Name: display, Dir: gameDir, Source: src.name, Target: name, Ref: ref})
+			if err := saveIntent(gameDir, src.name, ref, name, "client"); err != nil {
+				return err
+			}
+			a.registerInstance(config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name})
 			if src.remote() {
 				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: name, into: gameDir})
 				if err != nil {
@@ -154,27 +160,28 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher directory (default: the official launcher's .minecraft folder)")
 	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
 	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the target's display name)")
+	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "repoint a profile that syncs from a different source")
 	return cmd
 }
 
-// findLauncherLink is the registry entry a launcher already has under a name,
+// findLauncherInstance is the registry row a launcher already has under a name,
 // when its directory is still there.
-func (a *app) findLauncherLink(launcherName, launcherDir, name string) (config.Link, bool) {
-	links, err := a.loadLinks()
+func (a *app) findLauncherInstance(launcherName, launcherDir, name string) (config.Instance, bool) {
+	instances, err := a.loadInstances()
 	if err != nil {
-		return config.Link{}, false
+		return config.Instance{}, false
 	}
-	for _, l := range links {
-		if l.Launcher != launcherName || l.Name != name || !sameDir(l.LauncherDir, launcherDir) {
+	for _, in := range instances {
+		if in.Launcher != launcherName || in.Name != name || !sameDir(in.LauncherDir, launcherDir) {
 			continue
 		}
-		if _, err := os.Stat(l.Dir); err == nil {
-			return l, true
+		if _, err := os.Stat(in.Dir); err == nil {
+			return in, true
 		}
 	}
-	return config.Link{}, false
+	return config.Instance{}, false
 }
 
 // linkSource is the project a link command works from: the argument when there

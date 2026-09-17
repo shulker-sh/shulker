@@ -150,10 +150,14 @@ func (l *Prism) prepareGameDir(dir, link string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if len(entries) > 0 {
-			return gameDir, fmt.Errorf("%w: %s", ErrGameDirNotEmpty, gameDir)
+		// A game directory holding nothing but shulker's own state is shulker's to replace: it is
+		// what a sync-mode link leaves behind, and switching that instance to symlink mode drops it.
+		for _, entry := range entries {
+			if entry.Name() != shulkerDir {
+				return gameDir, fmt.Errorf("%w: %s", ErrGameDirNotEmpty, gameDir)
+			}
 		}
-		if err := os.Remove(gameDir); err != nil {
+		if err := os.RemoveAll(gameDir); err != nil {
 			return "", err
 		}
 	default:

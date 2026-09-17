@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shulker.sh/schema/v1/instance.json",
+  "title": ".shulker/instance.json",
+  "description": "What an instance directory syncs from, and the settings that decide how shulker sets it up. Hand-edit it to change what shulker does, then run `shulker sync` or `shulker instances repair`. Shulker never rewrites the settings block. What the last build actually did is recorded separately, in .shulker/state.json.",
+  "type": "object",
+  "required": ["$schema", "source", "target"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "Always https://shulker.sh/schema/v1/instance.json. Shulker refuses a file that names a schema it doesn't know, rather than guessing at its shape."
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Where this instance syncs from: a project directory, a git URL, or a manifest URL."
+    },
+    "ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Branch, tag, or commit to follow from a git source. Omitted follows the remote HEAD."
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Which of the source's targets this directory is built from. Its side is read from the target itself, never stored here."
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Yours to change. Shulker seeds these when the instance is created and reads them from then on.",
+      "properties": {
+        "hooks": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Which commands the launcher runs for this instance. A hook that is off isn't installed in the launcher, and turning it off removes it on the next repair.",
+          "properties": {
+            "preLaunch": {
+              "type": "boolean",
+              "description": "Sync this instance from its source before each launch. Default true."
+            },
+            "postExit": {
+              "type": "boolean",
+              "description": "Record how each run ended when the game exits. Default true."
+            }
+          }
+        },
+        "marker": {
+          "type": "boolean",
+          "description": "Include the marker mod, which lists this pack in the in-game mod list and lets an export of it be recognised as this pack again. Off drops both. Default true."
+        },
+        "java": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path to the Java this machine launches the instance with. Omitted uses shulker's managed runtime. Per-machine, which is why it lives here rather than in the lock, which is shared, or the manifest, which is everyone's."
+        },
+        "wrapper": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Command prefix for the launch command, such as [\"gamemoderun\"]. Omitted leaves the launcher's own wrapper setting alone."
+        },
+        "shulker": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Absolute path of the shulker binary the generated hook scripts call. Written when the scripts are, and repointed by `shulker instances repair` after the binary moves."
+        }
+      }
+    },
+    "resolved": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Written by shulker, for you to read. Editing it changes nothing; the next sync writes it again.",
+      "properties": {
+        "side": {
+          "type": "string",
+          "enum": ["client", "server"],
+          "description": "Which side the target is, taken from the source's manifest when this instance was last linked or synced. Recorded so shulker can group and filter instances without opening a source that may be a remote one."
+        },
+        "java": {
+          "type": "string",
+          "description": "The Java the last sync resolved, whether the managed runtime or the `java` setting."
+        },
+        "launcherJava": {
+          "type": "string",
+          "description": "The Java path the launcher used before shulker pointed it at its own, so `unlink` and `self uninstall` can put it back."
+        },
+        "lastSyncAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When this instance last synced."
+        },
+        "lastResult": {
+          "type": "string",
+          "enum": ["ok", "failed"],
+          "description": "How that sync ended. A failed sync leaves the instance's files as they were, so the launcher still starts what is on disk."
+        }
+      }
+    }
+  }
+}

@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	PathEnv          = "SHULKER_CONFIG"
-	RegistryFileName = "registry.json"
+	PathEnv           = "SHULKER_CONFIG"
+	RegistryFileName  = "registry.json"
+	RegistrySchemaURL = "https://shulker.sh/schema/v1/registry.json"
 )
 
 var Keys = []string{"curseforge.key", "registry"}
@@ -30,15 +31,27 @@ type CurseForge struct {
 	Key string `json:"key"`
 }
 
-type Link struct {
+// Instance is one row of the registry: the index shulker keeps of the instances it syncs. What an
+// instance syncs from and how it is set up lives in the instance's own .shulker/instance.json;
+// LauncherDir stays here because unlink needs it when the instance directory is gone.
+type Instance struct {
+	ID          string `json:"id"`
+	Name        string `json:"name,omitempty"`
 	Launcher    string `json:"launcher,omitempty"`
 	LauncherDir string `json:"launcherDir,omitempty"`
-	Side        string `json:"side"`
-	Name        string `json:"name"`
 	Dir         string `json:"dir"`
 	Source      string `json:"source"`
-	Target      string `json:"target"`
-	Ref         string `json:"ref,omitempty"`
+	LastSync    string `json:"lastSync,omitempty"`
+	LastError   string `json:"lastError,omitempty"`
+}
+
+// Label is what shulker calls an instance in its own output: the name the launcher shows, or the
+// id when there is none.
+func (i Instance) Label() string {
+	if i.Name != "" {
+		return i.Name
+	}
+	return i.ID
 }
 
 func Path() (string, error) {
@@ -130,7 +143,7 @@ func RegistryPath(configPath string, cfg Config) string {
 	}
 }
 
-func LoadLinks(path string) ([]Link, error) {
+func LoadInstances(path string) ([]Instance, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -141,13 +154,40 @@ func LoadLinks(path string) ([]Link, error) {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return nil, nil
 	}
+	if err := checkRegistrySchema(path, data); err != nil {
+		return nil, err
+	}
+	if err := schema.Validate(schema.Registry, data); err != nil {
+		return nil, schema.Invalid("registry-invalid", path, data, err)
+	}
 	var registry struct {
-		Links []Link `json:"links"`
+		Instances []Instance `json:"instances"`
 	}
 	if err := json.Unmarshal(data, &registry); err != nil {
 		return nil, schema.Invalid("registry-invalid", path, data, err)
 	}
-	return registry.Links, nil
+	return registry.Instances, nil
+}
+
+// checkRegistrySchema reports a registry written by another shulker as something to repair rather
+// than as a list of schema failures, which is what a registry from before the instances rewrite
+// produces.
+func checkRegistrySchema(path string, data []byte) error {
+	var head struct {
+		Schema string `json:"$schema"`
+	}
+	if err := json.Unmarshal(data, &head); err != nil {
+		return schema.Invalid("registry-invalid", path, data, err)
+	}
+	if head.Schema == RegistrySchemaURL {
+		return nil
+	}
+	what := "names no $schema"
+	if head.Schema != "" {
+		what = "names the schema " + head.Schema
+	}
+	return schema.Invalid("registry-invalid", path, data,
+		errors.New(what+", which this shulker doesn't know; `shulker instances repair` rebuilds it"))
 }
 
 // CreateRegistry writes an empty registry at path when nothing is there yet.
@@ -158,45 +198,73 @@ func CreateRegistry(path string) (bool, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return false, err
 	}
-	return true, fsutil.WriteJSON(path, map[string]any{})
+	return true, fsutil.WriteJSON(path, map[string]any{"$schema": RegistrySchemaURL})
 }
 
-func FindLink(links []Link, dir string) (int, bool) {
+func FindInstance(instances []Instance, dir string) (int, bool) {
 	dir = filepath.Clean(dir)
-	for i, l := range links {
-		if filepath.Clean(l.Dir) == dir {
+	for i, in := range instances {
+		if filepath.Clean(in.Dir) == dir {
 			return i, true
 		}
 	}
 	return -1, false
 }
 
-// UpdateLinks rereads the registry right before writing and rewrites only the links key, so another
-// writer's entries and keys shulker doesn't know survive.
-func UpdateLinks(path string, update func([]Link) []Link) (bool, error) {
+func FindID(instances []Instance, id string) (int, bool) {
+	for i, in := range instances {
+		if in.ID == id {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+// WriteInstances replaces the registry wholesale. It is what repair uses, since the file it is
+// fixing may be one UpdateInstances refuses to read.
+func WriteInstances(path string, instances []Instance) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	doc := map[string]any{"$schema": RegistrySchemaURL}
+	if len(instances) > 0 {
+		doc["instances"] = instances
+	}
+	return fsutil.WriteJSON(path, doc)
+}
+
+// UpdateInstances rereads the registry right before writing and rewrites only the instances key, so
+// another writer's entries and keys shulker doesn't know survive.
+func UpdateInstances(path string, update func([]Instance) []Instance) (bool, error) {
 	top := map[string]json.RawMessage{}
 	data, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return false, err
 	}
 	if len(bytes.TrimSpace(data)) > 0 {
+		if err := checkRegistrySchema(path, data); err != nil {
+			return false, err
+		}
 		if err := json.Unmarshal(data, &top); err != nil {
 			return false, schema.Invalid("registry-invalid", path, data, err)
 		}
 	}
-	var links []Link
-	if raw, ok := top["links"]; ok {
-		if err := json.Unmarshal(raw, &links); err != nil {
-			return false, fmt.Errorf("%s: links: %w", path, err)
+	var instances []Instance
+	if raw, ok := top["instances"]; ok {
+		if err := json.Unmarshal(raw, &instances); err != nil {
+			return false, fmt.Errorf("%s: instances: %w", path, err)
 		}
 	}
-	next := update(slices.Clone(links))
-	if slices.Equal(links, next) {
+	next := update(slices.Clone(instances))
+	if slices.Equal(instances, next) {
 		return false, nil
 	}
+	if top["$schema"], err = json.Marshal(RegistrySchemaURL); err != nil {
+		return false, err
+	}
 	if len(next) == 0 {
-		delete(top, "links")
-	} else if top["links"], err = json.Marshal(next); err != nil {
+		delete(top, "instances")
+	} else if top["instances"], err = json.Marshal(next); err != nil {
 		return false, err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

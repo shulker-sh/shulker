@@ -41,7 +41,8 @@ outline: [2, 3]
 | [`shulker link mojang [source]`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
 | [`shulker link prism [source]`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
 | [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
-| [`shulker links`](#shulker-links) | List linked launcher instances and synced directories |
+| [`shulker instances`](#shulker-instances) | List the instances shulker keeps in sync |
+| [`shulker instances repair`](#shulker-instances-repair) | Register instances shulker has lost track of and write any missing instance files |
 | [`shulker unlink <name>`](#shulker-unlink) | Stop syncing a linked instance or synced directory, keeping its files |
 | [`shulker list`](#shulker-list) | List everything in `requires` with its locked version |
 | [`shulker mod add\|remove\|list`](#shulker-mod-add-remove-list) | The plain verbs with `--type mod` |
@@ -69,6 +70,7 @@ These work with every command.
 | Flag | Description |
 | --- | --- |
 | `-C, --dir <path>` | Project directory (default: current directory) |
+| `-i, --instance <id>` | Act on a registered instance instead of a project directory, by id, name, or directory; `--id` is accepted as an alias. Can't be combined with `-C`. [`shulker instances`](#shulker-instances) lists them |
 | `--json` | Print machine-readable JSON, including errors; see [JSON output](#json-output) |
 | `--no-color` | Print without colour. Setting `NO_COLOR` or `TERM=dumb` does the same, and colour is off whenever the output is not a terminal |
 | `--ascii` | Print with ASCII glyphs (`*`, `x`, `|-`, `->`, `>>`) in place of `✔`, `✘`, `├─`, `⟶`, and `»` |
@@ -397,7 +399,7 @@ shulker config get curseforge.key --reveal
 
 ### `shulker config set`
 
-Set a key. When `registry` points at a file that doesn't exist, `set` creates it as an empty registry; an existing file must be a valid registry, and an empty file counts. If the current registry has entries the new one lacks, shulker would stop syncing them, so `set` fails with `registry-has-links` and lists them; `--force` changes it anyway.
+Set a key. When `registry` points at a file that doesn't exist, `set` creates it as an empty registry; an existing file must be a valid registry, and an empty file counts. If the current registry has entries the new one lacks, shulker would stop syncing them, so `set` fails with `registry-has-instances` and lists them; `--force` changes it anyway.
 
 ```sh
 shulker config set curseforge.key "$CURSEFORGE_KEY"
@@ -424,7 +426,7 @@ shulker config unset curseforge.key
 
 A feature is a name that mods opt into with a `feature` condition, like `shaders`. Each target can turn features on by default. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, `export mrpack`, and `export curseforge` use your choices over the target defaults, and their `--with` and `--without` flags override both for one run.
 
-A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into <dir>`, or with `--instance <name>` for anything [`shulker links`](#shulker-links) lists. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
+A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into <dir>`, or with `-i <id>` for anything [`shulker instances`](#shulker-instances) lists. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
 
 ### `shulker feature on|off`
 
@@ -436,15 +438,14 @@ With `--into`, the choice is saved for that synced directory only. shulker check
 shulker feature on shaders
 shulker feature off fancy
 shulker feature on shaders --into ~/instances/my-pack --sync
-shulker feature on shaders --instance "Friends SMP"
+shulker feature on shaders -i friends-smp
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | Change the choice for a directory you synced into, instead of this project |
-| `--instance <name>` | Change the choice for a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
-| `--side <side>` | Only match `--instance` against `client` or `server` entries |
+| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--side <side>` | Only match `-i` against `client` or `server` instances |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
 ### `shulker feature reset`
@@ -459,9 +460,8 @@ shulker feature reset shaders --into ~/instances/my-pack
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | Forget the choice for a directory you synced into, instead of this project |
-| `--instance <name>` | Forget the choice for a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
-| `--side <side>` | Only match `--instance` against `client` or `server` entries |
+| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--side <side>` | Only match `-i` against `client` or `server` instances |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
 ### `shulker feature list`
@@ -476,9 +476,8 @@ shulker feature list --into ~/instances/my-pack
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | List the choices that apply to a directory you synced into |
-| `--instance <name>` | List the choices that apply to a linked instance or synced directory, by name or directory |
-| `--launcher <launcher>` | Only match `--instance` against entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
-| `--side <side>` | Only match `--instance` against `client` or `server` entries |
+| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--side <side>` | Only match `-i` against `client` or `server` instances |
 
 ## Builds
 
@@ -625,6 +624,7 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--launcher-dir <path>` | Launcher data directory (default: ATLauncher's) |
 | `--target <name>` | Client target to link (default: the only client target) |
 | `--name <name>` | Instance name (default: the target's display name) |
+| `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Link over an instance that syncs from a different source or that shulker didn't link |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
@@ -638,7 +638,7 @@ shulker writes the instance's `instance.json` itself: the Minecraft version, the
 
 With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named the way GDLauncher names it. Running `link` again keeps the settings you changed in GDLauncher, such as memory and Java arguments. If you moved GDLauncher's runtime path in its settings, shulker follows it.
 
-Renaming the instance in GDLauncher moves its folder. It keeps syncing before each launch, but `shulker links` reports it missing; run `link` again with the new `--name`, and `shulker unlink` the old one.
+Renaming the instance in GDLauncher moves its folder. It keeps syncing before each launch, but `shulker instances` reports it missing; run `link` again with the new `--name`, and `shulker unlink` the old one.
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game folder>`, or run `link` again with new flags.
 
@@ -655,6 +655,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--launcher-dir <path>` | Launcher runtime directory (default: GDLauncher's) |
 | `--target <name>` | Client target to link (default: the only client target) |
 | `--name <name>` | Instance name (default: the target's display name) |
+| `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
@@ -664,7 +665,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 
 Install the project's loader, if it has one, into the official launcher and add a profile that points at the client build. Alias: `vanilla`.
 
-With no source, it links the project in the current directory, and the profile's game directory is the project's `build/<target>`. Pass a project directory, git URL, or manifest URL to link that instead: the game directory is then `shulker/<slug>` inside the launcher directory, and shulker syncs it right away so it's ready to play. The official launcher has no pre-launch hook, so the profile doesn't update itself; run `shulker sync --instance <name>` (or `shulker sync --all`) to bring it up to date.
+With no source, it links the project in the current directory, and the profile's game directory is the project's `build/<target>`. Pass a project directory, git URL, or manifest URL to link that instead: the game directory is then `shulker/<slug>` inside the launcher directory, and shulker syncs it right away so it's ready to play. The official launcher has no pre-launch hook, so the profile doesn't update itself; run `shulker sync -i <id>` (or `shulker sync --all`) to bring it up to date.
 
 If the profile already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one.
 
@@ -679,6 +680,7 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | `--launcher-dir <path>` | Launcher directory (default: the official launcher's `.minecraft` folder) |
 | `--target <name>` | Client target to link (default: the only client target) |
 | `--name <name>` | Profile name (default: the target's display name) |
+| `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint a profile that syncs from a different source |
 
@@ -706,6 +708,7 @@ shulker link multimc --launcher-dir ~/MultiMC
 | `--target <name>` | Client target to link (default: the only client target) |
 | `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
 | `--name <name>` | Instance name (default: the target's display name) |
+| `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint an instance that syncs from a different source |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more (sync mode only) |
@@ -718,29 +721,29 @@ Download and build one target of a project straight into a directory, without se
 ```sh
 shulker sync https://github.com/shulker-sh/base-pack.git --target server --into /srv/minecraft
 shulker sync ../my-pack --target client --into ~/instances/my-pack
-shulker sync --instance "Friends SMP"
+shulker sync -i friends-smp
 shulker sync --into ~/instances/my-pack
 shulker sync --all --side server
 shulker sync
 ```
 
-With `--into` and no source, shulker reads what the directory was last synced from out of its own `.shulker/state.json`, so a synced directory keeps working even if the links registry is gone.
+With `--into` and no source, shulker reads what the directory syncs from out of its own `.shulker/instance.json`, so a synced directory keeps working even if the registry is gone.
 
 If a git or manifest URL can't be reached because the network is down, `sync` warns and builds from the copy used by the last sync from that source that succeeded, so an instance still launches offline. The warning names the commit and says how old that copy is. A server that answers with an error, a missing ref, or a failed login still fails the sync, and so does a source that has never synced successfully here. `--offline` skips the network entirely, which is quicker than waiting for timeouts on a network that drops traffic. For a server target, an installed Java runtime is kept when its update check can't reach the network.
 
-shulker keeps a list of the directories it syncs into, in `registry.json` beside its `config.json` (a `registry` path in `config.json`, relative to that file, moves it). A `sync --into` adds the directory to that list, named after the target's display name (or `--name`), along with its source, target, and ref. `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker links`](#shulker-links) shows the list.
+Every directory shulker syncs into gets a `.shulker/instance.json` recording what it syncs from, and an index of those directories lives in `registry.json` beside shulker's `config.json` (a `registry` path in `config.json`, relative to that file, moves it). A `sync --into` adds the directory to that index under an id derived from its name, or the one `--as` gives it, and `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker instances`](#shulker-instances) shows the index.
 
-To update something on that list, name it instead of a source. `--instance` takes an entry's name or directory and syncs it from its recorded source, target, and ref. If several entries have that name, narrow it with `--launcher` or `--side`, or pass `--all` to sync them all. `--all` alone syncs every entry. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` run inside a project syncs every entry synced from that project, narrowed by `--launcher` or `--side`, and nothing else. Outside a project it asks which entry to sync when run in a terminal, and fails with the list otherwise.
+To update something on that index, name it instead of a source. `-i` takes an instance's id, its name, or its directory, and syncs it from what its instance file records. Ids are unique, so `-i <id>` always picks exactly one; a name several instances share needs `--launcher` or `--side` to narrow it, or `--all` to sync them all. `--all` alone syncs every instance. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` run inside a project syncs every instance synced from that project, narrowed by `--launcher` or `--side`, and nothing else. Outside a project it asks which one to sync when run in a terminal, and fails with the list otherwise.
 
 | Flag | Description |
 | --- | --- |
 | `--target <name>` | Target to build (default: the only target) |
 | `--into <path>` | Output directory (default: the target's build directory) |
 | `--name <name>` | Name to list the `--into` directory under (default: the target's display name; kept on later syncs) |
-| `--instance <name>` | Sync a linked instance or synced directory, by name or directory, instead of a source |
-| `--all` | Sync every entry `--instance` matches, or every entry when there's no `--instance` |
-| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
-| `--side <side>` | Only `client` or `server` entries |
+| `--as <id>` | Id to list the `--into` directory under, which `-i` takes (default: derived from its name) |
+| `--all` | Sync every instance `-i` matches, or every instance when there's no `-i` |
+| `--launcher <launcher>` | Only instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--side <side>` | Only `client` or `server` instances |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
@@ -748,31 +751,46 @@ To update something on that list, name it instead of a source. `--instance` take
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
 
-### `shulker links`
+### `shulker instances`
 
-List the launcher instances and directories shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each entry shows its side, when it was last synced, its directory, and the source and target it syncs from. A directory that is gone or can't be read is flagged.
+List the instances shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each row leads with the instance's id, which is what `-i` takes, and shows its side, when it was last synced, its directory, and the name, source and target it syncs from. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`.
 
 ```sh
-shulker links
+shulker instances
 ```
 
 ```
 Prism Launcher
-  Friends SMP (client), synced 2026-09-11 14:02
+  friends-smp (client), synced 2026-09-11 14:02
     ~/Library/Application Support/PrismLauncher/instances/shulker-friends-smp/minecraft
-    from https://github.com/shulker-sh/base-pack.git, target client
+    Friends SMP, from https://github.com/shulker-sh/base-pack.git, target client
 
 Other directories
-  My Pack server (server), synced 2026-09-10 21:40
+  smp-server (server), synced 2026-09-10 21:40
     /srv/minecraft
-    from https://github.com/shulker-sh/base-pack.git, ref v3, target server
+    My Pack server, from https://github.com/shulker-sh/base-pack.git, ref v3, target server
 ```
+
+### `shulker instances repair`
+
+Put the registry back in step with what is on disk. It works even when `registry.json` can't be read, rewriting it from what it finds: it scans each launcher's own instances directory, registers any folder shulker syncs that isn't in the index, and writes a `.shulker/instance.json` for any instance missing one, from what that directory's last build recorded. A registered directory that is gone is reported rather than dropped, since an unmounted disk looks exactly like a deleted instance; [`shulker unlink`](#shulker-unlink) is what forgets one. `shulker self update` runs it after a successful update.
+
+```sh
+shulker instances repair
+shulker instances repair --launcher prism
+shulker instances repair --launcher prism --launcher-dir ~/other-prism
+```
+
+| Flag | Description |
+| --- | --- |
+| `--launcher <launcher>` | Only scan this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--launcher-dir <path>` | Scan this directory instead of the launcher's own; needs `--launcher` |
 
 ### `shulker unlink`
 
 Stop syncing a linked instance or synced directory and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the build directory and the installed loader. A plain synced directory is just forgotten. When the entry syncs from a project directory, `unlink` also drops it from that project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it.
 
-Name the entry the way [`shulker links`](#shulker-links) shows it, or pass its directory. Inside a project, a launcher name (`mojang`, `prism`, `multimc`, `atlauncher`, `gdlauncher`) unlinks that project's entry in that launcher, the reverse of `shulker link <launcher>`; an entry actually called that name comes first. A name several entries share needs `--launcher`, `--side`, or `--all`. `unlink` prints the command that sets the entry up again.
+Name the instance by the id [`shulker instances`](#shulker-instances) shows, by the name its launcher shows, or by its directory. Inside a project, a launcher name (`mojang`, `prism`, `multimc`, `atlauncher`, `gdlauncher`) unlinks that project's instance in that launcher, the reverse of `shulker link <launcher>`; an instance actually called that name comes first. A name several instances share needs `--launcher`, `--side`, or `--all`, while an id always picks one. `unlink` prints the command that sets the instance up again.
 
 ```sh
 shulker unlink mojang
@@ -1020,7 +1038,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | Code | Meaning |
 | --- | --- |
 | `already-ignored` | The pair already has an ignore in `shulker.json`; pass `--force` to replace it |
-| `ambiguous-instance` | Several linked instances or synced directories match. `candidates`: the matches |
+| `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The target has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
@@ -1030,7 +1048,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs or shaders; pass `--bundle`. `items`: what is missing |
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
-| `registry-has-links` | `config set` or `config unset` would move the registry away from linked instances or synced directories the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
+| `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON; the message names the line and column |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
@@ -1045,7 +1063,9 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `instance-exists` | An instance already syncs from a different source, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
-| `instance-not-found` | Nothing linked matches. `candidates`: the linked entries |
+| `instance-not-found` | No instance matches. `candidates`: the instances shulker knows, `pass`: their ids |
+| `instance-id-taken` | Another instance already has the `--as` id; the message names its directory |
+| `instance-invalid` | An instance's `.shulker/instance.json` doesn't parse, doesn't match its schema, or names a `$schema` this shulker doesn't know; `shulker instances repair` writes it again |
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |
@@ -1078,7 +1098,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `mrpack-marker` | The modpack's own `shulker.json` or `shulker.lock` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
-| `no-links` | Nothing is linked yet |
+| `no-instances` | Nothing is linked yet |
 | `no-overrides` | The target has no overrides directory to adopt a file into |
 | `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
 | `no-target` | `shulker.json` has no target of the side the command needs |

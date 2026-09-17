@@ -508,7 +508,7 @@ func TestSyncDoesNotFailOnUnwritableLocalFile(t *testing.T) {
 	if _, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", two); strings.Contains(stderr, "not updated") {
 		t.Fatalf("a source project nobody can write to must not warn every sync: %s", stderr)
 	}
-	if links := readLinks(t, h); len(links) != 2 {
+	if links := readInstances(t, h); len(links) != 2 {
 		t.Fatalf("the links registry still knows both directories: %+v", links)
 	}
 }
@@ -591,7 +591,7 @@ func TestSyncIntoRecoversTheSourceWithoutTheRegistry(t *testing.T) {
 	if stdout := h.mustRun(t, "sync", "--into", into); !strings.Contains(stdout, "unchanged") {
 		t.Fatalf("sync --into must rebuild from the recorded source: %s", stdout)
 	}
-	if links := readLinks(t, h); len(links) != 1 || links[0].Dir != into || links[0].Source != h.dir {
+	if links := readInstances(t, h); len(links) != 1 || links[0].Dir != into || links[0].Source != h.dir {
 		t.Fatalf("the entry is registered again: %+v", links)
 	}
 

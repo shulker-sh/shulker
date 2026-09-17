@@ -13,7 +13,7 @@ import (
 
 const siteURL = "https://shulker.sh"
 
-var pageNames = []string{"getting-started", "concepts", "cli", "manifest", "lock"}
+var pageNames = []string{"getting-started", "concepts", "cli", "manifest", "instance"}
 
 var (
 	headingLine  = regexp.MustCompile("^(#{1,6}) +(.+?) *$")

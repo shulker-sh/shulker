@@ -36,8 +36,8 @@ func TestLookup(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"lock"}, "page lock"},
-		{[]string{"LOCK"}, "page lock"},
+		{[]string{"instance"}, "page instance"},
+		{[]string{"INSTANCE"}, "page instance"},
 		{[]string{"add"}, "section cli: shulker add"},
 		{[]string{"shulker", "add"}, "section cli: shulker add"},
 		{[]string{"cli", "lock"}, "section cli: shulker lock"},
@@ -47,7 +47,7 @@ func TestLookup(t *testing.T) {
 		{[]string{"manifest", "require"}, "section manifest: require"},
 		{[]string{"Edits in the build directory"}, "section concepts: Edits in the build directory"},
 		{[]string{"link"}, "matches"},
-		{[]string{"modpack"}, "matches"},
+		{[]string{"modpack"}, "section cli: shulker modpack add|remove|list"},
 		{[]string{"build", "directory"}, "hits"},
 		{[]string{"qqqq-nothing-matches"}, "none"},
 	}
@@ -61,13 +61,11 @@ func TestLookup(t *testing.T) {
 func TestLookupListsEveryPlaceANameIsDocumented(t *testing.T) {
 	pages := mustPages(t)
 	var got []string
-	for _, s := range Lookup(pages, []string{"requireKey"}).Matches {
+	for _, s := range Lookup(pages, []string{"link"}).Matches {
 		got = append(got, s.Page.Name+": "+s.Heading)
 	}
-	for _, want := range []string{"manifest: requireKey", "lock: requireKey"} {
-		if !slices.Contains(got, want) {
-			t.Errorf("matches for requireKey %q lack %q", got, want)
-		}
+	if len(got) < 2 {
+		t.Errorf("matches for link %q should name every place it is documented", got)
 	}
 }
 

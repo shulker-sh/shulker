@@ -179,27 +179,27 @@ func (a *app) switchRegistry(configPath string, current, next config.Config, for
 	if filepath.Clean(from) == filepath.Clean(to) {
 		return "", nil
 	}
-	target, err := config.LoadLinks(to)
+	target, err := config.LoadInstances(to)
 	if err != nil {
 		return "", err
 	}
 	if !force {
-		links, err := config.LoadLinks(from)
+		instances, err := config.LoadInstances(from)
 		if err != nil {
 			return "", err
 		}
 		var left []string
-		for _, l := range links {
-			if _, ok := config.FindLink(target, l.Dir); !ok {
-				left = append(left, l.Dir)
+		for _, in := range instances {
+			if _, ok := config.FindInstance(target, in.Dir); !ok {
+				left = append(left, in.Dir)
 			}
 		}
 		if len(left) > 0 {
-			entries := fmt.Sprintf("%d linked instances or synced directories", len(left))
+			entries := fmt.Sprintf("%d instances", len(left))
 			if len(left) == 1 {
-				entries = "1 linked instance or synced directory"
+				entries = "1 instance"
 			}
-			e := out.Errorf("registry-has-links", "changing the registry leaves %s behind in %s; run again with --force to change it anyway", entries, from)
+			e := out.Errorf("registry-has-instances", "changing the registry leaves %s behind in %s; run again with --force to change it anyway", entries, from)
 			e.Items = left
 			return "", e
 		}

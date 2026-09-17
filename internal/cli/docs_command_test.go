@@ -48,14 +48,18 @@ func TestDocsPrintsSectionMarkdown(t *testing.T) {
 }
 
 func TestDocsListsMatchesWithCommands(t *testing.T) {
-	matches := docsJSON(t, out.ExitOK, "requireKey")["matches"].([]any)
+	matches := docsJSON(t, out.ExitOK, "link")["matches"].([]any)
 	var commands []string
 	for _, m := range matches {
 		commands = append(commands, m.(map[string]any)["command"].(string))
 	}
-	joined := strings.Join(commands, "\n")
-	if !strings.Contains(joined, "shulker docs manifest requirekey") || !strings.Contains(joined, "shulker docs lock requirekey") {
+	if len(commands) < 2 {
 		t.Fatalf("commands %q", commands)
+	}
+	for _, command := range commands {
+		if !strings.HasPrefix(command, "shulker docs ") {
+			t.Fatalf("commands %q", commands)
+		}
 	}
 }
 

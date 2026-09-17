@@ -92,15 +92,15 @@ func TestConfigCurseForgeKey(t *testing.T) {
 func TestConfigRegistry(t *testing.T) {
 	h := newHarness(t)
 	defaultRegistry := filepath.Join(filepath.Dir(h.config), "registry.json")
-	friends := `{"links": [{"side": "client", "name": "Friends", "dir": "/instances/friends", "source": "/pack", "target": "client"}]}`
+	friends := `{"$schema": "https://shulker.sh/schema/v1/registry.json", "instances": [{"id": "friends", "name": "Friends", "dir": "/instances/friends", "source": "/pack"}]}`
 	if err := os.WriteFile(defaultRegistry, []byte(friends), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	moved := filepath.Join(t.TempDir(), "shared", "registry.json")
 	env := h.runSetting(t, 1, "config", "set", "registry", moved)
-	if env.Error == nil || env.Error.Code != "registry-has-links" || !strings.Contains(env.Error.Message, defaultRegistry) {
-		t.Fatalf("moving away from a registry with links: %+v", env.Error)
+	if env.Error == nil || env.Error.Code != "registry-has-instances" || !strings.Contains(env.Error.Message, defaultRegistry) {
+		t.Fatalf("moving away from a registry with instances: %+v", env.Error)
 	}
 	if _, err := os.Stat(moved); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("the refused set created %s", moved)
@@ -113,7 +113,7 @@ func TestConfigRegistry(t *testing.T) {
 	if stdout := h.mustRun(t, "config", "set", "registry", moved, "--force"); stdout != want {
 		t.Errorf("set --force output = %q, want %q", stdout, want)
 	}
-	if data, _ := os.ReadFile(moved); string(data) != "{}\n" {
+	if data, _ := os.ReadFile(moved); !strings.Contains(string(data), "schema/v1/registry.json") {
 		t.Errorf("created registry = %q", data)
 	}
 	if stdout := h.mustRun(t, "config", "get", "registry"); stdout != moved+"\n" {
@@ -156,7 +156,7 @@ func TestConfigUnsetRegistryCreatesDefault(t *testing.T) {
 	if stdout := h.mustRun(t, "config", "unset", "registry"); stdout != want {
 		t.Errorf("unset output = %q, want %q", stdout, want)
 	}
-	if data, _ := os.ReadFile(defaultRegistry); string(data) != "{}\n" {
+	if data, _ := os.ReadFile(defaultRegistry); !strings.Contains(string(data), "schema/v1/registry.json") {
 		t.Errorf("default registry = %q", data)
 	}
 }

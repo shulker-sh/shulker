@@ -34,7 +34,7 @@ type prismReport struct {
 }
 
 func (a *app) linkPrismCmd() *cobra.Command {
-	var launcherDir, target, mode, instanceName, ref string
+	var launcherDir, target, mode, instanceName, ref, as string
 	var force bool
 	var ff featureFlags
 	cmd := &cobra.Command{
@@ -144,7 +144,17 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			if l.MultiMC {
 				launcherName = "multimc"
 			}
-			a.registerLink(config.Link{Launcher: launcherName, LauncherDir: launcherDir, Side: "client", Name: display, Dir: res.GameDir, Source: src.name, Target: name, Ref: ref})
+			if err := a.checkID(as, res.GameDir); err != nil {
+				return err
+			}
+			// In symlink mode the game directory is the project's own build directory, so the
+			// project holds the intent and nothing is written into its output.
+			if mode == "sync" {
+				if err := saveIntent(res.GameDir, src.name, ref, name, "client"); err != nil {
+					return err
+				}
+			}
+			a.registerInstance(config.Instance{ID: as, Launcher: launcherName, LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
 			var synced *syncResult
 			if len(args) == 1 && mode == "sync" {
 				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: name, into: res.GameDir})
@@ -201,6 +211,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
 	cmd.Flags().StringVar(&mode, "mode", "sync", "sync: build into the instance before each launch; symlink: point the instance at the build directory")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the target's display name)")
+	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "repoint an instance that syncs from a different source")
 	ff.register(cmd, "for this instance")

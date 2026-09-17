@@ -131,19 +131,19 @@ func (a *app) cachePruneCmd() *cobra.Command {
 }
 
 func (a *app) cacheRoots() (roots, error) {
-	links, err := a.loadLinks()
+	entries, err := a.loadInstanceEntries()
 	if err != nil {
 		return roots{}, err
 	}
 	var r roots
 	seen := map[string]bool{}
-	for _, link := range links {
-		dir := filepath.Clean(link.Dir)
+	for _, in := range entries {
+		dir := filepath.Clean(in.Dir)
 		if seen[dir] {
 			continue
 		}
 		seen[dir] = true
-		locks, present, unreadable, err := dirRoots(dir, link.Source, link.Ref)
+		locks, present, unreadable, err := dirRoots(dir, in.Source, in.Ref)
 		if err != nil {
 			return roots{}, err
 		}

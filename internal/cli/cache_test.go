@@ -96,8 +96,8 @@ func TestCachePruneRefusesAnUnreadableRoot(t *testing.T) {
 	h := newInPlace(t)
 	broken := t.TempDir()
 	writeFile(t, filepath.Join(broken, "shulker.lock"), "{ not a lock")
-	registry := map[string]any{"links": []config.Link{{
-		Launcher: "prism", Side: "client", Name: "broken", Dir: broken, Target: "client",
+	registry := map[string]any{"$schema": config.RegistrySchemaURL, "instances": []config.Instance{{
+		ID: "broken", Launcher: "prism", Name: "broken", Dir: broken, Source: broken,
 	}}}
 	data, err := json.Marshal(registry)
 	if err != nil {
@@ -116,8 +116,9 @@ func TestCachePruneRefusesAnUnreadableRoot(t *testing.T) {
 // rather than blocking every prune until it is unlinked.
 func TestCachePruneSkipsAGoneInstance(t *testing.T) {
 	h := newInPlace(t)
-	registry := map[string]any{"links": []config.Link{{
-		Launcher: "prism", Side: "client", Name: "gone", Dir: filepath.Join(t.TempDir(), "deleted"), Target: "client",
+	gone := filepath.Join(t.TempDir(), "deleted")
+	registry := map[string]any{"$schema": config.RegistrySchemaURL, "instances": []config.Instance{{
+		ID: "gone", Launcher: "prism", Name: "gone", Dir: gone, Source: gone,
 	}}}
 	data, err := json.Marshal(registry)
 	if err != nil {
@@ -144,8 +145,8 @@ func TestCachePruneKeepsASeparateDirInstance(t *testing.T) {
 	if _, err := os.Stat(sodium); err != nil {
 		t.Fatalf("sodium should be in the cache after install: %v", err)
 	}
-	registry := map[string]any{"links": []config.Link{{
-		Launcher: "prism", Side: "client", Name: "built", Dir: filepath.Join(h.dir, "build", "client"), Source: h.dir, Target: "client",
+	registry := map[string]any{"$schema": config.RegistrySchemaURL, "instances": []config.Instance{{
+		ID: "built", Launcher: "prism", Name: "built", Dir: filepath.Join(h.dir, "build", "client"), Source: h.dir,
 	}}}
 	data, err := json.Marshal(registry)
 	if err != nil {
@@ -165,8 +166,8 @@ func TestCacheInfoReportsAnUnreadableRoot(t *testing.T) {
 	h := newInPlace(t)
 	broken := t.TempDir()
 	writeFile(t, filepath.Join(broken, "shulker.lock"), "{ not a lock")
-	registry := map[string]any{"links": []config.Link{{
-		Launcher: "prism", Side: "client", Name: "broken", Dir: broken, Target: "client",
+	registry := map[string]any{"$schema": config.RegistrySchemaURL, "instances": []config.Instance{{
+		ID: "broken", Launcher: "prism", Name: "broken", Dir: broken, Source: broken,
 	}}}
 	data, err := json.Marshal(registry)
 	if err != nil {

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shulker.sh/schema/v1/registry.json",
+  "title": "registry.json",
+  "description": "Shulker's index of the instances it keeps in sync, kept beside config.json. Written by shulker and safe to delete: `shulker instances repair` rebuilds it by scanning the launchers. Each instance's own settings live in its .shulker/instance.json, not here.",
+  "type": "object",
+  "required": ["$schema"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "Always https://shulker.sh/schema/v1/registry.json. A registry that names a schema shulker doesn't know is refused rather than rewritten; `shulker instances repair` replaces it."
+    },
+    "instances": {
+      "type": "array",
+      "description": "One row per instance shulker knows about.",
+      "items": {
+        "type": "object",
+        "required": ["id", "dir", "source"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+            "description": "Unique short name for this instance, and what `-i` takes. Slugified from the instance's name unless `--as` picked it."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The name the launcher shows. Set by `--name`, and what shulker calls the instance in its own output."
+          },
+          "launcher": {
+            "type": "string",
+            "description": "Which launcher owns the instance: prism, multimc, mojang, atlauncher, or gdlauncher. Empty for a directory shulker only syncs into."
+          },
+          "launcherDir": {
+            "type": "string",
+            "description": "The launcher's own data directory. Kept here rather than in the instance, because `unlink` needs it exactly when the instance directory is gone."
+          },
+          "dir": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The instance directory: the game directory the launcher runs, holding its .shulker/instance.json."
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Where the instance syncs from, as recorded in its instance.json."
+          },
+          "lastSync": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this instance last synced."
+          },
+          "lastError": {
+            "type": "string",
+            "description": "Why the last sync failed, if it did. Cleared by the next sync that works."
+          }
+        }
+      }
+    }
+  }
+}

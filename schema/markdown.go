@@ -19,7 +19,7 @@ type docsPage struct {
 
 var docsPages = []docsPage{
 	{Manifest, "manifest.md", "The project manifest. Hand-edited, committed, and read by every command.", "Every field in shulker.json, the project manifest, generated from its JSON Schema."},
-	{Lock, "lock.md", "The lock file. Written by the CLI, committed alongside the manifest, never hand-edited.", "Every field in shulker.lock, which records exact mod versions and hashes, generated from its JSON Schema."},
+	{Instance, "instance.md", "One instance's own file. Hand-edit it to change what shulker does with that instance, then sync.", "Every field in .shulker/instance.json, which records what an instance syncs from and how shulker sets it up, generated from its JSON Schema."},
 }
 
 var (

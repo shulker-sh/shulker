@@ -18,7 +18,7 @@ import (
 )
 
 func (a *app) linkGDLauncherCmd() *cobra.Command {
-	var launcherDir, target, instanceName, ref string
+	var launcherDir, target, instanceName, ref, as string
 	var force bool
 	var ff featureFlags
 	cmd := &cobra.Command{
@@ -126,7 +126,13 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 					return err
 				}
 			}
-			a.registerLink(config.Link{Launcher: "gdlauncher", LauncherDir: launcherDir, Side: "client", Name: display, Dir: res.GameDir, Source: src.name, Target: name, Ref: ref})
+			if err := a.checkID(as, res.GameDir); err != nil {
+				return err
+			}
+			if err := saveIntent(res.GameDir, src.name, ref, name, "client"); err != nil {
+				return err
+			}
+			a.registerInstance(config.Instance{ID: as, Launcher: "gdlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
 			var synced *syncResult
 			if len(args) == 1 {
 				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: name, into: res.GameDir})
@@ -171,6 +177,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher runtime directory (default: GDLauncher's)")
 	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
+	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the target's display name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet")

@@ -215,39 +215,37 @@ func (a *app) resync(cmd *cobra.Command, sc *featureScope) (*syncResult, error) 
 // itself, a synced directory (--into), or a linked instance (--instance,
 // narrowed by --launcher and --side).
 type featureWhere struct {
-	into     string
-	instance string
-	sync     bool
-	sel      linkSelection
+	into string
+	sync bool
+	sel  instanceSelection
 }
 
 func (f *featureWhere) register(cmd *cobra.Command, verb string) {
 	cmd.Flags().StringVar(&f.into, "into", "", verb+" a synced directory instead of this project")
-	cmd.Flags().StringVar(&f.instance, "instance", "", verb+" a linked instance or synced directory, by name or directory")
 	f.sel.register(cmd, "")
 }
 
 func (f *featureWhere) registerChange(cmd *cobra.Command) {
 	f.register(cmd, "change the choice for")
-	cmd.Flags().BoolVar(&f.sync, "sync", false, "sync the --into or --instance directory from its recorded source right away")
+	cmd.Flags().BoolVar(&f.sync, "sync", false, "sync the --into or -i directory from its recorded source right away")
 }
 
-// dir resolves --instance (narrowed by --launcher and --side) to the entry's directory.
+// featureDir resolves -i (narrowed by --launcher and --side) to the instance's directory.
 func (a *app) featureDir(f *featureWhere) (string, error) {
-	if f.instance == "" {
+	if a.instance == "" {
 		if f.sel.narrows() {
-			return "", out.Errorf("usage", "--launcher and --side narrow --instance")
+			return "", out.Errorf("usage", "--launcher and --side narrow -i")
 		}
 		return f.into, nil
 	}
 	if f.into != "" {
-		return "", out.Errorf("usage", "pass --into or --instance, not both")
+		return "", out.Errorf("usage", "pass --into or -i, not both")
 	}
-	links, err := a.selectLinks(f.instance, f.sel)
+	entries, err := a.selectInstances(a.instance, f.sel)
 	if err != nil {
 		return "", err
 	}
-	return links[0].Dir, nil
+	return entries[0].Dir, nil
 }
 
 func (a *app) featureChangeDir(f *featureWhere) (string, error) {
@@ -256,7 +254,7 @@ func (a *app) featureChangeDir(f *featureWhere) (string, error) {
 		return "", err
 	}
 	if f.sync && into == "" {
-		return "", out.Errorf("usage", "--sync needs --into or --instance; in a project, run `shulker build`")
+		return "", out.Errorf("usage", "--sync needs --into or -i; in a project, run `shulker build`")
 	}
 	return into, nil
 }

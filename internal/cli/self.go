@@ -104,6 +104,9 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 		return out.Errorf("self-update-install", "replace %s: %v", exe, err)
 	}
 	res.Updated, res.Path = true, exe
+	if _, err := a.repairInstances("", ""); err != nil {
+		a.printer.Warn("instances not repaired: %v", err)
+	}
 	return a.printer.Emit(res, func(l *out.Lines) {
 		l.OKInto("updated shulker "+l.T.Bump(version, res.Latest), exe, "")
 	})

@@ -35,8 +35,16 @@ type Entry struct {
 	// gameDirIsInstance marks launchers whose instance folder is the game directory itself,
 	// rather than holding it as minecraft/.
 	gameDirIsInstance bool
-	relink            func(e *Entry, l config.Link) (args []string, in string)
-	forget            func(e *Entry, l config.Link) (Forgotten, error)
+	relink            func(e *Entry, l Linked) (args []string, in string)
+	forget            func(e *Entry, l config.Instance) (Forgotten, error)
+}
+
+// Linked is a registry row plus the intent its instance.json records, which is where the target and
+// ref the relink command needs now live.
+type Linked struct {
+	config.Instance
+	Target string
+	Ref    string
 }
 
 var All = []*Entry{
@@ -118,7 +126,7 @@ func (e *Entry) defaultDir() string {
 
 // Relink is the command that recreates an entry, and the directory to run it in
 // when the command needs one.
-func Relink(l config.Link) (command, in string) {
+func Relink(l Linked) (command, in string) {
 	e := Find(l.Launcher)
 	if e == nil {
 		args, in := relinkSync(l)
@@ -131,24 +139,24 @@ func Relink(l config.Link) (command, in string) {
 	return strings.Join(args, " "), in
 }
 
-// Forget stops a launcher from syncing an entry, without touching its files.
-func Forget(l config.Link) (Forgotten, error) {
+// Forget stops a launcher from syncing an instance, without touching its files.
+func Forget(l config.Instance) (Forgotten, error) {
 	e := Find(l.Launcher)
 	if e == nil {
-		return Forgotten{Summary: fmt.Sprintf("Forgot %q (%s); its files stay.", l.Name, l.Dir)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Forgot %q (%s); its files stay.", l.Label(), l.Dir)}, nil
 	}
 	return e.forget(e, l)
 }
 
-func relinkSync(l config.Link) (args []string, in string) {
+func relinkSync(l Linked) (args []string, in string) {
 	args = []string{"shulker", "sync", shellArg(l.Source)}
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
 	}
-	return append(args, "--target", shellArg(l.Target), "--into", shellArg(l.Dir), "--name", shellArg(l.Name)), ""
+	return append(args, "--target", shellArg(l.Target), "--into", shellArg(l.Dir), "--name", shellArg(l.Label())), ""
 }
 
-func relinkInstance(e *Entry, l config.Link) (args []string, in string) {
+func relinkInstance(e *Entry, l Linked) (args []string, in string) {
 	args = []string{"shulker", "link", e.Name}
 	if info, err := os.Lstat(l.Dir); err == nil && info.Mode()&os.ModeSymlink != 0 {
 		in = l.Source
@@ -159,25 +167,25 @@ func relinkInstance(e *Entry, l config.Link) (args []string, in string) {
 			args = append(args, "--ref", shellArg(l.Ref))
 		}
 	}
-	return append(args, "--target", shellArg(l.Target), "--name", shellArg(l.Name)), in
+	return append(args, "--target", shellArg(l.Target), "--name", shellArg(l.Label())), in
 }
 
-func relinkMojang(e *Entry, l config.Link) (args []string, in string) {
+func relinkMojang(e *Entry, l Linked) (args []string, in string) {
 	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
 	}
-	return append(args, "--target", shellArg(l.Target), "--name", shellArg(l.Name)), ""
+	return append(args, "--target", shellArg(l.Target), "--name", shellArg(l.Label())), ""
 }
 
-func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
+func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 	instanceDir := e.InstanceDir(l.Dir)
 	_, statErr := os.Stat(instanceDir)
 	switch info, err := os.Lstat(l.Dir); {
 	case errors.Is(statErr, os.ErrNotExist):
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its instance was already gone.", l.Name, e.Title)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its instance was already gone.", l.Label(), e.Title)}, nil
 	case err == nil && info.Mode()&os.ModeSymlink != 0:
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance stays and still uses the build directory.", l.Name, e.Title)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance stays and still uses the build directory.", l.Label(), e.Title)}, nil
 	}
 	var removed bool
 	var err error
@@ -193,9 +201,9 @@ func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
 		return Forgotten{}, err
 	}
 	if !removed {
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept.", l.Name, e.Title)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept.", l.Label(), e.Title)}, nil
 	}
-	summary := fmt.Sprintf("Unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay.", l.Name, e.Title)
+	summary := fmt.Sprintf("Unlinked %q (%s): removed its pre-launch sync; the instance and its worlds stay.", l.Label(), e.Title)
 	// Unlink warns when GDLauncher is open, so the restart reminder is only for where it can't tell.
 	if _, detectable := GDLauncherRunning(); e.Name != "gdlauncher" || !detectable {
 		summary += "\nRestart the launcher if it is open so the change is picked up."
@@ -203,17 +211,17 @@ func forgetInstance(e *Entry, l config.Link) (Forgotten, error) {
 	return Forgotten{Removed: RemovedPreLaunch, Summary: summary}, nil
 }
 
-func forgetMojang(e *Entry, l config.Link) (Forgotten, error) {
+func forgetMojang(e *Entry, l config.Instance) (Forgotten, error) {
 	n, err := (&Mojang{Dir: l.LauncherDir}).RemoveProfiles(l.Dir)
 	if err != nil {
 		return Forgotten{}, err
 	}
 	if n == 0 {
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); it had no launcher profile left.", l.Name, e.Title)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); it had no launcher profile left.", l.Label(), e.Title)}, nil
 	}
 	return Forgotten{
 		Removed: RemovedProfile,
-		Summary: fmt.Sprintf("Unlinked %q (%s): removed its launcher profile; the build directory and the loader stay.", l.Name, e.Title),
+		Summary: fmt.Sprintf("Unlinked %q (%s): removed its launcher profile; the build directory and the loader stay.", l.Label(), e.Title),
 	}, nil
 }
 

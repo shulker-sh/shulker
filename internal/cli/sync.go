@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,29 +19,28 @@ import (
 )
 
 type syncResult struct {
-	Source     string        `json:"source"`
-	Kind       pack.Kind     `json:"kind"`
-	Commit     string        `json:"commit,omitempty"`
-	Sha256     string        `json:"sha256,omitempty"`
-	Offline    bool          `json:"offline,omitempty"`
-	LastGoodAt string        `json:"lastGoodAt,omitempty"`
-	Target     string        `json:"target"`
-	Dir        string        `json:"dir"`
-	Fetched    []string      `json:"fetched"`
-	Build      *build.Report `json:"build"`
-	Registered *config.Link  `json:"registered,omitempty"`
+	Source     string           `json:"source"`
+	Kind       pack.Kind        `json:"kind"`
+	Commit     string           `json:"commit,omitempty"`
+	Sha256     string           `json:"sha256,omitempty"`
+	Offline    bool             `json:"offline,omitempty"`
+	LastGoodAt string           `json:"lastGoodAt,omitempty"`
+	Target     string           `json:"target"`
+	Dir        string           `json:"dir"`
+	Fetched    []string         `json:"fetched"`
+	Build      *build.Report    `json:"build"`
+	Registered *config.Instance `json:"registered,omitempty"`
 }
 
 type syncRequest struct {
-	ref, target, into, os, name string
-	force                       bool
-	features                    featureFlags
+	ref, target, into, os, name, as string
+	force                           bool
+	features                        featureFlags
 }
 
 func (a *app) syncCmd() *cobra.Command {
 	var req syncRequest
-	var instance string
-	var sel linkSelection
+	var sel instanceSelection
 	var offline bool
 	cmd := &cobra.Command{
 		Use:   "sync [project-dir | git-url | manifest-url]",
@@ -58,7 +58,7 @@ func (a *app) syncCmd() *cobra.Command {
 				d.fetch.Offline = true
 			}
 			if len(args) == 0 {
-				if req.into != "" && req.target == "" && req.ref == "" && req.name == "" && instance == "" && !sel.all && !sel.narrows() {
+				if req.into != "" && req.target == "" && req.ref == "" && req.name == "" && a.instance == "" && !sel.all && !sel.narrows() {
 					res, err := a.syncRecorded(cmd, req)
 					if err != nil {
 						return err
@@ -66,42 +66,42 @@ func (a *app) syncCmd() *cobra.Command {
 					return a.printer.Emit(res, res.print)
 				}
 				if req.target != "" || req.into != "" || req.ref != "" || req.name != "" {
-					return out.Errorf("usage", "--target, --into, --ref, and --name need a source; a registered entry already has them")
+					return out.Errorf("usage", "--target, --into, --ref, and --name need a source; a registered instance already has them")
 				}
-				if instance == "" && !sel.all {
-					links, inProject, err := a.projectLinks(sel)
+				if a.instance == "" && !sel.all {
+					entries, inProject, err := a.projectInstances(sel)
 					if err != nil {
 						return err
 					}
 					if inProject {
-						return a.syncLinks(cmd, links, req)
+						return a.syncInstances(cmd, entries, req)
 					}
 				}
-				links, err := a.selectLinks(instance, sel)
+				entries, err := a.selectInstances(a.instance, sel)
 				if err != nil {
 					return err
 				}
-				if instance == "" && !sel.all {
-					l, err := a.pickLink(links)
+				if a.instance == "" && !sel.all {
+					picked, err := a.pickInstance(entries)
 					if err != nil {
 						return err
 					}
-					links = []config.Link{l}
+					entries = []instanceEntry{picked}
 				}
 				if sel.all {
-					return a.syncLinks(cmd, links, req)
+					return a.syncInstances(cmd, entries, req)
 				}
-				res, err := a.syncLink(cmd, links[0], req)
+				res, err := a.syncInstance(cmd, entries[0], req)
 				if err != nil {
 					return err
 				}
 				return a.printer.Emit(res, res.print)
 			}
-			if instance != "" || sel.all {
-				return out.Errorf("usage", "pass a source or --instance/--all, not both")
+			if a.instance != "" || sel.all {
+				return out.Errorf("usage", "pass a source or -i/--all, not both")
 			}
 			if sel.narrows() {
-				return out.Errorf("usage", "--launcher and --side narrow --instance, --all, or the picker; they don't apply to a source")
+				return out.Errorf("usage", "--launcher and --side narrow -i, --all, or the picker; they don't apply to a source")
 			}
 			src, err := a.openSource(cmd.Context(), args[0], req.ref)
 			if err != nil {
@@ -120,8 +120,8 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd.Flags().StringVar(&req.ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.os, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the target's display name)")
-	cmd.Flags().StringVar(&instance, "instance", "", "sync a linked instance or synced directory, by name or directory, from its recorded source")
-	sel.register(cmd, "sync every linked instance and synced directory (narrow with --launcher or --side)")
+	cmd.Flags().StringVar(&req.as, "as", "", "id to register the --into directory under, for -i (default: from its name)")
+	sel.register(cmd, "sync every instance (narrow with --launcher or --side)")
 	cmd.Flags().BoolVar(&offline, "offline", false, "don't use the network; build from the last successful sync and cached files")
 	req.features.register(cmd, "for this run only")
 	return cmd
@@ -131,7 +131,11 @@ func (res syncResult) print(l *out.Lines) {
 	l.OKInto("synced "+res.Target, res.Dir, reportAside(res.Build))
 	printReportDetails(l, res.Build)
 	if r := res.Registered; r != nil {
-		l.OK("registered "+r.Name, r.Side)
+		id := r.ID
+		if strings.EqualFold(id, r.Label()) {
+			id = ""
+		}
+		l.OK("registered "+r.Label(), id)
 	}
 }
 
@@ -194,6 +198,12 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if req.name != "" && !register {
 		return syncResult{}, out.Errorf("usage", "--name needs --into a directory other than the build directory")
 	}
+	if req.as != "" && !register {
+		return syncResult{}, out.Errorf("usage", "--as needs --into a directory other than the build directory")
+	}
+	if err := a.checkID(req.as, into); err != nil {
+		return syncResult{}, err
+	}
 	lf, inst, err := sourceLocalFiles(src, into)
 	if err != nil {
 		return syncResult{}, err
@@ -237,7 +247,10 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
 	if register {
-		entry := config.Link{Side: t.Side, Name: req.name, Dir: into, Source: src.name, Target: name, Ref: req.ref}
+		if err := saveIntent(into, src.name, req.ref, name, t.Side); err != nil {
+			return syncResult{}, err
+		}
+		entry := config.Instance{ID: req.as, Name: req.name, Dir: into, Source: src.name}
 		if entry, changed := a.registerSync(entry, p.Manifest.DisplayName(name)); changed {
 			res.Registered = &entry
 		}
@@ -245,21 +258,18 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	return res, nil
 }
 
-// syncRecorded syncs a directory from the source its own state file records, so
-// a synced directory stays usable after the links registry is gone.
+// syncRecorded syncs a directory from the source its own instance file records, so a synced
+// directory stays usable after the registry is gone.
 func (a *app) syncRecorded(cmd *cobra.Command, req syncRequest) (syncResult, error) {
 	into, err := filepath.Abs(req.into)
 	if err != nil {
 		return syncResult{}, err
 	}
-	st, stateErr := build.ReadState(into)
-	if stateErr != nil {
-		a.printer.Warn("%v", stateErr)
-	}
-	if st.Source == "" {
+	e := inspectInstance(config.Instance{Dir: into})
+	if e.Source == "" {
 		return syncResult{}, out.Errorf("source-unknown", "%s has no record of what it was synced from; name the source", into)
 	}
-	return a.syncLink(cmd, config.Link{Dir: into, Source: st.Source, Ref: st.Ref, Target: st.Target}, req)
+	return a.syncInstance(cmd, e, req)
 }
 
 // sameDir also treats a symlink to dir as dir, e.g. a Prism instance linked in symlink mode.

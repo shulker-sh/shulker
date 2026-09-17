@@ -53,7 +53,7 @@ func TestLinkATLauncher(t *testing.T) {
 
 	settings["maximumMemory"] = 8192
 	writeATLInstance(t, instDir, inst)
-	h.mustRun(t, "sync", "--instance", "Friends SMP")
+	h.mustRun(t, "sync", "-i", "Friends SMP")
 	if _, err := os.Stat(filepath.Join(instDir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("the pre-launch sync target should hold the mods: %v", err)
 	}
@@ -71,12 +71,12 @@ func TestLinkATLauncher(t *testing.T) {
 	}
 
 	var listed struct {
-		Data []linkEntry `json:"data"`
+		Data []instanceEntry `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "links", "--json")), &listed); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &listed); err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Data) != 1 || listed.Data[0].Launcher != "atlauncher" || listed.Data[0].Dir != instDir || listed.Data[0].Status != linkSynced {
+	if len(listed.Data) != 1 || listed.Data[0].Launcher != "atlauncher" || listed.Data[0].Dir != instDir || listed.Data[0].Status != instanceSynced {
 		t.Fatalf("links: %+v", listed.Data)
 	}
 

@@ -35,13 +35,13 @@ func (a *app) buildDirs(p *project.Project, lf *local.File, name string) (string
 		dirs = append(dirs, dir)
 	}
 	add(buildDir)
-	links, err := a.loadLinks()
+	entries, err := a.loadInstanceEntries()
 	if err != nil {
 		return "", nil, err
 	}
-	for _, l := range links {
-		if l.Target == name && sameDir(l.Source, p.Dir) {
-			add(l.Dir)
+	for _, e := range entries {
+		if e.Target == name && sameDir(e.Source, p.Dir) {
+			add(e.Dir)
 		}
 	}
 	for _, d := range lf.ExistingSyncDirs(name) {

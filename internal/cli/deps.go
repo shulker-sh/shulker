@@ -69,14 +69,30 @@ func (a *app) deps() (*deps, error) {
 }
 
 func (a *app) openProject() (*project.Project, error) {
-	dir := a.dir
-	if dir == "" {
-		var err error
-		if dir, err = os.Getwd(); err != nil {
-			return nil, err
-		}
+	dir, err := a.scopeDir()
+	if err != nil {
+		return nil, err
 	}
 	return a.openProjectAt(dir)
+}
+
+// scopeDir is the directory a command acts on: -i resolves a registered instance to its own
+// directory, -C names one, and neither means the current one.
+func (a *app) scopeDir() (string, error) {
+	if a.instance == "" {
+		if a.dir != "" {
+			return a.dir, nil
+		}
+		return os.Getwd()
+	}
+	if a.dir != "" {
+		return "", out.Errorf("usage", "pass -C or -i, not both: -i already says which directory to act on")
+	}
+	entries, err := a.selectInstances(a.instance, instanceSelection{})
+	if err != nil {
+		return "", err
+	}
+	return entries[0].Dir, nil
 }
 
 func (a *app) openProjectAt(dir string) (*project.Project, error) {

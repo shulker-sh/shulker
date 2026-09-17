@@ -24,7 +24,7 @@ func TestBareSyncInProjectSyncsItsOwnEntries(t *testing.T) {
 	dirs := func(args ...string) string {
 		t.Helper()
 		var env struct {
-			Data []syncLinkResult `json:"data"`
+			Data []syncInstanceResult `json:"data"`
 		}
 		if err := json.Unmarshal([]byte(h.mustRun(t, append(args, "--json")...)), &env); err != nil {
 			t.Fatal(err)
@@ -62,7 +62,7 @@ func TestBareSyncInProjectSyncsItsOwnEntries(t *testing.T) {
 	empty := t.TempDir()
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "empty", "-C", empty)
 	code, stdout, _ = h.run(t, "sync", "-C", empty, "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "no-links" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "no-instances" {
 		t.Fatalf("a project with nothing synced: %d %s", code, stdout)
 	}
 }

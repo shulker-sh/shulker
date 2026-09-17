@@ -39,7 +39,7 @@ func TestUnlink(t *testing.T) {
 	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "Server Copy")
 
 	code, stdout, _ := h.run(t, "unlink", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || !strings.Contains(e.Message, "shulker links") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || !strings.Contains(e.Message, "shulker instances") {
 		t.Fatalf("unlink with no name: exit %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "unlink", "nope", "--json")
@@ -93,7 +93,7 @@ func TestUnlink(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(plain, "mods")); err != nil {
 		t.Fatalf("unlink must keep the files: %v", err)
 	}
-	if links := readLinks(t, h); len(links) != 0 {
+	if links := readInstances(t, h); len(links) != 0 {
 		t.Fatalf("every entry was unlinked: %+v", links)
 	}
 }
@@ -146,7 +146,7 @@ func TestUnlinkAll(t *testing.T) {
 	if r := unlinkJSON(t, h, "--all"); len(r) != 2 {
 		t.Fatalf("--all alone unlinks everything left: %+v", r)
 	}
-	if links := readLinks(t, h); len(links) != 0 {
+	if links := readInstances(t, h); len(links) != 0 {
 		t.Fatalf("registry after --all: %+v", links)
 	}
 }

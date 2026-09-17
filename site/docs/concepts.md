@@ -10,7 +10,7 @@ description: How manifests, locks, targets, sides, overrides, build edits, modpa
 
 ## Lock
 
-`shulker.lock` records the exact resolved versions, hashes, and modpack commits. See the [lock reference](/docs/lock).
+`shulker.lock` records the exact resolved versions, hashes, and modpack commits. Shulker writes it and you commit it; nothing in it is hand-edited. Its fields are described by [its JSON Schema](https://shulker.sh/schema/v1/lock.json), which editors read from the `$schema` line at the top of the file.
 
 ## Targets
 

@@ -126,8 +126,11 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {
 		t.Fatalf("linking a remote source must not build in the current directory: %v", err)
 	}
-	if links := readLinks(t, h); len(links) != 1 || links[0].Launcher != "mojang" || links[0].Dir != gameDir || links[0].Source != source || links[0].Ref != "main" {
-		t.Fatalf("registry: %+v", links)
+	if instances := readInstances(t, h); len(instances) != 1 || instances[0].Launcher != "mojang" || instances[0].Dir != gameDir || instances[0].Source != source {
+		t.Fatalf("registry: %+v", instances)
+	}
+	if f := readIntent(t, gameDir); f.Ref != "main" || f.Target != "client" {
+		t.Fatalf("the ref and target live in the instance file: %+v", f)
 	}
 
 	other := t.TempDir()

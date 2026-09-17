@@ -13,7 +13,7 @@ import (
 )
 
 type unlinkResult struct {
-	config.Link
+	config.Instance
 	OK       bool       `json:"ok"`
 	Removed  string     `json:"removed,omitempty"`
 	Relink   string     `json:"relink"`
@@ -23,10 +23,10 @@ type unlinkResult struct {
 }
 
 func (a *app) unlinkCmd() *cobra.Command {
-	var sel linkSelection
+	var sel instanceSelection
 	cmd := &cobra.Command{
-		Use:   "unlink [name | dir | launcher]",
-		Short: "Stop syncing a linked instance or synced directory and forget it, keeping its files",
+		Use:   "unlink [id | name | dir | launcher]",
+		Short: "Stop syncing an instance and forget it, keeping its files",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			query := ""
@@ -34,9 +34,9 @@ func (a *app) unlinkCmd() *cobra.Command {
 				query = args[0]
 			}
 			if query == "" && !sel.all {
-				return out.Errorf("usage", "name the entry to unlink, or pass --all; `shulker links` lists them")
+				return out.Errorf("usage", "name the instance to unlink, or pass --all; `shulker instances` lists them")
 			}
-			links, err := a.unlinkTargets(query, sel)
+			entries, err := a.unlinkTargets(query, sel)
 			if err != nil {
 				return err
 			}
@@ -46,7 +46,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 			}
 			results := []unlinkResult{}
 			failed := 0
-			for _, l := range links {
+			for _, l := range entries {
 				r, err := a.unlink(path, l)
 				if err != nil {
 					failed++
@@ -54,7 +54,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 				}
 				results = append(results, r)
 			}
-			if failed > 0 && len(links) == 1 {
+			if failed > 0 && len(entries) == 1 {
 				return results[0].Error
 			}
 			printResults := func(l *out.Lines) {
@@ -84,7 +84,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 				if !a.printer.JSON {
 					printResults(a.printer.Out())
 				}
-				e := out.Errorf("unlink-failed", "%d of %d entries couldn't be unlinked", failed, len(links))
+				e := out.Errorf("unlink-failed", "%d of %d instances couldn't be unlinked", failed, len(entries))
 				e.Data = results
 				return e
 			}
@@ -95,9 +95,9 @@ func (a *app) unlinkCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) unlink(configPath string, l config.Link) (unlinkResult, error) {
-	r := unlinkResult{Link: l, OK: true}
-	r.Relink, r.RelinkIn = launcher.Relink(l)
+func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
+	r := unlinkResult{Instance: l.Instance, OK: true}
+	r.Relink, r.RelinkIn = launcher.Relink(launcher.Linked{Instance: l.Instance, Target: l.Target, Ref: l.Ref})
 	// An instance that never synced carries no shulker state, and without its hook link takes it for the
 	// player's own.
 	if l.Launcher == "atlauncher" || l.Launcher == "gdlauncher" {
@@ -107,19 +107,19 @@ func (a *app) unlink(configPath string, l config.Link) (unlinkResult, error) {
 	}
 	if l.Launcher == "gdlauncher" {
 		if running, _ := launcher.GDLauncherRunning(); running {
-			a.printer.Warn("GDLauncher is open; it may put back the pre-launch sync this removes from %q. Quit it, then check the instance's settings", l.Name)
+			a.printer.Warn("GDLauncher is open; it may put back the pre-launch sync this removes from %q. Quit it, then check the instance's settings", l.Label())
 		}
 	}
-	f, err := launcher.Forget(l)
+	f, err := launcher.Forget(l.Instance)
 	if err != nil {
 		return r, err
 	}
 	r.Removed, r.summary = f.Removed, f.Summary
-	_, err = config.UpdateLinks(configPath, func(links []config.Link) []config.Link {
-		if i, ok := config.FindLink(links, l.Dir); ok {
-			return append(links[:i], links[i+1:]...)
+	_, err = config.UpdateInstances(configPath, func(instances []config.Instance) []config.Instance {
+		if i, ok := config.FindInstance(instances, l.Dir); ok {
+			return append(instances[:i], instances[i+1:]...)
 		}
-		return links
+		return instances
 	})
 	if err != nil {
 		return r, err
