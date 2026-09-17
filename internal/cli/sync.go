@@ -171,6 +171,7 @@ func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, er
 		s.name = co.Dir
 	}
 	if co.Warning != "" {
+		a.printer.Drop()
 		a.printer.Warn("%s", co.Warning)
 	}
 	s.project, err = a.openProjectAt(co.Dir)

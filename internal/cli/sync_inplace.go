@@ -63,14 +63,14 @@ func (a *app) buildInPlace(ctx context.Context, dir string, req syncRequest) (sy
 
 // syncInPlaceForLaunch never stands between the player and the game: a refresh that fails falls
 // back to building the lock already there, and a build that fails leaves what is on disk.
-func (a *app) syncInPlaceForLaunch(cmd *cobra.Command, p *project.Project, target string) error {
-	_, err := a.syncInPlace(cmd, p, target, syncRequest{})
+func (a *app) syncInPlaceForLaunch(cmd *cobra.Command, p *project.Project, target string) (syncResult, error) {
+	res, err := a.syncInPlace(cmd, p, target, syncRequest{})
 	if err == nil || errors.Is(cmd.Context().Err(), context.DeadlineExceeded) {
-		return err
+		return res, err
 	}
+	a.printer.Drop()
 	a.printer.Warn("couldn't update, building what the lock already has: %v", err)
-	_, err = a.buildInPlace(cmd.Context(), p.Dir, syncRequest{target: target})
-	return err
+	return a.buildInPlace(cmd.Context(), p.Dir, syncRequest{target: target})
 }
 
 // syncTree syncs an instance that is also a source, then every directory built from it, since

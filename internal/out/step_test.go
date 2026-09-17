@@ -56,6 +56,17 @@ func TestFailedStepIsNotMarkedDone(t *testing.T) {
 	}
 }
 
+func TestDroppedStepLeavesNoLine(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	p.Step("fetching a")
+	p.Drop()
+	p.Warn("offline, using a")
+	if got := stderr.String(); strings.Contains(got, "fetched a") || !strings.Contains(got, "offline, using a") {
+		t.Fatalf("stderr: %q", got)
+	}
+}
+
 func TestStepsStayQuietInJSON(t *testing.T) {
 	var stderr bytes.Buffer
 	p := &Printer{JSON: true, Stdout: &bytes.Buffer{}, Stderr: &stderr}

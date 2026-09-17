@@ -60,6 +60,7 @@ func newSelfUpdateHarness(t *testing.T, current, tag string, corrupt bool) *self
 		t.Fatal(err)
 	}
 	h.app = newApp(&h.stdout, &h.stderr)
+	h.app.configPath = filepath.Join(t.TempDir(), "config.json")
 	h.app.releases = selfupdate.New(fetch.New("test"))
 	h.app.releases.LatestURL = server.URL + "/latest"
 	h.app.releases.DownloadURL = server.URL + "/download"

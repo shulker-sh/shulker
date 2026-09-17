@@ -180,9 +180,9 @@ func TestPreLaunchInPlaceFallsBackToTheLock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	code, _, stderr := h.run(t, "hook", "pre-launch")
-	if code != 0 || !strings.Contains(stderr, "building what the lock already has") {
-		t.Fatalf("pre-launch must fall back and exit 0: code=%d stderr=%s", code, stderr)
+	code, stdout, stderr := h.run(t, "hook", "pre-launch")
+	if code != 0 || !strings.Contains(stderr, "building what the lock already has") || !strings.Contains(stdout, "synced client") {
+		t.Fatalf("pre-launch must fall back, report the build and exit 0: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("the fallback should build the lock in place: %v", err)

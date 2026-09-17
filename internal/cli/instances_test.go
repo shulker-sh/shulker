@@ -393,9 +393,12 @@ func TestSyncDetectsAPrismInstance(t *testing.T) {
 
 func TestInstancesRepair(t *testing.T) {
 	h := newHarness(t)
+	prismDir := t.TempDir()
+	if stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir); !strings.Contains(stdout, "Nothing is linked yet") {
+		t.Fatalf("repair with nothing to find: %s", stdout)
+	}
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
-	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
 

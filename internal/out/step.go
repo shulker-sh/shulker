@@ -103,6 +103,10 @@ func (p *Printer) Step(format string, args ...any) {
 // writes to Stderr directly must call it.
 func (p *Printer) Settle() { p.settle(true) }
 
+// Drop clears the running step without a done line, for work that failed and was recovered from:
+// the warning that follows says what happened.
+func (p *Printer) Drop() { p.settle(false) }
+
 func (p *Printer) settle(done bool) {
 	p.steps.mu.Lock()
 	defer p.steps.mu.Unlock()

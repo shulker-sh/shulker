@@ -47,16 +47,17 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 				defer cancel()
 				cmd.SetContext(ctx)
 			}
+			var res syncResult
 			p, target, inPlace, err := a.inPlaceProject(dir)
 			switch {
 			case err != nil:
 			case inPlace:
-				err = a.syncInPlaceForLaunch(cmd, p, target)
+				res, err = a.syncInPlaceForLaunch(cmd, p, target)
 			default:
-				_, err = a.syncRecorded(cmd, syncRequest{into: dir})
+				res, err = a.syncRecorded(cmd, syncRequest{into: dir})
 			}
 			if err == nil {
-				return nil
+				return a.printer.Emit(res, res.print)
 			}
 			if deadline > 0 && errors.Is(cmd.Context().Err(), context.DeadlineExceeded) {
 				return updatePaused(deadline, a.instanceID(dir))

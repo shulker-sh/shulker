@@ -18,6 +18,7 @@ type repairResult struct {
 	Registered []config.Instance `json:"registered"`
 	Wrote      []string          `json:"wrote"`
 	Missing    []string          `json:"missing"`
+	total      int
 }
 
 func (a *app) instancesRepairCmd() *cobra.Command {
@@ -97,6 +98,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		instances = append(instances, found)
 		res.Registered = append(res.Registered, found)
 	}
+	res.total = len(instances)
 	if res.Rebuilt {
 		return res, config.WriteInstances(path, instances)
 	}
@@ -183,7 +185,10 @@ func (r repairResult) print(l *out.Lines) {
 		}
 		l.Nudge("To forget one", "shulker unlink <id>")
 	}
-	if len(r.Registered) == 0 && len(r.Wrote) == 0 && len(r.Missing) == 0 {
+	switch {
+	case r.total == 0:
+		l.Info("Nothing is linked yet; `shulker link prism` or `shulker sync --into <dir>` adds an instance.")
+	case len(r.Registered) == 0 && len(r.Wrote) == 0 && len(r.Missing) == 0:
 		l.Info("Every instance is registered and has its instance file.")
 	}
 }

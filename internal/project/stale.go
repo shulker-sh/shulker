@@ -35,7 +35,7 @@ func (p *Project) LockDifferences() []string {
 		diffs = append(diffs, ModDifferences(id, mods[id], lm)...)
 	}
 	for _, id := range slices.Sorted(maps.Keys(l.Mods)) {
-		if _, listed := mods[id]; !listed && len(l.Mods[id].RequiredBy) == 0 {
+		if _, listed := mods[id]; !listed && len(l.Mods[id].RequiredBy) == 0 && l.Mods[id].Modpack == "" {
 			diffs = append(diffs, id+": in shulker.lock, not in shulker.json")
 		}
 	}

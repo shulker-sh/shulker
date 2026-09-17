@@ -119,6 +119,7 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 		if p.Manifest.Java == "" {
 			rt, err := a.managedJava(ctx, p, true)
 			if err != nil && fetch.IsNetwork(err) {
+				a.printer.Drop()
 				if kept, keptErr := a.managedJava(ctx, p, false); keptErr == nil {
 					rt, err = kept, nil
 					a.printer.Warn("offline, keeping the installed Java runtime %s %s", kept.Component, kept.Version)
