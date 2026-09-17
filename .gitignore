@@ -4,3 +4,10 @@
 *.local.json
 /playground/
 .dev.vars
+/.agents/
+/.claude/
+/skills-lock.json
+/CLAUDE.md
+/docs/agents/
+/CONTEXT.md
+/docs/adr/
