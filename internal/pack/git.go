@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/out"
@@ -23,6 +24,8 @@ func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	killGroup(cmd)
+	cmd.WaitDelay = 5 * time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
