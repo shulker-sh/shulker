@@ -23,7 +23,8 @@ func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {
 		return nil, out.Errorf("git-missing", "git is required for git sources but was not found in PATH")
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	// A server that accepts the connection and then sends nothing would otherwise hang git forever.
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_HTTP_LOW_SPEED_LIMIT=1", "GIT_HTTP_LOW_SPEED_TIME=60")
 	killGroup(cmd)
 	cmd.WaitDelay = 5 * time.Second
 	var stdout, stderr bytes.Buffer
@@ -69,6 +70,7 @@ var gitNetworkErrors = []string{
 	"connection refused",
 	"connection timed out",
 	"operation timed out",
+	"operation too slow",
 	"network is unreachable",
 	"no route to host",
 	"connection reset",
