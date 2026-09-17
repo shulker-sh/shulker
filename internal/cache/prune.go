@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"shulker.sh/shulker/internal/lock"
 )
@@ -148,6 +149,43 @@ func (c *Cache) keep(roots []Root) map[string]bool {
 	return keep
 }
 
+// SourceLocks names the locks a remote source's checkouts hold: the one at the commit or digest a
+// directory was built from, and the ones its offline fallback records point at.
+func (c *Cache) SourceLocks(source, ref, commit, sha256 string) []string {
+	var paths []string
+	add := func(commit, sha256 string) {
+		if commit != "" {
+			paths = append(paths, filepath.Join(c.PackSource(commit), lock.FileName))
+		}
+		if sha256 != "" {
+			paths = append(paths, filepath.Join(c.ProjectCheckout(sha256), lock.FileName))
+		}
+	}
+	add(commit, sha256)
+	for _, path := range []string{c.LastGood(source, ref), c.LastGood(source, "")} {
+		rec, ok := readLastGood(path)
+		if ok {
+			add(rec.Commit, rec.Sha256)
+		}
+	}
+	slices.Sort(paths)
+	return slices.Compact(paths)
+}
+
+type lastGoodRecord struct {
+	Commit string `json:"commit"`
+	Sha256 string `json:"sha256"`
+}
+
+func readLastGood(path string) (lastGoodRecord, bool) {
+	var rec lastGoodRecord
+	data, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(data, &rec) != nil {
+		return rec, false
+	}
+	return rec, true
+}
+
 // keepSource keeps a remote source's mirror, its offline fallback record, and
 // whatever that record points at, so a sync from an unreachable source still
 // finds the copy it falls back to.
@@ -158,12 +196,8 @@ func (c *Cache) keepSource(keep map[string]bool, source, ref string) {
 	keep[c.PackMirror(source)] = true
 	for _, path := range []string{c.LastGood(source, ref), c.LastGood(source, "")} {
 		keep[path] = true
-		var rec struct {
-			Commit string `json:"commit"`
-			Sha256 string `json:"sha256"`
-		}
-		data, err := os.ReadFile(path)
-		if err != nil || json.Unmarshal(data, &rec) != nil {
+		rec, ok := readLastGood(path)
+		if !ok {
 			continue
 		}
 		if rec.Commit != "" {

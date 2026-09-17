@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 
@@ -13,13 +15,6 @@ import (
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
-
-type lockChanges struct {
-	*resolve.Changes
-	Reresolved  []string `json:"reresolved"`
-	Suggestions []string `json:"suggestions"`
-	Pin         string   `json:"pin,omitempty"`
-}
 
 func (a *app) updateCmd() *cobra.Command {
 	return &cobra.Command{
@@ -41,13 +36,9 @@ func (a *app) updateCmd() *cobra.Command {
 					}
 					targets = append(targets, arg)
 				}
-				refresh := len(args) == 0 || len(requested) > 0
-				if refresh {
-					loaded, err := a.resolvePacks(cmd.Context(), p)
+				if len(args) == 0 || len(requested) > 0 {
+					loaded, err := a.refreshModpacks(cmd.Context(), p, r, func(manifest.Require) bool { return true })
 					if err != nil {
-						return "", err
-					}
-					if err := r.RefreshPacks(loaded); err != nil {
 						return "", err
 					}
 					for _, l := range loaded {
@@ -97,6 +88,21 @@ func (a *app) unpinCmd() *cobra.Command {
 	}
 }
 
+type lockChanges struct {
+	*resolve.Changes
+	Reresolved  []string    `json:"reresolved"`
+	Suggestions []string    `json:"suggestions"`
+	Pin         string      `json:"pin,omitempty"`
+	Synced      *syncResult `json:"synced,omitempty"`
+	printItems  func(*out.Lines)
+}
+
+type relocked struct {
+	lockChanges
+	validation *resolve.Validation
+	saved      bool
+}
+
 func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
 	p, err := a.openProject()
 	if err != nil {
@@ -105,72 +111,28 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	if p.Lock == nil && cmd.Name() == "lock" {
 		p.Lock = lock.New()
 	}
-	if err := p.RequireLock(); err != nil {
-		return err
-	}
-	a.relocking = true
-	r, err := a.resolver(cmd.Context(), p)
+	rl, err := a.relockProject(cmd, p, false, run)
 	if err != nil {
 		return err
 	}
-	before := r.Snapshot()
-	if err := a.resolveMovedRefs(cmd.Context(), p, r); err != nil {
-		return err
-	}
-	reresolved, err := r.Reconcile(cmd.Context())
-	if err != nil {
-		return err
-	}
-	if reresolved == nil {
-		reresolved = []string{}
-	}
-	pin, err := run(p, r)
-	if err != nil {
-		return err
-	}
-	if _, err := r.Reconcile(cmd.Context()); err != nil {
-		return err
-	}
-	v, err := r.Validate()
-	if err != nil {
-		return err
-	}
-	if err := v.Err(); err != nil {
-		return err
-	}
-	// An instance keeps what it had before the manifest and lock are rewritten,
-	// which is the state a rollback puts back.
-	if target, ok := p.Manifest.AnyInPlace(); ok {
-		keep := p.Manifest.HistoryKeep()
-		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Target: target, Reason: cmd.Name()}); err != nil {
-			return err
-		}
-		warning, err := build.HistoryWarning(p.Dir, keep)
+	// An instance plays its own directory, so an update there is only done once it is built.
+	if target, ok := p.Manifest.AnyInPlace(); ok && cmd.Name() == "update" {
+		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{target: target})
 		if err != nil {
 			return err
 		}
-		if warning != "" {
-			a.printer.Warn("%s", warning)
-		}
+		rl.Synced = &synced
 	}
-	if err := p.SaveManifest(); err != nil {
-		return err
-	}
-	if err := p.SaveLock(); err != nil {
-		return err
-	}
-	a.printer.LockStale = false
-	a.warn(append(r.Warnings, v.Warnings...))
-	res := lockChanges{Changes: r.Changes(before), Reresolved: reresolved, Pin: pin, Suggestions: v.Recommended()}
+	res := rl.lockChanges
 	optional := 0
-	for _, s := range v.Suggestions {
+	for _, s := range rl.validation.Suggestions {
 		if s.Kind == "optional" && slices.ContainsFunc(res.Added, func(m resolve.AddedMod) bool { return m.ID == s.Mod }) {
 			optional++
 		}
 	}
 	return a.printer.Emit(res, func(l *out.Lines) {
 		if cmd.Name() == "pin" {
-			l.OK("pinned "+cmd.Flags().Arg(0), pin)
+			l.OK("pinned "+cmd.Flags().Arg(0), res.Pin)
 		}
 		if cmd.Name() == "unpin" {
 			l.OK("unpinned "+cmd.Flags().Arg(0), "")
@@ -178,16 +140,107 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		if len(res.Reresolved) > 0 {
 			l.Info("re-resolved every mod: " + strings.Join(res.Reresolved, "; "))
 		}
-		printChanges(l, res.Changes, v.Suggestions, p.Manifest.Targets, (&build.Builder{Manifest: r.Manifest, Lock: r.Lock, Packs: r.Packs}).Placements())
+		res.printItems(l)
 		if optional > 0 {
 			optionalNudge(l, optional)
 		}
 		if res.Empty() {
 			l.OK("already up to date", "")
+		}
+		if res.Synced != nil {
+			res.Synced.print(l)
 			return
 		}
-		l.Nudge("Download and build what changed", "shulker install")
+		if !res.Empty() {
+			l.Nudge("Download and build what changed", "shulker install")
+		}
 	})
+}
+
+// relockProject re-resolves p's lock with run and saves it. With keepUnchanged, a relock that
+// changes nothing writes nothing, so a sync on every launch doesn't fill the history with copies.
+func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchanged bool, run func(*project.Project, *resolve.Resolver) (pin string, err error)) (relocked, error) {
+	if err := p.RequireLock(); err != nil {
+		return relocked{}, err
+	}
+	stale := p.LockStale()
+	original, err := json.Marshal(p.Lock)
+	if err != nil {
+		return relocked{}, err
+	}
+	a.relocking = true
+	defer func() { a.relocking = false }()
+	r, err := a.resolver(cmd.Context(), p)
+	if err != nil {
+		return relocked{}, err
+	}
+	before := r.Snapshot()
+	if err := a.resolveMovedRefs(cmd.Context(), p, r); err != nil {
+		return relocked{}, err
+	}
+	reresolved, err := r.Reconcile(cmd.Context())
+	if err != nil {
+		return relocked{}, err
+	}
+	if reresolved == nil {
+		reresolved = []string{}
+	}
+	pin, err := run(p, r)
+	if err != nil {
+		return relocked{}, err
+	}
+	if _, err := r.Reconcile(cmd.Context()); err != nil {
+		return relocked{}, err
+	}
+	v, err := r.Validate()
+	if err != nil {
+		return relocked{}, err
+	}
+	if err := v.Err(); err != nil {
+		return relocked{}, err
+	}
+	rl := relocked{
+		lockChanges: lockChanges{Changes: r.Changes(before), Reresolved: reresolved, Pin: pin, Suggestions: v.Recommended()},
+		validation:  v,
+	}
+	placements := (&build.Builder{Manifest: r.Manifest, Lock: r.Lock, Packs: r.Packs}).Placements()
+	rl.printItems = func(l *out.Lines) {
+		printChanges(l, rl.Changes, v.Suggestions, p.Manifest.Targets, placements)
+	}
+	a.warn(append(r.Warnings, v.Warnings...))
+	if keepUnchanged && !stale {
+		now, err := json.Marshal(p.Lock)
+		if err != nil {
+			return relocked{}, err
+		}
+		if bytes.Equal(original, now) {
+			return rl, nil
+		}
+	}
+	// An instance keeps what it had before the manifest and lock are rewritten,
+	// which is the state a rollback puts back.
+	if target, ok := p.Manifest.AnyInPlace(); ok {
+		keep := p.Manifest.HistoryKeep()
+		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Target: target, Reason: cmd.Name()}); err != nil {
+			return relocked{}, err
+		}
+		warning, err := build.HistoryWarning(p.Dir, keep)
+		if err != nil {
+			return relocked{}, err
+		}
+		if warning != "" {
+			a.printer.Warn("%s", warning)
+		}
+	}
+	if err := p.SaveManifest(); err != nil {
+		return relocked{}, err
+	}
+	if err := p.SaveLock(); err != nil {
+		return relocked{}, err
+	}
+	a.printer.LockStale = false
+	rl.saved = true
+	return rl, nil
 }
 
 func (a *app) resolveMovedRefs(ctx context.Context, p *project.Project, r *resolve.Resolver) error {

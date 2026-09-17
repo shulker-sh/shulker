@@ -32,7 +32,7 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 	}
 	var all []instanceEntry
 	for _, in := range registry {
-		if sameDir(in.Source, dir) {
+		if sameDir(in.Source, dir) && !sameDir(in.Dir, dir) {
 			all = append(all, inspectInstance(in))
 		}
 	}
@@ -42,7 +42,7 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 	}
 	for _, name := range targetNames(p.Manifest.Targets) {
 		for _, d := range lf.ExistingSyncDirs(name) {
-			if slices.ContainsFunc(all, func(e instanceEntry) bool { return sameDir(e.Dir, d) }) {
+			if sameDir(d, dir) || slices.ContainsFunc(all, func(e instanceEntry) bool { return sameDir(e.Dir, d) }) {
 				continue
 			}
 			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(name), Dir: d, Source: dir})

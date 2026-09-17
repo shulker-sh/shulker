@@ -21,12 +21,12 @@ var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.Typ
 // and its `--type` spelling take the same flags.
 var typeFlags = map[string][]string{
 	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as", "with-deps"},
-	manifest.TypeModpack:      {"ref", "as", "unlocked"},
+	manifest.TypeModpack:      {"ref", "as", "unlocked", "no-auto-update"},
 	manifest.TypeResourcePack: {"channel", "pin", "provider", "as"},
 	manifest.TypeShader:       {"channel", "pin", "provider", "as"},
 }
 
-var allTypeFlags = []string{"as", "channel", "pin", "provider", "ref", "side", "unlocked", "with-deps"}
+var allTypeFlags = []string{"as", "channel", "no-auto-update", "pin", "provider", "ref", "side", "unlocked", "with-deps"}
 
 // inferredFlags are the flags an entry may take while its type is still the
 // provider's to settle. A modpack is never inferred — it takes a source, not a
@@ -99,7 +99,7 @@ func unsupportedType(kind string) error {
 	return out.Errorf("requires-unsupported", "%s entries aren't supported yet", kind)
 }
 
-func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, unlocked bool) error {
+func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, unlocked, noAutoUpdate bool) error {
 	if as != "" && len(sources) > 1 {
 		return out.Errorf("usage", "--as applies to a single modpack")
 	}
@@ -109,6 +109,10 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, 
 			if unlocked {
 				no := false
 				entry.Locked = &no
+			}
+			if noAutoUpdate {
+				no := false
+				entry.AutoUpdate = &no
 			}
 			for _, existing := range p.Manifest.Modpacks() {
 				if existing.Source == source {

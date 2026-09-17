@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
@@ -195,19 +196,29 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 	return loaded, nil
 }
 
-func (a *app) resolvePacks(ctx context.Context, p *project.Project) ([]*pack.Loaded, error) {
+// refreshModpacks re-resolves the modpacks refresh picks from their sources, keeps the rest at
+// their locked pins, and hands the result to the resolver.
+func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolve.Resolver, refresh func(manifest.Require) bool) ([]*pack.Loaded, error) {
 	store, err := a.packStore(p)
 	if err != nil {
 		return nil, err
 	}
 	modpacks := p.Manifest.Modpacks()
-	loaded := []*pack.Loaded{}
-	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
-		l, err := store.Resolve(ctx, name, modpacks[name])
+	loaded := make([]*pack.Loaded, 0, len(r.Packs))
+	for _, l := range r.Packs {
+		mp := modpacks[l.Name]
+		if !refresh(mp) {
+			loaded = append(loaded, l)
+			continue
+		}
+		fresh, err := store.Resolve(ctx, l.Name, mp)
 		if err != nil {
 			return nil, err
 		}
-		loaded = append(loaded, l)
+		loaded = append(loaded, fresh)
+	}
+	if err := r.RefreshPacks(loaded); err != nil {
+		return nil, err
 	}
 	a.packs = loaded
 	return loaded, nil

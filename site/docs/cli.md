@@ -174,6 +174,7 @@ shulker add ../base-pack --type modpack --as base
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
 | `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a modpack source's name) |
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
+| `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack |
 
 ### `shulker remove`
@@ -214,7 +215,7 @@ shulker lock
 
 ### `shulker update`
 
-Re-resolve mods to the newest compatible versions. With no arguments, updates every mod. Alias: `upgrade`.
+Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. In an instance (a project whose target builds into its own directory), `update` then builds the target in place; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
 
 ```sh
 shulker update
@@ -733,7 +734,9 @@ If a git or manifest URL can't be reached because the network is down, `sync` wa
 
 Every directory shulker syncs into gets a `.shulker/instance.json` recording what it syncs from, and an index of those directories lives in `registry.json` beside shulker's `config.json` (a `registry` path in `config.json`, relative to that file, moves it). A `sync --into` adds the directory to that index under an id derived from its name, or the one `--as` gives it, and `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker instances`](#shulker-instances) shows the index.
 
-To update something on that index, name it instead of a source. `-i` takes an instance's id, its name, or its directory, and syncs it from what its instance file records. Ids are unique, so `-i <id>` always picks exactly one; a name several instances share needs `--launcher` or `--side` to narrow it, or `--all` to sync them all. `--all` alone syncs every instance. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` run inside a project syncs every instance synced from that project, narrowed by `--launcher` or `--side`, and nothing else. Outside a project it asks which one to sync when run in a terminal, and fails with the list otherwise.
+To update something on that index, name it instead of a source. `-i` takes an instance's id, its name, or its directory, and syncs it from what its instance file records. Ids are unique, so `-i <id>` always picks exactly one; a name several instances share needs `--launcher` or `--side` to narrow it, or `--all` to sync them all. `--all` alone syncs every instance. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` run inside a project syncs every instance synced from that project, narrowed by `--launcher` or `--side`. Outside a project it asks which one to sync when run in a terminal, and fails with the list otherwise.
+
+A project whose target builds into its own directory is an instance, and `sync` run inside it (or naming it with `-i`) updates the instance itself first: modpacks that follow their source are fetched again (every modpack except one set to `"autoUpdate": false`), the lock is resolved against them without moving your own mods, and the target is built in place. Nothing is written, and no history entry is taken, when the lock comes out unchanged. Every instance synced from it is synced after, since those build from its lock. A modpack update your own mods can't satisfy stops the sync with the reason, leaving the lock and the directory as they were; a launcher's pre-launch hook instead builds what the lock already has and starts the game.
 
 | Flag | Description |
 | --- | --- |
@@ -834,7 +837,7 @@ shulker mod list
 
 ### `shulker modpack add|remove|list`
 
-A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`, `--unlocked`.
+A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`, `--unlocked`, `--no-auto-update`.
 
 A modpack that ships a `shulker.lock` is **locked**: its exact versions, dependencies included, are copied into this project's lock and marked with the modpack they came from, and its Minecraft and loader must match this project's exactly. A modpack without a lock, or one added with `--unlocked`, is **floating**: its mods are resolved here like your own, and its Minecraft and loader only have to admit this project's versions. A mod you list in `shulker.json` yourself always wins over either. Change your mind later with `shulker set requires.<key>.locked true|false`.
 

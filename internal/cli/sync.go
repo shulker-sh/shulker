@@ -19,17 +19,19 @@ import (
 )
 
 type syncResult struct {
-	Source     string           `json:"source"`
-	Kind       pack.Kind        `json:"kind"`
-	Commit     string           `json:"commit,omitempty"`
-	Sha256     string           `json:"sha256,omitempty"`
-	Offline    bool             `json:"offline,omitempty"`
-	LastGoodAt string           `json:"lastGoodAt,omitempty"`
-	Target     string           `json:"target"`
-	Dir        string           `json:"dir"`
-	Fetched    []string         `json:"fetched"`
-	Build      *build.Report    `json:"build"`
-	Registered *config.Instance `json:"registered,omitempty"`
+	Source     string               `json:"source"`
+	Kind       pack.Kind            `json:"kind"`
+	Commit     string               `json:"commit,omitempty"`
+	Sha256     string               `json:"sha256,omitempty"`
+	Offline    bool                 `json:"offline,omitempty"`
+	LastGoodAt string               `json:"lastGoodAt,omitempty"`
+	Target     string               `json:"target"`
+	Dir        string               `json:"dir"`
+	Fetched    []string             `json:"fetched"`
+	Build      *build.Report        `json:"build"`
+	Registered *config.Instance     `json:"registered,omitempty"`
+	Changes    *lockChanges         `json:"changes,omitempty"`
+	Instances  []syncInstanceResult `json:"instances,omitempty"`
 }
 
 type syncRequest struct {
@@ -69,6 +71,15 @@ func (a *app) syncCmd() *cobra.Command {
 					return out.Errorf("usage", "--target, --into, --ref, and --name need a source; a registered instance already has them")
 				}
 				if a.instance == "" && !sel.all {
+					dir, err := a.scopeDir()
+					if err != nil {
+						return err
+					}
+					if p, target, ok, err := a.inPlaceProject(dir); err != nil {
+						return err
+					} else if ok {
+						return a.syncTree(cmd, p, target, sel, req)
+					}
 					entries, inProject, err := a.projectInstances(sel)
 					if err != nil {
 						return err
@@ -128,6 +139,9 @@ func (a *app) syncCmd() *cobra.Command {
 }
 
 func (res syncResult) print(l *out.Lines) {
+	if res.Changes != nil {
+		res.Changes.printItems(l)
+	}
 	l.OKInto("synced "+res.Target, res.Dir, reportAside(res.Build))
 	printReportDetails(l, res.Build)
 	if r := res.Registered; r != nil {
@@ -223,7 +237,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if err != nil {
 		return syncResult{}, err
 	}
-	origin := build.Origin{Source: src.name, Ref: req.ref, Commit: src.Commit}
+	origin := build.Origin{Source: src.name, Ref: req.ref, Commit: src.Commit, Sha256: src.Sha256}
 	rep, err := b.Build(name, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin})
 	if err != nil {
 		return syncResult{}, err

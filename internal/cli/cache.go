@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 )
 
 type cacheInfo struct {
@@ -131,6 +132,10 @@ func (a *app) cachePruneCmd() *cobra.Command {
 }
 
 func (a *app) cacheRoots() (roots, error) {
+	d, err := a.deps()
+	if err != nil {
+		return roots{}, err
+	}
 	entries, err := a.loadInstanceEntries()
 	if err != nil {
 		return roots{}, err
@@ -143,7 +148,7 @@ func (a *app) cacheRoots() (roots, error) {
 			continue
 		}
 		seen[dir] = true
-		locks, present, unreadable, err := dirRoots(dir, in.Source, in.Ref)
+		locks, present, unreadable, err := dirRoots(d.cache, dir, in.Source, in.Ref)
 		if err != nil {
 			return roots{}, err
 		}
@@ -167,7 +172,7 @@ func (a *app) cacheRoots() (roots, error) {
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err != nil {
 		return r, nil
 	}
-	locks, _, unreadable, err := dirRoots(dir, "", "")
+	locks, _, unreadable, err := dirRoots(d.cache, dir, "", "")
 	if err != nil {
 		return roots{}, err
 	}
@@ -182,7 +187,7 @@ func (a *app) cacheRoots() (roots, error) {
 // instance it held was deleted; one whose lock is there but can't be read is
 // returned as a problem, which stops a prune because it may be an instance that
 // still needs its files, but leaves an inspection free to report.
-func dirRoots(dir, source, ref string) ([]cache.Root, bool, []string, error) {
+func dirRoots(c *cache.Cache, dir, source, ref string) ([]cache.Root, bool, []string, error) {
 	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil, nil
 	} else if err != nil {
@@ -197,6 +202,12 @@ func dirRoots(dir, source, ref string) ([]cache.Root, bool, []string, error) {
 		}
 	}
 	var paths []string
+	// A directory synced from a git or manifest URL runs on the lock of the checkout it was
+	// built from, and falls back offline to the one its last good sync recorded.
+	if kind := pack.Classify(source); source != "" && kind != pack.Local {
+		state, _ := build.ReadState(dir)
+		paths = append(paths, c.SourceLocks(source, ref, state.Commit, state.Sha256)...)
+	}
 	for _, d := range dirs {
 		paths = append(paths, filepath.Join(d, lock.FileName))
 		entries, err := build.History(d)

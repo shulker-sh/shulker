@@ -156,6 +156,8 @@ func (r Require) Kind() string {
 	return TypeMod
 }
 
+func (r Require) AutoUpdates() bool { return r.AutoUpdate == nil || *r.AutoUpdate }
+
 type StringList []string
 
 func (l *StringList) UnmarshalJSON(data []byte) error {

@@ -47,7 +47,14 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 				defer cancel()
 				cmd.SetContext(ctx)
 			}
-			_, err := a.syncRecorded(cmd, syncRequest{into: dir})
+			p, target, inPlace, err := a.inPlaceProject(dir)
+			switch {
+			case err != nil:
+			case inPlace:
+				err = a.syncInPlaceForLaunch(cmd, p, target)
+			default:
+				_, err = a.syncRecorded(cmd, syncRequest{into: dir})
+			}
 			if err == nil {
 				return nil
 			}

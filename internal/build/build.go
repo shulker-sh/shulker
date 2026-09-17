@@ -46,6 +46,7 @@ type Origin struct {
 	Source string `json:"source,omitempty"`
 	Ref    string `json:"ref,omitempty"`
 	Commit string `json:"commit,omitempty"`
+	Sha256 string `json:"sha256,omitempty"`
 }
 
 type State struct {

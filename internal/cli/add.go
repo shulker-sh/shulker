@@ -17,7 +17,7 @@ func (a *app) addCmd() *cobra.Command { return a.addCmdFor("") }
 func (a *app) addCmdFor(kind string) *cobra.Command {
 	var opts resolve.AddOptions
 	var typ, as, ref string
-	var unlocked bool
+	var unlocked, noAutoUpdate bool
 	cmd := &cobra.Command{
 		Use:   "add " + addArgs(kind),
 		Short: addShort(kind),
@@ -32,7 +32,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			}
 			switch chosen {
 			case manifest.TypeModpack:
-				return a.addModpacks(cmd, args, as, ref, unlocked)
+				return a.addModpacks(cmd, args, as, ref, unlocked, noAutoUpdate)
 			case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader:
 				// An empty type is settled by the provider during resolution.
 			default:
@@ -87,6 +87,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	}
 	if applies(kind, "unlocked") {
 		cmd.Flags().BoolVar(&unlocked, "unlocked", false, "resolve the modpack's mods here instead of copying the versions its lock pins")
+	}
+	if applies(kind, "no-auto-update") {
+		cmd.Flags().BoolVar(&noAutoUpdate, "no-auto-update", false, "keep the modpack at its locked version on `shulker sync`; `shulker update` still moves it")
 	}
 	if applies(kind, "with-deps") {
 		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another")

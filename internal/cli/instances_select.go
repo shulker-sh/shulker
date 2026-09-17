@@ -240,6 +240,11 @@ func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest)
 			return syncResult{}, out.Errorf("instance-missing", "the %s instance %q is gone (%s); `shulker unlink %s` forgets it", launcher.Title(e.Launcher), e.Label(), l.InstanceDir(e.Dir), e.ID)
 		}
 	}
+	if p, target, ok, err := a.inPlaceProject(e.Dir); err != nil {
+		return syncResult{}, err
+	} else if ok {
+		return a.syncInPlace(cmd, p, target, req)
+	}
 	a.packs = nil
 	src, err := a.openSource(cmd.Context(), e.Source, e.Ref)
 	if err != nil {
@@ -257,19 +262,31 @@ type syncInstanceResult struct {
 }
 
 func (a *app) syncInstances(cmd *cobra.Command, entries []instanceEntry, req syncRequest) error {
+	results, failed := a.syncEach(cmd, entries, req, false)
+	if failed > 0 {
+		e := out.Errorf("sync-failed", "%d of %d instances failed to sync", failed, len(entries))
+		e.Data = results
+		return e
+	}
+	return a.printer.Emit(results, func(*out.Lines) {})
+}
+
+// syncEach syncs every entry, printing each as it finishes; after says a result was printed
+// above the first one.
+func (a *app) syncEach(cmd *cobra.Command, entries []instanceEntry, req syncRequest, after bool) ([]syncInstanceResult, int) {
 	lines := a.printer.Out()
 	results := []syncInstanceResult{}
 	failed := 0
 	for i, e := range entries {
 		if !a.printer.JSON {
-			if i > 0 {
+			if i > 0 || after {
 				lines.Blank()
 			}
 			lines.Heading(instanceHeading(lines.T, e))
 		}
 		r := syncInstanceResult{Instance: e.Instance, OK: true}
 		restore := func() {}
-		if len(entries) > 1 {
+		if len(entries) > 1 || after {
 			restore = a.scopeWarnings(e.Label())
 		}
 		res, err := a.syncInstance(cmd, e, req)
@@ -288,10 +305,5 @@ func (a *app) syncInstances(cmd *cobra.Command, entries []instanceEntry, req syn
 		}
 		results = append(results, r)
 	}
-	if failed > 0 {
-		e := out.Errorf("sync-failed", "%d of %d instances failed to sync", failed, len(entries))
-		e.Data = results
-		return e
-	}
-	return a.printer.Emit(results, func(*out.Lines) {})
+	return results, failed
 }
