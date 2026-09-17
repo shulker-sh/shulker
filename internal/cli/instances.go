@@ -292,7 +292,7 @@ func saveIntent(dir, source, ref, target, side string) error {
 	case err != nil:
 		return err
 	default:
-		f.Source, f.Ref, f.Target = source, ref, target
+		f.Source, f.Ref, f.Target, f.Unlinked = source, ref, target, false
 	}
 	if f.Resolved == nil {
 		f.Resolved = &instance.Resolved{}

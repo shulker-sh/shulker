@@ -23,10 +23,12 @@ var ErrNotFound = errors.New("no " + FileName)
 // File is what an instance directory syncs from and how shulker sets it up. It is the only
 // file read as intent; .shulker/state.json records what the last build actually did.
 type File struct {
-	Schema   string    `json:"$schema"`
-	Source   string    `json:"source"`
-	Ref      string    `json:"ref,omitempty"`
-	Target   string    `json:"target"`
+	Schema string `json:"$schema"`
+	Source string `json:"source"`
+	Ref    string `json:"ref,omitempty"`
+	Target string `json:"target"`
+	// Unlinked keeps a directory `unlink` let go of from being registered again by a repair scan.
+	Unlinked bool      `json:"unlinked,omitempty"`
 	Settings Settings  `json:"settings"`
 	Resolved *Resolved `json:"resolved,omitempty"`
 }

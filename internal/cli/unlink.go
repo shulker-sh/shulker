@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
@@ -115,6 +116,12 @@ func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
 		return r, err
 	}
 	r.Removed, r.summary = f.Removed, f.Summary
+	if inf, err := instance.Load(l.Dir); err == nil {
+		inf.Unlinked = true
+		if err := inf.Save(l.Dir); err != nil {
+			return r, err
+		}
+	}
 	_, err = config.UpdateInstances(configPath, func(instances []config.Instance) []config.Instance {
 		if i, ok := config.FindInstance(instances, l.Dir); ok {
 			return append(instances[:i], instances[i+1:]...)

@@ -152,3 +152,26 @@ func TestUnlinkAll(t *testing.T) {
 		t.Fatalf("registry after --all: %+v", links)
 	}
 }
+
+func TestUnlinkedInstanceStaysUnlinked(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--as", "friends")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-pack", "minecraft")
+	h.mustRun(t, "unlink", "friends")
+	if f := readIntent(t, gameDir); !f.Unlinked {
+		t.Fatalf("unlink should mark the instance file: %+v", f)
+	}
+
+	h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
+	if instances := readInstances(t, h); len(instances) != 0 {
+		t.Fatalf("repair must not register an unlinked instance again: %+v", instances)
+	}
+
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--as", "friends")
+	if f := readIntent(t, gameDir); f.Unlinked {
+		t.Fatalf("link should clear the mark: %+v", f)
+	}
+}

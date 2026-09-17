@@ -161,7 +161,7 @@ func instanceAt(dir string) (config.Instance, bool) {
 	in := config.Instance{Name: filepath.Base(dir), Dir: dir}
 	if f, err := instance.Load(dir); err == nil {
 		in.Source = f.Source
-		return in, true
+		return in, !f.Unlinked
 	}
 	st, err := build.ReadState(dir)
 	if err != nil || st.Source == "" {
