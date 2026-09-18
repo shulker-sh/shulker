@@ -80,6 +80,9 @@ func (a *app) reconcileInstance(in config.Instance) error {
 		if want.Java, err = reconcileShim(in, f, current.Java, exe); err != nil {
 			return err
 		}
+	} else {
+		// The shim prepends the wrapper itself; every other launcher has a slot of its own for it.
+		want.Wrapper = launcher.WrapperCommand(in.Launcher, f.Settings.Wrapper)
 	}
 	if err := launcher.WriteSlots(e, in, want); err != nil {
 		return err

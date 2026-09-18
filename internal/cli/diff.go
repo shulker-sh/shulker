@@ -97,7 +97,7 @@ func (a *app) diffCmd() *cobra.Command {
 					}
 				}
 				for _, dir := range dirs {
-					rep, err := b.Diff(side, build.Options{Dir: dir, Features: lf.Features})
+					rep, err := b.Diff(side, build.Options{Dir: dir, Features: lf.Features, NoMarker: markerOff(b.Target(side, dir), p.Manifest)})
 					if err != nil && dir != "" && dir != buildDir && into == "" {
 						a.printer.Warn("skipped %s: %v", dir, err)
 						continue
@@ -168,7 +168,7 @@ func (a *app) pullCmd() *cobra.Command {
 			} else if into, err = a.pullSource(b, p, lf, side, args); err != nil {
 				return err
 			}
-			rep, err := b.Pull(side, build.PullRequest{Files: args, Keys: keys, To: to}, build.Options{Dir: into, Features: lf.Features})
+			rep, err := b.Pull(side, build.PullRequest{Files: args, Keys: keys, To: to}, build.Options{Dir: into, Features: lf.Features, NoMarker: markerOff(b.Target(side, into), p.Manifest)})
 			if err != nil {
 				return err
 			}
@@ -215,7 +215,7 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, s
 	}
 	var drifted []string
 	for _, dir := range dirs {
-		rep, err := b.Diff(side, build.Options{Dir: dir, Features: lf.Features})
+		rep, err := b.Diff(side, build.Options{Dir: dir, Features: lf.Features, NoMarker: markerOff(b.Target(side, dir), p.Manifest)})
 		if err != nil {
 			if dir == buildDir {
 				return "", err

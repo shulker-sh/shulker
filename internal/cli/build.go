@@ -7,7 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/local"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 )
@@ -52,7 +54,7 @@ func (a *app) buildCmd() *cobra.Command {
 			}
 			var reports []*build.Report
 			for _, side := range sides {
-				rep, err := b.Build(side, build.Options{Force: force, OS: osName, Features: overrides})
+				rep, err := b.Build(side, build.Options{Force: force, OS: osName, Features: overrides, NoMarker: markerOff(b.Target(side, ""), p.Manifest)})
 				if err != nil {
 					return err
 				}
@@ -75,6 +77,15 @@ func (a *app) buildCmd() *cobra.Command {
 	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	ff.register(cmd, "for this run only")
 	return cmd
+}
+
+// markerOff is whether a build into a directory drops the marker mod: the instance's own
+// settings.marker where the directory has an instance file, else the default the manifest carries.
+func markerOff(dir string, m *manifest.Manifest) bool {
+	if f, err := instance.Load(dir); err == nil {
+		return !f.Settings.MarkerOn()
+	}
+	return !m.MarkerOn()
 }
 
 func printReport(l *out.Lines, rep *build.Report) {

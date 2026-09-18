@@ -90,10 +90,7 @@ func projectSide(f planned) keyMerge {
 // checkNamed runs before any build work, so a file name that isn't in the directory at all is
 // reported as missing rather than as unchanged.
 func (b *Builder) checkNamed(side string, files []string, opts Options) error {
-	dir := opts.Dir
-	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
-	}
+	dir := b.Target(side, opts.Dir)
 	if _, err := os.Stat(dir); err != nil {
 		return nil
 	}
@@ -333,10 +330,7 @@ type drift struct {
 }
 
 func (b *Builder) drift(side string, opts Options) (*drift, error) {
-	dir := opts.Dir
-	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
-	}
+	dir := b.Target(side, opts.Dir)
 	report := &Report{Warnings: []string{}}
 	desired, _, err := b.collect(side, opts, report)
 	if err != nil {

@@ -111,6 +111,7 @@ type Options struct {
 	NoOS        bool
 	Features    map[string]bool
 	Origin      Origin
+	NoMarker    bool
 }
 
 type Builder struct {
@@ -209,11 +210,17 @@ func sortedKeys(set map[string]bool) []string {
 	return keys
 }
 
-func (b *Builder) Build(side string, opts Options) (*Report, error) {
-	dir := opts.Dir
-	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
+// Target is the directory a build writes into: the caller's own where it named one, else the side's
+// build directory. Callers resolve it to read what the directory itself says about a build.
+func (b *Builder) Target(side, dir string) string {
+	if dir != "" {
+		return dir
 	}
+	return filepath.Join(b.Dir, b.Manifest.BuildDir(side))
+}
+
+func (b *Builder) Build(side string, opts Options) (*Report, error) {
+	dir := b.Target(side, opts.Dir)
 	inPlace := sameDir(dir, b.Dir)
 	report := &Report{Side: side, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
 	desired, dirs, err := b.collect(side, opts, report)
@@ -354,7 +361,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectClient(side, opts, desired, vars, report); err != nil {
 			return nil, nil, err
 		}
-		if b.Lock.Loader.Type != "" {
+		if b.Lock.Loader.Type != "" && !opts.NoMarker {
 			jar, err := b.markerJar(side, cond, sel)
 			if err != nil {
 				return nil, nil, err

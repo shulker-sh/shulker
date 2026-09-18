@@ -43,6 +43,7 @@
     { "rule": "depends", "mod": "sodium", "on": "minecraft", "declared": ">=26.3", "note": "works" }
   ],
   "wholeFiles": ["config/whole.properties"],
+  "marker": true,
   "variables": { "motd": "Welcome", "port": 25565, "hardcore": false, "ratio": 1.50 },
   "server": {
     "name": "Every Field Server",
@@ -80,6 +81,7 @@
     "name": "Every Field",
     "build": "build/client",
     "variables": { "motd": "Client" },
+    "hooks": { "preLaunch": true, "postExit": true },
     "options": { "fov": 0.5, "lang": "en_us", "autoJump": false },
     "servers": [{ "name": "Home", "ip": "example.com:25565", "note": "servers" }],
     "note": "client"

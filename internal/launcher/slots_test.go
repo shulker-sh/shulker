@@ -225,3 +225,87 @@ func TestGDLauncherSlotSurvivesAQuoteInTheLauncherDir(t *testing.T) {
 		t.Fatalf("shulker must recognise its escaped slot: %q", command)
 	}
 }
+
+func TestWrapperSlotIsFilledButNeverCleared(t *testing.T) {
+	prism := t.TempDir()
+	write(t, filepath.Join(prism, InstanceConfigFile), "[General]\nConfigVersion=1.3\nWrapperCommand=mangohud\n")
+	e := Find("prism")
+	if err := WriteSlots(e, slotRow(e.Name, prism), Slots{PreLaunch: "sh pre", Wrapper: "gamemoderun"}); err != nil {
+		t.Fatal(err)
+	}
+	values, err := readINI(filepath.Join(prism, InstanceConfigFile), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if values["WrapperCommand"] != "gamemoderun" || values["OverrideCommands"] != "true" {
+		t.Fatalf("Prism reads the wrapper only with the override on: %+v", values)
+	}
+	if err := WriteSlots(e, slotRow(e.Name, prism), Slots{PreLaunch: "sh pre"}); err != nil {
+		t.Fatal(err)
+	}
+	if values, err = readINI(filepath.Join(prism, InstanceConfigFile), false); err != nil {
+		t.Fatal(err)
+	}
+	if values["WrapperCommand"] != "gamemoderun" {
+		t.Fatalf("an unset wrapper is the player's, not shulker's to clear: %+v", values)
+	}
+
+	atl := t.TempDir()
+	write(t, filepath.Join(atl, ATLauncherInstanceFile), `{"name":"Cozy","launcher":{"maximumMemory":4096}}`)
+	e = Find("atlauncher")
+	if err := WriteSlots(e, slotRow(e.Name, atl), Slots{Wrapper: "gamemoderun"}); err != nil {
+		t.Fatal(err)
+	}
+	if slots, found, err := ReadSlots(e, slotRow(e.Name, atl)); err != nil || !found || slots.Wrapper != "gamemoderun" {
+		t.Fatalf("read back: %+v found=%v err=%v", slots, found, err)
+	}
+	if got := atlauncherFixture(t, atl); got.Launcher.Enable == nil || !*got.Launcher.Enable {
+		t.Fatalf("ATLauncher drops the wrapper unless commands are enabled: %+v", got)
+	}
+	if err := WriteSlots(e, slotRow(e.Name, atl), Slots{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := atlauncherFixture(t, atl); got.Launcher.Enable == nil || !*got.Launcher.Enable {
+		t.Fatalf("a wrapper left in place keeps the switch that runs it: %+v", got)
+	}
+	if slots, _, err := ReadSlots(e, slotRow(e.Name, atl)); err != nil || slots.Wrapper != "gamemoderun" {
+		t.Fatalf("the wrapper survives clearing the command slots: %+v err=%v", slots, err)
+	}
+
+	gd := t.TempDir()
+	write(t, filepath.Join(gd, GDLauncherInstanceFile), `{"name":"Cozy","_version":"1"}`)
+	e = Find("gdlauncher")
+	if err := WriteSlots(e, slotRow(e.Name, gd), Slots{Wrapper: "gamemoderun"}); err != nil {
+		t.Fatal(err)
+	}
+	if slots, found, err := ReadSlots(e, slotRow(e.Name, gd)); err != nil || !found || slots.Wrapper != "gamemoderun" {
+		t.Fatalf("read back: %+v found=%v err=%v", slots, found, err)
+	}
+	if err := WriteSlots(e, slotRow(e.Name, gd), Slots{}); err != nil {
+		t.Fatal(err)
+	}
+	if slots, _, err := ReadSlots(e, slotRow(e.Name, gd)); err != nil || slots.Wrapper != "gamemoderun" {
+		t.Fatalf("the wrapper survives clearing the hooks: %+v err=%v", slots, err)
+	}
+}
+
+func TestWrapperCommandQuotesTheWayEachParserReads(t *testing.T) {
+	words := []string{"/opt/My Tools/gamemoderun", "--dlsym"}
+	if got := wrapperCommand("prism", words, "darwin"); got != `"/opt/My Tools/gamemoderun" --dlsym` {
+		t.Fatalf("prism: %q", got)
+	}
+	command := wrapperCommand("gdlauncher", words, "darwin")
+	if got := posixSplit(command); len(got) != 2 || got[0] != words[0] || got[1] != words[1] {
+		t.Fatalf("GDLauncher would split %q into %q", command, got)
+	}
+	// ATLauncher splits on whitespace and ignores quotes, so quoting a word would only corrupt it.
+	if got := wrapperCommand("atlauncher", words, "darwin"); got != "/opt/My Tools/gamemoderun --dlsym" {
+		t.Fatalf("atlauncher: %q", got)
+	}
+	if got := wrapperCommand("prism", []string{"gamemoderun"}, "darwin"); got != "gamemoderun" {
+		t.Fatalf("a word needing no quotes must not get any: %q", got)
+	}
+	if got := wrapperCommand("prism", nil, "darwin"); got != "" {
+		t.Fatalf("no wrapper, no command: %q", got)
+	}
+}

@@ -11,8 +11,10 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -42,12 +44,16 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	var launcherDir, instanceName, ref, as string
 	var force bool
 	var assumeClient bool
+	var ls linkSettings
 	cmd := &cobra.Command{
 		Use:     "mojang [project-dir | git-url | manifest-url]",
 		Aliases: []string{"vanilla"},
 		Short:   "Add a profile for the client build to the official launcher, installing its loader if it has one",
 		Args:    maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := ls.check(); err != nil {
+				return err
+			}
 			src, err := a.linkSource(cmd.Context(), args, ref)
 			if err != nil {
 				return err
@@ -130,7 +136,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
-			if err := saveIntent(gameDir, src.name, ref, side, assumeClient); err != nil {
+			if err := ls.save(gameDir, src.name, ref, side, assumeClient, p.Manifest); err != nil {
 				return err
 			}
 			row := config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name}
@@ -170,6 +176,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "repoint a profile that syncs from a different source")
+	ls.register(cmd)
 	return cmd
 }
 
@@ -211,4 +218,74 @@ func profileKey(name string) string {
 		slug = "project"
 	}
 	return "shulker-" + slug
+}
+
+// linkSettings are the settings a `link` seeds an instance with: the manifest's defaults on a new
+// instance, then a flag's value over them. On a relink only the flags land, because the settings
+// block belongs to whoever edited it once it exists, and no sync rewrites it.
+type linkSettings struct {
+	noHooks     bool
+	noPreLaunch bool
+	noPostExit  bool
+	noMarker    bool
+	java        string
+	wrapper     string
+}
+
+func (ls *linkSettings) register(cmd *cobra.Command) {
+	cmd.Flags().BoolVar(&ls.noHooks, "no-hooks", false, "install neither hook: don't sync before a launch, don't record how a run ended")
+	cmd.Flags().BoolVar(&ls.noPreLaunch, "no-pre-launch", false, "don't sync this instance before each launch")
+	cmd.Flags().BoolVar(&ls.noPostExit, "no-post-exit", false, "don't record how each run ended")
+	cmd.Flags().BoolVar(&ls.noMarker, "no-marker", false, "leave the marker mod out of this instance's builds")
+	cmd.Flags().StringVar(&ls.java, "java", "", "absolute path to the Java this machine launches the instance with (default: shulker's managed runtime)")
+	cmd.Flags().StringVar(&ls.wrapper, "wrapper", "", "command prefix for the launch command, such as gamemoderun; split on whitespace")
+}
+
+func (ls linkSettings) check() error {
+	if ls.java != "" && !filepath.IsAbs(ls.java) {
+		return out.Errorf("usage", "--java needs an absolute path: a launcher runs the instance with almost no environment, and nothing searches PATH for it")
+	}
+	return nil
+}
+
+// set reports whether this link asks for any setting at all, which is what a mode with no instance
+// file to record them in has to refuse.
+func (ls linkSettings) set() bool {
+	return ls.noHooks || ls.noPreLaunch || ls.noPostExit || ls.noMarker || ls.java != "" || ls.wrapper != ""
+}
+
+// save writes what a directory syncs from, and the settings this link decided.
+func (ls linkSettings) save(dir, source, ref, side string, assumeClient bool, m *manifest.Manifest) error {
+	f, fresh, err := loadIntent(dir, source, ref, side, assumeClient)
+	if err != nil {
+		return err
+	}
+	if fresh {
+		h := m.ClientHooks()
+		if h.PreLaunch != nil {
+			f.Settings.Hooks.PreLaunch = h.PreLaunch
+		}
+		if h.PostExit != nil {
+			f.Settings.Hooks.PostExit = h.PostExit
+		}
+		if m.Marker != nil {
+			f.Settings.Marker = m.Marker
+		}
+	}
+	if ls.noHooks || ls.noPreLaunch {
+		f.Settings.Hooks.PreLaunch = instance.Off()
+	}
+	if ls.noHooks || ls.noPostExit {
+		f.Settings.Hooks.PostExit = instance.Off()
+	}
+	if ls.noMarker {
+		f.Settings.Marker = instance.Off()
+	}
+	if ls.java != "" {
+		f.Settings.Java = ls.java
+	}
+	if w := strings.Fields(ls.wrapper); len(w) > 0 {
+		f.Settings.Wrapper = w
+	}
+	return f.Save(dir)
 }

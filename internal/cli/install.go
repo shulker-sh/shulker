@@ -57,7 +57,7 @@ func (a *app) installCmd() *cobra.Command {
 			sides := p.Manifest.Sides()
 			res := installResult{Fetched: fetched}
 			for _, side := range sides {
-				rep, err := b.Build(side, build.Options{Force: force, OS: osName, Features: overrides})
+				rep, err := b.Build(side, build.Options{Force: force, OS: osName, Features: overrides, NoMarker: markerOff(b.Target(side, ""), p.Manifest)})
 				if err != nil {
 					return err
 				}

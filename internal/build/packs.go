@@ -105,10 +105,7 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 	if _, own := options[resourcePacksKey]; own {
 		return
 	}
-	dir := opts.Dir
-	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
-	}
+	dir := b.Target(side, opts.Dir)
 	was, recorded := LoadState(dir).Values[OptionsFile][resourcePacksKey]
 	switch {
 	case opts.Force:

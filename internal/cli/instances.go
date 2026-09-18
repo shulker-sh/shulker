@@ -289,19 +289,31 @@ func (a *app) updateInstances(update func([]config.Instance) []config.Instance) 
 }
 
 // saveIntent writes what a directory syncs from, keeping the settings block a person may have
-// edited. Every directory shulker syncs into gets one, launcher instance or not.
+// edited: a sync never touches it. Every directory shulker syncs into gets one, launcher instance
+// or not; a link goes through linkSettings.save instead, which also seeds the settings.
 func saveIntent(dir, source, ref, side string, assumeClient bool) error {
+	f, _, err := loadIntent(dir, source, ref, side, assumeClient)
+	if err != nil {
+		return err
+	}
+	return f.Save(dir)
+}
+
+// loadIntent is the instance file for a directory with this sync recorded in it, and whether it had
+// to be created, which is what tells a link that the settings are still shulker's to seed.
+func loadIntent(dir, source, ref, side string, assumeClient bool) (*instance.File, bool, error) {
 	f, err := instance.Load(dir)
+	fresh := false
 	switch {
 	case errors.Is(err, instance.ErrNotFound):
-		f = instance.New(source, ref, side)
+		f, fresh = instance.New(source, ref, side), true
 	case err != nil:
-		return err
+		return nil, false, err
 	default:
 		f.Source, f.Ref, f.Side, f.Unlinked = source, ref, side, false
 	}
 	f.AssumeClient = assumeClient
-	return f.Save(dir)
+	return f, fresh, nil
 }
 
 var unsafeIDChars = regexp.MustCompile(`[^a-z0-9._-]+`)

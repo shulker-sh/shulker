@@ -143,3 +143,9 @@ func on() *bool {
 	v := true
 	return &v
 }
+
+// Off is a switch a link flag or a hand edit turned off.
+func Off() *bool {
+	v := false
+	return &v
+}

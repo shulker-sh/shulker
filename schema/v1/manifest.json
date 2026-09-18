@@ -80,6 +80,10 @@
       "items": { "$ref": "#/$defs/relativePath" },
       "description": "Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone."
     },
+    "marker": {
+      "type": "boolean",
+      "description": "Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both. Default true. It seeds settings.marker when an instance is created, and the instance decides from then on."
+    },
     "variables": { "$ref": "#/$defs/variables" },
     "server": { "$ref": "#/$defs/server" },
     "client": { "$ref": "#/$defs/client" },
@@ -525,6 +529,21 @@
         "note": { "$ref": "#/$defs/note" }
       }
     },
+    "clientHooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What a launcher instance of this pack does around a launch, by default. These seed settings.hooks when the instance is created; the instance decides from then on, and a link flag overrides them once.",
+      "properties": {
+        "preLaunch": {
+          "type": "boolean",
+          "description": "Sync the instance from this project before each launch. Default true."
+        },
+        "postExit": {
+          "type": "boolean",
+          "description": "Record how each run ended when the game exits. Default true."
+        }
+      }
+    },
     "client": {
       "type": "object",
       "additionalProperties": false,
@@ -539,6 +558,7 @@
           "description": "Output directory. Defaults to build/<side>; \".\" builds into the project directory itself, which is what makes the project an instance."
         },
         "variables": { "$ref": "#/$defs/variables" },
+        "hooks": { "$ref": "#/$defs/clientHooks" },
         "options": {
           "type": "object",
           "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_.:]*$" },

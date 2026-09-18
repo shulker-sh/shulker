@@ -100,11 +100,46 @@ func isLegacySyncCommand(command string) bool {
 }
 
 // Slots are what one instance holds in the slots its launcher has: two commands, or the profile's
-// Java where the launcher runs no commands.
+// Java where the launcher runs no commands, and the launch command's own prefix.
+//
+// Shulker owns the command slots, so an empty one clears what it wrote there. It never owns the
+// wrapper slot: an empty Wrapper leaves whatever the launcher has, because the instance naming no
+// wrapper means the player's own setting stands.
 type Slots struct {
 	PreLaunch string
 	PostExit  string
 	Java      string
+	Wrapper   string
+}
+
+// WrapperCommand is settings.wrapper as one string for a launcher's own wrapper slot. Each launcher
+// splits that string itself: Prism and GDLauncher read quotes, so a word that needs them gets them,
+// while ATLauncher splits on whitespace and ignores quotes, so its words stay bare and a wrapper
+// word holding a space can't be written there at all.
+func WrapperCommand(launcherName string, words []string) string {
+	return wrapperCommand(launcherName, words, runtime.GOOS)
+}
+
+func wrapperCommand(launcherName string, words []string, goos string) string {
+	quoted := make([]string, 0, len(words))
+	for _, word := range words {
+		quoted = append(quoted, wrapperWord(launcherName, word, goos))
+	}
+	return strings.Join(quoted, " ")
+}
+
+func wrapperWord(launcherName, word, goos string) string {
+	if !strings.ContainsAny(word, " \t\"'\\") {
+		return word
+	}
+	switch launcherName {
+	case "atlauncher":
+		return word
+	case "gdlauncher":
+		return gdlauncherHookArg(word, goos)
+	default:
+		return CommandArg(word)
+	}
 }
 
 // ReadSlots is what a launcher currently has in an instance's slots, and whether the instance exists
@@ -120,19 +155,19 @@ func ReadSlots(e *Entry, in config.Instance) (Slots, bool, error) {
 		if err != nil {
 			return Slots{}, false, err
 		}
-		return Slots{PreLaunch: values["PreLaunchCommand"], PostExit: values["PostExitCommand"]}, true, nil
+		return Slots{PreLaunch: values["PreLaunchCommand"], PostExit: values["PostExitCommand"], Wrapper: values["WrapperCommand"]}, true, nil
 	case "atlauncher":
 		settings, _, found, err := atlauncherSettings(instanceDir)
 		if err != nil || !found {
 			return Slots{}, found, err
 		}
-		return Slots{PreLaunch: jsonStringValue(settings["preLaunchCommand"]), PostExit: jsonStringValue(settings["postExitCommand"])}, true, nil
+		return Slots{PreLaunch: jsonStringValue(settings["preLaunchCommand"]), PostExit: jsonStringValue(settings["postExitCommand"]), Wrapper: jsonStringValue(settings["wrapperCommand"])}, true, nil
 	case "gdlauncher":
 		top, found, err := gdlauncherTop(instanceDir)
 		if err != nil || !found {
 			return Slots{}, found, err
 		}
-		return Slots{PreLaunch: jsonStringValue(top["pre_launch_hook"]), PostExit: jsonStringValue(top["post_exit_hook"])}, true, nil
+		return Slots{PreLaunch: jsonStringValue(top["pre_launch_hook"]), PostExit: jsonStringValue(top["post_exit_hook"]), Wrapper: jsonStringValue(top["wrapper_command"])}, true, nil
 	case "mojang":
 		java, found, err := (&Mojang{Dir: in.LauncherDir}).JavaDir(in.Dir)
 		return Slots{Java: java}, found, err
@@ -140,8 +175,9 @@ func ReadSlots(e *Entry, in config.Instance) (Slots, bool, error) {
 	return Slots{}, false, nil
 }
 
-// WriteSlots puts commands in an instance's slots, an empty one clearing that slot. It is what
-// reconcile uses, so a hand-edited switch takes effect through the same path that first set it.
+// WriteSlots puts commands in an instance's slots, an empty one clearing that slot, except for the
+// wrapper, which is only ever filled. It is what reconcile uses, so a hand-edited switch takes
+// effect through the same path that first set it.
 func WriteSlots(e *Entry, in config.Instance, s Slots) error {
 	instanceDir := e.InstanceDir(in.Dir)
 	switch e.Name {
@@ -176,6 +212,11 @@ func writePrismSlots(instanceDir string, multimc bool, s Slots) error {
 		}
 		set[key] = command
 	}
+	if s.Wrapper != "" {
+		set["WrapperCommand"] = s.Wrapper
+	}
+	// Prism reads all three from the instance only with this on (BaseInstance.cpp registers them
+	// against it), so a wrapper needs it as much as a command does.
 	if len(set) > 0 {
 		set["OverrideCommands"] = "true"
 	}
@@ -197,7 +238,7 @@ func writePrismSlots(instanceDir string, multimc bool, s Slots) error {
 		}
 		buf.WriteString(line + "\n")
 	}
-	for _, key := range []string{"OverrideCommands", "PreLaunchCommand", "PostExitCommand"} {
+	for _, key := range []string{"OverrideCommands", "PreLaunchCommand", "PostExitCommand", "WrapperCommand"} {
 		if value, has := set[key]; has && !done[key] {
 			fmt.Fprintf(&buf, "%s=%s\n", key, escape(value))
 		}
@@ -217,9 +258,13 @@ func writeATLauncherSlots(instanceDir string, s Slots) error {
 		}
 		settings[key] = jsonString(command)
 	}
+	if s.Wrapper != "" {
+		settings["wrapperCommand"] = jsonString(s.Wrapper)
+	}
 	// enableCommands is per instance, so reconcile has to set it or a generated or adopted command
-	// silently never runs.
-	if s.PreLaunch != "" || s.PostExit != "" {
+	// silently never runs. It gates the wrapper too, so a wrapper already in the file keeps it on.
+	_, wrapped := settings["wrapperCommand"]
+	if s.PreLaunch != "" || s.PostExit != "" || wrapped {
 		settings["enableCommands"] = json.RawMessage("true")
 	} else {
 		delete(settings, "enableCommands")
@@ -241,6 +286,9 @@ func writeGDLauncherSlots(instanceDir string, s Slots) error {
 			continue
 		}
 		top[key] = jsonString(command)
+	}
+	if s.Wrapper != "" {
+		top["wrapper_command"] = jsonString(s.Wrapper)
 	}
 	return fsutil.WriteJSON(filepath.Join(instanceDir, GDLauncherInstanceFile), top)
 }

@@ -23,11 +23,15 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 	var force bool
 	var assumeClient bool
 	var ff featureFlags
+	var ls linkSettings
 	cmd := &cobra.Command{
 		Use:   "atlauncher [project-dir | git-url | manifest-url]",
 		Short: "Create an ATLauncher instance that syncs the client build before each launch",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := ls.check(); err != nil {
+				return err
+			}
 			src, err := a.linkSource(cmd.Context(), args, ref)
 			if err != nil {
 				return err
@@ -113,7 +117,7 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 			if err := a.checkID(as, res.GameDir); err != nil {
 				return err
 			}
-			if err := saveIntent(res.GameDir, src.name, ref, side, assumeClient); err != nil {
+			if err := ls.save(res.GameDir, src.name, ref, side, assumeClient, p.Manifest); err != nil {
 				return err
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: "atlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
@@ -164,6 +168,7 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "link over an instance that syncs from a different source or that shulker didn't link")
 	ff.register(cmd, "for this instance")
+	ls.register(cmd)
 	return cmd
 }
 

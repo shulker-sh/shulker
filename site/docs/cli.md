@@ -571,6 +571,10 @@ With no source, it links the project in the current directory. Pass a project di
 
 If the instance already syncs from a different source, or is an ATLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one.
 
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` and `marker` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. Change your mind later by editing the file and running `shulker instances repair`.
+
+`--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours. ATLauncher splits its wrapper on whitespace and ignores quotes, so a wrapper word with a space in it can't be written there.
+
 ```sh
 shulker link atlauncher
 shulker link atlauncher https://github.com/shulker-sh/base-pack.git
@@ -585,6 +589,12 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Link over an instance that syncs from a different source or that shulker didn't link |
+| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
+| `--no-pre-launch` | Don't sync this instance before each launch |
+| `--no-post-exit` | Don't record how each run ended |
+| `--no-marker` | Leave the marker mod out of this instance's builds |
+| `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
+| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -602,6 +612,10 @@ Renaming the instance in GDLauncher moves its folder. It keeps syncing before ea
 
 If the instance already syncs from a different source, or is a GDLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one.
 
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` and `marker` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. Change your mind later by editing the file and running `shulker instances repair`.
+
+`--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours.
+
 ```sh
 shulker link gdlauncher
 shulker link gdlauncher https://github.com/shulker-sh/base-pack.git
@@ -616,6 +630,12 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet |
+| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
+| `--no-pre-launch` | Don't sync this instance before each launch |
+| `--no-post-exit` | Don't record how each run ended |
+| `--no-marker` | Leave the marker mod out of this instance's builds |
+| `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
+| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
@@ -626,6 +646,10 @@ Install the project's loader, if it has one, into the official launcher and add 
 With no source, it links the project in the current directory, and the profile's game directory is the project's `build/<side>`. Pass a project directory, git URL, or manifest URL to link that instead: the game directory is then `shulker/<slug>` inside the launcher directory, and shulker syncs it right away so it's ready to play. The official launcher runs no commands of its own, so shulker points the profile's Java at a small shim of its own that syncs the instance before each launch and then starts the game. On Windows the profile keeps the launcher's own Java, so run `shulker sync -i <id>` (or `shulker sync --all`) to bring it up to date.
 
 If the profile already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one.
+
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` and `marker` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. Change your mind later by editing the file and running `shulker instances repair`.
+
+`--wrapper` prefixes the Java command the shim runs, since the official launcher has no wrapper setting of its own.
 
 ```sh
 shulker link mojang
@@ -641,6 +665,12 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint a profile that syncs from a different source |
+| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
+| `--no-pre-launch` | Don't sync this instance before each launch |
+| `--no-post-exit` | Don't record how each run ended |
+| `--no-marker` | Leave the marker mod out of this instance's builds |
+| `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
+| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
 
 ### `shulker link prism`
 
@@ -651,6 +681,10 @@ With no source, it links the project in the current directory. Pass a project di
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game dir>`, or run `link` again with new flags.
 
 If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one. On the next sync, files the old source put there are removed, unless you changed them in-game.
+
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` and `marker` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. Change your mind later by editing the file and running `shulker instances repair`. In symlink mode there is no instance file to record them in, so these flags are refused.
+
+`--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours.
 
 ```sh
 shulker link prism
@@ -668,12 +702,22 @@ shulker link prism --mode symlink
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint an instance that syncs from a different source |
+| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended (sync mode only) |
+| `--no-pre-launch` | Don't sync this instance before each launch (sync mode only) |
+| `--no-post-exit` | Don't record how each run ended (sync mode only) |
+| `--no-marker` | Leave the marker mod out of this instance's builds (sync mode only) |
+| `--java <path>` | Absolute path to the Java this machine launches the instance with, in sync mode (default: shulker's managed runtime) |
+| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace (sync mode only) |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more (sync mode only) |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more (sync mode only) |
 
 ### `shulker link multimc`
 
 Create a MultiMC instance that syncs the client build before each launch. It is [`shulker link prism`](#shulker-link-prism) for MultiMC's own `instance.cfg` dialect, with the same source argument, flags and behaviour, and one difference: MultiMC is portable and has no fixed data folder, so `--launcher-dir` is required and names the folder that holds `multimc.cfg` (`launcher-dir-required` without it). The instance is registered under the launcher name `multimc`, which is what `--launcher multimc` and `shulker unlink multimc` match.
+
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` and `marker` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. Change your mind later by editing the file and running `shulker instances repair`. In symlink mode there is no instance file to record them in, so these flags are refused.
+
+`--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours.
 
 ```sh
 shulker link multimc --launcher-dir ~/MultiMC
@@ -689,6 +733,12 @@ shulker link multimc https://github.com/shulker-sh/base-pack.git --launcher-dir 
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint an instance that syncs from a different source |
+| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended (sync mode only) |
+| `--no-pre-launch` | Don't sync this instance before each launch (sync mode only) |
+| `--no-post-exit` | Don't record how each run ended (sync mode only) |
+| `--no-marker` | Leave the marker mod out of this instance's builds (sync mode only) |
+| `--java <path>` | Absolute path to the Java this machine launches the instance with, in sync mode (default: shulker's managed runtime) |
+| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace (sync mode only) |
 | `--with <feature>` | Turn a feature on for this instance; repeat for more (sync mode only) |
 | `--without <feature>` | Turn a feature off for this instance; repeat for more (sync mode only) |
 

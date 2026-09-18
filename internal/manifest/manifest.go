@@ -40,6 +40,7 @@ type Manifest struct {
 	Requires    map[string]Require `json:"requires"`
 	Ignore      []Ignore           `json:"ignore,omitempty"`
 	WholeFiles  []string           `json:"wholeFiles,omitempty"`
+	Marker      *bool              `json:"marker,omitempty"`
 	Variables   Variables          `json:"variables,omitempty"`
 	Server      *Server            `json:"server,omitempty"`
 	Client      *Client            `json:"client,omitempty"`
@@ -100,9 +101,17 @@ type Client struct {
 	Name      string          `json:"name,omitempty"`
 	Build     string          `json:"build,omitempty"`
 	Variables Variables       `json:"variables,omitempty"`
+	Hooks     *Hooks          `json:"hooks,omitempty"`
 	Options   map[string]any  `json:"options,omitempty"`
 	Servers   json.RawMessage `json:"servers,omitempty"`
 	Note      string          `json:"note,omitempty"`
+}
+
+// Hooks are the author's defaults for a launcher instance's hook switches. They seed the instance's
+// own settings when it is created; nothing reads them after that.
+type Hooks struct {
+	PreLaunch *bool `json:"preLaunch,omitempty"`
+	PostExit  *bool `json:"postExit,omitempty"`
 }
 
 type Loader struct {
@@ -447,6 +456,18 @@ func (m *Manifest) SideVariables(side string) Variables {
 	}
 	return vars
 }
+
+// ClientHooks are the author's hook defaults for a new instance, absent where the manifest says
+// nothing and the instance's own default stands.
+func (m *Manifest) ClientHooks() Hooks {
+	if m.Client == nil || m.Client.Hooks == nil {
+		return Hooks{}
+	}
+	return *m.Client.Hooks
+}
+
+// MarkerOn is whether a build carries the marker mod where no instance has decided for itself.
+func (m *Manifest) MarkerOn() bool { return m.Marker == nil || *m.Marker }
 
 const DefaultHistory = 5
 

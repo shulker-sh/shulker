@@ -44,6 +44,7 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 	var force bool
 	var assumeClient bool
 	var ff featureFlags
+	var ls linkSettings
 	launcherName, use, short := "prism", "prism", "Create a Prism Launcher instance that syncs the client build before each launch"
 	if multimc {
 		launcherName, use, short = "multimc", "multimc", "Create a MultiMC instance that syncs the client build before each launch"
@@ -53,11 +54,17 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 		Short: short,
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := ls.check(); err != nil {
+				return err
+			}
 			if multimc && launcherDir == "" {
 				return out.Errorf("launcher-dir-required", "MultiMC is portable; pass --launcher-dir with the folder that holds multimc.cfg")
 			}
 			if mode != "sync" && mode != "symlink" {
 				return out.Errorf("usage", "--mode must be sync or symlink, not %q", mode)
+			}
+			if mode != "sync" && ls.set() {
+				return out.Errorf("usage", "the instance settings need --mode sync; a symlinked instance has no instance file to record them in")
 			}
 			if mode == "symlink" && runtime.GOOS == "windows" {
 				return out.Errorf("unsupported-mode", "symlink mode is not supported on Windows yet; use --mode sync")
@@ -156,7 +163,7 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 			// In symlink mode the game directory is the project's own build directory, so the
 			// project holds the intent and nothing is written into its output.
 			if mode == "sync" {
-				if err := saveIntent(res.GameDir, src.name, ref, side, assumeClient); err != nil {
+				if err := ls.save(res.GameDir, src.name, ref, side, assumeClient, p.Manifest); err != nil {
 					return err
 				}
 			}
@@ -225,6 +232,7 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "repoint an instance that syncs from a different source")
 	ff.register(cmd, "for this instance")
+	ls.register(cmd)
 	return cmd
 }
 
