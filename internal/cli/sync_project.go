@@ -40,18 +40,18 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 	if err != nil {
 		return nil, true, err
 	}
-	for _, name := range targetNames(p.Manifest.Targets) {
-		for _, d := range lf.ExistingSyncDirs(name) {
+	for _, side := range p.Manifest.Sides() {
+		for _, d := range lf.ExistingSyncDirs(side) {
 			if sameDir(d, dir) || slices.ContainsFunc(all, func(e instanceEntry) bool { return sameDir(e.Dir, d) }) {
 				continue
 			}
-			e := inspectInstance(config.Instance{Name: p.Manifest.TargetDisplayName(name), Dir: d, Source: dir})
+			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(side), Dir: d, Source: dir})
 			e.ID = slugID(e.Name)
 			if e.Target == "" {
-				e.Target = name
+				e.Target = side
 			}
 			if e.Side == "" {
-				e.Side = p.Manifest.Targets[name].Side
+				e.Side = side
 			}
 			all = append(all, e)
 		}

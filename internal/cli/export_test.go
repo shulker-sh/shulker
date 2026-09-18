@@ -93,10 +93,6 @@ func TestExportMrpack(t *testing.T) {
 		m["version"] = "1.0"
 		m["note"] = "A demo pack"
 		m["description"] = "Survival with friends."
-		m["targets"] = map[string]any{
-			"client": map[string]any{"side": "client", "overrides": []string{"overrides"}, "build": "build/client"},
-			"server": map[string]any{"side": "server", "overrides": []string{"overrides"}, "build": "build/server"},
-		}
 		m["client"].(map[string]any)["name"] = "Demo Pack"
 		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"motd": "Demo"}}
 	})

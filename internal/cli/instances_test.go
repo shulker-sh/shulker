@@ -196,7 +196,7 @@ func TestInstancesList(t *testing.T) {
 	stdout := h.mustRun(t, "instances")
 	for _, part := range []string{
 		"Prism Launcher\n    ├─ • alpha client (synced ",
-		"• zed client (not synced yet)\n         " + filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         Zed, from " + h.dir + ", target client\n",
+		"• zed client (not synced yet)\n         " + filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         Zed, from " + h.dir + ", side client\n",
 		"\n\n  Minecraft Launcher\n    └─ • pack client (not synced yet)\n",
 		"\n\n  Other directories\n    ├─ • gone (directory is missing)\n",
 		"• locked (can't read the directory)\n",

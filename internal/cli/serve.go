@@ -73,17 +73,12 @@ func (a *app) projectJava(ctx context.Context, p *project.Project) (server.Java,
 }
 
 func (a *app) serveCmd() *cobra.Command {
-	var tf targetFlag
 	var force, acceptEula bool
 	cmd := &cobra.Command{
-		Use:   "serve [target]",
-		Short: "Build a server target and run it in the foreground",
-		Args:  maximumArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			target, err := tf.resolve(args)
-			if err != nil {
-				return err
-			}
+		Use:   "serve",
+		Short: "Build the server side and run it in the foreground",
+		Args:  noArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			p, err := a.openProject()
 			if err != nil {
 				return err
@@ -91,9 +86,8 @@ func (a *app) serveCmd() *cobra.Command {
 			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			name, err := sideTarget(p.Manifest, target, "server", "serve")
-			if err != nil {
-				return err
+			if !p.Manifest.HasSide("server") {
+				return noSide("server")
 			}
 			var in io.Reader = a.stdin
 			if in == nil {
@@ -135,11 +129,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			side, buildDir, err := buildSide(p, name)
-			if err != nil {
-				return err
-			}
-			rep, err := b.Build(side, build.Options{Dir: buildDir, Force: force})
+			rep, err := b.Build("server", build.Options{Dir: buildDir(p, "server"), Force: force})
 			if err != nil {
 				return err
 			}
@@ -150,9 +140,9 @@ func (a *app) serveCmd() *cobra.Command {
 			if err := cmd.Context().Err(); err != nil {
 				return err
 			}
-			dir := filepath.Join(p.Dir, p.Manifest.TargetBuildDir(name))
+			dir := buildDir(p, "server")
 			launchArgs := server.Command(jvm, build.LaunchArgs(p.Lock))
-			a.progress("starting %s in %s with %s", name, dir, java)
+			a.progress("starting %s in %s with %s", "server", dir, java)
 			a.printer.Settle()
 
 			interrupt := make(chan os.Signal, 2)
@@ -178,7 +168,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res := serveResult{Target: name, Dir: dir, Java: java, Args: launchArgs, ExitCode: code}
+			res := serveResult{Target: "server", Dir: dir, Java: java, Args: launchArgs, ExitCode: code}
 			if code != 0 {
 				res.Log, res.CrashReport = serverFailureFiles(dir, started)
 				if a.printer.JSON {
@@ -198,7 +188,6 @@ func (a *app) serveCmd() *cobra.Command {
 			})
 		},
 	}
-	tf.register(cmd, "server target to run (default: the only server target)")
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory")
 	cmd.Flags().BoolVar(&acceptEula, "accept-eula", false, "record acceptance of the Minecraft EULA in shulker.json without prompting")
 	return cmd

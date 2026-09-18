@@ -3,13 +3,11 @@ package cli
 import (
 	"context"
 	"path/filepath"
-	"sort"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/local"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
@@ -26,7 +24,7 @@ func (a *app) installCmd() *cobra.Command {
 	var ff featureFlags
 	cmd := &cobra.Command{
 		Use:   "install",
-		Short: "Download everything in the lock and build all targets",
+		Short: "Download everything in the lock and build every side",
 		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			p, err := a.openProject()
@@ -39,7 +37,7 @@ func (a *app) installCmd() *cobra.Command {
 			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			fetched, err := a.fetchLocked(cmd.Context(), p, hasServerTarget(p.Manifest.Targets))
+			fetched, err := a.fetchLocked(cmd.Context(), p, p.Manifest.HasSide("server"))
 			if err != nil {
 				return err
 			}
@@ -58,18 +56,14 @@ func (a *app) installCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			names := targetNames(p.Manifest.Targets)
+			sides := p.Manifest.Sides()
 			res := installResult{Fetched: fetched}
-			for _, name := range names {
-				side, dir, err := buildSide(p, name)
+			for _, side := range sides {
+				rep, err := b.Build(side, build.Options{Dir: buildDir(p, side), Force: force, OS: osName, Features: overrides})
 				if err != nil {
 					return err
 				}
-				rep, err := b.Build(side, build.Options{Dir: dir, Force: force, OS: osName, Features: overrides})
-				if err != nil {
-					return err
-				}
-				a.warnFor(name, len(names) > 1, rep.Warnings)
+				a.warnFor(side, len(sides) > 1, rep.Warnings)
 				if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 					return err
 				}
@@ -151,30 +145,7 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 	return fetched, nil
 }
 
-func hasServerTarget(targets map[string]manifest.Target) bool {
-	for _, t := range targets {
-		if t.Side == "server" {
-			return true
-		}
-	}
-	return false
-}
-
-// buildSide is the side a named target builds and where it builds it, which is
-// what the build engine takes. The side blocks take over when targets go.
-func buildSide(p *project.Project, name string) (string, string, error) {
-	t, err := p.Manifest.Target(name)
-	if err != nil {
-		return "", "", err
-	}
-	return t.Side, filepath.Join(p.Dir, p.Manifest.TargetBuildDir(name)), nil
-}
-
-func targetNames[T any](targets map[string]T) []string {
-	names := make([]string, 0, len(targets))
-	for n := range targets {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return names
+// buildDir is where a side builds, which is what the build engine takes.
+func buildDir(p *project.Project, side string) string {
+	return filepath.Join(p.Dir, p.Manifest.BuildDir(side))
 }

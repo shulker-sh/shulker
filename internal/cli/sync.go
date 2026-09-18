@@ -11,7 +11,6 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/local"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/player"
@@ -46,7 +45,7 @@ func (a *app) syncCmd() *cobra.Command {
 	var offline bool
 	cmd := &cobra.Command{
 		Use:   "sync [project-dir | git-url | manifest-url]",
-		Short: "Download and build one target of a project straight into a directory",
+		Short: "Download and build one side of a project straight into a directory",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkOS(req.os); err != nil {
@@ -125,12 +124,12 @@ func (a *app) syncCmd() *cobra.Command {
 			return a.printer.Emit(res, res.print)
 		},
 	}
-	cmd.Flags().StringVar(&req.target, "target", "", "target to build (default: the only target)")
-	cmd.Flags().StringVar(&req.into, "into", "", "output directory (default: the target's build directory)")
+	cmd.Flags().StringVar(&req.target, "target", "", "side to build (default: the only side)")
+	cmd.Flags().StringVar(&req.into, "into", "", "output directory (default: the side's build directory)")
 	cmd.Flags().BoolVar(&req.force, "force", false, "overwrite files edited in the output directory")
 	cmd.Flags().StringVar(&req.ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.os, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
-	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the target's display name)")
+	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the side's display name)")
 	cmd.Flags().StringVar(&req.as, "as", "", "id to register the --into directory under, for -i (default: from its name)")
 	sel.register(cmd, "sync every instance (narrow with --launcher or --side)")
 	cmd.Flags().BoolVar(&offline, "offline", false, "don't use the network; build from the last successful sync and cached files")
@@ -189,7 +188,7 @@ func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, er
 
 func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncResult, error) {
 	p := src.project
-	name, t, err := singleTarget(p, req.target)
+	side, err := singleSide(p, req.target)
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -198,7 +197,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if into == "" && remote {
 		return syncResult{}, out.Errorf("into-required", "--into is required when syncing from %s", src.name)
 	}
-	buildDir, err := filepath.Abs(filepath.Join(src.Dir, p.Manifest.TargetBuildDir(name)))
+	buildDir, err := filepath.Abs(filepath.Join(src.Dir, p.Manifest.BuildDir(side)))
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -223,7 +222,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if err != nil {
 		return syncResult{}, err
 	}
-	fetched, err := a.fetchLocked(ctx, p, t.Side == "server")
+	fetched, err := a.fetchLocked(ctx, p, side == "server")
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -239,11 +238,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		return syncResult{}, err
 	}
 	origin := build.Origin{Source: src.name, Ref: req.ref, Commit: src.Commit, Sha256: src.Sha256}
-	side, err := p.Manifest.Target(name)
-	if err != nil {
-		return syncResult{}, err
-	}
-	rep, err := b.Build(side.Side, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin})
+	rep, err := b.Build(side, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin})
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -251,7 +246,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if err := a.installServerLoader(ctx, p, rep); err != nil {
 		return syncResult{}, err
 	}
-	recorded := !remote && !ownBuild && lf.RecordSyncDir(name, into)
+	recorded := !remote && !ownBuild && lf.RecordSyncDir(side, into)
 	a.refreshLocal(lf, !remote, recorded)
 	if !remote {
 		a.refreshLocal(inst, false, false)
@@ -261,16 +256,16 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 			a.printer.Warn("couldn't record %s as the offline fallback: %v", src.name, err)
 		}
 	}
-	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Target: name, Dir: into, Fetched: fetched, Build: rep}
+	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Target: side, Dir: into, Fetched: fetched, Build: rep}
 	if !src.LastGood.IsZero() {
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
 	if register {
-		if err := saveIntent(into, src.name, req.ref, name, t.Side); err != nil {
+		if err := saveIntent(into, src.name, req.ref, side, side); err != nil {
 			return syncResult{}, err
 		}
 		entry := config.Instance{ID: req.as, Name: req.name, Dir: into, Source: src.name}
-		if entry, changed := a.registerSync(entry, p.Manifest.TargetDisplayName(name)); changed {
+		if entry, changed := a.registerSync(entry, p.Manifest.DisplayName(side)); changed {
 			res.Registered = &entry
 		}
 	}
@@ -323,21 +318,4 @@ func (a *app) checkout(ctx context.Context, source, ref string) (*pack.Checkout,
 		return nil, err
 	}
 	return a.sourceStore().Checkout(ctx, source, ref)
-}
-
-func singleTarget(p *project.Project, want string) (string, manifest.Target, error) {
-	if want != "" {
-		t, err := p.Manifest.Target(want)
-		if err != nil {
-			return "", t, err
-		}
-		return want, t, nil
-	}
-	names := targetNames(p.Manifest.Targets)
-	if len(names) == 1 {
-		return names[0], p.Manifest.Targets[names[0]], nil
-	}
-	e := out.Errorf("ambiguous-target", "shulker.json has several targets; pass --target")
-	e.Candidates, e.Flag = names, "--target"
-	return "", manifest.Target{}, e
 }

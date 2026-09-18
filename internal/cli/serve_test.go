@@ -124,9 +124,13 @@ func TestServeErrors(t *testing.T) {
 		t.Fatalf("expected exit 3, got %d: %s", code, stderr)
 	}
 
-	code, _, stderr = h.run(t, "serve", "--target", "nope")
-	if code == 0 || !strings.Contains(stderr, "‣ server") {
-		t.Fatalf("expected target-not-found, got %d: %s", code, stderr)
+	h.editManifest(t, func(m map[string]any) {
+		delete(m, "server")
+		m["client"] = map[string]any{}
+	})
+	code, _, stderr = h.run(t, "serve")
+	if code == 0 || !strings.Contains(stderr, "declares no server") || !strings.Contains(stderr, `add "server": {}`) {
+		t.Fatalf("expected no-side, got %d: %s", code, stderr)
 	}
 }
 

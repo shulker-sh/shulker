@@ -217,7 +217,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 
 	stdout := h.mustRun(t, "add", "jei")
-	if !strings.Contains(stdout, "+ jei ") || !strings.Contains(stdout, "» all targets\n") || !strings.Contains(stdout, "+ fabric-api fabric-api-0.130.0+26.2 » all targets (required by jei)") {
+	if !strings.Contains(stdout, "+ jei ") || !strings.Contains(stdout, "» all sides\n") || !strings.Contains(stdout, "+ fabric-api fabric-api-0.130.0+26.2 » all sides (required by jei)") {
 		t.Fatalf("add: %s", stdout)
 	}
 	l := h.readLock(t)
@@ -337,7 +337,7 @@ func TestCurseForgeManualDownloads(t *testing.T) {
 	os.MkdirAll(downloads, 0o755)
 	os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
 	stdout = h.mustRun(t, "add", "nodist")
-	if !strings.Contains(stdout, "+ nodist nodist-1.0.0 » all targets (client only)") {
+	if !strings.Contains(stdout, "+ nodist nodist-1.0.0 » all sides (client only)") {
 		t.Fatalf("add after drop: %s", stdout)
 	}
 	nodist := h.readLock(t).Mods["nodist"]

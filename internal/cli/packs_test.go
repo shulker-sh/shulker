@@ -28,8 +28,8 @@ func TestResourcePacksAndShaders(t *testing.T) {
 	// No --type: the provider's own project type settles what each one is.
 	// Packs are placed into client targets, so the add line names them rather
 	// than reading as if the pack went nowhere.
-	if stdout := h.mustRun(t, "add", "fresh-animations"); !strings.Contains(stdout, "» all targets") || !strings.Contains(stdout, "client only") {
-		t.Fatalf("a pack should name the targets it reaches: %s", stdout)
+	if stdout := h.mustRun(t, "add", "fresh-animations"); !strings.Contains(stdout, "» all sides") || !strings.Contains(stdout, "client only") {
+		t.Fatalf("a pack should name the sides it reaches: %s", stdout)
 	}
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
 

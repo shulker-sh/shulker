@@ -58,7 +58,7 @@ type markerEntry struct {
 	data []byte
 }
 
-func (b *Builder) markerJar(targetName, side string, cond conditions, sel selection) ([]byte, error) {
+func (b *Builder) markerJar(side string, cond conditions, sel selection) ([]byte, error) {
 	lockData, err := os.ReadFile(b.LockPath)
 	if err != nil {
 		return nil, err
@@ -76,9 +76,9 @@ func (b *Builder) markerJar(targetName, side string, cond conditions, sel select
 	var entries []markerEntry
 	// The marker declares itself in the file its loader reads, and that file decides the format.
 	if strings.HasSuffix(l.MarkerFile, ".json") {
-		entries, err = b.fabricMarker(targetName, lockHash, direct, deps, cond)
+		entries, err = b.fabricMarker(side, lockHash, direct, deps, cond)
 	} else {
-		entries, err = b.tomlMarker(l, targetName, lockHash, direct, deps, cond)
+		entries, err = b.tomlMarker(l, side, lockHash, direct, deps, cond)
 	}
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (b *Builder) markerJar(targetName, side string, cond conditions, sel select
 	return buf.Bytes(), nil
 }
 
-func (b *Builder) fabricMarker(targetName, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
+func (b *Builder) fabricMarker(side, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
 	id := markerModID(b.Manifest.Name)
 	contact, links, labels := markerLinks(b.Manifest.Links)
 	modmenu := map[string]any{"update_checker": false}
@@ -113,7 +113,7 @@ func (b *Builder) fabricMarker(targetName, lockHash string, direct, deps []strin
 		"schemaVersion": 1,
 		"id":            id,
 		"version":       markerVersion(b.Manifest.Version, lockHash),
-		"name":          b.Manifest.TargetDisplayName(targetName),
+		"name":          b.Manifest.DisplayName(side),
 		"description":   b.markerDescription(direct, deps, cond, quickText),
 		"icon":          "assets/" + id + "/icon.png",
 		"environment":   "*",
@@ -189,11 +189,11 @@ type markerTomlMod struct {
 
 // tomlMarker builds the NeoForge and Forge marker: no classes, since both loaders load a mod that
 // declares none, and a pack.mcmeta so Forge doesn't warn that the mod's pack metadata is missing.
-func (b *Builder) tomlMarker(l loader.Loader, targetName, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
+func (b *Builder) tomlMarker(l loader.Loader, side, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {
 	mod := markerTomlMod{
 		ModID:       markerModID(b.Manifest.Name),
 		Version:     markerVersion(b.Manifest.Version, lockHash),
-		DisplayName: b.Manifest.TargetDisplayName(targetName),
+		DisplayName: b.Manifest.DisplayName(side),
 		LogoFile:    markerLogo,
 		Authors:     strings.Join(b.Manifest.Authors, ", "),
 		DisplayURL:  b.Manifest.Links["website"],
@@ -229,7 +229,7 @@ func (b *Builder) tomlMarker(l loader.Loader, targetName, lockHash string, direc
 	// `max_format` (26.2 is resource format 88, data format 107 — well past the old 1–99 range
 	// this used to declare). The ranges say "whatever is running", since there is nothing to break.
 	pack, err := json.MarshalIndent(map[string]any{"pack": map[string]any{
-		"description":       b.Manifest.TargetDisplayName(targetName),
+		"description":       b.Manifest.DisplayName(side),
 		"pack_format":       markerPackFormat,
 		"supported_formats": map[string]int{"min_inclusive": 1, "max_inclusive": markerPackFormatMax},
 		"min_format":        []int{1, 0},

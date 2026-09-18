@@ -161,7 +161,11 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 			}
 			opts := build.MrpackOptions{VersionID: job.version, Output: job.output, Bundle: f.bundle, OS: f.osName, Features: job.features}
 			if f.target != "" {
-				opts.Targets = []string{f.target}
+				side, err := declaredSide(job.project.Manifest, f.target, "--target")
+				if err != nil {
+					return err
+				}
+				opts.Targets = []string{side}
 			}
 			rep, err := job.builder.ExportMrpack(opts)
 			if err != nil {
@@ -174,7 +178,7 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 			})
 		},
 	}
-	f.register(cmd, ".mrpack", "export one target only (default: every target)", "put files that Modrinth launchers cannot download inside the archive")
+	f.register(cmd, ".mrpack", "export one side only (default: every declared side)", "put files that Modrinth launchers cannot download inside the archive")
 	return cmd
 }
 
@@ -189,7 +193,7 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			target, err := sideTarget(job.project.Manifest, f.target, "client", "export")
+			target, err := sideOf(job.project.Manifest, f.target, "client", "export")
 			if err != nil {
 				return err
 			}
@@ -218,7 +222,7 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 			})
 		},
 	}
-	f.register(cmd, ".zip", "client target to export (default: the only client target)", "put files that aren't on CurseForge inside the archive")
+	f.register(cmd, ".zip", "side to export; a CurseForge pack is always the client side", "put files that aren't on CurseForge inside the archive")
 	return cmd
 }
 

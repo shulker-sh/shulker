@@ -173,7 +173,7 @@ func TestMarkerUsesManifestVersionAndDisplayName(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "versioned")
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"
-		m["targets"].(map[string]any)["client"].(map[string]any)["name"] = "LAN Party"
+		m["client"].(map[string]any)["name"] = "LAN Party"
 	})
 	h.mustRun(t, "install")
 	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-versioned.jar"))

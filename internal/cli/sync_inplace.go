@@ -13,7 +13,7 @@ import (
 	"shulker.sh/shulker/internal/resolve"
 )
 
-// inPlaceProject is the project in dir when one of its targets builds into dir itself, which is
+// inPlaceProject is the project in dir when one of its sides builds into dir itself, which is
 // what makes dir an instance rather than a project that builds elsewhere.
 func (a *app) inPlaceProject(dir string) (*project.Project, string, bool, error) {
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); errors.Is(err, os.ErrNotExist) {
@@ -25,13 +25,13 @@ func (a *app) inPlaceProject(dir string) (*project.Project, string, bool, error)
 	if err != nil {
 		return nil, "", false, err
 	}
-	target, ok := p.Manifest.AnyInPlace()
-	return p, target, ok, nil
+	side, ok := p.Manifest.InPlaceSide()
+	return p, side, ok, nil
 }
 
 // syncInPlace refreshes the modpacks that follow their source, relocks without moving the
 // project's own mods, and builds the instance where it stands.
-func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, target string, req syncRequest) (syncResult, error) {
+func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, req syncRequest) (syncResult, error) {
 	a.packs = nil
 	rl, err := a.relockProject(cmd, p, true, func(p *project.Project, r *resolve.Resolver) (string, error) {
 		_, err := a.refreshModpacks(cmd.Context(), p, r, manifest.Require.AutoUpdates)
@@ -40,7 +40,7 @@ func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, target string,
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.target = target
+	req.target = side
 	res, err := a.buildInPlace(cmd.Context(), p.Dir, req)
 	if err != nil {
 		return syncResult{}, err

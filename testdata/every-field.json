@@ -23,18 +23,6 @@
     },
     "shaders": { "overrides": "shader-overrides" }
   },
-  "targets": {
-    "client": {
-      "name": "Client",
-      "side": "client",
-      "overrides": ["overrides", "client-overrides"],
-      "build": "build/client",
-      "variables": { "level": 3, "fancy": true, "greeting": "hi" },
-      "features": ["fancy"],
-      "wholeFiles": ["config/*.properties"],
-      "note": "target"
-    }
-  },
   "requires": {
     "base": { "type": "modpack", "source": "../base", "ref": "main", "autoUpdate": false, "locked": false, "note": "modpack" },
     "extras": { "type": "resourcepack", "file": "packs/extras.zip" },

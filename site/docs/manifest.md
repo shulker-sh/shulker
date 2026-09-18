@@ -7,7 +7,7 @@ editLink: false
 
 The project manifest. Hand-edited, committed, and read by every command.
 
-Shulker project manifest. Lists direct mods, targets, and first-class configuration. Resolution results live in shulker.lock.
+Shulker project manifest. Lists direct mods, the sides it builds, and first-class configuration. Resolution results live in shulker.lock.
 
 Schema: [https://shulker.sh/schema/v1/manifest.json](/schema/v1/manifest.json)
 
@@ -29,7 +29,6 @@ Required properties are marked with *.
 | `java` | `string` | Optional override. Either an absolute path to a JDK/JRE home or a semver range over the Java major version, e.g. "&gt;=25". Omit to derive from the Minecraft version json and use the managed runtime.<br>min length 1 |
 | `providers` | [`provider`](#provider)[] | Provider preference order. A single entry makes the tool single-provider.<br>min items 1, unique items, default `["modrinth","curseforge"]` |
 | `features` | map of [`featureDecl`](#featuredecl) | Optional parts of the pack, each one switch over the mods gated with feature and over the feature's own override folder. --with and --without decide a feature for one build; feature on and feature off record the choice.<br>keys are [`featureName`](#featurename) |
-| `targets` * | map of [`target`](#target) | Build targets. Each lists its override layers explicitly; paths are never inferred.<br>min properties 1, keys match `^[a-z][a-z0-9_-]*$` |
 | `requires` | map of [`require`](#require) | Mods, modpacks, resource packs and shaders this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id; a resource pack's or shader's key is the file name it is placed under, so a pack enabled in game stays enabled when it updates. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader.<br>keys are [`requireKey`](#requirekey), default `{}` |
 | `ignore` | [`ignore`](#ignore)[] | Per-pair overrides for unmet depends or matched breaks found in jar metadata. |
 | `wholeFiles` | [`relativePath`](#relativepath)[] | Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone.<br>unique items |
@@ -153,21 +152,6 @@ Type: map of `string` \| `number` \| `boolean`. keys match `^[A-Za-z_][A-Za-z0-9
 
 No other properties are allowed.
 
-### target
-
-| Property | Type | Description |
-| --- | --- | --- |
-| `name` | `string` | Display name launchers show for this target (Prism instance name, official launcher profile name). Defaults to the manifest name.<br>min length 1 |
-| `side` * | `"client"` \| `"server"` | Which side this target builds. Mods with side "both" are included in every target. |
-| `overrides` * | [`relativePath`](#relativepath)[] | Override layers applied in order; later layers win. Modpack overrides sit beneath all of these.<br>min items 1, unique items |
-| `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;target&gt;; "." builds into the project directory itself. |
-| `variables` | [`variables`](#variables) |  |
-| `features` | [`featureName`](#featurename)[] | Features on by default for this target. A mod gated with feature ships when one of its names is on.<br>unique items |
-| `wholeFiles` | [`relativePath`](#relativepath)[] | Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone.<br>unique items |
-| `note` | [`note`](#note) |  |
-
-No other properties are allowed.
-
 ### requireKey
 
 Name of a requires entry, unique across mods, modpacks, resource packs and shaders. Used in messages and requiredBy, and as the placed file name for a resource pack or shader.
@@ -190,7 +174,7 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `side` | [`side`](#side) | Overrides the side derived from provider environment data. |
 | `provider` | [`provider`](#provider) | Overrides the provider preference list for this mod. |
 | `os` | [`osCondition`](#oscondition) \| [`osCondition`](#oscondition)[] | Ship only on these operating systems, evaluated where the build runs. Names are any-of, !names are none-of; both must hold. A dependency needed only by excluded mods is excluded too. |
-| `feature` | [`featureCondition`](#featurecondition) \| [`featureCondition`](#featurecondition)[] | Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Features default from the target's features list. |
+| `feature` | [`featureCondition`](#featurecondition) \| [`featureCondition`](#featurecondition)[] | Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Every name must be declared in features, which is where its default lives. |
 | `note` | [`note`](#note) |  |
 
 No other properties are allowed.

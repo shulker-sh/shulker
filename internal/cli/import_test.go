@@ -122,8 +122,8 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 	if _, ok := m.Mods()["sodium"]; !ok {
 		t.Fatalf("manifest mods: %v", m.Mods())
 	}
-	if got := m.Targets["client"].Overrides; strings.Join(got, ",") != "overrides" {
-		t.Fatalf("target overrides: %v", got)
+	if m.Server != nil {
+		t.Fatalf("a client-only pack declared a server: %+v", m.Server)
 	}
 	if len(l.Mods) != 2 || strings.Join(l.Mods["fabric-api"].RequiredBy, ",") != "sodium" {
 		t.Fatalf("lock: %+v", l)
@@ -279,11 +279,8 @@ func TestImportMrpackForeign(t *testing.T) {
 	if m.Note != "hello" || m.Minecraft != "26.2" || m.Loader.Version != "0.17.3" || m.Server == nil || len(m.Mods()) != 2 {
 		t.Fatalf("manifest: %+v", m)
 	}
-	if got := m.Targets["client"].Overrides; strings.Join(got, ",") != "overrides,client-overrides" {
-		t.Fatalf("client overrides: %v", got)
-	}
-	if got := m.Targets["server"].Overrides; strings.Join(got, ",") != "overrides,server-overrides" {
-		t.Fatalf("server overrides: %v", got)
+	if got := m.Sides(); strings.Join(got, ",") != "client,server" {
+		t.Fatalf("sides: %v", got)
 	}
 	if l.Mods["sodium"].Side != "client" || l.Mods["fabric-api"].Side != "both" || l.Mods["sodium"].VersionNumber != "1.0.0+mc26.2" {
 		t.Fatalf("lock mods: %+v", l.Mods)

@@ -16,8 +16,7 @@ import (
 func writePack(t *testing.T, dir, minecraft, mods string, files map[string]string) {
 	t.Helper()
 	manifest := `{"name": "base", "minecraft": "` + minecraft + `", "loader": {"type": "fabric", "version": "*"},
-  "targets": {"client": {"side": "client", "overrides": ["overrides"], "build": "build/client"}},
-  "requires": {` + mods + `}, "variables": {"greeting": "hello"}}`
+  "requires": {` + mods + `}, "variables": {"greeting": "hello"}, "client": {}}`
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +333,7 @@ func TestURLModpackAndHandEdits(t *testing.T) {
 			return
 		}
 		w.Write([]byte(`{"name": "tiny", "minecraft": "~26.2", "loader": {"type": "fabric", "version": "*"},
-  "targets": {"client": {"side": "client", "overrides": ["overrides"]}}, "requires": {"sodium": {}}}`))
+  "requires": {"sodium": {}}, "client": {}}`))
 	}))
 	defer srv.Close()
 	source := srv.URL + "/tiny.json"

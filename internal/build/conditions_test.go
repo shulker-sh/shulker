@@ -15,10 +15,8 @@ func TestPlacementsFollowFeatureDefaultsAndIgnoreOS(t *testing.T) {
 				"profiling": {Default: true},
 				"shaders":   {},
 			},
-			Targets: map[string]manifest.Target{
-				"client": {Side: "client"},
-				"server": {Side: "server"},
-			},
+			Client: &manifest.Client{},
+			Server: &manifest.Server{},
 			Requires: map[string]manifest.Require{
 				"lithium": {},
 				"modmenu": {},

@@ -56,19 +56,17 @@ func (a *app) historyCmd() *cobra.Command {
 	return cmd
 }
 
-// instanceProject names the target that builds in place, the only kind of build
+// instanceProject names the side that builds in place, the only kind of build
 // that takes history.
 func (a *app) instanceProject() (*project.Project, string, error) {
 	p, err := a.openProject()
 	if err != nil {
 		return nil, "", err
 	}
-	for _, name := range targetNames(p.Manifest.Targets) {
-		if p.Manifest.TargetInPlace(name) {
-			return p, name, nil
-		}
+	if side, ok := p.Manifest.InPlaceSide(); ok {
+		return p, side, nil
 	}
-	return nil, "", out.Errorf("not-in-place", "no target builds in place, so this project keeps no history; point a target's build directory at \".\" to make it an instance")
+	return nil, "", out.Errorf("not-in-place", "no side builds in place, so this project keeps no history; point a side's build directory at \".\" to make it an instance")
 }
 
 func historyIndex(args []string) (int, error) {
@@ -288,7 +286,7 @@ func (a *app) rollbackCmd() *cobra.Command {
 		Short: "Restore a history entry and build it in place",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p, target, err := a.instanceProject()
+			p, side, err := a.instanceProject()
 			if err != nil {
 				return err
 			}
@@ -303,7 +301,7 @@ func (a *app) rollbackCmd() *cobra.Command {
 			// The current state becomes an entry of its own first, so a rollback
 			// is itself undoable.
 			snapshot, err := build.TakeHistory(p.Dir, p.Manifest.HistoryKeep(), build.HistoryEntry{
-				Target: target,
+				Target: side,
 				Reason: "rollback",
 			})
 			if err != nil {
@@ -331,15 +329,11 @@ func (a *app) rollbackCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			side, dir, err := buildSide(p, target)
+			rep, err := b.Build(side, build.Options{Dir: buildDir(p, side), Features: overrides, NoHistory: true})
 			if err != nil {
 				return err
 			}
-			rep, err := b.Build(side, build.Options{Dir: dir, Features: overrides, NoHistory: true})
-			if err != nil {
-				return err
-			}
-			a.warnFor(target, false, rep.Warnings)
+			a.warnFor(side, false, rep.Warnings)
 			res := rollbackResult{Entry: e, Snapshot: snapshot.ID, Builds: []*build.Report{rep}}
 			if prune {
 				dropped, err := build.PruneHistory(p.Dir, p.Manifest.HistoryKeep())

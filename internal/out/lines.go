@@ -32,9 +32,9 @@ type Item struct {
 	Version string
 	// From and To print as a version change, the old grey and the new yellow.
 	From, To string
-	// Targets lists where the item lands; OfTargets is how many targets exist.
-	// The list prints after » when OfTargets is set: "all targets" when every
-	// target, grey "no targets" when none.
+	// Targets lists the sides the item lands on; OfTargets is how many sides the
+	// manifest declares. The list prints after » when OfTargets is set: "all
+	// sides" when every side, grey "no sides" when none.
 	Targets   []string
 	OfTargets int
 	Text      string
@@ -149,9 +149,9 @@ func (t Theme) Bump(from, to string) string {
 func (t Theme) Targets(names []string, of int) string {
 	switch {
 	case len(names) == 0:
-		return t.Grey("no targets")
+		return t.Grey("no sides")
 	case len(names) >= of:
-		return t.Cyan("all targets")
+		return t.Cyan("all sides")
 	}
 	parts := make([]string, len(names))
 	for i, n := range names {

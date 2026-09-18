@@ -14,11 +14,11 @@ import (
 	"shulker.sh/shulker/internal/project"
 )
 
-// buildDirs is the build directory plus every directory this target was synced
+// buildDirs is the build directory plus every directory this side was synced
 // into: the links registry first, then any left in shulker.local.json by a
 // shulker that recorded them there. Directories that are gone are skipped.
-func (a *app) buildDirs(p *project.Project, lf *local.File, name string) (string, []string, error) {
-	buildDir, err := filepath.Abs(filepath.Join(p.Dir, p.Manifest.TargetBuildDir(name)))
+func (a *app) buildDirs(p *project.Project, lf *local.File, side string) (string, []string, error) {
+	buildDir, err := filepath.Abs(buildDir(p, side))
 	if err != nil {
 		return "", nil, err
 	}
@@ -40,11 +40,11 @@ func (a *app) buildDirs(p *project.Project, lf *local.File, name string) (string
 		return "", nil, err
 	}
 	for _, e := range entries {
-		if e.Target == name && sameDir(e.Source, p.Dir) {
+		if e.Target == side && sameDir(e.Source, p.Dir) {
 			add(e.Dir)
 		}
 	}
-	for _, d := range lf.ExistingSyncDirs(name) {
+	for _, d := range lf.ExistingSyncDirs(side) {
 		add(d)
 	}
 	return buildDir, dirs, nil
@@ -52,9 +52,8 @@ func (a *app) buildDirs(p *project.Project, lf *local.File, name string) (string
 
 func (a *app) diffCmd() *cobra.Command {
 	var into string
-	var tf targetFlag
 	cmd := &cobra.Command{
-		Use:   "diff [target]",
+		Use:   "diff [side]",
 		Short: "Show build files that differ from what build would write",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -73,17 +72,13 @@ func (a *app) diffCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			name, err := tf.resolve(args)
+			sides, err := projectSides(p, args)
 			if err != nil {
 				return err
 			}
-			names := targetNames(p.Manifest.Targets)
-			if name != "" {
-				names = []string{name}
-			}
 			if into != "" {
-				if len(names) != 1 {
-					return out.Errorf("into-target", "--into applies to one target; name it")
+				if len(sides) != 1 {
+					return out.Errorf("into-target", "--into applies to one side; name it")
 				}
 				if into, err = filepath.Abs(into); err != nil {
 					return err
@@ -91,10 +86,10 @@ func (a *app) diffCmd() *cobra.Command {
 			}
 			var reports []*build.DiffReport
 			where := map[*build.DiffReport]string{}
-			for _, name := range names {
+			for _, side := range sides {
 				buildDir, dirs := "", []string{into}
 				if into == "" {
-					if buildDir, dirs, err = a.buildDirs(p, lf, name); err != nil {
+					if buildDir, dirs, err = a.buildDirs(p, lf, side); err != nil {
 						return err
 					}
 					if len(dirs) == 0 {
@@ -102,7 +97,7 @@ func (a *app) diffCmd() *cobra.Command {
 					}
 				}
 				for _, dir := range dirs {
-					rep, err := b.Diff(name, build.Options{Dir: dir, Features: lf.Features})
+					rep, err := b.Diff(side, build.Options{Dir: dir, Features: lf.Features})
 					if err != nil && dir != "" && dir != buildDir && into == "" {
 						a.printer.Warn("skipped %s: %v", dir, err)
 						continue
@@ -110,7 +105,7 @@ func (a *app) diffCmd() *cobra.Command {
 					if err != nil {
 						return err
 					}
-					a.warnFor(name, len(names) > 1, rep.Warnings)
+					a.warnFor(side, len(sides) > 1, rep.Warnings)
 					reports = append(reports, rep)
 					where[rep] = "the build directory"
 					if dir != "" && dir != buildDir {
@@ -136,8 +131,7 @@ func (a *app) diffCmd() *cobra.Command {
 			})
 		},
 	}
-	tf.register(cmd, "target to diff (default: every target)")
-	cmd.Flags().StringVar(&into, "into", "", "directory the target was synced into (default: the build directory and every directory it was synced into)")
+	cmd.Flags().StringVar(&into, "into", "", "directory the side was synced into (default: the build directory and every directory it was synced into)")
 	return cmd
 }
 
@@ -155,7 +149,7 @@ func (a *app) pullCmd() *cobra.Command {
 			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			name, _, err := singleTarget(p, target)
+			side, err := singleSide(p, target)
 			if err != nil {
 				return err
 			}
@@ -171,10 +165,10 @@ func (a *app) pullCmd() *cobra.Command {
 				if into, err = filepath.Abs(into); err != nil {
 					return err
 				}
-			} else if into, err = a.pullSource(b, p, lf, name, args); err != nil {
+			} else if into, err = a.pullSource(b, p, lf, side, args); err != nil {
 				return err
 			}
-			rep, err := b.Pull(name, args, keys, build.Options{Dir: into, Features: lf.Features})
+			rep, err := b.Pull(side, args, keys, build.Options{Dir: into, Features: lf.Features})
 			if err != nil {
 				return err
 			}
@@ -204,14 +198,14 @@ func (a *app) pullCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&target, "target", "", "target whose build directory to pull from (default: the only target)")
-	cmd.Flags().StringVar(&into, "into", "", "directory the target was synced into (default: whichever of the build directory and its sync directories has edits)")
+	cmd.Flags().StringVar(&target, "target", "", "side whose build directory to pull from (default: the only side)")
+	cmd.Flags().StringVar(&into, "into", "", "directory the side was synced into (default: whichever of the build directory and its sync directories has edits)")
 	cmd.Flags().StringArrayVar(&keys, "key", nil, "start managing this key of the named .properties file; repeat for more")
 	return cmd
 }
 
-func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, name string, files []string) (string, error) {
-	buildDir, dirs, err := a.buildDirs(p, lf, name)
+func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, side string, files []string) (string, error) {
+	buildDir, dirs, err := a.buildDirs(p, lf, side)
 	if err != nil || len(dirs) == 0 {
 		return "", err
 	}
@@ -220,7 +214,7 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, n
 	}
 	var drifted []string
 	for _, dir := range dirs {
-		rep, err := b.Diff(name, build.Options{Dir: dir, Features: lf.Features})
+		rep, err := b.Diff(side, build.Options{Dir: dir, Features: lf.Features})
 		if err != nil {
 			if dir == buildDir {
 				return "", err
@@ -238,7 +232,7 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, n
 	case 1:
 		return drifted[0], nil
 	}
-	e := out.Errorf("ambiguous-into", "target %s has edits in several directories; pass --into", name)
+	e := out.Errorf("ambiguous-into", "the %s side has edits in several directories; pass --into", side)
 	e.Candidates, e.Flag = drifted, "--into"
 	return "", e
 }

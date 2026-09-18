@@ -100,14 +100,14 @@ func (b *Builder) enableShader(desired map[string]source) {
 // then on. Minecraft reads the list in priority order, so once it is a player's
 // own shulker stops touching it: a later add or remove leaves the line alone and
 // the pack is enabled in game by hand. --force seeds it again.
-func (b *Builder) seedResourcePacks(name string, opts Options, desired map[string]source, options properties, report *Report) {
+func (b *Builder) seedResourcePacks(side string, opts Options, desired map[string]source, options properties, report *Report) {
 	defer func() { reportUnenabled(desired, options[resourcePacksKey], report) }()
 	if _, own := options[resourcePacksKey]; own {
 		return
 	}
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.TargetBuildDir(name))
+		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
 	}
 	was, recorded := LoadState(dir).Values[OptionsFile][resourcePacksKey]
 	switch {

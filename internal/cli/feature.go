@@ -66,7 +66,7 @@ func featureNames(features []build.Feature) []string {
 }
 
 func unknownFeature(name string, known []string) error {
-	e := out.Errorf("feature-not-found", "no mod or target in shulker.json uses feature %q", name)
+	e := out.Errorf("feature-not-found", "no mod or feature declaration in shulker.json uses feature %q", name)
 	e.Candidates, e.Given = known, name
 	return e
 }
@@ -296,7 +296,7 @@ func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
 	var where featureWhere
 	cmd := &cobra.Command{
 		Use:   verb + " <feature>",
-		Short: fmt.Sprintf("Turn a feature %s for every target on this machine", verb),
+		Short: fmt.Sprintf("Turn a feature %s for every side on this machine", verb),
 		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
@@ -396,7 +396,13 @@ func (a *app) featureListCmd() *cobra.Command {
 				var items []out.Item
 				for _, st := range res {
 					state, reason, _ := strings.Cut(st.state(), " (")
-					aside := []string{"gates: " + strings.Join(st.Mods, ", ")}
+					var aside []string
+					if len(st.Mods) > 0 {
+						aside = []string{"gates: " + strings.Join(st.Mods, ", ")}
+					}
+					if st.Origin != "" {
+						aside = append([]string{"from " + st.Origin}, aside...)
+					}
 					if reason != "" {
 						aside = append([]string{strings.TrimSuffix(reason, ")")}, aside...)
 					}

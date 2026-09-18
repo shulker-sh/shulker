@@ -11,7 +11,6 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/manifest"
 )
 
 func TestLinkPrismFromRemoteSource(t *testing.T) {
@@ -154,13 +153,9 @@ func TestLinkPrismTargetNameAndErrors(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
-	path := filepath.Join(h.dir, manifest.FileName)
-	data, _ := os.ReadFile(path)
-	data = []byte(strings.Replace(string(data), `"side": "client"`, `"name": "Pack (dev)",
-      "side": "client"`, 1))
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	h.editManifest(t, func(m map[string]any) {
+		m["client"].(map[string]any)["name"] = "Pack (dev)"
+	})
 
 	launcherDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(launcherDir, "prismlauncher.cfg"), []byte("[General]\nInstanceDir=custom\n"), 0o644); err != nil {

@@ -16,9 +16,8 @@ func (a *app) buildCmd() *cobra.Command {
 	var force, acceptPlayerChange bool
 	var osName string
 	var ff featureFlags
-	var tf targetFlag
 	cmd := &cobra.Command{
-		Use:   "build [target]",
+		Use:   "build [side]",
 		Short: "Assemble build directories from the lock and overrides",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -47,25 +46,17 @@ func (a *app) buildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			name, err := tf.resolve(args)
+			sides, err := projectSides(p, args)
 			if err != nil {
 				return err
 			}
-			names := targetNames(p.Manifest.Targets)
-			if name != "" {
-				names = []string{name}
-			}
 			var reports []*build.Report
-			for _, name := range names {
-				side, dir, err := buildSide(p, name)
+			for _, side := range sides {
+				rep, err := b.Build(side, build.Options{Dir: buildDir(p, side), Force: force, OS: osName, Features: overrides})
 				if err != nil {
 					return err
 				}
-				rep, err := b.Build(side, build.Options{Dir: dir, Force: force, OS: osName, Features: overrides})
-				if err != nil {
-					return err
-				}
-				a.warnFor(name, len(names) > 1, rep.Warnings)
+				a.warnFor(side, len(sides) > 1, rep.Warnings)
 				if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 					return err
 				}
@@ -82,7 +73,6 @@ func (a *app) buildCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory")
 	cmd.Flags().BoolVar(&acceptPlayerChange, "accept-player-change", false, "relock a player name that now belongs to a different account")
 	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
-	tf.register(cmd, "target to build (default: every target)")
 	ff.register(cmd, "for this run only")
 	return cmd
 }

@@ -105,7 +105,7 @@ type Printer struct {
 	Stderr    io.Writer
 	// Args is the command line as typed, for example commands under errors.
 	Args []string
-	// WarnPrefix names the target or instance a multi-part run is on.
+	// WarnPrefix names the side or instance a multi-part run is on.
 	WarnPrefix string
 	warnings   []string
 	steps      stepState

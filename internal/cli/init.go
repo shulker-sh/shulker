@@ -53,10 +53,8 @@ func (a *app) initCmd() *cobra.Command {
 			if !yes && (minecraft == "" || name == "") {
 				return out.Errorf("usage", "pass --yes for defaults or set --name and --minecraft; interactive prompts are not implemented yet")
 			}
-			if target != "client" && target != "server" {
-				e := out.Errorf("usage", "--target must be client or server, not %q", target)
-				e.Candidates, e.Given, e.Flag = []string{"client", "server"}, target, "--target"
-				return e
+			if err := checkSide(target, "--target"); err != nil {
+				return err
 			}
 			loaders := append([]string{noLoader}, loader.Names()...)
 			if _, ok := loader.Lookup(loaderName); !ok && loaderName != noLoader {
@@ -82,7 +80,6 @@ func (a *app) initCmd() *cobra.Command {
 				Authors:   defaultAuthors(),
 				Minecraft: minecraft,
 				Loader:    projectLoader,
-				Targets:   map[string]manifest.Target{target: {Side: target, Overrides: []string{"overrides"}, Build: "build/" + target}},
 				Requires:  map[string]manifest.Require{},
 			}
 			if target == "server" {
@@ -137,12 +134,12 @@ func (a *app) initCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "accept defaults: latest release, no loader, client target")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "accept defaults: latest release, no loader, client side")
 	cmd.Flags().StringVar(&name, "name", "", "project name (default: directory name)")
 	cmd.Flags().StringVar(&minecraft, "minecraft", "", "Minecraft version or range (default: latest release)")
 	cmd.Flags().StringVar(&loaderName, "loader", noLoader, "mod loader: "+noLoader+", "+strings.Join(loader.Names(), ", "))
 	cmd.Flags().StringVar(&loaderVersion, "loader-version", "*", "loader version range")
-	cmd.Flags().StringVar(&target, "target", "client", "first target: client or server")
+	cmd.Flags().StringVar(&target, "target", "client", "side to declare: client or server")
 	return cmd
 }
 

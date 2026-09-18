@@ -3,10 +3,8 @@
   "name": "my-client",
   "minecraft": "26.2",
   "loader": { "type": "fabric", "version": "*" },
-  "targets": {
-    "client": { "side": "client", "overrides": ["overrides"], "build": "build/client" }
-  },
   "requires": {
     "sodium": {}
-  }
+  },
+  "client": {}
 }

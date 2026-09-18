@@ -6,20 +6,6 @@
   "loader": { "type": "fabric", "version": "^0.17" },
   "providers": ["modrinth", "curseforge"],
 
-  "targets": {
-    "client": {
-      "side": "client",
-      "overrides": ["overrides/common", "overrides/client"],
-      "build": "build/client"
-    },
-    "server": {
-      "side": "server",
-      "overrides": ["overrides/common", "overrides/server"],
-      "build": "build/server",
-      "variables": { "motd": "West Coast SMP (dev build)" }
-    }
-  },
-
   "requires": {
     "base-pack": { "source": "https://github.com/shulker-sh/base-pack.git", "ref": "v3" },
     "fabric-api": {},
@@ -50,6 +36,8 @@
   },
 
   "server": {
+    "build": "build/server",
+    "variables": { "motd": "West Coast SMP (dev build)" },
     "eula": true,
     "memory": "6G",
     "jvmFlags": "aikars",
@@ -78,6 +66,7 @@
   },
 
   "client": {
+    "build": "build/client",
     "options": {
       "renderDistance": 12,
       "guiScale": 3,

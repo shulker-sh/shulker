@@ -116,8 +116,8 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		return err
 	}
 	// An instance plays its own directory, so an update there is only done once it is built.
-	if target, ok := p.Manifest.AnyInPlace(); ok && cmd.Name() == "update" {
-		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{target: target})
+	if side, ok := p.Manifest.InPlaceSide(); ok && cmd.Name() == "update" {
+		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{target: side})
 		if err != nil {
 			return err
 		}
@@ -205,7 +205,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	}
 	placements := (&build.Builder{Manifest: r.Manifest, Lock: r.Lock, Packs: r.Packs}).Placements()
 	rl.printItems = func(l *out.Lines) {
-		printChanges(l, rl.Changes, v.Suggestions, p.Manifest.Targets, placements)
+		printChanges(l, rl.Changes, v.Suggestions, p.Manifest.Sides(), placements)
 	}
 	a.warn(append(r.Warnings, v.Warnings...))
 	if keepUnchanged && !stale {
@@ -219,9 +219,9 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	}
 	// An instance keeps what it had before the manifest and lock are rewritten,
 	// which is the state a rollback puts back.
-	if target, ok := p.Manifest.AnyInPlace(); ok {
+	if side, ok := p.Manifest.InPlaceSide(); ok {
 		keep := p.Manifest.HistoryKeep()
-		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Target: target, Reason: cmd.Name()}); err != nil {
+		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Target: side, Reason: cmd.Name()}); err != nil {
 			return relocked{}, err
 		}
 		warning, err := build.HistoryWarning(p.Dir, keep)
@@ -304,7 +304,7 @@ func (a *app) outdatedCmd() *cobra.Command {
 	}
 }
 
-func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Suggestion, targets map[string]manifest.Target, placements map[string]build.Placement) {
+func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Suggestion, sides []string, placements map[string]build.Placement) {
 	var items []out.Item
 	for _, p := range c.Platform {
 		if p.From == "" {
@@ -325,7 +325,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 	}
 	for _, m := range c.Added {
 		place := placements[m.ID]
-		it := out.Item{Kind: out.Add, Name: m.ID, Version: m.VersionNumber, Targets: place.Targets, OfTargets: len(targets)}
+		it := out.Item{Kind: out.Add, Name: m.ID, Version: m.VersionNumber, Targets: place.Targets, OfTargets: len(sides)}
 		if m.Side != "" && m.Side != "both" {
 			it.Aside = append(it.Aside, m.Side+" only")
 		}
@@ -333,8 +333,8 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 			it.Aside = append(it.Aside, text)
 		}
 		if text := conditionText("feature", place.Feature); text != "" {
-			if len(place.Targets) == 0 && sideHasTarget(targets, m.Side) {
-				text += ", off in every target"
+			if len(place.Targets) == 0 && sideDeclared(sides, m.Side) {
+				text += ", off on every side"
 			}
 			it.Aside = append(it.Aside, text)
 		}
@@ -380,13 +380,11 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 	l.Items(items...)
 }
 
-func sideHasTarget(targets map[string]manifest.Target, side string) bool {
-	for _, t := range targets {
-		if side == "" || side == "both" || t.Side == side {
-			return true
-		}
+func sideDeclared(sides []string, side string) bool {
+	if side == "" || side == "both" {
+		return len(sides) > 0
 	}
-	return false
+	return slices.Contains(sides, side)
 }
 
 // conditionText reads a condition list back as the manifest means it: any of

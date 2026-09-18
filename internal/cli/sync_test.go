@@ -78,8 +78,13 @@ func TestSyncErrors(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	code, stdout, _ = h.run(t, "sync", h.dir, "--target", "nope", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "target-not-found" || strings.Join(e.Candidates, ",") != "client" {
-		t.Fatalf("unknown target: exit %d %s", code, stdout)
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,server" {
+		t.Fatalf("not a side: exit %d %s", code, stdout)
+	}
+
+	code, stdout, _ = h.run(t, "sync", h.dir, "--target", "server", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "no-side" || e.Message != "shulker.json declares no server" {
+		t.Fatalf("undeclared side: exit %d %s", code, stdout)
 	}
 }
 

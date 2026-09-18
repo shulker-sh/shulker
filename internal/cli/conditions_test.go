@@ -15,21 +15,52 @@ func setMod(t *testing.T, h *harness, id string, entry map[string]any) {
 	t.Helper()
 	h.editManifest(t, func(m map[string]any) {
 		m["requires"].(map[string]any)[id] = entry
+		for _, name := range gatedOn(entry) {
+			if decls := declarations(m); decls[name] == nil {
+				decls[name] = map[string]any{}
+			}
+		}
 	})
 }
 
+// gatedOn names the features an entry gates on, which the manifest has to
+// declare for it to parse.
+func gatedOn(entry map[string]any) []string {
+	var gates []string
+	switch gate := entry["feature"].(type) {
+	case string:
+		gates = []string{gate}
+	case []string:
+		gates = gate
+	}
+	names := make([]string, len(gates))
+	for i, gate := range gates {
+		names[i] = strings.TrimPrefix(gate, "!")
+	}
+	return names
+}
+
+func declarations(m map[string]any) map[string]any {
+	decls, ok := m["features"].(map[string]any)
+	if !ok {
+		decls = map[string]any{}
+		m["features"] = decls
+	}
+	return decls
+}
+
+// setFeatures turns the named features on by default and every other declared
+// feature off.
 func setFeatures(t *testing.T, h *harness, features []string) {
 	t.Helper()
 	h.editManifest(t, func(m map[string]any) {
-		if features == nil {
-			delete(m, "features")
-			return
+		decls := declarations(m)
+		for name := range decls {
+			decls[name] = map[string]any{}
 		}
-		decls := map[string]any{}
 		for _, name := range features {
 			decls[name] = map[string]any{"default": true}
 		}
-		m["features"] = decls
 	})
 }
 
@@ -231,10 +262,10 @@ func TestLockShowsWhereGatedModsLand(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy", "os": other})
 	stdout := h.mustRun(t, "lock")
-	if !strings.Contains(stdout, "» no targets (") || !strings.Contains(stdout, "os: "+other+", feature: fancy, off in every target)") {
-		t.Fatalf("feature off in every target, os reported not checked: %s", stdout)
+	if !strings.Contains(stdout, "» no sides (") || !strings.Contains(stdout, "os: "+other+", feature: fancy, off on every side)") {
+		t.Fatalf("feature off on every side, os reported not checked: %s", stdout)
 	}
-	if !strings.Contains(stdout, "» no targets (required by sodium)") {
+	if !strings.Contains(stdout, "» no sides (required by sodium)") {
 		t.Fatalf("a dependency lands where its requirer does: %s", stdout)
 	}
 
@@ -243,7 +274,7 @@ func TestLockShowsWhereGatedModsLand(t *testing.T) {
 	setFeatures(t, h, []string{"fancy"})
 	setMod(t, h, "sodium", map[string]any{"feature": []string{"fancy", "!lowend"}})
 	stdout = h.mustRun(t, "lock")
-	if !strings.Contains(stdout, "» all targets (") || !strings.Contains(stdout, "feature: fancy and not lowend)") || strings.Contains(stdout, "off in every target") {
-		t.Fatalf("feature on by target default: %s", stdout)
+	if !strings.Contains(stdout, "» all sides (") || !strings.Contains(stdout, "feature: fancy and not lowend)") || strings.Contains(stdout, "off on every side") {
+		t.Fatalf("feature on by its declared default: %s", stdout)
 	}
 }

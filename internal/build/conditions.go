@@ -315,7 +315,7 @@ func (b *Builder) Placements() map[string]Placement {
 			c.features[name] = f.Default
 		}
 	}
-	for _, side := range b.sides() {
+	for _, side := range b.Manifest.Sides() {
 		for id := range b.selectMods(c).included {
 			if m := b.Lock.Mods[id]; m.Side != "both" && m.Side != side {
 				continue

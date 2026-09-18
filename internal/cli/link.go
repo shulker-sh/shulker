@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,7 +13,6 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -60,7 +58,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					return err
 				}
 			}
-			name, err := sideTarget(p.Manifest, target, "client", "link")
+			side, err := sideOf(p.Manifest, target, "client", "link")
 			if err != nil {
 				return err
 			}
@@ -78,7 +76,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			} else if err != nil {
 				return err
 			}
-			display := p.Manifest.TargetDisplayName(name)
+			display := p.Manifest.DisplayName(side)
 			if instanceName != "" {
 				display = instanceName
 			}
@@ -86,7 +84,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if prev, ok := a.findLauncherInstance("mojang", launcherDir, display); ok && prev.Source != src.name && !force {
 				return out.Errorf("instance-exists", "profile %q already syncs from %s; pass --name to create a second profile, or --force to repoint this one", display, prev.Source)
 			}
-			gameDir := filepath.Join(src.Dir, p.Manifest.TargetBuildDir(name))
+			gameDir := filepath.Join(src.Dir, p.Manifest.BuildDir(side))
 			if src.remote() {
 				gameDir = filepath.Join(launcherDir, "shulker", strings.TrimPrefix(key, "shulker-"))
 			}
@@ -120,7 +118,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				Profile:     key,
 				Name:        display,
 				VersionID:   versionID,
-				Target:      name,
+				Target:      side,
 				GameDir:     gameDir,
 				Source:      src.name,
 				Ref:         ref,
@@ -131,12 +129,12 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
-			if err := saveIntent(gameDir, src.name, ref, name, "client"); err != nil {
+			if err := saveIntent(gameDir, src.name, ref, side, "client"); err != nil {
 				return err
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name})
 			if src.remote() {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: name, into: gameDir})
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: side, into: gameDir})
 				if err != nil {
 					return err
 				}
@@ -158,8 +156,8 @@ func (a *app) linkMojangCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher directory (default: the official launcher's .minecraft folder)")
-	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
-	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the target's display name)")
+	cmd.Flags().StringVar(&target, "target", "", "side to link; a launcher instance is always the client side")
+	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "repoint a profile that syncs from a different source")
@@ -196,31 +194,6 @@ func (a *app) linkSource(ctx context.Context, args []string, ref string) (*syncS
 	return a.projectSource()
 }
 
-func sideTarget(m *manifest.Manifest, want, side, verb string) (string, error) {
-	if want != "" {
-		t, err := m.Target(want)
-		if err != nil {
-			return "", err
-		}
-		if t.Side != side {
-			e := out.Errorf("wrong-side-target", "target %q is a %s target; %s needs a %s target", want, t.Side, verb, side)
-			e.Candidates, e.Flag = sideTargets(m, side), "--target"
-			return "", e
-		}
-		return want, nil
-	}
-	matches := sideTargets(m, side)
-	switch len(matches) {
-	case 0:
-		return "", out.Errorf("no-target", "shulker.json has no %s target to %s", side, verb)
-	case 1:
-		return matches[0], nil
-	}
-	e := out.Errorf("ambiguous-target", "shulker.json has several %s targets; pass --target", side)
-	e.Candidates, e.Flag = matches, "--target"
-	return "", e
-}
-
 var unsafeKeyChars = regexp.MustCompile(`[^a-z0-9]+`)
 
 func profileKey(name string) string {
@@ -229,15 +202,4 @@ func profileKey(name string) string {
 		slug = "project"
 	}
 	return "shulker-" + slug
-}
-
-func sideTargets(m *manifest.Manifest, side string) []string {
-	var names []string
-	for name, t := range m.Targets {
-		if t.Side == side {
-			names = append(names, name)
-		}
-	}
-	sort.Strings(names)
-	return names
 }

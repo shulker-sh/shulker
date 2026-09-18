@@ -126,7 +126,7 @@ func (b *Builder) addIdentity(entries map[string][]byte) error {
 
 func (b *Builder) mrpackSides(sides []string) ([]*mrpackTarget, error) {
 	if len(sides) == 0 {
-		sides = b.sides()
+		sides = b.Manifest.Sides()
 	}
 	var targets []*mrpackTarget
 	seen := map[string]bool{}

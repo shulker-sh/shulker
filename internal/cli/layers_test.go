@@ -23,10 +23,6 @@ func buildWarnings(t *testing.T, h *harness, args ...string) []string {
 func twoSided(t *testing.T, h *harness) {
 	t.Helper()
 	h.editManifest(t, func(m map[string]any) {
-		m["targets"] = map[string]any{
-			"client": map[string]any{"side": "client", "overrides": []string{"overrides"}, "build": "build/client"},
-			"server": map[string]any{"side": "server", "overrides": []string{"overrides"}, "build": "build/server"},
-		}
 		m["server"] = map[string]any{"eula": true}
 	})
 }
@@ -169,9 +165,8 @@ func TestPulledPackFeaturesMergeIntoTheProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeFile(t, filepath.Join(base, "shulker.json"), `{"name": "base", "minecraft": "~26.2", "loader": {"type": "fabric", "version": "*"},
-  "targets": {"client": {"side": "client", "overrides": ["overrides"], "build": "build/client"}},
-  "features": {"shaders": {"default": true, "note": "the pack's note"}},
-  "requires": {}}`)
+  "features": {"shaders": {"default": true, "note": "the pack's note"}, "voice": {}},
+  "requires": {}, "client": {}}`)
 	writeFile(t, filepath.Join(base, "overrides", "config", "base.txt"), "from the pack\n")
 	writeFile(t, filepath.Join(base, "shaders-overrides", "config", "shade.txt"), "pack\n")
 	writeFile(t, filepath.Join(h.dir, "shaders-overrides", "config", "shade.txt"), "project\n")
@@ -197,8 +192,14 @@ func TestPulledPackFeaturesMergeIntoTheProject(t *testing.T) {
 	if err := json.Unmarshal([]byte(dataJSON(t, h.mustRun(t, "feature", "list", "--json"))), &listed); err != nil {
 		t.Fatal(err)
 	}
-	if len(listed) != 1 || listed[0].Name != "shaders" || listed[0].On || listed[0].Origin != "" {
-		t.Fatalf("one switch, declared by the project: %+v", listed)
+	if len(listed) != 2 || listed[0].Name != "shaders" || listed[0].On || listed[0].Origin != "" {
+		t.Fatalf("one switch for the name both declare, and the project owns it: %+v", listed)
+	}
+	if listed[1].Name != "voice" || listed[1].Origin != "base" {
+		t.Fatalf("a feature only the pack declares keeps its origin: %+v", listed[1])
+	}
+	if stdout := h.mustRun(t, "feature", "list"); !strings.Contains(stdout, "off (from base)") {
+		t.Fatalf("feature list names where a feature comes from: %s", stdout)
 	}
 
 	h.mustRun(t, "build", "--with", "shaders")

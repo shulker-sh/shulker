@@ -18,9 +18,9 @@ func fixture(t *testing.T, name string) []byte {
 
 func TestFixturesValidate(t *testing.T) {
 	cases := map[string]Kind{
-		"two-target.json": Manifest,
-		"minimal.json":    Manifest,
-		"lock.json":       Lock,
+		"client-server.json": Manifest,
+		"minimal.json":       Manifest,
+		"lock.json":          Lock,
 	}
 	for name, kind := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -36,7 +36,7 @@ func TestInvalidRejected(t *testing.T) {
 		kind Kind
 		doc  string
 	}{
-		"manifest missing minecraft": {Manifest, `{"loader":{"type":"fabric"},"targets":{},"mods":{}}`},
+		"manifest missing minecraft": {Manifest, `{"loader":{"type":"fabric"},"client":{},"mods":{}}`},
 		"lock pack with two pins":    {Lock, `{"lockVersion":1,"minecraft":"26.2","loader":{"type":"fabric","version":"0.17.0"},"java":{"major":21,"component":"java-runtime-delta"},"packs":{"../p":{"name":"p","commit":"` + hex(40) + `","dirSha256":"` + hex(64) + `"}},"mods":{},"players":[]}`},
 	}
 	for name, tc := range cases {

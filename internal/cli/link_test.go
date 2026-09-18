@@ -163,14 +163,22 @@ func TestLinkMojangErrors(t *testing.T) {
 	}
 
 	code, stdout, _ = h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--target", "nope", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "target-not-found" || strings.Join(e.Candidates, ",") != "client" {
-		t.Fatalf("unknown target: exit %d %s", code, stdout)
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,server" {
+		t.Fatalf("not a side: exit %d %s", code, stdout)
 	}
 
-	h.mustRun(t, "target", "add", "server")
 	code, stdout, _ = h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--target", "server", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "wrong-side-target" || strings.Join(e.Candidates, ",") != "client" {
-		t.Fatalf("server target: exit %d %s", code, stdout)
+		t.Fatalf("server side: exit %d %s", code, stdout)
+	}
+
+	h.editManifest(t, func(m map[string]any) {
+		delete(m, "client")
+		m["server"] = map[string]any{"eula": true}
+	})
+	code, stdout, _ = h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "no-side" || e.Message != "shulker.json declares no client" {
+		t.Fatalf("no client side: exit %d %s", code, stdout)
 	}
 }
 

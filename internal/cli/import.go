@@ -106,11 +106,10 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			if arc.Marker != nil {
 				mods.Overrides = dropManifestOwned(m, mods.Overrides)
 			}
-			setTargetOverrides(m, mods.Overrides)
 			if err := writeImport(dir, m, l, mods.Overrides); err != nil {
 				return err
 			}
-			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Targets: targetNames(m.Targets), Mods: mods, Overrides: overridePaths(mods.Overrides)}
+			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Targets: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
 				rows := []out.Row{
@@ -145,11 +144,10 @@ func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []str
 			Note:      arc.Index.Summary,
 			Minecraft: minecraft,
 			Loader:    manifest.Loader{Type: loaderType, Version: loaderVersion},
-			Targets:   map[string]manifest.Target{"client": {Side: "client", Build: "build/client"}},
 			Requires:  map[string]manifest.Require{},
+			Client:    &manifest.Client{},
 		}
 		if importNeedsServer(arc) {
-			m.Targets["server"] = manifest.Target{Side: "server", Build: "build/server"}
 			m.Server = &manifest.Server{Memory: server.DefaultMemory}
 		}
 		return m, warnings, nil
@@ -214,20 +212,6 @@ func dropManifestOwned(m *manifest.Manifest, overrides []mrpack.Override) []mrpa
 		}
 	}
 	return kept
-}
-
-func setTargetOverrides(m *manifest.Manifest, overrides []mrpack.Override) {
-	present := map[string]bool{}
-	for _, o := range overrides {
-		present[o.Layer] = true
-	}
-	for name, t := range m.Targets {
-		t.Overrides = []string{"overrides"}
-		if layer := t.Side + "-overrides"; present[layer] {
-			t.Overrides = append(t.Overrides, layer)
-		}
-		m.Targets[name] = t
-	}
 }
 
 func writeImport(dir string, m *manifest.Manifest, l *lock.Lock, overrides []mrpack.Override) error {

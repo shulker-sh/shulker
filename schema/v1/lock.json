@@ -34,7 +34,7 @@
           "type": "object",
           "required": ["sha512"],
           "additionalProperties": false,
-          "description": "Server launcher, present once a server target has been installed.",
+          "description": "Server launcher, present once the server side has been installed.",
           "properties": {
             "installer": { "type": "string", "minLength": 1, "description": "Fabric: installer version whose bundled server launcher is locked." },
             "url": { "type": "string", "format": "uri", "description": "Download url of the jar in sha512. The quilt-server-launch.jar shulker generates has none." },
@@ -59,7 +59,7 @@
     },
     "server": {
       "$ref": "#/$defs/download",
-      "description": "The vanilla server jar, present once a server target has been installed. Fabric's launcher finds it in .fabric/server/, Quilt's starts it as server.jar, and the NeoForge and Forge installers patch it from libraries/."
+      "description": "The vanilla server jar, present once the server side has been installed. Fabric's launcher finds it in .fabric/server/, Quilt's starts it as server.jar, and the NeoForge and Forge installers patch it from libraries/."
     },
     "modpacks": {
       "type": "object",

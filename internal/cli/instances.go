@@ -171,7 +171,7 @@ func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
 			detail += ", ref " + e.Ref
 		}
 		if e.Target != "" {
-			detail += ", target " + e.Target
+			detail += ", side " + e.Target
 		}
 		group = append(group, out.Entry{Synced: e.Status == instanceSynced, Name: e.ID, Tag: e.Side, Aside: e.statusText(), Path: e.Dir, Detail: detail})
 	}

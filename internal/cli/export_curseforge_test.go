@@ -82,10 +82,6 @@ func newCurseForgeExport(t *testing.T) *harness {
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"
 		m["authors"] = []string{"Ann", "Bo"}
-		m["targets"] = map[string]any{
-			"client": map[string]any{"side": "client", "overrides": []string{"overrides"}, "build": "build/client"},
-			"server": map[string]any{"side": "server", "overrides": []string{"overrides"}, "build": "build/server"},
-		}
 		m["client"].(map[string]any)["name"] = "Demo Pack"
 		m["server"] = map[string]any{"eula": true}
 	})

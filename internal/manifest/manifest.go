@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
@@ -36,7 +37,6 @@ type Manifest struct {
 	Providers   []string           `json:"providers,omitempty"`
 	History     *int               `json:"history,omitempty"`
 	Features    map[string]Feature `json:"features,omitempty"`
-	Targets     map[string]Target  `json:"targets"`
 	Requires    map[string]Require `json:"requires"`
 	Ignore      []Ignore           `json:"ignore,omitempty"`
 	WholeFiles  []string           `json:"wholeFiles,omitempty"`
@@ -109,17 +109,6 @@ type Loader struct {
 	Type    string `json:"type"`
 	Version string `json:"version,omitempty"`
 	Note    string `json:"note,omitempty"`
-}
-
-type Target struct {
-	Name       string    `json:"name,omitempty"`
-	Side       string    `json:"side"`
-	Overrides  []string  `json:"overrides"`
-	Build      string    `json:"build,omitempty"`
-	Variables  Variables `json:"variables,omitempty"`
-	Features   []string  `json:"features,omitempty"`
-	WholeFiles []string  `json:"wholeFiles,omitempty"`
-	Note       string    `json:"note,omitempty"`
 }
 
 type Feature struct {
@@ -261,6 +250,17 @@ func Load(path string) (*Manifest, error) {
 }
 
 func Parse(data []byte) (*Manifest, error) {
+	// Before the schema, whose anyOf reports the same thing as two missing
+	// properties.
+	var declared struct {
+		Client json.RawMessage `json:"client"`
+		Server json.RawMessage `json:"server"`
+	}
+	if json.Unmarshal(data, &declared) == nil && declared.Client == nil && declared.Server == nil {
+		e := out.Errorf("manifest-invalid", "%s declares no side", FileName)
+		e.Rows = []out.Detail{{Label: "Fix", Text: `add "client": {} or "server": {}`}}
+		return nil, e
+	}
 	if err := schema.Validate(schema.Manifest, data); err != nil {
 		return nil, schema.Invalid("manifest-invalid", FileName, data, err)
 	}
@@ -285,6 +285,15 @@ func (m *Manifest) check() error {
 			e := out.Errorf("manifest-invalid", "%s names a feature %q, which is the side's own name", FileName, name)
 			e.Rows = []out.Detail{{Label: "Fix", Text: "rename the feature"}}
 			return e
+		}
+	}
+	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
+		for _, name := range m.Requires[key].Feature {
+			if _, ok := m.Features[strings.TrimPrefix(name, "!")]; !ok {
+				e := out.Errorf("manifest-invalid", "requires.%s gates on the feature %q, which %s doesn't declare", key, strings.TrimPrefix(name, "!"), FileName)
+				e.Rows = []out.Detail{{Label: "Fix", Text: `declare it under "features"`}}
+				return e
+			}
 		}
 	}
 	if m.InPlace("client") && m.InPlace("server") {
@@ -349,48 +358,6 @@ func (m *Manifest) Save(path string) error {
 		return e
 	}
 	return fsutil.Write(path, data)
-}
-
-func (m *Manifest) Target(name string) (Target, error) {
-	t, ok := m.Targets[name]
-	if !ok {
-		e := out.Errorf("target-not-found", "no target %q in %s", name, FileName)
-		e.Candidates, e.Given = slices.Sorted(maps.Keys(m.Targets)), name
-		return Target{}, e
-	}
-	return t, nil
-}
-
-func (m *Manifest) TargetDisplayName(target string) string {
-	if t, ok := m.Targets[target]; ok && t.Name != "" {
-		return t.Name
-	}
-	return m.Name
-}
-
-func (m *Manifest) TargetBuildDir(target string) string {
-	if t, ok := m.Targets[target]; ok && t.Build != "" {
-		return t.Build
-	}
-	return "build/" + target
-}
-
-// TargetInPlace reports whether the target builds into the project directory
-// itself, which is what makes a project an instance.
-func (m *Manifest) TargetInPlace(target string) bool {
-	return m.TargetBuildDir(target) == "."
-}
-
-// AnyInPlace names the target that builds in place, which is what makes the
-// project an instance that keeps history.
-func (m *Manifest) AnyInPlace() (string, bool) {
-	best := ""
-	for name := range m.Targets {
-		if m.TargetInPlace(name) && (best == "" || name < best) {
-			best = name
-		}
-	}
-	return best, best != ""
 }
 
 // Sides names the sides the manifest declares, client first. A side is

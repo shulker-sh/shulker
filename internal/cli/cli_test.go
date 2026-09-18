@@ -80,9 +80,9 @@ func TestHomeTilde(t *testing.T) {
 
 func TestHelpLinksDocs(t *testing.T) {
 	for args, url := range map[string]string{
-		"--help":            docsURL,
-		"add --help":        docsURL + "/cli#shulker-add",
-		"target add --help": docsURL + "/cli#shulker-target-add",
+		"--help":              docsURL,
+		"add --help":          docsURL + "/cli#shulker-add",
+		"feature list --help": docsURL + "/cli#shulker-feature-list",
 	} {
 		code, stdout, _ := run(t, strings.Fields(args)...)
 		if code != out.ExitOK || !strings.HasSuffix(stdout, "  Docs "+url+"\n  For agents "+agentsURL+"\n") {
@@ -130,25 +130,25 @@ func TestCompletionScripts(t *testing.T) {
 	if _, stdout, _ := run(t, "completion", "zsh", "--help"); !strings.HasPrefix(stdout, "  Print the zsh completion script, so Tab completes") || !strings.Contains(stdout, "$ source <(shulker completion zsh)\n") {
 		t.Fatalf("completion zsh help:\n%s", stdout)
 	}
-	if _, stdout, _ := run(t, "__complete", "target", "l"); !strings.Contains(stdout, "list") {
-		t.Fatalf("__complete target l = %q", stdout)
+	if _, stdout, _ := run(t, "__complete", "feature", "l"); !strings.Contains(stdout, "list") {
+		t.Fatalf("__complete feature l = %q", stdout)
 	}
 }
 
 func TestHelpCommandReportsUnknownTopics(t *testing.T) {
 	for args, want := range map[string]string{
-		"help nosuch":     `unknown command "nosuch"`,
-		"help target lst": `unknown command "lst" for "shulker target"`,
+		"help nosuch":      `unknown command "nosuch"`,
+		"help feature lst": `unknown command "lst" for "shulker feature"`,
 	} {
 		code, stdout, _ := run(t, append([]string{"--json"}, strings.Fields(args)...)...)
 		if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || e.Message != want {
 			t.Errorf("%s: exit %d, %+v", args, code, e)
 		}
 	}
-	if _, _, stderr := run(t, "help", "target", "lst"); !strings.Contains(stderr, "$ shulker help target list\n") {
+	if _, _, stderr := run(t, "help", "feature", "lst"); !strings.Contains(stderr, "$ shulker help feature list\n") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
-	for help, flag := range map[string]string{"help add": "add --help", "help rm": "remove --help", "help target list": "target list --help"} {
+	for help, flag := range map[string]string{"help add": "add --help", "help rm": "remove --help", "help feature list": "feature list --help"} {
 		_, viaHelp, _ := run(t, strings.Fields(help)...)
 		_, viaFlag, _ := run(t, strings.Fields(flag)...)
 		if viaHelp == "" || viaHelp != viaFlag {
@@ -164,7 +164,7 @@ func TestHelpCommandReportsUnknownTopics(t *testing.T) {
 }
 
 func TestGroupCommandsReportUnknownSubcommands(t *testing.T) {
-	for _, args := range [][]string{{"target", "lst"}, {"self", "updte"}, {"config", "st", "key"}} {
+	for _, args := range [][]string{{"feature", "lst"}, {"self", "updte"}, {"config", "st", "key"}} {
 		code, stdout, _ := run(t, append([]string{"--json"}, args...)...)
 		e := failureCode(t, stdout)
 		want := `unknown command "` + args[1] + `" for "shulker ` + args[0] + `"`
@@ -172,14 +172,14 @@ func TestGroupCommandsReportUnknownSubcommands(t *testing.T) {
 			t.Errorf("%v: exit %d, %+v", args, code, e)
 		}
 	}
-	_, _, stderr := run(t, "target", "lst")
-	for _, want := range []string{"did you mean:", "\u2023 list", "$ shulker target list\n"} {
+	_, _, stderr := run(t, "feature", "lst")
+	for _, want := range []string{"did you mean:", "\u2023 list", "$ shulker feature list\n"} {
 		if !strings.Contains(stderr, want) {
 			t.Fatalf("stderr lacks %q:\n%s", want, stderr)
 		}
 	}
-	if code, stdout, _ := run(t, "target"); code != out.ExitOK || !strings.Contains(stdout, "  Commands\n") {
-		t.Fatalf("target alone: exit %d\n%s", code, stdout)
+	if code, stdout, _ := run(t, "feature"); code != out.ExitOK || !strings.Contains(stdout, "  Commands\n") {
+		t.Fatalf("feature alone: exit %d\n%s", code, stdout)
 	}
 }
 

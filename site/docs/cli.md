@@ -18,29 +18,26 @@ outline: [2, 3]
 | [`shulker unpin <mod>`](#shulker-unpin) | Remove a mod's pin and re-resolve it |
 | [`shulker ignore <mod> <on>`](#shulker-ignore) | Record that a dependency problem is safe to ignore |
 | [`shulker unignore <mod> <on>`](#shulker-unignore) | Drop an ignored dependency problem |
-| [`shulker target add <name>`](#shulker-target-add) | Add a build target |
-| [`shulker target remove <name>`](#shulker-target-remove) | Remove a target, leaving its build directory |
-| [`shulker target list`](#shulker-target-list) | List targets |
 | [`shulker set <path> <value>`](#shulker-set) | Set a field in shulker.json |
 | [`shulker unset <path>`](#shulker-unset) | Remove a field from shulker.json |
 | [`shulker get [path]`](#shulker-get) | Print a field of shulker.json, or all of it |
 | [`shulker feature on\|off <feature>`](#shulker-feature-on-off) | Turn a feature on or off on this machine |
-| [`shulker feature reset <feature>`](#shulker-feature-reset) | Go back to the target defaults for a feature |
+| [`shulker feature reset <feature>`](#shulker-feature-reset) | Go back to the declared default for a feature |
 | [`shulker feature list`](#shulker-feature-list) | List features and whether they're on |
-| [`shulker install`](#shulker-install) | Download everything in the lock and build all targets |
-| [`shulker build [target]`](#shulker-build) | Assemble build directories from the lock and overrides |
-| [`shulker diff [target]`](#shulker-diff) | Show build files that differ from what build would write |
+| [`shulker install`](#shulker-install) | Download everything in the lock and build every side |
+| [`shulker build [side]`](#shulker-build) | Assemble build directories from the lock and overrides |
+| [`shulker diff [side]`](#shulker-diff) | Show build files that differ from what build would write |
 | [`shulker pull [file...]`](#shulker-pull) | Copy edits made in a build directory back into their source |
 | [`shulker history list`](#shulker-history-list) | List the states kept before in-place builds |
 | [`shulker history show [n]`](#shulker-history-show) | Show a history entry and what restoring it would change |
 | [`shulker history prune`](#shulker-history-prune) | Remove history entries beyond the number the manifest keeps |
 | [`shulker rollback [n]`](#shulker-rollback) | Restore a history entry and build it in place |
-| [`shulker serve [target]`](#shulker-serve) | Build a server target and run it in the foreground |
+| [`shulker serve`](#shulker-serve) | Build the server side and run it in the foreground |
 | [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
 | [`shulker link gdlauncher [source]`](#shulker-link-gdlauncher) | Create a GDLauncher instance for the client build |
 | [`shulker link mojang [source]`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
 | [`shulker link prism [source]`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
-| [`shulker sync [source]`](#shulker-sync) | Download and build one target of a project into a directory, or update a linked one |
+| [`shulker sync [source]`](#shulker-sync) | Download and build one side of a project into a directory, or update a linked one |
 | [`shulker instances`](#shulker-instances) | List the instances shulker keeps in sync |
 | [`shulker instances repair`](#shulker-instances-repair) | Register instances shulker has lost track of and write any missing instance files |
 | [`shulker unlink <name>`](#shulker-unlink) | Stop syncing a linked instance or synced directory, keeping its files |
@@ -88,12 +85,12 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --target serv
 
 | Flag | Description |
 | --- | --- |
-| `-y, --yes` | Accept defaults: latest release, no loader, client target |
+| `-y, --yes` | Accept defaults: latest release, no loader, client side |
 | `--name <name>` | Project name (default: directory name) |
 | `--minecraft <version>` | Minecraft version or range (default: latest release) |
 | `--loader <loader>` | Mod loader: `none` (the default, vanilla Minecraft), `fabric`, `quilt`, `neoforge`, `forge` |
 | `--loader-version <range>` | Loader version range (default: `*`); needs `--loader` |
-| `--target <side>` | First target: `client` or `server` |
+| `--target <side>` | Side to declare: `client` or `server` |
 
 ### `shulker import mrpack`
 
@@ -123,7 +120,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 | --- | --- |
 | `--version <version>` | Version written into the modpack (default: `version` in shulker.json) |
 | `-o, --output <path>` | Archive path (default: `build/<name>-<version>.mrpack`, or the current directory for a git or URL source) |
-| `--target <name>` | Export one target only (default: every target) |
+| `--target <side>` | Export one side only (default: every declared side) |
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
@@ -132,7 +129,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 
 ### `shulker export curseforge`
 
-Export the client target as a CurseForge profile `.zip` for the CurseForge app's Import Profile. Mods, resource packs and shaders locked from CurseForge go in by file ID. Everything else is looked up on CurseForge by its fingerprint, and matches go in by file ID too. Files that aren't on CurseForge fail the export unless `--bundle` ships them inside the archive, which the CurseForge app warns about on import. Server-only mods and files are left out. The profile gets shulker's logo as its image, and the archive carries `shulker.json` and `shulker.lock` at its root. The source works as in [`export mrpack`](#shulker-export-mrpack).
+Export the client side as a CurseForge profile `.zip` for the CurseForge app's Import Profile. Mods, resource packs and shaders locked from CurseForge go in by file ID. Everything else is looked up on CurseForge by its fingerprint, and matches go in by file ID too. Files that aren't on CurseForge fail the export unless `--bundle` ships them inside the archive, which the CurseForge app warns about on import. Server-only mods and files are left out. The profile gets shulker's logo as its image, and the archive carries `shulker.json` and `shulker.lock` at its root. The source works as in [`export mrpack`](#shulker-export-mrpack).
 
 ```sh
 shulker export curseforge
@@ -143,7 +140,7 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 | --- | --- |
 | `--version <version>` | Version written into the modpack (default: `version` in shulker.json) |
 | `-o, --output <path>` | Archive path (default: `build/<name>-<version>.zip`, or the current directory for a git or URL source) |
-| `--target <name>` | Client target to export (default: the only client target) |
+| `--target <side>` | Side to export; a CurseForge pack is always the client side |
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
@@ -215,7 +212,7 @@ shulker lock
 
 ### `shulker update`
 
-Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. In an instance (a project whose target builds into its own directory), `update` then builds the target in place; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
+Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. In an instance (a project whose side builds into its own directory), `update` then builds that side in place; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
 
 ```sh
 shulker update
@@ -289,46 +286,6 @@ shulker unignore sodium fabric-api
 ```
 
 With `--json`, `data` is the entry removed.
-
-## Targets
-
-A target is one build of the project: a client instance or a server directory. Targets never change the lock.
-
-### `shulker target add`
-
-Add a target to `shulker.json`. It doesn't build anything; run `shulker build <name>` next. A target named `client` or `server` gets that side; any other name needs `--side`.
-
-```sh
-shulker target add server
-shulker target add shaders --side client --feature shaders --name "Shaders Client"
-```
-
-| Flag | Description |
-| --- | --- |
-| `--side <side>` | `client` or `server` (default: the target name when it is `client` or `server`) |
-| `--build <dir>` | Output directory (default: `build/<name>`); `.` builds into the project directory itself |
-| `--overrides <dir>` | Override layer, applied in order; repeat for more (default: `overrides`) |
-| `--feature <name>` | Feature on by default for this target; repeat for more |
-| `--whole-file <path>` | `.properties` override path or glob to copy whole instead of merging per key; repeat for more |
-| `--name <name>` | Display name launchers show (default: the manifest name) |
-| `--var <key=value>` | Template variable; repeat for more |
-| `--note <text>` | Free-form note kept in `shulker.json` |
-
-### `shulker target remove`
-
-Remove a target from `shulker.json`. Its build directory stays on disk. The last target can't be removed; add its replacement first. Alias: `rm`.
-
-```sh
-shulker target remove shaders
-```
-
-### `shulker target list`
-
-List targets with their side, build directory, overrides, features, and display name. Alias: `ls`.
-
-```sh
-shulker target list
-```
 
 ## Settings
 
@@ -425,13 +382,13 @@ shulker config unset curseforge.key
 
 ## Features
 
-A feature is a name that mods opt into with a `feature` condition, like `shaders`. Each target can turn features on by default. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, `export mrpack`, and `export curseforge` use your choices over the target defaults, and their `--with` and `--without` flags override both for one run.
+A feature is a name that mods opt into with a `feature` condition, like `shaders`. `features` in `shulker.json` declares each one, and its `default` turns it on. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, `export mrpack`, and `export curseforge` use your choices over the declared defaults, and their `--with` and `--without` flags override both for one run.
 
 A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into <dir>`, or with `-i <id>` for anything [`shulker instances`](#shulker-instances) lists. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
 
 ### `shulker feature on|off`
 
-Turn a feature on or off for every target on this machine. It takes effect on the next build or sync, including a launcher's pre-launch sync. Naming a feature nothing in `shulker.json` uses is an error.
+Turn a feature on or off for every side on this machine. It takes effect on the next build or sync, including a launcher's pre-launch sync. Naming a feature nothing in `shulker.json` uses is an error.
 
 With `--into`, the choice is saved for that synced directory only. shulker checks the name against the project that directory was synced from.
 
@@ -451,7 +408,7 @@ shulker feature on shaders -i friends-smp
 
 ### `shulker feature reset`
 
-Forget your choice for a feature so it follows the target defaults again.
+Forget your choice for a feature so it follows its declared default again.
 
 ```sh
 shulker feature reset shaders
@@ -484,7 +441,7 @@ shulker feature list --into ~/instances/my-pack
 
 ### `shulker install`
 
-Download everything in the lock and build every target. Run this after cloning a project.
+Download everything in the lock and build every side the manifest declares. Run this after cloning a project.
 
 ```sh
 shulker install
@@ -499,7 +456,7 @@ shulker install
 
 ### `shulker build`
 
-Assemble a target's build directory from the lock and its overrides. With no target, builds all of them.
+Assemble a side's build directory from the lock and its overrides. With no side, builds every side the manifest declares.
 
 ```sh
 shulker build
@@ -508,7 +465,6 @@ shulker build client
 
 | Flag | Description |
 | --- | --- |
-| `--target <name>` | Target to build (default: every target); the same as the argument, and passing both is an error |
 | `--force` | Overwrite files edited in the build directory |
 | `--accept-player-change` | Relock a player name that now belongs to a different account |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
@@ -517,7 +473,7 @@ shulker build client
 
 ### `shulker diff`
 
-Show what was edited in a build directory since `build` wrote it, such as config changed in-game, as a diff from the project to the directory. `build` leaves these files alone and `pull` copies the edits back. A per-key file shows only its managed keys. With no target, checks all of them.
+Show what was edited in a build directory since `build` wrote it, such as config changed in-game, as a diff from the project to the directory. `build` leaves these files alone and `pull` copies the edits back. A per-key file shows only its managed keys. With no side, checks every side the manifest declares.
 
 ```sh
 shulker diff
@@ -527,8 +483,7 @@ shulker diff server --into /srv/minecraft
 
 | Flag | Description |
 | --- | --- |
-| `--target <name>` | Target to diff (default: every target); the same as the argument, and passing both is an error |
-| `--into <path>` | Directory the target was synced into (default: the build directory and every directory `sync` recorded) |
+| `--into <path>` | Directory the side was synced into (default: the build directory and every directory `sync` recorded) |
 
 ### `shulker pull`
 
@@ -542,13 +497,13 @@ shulker pull config/iris.properties --key colorSpace
 
 | Flag | Description |
 | --- | --- |
-| `--target <name>` | Target whose build directory to pull from (default: the only target) |
-| `--into <path>` | Directory the target was synced into (default: the build directory and every directory `sync` recorded) |
+| `--target <side>` | Side whose build directory to pull from (default: the only side) |
+| `--into <path>` | Directory the side was synced into (default: the build directory and every directory `sync` recorded) |
 | `--key <key>` | Start managing this key of the one named `.properties` file, copying its current value into the override; repeat for more |
 
 ### `shulker history list`
 
-List the states an instance kept before it changed, newest first. An entry is taken before anything is rewritten: by `add`, `remove`, `update` and `lock` before they save `shulker.json` and `shulker.lock`, and by an in-place build before it writes over anything you changed. A build that only places what the lock already says takes none, because the relock that changed the lock kept that state already. It holds the manifest, the lock, the whole `config` directory and every other file the build manages; mod and pack files aren't copied, since the restored lock brings them back from the cache. Only a project with a target that builds in place keeps history. The number in front of each entry is what `history show` and `rollback` take. Alias: `ls`.
+List the states an instance kept before it changed, newest first. An entry is taken before anything is rewritten: by `add`, `remove`, `update` and `lock` before they save `shulker.json` and `shulker.lock`, and by an in-place build before it writes over anything you changed. A build that only places what the lock already says takes none, because the relock that changed the lock kept that state already. It holds the manifest, the lock, the whole `config` directory and every other file the build manages; mod and pack files aren't copied, since the restored lock brings them back from the cache. Only a project with a side that builds in place keeps history. The number in front of each entry is what `history show` and `rollback` take. Alias: `ls`.
 
 ```sh
 shulker history list
@@ -589,7 +544,7 @@ shulker rollback --prune
 
 ### `shulker serve`
 
-Build a server target and run it in the foreground. It downloads whatever the lock needs first, the way `install` does, so a fresh clone reaches a running server in one command.
+Build the server side and run it in the foreground. It downloads whatever the lock needs first, the way `install` does, so a fresh clone reaches a running server in one command.
 
 ```sh
 shulker serve
@@ -598,7 +553,6 @@ shulker serve server --accept-eula
 
 | Flag | Description |
 | --- | --- |
-| `--target <name>` | Server target to run (default: the only server target); the same as the argument, and passing both is an error |
 | `--force` | Overwrite files edited in the build directory |
 | `--accept-eula` | Record acceptance of the Minecraft EULA in shulker.json without prompting |
 
@@ -623,8 +577,8 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: ATLauncher's) |
-| `--target <name>` | Client target to link (default: the only client target) |
-| `--name <name>` | Instance name (default: the target's display name) |
+| `--target <side>` | Side to link; a launcher instance is always the client side |
+| `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Link over an instance that syncs from a different source or that shulker didn't link |
@@ -654,8 +608,8 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher runtime directory (default: GDLauncher's) |
-| `--target <name>` | Client target to link (default: the only client target) |
-| `--name <name>` | Instance name (default: the target's display name) |
+| `--target <side>` | Side to link; a launcher instance is always the client side |
+| `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet |
@@ -666,7 +620,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 
 Install the project's loader, if it has one, into the official launcher and add a profile that points at the client build. Alias: `vanilla`.
 
-With no source, it links the project in the current directory, and the profile's game directory is the project's `build/<target>`. Pass a project directory, git URL, or manifest URL to link that instead: the game directory is then `shulker/<slug>` inside the launcher directory, and shulker syncs it right away so it's ready to play. The official launcher has no pre-launch hook, so the profile doesn't update itself; run `shulker sync -i <id>` (or `shulker sync --all`) to bring it up to date.
+With no source, it links the project in the current directory, and the profile's game directory is the project's `build/<side>`. Pass a project directory, git URL, or manifest URL to link that instead: the game directory is then `shulker/<slug>` inside the launcher directory, and shulker syncs it right away so it's ready to play. The official launcher has no pre-launch hook, so the profile doesn't update itself; run `shulker sync -i <id>` (or `shulker sync --all`) to bring it up to date.
 
 If the profile already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one.
 
@@ -679,8 +633,8 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher directory (default: the official launcher's `.minecraft` folder) |
-| `--target <name>` | Client target to link (default: the only client target) |
-| `--name <name>` | Profile name (default: the target's display name) |
+| `--target <side>` | Side to link; a launcher instance is always the client side |
+| `--name <name>` | Profile name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint a profile that syncs from a different source |
@@ -706,9 +660,9 @@ shulker link multimc --launcher-dir ~/MultiMC
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: Prism Launcher's; required for MultiMC) |
-| `--target <name>` | Client target to link (default: the only client target) |
+| `--target <side>` | Side to link; a launcher instance is always the client side |
 | `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
-| `--name <name>` | Instance name (default: the target's display name) |
+| `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint an instance that syncs from a different source |
@@ -717,7 +671,7 @@ shulker link multimc --launcher-dir ~/MultiMC
 
 ### `shulker sync`
 
-Download and build one target of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<target>/`.
+Download and build one side of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<side>/`.
 
 ```sh
 shulker sync https://github.com/shulker-sh/base-pack.git --target server --into /srv/minecraft
@@ -730,19 +684,19 @@ shulker sync
 
 With `--into` and no source, shulker reads what the directory syncs from out of its own `.shulker/instance.json`, so a synced directory keeps working even if the registry is gone.
 
-If a git or manifest URL can't be reached because the network is down, `sync` warns and builds from the copy used by the last sync from that source that succeeded, so an instance still launches offline. The warning names the commit and says how old that copy is. A server that answers with an error, a missing ref, or a failed login still fails the sync, and so does a source that has never synced successfully here. `--offline` skips the network entirely, which is quicker than waiting for timeouts on a network that drops traffic. For a server target, an installed Java runtime is kept when its update check can't reach the network.
+If a git or manifest URL can't be reached because the network is down, `sync` warns and builds from the copy used by the last sync from that source that succeeded, so an instance still launches offline. The warning names the commit and says how old that copy is. A server that answers with an error, a missing ref, or a failed login still fails the sync, and so does a source that has never synced successfully here. `--offline` skips the network entirely, which is quicker than waiting for timeouts on a network that drops traffic. For the server side, an installed Java runtime is kept when its update check can't reach the network.
 
-Every directory shulker syncs into gets a `.shulker/instance.json` recording what it syncs from, and an index of those directories lives in `registry.json` beside shulker's `config.json` (a `registry` path in `config.json`, relative to that file, moves it). A `sync --into` adds the directory to that index under an id derived from its name, or the one `--as` gives it, and `link` does the same for each launcher instance or profile. Syncing into the target's own build directory adds nothing. [`shulker instances`](#shulker-instances) shows the index.
+Every directory shulker syncs into gets a `.shulker/instance.json` recording what it syncs from, and an index of those directories lives in `registry.json` beside shulker's `config.json` (a `registry` path in `config.json`, relative to that file, moves it). A `sync --into` adds the directory to that index under an id derived from its name, or the one `--as` gives it, and `link` does the same for each launcher instance or profile. Syncing into the side's own build directory adds nothing. [`shulker instances`](#shulker-instances) shows the index.
 
 To update something on that index, name it instead of a source. `-i` takes an instance's id, its name, or its directory, and syncs it from what its instance file records. Ids are unique, so `-i <id>` always picks exactly one; a name several instances share needs `--launcher` or `--side` to narrow it, or `--all` to sync them all. `--all` alone syncs every instance. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` run inside a project syncs every instance synced from that project, narrowed by `--launcher` or `--side`. Outside a project it asks which one to sync when run in a terminal, and fails with the list otherwise.
 
-A project whose target builds into its own directory is an instance, and `sync` run inside it (or naming it with `-i`) updates the instance itself first: modpacks that follow their source are fetched again (every modpack except one set to `"autoUpdate": false`), the lock is resolved against them without moving your own mods, and the target is built in place. Nothing is written, and no history entry is taken, when the lock comes out unchanged. Every instance synced from it is synced after, since those build from its lock. A modpack update your own mods can't satisfy stops the sync with the reason, leaving the lock and the directory as they were; a launcher's pre-launch hook instead builds what the lock already has and starts the game.
+A project whose side builds into its own directory is an instance, and `sync` run inside it (or naming it with `-i`) updates the instance itself first: modpacks that follow their source are fetched again (every modpack except one set to `"autoUpdate": false`), the lock is resolved against them without moving your own mods, and the side is built in place. Nothing is written, and no history entry is taken, when the lock comes out unchanged. Every instance synced from it is synced after, since those build from its lock. A modpack update your own mods can't satisfy stops the sync with the reason, leaving the lock and the directory as they were; a launcher's pre-launch hook instead builds what the lock already has and starts the game.
 
 | Flag | Description |
 | --- | --- |
-| `--target <name>` | Target to build (default: the only target) |
-| `--into <path>` | Output directory (default: the target's build directory) |
-| `--name <name>` | Name to list the `--into` directory under (default: the target's display name; kept on later syncs) |
+| `--target <side>` | Side to build (default: the only side) |
+| `--into <path>` | Output directory (default: the side's build directory) |
+| `--name <name>` | Name to list the `--into` directory under (default: the side's display name; kept on later syncs) |
 | `--as <id>` | Id to list the `--into` directory under, which `-i` takes (default: derived from its name) |
 | `--all` | Sync every instance `-i` matches, or every instance when there's no `-i` |
 | `--launcher <launcher>` | Only instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
@@ -756,7 +710,7 @@ A project whose target builds into its own directory is an instance, and `sync` 
 
 ### `shulker instances`
 
-List the instances shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each row leads with the instance's id, which is what `-i` takes, and shows its side, when it was last synced, its directory, and the name, source and target it syncs from. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`.
+List the instances shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each row leads with the instance's id, which is what `-i` takes, and shows its side, when it was last synced, its directory, and the name and source it syncs from. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`.
 
 ```sh
 shulker instances
@@ -766,12 +720,12 @@ shulker instances
 Prism Launcher
   friends-smp (client), synced 2026-09-11 14:02
     ~/Library/Application Support/PrismLauncher/instances/shulker-friends-smp/minecraft
-    Friends SMP, from https://github.com/shulker-sh/base-pack.git, target client
+    Friends SMP, from https://github.com/shulker-sh/base-pack.git, side client
 
 Other directories
   smp-server (server), synced 2026-09-10 21:40
     /srv/minecraft
-    My Pack server, from https://github.com/shulker-sh/base-pack.git, ref v3, target server
+    My Pack server, from https://github.com/shulker-sh/base-pack.git, ref v3, side server
 ```
 
 ### `shulker instances repair`
@@ -1010,7 +964,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `data` | The command's result. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
 | `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `candidates` or `items` |
 
-`candidates` lists values you could pass instead, like the target names when `--target` matches none of them. `items` lists what the error is about, like the files in conflict. Both are left out when empty.
+`candidates` lists values you could pass instead, like the sides when a command is given something that is not one. `items` lists what the error is about, like the files in conflict. Both are left out when empty.
 
 | Exit status | Meaning |
 | --- | --- |
@@ -1056,10 +1010,10 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | --- | --- |
 | `already-ignored` | The pair already has an ignore in `shulker.json`; pass `--force` to replace it |
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
-| `ambiguous-into` | The target has edits in several synced directories; pass `--into`. `candidates`: the directories |
-| `ambiguous-target` | Several targets fit; pass `--target`. `candidates`: the targets |
+| `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
+| `ambiguous-target` | The manifest declares both sides; pass `--target`. `candidates`: the sides |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
-| `build-reserved` | A target that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
+| `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need; `cache info` still reports and names the instance |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
@@ -1069,7 +1023,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON; the message names the line and column |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
-| `feature-not-found` | No mod or target uses the feature. `candidates`: the features in use |
+| `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
 | `file-not-found` | A file named to `pull` isn't in the build directory |
 | `git-missing` | A git source needs `git` on PATH |
 | `history-empty` | The instance has no history entries yet; one is taken before an in-place build changes anything |
@@ -1086,13 +1040,12 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |
-| `into-target` | `--into` applies to one target; name it |
+| `into-target` | `--into` applies to one side; name it |
 | `java-not-found` | No working Java at the configured path or on PATH |
 | `java-range` | `java` in `shulker.json` is neither a path nor a version range |
 | `java-version` | The Java found is outside the range in `shulker.json` |
 | `jvm-flags` | Unknown `jvmFlags` preset |
 | `key-not-found` | A `--key` isn't in the file. `candidates`: its keys |
-| `last-target` | The only target can't be removed |
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-not-found` | No launcher directory where shulker looked |
 | `loader-required` | `add` of a mod in a project without a loader; set one with `shulker set loader.type <loader>` |
@@ -1117,12 +1070,12 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
 | `no-instances` | Nothing is linked yet |
 | `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
-| `no-target` | `shulker.json` has no target of the side the command needs |
-| `not-built` | The target has no build directory yet; run `shulker build` |
+| `no-side` | `shulker.json` declares no side of the kind the command needs |
+| `not-built` | The side has no build directory yet; run `shulker build` |
 | `not-direct` | The mod is only a dependency. `items`: the mods that require it |
 | `not-drifted` | A file named to `pull` has no changes. `candidates`: the changed files |
 | `not-ignored` | The pair has no ignore in `shulker.json`. `candidates`: the pairs that do |
-| `not-in-place` | The project has no target that builds in place, so it keeps no history |
+| `not-in-place` | The project has no side that builds in place, so it keeps no history |
 | `not-installed` | A file isn't in the cache; run `shulker install` |
 | `not-pinned` | The mod has no pin |
 | `not-synced` | The directory has no record of the source it was synced from |
@@ -1163,8 +1116,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
 | `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
-| `target-exists` | The target is already in `shulker.json` |
-| `target-not-found` | No such target. `candidates`: the targets |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
 | `type-ambiguous` | A CurseForge slug matches projects of several types; pass `--type` to choose. `candidates`: the types it matched |
 | `type-mismatch` | `--type` disagrees with what the provider says the project is. `candidates`: the provider's own type |
@@ -1177,4 +1128,4 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
-| `wrong-side-target` | The target is on the wrong side for the command. `candidates`: the targets on the right side |
+| `wrong-side-target` | `--target` names the side the command doesn't work on. `candidates`: the side it needs |

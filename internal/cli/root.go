@@ -127,7 +127,7 @@ func (a *app) root() *cobra.Command {
 	root.PersistentFlags().BoolVar(&a.style.NoColor, "no-color", false, "print without colour (NO_COLOR does the same)")
 	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ »")
 	a.printer.JSON, a.dir, a.style.NoColor, a.style.ASCII = jsonOut, dir, noColor, ascii
-	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.listCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.ignoreCmd(), a.unignoreCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.instancesCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.targetCmd(), a.historyCmd(), a.rollbackCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd(), a.docsCmd(), a.cacheCmd(), a.completionCmd())
+	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.listCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.ignoreCmd(), a.unignoreCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.instancesCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.historyCmd(), a.rollbackCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.selfCmd(), a.docsCmd(), a.cacheCmd(), a.completionCmd())
 	root.AddCommand(a.typeGroupCmds()...)
 	// hook is hidden and in no help group: the generated scripts run it, nobody types it.
 	root.AddCommand(a.hookCmd())

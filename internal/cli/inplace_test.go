@@ -14,7 +14,7 @@ func newInPlace(t *testing.T) *harness {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.editManifest(t, func(m map[string]any) {
-		m["targets"].(map[string]any)["client"].(map[string]any)["build"] = "."
+		m["client"].(map[string]any)["build"] = "."
 	})
 	return h
 }

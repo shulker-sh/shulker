@@ -24,7 +24,7 @@ var helpGroups = []struct {
 }{
 	{"project", "Project", []string{"init", "get", "set", "unset", "lock", "import", "export"}},
 	{"mods", "Mods and modpacks", []string{"add", "remove", "list", "update", "outdated", "pin", "unpin", "ignore", "unignore", "suggests", "mod", "modpack", "resourcepack", "shader"}},
-	{"builds", "Targets and builds", []string{"target", "install", "build", "diff", "pull", "feature", "history", "rollback"}},
+	{"builds", "Builds", []string{"install", "build", "diff", "pull", "feature", "history", "rollback"}},
 	{"launchers", "Launchers", []string{"link", "instances", "sync", "unlink"}},
 	{"servers", "Servers", []string{"serve", "player"}},
 	{"shulker", "Shulker", []string{"docs", "config", "cache", "self", "version", "completion"}},

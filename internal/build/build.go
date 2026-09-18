@@ -355,7 +355,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 			return nil, nil, err
 		}
 		if b.Lock.Loader.Type != "" {
-			jar, err := b.markerJar(side, side, cond, sel)
+			jar, err := b.markerJar(side, cond, sel)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -444,21 +444,6 @@ func featureFolders(name string, f manifest.Feature, side string) []string {
 		folders = append(folders, f.Overrides.Server)
 	}
 	return folders
-}
-
-// sides names the sides this project builds. The manifest still spells them as
-// targets; the side blocks take over when targets go.
-func (b *Builder) sides() []string {
-	var sides []string
-	for _, side := range []string{"client", "server"} {
-		for _, t := range b.Manifest.Targets {
-			if t.Side == side {
-				sides = append(sides, side)
-				break
-			}
-		}
-	}
-	return sides
 }
 
 func (b *Builder) layer(l overrideLayer, vars map[string]string, whole func(string) bool, desired map[string]source, report *Report) error {
@@ -616,7 +601,7 @@ func RecordLoader(dir string, l InstalledLoader) error {
 	return writeState(dir, s)
 }
 
-func (b *Builder) collectClient(name string, opts Options, desired map[string]source, vars map[string]string, report *Report) error {
+func (b *Builder) collectClient(side string, opts Options, desired map[string]source, vars map[string]string, report *Report) error {
 	cl := b.Manifest.Client
 	options := properties{}
 	if cl != nil && len(cl.Options) > 0 {
@@ -626,7 +611,7 @@ func (b *Builder) collectClient(name string, opts Options, desired map[string]so
 		}
 		options = rendered
 	}
-	b.seedResourcePacks(name, opts, desired, options, report)
+	b.seedResourcePacks(side, opts, desired, options, report)
 	if len(options) == 0 {
 		return nil
 	}

@@ -14,10 +14,13 @@ import (
 )
 
 func TestRoundTrip(t *testing.T) {
-	for _, name := range []string{"two-target.json", "minimal.json"} {
+	for name, sides := range map[string][]string{"client-server.json": {"client", "server"}, "minimal.json": {"client"}} {
 		m, err := Load(filepath.Join("..", "..", "testdata", name))
 		if err != nil {
 			t.Fatal(err)
+		}
+		if got := m.Sides(); !slices.Equal(got, sides) {
+			t.Errorf("%s declares %v, want %v", name, got, sides)
 		}
 		data, err := m.Encode()
 		if err != nil {
@@ -122,11 +125,11 @@ func schemaCoverage(root, node map[string]any, doc any, path string, want, have 
 }
 
 func TestSaveRefusesInvalid(t *testing.T) {
-	m := &Manifest{Name: "x", Minecraft: "26.2", Loader: Loader{Type: "fabric", Version: "*"}, Targets: map[string]Target{}, Requires: map[string]Require{}}
+	m := &Manifest{Name: "x", Minecraft: "26.2", Loader: Loader{Type: "fabric", Version: "*"}, Requires: map[string]Require{}}
 	if err := m.Save(filepath.Join(t.TempDir(), FileName)); err == nil {
-		t.Fatal("expected schema error for empty targets")
+		t.Fatal("expected schema error for a manifest with no side")
 	}
-	m.Targets["client"] = Target{Side: "client", Overrides: []string{"overrides"}, Build: "build/client"}
+	m.Client = &Client{Build: "build/client"}
 	path := filepath.Join(t.TempDir(), FileName)
 	if err := m.Save(path); err != nil {
 		t.Fatal(err)
@@ -137,11 +140,11 @@ func TestSaveRefusesInvalid(t *testing.T) {
 }
 
 func TestConditionsRoundTrip(t *testing.T) {
-	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"],"features":["fancy"]}},"requires":{"aa":{"os":"macos"},"bb":{"feature":["fancy","!shaders"]}}}`))
+	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"features":{"fancy":{"default":true},"shaders":{}},"requires":{"aa":{"os":"macos"},"bb":{"feature":["fancy","!shaders"]}},"client":{}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(m.Mods()["aa"].OS) != 1 || m.Mods()["aa"].OS[0] != "macos" || len(m.Mods()["bb"].Feature) != 2 || m.Targets["client"].Features[0] != "fancy" {
+	if len(m.Mods()["aa"].OS) != 1 || m.Mods()["aa"].OS[0] != "macos" || len(m.Mods()["bb"].Feature) != 2 || !m.Features["fancy"].Default {
 		t.Fatalf("parsed conditions: %+v", m.Mods())
 	}
 	data, err := m.Encode()
@@ -155,7 +158,7 @@ func TestConditionsRoundTrip(t *testing.T) {
 
 func TestRequiresEntryKinds(t *testing.T) {
 	doc := func(entries string) []byte {
-		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{` + entries + `}}`)
+		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"requires":{` + entries + `},"client":{}}`)
 	}
 	for _, entries := range []string{
 		`"base":{"source":"../base","pin":"AANobbMI"}`,
@@ -210,7 +213,7 @@ func TestRequiresEntryKinds(t *testing.T) {
 
 func TestFeatureOverridesForms(t *testing.T) {
 	doc := func(features string) []byte {
-		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"features":{` + features + `},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{}}`)
+		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"features":{` + features + `},"requires":{},"client":{}}`)
 	}
 	m, err := Parse(doc(`"shaders":{"default":true,"overrides":"extras/shaders"},"voice":{"overrides":{"client":"voice-client"}},"minimap":{}`))
 	if err != nil {
@@ -243,7 +246,7 @@ func TestFeatureOverridesForms(t *testing.T) {
 }
 
 func TestSideHelpers(t *testing.T) {
-	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{},"variables":{"motd":"shared","port":25565},"client":{"name":"West Coast","build":".","variables":{"motd":"client"}},"server":{}}`))
+	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"requires":{},"variables":{"motd":"shared","port":25565},"client":{"name":"West Coast","build":".","variables":{"motd":"client"}},"server":{}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,26 +278,29 @@ func TestSideHelpers(t *testing.T) {
 		t.Error("SideVariables wrote through to the project variables")
 	}
 
-	bare, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
+	bare := &Manifest{Name: "p"}
 	if len(bare.Sides()) != 0 {
 		t.Errorf("sides without blocks: %v", bare.Sides())
 	}
 	if _, ok := bare.InPlaceSide(); ok {
 		t.Error("InPlaceSide without blocks")
 	}
+	if bare.BuildDir("client") != "build/client" || bare.DisplayName("client") != "p" {
+		t.Error("fallbacks without blocks")
+	}
 }
 
 func TestParseRejects(t *testing.T) {
 	doc := func(rest string) []byte {
-		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{},` + rest + `}`)
+		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},` + rest + `}`)
 	}
 	for _, rest := range []string{
-		`"features":{"client":{}}`,
-		`"features":{"server":{"default":true}}`,
-		`"client":{"build":"."},"server":{"build":"."}`,
+		`"requires":{},"features":{"client":{}},"client":{}`,
+		`"requires":{},"features":{"server":{"default":true}},"client":{}`,
+		`"requires":{},"client":{"build":"."},"server":{"build":"."}`,
+		`"requires":{"iris":{"feature":"shaders"}},"client":{}`,
+		`"features":{"shaders":{}},"requires":{"iris":{"feature":"!shadders"}},"client":{}`,
+		`"requires":{}`,
 	} {
 		if _, err := Parse(doc(rest)); err == nil {
 			t.Errorf("%s should be invalid", rest)
@@ -302,7 +308,12 @@ func TestParseRejects(t *testing.T) {
 			t.Errorf("%s: code %q", rest, out.CodeOf(err))
 		}
 	}
-	if _, err := Parse(doc(`"client":{"build":"."},"server":{"build":"build/server"}`)); err != nil {
+	_, err := Parse(doc(`"requires":{}`))
+	e, ok := err.(*out.Error)
+	if !ok || e.Message != "shulker.json declares no side" || len(e.Rows) != 1 || e.Rows[0].Text != `add "client": {} or "server": {}` {
+		t.Fatalf("no side: %v", err)
+	}
+	if _, err := Parse(doc(`"features":{"shaders":{}},"requires":{"iris":{"feature":"!shaders"}},"client":{"build":"."},"server":{"build":"build/server"}`)); err != nil {
 		t.Fatal(err)
 	}
 }

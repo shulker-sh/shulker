@@ -38,7 +38,7 @@ func TestItemsSpacing(t *testing.T) {
 		"  + kitchen-sink 1.5 (pack)",
 		"  + fabric-api   0.102.0+26.2 (required by lithium)",
 		"  + lithium      0.14.3 » client",
-		"  + ferritecore  6.0.2  » all targets",
+		"  + ferritecore  6.0.2  » all sides",
 	}
 	plain := render(Theme{}, func(l *Lines) { l.Items(items...) })
 	colour := render(coloured(), func(l *Lines) { l.Items(items...) })

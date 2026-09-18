@@ -35,7 +35,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 					return err
 				}
 			}
-			name, err := sideTarget(p.Manifest, target, "client", "link")
+			side, err := sideOf(p.Manifest, target, "client", "link")
 			if err != nil {
 				return err
 			}
@@ -69,7 +69,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				return err
 			}
 			gdl.Dir = launcherDir
-			display := p.Manifest.TargetDisplayName(name)
+			display := p.Manifest.DisplayName(side)
 			if instanceName != "" {
 				display = instanceName
 			}
@@ -118,13 +118,13 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			if err := a.checkID(as, res.GameDir); err != nil {
 				return err
 			}
-			if err := saveIntent(res.GameDir, src.name, ref, name, "client"); err != nil {
+			if err := saveIntent(res.GameDir, src.name, ref, side, "client"); err != nil {
 				return err
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: "gdlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
 			var synced *syncResult
 			if len(args) == 1 {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: name, into: res.GameDir})
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: side, into: res.GameDir})
 				if err != nil {
 					return err
 				}
@@ -137,7 +137,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				InstanceDir: res.Dir,
 				Name:        display,
 				Mode:        "sync",
-				Target:      name,
+				Target:      side,
 				GameDir:     res.GameDir,
 				Command:     launcher.SlotCommand("gdlauncher", res.GameDir, launcher.HookPreLaunch),
 				Created:     res.Created,
@@ -150,7 +150,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 					verb = "updated"
 				}
 				l.OKInto(verb+" instance "+display, res.Dir, "")
-				rows := []out.Row{{Text: "the launcher runs `shulker sync` for target " + name + " before each launch"}}
+				rows := []out.Row{{Text: "the launcher runs `shulker sync` for the " + side + " side before each launch"}}
 				if hasFeatures {
 					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
 				}
@@ -165,9 +165,9 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher runtime directory (default: GDLauncher's)")
-	cmd.Flags().StringVar(&target, "target", "", "client target to link (default: the only client target)")
+	cmd.Flags().StringVar(&target, "target", "", "side to link; a launcher instance is always the client side")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
-	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the target's display name)")
+	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet")
 	ff.register(cmd, "for this instance")

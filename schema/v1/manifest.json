@@ -2,9 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://shulker.sh/schema/v1/manifest.json",
   "title": "shulker.json",
-  "description": "Shulker project manifest. Lists direct mods, targets, and first-class configuration. Resolution results live in shulker.lock.",
+  "description": "Shulker project manifest. Lists direct mods, the sides it builds, and first-class configuration. Resolution results live in shulker.lock.",
   "type": "object",
-  "required": ["name", "targets"],
+  "required": ["name"],
+  "anyOf": [{ "required": ["client"] }, { "required": ["server"] }],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string", "format": "uri" },
@@ -60,13 +61,6 @@
       "propertyNames": { "$ref": "#/$defs/featureName" },
       "additionalProperties": { "$ref": "#/$defs/featureDecl" },
       "description": "Optional parts of the pack, each one switch over the mods gated with feature and over the feature's own override folder. --with and --without decide a feature for one build; feature on and feature off record the choice."
-    },
-    "targets": {
-      "type": "object",
-      "minProperties": 1,
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_-]*$" },
-      "additionalProperties": { "$ref": "#/$defs/target" },
-      "description": "Build targets. Each lists its override layers explicitly; paths are never inferred."
     },
     "requires": {
       "type": "object",
@@ -226,48 +220,6 @@
         "note": { "$ref": "#/$defs/note" }
       }
     },
-    "target": {
-      "type": "object",
-      "required": ["side", "overrides"],
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Display name launchers show for this target (Prism instance name, official launcher profile name). Defaults to the manifest name."
-        },
-        "side": {
-          "type": "string",
-          "enum": ["client", "server"],
-          "description": "Which side this target builds. Mods with side \"both\" are included in every target."
-        },
-        "overrides": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true,
-          "items": { "$ref": "#/$defs/relativePath" },
-          "description": "Override layers applied in order; later layers win. Modpack overrides sit beneath all of these."
-        },
-        "build": {
-          "$ref": "#/$defs/relativePath",
-          "description": "Output directory. Defaults to build/<target>; \".\" builds into the project directory itself."
-        },
-        "variables": { "$ref": "#/$defs/variables" },
-        "features": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "$ref": "#/$defs/featureName" },
-          "description": "Features on by default for this target. A mod gated with feature ships when one of its names is on."
-        },
-        "wholeFiles": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "$ref": "#/$defs/relativePath" },
-          "description": "Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone."
-        },
-        "note": { "$ref": "#/$defs/note" }
-      }
-    },
     "requireKey": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
@@ -338,7 +290,7 @@
             { "$ref": "#/$defs/featureCondition" },
             { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/featureCondition" } }
           ],
-          "description": "Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Features default from the target's features list."
+          "description": "Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Every name must be declared in features, which is where its default lives."
         },
         "note": { "$ref": "#/$defs/note" }
       },
