@@ -107,6 +107,8 @@ type harness struct {
 	cfMods         map[int]*cfMod
 	cfHits         int
 	ctx            context.Context
+	// exe stands in for the running binary, for the commands that move or remove it.
+	exe string
 }
 
 func newHarness(t *testing.T) *harness {
@@ -458,6 +460,9 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	a.stdin = h.stdin
 	a.tty = func() bool { return h.tty }
 	a.installer = h.fakeInstaller
+	if h.exe != "" {
+		a.exe = func() (string, error) { return h.exe, nil }
+	}
 	f := fetch.New("test")
 	piston := meta.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"

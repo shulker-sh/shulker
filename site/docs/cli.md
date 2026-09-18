@@ -968,6 +968,25 @@ shulker self update --check
 | `--without-attestation` | Skip the build provenance check |
 | `--require-attestation` | Fail unless `gh` verifies the build provenance |
 
+### `shulker self uninstall`
+
+Take shulker out of every launcher it hooked, then remove the binary. It walks the registry: each instance gets its pre-launch and post-exit scripts, its slots and its generated shim removed, a command shulker adopted goes back where it came from, and an official launcher profile gets its own Java back. Instances whose folders have moved away are still unhooked, from what the registry records about them.
+
+Nothing else goes. Every instance folder stays, with its worlds and its builds, and so does the registry, so reinstalling shulker and running [`shulker instances repair`](#shulker-instances-repair) puts every hook back. Nothing prompts: running the command is the intent.
+
+`--purge` also forgets the registry. Then nothing is left of shulker on the machine, and a repair after reinstalling finds only the instances the launchers themselves hold: a plain `sync --into` directory isn't in any launcher, so `--purge` names those before it goes.
+
+An instance shulker can't unhook — an unreadable launcher file, say — is a warning, and the rest of the uninstall carries on. On Windows the running binary can't be deleted, so it is renamed to `shulker.exe.old` and the last line tells you to delete it.
+
+```sh
+shulker self uninstall
+shulker self uninstall --purge
+```
+
+| Flag | Description |
+| --- | --- |
+| `--purge` | Also forget the registry, the index `instances repair` rebuilds from |
+
 ### `shulker completion bash`
 
 Print the bash completion script, so Tab completes shulker's commands, flags, and arguments. Load it in the current shell, or add that line to `~/.bashrc` to have it in every new shell. It needs the bash-completion package.
@@ -1182,6 +1201,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a local `file`, or a modpack from a provider rather than a `source` |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
+| `self-uninstall` | The shulker binary couldn't be removed |
 | `self-update-check` | Checking for a release failed, or none is published |
 | `self-update-checksum` | The download doesn't match its checksum |
 | `self-update-download` | The download failed |

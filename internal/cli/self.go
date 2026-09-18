@@ -5,10 +5,13 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/selfupdate"
 )
@@ -27,8 +30,125 @@ func (a *app) selfCmd() *cobra.Command {
 		Use:   "self",
 		Short: "Manage the shulker binary itself",
 	}
-	cmd.AddCommand(a.selfUpdateCmd())
+	cmd.AddCommand(a.selfUpdateCmd(), a.selfUninstallCmd())
 	return cmd
+}
+
+type selfUninstallResult struct {
+	Unhooked  []config.Instance `json:"unhooked"`
+	Removed   string            `json:"removed,omitempty"`
+	Renamed   string            `json:"renamed,omitempty"`
+	Purged    bool              `json:"purged"`
+	Forgotten []config.Instance `json:"forgotten,omitempty"`
+}
+
+func (a *app) selfUninstallCmd() *cobra.Command {
+	var purge bool
+	cmd := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Take shulker out of every launcher it hooked, then remove the binary",
+		Args:  noArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.selfUninstall(purge)
+		},
+	}
+	cmd.Flags().BoolVar(&purge, "purge", false, "also forget the registry, the index instances repair rebuilds from")
+	return cmd
+}
+
+// selfUninstall leaves the instance folders and, unless --purge, the registry, so reinstalling and
+// running `instances repair` puts every hook back. Nothing prompts: typing the command is the intent,
+// and --purge is a second explicit act. A failure to unhook one instance is a warning, because
+// leaving shulker installed over one unreadable launcher file helps nobody.
+func (a *app) selfUninstall(purge bool) error {
+	exe, err := a.exe()
+	if err != nil {
+		return out.Errorf("self-uninstall", "find the running shulker binary: %v", err)
+	}
+	res := selfUninstallResult{Unhooked: []config.Instance{}, Purged: purge}
+	instances, err := a.loadInstances()
+	if err != nil {
+		a.printer.Warn("no instance was unhooked: %v", err)
+	}
+	for _, in := range instances {
+		e := launcher.Find(in.Launcher)
+		if e == nil {
+			// A plain `sync --into` directory has no launcher holding a hook of shulker's.
+			res.Forgotten = append(res.Forgotten, in)
+			continue
+		}
+		// The slot-clearing path unlink uses: an adopted command goes back, shulker's own slots and
+		// scripts go, and a Mojang profile gets its own Java back. The row's launcherDir is what
+		// reaches the profile of an instance whose folder is gone.
+		if _, _, err := launcher.ReleaseSlots(e, in); err != nil {
+			a.printer.Warn("%s (%s) keeps shulker's hooks: %v", in.Label(), e.Title, err)
+			continue
+		}
+		res.Unhooked = append(res.Unhooked, in)
+	}
+	res.Removed = exe
+	if runtime.GOOS == "windows" {
+		// os.Remove can't touch a running exe, and the .old sweep `self update` relies on happens on
+		// the next run, which an uninstall never has.
+		res.Renamed = exe + ".old"
+		err = os.Rename(exe, res.Renamed)
+	} else {
+		err = os.Remove(exe)
+	}
+	if err != nil {
+		e := out.Errorf("self-uninstall", "remove %s: %v", exe, err)
+		e.Data = res
+		return e
+	}
+	if purge {
+		if err := a.forgetRegistry(); err != nil {
+			a.printer.Warn("the registry is still there: %v", err)
+			res.Purged, res.Forgotten = false, nil
+		}
+	} else {
+		res.Forgotten = nil
+	}
+	return a.printer.Emit(res, res.print)
+}
+
+func (a *app) forgetRegistry() error {
+	path, err := a.registryFile()
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func (r selfUninstallResult) print(l *out.Lines) {
+	if len(r.Unhooked) > 0 {
+		l.OK("unhooked "+plural(len(r.Unhooked), "instance", "instances"), "")
+		items := make([]out.Item, 0, len(r.Unhooked))
+		for _, in := range r.Unhooked {
+			items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{launcher.Title(in.Launcher)}})
+		}
+		l.Items(items...)
+	}
+	l.OK("removed "+r.Removed, "")
+	if r.Purged {
+		l.OK("forgot the registry", "")
+		if len(r.Forgotten) > 0 {
+			l.Info(plural(len(r.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`")
+			items := make([]out.Item, 0, len(r.Forgotten))
+			for _, in := range r.Forgotten {
+				items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{in.Dir}})
+			}
+			l.Items(items...)
+		}
+	} else {
+		l.Info("the registry and every instance folder are untouched")
+		l.Nudge("Reinstall, then", "shulker instances repair")
+	}
+	if r.Renamed != "" {
+		l.Nudge("Delete the leftover binary", `del "`+r.Renamed+`"`)
+	}
 }
 
 func (a *app) selfUpdateCmd() *cobra.Command {
