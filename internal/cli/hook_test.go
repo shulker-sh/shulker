@@ -24,6 +24,13 @@ func TestPreLaunchReportsTheSync(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("pre-launch should sync the instance: %v", err)
 	}
+	in := readInstances(t, h)[0]
+	if in.LastSync == "" || in.LastError != "" {
+		t.Fatalf("pre-launch should stamp the row: %+v", in)
+	}
+	if f := readIntent(t, gameDir); f.Resolved == nil || f.Resolved.LastSyncAt != in.LastSync || f.Resolved.LastResult != instance.ResultOK {
+		t.Fatalf("pre-launch should stamp the instance file: %+v", f.Resolved)
+	}
 }
 
 const fakeGame = `#!/bin/sh

@@ -24,6 +24,17 @@ func readInstances(t *testing.T, h *harness) []config.Instance {
 	return instances
 }
 
+// withoutStamp checks that the sync stamped the row, then takes the stamp off so the rest of the
+// row can be compared whole.
+func withoutStamp(t *testing.T, in config.Instance) config.Instance {
+	t.Helper()
+	if in.LastSync == "" || in.LastError != "" {
+		t.Fatalf("a sync that worked should stamp the row: %+v", in)
+	}
+	in.LastSync = ""
+	return in
+}
+
 func readIntent(t *testing.T, dir string) *instance.File {
 	t.Helper()
 	f, err := instance.Load(dir)
@@ -52,7 +63,7 @@ func TestSyncIntoRegisters(t *testing.T) {
 	stdout = h.mustRun(t, "sync", h.dir, "--into", into)
 	instances := readInstances(t, h)
 	want := config.Instance{ID: "pack", Name: "pack", Dir: into, Source: h.dir}
-	if len(instances) != 1 || instances[0] != want {
+	if len(instances) != 1 || withoutStamp(t, instances[0]) != want {
 		t.Fatalf("instance: %+v", instances)
 	}
 	if !strings.Contains(stdout, "registered pack") {
@@ -122,7 +133,7 @@ func TestLinkRegisters(t *testing.T) {
 	}
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
 	prism := config.Instance{ID: "friends", Launcher: "prism", LauncherDir: prismDir, Name: "Friends", Dir: gameDir, Source: h.dir}
-	if instances := readInstances(t, h); len(instances) != 1 || instances[0] != prism {
+	if instances := readInstances(t, h); len(instances) != 1 || withoutStamp(t, instances[0]) != prism {
 		t.Fatalf("prism instance: %+v", instances)
 	}
 	if f := readIntent(t, gameDir); f.Source != h.dir || f.Side != "client" {
@@ -135,7 +146,7 @@ func TestLinkRegisters(t *testing.T) {
 	mojangDir := t.TempDir()
 	h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)
 	instances := readInstances(t, h)
-	if len(instances) != 2 || instances[0] != prism {
+	if len(instances) != 2 || withoutStamp(t, instances[0]) != prism {
 		t.Fatalf("instances after link mojang: %+v", instances)
 	}
 	if m := instances[1]; m.Launcher != "mojang" || m.LauncherDir != mojangDir || m.Dir != filepath.Join(h.dir, "build", "client") || m.Source != h.dir || m.ID != "pack" {
@@ -431,5 +442,71 @@ func TestInstancesRepair(t *testing.T) {
 	}
 	if instances := readInstances(t, h); len(instances) != 1 {
 		t.Fatalf("a missing directory keeps its row: %+v", instances)
+	}
+}
+
+func TestSyncStampsTheInstanceAndTheRow(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	overrides := filepath.Join(h.dir, "overrides")
+	if err := os.MkdirAll(overrides, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(overrides, "options.txt"), []byte("renderDistance:8\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
+
+	good := readInstances(t, h)[0]
+	if good.LastSync == "" || good.LastError != "" {
+		t.Fatalf("a sync that worked stamps lastSync and no error: %+v", good)
+	}
+	f := readIntent(t, gameDir)
+	if f.Resolved == nil || f.Resolved.LastSyncAt != good.LastSync || f.Resolved.LastResult != instance.ResultOK {
+		t.Fatalf("instance file: %+v", f.Resolved)
+	}
+
+	// A file changed on both sides conflicts, and the failure is recorded without disturbing the
+	// time of the sync that built what is on disk.
+	if err := os.WriteFile(filepath.Join(gameDir, "options.txt"), []byte("renderDistance:16\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(overrides, "options.txt"), []byte("renderDistance:32\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, _ := h.run(t, "sync", "-i", "friends", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "build-conflict" {
+		t.Fatalf("a both-sides change should conflict: exit %d %s", code, stdout)
+	}
+	failed := readInstances(t, h)[0]
+	if failed.LastSync != good.LastSync {
+		t.Fatalf("a failed sync keeps the last good time: %+v", failed)
+	}
+	if !strings.Contains(failed.LastError, "changed in the output directory") {
+		t.Fatalf("a failed sync records why: %+v", failed)
+	}
+	if f := readIntent(t, gameDir); f.Resolved.LastResult != instance.ResultFailed || f.Resolved.LastSyncAt != good.LastSync {
+		t.Fatalf("instance file after a failure: %+v", f.Resolved)
+	}
+	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "last sync failed: "+failed.LastError) {
+		t.Fatalf("instances should show the failure: %s", stdout)
+	}
+
+	// The registry rebuild reads the instance file, so a row it writes again knows when the
+	// instance last synced.
+	h.mustRun(t, "sync", "-i", "friends", "--force")
+	if in := readInstances(t, h)[0]; in.LastError != "" {
+		t.Fatalf("a sync that works clears the error: %+v", in)
+	}
+	if err := os.WriteFile(registryPath(h), []byte("{ not a registry"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRunStderr(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
+	rebuilt := readInstances(t, h)[0]
+	if rebuilt.LastSync != readIntent(t, gameDir).Resolved.LastSyncAt {
+		t.Fatalf("repair carries the last sync into the row: %+v", rebuilt)
 	}
 }

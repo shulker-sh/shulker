@@ -170,7 +170,7 @@ func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
 		if e.Side != "" {
 			detail += ", side " + e.Side
 		}
-		group = append(group, out.Entry{Synced: e.Status == instanceSynced, Name: e.ID, Tag: e.Side, Aside: e.statusText(), Path: e.Dir, Detail: detail})
+		group = append(group, out.Entry{Synced: e.Status == instanceSynced && e.LastError == "", Name: e.ID, Tag: e.Side, Aside: e.statusText(), Path: e.Dir, Detail: detail})
 	}
 	flush(entries[len(entries)-1].Launcher)
 }
@@ -181,7 +181,16 @@ func (e instanceEntry) statusText() string {
 		return "directory is missing"
 	case instanceUnreadable:
 		return "can't read the directory"
-	case instanceNotSynced:
+	}
+	text := e.syncedText()
+	if e.LastError != "" {
+		text += ", last sync failed: " + e.LastError
+	}
+	return text
+}
+
+func (e instanceEntry) syncedText() string {
+	if e.Status == instanceNotSynced {
 		return "not synced yet"
 	}
 	if e.Problem != "" {

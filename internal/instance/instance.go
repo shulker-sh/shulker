@@ -20,6 +20,12 @@ const (
 // ErrNotFound is returned for a directory shulker has never synced into.
 var ErrNotFound = errors.New("no " + FileName)
 
+// How a sync ended, as resolved.lastResult records it.
+const (
+	ResultOK     = "ok"
+	ResultFailed = "failed"
+)
+
 // File is what an instance directory syncs from and how shulker sets it up. It is the only
 // file read as intent; .shulker/state.json records what the last build actually did.
 type File struct {

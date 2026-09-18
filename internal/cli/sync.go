@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
@@ -187,7 +188,7 @@ func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, er
 	return s, nil
 }
 
-func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncResult, error) {
+func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res syncResult, err error) {
 	p := src.project
 	side, err := a.syncSide(p, req.side, req.assumeClient)
 	if err != nil {
@@ -208,6 +209,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if into, err = filepath.Abs(into); err != nil {
 		return syncResult{}, err
 	}
+	defer func() { a.stampSync(into, err) }()
 	ownBuild := sameDir(into, buildDir)
 	register := req.into != "" && !ownBuild
 	if req.name != "" && !register {
@@ -262,7 +264,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 			a.printer.Warn("couldn't record %s as the offline fallback: %v", src.name, err)
 		}
 	}
-	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep}
+	res = syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep}
 	if !src.LastGood.IsZero() {
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
@@ -276,6 +278,52 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		}
 	}
 	return res, nil
+}
+
+// stampSync records how a sync of a registered instance ended, in the instance file and on its
+// registry row. A failed sync leaves lastSyncAt and lastSync where they are: the files in the
+// directory are still the ones the last good sync built.
+func (a *app) stampSync(dir string, syncErr error) {
+	if _, ok := a.registeredInstance(dir); !ok {
+		return
+	}
+	at := time.Now().UTC().Format(time.RFC3339)
+	result, failure := instance.ResultOK, ""
+	if syncErr != nil {
+		result, failure = instance.ResultFailed, out.AsError(syncErr).Message
+	}
+	a.stampIntent(dir, at, result)
+	a.updateInstances(func(instances []config.Instance) []config.Instance {
+		i, ok := config.FindInstance(instances, dir)
+		if !ok {
+			return instances
+		}
+		if syncErr == nil {
+			instances[i].LastSync = at
+		}
+		instances[i].LastError = failure
+		return instances
+	})
+}
+
+func (a *app) stampIntent(dir, at, result string) {
+	f, err := instance.Load(dir)
+	if errors.Is(err, instance.ErrNotFound) {
+		return
+	}
+	if err == nil {
+		if f.Resolved == nil {
+			f.Resolved = &instance.Resolved{}
+		}
+		if result == instance.ResultOK {
+			f.Resolved.LastSyncAt = at
+		}
+		f.Resolved.LastResult = result
+		err = f.Save(dir)
+	}
+	if err != nil {
+		a.printer.Warn("%s not updated: %v", instance.Path(dir), out.AsError(err).Message)
+	}
 }
 
 // syncRecorded syncs a directory from the source its own instance file records, so a synced
