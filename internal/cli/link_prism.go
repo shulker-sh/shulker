@@ -32,17 +32,30 @@ type prismReport struct {
 	Sync        *syncResult `json:"sync,omitempty"`
 }
 
-func (a *app) linkPrismCmd() *cobra.Command {
+func (a *app) linkPrismCmd() *cobra.Command { return a.linkPrismLikeCmd(false) }
+
+func (a *app) linkMultiMCCmd() *cobra.Command { return a.linkPrismLikeCmd(true) }
+
+// linkPrismLikeCmd is `link prism` and `link multimc`: one implementation, since MultiMC is the
+// layout Prism grew from, told apart by the launcher name, the instance.cfg dialect and MultiMC
+// having no default directory to find.
+func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 	var launcherDir, mode, instanceName, ref, as string
 	var force bool
 	var assumeClient bool
 	var ff featureFlags
+	launcherName, use, short := "prism", "prism", "Create a Prism Launcher instance that syncs the client build before each launch"
+	if multimc {
+		launcherName, use, short = "multimc", "multimc", "Create a MultiMC instance that syncs the client build before each launch"
+	}
 	cmd := &cobra.Command{
-		Use:     "prism [project-dir | git-url | manifest-url]",
-		Aliases: []string{"multimc"},
-		Short:   "Create a Prism Launcher or MultiMC instance that syncs the client build before each launch",
-		Args:    maximumArgs(1),
+		Use:   use + " [project-dir | git-url | manifest-url]",
+		Short: short,
+		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if multimc && launcherDir == "" {
+				return out.Errorf("launcher-dir-required", "MultiMC is portable; pass --launcher-dir with the folder that holds multimc.cfg")
+			}
 			if mode != "sync" && mode != "symlink" {
 				return out.Errorf("usage", "--mode must be sync or symlink, not %q", mode)
 			}
@@ -80,9 +93,6 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				}
 			}
 			if launcherDir == "" {
-				if cmd.CalledAs() == "multimc" {
-					return out.Errorf("launcher-dir-required", "MultiMC is portable; pass --launcher-dir with the folder that holds multimc.cfg")
-				}
 				if launcherDir, err = launcher.DefaultPrismDir(); err != nil {
 					return err
 				}
@@ -90,7 +100,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			if launcherDir, err = filepath.Abs(launcherDir); err != nil {
 				return err
 			}
-			l := &launcher.Prism{Dir: launcherDir, MultiMC: cmd.CalledAs() == "multimc"}
+			l := &launcher.Prism{Dir: launcherDir, MultiMC: multimc}
 			if err := l.Check(); errors.Is(err, launcher.ErrNotFound) {
 				return out.Errorf("launcher-not-found", "no launcher directory at %s; run the launcher once or pass --launcher-dir", launcherDir)
 			} else if err != nil {
@@ -130,10 +140,6 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				if err := a.saveInstanceFeatures(res.GameDir, ff); err != nil {
 					return err
 				}
-			}
-			launcherName := "prism"
-			if l.MultiMC {
-				launcherName = "multimc"
 			}
 			// A symlink-mode instance gets no instance file and so no hooks; if it had them before,
 			// this is where it lets go of them.
@@ -207,7 +213,11 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: Prism Launcher's; required for MultiMC)")
+	if multimc {
+		cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "the MultiMC folder, the one that holds multimc.cfg (required)")
+	} else {
+		cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: Prism Launcher's)")
+	}
 	cmd.Flags().BoolVar(&assumeClient, "assume-client", false, "link a client even when the source declares none, built from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&mode, "mode", "sync", "sync: build into the instance before each launch; symlink: point the instance at the build directory")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")

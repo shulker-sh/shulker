@@ -255,3 +255,19 @@ func rawINILines(t *testing.T, path string) map[string]bool {
 	}
 	return lines
 }
+
+func TestLinkHelpListsMultiMCBesideTheOtherLaunchers(t *testing.T) {
+	h := newHarness(t)
+	stdout := h.mustRun(t, "link", "--help")
+	listed := map[string]bool{}
+	for _, line := range strings.Split(stdout, "\n") {
+		if fields := strings.Fields(line); len(fields) > 1 {
+			listed[fields[0]] = true
+		}
+	}
+	for _, name := range []string{"mojang", "prism", "multimc", "atlauncher", "gdlauncher"} {
+		if !listed[name] {
+			t.Fatalf("link --help should list %s:\n%s", name, stdout)
+		}
+	}
+}

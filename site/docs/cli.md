@@ -36,7 +36,8 @@ outline: [2, 3]
 | [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
 | [`shulker link gdlauncher [source]`](#shulker-link-gdlauncher) | Create a GDLauncher instance for the client build |
 | [`shulker link mojang [source]`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
-| [`shulker link prism [source]`](#shulker-link-prism) | Create a Prism Launcher or MultiMC instance for the client build |
+| [`shulker link prism [source]`](#shulker-link-prism) | Create a Prism Launcher instance for the client build |
+| [`shulker link multimc [source]`](#shulker-link-multimc) | Create a MultiMC instance for the client build |
 | [`shulker sync [source]`](#shulker-sync) | Download and build one side of a project into a directory, or update a linked one |
 | [`shulker instances`](#shulker-instances) | List the instances shulker keeps in sync |
 | [`shulker instances repair`](#shulker-instances-repair) | Register instances shulker has lost track of and write any missing instance files |
@@ -643,7 +644,7 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 
 ### `shulker link prism`
 
-Create a Prism Launcher or MultiMC instance that syncs the client build before each launch. Alias: `multimc`.
+Create a Prism Launcher instance that syncs the client build before each launch.
 
 With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. Nothing is created in the directory you ran it from.
 
@@ -656,12 +657,32 @@ shulker link prism
 shulker link prism https://github.com/shulker-sh/base-pack.git
 shulker link prism https://example.com/pack/shulker.json --name "Friends SMP" --with shaders
 shulker link prism --mode symlink
-shulker link multimc --launcher-dir ~/MultiMC
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--launcher-dir <path>` | Launcher data directory (default: Prism Launcher's; required for MultiMC) |
+| `--launcher-dir <path>` | Launcher data directory (default: Prism Launcher's) |
+| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
+| `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
+| `--name <name>` | Instance name (default: the side's display name) |
+| `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
+| `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--force` | Repoint an instance that syncs from a different source |
+| `--with <feature>` | Turn a feature on for this instance; repeat for more (sync mode only) |
+| `--without <feature>` | Turn a feature off for this instance; repeat for more (sync mode only) |
+
+### `shulker link multimc`
+
+Create a MultiMC instance that syncs the client build before each launch. It is [`shulker link prism`](#shulker-link-prism) for MultiMC's own `instance.cfg` dialect, with the same source argument, flags and behaviour, and one difference: MultiMC is portable and has no fixed data folder, so `--launcher-dir` is required and names the folder that holds `multimc.cfg` (`launcher-dir-required` without it). The instance is registered under the launcher name `multimc`, which is what `--launcher multimc` and `shulker unlink multimc` match.
+
+```sh
+shulker link multimc --launcher-dir ~/MultiMC
+shulker link multimc https://github.com/shulker-sh/base-pack.git --launcher-dir ~/MultiMC
+```
+
+| Flag | Description |
+| --- | --- |
+| `--launcher-dir <path>` | The MultiMC folder, the one that holds `multimc.cfg` (required) |
 | `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
 | `--name <name>` | Instance name (default: the side's display name) |
