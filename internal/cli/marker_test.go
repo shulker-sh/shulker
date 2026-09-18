@@ -70,7 +70,7 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 			t.Fatalf("%s missing or not a class file", class)
 		}
 		if major := int(data[6])<<8 | int(data[7]); major != 61 {
-			t.Fatalf("%s targets class version %d, want 61 (Java 17)", class, major)
+			t.Fatalf("%s is class version %d, want 61 (Java 17)", class, major)
 		}
 	}
 	var embedded map[string]any

@@ -179,7 +179,7 @@ func (a *app) switchRegistry(configPath string, current, next config.Config, for
 	if filepath.Clean(from) == filepath.Clean(to) {
 		return "", nil
 	}
-	target, err := config.LoadInstances(to)
+	dest, err := config.LoadInstances(to)
 	if err != nil {
 		return "", err
 	}
@@ -190,7 +190,7 @@ func (a *app) switchRegistry(configPath string, current, next config.Config, for
 		}
 		var left []string
 		for _, in := range instances {
-			if _, ok := config.FindInstance(target, in.Dir); !ok {
+			if _, ok := config.FindInstance(dest, in.Dir); !ok {
 				left = append(left, in.Dir)
 			}
 		}

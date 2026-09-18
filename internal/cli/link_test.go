@@ -130,7 +130,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 		t.Fatalf("registry: %+v", instances)
 	}
 	if f := readIntent(t, gameDir); f.Ref != "main" || f.Side != "client" {
-		t.Fatalf("the ref and target live in the instance file: %+v", f)
+		t.Fatalf("the ref and side live in the instance file: %+v", f)
 	}
 
 	other := t.TempDir()

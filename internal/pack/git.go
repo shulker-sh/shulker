@@ -142,19 +142,19 @@ func untar(r io.Reader, dst string) error {
 		if rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
 			continue
 		}
-		target := filepath.Join(dst, rel)
+		entryPath := filepath.Join(dst, rel)
 		switch hdr.Typeflag {
 		case tar.TypeXGlobalHeader:
 			continue
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o755); err != nil {
+			if err := os.MkdirAll(entryPath, 0o755); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			if err := os.MkdirAll(filepath.Dir(entryPath), 0o755); err != nil {
 				return err
 			}
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode)&0o777|0o600)
+			f, err := os.OpenFile(entryPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(hdr.Mode)&0o777|0o600)
 			if err != nil {
 				return err
 			}

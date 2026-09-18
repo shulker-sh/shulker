@@ -96,7 +96,7 @@ func TestFeatureConditionsFilterModsAndDependencies(t *testing.T) {
 	setFeatures(t, h, []string{"fancy"})
 	stdout = h.mustRun(t, "build")
 	if strings.Contains(stdout, "excluded") || len(modsDir(t, h)) != 2 {
-		t.Fatalf("feature on by target default: %s %v", stdout, modsDir(t, h))
+		t.Fatalf("feature on by default: %s %v", stdout, modsDir(t, h))
 	}
 
 	setMod(t, h, "sodium", map[string]any{"feature": []string{"fancy", "!shaders"}})

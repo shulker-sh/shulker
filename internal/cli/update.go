@@ -27,14 +27,14 @@ func (a *app) updateCmd() *cobra.Command {
 				for _, l := range r.Packs {
 					packNames[l.Name] = true
 				}
-				var targets []string
+				var ids []string
 				requested := map[string]bool{}
 				for _, arg := range args {
 					if packNames[arg] {
 						requested[arg] = true
 						continue
 					}
-					targets = append(targets, arg)
+					ids = append(ids, arg)
 				}
 				if len(args) == 0 || len(requested) > 0 {
 					loaded, err := a.refreshModpacks(cmd.Context(), p, r, func(manifest.Require) bool { return true })
@@ -44,15 +44,15 @@ func (a *app) updateCmd() *cobra.Command {
 					for _, l := range loaded {
 						if requested[l.Name] {
 							for id := range l.Manifest.Mods() {
-								targets = append(targets, id)
+								ids = append(ids, id)
 							}
 						}
 					}
 				}
-				if len(args) > 0 && len(targets) == 0 {
+				if len(args) > 0 && len(ids) == 0 {
 					return "", nil
 				}
-				return "", r.Update(cmd.Context(), targets)
+				return "", r.Update(cmd.Context(), ids)
 			})
 		},
 	}

@@ -55,7 +55,7 @@ func TestLinkATLauncher(t *testing.T) {
 	writeATLInstance(t, instDir, inst)
 	h.mustRun(t, "sync", "-i", "Friends SMP")
 	if _, err := os.Stat(filepath.Join(instDir, "mods", h.jars["sodium"].filename)); err != nil {
-		t.Fatalf("the pre-launch sync target should hold the mods: %v", err)
+		t.Fatalf("the pre-launch sync directory should hold the mods: %v", err)
 	}
 	if st := build.LoadState(instDir); st.Source != h.dir {
 		t.Fatalf("state origin: %+v", st.Origin)

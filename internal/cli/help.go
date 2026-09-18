@@ -73,16 +73,16 @@ func helpCommand() *cobra.Command {
 			return names, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			target := cmd.Root()
+			at := cmd.Root()
 			for _, word := range args {
-				next := subcommand(target, word)
+				next := subcommand(at, word)
 				if next == nil {
-					return unknownSubcommand(target, word)
+					return unknownSubcommand(at, word)
 				}
-				target = next
+				at = next
 			}
-			target.InitDefaultHelpFlag()
-			return target.Help()
+			at.InitDefaultHelpFlag()
+			return at.Help()
 		},
 	}
 }

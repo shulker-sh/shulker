@@ -11,7 +11,7 @@ func TestInitChecksTheTarget(t *testing.T) {
 	h := newHarness(t)
 	code, stdout, _ := h.run(t, "init", "--yes", "--loader", "fabric", "--side", "weird", "--json")
 	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || len(e.Candidates) != 2 {
-		t.Fatalf("unknown target: code=%d %s", code, stdout)
+		t.Fatalf("unknown side: code=%d %s", code, stdout)
 	}
 }
 

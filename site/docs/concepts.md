@@ -1,28 +1,26 @@
 ---
-description: How manifests, locks, targets, sides, overrides, build edits, modpacks, and providers fit together.
+description: How manifests, locks, sides, overrides, build edits, modpacks, and providers fit together.
 ---
 
 # Concepts
 
 ## Manifest
 
-`shulker.json` declares the Minecraft version, loader, targets, mods, and modpacks. See the [manifest reference](/docs/manifest).
+`shulker.json` declares the Minecraft version, loader, sides, mods, and modpacks. See the [manifest reference](/docs/manifest).
 
 ## Lock
 
 `shulker.lock` records the exact resolved versions, hashes, and modpack commits. Shulker writes it and you commit it; nothing in it is hand-edited. Its fields are described by [its JSON Schema](https://shulker.sh/schema/v1/lock.json), which editors read from the `$schema` line at the top of the file.
 
-## Targets
-
-A target is a build output: a client instance or a server directory. Each target has its own build directory and override layers, so one project can produce a client and a server from the same mod list. Manage them with [`shulker target`](/docs/cli#shulker-target-add).
-
 ## Sides
 
-Every mod has a side: `client`, `server`, or `both`. Shulker reads it from the provider, and you can override it with `side` on the mod. A target only gets mods for its own side plus those marked `both`, so client-only mods like Iris never end up on a server. Resource packs and shaders are always client-only, and a server build leaves them out.
+A project has a client side, a server side, or both, and each is a build output: a client instance or a server directory. A side exists when its block does: `"client": {}` in `shulker.json` declares the client, `"server": {}` the server, and the block holds that side's settings, such as `client.options` or `server.properties`. Each side builds into `build/<side>` (or in place, with `"build": "."`), so one project produces a client and a server from the same mod list. [`shulker build`](/docs/cli#shulker-build) builds every declared side, or the one you name. To play a server-only pack someone else publishes, pass `--assume-client` to `link`, `sync` or `export`, and shulker builds a client from what both sides share.
+
+Every mod has a side too: `client`, `server`, or `both`. Shulker reads it from the provider, and you can override it with `side` on the mod. A side only gets mods for itself plus those marked `both`, so client-only mods like Iris never end up on a server. Resource packs and shaders are always client-only, and a server build leaves them out.
 
 ## Overrides
 
-Overrides are folders of files copied into a build on top of the mods: configs, resource packs, scripts. A target lists its layers in order and later layers win, so a shared `overrides/common` can sit under a `overrides/server`. Files ending in `.tmpl` have `${name}` replaced with the target's [`variables`](/docs/manifest#variables) and are written without the suffix.
+Overrides are folders of files copied into a build on top of the mods: configs, resource packs, scripts. The folders are fixed by convention, and each is used only if it exists: `overrides/` goes into both sides, `client-overrides/` and `server-overrides/` into one, and `<feature>-overrides/` (or the path the feature's `overrides` names) into a build while that feature is on. Later folders win, in that order, with features in name order, so a shared config can sit under a server-only one. Files ending in `.tmpl` have `${name}` replaced with the side's [`variables`](/docs/manifest#variables) and are written without the suffix.
 
 Some files are generated instead of copied: `server.properties`, `options.txt`, and the whitelist, ops, and ban lists from `shulker.json`, and a shader mod's `iris.properties` from the shader you locked.
 
@@ -33,7 +31,7 @@ Each build records what it wrote in `.shulker/state.json` in the build directory
 - A file you edited is kept, as long as its source hasn't changed.
 - If the file changed in both places, or a file shulker didn't write is in the way, the build stops and lists it. Use `shulker build --force` to overwrite.
 - Generated files like `server.properties` merge per key, so a key you edited in-game and a key you changed in `shulker.json` both apply. If both changed the same key, `shulker.json` wins and the build warns.
-- A `.properties` file in your overrides merges per key too. shulker manages only the keys it lists, and leaves any others a mod writes alone. A file the mod wrote first gets those keys merged in instead of stopping the build. List a path in the target's [`wholeFiles`](/docs/manifest) to copy it whole instead.
+- A `.properties` file in your overrides merges per key too. shulker manages only the keys it lists, and leaves any others a mod writes alone. A file the mod wrote first gets those keys merged in instead of stopping the build. List a path in the side's [`wholeFiles`](/docs/manifest) to copy it whole instead.
 
 Use [`shulker diff`](/docs/cli#shulker-diff) to see what changed, and [`shulker pull`](/docs/cli#shulker-pull) to copy those edits back into your overrides or `shulker.json` so they're part of the project.
 

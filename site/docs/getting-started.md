@@ -24,7 +24,7 @@ The installer downloads the latest release, checks it against the published SHA2
 
 ## Create a project
 
-In an empty directory, create a manifest with the latest Minecraft release, Fabric, and a client target:
+In an empty directory, create a manifest with the latest Minecraft release, Fabric, and a client side:
 
 ```sh
 shulker init --yes --loader fabric
@@ -65,10 +65,9 @@ shulker link mojang https://github.com/shulker-sh/base-pack.git
 
 ## Run a server
 
-Add a server target, then build and start it in one step:
+Declare a server side by adding `"server": {}` to `shulker.json`, then build and start it in one step:
 
 ```sh
-shulker target add server
 shulker serve
 ```
 
@@ -76,6 +75,6 @@ The first run asks you to accept the [Minecraft EULA](https://aka.ms/MinecraftEU
 
 ## Next steps
 
-- [Concepts](/docs/concepts) explains manifests, locks, targets, and modpacks.
+- [Concepts](/docs/concepts) explains manifests, locks, sides, and modpacks.
 - The [CLI reference](/docs/cli) covers every command.
 - The [manifest reference](/docs/manifest) lists every field in `shulker.json`.

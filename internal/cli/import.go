@@ -156,11 +156,11 @@ func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []str
 	m := &copied
 	ml := arc.Marker.Lock
 	if ml.Minecraft != minecraft {
-		warnings = append(warnings, fmt.Sprintf("the marker was locked to Minecraft %s but the pack targets %s; using %s", ml.Minecraft, minecraft, minecraft))
+		warnings = append(warnings, fmt.Sprintf("the marker was locked to Minecraft %s but the pack is for %s; using %s", ml.Minecraft, minecraft, minecraft))
 		m.Minecraft = minecraft
 	}
 	if ml.Loader.Type != loaderType || ml.Loader.Version != loaderVersion {
-		warnings = append(warnings, fmt.Sprintf("the marker was locked to %s but the pack targets %s; using the pack's", loader.Describe(ml.Loader.Type, ml.Loader.Version), loader.Describe(loaderType, loaderVersion)))
+		warnings = append(warnings, fmt.Sprintf("the marker was locked to %s but the pack is for %s; using the pack's", loader.Describe(ml.Loader.Type, ml.Loader.Version), loader.Describe(loaderType, loaderVersion)))
 		m.Loader = manifest.Loader{Type: loaderType, Version: loaderVersion}
 	}
 	if m.Version != arc.Index.VersionID {

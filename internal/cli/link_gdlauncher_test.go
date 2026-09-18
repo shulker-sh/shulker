@@ -66,7 +66,7 @@ func TestLinkGDLauncher(t *testing.T) {
 		h.mustRun(t, "sync", h.dir, "--side", "client", "--into", ".")
 	})
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
-		t.Fatalf("the pre-launch sync target should hold the mods: %v", err)
+		t.Fatalf("the pre-launch sync directory should hold the mods: %v", err)
 	}
 	if st := build.LoadState(gameDir); st.Source != h.dir {
 		t.Fatalf("state origin: %+v", st.Origin)
