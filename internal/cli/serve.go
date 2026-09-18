@@ -129,7 +129,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep, err := b.Build("server", build.Options{Dir: buildDir(p, "server"), Force: force})
+			rep, err := b.Build("server", build.Options{Force: force})
 			if err != nil {
 				return err
 			}
@@ -140,9 +140,9 @@ func (a *app) serveCmd() *cobra.Command {
 			if err := cmd.Context().Err(); err != nil {
 				return err
 			}
-			dir := buildDir(p, "server")
+			dir := rep.Dir
 			launchArgs := server.Command(jvm, build.LaunchArgs(p.Lock))
-			a.progress("starting %s in %s with %s", "server", dir, java)
+			a.progress("starting server in %s with %s", dir, java)
 			a.printer.Settle()
 
 			interrupt := make(chan os.Signal, 2)

@@ -57,8 +57,7 @@ type Feature struct {
 	Name    string   `json:"name"`
 	Mods    []string `json:"mods"`
 	Default bool     `json:"default"`
-	// Origin is the pulled pack that declares the feature, empty for the project.
-	Origin string `json:"origin,omitempty"`
+	Origin  string   `json:"origin,omitempty"`
 }
 
 func (b *Builder) Features() []Feature {

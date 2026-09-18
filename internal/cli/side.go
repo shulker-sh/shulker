@@ -8,17 +8,12 @@ import (
 	"shulker.sh/shulker/internal/project"
 )
 
-var sideNames = []string{"client", "server"}
-
-func isSide(name string) bool { return name == "client" || name == "server" }
-
-// checkSide reads a side out of a positional argument or a --side flag.
 func checkSide(name, flag string) error {
-	if isSide(name) {
+	if manifest.IsSide(name) {
 		return nil
 	}
-	e := out.Errorf("usage", "%q is not a side", name)
-	e.Candidates, e.Given, e.Flag = sideNames, name, flag
+	e := manifest.NotASide(name)
+	e.Flag = flag
 	return e
 }
 
@@ -41,8 +36,6 @@ func ambiguousSide(sides []string, flag string) error {
 	return e
 }
 
-// declaredSide is a side a flag or argument names, which the manifest must
-// declare.
 func declaredSide(m *manifest.Manifest, name, flag string) (string, error) {
 	if err := checkSide(name, flag); err != nil {
 		return "", err
@@ -53,8 +46,6 @@ func declaredSide(m *manifest.Manifest, name, flag string) (string, error) {
 	return name, nil
 }
 
-// projectSides is the sides a local build command works on: the one named
-// positionally, or every side the manifest declares.
 func projectSides(p *project.Project, args []string) ([]string, error) {
 	if len(args) == 0 {
 		return p.Manifest.Sides(), nil
@@ -66,8 +57,6 @@ func projectSides(p *project.Project, args []string) ([]string, error) {
 	return []string{side}, nil
 }
 
-// singleSide is the one side a command builds: the one --side names, or the
-// only side the manifest declares.
 func singleSide(p *project.Project, want string) (string, error) {
 	if want != "" {
 		return declaredSide(p.Manifest, want, "--side")
@@ -88,8 +77,6 @@ func noClient() error {
 	return e
 }
 
-// clientSide is the side a launcher-facing command builds: the declared
-// client, or with --assume-client one built from what both sides share.
 func (a *app) clientSide(m *manifest.Manifest, assume bool) (string, error) {
 	if m.HasSide("client") {
 		return "client", nil
@@ -101,8 +88,6 @@ func (a *app) clientSide(m *manifest.Manifest, assume bool) (string, error) {
 	return "client", nil
 }
 
-// syncSide is the side sync builds: the client --assume-client stands in for,
-// the one --side names, or the only declared side.
 func (a *app) syncSide(p *project.Project, want string, assume bool) (string, error) {
 	switch {
 	case assume && want == "server":
@@ -115,8 +100,6 @@ func (a *app) syncSide(p *project.Project, want string, assume bool) (string, er
 	return singleSide(p, want)
 }
 
-// exportSides is what export mrpack packs: every declared side, plus the
-// client --assume-client stands in for, narrowed to the one --side names.
 func (a *app) exportSides(m *manifest.Manifest, want string, assume bool) ([]string, error) {
 	sides := m.Sides()
 	if assume && !m.HasSide("client") {

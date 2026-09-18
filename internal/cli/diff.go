@@ -18,7 +18,7 @@ import (
 // into: the links registry first, then any left in shulker.local.json by a
 // shulker that recorded them there. Directories that are gone are skipped.
 func (a *app) buildDirs(p *project.Project, lf *local.File, side string) (string, []string, error) {
-	buildDir, err := filepath.Abs(buildDir(p, side))
+	buildDir, err := filepath.Abs(filepath.Join(p.Dir, p.Manifest.BuildDir(side)))
 	if err != nil {
 		return "", nil, err
 	}

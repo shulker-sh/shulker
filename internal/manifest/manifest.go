@@ -142,6 +142,13 @@ func (o *FeatureOverrides) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (o FeatureOverrides) For(side string) string {
+	if side == "client" {
+		return o.Client
+	}
+	return o.Server
+}
+
 func (o FeatureOverrides) MarshalJSON() ([]byte, error) {
 	if o.Both != "" {
 		return json.Marshal(o.Both)
@@ -360,47 +367,57 @@ func (m *Manifest) Save(path string) error {
 	return fsutil.Write(path, data)
 }
 
-// Sides names the sides the manifest declares, client first. A side is
-// declared by its block: "client": {} is a client.
+var SideNames = []string{"client", "server"}
+
+func IsSide(name string) bool { return name == "client" || name == "server" }
+
+func NotASide(name string) *out.Error {
+	e := out.Errorf("usage", "%q is not a side", name)
+	e.Candidates, e.Given = SideNames, name
+	return e
+}
+
+type sideBlock struct {
+	Name      string
+	Build     string
+	Variables Variables
+}
+
+func (m *Manifest) side(side string) (sideBlock, bool) {
+	switch {
+	case side == "client" && m.Client != nil:
+		return sideBlock{m.Client.Name, m.Client.Build, m.Client.Variables}, true
+	case side == "server" && m.Server != nil:
+		return sideBlock{m.Server.Name, m.Server.Build, m.Server.Variables}, true
+	}
+	return sideBlock{}, false
+}
+
 func (m *Manifest) Sides() []string {
 	var sides []string
-	if m.Client != nil {
-		sides = append(sides, "client")
-	}
-	if m.Server != nil {
-		sides = append(sides, "server")
+	for _, side := range SideNames {
+		if m.HasSide(side) {
+			sides = append(sides, side)
+		}
 	}
 	return sides
 }
 
 func (m *Manifest) HasSide(side string) bool {
-	switch side {
-	case "client":
-		return m.Client != nil
-	case "server":
-		return m.Server != nil
-	}
-	return false
+	_, ok := m.side(side)
+	return ok
 }
 
-// DisplayName is what launchers show for the side: its block name, else the
-// manifest name.
 func (m *Manifest) DisplayName(side string) string {
-	if side == "client" && m.Client != nil && m.Client.Name != "" {
-		return m.Client.Name
-	}
-	if side == "server" && m.Server != nil && m.Server.Name != "" {
-		return m.Server.Name
+	if b, ok := m.side(side); ok && b.Name != "" {
+		return b.Name
 	}
 	return m.Name
 }
 
 func (m *Manifest) BuildDir(side string) string {
-	if side == "client" && m.Client != nil && m.Client.Build != "" {
-		return m.Client.Build
-	}
-	if side == "server" && m.Server != nil && m.Server.Build != "" {
-		return m.Server.Build
+	if b, ok := m.side(side); ok && b.Build != "" {
+		return b.Build
 	}
 	return "build/" + side
 }
@@ -422,16 +439,11 @@ func (m *Manifest) InPlaceSide() (string, bool) {
 	return "", false
 }
 
-// SideVariables is the project's variables with the side block's layered over
-// them.
 func (m *Manifest) SideVariables(side string) Variables {
 	vars := Variables{}
 	maps.Copy(vars, m.Variables)
-	switch {
-	case side == "client" && m.Client != nil:
-		maps.Copy(vars, m.Client.Variables)
-	case side == "server" && m.Server != nil:
-		maps.Copy(vars, m.Server.Variables)
+	if b, ok := m.side(side); ok {
+		maps.Copy(vars, b.Variables)
 	}
 	return vars
 }

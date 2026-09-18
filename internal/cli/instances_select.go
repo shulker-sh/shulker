@@ -25,8 +25,6 @@ func (s *instanceSelection) register(cmd *cobra.Command, all string) {
 	s.registerWith(cmd, all, "only client or server instances")
 }
 
-// registerWith lets a command whose --side also means something with a source
-// describe both readings in one flag.
 func (s *instanceSelection) registerWith(cmd *cobra.Command, all, side string) {
 	cmd.Flags().StringVar(&s.launcher, "launcher", "", "only instances linked in this launcher: "+launcher.NameList())
 	cmd.Flags().StringVar(&s.side, "side", "", side)

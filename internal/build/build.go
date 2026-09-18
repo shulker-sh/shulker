@@ -370,18 +370,16 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		}
 		return false
 	}
-	for _, l := range b.overrideLayers(side, cond) {
-		if err := b.layer(l, vars, whole, desired, report); err != nil {
+	for _, l := range b.overrideLayers(side, cond, vars) {
+		if err := b.layer(l, whole, desired, report); err != nil {
 			return nil, nil, err
 		}
 	}
 	return desired, dirs, nil
 }
 
-// overrideLayer is one override folder, in the order it is laid down.
 type overrideLayer struct {
-	root string
-	// label names the folder in messages, prefixed with the pack it came from.
+	root    string
 	label   string
 	pack    string
 	feature string
@@ -392,7 +390,7 @@ type overrideLayer struct {
 // order: each pulled pack's folders in requires order, then the project's, and
 // within each the shared folder, the side's, then the enabled features in name
 // order. A folder that doesn't exist is skipped when it is walked.
-func (b *Builder) overrideLayers(side string, cond conditions) []overrideLayer {
+func (b *Builder) overrideLayers(side string, cond conditions, vars map[string]string) []overrideLayer {
 	var layers []overrideLayer
 	add := func(m *manifest.Manifest, dir, pack string, vars map[string]string) {
 		label := func(folder string) string {
@@ -413,7 +411,6 @@ func (b *Builder) overrideLayers(side string, cond conditions) []overrideLayer {
 			}
 		}
 	}
-	vars := b.Manifest.SideVariables(side).Text()
 	for _, pk := range b.Packs {
 		if pk.Dir == "" {
 			continue
@@ -427,8 +424,6 @@ func (b *Builder) overrideLayers(side string, cond conditions) []overrideLayer {
 	return layers
 }
 
-// featureFolders is where a feature's override files live for the side: the
-// folder it shares between sides, then the one for this side alone.
 func featureFolders(name string, f manifest.Feature, side string) []string {
 	var folders []string
 	switch {
@@ -437,20 +432,14 @@ func featureFolders(name string, f manifest.Feature, side string) []string {
 	case f.Overrides.Client == "" && f.Overrides.Server == "":
 		folders = append(folders, name+"-overrides")
 	}
-	if side == "client" && f.Overrides.Client != "" {
-		folders = append(folders, f.Overrides.Client)
-	}
-	if side == "server" && f.Overrides.Server != "" {
-		folders = append(folders, f.Overrides.Server)
+	if own := f.Overrides.For(side); own != "" {
+		folders = append(folders, own)
 	}
 	return folders
 }
 
-func (b *Builder) layer(l overrideLayer, vars map[string]string, whole func(string) bool, desired map[string]source, report *Report) error {
-	root, label, pack := l.root, l.label, l.pack
-	if l.vars != nil {
-		vars = l.vars
-	}
+func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[string]source, report *Report) error {
+	root, label, pack, vars := l.root, l.label, l.pack, l.vars
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && path == root {

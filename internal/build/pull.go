@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/near"
 	"shulker.sh/shulker/internal/out"
 )
@@ -41,12 +42,12 @@ type PullReport struct {
 	ManifestChanged bool     `json:"manifestChanged"`
 }
 
-func (b *Builder) Diff(name string, opts Options) (*DiffReport, error) {
-	d, err := b.drift(name, opts)
+func (b *Builder) Diff(side string, opts Options) (*DiffReport, error) {
+	d, err := b.drift(side, opts)
 	if err != nil {
 		return nil, err
 	}
-	report := &DiffReport{Side: name, Dir: d.dir, Files: []FileDiff{}, Warnings: d.warnings}
+	report := &DiffReport{Side: side, Dir: d.dir, Files: []FileDiff{}, Warnings: d.warnings}
 	for _, f := range d.plans {
 		if !drifted(f) {
 			continue
@@ -88,10 +89,10 @@ func projectSide(f planned) keyMerge {
 
 // checkNamed runs before any build work, so a file name that isn't in the directory at all is
 // reported as missing rather than as unchanged.
-func (b *Builder) checkNamed(name string, files []string, opts Options) error {
+func (b *Builder) checkNamed(side string, files []string, opts Options) error {
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
+		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
 	}
 	if _, err := os.Stat(dir); err != nil {
 		return nil
@@ -133,38 +134,36 @@ func listFiles(dir string) ([]string, error) {
 	return files, err
 }
 
-// PullRequest is what a pull copies back: the named files (every changed file
-// when empty), the .properties keys to start managing, and the override folder
-// to write into. An empty To keeps a file where it already lives and puts a new
-// one in overrides/.
+// Empty Files means every changed file; empty To keeps a file where it lives
+// and puts a new one in overrides/.
 type PullRequest struct {
 	Files []string
 	Keys  []string
 	To    string
 }
 
-func (b *Builder) Pull(name string, req PullRequest, opts Options) (*PullReport, error) {
+func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport, error) {
 	files, adopt := req.Files, req.Keys
 	if len(adopt) > 0 && len(files) != 1 {
 		return nil, out.Errorf("usage", "--key needs exactly one file")
 	}
-	toDir, err := b.pullDest(name, req.To)
+	toDir, err := b.pullDest(side, req.To)
 	if err != nil {
 		return nil, err
 	}
-	if err := b.checkNamed(name, files, opts); err != nil {
+	if err := b.checkNamed(side, files, opts); err != nil {
 		return nil, err
 	}
-	d, err := b.drift(name, opts)
+	d, err := b.drift(side, opts)
 	if err != nil {
 		return nil, err
 	}
 	dir, desired, prev, plans := d.dir, d.desired, d.prev, d.plans
-	report := &PullReport{Side: name, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Skipped: []string{}, Warnings: d.warnings}
+	report := &PullReport{Side: side, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Skipped: []string{}, Warnings: d.warnings}
 	var pulled []string
 	if len(adopt) > 0 {
 		rel := filepath.ToSlash(filepath.Clean(files[0]))
-		if err := b.adoptKeys(name, rel, adopt, d, report); err != nil {
+		if err := b.adoptKeys(rel, adopt, d, report); err != nil {
 			return nil, err
 		}
 		files, plans, pulled = nil, nil, []string{rel}
@@ -182,7 +181,7 @@ func (b *Builder) Pull(name string, req PullRequest, opts Options) (*PullReport,
 		if f, ok := byPath[rel]; !ok {
 			fresh = append(fresh, rel)
 		} else if !drifted(f) {
-			e := out.Errorf("not-drifted", "%s is not changed in the build directory of %s", rel, name)
+			e := out.Errorf("not-drifted", "%s is not changed in the build directory of %s", rel, side)
 			e.Candidates, e.Given = driftedPaths(plans), rel
 			return nil, e
 		}
@@ -283,7 +282,7 @@ func (b *Builder) Pull(name string, req PullRequest, opts Options) (*PullReport,
 	if len(pulled) == 0 {
 		return report, nil
 	}
-	desired, _, err = b.collect(name, opts, &Report{})
+	desired, _, err = b.collect(side, opts, &Report{})
 	if err != nil {
 		return nil, err
 	}
@@ -304,20 +303,18 @@ func (b *Builder) Pull(name string, req PullRequest, opts Options) (*PullReport,
 	return report, nil
 }
 
-// pullDest is the override folder --to names: a side's folder, or a declared
-// feature's folder for the side being pulled from.
 func (b *Builder) pullDest(side, to string) (string, error) {
 	if to == "" {
 		return "", nil
 	}
-	if to == "client" || to == "server" {
+	if manifest.IsSide(to) {
 		return filepath.Join(b.Dir, to+"-overrides"), nil
 	}
 	features := slices.Sorted(maps.Keys(b.Manifest.Features))
 	f, ok := b.Manifest.Features[to]
 	if !ok {
 		e := out.Errorf("usage", "%q is neither a side nor a feature", to)
-		e.Candidates, e.Given, e.Flag = append([]string{"client", "server"}, features...), to, "--to"
+		e.Candidates, e.Given, e.Flag = slices.Concat(manifest.SideNames, features), to, "--to"
 		return "", e
 	}
 	folders := featureFolders(to, f, side)
@@ -336,7 +333,6 @@ type drift struct {
 }
 
 func (b *Builder) drift(side string, opts Options) (*drift, error) {
-	name := side
 	dir := opts.Dir
 	if dir == "" {
 		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
@@ -352,7 +348,7 @@ func (b *Builder) drift(side string, opts Options) (*drift, error) {
 			e.Flag = "--into"
 			return nil, e
 		}
-		return nil, out.Errorf("not-built", "%s has no build directory; run `shulker build`", name)
+		return nil, out.Errorf("not-built", "%s has no build directory; run `shulker build`", side)
 	}
 	prev, stateErr := ReadState(dir)
 	if stateErr != nil {
@@ -430,7 +426,7 @@ func writeProperties(dest string, set properties) error {
 	return fsutil.Write(dest, set.mergeInto(data, "=", nil))
 }
 
-func (b *Builder) adoptKeys(name, rel string, keys []string, d *drift, report *PullReport) error {
+func (b *Builder) adoptKeys(rel string, keys []string, d *drift, report *PullReport) error {
 	if !strings.HasSuffix(rel, ".properties") {
 		return out.Errorf("usage", "--key works on .properties files, not %s", rel)
 	}

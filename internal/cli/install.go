@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
@@ -59,7 +58,7 @@ func (a *app) installCmd() *cobra.Command {
 			sides := p.Manifest.Sides()
 			res := installResult{Fetched: fetched}
 			for _, side := range sides {
-				rep, err := b.Build(side, build.Options{Dir: buildDir(p, side), Force: force, OS: osName, Features: overrides})
+				rep, err := b.Build(side, build.Options{Force: force, OS: osName, Features: overrides})
 				if err != nil {
 					return err
 				}
@@ -143,9 +142,4 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 	}
 	a.warn(v.Warnings)
 	return fetched, nil
-}
-
-// buildDir is where a side builds, which is what the build engine takes.
-func buildDir(p *project.Project, side string) string {
-	return filepath.Join(p.Dir, p.Manifest.BuildDir(side))
 }

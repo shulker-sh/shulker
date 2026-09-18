@@ -50,9 +50,6 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 			if e.Side == "" {
 				e.Side = side
 			}
-			if e.Side == "" {
-				e.Side = side
-			}
 			all = append(all, e)
 		}
 	}

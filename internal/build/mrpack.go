@@ -131,10 +131,8 @@ func (b *Builder) mrpackSides(names []string) ([]*mrpackSide, error) {
 	var sides []*mrpackSide
 	seen := map[string]bool{}
 	for _, name := range names {
-		if name != "client" && name != "server" {
-			e := out.Errorf("usage", "%q is not a side", name)
-			e.Candidates, e.Given = []string{"client", "server"}, name
-			return nil, e
+		if !manifest.IsSide(name) {
+			return nil, manifest.NotASide(name)
 		}
 		if seen[name] {
 			continue
@@ -145,8 +143,6 @@ func (b *Builder) mrpackSides(names []string) ([]*mrpackSide, error) {
 	return sides, nil
 }
 
-// mrpackName is the name the Modrinth app shows. A pack carrying the client is
-// named for it; a server-only export keeps the server's own name.
 func (b *Builder) mrpackName(sides []*mrpackSide) string {
 	pick := sides[0].side
 	for _, t := range sides {
