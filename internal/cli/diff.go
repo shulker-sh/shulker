@@ -136,7 +136,7 @@ func (a *app) diffCmd() *cobra.Command {
 }
 
 func (a *app) pullCmd() *cobra.Command {
-	var side, into string
+	var side, into, to string
 	var keys []string
 	cmd := &cobra.Command{
 		Use:   "pull [file...]",
@@ -168,7 +168,7 @@ func (a *app) pullCmd() *cobra.Command {
 			} else if into, err = a.pullSource(b, p, lf, side, args); err != nil {
 				return err
 			}
-			rep, err := b.Pull(side, args, keys, build.Options{Dir: into, Features: lf.Features})
+			rep, err := b.Pull(side, build.PullRequest{Files: args, Keys: keys, To: to}, build.Options{Dir: into, Features: lf.Features})
 			if err != nil {
 				return err
 			}
@@ -201,6 +201,7 @@ func (a *app) pullCmd() *cobra.Command {
 	cmd.Flags().StringVar(&side, "side", "", "side whose build directory to pull from (default: the only declared side)")
 	cmd.Flags().StringVar(&into, "into", "", "directory the side was synced into (default: whichever of the build directory and its sync directories has edits)")
 	cmd.Flags().StringArrayVar(&keys, "key", nil, "start managing this key of the named .properties file; repeat for more")
+	cmd.Flags().StringVar(&to, "to", "", "override folder to write into: client, server, or a feature name (default: where the file already lives, or overrides/ for a new one)")
 	return cmd
 }
 

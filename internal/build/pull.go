@@ -133,9 +133,24 @@ func listFiles(dir string) ([]string, error) {
 	return files, err
 }
 
-func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullReport, error) {
+// PullRequest is what a pull copies back: the named files (every changed file
+// when empty), the .properties keys to start managing, and the override folder
+// to write into. An empty To keeps a file where it already lives and puts a new
+// one in overrides/.
+type PullRequest struct {
+	Files []string
+	Keys  []string
+	To    string
+}
+
+func (b *Builder) Pull(name string, req PullRequest, opts Options) (*PullReport, error) {
+	files, adopt := req.Files, req.Keys
 	if len(adopt) > 0 && len(files) != 1 {
 		return nil, out.Errorf("usage", "--key needs exactly one file")
+	}
+	toDir, err := b.pullDest(name, req.To)
+	if err != nil {
+		return nil, err
 	}
 	if err := b.checkNamed(name, files, opts); err != nil {
 		return nil, err
@@ -162,12 +177,33 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 	for _, f := range plans {
 		byPath[f.rel] = f
 	}
-	for rel := range named {
-		if !drifted(byPath[rel]) {
+	var fresh []string
+	for _, rel := range slices.Sorted(maps.Keys(named)) {
+		if f, ok := byPath[rel]; !ok {
+			fresh = append(fresh, rel)
+		} else if !drifted(f) {
 			e := out.Errorf("not-drifted", "%s is not changed in the build directory of %s", rel, name)
 			e.Candidates, e.Given = driftedPaths(plans), rel
 			return nil, e
 		}
+	}
+	for _, rel := range fresh {
+		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
+		if err != nil {
+			return nil, err
+		}
+		dest := filepath.Join(b.Dir, "overrides", filepath.FromSlash(rel))
+		if toDir != "" {
+			dest = filepath.Join(toDir, filepath.FromSlash(rel))
+		}
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return nil, err
+		}
+		if err := fsutil.Write(dest, data); err != nil {
+			return nil, err
+		}
+		report.Pulled = append(report.Pulled, rel+" -> "+b.relPath(dest))
+		pulled = append(pulled, rel)
 	}
 	for _, f := range plans {
 		if !drifted(f) || (len(named) > 0 && !named[f.rel]) {
@@ -225,6 +261,9 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 			report.Skipped = append(report.Skipped, f.rel+" (managed by the lock)")
 			continue
 		}
+		if toDir != "" {
+			dest = filepath.Join(toDir, filepath.FromSlash(f.rel))
+		}
 		if src.managed != nil {
 			keys := b.pullKeys(f.rel, src.managed.(propsFile), existing)
 			report.Keys = append(report.Keys, keys...)
@@ -263,6 +302,29 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 		return nil, err
 	}
 	return report, nil
+}
+
+// pullDest is the override folder --to names: a side's folder, or a declared
+// feature's folder for the side being pulled from.
+func (b *Builder) pullDest(side, to string) (string, error) {
+	if to == "" {
+		return "", nil
+	}
+	if to == "client" || to == "server" {
+		return filepath.Join(b.Dir, to+"-overrides"), nil
+	}
+	features := slices.Sorted(maps.Keys(b.Manifest.Features))
+	f, ok := b.Manifest.Features[to]
+	if !ok {
+		e := out.Errorf("usage", "%q is neither a side nor a feature", to)
+		e.Candidates, e.Given, e.Flag = append([]string{"client", "server"}, features...), to, "--to"
+		return "", e
+	}
+	folders := featureFolders(to, f, side)
+	if len(folders) == 0 {
+		return "", out.Errorf("usage", "feature %s has no override folder for the %s side", to, side)
+	}
+	return filepath.Join(b.Dir, folders[len(folders)-1]), nil
 }
 
 type drift struct {

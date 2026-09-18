@@ -486,7 +486,7 @@ shulker diff server --into /srv/minecraft
 
 ### `shulker pull`
 
-Copy edits made in a build directory back into their source, an override file or keys in shulker.json, so the next build keeps them. With no files, pulls every changed file. Paths are relative to the build directory. For a `.properties` override, only the keys it lists are pulled; name more with `--key` to start managing them.
+Copy edits made in a build directory back into their source, an override file or keys in shulker.json, so the next build keeps them. With no files, pulls every changed file. Paths are relative to the build directory. A file some override folder already holds is updated there; a file no folder holds yet goes to `overrides/`, and `--to` names another folder instead. For a `.properties` override, only the keys it lists are pulled; name more with `--key` to start managing them.
 
 ```sh
 shulker pull
@@ -499,6 +499,7 @@ shulker pull config/iris.properties --key colorSpace
 | `--side <side>` | Side whose build directory to pull from (default: the only declared side) |
 | `--into <path>` | Directory the side was synced into (default: the build directory and every directory `sync` recorded) |
 | `--key <key>` | Start managing this key of the one named `.properties` file, copying its current value into the override; repeat for more |
+| `--to <side\|feature>` | Override folder to write into: `client` or `server` for that side's folder, or a feature name for its folder (default: where the file already lives, or `overrides/` for a new one) |
 
 ### `shulker history list`
 
