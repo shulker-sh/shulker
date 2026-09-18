@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
@@ -115,19 +114,12 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 			}
 		}
 		if p.Manifest.Java == "" {
-			rt, err := a.managedJava(ctx, p, true)
-			if err != nil && fetch.IsNetwork(err) {
-				a.printer.Drop()
-				if kept, keptErr := a.managedJava(ctx, p, false); keptErr == nil {
-					rt, err = kept, nil
-					a.printer.Warn("offline, keeping the installed Java runtime %s %s", kept.Component, kept.Version)
-				}
-			}
+			rt, err := a.freshestJava(ctx, p, serverJavaFix)
 			if err != nil && out.CodeOf(err) != "runtime-unavailable" {
 				return nil, err
 			}
 			if err != nil {
-				a.printer.Warn("%s", err)
+				a.printer.Warn("%s", runtimeWarning(err))
 			} else if rt.Fetched {
 				fetched = append(fetched, rt.Component+" "+rt.Version)
 			}

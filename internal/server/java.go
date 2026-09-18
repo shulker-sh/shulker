@@ -21,11 +21,17 @@ type Java struct {
 
 var versionLine = regexp.MustCompile(`version "([^"]+)"`)
 
-func JavaAt(home string) (Java, error) {
+// JavaBin is the java executable under a runtime home.
+func JavaBin(home string) string {
 	bin := filepath.Join(home, "bin", "java")
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
+	return bin
+}
+
+func JavaAt(home string) (Java, error) {
+	bin := JavaBin(home)
 	if _, err := exec.LookPath(bin); err != nil {
 		return Java{}, out.Errorf("java-not-found", "no java executable under %s (looked for %s)", home, bin)
 	}

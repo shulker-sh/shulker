@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/meta"
 )
 
@@ -135,4 +136,115 @@ func (h *harness) readRuntimeMarker(t *testing.T) map[string]any {
 		t.Fatal(err)
 	}
 	return m
+}
+
+func writeMojangLauncher(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "launcher_profiles.json"), []byte(`{"profiles": {}, "version": 3}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func resolvedJava(t *testing.T, dir string) string {
+	t.Helper()
+	f, err := instance.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Resolved == nil {
+		return ""
+	}
+	return f.Resolved.Java
+}
+
+func TestLinkMojangRecordsTheManagedRuntime(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	launcherDir := writeMojangLauncher(t)
+	gameDir := filepath.Join(h.dir, "build", "client")
+	managed := filepath.Join(h.managedJavaDir(), filepath.FromSlash(runtimeHome), "bin", "java")
+
+	_, stderr := h.mustRunStderr(t, "link", "mojang", "--launcher-dir", launcherDir)
+	if !strings.Contains(stderr, "downloaded Java runtime 25.0.1") {
+		t.Fatalf("link should download the runtime on its own line:\n%s", stderr)
+	}
+	if got := resolvedJava(t, gameDir); got != managed {
+		t.Fatalf("resolved.java = %q, want %q", got, managed)
+	}
+
+	if err := os.RemoveAll(h.managedJavaDir()); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr = h.mustRunStderr(t, "sync")
+	if !strings.Contains(stderr, "downloaded Java runtime 25.0.1") {
+		t.Fatalf("a sync should ensure the runtime again:\n%s", stderr)
+	}
+	if got := resolvedJava(t, gameDir); got != managed {
+		t.Fatalf("resolved.java after sync = %q, want %q", got, managed)
+	}
+
+	_, stderr = h.mustRunStderr(t, "sync", "--offline")
+	if !strings.Contains(stderr, "offline, keeping the installed Java runtime java-runtime-epsilon 25.0.1") {
+		t.Fatalf("an offline sync should keep the installed runtime:\n%s", stderr)
+	}
+	if got := resolvedJava(t, gameDir); got != managed {
+		t.Fatalf("resolved.java offline = %q, want %q", got, managed)
+	}
+}
+
+func TestClientJavaSettingStandsInForTheRuntime(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	launcherDir := writeMojangLauncher(t)
+	gameDir := filepath.Join(h.dir, "build", "client")
+	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
+	f, err := instance.Load(gameDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Settings.Java = "/opt/java/bin/java"
+	if err := f.Save(gameDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(h.managedJavaDir()); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "sync")
+	if got := resolvedJava(t, gameDir); got != "/opt/java/bin/java" {
+		t.Fatalf("resolved.java = %q, want the java setting", got)
+	}
+	if _, err := os.Stat(h.managedJavaDir()); err == nil {
+		t.Fatal("a java setting should stop the runtime download")
+	}
+}
+
+func TestLinkMojangNamesTheJavaFlagWhenNoRuntimeExists(t *testing.T) {
+	h := newHarness(t)
+	h.runtime.missing = true
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	launcherDir := writeMojangLauncher(t)
+	code, stdout, stderr := h.run(t, "link", "mojang", "--launcher-dir", launcherDir)
+	if code == 0 || !strings.Contains(stderr, "runtime-unavailable") || !strings.Contains(stderr, "Fix: shulker link mojang --java <path>") {
+		t.Fatalf("link should fail with the link fix: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	if strings.Contains(stderr, "shulker.json") {
+		t.Fatalf("a client should not be told to edit shulker.json:\n%s", stderr)
+	}
+}
+
+func TestOtherLaunchersBringTheirOwnJava(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Friends")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
+	if got := resolvedJava(t, gameDir); got != "" {
+		t.Fatalf("a Prism instance should record no runtime, got %q", got)
+	}
+	if _, err := os.Stat(h.managedJavaDir()); err == nil {
+		t.Fatal("a Prism link should not download the runtime")
+	}
 }

@@ -101,14 +101,6 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			if !ok {
 				return nil
 			}
-			java := f.Settings.Java
-			if java == "" && f.Resolved != nil {
-				java = f.Resolved.Java
-			}
-			if java == "" {
-				a.printer.Warn("%s records no Java to run the game with; run shulker instances repair", instance.Path(dir))
-				return nil
-			}
 			if launching && f.Settings.PreLaunch() {
 				a.stampLaunch(dir, f.Settings)
 				if res, err := a.syncForLaunch(cmd, dir); err != nil {
@@ -116,6 +108,17 @@ func (a *app) hookWrapCmd() *cobra.Command {
 				} else if err := a.printer.Emit(res, res.print); err != nil {
 					return err
 				}
+				if synced, err := instance.Load(dir); err == nil {
+					f = synced
+				}
+			}
+			java := f.Settings.Java
+			if java == "" && f.Resolved != nil {
+				java = f.Resolved.Java
+			}
+			if java == "" {
+				a.printer.Warn("%s records no Java to run the game with; run shulker instances repair", instance.Path(dir))
+				return nil
 			}
 			exe, args := java, argv
 			if w := f.Settings.Wrapper; len(w) > 0 {
@@ -239,18 +242,20 @@ func (a *app) stampLaunch(dir string, s instance.Settings) {
 // instanceID is the id `-i` takes for a directory, for the message that names it. Empty when the
 // registry can't be read, which only costs the message its command.
 func (a *app) instanceID(dir string) string {
-	path, err := a.registryFile()
+	in, _ := a.registeredInstance(dir)
+	return in.ID
+}
+
+// registeredInstance is the registry row for a directory, when there is one.
+func (a *app) registeredInstance(dir string) (config.Instance, bool) {
+	instances, err := a.loadInstances()
 	if err != nil {
-		return ""
-	}
-	instances, err := config.LoadInstances(path)
-	if err != nil {
-		return ""
+		return config.Instance{}, false
 	}
 	if i, ok := config.FindInstance(instances, dir); ok {
-		return instances[i].ID
+		return instances[i], true
 	}
-	return ""
+	return config.Instance{}, false
 }
 
 // updatePaused is shown by GDLauncher as the failed task's error, in a dialog rather than a

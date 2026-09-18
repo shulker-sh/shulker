@@ -247,6 +247,11 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if err := a.installServerLoader(ctx, p, rep); err != nil {
 		return syncResult{}, err
 	}
+	if rt, err := a.recordClientRuntime(ctx, p, side, into); err != nil {
+		return syncResult{}, err
+	} else if rt.Fetched {
+		fetched = append(fetched, rt.Component+" "+rt.Version)
+	}
 	recorded := !remote && !ownBuild && lf.RecordSyncDir(side, into)
 	a.refreshLocal(lf, !remote, recorded)
 	if !remote {

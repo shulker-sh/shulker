@@ -134,6 +134,11 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				return err
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name})
+			if !src.remote() {
+				if _, err := a.recordClientRuntime(cmd.Context(), p, side, gameDir); err != nil {
+					return err
+				}
+			}
 			if src.remote() {
 				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: gameDir, assumeClient: assumeClient})
 				if err != nil {

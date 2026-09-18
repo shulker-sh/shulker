@@ -55,14 +55,14 @@ func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *meta.Run
 	}
 	platform, ok := meta.RuntimePlatform()
 	if !ok {
-		return Runtime{}, out.Errorf("runtime-unavailable", "Mojang publishes no Java runtime for %s/%s; set \"java\" in shulker.json to a JDK path", runtime.GOOS, runtime.GOARCH)
+		return Runtime{}, out.Errorf("runtime-unavailable", "Mojang publishes no Java runtime for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
 	release, ok, err := runtimes.Release(ctx, platform, component)
 	if err != nil {
 		return Runtime{}, err
 	}
 	if !ok {
-		return Runtime{}, out.Errorf("runtime-unavailable", "Mojang publishes no %s runtime for %s; set \"java\" in shulker.json to a JDK path", component, platform)
+		return Runtime{}, out.Errorf("runtime-unavailable", "Mojang publishes no %s runtime for %s", component, platform)
 	}
 	if hasExisting && existing.ManifestSha1 == release.ManifestSha1 {
 		return Runtime{Component: component, Version: existing.Version, Home: filepath.Join(dir, existing.Home)}, nil

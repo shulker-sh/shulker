@@ -224,13 +224,35 @@ func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolv
 	return loaded, nil
 }
 
-func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool) (server.Runtime, error) {
+// managedJava ensures the lock's runtime component. fix is the Fix row a runtime-unavailable error
+// carries, which depends on which side needs the Java.
+func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool, fix out.Detail) (server.Runtime, error) {
 	d, err := a.deps()
 	if err != nil {
 		return server.Runtime{}, err
 	}
 	opts := server.RuntimeOptions{Refresh: refresh, Log: a.progress}
-	return server.EnsureRuntime(ctx, d.fetch, d.runtimes, d.cache.Dir, p.Lock.Java.Component, opts)
+	rt, err := server.EnsureRuntime(ctx, d.fetch, d.runtimes, d.cache.Dir, p.Lock.Java.Component, opts)
+	if out.CodeOf(err) == "runtime-unavailable" {
+		out.AsError(err).Rows = []out.Detail{fix}
+	}
+	return rt, err
+}
+
+var serverJavaFix = out.Detail{Label: "Fix", Text: `set "java" in shulker.json to a JDK path`}
+
+func linkJavaFix(launcherName string) out.Detail {
+	return out.Detail{Label: "Fix", Text: "shulker link " + launcherName + " --java <path>", Command: true}
+}
+
+// runtimeWarning is a runtime-unavailable error as one line, for a command that carries on without
+// the managed runtime and so never shows the error's rows.
+func runtimeWarning(err error) string {
+	e := out.AsError(err)
+	if len(e.Rows) == 0 {
+		return e.Message
+	}
+	return e.Message + "; " + e.Rows[0].Text
 }
 
 func (a *app) progress(format string, args ...any) {

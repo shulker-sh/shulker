@@ -61,12 +61,12 @@ func (a *app) projectJava(ctx context.Context, p *project.Project) (server.Java,
 	if p.Manifest.Java != "" {
 		return server.FindJava(p.Manifest.Java, p.Lock.Java.Major)
 	}
-	rt, err := a.managedJava(ctx, p, false)
+	rt, err := a.managedJava(ctx, p, false, serverJavaFix)
 	if err != nil {
 		if out.CodeOf(err) != "runtime-unavailable" {
 			return server.Java{}, err
 		}
-		a.printer.Warn("%s; using java on PATH", err)
+		a.printer.Warn("%s; using java on PATH", runtimeWarning(err))
 		return server.FindJava("", p.Lock.Java.Major)
 	}
 	return server.JavaAt(rt.Home)
