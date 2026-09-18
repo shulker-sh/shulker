@@ -62,6 +62,10 @@ func TestSyncNeedsOneSideWhenBothAreDeclared(t *testing.T) {
 	if _, _, stderr := h.run(t, "sync", h.dir, "--into", t.TempDir()); !strings.Contains(stderr, "--side client") {
 		t.Fatalf("the example names --side: %s", stderr)
 	}
+	code, stdout, _ = h.run(t, "sync", h.dir, "--into", t.TempDir(), "--assume-client", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-side" {
+		t.Fatalf("--assume-client is ignored once a client is declared: exit %d %s", code, stdout)
+	}
 	h.mustRun(t, "sync", h.dir, "--side", "server", "--into", t.TempDir())
 }
 
@@ -125,6 +129,11 @@ func TestAssumeClientBuildsAnUndeclaredClient(t *testing.T) {
 		t.Fatalf("a later sync of the same directory keeps building: side=%s warnings=%v", env.Data.Side, env.Warnings)
 	}
 
+	code, stdout, _ = h.run(t, "sync", h.dir, "--into", t.TempDir(), "--assume-client", "--side", "server", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
+		t.Fatalf("--assume-client with --side server: exit %d %s", code, stdout)
+	}
+
 	h.editManifest(t, func(m map[string]any) {
 		m["client"] = map[string]any{"options": map[string]any{"fov": 1}}
 	})
@@ -138,9 +147,11 @@ func TestAssumeClientBuildsAnUndeclaredClient(t *testing.T) {
 		t.Fatal("the declared client's options are built")
 	}
 
-	code, stdout, _ = h.run(t, "sync", h.dir, "--into", t.TempDir(), "--assume-client", "--side", "server", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
-		t.Fatalf("--assume-client with --side server: exit %d %s", code, stdout)
+	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", h.dir, "--into", t.TempDir(), "--assume-client", "--side", "server", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Data.Side != "server" || len(env.Warnings) != 0 {
+		t.Fatalf("--assume-client is ignored once a client is declared: side=%s warnings=%v", env.Data.Side, env.Warnings)
 	}
 }
 

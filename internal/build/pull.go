@@ -314,7 +314,7 @@ func (b *Builder) pullDest(side, to string) (string, error) {
 	f, ok := b.Manifest.Features[to]
 	if !ok {
 		e := out.Errorf("usage", "%q is neither a side nor a feature", to)
-		e.Candidates, e.Given, e.Flag = slices.Concat(manifest.SideNames, features), to, "--to"
+		e.Candidates, e.Given, e.Flag = append([]string{side}, features...), to, "--to"
 		return "", e
 	}
 	folders := featureFolders(to, f, side)

@@ -89,6 +89,9 @@ func (a *app) clientSide(m *manifest.Manifest, assume bool) (string, error) {
 }
 
 func (a *app) syncSide(p *project.Project, want string, assume bool) (string, error) {
+	if p.Manifest.HasSide("client") {
+		assume = false
+	}
 	switch {
 	case assume && want == "server":
 		return "", out.Errorf("usage", "--assume-client builds the client; it doesn't go with --side server")

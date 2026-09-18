@@ -57,7 +57,7 @@ func TestPullToChoosesTheOverrideFolder(t *testing.T) {
 
 	writeOverride(t, buildDir, "config/voice.txt", "v2\n")
 	code, stdout, _ := h.run(t, "pull", "--to", "nope", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,server,shaders,voice" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,shaders,voice" {
 		t.Fatalf("unknown --to: exit %d %s", code, stdout)
 	}
 }
