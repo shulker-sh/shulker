@@ -52,6 +52,9 @@ func SlotCommand(launcherName, dir string, kind HookKind) string {
 	return slotCommand(launcherName, dir, kind, runtime.GOOS)
 }
 
+// GDLauncher is the one launcher that sees a literal path here, and it splits the command itself, so
+// its path is quoted the way its parser reads; the others get the plain quoted shape every parser
+// reads alike.
 func slotCommand(launcherName, dir string, kind HookKind, goos string) string {
 	base := dir
 	if s, ok := slots[launcherName]; ok && s.Token != "" {
@@ -60,7 +63,11 @@ func slotCommand(launcherName, dir string, kind HookKind, goos string) string {
 	if goos == "windows" {
 		return `cmd /c "` + base + `\` + instance.Dir + `\` + string(kind) + `.cmd"`
 	}
-	return `sh "` + base + "/" + instance.Dir + "/" + string(kind) + `"`
+	script := base + "/" + instance.Dir + "/" + string(kind)
+	if launcherName == "gdlauncher" {
+		return "sh " + gdlauncherHookArg(script, goos)
+	}
+	return `sh "` + script + `"`
 }
 
 // IsShulkerSlot reports whether a slot command is one shulker owns, which is how reconcile tells its

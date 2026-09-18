@@ -16,6 +16,8 @@ func TestSlotCommandReachesTheScriptThroughTheLaunchersToken(t *testing.T) {
 		{"atlauncher", "/games/cozy", "darwin", `sh "$INST_DIR/.shulker/pre-launch"`},
 		{"gdlauncher", "/games/cozy/instance", "darwin", `sh "/games/cozy/instance/.shulker/pre-launch"`},
 		{"gdlauncher", `C:\games\cozy\instance`, "windows", `cmd /c "C:\games\cozy\instance\.shulker\pre-launch.cmd"`},
+		{"gdlauncher", `/Users/me/My "Games"/cozy\instance`, "darwin", `sh "/Users/me/My \"Games\"/cozy\\instance/.shulker/pre-launch"`},
+		{"prism", `/Users/me/My "Games"/.minecraft`, "darwin", `sh "$INST_MC_DIR/.shulker/pre-launch"`},
 		{"prism", `C:\games\cozy\.minecraft`, "windows", `cmd /c "$INST_MC_DIR\.shulker\pre-launch.cmd"`},
 	} {
 		if got := slotCommand(tc.launcher, tc.dir, HookPreLaunch, tc.goos); got != tc.want {
@@ -164,4 +166,47 @@ func atlauncherFixture(t *testing.T, dir string) atlauncherFile {
 		t.Fatal(err)
 	}
 	return got
+}
+
+// posixSplit reads a command the way GDLauncher's shlex does: whitespace separates words, double
+// quotes group them, and a backslash escapes the character after it.
+func posixSplit(command string) []string {
+	var words []string
+	var word []rune
+	inWord, quoted := false, false
+	for i := 0; i < len(command); i++ {
+		c := rune(command[i])
+		switch {
+		case c == '\\' && i+1 < len(command):
+			i++
+			word = append(word, rune(command[i]))
+			inWord = true
+		case c == '"':
+			quoted, inWord = !quoted, true
+		case c == ' ' && !quoted:
+			if inWord {
+				words = append(words, string(word))
+				word, inWord = nil, false
+			}
+		default:
+			word = append(word, c)
+			inWord = true
+		}
+	}
+	if inWord {
+		words = append(words, string(word))
+	}
+	return words
+}
+
+func TestGDLauncherSlotSurvivesAQuoteInTheLauncherDir(t *testing.T) {
+	dir := `/Users/me/My "Games"/cozy\instance`
+	command := slotCommand("gdlauncher", dir, HookPreLaunch, "darwin")
+	words := posixSplit(command)
+	if len(words) != 2 || words[0] != "sh" || words[1] != dir+"/.shulker/pre-launch" {
+		t.Fatalf("GDLauncher would split %q into %q", command, words)
+	}
+	if !IsShulkerSlot(command) {
+		t.Fatalf("shulker must recognise its escaped slot: %q", command)
+	}
 }
