@@ -166,15 +166,15 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 		t.Fatalf("--with fancy should ship sodium, got %v", jars)
 	}
 
-	if stdout := h.mustRun(t, "feature", "reset", "fancy"); !strings.Contains(stdout, "follows the target defaults again") {
+	if stdout := h.mustRun(t, "feature", "reset", "fancy"); !strings.Contains(stdout, "follows its default again") {
 		t.Fatalf("reset: %s", stdout)
 	}
 	if stdout := h.mustRun(t, "feature", "reset", "fancy"); !strings.Contains(stdout, "had no choice to reset") {
 		t.Fatalf("second reset: %s", stdout)
 	}
 	setFeatures(t, h, []string{"fancy"})
-	if stdout := h.mustRun(t, "feature", "list"); stdout != "  • fancy on (target default, gates: sodium)\n" {
-		t.Fatalf("list with a target default: %q", stdout)
+	if stdout := h.mustRun(t, "feature", "list"); stdout != "  • fancy on (default, gates: sodium)\n" {
+		t.Fatalf("list with a default: %q", stdout)
 	}
 
 	for _, tc := range []struct {

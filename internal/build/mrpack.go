@@ -48,7 +48,6 @@ type MrpackReport struct {
 }
 
 type mrpackTarget struct {
-	name  string
 	side  string
 	files map[string][]byte
 	mods  map[string]bool
@@ -56,13 +55,13 @@ type mrpackTarget struct {
 }
 
 func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
-	targets, err := b.mrpackTargets(opts.Targets)
+	targets, err := b.mrpackSides(opts.Targets)
 	if err != nil {
 		return nil, err
 	}
 	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}, Warnings: []string{}}
 	for _, t := range targets {
-		report.Targets = append(report.Targets, t.name)
+		report.Targets = append(report.Targets, t.side)
 		warnings, err := b.mrpackCollect(t, opts.OS, opts.Features)
 		if err != nil {
 			return nil, err
@@ -125,48 +124,43 @@ func (b *Builder) addIdentity(entries map[string][]byte) error {
 	return nil
 }
 
-func (b *Builder) mrpackTargets(names []string) ([]*mrpackTarget, error) {
-	if len(names) == 0 {
-		for n := range b.Manifest.Targets {
-			names = append(names, n)
-		}
-		sort.Strings(names)
+func (b *Builder) mrpackSides(sides []string) ([]*mrpackTarget, error) {
+	if len(sides) == 0 {
+		sides = b.sides()
 	}
 	var targets []*mrpackTarget
-	bySide := map[string]string{}
-	for _, n := range names {
-		t, err := b.Manifest.Target(n)
-		if err != nil {
-			return nil, err
-		}
-		if other, dup := bySide[t.Side]; dup {
-			e := out.Errorf("ambiguous-target", "targets %s and %s are both %s side; pass --target", other, n, t.Side)
-			e.Candidates, e.Flag = names, "--target"
+	seen := map[string]bool{}
+	for _, side := range sides {
+		if side != "client" && side != "server" {
+			e := out.Errorf("usage", "%q is not a side", side)
+			e.Candidates, e.Given = []string{"client", "server"}, side
 			return nil, e
 		}
-		bySide[t.Side] = n
-		targets = append(targets, &mrpackTarget{name: n, side: t.Side, files: map[string][]byte{}})
+		if seen[side] {
+			continue
+		}
+		seen[side] = true
+		targets = append(targets, &mrpackTarget{side: side, files: map[string][]byte{}})
 	}
 	return targets, nil
 }
 
+// mrpackName is the name the Modrinth app shows. A pack carrying the client is
+// named for it; a server-only export keeps the server's own name.
 func (b *Builder) mrpackName(targets []*mrpackTarget) string {
-	pick := targets[0]
+	pick := targets[0].side
 	for _, t := range targets {
 		if t.side == "client" {
-			pick = t
+			pick = t.side
 		}
 	}
-	if name := b.Manifest.Targets[pick.name].Name; name != "" {
-		return name
-	}
-	return b.Manifest.Name
+	return b.Manifest.DisplayName(pick)
 }
 
 // mrpackCollect fills a target's override files and the mods it ships, returning the warnings.
 func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, features map[string]bool) ([]string, error) {
 	rep := &Report{}
-	desired, _, err := b.collect(t.name, b.Manifest.Targets[t.name], Options{OS: osName, NoOS: osName == "", Features: features}, rep)
+	desired, _, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features}, rep)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +179,7 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, features map[str
 	}
 	for _, e := range rep.Excluded {
 		if strings.Contains(e, "(needs os ") {
-			warnings = append(warnings, fmt.Sprintf("%s: left out of %s; pass --os to export that variation", e, t.name))
+			warnings = append(warnings, fmt.Sprintf("%s: left out of %s; pass --os to export that variation", e, t.side))
 		}
 	}
 	for path, s := range desired {

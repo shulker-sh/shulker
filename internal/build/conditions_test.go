@@ -8,12 +8,15 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 )
 
-func TestPlacementsFollowTargetDefaultsAndIgnoreOS(t *testing.T) {
+func TestPlacementsFollowFeatureDefaultsAndIgnoreOS(t *testing.T) {
 	b := &Builder{
 		Manifest: &manifest.Manifest{
+			Features: map[string]manifest.Feature{
+				"profiling": {Default: true},
+				"shaders":   {},
+			},
 			Targets: map[string]manifest.Target{
 				"client": {Side: "client"},
-				"dev":    {Side: "client", Features: []string{"profiling"}},
 				"server": {Side: "server"},
 			},
 			Requires: map[string]manifest.Require{
@@ -36,12 +39,12 @@ func TestPlacementsFollowTargetDefaultsAndIgnoreOS(t *testing.T) {
 	}
 	got := b.Placements()
 	for id, want := range map[string][]string{
-		"lithium": {"client", "dev", "server"},
-		"modmenu": {"client", "dev"},
-		"spark":   {"dev"},
-		"discord": {"client", "dev"},
+		"lithium": {"client", "server"},
+		"modmenu": {"client"},
+		"spark":   {"client", "server"},
+		"discord": {"client"},
 		"iris":    nil,
-		"cloth":   {"client", "dev"},
+		"cloth":   {"client"},
 		"sodium":  nil,
 	} {
 		if !slices.Equal(got[id].Targets, want) {

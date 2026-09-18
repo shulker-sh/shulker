@@ -331,7 +331,11 @@ func (a *app) rollbackCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep, err := b.Build(target, build.Options{Features: overrides, NoHistory: true})
+			side, dir, err := buildSide(p, target)
+			if err != nil {
+				return err
+			}
+			rep, err := b.Build(side, build.Options{Dir: dir, Features: overrides, NoHistory: true})
 			if err != nil {
 				return err
 			}

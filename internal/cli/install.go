@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"path/filepath"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -60,7 +61,11 @@ func (a *app) installCmd() *cobra.Command {
 			names := targetNames(p.Manifest.Targets)
 			res := installResult{Fetched: fetched}
 			for _, name := range names {
-				rep, err := b.Build(name, build.Options{Force: force, OS: osName, Features: overrides})
+				side, dir, err := buildSide(p, name)
+				if err != nil {
+					return err
+				}
+				rep, err := b.Build(side, build.Options{Dir: dir, Force: force, OS: osName, Features: overrides})
 				if err != nil {
 					return err
 				}
@@ -153,6 +158,16 @@ func hasServerTarget(targets map[string]manifest.Target) bool {
 		}
 	}
 	return false
+}
+
+// buildSide is the side a named target builds and where it builds it, which is
+// what the build engine takes. The side blocks take over when targets go.
+func buildSide(p *project.Project, name string) (string, string, error) {
+	t, err := p.Manifest.Target(name)
+	if err != nil {
+		return "", "", err
+	}
+	return t.Side, filepath.Join(p.Dir, p.Manifest.TargetBuildDir(name)), nil
 }
 
 func targetNames[T any](targets map[string]T) []string {

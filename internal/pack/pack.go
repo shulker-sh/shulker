@@ -274,27 +274,6 @@ func (s *Store) storeManifest(data []byte) (string, error) {
 	return sha, fsutil.Write(path, data)
 }
 
-func (l *Loaded) Target(name, side string) (*manifest.Target, error) {
-	if t, ok := l.Manifest.Targets[name]; ok && t.Side == side {
-		return &t, nil
-	}
-	var matches []string
-	for n, t := range l.Manifest.Targets {
-		if t.Side == side {
-			matches = append(matches, n)
-		}
-	}
-	sort.Strings(matches)
-	switch len(matches) {
-	case 0:
-		return nil, nil
-	case 1:
-		t := l.Manifest.Targets[matches[0]]
-		return &t, nil
-	}
-	return nil, out.Errorf("modpack-target", "modpack %s has several %s targets (%s) and none named %q; rename the project target to match one", l.Name, side, strings.Join(matches, ", "), name)
-}
-
 // Compatible checks a modpack against the project's platform. A locked modpack
 // contributes exact versions, so its own lock has to match; a floating one is
 // resolved here and only has to admit the project's versions in its ranges.
@@ -359,10 +338,15 @@ func describeLoader(name string) string {
 }
 
 func dirSha256(dir string, m *manifest.Manifest) (string, error) {
-	roots := map[string]bool{}
-	for _, t := range m.Targets {
-		for _, layer := range t.Overrides {
-			roots[layer] = true
+	roots := map[string]bool{"overrides": true, "client-overrides": true, "server-overrides": true}
+	for name, f := range m.Features {
+		for _, folder := range []string{f.Overrides.Both, f.Overrides.Client, f.Overrides.Server} {
+			if folder != "" {
+				roots[folder] = true
+			}
+		}
+		if f.Overrides == (manifest.FeatureOverrides{}) {
+			roots[name+"-overrides"] = true
 		}
 	}
 	var files []string

@@ -57,7 +57,11 @@ func (a *app) buildCmd() *cobra.Command {
 			}
 			var reports []*build.Report
 			for _, name := range names {
-				rep, err := b.Build(name, build.Options{Force: force, OS: osName, Features: overrides})
+				side, dir, err := buildSide(p, name)
+				if err != nil {
+					return err
+				}
+				rep, err := b.Build(side, build.Options{Dir: dir, Force: force, OS: osName, Features: overrides})
 				if err != nil {
 					return err
 				}

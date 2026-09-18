@@ -116,8 +116,8 @@ func (a *app) refreshLocal(lf *local.File, inProject, changed bool) {
 
 type featureStatus struct {
 	build.Feature
-	Choice    *bool           `json:"choice"`
-	Effective map[string]bool `json:"effective"`
+	Choice    *bool `json:"choice"`
+	Effective bool  `json:"effective"`
 }
 
 func (a *app) featureCmd() *cobra.Command {
@@ -330,7 +330,7 @@ func (a *app) featureResetCmd() *cobra.Command {
 	var where featureWhere
 	cmd := &cobra.Command{
 		Use:   "reset <feature>",
-		Short: "Forget your choice for a feature and follow the target defaults again",
+		Short: "Forget your choice for a feature and follow its default again",
 		Args:  exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
@@ -353,7 +353,7 @@ func (a *app) featureResetCmd() *cobra.Command {
 					return err
 				}
 			}
-			line := name + " follows the target defaults again"
+			line := name + " follows its default again"
 			if !had {
 				line = name + " had no choice to reset"
 			}
@@ -369,7 +369,7 @@ func (a *app) featureListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List features with the mods they gate, target defaults, and your choices",
+		Short:   "List features with the mods they gate, their defaults, and your choices",
 		Args:    noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			into, err := a.featureDir(&where)
@@ -380,18 +380,11 @@ func (a *app) featureListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			targets := targetNames(sc.project.Manifest.Targets)
 			res := []featureStatus{}
 			for _, f := range b.Features() {
-				st := featureStatus{Feature: f, Effective: map[string]bool{}}
+				st := featureStatus{Feature: f, Effective: f.Default}
 				if on, ok := sc.decisions[f.Name]; ok {
-					st.Choice = &on
-				}
-				for _, t := range targets {
-					st.Effective[t] = slices.Contains(f.Defaults, t)
-					if st.Choice != nil {
-						st.Effective[t] = *st.Choice
-					}
+					st.Choice, st.Effective = &on, on
 				}
 				res = append(res, st)
 			}
@@ -402,7 +395,7 @@ func (a *app) featureListCmd() *cobra.Command {
 				}
 				var items []out.Item
 				for _, st := range res {
-					state, reason, _ := strings.Cut(st.state(len(targets)), " (")
+					state, reason, _ := strings.Cut(st.state(), " (")
 					aside := []string{"gates: " + strings.Join(st.Mods, ", ")}
 					if reason != "" {
 						aside = append([]string{strings.TrimSuffix(reason, ")")}, aside...)
@@ -417,18 +410,15 @@ func (a *app) featureListCmd() *cobra.Command {
 	return cmd
 }
 
-func (st featureStatus) state(targets int) string {
+func (st featureStatus) state() string {
 	if st.Choice != nil {
 		if *st.Choice {
 			return "on (your choice)"
 		}
 		return "off (your choice)"
 	}
-	switch len(st.Defaults) {
-	case 0:
-		return "off"
-	case targets:
-		return "on (target default)"
+	if st.Default {
+		return "on (default)"
 	}
-	return "on in " + strings.Join(st.Defaults, ", ") + " (target default)"
+	return "off"
 }

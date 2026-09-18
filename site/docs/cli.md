@@ -1116,7 +1116,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
 | `no-instances` | Nothing is linked yet |
-| `no-overrides` | The target has no overrides directory to adopt a file into |
 | `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
 | `no-target` | `shulker.json` has no target of the side the command needs |
 | `not-built` | The target has no build directory yet; run `shulker build` |
@@ -1139,7 +1138,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-platform` | Locked modpacks disagree about Minecraft or the loader, and `shulker.json` sets neither; set `minecraft`/`loader`, or unlock one |
 | `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
-| `modpack-target` | A modpack has several targets of a side and none named like the project's |
 | `modpack-unlocked` | A modpack has no commit in the lock; run `shulker update` |
 | `path-invalid` | `shulker.json` or `config.json` has no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get` or `config get` names a field that isn't set |

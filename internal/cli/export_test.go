@@ -94,15 +94,16 @@ func TestExportMrpack(t *testing.T) {
 		m["note"] = "A demo pack"
 		m["description"] = "Survival with friends."
 		m["targets"] = map[string]any{
-			"client": map[string]any{"side": "client", "name": "Demo Pack", "overrides": []string{"overrides/common", "overrides/client"}, "build": "build/client"},
-			"server": map[string]any{"side": "server", "overrides": []string{"overrides/common", "overrides/server"}, "build": "build/server"},
+			"client": map[string]any{"side": "client", "overrides": []string{"overrides"}, "build": "build/client"},
+			"server": map[string]any{"side": "server", "overrides": []string{"overrides"}, "build": "build/server"},
 		}
+		m["client"].(map[string]any)["name"] = "Demo Pack"
 		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"motd": "Demo"}}
 	})
-	writeOverride(t, h.dir, "overrides/common/config/same.txt", "same\n")
-	writeOverride(t, h.dir, "overrides/common/config/shared.toml", "common\n")
-	writeOverride(t, h.dir, "overrides/client/config/client.toml", "client\n")
-	writeOverride(t, h.dir, "overrides/server/config/shared.toml", "server\n")
+	writeOverride(t, h.dir, "overrides/config/same.txt", "same\n")
+	writeOverride(t, h.dir, "overrides/config/shared.toml", "common\n")
+	writeOverride(t, h.dir, "client-overrides/config/client.toml", "client\n")
+	writeOverride(t, h.dir, "server-overrides/config/shared.toml", "server\n")
 	h.mustRun(t, "install")
 
 	code, stdout, _ := h.run(t, "export", "mrpack", "--json")

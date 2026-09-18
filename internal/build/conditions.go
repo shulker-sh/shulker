@@ -2,7 +2,6 @@ package build
 
 import (
 	"fmt"
-	"maps"
 	"runtime"
 	"slices"
 	"sort"
@@ -28,13 +27,15 @@ func ValidOS(name string) bool {
 	return name == "macos" || name == "windows" || name == "linux"
 }
 
-func (b *Builder) conditions(target manifest.Target, opts Options) conditions {
+func (b *Builder) conditions(opts Options) conditions {
 	c := conditions{os: opts.OS, features: map[string]bool{}}
 	if !opts.NoOS && c.os == "" {
 		c.os = DetectOS()
 	}
-	for _, f := range target.Features {
-		c.features[f] = true
+	for _, m := range b.featureDecls() {
+		for name, f := range m.Features {
+			c.features[name] = f.Default
+		}
 	}
 	for name, on := range opts.Features {
 		c.features[name] = on
@@ -42,10 +43,22 @@ func (b *Builder) conditions(target manifest.Target, opts Options) conditions {
 	return c
 }
 
+// featureDecls lists the manifests declaring features, each pulled pack before
+// the project, so a name the project also declares takes the project's default.
+func (b *Builder) featureDecls() []*manifest.Manifest {
+	decls := make([]*manifest.Manifest, 0, len(b.Packs)+1)
+	for _, p := range b.Packs {
+		decls = append(decls, p.Manifest)
+	}
+	return append(decls, b.Manifest)
+}
+
 type Feature struct {
-	Name     string   `json:"name"`
-	Mods     []string `json:"mods"`
-	Defaults []string `json:"defaultTargets"`
+	Name    string   `json:"name"`
+	Mods    []string `json:"mods"`
+	Default bool     `json:"default"`
+	// Origin is the pulled pack that declares the feature, empty for the project.
+	Origin string `json:"origin,omitempty"`
 }
 
 func (b *Builder) Features() []Feature {
@@ -54,7 +67,7 @@ func (b *Builder) Features() []Feature {
 		if f, ok := byName[name]; ok {
 			return f
 		}
-		f := &Feature{Name: name, Mods: []string{}, Defaults: []string{}}
+		f := &Feature{Name: name, Mods: []string{}}
 		byName[name] = f
 		return f
 	}
@@ -82,17 +95,21 @@ func (b *Builder) Features() []Feature {
 			}
 		}
 	}
-	for name, t := range b.Manifest.Targets {
-		for _, f := range t.Features {
-			get(f).Defaults = append(get(f).Defaults, name)
+	for _, p := range b.Packs {
+		for name, decl := range p.Manifest.Features {
+			f := get(name)
+			f.Default, f.Origin = decl.Default, p.Name
 		}
+	}
+	for name, decl := range b.Manifest.Features {
+		f := get(name)
+		f.Default, f.Origin = decl.Default, ""
 	}
 	res := make([]Feature, 0, len(byName))
 	for _, f := range byName {
 		sort.Slice(f.Mods, func(i, j int) bool {
 			return strings.TrimPrefix(f.Mods[i], "!") < strings.TrimPrefix(f.Mods[j], "!")
 		})
-		sort.Strings(f.Defaults)
 		res = append(res, *f)
 	}
 	sort.Slice(res, func(i, j int) bool { return res[i].Name < res[j].Name })
@@ -281,9 +298,9 @@ func includedRequirers(by []string, included map[string]bool) []string {
 	return names
 }
 
-// Placement is where a locked mod lands by the project's own settings: each
-// target's default features, with OS conditions reported rather than checked,
-// so every machine gives the same answer.
+// Placement is where a locked mod lands by the project's own settings: the
+// features on by default, with OS conditions reported rather than checked, so
+// every machine gives the same answer.
 type Placement struct {
 	Targets []string
 	OS      manifest.StringList
@@ -292,21 +309,22 @@ type Placement struct {
 
 func (b *Builder) Placements() map[string]Placement {
 	placements := map[string]Placement{}
-	for _, name := range slices.Sorted(maps.Keys(b.Manifest.Targets)) {
-		target := b.Manifest.Targets[name]
-		c := conditions{anyOS: true, features: map[string]bool{}}
-		for _, f := range target.Features {
-			c.features[f] = true
+	c := conditions{anyOS: true, features: map[string]bool{}}
+	for _, m := range b.featureDecls() {
+		for name, f := range m.Features {
+			c.features[name] = f.Default
 		}
+	}
+	for _, side := range b.sides() {
 		for id := range b.selectMods(c).included {
-			if m := b.Lock.Mods[id]; m.Side != "both" && m.Side != target.Side {
+			if m := b.Lock.Mods[id]; m.Side != "both" && m.Side != side {
 				continue
 			}
 			p := placements[id]
-			p.Targets = append(p.Targets, name)
+			p.Targets = append(p.Targets, side)
 			placements[id] = p
 		}
-		if target.Side != "client" {
+		if side != "client" {
 			continue
 		}
 		for _, ref := range b.packRefs() {
@@ -321,7 +339,7 @@ func (b *Builder) Placements() map[string]Placement {
 				}
 			}
 			p := placements[ref.key]
-			p.Targets = append(p.Targets, name)
+			p.Targets = append(p.Targets, side)
 			if isListed {
 				p.OS, p.Feature = entry.OS, entry.Feature
 			}
@@ -337,4 +355,15 @@ func (b *Builder) Placements() map[string]Placement {
 		placements[id] = p
 	}
 	return placements
+}
+
+// warnFeatureConflict reports two enabled features writing the same file. The
+// alphabetical layer order makes the winner deterministic but arbitrary to the
+// author, so it is named. A feature overriding a base layer is the point of
+// features and says nothing.
+func warnFeatureConflict(report *Report, was, now, rel string) {
+	if report == nil || was == "" || now == "" || was == now {
+		return
+	}
+	report.Warnings = append(report.Warnings, fmt.Sprintf("%s and %s both write %s; %s wins", was, now, rel, now))
 }

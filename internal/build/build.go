@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -127,6 +128,7 @@ type source struct {
 	owned    ownedFile
 	origin   string
 	pack     string
+	feature  string
 	template bool
 	managed  ownedFile
 }
@@ -207,23 +209,19 @@ func sortedKeys(set map[string]bool) []string {
 	return keys
 }
 
-func (b *Builder) Build(name string, opts Options) (*Report, error) {
-	target, err := b.Manifest.Target(name)
-	if err != nil {
-		return nil, err
-	}
+func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.TargetBuildDir(name))
+		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
 	}
 	inPlace := sameDir(dir, b.Dir)
-	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
-	desired, dirs, err := b.collect(name, target, opts, report)
+	report := &Report{Target: side, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
+	desired, dirs, err := b.collect(side, opts, report)
 	if err != nil {
 		return nil, err
 	}
 	if inPlace {
-		if err := checkReserved(name, desired, dirs); err != nil {
+		if err := checkReserved(side, desired, dirs); err != nil {
 			return nil, err
 		}
 	}
@@ -234,8 +232,8 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	if stateErr != nil {
 		report.Warnings = append(report.Warnings, stateErr.Error())
 	}
-	next := State{Target: name, Origin: opts.Origin, Files: map[string]string{}, Loader: prev.Loader}
-	links, err := b.planLinks(dir, name, dirs, prev, report)
+	next := State{Target: side, Origin: opts.Origin, Files: map[string]string{}, Loader: prev.Loader}
+	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
 		return nil, err
 	}
@@ -281,12 +279,12 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 		}
 	}
 	if len(report.Conflicts) > 0 {
-		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the output directory and in the source; run `shulker diff`, or `build --force` to overwrite", name, len(report.Conflicts))
+		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the output directory and in the source; run `shulker diff`, or `build --force` to overwrite", side, len(report.Conflicts))
 		e.Items = report.Conflicts
 		return report, e
 	}
 	if inPlace && !opts.NoHistory && planDrift(plans) {
-		if err := b.takeHistory(dir, name, "build", len(writes), len(report.Removed), report); err != nil {
+		if err := b.takeHistory(dir, side, "build", len(writes), len(report.Removed), report); err != nil {
 			return nil, err
 		}
 	}
@@ -311,7 +309,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 			return nil, err
 		}
 	}
-	if err := b.applyLinks(dir, name, links, report); err != nil {
+	if err := b.applyLinks(dir, side, links, report); err != nil {
 		return nil, err
 	}
 	next.BuiltAt = time.Now().UTC().Format(time.RFC3339)
@@ -324,15 +322,15 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	return report, nil
 }
 
-func (b *Builder) collect(name string, target manifest.Target, opts Options, report *Report) (map[string]source, []string, error) {
+func (b *Builder) collect(side string, opts Options, report *Report) (map[string]source, []string, error) {
 	desired := map[string]source{}
-	dirs := dataDirs(target.Side, "world")
-	cond := b.conditions(target, opts)
+	dirs := dataDirs(side, "world")
+	cond := b.conditions(opts)
 	sel := b.selectMods(cond)
 	report.Excluded = append(report.Excluded, sel.excluded...)
 	report.Warnings = append(report.Warnings, sel.warnings...)
 	for id, m := range b.Lock.Mods {
-		if !sel.included[id] || (m.Side != "both" && m.Side != target.Side) {
+		if !sel.included[id] || (m.Side != "both" && m.Side != side) {
 			continue
 		}
 		if !b.Cache.Has(m.Sha512) {
@@ -340,27 +338,24 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 		}
 		desired["mods/"+m.Filename] = source{sha512: m.Sha512}
 	}
-	vars := b.Manifest.Variables.Text()
-	for k, v := range target.Variables.Text() {
-		vars[k] = v
-	}
-	if target.Side == "server" {
+	vars := b.Manifest.SideVariables(side).Text()
+	if side == "server" {
 		levelName, err := b.collectServer(desired, vars, report)
 		if err != nil {
 			return nil, nil, err
 		}
-		dirs = dataDirs(target.Side, levelName)
+		dirs = dataDirs(side, levelName)
 	}
-	if target.Side == "client" {
+	if side == "client" {
 		if err := b.collectPacks(cond, desired, report); err != nil {
 			return nil, nil, err
 		}
 		b.enableShader(desired)
-		if err := b.collectClient(name, opts, desired, vars, report); err != nil {
+		if err := b.collectClient(side, opts, desired, vars, report); err != nil {
 			return nil, nil, err
 		}
 		if b.Lock.Loader.Type != "" {
-			jar, err := b.markerJar(name, target.Side, cond, sel)
+			jar, err := b.markerJar(side, side, cond, sel)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -368,42 +363,109 @@ func (b *Builder) collect(name string, target manifest.Target, opts Options, rep
 		}
 	}
 	whole := func(rel string) bool {
-		for _, pattern := range target.WholeFiles {
+		for _, pattern := range b.Manifest.WholeFiles {
 			if ok, _ := path.Match(pattern, rel); ok {
 				return true
 			}
 		}
 		return false
 	}
-	for _, pk := range b.Packs {
-		pt, err := pk.Target(name, target.Side)
-		if err != nil {
-			return nil, nil, err
-		}
-		if pt == nil || pk.Dir == "" {
-			continue
-		}
-		packVars := map[string]string{}
-		for _, layer := range []map[string]string{pk.Manifest.Variables.Text(), pt.Variables.Text(), vars} {
-			for k, v := range layer {
-				packVars[k] = v
-			}
-		}
-		for _, layer := range pt.Overrides {
-			if err := b.layer(filepath.Join(pk.Dir, layer), pk.Name+":"+layer, pk.Name, packVars, whole, desired); err != nil {
-				return nil, nil, err
-			}
-		}
-	}
-	for _, layer := range target.Overrides {
-		if err := b.layer(filepath.Join(b.Dir, layer), layer, "", vars, whole, desired); err != nil {
+	for _, l := range b.overrideLayers(side, cond) {
+		if err := b.layer(l, vars, whole, desired, report); err != nil {
 			return nil, nil, err
 		}
 	}
 	return desired, dirs, nil
 }
 
-func (b *Builder) layer(root, label, pack string, vars map[string]string, whole func(string) bool, desired map[string]source) error {
+// overrideLayer is one override folder, in the order it is laid down.
+type overrideLayer struct {
+	root string
+	// label names the folder in messages, prefixed with the pack it came from.
+	label   string
+	pack    string
+	feature string
+	vars    map[string]string
+}
+
+// overrideLayers is every override folder that applies to the side, in build
+// order: each pulled pack's folders in requires order, then the project's, and
+// within each the shared folder, the side's, then the enabled features in name
+// order. A folder that doesn't exist is skipped when it is walked.
+func (b *Builder) overrideLayers(side string, cond conditions) []overrideLayer {
+	var layers []overrideLayer
+	add := func(m *manifest.Manifest, dir, pack string, vars map[string]string) {
+		label := func(folder string) string {
+			if pack == "" {
+				return folder
+			}
+			return pack + ":" + folder
+		}
+		for _, folder := range []string{"overrides", side + "-overrides"} {
+			layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, vars: vars})
+		}
+		for _, name := range slices.Sorted(maps.Keys(m.Features)) {
+			if !cond.features[name] {
+				continue
+			}
+			for _, folder := range featureFolders(name, m.Features[name], side) {
+				layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, feature: name, vars: vars})
+			}
+		}
+	}
+	vars := b.Manifest.SideVariables(side).Text()
+	for _, pk := range b.Packs {
+		if pk.Dir == "" {
+			continue
+		}
+		packVars := map[string]string{}
+		maps.Copy(packVars, pk.Manifest.SideVariables(side).Text())
+		maps.Copy(packVars, vars)
+		add(pk.Manifest, pk.Dir, pk.Name, packVars)
+	}
+	add(b.Manifest, b.Dir, "", vars)
+	return layers
+}
+
+// featureFolders is where a feature's override files live for the side: the
+// folder it shares between sides, then the one for this side alone.
+func featureFolders(name string, f manifest.Feature, side string) []string {
+	var folders []string
+	switch {
+	case f.Overrides.Both != "":
+		folders = append(folders, f.Overrides.Both)
+	case f.Overrides.Client == "" && f.Overrides.Server == "":
+		folders = append(folders, name+"-overrides")
+	}
+	if side == "client" && f.Overrides.Client != "" {
+		folders = append(folders, f.Overrides.Client)
+	}
+	if side == "server" && f.Overrides.Server != "" {
+		folders = append(folders, f.Overrides.Server)
+	}
+	return folders
+}
+
+// sides names the sides this project builds. The manifest still spells them as
+// targets; the side blocks take over when targets go.
+func (b *Builder) sides() []string {
+	var sides []string
+	for _, side := range []string{"client", "server"} {
+		for _, t := range b.Manifest.Targets {
+			if t.Side == side {
+				sides = append(sides, side)
+				break
+			}
+		}
+	}
+	return sides
+}
+
+func (b *Builder) layer(l overrideLayer, vars map[string]string, whole func(string) bool, desired map[string]source, report *Report) error {
+	root, label, pack := l.root, l.label, l.pack
+	if l.vars != nil {
+		vars = l.vars
+	}
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && path == root {
@@ -420,7 +482,7 @@ func (b *Builder) layer(root, label, pack string, vars map[string]string, whole 
 		if err != nil {
 			return err
 		}
-		src := source{origin: path, pack: pack}
+		src := source{origin: path, pack: pack, feature: l.feature}
 		if strings.HasSuffix(rel, TemplateSuffix) {
 			rel = strings.TrimSuffix(rel, TemplateSuffix)
 			src.template = true
@@ -429,8 +491,11 @@ func (b *Builder) layer(root, label, pack string, vars map[string]string, whole 
 			}
 		}
 		if strings.HasSuffix(rel, ".properties") && !whole(rel) {
-			desired[rel] = mergedProperties(desired[rel], data, keySource{path: path, pack: pack, template: src.template}, src)
+			desired[rel] = mergedProperties(desired[rel], data, keySource{path: path, pack: pack, feature: l.feature, template: src.template}, src, rel, report)
 			return nil
+		}
+		if prev, taken := desired[rel]; taken {
+			warnFeatureConflict(report, prev.feature, l.feature, rel)
 		}
 		if owned := desired[rel].owned; owned != nil {
 			src.managed = owned

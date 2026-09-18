@@ -91,7 +91,7 @@ func projectSide(f planned) keyMerge {
 func (b *Builder) checkNamed(name string, files []string, opts Options) error {
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.TargetBuildDir(name))
+		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
 	}
 	if _, err := os.Stat(dir); err != nil {
 		return nil
@@ -145,7 +145,6 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 		return nil, err
 	}
 	dir, desired, prev, plans := d.dir, d.desired, d.prev, d.plans
-	target := b.Manifest.Targets[name]
 	report := &PullReport{Target: name, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Skipped: []string{}, Warnings: d.warnings}
 	var pulled []string
 	if len(adopt) > 0 {
@@ -191,10 +190,7 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 				report.Skipped = append(report.Skipped, f.rel+" ("+reason+"; name it to adopt it)")
 				continue
 			}
-			if len(target.Overrides) == 0 {
-				return nil, out.Errorf("no-overrides", "target %s has no overrides directory to adopt %s into", name, f.rel)
-			}
-			dest = filepath.Join(b.Dir, target.Overrides[0], filepath.FromSlash(f.rel))
+			dest = filepath.Join(b.Dir, "overrides", filepath.FromSlash(f.rel))
 		case src.owned != nil:
 			if _, ok := src.owned.(propsFile); !ok {
 				report.Skipped = append(report.Skipped, f.rel+" (player files are managed by `shulker player`)")
@@ -248,7 +244,7 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 	if len(pulled) == 0 {
 		return report, nil
 	}
-	desired, _, err = b.collect(name, target, opts, &Report{})
+	desired, _, err = b.collect(name, opts, &Report{})
 	if err != nil {
 		return nil, err
 	}
@@ -277,17 +273,14 @@ type drift struct {
 	warnings []string
 }
 
-func (b *Builder) drift(name string, opts Options) (*drift, error) {
-	target, err := b.Manifest.Target(name)
-	if err != nil {
-		return nil, err
-	}
+func (b *Builder) drift(side string, opts Options) (*drift, error) {
+	name := side
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.TargetBuildDir(name))
+		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
 	}
 	report := &Report{Warnings: []string{}}
-	desired, _, err := b.collect(name, target, opts, report)
+	desired, _, err := b.collect(side, opts, report)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +369,6 @@ func writeProperties(dest string, set properties) error {
 }
 
 func (b *Builder) adoptKeys(name, rel string, keys []string, d *drift, report *PullReport) error {
-	target := b.Manifest.Targets[name]
 	if !strings.HasSuffix(rel, ".properties") {
 		return out.Errorf("usage", "--key works on .properties files, not %s", rel)
 	}
@@ -407,10 +399,7 @@ func (b *Builder) adoptKeys(name, rel string, keys []string, d *drift, report *P
 	}
 	dest := src.origin
 	if dest == "" || src.pack != "" {
-		if len(target.Overrides) == 0 {
-			return out.Errorf("no-overrides", "target %s has no overrides directory to adopt %s into", name, rel)
-		}
-		dest = filepath.Join(b.Dir, target.Overrides[0], filepath.FromSlash(rel))
+		dest = filepath.Join(b.Dir, "overrides", filepath.FromSlash(rel))
 	}
 	if err := writeProperties(dest, set); err != nil {
 		return err

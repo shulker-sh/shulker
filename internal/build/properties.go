@@ -80,6 +80,7 @@ type propsFile struct {
 type keySource struct {
 	path     string
 	pack     string
+	feature  string
 	template bool
 }
 
@@ -137,7 +138,7 @@ func (p properties) mergeInto(existing []byte, sep string, dropped map[string]bo
 
 // Keys already set by the manifest (no origin path) stay on top; later layers
 // replace keys from earlier ones.
-func mergedProperties(prev source, data []byte, from keySource, src source) source {
+func mergedProperties(prev source, data []byte, from keySource, src source, rel string, report *Report) source {
 	merged := properties{}
 	origins := map[string]keySource{}
 	sep := "="
@@ -150,12 +151,22 @@ func mergedProperties(prev source, data []byte, from keySource, src source) sour
 		}
 		sep = pf.sep
 	}
+	var conflicts []string
 	for k, v := range parseProperties(data) {
-		if _, set := merged[k]; set && origins[k].path == "" {
-			continue
+		if old, set := merged[k]; set {
+			if origins[k].path == "" {
+				continue
+			}
+			if was := origins[k].feature; was != "" && from.feature != "" && was != from.feature && old != v {
+				conflicts = append(conflicts, fmt.Sprintf("%s and %s set %s in %s differently; %s wins", was, from.feature, k, rel, from.feature))
+			}
 		}
 		merged[k] = v
 		origins[k] = from
+	}
+	if report != nil {
+		sort.Strings(conflicts)
+		report.Warnings = append(report.Warnings, conflicts...)
 	}
 	src.owned = propsFile{props: merged, sep: sep, base: data, origins: origins}
 	src.data = nil

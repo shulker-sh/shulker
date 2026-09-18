@@ -95,18 +95,15 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 func TestPropertiesLayersAndWholeFiles(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
-	h.editManifest(t, func(m map[string]any) {
-		m["targets"].(map[string]any)["client"].(map[string]any)["overrides"] = []string{"overrides", "overrides-extra"}
-	})
 	writeFile(t, filepath.Join(h.dir, "overrides", "config", "mod.properties"), "a=base\nb=base\n")
-	writeFile(t, filepath.Join(h.dir, "overrides-extra", "config", "mod.properties"), "b=extra\nc=extra\n")
+	writeFile(t, filepath.Join(h.dir, "client-overrides", "config", "mod.properties"), "b=extra\nc=extra\n")
 	writeFile(t, filepath.Join(h.dir, "overrides", "config", "strict.properties"), "x=1\n")
 	built := filepath.Join(h.dir, "build", "client", "config")
 	writeFile(t, filepath.Join(built, "mod.properties"), "a=game\nz=game\n")
 	writeFile(t, filepath.Join(built, "strict.properties"), "x=0\ny=0\n")
 
 	h.editManifest(t, func(m map[string]any) {
-		m["targets"].(map[string]any)["client"].(map[string]any)["wholeFiles"] = []string{"config/strict.*"}
+		m["wholeFiles"] = []string{"config/strict.*"}
 	})
 	code, stdout, _ := h.run(t, "build", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "build-conflict" || strings.Join(e.Items, ",") != "config/strict.properties (not written by shulker)" {

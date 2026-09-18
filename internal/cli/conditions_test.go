@@ -21,12 +21,15 @@ func setMod(t *testing.T, h *harness, id string, entry map[string]any) {
 func setFeatures(t *testing.T, h *harness, features []string) {
 	t.Helper()
 	h.editManifest(t, func(m map[string]any) {
-		target := m["targets"].(map[string]any)["client"].(map[string]any)
 		if features == nil {
-			delete(target, "features")
+			delete(m, "features")
 			return
 		}
-		target["features"] = features
+		decls := map[string]any{}
+		for _, name := range features {
+			decls[name] = map[string]any{"default": true}
+		}
+		m["features"] = decls
 	})
 }
 

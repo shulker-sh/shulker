@@ -86,12 +86,16 @@ type curseForgeFile struct {
 }
 
 func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, error) {
-	targets, err := b.mrpackTargets([]string{opts.Target})
+	side := opts.Target
+	if side == "" {
+		side = "client"
+	}
+	targets, err := b.mrpackSides([]string{side})
 	if err != nil {
 		return nil, err
 	}
 	t := targets[0]
-	report := &CurseForgeReport{Path: opts.Output, Version: opts.Version, Name: b.mrpackName(targets), Target: t.name, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, Matched: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}}
+	report := &CurseForgeReport{Path: opts.Output, Version: opts.Version, Name: b.mrpackName(targets), Target: t.side, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, Matched: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}}
 	if report.Warnings, err = b.mrpackCollect(t, opts.OS, opts.Features); err != nil {
 		return nil, err
 	}

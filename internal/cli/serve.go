@@ -135,7 +135,11 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep, err := b.Build(name, build.Options{Force: force})
+			side, buildDir, err := buildSide(p, name)
+			if err != nil {
+				return err
+			}
+			rep, err := b.Build(side, build.Options{Dir: buildDir, Force: force})
 			if err != nil {
 				return err
 			}
