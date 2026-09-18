@@ -223,26 +223,87 @@ func sameJSON(a, b json.RawMessage) bool {
 	return reflect.DeepEqual(va, vb)
 }
 
-// RemoveProfiles drops the shulker-made profiles (keys starting "shulker-") that point at gameDir.
+// RemoveProfiles drops the shulker-made profiles that point at gameDir.
 func (v *Mojang) RemoveProfiles(gameDir string) (int, error) {
 	top, profiles, err := v.readProfiles()
 	if err != nil {
 		return 0, err
 	}
-	removed := 0
+	keys := shulkerProfiles(profiles, gameDir)
+	for _, key := range keys {
+		delete(profiles, key)
+	}
+	if len(keys) == 0 {
+		return 0, nil
+	}
+	return len(keys), v.writeProfiles(top, profiles)
+}
+
+// JavaDir is the Java the launcher runs for a game directory, and whether shulker has a profile
+// there at all. An empty path is a profile with no javaDir, which is the launcher's own runtime.
+func (v *Mojang) JavaDir(gameDir string) (string, bool, error) {
+	_, profiles, err := v.readProfiles()
+	if err != nil {
+		return "", false, err
+	}
+	keys := shulkerProfiles(profiles, gameDir)
+	for _, key := range keys {
+		var p struct {
+			JavaDir string `json:"javaDir"`
+		}
+		if json.Unmarshal(profiles[key], &p) == nil && p.JavaDir != "" {
+			return p.JavaDir, true, nil
+		}
+	}
+	return "", len(keys) > 0, nil
+}
+
+// SetJavaDir points every shulker profile for a game directory at a Java, an empty one deleting the
+// key so the launcher goes back to choosing the runtime itself.
+func (v *Mojang) SetJavaDir(gameDir, javaDir string) error {
+	top, profiles, err := v.readProfiles()
+	if err != nil {
+		return err
+	}
+	changed := false
+	for _, key := range shulkerProfiles(profiles, gameDir) {
+		entry := map[string]any{}
+		if err := json.Unmarshal(profiles[key], &entry); err != nil {
+			return fmt.Errorf("%s: profile %s: %w", v.profilesPath(), key, err)
+		}
+		if current, _ := entry["javaDir"].(string); current == javaDir {
+			continue
+		}
+		changed = true
+		if javaDir == "" {
+			delete(entry, "javaDir")
+		} else {
+			entry["javaDir"] = javaDir
+		}
+		if profiles[key], err = json.Marshal(entry); err != nil {
+			return err
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return v.writeProfiles(top, profiles)
+}
+
+// shulkerProfiles are the profiles shulker made for a game directory: the ones `link mojang` writes,
+// which it knows by their key, and which are the only ones it ever changes or removes.
+func shulkerProfiles(profiles map[string]json.RawMessage, gameDir string) []string {
+	var keys []string
 	for key, raw := range profiles {
 		var p struct {
 			GameDir string `json:"gameDir"`
 		}
 		if strings.HasPrefix(key, "shulker-") && json.Unmarshal(raw, &p) == nil && p.GameDir != "" && filepath.Clean(p.GameDir) == filepath.Clean(gameDir) {
-			delete(profiles, key)
-			removed++
+			keys = append(keys, key)
 		}
 	}
-	if removed == 0 {
-		return 0, nil
-	}
-	return removed, v.writeProfiles(top, profiles)
+	sort.Strings(keys)
+	return keys
 }
 
 func (v *Mojang) now() time.Time {

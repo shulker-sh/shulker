@@ -5,7 +5,19 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"shulker.sh/shulker/internal/config"
 )
+
+// slotRow is the registry row for an instance folder: the slot functions take the row, since the
+// Minecraft launcher's slot lives in its own directory rather than beside the game.
+func slotRow(name, instanceDir string) config.Instance {
+	in := config.Instance{Launcher: name, LauncherDir: instanceDir, Dir: instanceDir}
+	if e := Find(name); !e.gameDirIsInstance {
+		in.Dir = filepath.Join(instanceDir, "minecraft")
+	}
+	return in
+}
 
 func TestSlotCommandReachesTheScriptThroughTheLaunchersToken(t *testing.T) {
 	for _, tc := range []struct {
@@ -40,7 +52,7 @@ func TestATLauncherSlotsToggleEnableCommands(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, ATLauncherInstanceFile), `{"name":"Cozy","launcher":{"maximumMemory":4096}}`)
 	e := Find("atlauncher")
-	if err := WriteSlots(e, dir, Slots{PreLaunch: "sh pre", PostExit: "sh post"}); err != nil {
+	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{PreLaunch: "sh pre", PostExit: "sh post"}); err != nil {
 		t.Fatal(err)
 	}
 	got := atlauncherFixture(t, dir)
@@ -50,10 +62,10 @@ func TestATLauncherSlotsToggleEnableCommands(t *testing.T) {
 	if got.Launcher.Pre != "sh pre" || got.Launcher.Post != "sh post" || got.Launcher.Memory != 4096 || got.Name != "Cozy" {
 		t.Fatalf("slots written, settings kept: %+v", got)
 	}
-	if slots, found, err := ReadSlots(e, dir); err != nil || !found || slots.PreLaunch != "sh pre" || slots.PostExit != "sh post" {
+	if slots, found, err := ReadSlots(e, slotRow(e.Name, dir)); err != nil || !found || slots.PreLaunch != "sh pre" || slots.PostExit != "sh post" {
 		t.Fatalf("read back: %+v found=%v err=%v", slots, found, err)
 	}
-	if err := WriteSlots(e, dir, Slots{}); err != nil {
+	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{}); err != nil {
 		t.Fatal(err)
 	}
 	got = atlauncherFixture(t, dir)
@@ -69,7 +81,7 @@ func TestPrismSlotsWriteOverrideCommands(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, InstanceConfigFile), "[General]\nConfigVersion=1.3\nname=Cozy\n")
 	e := Find("prism")
-	if err := WriteSlots(e, dir, Slots{PreLaunch: "sh pre", PostExit: "sh post"}); err != nil {
+	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{PreLaunch: "sh pre", PostExit: "sh post"}); err != nil {
 		t.Fatal(err)
 	}
 	values, err := readINI(filepath.Join(dir, InstanceConfigFile), false)
@@ -82,7 +94,7 @@ func TestPrismSlotsWriteOverrideCommands(t *testing.T) {
 	if values["name"] != "Cozy" || values["ConfigVersion"] != "1.3" {
 		t.Fatalf("the instance's own keys must survive: %+v", values)
 	}
-	if err := WriteSlots(e, dir, Slots{PreLaunch: "sh pre"}); err != nil {
+	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{PreLaunch: "sh pre"}); err != nil {
 		t.Fatal(err)
 	}
 	values, err = readINI(filepath.Join(dir, InstanceConfigFile), false)
@@ -98,17 +110,17 @@ func TestGDLauncherSlotsRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	write(t, filepath.Join(dir, GDLauncherInstanceFile), `{"name":"Cozy","_version":"1"}`)
 	e := Find("gdlauncher")
-	if err := WriteSlots(e, dir, Slots{PreLaunch: "sh pre", PostExit: "sh post"}); err != nil {
+	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{PreLaunch: "sh pre", PostExit: "sh post"}); err != nil {
 		t.Fatal(err)
 	}
-	slots, found, err := ReadSlots(e, dir)
+	slots, found, err := ReadSlots(e, slotRow(e.Name, dir))
 	if err != nil || !found || slots.PreLaunch != "sh pre" || slots.PostExit != "sh post" {
 		t.Fatalf("read back: %+v found=%v err=%v", slots, found, err)
 	}
-	if err := WriteSlots(e, dir, Slots{}); err != nil {
+	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{}); err != nil {
 		t.Fatal(err)
 	}
-	if slots, _, err := ReadSlots(e, dir); err != nil || slots.PreLaunch != "" || slots.PostExit != "" {
+	if slots, _, err := ReadSlots(e, slotRow(e.Name, dir)); err != nil || slots.PreLaunch != "" || slots.PostExit != "" {
 		t.Fatalf("slots cleared: %+v err=%v", slots, err)
 	}
 	var got struct {
@@ -126,15 +138,18 @@ func TestGDLauncherSlotsRoundTrip(t *testing.T) {
 func TestWriteSlotsWithNoInstanceIsNoOp(t *testing.T) {
 	dir := t.TempDir()
 	for _, name := range []string{"atlauncher", "gdlauncher"} {
-		if err := WriteSlots(Find(name), dir, Slots{PreLaunch: "sh pre"}); err != nil {
+		if err := WriteSlots(Find(name), slotRow(name, dir), Slots{PreLaunch: "sh pre"}); err != nil {
 			t.Fatalf("%s: writing slots for an instance that isn't there: %v", name, err)
 		}
-		if _, found, err := ReadSlots(Find(name), dir); found || err != nil {
+		if _, found, err := ReadSlots(Find(name), slotRow(name, dir)); found || err != nil {
 			t.Fatalf("%s: found=%v err=%v", name, found, err)
 		}
 	}
-	if _, ok := SlotOf("mojang"); ok {
-		t.Fatal("the Minecraft launcher has no slot to fill until the shim lands")
+	if slot, ok := SlotOf("mojang"); !ok || !slot.Shim {
+		t.Fatalf("the Minecraft launcher fills the profile's Java: %+v ok=%v", slot, ok)
+	}
+	if slot, _ := SlotOf("prism"); slot.Shim {
+		t.Fatal("a launcher with command slots must not take the profile's Java")
 	}
 }
 

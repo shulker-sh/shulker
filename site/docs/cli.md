@@ -623,7 +623,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 
 Install the project's loader, if it has one, into the official launcher and add a profile that points at the client build. Alias: `vanilla`.
 
-With no source, it links the project in the current directory, and the profile's game directory is the project's `build/<side>`. Pass a project directory, git URL, or manifest URL to link that instead: the game directory is then `shulker/<slug>` inside the launcher directory, and shulker syncs it right away so it's ready to play. The official launcher has no pre-launch hook, so the profile doesn't update itself; run `shulker sync -i <id>` (or `shulker sync --all`) to bring it up to date.
+With no source, it links the project in the current directory, and the profile's game directory is the project's `build/<side>`. Pass a project directory, git URL, or manifest URL to link that instead: the game directory is then `shulker/<slug>` inside the launcher directory, and shulker syncs it right away so it's ready to play. The official launcher runs no commands of its own, so shulker points the profile's Java at a small shim of its own that syncs the instance before each launch and then starts the game. On Windows the profile keeps the launcher's own Java, so run `shulker sync -i <id>` (or `shulker sync --all`) to bring it up to date.
 
 If the profile already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one.
 

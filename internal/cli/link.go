@@ -133,11 +133,14 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := saveIntent(gameDir, src.name, ref, side, assumeClient); err != nil {
 				return err
 			}
-			a.registerInstance(config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name})
+			row := config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name}
+			a.registerInstance(row)
 			if !src.remote() {
 				if _, err := a.recordClientRuntime(cmd.Context(), p, side, gameDir); err != nil {
 					return err
 				}
+				// The shim records the Java it falls back to, which the runtime step just resolved.
+				a.reconcileOrWarn(row)
 			}
 			if src.remote() {
 				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: gameDir, assumeClient: assumeClient})

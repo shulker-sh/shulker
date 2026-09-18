@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/instance"
 )
@@ -28,6 +29,9 @@ type Slot struct {
 	Deadline string
 	// Reproducible is Tokens minus the ones shulker cannot reproduce, which adoption warns about.
 	Unreproducible []string
+	// Shim marks a launcher with no command slots at all, where what shulker fills is the profile's
+	// Java instead, with a shim that hands the launch back to it.
+	Shim bool
 }
 
 var instTokens = []string{"INST_NAME", "INST_ID", "INST_DIR", "INST_MC_DIR"}
@@ -37,6 +41,7 @@ var slots = map[string]Slot{
 	"multimc":    {Token: "$INST_MC_DIR", Tokens: instTokens},
 	"atlauncher": {Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}},
 	"gdlauncher": {Deadline: "4m"},
+	"mojang":     {Shim: true},
 }
 
 // SlotOf is how a launcher's slots behave, and whether shulker fills them at all.
@@ -94,15 +99,18 @@ func isLegacySyncCommand(command string) bool {
 		(strings.HasSuffix(command, `--into "$INST_MC_DIR"`) || strings.HasSuffix(command, " --into ."))
 }
 
-// Slots are the commands in one instance's two slots.
+// Slots are what one instance holds in the slots its launcher has: two commands, or the profile's
+// Java where the launcher runs no commands.
 type Slots struct {
 	PreLaunch string
 	PostExit  string
+	Java      string
 }
 
 // ReadSlots is what a launcher currently has in an instance's slots, and whether the instance exists
 // at all. A launcher shulker fills no slots for reports nothing found.
-func ReadSlots(e *Entry, instanceDir string) (Slots, bool, error) {
+func ReadSlots(e *Entry, in config.Instance) (Slots, bool, error) {
+	instanceDir := e.InstanceDir(in.Dir)
 	switch e.Name {
 	case "prism", "multimc":
 		values, err := readINI(filepath.Join(instanceDir, InstanceConfigFile), e.Name == "multimc")
@@ -125,13 +133,17 @@ func ReadSlots(e *Entry, instanceDir string) (Slots, bool, error) {
 			return Slots{}, found, err
 		}
 		return Slots{PreLaunch: jsonStringValue(top["pre_launch_hook"]), PostExit: jsonStringValue(top["post_exit_hook"])}, true, nil
+	case "mojang":
+		java, found, err := (&Mojang{Dir: in.LauncherDir}).JavaDir(in.Dir)
+		return Slots{Java: java}, found, err
 	}
 	return Slots{}, false, nil
 }
 
 // WriteSlots puts commands in an instance's slots, an empty one clearing that slot. It is what
 // reconcile uses, so a hand-edited switch takes effect through the same path that first set it.
-func WriteSlots(e *Entry, instanceDir string, s Slots) error {
+func WriteSlots(e *Entry, in config.Instance, s Slots) error {
+	instanceDir := e.InstanceDir(in.Dir)
 	switch e.Name {
 	case "prism", "multimc":
 		return writePrismSlots(instanceDir, e.Name == "multimc", s)
@@ -139,6 +151,8 @@ func WriteSlots(e *Entry, instanceDir string, s Slots) error {
 		return writeATLauncherSlots(instanceDir, s)
 	case "gdlauncher":
 		return writeGDLauncherSlots(instanceDir, s)
+	case "mojang":
+		return (&Mojang{Dir: in.LauncherDir}).SetJavaDir(in.Dir, s.Java)
 	}
 	return nil
 }
@@ -236,9 +250,9 @@ func writeGDLauncherSlots(instanceDir string, s Slots) error {
 // slots are cleared, and both generated scripts go. It reports which slots shulker was holding, so
 // the caller can say what it removed. Used by `unlink` and by a link that switches to symlink mode,
 // so letting go of a slot happens one way.
-func ReleaseSlots(e *Entry, gameDir string) (tookPreLaunch, tookPostExit bool, err error) {
-	instanceDir := e.InstanceDir(gameDir)
-	current, found, err := ReadSlots(e, instanceDir)
+func ReleaseSlots(e *Entry, in config.Instance) (tookPreLaunch, tookPostExit bool, err error) {
+	gameDir := in.Dir
+	current, found, err := ReadSlots(e, in)
 	if err != nil {
 		return false, false, err
 	}
@@ -248,8 +262,20 @@ func ReleaseSlots(e *Entry, gameDir string) (tookPreLaunch, tookPostExit bool, e
 		adopted = Slots{PreLaunch: f.Settings.Commands.PreLaunch, PostExit: f.Settings.Commands.PostExit}
 	}
 	tookPreLaunch, tookPostExit = IsShulkerSlot(current.PreLaunch), IsShulkerSlot(current.PostExit)
-	if found {
-		if err := WriteSlots(e, instanceDir, Slots{
+	if slot, _ := SlotOf(e.Name); slot.Shim {
+		// The profile keeps a Java shulker didn't set; the one it did set goes back to what the
+		// launcher had, which is usually no key at all.
+		if found && IsShulkerShim(current.Java) {
+			var launcherJava string
+			if ferr == nil && f.Resolved != nil {
+				launcherJava = f.Resolved.LauncherJava
+			}
+			if err := WriteSlots(e, in, Slots{Java: launcherJava}); err != nil {
+				return false, false, err
+			}
+		}
+	} else if found {
+		if err := WriteSlots(e, in, Slots{
 			PreLaunch: releaseSlot(adopted.PreLaunch, current.PreLaunch),
 			PostExit:  releaseSlot(adopted.PostExit, current.PostExit),
 		}); err != nil {
@@ -261,8 +287,14 @@ func ReleaseSlots(e *Entry, gameDir string) (tookPreLaunch, tookPostExit bool, e
 			return false, false, err
 		}
 	}
-	if ferr == nil && f.Settings.Commands != nil {
+	if err := RemoveShim(gameDir); err != nil {
+		return false, false, err
+	}
+	if ferr == nil && (f.Settings.Commands != nil || (f.Resolved != nil && f.Resolved.LauncherJava != "")) {
 		f.Settings.Commands = nil
+		if f.Resolved != nil {
+			f.Resolved.LauncherJava = ""
+		}
 		if err := f.Save(gameDir); err != nil {
 			return false, false, err
 		}

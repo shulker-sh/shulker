@@ -145,7 +145,7 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 			// this is where it lets go of them.
 			if mode != "sync" {
 				if e := launcher.Find(launcherName); e != nil {
-					if _, _, err := launcher.ReleaseSlots(e, res.GameDir); err != nil {
+					if _, _, err := launcher.ReleaseSlots(e, config.Instance{Launcher: launcherName, LauncherDir: launcherDir, Dir: res.GameDir}); err != nil {
 						return err
 					}
 				}

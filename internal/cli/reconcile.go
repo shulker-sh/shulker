@@ -18,8 +18,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 	e := launcher.Find(in.Launcher)
 	slot, fills := launcher.SlotOf(in.Launcher)
 	if e == nil || !fills {
-		// A plain synced directory and a Minecraft launcher profile have no slot to fill, so they get
-		// no scripts either, until the shim lands.
+		// A plain synced directory has no slot to fill, so it gets no scripts either.
 		return nil
 	}
 	f, err := instance.Load(in.Dir)
@@ -27,7 +26,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 		return err
 	}
 	instanceDir := e.InstanceDir(in.Dir)
-	current, found, err := launcher.ReadSlots(e, instanceDir)
+	current, found, err := launcher.ReadSlots(e, in)
 	if err != nil || !found {
 		return err
 	}
@@ -37,6 +36,9 @@ func (a *app) reconcileInstance(in config.Instance) error {
 	}
 	f.Settings.Shulker = exe
 	a.adoptSlots(f, slot, current)
+	if slot.Shim {
+		captureLauncherJava(f, current.Java)
+	}
 
 	var want launcher.Slots
 	if f.Settings.PreLaunch() {
@@ -53,7 +55,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 		if err := launcher.WriteHook(h); err != nil {
 			return err
 		}
-		want.PreLaunch = launcher.SlotCommand(in.Launcher, in.Dir, launcher.HookPreLaunch)
+		want.PreLaunch = slotCommandOf(slot, in, launcher.HookPreLaunch)
 	} else if err := launcher.RemoveHook(in.Dir, launcher.HookPreLaunch); err != nil {
 		return err
 	}
@@ -70,14 +72,70 @@ func (a *app) reconcileInstance(in config.Instance) error {
 		if err := launcher.WriteHook(h); err != nil {
 			return err
 		}
-		want.PostExit = launcher.SlotCommand(in.Launcher, in.Dir, launcher.HookPostExit)
+		want.PostExit = slotCommandOf(slot, in, launcher.HookPostExit)
 	} else if err := launcher.RemoveHook(in.Dir, launcher.HookPostExit); err != nil {
 		return err
 	}
-	if err := launcher.WriteSlots(e, instanceDir, want); err != nil {
+	if slot.Shim {
+		if want.Java, err = reconcileShim(in, f, current.Java, exe); err != nil {
+			return err
+		}
+	}
+	if err := launcher.WriteSlots(e, in, want); err != nil {
 		return err
 	}
 	return f.Save(in.Dir)
+}
+
+// slotCommandOf is what the launcher's own slot holds. A launcher with no command slots keeps them
+// empty: its generated scripts are there for the shim to reach, not for the launcher to run.
+func slotCommandOf(slot launcher.Slot, in config.Instance, kind launcher.HookKind) string {
+	if slot.Shim {
+		return ""
+	}
+	return launcher.SlotCommand(in.Launcher, in.Dir, kind)
+}
+
+// reconcileShim writes or removes the shim with the hook switches, and reports what the profile's
+// Java should be: the shim while a switch is on, else the Java the profile had before shulker.
+func reconcileShim(in config.Instance, f *instance.File, current, exe string) (string, error) {
+	if !launcher.ShimSupported() {
+		return current, nil
+	}
+	if !f.Settings.PreLaunch() && !f.Settings.PostExit() {
+		restore := ""
+		if f.Resolved != nil {
+			restore = f.Resolved.LauncherJava
+		}
+		return restore, launcher.RemoveShim(in.Dir)
+	}
+	java := f.Settings.Java
+	if java == "" && f.Resolved != nil {
+		java = f.Resolved.Java
+	}
+	if err := launcher.WriteShim(launcher.Shim{Dir: in.Dir, Shulker: exe, Java: java}); err != nil {
+		return "", err
+	}
+	return launcher.ShimPath(in.Dir), nil
+}
+
+// captureLauncherJava records the Java the profile had before shulker pointed it at the shim, so
+// unlink and a switch turned off can put it back. Finding the shim there means this profile is
+// already linked, and what was captured the first time stands.
+func captureLauncherJava(f *instance.File, current string) {
+	if launcher.IsShulkerShim(current) {
+		return
+	}
+	if current == "" {
+		if f.Resolved != nil {
+			f.Resolved.LauncherJava = ""
+		}
+		return
+	}
+	if f.Resolved == nil {
+		f.Resolved = &instance.Resolved{}
+	}
+	f.Resolved.LauncherJava = current
 }
 
 // adoptSlots moves a command shulker didn't write into the instance's own settings, so the generated

@@ -199,7 +199,7 @@ func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 	case err == nil && info.Mode()&os.ModeSymlink != 0:
 		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance stays and still uses the build directory.", l.Label(), e.Title)}, nil
 	}
-	tookPreLaunch, tookPostExit, err := ReleaseSlots(e, l.Dir)
+	tookPreLaunch, tookPostExit, err := ReleaseSlots(e, l)
 	if err != nil {
 		return Forgotten{}, err
 	}
@@ -221,6 +221,11 @@ func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 }
 
 func forgetMojang(e *Entry, l config.Instance) (Forgotten, error) {
+	// Unlink takes the generated scripts and the shim with the profile, and puts the profile's own
+	// Java back on the way.
+	if _, _, err := ReleaseSlots(e, l); err != nil {
+		return Forgotten{}, err
+	}
 	n, err := (&Mojang{Dir: l.LauncherDir}).RemoveProfiles(l.Dir)
 	if err != nil {
 		return Forgotten{}, err
