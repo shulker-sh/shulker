@@ -21,6 +21,7 @@ Required properties are marked with *.
 | `source` * | `string` | Where this instance syncs from: a project directory, a git URL, or a manifest URL.<br>min length 1 |
 | `ref` | `string` | Branch, tag, or commit to follow from a git source. Omitted follows the remote HEAD.<br>min length 1 |
 | `side` * | `"client"` \| `"server"` | Which side of the source this directory is built for. A launcher instance is always the client. |
+| `assumeClient` | `boolean` | Set by `--assume-client`: the source declares no client, so this directory is built from the mods and overrides both sides share. Ignored once the source declares one. |
 | `unlinked` | `boolean` | Set by `shulker unlink`: shulker no longer syncs this directory, and `shulker instances repair` leaves it alone. Linking or syncing into it again clears it. |
 | `settings` | object | Yours to change. Shulker seeds these when the instance is created and reads them from then on. |
 | `resolved` | object | Written by shulker, for you to read. Editing it changes nothing; the next sync writes it again. |

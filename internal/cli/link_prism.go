@@ -35,6 +35,7 @@ type prismReport struct {
 func (a *app) linkPrismCmd() *cobra.Command {
 	var launcherDir, mode, instanceName, ref, as string
 	var force bool
+	var assumeClient bool
 	var ff featureFlags
 	cmd := &cobra.Command{
 		Use:     "prism [project-dir | git-url | manifest-url]",
@@ -61,7 +62,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 					return err
 				}
 			}
-			side, err := clientSide(p.Manifest)
+			side, err := a.clientSide(p.Manifest, assumeClient)
 			if err != nil {
 				return err
 			}
@@ -149,14 +150,14 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			// In symlink mode the game directory is the project's own build directory, so the
 			// project holds the intent and nothing is written into its output.
 			if mode == "sync" {
-				if err := saveIntent(res.GameDir, src.name, ref, side); err != nil {
+				if err := saveIntent(res.GameDir, src.name, ref, side, assumeClient); err != nil {
 					return err
 				}
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: launcherName, LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
 			var synced *syncResult
 			if len(args) == 1 && mode == "sync" {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: res.GameDir})
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: res.GameDir, assumeClient: assumeClient})
 				if err != nil {
 					return err
 				}
@@ -207,6 +208,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: Prism Launcher's; required for MultiMC)")
+	cmd.Flags().BoolVar(&assumeClient, "assume-client", false, "link a client even when the source declares none, built from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&mode, "mode", "sync", "sync: build into the instance before each launch; symlink: point the instance at the build directory")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")

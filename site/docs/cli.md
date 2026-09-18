@@ -125,6 +125,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
 | `--bundle` | Put files that Modrinth launchers can't download inside the archive |
+| `--assume-client` | Export a client even when the source declares none, from the mods and overrides both sides share |
 | `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
 
 ### `shulker export curseforge`
@@ -144,6 +145,7 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
 | `--bundle` | Put mods that aren't on CurseForge inside the archive, and bundle every mod not from CurseForge when the lookup can't run |
+| `--assume-client` | Export a client even when the source declares none, from the mods and overrides both sides share |
 | `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
 
 ## Mods
@@ -577,6 +579,7 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: ATLauncher's) |
+| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
@@ -607,6 +610,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher runtime directory (default: GDLauncher's) |
+| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
@@ -631,6 +635,7 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher directory (default: the official launcher's `.minecraft` folder) |
+| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--name <name>` | Profile name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
@@ -657,6 +662,7 @@ shulker link multimc --launcher-dir ~/MultiMC
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: Prism Launcher's; required for MultiMC) |
+| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
@@ -698,6 +704,7 @@ A project whose side builds into its own directory is an instance, and `sync` ru
 | `--side <side>` | Side to build from a source (default: the only declared side); with `-i`, `--all`, or the picker, only `client` or `server` instances |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
+| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
@@ -1064,7 +1071,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
 | `no-instances` | Nothing is linked yet |
 | `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
-| `no-side` | `shulker.json` declares no side of the kind the command needs |
+| `no-side` | `shulker.json` declares no side of the kind the command needs. A local command (`build`, `diff`, `serve`) says to add the block; a command that can take a remote source (`link *`, `sync`, `export *`) says to pass `--assume-client` |
 | `not-built` | The side has no build directory yet; run `shulker build` |
 | `not-direct` | The mod is only a dependency. `items`: the mods that require it |
 | `not-drifted` | A file named to `pull` has no changes. `candidates`: the changed files |

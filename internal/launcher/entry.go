@@ -44,8 +44,9 @@ type Entry struct {
 // ref the relink command needs now live.
 type Linked struct {
 	config.Instance
-	Side string
-	Ref  string
+	Side         string
+	AssumeClient bool
+	Ref          string
 }
 
 var All = []*Entry{
@@ -154,7 +155,11 @@ func relinkSync(l Linked) (args []string, in string) {
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
 	}
-	return append(args, "--side", shellArg(l.Side), "--into", shellArg(l.Dir), "--name", shellArg(l.Label())), ""
+	args = append(args, "--side", shellArg(l.Side))
+	if l.AssumeClient {
+		args = append(args, "--assume-client")
+	}
+	return append(args, "--into", shellArg(l.Dir), "--name", shellArg(l.Label())), ""
 }
 
 func relinkInstance(e *Entry, l Linked) (args []string, in string) {
@@ -168,6 +173,9 @@ func relinkInstance(e *Entry, l Linked) (args []string, in string) {
 			args = append(args, "--ref", shellArg(l.Ref))
 		}
 	}
+	if l.AssumeClient {
+		args = append(args, "--assume-client")
+	}
 	return append(args, "--name", shellArg(l.Label())), in
 }
 
@@ -175,6 +183,9 @@ func relinkMojang(e *Entry, l Linked) (args []string, in string) {
 	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
+	}
+	if l.AssumeClient {
+		args = append(args, "--assume-client")
 	}
 	return append(args, "--name", shellArg(l.Label())), ""
 }

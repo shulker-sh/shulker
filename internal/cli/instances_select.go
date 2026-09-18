@@ -257,6 +257,7 @@ func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest)
 		return syncResult{}, err
 	}
 	req.ref, req.side, req.into = e.Ref, e.Side, e.Dir
+	req.assumeClient = req.assumeClient || e.AssumeClient
 	return a.sync(cmd.Context(), src, req)
 }
 

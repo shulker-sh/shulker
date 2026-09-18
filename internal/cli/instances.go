@@ -21,12 +21,13 @@ import (
 
 type instanceEntry struct {
 	config.Instance
-	Status   string `json:"status"`
-	SyncedAt string `json:"syncedAt,omitempty"`
-	Side     string `json:"side,omitempty"`
-	Ref      string `json:"ref,omitempty"`
-	Problem  string `json:"problem,omitempty"`
-	intent   *instance.File
+	Status       string `json:"status"`
+	SyncedAt     string `json:"syncedAt,omitempty"`
+	Side         string `json:"side,omitempty"`
+	AssumeClient bool   `json:"assumeClient,omitempty"`
+	Ref          string `json:"ref,omitempty"`
+	Problem      string `json:"problem,omitempty"`
+	intent       *instance.File
 }
 
 const (
@@ -99,7 +100,7 @@ func inspectInstance(in config.Instance) instanceEntry {
 		e.Problem = out.AsError(err).Message
 	default:
 		e.intent = f
-		e.Side, e.Ref = f.Side, f.Ref
+		e.Side, e.Ref, e.AssumeClient = f.Side, f.Ref, f.AssumeClient
 		if e.Source == "" {
 			e.Source = f.Source
 		}
@@ -280,7 +281,7 @@ func (a *app) updateInstances(update func([]config.Instance) []config.Instance) 
 
 // saveIntent writes what a directory syncs from, keeping the settings block a person may have
 // edited. Every directory shulker syncs into gets one, launcher instance or not.
-func saveIntent(dir, source, ref, side string) error {
+func saveIntent(dir, source, ref, side string, assumeClient bool) error {
 	f, err := instance.Load(dir)
 	switch {
 	case errors.Is(err, instance.ErrNotFound):
@@ -290,6 +291,7 @@ func saveIntent(dir, source, ref, side string) error {
 	default:
 		f.Source, f.Ref, f.Side, f.Unlinked = source, ref, side, false
 	}
+	f.AssumeClient = assumeClient
 	return f.Save(dir)
 }
 

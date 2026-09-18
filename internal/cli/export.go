@@ -28,7 +28,7 @@ func (a *app) exportCmd() *cobra.Command {
 
 type exportFlags struct {
 	version, output, side, osName, ref string
-	bundle                             bool
+	bundle, assumeClient               bool
 	ff                                 featureFlags
 }
 
@@ -37,6 +37,7 @@ func (f *exportFlags) register(cmd *cobra.Command, extension, bundle string) {
 	cmd.Flags().StringVarP(&f.output, "output", "o", "", "archive path (default: build/<name>-<version>"+extension+", or the current directory for a git or URL source)")
 	cmd.Flags().StringVar(&f.osName, "os", "", "include mods gated on this os: macos, windows, or linux (default: leave them out)")
 	cmd.Flags().BoolVar(&f.bundle, "bundle", false, bundle)
+	cmd.Flags().BoolVar(&f.assumeClient, "assume-client", false, "export a client even when the source declares none, built from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&f.ref, "ref", "", "branch, tag, or commit to export from a git source (default: the remote HEAD)")
 	f.ff.register(cmd, "for this run only")
 }
@@ -159,12 +160,8 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 				return err
 			}
 			opts := build.MrpackOptions{VersionID: job.version, Output: job.output, Bundle: f.bundle, OS: f.osName, Features: job.features}
-			if f.side != "" {
-				side, err := declaredSide(job.project.Manifest, f.side, "--side")
-				if err != nil {
-					return err
-				}
-				opts.Sides = []string{side}
+			if opts.Sides, err = a.exportSides(job.project.Manifest, f.side, f.assumeClient); err != nil {
+				return err
 			}
 			rep, err := job.builder.ExportMrpack(opts)
 			if err != nil {
@@ -193,7 +190,7 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			side, err := clientSide(job.project.Manifest)
+			side, err := a.clientSide(job.project.Manifest, f.assumeClient)
 			if err != nil {
 				return err
 			}

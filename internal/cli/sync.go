@@ -35,7 +35,7 @@ type syncResult struct {
 
 type syncRequest struct {
 	ref, side, into, os, name, as string
-	force                         bool
+	force, assumeClient           bool
 	features                      featureFlags
 }
 
@@ -127,6 +127,7 @@ func (a *app) syncCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&req.into, "into", "", "output directory (default: the side's build directory)")
 	cmd.Flags().BoolVar(&req.force, "force", false, "overwrite files edited in the output directory")
+	cmd.Flags().BoolVar(&req.assumeClient, "assume-client", false, "build a client even when the source declares none, from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&req.ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.os, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the side's display name)")
@@ -188,7 +189,7 @@ func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, er
 
 func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncResult, error) {
 	p := src.project
-	side, err := singleSide(p, req.side)
+	side, err := a.syncSide(p, req.side, req.assumeClient)
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -261,7 +262,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
 	if register {
-		if err := saveIntent(into, src.name, req.ref, side); err != nil {
+		if err := saveIntent(into, src.name, req.ref, side, req.assumeClient); err != nil {
 			return syncResult{}, err
 		}
 		entry := config.Instance{ID: req.as, Name: req.name, Dir: into, Source: src.name}

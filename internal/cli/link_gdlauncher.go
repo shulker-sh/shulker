@@ -19,6 +19,7 @@ import (
 func (a *app) linkGDLauncherCmd() *cobra.Command {
 	var launcherDir, instanceName, ref, as string
 	var force bool
+	var assumeClient bool
 	var ff featureFlags
 	cmd := &cobra.Command{
 		Use:   "gdlauncher [project-dir | git-url | manifest-url]",
@@ -35,7 +36,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 					return err
 				}
 			}
-			side, err := clientSide(p.Manifest)
+			side, err := a.clientSide(p.Manifest, assumeClient)
 			if err != nil {
 				return err
 			}
@@ -118,13 +119,13 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			if err := a.checkID(as, res.GameDir); err != nil {
 				return err
 			}
-			if err := saveIntent(res.GameDir, src.name, ref, side); err != nil {
+			if err := saveIntent(res.GameDir, src.name, ref, side, assumeClient); err != nil {
 				return err
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: "gdlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
 			var synced *syncResult
 			if len(args) == 1 {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: res.GameDir})
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: res.GameDir, assumeClient: assumeClient})
 				if err != nil {
 					return err
 				}
@@ -165,6 +166,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher runtime directory (default: GDLauncher's)")
+	cmd.Flags().BoolVar(&assumeClient, "assume-client", false, "link a client even when the source declares none, built from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")

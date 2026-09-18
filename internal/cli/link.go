@@ -41,6 +41,7 @@ func (a *app) linkCmd() *cobra.Command {
 func (a *app) linkMojangCmd() *cobra.Command {
 	var launcherDir, instanceName, ref, as string
 	var force bool
+	var assumeClient bool
 	cmd := &cobra.Command{
 		Use:     "mojang [project-dir | git-url | manifest-url]",
 		Aliases: []string{"vanilla"},
@@ -58,7 +59,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					return err
 				}
 			}
-			side, err := clientSide(p.Manifest)
+			side, err := a.clientSide(p.Manifest, assumeClient)
 			if err != nil {
 				return err
 			}
@@ -129,12 +130,12 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
-			if err := saveIntent(gameDir, src.name, ref, side); err != nil {
+			if err := saveIntent(gameDir, src.name, ref, side, assumeClient); err != nil {
 				return err
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name})
 			if src.remote() {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: gameDir})
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: gameDir, assumeClient: assumeClient})
 				if err != nil {
 					return err
 				}
@@ -156,6 +157,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher directory (default: the official launcher's .minecraft folder)")
+	cmd.Flags().BoolVar(&assumeClient, "assume-client", false, "link a client even when the source declares none, built from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")

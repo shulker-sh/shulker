@@ -27,6 +27,8 @@ type File struct {
 	Source string `json:"source"`
 	Ref    string `json:"ref,omitempty"`
 	Side   string `json:"side"`
+	// AssumeClient builds a client the source never declared, from what both sides share.
+	AssumeClient bool `json:"assumeClient,omitempty"`
 	// Unlinked keeps a directory `unlink` let go of from being registered again by a repair scan.
 	Unlinked bool      `json:"unlinked,omitempty"`
 	Settings Settings  `json:"settings"`

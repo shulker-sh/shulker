@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -207,7 +208,9 @@ func (a *app) resync(cmd *cobra.Command, sc *featureScope) (*syncResult, error) 
 			return nil, err
 		}
 	}
-	res, err := a.sync(cmd.Context(), sc.source, syncRequest{ref: sc.state.Ref, side: sc.state.Side, into: sc.into})
+	intent, err := instance.Load(sc.into)
+	assume := err == nil && intent.AssumeClient
+	res, err := a.sync(cmd.Context(), sc.source, syncRequest{ref: sc.state.Ref, side: sc.state.Side, into: sc.into, assumeClient: assume})
 	return &res, err
 }
 

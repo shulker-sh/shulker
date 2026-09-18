@@ -170,6 +170,9 @@ func TestLinkMojangErrors(t *testing.T) {
 	if e := failureCode(t, stdout); code == 0 || e.Code != "no-side" || e.Message != "shulker.json declares no client" {
 		t.Fatalf("no client side: exit %d %s", code, stdout)
 	}
+	if _, _, stderr := h.run(t, "link", "mojang", "--launcher-dir", t.TempDir()); !strings.Contains(stderr, "pass --assume-client to build one anyway") {
+		t.Fatalf("no-side hint names the flag: %s", stderr)
+	}
 }
 
 func failureCode(t *testing.T, stdout string) *out.Error {
