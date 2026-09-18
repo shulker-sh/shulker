@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -26,7 +28,7 @@ func (a *app) hookCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.AddCommand(a.hookPreLaunchCmd(), a.hookPostExitCmd())
+	cmd.AddCommand(a.hookPreLaunchCmd(), a.hookPostExitCmd(), a.hookWrapCmd())
 	return cmd
 }
 
@@ -47,15 +49,7 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 				defer cancel()
 				cmd.SetContext(ctx)
 			}
-			var res syncResult
-			p, side, inPlace, err := a.inPlaceProject(dir)
-			switch {
-			case err != nil:
-			case inPlace:
-				res, err = a.syncInPlaceForLaunch(cmd, p, side)
-			default:
-				res, err = a.syncRecorded(cmd, syncRequest{into: dir})
-			}
+			res, err := a.syncForLaunch(cmd, dir)
 			if err == nil {
 				return a.printer.Emit(res, res.print)
 			}
@@ -82,38 +76,134 @@ func (a *app) hookPostExitCmd() *cobra.Command {
 			if !ok || !f.Settings.PostExit() {
 				return nil
 			}
-			keep := f.Settings.LaunchKeep()
-			if keep == 0 {
+			a.closeLaunch(dir, f.Settings)
+			return nil
+		},
+	}
+}
+
+// hookWrapCmd stands in for Java where the launcher has no command slots: the Mojang shim names the
+// instance with -C and hands the game's own argv over after --. That argv carries the session access
+// token, so it goes to Java and nowhere else: no warning, no record and no output repeats it.
+func (a *app) hookWrapCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "wrap -- <java arguments>",
+		Short: "Sync the instance, then run the game with this machine's Java",
+		Args:  cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, argv []string) error {
+			// The launcher's version check runs the shim without --gameDir, and that call just
+			// wants Java.
+			gameDir, launching := gameDirOf(argv)
+			if a.dir == "" && a.instance == "" {
+				a.dir = gameDir
+			}
+			dir, f, ok := a.hookInstance()
+			if !ok {
 				return nil
 			}
-			records := instance.LoadLaunches(dir)
-			open := -1
-			for i := len(records) - 1; i >= 0; i-- {
-				if records[i].EndedAt == "" {
-					open = i
-					break
+			java := f.Settings.Java
+			if java == "" && f.Resolved != nil {
+				java = f.Resolved.Java
+			}
+			if java == "" {
+				a.printer.Warn("%s records no Java to run the game with; run shulker instances repair", instance.Path(dir))
+				return nil
+			}
+			if launching && f.Settings.PreLaunch() {
+				a.stampLaunch(dir, f.Settings)
+				if res, err := a.syncForLaunch(cmd, dir); err != nil {
+					a.printer.Warn("%v", err)
+				} else if err := a.printer.Emit(res, res.print); err != nil {
+					return err
 				}
 			}
-			if open < 0 {
-				return nil
+			exe, args := java, argv
+			if w := f.Settings.Wrapper; len(w) > 0 {
+				exe = w[0]
+				args = append(append(append([]string{}, w[1:]...), java), argv...)
 			}
-			started, err := time.Parse(time.RFC3339, records[open].StartedAt)
-			if err != nil {
-				started = time.Time{}
+			gameOut := a.printer.Stdout
+			if a.printer.JSON {
+				gameOut = a.printer.Stderr
 			}
-			log, crash := serverFailureFiles(dir, started)
-			records[open].EndedAt = time.Now().UTC().Format(time.RFC3339)
-			records[open].Outcome = instance.OutcomeOK
-			records[open].Log = log
-			if crash != "" {
-				records[open].Outcome = instance.OutcomeCrashed
-				records[open].CrashReport = crash
+			game := exec.Command(exe, args...)
+			game.Stdin, game.Stdout, game.Stderr = a.stdin, gameOut, a.printer.Stderr
+			code := 0
+			if err := game.Run(); err != nil {
+				var exit *exec.ExitError
+				if !errors.As(err, &exit) {
+					a.printer.Warn("run %s: %v", exe, err)
+					return nil
+				}
+				code = exit.ExitCode()
 			}
-			if err := instance.SaveLaunches(dir, records, keep); err != nil {
-				a.printer.Warn("%v", err)
+			if launching && f.Settings.PostExit() {
+				a.closeLaunch(dir, f.Settings)
+			}
+			if code != 0 {
+				return &out.Error{Code: "game-exit", Message: fmt.Sprintf("game exited with status %d", code), Exit: code}
 			}
 			return nil
 		},
+	}
+}
+
+func gameDirOf(argv []string) (string, bool) {
+	for i, arg := range argv {
+		if arg == "--gameDir" && i+1 < len(argv) {
+			return argv[i+1], true
+		}
+		if v, ok := strings.CutPrefix(arg, "--gameDir="); ok {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+func (a *app) syncForLaunch(cmd *cobra.Command, dir string) (syncResult, error) {
+	p, side, inPlace, err := a.inPlaceProject(dir)
+	switch {
+	case err != nil:
+		return syncResult{}, err
+	case inPlace:
+		return a.syncInPlaceForLaunch(cmd, p, side)
+	default:
+		return a.syncRecorded(cmd, syncRequest{into: dir})
+	}
+}
+
+// closeLaunch ends the record stampLaunch opened. The outcome is read from a crash report newer
+// than the start, since no launcher slot passes the exit code on.
+func (a *app) closeLaunch(dir string, s instance.Settings) {
+	keep := s.LaunchKeep()
+	if keep == 0 {
+		return
+	}
+	records := instance.LoadLaunches(dir)
+	open := -1
+	for i := len(records) - 1; i >= 0; i-- {
+		if records[i].EndedAt == "" {
+			open = i
+			break
+		}
+	}
+	if open < 0 {
+		return
+	}
+	started, err := time.Parse(time.RFC3339, records[open].StartedAt)
+	if err != nil {
+		started = time.Time{}
+	}
+	log, crash := serverFailureFiles(dir, started)
+	records[open].EndedAt = time.Now().UTC().Format(time.RFC3339)
+	records[open].Outcome = instance.OutcomeOK
+	records[open].Log = log
+	if crash != "" {
+		records[open].Outcome = instance.OutcomeCrashed
+		records[open].CrashReport = crash
+	}
+	if err := instance.SaveLaunches(dir, records, keep); err != nil {
+		a.printer.Warn("%v", err)
 	}
 }
 

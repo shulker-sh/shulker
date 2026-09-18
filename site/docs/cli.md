@@ -778,6 +778,10 @@ A launcher that gives shulker no way to show a message gets a deadline instead, 
 
 What a launcher's own post-exit slot runs, recording how the run ended in the instance's `.shulker/launches.json`: when it started and finished, whether the game left a crash report, and where that report and the log are. `settings.launchHistory` in `.shulker/instance.json` is how many runs are kept — 5 by default, `-1` every one, and `0` none at all, which records nothing.
 
+### `shulker hook wrap -- <java arguments>`
+
+What the Mojang launcher's `javaDir` shim runs in place of Java, with the instance in `-C` and the game's own arguments after `--`. When those arguments carry `--gameDir` it does what the pre-launch and post-exit hooks do around the game: syncs the instance first (a failure is a warning, and the game still starts), runs Java with the arguments untouched, prefixed by `settings.wrapper` when that is set, then records the run. Without `--gameDir` it is the launcher's version check, which only runs Java. Java is `settings.java` when set, else `resolved.java`, shulker's managed runtime. The game's exit status is passed back as its own (`game-exit`); shulker's own failures never turn into one, since the launcher shows a non-zero exit as an error dialog. The arguments carry the session access token and appear in no output or record.
+
 ## Types
 
 `add`, `remove`, and `list` span every kind of thing a project requires. Each kind also has a group of its own, which is the plain verb with that `--type` and only the flags that kind takes.
@@ -1027,6 +1031,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
 | `file-not-found` | A file named to `pull` isn't in the build directory |
+| `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |
 | `history-empty` | The instance has no history entries yet; one is taken before an in-place build changes anything |
 | `history-invalid` | A history entry's own record is unreadable; `history prune` removes it |
