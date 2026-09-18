@@ -214,7 +214,7 @@ func (b *Builder) Build(name string, opts Options) (*Report, error) {
 	}
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
+		dir = filepath.Join(b.Dir, b.Manifest.TargetBuildDir(name))
 	}
 	inPlace := sameDir(dir, b.Dir)
 	report := &Report{Target: name, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}

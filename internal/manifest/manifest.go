@@ -35,15 +35,20 @@ type Manifest struct {
 	Java        string             `json:"java,omitempty"`
 	Providers   []string           `json:"providers,omitempty"`
 	History     *int               `json:"history,omitempty"`
+	Features    map[string]Feature `json:"features,omitempty"`
 	Targets     map[string]Target  `json:"targets"`
 	Requires    map[string]Require `json:"requires"`
 	Ignore      []Ignore           `json:"ignore,omitempty"`
+	WholeFiles  []string           `json:"wholeFiles,omitempty"`
 	Variables   Variables          `json:"variables,omitempty"`
 	Server      *Server            `json:"server,omitempty"`
 	Client      *Client            `json:"client,omitempty"`
 }
 
 type Server struct {
+	Name       string         `json:"name,omitempty"`
+	Build      string         `json:"build,omitempty"`
+	Variables  Variables      `json:"variables,omitempty"`
 	Eula       bool           `json:"eula"`
 	Memory     string         `json:"memory,omitempty"`
 	JvmFlags   string         `json:"jvmFlags,omitempty"`
@@ -92,9 +97,12 @@ func (p *Players) All() []Player {
 }
 
 type Client struct {
-	Options map[string]any  `json:"options,omitempty"`
-	Servers json.RawMessage `json:"servers,omitempty"`
-	Note    string          `json:"note,omitempty"`
+	Name      string          `json:"name,omitempty"`
+	Build     string          `json:"build,omitempty"`
+	Variables Variables       `json:"variables,omitempty"`
+	Options   map[string]any  `json:"options,omitempty"`
+	Servers   json.RawMessage `json:"servers,omitempty"`
+	Note      string          `json:"note,omitempty"`
 }
 
 type Loader struct {
@@ -112,6 +120,51 @@ type Target struct {
 	Features   []string  `json:"features,omitempty"`
 	WholeFiles []string  `json:"wholeFiles,omitempty"`
 	Note       string    `json:"note,omitempty"`
+}
+
+type Feature struct {
+	Default   bool             `json:"default,omitempty"`
+	Note      string           `json:"note,omitempty"`
+	Overrides FeatureOverrides `json:"overrides,omitzero"`
+}
+
+// FeatureOverrides is where a feature's override files live: one folder for
+// both sides, or a folder per side. Both empty means the default folder.
+type FeatureOverrides struct {
+	Both   string
+	Client string
+	Server string
+}
+
+func (o *FeatureOverrides) UnmarshalJSON(data []byte) error {
+	var both string
+	if err := json.Unmarshal(data, &both); err == nil {
+		*o = FeatureOverrides{Both: both}
+		return nil
+	}
+	var sides struct {
+		Client string `json:"client"`
+		Server string `json:"server"`
+	}
+	if err := json.Unmarshal(data, &sides); err != nil {
+		return err
+	}
+	*o = FeatureOverrides{Client: sides.Client, Server: sides.Server}
+	return nil
+}
+
+func (o FeatureOverrides) MarshalJSON() ([]byte, error) {
+	if o.Both != "" {
+		return json.Marshal(o.Both)
+	}
+	sides := map[string]string{}
+	if o.Client != "" {
+		sides["client"] = o.Client
+	}
+	if o.Server != "" {
+		sides["server"] = o.Server
+	}
+	return json.Marshal(sides)
 }
 
 const (
@@ -220,7 +273,26 @@ func Parse(data []byte) (*Manifest, error) {
 	if m.Requires == nil {
 		m.Requires = map[string]Require{}
 	}
+	if err := m.check(); err != nil {
+		return nil, err
+	}
 	return &m, nil
+}
+
+func (m *Manifest) check() error {
+	for _, name := range slices.Sorted(maps.Keys(m.Features)) {
+		if name == "client" || name == "server" {
+			e := out.Errorf("manifest-invalid", "%s names a feature %q, which is the side's own name", FileName, name)
+			e.Rows = []out.Detail{{Label: "Fix", Text: "rename the feature"}}
+			return e
+		}
+	}
+	if m.InPlace("client") && m.InPlace("server") {
+		e := out.Errorf("manifest-invalid", "%s builds both sides in place", FileName)
+		e.Rows = []out.Detail{{Label: "Fix", Text: `give one side a "build" directory of its own`}}
+		return e
+	}
+	return nil
 }
 
 func (m *Manifest) Mods() map[string]Require { return m.byKind(TypeMod) }
@@ -289,24 +361,24 @@ func (m *Manifest) Target(name string) (Target, error) {
 	return t, nil
 }
 
-func (m *Manifest) DisplayName(target string) string {
+func (m *Manifest) TargetDisplayName(target string) string {
 	if t, ok := m.Targets[target]; ok && t.Name != "" {
 		return t.Name
 	}
 	return m.Name
 }
 
-func (m *Manifest) BuildDir(target string) string {
+func (m *Manifest) TargetBuildDir(target string) string {
 	if t, ok := m.Targets[target]; ok && t.Build != "" {
 		return t.Build
 	}
 	return "build/" + target
 }
 
-// InPlace reports whether the target builds into the project directory itself,
-// which is what makes a project an instance.
-func (m *Manifest) InPlace(target string) bool {
-	return m.BuildDir(target) == "."
+// TargetInPlace reports whether the target builds into the project directory
+// itself, which is what makes a project an instance.
+func (m *Manifest) TargetInPlace(target string) bool {
+	return m.TargetBuildDir(target) == "."
 }
 
 // AnyInPlace names the target that builds in place, which is what makes the
@@ -314,11 +386,87 @@ func (m *Manifest) InPlace(target string) bool {
 func (m *Manifest) AnyInPlace() (string, bool) {
 	best := ""
 	for name := range m.Targets {
-		if m.InPlace(name) && (best == "" || name < best) {
+		if m.TargetInPlace(name) && (best == "" || name < best) {
 			best = name
 		}
 	}
 	return best, best != ""
+}
+
+// Sides names the sides the manifest declares, client first. A side is
+// declared by its block: "client": {} is a client.
+func (m *Manifest) Sides() []string {
+	var sides []string
+	if m.Client != nil {
+		sides = append(sides, "client")
+	}
+	if m.Server != nil {
+		sides = append(sides, "server")
+	}
+	return sides
+}
+
+func (m *Manifest) HasSide(side string) bool {
+	switch side {
+	case "client":
+		return m.Client != nil
+	case "server":
+		return m.Server != nil
+	}
+	return false
+}
+
+// DisplayName is what launchers show for the side: its block name, else the
+// manifest name.
+func (m *Manifest) DisplayName(side string) string {
+	if side == "client" && m.Client != nil && m.Client.Name != "" {
+		return m.Client.Name
+	}
+	if side == "server" && m.Server != nil && m.Server.Name != "" {
+		return m.Server.Name
+	}
+	return m.Name
+}
+
+func (m *Manifest) BuildDir(side string) string {
+	if side == "client" && m.Client != nil && m.Client.Build != "" {
+		return m.Client.Build
+	}
+	if side == "server" && m.Server != nil && m.Server.Build != "" {
+		return m.Server.Build
+	}
+	return "build/" + side
+}
+
+// InPlace reports whether the side builds into the project directory itself,
+// which is what makes a project an instance.
+func (m *Manifest) InPlace(side string) bool {
+	return m.BuildDir(side) == "."
+}
+
+// InPlaceSide names the side that builds in place, which is what makes the
+// project an instance that keeps history.
+func (m *Manifest) InPlaceSide() (string, bool) {
+	for _, side := range m.Sides() {
+		if m.InPlace(side) {
+			return side, true
+		}
+	}
+	return "", false
+}
+
+// SideVariables is the project's variables with the side block's layered over
+// them.
+func (m *Manifest) SideVariables(side string) Variables {
+	vars := Variables{}
+	maps.Copy(vars, m.Variables)
+	switch {
+	case side == "client" && m.Client != nil:
+		maps.Copy(vars, m.Client.Variables)
+	case side == "server" && m.Server != nil:
+		maps.Copy(vars, m.Server.Variables)
+	}
+	return vars
 }
 
 const DefaultHistory = 5

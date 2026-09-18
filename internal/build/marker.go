@@ -113,7 +113,7 @@ func (b *Builder) fabricMarker(targetName, lockHash string, direct, deps []strin
 		"schemaVersion": 1,
 		"id":            id,
 		"version":       markerVersion(b.Manifest.Version, lockHash),
-		"name":          b.Manifest.DisplayName(targetName),
+		"name":          b.Manifest.TargetDisplayName(targetName),
 		"description":   b.markerDescription(direct, deps, cond, quickText),
 		"icon":          "assets/" + id + "/icon.png",
 		"environment":   "*",
@@ -193,7 +193,7 @@ func (b *Builder) tomlMarker(l loader.Loader, targetName, lockHash string, direc
 	mod := markerTomlMod{
 		ModID:       markerModID(b.Manifest.Name),
 		Version:     markerVersion(b.Manifest.Version, lockHash),
-		DisplayName: b.Manifest.DisplayName(targetName),
+		DisplayName: b.Manifest.TargetDisplayName(targetName),
 		LogoFile:    markerLogo,
 		Authors:     strings.Join(b.Manifest.Authors, ", "),
 		DisplayURL:  b.Manifest.Links["website"],
@@ -229,7 +229,7 @@ func (b *Builder) tomlMarker(l loader.Loader, targetName, lockHash string, direc
 	// `max_format` (26.2 is resource format 88, data format 107 — well past the old 1–99 range
 	// this used to declare). The ranges say "whatever is running", since there is nothing to break.
 	pack, err := json.MarshalIndent(map[string]any{"pack": map[string]any{
-		"description":       b.Manifest.DisplayName(targetName),
+		"description":       b.Manifest.TargetDisplayName(targetName),
 		"pack_format":       markerPackFormat,
 		"supported_formats": map[string]int{"min_inclusive": 1, "max_inclusive": markerPackFormatMax},
 		"min_format":        []int{1, 0},

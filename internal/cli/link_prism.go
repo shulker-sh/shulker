@@ -95,8 +95,8 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			} else if err != nil {
 				return err
 			}
-			buildDir := filepath.Join(src.Dir, p.Manifest.BuildDir(name))
-			display := p.Manifest.DisplayName(name)
+			buildDir := filepath.Join(src.Dir, p.Manifest.TargetBuildDir(name))
+			display := p.Manifest.TargetDisplayName(name)
 			if instanceName != "" {
 				display = instanceName
 			}

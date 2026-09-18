@@ -78,7 +78,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			} else if err != nil {
 				return err
 			}
-			display := p.Manifest.DisplayName(name)
+			display := p.Manifest.TargetDisplayName(name)
 			if instanceName != "" {
 				display = instanceName
 			}
@@ -86,7 +86,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if prev, ok := a.findLauncherInstance("mojang", launcherDir, display); ok && prev.Source != src.name && !force {
 				return out.Errorf("instance-exists", "profile %q already syncs from %s; pass --name to create a second profile, or --force to repoint this one", display, prev.Source)
 			}
-			gameDir := filepath.Join(src.Dir, p.Manifest.BuildDir(name))
+			gameDir := filepath.Join(src.Dir, p.Manifest.TargetBuildDir(name))
 			if src.remote() {
 				gameDir = filepath.Join(launcherDir, "shulker", strings.TrimPrefix(key, "shulker-"))
 			}

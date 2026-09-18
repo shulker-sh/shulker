@@ -198,7 +198,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 	if into == "" && remote {
 		return syncResult{}, out.Errorf("into-required", "--into is required when syncing from %s", src.name)
 	}
-	buildDir, err := filepath.Abs(filepath.Join(src.Dir, p.Manifest.BuildDir(name)))
+	buildDir, err := filepath.Abs(filepath.Join(src.Dir, p.Manifest.TargetBuildDir(name)))
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -266,7 +266,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 			return syncResult{}, err
 		}
 		entry := config.Instance{ID: req.as, Name: req.name, Dir: into, Source: src.name}
-		if entry, changed := a.registerSync(entry, p.Manifest.DisplayName(name)); changed {
+		if entry, changed := a.registerSync(entry, p.Manifest.TargetDisplayName(name)); changed {
 			res.Registered = &entry
 		}
 	}

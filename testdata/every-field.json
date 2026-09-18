@@ -15,6 +15,14 @@
   "java": ">=25",
   "providers": ["modrinth", "curseforge"],
   "history": 3,
+  "features": {
+    "fancy": {
+      "default": true,
+      "overrides": { "client": "fancy-client", "server": "fancy-server" },
+      "note": "feature"
+    },
+    "shaders": { "overrides": "shader-overrides" }
+  },
   "targets": {
     "client": {
       "name": "Client",
@@ -46,8 +54,12 @@
   "ignore": [
     { "rule": "depends", "mod": "sodium", "on": "minecraft", "declared": ">=26.3", "note": "works" }
   ],
+  "wholeFiles": ["config/whole.properties"],
   "variables": { "motd": "Welcome", "port": 25565, "hardcore": false, "ratio": 1.50 },
   "server": {
+    "name": "Every Field Server",
+    "build": "build/server",
+    "variables": { "motd": "Server" },
     "eula": true,
     "memory": "6G",
     "jvmFlags": "aikars",
@@ -77,6 +89,9 @@
     "note": "server"
   },
   "client": {
+    "name": "Every Field",
+    "build": "build/client",
+    "variables": { "motd": "Client" },
     "options": { "fov": 0.5, "lang": "en_us", "autoJump": false },
     "servers": [{ "name": "Home", "ip": "example.com:25565", "note": "servers" }],
     "note": "client"

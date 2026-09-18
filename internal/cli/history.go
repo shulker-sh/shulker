@@ -64,7 +64,7 @@ func (a *app) instanceProject() (*project.Project, string, error) {
 		return nil, "", err
 	}
 	for _, name := range targetNames(p.Manifest.Targets) {
-		if p.Manifest.InPlace(name) {
+		if p.Manifest.TargetInPlace(name) {
 			return p, name, nil
 		}
 	}

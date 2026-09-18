@@ -146,7 +146,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err := cmd.Context().Err(); err != nil {
 				return err
 			}
-			dir := filepath.Join(p.Dir, p.Manifest.BuildDir(name))
+			dir := filepath.Join(p.Dir, p.Manifest.TargetBuildDir(name))
 			launchArgs := server.Command(jvm, build.LaunchArgs(p.Lock))
 			a.progress("starting %s in %s with %s", name, dir, java)
 			a.printer.Settle()

@@ -69,7 +69,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				return err
 			}
 			gdl.Dir = launcherDir
-			display := p.Manifest.DisplayName(name)
+			display := p.Manifest.TargetDisplayName(name)
 			if instanceName != "" {
 				display = instanceName
 			}

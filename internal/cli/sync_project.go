@@ -45,7 +45,7 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 			if sameDir(d, dir) || slices.ContainsFunc(all, func(e instanceEntry) bool { return sameDir(e.Dir, d) }) {
 				continue
 			}
-			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(name), Dir: d, Source: dir})
+			e := inspectInstance(config.Instance{Name: p.Manifest.TargetDisplayName(name), Dir: d, Source: dir})
 			e.ID = slugID(e.Name)
 			if e.Target == "" {
 				e.Target = name

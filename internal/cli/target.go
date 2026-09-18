@@ -108,7 +108,7 @@ func (a *app) targetRemoveCmd() *cobra.Command {
 			if len(p.Manifest.Targets) == 1 {
 				return out.Errorf("last-target", "%s is the only target; add another with `shulker target add` before removing it", name)
 			}
-			t.Build = p.Manifest.BuildDir(name)
+			t.Build = p.Manifest.TargetBuildDir(name)
 			delete(p.Manifest.Targets, name)
 			if err := p.SaveManifest(); err != nil {
 				return err
@@ -134,7 +134,7 @@ func (a *app) targetListCmd() *cobra.Command {
 			res := []targetEntry{}
 			for _, name := range targetNames(p.Manifest.Targets) {
 				t := p.Manifest.Targets[name]
-				t.Build = p.Manifest.BuildDir(name)
+				t.Build = p.Manifest.TargetBuildDir(name)
 				res = append(res, targetEntry{ID: name, Target: t})
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {

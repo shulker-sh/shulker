@@ -28,9 +28,11 @@ Required properties are marked with *.
 | `loader` | [`loader`](#loader) |  |
 | `java` | `string` | Optional override. Either an absolute path to a JDK/JRE home or a semver range over the Java major version, e.g. "&gt;=25". Omit to derive from the Minecraft version json and use the managed runtime.<br>min length 1 |
 | `providers` | [`provider`](#provider)[] | Provider preference order. A single entry makes the tool single-provider.<br>min items 1, unique items, default `["modrinth","curseforge"]` |
+| `features` | map of [`featureDecl`](#featuredecl) | Optional parts of the pack, each one switch over the mods gated with feature and over the feature's own override folder. --with and --without decide a feature for one build; feature on and feature off record the choice.<br>keys are [`featureName`](#featurename) |
 | `targets` * | map of [`target`](#target) | Build targets. Each lists its override layers explicitly; paths are never inferred.<br>min properties 1, keys match `^[a-z][a-z0-9_-]*$` |
 | `requires` | map of [`require`](#require) | Mods, modpacks, resource packs and shaders this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id; a resource pack's or shader's key is the file name it is placed under, so a pack enabled in game stays enabled when it updates. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader.<br>keys are [`requireKey`](#requirekey), default `{}` |
 | `ignore` | [`ignore`](#ignore)[] | Per-pair overrides for unmet depends or matched breaks found in jar metadata. |
+| `wholeFiles` | [`relativePath`](#relativepath)[] | Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone.<br>unique items |
 | `variables` | [`variables`](#variables) |  |
 | `server` | [`server`](#server) |  |
 | `client` | [`client`](#client) |  |
@@ -140,6 +142,16 @@ Type: `string`. pattern `^[^/\\]`, min length 1
 Values substituted for ${name} in *.tmpl override files and in server.properties values.
 
 Type: map of `string` \| `number` \| `boolean`. keys match `^[A-Za-z_][A-Za-z0-9_]*$`
+
+### featureDecl
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `default` | `boolean` | Whether the feature is on when nothing else decides it. A recorded choice, --with and --without all win over it.<br>default `false` |
+| `overrides` | [`relativePath`](#relativepath) \| object | Override folder this feature adds while it is on, layered after the base folders in feature name order. A string is one folder for both sides; an object gives a folder per side, either key alone. Defaults to &lt;name&gt;-overrides/. |
+| `note` | [`note`](#note) |  |
+
+No other properties are allowed.
 
 ### target
 
@@ -289,6 +301,9 @@ Keys written into server.properties. Values may reference ${variables}. Known ke
 
 | Property | Type | Description |
 | --- | --- | --- |
+| `name` | `string` | Display name launchers show for this side (Prism instance name, official launcher profile name). Defaults to the manifest name.<br>min length 1 |
+| `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;side&gt;; "." builds into the project directory itself, which is what makes the project an instance. |
+| `variables` | [`variables`](#variables) |  |
 | `eula` | `boolean` | eula.txt is written only when true. serve refuses to start otherwise.<br>default `false` |
 | `memory` | `string` | Heap size passed as -Xms/-Xmx, e.g. "6G".<br>pattern `^[1-9][0-9]*[MmGg]$` |
 | `jvmFlags` | `"aikars"` \| `"none"` | JVM flags preset used by serve. aikars applies Aikar's G1 flags (12 GB+ variant chosen from memory, -Xms set equal to -Xmx); none passes only the memory flags.<br>default `"aikars"` |
@@ -303,6 +318,9 @@ No other properties are allowed.
 
 | Property | Type | Description |
 | --- | --- | --- |
+| `name` | `string` | Display name launchers show for this side (Prism instance name, official launcher profile name). Defaults to the manifest name.<br>min length 1 |
+| `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;side&gt;; "." builds into the project directory itself, which is what makes the project an instance. |
+| `variables` | [`variables`](#variables) |  |
 | `options` | map of `string` \| `number` \| `boolean` | Keys written into options.txt as key:value. Other keys already in the file are left alone.<br>keys match `^[A-Za-z][A-Za-z0-9_.:]*$` |
 | `servers` | object[] | Entries written into servers.dat. |
 | `note` | [`note`](#note) |  |

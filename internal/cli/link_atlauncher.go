@@ -66,7 +66,7 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 			} else if err != nil {
 				return err
 			}
-			display := p.Manifest.DisplayName(name)
+			display := p.Manifest.TargetDisplayName(name)
 			if instanceName != "" {
 				display = instanceName
 			}

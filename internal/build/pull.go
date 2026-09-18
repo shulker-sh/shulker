@@ -91,7 +91,7 @@ func projectSide(f planned) keyMerge {
 func (b *Builder) checkNamed(name string, files []string, opts Options) error {
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
+		dir = filepath.Join(b.Dir, b.Manifest.TargetBuildDir(name))
 	}
 	if _, err := os.Stat(dir); err != nil {
 		return nil
@@ -284,7 +284,7 @@ func (b *Builder) drift(name string, opts Options) (*drift, error) {
 	}
 	dir := opts.Dir
 	if dir == "" {
-		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(name))
+		dir = filepath.Join(b.Dir, b.Manifest.TargetBuildDir(name))
 	}
 	report := &Report{Warnings: []string{}}
 	desired, _, err := b.collect(name, target, opts, report)

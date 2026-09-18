@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -203,5 +205,104 @@ func TestRequiresEntryKinds(t *testing.T) {
 		if len(m.Mods()) != 0 || len(m.Modpacks()) != 0 {
 			t.Errorf("%s: unsupported entry counted as mod or modpack", entries)
 		}
+	}
+}
+
+func TestFeatureOverridesForms(t *testing.T) {
+	doc := func(features string) []byte {
+		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"features":{` + features + `},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{}}`)
+	}
+	m, err := Parse(doc(`"shaders":{"default":true,"overrides":"extras/shaders"},"voice":{"overrides":{"client":"voice-client"}},"minimap":{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := m.Features["shaders"]; !f.Default || f.Overrides.Both != "extras/shaders" {
+		t.Errorf("string form: %+v", f)
+	}
+	if f := m.Features["voice"]; f.Overrides.Client != "voice-client" || f.Overrides.Server != "" || f.Overrides.Both != "" {
+		t.Errorf("object form: %+v", f)
+	}
+	if f := m.Features["minimap"]; f.Overrides != (FeatureOverrides{}) {
+		t.Errorf("no folder declared: %+v", f)
+	}
+	data, err := m.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := string(data); !strings.Contains(s, `"overrides": "extras/shaders"`) || !strings.Contains(s, `"client": "voice-client"`) || strings.Contains(s, `"minimap": {"overrides"`) {
+		t.Fatalf("encoded features: %s", s)
+	}
+	if _, err := Parse(data); err != nil {
+		t.Fatal(err)
+	}
+	for _, features := range []string{`"shaders":{"overrides":{}}`, `"shaders":{"overrides":["a"]}`, `"shaders":{"overrides":{"both":"a"}}`} {
+		if _, err := Parse(doc(features)); err == nil {
+			t.Errorf("%s should be invalid", features)
+		}
+	}
+}
+
+func TestSideHelpers(t *testing.T) {
+	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{},"variables":{"motd":"shared","port":25565},"client":{"name":"West Coast","build":".","variables":{"motd":"client"}},"server":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Sides(); !slices.Equal(got, []string{"client", "server"}) {
+		t.Errorf("sides %v", got)
+	}
+	if !m.HasSide("client") || !m.HasSide("server") || m.HasSide("both") {
+		t.Error("HasSide")
+	}
+	if m.DisplayName("client") != "West Coast" || m.DisplayName("server") != "p" {
+		t.Errorf("display names %q %q", m.DisplayName("client"), m.DisplayName("server"))
+	}
+	if m.BuildDir("client") != "." || m.BuildDir("server") != "build/server" {
+		t.Errorf("build dirs %q %q", m.BuildDir("client"), m.BuildDir("server"))
+	}
+	if !m.InPlace("client") || m.InPlace("server") {
+		t.Error("InPlace")
+	}
+	if side, ok := m.InPlaceSide(); !ok || side != "client" {
+		t.Errorf("InPlaceSide = %q %v", side, ok)
+	}
+	if vars := m.SideVariables("client"); vars["motd"] != "client" || vars["port"] == nil {
+		t.Errorf("client variables %v", vars)
+	}
+	if vars := m.SideVariables("server"); vars["motd"] != "shared" {
+		t.Errorf("server variables %v", vars)
+	}
+	if m.Variables["motd"] != "shared" {
+		t.Error("SideVariables wrote through to the project variables")
+	}
+
+	bare, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bare.Sides()) != 0 {
+		t.Errorf("sides without blocks: %v", bare.Sides())
+	}
+	if _, ok := bare.InPlaceSide(); ok {
+		t.Error("InPlaceSide without blocks")
+	}
+}
+
+func TestParseRejects(t *testing.T) {
+	doc := func(rest string) []byte {
+		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"targets":{"client":{"side":"client","overrides":["overrides"]}},"requires":{},` + rest + `}`)
+	}
+	for _, rest := range []string{
+		`"features":{"client":{}}`,
+		`"features":{"server":{"default":true}}`,
+		`"client":{"build":"."},"server":{"build":"."}`,
+	} {
+		if _, err := Parse(doc(rest)); err == nil {
+			t.Errorf("%s should be invalid", rest)
+		} else if out.CodeOf(err) != "manifest-invalid" {
+			t.Errorf("%s: code %q", rest, out.CodeOf(err))
+		}
+	}
+	if _, err := Parse(doc(`"client":{"build":"."},"server":{"build":"build/server"}`)); err != nil {
+		t.Fatal(err)
 	}
 }

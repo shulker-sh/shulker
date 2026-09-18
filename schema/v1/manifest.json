@@ -55,6 +55,12 @@
       "default": ["modrinth", "curseforge"],
       "description": "Provider preference order. A single entry makes the tool single-provider."
     },
+    "features": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/featureName" },
+      "additionalProperties": { "$ref": "#/$defs/featureDecl" },
+      "description": "Optional parts of the pack, each one switch over the mods gated with feature and over the feature's own override folder. --with and --without decide a feature for one build; feature on and feature off record the choice."
+    },
     "targets": {
       "type": "object",
       "minProperties": 1,
@@ -73,6 +79,12 @@
       "type": "array",
       "items": { "$ref": "#/$defs/ignore" },
       "description": "Per-pair overrides for unmet depends or matched breaks found in jar metadata."
+    },
+    "wholeFiles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/relativePath" },
+      "description": "Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone."
     },
     "variables": { "$ref": "#/$defs/variables" },
     "server": { "$ref": "#/$defs/server" },
@@ -186,6 +198,33 @@
       "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
       "additionalProperties": { "type": ["string", "number", "boolean"] },
       "description": "Values substituted for ${name} in *.tmpl override files and in server.properties values."
+    },
+    "featureDecl": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the feature is on when nothing else decides it. A recorded choice, --with and --without all win over it."
+        },
+        "overrides": {
+          "description": "Override folder this feature adds while it is on, layered after the base folders in feature name order. A string is one folder for both sides; an object gives a folder per side, either key alone. Defaults to <name>-overrides/.",
+          "oneOf": [
+            { "$ref": "#/$defs/relativePath" },
+            {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": false,
+              "properties": {
+                "client": { "$ref": "#/$defs/relativePath" },
+                "server": { "$ref": "#/$defs/relativePath" }
+              }
+            }
+          ]
+        },
+        "note": { "$ref": "#/$defs/note" }
+      }
     },
     "target": {
       "type": "object",
@@ -459,6 +498,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display name launchers show for this side (Prism instance name, official launcher profile name). Defaults to the manifest name."
+        },
+        "build": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Output directory. Defaults to build/<side>; \".\" builds into the project directory itself, which is what makes the project an instance."
+        },
+        "variables": { "$ref": "#/$defs/variables" },
         "eula": {
           "type": "boolean",
           "default": false,
@@ -528,6 +577,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Display name launchers show for this side (Prism instance name, official launcher profile name). Defaults to the manifest name."
+        },
+        "build": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Output directory. Defaults to build/<side>; \".\" builds into the project directory itself, which is what makes the project an instance."
+        },
+        "variables": { "$ref": "#/$defs/variables" },
         "options": {
           "type": "object",
           "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_.:]*$" },
