@@ -26,11 +26,6 @@ type Shim struct {
 	Java string
 }
 
-// ShimSupported reports whether this OS has a shim to write. A Windows profile keeps the launcher's
-// own Java, because a script can't stand in for Java there: it needs a GUI-subsystem executable,
-// which shulker doesn't carry yet.
-func ShimSupported() bool { return runtime.GOOS != "windows" }
-
 // ShimPath is the file a profile's javaDir names.
 func ShimPath(dir string) string { return shimPath(dir, runtime.GOOS) }
 
@@ -53,26 +48,121 @@ func IsShulkerShim(javaDir string) bool {
 	return false
 }
 
-// WriteShim writes the shim and makes it executable, since the launcher runs it directly.
+// WriteShim writes the shim for the running OS: an sh script, or on Windows an executable and the
+// sidecar holding the same two paths the script embeds.
 func WriteShim(s Shim) error {
-	path := ShimPath(s.Dir)
+	return writeShim(s, runtime.GOOS, machineShimBuild())
+}
+
+func writeShim(s Shim, goos string, b shimBuild) error {
 	if err := os.MkdirAll(filepath.Join(s.Dir, instance.Dir), 0o755); err != nil {
 		return err
 	}
+	if goos == "windows" {
+		return writeWindowsShim(s, b)
+	}
+	path := shimPath(s.Dir, goos)
 	if err := fsutil.Write(path, []byte(shimSh(s))); err != nil {
 		return err
 	}
+	// The launcher runs the shim itself, so it has to be executable.
 	return os.Chmod(path, 0o755)
 }
 
-// RemoveShim drops both shapes of the shim, for a switch turned off or an instance unlinked.
+// RemoveShim drops both shapes of the shim and the sidecar, for a switch turned off or an instance
+// unlinked.
 func RemoveShim(dir string) error {
-	for _, goos := range []string{"unix", "windows"} {
-		if err := os.Remove(shimPath(dir, goos)); err != nil && !errors.Is(err, os.ErrNotExist) {
+	windows := shimPath(dir, "windows")
+	// A shim moved aside by an earlier rewrite may still be running, and Windows won't delete one of
+	// those; it is leftover bytes nothing points at, so failing to remove it is not a failure.
+	os.Remove(windows + shimOldSuffix)
+	for _, path := range []string{shimPath(dir, "unix"), windows, shimSidecarPath(windows)} {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
 	return nil
+}
+
+// ShimMode reports whether this binary is running as an instance's javaw.exe, which is what the
+// fallback route leaves there: one copy of shulker with its subsystem byte patched. The name comes
+// from GetModuleFileName, which os.Executable reads, so a caller can't spoof it the way it could
+// argv[0].
+func ShimMode() bool {
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	exe, err := os.Executable()
+	return err == nil && strings.EqualFold(filepath.Base(exe), filepath.Base(shimPath("", "windows")))
+}
+
+// RunShim hands the launch to the shulker the sidecar records, to the recorded Java when that binary
+// is gone, and reports the child's exit code: a non-zero exit of its own would raise a launcher error
+// dialog over shulker's business rather than the game's.
+func RunShim() int {
+	exe, err := os.Executable()
+	if err != nil {
+		return 0
+	}
+	program, arguments, err := shimLaunch(exe, commandLineTail())
+	if err != nil || program == "" {
+		return 0
+	}
+	return shimSpawn(filepath.Dir(filepath.Dir(exe)), program, arguments)
+}
+
+// shimLaunch is what the shim starts, from the sidecar beside it and the raw tail of its own command
+// line. The tail passes through untouched: it carries the session access token, and rebuilding it
+// from a parsed argv would corrupt the quoting.
+func shimLaunch(exe, tail string) (program, arguments string, err error) {
+	dir := filepath.Dir(filepath.Dir(exe))
+	data, err := os.ReadFile(shimSidecarPath(exe))
+	if err != nil {
+		return "", "", err
+	}
+	shulker, java := sidecarPaths(data)
+	if shulker == "" || !fileExists(shulker) {
+		return java, tail, nil
+	}
+	arguments = `hook wrap -C "` + dir + `" --`
+	if tail != "" {
+		arguments += " " + tail
+	}
+	return shulker, arguments, nil
+}
+
+func sidecarPaths(data []byte) (shulker, java string) {
+	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	if len(lines) > 0 {
+		shulker = strings.TrimSpace(lines[0])
+	}
+	if len(lines) > 1 {
+		java = strings.TrimSpace(lines[1])
+	}
+	return shulker, java
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// cutProgramName drops the shim's own name from the front of a raw command line, quoted or bare,
+// leaving the arguments exactly as the launcher wrote them.
+func cutProgramName(line string) string {
+	i := 0
+	if strings.HasPrefix(line, `"`) {
+		if end := strings.Index(line[1:], `"`); end >= 0 {
+			i = end + 2
+		} else {
+			i = len(line)
+		}
+	} else {
+		for i < len(line) && line[i] != ' ' && line[i] != '\t' {
+			i++
+		}
+	}
+	return strings.TrimLeft(line[i:], " \t")
 }
 
 // shimSh names the instance with -C because the launcher's version check runs the shim with no

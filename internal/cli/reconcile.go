@@ -102,9 +102,6 @@ func slotCommandOf(slot launcher.Slot, in config.Instance, kind launcher.HookKin
 // reconcileShim writes or removes the shim with the hook switches, and reports what the profile's
 // Java should be: the shim while a switch is on, else the Java the profile had before shulker.
 func reconcileShim(in config.Instance, f *instance.File, current, exe string) (string, error) {
-	if !launcher.ShimSupported() {
-		return current, nil
-	}
 	if !f.Settings.PreLaunch() && !f.Settings.PostExit() {
 		restore := ""
 		if f.Resolved != nil {

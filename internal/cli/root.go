@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/selfupdate"
@@ -43,6 +44,11 @@ type app struct {
 }
 
 func Execute(args []string, stdout, stderr io.Writer) int {
+	// A copy of shulker installed as an instance's javaw.exe is a launcher's Java, not the CLI: it
+	// hands the launch on and never parses these arguments, which are the game's.
+	if launcher.ShimMode() {
+		return launcher.RunShim()
+	}
 	if runtime.GOOS == "windows" {
 		selfupdate.RemoveOld()
 	}
