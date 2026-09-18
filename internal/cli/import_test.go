@@ -106,7 +106,7 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := env.Data
-	if !res.Marker || res.Version != "1.0.0" || res.Minecraft != "26.2" || strings.Join(res.Targets, ",") != "client" {
+	if !res.Marker || res.Version != "1.0.0" || res.Minecraft != "26.2" || strings.Join(res.Sides, ",") != "client" {
 		t.Fatalf("result: %+v", res)
 	}
 	if strings.Join(res.Mods.Reused, ",") != "fabric-api,sodium" || len(res.Mods.Locked) != 0 || len(res.Mods.Dropped) != 0 || len(res.Mods.Unmanaged) != 0 {
@@ -269,7 +269,7 @@ func TestImportMrpackForeign(t *testing.T) {
 	}
 	res := env.Data
 	dir := filepath.Join(parent, "someone-s-pack")
-	if res.Marker || res.Name != "someone-s-pack" || res.Version != "2.0" || strings.Join(res.Targets, ",") != "client,server" {
+	if res.Marker || res.Name != "someone-s-pack" || res.Version != "2.0" || strings.Join(res.Sides, ",") != "client,server" {
 		t.Fatalf("result: %+v", res)
 	}
 	if strings.Join(res.Mods.Locked, ",") != "fabric-api,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/local-1.0.jar,server-overrides/mods/extra-1.0.jar" {

@@ -18,7 +18,7 @@ import (
 const curseForgeManifestName = "manifest.json"
 
 type CurseForgeOptions struct {
-	Target   string
+	Side     string
 	Version  string
 	Output   string
 	Bundle   bool
@@ -32,7 +32,7 @@ type CurseForgeReport struct {
 	Path                 string   `json:"path"`
 	Version              string   `json:"version"`
 	Name                 string   `json:"name"`
-	Target               string   `json:"target"`
+	Side                 string   `json:"side"`
 	Mods                 []string `json:"mods"`
 	ResourcePacks        []string `json:"resourcepacks"`
 	Shaders              []string `json:"shaders"`
@@ -86,16 +86,16 @@ type curseForgeFile struct {
 }
 
 func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, error) {
-	side := opts.Target
+	side := opts.Side
 	if side == "" {
 		side = "client"
 	}
-	targets, err := b.mrpackSides([]string{side})
+	sides, err := b.mrpackSides([]string{side})
 	if err != nil {
 		return nil, err
 	}
-	t := targets[0]
-	report := &CurseForgeReport{Path: opts.Output, Version: opts.Version, Name: b.mrpackName(targets), Target: t.side, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, Matched: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}}
+	t := sides[0]
+	report := &CurseForgeReport{Path: opts.Output, Version: opts.Version, Name: b.mrpackName(sides), Side: t.side, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, Matched: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}}
 	if report.Warnings, err = b.mrpackCollect(t, opts.OS, opts.Features); err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 
 // curseForgeMods returns the profile's files and the names that pair with them
 // in the modlist, in the order the archive lists them.
-func (b *Builder) curseForgeMods(t *mrpackTarget, opts CurseForgeOptions, report *CurseForgeReport) ([]curseForgeFile, []string, error) {
+func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *CurseForgeReport) ([]curseForgeFile, []string, error) {
 	entries := b.curseForgeEntries(t)
 	byKey := map[string]curseForgeFile{}
 	byEntry := map[string]curseForgeEntry{}
@@ -233,7 +233,7 @@ func reportList(report *CurseForgeReport, kind string, bundled bool) *[]string {
 	return &report.Mods
 }
 
-func (b *Builder) curseForgeEntries(t *mrpackTarget) []curseForgeEntry {
+func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 	ids := make([]string, 0, len(t.mods))
 	for id := range t.mods {
 		ids = append(ids, id)

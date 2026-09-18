@@ -30,7 +30,7 @@ const (
 type HistoryEntry struct {
 	ID            string `json:"id"`
 	TakenAt       string `json:"takenAt"`
-	Target        string `json:"target"`
+	Side          string `json:"side"`
 	Reason        string `json:"reason"`
 	Minecraft     string `json:"minecraft,omitempty"`
 	Loader        string `json:"loader,omitempty"`
@@ -41,10 +41,10 @@ type HistoryEntry struct {
 	Removed       int    `json:"removed,omitempty"`
 }
 
-func (b *Builder) takeHistory(dir, target, reason string, written, removed int, report *Report) error {
+func (b *Builder) takeHistory(dir, side, reason string, written, removed int, report *Report) error {
 	keep := b.Manifest.HistoryKeep()
 	e, err := TakeHistory(dir, keep, HistoryEntry{
-		Target:  target,
+		Side:    side,
 		Reason:  reason,
 		Written: written,
 		Removed: removed,

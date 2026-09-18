@@ -40,8 +40,39 @@ func TestDiffIntoNeedsOneSide(t *testing.T) {
 	h.mustRun(t, "install")
 
 	code, stdout, _ := h.run(t, "diff", "--into", t.TempDir(), "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "into-target" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-side" {
 		t.Fatalf("--into across both sides: exit %d %s", code, stdout)
 	}
 	h.mustRun(t, "diff", "client", "--into", t.TempDir())
+}
+
+func TestSyncNeedsOneSideWhenBothAreDeclared(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	twoSided(t, h)
+
+	code, stdout, _ := h.run(t, "sync", h.dir, "--into", t.TempDir(), "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-side" || e.Message != "shulker.json declares both sides; choose one" || strings.Join(e.Candidates, ",") != "client,server" {
+		t.Fatalf("sync across both sides: exit %d %s", code, stdout)
+	}
+	if _, _, stderr := h.run(t, "sync", h.dir, "--into", t.TempDir()); !strings.Contains(stderr, "--side client") {
+		t.Fatalf("the example names --side: %s", stderr)
+	}
+	h.mustRun(t, "sync", h.dir, "--side", "server", "--into", t.TempDir())
+}
+
+func TestLauncherCommandsTakeNoSideFlag(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+
+	for _, args := range [][]string{
+		{"link", "mojang", "--launcher-dir", t.TempDir(), "--side", "client"},
+		{"link", "prism", "--launcher-dir", t.TempDir(), "--side", "client"},
+		{"export", "curseforge", "--side", "client"},
+	} {
+		code, stdout, _ := h.run(t, append(args, "--json")...)
+		if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || !strings.Contains(e.Message, "--side") {
+			t.Fatalf("%v: exit %d %s", args, code, stdout)
+		}
+	}
 }

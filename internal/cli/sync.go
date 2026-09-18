@@ -24,7 +24,7 @@ type syncResult struct {
 	Sha256     string               `json:"sha256,omitempty"`
 	Offline    bool                 `json:"offline,omitempty"`
 	LastGoodAt string               `json:"lastGoodAt,omitempty"`
-	Target     string               `json:"target"`
+	Side       string               `json:"side"`
 	Dir        string               `json:"dir"`
 	Fetched    []string             `json:"fetched"`
 	Build      *build.Report        `json:"build"`
@@ -34,9 +34,9 @@ type syncResult struct {
 }
 
 type syncRequest struct {
-	ref, target, into, os, name, as string
-	force                           bool
-	features                        featureFlags
+	ref, side, into, os, name, as string
+	force                         bool
+	features                      featureFlags
 }
 
 func (a *app) syncCmd() *cobra.Command {
@@ -59,25 +59,25 @@ func (a *app) syncCmd() *cobra.Command {
 				d.fetch.Offline = true
 			}
 			if len(args) == 0 {
-				if req.into != "" && req.target == "" && req.ref == "" && req.name == "" && a.instance == "" && !sel.all && !sel.narrows() {
+				if req.into != "" && req.side == "" && req.ref == "" && req.name == "" && a.instance == "" && !sel.all && !sel.narrows() {
 					res, err := a.syncRecorded(cmd, req)
 					if err != nil {
 						return err
 					}
 					return a.printer.Emit(res, res.print)
 				}
-				if req.target != "" || req.into != "" || req.ref != "" || req.name != "" {
-					return out.Errorf("usage", "--target, --into, --ref, and --name need a source; a registered instance already has them")
+				if req.into != "" || req.ref != "" || req.name != "" {
+					return out.Errorf("usage", "--into, --ref, and --name need a source; a registered instance already has them")
 				}
 				if a.instance == "" && !sel.all {
 					dir, err := a.scopeDir()
 					if err != nil {
 						return err
 					}
-					if p, target, ok, err := a.inPlaceProject(dir); err != nil {
+					if p, side, ok, err := a.inPlaceProject(dir); err != nil {
 						return err
 					} else if ok {
-						return a.syncTree(cmd, p, target, sel, req)
+						return a.syncTree(cmd, p, side, sel, req)
 					}
 					entries, inProject, err := a.projectInstances(sel)
 					if err != nil {
@@ -110,9 +110,10 @@ func (a *app) syncCmd() *cobra.Command {
 			if a.instance != "" || sel.all {
 				return out.Errorf("usage", "pass a source or -i/--all, not both")
 			}
-			if sel.narrows() {
-				return out.Errorf("usage", "--launcher and --side narrow -i, --all, or the picker; they don't apply to a source")
+			if sel.launcher != "" {
+				return out.Errorf("usage", "--launcher narrows -i, --all, or the picker; it doesn't apply to a source")
 			}
+			req.side = sel.side
 			src, err := a.openSource(cmd.Context(), args[0], req.ref)
 			if err != nil {
 				return err
@@ -124,14 +125,13 @@ func (a *app) syncCmd() *cobra.Command {
 			return a.printer.Emit(res, res.print)
 		},
 	}
-	cmd.Flags().StringVar(&req.target, "target", "", "side to build (default: the only side)")
 	cmd.Flags().StringVar(&req.into, "into", "", "output directory (default: the side's build directory)")
 	cmd.Flags().BoolVar(&req.force, "force", false, "overwrite files edited in the output directory")
 	cmd.Flags().StringVar(&req.ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.os, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the side's display name)")
 	cmd.Flags().StringVar(&req.as, "as", "", "id to register the --into directory under, for -i (default: from its name)")
-	sel.register(cmd, "sync every instance (narrow with --launcher or --side)")
+	sel.registerWith(cmd, "sync every instance (narrow with --launcher or --side)", "side to build from a source (default: the only declared side); with -i, --all, or the picker, only client or server instances")
 	cmd.Flags().BoolVar(&offline, "offline", false, "don't use the network; build from the last successful sync and cached files")
 	req.features.register(cmd, "for this run only")
 	return cmd
@@ -141,7 +141,7 @@ func (res syncResult) print(l *out.Lines) {
 	if res.Changes != nil {
 		res.Changes.printItems(l)
 	}
-	l.OKInto("synced "+res.Target, res.Dir, reportAside(res.Build))
+	l.OKInto("synced "+res.Side, res.Dir, reportAside(res.Build))
 	printReportDetails(l, res.Build)
 	if r := res.Registered; r != nil {
 		id := r.ID
@@ -188,7 +188,7 @@ func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, er
 
 func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncResult, error) {
 	p := src.project
-	side, err := singleSide(p, req.target)
+	side, err := singleSide(p, req.side)
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -256,12 +256,12 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (syncR
 			a.printer.Warn("couldn't record %s as the offline fallback: %v", src.name, err)
 		}
 	}
-	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Target: side, Dir: into, Fetched: fetched, Build: rep}
+	res := syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep}
 	if !src.LastGood.IsZero() {
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
 	if register {
-		if err := saveIntent(into, src.name, req.ref, side, side); err != nil {
+		if err := saveIntent(into, src.name, req.ref, side); err != nil {
 			return syncResult{}, err
 		}
 		entry := config.Instance{ID: req.as, Name: req.name, Dir: into, Source: src.name}

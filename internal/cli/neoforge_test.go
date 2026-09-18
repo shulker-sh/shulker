@@ -18,7 +18,7 @@ import (
 
 func TestNeoForgeServer(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"] = map[string]any{"eula": true}
 	})

@@ -98,7 +98,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 
 func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
 	r := unlinkResult{Instance: l.Instance, OK: true}
-	r.Relink, r.RelinkIn = launcher.Relink(launcher.Linked{Instance: l.Instance, Target: l.Target, Ref: l.Ref})
+	r.Relink, r.RelinkIn = launcher.Relink(launcher.Linked{Instance: l.Instance, Side: l.Side, Ref: l.Ref})
 	// An instance that never synced carries no shulker state, and without its hook link takes it for the
 	// player's own.
 	if l.Launcher == "atlauncher" || l.Launcher == "gdlauncher" {
@@ -133,7 +133,7 @@ func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
 	}
 	if filepath.IsAbs(l.Source) {
 		lf, err := local.Load(l.Source)
-		if err == nil && lf.RemoveSyncDir(l.Target, l.Dir) {
+		if err == nil && lf.RemoveSyncDir(l.Side, l.Dir) {
 			err = lf.Save()
 		}
 		if err != nil {

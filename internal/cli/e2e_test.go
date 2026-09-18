@@ -596,7 +596,7 @@ func TestVerticalSlice(t *testing.T) {
 	}
 	var state build.State
 	h.readJSON(t, "build/client/.shulker/state.json", &state)
-	if state.Target != "client" || len(state.Files) != 4 {
+	if state.Side != "client" || len(state.Files) != 4 {
 		t.Fatalf("state: %+v", state)
 	}
 

@@ -60,10 +60,10 @@ func TestSyncIntoDirectory(t *testing.T) {
 		Warnings []string   `json:"warnings"`
 		Data     syncResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", h.dir, "--into", into, "--target", "client", "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", h.dir, "--into", into, "--side", "client", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if res := env.Data; res.Target != "client" || res.Dir != into || res.Build == nil || res.Build.Dir != into {
+	if res := env.Data; res.Side != "client" || res.Dir != into || res.Build == nil || res.Build.Dir != into {
 		t.Fatalf("json result: %+v", res)
 	}
 }
@@ -77,12 +77,12 @@ func TestSyncErrors(t *testing.T) {
 
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
-	code, stdout, _ = h.run(t, "sync", h.dir, "--target", "nope", "--json")
+	code, stdout, _ = h.run(t, "sync", h.dir, "--side", "nope", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,server" {
 		t.Fatalf("not a side: exit %d %s", code, stdout)
 	}
 
-	code, stdout, _ = h.run(t, "sync", h.dir, "--target", "server", "--json")
+	code, stdout, _ = h.run(t, "sync", h.dir, "--side", "server", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "no-side" || e.Message != "shulker.json declares no server" {
 		t.Fatalf("undeclared side: exit %d %s", code, stdout)
 	}
@@ -244,7 +244,7 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 
 func TestSyncOfflineKeepsTheInstalledRuntime(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "add", "fabric-api")
 	into := filepath.Join(t.TempDir(), "server")
 	h.mustRun(t, "sync", h.dir, "--into", into)
@@ -396,12 +396,10 @@ func TestPullPicksTheDriftedSyncDir(t *testing.T) {
 	h.mustRun(t, "sync", h.dir, "--into", one)
 	h.mustRun(t, "sync", h.dir, "--into", two)
 	var lf struct {
-		Targets map[string]struct {
-			SyncDirs []string `json:"syncDirs"`
-		} `json:"targets"`
+		SyncDirs map[string][]string `json:"syncDirs"`
 	}
 	h.readJSON(t, "shulker.local.json", &lf)
-	if got := strings.Join(lf.Targets["client"].SyncDirs, ","); got != one+","+two {
+	if got := strings.Join(lf.SyncDirs["client"], ","); got != one+","+two {
 		t.Fatalf("syncDirs = %s", got)
 	}
 	if data, _ := os.ReadFile(filepath.Join(h.dir, ".gitignore")); !strings.Contains(string(data), "/shulker.local.json\n") {

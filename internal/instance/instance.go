@@ -26,7 +26,7 @@ type File struct {
 	Schema string `json:"$schema"`
 	Source string `json:"source"`
 	Ref    string `json:"ref,omitempty"`
-	Target string `json:"target"`
+	Side   string `json:"side"`
 	// Unlinked keeps a directory `unlink` let go of from being registered again by a repair scan.
 	Unlinked bool      `json:"unlinked,omitempty"`
 	Settings Settings  `json:"settings"`
@@ -56,7 +56,6 @@ type Commands struct {
 }
 
 type Resolved struct {
-	Side         string `json:"side,omitempty"`
 	Java         string `json:"java,omitempty"`
 	LauncherJava string `json:"launcherJava,omitempty"`
 	LastSyncAt   string `json:"lastSyncAt,omitempty"`
@@ -67,12 +66,12 @@ func Path(dir string) string { return filepath.Join(dir, Dir, FileName) }
 
 // New is the file shulker writes for a directory it starts syncing into, with every setting at
 // its default so opening it shows what shulker will do.
-func New(source, ref, target string) *File {
+func New(source, ref, side string) *File {
 	return &File{
 		Schema:   SchemaURL,
 		Source:   source,
 		Ref:      ref,
-		Target:   target,
+		Side:     side,
 		Settings: Settings{Hooks: Hooks{PreLaunch: on(), PostExit: on()}, Marker: on()},
 	}
 }

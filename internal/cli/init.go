@@ -23,7 +23,7 @@ type initResult struct {
 	Loader    string `json:"loader,omitempty"`
 	Version   string `json:"loaderVersion,omitempty"`
 	Java      int    `json:"java"`
-	Target    string `json:"target"`
+	Side      string `json:"side"`
 }
 
 func (a *app) initCmd() *cobra.Command {
@@ -33,7 +33,7 @@ func (a *app) initCmd() *cobra.Command {
 		minecraft     string
 		loaderName    string
 		loaderVersion string
-		target        string
+		side          string
 	)
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -53,7 +53,7 @@ func (a *app) initCmd() *cobra.Command {
 			if !yes && (minecraft == "" || name == "") {
 				return out.Errorf("usage", "pass --yes for defaults or set --name and --minecraft; interactive prompts are not implemented yet")
 			}
-			if err := checkSide(target, "--target"); err != nil {
+			if err := checkSide(side, "--side"); err != nil {
 				return err
 			}
 			loaders := append([]string{noLoader}, loader.Names()...)
@@ -82,10 +82,10 @@ func (a *app) initCmd() *cobra.Command {
 				Loader:    projectLoader,
 				Requires:  map[string]manifest.Require{},
 			}
-			if target == "server" {
+			if side == "server" {
 				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
 			}
-			if target == "client" {
+			if side == "client" {
 				m.Client = &manifest.Client{Options: map[string]any{
 					"onboardAccessibility":   false,
 					"skipMultiplayerWarning": true,
@@ -120,13 +120,13 @@ func (a *app) initCmd() *cobra.Command {
 			if err := scaffold(dir); err != nil {
 				return err
 			}
-			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Target: target}
+			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Side: side}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.OK("created "+manifest.FileName, fmt.Sprintf("%s, Java %d", platformLabel(res.Minecraft, res.Loader, res.Version), res.Java))
 				switch {
 				case res.Loader != "":
 					l.Nudge("Add a mod", "shulker add <mod>")
-				case target == "server":
+				case side == "server":
 					l.Nudge("Download and build it", "shulker install")
 				default:
 					l.Nudge("Add a resource pack or shader", "shulker add <name>")
@@ -139,7 +139,7 @@ func (a *app) initCmd() *cobra.Command {
 	cmd.Flags().StringVar(&minecraft, "minecraft", "", "Minecraft version or range (default: latest release)")
 	cmd.Flags().StringVar(&loaderName, "loader", noLoader, "mod loader: "+noLoader+", "+strings.Join(loader.Names(), ", "))
 	cmd.Flags().StringVar(&loaderVersion, "loader-version", "*", "loader version range")
-	cmd.Flags().StringVar(&target, "target", "client", "side to declare: client or server")
+	cmd.Flags().StringVar(&side, "side", "client", "side to declare: client or server")
 	return cmd
 }
 

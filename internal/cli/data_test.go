@@ -63,7 +63,7 @@ func TestBuildLinksDataDirs(t *testing.T) {
 
 func TestServerBuildLinksWorldByLevelName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
 	buildDir := filepath.Join(h.dir, "build", "server")
 
 	stdout := h.mustRun(t, "install")

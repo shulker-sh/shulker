@@ -20,7 +20,7 @@ Required properties are marked with *.
 | `$schema` * | `string` | Always https://shulker.sh/schema/v1/instance.json. Shulker refuses a file that names a schema it doesn't know, rather than guessing at its shape.<br>format `uri` |
 | `source` * | `string` | Where this instance syncs from: a project directory, a git URL, or a manifest URL.<br>min length 1 |
 | `ref` | `string` | Branch, tag, or commit to follow from a git source. Omitted follows the remote HEAD.<br>min length 1 |
-| `target` * | `string` | Which of the source's targets this directory is built from. Its side is read from the target itself, never stored here.<br>min length 1 |
+| `side` * | `"client"` \| `"server"` | Which side of the source this directory is built for. A launcher instance is always the client. |
 | `unlinked` | `boolean` | Set by `shulker unlink`: shulker no longer syncs this directory, and `shulker instances repair` leaves it alone. Linking or syncing into it again clears it. |
 | `settings` | object | Yours to change. Shulker seeds these when the instance is created and reads them from then on. |
 | `resolved` | object | Written by shulker, for you to read. Editing it changes nothing; the next sync writes it again. |

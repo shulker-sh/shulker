@@ -22,7 +22,7 @@ type linkReport struct {
 	Profile     string      `json:"profile"`
 	Name        string      `json:"name"`
 	VersionID   string      `json:"versionId"`
-	Target      string      `json:"target"`
+	Side        string      `json:"side"`
 	GameDir     string      `json:"gameDir"`
 	Source      string      `json:"source"`
 	Ref         string      `json:"ref,omitempty"`
@@ -39,7 +39,7 @@ func (a *app) linkCmd() *cobra.Command {
 }
 
 func (a *app) linkMojangCmd() *cobra.Command {
-	var launcherDir, target, instanceName, ref, as string
+	var launcherDir, instanceName, ref, as string
 	var force bool
 	cmd := &cobra.Command{
 		Use:     "mojang [project-dir | git-url | manifest-url]",
@@ -58,7 +58,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					return err
 				}
 			}
-			side, err := sideOf(p.Manifest, target, "client", "link")
+			side, err := clientSide(p.Manifest)
 			if err != nil {
 				return err
 			}
@@ -118,7 +118,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				Profile:     key,
 				Name:        display,
 				VersionID:   versionID,
-				Target:      side,
+				Side:        side,
 				GameDir:     gameDir,
 				Source:      src.name,
 				Ref:         ref,
@@ -129,12 +129,12 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
-			if err := saveIntent(gameDir, src.name, ref, side, "client"); err != nil {
+			if err := saveIntent(gameDir, src.name, ref, side); err != nil {
 				return err
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name})
 			if src.remote() {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: side, into: gameDir})
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: gameDir})
 				if err != nil {
 					return err
 				}
@@ -156,7 +156,6 @@ func (a *app) linkMojangCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher directory (default: the official launcher's .minecraft folder)")
-	cmd.Flags().StringVar(&target, "target", "", "side to link; a launcher instance is always the client side")
 	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")

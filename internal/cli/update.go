@@ -117,7 +117,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	}
 	// An instance plays its own directory, so an update there is only done once it is built.
 	if side, ok := p.Manifest.InPlaceSide(); ok && cmd.Name() == "update" {
-		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{target: side})
+		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{side: side})
 		if err != nil {
 			return err
 		}
@@ -221,7 +221,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	// which is the state a rollback puts back.
 	if side, ok := p.Manifest.InPlaceSide(); ok {
 		keep := p.Manifest.HistoryKeep()
-		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Target: side, Reason: cmd.Name()}); err != nil {
+		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Side: side, Reason: cmd.Name()}); err != nil {
 			return relocked{}, err
 		}
 		warning, err := build.HistoryWarning(p.Dir, keep)
@@ -325,7 +325,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 	}
 	for _, m := range c.Added {
 		place := placements[m.ID]
-		it := out.Item{Kind: out.Add, Name: m.ID, Version: m.VersionNumber, Targets: place.Targets, OfTargets: len(sides)}
+		it := out.Item{Kind: out.Add, Name: m.ID, Version: m.VersionNumber, Sides: place.Sides, OfSides: len(sides)}
 		if m.Side != "" && m.Side != "both" {
 			it.Aside = append(it.Aside, m.Side+" only")
 		}
@@ -333,7 +333,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 			it.Aside = append(it.Aside, text)
 		}
 		if text := conditionText("feature", place.Feature); text != "" {
-			if len(place.Targets) == 0 && sideDeclared(sides, m.Side) {
+			if len(place.Sides) == 0 && sideDeclared(sides, m.Side) {
 				text += ", off on every side"
 			}
 			it.Aside = append(it.Aside, text)

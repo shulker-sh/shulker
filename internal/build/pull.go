@@ -24,14 +24,14 @@ type FileDiff struct {
 }
 
 type DiffReport struct {
-	Target   string     `json:"target"`
+	Side     string     `json:"side"`
 	Dir      string     `json:"dir"`
 	Files    []FileDiff `json:"files"`
 	Warnings []string   `json:"-"`
 }
 
 type PullReport struct {
-	Target          string   `json:"target"`
+	Side            string   `json:"side"`
 	Dir             string   `json:"dir"`
 	Pulled          []string `json:"pulled"`
 	Keys            []string `json:"keys"`
@@ -46,7 +46,7 @@ func (b *Builder) Diff(name string, opts Options) (*DiffReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	report := &DiffReport{Target: name, Dir: d.dir, Files: []FileDiff{}, Warnings: d.warnings}
+	report := &DiffReport{Side: name, Dir: d.dir, Files: []FileDiff{}, Warnings: d.warnings}
 	for _, f := range d.plans {
 		if !drifted(f) {
 			continue
@@ -145,7 +145,7 @@ func (b *Builder) Pull(name string, files, adopt []string, opts Options) (*PullR
 		return nil, err
 	}
 	dir, desired, prev, plans := d.dir, d.desired, d.prev, d.plans
-	report := &PullReport{Target: name, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Skipped: []string{}, Warnings: d.warnings}
+	report := &PullReport{Side: name, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Skipped: []string{}, Warnings: d.warnings}
 	var pulled []string
 	if len(adopt) > 0 {
 		rel := filepath.ToSlash(filepath.Clean(files[0]))
@@ -290,7 +290,7 @@ func (b *Builder) drift(side string, opts Options) (*drift, error) {
 			e.Flag = "--into"
 			return nil, e
 		}
-		return nil, out.Errorf("not-built", "target %s has no build directory; run `shulker build`", name)
+		return nil, out.Errorf("not-built", "%s has no build directory; run `shulker build`", name)
 	}
 	prev, stateErr := ReadState(dir)
 	if stateErr != nil {

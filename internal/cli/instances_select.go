@@ -22,8 +22,14 @@ type instanceSelection struct {
 }
 
 func (s *instanceSelection) register(cmd *cobra.Command, all string) {
+	s.registerWith(cmd, all, "only client or server instances")
+}
+
+// registerWith lets a command whose --side also means something with a source
+// describe both readings in one flag.
+func (s *instanceSelection) registerWith(cmd *cobra.Command, all, side string) {
 	cmd.Flags().StringVar(&s.launcher, "launcher", "", "only instances linked in this launcher: "+launcher.NameList())
-	cmd.Flags().StringVar(&s.side, "side", "", "only client or server instances")
+	cmd.Flags().StringVar(&s.side, "side", "", side)
 	if all != "" {
 		cmd.Flags().BoolVar(&s.all, "all", false, all)
 	}
@@ -240,17 +246,17 @@ func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest)
 			return syncResult{}, out.Errorf("instance-missing", "the %s instance %q is gone (%s); `shulker unlink %s` forgets it", launcher.Title(e.Launcher), e.Label(), l.InstanceDir(e.Dir), e.ID)
 		}
 	}
-	if p, target, ok, err := a.inPlaceProject(e.Dir); err != nil {
+	if p, side, ok, err := a.inPlaceProject(e.Dir); err != nil {
 		return syncResult{}, err
 	} else if ok {
-		return a.syncInPlace(cmd, p, target, req)
+		return a.syncInPlace(cmd, p, side, req)
 	}
 	a.packs = nil
 	src, err := a.openSource(cmd.Context(), e.Source, e.Ref)
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.ref, req.target, req.into = e.Ref, e.Target, e.Dir
+	req.ref, req.side, req.into = e.Ref, e.Side, e.Dir
 	return a.sync(cmd.Context(), src, req)
 }
 

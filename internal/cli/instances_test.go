@@ -59,7 +59,7 @@ func TestSyncIntoRegisters(t *testing.T) {
 		t.Fatalf("sync should say it registered the directory: %s", stdout)
 	}
 	f := readIntent(t, into)
-	if f.Source != h.dir || f.Target != "client" || f.Resolved == nil || f.Resolved.Side != "client" {
+	if f.Source != h.dir || f.Side != "client" {
 		t.Fatalf("instance file: %+v", f)
 	}
 	if !f.Settings.PreLaunch() || !f.Settings.PostExit() || !f.Settings.MarkerOn() {
@@ -125,10 +125,10 @@ func TestLinkRegisters(t *testing.T) {
 	if instances := readInstances(t, h); len(instances) != 1 || instances[0] != prism {
 		t.Fatalf("prism instance: %+v", instances)
 	}
-	if f := readIntent(t, gameDir); f.Source != h.dir || f.Target != "client" || f.Resolved.Side != "client" {
+	if f := readIntent(t, gameDir); f.Source != h.dir || f.Side != "client" {
 		t.Fatalf("instance file: %+v", f)
 	}
-	if stdout := h.mustRun(t, "sync", h.dir, "--target", "client", "--into", gameDir); strings.Contains(stdout, "Registered") {
+	if stdout := h.mustRun(t, "sync", h.dir, "--side", "client", "--into", gameDir); strings.Contains(stdout, "Registered") {
 		t.Fatalf("a pre-launch sync must not change the instance: %s", stdout)
 	}
 
@@ -381,7 +381,7 @@ func TestSyncDetectsAPrismInstance(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "sync", h.dir, "--target", "client", "--into", gameDir)
+	h.mustRun(t, "sync", h.dir, "--side", "client", "--into", gameDir)
 	instances := readInstances(t, h)
 	if len(instances) != 1 || instances[0].Launcher != "prism" || instances[0].LauncherDir != prismDir {
 		t.Fatalf("a sync into a Prism instance records the launcher: %+v", instances)
@@ -418,7 +418,7 @@ func TestInstancesRepair(t *testing.T) {
 	if len(instances) != 1 || instances[0].Dir != gameDir || instances[0].Source != h.dir || instances[0].Launcher != "prism" {
 		t.Fatalf("the scan registers the instance again: %+v", instances)
 	}
-	if f := readIntent(t, gameDir); f.Source != h.dir || f.Target != "client" {
+	if f := readIntent(t, gameDir); f.Source != h.dir || f.Side != "client" {
 		t.Fatalf("repair writes the instance file: %+v", f)
 	}
 

@@ -40,7 +40,7 @@ func (a *app) buildDirs(p *project.Project, lf *local.File, side string) (string
 		return "", nil, err
 	}
 	for _, e := range entries {
-		if e.Target == side && sameDir(e.Source, p.Dir) {
+		if e.Side == side && sameDir(e.Source, p.Dir) {
 			add(e.Dir)
 		}
 	}
@@ -78,7 +78,7 @@ func (a *app) diffCmd() *cobra.Command {
 			}
 			if into != "" {
 				if len(sides) != 1 {
-					return out.Errorf("into-target", "--into applies to one side; name it")
+					return ambiguousSide(sides, "")
 				}
 				if into, err = filepath.Abs(into); err != nil {
 					return err
@@ -116,10 +116,10 @@ func (a *app) diffCmd() *cobra.Command {
 			return a.printer.Emit(reports, func(l *out.Lines) {
 				for _, rep := range reports {
 					if len(rep.Files) == 0 {
-						l.OK("no changes in "+rep.Target, where[rep])
+						l.OK("no changes in "+rep.Side, where[rep])
 						continue
 					}
-					l.Heading(rep.Target + " " + l.T.Grey(fmt.Sprintf("(%s in %s)", plural(len(rep.Files), "file changed", "files changed"), where[rep])))
+					l.Heading(rep.Side + " " + l.T.Grey(fmt.Sprintf("(%s in %s)", plural(len(rep.Files), "file changed", "files changed"), where[rep])))
 					for i, f := range rep.Files {
 						if i > 0 {
 							l.Blank()
@@ -136,7 +136,7 @@ func (a *app) diffCmd() *cobra.Command {
 }
 
 func (a *app) pullCmd() *cobra.Command {
-	var target, into string
+	var side, into string
 	var keys []string
 	cmd := &cobra.Command{
 		Use:   "pull [file...]",
@@ -149,7 +149,7 @@ func (a *app) pullCmd() *cobra.Command {
 			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			side, err := singleSide(p, target)
+			side, err := singleSide(p, side)
 			if err != nil {
 				return err
 			}
@@ -179,7 +179,7 @@ func (a *app) pullCmd() *cobra.Command {
 				}
 			}
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OK("pulled "+rep.Target, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", plural(len(rep.Pulled), "file", "files"), plural(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
+				l.OK("pulled "+rep.Side, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", plural(len(rep.Pulled), "file", "files"), plural(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
 				var rows []out.Row
 				arrow := " " + l.T.ArrowBump() + " "
 				for _, f := range rep.Pulled {
@@ -198,7 +198,7 @@ func (a *app) pullCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&target, "target", "", "side whose build directory to pull from (default: the only side)")
+	cmd.Flags().StringVar(&side, "side", "", "side whose build directory to pull from (default: the only declared side)")
 	cmd.Flags().StringVar(&into, "into", "", "directory the side was synced into (default: whichever of the build directory and its sync directories has edits)")
 	cmd.Flags().StringArrayVar(&keys, "key", nil, "start managing this key of the named .properties file; repeat for more")
 	return cmd

@@ -133,11 +133,6 @@ func TestExportCurseForge(t *testing.T) {
 			t.Fatalf("a matched mod was bundled: %s", name)
 		}
 	}
-
-	code, stdout, _ := h.run(t, "export", "curseforge", "--target", "server", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "wrong-side-target" {
-		t.Fatalf("server target: code=%d %+v", code, e)
-	}
 }
 
 func TestExportCurseForgeUnmatchedMods(t *testing.T) {

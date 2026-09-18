@@ -32,13 +32,13 @@ type Item struct {
 	Version string
 	// From and To print as a version change, the old grey and the new yellow.
 	From, To string
-	// Targets lists the sides the item lands on; OfTargets is how many sides the
-	// manifest declares. The list prints after » when OfTargets is set: "all
+	// Sides lists the sides the item lands on; OfSides is how many sides the
+	// manifest declares. The list prints after » when OfSides is set: "all
 	// sides" when every side, grey "no sides" when none.
-	Targets   []string
-	OfTargets int
-	Text      string
-	Aside     []string
+	Sides   []string
+	OfSides int
+	Text    string
+	Aside   []string
 }
 
 func (l *Lines) line(s string) { fmt.Fprintln(l.W, gutter+s) }
@@ -75,7 +75,7 @@ func (l *Lines) Heading(text string) { l.line(l.T.Bold(text)) }
 func (l *Lines) Items(items ...Item) {
 	nameWidth, versionWidth := 0, 0
 	for _, it := range items {
-		if it.Version != "" || it.From != "" || it.Text != "" || it.OfTargets > 0 {
+		if it.Version != "" || it.From != "" || it.Text != "" || it.OfSides > 0 {
 			nameWidth = max(nameWidth, Width(it.Name))
 		}
 		if afterVersion(it) {
@@ -101,8 +101,8 @@ func (l *Lines) item(it Item, nameWidth, versionWidth int) string {
 	if it.From != "" || it.To != "" {
 		rest = append(rest, t.Bump(it.From, it.To))
 	}
-	if it.OfTargets > 0 {
-		rest = append(rest, t.Grey(t.ArrowInto())+" "+t.Targets(it.Targets, it.OfTargets))
+	if it.OfSides > 0 {
+		rest = append(rest, t.Grey(t.ArrowInto())+" "+t.Sides(it.Sides, it.OfSides))
 	}
 	if it.Text != "" {
 		rest = append(rest, t.Markup(it.Text))
@@ -117,7 +117,7 @@ func (l *Lines) item(it Item, nameWidth, versionWidth int) string {
 }
 
 func afterVersion(it Item) bool {
-	return it.From != "" || it.To != "" || it.OfTargets > 0 || it.Text != ""
+	return it.From != "" || it.To != "" || it.OfSides > 0 || it.Text != ""
 }
 
 func (l *Lines) glyph(k Kind) string {
@@ -146,7 +146,7 @@ func (t Theme) Bump(from, to string) string {
 	return t.Grey(from) + " " + t.Grey(t.ArrowBump()) + " " + t.Yellow(to)
 }
 
-func (t Theme) Targets(names []string, of int) string {
+func (t Theme) Sides(names []string, of int) string {
 	switch {
 	case len(names) == 0:
 		return t.Grey("no sides")

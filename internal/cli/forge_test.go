@@ -14,7 +14,7 @@ import (
 
 func TestForgeServer(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "forge", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "forge", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"] = map[string]any{"eula": true}
 	})

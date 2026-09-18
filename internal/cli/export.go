@@ -27,15 +27,14 @@ func (a *app) exportCmd() *cobra.Command {
 }
 
 type exportFlags struct {
-	version, output, target, osName, ref string
-	bundle                               bool
-	ff                                   featureFlags
+	version, output, side, osName, ref string
+	bundle                             bool
+	ff                                 featureFlags
 }
 
-func (f *exportFlags) register(cmd *cobra.Command, extension, target, bundle string) {
+func (f *exportFlags) register(cmd *cobra.Command, extension, bundle string) {
 	cmd.Flags().StringVar(&f.version, "version", "", "version written into the pack (default: \"version\" in shulker.json)")
 	cmd.Flags().StringVarP(&f.output, "output", "o", "", "archive path (default: build/<name>-<version>"+extension+", or the current directory for a git or URL source)")
-	cmd.Flags().StringVar(&f.target, "target", "", target)
 	cmd.Flags().StringVar(&f.osName, "os", "", "include mods gated on this os: macos, windows, or linux (default: leave them out)")
 	cmd.Flags().BoolVar(&f.bundle, "bundle", false, bundle)
 	cmd.Flags().StringVar(&f.ref, "ref", "", "branch, tag, or commit to export from a git source (default: the remote HEAD)")
@@ -160,12 +159,12 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 				return err
 			}
 			opts := build.MrpackOptions{VersionID: job.version, Output: job.output, Bundle: f.bundle, OS: f.osName, Features: job.features}
-			if f.target != "" {
-				side, err := declaredSide(job.project.Manifest, f.target, "--target")
+			if f.side != "" {
+				side, err := declaredSide(job.project.Manifest, f.side, "--side")
 				if err != nil {
 					return err
 				}
-				opts.Targets = []string{side}
+				opts.Sides = []string{side}
 			}
 			rep, err := job.builder.ExportMrpack(opts)
 			if err != nil {
@@ -173,12 +172,13 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 			}
 			a.warn(rep.Warnings)
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OKInto("wrote "+rep.Name+" "+rep.VersionID, rep.Path, "")
+				l.OKInto("wrote "+rep.Name+" "+rep.VersionID, rep.Path, strings.Join(rep.Sides, " and "))
 				l.Tree(exportTally{how: "by download", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, overrides: rep.Overrides}.rows()...)
 			})
 		},
 	}
-	f.register(cmd, ".mrpack", "export one side only (default: every declared side)", "put files that Modrinth launchers cannot download inside the archive")
+	f.register(cmd, ".mrpack", "put files that Modrinth launchers cannot download inside the archive")
+	cmd.Flags().StringVar(&f.side, "side", "", "export one side only (default: every declared side)")
 	return cmd
 }
 
@@ -193,12 +193,12 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			target, err := sideOf(job.project.Manifest, f.target, "client", "export")
+			side, err := clientSide(job.project.Manifest)
 			if err != nil {
 				return err
 			}
 			rep, err := job.builder.ExportCurseForge(build.CurseForgeOptions{
-				Target:   target,
+				Side:     side,
 				Version:  job.version,
 				Output:   job.output,
 				Bundle:   f.bundle,
@@ -222,7 +222,7 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 			})
 		},
 	}
-	f.register(cmd, ".zip", "side to export; a CurseForge pack is always the client side", "put files that aren't on CurseForge inside the archive")
+	f.register(cmd, ".zip", "put files that aren't on CurseForge inside the archive")
 	return cmd
 }
 

@@ -80,7 +80,7 @@ Create `shulker.json` and `shulker.lock` in the current directory. Pass `--yes` 
 
 ```sh
 shulker init --yes
-shulker init --name my-server --minecraft 1.21.1 --loader neoforge --target server
+shulker init --name my-server --minecraft 1.21.1 --loader neoforge --side server
 ```
 
 | Flag | Description |
@@ -90,7 +90,7 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --target serv
 | `--minecraft <version>` | Minecraft version or range (default: latest release) |
 | `--loader <loader>` | Mod loader: `none` (the default, vanilla Minecraft), `fabric`, `quilt`, `neoforge`, `forge` |
 | `--loader-version <range>` | Loader version range (default: `*`); needs `--loader` |
-| `--target <side>` | Side to declare: `client` or `server` |
+| `--side <side>` | Side to declare: `client` or `server` |
 
 ### `shulker import mrpack`
 
@@ -112,7 +112,7 @@ Export the project as a Modrinth modpack for the Modrinth app and other launcher
 
 ```sh
 shulker export mrpack
-shulker export mrpack --target client -o dist/my-pack.mrpack
+shulker export mrpack --side client -o dist/my-pack.mrpack
 shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 ```
 
@@ -120,7 +120,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 | --- | --- |
 | `--version <version>` | Version written into the modpack (default: `version` in shulker.json) |
 | `-o, --output <path>` | Archive path (default: `build/<name>-<version>.mrpack`, or the current directory for a git or URL source) |
-| `--target <side>` | Export one side only (default: every declared side) |
+| `--side <side>` | Export one side only, for a deliberately partial pack (default: every declared side) |
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
@@ -140,7 +140,6 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 | --- | --- |
 | `--version <version>` | Version written into the modpack (default: `version` in shulker.json) |
 | `-o, --output <path>` | Archive path (default: `build/<name>-<version>.zip`, or the current directory for a git or URL source) |
-| `--target <side>` | Side to export; a CurseForge pack is always the client side |
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
@@ -491,13 +490,13 @@ Copy edits made in a build directory back into their source, an override file or
 
 ```sh
 shulker pull
-shulker pull config/sodium-options.json --target client
+shulker pull config/sodium-options.json --side client
 shulker pull config/iris.properties --key colorSpace
 ```
 
 | Flag | Description |
 | --- | --- |
-| `--target <side>` | Side whose build directory to pull from (default: the only side) |
+| `--side <side>` | Side whose build directory to pull from (default: the only declared side) |
 | `--into <path>` | Directory the side was synced into (default: the build directory and every directory `sync` recorded) |
 | `--key <key>` | Start managing this key of the one named `.properties` file, copying its current value into the override; repeat for more |
 
@@ -577,7 +576,6 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: ATLauncher's) |
-| `--target <side>` | Side to link; a launcher instance is always the client side |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
@@ -608,7 +606,6 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher runtime directory (default: GDLauncher's) |
-| `--target <side>` | Side to link; a launcher instance is always the client side |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
@@ -633,7 +630,6 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher directory (default: the official launcher's `.minecraft` folder) |
-| `--target <side>` | Side to link; a launcher instance is always the client side |
 | `--name <name>` | Profile name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
@@ -660,7 +656,6 @@ shulker link multimc --launcher-dir ~/MultiMC
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: Prism Launcher's; required for MultiMC) |
-| `--target <side>` | Side to link; a launcher instance is always the client side |
 | `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
@@ -674,8 +669,8 @@ shulker link multimc --launcher-dir ~/MultiMC
 Download and build one side of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<side>/`.
 
 ```sh
-shulker sync https://github.com/shulker-sh/base-pack.git --target server --into /srv/minecraft
-shulker sync ../my-pack --target client --into ~/instances/my-pack
+shulker sync https://github.com/shulker-sh/base-pack.git --side server --into /srv/minecraft
+shulker sync ../my-pack --side client --into ~/instances/my-pack
 shulker sync -i friends-smp
 shulker sync --into ~/instances/my-pack
 shulker sync --all --side server
@@ -694,13 +689,12 @@ A project whose side builds into its own directory is an instance, and `sync` ru
 
 | Flag | Description |
 | --- | --- |
-| `--target <side>` | Side to build (default: the only side) |
 | `--into <path>` | Output directory (default: the side's build directory) |
 | `--name <name>` | Name to list the `--into` directory under (default: the side's display name; kept on later syncs) |
 | `--as <id>` | Id to list the `--into` directory under, which `-i` takes (default: derived from its name) |
 | `--all` | Sync every instance `-i` matches, or every instance when there's no `-i` |
 | `--launcher <launcher>` | Only instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
-| `--side <side>` | Only `client` or `server` instances |
+| `--side <side>` | Side to build from a source (default: the only declared side); with `-i`, `--all`, or the picker, only `client` or `server` instances |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
@@ -1011,7 +1005,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `already-ignored` | The pair already has an ignore in `shulker.json`; pass `--force` to replace it |
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
-| `ambiguous-target` | The manifest declares both sides; pass `--target`. `candidates`: the sides |
+| `ambiguous-side` | The manifest declares both sides and the command works on one; `sync` and `pull` take `--side`, `diff --into` names it. `candidates`: the sides |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need; `cache info` still reports and names the instance |
@@ -1040,7 +1034,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |
-| `into-target` | `--into` applies to one side; name it |
 | `java-not-found` | No working Java at the configured path or on PATH |
 | `java-range` | `java` in `shulker.json` is neither a path nor a version range |
 | `java-version` | The Java found is outside the range in `shulker.json` |
@@ -1128,4 +1121,3 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
-| `wrong-side-target` | `--target` names the side the command doesn't work on. `candidates`: the side it needs |

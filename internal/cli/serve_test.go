@@ -12,7 +12,7 @@ import (
 
 func TestServeRunsServerAndStops(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
 	var m map[string]any
 	h.readJSON(t, "shulker.json", &m)
 	srv, _ := m["server"].(map[string]any)
@@ -84,7 +84,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	var env struct {
 		OK   bool `json:"ok"`
 		Data struct {
-			Target   string `json:"target"`
+			Side     string `json:"side"`
 			ExitCode int    `json:"exitCode"`
 			Java     struct {
 				Major int `json:"major"`
@@ -94,14 +94,14 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatalf("json stdout not a single envelope: %v\n%s", err, stdout)
 	}
-	if !env.OK || env.Data.Target != "server" || env.Data.ExitCode != 0 || env.Data.Java.Major != 25 {
+	if !env.OK || env.Data.Side != "server" || env.Data.ExitCode != 0 || env.Data.Java.Major != 25 {
 		t.Fatalf("envelope: %+v", env)
 	}
 }
 
 func TestServeErrors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 
 	old := h.fakeJDK(t, "17.0.12", "0")
@@ -136,7 +136,7 @@ func TestServeErrors(t *testing.T) {
 
 func TestManagedJava(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "add", "fabric-api")
 
 	code, stdout, _ := h.run(t, "--json", "install")
@@ -228,7 +228,7 @@ func TestManagedJava(t *testing.T) {
 func TestManagedJavaUnavailable(t *testing.T) {
 	h := newHarness(t)
 	h.runtime.missing = true
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
 	_, stderr := h.mustRunStderr(t, "install")
 	if !strings.Contains(stderr, "runtime") || !strings.Contains(stderr, "shulker.json") {
 		t.Fatalf("install should warn about the missing runtime: %s", stderr)
@@ -242,7 +242,7 @@ func TestManagedJavaUnavailable(t *testing.T) {
 
 func TestServeInstallsWhatTheLockNeeds(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server", "--loader", "neoforge")
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--side", "server", "--loader", "neoforge")
 	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
 	h.stdin = strings.NewReader("stop\n")
 	stdout, _ := h.mustRunStderr(t, "serve", "--accept-eula")

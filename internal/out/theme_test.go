@@ -31,8 +31,8 @@ func TestItemsSpacing(t *testing.T) {
 	items := []Item{
 		{Kind: Add, Name: "kitchen-sink", Version: "1.5", Aside: []string{"pack"}},
 		{Kind: Add, Name: "fabric-api", Version: "0.102.0+26.2", Aside: []string{"required by lithium"}},
-		{Kind: Add, Name: "lithium", Version: "0.14.3", Targets: []string{"client"}, OfTargets: 2},
-		{Kind: Add, Name: "ferritecore", Version: "6.0.2", Targets: []string{"client", "server"}, OfTargets: 2},
+		{Kind: Add, Name: "lithium", Version: "0.14.3", Sides: []string{"client"}, OfSides: 2},
+		{Kind: Add, Name: "ferritecore", Version: "6.0.2", Sides: []string{"client", "server"}, OfSides: 2},
 	}
 	want := []string{
 		"  + kitchen-sink 1.5 (pack)",

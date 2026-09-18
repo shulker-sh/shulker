@@ -301,7 +301,7 @@ func (a *app) rollbackCmd() *cobra.Command {
 			// The current state becomes an entry of its own first, so a rollback
 			// is itself undoable.
 			snapshot, err := build.TakeHistory(p.Dir, p.Manifest.HistoryKeep(), build.HistoryEntry{
-				Target: side,
+				Side:   side,
 				Reason: "rollback",
 			})
 			if err != nil {
@@ -378,8 +378,8 @@ func historyTaken(e build.HistoryEntry) string {
 	switch {
 	case e.Reason == "rollback":
 		return when + ", before a rollback"
-	case e.Reason == "build" && e.Target != "":
-		return when + ", before build " + e.Target
+	case e.Reason == "build" && e.Side != "":
+		return when + ", before build " + e.Side
 	case e.Reason != "":
 		return when + ", before " + e.Reason
 	}

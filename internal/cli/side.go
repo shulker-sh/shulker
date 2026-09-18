@@ -10,7 +10,7 @@ var sideNames = []string{"client", "server"}
 
 func isSide(name string) bool { return name == "client" || name == "server" }
 
-// checkSide reads a side out of a positional argument or the --target shim.
+// checkSide reads a side out of a positional argument or a --side flag.
 func checkSide(name, flag string) error {
 	if isSide(name) {
 		return nil
@@ -25,6 +25,15 @@ func checkSide(name, flag string) error {
 func noSide(side string) error {
 	e := out.Errorf("no-side", "%s declares no %s", manifest.FileName, side)
 	e.Rows = []out.Detail{{Label: "Fix", Text: `add "` + side + `": {} to ` + manifest.FileName}}
+	return e
+}
+
+// ambiguousSide is what a command that works on one side raises when the
+// manifest declares both and nothing chose between them. flag names the flag
+// that would, or is empty when the side is positional.
+func ambiguousSide(sides []string, flag string) error {
+	e := out.Errorf("ambiguous-side", "%s declares both sides; choose one", manifest.FileName)
+	e.Candidates, e.Flag = sides, flag
 	return e
 }
 
@@ -53,36 +62,24 @@ func projectSides(p *project.Project, args []string) ([]string, error) {
 	return []string{side}, nil
 }
 
-// singleSide is the one side a command builds: the one --target names, or the
+// singleSide is the one side a command builds: the one --side names, or the
 // only side the manifest declares.
 func singleSide(p *project.Project, want string) (string, error) {
 	if want != "" {
-		return declaredSide(p.Manifest, want, "--target")
+		return declaredSide(p.Manifest, want, "--side")
 	}
 	sides := p.Manifest.Sides()
 	if len(sides) == 1 {
 		return sides[0], nil
 	}
-	e := out.Errorf("ambiguous-target", "%s declares both sides; pass --target", manifest.FileName)
-	e.Candidates, e.Flag = sides, "--target"
-	return "", e
+	return "", ambiguousSide(sides, "--side")
 }
 
-// sideOf is the side a launcher-facing command needs, which --target may name
-// as long as it names that one.
-func sideOf(m *manifest.Manifest, want, side, verb string) (string, error) {
-	if want != "" {
-		if err := checkSide(want, "--target"); err != nil {
-			return "", err
-		}
-		if want != side {
-			e := out.Errorf("wrong-side-target", "--target names the %s side; %s needs the %s side", want, verb, side)
-			e.Candidates, e.Given, e.Flag = []string{side}, want, "--target"
-			return "", e
-		}
+// clientSide is the side a launcher-facing command builds, which the manifest
+// must declare.
+func clientSide(m *manifest.Manifest) (string, error) {
+	if !m.HasSide("client") {
+		return "", noSide("client")
 	}
-	if !m.HasSide(side) {
-		return "", noSide(side)
-	}
-	return side, nil
+	return "client", nil
 }

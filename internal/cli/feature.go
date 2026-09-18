@@ -207,7 +207,7 @@ func (a *app) resync(cmd *cobra.Command, sc *featureScope) (*syncResult, error) 
 			return nil, err
 		}
 	}
-	res, err := a.sync(cmd.Context(), sc.source, syncRequest{ref: sc.state.Ref, target: sc.state.Target, into: sc.into})
+	res, err := a.sync(cmd.Context(), sc.source, syncRequest{ref: sc.state.Ref, side: sc.state.Side, into: sc.into})
 	return &res, err
 }
 

@@ -302,7 +302,7 @@ func includedRequirers(by []string, included map[string]bool) []string {
 // features on by default, with OS conditions reported rather than checked, so
 // every machine gives the same answer.
 type Placement struct {
-	Targets []string
+	Sides   []string
 	OS      manifest.StringList
 	Feature manifest.StringList
 }
@@ -321,7 +321,7 @@ func (b *Builder) Placements() map[string]Placement {
 				continue
 			}
 			p := placements[id]
-			p.Targets = append(p.Targets, side)
+			p.Sides = append(p.Sides, side)
 			placements[id] = p
 		}
 		if side != "client" {
@@ -339,7 +339,7 @@ func (b *Builder) Placements() map[string]Placement {
 				}
 			}
 			p := placements[ref.key]
-			p.Targets = append(p.Targets, side)
+			p.Sides = append(p.Sides, side)
 			if isListed {
 				p.OS, p.Feature = entry.OS, entry.Feature
 			}

@@ -24,7 +24,7 @@ import (
 const eulaURL = "https://aka.ms/MinecraftEULA"
 
 type serveResult struct {
-	Target      string      `json:"target"`
+	Side        string      `json:"side"`
 	Dir         string      `json:"dir"`
 	Java        server.Java `json:"java"`
 	Args        []string    `json:"args"`
@@ -168,7 +168,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res := serveResult{Target: "server", Dir: dir, Java: java, Args: launchArgs, ExitCode: code}
+			res := serveResult{Side: "server", Dir: dir, Java: java, Args: launchArgs, ExitCode: code}
 			if code != 0 {
 				res.Log, res.CrashReport = serverFailureFiles(dir, started)
 				if a.printer.JSON {

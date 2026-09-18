@@ -40,12 +40,12 @@ type Entry struct {
 	forget            func(e *Entry, l config.Instance) (Forgotten, error)
 }
 
-// Linked is a registry row plus the intent its instance.json records, which is where the target and
+// Linked is a registry row plus the intent its instance.json records, which is where the side and
 // ref the relink command needs now live.
 type Linked struct {
 	config.Instance
-	Target string
-	Ref    string
+	Side string
+	Ref  string
 }
 
 var All = []*Entry{
@@ -154,7 +154,7 @@ func relinkSync(l Linked) (args []string, in string) {
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
 	}
-	return append(args, "--target", shellArg(l.Target), "--into", shellArg(l.Dir), "--name", shellArg(l.Label())), ""
+	return append(args, "--side", shellArg(l.Side), "--into", shellArg(l.Dir), "--name", shellArg(l.Label())), ""
 }
 
 func relinkInstance(e *Entry, l Linked) (args []string, in string) {
@@ -168,7 +168,7 @@ func relinkInstance(e *Entry, l Linked) (args []string, in string) {
 			args = append(args, "--ref", shellArg(l.Ref))
 		}
 	}
-	return append(args, "--target", shellArg(l.Target), "--name", shellArg(l.Label())), in
+	return append(args, "--name", shellArg(l.Label())), in
 }
 
 func relinkMojang(e *Entry, l Linked) (args []string, in string) {
@@ -176,7 +176,7 @@ func relinkMojang(e *Entry, l Linked) (args []string, in string) {
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
 	}
-	return append(args, "--target", shellArg(l.Target), "--name", shellArg(l.Label())), ""
+	return append(args, "--name", shellArg(l.Label())), ""
 }
 
 func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {

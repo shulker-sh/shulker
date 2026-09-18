@@ -3,6 +3,7 @@ package cli
 import (
 	"archive/zip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -159,13 +160,16 @@ func TestExportMrpack(t *testing.T) {
 		}
 	}
 
-	stdout = h.mustRun(t, "export", "mrpack", "--target", "server", "--version", "2.0", "--output", filepath.Join(h.dir, "out", "server.mrpack"), "--json")
+	stdout = h.mustRun(t, "export", "mrpack", "--side", "server", "--version", "2.0", "--output", filepath.Join(h.dir, "out", "server.mrpack"), "--json")
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
 	rep := env.Data.(map[string]any)
-	if rep["name"] != "pack" || rep["versionId"] != "2.0" || len(rep["mods"].([]any)) != 1 {
+	if rep["name"] != "pack" || rep["versionId"] != "2.0" || len(rep["mods"].([]any)) != 1 || fmt.Sprint(rep["sides"]) != "[server]" {
 		t.Fatalf("server export report: %v", rep)
+	}
+	if stdout := h.mustRun(t, "export", "mrpack", "--side", "server", "--version", "2.0", "--output", filepath.Join(h.dir, "out", "server.mrpack")); !strings.Contains(stdout, "(server)") {
+		t.Fatalf("a partial export names its side: %s", stdout)
 	}
 	index, entries = readMrpack(t, filepath.Join(h.dir, "out", "server.mrpack"))
 	if index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename || entries["overrides/config/shared.toml"] != "server\n" || entries["overrides/eula.txt"] == "" || len(entries) != 6 {

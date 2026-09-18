@@ -77,7 +77,7 @@ func TestLinkMojang(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Command != "link mojang" || env.Data.Profile != "shulker-pack" || env.Data.Target != "client" || env.Data.GameDir != wantGameDir {
+	if env.Command != "link mojang" || env.Data.Profile != "shulker-pack" || env.Data.Side != "client" || env.Data.GameDir != wantGameDir {
 		t.Fatalf("relink envelope: %s", stdout)
 	}
 	profiles = readProfiles(t, launcherDir)
@@ -129,7 +129,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 	if instances := readInstances(t, h); len(instances) != 1 || instances[0].Launcher != "mojang" || instances[0].Dir != gameDir || instances[0].Source != source {
 		t.Fatalf("registry: %+v", instances)
 	}
-	if f := readIntent(t, gameDir); f.Ref != "main" || f.Target != "client" {
+	if f := readIntent(t, gameDir); f.Ref != "main" || f.Side != "client" {
 		t.Fatalf("the ref and target live in the instance file: %+v", f)
 	}
 
@@ -147,7 +147,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 	}
 
 	r := unlinkJSON(t, h, "Friends", "--launcher", "mojang")
-	if r[0].Removed != launcher.RemovedProfile || r[0].Relink != "shulker link mojang "+source+" --ref main --target client --name Friends --launcher-dir "+launcherDir {
+	if r[0].Removed != launcher.RemovedProfile || r[0].Relink != "shulker link mojang "+source+" --ref main --name Friends --launcher-dir "+launcherDir {
 		t.Fatalf("unlink mojang: %+v", r[0])
 	}
 }
@@ -160,16 +160,6 @@ func TestLinkMojangErrors(t *testing.T) {
 	code, stdout, _ := h.run(t, "link", "mojang", "--launcher-dir", filepath.Join(t.TempDir(), "missing"), "--json")
 	if code == 0 || failureCode(t, stdout).Code != "launcher-not-found" {
 		t.Fatalf("missing launcher: exit %d %s", code, stdout)
-	}
-
-	code, stdout, _ = h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--target", "nope", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,server" {
-		t.Fatalf("not a side: exit %d %s", code, stdout)
-	}
-
-	code, stdout, _ = h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--target", "server", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "wrong-side-target" || strings.Join(e.Candidates, ",") != "client" {
-		t.Fatalf("server side: exit %d %s", code, stdout)
 	}
 
 	h.editManifest(t, func(m map[string]any) {

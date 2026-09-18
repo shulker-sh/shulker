@@ -4,7 +4,7 @@
   "title": ".shulker/instance.json",
   "description": "What an instance directory syncs from, and the settings that decide how shulker sets it up. Hand-edit it to change what shulker does, then run `shulker sync` or `shulker instances repair`. Shulker never rewrites the settings block. What the last build actually did is recorded separately, in .shulker/state.json.",
   "type": "object",
-  "required": ["$schema", "source", "target"],
+  "required": ["$schema", "source", "side"],
   "additionalProperties": false,
   "properties": {
     "$schema": {
@@ -22,10 +22,10 @@
       "minLength": 1,
       "description": "Branch, tag, or commit to follow from a git source. Omitted follows the remote HEAD."
     },
-    "target": {
+    "side": {
       "type": "string",
-      "minLength": 1,
-      "description": "Which of the source's targets this directory is built from. Its side is read from the target itself, never stored here."
+      "enum": ["client", "server"],
+      "description": "Which side of the source this directory is built for. A launcher instance is always the client."
     },
     "unlinked": {
       "type": "boolean",
@@ -100,11 +100,6 @@
       "additionalProperties": false,
       "description": "Written by shulker, for you to read. Editing it changes nothing; the next sync writes it again.",
       "properties": {
-        "side": {
-          "type": "string",
-          "enum": ["client", "server"],
-          "description": "Which side the target is, taken from the source's manifest when this instance was last linked or synced. Recorded so shulker can group and filter instances without opening a source that may be a remote one."
-        },
         "java": {
           "type": "string",
           "description": "The Java the last sync resolved, whether the managed runtime or the `java` setting."

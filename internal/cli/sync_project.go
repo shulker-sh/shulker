@@ -47,8 +47,8 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 			}
 			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(side), Dir: d, Source: dir})
 			e.ID = slugID(e.Name)
-			if e.Target == "" {
-				e.Target = side
+			if e.Side == "" {
+				e.Side = side
 			}
 			if e.Side == "" {
 				e.Side = side

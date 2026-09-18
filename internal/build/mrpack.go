@@ -24,7 +24,7 @@ import (
 var MrpackHosts = []string{"cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"}
 
 type MrpackOptions struct {
-	Targets   []string
+	Sides     []string
 	VersionID string
 	Output    string
 	Bundle    bool
@@ -36,7 +36,7 @@ type MrpackReport struct {
 	Path                 string   `json:"path"`
 	VersionID            string   `json:"versionId"`
 	Name                 string   `json:"name"`
-	Targets              []string `json:"targets"`
+	Sides                []string `json:"sides"`
 	Mods                 []string `json:"mods"`
 	ResourcePacks        []string `json:"resourcepacks"`
 	Shaders              []string `json:"shaders"`
@@ -47,7 +47,7 @@ type MrpackReport struct {
 	Warnings             []string `json:"-"`
 }
 
-type mrpackTarget struct {
+type mrpackSide struct {
 	side  string
 	files map[string][]byte
 	mods  map[string]bool
@@ -55,24 +55,24 @@ type mrpackTarget struct {
 }
 
 func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
-	targets, err := b.mrpackSides(opts.Targets)
+	sides, err := b.mrpackSides(opts.Sides)
 	if err != nil {
 		return nil, err
 	}
-	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(targets), Targets: []string{}, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}, Warnings: []string{}}
-	for _, t := range targets {
-		report.Targets = append(report.Targets, t.side)
+	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(sides), Sides: []string{}, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}, Warnings: []string{}}
+	for _, t := range sides {
+		report.Sides = append(report.Sides, t.side)
 		warnings, err := b.mrpackCollect(t, opts.OS, opts.Features)
 		if err != nil {
 			return nil, err
 		}
 		report.Warnings = append(report.Warnings, warnings...)
 	}
-	files, bundled, err := b.mrpackMods(targets, opts.Bundle, report)
+	files, bundled, err := b.mrpackMods(sides, opts.Bundle, report)
 	if err != nil {
 		return nil, err
 	}
-	entries := mrpackSplit(targets)
+	entries := mrpackSplit(sides)
 	for path := range entries {
 		if bundled[path] {
 			continue
@@ -124,32 +124,32 @@ func (b *Builder) addIdentity(entries map[string][]byte) error {
 	return nil
 }
 
-func (b *Builder) mrpackSides(sides []string) ([]*mrpackTarget, error) {
-	if len(sides) == 0 {
-		sides = b.Manifest.Sides()
+func (b *Builder) mrpackSides(names []string) ([]*mrpackSide, error) {
+	if len(names) == 0 {
+		names = b.Manifest.Sides()
 	}
-	var targets []*mrpackTarget
+	var sides []*mrpackSide
 	seen := map[string]bool{}
-	for _, side := range sides {
-		if side != "client" && side != "server" {
-			e := out.Errorf("usage", "%q is not a side", side)
-			e.Candidates, e.Given = []string{"client", "server"}, side
+	for _, name := range names {
+		if name != "client" && name != "server" {
+			e := out.Errorf("usage", "%q is not a side", name)
+			e.Candidates, e.Given = []string{"client", "server"}, name
 			return nil, e
 		}
-		if seen[side] {
+		if seen[name] {
 			continue
 		}
-		seen[side] = true
-		targets = append(targets, &mrpackTarget{side: side, files: map[string][]byte{}})
+		seen[name] = true
+		sides = append(sides, &mrpackSide{side: name, files: map[string][]byte{}})
 	}
-	return targets, nil
+	return sides, nil
 }
 
 // mrpackName is the name the Modrinth app shows. A pack carrying the client is
 // named for it; a server-only export keeps the server's own name.
-func (b *Builder) mrpackName(targets []*mrpackTarget) string {
-	pick := targets[0].side
-	for _, t := range targets {
+func (b *Builder) mrpackName(sides []*mrpackSide) string {
+	pick := sides[0].side
+	for _, t := range sides {
 		if t.side == "client" {
 			pick = t.side
 		}
@@ -157,8 +157,8 @@ func (b *Builder) mrpackName(targets []*mrpackTarget) string {
 	return b.Manifest.DisplayName(pick)
 }
 
-// mrpackCollect fills a target's override files and the mods it ships, returning the warnings.
-func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, features map[string]bool) ([]string, error) {
+// mrpackCollect fills a side's override files and the mods it ships, returning the warnings.
+func (b *Builder) mrpackCollect(t *mrpackSide, osName string, features map[string]bool) ([]string, error) {
 	rep := &Report{}
 	desired, _, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features}, rep)
 	if err != nil {
@@ -199,11 +199,11 @@ func (b *Builder) mrpackCollect(t *mrpackTarget, osName string, features map[str
 	return warnings, nil
 }
 
-func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *MrpackReport) ([]mrpack.File, map[string]bool, error) {
+func (b *Builder) mrpackMods(sides []*mrpackSide, bundle bool, report *MrpackReport) ([]mrpack.File, map[string]bool, error) {
 	files := []mrpack.File{}
 	bundledPaths := map[string]bool{}
 	blocked := &kindTally{}
-	add := func(key, kind, filePath, side, provider, sum512 string, u *string, owners []*mrpackTarget, locked, bundled *[]string) error {
+	add := func(key, kind, filePath, side, provider, sum512 string, u *string, owners []*mrpackSide, locked, bundled *[]string) error {
 		data, err := os.ReadFile(b.Cache.Object(sum512))
 		if err != nil {
 			return out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", key)
@@ -242,7 +242,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 	sort.Strings(ids)
 	for _, id := range ids {
 		m := b.Lock.Mods[id]
-		owners := mrpackOwners(targets, func(t *mrpackTarget) bool { return t.mods[id] })
+		owners := mrpackOwners(sides, func(t *mrpackSide) bool { return t.mods[id] })
 		if len(owners) == 0 {
 			continue
 		}
@@ -251,7 +251,7 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 		}
 	}
 	for _, ref := range b.packRefs() {
-		owners := mrpackOwners(targets, func(t *mrpackTarget) bool { return t.packs[ref.key] })
+		owners := mrpackOwners(sides, func(t *mrpackSide) bool { return t.packs[ref.key] })
 		if len(owners) == 0 {
 			continue
 		}
@@ -269,9 +269,9 @@ func (b *Builder) mrpackMods(targets []*mrpackTarget, bundle bool, report *Mrpac
 	return files, bundledPaths, nil
 }
 
-func mrpackOwners(targets []*mrpackTarget, ships func(*mrpackTarget) bool) []*mrpackTarget {
-	var owners []*mrpackTarget
-	for _, t := range targets {
+func mrpackOwners(sides []*mrpackSide, ships func(*mrpackSide) bool) []*mrpackSide {
+	var owners []*mrpackSide
+	for _, t := range sides {
 		if ships(t) {
 			owners = append(owners, t)
 		}
@@ -313,17 +313,17 @@ func mrpackHostAllowed(raw string) bool {
 	return false
 }
 
-func mrpackSplit(targets []*mrpackTarget) map[string][]byte {
+func mrpackSplit(sides []*mrpackSide) map[string][]byte {
 	entries := map[string][]byte{}
-	if len(targets) == 1 {
-		for path, data := range targets[0].files {
+	if len(sides) == 1 {
+		for path, data := range sides[0].files {
 			entries["overrides/"+path] = data
 		}
 		return entries
 	}
-	for path, data := range targets[0].files {
+	for path, data := range sides[0].files {
 		shared := true
-		for _, t := range targets[1:] {
+		for _, t := range sides[1:] {
 			if other, ok := t.files[path]; !ok || !bytes.Equal(other, data) {
 				shared = false
 				break
@@ -333,7 +333,7 @@ func mrpackSplit(targets []*mrpackTarget) map[string][]byte {
 			entries["overrides/"+path] = data
 		}
 	}
-	for _, t := range targets {
+	for _, t := range sides {
 		for path, data := range t.files {
 			if _, ok := entries["overrides/"+path]; ok {
 				continue

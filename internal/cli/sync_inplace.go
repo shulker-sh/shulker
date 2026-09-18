@@ -40,7 +40,7 @@ func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, r
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.target = side
+	req.side = side
 	res, err := a.buildInPlace(cmd.Context(), p.Dir, req)
 	if err != nil {
 		return syncResult{}, err
@@ -63,20 +63,20 @@ func (a *app) buildInPlace(ctx context.Context, dir string, req syncRequest) (sy
 
 // syncInPlaceForLaunch never stands between the player and the game: a refresh that fails falls
 // back to building the lock already there, and a build that fails leaves what is on disk.
-func (a *app) syncInPlaceForLaunch(cmd *cobra.Command, p *project.Project, target string) (syncResult, error) {
-	res, err := a.syncInPlace(cmd, p, target, syncRequest{})
+func (a *app) syncInPlaceForLaunch(cmd *cobra.Command, p *project.Project, side string) (syncResult, error) {
+	res, err := a.syncInPlace(cmd, p, side, syncRequest{})
 	if err == nil || errors.Is(cmd.Context().Err(), context.DeadlineExceeded) {
 		return res, err
 	}
 	a.printer.Drop()
 	a.printer.Warn("couldn't update, building what the lock already has: %v", err)
-	return a.buildInPlace(cmd.Context(), p.Dir, syncRequest{target: target})
+	return a.buildInPlace(cmd.Context(), p.Dir, syncRequest{side: side})
 }
 
 // syncTree syncs an instance that is also a source, then every directory built from it, since
 // those would otherwise keep building from the lock it just replaced.
-func (a *app) syncTree(cmd *cobra.Command, p *project.Project, target string, sel instanceSelection, req syncRequest) error {
-	own, err := a.syncInPlace(cmd, p, target, req)
+func (a *app) syncTree(cmd *cobra.Command, p *project.Project, side string, sel instanceSelection, req syncRequest) error {
+	own, err := a.syncInPlace(cmd, p, side, req)
 	if err != nil {
 		return err
 	}

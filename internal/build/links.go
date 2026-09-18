@@ -26,9 +26,9 @@ type linkPlan struct {
 	remove []string
 }
 
-func (b *Builder) planLinks(dir, target string, dirs []string, prev State, report *Report) (linkPlan, error) {
+func (b *Builder) planLinks(dir, side string, dirs []string, prev State, report *Report) (linkPlan, error) {
 	var plan linkPlan
-	dataRoot := filepath.Join(b.Dir, DataDir, target)
+	dataRoot := filepath.Join(b.Dir, DataDir, side)
 	wanted := map[string]bool{}
 	for _, rel := range dirs {
 		wanted[rel] = true
@@ -78,8 +78,8 @@ func (b *Builder) planLinks(dir, target string, dirs []string, prev State, repor
 	return plan, nil
 }
 
-func (b *Builder) applyLinks(dir, target string, plan linkPlan, report *Report) error {
-	dataRoot := filepath.Join(b.Dir, DataDir, target)
+func (b *Builder) applyLinks(dir, side string, plan linkPlan, report *Report) error {
+	dataRoot := filepath.Join(b.Dir, DataDir, side)
 	if len(plan.move)+len(plan.link) > 0 {
 		if err := os.MkdirAll(dataRoot, 0o755); err != nil {
 			return err

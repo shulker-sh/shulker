@@ -29,7 +29,7 @@ func TestInitWithoutALoader(t *testing.T) {
 	}
 
 	server := newHarness(t)
-	stdout = server.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	stdout = server.mustRun(t, "init", "--yes", "--name", "pack", "--side", "server")
 	if !strings.Contains(stdout, "Download and build it") || !strings.Contains(stdout, "$ shulker install") {
 		t.Fatalf("server init output: %s", stdout)
 	}
@@ -60,7 +60,7 @@ func TestAddNeedsALoader(t *testing.T) {
 
 func TestServerWithoutALoader(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 	_, l := readProject(t, h.dir)
 	if l.Server == nil || l.Server.Sha512 != h.vanilla.sha512 || l.Loader.Type != "" {

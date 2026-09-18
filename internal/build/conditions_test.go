@@ -45,8 +45,8 @@ func TestPlacementsFollowFeatureDefaultsAndIgnoreOS(t *testing.T) {
 		"cloth":   {"client"},
 		"sodium":  nil,
 	} {
-		if !slices.Equal(got[id].Targets, want) {
-			t.Errorf("%s lands in %v, want %v", id, got[id].Targets, want)
+		if !slices.Equal(got[id].Sides, want) {
+			t.Errorf("%s lands in %v, want %v", id, got[id].Sides, want)
 		}
 	}
 	if !slices.Equal(got["discord"].OS, manifest.StringList{"windows"}) || !slices.Equal(got["iris"].Feature, manifest.StringList{"shaders"}) {

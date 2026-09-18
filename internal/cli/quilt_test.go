@@ -14,7 +14,7 @@ import (
 
 func TestQuiltServer(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "quilt", "--target", "server")
+	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "quilt", "--side", "server")
 	h.mustRun(t, "add", "fabric-api")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"] = map[string]any{"eula": true}

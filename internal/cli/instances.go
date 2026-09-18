@@ -23,7 +23,6 @@ type instanceEntry struct {
 	config.Instance
 	Status   string `json:"status"`
 	SyncedAt string `json:"syncedAt,omitempty"`
-	Target   string `json:"target,omitempty"`
 	Side     string `json:"side,omitempty"`
 	Ref      string `json:"ref,omitempty"`
 	Problem  string `json:"problem,omitempty"`
@@ -100,12 +99,9 @@ func inspectInstance(in config.Instance) instanceEntry {
 		e.Problem = out.AsError(err).Message
 	default:
 		e.intent = f
-		e.Target, e.Ref = f.Target, f.Ref
+		e.Side, e.Ref = f.Side, f.Ref
 		if e.Source == "" {
 			e.Source = f.Source
-		}
-		if f.Resolved != nil {
-			e.Side = f.Resolved.Side
 		}
 	}
 	state, _ := build.ReadState(in.Dir)
@@ -123,8 +119,8 @@ func inspectInstance(in config.Instance) instanceEntry {
 		return e
 	}
 	e.SyncedAt = state.BuiltAt
-	if e.Target == "" {
-		e.Target = state.Target
+	if e.Side == "" {
+		e.Side = state.Side
 	}
 	return e
 }
@@ -170,8 +166,8 @@ func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
 		if e.Ref != "" {
 			detail += ", ref " + e.Ref
 		}
-		if e.Target != "" {
-			detail += ", side " + e.Target
+		if e.Side != "" {
+			detail += ", side " + e.Side
 		}
 		group = append(group, out.Entry{Synced: e.Status == instanceSynced, Name: e.ID, Tag: e.Side, Aside: e.statusText(), Path: e.Dir, Detail: detail})
 	}
@@ -284,20 +280,16 @@ func (a *app) updateInstances(update func([]config.Instance) []config.Instance) 
 
 // saveIntent writes what a directory syncs from, keeping the settings block a person may have
 // edited. Every directory shulker syncs into gets one, launcher instance or not.
-func saveIntent(dir, source, ref, target, side string) error {
+func saveIntent(dir, source, ref, side string) error {
 	f, err := instance.Load(dir)
 	switch {
 	case errors.Is(err, instance.ErrNotFound):
-		f = instance.New(source, ref, target)
+		f = instance.New(source, ref, side)
 	case err != nil:
 		return err
 	default:
-		f.Source, f.Ref, f.Target, f.Unlinked = source, ref, target, false
+		f.Source, f.Ref, f.Side, f.Unlinked = source, ref, side, false
 	}
-	if f.Resolved == nil {
-		f.Resolved = &instance.Resolved{}
-	}
-	f.Resolved.Side = side
 	return f.Save(dir)
 }
 

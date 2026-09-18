@@ -24,7 +24,7 @@ type prismReport struct {
 	InstanceDir string      `json:"instanceDir"`
 	Name        string      `json:"name"`
 	Mode        string      `json:"mode"`
-	Target      string      `json:"target"`
+	Side        string      `json:"side"`
 	GameDir     string      `json:"gameDir"`
 	Command     string      `json:"command,omitempty"`
 	Created     bool        `json:"created"`
@@ -33,7 +33,7 @@ type prismReport struct {
 }
 
 func (a *app) linkPrismCmd() *cobra.Command {
-	var launcherDir, target, mode, instanceName, ref, as string
+	var launcherDir, mode, instanceName, ref, as string
 	var force bool
 	var ff featureFlags
 	cmd := &cobra.Command{
@@ -61,7 +61,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 					return err
 				}
 			}
-			side, err := sideOf(p.Manifest, target, "client", "link")
+			side, err := clientSide(p.Manifest)
 			if err != nil {
 				return err
 			}
@@ -149,14 +149,14 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			// In symlink mode the game directory is the project's own build directory, so the
 			// project holds the intent and nothing is written into its output.
 			if mode == "sync" {
-				if err := saveIntent(res.GameDir, src.name, ref, side, "client"); err != nil {
+				if err := saveIntent(res.GameDir, src.name, ref, side); err != nil {
 					return err
 				}
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: launcherName, LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
 			var synced *syncResult
 			if len(args) == 1 && mode == "sync" {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: side, into: res.GameDir})
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: res.GameDir})
 				if err != nil {
 					return err
 				}
@@ -169,7 +169,7 @@ func (a *app) linkPrismCmd() *cobra.Command {
 				InstanceDir: res.Dir,
 				Name:        display,
 				Mode:        mode,
-				Target:      side,
+				Side:        side,
 				GameDir:     res.GameDir,
 				Command:     linkedSlotCommand(launcherName, mode, res.GameDir),
 				Created:     res.Created,
@@ -207,7 +207,6 @@ func (a *app) linkPrismCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: Prism Launcher's; required for MultiMC)")
-	cmd.Flags().StringVar(&target, "target", "", "side to link; a launcher instance is always the client side")
 	cmd.Flags().StringVar(&mode, "mode", "sync", "sync: build into the instance before each launch; symlink: point the instance at the build directory")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")

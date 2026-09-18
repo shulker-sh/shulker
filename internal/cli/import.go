@@ -28,7 +28,7 @@ type importResult struct {
 	Minecraft string            `json:"minecraft"`
 	Loader    lock.Loader       `json:"loader"`
 	Marker    bool              `json:"marker"`
-	Targets   []string          `json:"targets"`
+	Sides     []string          `json:"sides"`
 	Mods      *resolve.Imported `json:"mods"`
 	Overrides []string          `json:"overrides"`
 }
@@ -109,7 +109,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			if err := writeImport(dir, m, l, mods.Overrides); err != nil {
 				return err
 			}
-			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Targets: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
+			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
 				rows := []out.Row{

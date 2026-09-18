@@ -113,14 +113,14 @@ func repairIntent(in config.Instance) (bool, error) {
 		return false, nil
 	}
 	st, _ := build.ReadState(in.Dir)
-	source, ref, target := st.Source, st.Ref, st.Target
+	source, ref, side := st.Source, st.Ref, st.Side
 	if source == "" {
 		source = in.Source
 	}
 	if source == "" {
 		return false, nil
 	}
-	return true, instance.New(source, ref, target).Save(in.Dir)
+	return true, instance.New(source, ref, side).Save(in.Dir)
 }
 
 func scanLaunchers(only, dir string) []config.Instance {

@@ -78,7 +78,7 @@ func (a *app) buildCmd() *cobra.Command {
 }
 
 func printReport(l *out.Lines, rep *build.Report) {
-	l.OK("built "+rep.Target, reportAside(rep))
+	l.OK("built "+rep.Side, reportAside(rep))
 	printReportDetails(l, rep)
 }
 
@@ -105,7 +105,7 @@ func reportAside(rep *build.Report) string {
 func printReportDetails(l *out.Lines, rep *build.Report) {
 	var rows []out.Row
 	for _, m := range rep.Moved {
-		rows = append(rows, out.Row{Label: "moved", Text: m + " " + l.T.Grey(l.T.ArrowInto()) + " " + filepath.Join(build.DataDir, rep.Target, m)})
+		rows = append(rows, out.Row{Label: "moved", Text: m + " " + l.T.Grey(l.T.ArrowInto()) + " " + filepath.Join(build.DataDir, rep.Side, m)})
 	}
 	for _, m := range rep.MovedBack {
 		rows = append(rows, out.Row{Label: "moved back", Text: m + " " + l.T.Grey(l.T.ArrowInto()) + " " + rep.Dir})

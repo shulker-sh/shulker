@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
@@ -16,16 +17,12 @@ import (
 const FileName = "shulker.local.json"
 
 type File struct {
-	Features   map[string]bool   `json:"features,omitempty"`
-	Targets    map[string]Target `json:"targets,omitempty"`
-	DetectedOS string            `json:"detectedOs,omitempty"`
+	Features   map[string]bool     `json:"features,omitempty"`
+	SyncDirs   map[string][]string `json:"syncDirs,omitempty"`
+	DetectedOS string              `json:"detectedOs,omitempty"`
 
 	dir    string
 	exists bool
-}
-
-type Target struct {
-	SyncDirs []string `json:"syncDirs,omitempty"`
 }
 
 func Load(dir string) (*File, error) {
@@ -67,41 +64,35 @@ func (f *File) ResetFeature(name string) bool {
 	return ok
 }
 
-func (f *File) RecordSyncDir(target, dir string) bool {
-	t := f.Targets[target]
-	for _, d := range t.SyncDirs {
-		if d == dir {
-			return false
-		}
+func (f *File) RecordSyncDir(side, dir string) bool {
+	if slices.Contains(f.SyncDirs[side], dir) {
+		return false
 	}
-	t.SyncDirs = append(t.SyncDirs, dir)
-	if f.Targets == nil {
-		f.Targets = map[string]Target{}
+	if f.SyncDirs == nil {
+		f.SyncDirs = map[string][]string{}
 	}
-	f.Targets[target] = t
+	f.SyncDirs[side] = append(f.SyncDirs[side], dir)
 	return true
 }
 
-func (f *File) RemoveSyncDir(target, dir string) bool {
-	t := f.Targets[target]
-	for i, d := range t.SyncDirs {
-		if d != dir {
-			continue
-		}
-		t.SyncDirs = append(t.SyncDirs[:i:i], t.SyncDirs[i+1:]...)
-		if len(t.SyncDirs) == 0 {
-			delete(f.Targets, target)
-		} else {
-			f.Targets[target] = t
-		}
-		return true
+func (f *File) RemoveSyncDir(side, dir string) bool {
+	dirs := f.SyncDirs[side]
+	i := slices.Index(dirs, dir)
+	if i < 0 {
+		return false
 	}
-	return false
+	dirs = append(dirs[:i:i], dirs[i+1:]...)
+	if len(dirs) == 0 {
+		delete(f.SyncDirs, side)
+	} else {
+		f.SyncDirs[side] = dirs
+	}
+	return true
 }
 
-func (f *File) ExistingSyncDirs(target string) []string {
+func (f *File) ExistingSyncDirs(side string) []string {
 	var dirs []string
-	for _, d := range f.Targets[target].SyncDirs {
+	for _, d := range f.SyncDirs[side] {
 		if _, err := os.Stat(d); !errors.Is(err, os.ErrNotExist) {
 			dirs = append(dirs, d)
 		}

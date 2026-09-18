@@ -17,7 +17,7 @@ import (
 )
 
 func (a *app) linkGDLauncherCmd() *cobra.Command {
-	var launcherDir, target, instanceName, ref, as string
+	var launcherDir, instanceName, ref, as string
 	var force bool
 	var ff featureFlags
 	cmd := &cobra.Command{
@@ -35,7 +35,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 					return err
 				}
 			}
-			side, err := sideOf(p.Manifest, target, "client", "link")
+			side, err := clientSide(p.Manifest)
 			if err != nil {
 				return err
 			}
@@ -118,13 +118,13 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			if err := a.checkID(as, res.GameDir); err != nil {
 				return err
 			}
-			if err := saveIntent(res.GameDir, src.name, ref, side, "client"); err != nil {
+			if err := saveIntent(res.GameDir, src.name, ref, side); err != nil {
 				return err
 			}
 			a.registerInstance(config.Instance{ID: as, Launcher: "gdlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
 			var synced *syncResult
 			if len(args) == 1 {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, target: side, into: res.GameDir})
+				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: res.GameDir})
 				if err != nil {
 					return err
 				}
@@ -137,7 +137,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				InstanceDir: res.Dir,
 				Name:        display,
 				Mode:        "sync",
-				Target:      side,
+				Side:        side,
 				GameDir:     res.GameDir,
 				Command:     launcher.SlotCommand("gdlauncher", res.GameDir, launcher.HookPreLaunch),
 				Created:     res.Created,
@@ -165,7 +165,6 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher runtime directory (default: GDLauncher's)")
-	cmd.Flags().StringVar(&target, "target", "", "side to link; a launcher instance is always the client side")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")

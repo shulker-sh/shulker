@@ -51,7 +51,7 @@ type Origin struct {
 }
 
 type State struct {
-	Target string `json:"target"`
+	Side string `json:"side"`
 	Origin
 	BuiltAt    string                       `json:"builtAt"`
 	LockSha256 string                       `json:"lockSha256"`
@@ -84,7 +84,7 @@ func (s *State) record(rel string, f ownedFile) {
 }
 
 type Report struct {
-	Target    string   `json:"target"`
+	Side      string   `json:"side"`
 	Dir       string   `json:"dir"`
 	Written   []string `json:"written"`
 	Unchanged int      `json:"unchanged"`
@@ -215,7 +215,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		dir = filepath.Join(b.Dir, b.Manifest.BuildDir(side))
 	}
 	inPlace := sameDir(dir, b.Dir)
-	report := &Report{Target: side, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
+	report := &Report{Side: side, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
 	desired, dirs, err := b.collect(side, opts, report)
 	if err != nil {
 		return nil, err
@@ -232,7 +232,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	if stateErr != nil {
 		report.Warnings = append(report.Warnings, stateErr.Error())
 	}
-	next := State{Target: side, Origin: opts.Origin, Files: map[string]string{}, Loader: prev.Loader}
+	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, Loader: prev.Loader}
 	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
 		return nil, err
@@ -824,7 +824,7 @@ func sameDir(a, b string) bool {
 
 // checkReserved keeps a build in place off the files the project and the player
 // own: an override layer can write anything except these.
-func checkReserved(target string, desired map[string]source, data []string) error {
+func checkReserved(side string, desired map[string]source, data []string) error {
 	var bad []string
 	for rel := range desired {
 		if reservedPath(rel, data) {
@@ -839,7 +839,7 @@ func checkReserved(target string, desired map[string]source, data []string) erro
 	if len(bad) == 1 {
 		noun = "file"
 	}
-	e := out.Errorf("build-reserved", "%s builds in place, so it can't write %d %s it doesn't own", target, len(bad), noun)
+	e := out.Errorf("build-reserved", "%s builds in place, so it can't write %d %s it doesn't own", side, len(bad), noun)
 	e.Items = bad
 	return e
 }
@@ -877,7 +877,7 @@ func sha256Hex(data []byte) string {
 }
 
 func (r *Report) Summary() string {
-	s := fmt.Sprintf("%s: %d written, %d unchanged, %d kept, %d removed", r.Target, len(r.Written), r.Unchanged, len(r.Kept), len(r.Removed))
+	s := fmt.Sprintf("%s: %d written, %d unchanged, %d kept, %d removed", r.Side, len(r.Written), r.Unchanged, len(r.Kept), len(r.Removed))
 	if len(r.Linked) > 0 {
 		s += fmt.Sprintf(", %d linked", len(r.Linked))
 	}
