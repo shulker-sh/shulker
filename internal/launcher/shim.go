@@ -107,8 +107,9 @@ func ShimMode() bool {
 }
 
 // shimNoJavaTail is what the shim says when the sidecar leaves it nothing to start, whether that file
-// is missing, unreadable or short. It is the line `hook wrap` warns with for the same failure one
-// layer up, because from the player's side it is the same failure.
+// is missing, unreadable or short. It carries its own fix line, where `hook wrap` reports the same
+// failure as launch-not-started with a Fix row: the shim gets here only when shulker is not there to
+// render one.
 const shimNoJavaTail = " records no Java to run the game with; run shulker instances repair"
 
 // shimExitNothingToRun is the status the shim leaves when no game ever started. The launcher raises

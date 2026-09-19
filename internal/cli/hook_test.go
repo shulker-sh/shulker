@@ -248,11 +248,11 @@ func TestWrapRecordsALaunchThatNeverStarted(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, stdout, stderr := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)
-	if code != 0 {
-		t.Fatalf("a Java that can't run must not fail the launch: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	if code == 0 {
+		t.Fatalf("no game started, so the launcher needs a non-zero exit to show an error\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
 	if !strings.Contains(stderr, "can't run Java at "+java+", so the game didn't start") {
-		t.Fatalf("the failure should warn:\n%s", stderr)
+		t.Fatalf("the failure should name the Java it couldn't run:\n%s", stderr)
 	}
 	if _, err := os.Stat(argsFile); err == nil {
 		t.Fatal("the game must not have run")
@@ -291,7 +291,9 @@ func TestWrapRecordsALaunchThatNeverStartedWithoutThePreLaunchHook(t *testing.T)
 	if err := instance.SaveLaunches(gameDir, []instance.Launch{abandoned}, 5); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir)
+	if code, _, _ := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir); code == 0 {
+		t.Fatal("no game started, so the exit is non-zero even with both hooks off")
+	}
 	records := instance.LoadLaunches(gameDir)
 	if len(records) != 2 || records[1].Outcome != instance.OutcomeNotStarted {
 		t.Fatalf("no record was stamped, so the failure opens its own, got %+v", records)
@@ -309,9 +311,31 @@ func TestWrapKeepsNoRecordWhenTheHistoryIsOff(t *testing.T) {
 	if err := os.Remove(readIntent(t, gameDir).Resolved.Java); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir)
+	if code, _, _ := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir); code == 0 {
+		t.Fatal("a launch that never started still exits non-zero with no history to record it in")
+	}
 	if records := instance.LoadLaunches(gameDir); len(records) != 0 {
 		t.Fatalf("launchHistory 0 records nothing at all, got %+v", records)
+	}
+}
+
+func TestWrapSaysSoWhenTheInstanceFileCantBeRead(t *testing.T) {
+	h, gameDir, argsFile := wrappedInstance(t, "0", nil)
+	if err := os.WriteFile(instance.Path(gameDir), []byte("{ broken"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)
+	if code == 0 {
+		t.Fatalf("an instance shulker can't read leaves no launch, so the launcher needs an error\nstdout: %s\nstderr: %s", stdout, stderr)
+	}
+	if !strings.Contains(stderr, instance.Path(gameDir)) {
+		t.Fatalf("the failure should name the file it couldn't read:\n%s", stderr)
+	}
+	if strings.Contains(stderr, accessToken) {
+		t.Fatalf("the failure repeats the game argv:\n%s", stderr)
+	}
+	if _, err := os.Stat(argsFile); err == nil {
+		t.Fatal("the game must not have run")
 	}
 }
 

@@ -40,8 +40,12 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 		Short: "Sync the instance before the launcher starts the game",
 		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, f, ok := a.hookInstance()
-			if !ok || !f.Settings.PreLaunch() {
+			dir, f, err := a.hookInstance()
+			if err != nil {
+				a.printer.Warn("%v", err)
+				return nil
+			}
+			if !f.Settings.PreLaunch() {
 				return nil
 			}
 			a.stampLaunch(dir, f.Settings)
@@ -73,8 +77,12 @@ func (a *app) hookPostExitCmd() *cobra.Command {
 		Short: "Record how the run ended after the game exits",
 		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir, f, ok := a.hookInstance()
-			if !ok || !f.Settings.PostExit() {
+			dir, f, err := a.hookInstance()
+			if err != nil {
+				a.printer.Warn("%v", err)
+				return nil
+			}
+			if !f.Settings.PostExit() {
 				return nil
 			}
 			a.closeLaunch(dir, f.Settings)
@@ -98,9 +106,9 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			if a.dir == "" && a.instance == "" {
 				a.dir = gameDir
 			}
-			dir, f, ok := a.hookInstance()
-			if !ok {
-				return nil
+			dir, f, err := a.hookInstance()
+			if err != nil {
+				return notStarted(err.Error())
 			}
 			stamped := launching && f.Settings.PreLaunch()
 			if stamped {
@@ -120,19 +128,19 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			}
 			if java == "" {
 				reason := instance.Path(dir) + " records no Java to run the game with"
-				a.printer.Warn("%s; run shulker instances repair", reason)
 				if launching {
 					a.failLaunch(dir, f.Settings, stamped, reason)
 				}
-				return nil
+				e := notStarted(reason)
+				e.Rows = []out.Detail{{Label: "Fix", Text: "shulker instances repair", Command: true}}
+				return e
 			}
 			code, err := a.runGame(f.Settings, java, argv)
 			if err != nil {
-				a.printer.Warn("can't run Java at %s, so the game didn't start: %v", java, err)
 				if launching {
 					a.failLaunch(dir, f.Settings, stamped, runReason(java, err))
 				}
-				return nil
+				return notStarted(fmt.Sprintf("can't run Java at %s, so the game didn't start: %v", java, err))
 			}
 			if launching && f.Settings.PostExit() {
 				a.closeLaunch(dir, f.Settings)
@@ -287,20 +295,26 @@ func (a *app) failLaunch(dir string, s instance.Settings, stamped bool, reason s
 	}
 }
 
-// hookInstance is the directory the script named and the intent it records. A hook never fails a
-// launch, so anything unreadable is a warning and nothing to do.
-func (a *app) hookInstance() (string, *instance.File, bool) {
+// hookInstance is the directory the script named and the intent it records. Its callers decide what
+// an unreadable one costs: a hook running beside a launch the launcher drives itself warns and
+// leaves it alone, while `hook wrap` is the launch and has to say so.
+func (a *app) hookInstance() (string, *instance.File, error) {
 	dir, err := a.scopeDir()
 	if err != nil {
-		a.printer.Warn("%v", err)
-		return "", nil, false
+		return "", nil, err
 	}
 	f, err := instance.Load(dir)
 	if err != nil {
-		a.printer.Warn("%v", err)
-		return "", nil, false
+		return "", nil, err
 	}
-	return dir, f, true
+	return dir, f, nil
+}
+
+// notStarted is a launch that never happened, which the Mojang launcher shows as an error of its own
+// because a non-zero exit is all it reads from the shim. Shulker's own failures around a launch that
+// is going ahead stay an exit of 0: a sync that failed, or a wrapper that gave way to Java alone.
+func notStarted(reason string) *out.Error {
+	return out.Errorf("launch-not-started", "%s", reason)
 }
 
 // stampLaunch opens a launch record for the run about to start; post-exit closes it. A run whose

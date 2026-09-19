@@ -860,7 +860,9 @@ A run's `outcome` is `ok`, `crashed`, or `not-started` for one the game never be
 
 ### `shulker hook wrap -- <java arguments>`
 
-What the Mojang launcher's `javaDir` shim runs in place of Java, with the instance in `-C` and the game's own arguments after `--`. When those arguments carry `--gameDir` it does what the pre-launch and post-exit hooks do around the game: syncs the instance first (a failure is a warning, and the game still starts), runs Java with the arguments untouched, prefixed by `settings.wrapper` when that is set, then records the run. A `settings.wrapper` that can't be run at all is a warning and the game starts with Java on its own, and a Java that can't be run is a warning and a `not-started` launch record, so `instances` and the launch history both say the launch never happened. Without `--gameDir` it is the launcher's version check, which only runs Java. Java is `settings.java` when set, else `resolved.java`, shulker's managed runtime. The game's exit status is passed back as its own (`game-exit`); shulker's own failures never turn into one, since the launcher shows a non-zero exit as an error dialog. The arguments carry the session access token and appear in no output or record.
+What the Mojang launcher's `javaDir` shim runs in place of Java, with the instance in `-C` and the game's own arguments after `--`. When those arguments carry `--gameDir` it does what the pre-launch and post-exit hooks do around the game: syncs the instance first (a failure is a warning, and the game still starts), runs Java with the arguments untouched, prefixed by `settings.wrapper` when that is set, then records the run. A `settings.wrapper` that can't be run at all is a warning and the game starts with Java on its own. Without `--gameDir` it is the launcher's version check, which only runs Java. Java is `settings.java` when set, else `resolved.java`, shulker's managed runtime. The game's exit status is passed back as its own (`game-exit`).
+
+Where no game started at all, `hook wrap` exits `launch-not-started`: the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start. That exit is what makes the launcher raise an error, which is all a player sees when no window appears, and the last two also leave a `not-started` launch record, so `instances` and the launch history say the launch never happened. Shulker's own failures around a launch that is going ahead never turn into one: a failed sync and a wrapper that gave way both exit 0, because the game is starting either way. The arguments carry the session access token and appear in no output or record.
 
 ## Types
 
@@ -1151,6 +1153,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `java-version` | The Java found is outside the range in `shulker.json` |
 | `jvm-flags` | Unknown `jvmFlags` preset |
 | `key-not-found` | A `--key` isn't in the file. `candidates`: its keys |
+| `launch-not-started` | `hook wrap` never got as far as running the game: the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start. The exit is what makes the launcher show an error, since no window appears |
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-not-found` | No launcher directory where shulker looked |
 | `loader-required` | `add` of a mod in a project without a loader; set one with `shulker set loader.type <loader>` |

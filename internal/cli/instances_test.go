@@ -522,7 +522,9 @@ func TestInstancesShowsALaunchThatNeverStarted(t *testing.T) {
 	if err := os.Remove(java); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)
+	if code, _, _ := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken); code == 0 {
+		t.Fatal("a launch that never started exits non-zero")
+	}
 
 	var env struct {
 		Data []instanceEntry `json:"data"`
