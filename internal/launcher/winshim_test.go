@@ -105,11 +105,16 @@ func TestShimMarkerFollowsTheSourceAndNotTheVersion(t *testing.T) {
 	if !strings.HasPrefix(marker, shimMarkerPrefix) || len(marker) != len(shimMarkerPrefix)+8 {
 		t.Fatalf("marker = %q", marker)
 	}
-	if marker != markerFor(shimCS) {
-		t.Fatalf("the marker is the digest of the embedded source: %q", marker)
+	if marker != markerFor(shimSource()) {
+		t.Fatalf("the marker is the digest of the source as it is compiled: %q", marker)
 	}
-	if markerFor(shimCS+"\n") == marker {
+	if markerFor(shimSource()+"\n") == marker {
 		t.Fatal("a changed shim source has to move the marker")
+	}
+	// The line and the status the shim leaves behind are filled in before the digest, so a change to
+	// either recompiles every linked instance's shim.
+	if markerFor(shimCS) == marker {
+		t.Fatal("the marker is taken from the filled source, not the template")
 	}
 	// Nothing but the digest is in it, so a release that leaves the shim alone recompiles nothing.
 	if _, err := hex.DecodeString(strings.TrimPrefix(marker, shimMarkerPrefix)); err != nil {
@@ -209,25 +214,22 @@ func TestShimLaunchPrefersShulkerAndPassesTheTailThrough(t *testing.T) {
 	write(t, shimSidecarPath(exe), shulker+"\r\n"+`C:\java\bin\javaw.exe`+"\r\n")
 
 	tail := `-Xmx2G net.minecraft.client.main.Main --gameDir "` + gameDir + `" --accessToken secret`
-	program, arguments, err := shimLaunch(exe, tail)
-	if err != nil {
-		t.Fatal(err)
-	}
+	program, arguments := shimLaunch(exe, tail)
 	if program != shulker || arguments != `hook wrap -C "`+gameDir+`" -- `+tail {
 		t.Fatalf("program %q arguments %q", program, arguments)
 	}
-	if program, arguments, err = shimLaunch(exe, ""); err != nil || arguments != `hook wrap -C "`+gameDir+`" --` {
-		t.Fatalf("the launcher's version check runs the shim with no arguments: %q %q %v", program, arguments, err)
+	if program, arguments = shimLaunch(exe, ""); arguments != `hook wrap -C "`+gameDir+`" --` {
+		t.Fatalf("the launcher's version check runs the shim with no arguments: %q %q", program, arguments)
 	}
 	// A player who deletes shulker keeps their game: it stops updating, it doesn't stop starting.
 	if err := os.Remove(shulker); err != nil {
 		t.Fatal(err)
 	}
-	if program, arguments, err = shimLaunch(exe, tail); err != nil || program != `C:\java\bin\javaw.exe` || arguments != tail {
-		t.Fatalf("program %q arguments %q err %v", program, arguments, err)
+	if program, arguments = shimLaunch(exe, tail); program != `C:\java\bin\javaw.exe` || arguments != tail {
+		t.Fatalf("program %q arguments %q", program, arguments)
 	}
-	if _, _, err = shimLaunch(filepath.Join(t.TempDir(), "javaw.exe"), tail); err == nil {
-		t.Fatal("no sidecar, nothing to run")
+	if program, _ = shimLaunch(filepath.Join(t.TempDir(), "javaw.exe"), tail); program != "" {
+		t.Fatalf("no sidecar, nothing to run: %q", program)
 	}
 }
 
@@ -253,4 +255,30 @@ func readFileString(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+// The shim's contract is written three times with no compiler tying the copies together: the sh
+// script, the embedded C# source and the Go fallback. This is what catches a change to the argument
+// shape or the no-Java line landing in only one of them.
+func TestEveryShimRouteHoldsTheSameContract(t *testing.T) {
+	gameDir, exe := shimDir(t)
+	shulker := filepath.Join(gameDir, "shulker.exe")
+	write(t, shulker, "")
+	write(t, shimSidecarPath(exe), shulker+"\r\n"+`C:\java\bin\javaw.exe`+"\r\n")
+
+	if _, arguments := shimLaunch(exe, ""); arguments != `hook wrap -C "`+gameDir+`" --` {
+		t.Fatalf("the Go fallback builds %q", arguments)
+	}
+	sources := map[string]string{
+		"the sh script": shimSh(Shim{Dir: gameDir, Shulker: shulker, Java: `/java`}),
+		"the C# source": shimSource(),
+	}
+	for name, source := range sources {
+		if !strings.Contains(source, "hook wrap -C ") {
+			t.Fatalf("%s names the instance some other way", name)
+		}
+	}
+	if !strings.Contains(shimSource(), shimNoJavaTail) {
+		t.Fatal("the C# route says something else when there is no Java to run")
+	}
 }

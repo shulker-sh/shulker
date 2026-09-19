@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,5 +118,85 @@ func TestShimIsRewrittenAndRemoved(t *testing.T) {
 	}
 	if err := RemoveShim(gameDir); err != nil {
 		t.Fatalf("removing a shim that is already gone: %v", err)
+	}
+}
+
+// shimDir is an instance whose .shulker/ folder is there for a sidecar to go in.
+func shimDir(t *testing.T) (gameDir, exe string) {
+	t.Helper()
+	gameDir = t.TempDir()
+	exe = shimPath(gameDir, "windows")
+	if err := os.MkdirAll(filepath.Dir(exe), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return gameDir, exe
+}
+
+func TestShimSaysWhyWhenThereIsNothingToRun(t *testing.T) {
+	_, exe := shimDir(t)
+	started := false
+	spawn := func(string, string, string) (int, error) { started = true; return 0, nil }
+	nothingToRun := func(name string) {
+		t.Helper()
+		var stderr strings.Builder
+		if code := runShim(exe, "", &stderr, spawn); code == 0 {
+			t.Fatalf("%s: a shim that started no game must not report success", name)
+		}
+		if started {
+			t.Fatalf("%s: there was nothing to start", name)
+		}
+		got := stderr.String()
+		if !strings.Contains(got, shimSidecarPath(exe)) || !strings.Contains(got, "shulker instances repair") {
+			t.Fatalf("%s: the shim names the file and what to do about it: %q", name, got)
+		}
+	}
+
+	nothingToRun("no sidecar at all")
+	for _, tc := range []struct{ name, sidecar string }{
+		{"an empty sidecar", ""},
+		{"one line and no Java", `C:\gone\shulker.exe` + "\r\n"},
+		{"a blank second line", `C:\gone\shulker.exe` + "\r\n \r\n"},
+	} {
+		write(t, shimSidecarPath(exe), tc.sidecar)
+		nothingToRun(tc.name)
+	}
+
+	// An unreadable sidecar records no Java either, so it is the same failure as a missing one.
+	if err := os.Remove(shimSidecarPath(exe)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(shimSidecarPath(exe), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	nothingToRun("an unreadable sidecar")
+}
+
+func TestShimRunsTheRecordedJavaAndPassesItsCodeOn(t *testing.T) {
+	_, exe := shimDir(t)
+	java := `C:\java\bin\javaw.exe`
+	write(t, shimSidecarPath(exe), "\r\n"+java+"\r\n")
+
+	var stderr strings.Builder
+	var ran string
+	if code := runShim(exe, `-Xmx2G --accessToken secret`, &stderr, func(_, program, arguments string) (int, error) {
+		ran = program + " " + arguments
+		return 3, nil
+	}); code != 3 {
+		t.Fatalf("the game's own status goes back to the launcher: %d", code)
+	}
+	if ran != java+" -Xmx2G --accessToken secret" {
+		t.Fatalf("the recorded Java runs with the tail untouched: %q", ran)
+	}
+	if stderr.String() != "" {
+		t.Fatalf("a game that ran says nothing: %q", stderr.String())
+	}
+
+	// A recorded Java that is gone is the other way to end up with no window and no message.
+	stderr.Reset()
+	code := runShim(exe, "", &stderr, func(string, string, string) (int, error) {
+		return 0, errors.New("file does not exist")
+	})
+	if code == 0 || !strings.Contains(stderr.String(), java) {
+		t.Fatalf("a Java that never started: code %d, stderr %q", code, stderr.String())
 	}
 }

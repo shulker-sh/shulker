@@ -7,4 +7,4 @@ package launcher
 
 func commandLineTail() string { return "" }
 
-func shimSpawn(dir, program, arguments string) int { return 0 }
+func shimSpawn(dir, program, arguments string) (int, error) { return 0, nil }

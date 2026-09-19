@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
@@ -18,7 +19,8 @@ import (
 // The Windows shim is `.shulker\javaw.exe`, a GUI-subsystem executable: a console-subsystem one opens
 // a terminal window for the life of the game. Two routes produce it, and both read the same sidecar
 // and honour the same contract as the sh script — hand the launch to the recorded shulker, fall back
-// to the recorded Java, pass the child's exit code on.
+// to the recorded Java, pass the child's exit code on, and say why on stderr where there is nothing
+// to run at all rather than closing on a player with no window and no message.
 //
 // The preferred route compiles shimCS with the C# compiler Windows carries as an OS component, which
 // costs 4 KB. Where that compiler is missing, shulker copies itself and patches one byte, which costs
@@ -38,6 +40,9 @@ const cscDir = "v4.0.30319"
 
 // shimCS is the shim's whole source, compiled at link time rather than shipped, so no unsigned binary
 // lives in the repo. It knows nothing of shulker's model: it reads two paths and starts one process.
+// It is the third copy of the shim's contract, and holds what the sh script (shimSh) and the Go
+// fallback (runShim) hold: a change to the argument shape, the sidecar format or the no-Java line
+// belongs in all three.
 //
 // It never tokenizes the game's argv. C# hands Main an already-parsed array, and .NET Framework has
 // no way to re-quote one correctly, so the raw tail of the command line goes to the child untouched:
@@ -61,12 +66,9 @@ class ShulkerShim
         string dir = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(exe), ".."));
         string shulker = "", java = "";
         string sidecar = Path.ChangeExtension(exe, ".paths");
-        if (File.Exists(sidecar))
-        {
-            string[] paths = File.ReadAllLines(sidecar);
-            if (paths.Length > 0) shulker = paths[0].Trim();
-            if (paths.Length > 1) java = paths[1].Trim();
-        }
+        string[] paths = Read(sidecar);
+        if (paths.Length > 0) shulker = paths[0].Trim();
+        if (paths.Length > 1) java = paths[1].Trim();
         string tail = Tail(Marshal.PtrToStringUni(GetCommandLineW()));
         string program = java, arguments = tail;
         if (shulker.Length > 0 && File.Exists(shulker))
@@ -75,16 +77,36 @@ class ShulkerShim
             arguments = "hook wrap -C \"" + dir + "\" --";
             if (tail.Length > 0) arguments += " " + tail;
         }
-        if (program.Length == 0) return 0;
+        if (program.Length == 0)
+        {
+            Console.Error.WriteLine(sidecar + @NOJAVA@);
+            return @NOTHING@;
+        }
         ProcessStartInfo start = new ProcessStartInfo(program, arguments);
         start.UseShellExecute = false;
         start.CreateNoWindow = true;
         start.WorkingDirectory = dir;
-        using (Process child = Process.Start(start))
+        try
         {
-            child.WaitForExit();
-            return child.ExitCode;
+            using (Process child = Process.Start(start))
+            {
+                child.WaitForExit();
+                return child.ExitCode;
+            }
         }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine("can't run " + program + ", so the game didn't start: " + e.Message);
+            return @NOTHING@;
+        }
+    }
+
+    // A sidecar that can't be read records no paths, which is the same to the shim as one that
+    // records none.
+    static string[] Read(string sidecar)
+    {
+        try { return File.ReadAllLines(sidecar); }
+        catch (Exception) { return new string[0]; }
     }
 
     static string Tail(string line)
@@ -104,10 +126,24 @@ class ShulkerShim
 }
 `
 
+// shimSource is the C# with everything but its own marker filled in. The line and the status this
+// route leaves when there is nothing to run are the Go constants, so that copy of the shim's contract
+// cannot drift from the one runShim holds.
+func shimSource() string {
+	return strings.NewReplacer(
+		"@NOJAVA@", csLiteral(shimNoJavaTail),
+		"@NOTHING@", strconv.Itoa(shimExitNothingToRun),
+	).Replace(shimCS)
+}
+
+func csLiteral(s string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
+}
+
 // shimMarker is derived from the source itself, not from shulker's version, so a release that leaves
-// the shim alone doesn't make every linked instance recompile. The sidecar format lives in that
-// source, so a format change moves the marker with it.
-func shimMarker() string { return markerFor(shimCS) }
+// the shim alone doesn't make every linked instance recompile. The sidecar format and the line the
+// shim leaves behind both live in that source, so a change to either moves the marker with it.
+func shimMarker() string { return markerFor(shimSource()) }
 
 func markerFor(source string) string {
 	sum := sha256.Sum256([]byte(source))
@@ -252,7 +288,7 @@ func compileShim(csc, marker string) ([]byte, error) {
 	}
 	defer os.RemoveAll(dir)
 	source := filepath.Join(dir, "shim.cs")
-	if err := os.WriteFile(source, []byte(strings.ReplaceAll(shimCS, "@MARKER@", marker)), 0o644); err != nil {
+	if err := os.WriteFile(source, []byte(strings.ReplaceAll(shimSource(), "@MARKER@", marker)), 0o644); err != nil {
 		return nil, err
 	}
 	out := filepath.Join(dir, "javaw.exe")

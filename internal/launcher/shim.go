@@ -3,6 +3,7 @@ package launcher
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -29,20 +30,28 @@ type Shim struct {
 // ShimPath is the file a profile's javaDir names.
 func ShimPath(dir string) string { return shimPath(dir, runtime.GOOS) }
 
+// The two names the shim can have. RemoveShim and IsShulkerShim know both, because an instance
+// folder outlives the machine it was linked on.
+const (
+	shimScriptName  = "java"
+	shimWindowsName = "javaw.exe"
+)
+
 func shimPath(dir, goos string) string {
-	name := "java"
 	if goos == "windows" {
-		name = "javaw.exe"
+		return filepath.Join(dir, instance.Dir, shimWindowsName)
 	}
-	return filepath.Join(dir, instance.Dir, name)
+	return filepath.Join(dir, instance.Dir, shimScriptName)
 }
 
 // IsShulkerShim reports whether a profile's javaDir is one shulker wrote, which is how reconcile
 // tells its own value from the Java a player chose.
 func IsShulkerShim(javaDir string) bool {
 	for _, sep := range []string{"/", `\`} {
-		if strings.HasSuffix(javaDir, instance.Dir+sep+"java") || strings.HasSuffix(javaDir, instance.Dir+sep+"javaw.exe") {
-			return true
+		for _, name := range []string{shimScriptName, shimWindowsName} {
+			if strings.HasSuffix(javaDir, instance.Dir+sep+name) {
+				return true
+			}
 		}
 	}
 	return false
@@ -76,7 +85,8 @@ func RemoveShim(dir string) error {
 	// A shim moved aside by an earlier rewrite may still be running, and Windows won't delete one of
 	// those; it is leftover bytes nothing points at, so failing to remove it is not a failure.
 	os.Remove(windows + shimOldSuffix)
-	for _, path := range []string{shimPath(dir, "unix"), windows, shimSidecarPath(windows)} {
+	script := filepath.Join(dir, instance.Dir, shimScriptName)
+	for _, path := range []string{script, windows, shimSidecarPath(windows)} {
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -93,42 +103,67 @@ func ShimMode() bool {
 		return false
 	}
 	exe, err := os.Executable()
-	return err == nil && strings.EqualFold(filepath.Base(exe), filepath.Base(shimPath("", "windows")))
+	return err == nil && strings.EqualFold(filepath.Base(exe), shimWindowsName)
 }
 
+// shimNoJavaTail is what the shim says when the sidecar leaves it nothing to start, whether that file
+// is missing, unreadable or short. It is the line `hook wrap` warns with for the same failure one
+// layer up, because from the player's side it is the same failure.
+const shimNoJavaTail = " records no Java to run the game with; run shulker instances repair"
+
+// shimExitNothingToRun is the status the shim leaves when no game ever started. The launcher raises
+// its own error over a non-zero exit, which is all a player sees when no window appears; ordinarily
+// the shim exits 0 so shulker's own failures never become that dialog, but there is no launch left to
+// protect here.
+const shimExitNothingToRun = 1
+
 // RunShim hands the launch to the shulker the sidecar records, to the recorded Java when that binary
-// is gone, and reports the child's exit code: a non-zero exit of its own would raise a launcher error
-// dialog over shulker's business rather than the game's.
+// is gone, and reports the child's exit code.
 func RunShim() int {
 	exe, err := os.Executable()
 	if err != nil {
-		return 0
+		fmt.Fprintf(os.Stderr, "shulker's shim can't find its own path, so the game didn't start: %v\n", err)
+		return shimExitNothingToRun
 	}
-	program, arguments, err := shimLaunch(exe, commandLineTail())
-	if err != nil || program == "" {
-		return 0
+	return runShim(exe, commandLineTail(), os.Stderr, shimSpawn)
+}
+
+// runShim is the Go copy of the shim's contract, which the fallback route runs and which the sh
+// script (shimSh) and the embedded C# source (shimCS) hold too: read the sidecar's two lines, prefer
+// the recorded shulker, and say why on stderr rather than closing on a player with no window and no
+// message. A change here belongs in those two as well.
+func runShim(exe, tail string, stderr io.Writer, spawn func(dir, program, arguments string) (int, error)) int {
+	program, arguments := shimLaunch(exe, tail)
+	if program == "" {
+		fmt.Fprintln(stderr, shimSidecarPath(exe)+shimNoJavaTail)
+		return shimExitNothingToRun
 	}
-	return shimSpawn(filepath.Dir(filepath.Dir(exe)), program, arguments)
+	code, err := spawn(filepath.Dir(filepath.Dir(exe)), program, arguments)
+	if err != nil {
+		fmt.Fprintf(stderr, "can't run %s, so the game didn't start: %v\n", program, err)
+		return shimExitNothingToRun
+	}
+	return code
 }
 
 // shimLaunch is what the shim starts, from the sidecar beside it and the raw tail of its own command
-// line. The tail passes through untouched: it carries the session access token, and rebuilding it
-// from a parsed argv would corrupt the quoting.
-func shimLaunch(exe, tail string) (program, arguments string, err error) {
+// line. An empty program means the sidecar named nothing this machine can run. The tail passes
+// through untouched: it carries the session access token, and rebuilding it from a parsed argv would
+// corrupt the quoting.
+func shimLaunch(exe, tail string) (program, arguments string) {
 	dir := filepath.Dir(filepath.Dir(exe))
-	data, err := os.ReadFile(shimSidecarPath(exe))
-	if err != nil {
-		return "", "", err
-	}
+	// A sidecar that can't be read records no paths, which is the same to the shim as one that
+	// records none.
+	data, _ := os.ReadFile(shimSidecarPath(exe))
 	shulker, java := sidecarPaths(data)
 	if shulker == "" || !fileExists(shulker) {
-		return java, tail, nil
+		return java, tail
 	}
 	arguments = `hook wrap -C "` + dir + `" --`
 	if tail != "" {
 		arguments += " " + tail
 	}
-	return shulker, arguments, nil
+	return shulker, arguments
 }
 
 func sidecarPaths(data []byte) (shulker, java string) {
@@ -165,9 +200,12 @@ func cutProgramName(line string) string {
 	return strings.TrimLeft(line[i:], " \t")
 }
 
-// shimSh names the instance with -C because the launcher's version check runs the shim with no
-// --gameDir in the argv, and passes the argv on after -- because it carries the session token and
-// belongs to Java alone.
+// shimSh is the shim everywhere but Windows, and the copy of the contract the other two follow: the
+// embedded C# source (shimCS) and the Go fallback (runShim) do what it does. It names the instance
+// with -C because the launcher's version check runs the shim with no --gameDir in the argv, and
+// passes the argv on after -- because it carries the session token and belongs to Java alone. An
+// unset Java leaves sh's own "not found" on stderr and a non-zero status, which is what
+// shimNoJavaTail and shimExitNothingToRun leave for the other two.
 func shimSh(s Shim) string {
 	var b strings.Builder
 	b.WriteString("#!/bin/sh\n")

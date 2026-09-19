@@ -16,16 +16,19 @@ func commandLineTail() string {
 }
 
 // shimSpawn starts the child with a command line built by hand, since os/exec would re-quote an
-// argument list, and reports its exit code.
-func shimSpawn(dir, program, arguments string) int {
+// argument list, and reports its exit code. An error is a program that never started at all, which
+// the caller says out loud rather than exiting on quietly.
+func shimSpawn(dir, program, arguments string) (int, error) {
 	cmd := exec.Command(program)
 	cmd.Dir = dir
 	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `"` + program + `" ` + arguments, CreationFlags: windows.CREATE_NO_WINDOW}
-	if err := cmd.Run(); err != nil {
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			return exit.ExitCode()
-		}
+	err := cmd.Run()
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
+		return 0, nil
+	case errors.As(err, &exit):
+		return exit.ExitCode(), nil
 	}
-	return 0
+	return 0, err
 }
