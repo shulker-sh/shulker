@@ -238,6 +238,9 @@ type Entry struct {
 	Aside  string
 	Path   string
 	Detail string
+	// Note is a last grey line under the detail, for a problem the status aside is too narrow to
+	// carry.
+	Note string
 }
 
 // Entries is a bold heading with a tree of status-dotted entries, each with
@@ -265,6 +268,9 @@ func (l *Lines) Entries(heading string, entries []Entry) {
 		}
 		if e.Detail != "" {
 			fmt.Fprintln(l.W, gutter+gutter+below+"    "+t.Grey(e.Detail))
+		}
+		if e.Note != "" {
+			fmt.Fprintln(l.W, gutter+gutter+below+"    "+t.Grey(e.Note))
 		}
 	}
 }

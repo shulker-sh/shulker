@@ -788,7 +788,7 @@ A project whose side builds into its own directory is an instance, and `sync` ru
 
 ### `shulker instances`
 
-List the instances shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each row leads with the instance's id, which is what `-i` takes, and shows its side, when it was last synced, its directory, and the name and source it syncs from. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`. When the last sync failed, the row says so and names why, beside the time of the sync that built what is on disk.
+List the instances shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each row leads with the instance's id, which is what `-i` takes, and shows its side, when it was last synced, its directory, and the name and source it syncs from. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`. When the last sync failed, the row says so and names why, beside the time of the sync that built what is on disk. When the last launch never got as far as running the game, a line under the row says so and names the reason.
 
 ```sh
 shulker instances
@@ -856,9 +856,11 @@ A launcher that gives shulker no way to show a message gets a deadline instead, 
 
 What a launcher's own post-exit slot runs, recording how the run ended in the instance's `.shulker/launches.json`: when it started and finished, whether the game left a crash report, and where that report and the log are. `settings.launchHistory` in `.shulker/instance.json` is how many runs are kept — 5 by default, `-1` every one, and `0` none at all, which records nothing.
 
+A run's `outcome` is `ok`, `crashed`, or `not-started` for one the game never began, which also carries the reason in `error` and has the same `startedAt` and `endedAt`.
+
 ### `shulker hook wrap -- <java arguments>`
 
-What the Mojang launcher's `javaDir` shim runs in place of Java, with the instance in `-C` and the game's own arguments after `--`. When those arguments carry `--gameDir` it does what the pre-launch and post-exit hooks do around the game: syncs the instance first (a failure is a warning, and the game still starts), runs Java with the arguments untouched, prefixed by `settings.wrapper` when that is set, then records the run. Without `--gameDir` it is the launcher's version check, which only runs Java. Java is `settings.java` when set, else `resolved.java`, shulker's managed runtime. The game's exit status is passed back as its own (`game-exit`); shulker's own failures never turn into one, since the launcher shows a non-zero exit as an error dialog. The arguments carry the session access token and appear in no output or record.
+What the Mojang launcher's `javaDir` shim runs in place of Java, with the instance in `-C` and the game's own arguments after `--`. When those arguments carry `--gameDir` it does what the pre-launch and post-exit hooks do around the game: syncs the instance first (a failure is a warning, and the game still starts), runs Java with the arguments untouched, prefixed by `settings.wrapper` when that is set, then records the run. A `settings.wrapper` that can't be run at all is a warning and the game starts with Java on its own, and a Java that can't be run is a warning and a `not-started` launch record, so `instances` and the launch history both say the launch never happened. Without `--gameDir` it is the launcher's version check, which only runs Java. Java is `settings.java` when set, else `resolved.java`, shulker's managed runtime. The game's exit status is passed back as its own (`game-exit`); shulker's own failures never turn into one, since the launcher shows a non-zero exit as an error dialog. The arguments carry the session access token and appear in no output or record.
 
 ## Types
 

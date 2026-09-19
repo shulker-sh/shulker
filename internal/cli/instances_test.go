@@ -515,3 +515,40 @@ func TestSyncStampsTheInstanceAndTheRow(t *testing.T) {
 		t.Fatalf("a sync that works clears the error: %+v", in)
 	}
 }
+
+func TestInstancesShowsALaunchThatNeverStarted(t *testing.T) {
+	h, gameDir, _ := wrappedInstance(t, "0", nil)
+	java := readIntent(t, gameDir).Resolved.Java
+	if err := os.Remove(java); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)
+
+	var env struct {
+		Data []instanceEntry `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 1 || !strings.Contains(env.Data[0].LaunchError, java) {
+		t.Fatalf("the entry should carry the reason the launch never started: %+v", env.Data)
+	}
+	stdout := h.mustRun(t, "instances")
+	if !strings.Contains(stdout, "last launch didn't start: ") || !strings.Contains(stdout, java) {
+		t.Fatalf("instances should show the failed launch:\n%s", stdout)
+	}
+	if strings.Contains(stdout, accessToken) {
+		t.Fatalf("instances repeats the game argv:\n%s", stdout)
+	}
+
+	h.mustRun(t, "instances", "repair")
+	fresh := readIntent(t, gameDir)
+	fresh.Resolved.Java, _ = fakeGameExe(t, "0")
+	if err := fresh.Save(gameDir); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir)
+	if stdout := h.mustRun(t, "instances"); strings.Contains(stdout, "last launch didn't start") {
+		t.Fatalf("a launch that started clears the line:\n%s", stdout)
+	}
+}

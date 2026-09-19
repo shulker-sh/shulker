@@ -217,3 +217,113 @@ func TestGameDirOf(t *testing.T) {
 		}
 	}
 }
+
+func TestWrapFallsBackToJavaWhenTheWrapperCantRun(t *testing.T) {
+	h, gameDir, argsFile := wrappedInstance(t, "0", func(f *instance.File) {
+		f.Settings.Wrapper = []string{"shulker-no-such-wrapper", "--tag"}
+	})
+	code, stdout, stderr := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)
+	if code != 0 {
+		t.Fatalf("a wrapper that can't run must not fail the launch: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	if !strings.Contains(stderr, `can't run the wrapper "shulker-no-such-wrapper", so the game starts with Java alone`) {
+		t.Fatalf("the fallback should warn:\n%s", stderr)
+	}
+	if got := readArgs(t, argsFile); got != "--gameDir\n"+gameDir+"\n--accessToken\n"+accessToken+"\n" {
+		t.Fatalf("java should get the argv untouched, got %q", got)
+	}
+	records := instance.LoadLaunches(gameDir)
+	if len(records) != 1 || records[0].Outcome != instance.OutcomeOK {
+		t.Fatalf("the game ran, so the record is a normal one, got %+v", records)
+	}
+	if strings.Contains(stderr, accessToken) {
+		t.Fatalf("the warning repeats the game argv:\n%s", stderr)
+	}
+}
+
+func TestWrapRecordsALaunchThatNeverStarted(t *testing.T) {
+	h, gameDir, argsFile := wrappedInstance(t, "0", nil)
+	java := readIntent(t, gameDir).Resolved.Java
+	if err := os.Remove(java); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)
+	if code != 0 {
+		t.Fatalf("a Java that can't run must not fail the launch: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	if !strings.Contains(stderr, "can't run Java at "+java+", so the game didn't start") {
+		t.Fatalf("the failure should warn:\n%s", stderr)
+	}
+	if _, err := os.Stat(argsFile); err == nil {
+		t.Fatal("the game must not have run")
+	}
+	records := instance.LoadLaunches(gameDir)
+	if len(records) != 1 {
+		t.Fatalf("a launch that never started is still one record, got %+v", records)
+	}
+	rec := records[0]
+	if rec.Outcome != instance.OutcomeNotStarted || rec.EndedAt == "" || rec.StartedAt != rec.EndedAt {
+		t.Fatalf("the record should close on the spot as not-started, got %+v", rec)
+	}
+	if !strings.Contains(rec.Error, java) {
+		t.Fatalf("the record should name the Java it couldn't run, got %q", rec.Error)
+	}
+	launches, err := os.ReadFile(instance.LaunchesPath(gameDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, text := range map[string]string{"stderr": stderr, "launches.json": string(launches)} {
+		if strings.Contains(text, accessToken) {
+			t.Fatalf("%s repeats the game argv:\n%s", name, text)
+		}
+	}
+}
+
+func TestWrapRecordsALaunchThatNeverStartedWithoutThePreLaunchHook(t *testing.T) {
+	off := false
+	h, gameDir, _ := wrappedInstance(t, "0", func(f *instance.File) {
+		f.Settings.Hooks.PreLaunch, f.Settings.Hooks.PostExit = &off, &off
+	})
+	if err := os.Remove(readIntent(t, gameDir).Resolved.Java); err != nil {
+		t.Fatal(err)
+	}
+	abandoned := instance.Launch{StartedAt: "2026-09-01T00:00:00Z"}
+	if err := instance.SaveLaunches(gameDir, []instance.Launch{abandoned}, 5); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir)
+	records := instance.LoadLaunches(gameDir)
+	if len(records) != 2 || records[1].Outcome != instance.OutcomeNotStarted {
+		t.Fatalf("no record was stamped, so the failure opens its own, got %+v", records)
+	}
+	if records[0] != abandoned {
+		t.Fatalf("an open record this run didn't stamp is an abandoned run, got %+v", records[0])
+	}
+}
+
+func TestWrapKeepsNoRecordWhenTheHistoryIsOff(t *testing.T) {
+	none := 0
+	h, gameDir, _ := wrappedInstance(t, "0", func(f *instance.File) {
+		f.Settings.LaunchHistory = &none
+	})
+	if err := os.Remove(readIntent(t, gameDir).Resolved.Java); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir)
+	if records := instance.LoadLaunches(gameDir); len(records) != 0 {
+		t.Fatalf("launchHistory 0 records nothing at all, got %+v", records)
+	}
+}
+
+func TestWrapWithoutGameDirStillFallsBackPastTheWrapper(t *testing.T) {
+	h, gameDir, argsFile := wrappedInstance(t, "0", func(f *instance.File) {
+		f.Settings.Wrapper = []string{"shulker-no-such-wrapper"}
+	})
+	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "-jar", ".")
+	if got := readArgs(t, argsFile); got != "-jar\n.\n" {
+		t.Fatalf("the version check should still reach java, got %q", got)
+	}
+	if records := instance.LoadLaunches(gameDir); len(records) != 0 {
+		t.Fatalf("the version check is not a launch, got %d records", len(records))
+	}
+}

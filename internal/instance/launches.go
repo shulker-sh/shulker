@@ -15,18 +15,25 @@ const (
 
 	OutcomeOK      = "ok"
 	OutcomeCrashed = "crashed"
+	// OutcomeNotStarted is a run the game never began: shulker could not run Java at all, so there
+	// is no log, no crash report and no exit code to read, only the reason it could not.
+	OutcomeNotStarted = "not-started"
 )
 
 // Launch is one run of the game: the pre-launch hook stamps it and the post-exit hook closes it.
 // No launcher hands a post-exit command the game's exit code, so the outcome is read from a crash
 // report newer than StartedAt. A run whose post-exit never fired keeps an open record, with no
-// EndedAt and no Outcome.
+// EndedAt and no Outcome. A run the game never began is closed on the spot as OutcomeNotStarted,
+// with StartedAt and EndedAt the same moment, since none of the time that passed was the game's.
 type Launch struct {
 	StartedAt   string `json:"startedAt"`
 	EndedAt     string `json:"endedAt,omitempty"`
 	Outcome     string `json:"outcome,omitempty"`
 	Log         string `json:"log,omitempty"`
 	CrashReport string `json:"crashReport,omitempty"`
+	// Error names the executable that would not run and the operating system's reason. It never
+	// carries any part of the game's argv, which holds the session access token.
+	Error string `json:"error,omitempty"`
 }
 
 func LaunchesPath(dir string) string { return filepath.Join(dir, Dir, LaunchesFileName) }

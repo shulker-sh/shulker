@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os/exec"
 	"strings"
 	"time"
@@ -101,7 +102,8 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			if !ok {
 				return nil
 			}
-			if launching && f.Settings.PreLaunch() {
+			stamped := launching && f.Settings.PreLaunch()
+			if stamped {
 				a.stampLaunch(dir, f.Settings)
 				if res, err := a.syncForLaunch(cmd, dir); err != nil {
 					a.printer.Warn("%v", err)
@@ -117,28 +119,20 @@ func (a *app) hookWrapCmd() *cobra.Command {
 				java = f.Resolved.Java
 			}
 			if java == "" {
-				a.printer.Warn("%s records no Java to run the game with; run shulker instances repair", instance.Path(dir))
+				reason := instance.Path(dir) + " records no Java to run the game with"
+				a.printer.Warn("%s; run shulker instances repair", reason)
+				if launching {
+					a.failLaunch(dir, f.Settings, stamped, reason)
+				}
 				return nil
 			}
-			exe, args := java, argv
-			if w := f.Settings.Wrapper; len(w) > 0 {
-				exe = w[0]
-				args = append(append(append([]string{}, w[1:]...), java), argv...)
-			}
-			gameOut := a.printer.Stdout
-			if a.printer.JSON {
-				gameOut = a.printer.Stderr
-			}
-			game := exec.Command(exe, args...)
-			game.Stdin, game.Stdout, game.Stderr = a.stdin, gameOut, a.printer.Stderr
-			code := 0
-			if err := game.Run(); err != nil {
-				var exit *exec.ExitError
-				if !errors.As(err, &exit) {
-					a.printer.Warn("run %s: %v", exe, err)
-					return nil
+			code, err := a.runGame(f.Settings, java, argv)
+			if err != nil {
+				a.printer.Warn("can't run Java at %s, so the game didn't start: %v", java, err)
+				if launching {
+					a.failLaunch(dir, f.Settings, stamped, runReason(java, err))
 				}
-				code = exit.ExitCode()
+				return nil
 			}
 			if launching && f.Settings.PostExit() {
 				a.closeLaunch(dir, f.Settings)
@@ -149,6 +143,57 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// runGame runs the game and hands back its exit status. A wrapper that can't be run at all is not
+// worth losing the launch over, so the game starts with Java on its own instead; an error is Java
+// itself never starting, which is the end of the launch.
+func (a *app) runGame(s instance.Settings, java string, argv []string) (int, error) {
+	if w := s.Wrapper; len(w) > 0 {
+		args := append(append(append([]string{}, w[1:]...), java), argv...)
+		code, err := a.runExe(w[0], args)
+		if err == nil {
+			return code, nil
+		}
+		a.printer.Warn("can't run the wrapper %q, so the game starts with Java alone: %v", w[0], err)
+	}
+	return a.runExe(java, argv)
+}
+
+// runExe runs one program to completion. A non-zero status comes back as the code, so only a
+// program that never started at all is an error.
+func (a *app) runExe(exe string, args []string) (int, error) {
+	stdout := a.printer.Stdout
+	if a.printer.JSON {
+		stdout = a.printer.Stderr
+	}
+	cmd := exec.Command(exe, args...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = a.stdin, stdout, a.printer.Stderr
+	err := cmd.Run()
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
+		return 0, nil
+	case errors.As(err, &exit):
+		return exit.ExitCode(), nil
+	}
+	return 0, err
+}
+
+// runReason is why a program never started, as one sentence. The operating system repeats the path
+// inside its own error, so the path it carries is unwrapped first.
+func runReason(exe string, err error) string {
+	var (
+		path *fs.PathError
+		look *exec.Error
+	)
+	switch {
+	case errors.As(err, &path):
+		err = path.Err
+	case errors.As(err, &look):
+		err = look.Err
+	}
+	return fmt.Sprintf("run %s: %v", exe, err)
 }
 
 func gameDirOf(argv []string) (string, bool) {
@@ -205,6 +250,38 @@ func (a *app) closeLaunch(dir string, s instance.Settings) {
 		records[open].Outcome = instance.OutcomeCrashed
 		records[open].CrashReport = crash
 	}
+	if err := instance.SaveLaunches(dir, records, keep); err != nil {
+		a.printer.Warn("%v", err)
+	}
+}
+
+// failLaunch records a run the game never began. It closes the record this run stamped, and opens
+// one already closed when there was none, so the history shows the launch either way. An open
+// record it did not stamp belongs to an abandoned run and is left alone. Only settings.launchHistory
+// silences this: postExit governs a run that ended, and this one never ran. StartedAt and EndedAt
+// match, because whatever time passed was shulker's and not the game's.
+func (a *app) failLaunch(dir string, s instance.Settings, stamped bool, reason string) {
+	keep := s.LaunchKeep()
+	if keep == 0 {
+		return
+	}
+	records := instance.LoadLaunches(dir)
+	at := -1
+	if stamped {
+		for i := len(records) - 1; i >= 0; i-- {
+			if records[i].EndedAt == "" {
+				at = i
+				break
+			}
+		}
+	}
+	if at < 0 {
+		records = append(records, instance.Launch{StartedAt: time.Now().UTC().Format(time.RFC3339)})
+		at = len(records) - 1
+	}
+	records[at].EndedAt = records[at].StartedAt
+	records[at].Outcome = instance.OutcomeNotStarted
+	records[at].Error = reason
 	if err := instance.SaveLaunches(dir, records, keep); err != nil {
 		a.printer.Warn("%v", err)
 	}

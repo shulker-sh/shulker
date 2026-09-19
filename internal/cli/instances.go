@@ -27,6 +27,7 @@ type instanceEntry struct {
 	AssumeClient bool   `json:"assumeClient,omitempty"`
 	Ref          string `json:"ref,omitempty"`
 	Problem      string `json:"problem,omitempty"`
+	LaunchError  string `json:"launchError,omitempty"`
 	intent       *instance.File
 }
 
@@ -105,6 +106,11 @@ func inspectInstance(in config.Instance) instanceEntry {
 			e.Source = f.Source
 		}
 	}
+	if records := instance.LoadLaunches(in.Dir); len(records) > 0 {
+		if last := records[len(records)-1]; last.Outcome == instance.OutcomeNotStarted {
+			e.LaunchError = last.Error
+		}
+	}
 	state, _ := build.ReadState(in.Dir)
 	if e.intent == nil {
 		e.Ref = state.Ref
@@ -170,9 +176,18 @@ func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
 		if e.Side != "" {
 			detail += ", side " + e.Side
 		}
-		group = append(group, out.Entry{Synced: e.Status == instanceSynced && e.LastError == "", Name: e.ID, Tag: e.Side, Aside: e.statusText(), Path: e.Dir, Detail: detail})
+		group = append(group, out.Entry{Synced: e.Status == instanceSynced && e.LastError == "" && e.LaunchError == "", Name: e.ID, Tag: e.Side, Aside: e.statusText(), Path: e.Dir, Detail: detail, Note: e.launchText()})
 	}
 	flush(entries[len(entries)-1].Launcher)
+}
+
+// launchText is the line under a directory whose last launch never got as far as running the game.
+// It is its own line because the reason is an operating system message, too long for the aside.
+func (e instanceEntry) launchText() string {
+	if e.LaunchError == "" {
+		return ""
+	}
+	return "last launch didn't start: " + e.LaunchError
 }
 
 func (e instanceEntry) statusText() string {
