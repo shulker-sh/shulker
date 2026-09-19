@@ -32,7 +32,7 @@ Required properties are marked with *.
 | `requires` | map of [`require`](#require) | Mods, modpacks, resource packs and shaders this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id; a resource pack's or shader's key is the file name it is placed under, so a pack enabled in game stays enabled when it updates. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader.<br>keys are [`requireKey`](#requirekey), default `{}` |
 | `ignore` | [`ignore`](#ignore)[] | Per-pair overrides for unmet depends or matched breaks found in jar metadata. |
 | `wholeFiles` | [`relativePath`](#relativepath)[] | Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone.<br>unique items |
-| `marker` | `boolean` | Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both. Default true. It seeds settings.marker when an instance is created, and the instance decides from then on. |
+| `marker` | `boolean` | Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both. Default true. An instance that sets its own settings.marker decides for itself instead. |
 | `variables` | [`variables`](#variables) |  |
 | `server` | [`server`](#server) |  |
 | `client` | [`client`](#client) |  |

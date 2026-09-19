@@ -74,7 +74,7 @@
         },
         "marker": {
           "type": "boolean",
-          "description": "Include the marker mod, which lists this pack in the in-game mod list and lets an export of it be recognised as this pack again. Off drops both. Default true."
+          "description": "Include the marker mod, which lists this pack in the in-game mod list and lets an export of it be recognised as this pack again. Off drops both. Set here it decides for this instance, over whatever the manifest says; absent, the manifest's marker decides, which defaults to true. Written by link --no-marker and --with-marker."
         },
         "java": {
           "type": "string",

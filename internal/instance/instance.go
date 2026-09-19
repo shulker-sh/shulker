@@ -71,15 +71,16 @@ type Resolved struct {
 
 func Path(dir string) string { return filepath.Join(dir, Dir, FileName) }
 
-// New is the file shulker writes for a directory it starts syncing into, with every setting at
-// its default so opening it shows what shulker will do.
+// New is the file shulker writes for a directory it starts syncing into. The hooks are written at
+// their default so opening it shows what shulker will do; marker is left absent, because an absent
+// marker defers to the manifest and a written one would freeze the manifest's value at this moment.
 func New(source, ref, side string) *File {
 	return &File{
 		Schema:   SchemaURL,
 		Source:   source,
 		Ref:      ref,
 		Side:     side,
-		Settings: Settings{Hooks: Hooks{PreLaunch: on(), PostExit: on()}, Marker: on()},
+		Settings: Settings{Hooks: Hooks{PreLaunch: On(), PostExit: On()}},
 	}
 }
 
@@ -137,9 +138,8 @@ func (s Settings) PreLaunch() bool { return s.Hooks.PreLaunch == nil || *s.Hooks
 
 func (s Settings) PostExit() bool { return s.Hooks.PostExit == nil || *s.Hooks.PostExit }
 
-func (s Settings) MarkerOn() bool { return s.Marker == nil || *s.Marker }
-
-func on() *bool {
+// On is a switch a link flag or a hand edit turned on.
+func On() *bool {
 	v := true
 	return &v
 }

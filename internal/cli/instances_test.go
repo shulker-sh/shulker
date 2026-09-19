@@ -73,8 +73,8 @@ func TestSyncIntoRegisters(t *testing.T) {
 	if f.Source != h.dir || f.Side != "client" {
 		t.Fatalf("instance file: %+v", f)
 	}
-	if !f.Settings.PreLaunch() || !f.Settings.PostExit() || !f.Settings.MarkerOn() {
-		t.Fatalf("settings default on: %+v", f.Settings)
+	if !f.Settings.PreLaunch() || !f.Settings.PostExit() || f.Settings.Marker != nil {
+		t.Fatalf("the hooks default on and the marker defers to the manifest: %+v", f.Settings)
 	}
 	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); strings.Contains(stdout, "Registered") {
 		t.Fatalf("an unchanged instance is not registered again: %s", stdout)

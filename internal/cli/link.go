@@ -220,14 +220,17 @@ func profileKey(name string) string {
 	return "shulker-" + slug
 }
 
-// linkSettings are the settings a `link` seeds an instance with: the manifest's defaults on a new
-// instance, then a flag's value over them. On a relink only the flags land, because the settings
-// block belongs to whoever edited it once it exists, and no sync rewrites it.
+// linkSettings are the settings a `link` seeds an instance with: the manifest's hook defaults on a
+// new instance, then a flag's value over them. On a relink only the flags land, because the
+// settings block belongs to whoever edited it once it exists, and no sync rewrites it. The marker
+// is never seeded: an absent settings.marker defers to the manifest, so only --no-marker and
+// --with-marker write one.
 type linkSettings struct {
 	noHooks     bool
 	noPreLaunch bool
 	noPostExit  bool
 	noMarker    bool
+	withMarker  bool
 	java        string
 	wrapper     string
 }
@@ -237,11 +240,15 @@ func (ls *linkSettings) register(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&ls.noPreLaunch, "no-pre-launch", false, "don't sync this instance before each launch")
 	cmd.Flags().BoolVar(&ls.noPostExit, "no-post-exit", false, "don't record how each run ended")
 	cmd.Flags().BoolVar(&ls.noMarker, "no-marker", false, "leave the marker mod out of this instance's builds")
+	cmd.Flags().BoolVar(&ls.withMarker, "with-marker", false, "include the marker mod in this instance's builds, over a manifest that leaves it out")
 	cmd.Flags().StringVar(&ls.java, "java", "", "absolute path to the Java this machine launches the instance with (default: shulker's managed runtime)")
 	cmd.Flags().StringVar(&ls.wrapper, "wrapper", "", "command prefix for the launch command, such as gamemoderun; split on whitespace")
 }
 
 func (ls linkSettings) check() error {
+	if ls.noMarker && ls.withMarker {
+		return out.Errorf("usage", "--no-marker and --with-marker ask for opposite things")
+	}
 	if ls.java != "" && !filepath.IsAbs(ls.java) {
 		return out.Errorf("usage", "--java needs an absolute path: a launcher runs the instance with almost no environment, and nothing searches PATH for it")
 	}
@@ -251,7 +258,7 @@ func (ls linkSettings) check() error {
 // set reports whether this link asks for any setting at all, which is what a mode with no instance
 // file to record them in has to refuse.
 func (ls linkSettings) set() bool {
-	return ls.noHooks || ls.noPreLaunch || ls.noPostExit || ls.noMarker || ls.java != "" || ls.wrapper != ""
+	return ls.noHooks || ls.noPreLaunch || ls.noPostExit || ls.noMarker || ls.withMarker || ls.java != "" || ls.wrapper != ""
 }
 
 // save writes what a directory syncs from, and the settings this link decided.
@@ -268,9 +275,6 @@ func (ls linkSettings) save(dir, source, ref, side string, assumeClient bool, m 
 		if h.PostExit != nil {
 			f.Settings.Hooks.PostExit = h.PostExit
 		}
-		if m.Marker != nil {
-			f.Settings.Marker = m.Marker
-		}
 	}
 	if ls.noHooks || ls.noPreLaunch {
 		f.Settings.Hooks.PreLaunch = instance.Off()
@@ -280,6 +284,9 @@ func (ls linkSettings) save(dir, source, ref, side string, assumeClient bool, m 
 	}
 	if ls.noMarker {
 		f.Settings.Marker = instance.Off()
+	}
+	if ls.withMarker {
+		f.Settings.Marker = instance.On()
 	}
 	if ls.java != "" {
 		f.Settings.Java = ls.java

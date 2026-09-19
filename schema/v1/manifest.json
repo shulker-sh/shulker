@@ -82,7 +82,7 @@
     },
     "marker": {
       "type": "boolean",
-      "description": "Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both. Default true. It seeds settings.marker when an instance is created, and the instance decides from then on."
+      "description": "Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both. Default true. An instance that sets its own settings.marker decides for itself instead."
     },
     "variables": { "$ref": "#/$defs/variables" },
     "server": { "$ref": "#/$defs/server" },

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	"shulker.sh/shulker/internal/instance"
 )
 
 func TestClientBuildWritesMarkerJar(t *testing.T) {
@@ -337,4 +338,78 @@ func TestQuiltMarkerJarIsFabricMetadata(t *testing.T) {
 	if parsed["id"] != "shulker_pack" {
 		t.Fatalf("marker id: %v", parsed["id"])
 	}
+}
+
+// TestMarkerSwitchResolvesTheSameWayOnEveryBuild pins the layers: the directory's own
+// settings.marker where it names one, else the manifest's, else on. A sync writes the instance
+// file after the build, so a seeded value would make the first run into a directory disagree with
+// every run after.
+func TestMarkerSwitchResolvesTheSameWayOnEveryBuild(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.editManifest(t, func(m map[string]any) { m["marker"] = false })
+	h.mustRun(t, "install")
+
+	into := t.TempDir()
+	jarIn := func(dir string) string { return filepath.Join(dir, "mods", "shulker-pack.jar") }
+	missing := func(t *testing.T, what, dir string) {
+		t.Helper()
+		if _, err := os.Stat(jarIn(dir)); !os.IsNotExist(err) {
+			t.Fatalf("%s: the manifest leaves the marker out: %v", what, err)
+		}
+	}
+	present := func(t *testing.T, what, dir string) {
+		t.Helper()
+		if _, err := os.Stat(jarIn(dir)); err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+	}
+
+	h.mustRun(t, "sync", h.dir, "--into", into)
+	missing(t, "first sync", into)
+	if f := readIntent(t, into); f.Settings.Marker != nil {
+		t.Fatalf("a sync writes no marker value of its own: %+v", f.Settings)
+	}
+	h.mustRun(t, "sync", h.dir, "--into", into)
+	missing(t, "second sync", into)
+
+	// Every other build site reads the same layers.
+	missing(t, "install", filepath.Join(h.dir, "build", "client"))
+	h.mustRun(t, "build")
+	missing(t, "build", filepath.Join(h.dir, "build", "client"))
+	if stdout := h.mustRun(t, "diff", "client", "--into", into); !strings.Contains(stdout, "no changes") {
+		t.Fatalf("diff sees no drift from a marker nobody asked for: %s", stdout)
+	}
+	h.mustRun(t, "pull", "--into", into)
+	missing(t, "pull", into)
+
+	// The instance's own value wins either way.
+	f := readIntent(t, into)
+	f.Settings.Marker = instance.On()
+	if err := f.Save(into); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "sync", h.dir, "--into", into)
+	present(t, "settings.marker on over a manifest that says off", into)
+
+	h.editManifest(t, func(m map[string]any) { delete(m, "marker") })
+	f.Settings.Marker = instance.Off()
+	if err := f.Save(into); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "sync", h.dir, "--into", into)
+	missing(t, "settings.marker off under a manifest that says on", into)
+	h.mustRun(t, "sync", h.dir, "--into", into)
+	missing(t, "settings.marker off, second sync", into)
+	h.mustRun(t, "build")
+	present(t, "the build directory has no instance file, so the manifest decides", filepath.Join(h.dir, "build", "client"))
+
+	// Rollback builds too, and only an in-place project keeps history to roll back to.
+	ip := newInPlace(t)
+	ip.editManifest(t, func(m map[string]any) { m["marker"] = false })
+	ip.mustRun(t, "add", "sodium")
+	ip.mustRun(t, "install")
+	ip.mustRun(t, "rollback")
+	missing(t, "rollback", ip.dir)
 }

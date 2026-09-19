@@ -111,7 +111,6 @@ type Options struct {
 	NoOS        bool
 	Features    map[string]bool
 	Origin      Origin
-	NoMarker    bool
 }
 
 type Builder struct {
@@ -332,6 +331,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 func (b *Builder) collect(side string, opts Options, report *Report) (map[string]source, []string, error) {
 	desired := map[string]source{}
 	dirs := dataDirs(side, "world")
+	dir := b.Target(side, opts.Dir)
 	cond := b.conditions(opts)
 	sel := b.selectMods(cond)
 	report.Excluded = append(report.Excluded, sel.excluded...)
@@ -361,7 +361,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectClient(side, opts, desired, vars, report); err != nil {
 			return nil, nil, err
 		}
-		if b.Lock.Loader.Type != "" && !opts.NoMarker {
+		if b.Lock.Loader.Type != "" && b.markerOn(dir) {
 			jar, err := b.markerJar(side, cond, sel)
 			if err != nil {
 				return nil, nil, err

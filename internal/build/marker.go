@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -47,6 +48,18 @@ func markerVersion(packVersion, lockHash string) string {
 		packVersion = "0.0.0"
 	}
 	return packVersion + "+" + build
+}
+
+// markerOn is whether a build into dir carries the marker mod. The layers are the directory's own
+// settings.marker where its instance file names one, then the manifest's, then on. The builder
+// resolves it from the directory it builds into, so no call site can leave it out and ship the jar
+// into an instance that asked for none, and a sync that writes the instance file after the build
+// resolves the same way on the run that creates it as on every run after.
+func (b *Builder) markerOn(dir string) bool {
+	if f, err := instance.Load(dir); err == nil && f.Settings.Marker != nil {
+		return *f.Settings.Marker
+	}
+	return b.Manifest.MarkerOn()
 }
 
 func markerJarPath(name string) string {
