@@ -429,6 +429,9 @@ func TestInstancesRepair(t *testing.T) {
 	if len(instances) != 1 || instances[0].Dir != gameDir || instances[0].Source != h.dir || instances[0].Launcher != "prism" {
 		t.Fatalf("the scan registers the instance again: %+v", instances)
 	}
+	if instances[0].LastSync != "" {
+		t.Fatalf("a directory with no record of a sync is registered without a time: %+v", instances[0])
+	}
 	if f := readIntent(t, gameDir); f.Source != h.dir || f.Side != "client" {
 		t.Fatalf("repair writes the instance file: %+v", f)
 	}
@@ -496,17 +499,19 @@ func TestSyncStampsTheInstanceAndTheRow(t *testing.T) {
 	}
 
 	// The registry rebuild reads the instance file, so a row it writes again knows when the
-	// instance last synced.
-	h.mustRun(t, "sync", "-i", "friends", "--force")
-	if in := readInstances(t, h)[0]; in.LastError != "" {
-		t.Fatalf("a sync that works clears the error: %+v", in)
-	}
+	// directory was last built correctly, whatever the sync after that did. The failure message
+	// only ever lived on the row, and a rebuilt row goes without one.
 	if err := os.WriteFile(registryPath(h), []byte("{ not a registry"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	h.mustRunStderr(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
 	rebuilt := readInstances(t, h)[0]
-	if rebuilt.LastSync != readIntent(t, gameDir).Resolved.LastSyncAt {
-		t.Fatalf("repair carries the last sync into the row: %+v", rebuilt)
+	if rebuilt.LastSync != good.LastSync || rebuilt.LastError != "" {
+		t.Fatalf("repair carries the last good sync and no error: %+v", rebuilt)
+	}
+
+	h.mustRun(t, "sync", "-i", rebuilt.ID, "--force")
+	if in := readInstances(t, h)[0]; in.LastError != "" {
+		t.Fatalf("a sync that works clears the error: %+v", in)
 	}
 }

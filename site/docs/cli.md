@@ -783,7 +783,7 @@ A project whose side builds into its own directory is an instance, and `sync` ru
 
 ### `shulker instances`
 
-List the instances shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each row leads with the instance's id, which is what `-i` takes, and shows its side, when it was last synced, its directory, and the name and source it syncs from. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`.
+List the instances shulker keeps in sync, grouped by launcher, with plain `sync --into` directories last. Each row leads with the instance's id, which is what `-i` takes, and shows its side, when it was last synced, its directory, and the name and source it syncs from. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`. When the last sync failed, the row says so and names why, beside the time of the sync that built what is on disk.
 
 ```sh
 shulker instances
@@ -804,6 +804,8 @@ Other directories
 ### `shulker instances repair`
 
 Put the registry back in step with what is on disk. It works even when `registry.json` can't be read, rewriting it from what it finds: it scans each launcher's own instances directory, registers any folder shulker syncs that isn't in the index and wasn't unlinked, and writes a `.shulker/instance.json` for any instance missing one, from what that directory's last build recorded. A registered directory that is gone is reported rather than dropped, since an unmounted disk looks exactly like a deleted instance; [`shulker unlink`](#shulker-unlink) is what forgets one. `shulker self update` runs it after a successful update.
+
+A row written again keeps the time of the last sync that worked, which the directory's own `.shulker/instance.json` records, even when the sync after it failed: that time is when the directory was last built correctly. The message from that failure isn't kept, since it lives only on the registry row, so [`shulker instances`](#shulker-instances) reports no failure for a repaired row until the next sync.
 
 ```sh
 shulker instances repair

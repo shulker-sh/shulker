@@ -156,12 +156,14 @@ func scanLaunchers(only, dir string) []config.Instance {
 }
 
 // instanceAt recognises a directory shulker syncs by its .shulker/ directory: the instance file it
-// keeps now, or the state a build left before instance files existed.
+// keeps now, or the state a build left before instance files existed. lastSyncAt is when the
+// directory was last built correctly, which a failure after that doesn't undo, so it is carried
+// whatever the last sync did. lastError isn't: it belongs to the row shulker is replacing.
 func instanceAt(dir string) (config.Instance, bool) {
 	in := config.Instance{Name: filepath.Base(dir), Dir: dir}
 	if f, err := instance.Load(dir); err == nil {
 		in.Source = f.Source
-		if r := f.Resolved; r != nil && r.LastResult == instance.ResultOK {
+		if r := f.Resolved; r != nil {
 			in.LastSync = r.LastSyncAt
 		}
 		return in, !f.Unlinked
