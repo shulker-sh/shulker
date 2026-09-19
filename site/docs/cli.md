@@ -171,7 +171,7 @@ shulker add ../base-pack --type modpack --as base
 | `--pin <version-id>` | Pin to a provider version id (one mod only) |
 | `--provider <provider>` | Provider to use for this mod: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
-| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a modpack source's name) |
+| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, the name in a modpack's manifest) |
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack |
@@ -1194,7 +1194,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-lock-missing` | A modpack is set `locked: true` but its source has no `shulker.lock`; run `shulker lock` there, or set locked false |
 | `modpack-manifest` | A modpack source has no `shulker.json` |
 | `modpack-mismatch` | A modpack wants a different Minecraft version or loader |
-| `modpack-name` | A modpack's name can't be worked out from its source; pass `--as` |
 | `modpack-not-found` | The modpack isn't in `shulker.json`. `candidates`: the modpacks |
 | `modpack-platform` | Locked modpacks disagree about Minecraft or the loader, and `shulker.json` sets neither; set `minecraft`/`loader`, or unlock one |
 | `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |

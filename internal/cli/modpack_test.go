@@ -15,7 +15,7 @@ import (
 
 func writePack(t *testing.T, dir, minecraft, mods string, files map[string]string) {
 	t.Helper()
-	manifest := `{"name": "base", "minecraft": "` + minecraft + `", "loader": {"type": "fabric", "version": "*"},
+	manifest := `{"name": "` + filepath.Base(dir) + `", "minecraft": "` + minecraft + `", "loader": {"type": "fabric", "version": "*"},
   "requires": {` + mods + `}, "variables": {"greeting": "hello"}, "client": {}}`
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -385,5 +385,70 @@ func TestURLModpackAndHandEdits(t *testing.T) {
 	}
 	if l = readLock(t, h); len(l.Packs) != 0 || len(l.Mods) != 0 {
 		t.Fatalf("lock after removing modpacks: %+v", l)
+	}
+}
+
+func renamePack(t *testing.T, dir, name string) {
+	t.Helper()
+	path := filepath.Join(dir, "shulker.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := strings.Replace(string(data), `"name": "`+filepath.Base(dir)+`"`, `"name": "`+name+`"`, 1)
+	if edited == string(data) {
+		t.Fatalf("pack manifest has no name to replace: %s", data)
+	}
+	writeFile(t, path, edited)
+}
+
+func TestModpackKeyComesFromTheManifestName(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	repo := filepath.Join(h.dir, "mc-pack-v3")
+	writePack(t, repo, "~26.2", `"sodium": {}`, nil)
+	renamePack(t, repo, "westcoast-smp")
+
+	stdout := h.mustRun(t, "modpack", "add", "./mc-pack-v3")
+	if !strings.Contains(stdout, "+ westcoast-smp ") {
+		t.Fatalf("modpack add output: %s", stdout)
+	}
+	var m struct {
+		Requires map[string]map[string]string `json:"requires"`
+	}
+	h.readJSON(t, "shulker.json", &m)
+	if len(m.Requires) != 1 || m.Requires["westcoast-smp"]["source"] != "./mc-pack-v3" {
+		t.Fatalf("manifest requires: %v", m.Requires)
+	}
+	if p := readLock(t, h).Packs["westcoast-smp"]; p["source"] != "./mc-pack-v3" {
+		t.Fatalf("lock modpacks: %v", readLock(t, h).Packs)
+	}
+	if by := readLock(t, h).Mods["sodium"].RequiredBy; len(by) != 1 || by[0] != "westcoast-smp" {
+		t.Fatalf("sodium requiredBy: %v", by)
+	}
+
+	twin := filepath.Join(h.dir, "eastcoast")
+	writePack(t, twin, "~26.2", `"sodium": {}`, nil)
+	renamePack(t, twin, "westcoast-smp")
+	code, stdout, _ := h.run(t, "modpack", "add", "./eastcoast", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "requires-taken" {
+		t.Fatalf("two manifests sharing a name should collide: code=%d %s", code, stdout)
+	}
+
+	stdout = h.mustRun(t, "modpack", "add", "./eastcoast", "--as", "eastcoast-smp")
+	if !strings.Contains(stdout, "+ eastcoast-smp ") {
+		t.Fatalf("--as should win over the manifest name: %s", stdout)
+	}
+	h.readJSON(t, "shulker.json", &m)
+	if len(m.Requires) != 2 || m.Requires["eastcoast-smp"]["source"] != "./eastcoast" {
+		t.Fatalf("manifest requires after --as: %v", m.Requires)
+	}
+	if p := readLock(t, h).Packs["eastcoast-smp"]; p["source"] != "./eastcoast" {
+		t.Fatalf("lock modpacks after --as: %v", readLock(t, h).Packs)
+	}
+
+	code, stdout, _ = h.run(t, "modpack", "add", "./mc-pack-v3", "--as", "again", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "modpack-exists" {
+		t.Fatalf("a repeated source should still fail: code=%d %s", code, stdout)
 	}
 }

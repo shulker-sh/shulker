@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -67,26 +66,6 @@ func Classify(source string) Kind {
 		return Git
 	}
 	return Local
-}
-
-func Key(source string) (string, error) {
-	base := strings.TrimSuffix(source, "/")
-	switch Classify(source) {
-	case Local:
-		base = filepath.Base(filepath.Clean(base))
-		if base == "." || base == ".." || base == string(filepath.Separator) {
-			return "", out.Errorf("modpack-name", "cannot derive a modpack name from %q; pass --as", source)
-		}
-	case Git:
-		base = strings.TrimSuffix(path.Base(base), ".git")
-	case URL:
-		base = strings.TrimSuffix(path.Base(base), path.Ext(base))
-	}
-	key := strings.ToLower(base)
-	if !manifest.ValidKey(key) {
-		return "", out.Errorf("modpack-name", "cannot derive a modpack name from %q (got %q); pass --as", source, key)
-	}
-	return key, nil
 }
 
 func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*Loaded, error) {

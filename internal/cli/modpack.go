@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -119,25 +118,22 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, 
 					return "", out.Errorf("modpack-exists", "modpack %s is already in the manifest", source)
 				}
 			}
-			key := as
-			if key == "" {
-				derived, err := pack.Key(source)
-				if err != nil {
-					return "", err
-				}
-				key = derived
-			}
-			if held, taken := p.Manifest.Requires[key]; taken {
-				return "", manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
-			}
 			store, err := a.packStore(p)
 			if err != nil {
 				return "", err
 			}
-			loaded, err := store.Resolve(cmd.Context(), key, entry)
+			loaded, err := store.Resolve(cmd.Context(), source, entry)
 			if err != nil {
 				return "", err
 			}
+			key := as
+			if key == "" {
+				key = loaded.Manifest.Name
+			}
+			if held, taken := p.Manifest.Requires[key]; taken {
+				return "", manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
+			}
+			loaded.Name = key
 			if err := r.AddPack(cmd.Context(), loaded); err != nil {
 				return "", err
 			}
