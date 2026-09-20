@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/server"
 )
 
@@ -26,15 +27,19 @@ type initResult struct {
 	Side      string `json:"side"`
 }
 
+// initOptions is what the flags set and what the wizard fills in for the ones left out.
+type initOptions struct {
+	yes           bool
+	name          string
+	minecraft     string
+	loaderName    string
+	loaderVersion string
+	side          string
+	pack          string
+}
+
 func (a *app) initCmd() *cobra.Command {
-	var (
-		yes           bool
-		name          string
-		minecraft     string
-		loaderName    string
-		loaderVersion string
-		side          string
-	)
+	var opts initOptions
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Create shulker.json and a lock in the current directory",
@@ -50,30 +55,35 @@ func (a *app) initCmd() *cobra.Command {
 			if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
 				return out.Errorf("manifest-exists", "%s already exists here", manifest.FileName)
 			}
-			if !yes && (minecraft == "" || name == "") {
-				return out.Errorf("usage", "pass --yes for defaults or set --name and --minecraft; interactive prompts are not implemented yet")
-			}
-			if err := checkSide(side, "--side"); err != nil {
+			if err := checkSide(opts.side, "--side"); err != nil {
 				return err
 			}
 			loaders := append([]string{noLoader}, loader.Names()...)
-			if _, ok := loader.Lookup(loaderName); !ok && loaderName != noLoader {
-				e := out.Errorf("usage", "unknown loader %q; use one of %s", loaderName, strings.Join(loaders, ", "))
-				e.Candidates, e.Given, e.Flag = loaders, loaderName, "--loader"
+			if _, ok := loader.Lookup(opts.loaderName); !ok && opts.loaderName != noLoader {
+				e := out.Errorf("usage", "unknown loader %q; use one of %s", opts.loaderName, strings.Join(loaders, ", "))
+				e.Candidates, e.Given, e.Flag = loaders, opts.loaderName, "--loader"
 				return e
 			}
-			var projectLoader manifest.Loader
-			if loaderName != noLoader {
-				projectLoader = manifest.Loader{Type: loaderName, Version: loaderVersion}
-			} else if cmd.Flags().Changed("loader-version") {
+			if opts.loaderName == noLoader && cmd.Flags().Changed("loader-version") {
 				return out.Errorf("usage", "--loader-version needs --loader")
 			}
+			// D12: --yes is init's own spelling of --no-input, since the wizard leaves the
+			// command no required value.
+			if opts.yes {
+				a.printer.NoInput = true
+			}
+			if err := a.askInit(cmd, &opts); err != nil {
+				return err
+			}
+			var projectLoader manifest.Loader
+			if opts.loaderName != noLoader {
+				projectLoader = manifest.Loader{Type: opts.loaderName, Version: opts.loaderVersion}
+			}
+			name := opts.name
 			if name == "" {
 				name = slugify(filepath.Base(dir))
 			}
-			if minecraft == "" {
-				minecraft = "*"
-			}
+			minecraft := orLatest(opts.minecraft)
 			m := &manifest.Manifest{
 				Schema:    manifest.SchemaURL,
 				Name:      name,
@@ -82,10 +92,10 @@ func (a *app) initCmd() *cobra.Command {
 				Loader:    projectLoader,
 				Requires:  map[string]manifest.Require{},
 			}
-			if side == "server" {
+			if opts.side == "server" {
 				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
 			}
-			if side == "client" {
+			if opts.side == "client" {
 				m.Client = &manifest.Client{Options: map[string]any{
 					"onboardAccessibility":   false,
 					"skipMultiplayerWarning": true,
@@ -120,13 +130,18 @@ func (a *app) initCmd() *cobra.Command {
 			if err := scaffold(dir); err != nil {
 				return err
 			}
-			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Side: side}
+			packItems, err := a.initPack(cmd, p, opts.pack)
+			if err != nil {
+				return err
+			}
+			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Side: opts.side}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.OK("created "+manifest.FileName, fmt.Sprintf("%s, Java %d", platformLabel(res.Minecraft, res.Loader, res.Version), res.Java))
+				packItems(l)
 				switch {
 				case res.Loader != "":
 					l.Nudge("Add a mod", "shulker add <mod>")
-				case side == "server":
+				case opts.side == "server":
 					l.Nudge("Download and build it", "shulker install")
 				default:
 					l.Nudge("Add a resource pack or shader", "shulker add <name>")
@@ -134,13 +149,123 @@ func (a *app) initCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "accept defaults: latest release, no loader, client side")
-	cmd.Flags().StringVar(&name, "name", "", "project name (default: directory name)")
-	cmd.Flags().StringVar(&minecraft, "minecraft", "", "Minecraft version or range (default: latest release)")
-	cmd.Flags().StringVar(&loaderName, "loader", noLoader, "mod loader: "+noLoader+", "+strings.Join(loader.Names(), ", "))
-	cmd.Flags().StringVar(&loaderVersion, "loader-version", "*", "loader version range")
-	cmd.Flags().StringVar(&side, "side", "client", "side to declare: client or server")
+	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "accept defaults without asking: latest release, no loader, client side")
+	cmd.Flags().StringVar(&opts.name, "name", "", "project name (default: directory name)")
+	cmd.Flags().StringVar(&opts.minecraft, "minecraft", "", "Minecraft version or range (default: latest release)")
+	cmd.Flags().StringVar(&opts.loaderName, "loader", noLoader, "mod loader: "+noLoader+", "+strings.Join(loader.Names(), ", "))
+	cmd.Flags().StringVar(&opts.loaderVersion, "loader-version", "*", "loader version range")
+	cmd.Flags().StringVar(&opts.side, "side", "client", "side to declare: client or server")
 	return cmd
+}
+
+// askInit walks the wizard's questions in order. Each is skipped by the flag that answers it,
+// and every default is that flag's, so accepting them all creates what --yes creates.
+func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
+	if !a.canPick() {
+		return nil
+	}
+	d, err := a.deps()
+	if err != nil {
+		return err
+	}
+	ctx, t := cmd.Context(), a.printer.ErrTheme
+	if !cmd.Flags().Changed("side") {
+		side, err := a.ask("What are you making?", []out.Choice{
+			{Label: "a client pack", Value: "client"},
+			{Label: "a server pack", Value: "server"},
+		})
+		if err != nil {
+			return err
+		}
+		opts.side = side
+	}
+	if !cmd.Flags().Changed("minecraft") {
+		a.progress("fetching Minecraft versions")
+		releases, latest, err := d.meta.GameVersions(ctx)
+		if err != nil {
+			return err
+		}
+		choices := []out.Choice{latestChoice(t, latest)}
+		for _, id := range releases {
+			choices = append(choices, out.Choice{Label: id, Value: id})
+		}
+		if opts.minecraft, err = a.ask("Which Minecraft version?", choices); err != nil {
+			return err
+		}
+	}
+	if !cmd.Flags().Changed("loader") {
+		mods, err := a.ask("Add mods?", []out.Choice{{Label: "no", Value: noLoader}, {Label: "yes", Value: "yes"}})
+		if err != nil {
+			return err
+		}
+		if mods == "yes" {
+			choices := make([]out.Choice, 0, len(loader.Names()))
+			for _, name := range loader.Names() {
+				choices = append(choices, out.Choice{Label: name, Value: name})
+			}
+			if opts.loaderName, err = a.ask("Which mod loader?", choices); err != nil {
+				return err
+			}
+		}
+	}
+	if opts.loaderName != noLoader && !cmd.Flags().Changed("loader-version") {
+		a.progress("fetching %s versions", opts.loaderName)
+		game, err := d.meta.GameVersion(ctx, orLatest(opts.minecraft))
+		if err != nil {
+			return err
+		}
+		versions, latest, err := d.meta.LoaderVersions(ctx, opts.loaderName, game)
+		if err != nil {
+			return err
+		}
+		choices := []out.Choice{latestChoice(t, latest)}
+		for _, id := range versions {
+			choices = append(choices, out.Choice{Label: id, Value: id})
+		}
+		if opts.loaderVersion, err = a.ask("Which "+opts.loaderName+" version?", choices); err != nil {
+			return err
+		}
+	}
+	from, err := a.ask("Start from an existing pack?", []out.Choice{
+		{Label: "start from scratch", Value: ""},
+		{Label: "from an existing pack", Value: "pack"},
+	})
+	if err != nil {
+		return err
+	}
+	if from == "pack" {
+		if opts.pack, err = a.askText("Which pack?", "a local path, git URL, or manifest URL"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// orLatest is the range an unset version means, which is the newest release.
+func orLatest(minecraft string) string {
+	if minecraft == "" {
+		return "*"
+	}
+	return minecraft
+}
+
+// initPack adds the pack the wizard asked for to the project init has just written, and returns
+// what it changed, so the lines print under init's own rather than as a second result.
+func (a *app) initPack(cmd *cobra.Command, p *project.Project, source string) (func(*out.Lines), error) {
+	if source == "" {
+		return func(*out.Lines) {}, nil
+	}
+	rl, err := a.relockProject(cmd, p, false, func(p *project.Project, r *resolve.Resolver) (string, error) {
+		return "", a.addPackEntry(cmd.Context(), p, r, source, "", manifest.Require{Source: source})
+	})
+	if err != nil {
+		e := out.AsError(err)
+		if e.Nudge.Command == "" {
+			e.Nudge = out.Nudge{Lead: "Add the pack to the project just created", Command: "shulker add " + source + " --type modpack"}
+		}
+		return nil, e
+	}
+	return rl.printItems, nil
 }
 
 const noLoader = "none"

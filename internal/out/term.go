@@ -56,3 +56,11 @@ func terminalWidth(f *os.File) int {
 	}
 	return w
 }
+
+// width is how wide the prompts may draw: the terminal stderr is on, or the fallback width.
+func (p *Printer) width() int {
+	if f, ok := p.Stderr.(*os.File); ok {
+		return terminalWidth(f)
+	}
+	return 80
+}

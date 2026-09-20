@@ -98,7 +98,10 @@ func AsError(err error) *Error {
 }
 
 type Printer struct {
-	JSON      bool
+	JSON bool
+	// NoInput is --no-input: the run asks nothing, so a prompt takes its default and a required
+	// value left unset is a usage error instead.
+	NoInput   bool
 	Command   string
 	LockStale bool
 	Stdout    io.Writer

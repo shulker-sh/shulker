@@ -65,6 +65,7 @@ func newApp(stdout, stderr io.Writer) *app {
 
 func (a *app) run(ctx context.Context, args []string) int {
 	a.printer.JSON = flagRequested(args, "json")
+	a.printer.NoInput = flagRequested(args, "no-input")
 	a.printer.Args = args
 	a.style = out.Options{NoColor: flagRequested(args, "no-color"), ASCII: flagRequested(args, "ascii")}
 	if !a.printer.JSON {
@@ -119,8 +120,9 @@ func (a *app) root() *cobra.Command {
 	// These values are read from the arguments before cobra parses them, so
 	// they are put back after the flags are defined with the zero defaults
 	// help prints.
-	jsonOut, dir, noColor, ascii := a.printer.JSON, a.dir, a.style.NoColor, a.style.ASCII
+	jsonOut, noInput, dir, noColor, ascii := a.printer.JSON, a.printer.NoInput, a.dir, a.style.NoColor, a.style.ASCII
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", false, "print machine-readable JSON, including errors")
+	root.PersistentFlags().BoolVar(&a.printer.NoInput, "no-input", false, "ask nothing: take every default, and fail on a missing required value")
 	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", "", "project directory (default: current directory)")
 	root.PersistentFlags().StringVarP(&a.instance, "instance", "i", "", "act on a registered instance, by id, name, or directory")
 	// --id is the same flag: the row calls it id, and the flag says which instance.
@@ -132,7 +134,7 @@ func (a *app) root() *cobra.Command {
 	})
 	root.PersistentFlags().BoolVar(&a.style.NoColor, "no-color", false, "print without colour (NO_COLOR does the same)")
 	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ »")
-	a.printer.JSON, a.dir, a.style.NoColor, a.style.ASCII = jsonOut, dir, noColor, ascii
+	a.printer.JSON, a.printer.NoInput, a.dir, a.style.NoColor, a.style.ASCII = jsonOut, noInput, dir, noColor, ascii
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.removeCmd(), a.listCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.ignoreCmd(), a.unignoreCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.instancesCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.historyCmd(), a.rollbackCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.accountsCmd(), a.selfCmd(), a.docsCmd(), a.cacheCmd(), a.completionCmd())
 	root.AddCommand(a.typeGroupCmds()...)
 	// hook is hidden and in no help group: the generated scripts run it, nobody types it.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/jarmeta"
@@ -52,40 +53,30 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 	if err != nil {
 		return nil, err
 	}
-	rng, err := mcver.ParseRange(minecraft)
+	game, err := newestGame(games, minecraft)
 	if err != nil {
-		return nil, fmt.Errorf("manifest minecraft: %w", err)
-	}
-	var candidates []mcver.Version
-	for _, g := range games.Versions {
-		if v, err := mcver.Parse(g.ID); err == nil {
-			candidates = append(candidates, v)
-		}
-	}
-	game, ok := mcver.Newest(candidates, rng)
-	if !ok {
-		return nil, fmt.Errorf("no Minecraft version matches %q (latest release is %s)", minecraft, games.Latest.Release)
+		return nil, err
 	}
 	if m.Loader.Type != "" {
 		if _, err := loader.Require(m.Loader.Type); err != nil {
 			return nil, err
 		}
 	}
-	entry, _ := games.Find(game.ID)
+	entry, _ := games.Find(game)
 	java, err := mt.Piston.Java(ctx, entry)
 	if err != nil {
 		return nil, err
 	}
-	platform := &Platform{Minecraft: game.ID, Java: lock.Java{Major: java.Major, Component: java.Component}}
+	platform := &Platform{Minecraft: game, Java: lock.Java{Major: java.Major, Component: java.Component}}
 	if m.Loader.Type == "" {
 		platform.Loader = inherited.Loader
 		return platform, nil
 	}
-	loaderVersion, err := mt.loaderVersion(ctx, m.Loader, game.ID)
+	loaderVersion, err := mt.loaderVersion(ctx, m.Loader, game)
 	if err != nil {
 		return nil, err
 	}
-	provides, err := mt.loaderProvides(ctx, m.Loader.Type, game.ID, loaderVersion)
+	provides, err := mt.loaderProvides(ctx, m.Loader.Type, game, loaderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -217,4 +208,86 @@ func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) 
 		return nil, err
 	}
 	return info.Provides, nil
+}
+
+// GameVersion is the Minecraft version a range resolves to, for a caller that needs it before
+// the rest of the platform.
+func (mt *Meta) GameVersion(ctx context.Context, minecraft string) (string, error) {
+	games, err := mt.Piston.Manifest(ctx)
+	if err != nil {
+		return "", err
+	}
+	return newestGame(games, minecraft)
+}
+
+// newestGame is the newest version the manifest lists that matches minecraft. An any range takes
+// the newest release, so a project that names no version is never authored against a snapshot.
+func newestGame(games *meta.GameManifest, minecraft string) (string, error) {
+	rng, err := mcver.ParseRange(minecraft)
+	if err != nil {
+		return "", fmt.Errorf("manifest minecraft: %w", err)
+	}
+	var candidates []mcver.Version
+	for _, g := range games.Versions {
+		if v, err := mcver.Parse(g.ID); err == nil {
+			candidates = append(candidates, v)
+		}
+	}
+	game, ok := mcver.Newest(candidates, rng)
+	if !ok {
+		return "", fmt.Errorf("no Minecraft version matches %q (latest release is %s)", minecraft, games.Latest.Release)
+	}
+	return game.ID, nil
+}
+
+// GameVersions lists the Minecraft releases newest first, and the latest release, for a prompt
+// that offers them. Snapshots are left out: a project is authored against a release.
+func (mt *Meta) GameVersions(ctx context.Context) ([]string, string, error) {
+	games, err := mt.Piston.Manifest(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	var releases []mcver.Version
+	for _, g := range games.Versions {
+		if v, err := mcver.Parse(g.ID); err == nil && v.IsRelease() {
+			releases = append(releases, v)
+		}
+	}
+	slices.SortFunc(releases, func(a, b mcver.Version) int { return mcver.Compare(b, a) })
+	ids := make([]string, len(releases))
+	for i, v := range releases {
+		ids[i] = v.ID
+	}
+	return ids, games.Latest.Release, nil
+}
+
+// LoaderVersions lists a loader's versions for one Minecraft version, newest first, and the one
+// "*" resolves to, which is the newest stable.
+func (mt *Meta) LoaderVersions(ctx context.Context, name, game string) ([]string, string, error) {
+	src, err := mt.versions(name)
+	if err != nil {
+		return nil, "", err
+	}
+	list, err := src.LoaderVersions(ctx, game)
+	if err != nil {
+		return nil, "", err
+	}
+	var all, stable []loaderver.Version
+	for _, lv := range list {
+		v, err := loaderver.Parse(lv.Version)
+		if err != nil {
+			continue
+		}
+		all = append(all, v)
+		if lv.Stable {
+			stable = append(stable, v)
+		}
+	}
+	slices.SortFunc(all, func(a, b loaderver.Version) int { return loaderver.Compare(b, a) })
+	ids := make([]string, len(all))
+	for i, v := range all {
+		ids[i] = v.ID
+	}
+	newest, _ := loaderver.Newest(stable, loaderver.Range{})
+	return ids, newest.ID, nil
 }

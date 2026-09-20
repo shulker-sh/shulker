@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"slices"
 	"strings"
 
@@ -113,32 +114,41 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, 
 				no := false
 				entry.AutoUpdate = &no
 			}
-			for _, existing := range p.Manifest.Modpacks() {
-				if existing.Source == source {
-					return "", out.Errorf("modpack-exists", "modpack %s is already in the manifest", source)
-				}
-			}
-			store, err := a.packStore(p)
-			if err != nil {
+			if err := a.addPackEntry(cmd.Context(), p, r, source, as, entry); err != nil {
 				return "", err
 			}
-			loaded, err := store.Resolve(cmd.Context(), source, entry)
-			if err != nil {
-				return "", err
-			}
-			key := as
-			if key == "" {
-				key = loaded.Manifest.Name
-			}
-			if held, taken := p.Manifest.Requires[key]; taken {
-				return "", manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
-			}
-			loaded.Name = key
-			if err := r.AddPack(cmd.Context(), loaded); err != nil {
-				return "", err
-			}
-			p.Manifest.Requires[key] = entry
 		}
 		return "", nil
 	})
+}
+
+// addPackEntry resolves one modpack source and puts it in the manifest under the key as names,
+// or the name the pack's own manifest carries.
+func (a *app) addPackEntry(ctx context.Context, p *project.Project, r *resolve.Resolver, source, as string, entry manifest.Require) error {
+	for _, existing := range p.Manifest.Modpacks() {
+		if existing.Source == source {
+			return out.Errorf("modpack-exists", "modpack %s is already in the manifest", source)
+		}
+	}
+	store, err := a.packStore(p)
+	if err != nil {
+		return err
+	}
+	loaded, err := store.Resolve(ctx, source, entry)
+	if err != nil {
+		return err
+	}
+	key := as
+	if key == "" {
+		key = loaded.Manifest.Name
+	}
+	if held, taken := p.Manifest.Requires[key]; taken {
+		return manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
+	}
+	loaded.Name = key
+	if err := r.AddPack(ctx, loaded); err != nil {
+		return err
+	}
+	p.Manifest.Requires[key] = entry
+	return nil
 }
