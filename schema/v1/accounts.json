@@ -1,0 +1,112 @@
+{
+  "$id": "https://shulker.sh/schema/v1/accounts.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shulker accounts",
+  "description": "The accounts shulker signed in or created itself, and their tokens. Borrowed accounts are read from another launcher's own file and never written here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The version of this file, as a published schema URL."
+    },
+    "accounts": {
+      "type": "array",
+      "description": "Every account shulker holds, own and offline alike.",
+      "items": { "$ref": "#/$defs/account" }
+    }
+  },
+  "$defs": {
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "description": "An account needs something to name it by and something to identify it: a Java profile, or the Xbox side of an account that owns no profile. An offline account always has a profile, because shulker made it.",
+      "anyOf": [{ "required": ["profile"] }, { "required": ["xbox"] }],
+      "if": { "properties": { "type": { "const": "offline" } } },
+      "then": { "required": ["profile"] },
+      "properties": {
+        "type": {
+          "enum": ["microsoft", "offline"],
+          "description": "microsoft is an account signed in through Microsoft; offline is one created with `shulker accounts add`."
+        },
+        "profile": {
+          "$ref": "#/$defs/profile",
+          "description": "The Java profile. Its presence is the proof the account owns Java Edition; a Microsoft account without one is named by its gamertag and can't launch."
+        },
+        "xbox": {
+          "$ref": "#/$defs/xbox",
+          "description": "The Xbox Live side of a Microsoft account: what names it when it owns no Java profile, and the user token while it lasts."
+        },
+        "refreshToken": {
+          "type": "string",
+          "description": "The Microsoft refresh token, rotated on every use. Without it the account is `sign-in expired`."
+        },
+        "minecraft": {
+          "$ref": "#/$defs/minecraft",
+          "description": "The Minecraft session token a launch reuses until it is within an hour of expiring."
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The player UUID, as `/minecraft/profile` gives it."
+        },
+        "name": {
+          "type": "string",
+          "description": "The Minecraft username."
+        }
+      }
+    },
+    "xbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "xuid": {
+          "type": "string",
+          "description": "The 16-digit Xbox user id, which identifies an account that owns no Java profile."
+        },
+        "gamertag": {
+          "type": "string",
+          "description": "The Xbox gamertag, which names an account that owns no Java profile. It may contain spaces and is not unique."
+        },
+        "userHash": {
+          "type": "string",
+          "description": "The user hash the Minecraft login header carries beside the XSTS token."
+        },
+        "token": {
+          "type": "string",
+          "description": "The XSTS token, kept only while notAfter holds."
+        },
+        "notAfter": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the XSTS token stops being usable."
+        }
+      }
+    },
+    "minecraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token"],
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "The Minecraft session token."
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the session token stops being usable."
+        }
+      }
+    }
+  }
+}

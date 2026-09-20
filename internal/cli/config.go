@@ -8,11 +8,16 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
 )
 
-const curseForgeKey = "curseforge.key"
+const (
+	curseForgeKey     = "curseforge.key"
+	accountsProviders = "accounts.providers"
+	accountsDefault   = "accounts.default"
+)
 
 type configChange struct {
 	Path    string `json:"path"`
@@ -56,7 +61,7 @@ func (a *app) configGetCmd() *cobra.Command {
 				for k, v := range resolved {
 					all[k] = v
 				}
-				if secret, ok := configLookup(doc, curseForgeKey); ok && !reveal {
+				if secret, ok := configSecret(doc, curseForgeKey); ok && !reveal {
 					cf := maps.Clone(doc["curseforge"].(map[string]any))
 					cf["key"] = maskKey(secret)
 					all["curseforge"] = cf
@@ -65,14 +70,18 @@ func (a *app) configGetCmd() *cobra.Command {
 			case resolved[key] != "":
 				value = resolved[key]
 			default:
-				secret, ok := configLookup(doc, key)
+				v, ok := configLookup(doc, key)
 				if !ok {
-					return out.Errorf("path-not-set", "%s is not set", key)
+					if v, ok = configDefault(key); !ok {
+						return out.Errorf("path-not-set", "%s is not set", key)
+					}
 				}
-				if !reveal {
-					secret = maskKey(secret)
+				if key == curseForgeKey && !reveal {
+					if secret, isText := v.(string); isText {
+						v = maskKey(secret)
+					}
 				}
-				value = secret
+				value = v
 			}
 			return a.printer.Emit(value, func(l *out.Lines) { writeValue(l.W, value) })
 		},
@@ -82,7 +91,7 @@ func (a *app) configGetCmd() *cobra.Command {
 }
 
 func (a *app) configSetCmd() *cobra.Command {
-	var force bool
+	var force, literal bool
 	cmd := &cobra.Command{
 		Use:   "set <key> <value>",
 		Short: "Set a key in config.json",
@@ -96,7 +105,16 @@ func (a *app) configSetCmd() *cobra.Command {
 			if value == "" {
 				return out.Errorf("usage", "%s needs a value; `shulker config unset %s` removes it", key, key)
 			}
-			change := configChange{Path: key, To: value}
+			var to any = value
+			if literal {
+				if to, err = decodeLiteral(key, value); err != nil {
+					return err
+				}
+			}
+			if to, err = checkConfigValue(key, to, literal); err != nil {
+				return err
+			}
+			change := configChange{Path: key, To: to}
 			if from, ok := configLookup(doc, key); ok {
 				change.From = from
 			}
@@ -107,7 +125,7 @@ func (a *app) configSetCmd() *cobra.Command {
 					return err
 				}
 			}
-			configPut(doc, key, value)
+			configPut(doc, key, to)
 			if err := config.SaveDocument(path, doc); err != nil {
 				return err
 			}
@@ -115,6 +133,7 @@ func (a *app) configSetCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "change the registry even if it leaves linked instances behind")
+	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for a list or an object")
 	return cmd
 }
 
@@ -258,17 +277,90 @@ func maskKey(key string) string {
 	return dots + key[len(key)-4:]
 }
 
-func configLookup(doc map[string]any, key string) (string, bool) {
+func configLookup(doc map[string]any, key string) (any, bool) {
 	m := doc
 	if parent, name, nested := strings.Cut(key, "."); nested {
 		m, _ = doc[parent].(map[string]any)
 		key = name
 	}
-	s, ok := m[key].(string)
-	return s, ok && s != ""
+	v, ok := m[key]
+	return v, ok && v != nil && v != ""
 }
 
-func configPut(doc map[string]any, key, value string) {
+// configSecret is configLookup for a key whose value is masked, which only a string can be.
+func configSecret(doc map[string]any, key string) (string, bool) {
+	v, ok := configLookup(doc, key)
+	if !ok {
+		return "", false
+	}
+	s, ok := v.(string)
+	return s, ok
+}
+
+// configDefault is what an unset key means. The roots are resolved separately, because an unset
+// root names a real directory on this machine; this covers the keys whose default is a value
+// rather than a path.
+func configDefault(key string) (any, bool) {
+	if key == accountsProviders {
+		return account.DefaultProviders(), true
+	}
+	return nil, false
+}
+
+// checkConfigValue rejects a value config.json can hold but shulker can't use, at the point it is
+// typed rather than on the next run that reads it.
+func checkConfigValue(key string, v any, literal bool) (any, error) {
+	switch key {
+	case accountsProviders:
+		if !literal {
+			return nil, out.Errorf("usage", "%s is a list; pass --literal with a JSON array, like `--literal '[\"shulker\"]'`", key)
+		}
+		names, err := providerList(v)
+		if err != nil {
+			return nil, err
+		}
+		return names, nil
+	case accountsDefault:
+		if _, ok := v.(string); !ok {
+			return nil, out.Errorf("usage", "%s is an account id, so it takes a string", key)
+		}
+	}
+	return v, nil
+}
+
+// providerList reads accounts.providers, refusing a list shulker can't act on: an empty one leaves
+// no account anywhere, a repeat says nothing the first mention didn't, and a launcher with no
+// reader yet would contribute nothing without saying so.
+func providerList(v any) ([]string, error) {
+	items, ok := v.([]any)
+	if !ok {
+		return nil, out.Errorf("usage", "%s takes a JSON array of provider names", accountsProviders)
+	}
+	if len(items) == 0 {
+		e := out.Errorf("usage", "%s can't be empty; unset it to go back to the default", accountsProviders)
+		e.Candidates = account.Providers()
+		return nil, e
+	}
+	names := make([]string, 0, len(items))
+	for _, item := range items {
+		name, ok := item.(string)
+		if !ok {
+			return nil, out.Errorf("usage", "%s takes provider names, not %s", accountsProviders, settingText(item))
+		}
+		if slices.Contains(names, name) {
+			return nil, out.Errorf("usage", "%s names %s twice", accountsProviders, name)
+		}
+		if !slices.Contains(account.Providers(), name) {
+			e := out.Errorf("usage", "shulker can't read accounts from %s", name)
+			e.Candidates, e.Given = account.Providers(), name
+			return nil, e
+		}
+		names = append(names, name)
+	}
+	return names, nil
+}
+
+func configPut(doc map[string]any, key string, value any) {
 	parent, name, nested := strings.Cut(key, ".")
 	if !nested {
 		doc[key] = value

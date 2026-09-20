@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 )
 
 const gutter = "  "
@@ -363,4 +364,27 @@ func (l *Lines) detailRows(e *Error, extra string) []Row {
 		}
 	}
 	return rows
+}
+
+// Ago is how long before now a moment was, in the words shulker uses wherever it dates something:
+// "just now", "5 minutes ago", "3 hours ago", "2 days ago".
+func Ago(t time.Time) string { return Since(time.Since(t)) }
+
+// Since is Ago for a duration already measured.
+func Since(d time.Duration) string {
+	plural := func(n int, unit string) string {
+		if n == 1 {
+			return "1 " + unit + " ago"
+		}
+		return fmt.Sprintf("%d %ss ago", n, unit)
+	}
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return plural(int(d/time.Minute), "minute")
+	case d < 48*time.Hour:
+		return plural(int(d/time.Hour), "hour")
+	}
+	return plural(int(d/(24*time.Hour)), "day")
 }

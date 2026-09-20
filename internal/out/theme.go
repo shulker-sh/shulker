@@ -46,10 +46,14 @@ func Detect(stdout, stderr io.Writer, opts Options) (out, err Theme) {
 	return out, err
 }
 
-func isTerminal(w io.Writer) bool {
+// IsTerminal reports whether w is a terminal, which decides both colour and whether a prompt can
+// be drawn at all.
+func IsTerminal(w io.Writer) bool {
 	f, ok := w.(*os.File)
 	return ok && term.IsTerminal(int(f.Fd()))
 }
+
+func isTerminal(w io.Writer) bool { return IsTerminal(w) }
 
 func queryGrey(stdout, stderr io.Writer, outTTY bool) int {
 	tty := stderr

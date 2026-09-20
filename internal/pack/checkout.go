@@ -156,7 +156,7 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 		return nil, neverSynced(c, cause)
 	}
 	c.Commit, c.Dir, c.LastGood = rec.Commit, s.Cache.PackSource(rec.Commit), rec.At
-	c.Warning = fmt.Sprintf("%s, using %s at %s from the last successful sync %s", offlineReason(cause), c.Source, rec.Commit[:12], ago(rec.At))
+	c.Warning = fmt.Sprintf("%s, using %s at %s from the last successful sync %s", offlineReason(cause), c.Source, rec.Commit[:12], out.Ago(rec.At))
 	return c, nil
 }
 
@@ -167,7 +167,7 @@ func (s *Store) urlFallback(c *Checkout, cause error) (*Checkout, error) {
 		return nil, neverSynced(c, cause)
 	}
 	c.Sha256, c.Dir, c.LastGood = rec.Sha256, s.Cache.ProjectCheckout(rec.Sha256), rec.At
-	c.Warning = fmt.Sprintf("%s, using %s from the last successful sync %s", offlineReason(cause), c.Source, ago(rec.At))
+	c.Warning = fmt.Sprintf("%s, using %s from the last successful sync %s", offlineReason(cause), c.Source, out.Ago(rec.At))
 	return c, nil
 }
 
@@ -215,25 +215,6 @@ func unreachableReason(c *Checkout, cause error) (string, string) {
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
-}
-
-func ago(t time.Time) string {
-	d := time.Since(t)
-	plural := func(n int, unit string) string {
-		if n == 1 {
-			return "1 " + unit + " ago"
-		}
-		return fmt.Sprintf("%d %ss ago", n, unit)
-	}
-	switch {
-	case d < time.Minute:
-		return "just now"
-	case d < time.Hour:
-		return plural(int(d/time.Minute), "minute")
-	case d < 48*time.Hour:
-		return plural(int(d/time.Hour), "hour")
-	}
-	return plural(int(d/(24*time.Hour)), "day")
 }
 
 func (s *Store) download(ctx context.Context, url string) ([]byte, error) {

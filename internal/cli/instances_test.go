@@ -273,10 +273,12 @@ func TestSyncInstance(t *testing.T) {
 		}
 	}
 
+	// The picker draws on the screen and reads keys, so it needs a terminal on both ends; a test's
+	// buffers are neither, and a run that can't ask says which instances matched instead.
 	h.tty, h.stdin = true, strings.NewReader("2\n")
-	stdout, stderr := h.mustRunStderr(t, "sync", "-C", t.TempDir())
-	if !strings.Contains(stderr, " 2) friends client (MultiMC)\n     "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "» "+plain) {
-		t.Fatalf("picker:\nstdout: %s\nstderr: %s", stdout, stderr)
+	code, stdout, _ := h.run(t, "sync", "-C", t.TempDir(), "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-instance" || len(e.Candidates) != 2 {
+		t.Fatalf("off a terminal sync should name both instances: %s", stdout)
 	}
 	h.tty = false
 
@@ -294,7 +296,7 @@ func TestSyncInstance(t *testing.T) {
 	if err := os.RemoveAll(filepath.Dir(gameDir)); err != nil {
 		t.Fatal(err)
 	}
-	code, stdout, _ := h.run(t, "sync", "--all", "--json")
+	code, stdout, _ = h.run(t, "sync", "--all", "--json")
 	var env struct {
 		OK    bool                 `json:"ok"`
 		Data  []syncInstanceResult `json:"data"`

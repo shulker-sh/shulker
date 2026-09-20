@@ -339,6 +339,8 @@ shulker get server.properties
 
 | Key | Description |
 | --- | --- |
+| `accounts.providers` | Where accounts are read from, in order, as a JSON array of `shulker`, `prism` or `mojang`. Without it, `["shulker"]`. An account in several providers is counted once, and the earliest one wins |
+| `accounts.default` | The id of the account a launch uses when nothing else names one. [`shulker accounts use`](#shulker-accounts-use) sets it |
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
 | `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
 | `instances` | Where [`shulker link shulker`](#shulker-link-shulker) puts the instances shulker owns. Without it, `instances` in shulker's data directory |
@@ -349,7 +351,7 @@ The CurseForge key is always shown as its last four characters, like `•••�
 
 ### `shulker config get`
 
-Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set. A `curseforge.key` that isn't set fails with `path-not-set`.
+Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set, and `accounts.providers` shows its default the same way. A `curseforge.key` that isn't set fails with `path-not-set`.
 
 ```sh
 shulker config get
@@ -368,11 +370,15 @@ Set a key. When `registry` points at a file that doesn't exist, `set` creates it
 ```sh
 shulker config set curseforge.key "$CURSEFORGE_KEY"
 shulker config set registry ~/Dropbox/shulker/registry.json
+shulker config set accounts.providers --literal '["shulker","prism"]'
 ```
+
+A key that holds a list needs `--literal`, which reads the value as JSON. `accounts.providers` is checked as it is set: it must be a non-empty array of known provider names with no repeats, so a typo fails here rather than on the next run.
 
 | Flag | Description |
 | --- | --- |
 | `--force` | Change the registry even if it leaves linked instances or synced directories behind |
+| `--literal` | Parse the value as JSON, for a list or an object |
 
 ### `shulker config unset`
 
@@ -546,6 +552,34 @@ shulker rollback --prune
 | Flag | Description |
 | --- | --- |
 | `--prune` | Also trim history to the number the manifest keeps |
+
+## Accounts and sign-in
+
+### `shulker accounts`
+
+List every account shulker can see, grouped by where it came from: **Own** for the ones signed in through Microsoft, **Offline** for the ones `accounts add` created, and **Borrowed** for the ones read from another launcher. Each row carries the account's id and its state, and the default account's row is marked `✔` instead of `•`.
+
+The id is a player UUID, or an Xbox user id for an account that owns no Java profile and so has no UUID. It is on every row because it is what tells two accounts with the same name apart, and what you type to pick one.
+
+```sh
+shulker accounts
+```
+
+The states are `playable`, `not playable (no Java profile)`, `sign-in expired`, `token expired <ago>` for a borrowed account whose launcher has not renewed it, and `offline`.
+
+Which accounts are read comes from `accounts.providers`. A provider shulker has no reader for yet warns and contributes nothing. With `--json`, each row is `{ "id", "name", "source", "group", "state", "default" }`.
+
+### `shulker accounts use`
+
+Switch the default account — the one a launch uses when nothing else names one. It is recorded as `accounts.default` in `config.json`.
+
+```sh
+shulker accounts use Notch
+shulker accounts use Notch@offline
+shulker accounts use 069a79f4-44e9-4726-a5be-fca90e38aaf5
+```
+
+An account is named by its username, matched without regard to case; by `name@source`, where the source is `shulker`, `offline`, `prism` or `mojang`; or by its id, dashed or not. A name may hold spaces, because an account with no Java profile is named by its Xbox gamertag, so quote it. When several accounts match, shulker asks which one on a terminal, and fails with `ambiguous-account` anywhere else, listing each match with its qualifier and its id. An account that owns no Java profile can't launch anything, so it is refused with `account-not-playable`.
 
 ## Running
 
@@ -1147,7 +1181,11 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 
 | Code | Meaning |
 | --- | --- |
+| `account-not-found` | No account matches the selector. `candidates`: every account, each as its qualifier and its id, `pass`: their ids |
+| `account-not-playable` | The account owns no Java profile, so it can't launch anything |
+| `accounts-invalid` | shulker's own `accounts.json` doesn't parse or doesn't match its schema |
 | `already-ignored` | The pair already has an ignore in `shulker.json`; pass `--force` to replace it |
+| `ambiguous-account` | Several accounts match the selector and shulker can't ask, because it isn't running on a terminal. `candidates`: the matches, each as its qualifier and its id, `pass`: their ids |
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-side` | The manifest declares both sides and the command works on one; `sync` and `pull` take `--side`, `diff --into` names it. `candidates`: the sides |
@@ -1207,6 +1245,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `mrpack-invalid` | The modpack is malformed |
 | `mrpack-marker` | The modpack's own `shulker.json` or `shulker.lock` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
+| `no-accounts` | shulker can see no account at all, so there is nothing to play with |
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
 | `no-instances` | Nothing is linked yet |
 | `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
@@ -1244,6 +1283,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a local `file`, or a modpack from a provider rather than a `source` |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
+| `schema-newer` | A file shulker manages was written by a newer shulker, and this one can't read it; `shulker self update` catches up |
 | `self-uninstall` | The shulker binary couldn't be removed |
 | `self-update-check` | Checking for a release failed, or none is published |
 | `self-update-checksum` | The download doesn't match its checksum |

@@ -132,36 +132,41 @@ func TestJSONReferenceCoversEveryErrorCode(t *testing.T) {
 func errorCodes(t *testing.T, root string) map[string]bool {
 	codes := map[string]bool{}
 	fset := token.NewFileSet()
-	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return err
-		}
-		file, err := parser.ParseFile(fset, path, nil, 0)
-		if err != nil {
-			return err
-		}
-		ast.Inspect(file, func(n ast.Node) bool {
-			var lit ast.Expr
-			switch n := n.(type) {
-			case *ast.CallExpr:
-				if isErrorf(n.Fun) && len(n.Args) > 0 {
-					lit = n.Args[0]
-				}
-			case *ast.KeyValueExpr:
-				if key, ok := n.Key.(*ast.Ident); ok && (key.Name == "Code" || key.Name == "code") {
-					lit = n.Value
-				}
+	walk := func(dir string) error {
+		return filepath.WalkDir(filepath.Join(root, dir), func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return err
 			}
-			if s, ok := lit.(*ast.BasicLit); ok && s.Kind == token.STRING {
-				code, _ := strconv.Unquote(s.Value)
-				codes[code] = true
+			file, err := parser.ParseFile(fset, path, nil, 0)
+			if err != nil {
+				return err
 			}
-			return true
+			ast.Inspect(file, func(n ast.Node) bool {
+				var lit ast.Expr
+				switch n := n.(type) {
+				case *ast.CallExpr:
+					if isErrorf(n.Fun) && len(n.Args) > 0 {
+						lit = n.Args[0]
+					}
+				case *ast.KeyValueExpr:
+					if key, ok := n.Key.(*ast.Ident); ok && (key.Name == "Code" || key.Name == "code") {
+						lit = n.Value
+					}
+				}
+				if s, ok := lit.(*ast.BasicLit); ok && s.Kind == token.STRING {
+					code, _ := strconv.Unquote(s.Value)
+					codes[code] = true
+				}
+				return true
+			})
+			return nil
 		})
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
+	}
+	// schema/ owns schema-newer, the one code born outside internal/.
+	for _, dir := range []string{"internal", "schema"} {
+		if err := walk(dir); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return codes
 }

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -215,27 +214,15 @@ func instanceHeading(t out.Theme, e instanceEntry) string {
 }
 
 func (a *app) pickInstance(entries []instanceEntry) (instanceEntry, error) {
-	if a.printer.JSON || a.tty == nil || !a.tty() {
-		e := out.Errorf("ambiguous-instance", "pass a source, -i <id>, or --all to choose what to sync")
-		e.Candidates, e.Pass, e.Flag = instanceCandidates(entries), instanceIDs(entries), "--instance"
-		return instanceEntry{}, e
-	}
-	lines := a.printer.Err()
-	t := lines.T
-	width := len(strconv.Itoa(len(entries)))
-	for i, e := range entries {
-		label := fmt.Sprintf("%*d)", width, i+1)
-		lines.Text(t.Cyan(label) + " " + t.Bold(e.Label()) + " " + t.Cyan(e.Side) + instanceAside(t, e))
-		lines.Text(strings.Repeat(" ", len(label)+1) + t.Link(t.Grey(e.Dir), e.Dir))
-	}
-	lines.Blank()
-	fmt.Fprintf(a.printer.Stderr, "  Sync which one? %s ", t.Grey(fmt.Sprintf("[1-%d]", len(entries))))
-	line, _ := bufio.NewReader(a.stdin).ReadString('\n')
-	n, err := strconv.Atoi(strings.TrimSpace(line))
-	if err != nil || n < 1 || n > len(entries) {
-		return instanceEntry{}, out.Errorf("usage", "pick a number from 1 to %d", len(entries))
-	}
-	return entries[n-1], nil
+	t := a.printer.ErrTheme
+	return pickOne(a, "Sync which one?", entries,
+		func(e instanceEntry) string { return e.ID },
+		func(e instanceEntry) string { return instanceHeading(t, e) + " " + t.Link(t.Grey(e.Dir), e.Dir) },
+		func() error {
+			e := out.Errorf("ambiguous-instance", "pass a source, -i <id>, or --all to choose what to sync")
+			e.Candidates, e.Pass, e.Flag = instanceCandidates(entries), instanceIDs(entries), "--instance"
+			return e
+		})
 }
 
 func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest) (syncResult, error) {

@@ -22,9 +22,10 @@ const (
 	RegistrySchemaURL = "https://shulker.sh/schema/v1/registry.json"
 )
 
-var Keys = []string{"curseforge.key", "instances", "registry", "saves", "store"}
+var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "registry", "saves", "store"}
 
 type Config struct {
+	Accounts   Accounts   `json:"accounts"`
 	CurseForge CurseForge `json:"curseforge"`
 	Instances  string     `json:"instances,omitempty"`
 	Registry   string     `json:"registry,omitempty"`
@@ -34,6 +35,16 @@ type Config struct {
 
 type CurseForge struct {
 	Key string `json:"key"`
+}
+
+// Accounts is which accounts shulker can see and which one it uses by default. The default lives
+// here rather than in accounts.json because a borrowed account may be it, and shulker never writes
+// another launcher's accounts into its own file.
+type Accounts struct {
+	// Providers is where accounts are read from, in the order the earliest one wins ties by UUID.
+	Providers []string `json:"providers,omitempty"`
+	// Default is the id of the account a launch falls back to.
+	Default string `json:"default,omitempty"`
 }
 
 // Instance is one row of the registry: the index shulker keeps of the instances it syncs. What an
