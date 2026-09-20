@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
 )
 
 type keyServer struct {
@@ -133,5 +135,36 @@ func TestVersionsQueriesEachLoaderType(t *testing.T) {
 	}
 	if !slices.Equal(versions[1].Loaders, []string{"fabric", "quilt"}) {
 		t.Errorf("loaders of the file tagged both = %v", versions[1].Loaders)
+	}
+}
+
+func TestSearchSortsByPopularityAndKeepsClassesShulkerCanAdd(t *testing.T) {
+	var got url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()
+		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{
+			{"id": 394468, "name": "Sodium", "slug": "sodium", "classId": 6, "downloadCount": 151434981},
+			{"id": 900000, "name": "Sodium World", "slug": "sodium-world", "classId": 17, "downloadCount": 12},
+		}})
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+	projects, err := c.Search(context.Background(), "sodium", "", 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Get("gameId") != "432" || got.Get("searchFilter") != "sodium" || got.Get("sortField") != "2" || got.Get("sortOrder") != "desc" || got.Get("pageSize") != "50" || got.Has("classId") {
+		t.Errorf("search asked for %v", got)
+	}
+	want := provider.Project{ID: "394468", Slug: "sodium", Title: "Sodium", Type: "mod", Downloads: 151434981}
+	if len(projects) != 1 || projects[0] != want {
+		t.Errorf("projects %+v, want %+v", projects, want)
+	}
+	if _, err := c.Search(context.Background(), "sodium", "shader", 5); err != nil {
+		t.Fatal(err)
+	}
+	if got.Get("classId") != classShader || got.Get("pageSize") != "5" {
+		t.Errorf("search for shaders asked for %v", got)
 	}
 }

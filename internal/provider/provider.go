@@ -20,7 +20,8 @@ type Project struct {
 	Side  string
 	// Type is the provider's own project type: mod, modpack, resourcepack or
 	// shader. Empty when the provider doesn't say.
-	Type string
+	Type      string
+	Downloads int64
 }
 
 type File struct {
@@ -57,6 +58,11 @@ type Provider interface {
 	// type. Whether the result's Type agrees with what was asked for is the
 	// caller's to decide.
 	Project(ctx context.Context, slugOrID, kind string) (*Project, error)
+	// Search lists the projects matching query, at most limit of them, ranked
+	// the way the provider ranks a search: by relevance where it offers that,
+	// by popularity where it doesn't. kind narrows the search to one project
+	// type; "" spans every type the provider offers that shulker can add.
+	Search(ctx context.Context, query, kind string, limit int) ([]Project, error)
 	Versions(ctx context.Context, projectID, game string, loaders []string) ([]Version, error)
 	Version(ctx context.Context, versionID string) (*Version, error)
 }

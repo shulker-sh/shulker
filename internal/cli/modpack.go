@@ -70,15 +70,23 @@ func chooseType(cmd *cobra.Command, kind, typ, fallback string) (string, error) 
 		}
 		return "", nil
 	}
-	if !slices.Contains(contentTypes, chosen) {
-		e := out.Errorf("usage", "--type takes one of %s, not %q", strings.Join(contentTypes, ", "), typ)
-		e.Candidates, e.Given, e.Flag = contentTypes, typ, "--type"
-		return "", e
+	if err := checkType(chosen); err != nil {
+		return "", err
 	}
 	if wrong := changedFlags(cmd, typeFlags[chosen]); len(wrong) > 0 {
 		return "", out.Errorf("usage", "%s doesn't apply to a %s", strings.Join(wrong, " and "), chosen)
 	}
 	return chosen, nil
+}
+
+// checkType refuses a type that names none of the entry types.
+func checkType(typ string) error {
+	if typ == "" || slices.Contains(contentTypes, typ) {
+		return nil
+	}
+	e := out.Errorf("usage", "--type takes one of %s, not %q", strings.Join(contentTypes, ", "), typ)
+	e.Candidates, e.Given, e.Flag = contentTypes, typ, "--type"
+	return e
 }
 
 // changedFlags lists the type flags the command was given that aren't allowed.

@@ -55,7 +55,7 @@ func (r *Resolver) provider(name string) (provider.Provider, error) {
 	if name != "" {
 		p, ok := r.Providers[name]
 		if !ok {
-			return nil, out.Errorf("provider-unavailable", "%s", unavailable(name))
+			return nil, out.Errorf("provider-unavailable", "%s", Unavailable(name))
 		}
 		return p, nil
 	}
@@ -64,12 +64,14 @@ func (r *Resolver) provider(name string) (provider.Provider, error) {
 		if p, ok := r.Providers[n]; ok {
 			return p, nil
 		}
-		reasons = append(reasons, unavailable(n))
+		reasons = append(reasons, Unavailable(n))
 	}
 	return nil, out.Errorf("provider-unavailable", "no manifest provider is available: %s", strings.Join(reasons, "; "))
 }
 
-func unavailable(name string) string {
+// Unavailable says why a provider can't be used, for a caller that reaches the
+// providers without a resolver.
+func Unavailable(name string) string {
 	if name == "curseforge" {
 		return "curseforge needs an API key; set " + curseforge.KeyEnv + " or run `shulker config set curseforge.key <key>`"
 	}
@@ -89,7 +91,7 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 	for _, n := range r.Manifest.ProviderOrder() {
 		p, ok := r.Providers[n]
 		if !ok {
-			skipped = append(skipped, unavailable(n))
+			skipped = append(skipped, Unavailable(n))
 			continue
 		}
 		proj, err := p.Project(ctx, slug, kind)

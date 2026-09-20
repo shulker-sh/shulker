@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"cmp"
 	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,10 +18,11 @@ import (
 const curseForgeTestKey = "test-key"
 
 type cfMod struct {
-	id    int
-	slug  string
-	class int
-	files []cfFile
+	id        int
+	slug      string
+	class     int
+	downloads int64
+	files     []cfFile
 }
 
 func (m *cfMod) classID() int {
@@ -48,15 +51,15 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 	h.jars["cf-fresh-animations"] = makeJarFile(t, "fresh-animations", "FreshAnimations_CF_v1.9.4.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"fresh"}}`)
 	h.jars["stale"] = makeJarVersion(t, "jei", "jei-26.1-fabric-0.9.0.jar", "*", "0.9.0", `"depends":{"fabricloader":">=0.17"}`)
 	h.cfMods = map[int]*cfMod{
-		238222: {id: 238222, slug: "jei", files: []cfFile{
+		238222: {id: 238222, slug: "jei", downloads: 300_000_000, files: []cfFile{
 			{id: 5000001, jar: jei, date: "2026-09-01T00:00:00Z", channel: 1, deps: []int{306612}},
 			{id: 5000000, jar: h.jars["stale"], date: "2026-08-01T00:00:00Z", channel: 1, hidden: true},
 		}},
-		306612: {id: 306612, slug: "fabric-api", files: []cfFile{{id: 5000010, jar: h.jars["fabric-api"], date: "2026-09-01T00:00:00Z", channel: 1}}},
-		394468: {id: 394468, slug: "sodium", files: []cfFile{{id: 5000020, jar: h.jars["sodium"], date: "2026-09-01T00:00:00Z", channel: 1, deps: []int{306612}}}},
+		306612: {id: 306612, slug: "fabric-api", downloads: 200_000_000, files: []cfFile{{id: 5000010, jar: h.jars["fabric-api"], date: "2026-09-01T00:00:00Z", channel: 1}}},
+		394468: {id: 394468, slug: "sodium", downloads: 151_434_981, files: []cfFile{{id: 5000020, jar: h.jars["sodium"], date: "2026-09-01T00:00:00Z", channel: 1, deps: []int{306612}}}},
 		300000: {id: 300000, slug: "nodist", files: []cfFile{{id: 5100001, jar: h.jars["nodist"], date: "2026-09-01T00:00:00Z", channel: 1, url: "null"}}},
 		400000: {id: 400000, slug: "locked", files: []cfFile{{id: 5200001, jar: h.jars["locked"], date: "2026-09-01T00:00:00Z", channel: 1, forbidden: true}}},
-		600000: {id: 600000, slug: "fresh-animations", class: 12, files: []cfFile{{id: 5300001, jar: h.jars["cf-fresh-animations"], date: "2026-09-01T00:00:00Z", channel: 1}}},
+		600000: {id: 600000, slug: "fresh-animations", class: 12, downloads: 4_000_000, files: []cfFile{{id: 5300001, jar: h.jars["cf-fresh-animations"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 	}
 	fileJSON := func(f cfFile, m *cfMod) map[string]any {
 		var url any = base() + "/cfcdn/" + f.jar.filename
@@ -87,7 +90,10 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		}
 	}
 	modJSON := func(m *cfMod) map[string]any {
-		return map[string]any{"id": m.id, "name": strings.ToUpper(m.slug), "slug": m.slug, "classId": m.classID(), "links": map[string]any{"websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/" + m.slug}}
+		return map[string]any{
+			"id": m.id, "name": strings.ToUpper(m.slug), "slug": m.slug, "classId": m.classID(), "downloadCount": m.downloads,
+			"links": map[string]any{"websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/" + m.slug},
+		}
 	}
 	allFiles := func(m *cfMod) []cfFile {
 		files := m.files
@@ -118,20 +124,39 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		if !authed(w, r) {
 			return
 		}
+		if h.cfSearchFails {
+			http.Error(w, "search is down", http.StatusInternalServerError)
+			return
+		}
 		if r.URL.Query().Get("gameId") != "432" {
 			http.Error(w, "bad filter", http.StatusBadRequest)
 			return
 		}
 		// A slug search without a classId spans every class, as the real API does.
-		class := r.URL.Query().Get("classId")
-		data := []map[string]any{}
+		q := r.URL.Query()
+		class := q.Get("classId")
+		var matched []*cfMod
 		for _, m := range h.cfMods {
 			if class != "" && class != strconv.Itoa(m.classID()) {
 				continue
 			}
-			if strings.HasPrefix(m.slug, r.URL.Query().Get("slug")) {
-				data = append(data, modJSON(m))
+			if words := q.Get("searchFilter"); words != "" {
+				if matchesQuery(words, m.slug, strings.ToUpper(m.slug)) {
+					matched = append(matched, m)
+				}
+				continue
 			}
+			if strings.HasPrefix(m.slug, q.Get("slug")) {
+				matched = append(matched, m)
+			}
+		}
+		slices.SortFunc(matched, func(a, b *cfMod) int { return cmp.Compare(b.downloads, a.downloads) })
+		if size, _ := strconv.Atoi(q.Get("pageSize")); size > 0 && len(matched) > size {
+			matched = matched[:size]
+		}
+		data := []map[string]any{}
+		for _, m := range matched {
+			data = append(data, modJSON(m))
 		}
 		writeJSON(w, map[string]any{"data": data})
 	})

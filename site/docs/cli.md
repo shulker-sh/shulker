@@ -9,6 +9,7 @@ outline: [2, 3]
 | --- | --- |
 | [`shulker init`](#shulker-init) | Create shulker.json and a lock in the current directory |
 | [`shulker add <mod>...`](#shulker-add) | Add mods to the manifest and lock |
+| [`shulker search <words>...`](#shulker-search) | Search the providers for projects to add |
 | [`shulker remove <mod>...`](#shulker-remove) | Remove mods from the manifest and lock |
 | [`shulker lock`](#shulker-lock) | Bring the lock in line with shulker.json without upgrading |
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
@@ -180,6 +181,24 @@ shulker add ../base-pack --type modpack --as base
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack |
+
+### `shulker search`
+
+Search every provider shulker has set up for projects matching the words, and print the ids to add them by. Results come in a block per provider, most downloaded first, and the command writes nothing: `shulker.json` and the lock only change through `add`. Projects CurseForge classes as something shulker has no entry type for, worlds and plugins among them, are left out. A `modpack` row is a provider modpack, which `add` can't take yet: add a modpack by source instead.
+
+```sh
+shulker search sodium
+shulker search fresh animations --type resourcepack
+shulker search jei --provider curseforge --limit 5
+```
+
+| Flag | Description |
+| --- | --- |
+| `--type <type>` | Only projects of one type: `mod`, `modpack`, `resourcepack`, `shader` |
+| `--provider <provider>` | Search one provider instead of every available one: `modrinth` or `curseforge` |
+| `--limit <n>` | Results to print per provider (default 10, as many as each provider answers with: at most 100 from Modrinth, 50 from CurseForge) |
+
+With `--json`, `data.results` lists each hit as `{ "provider", "id", "slug", "title", "type", "side", "downloads" }`, and `data.query` is the words as one string.
 
 ### `shulker remove`
 

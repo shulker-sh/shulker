@@ -6,13 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"time"
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/provider"
 )
 
-const APIURL = "https://api.modrinth.com/v2"
+const (
+	APIURL      = "https://api.modrinth.com/v2"
+	searchLimit = 100
+)
 
 type Modrinth struct {
 	Client  *fetch.Client
@@ -32,6 +36,14 @@ type project struct {
 	ClientSide  string `json:"client_side"`
 	ServerSide  string `json:"server_side"`
 	ProjectType string `json:"project_type"`
+	Downloads   int64  `json:"downloads"`
+}
+
+// hit is a search result, which names the project id differently from the
+// project itself.
+type hit struct {
+	ProjectID string `json:"project_id"`
+	project
 }
 
 type version struct {
@@ -65,7 +77,32 @@ func (m *Modrinth) Project(ctx context.Context, slugOrID, _ string) (*provider.P
 		}
 		return nil, fmt.Errorf("modrinth project %s: %w", slugOrID, err)
 	}
-	return &provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: p.ProjectType}, nil
+	found := convertProject(p)
+	return &found, nil
+}
+
+func (m *Modrinth) Search(ctx context.Context, query, kind string, limit int) ([]provider.Project, error) {
+	q := url.Values{"query": {query}, "limit": {strconv.Itoa(min(limit, searchLimit))}}
+	if kind != "" {
+		q.Set("facets", facet("project_type:"+kind))
+	}
+	var res struct {
+		Hits []hit `json:"hits"`
+	}
+	if err := m.Client.GetJSON(ctx, m.BaseURL+"/search?"+q.Encode(), &res); err != nil {
+		return nil, fmt.Errorf("modrinth search %s: %w", query, err)
+	}
+	projects := make([]provider.Project, 0, len(res.Hits))
+	for _, h := range res.Hits {
+		found := convertProject(h.project)
+		found.ID = h.ProjectID
+		projects = append(projects, found)
+	}
+	return projects, nil
+}
+
+func convertProject(p project) provider.Project {
+	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: p.ProjectType, Downloads: p.Downloads}
 }
 
 func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {
@@ -149,6 +186,13 @@ func side(client, server string) string {
 		return "client"
 	}
 	return "both"
+}
+
+// facet wraps one filter the way Modrinth reads a requirement: the array of
+// alternatives that must match, inside the array of requirements.
+func facet(f string) string {
+	b, _ := json.Marshal([][]string{{f}})
+	return string(b)
 }
 
 func jsonList(items ...string) string {

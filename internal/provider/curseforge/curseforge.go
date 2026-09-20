@@ -27,6 +27,9 @@ const (
 	KeyEnv   = "SHULKER_CURSEFORGE_KEY"
 	gameID   = "432"
 	pageSize = 50
+	// sortPopularity is CurseForge's Popularity sort field, from /v1/mods/search's
+	// sortField enum.
+	sortPopularity = "2"
 )
 
 // CurseForge class ids for the Minecraft game, from /v1/categories?classesOnly=true.
@@ -102,11 +105,12 @@ func withKey(c *fetch.Client, key string) *fetch.Client {
 func (c *CurseForge) Name() string { return "curseforge" }
 
 type mod struct {
-	ID      int    `json:"id"`
-	Name    string `json:"name"`
-	Slug    string `json:"slug"`
-	ClassID int    `json:"classId"`
-	Links   struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	ClassID   int    `json:"classId"`
+	Downloads int64  `json:"downloadCount"`
+	Links     struct {
 		WebsiteURL string `json:"websiteUrl"`
 	} `json:"links"`
 }
@@ -187,6 +191,34 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID, kind string) (*provi
 		return nil, e
 	}
 	return c.remember(matched[0]), nil
+}
+
+func (c *CurseForge) Search(ctx context.Context, query, kind string, limit int) ([]provider.Project, error) {
+	q := url.Values{
+		"gameId": {gameID}, "searchFilter": {query}, "sortField": {sortPopularity},
+		"sortOrder": {"desc"}, "pageSize": {strconv.Itoa(min(limit, pageSize))},
+	}
+	if class, ok := typeClasses[kind]; ok {
+		q.Set("classId", class)
+	}
+	var res struct {
+		Data []mod `json:"data"`
+	}
+	if err := c.call(ctx, "search "+query, func() error {
+		return c.Client.GetJSON(ctx, c.BaseURL+"/mods/search?"+q.Encode(), &res)
+	}); err != nil {
+		return nil, err
+	}
+	projects := make([]provider.Project, 0, len(res.Data))
+	for _, m := range res.Data {
+		// Minecraft has classes shulker has no entry type for, worlds and
+		// bukkit plugins among them, and a search without a classId spans them all.
+		if _, ok := classTypes[m.ClassID]; !ok {
+			continue
+		}
+		projects = append(projects, *c.remember(m))
+	}
+	return projects, nil
 }
 
 func (c *CurseForge) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {
@@ -353,7 +385,7 @@ func ProjectPage(projectID string) string {
 }
 
 func convertMod(m mod) *provider.Project {
-	return &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Type: classTypes[m.ClassID]}
+	return &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Type: classTypes[m.ClassID], Downloads: m.Downloads}
 }
 
 func convertFile(f file) (provider.Version, error) {

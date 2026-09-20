@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -104,6 +105,7 @@ type harness struct {
 	mojang         map[string]string
 	mojangHits     int
 	noCurseForge   bool
+	cfSearchFails  bool
 	cfMods         map[int]*cfMod
 	cfHits         int
 	ctx            context.Context
@@ -338,6 +340,31 @@ func newHarness(t *testing.T) *harness {
 		}
 		writeJSON(w, p)
 	})
+	mux.HandleFunc("/modrinth/search", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		hits := []map[string]any{}
+		for _, slug := range []string{"fabric-api", "sodium", "fresh-animations", "complementary-reimagined"} {
+			p := projects[slug]
+			kind, _ := p["project_type"].(string)
+			if kind == "" {
+				kind = "mod"
+			}
+			if facets := q.Get("facets"); facets != "" && facets != `[["project_type:`+kind+`"]]` {
+				continue
+			}
+			if !matchesQuery(q.Get("query"), slug, p["title"].(string)) {
+				continue
+			}
+			hit := maps.Clone(p)
+			hit["project_id"], hit["project_type"], hit["downloads"] = p["id"], kind, searchDownloads[slug]
+			hits = append(hits, hit)
+		}
+		if limit > 0 && len(hits) > limit {
+			hits = hits[:limit]
+		}
+		writeJSON(w, map[string]any{"hits": hits, "total_hits": len(hits)})
+	})
 	mux.HandleFunc("/cdn/", func(w http.ResponseWriter, r *http.Request) {
 		for _, jar := range h.jars {
 			if strings.HasSuffix(r.URL.Path, jar.filename) {
@@ -444,6 +471,27 @@ func newHarness(t *testing.T) *harness {
 	}
 	t.Cleanup(h.server.Close)
 	return h
+}
+
+// matchesQuery is how the fake providers search: every word of the query
+// somewhere in the project's slug or title.
+func matchesQuery(query, slug, title string) bool {
+	hay := strings.ToLower(slug + " " + title)
+	for _, word := range strings.Fields(strings.ToLower(query)) {
+		if !strings.Contains(hay, word) {
+			return false
+		}
+	}
+	return true
+}
+
+// searchDownloads ranks the fake's projects the way a provider's search does,
+// most downloaded first.
+var searchDownloads = map[string]int64{
+	"fabric-api":               900_000_000,
+	"sodium":                   228_124_617,
+	"fresh-animations":         5_000_000,
+	"complementary-reimagined": 3_000,
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
