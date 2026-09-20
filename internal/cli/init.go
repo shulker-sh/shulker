@@ -169,6 +169,8 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 		return err
 	}
 	ctx, t := cmd.Context(), a.printer.ErrTheme
+	// game is what the Minecraft answer resolves to, which the loader's version list needs.
+	var game string
 	if !cmd.Flags().Changed("side") {
 		side, err := a.ask("What are you making?", []out.Choice{
 			{Label: "a client pack", Value: "client"},
@@ -192,6 +194,10 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 		if opts.minecraft, err = a.ask("Which Minecraft version?", choices); err != nil {
 			return err
 		}
+		game = opts.minecraft
+		if game == "*" {
+			game = latest
+		}
 	}
 	if !cmd.Flags().Changed("loader") {
 		mods, err := a.ask("Add mods?", []out.Choice{{Label: "no", Value: noLoader}, {Label: "yes", Value: "yes"}})
@@ -210,9 +216,10 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 	}
 	if opts.loaderName != noLoader && !cmd.Flags().Changed("loader-version") {
 		a.progress("fetching %s versions", opts.loaderName)
-		game, err := d.meta.GameVersion(ctx, orLatest(opts.minecraft))
-		if err != nil {
-			return err
+		if game == "" {
+			if game, err = d.meta.GameVersion(ctx, orLatest(opts.minecraft)); err != nil {
+				return err
+			}
 		}
 		versions, latest, err := d.meta.LoaderVersions(ctx, opts.loaderName, game)
 		if err != nil {

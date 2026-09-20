@@ -20,13 +20,14 @@ func (p *Printer) Ask(title, description string, in io.Reader) (string, error) {
 	}
 	var answer string
 	field := huh.NewInput().Title(gutter + title).Value(&answer).Prompt(gutter + "> ")
-	lines := 2
+	// The question, the typed line, and the blank row above the key help.
+	height := 3
 	if description != "" {
-		field, lines = field.Description(gutter+description), lines+1
+		field, height = field.Description(gutter+description), height+1
 	}
 	// A form left to size itself gives the group no room for the field, which draws the question
 	// as blank lines with only the key help under them.
-	form := huh.NewForm(huh.NewGroup(field)).WithTheme(askTheme(t)).WithOutput(p.Stderr).WithInput(in).WithWidth(p.width()).WithHeight(lines + 1)
+	form := huh.NewForm(huh.NewGroup(field)).WithTheme(askTheme(t)).WithOutput(p.Stderr).WithInput(in).WithWidth(p.width()).WithHeight(height)
 	if err := form.Run(); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
 			return "", ErrPickCancelled
