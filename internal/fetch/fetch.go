@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -49,7 +50,13 @@ func IsNetwork(err error) bool {
 type StatusError struct {
 	URL    string
 	Status int
+	// Body is what the server answered with, up to errorBody bytes. The sign-in chain reads it:
+	// its endpoints put the reason a request failed in a JSON body, not in the status.
+	Body []byte
 }
+
+// errorBody is how much of a failed request's answer is kept for the caller to read.
+const errorBody = 64 << 10
 
 func (e *StatusError) Error() string { return fmt.Sprintf("%s: HTTP %d", e.URL, e.Status) }
 
@@ -106,10 +113,10 @@ func New(version string) *Client {
 }
 
 func (c *Client) get(ctx context.Context, url string, accept string) (*http.Response, error) {
-	return c.do(ctx, http.MethodGet, url, accept, nil)
+	return c.do(ctx, http.MethodGet, url, accept, "", nil)
 }
 
-func (c *Client) do(ctx context.Context, method, url, accept string, body io.Reader) (*http.Response, error) {
+func (c *Client) do(ctx context.Context, method, url, accept, contentType string, body io.Reader) (*http.Response, error) {
 	if c.Offline {
 		return nil, fmt.Errorf("%s: %w", url, ErrOffline)
 	}
@@ -124,8 +131,8 @@ func (c *Client) do(ctx context.Context, method, url, accept string, body io.Rea
 	if accept != "" {
 		req.Header.Set("Accept", accept)
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 	done := func() {}
 	if c.Waiting != nil {
@@ -138,8 +145,9 @@ func (c *Client) do(ctx context.Context, method, url, accept string, body io.Rea
 	}
 	resp.Body = waitingBody{resp.Body, done}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		answer, _ := io.ReadAll(io.LimitReader(resp.Body, errorBody))
 		resp.Body.Close()
-		return nil, &StatusError{URL: url, Status: resp.StatusCode}
+		return nil, &StatusError{URL: url, Status: resp.StatusCode, Body: answer}
 	}
 	return resp, nil
 }
@@ -173,7 +181,21 @@ func (c *Client) PostJSON(ctx context.Context, url string, body any, v any) erro
 	if err != nil {
 		return err
 	}
-	resp, err := c.do(ctx, http.MethodPost, url, "application/json", bytes.NewReader(payload))
+	resp, err := c.do(ctx, http.MethodPost, url, "application/json", "application/json", bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+		return fmt.Errorf("%s: decode: %w", url, err)
+	}
+	return nil
+}
+
+// PostForm posts a form-encoded body and decodes the JSON answer, which is what the Microsoft
+// token endpoints take and give.
+func (c *Client) PostForm(ctx context.Context, url string, form url.Values, v any) error {
+	resp, err := c.do(ctx, http.MethodPost, url, "application/json", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
 	}

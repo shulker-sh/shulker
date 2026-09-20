@@ -78,3 +78,32 @@ func Save(path string, s Store) error {
 	}
 	return nil
 }
+
+// Put stores an account, replacing the entry that is already this account: the one with the same
+// id, or failing that the one with the same Xbox user hash. The hash is what an account that has
+// just bought Java has in common with the entry it was stored under while it had no player UUID,
+// and that id changes from the Xbox user id to the UUID underneath it.
+func (s *Store) Put(a Account) {
+	for i, have := range s.Accounts {
+		if SameID(have.ID(), a.ID()) || sameUser(have, a) {
+			s.Accounts[i] = a
+			return
+		}
+	}
+	s.Accounts = append(s.Accounts, a)
+}
+
+func sameUser(a, b Account) bool {
+	return a.Xbox != nil && b.Xbox != nil && a.Xbox.UserHash != "" && a.Xbox.UserHash == b.Xbox.UserHash
+}
+
+// Remove drops the account with an id, and says whether it was there at all.
+func (s *Store) Remove(id string) bool {
+	for i, have := range s.Accounts {
+		if SameID(have.ID(), id) {
+			s.Accounts = append(s.Accounts[:i], s.Accounts[i+1:]...)
+			return true
+		}
+	}
+	return false
+}

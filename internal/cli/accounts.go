@@ -26,7 +26,7 @@ func (a *app) accountsCmd() *cobra.Command {
 		Args:  exactArgs(0),
 		RunE:  func(cmd *cobra.Command, args []string) error { return a.listAccounts() },
 	}
-	cmd.AddCommand(a.accountsUseCmd())
+	cmd.AddCommand(a.accountsLoginCmd(), a.accountsLogoutCmd(), a.accountsRefreshCmd(), a.accountsUseCmd())
 	return cmd
 }
 
@@ -39,10 +39,7 @@ func (a *app) listAccounts() error {
 	rows := []accountRow{}
 	for _, g := range grouped {
 		for _, r := range g.accounts {
-			rows = append(rows, accountRow{
-				ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State,
-				Default: isDefault(r, cfg),
-			})
+			rows = append(rows, rowFor(r, cfg))
 		}
 	}
 	return a.printer.Emit(rows, func(l *out.Lines) {
@@ -98,6 +95,11 @@ func writeAccounts(l *out.Lines, groups []accountGroup, cfg config.Config) {
 	}
 }
 
+// rowFor is one account as a command prints it, and as --json carries it.
+func rowFor(r account.Resolved, cfg config.Config) accountRow {
+	return accountRow{ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State, Default: isDefault(r, cfg)}
+}
+
 func isDefault(r account.Resolved, cfg config.Config) bool {
 	return cfg.Accounts.Default != "" && account.SameID(r.ID, cfg.Accounts.Default)
 }
@@ -113,22 +115,10 @@ func (a *app) accountsUseCmd() *cobra.Command {
 				return err
 			}
 			if r.State == account.NoProfile {
-				return out.Errorf("account-not-playable", "%s owns no Java profile, so it can't launch anything", r.Name)
+				return account.NoProfile.Error(r.Name)
 			}
-			path, err := a.configFile()
+			change, err := a.changeDefault(r.ID)
 			if err != nil {
-				return err
-			}
-			doc, err := config.LoadDocument(path)
-			if err != nil {
-				return err
-			}
-			change := configChange{Path: accountsDefault, To: r.ID}
-			if from, ok := configLookup(doc, accountsDefault); ok {
-				change.From = from
-			}
-			configPut(doc, accountsDefault, r.ID)
-			if err := config.SaveDocument(path, doc); err != nil {
 				return err
 			}
 			return a.printer.Emit(change, func(l *out.Lines) {
@@ -136,6 +126,40 @@ func (a *app) accountsUseCmd() *cobra.Command {
 			})
 		},
 	}
+}
+
+// changeDefault writes accounts.default, or takes the key out when id is empty, and answers with
+// what changed so the command can print it.
+func (a *app) changeDefault(id string) (configChange, error) {
+	path, err := a.configFile()
+	if err != nil {
+		return configChange{}, err
+	}
+	doc, err := config.LoadDocument(path)
+	if err != nil {
+		return configChange{}, err
+	}
+	change := configChange{Path: accountsDefault, To: id}
+	if from, ok := configLookup(doc, accountsDefault); ok {
+		change.From = from
+	}
+	if id == "" {
+		configRemove(doc, accountsDefault)
+	} else {
+		configPut(doc, accountsDefault, id)
+	}
+	return change, config.SaveDocument(path, doc)
+}
+
+// accountStore is shulker's own accounts.json: where it is, and what it holds. Only the accounts
+// shulker signed in or created itself are in there; a borrowed one is read where it lives.
+func (a *app) accountStore() (string, account.Store, error) {
+	path, err := a.configFile()
+	if err != nil {
+		return "", account.Store{}, err
+	}
+	store, err := account.Load(account.Path(path))
+	return account.Path(path), store, err
 }
 
 // accounts is every account the configured providers yield, with the config that named them.

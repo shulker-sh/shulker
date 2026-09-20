@@ -83,12 +83,12 @@
         },
         "token": {
           "type": "string",
-          "description": "The XSTS token, kept only while notAfter holds."
+          "description": "The Xbox Live user token, kept while notAfter holds: with it a renewal skips the Microsoft round trip and starts at the XSTS authorization."
         },
         "notAfter": {
           "type": "string",
           "format": "date-time",
-          "description": "When the XSTS token stops being usable."
+          "description": "When the Xbox Live user token stops being usable."
         }
       }
     },

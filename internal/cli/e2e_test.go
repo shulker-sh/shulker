@@ -109,6 +109,7 @@ type harness struct {
 	cfMods         map[int]*cfMod
 	cfHits         int
 	ctx            context.Context
+	msa            *fakeMSA
 	// exe stands in for the running binary, for the commands that move or remove it.
 	exe string
 }
@@ -424,6 +425,7 @@ func newHarness(t *testing.T) *harness {
 	})
 	h.runtime.register(mux, func() string { return base })
 	h.registerCurseForge(t, mux, func() string { return base })
+	h.msa = h.fakeSignIn(mux)
 	h.server = httptest.NewServer(mux)
 	base = h.server.URL
 	library := func(name, path string) map[string]any {
@@ -502,7 +504,19 @@ func writeJSON(w http.ResponseWriter, v any) {
 func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	a := newApp(&stdout, &stderr)
+	a := h.newApp(&stdout, &stderr)
+	ctx := h.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	code := a.run(ctx, args)
+	return code, stdout.String(), stderr.String()
+}
+
+// newApp is what every run in a test is built from: the harness's own directories and stdin, and
+// every client pointed at its fake server.
+func (h *harness) newApp(stdout, stderr io.Writer) *app {
+	a := newApp(stdout, stderr)
 	a.dir = h.dir
 	a.configPath = h.config
 	a.stdin = h.stdin
@@ -545,13 +559,9 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 		runtimes:   runtimes,
 		players:    players,
 		gdlauncher: &meta.GDLauncher{Client: f, BaseURL: h.server.URL + "/gdl"},
+		signin:     h.msa.signIn(f, h.server.URL),
 	}
-	ctx := h.ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	code := a.run(ctx, args)
-	return code, stdout.String(), stderr.String()
+	return a
 }
 
 func (h *harness) mustRunStderr(t *testing.T, args ...string) (string, string) {

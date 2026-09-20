@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
@@ -32,6 +33,7 @@ type deps struct {
 	runtimes   *meta.Runtimes
 	players    *player.Client
 	gdlauncher *meta.GDLauncher
+	signin     *account.SignIn
 }
 
 func (a *app) deps() (*deps, error) {
@@ -65,6 +67,7 @@ func (a *app) deps() (*deps, error) {
 		runtimes:   meta.NewRuntimes(f),
 		players:    player.New(f),
 		gdlauncher: meta.NewGDLauncher(f),
+		signin:     account.NewSignIn(f),
 	}
 	return a.d, nil
 }

@@ -204,7 +204,19 @@ func (t Theme) Link(text, path string) string {
 		return text
 	}
 	u := url.URL{Scheme: "file", Path: filepath.ToSlash(abs)}
-	return "\x1b]8;;" + u.String() + "\x1b\\" + text + "\x1b]8;;\x1b\\"
+	return hyperlink(text, u.String())
+}
+
+// LinkURL wraps text in an OSC 8 hyperlink to a page, for one the player has to open themselves.
+func (t Theme) LinkURL(text, target string) string {
+	if !t.Links || !t.Color {
+		return text
+	}
+	return hyperlink(text, target)
+}
+
+func hyperlink(text, target string) string {
+	return "\x1b]8;;" + target + "\x1b\\" + text + "\x1b]8;;\x1b\\"
 }
 
 var ansiSeq = regexp.MustCompile(`\x1b\[[0-9;]*m|\x1b\]8;;[^\x1b]*\x1b\\`)

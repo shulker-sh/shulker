@@ -50,6 +50,11 @@ outline: [2, 3]
 | [`shulker resourcepack add\|remove\|list`](#shulker-resourcepack-add-remove-list) | The plain verbs with `--type resourcepack` |
 | [`shulker shader add\|remove\|list`](#shulker-shader-add-remove-list) | The plain verbs with `--type shader` |
 | [`shulker player [name\|uuid]...`](#shulker-player) | Check player names and uuids against Mojang and the lock |
+| [`shulker accounts`](#shulker-accounts) | List the accounts shulker can play with |
+| [`shulker accounts login`](#shulker-accounts-login) | Sign in to a Microsoft account |
+| [`shulker accounts logout [name]`](#shulker-accounts-logout) | Sign a Microsoft account out |
+| [`shulker accounts refresh [name...]`](#shulker-accounts-refresh) | Renew the accounts shulker signed in |
+| [`shulker accounts use <name>`](#shulker-accounts-use) | Switch the default account |
 | [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
@@ -591,6 +596,57 @@ shulker accounts
 The states are `playable`, `not playable (no Java profile)`, `sign-in expired`, `token expired <ago>` for a borrowed account whose launcher has not renewed it, and `offline`.
 
 Which accounts are read comes from `accounts.providers`. A provider shulker has no reader for yet warns and contributes nothing. With `--json`, each row is `{ "id", "name", "source", "group", "state", "default" }`.
+
+### `shulker accounts login`
+
+Sign in to a Microsoft account and store it. Shulker prints a page to open and a code to type there; the sign-in finishes in the browser, and the command waits until it does. Running it again signs in another account, and signing in as an account that is already there updates that entry rather than adding a second.
+
+```sh
+shulker accounts login
+shulker accounts login --use
+```
+
+Shulker asks for `XboxLive.signin` and `offline_access`, and nothing else: an email address would cost every player a consent screen to name the rare account that owns no Java profile, and the Xbox gamertag names that one for free. What it keeps in `accounts.json` is the Microsoft refresh token, the Minecraft session token and when it expires, the Xbox token while it lasts, and the profile — or the gamertag and Xbox user id when there is no profile. No token is ever printed or logged.
+
+An account that owns no Java Edition is stored as `not playable`, named by its gamertag, and can't launch or be the default account; Java Edition is at minecraft.net. The sign-in leaves the default account alone and prints the [`shulker accounts use`](#shulker-accounts-use) line that switches it.
+
+| Flag | Description |
+| --- | --- |
+| `--use` | Make it the default account straight away |
+
+### `shulker accounts logout`
+
+Sign a Microsoft account out: its entry and every token in it are deleted. With no name it is the default account that signs out.
+
+```sh
+shulker accounts logout
+shulker accounts logout Notch
+shulker accounts logout Notch --yes
+```
+
+Shulker asks before it signs anything out, and `--yes` answers the question ahead of time — which a run that isn't on a terminal has to pass, since there is nobody to ask. Signing out the default account leaves the one playable account behind it as the default, and no default at all when there isn't exactly one to take over.
+
+An offline account has no sign-in to end, so `logout` on one is an error naming [`shulker accounts remove`](#shulker-accounts-use); a borrowed account belongs to the launcher it came from, and only that launcher can sign it out.
+
+| Flag | Description |
+| --- | --- |
+| `-y, --yes` | Sign out without being asked first |
+
+### `shulker accounts refresh`
+
+Renew the accounts shulker signed in itself, from the tokens it holds. Nothing is asked: the sign-in chain runs again in the background, and the Microsoft refresh token it rotates replaces the one used, since Microsoft leaves the old one working. A launch renews the account it uses on its own, so this is for renewing them ahead of time, or for picking up a profile an account has bought since.
+
+```sh
+shulker accounts refresh
+shulker accounts refresh Notch
+shulker accounts refresh --missing-profile
+```
+
+With no names every account of shulker's own is renewed. Names and `--missing-profile` are an AND: together they mean the named accounts that own no Java profile. An account whose sign-in has expired warns and is skipped, and the rest are still renewed; with `--json` the accounts that were renewed come back as the rows [`shulker accounts`](#shulker-accounts) prints.
+
+| Flag | Description |
+| --- | --- |
+| `--missing-profile` | Only the accounts that own no Java profile |
 
 ### `shulker accounts use`
 
@@ -1199,6 +1255,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | --- | --- |
 | `account-not-found` | No account matches the selector. `candidates`: every account, each as its qualifier and its id, `pass`: their ids |
 | `account-not-playable` | The account owns no Java profile, so it can't launch anything |
+| `account-sign-in-expired` | The Microsoft refresh token is gone or revoked, so shulker can't get a session for the account; `shulker accounts login` signs it in again |
 | `accounts-invalid` | shulker's own `accounts.json` doesn't parse or doesn't match its schema |
 | `already-ignored` | The pair already has an ignore in `shulker.json`; pass `--force` to replace it |
 | `ambiguous-account` | Several accounts match the selector and shulker can't ask, because it isn't running on a terminal. `candidates`: the matches, each as its qualifier and its id, `pass`: their ids |
@@ -1305,6 +1362,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `self-update-download` | The download failed |
 | `self-update-install` | The running binary couldn't be replaced |
 | `self-update-provenance` | `--require-attestation` is set and the build provenance couldn't be verified |
+| `sign-in-failed` | The Microsoft sign-in didn't finish: it was declined, the code ran out before it was used, or Microsoft or Xbox Live refused it — including an account with no Xbox profile, which can't reach Minecraft at all |
 | `server-exit` | The server exited with an error. `items`: its `logs/latest.log` and, when the server wrote one during the run, its crash report; `data` carries them as `log` and `crashReport` |
 | `source-fetch` | The sync source couldn't be fetched |
 | `source-lock` | The sync source has no `shulker.lock` |
