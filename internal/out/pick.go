@@ -4,7 +4,9 @@ import (
 	"errors"
 	"io"
 	"strconv"
+	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
@@ -38,6 +40,9 @@ func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, er
 	for i, c := range choices {
 		options[i] = huh.NewOption(c.Label, c.Value)
 	}
+	// huh binds quit to ctrl+c alone, which leaves a picker you can only leave by interrupting.
+	keys := huh.NewDefaultKeyMap()
+	keys.Quit = key.NewBinding(key.WithKeys("esc", "ctrl+c"), key.WithHelp("esc", "cancel"))
 	var chosen string
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().
@@ -45,7 +50,8 @@ func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, er
 			Options(options...).
 			Value(&chosen).
 			Height(min(len(choices), pickRows) + 1),
-	)).WithTheme(pickTheme(t)).WithOutput(p.Stderr).WithInput(in)
+	)).WithTheme(pickTheme(t)).WithOutput(p.Stderr).WithInput(in).
+		WithKeyMap(keys).WithLayout(gutterLayout{quit: keys.Quit})
 	if err := form.Run(); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
 			return "", ErrPickCancelled
@@ -54,6 +60,28 @@ func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, er
 	}
 	return chosen, nil
 }
+
+// gutterLayout puts huh's help line in the two-space gutter every other line sits in. huh's own
+// Group.View joins the footer outside any container the theme can reach, so the only way to indent
+// it is to lay the form out here. A picker is always one group of one field, and its select has no
+// Validate, so the field's own view and the help line are the whole form.
+type gutterLayout struct{ quit key.Binding }
+
+func (l gutterLayout) View(f *huh.Form) string {
+	view := f.GetFocusedField().View()
+	// The field lists only its own keys, and leaving the picker is the one a stuck player needs.
+	help := f.Help().ShortHelpView(append(f.KeyBinds(), l.quit))
+	if help == "" {
+		return view
+	}
+	lines := strings.Split(help, "\n")
+	for i, line := range lines {
+		lines[i] = gutter + line
+	}
+	return view + "\n\n" + strings.Join(lines, "\n")
+}
+
+func (gutterLayout) GroupWidth(_ *huh.Form, _ *huh.Group, w int) int { return w }
 
 // pickTheme keeps the picker inside shulker's own vocabulary: the two-space gutter, the ‣ pick
 // arrow in cyan, grey help, and no border, background or padding. The rows themselves are left
