@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://shulker.sh/schema/v1/instance.json",
   "title": ".shulker/instance.json",
-  "description": "What an instance directory syncs from, and the settings that decide how shulker sets it up. Hand-edit it to change what shulker does, then run `shulker sync` or `shulker instances repair`. Shulker never rewrites the settings block. What the last build actually did is recorded separately, in .shulker/state.json.",
+  "description": "The settings that decide how shulker sets an instance up, and, for a directory with no shulker.json of its own, what it syncs from. Hand-edit it to change what shulker does, then run `shulker sync` or `shulker instances repair`. Shulker never rewrites the settings block. What the last build actually did is recorded separately, in .shulker/state.json.",
   "type": "object",
-  "required": ["$schema", "source", "side"],
+  "required": ["$schema"],
   "additionalProperties": false,
   "properties": {
     "$schema": {
@@ -15,17 +15,17 @@
     "source": {
       "type": "string",
       "minLength": 1,
-      "description": "Where this instance syncs from: a project directory, a git URL, or a manifest URL."
+      "description": "Where this instance syncs from: a project directory, a git URL, or a manifest URL. Absent in an instance that is a project of its own: the one modpack its shulker.json requires is what it follows."
     },
     "ref": {
       "type": "string",
       "minLength": 1,
-      "description": "Branch, tag, or commit to follow from a git source. Omitted follows the remote HEAD."
+      "description": "Branch, tag, or commit to follow from a git source. Omitted follows the remote HEAD, or, in an instance that is a project of its own, whatever its modpack entry follows."
     },
     "side": {
       "type": "string",
       "enum": ["client", "server"],
-      "description": "Which side of the source this directory is built for. A launcher instance is always the client."
+      "description": "Which side of the source this directory is built for. A launcher instance is always the client. Absent in an instance that is a project of its own: the side its shulker.json builds in place is the one."
     },
     "assumeClient": {
       "type": "boolean",

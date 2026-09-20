@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 )
 
@@ -67,10 +66,6 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 		t.Fatalf("linking another source into the instance: exit %d %s", code, stdout)
 	}
 	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--name", "Friends", "--force")
-	// The slot is a fixed script path now, so where the instance syncs from shows in its own file.
-	if intent := readFile(t, filepath.Join(instDir, "minecraft", instance.Dir, instance.FileName)); !strings.Contains(intent, h.dir) {
-		t.Fatalf("--force should repoint the instance: %s", intent)
-	}
 	if _, entry := onlyModpack(t, instanceManifest(t, gameDir)); entry["source"] != h.dir || entry["ref"] != nil {
 		t.Fatalf("--force repoints the modpack the instance follows: %v", entry)
 	}

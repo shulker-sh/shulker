@@ -83,8 +83,9 @@ func (a *app) loadInstanceEntries() ([]instanceEntry, error) {
 	return entries, nil
 }
 
-// inspectInstance reads what the instance directory says about itself. A directory shulker can't
-// read, or that holds no instance file, is still listed: `instances repair` is what fixes it.
+// inspectInstance reads what the instance directory says about itself: its manifest where it is a
+// project, its instance file otherwise, and what the last build recorded where there is neither. A
+// directory shulker can't read is still listed: `instances repair` is what fixes it.
 func inspectInstance(in config.Instance) instanceEntry {
 	e := instanceEntry{Instance: in, Status: instanceSynced}
 	if _, err := os.Stat(in.Dir); errors.Is(err, os.ErrNotExist) {
@@ -111,8 +112,15 @@ func inspectInstance(in config.Instance) instanceEntry {
 			e.LaunchError = last.Error
 		}
 	}
+	source, ref, side, inPlace := inPlaceIntent(in.Dir)
 	state, _ := build.ReadState(in.Dir)
-	if e.intent == nil {
+	switch {
+	case inPlace:
+		e.Ref, e.Side = ref, side
+		if source != "" {
+			e.Source = source
+		}
+	case e.intent == nil:
 		e.Ref = state.Ref
 		if e.Source == "" {
 			e.Source = state.Source
@@ -311,17 +319,27 @@ func saveIntent(dir, source, ref, side string, assumeClient bool) error {
 // loadIntent is the instance file for a directory with this sync recorded in it, and whether it had
 // to be created, which is what tells a link that the settings are still shulker's to seed.
 func loadIntent(dir, source, ref, side string, assumeClient bool) (*instance.File, bool, error) {
+	_, _, inPlace, err := inPlaceManifest(dir)
+	if err != nil {
+		return nil, false, err
+	}
 	f, err := instance.Load(dir)
 	fresh := false
 	switch {
 	case errors.Is(err, instance.ErrNotFound):
-		f, fresh = instance.New(source, ref, side), true
+		f, fresh = instance.New(), true
 	case err != nil:
 		return nil, false, err
 	default:
-		f.Source, f.Ref, f.Side, f.Unlinked = source, ref, side, false
+		f.Unlinked = false
 	}
-	f.AssumeClient = assumeClient
+	// One writer per fact: an instance that is a project holds the modpack it follows and the side
+	// that builds in place in its manifest, so its file keeps no copy of either to go stale.
+	if inPlace {
+		f.Source, f.Ref, f.Side, f.AssumeClient = "", "", "", false
+	} else {
+		f.Source, f.Ref, f.Side, f.AssumeClient = source, ref, side, assumeClient
+	}
 	return f, fresh, nil
 }
 

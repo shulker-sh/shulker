@@ -9,7 +9,8 @@ import (
 func TestSaveLoadKeepsEverySetting(t *testing.T) {
 	dir := t.TempDir()
 	keep := -1
-	f := New("/packs/smp", "main", "client")
+	f := New()
+	f.Source, f.Ref, f.Side = "/packs/smp", "main", "client"
 	f.Settings.Commands = &Commands{PreLaunch: "echo before", PostExit: "echo after"}
 	f.Settings.Java = "/opt/java/bin/java"
 	f.Settings.Wrapper = []string{"gamemoderun"}

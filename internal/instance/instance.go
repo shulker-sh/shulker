@@ -26,13 +26,17 @@ const (
 	ResultFailed = "failed"
 )
 
-// File is what an instance directory syncs from and how shulker sets it up. It is the only
-// file read as intent; .shulker/state.json records what the last build actually did.
+// File is how shulker sets an instance directory up, and, where the directory is no project of its
+// own, what it syncs from. It is the only file read as intent; .shulker/state.json records what the
+// last build actually did.
 type File struct {
-	Schema       string `json:"$schema"`
-	Source       string `json:"source"`
+	Schema string `json:"$schema"`
+	// Source, Ref and Side are what a directory with no manifest of its own syncs from. An instance
+	// that is a project keeps all three in its manifest instead — the one modpack it requires, and
+	// the side carrying `build: "."` — so nothing here can go stale against it.
+	Source       string `json:"source,omitempty"`
 	Ref          string `json:"ref,omitempty"`
-	Side         string `json:"side"`
+	Side         string `json:"side,omitempty"`
 	AssumeClient bool   `json:"assumeClient,omitempty"`
 	// Unlinked keeps a directory `unlink` let go of from being registered again by a repair scan.
 	Unlinked bool      `json:"unlinked,omitempty"`
@@ -74,12 +78,9 @@ func Path(dir string) string { return filepath.Join(dir, Dir, FileName) }
 // New is the file shulker writes for a directory it starts syncing into. The hooks are written at
 // their default so opening it shows what shulker will do; marker is left absent, because an absent
 // marker defers to the manifest and a written one would freeze the manifest's value at this moment.
-func New(source, ref, side string) *File {
+func New() *File {
 	return &File{
 		Schema:   SchemaURL,
-		Source:   source,
-		Ref:      ref,
-		Side:     side,
 		Settings: Settings{Hooks: Hooks{PreLaunch: On(), PostExit: On()}},
 	}
 }

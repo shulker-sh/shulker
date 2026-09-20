@@ -120,7 +120,9 @@ func repairIntent(in config.Instance) (bool, error) {
 	if source == "" {
 		return false, nil
 	}
-	return true, instance.New(source, ref, side).Save(in.Dir)
+	f := instance.New()
+	f.Source, f.Ref, f.Side = source, ref, side
+	return true, f.Save(in.Dir)
 }
 
 func scanLaunchers(only, dir string) []config.Instance {
@@ -163,6 +165,15 @@ func instanceAt(dir string) (config.Instance, bool) {
 	in := config.Instance{Name: filepath.Base(dir), Dir: dir}
 	if f, err := instance.Load(dir); err == nil {
 		in.Source = f.Source
+		// An instance that is a project follows the one modpack its manifest requires. With several
+		// required none of them is the one, and what the last build recorded is all there is.
+		if source, _, _, inPlace := inPlaceIntent(dir); inPlace {
+			if source == "" {
+				st, _ := build.ReadState(dir)
+				source = st.Source
+			}
+			in.Source = source
+		}
 		if r := f.Resolved; r != nil {
 			in.LastSync = r.LastSyncAt
 		}

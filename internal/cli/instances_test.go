@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -134,8 +135,8 @@ func TestLinkRegisters(t *testing.T) {
 	if instances := readInstances(t, h); len(instances) != 1 || withoutStamp(t, instances[0]) != prism {
 		t.Fatalf("prism instance: %+v", instances)
 	}
-	if f := readIntent(t, gameDir); f.Source != h.dir || f.Side != "client" {
-		t.Fatalf("instance file: %+v", f)
+	if f := readIntent(t, gameDir); f.Source != "" || f.Side != "" {
+		t.Fatalf("an in-place instance keeps neither in its file: %+v", f)
 	}
 	if stdout := h.mustRun(t, "sync", h.dir, "--side", "client", "--into", gameDir); strings.Contains(stdout, "Registered") {
 		t.Fatalf("a pre-launch sync must not change the instance: %s", stdout)
@@ -155,6 +156,57 @@ func TestLinkRegisters(t *testing.T) {
 	h.mustRun(t, "link", "multimc", "--launcher-dir", multimcDir, "--as", "mmc")
 	if instances := readInstances(t, h); len(instances) != 3 || instances[2].Launcher != "multimc" || instances[2].ID != "mmc" {
 		t.Fatalf("multimc instance: %+v", instances)
+	}
+}
+
+// An in-place instance's file keeps what the manifest can't hold and nothing else, and every
+// reader takes the manifest as its fallback.
+func TestInPlaceInstanceFileKeepsSettingsOnly(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	gitRun(t, h.dir, "init", "-q", "-b", "main")
+	gitRun(t, h.dir, "add", ".")
+	gitRun(t, h.dir, "commit", "-q", "-m", "one")
+	source := "file://" + h.dir
+
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", source, "--launcher-dir", prismDir, "--name", "Friends", "--ref", "main")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
+
+	var raw map[string]any
+	readJSONFile(t, instance.Path(gameDir), &raw)
+	for _, key := range []string{"source", "ref", "side", "assumeClient"} {
+		if _, held := raw[key]; held {
+			t.Fatalf("the manifest holds %s, so the instance file writes none: %v", key, raw)
+		}
+	}
+	f := readIntent(t, gameDir)
+	if !f.Settings.PreLaunch() || !f.Settings.PostExit() || f.Resolved == nil || f.Resolved.LastResult != instance.ResultOK {
+		t.Fatalf("what is left is the settings and the last sync: %+v", f)
+	}
+
+	// A registry row that fell behind can't misreport what the instance follows: the manifest is
+	// the one writer of all three.
+	instances := readInstances(t, h)
+	instances[0].Source = filepath.Join(t.TempDir(), "moved-away")
+	if err := config.WriteInstances(registryPath(h), instances); err != nil {
+		t.Fatal(err)
+	}
+	var env struct {
+		Data []instanceEntry `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data) != 1 {
+		t.Fatalf("one instance: %+v", env.Data)
+	}
+	if e := env.Data[0]; e.Source != source || e.Ref != "main" || e.Side != "client" {
+		t.Fatalf("instances reads the manifest: %+v", e)
 	}
 }
 
