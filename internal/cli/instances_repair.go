@@ -107,21 +107,24 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 }
 
 // repairIntent writes the instance file for a directory shulker synced before it kept one, from
-// what the build recorded.
+// what the build recorded. An instance that is a project gets a defaults-only file: its manifest
+// holds what it follows, so anything written here could only go stale against it.
 func repairIntent(in config.Instance) (bool, error) {
 	if _, err := instance.Load(in.Dir); err == nil {
 		return false, nil
 	}
-	st, _ := build.ReadState(in.Dir)
-	source, ref, side := st.Source, st.Ref, st.Side
-	if source == "" {
-		source = in.Source
-	}
-	if source == "" {
-		return false, nil
-	}
 	f := instance.New()
-	f.Source, f.Ref, f.Side = source, ref, side
+	if _, _, _, inPlace := inPlaceIntent(in.Dir); !inPlace {
+		st, _ := build.ReadState(in.Dir)
+		source := st.Source
+		if source == "" {
+			source = in.Source
+		}
+		if source == "" {
+			return false, nil
+		}
+		f.Source, f.Ref, f.Side = source, st.Ref, st.Side
+	}
 	return true, f.Save(in.Dir)
 }
 
@@ -157,33 +160,37 @@ func scanLaunchers(only, dir string) []config.Instance {
 	return found
 }
 
-// instanceAt recognises a directory shulker syncs by its .shulker/ directory: the instance file it
-// keeps now, or the state a build left before instance files existed. lastSyncAt is when the
-// directory was last built correctly, which a failure after that doesn't undo, so it is carried
-// whatever the last sync did. lastError isn't: it belongs to the row shulker is replacing.
+// instanceAt recognises a directory shulker syncs from what it holds, in order: an in-place
+// shulker.json, the manifest of a project that is an instance under ADR 0001, whose one modpack
+// entry says what it follows; the instance file's source; the state a build left before instance
+// files existed. An instance file saying unlinked wins over all three, because unlink is what
+// forgets. The name is never the manifest's: the row's name is the one the launcher shows, which
+// scanLaunchers reads from the launcher itself. lastSyncAt is when the directory was last built
+// correctly, which a failure after that doesn't undo, so it is carried whatever the last sync did.
+// lastError isn't: it belongs to the row shulker is replacing.
 func instanceAt(dir string) (config.Instance, bool) {
-	in := config.Instance{Name: filepath.Base(dir), Dir: dir}
-	if f, err := instance.Load(dir); err == nil {
-		in.Source = f.Source
-		// An instance that is a project follows the one modpack its manifest requires. With several
-		// required none of them is the one, and what the last build recorded is all there is.
-		if source, _, _, inPlace := inPlaceIntent(dir); inPlace {
-			if source == "" {
-				st, _ := build.ReadState(dir)
-				source = st.Source
-			}
-			in.Source = source
-		}
-		if r := f.Resolved; r != nil {
-			in.LastSync = r.LastSyncAt
-		}
-		return in, !f.Unlinked
-	}
-	st, err := build.ReadState(dir)
-	if err != nil || st.Source == "" {
+	f, err := instance.Load(dir)
+	if err == nil && f.Unlinked {
 		return config.Instance{}, false
 	}
-	in.Source = st.Source
+	// With several modpacks required none of them is the one the instance was linked from, so the
+	// manifest says nothing and the sources below answer instead. A directory with no source
+	// anywhere is no row shulker can write: the registry needs one.
+	source, _, _, _ := inPlaceIntent(dir)
+	if source == "" && err == nil {
+		source = f.Source
+	}
+	if source == "" {
+		st, _ := build.ReadState(dir)
+		source = st.Source
+	}
+	if source == "" {
+		return config.Instance{}, false
+	}
+	in := config.Instance{Name: filepath.Base(dir), Dir: dir, Source: source}
+	if err == nil && f.Resolved != nil {
+		in.LastSync = f.Resolved.LastSyncAt
+	}
 	return in, true
 }
 

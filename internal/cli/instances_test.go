@@ -10,6 +10,7 @@ import (
 
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/launcher"
 )
 
 func registryPath(h *harness) string {
@@ -449,9 +450,8 @@ func TestInstancesRepair(t *testing.T) {
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
 
-	// A registry shulker can't read is rebuilt from what the launcher holds, and
-	// an instance missing its file gets one from what its build recorded. An in-place instance
-	// builds from itself, so that record names the directory until repair reads the manifest.
+	// A registry shulker can't read is rebuilt from what the launcher holds, and an instance
+	// missing its file gets one holding what the manifest can't.
 	if err := os.WriteFile(registryPath(h), []byte("{ not a registry"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -469,8 +469,8 @@ func TestInstancesRepair(t *testing.T) {
 	if instances[0].LastSync != "" {
 		t.Fatalf("a directory with no record of a sync is registered without a time: %+v", instances[0])
 	}
-	if f := readIntent(t, gameDir); f.Side != "client" {
-		t.Fatalf("repair writes the instance file: %+v", f)
+	if f := readIntent(t, gameDir); f.Source != "" || f.Ref != "" || f.Side != "" || !f.Settings.PreLaunch() {
+		t.Fatalf("repair writes a defaults-only instance file for a project: %+v", f)
 	}
 
 	// A directory that is gone is reported, never dropped: unlink is what forgets.
@@ -482,6 +482,105 @@ func TestInstancesRepair(t *testing.T) {
 	}
 	if instances := readInstances(t, h); len(instances) != 1 {
 		t.Fatalf("a missing directory keeps its row: %+v", instances)
+	}
+}
+
+// Under ADR 0001 a project building where it stands in a launcher's game directory is an instance,
+// so repair recognises one from its manifest alone: no .shulker/, no row, nothing but the project
+// the player kept.
+func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Lost")
+	instDir := filepath.Join(prismDir, "instances", "shulker-lost")
+	gameDir := filepath.Join(instDir, "minecraft")
+
+	// Everything shulker wrote outside the project is gone: its .shulker directory, its row, and
+	// the slot command the link installed.
+	if err := os.RemoveAll(filepath.Join(gameDir, instance.Dir)); err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := filepath.Join(instDir, launcher.InstanceConfigFile)
+	var kept []string
+	for _, line := range strings.Split(readFile(t, cfgPath), "\n") {
+		if !strings.HasPrefix(line, "PreLaunchCommand") && !strings.HasPrefix(line, "OverrideCommands") {
+			kept = append(kept, line)
+		}
+	}
+	writeFile(t, cfgPath, strings.Join(kept, "\n"))
+	if err := config.WriteInstances(registryPath(h), nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir); !strings.Contains(stdout, "registered shulker-lost") {
+		t.Fatalf("repair registers the directory again: %s", stdout)
+	}
+	instances := readInstances(t, h)
+	if len(instances) != 1 || instances[0].Dir != gameDir || instances[0].Source != h.dir {
+		t.Fatalf("the source comes from the modpack the manifest requires: %+v", instances)
+	}
+	if instances[0].Name != "shulker-lost" {
+		t.Fatalf("the name comes from the launcher, not from the manifest: %+v", instances[0])
+	}
+
+	// The instance file it writes holds nothing the manifest holds.
+	var raw map[string]any
+	readJSONFile(t, instance.Path(gameDir), &raw)
+	for _, key := range []string{"source", "ref", "side"} {
+		if _, held := raw[key]; held {
+			t.Fatalf("a repaired project keeps no %s in its instance file: %v", key, raw)
+		}
+	}
+	if f := readIntent(t, gameDir); !f.Settings.PreLaunch() || !f.Settings.PostExit() {
+		t.Fatalf("the settings are written at their defaults: %+v", f)
+	}
+
+	// Repair writes rows and instance files and no slot command, so the rediscovered instance is
+	// listed and syncable by -i while its pre-launch refresh waits for a link.
+	if cfg := readINIFile(t, cfgPath); cfg["PreLaunchCommand"] != "" {
+		t.Fatalf("repair installs no slot command: %q", cfg["PreLaunchCommand"])
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, instance.Dir, "pre-launch")); !os.IsNotExist(err) {
+		t.Fatalf("repair generates no hook script: %v", err)
+	}
+	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "shulker-lost") {
+		t.Fatalf("instances lists it: %s", stdout)
+	}
+	h.mustRun(t, "sync", "-i", "shulker-lost")
+}
+
+// A directory shulker only syncs into is no project, so its source is its instance file's, and the
+// state the last build left where the file is gone too.
+func TestInstancesRepairReadsASyncedDirectory(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	prismDir := t.TempDir()
+	gameDir := filepath.Join(prismDir, "instances", "handmade", "minecraft")
+	h.mustRun(t, "sync", h.dir, "--side", "client", "--into", gameDir)
+
+	h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
+	instances := readInstances(t, h)
+	if len(instances) != 1 || instances[0].Dir != gameDir || instances[0].Source != h.dir {
+		t.Fatalf("a synced directory is registered from its instance file: %+v", instances)
+	}
+
+	// With the instance file gone too, what the last build recorded is the only reading left, and
+	// repair writes the file again from it.
+	if err := os.Remove(instance.Path(gameDir)); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.WriteInstances(registryPath(h), nil); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
+	if instances := readInstances(t, h); len(instances) != 1 || instances[0].Source != h.dir {
+		t.Fatalf("a synced directory with no instance file is registered from its build state: %+v", instances)
+	}
+	if f := readIntent(t, gameDir); f.Source != h.dir || f.Side != "client" {
+		t.Fatalf("repair writes the instance file from what the build recorded: %+v", f)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/manifest"
 )
 
 func unlinkJSON(t *testing.T, h *harness, args ...string) []unlinkResult {
@@ -150,6 +151,11 @@ func TestUnlinkedInstanceStaysUnlinked(t *testing.T) {
 		t.Fatalf("unlink should mark the instance file: %+v", f)
 	}
 
+	// The mark outranks every other reading of the directory, including the manifest that would
+	// otherwise name it an instance on its own.
+	if _, err := os.Stat(filepath.Join(gameDir, manifest.FileName)); err != nil {
+		t.Fatal(err)
+	}
 	h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
 	if instances := readInstances(t, h); len(instances) != 0 {
 		t.Fatalf("repair must not register an unlinked instance again: %+v", instances)
