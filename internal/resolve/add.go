@@ -138,7 +138,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	default:
 		return out.Errorf("requires-unsupported", "%s is a %s, which shulker can't add yet", slug, kind)
 	}
-	if r.Manifest.Loader.Type == "" {
+	// The lock, not the manifest: an instance following a modpack sets no loader of its own and
+	// inherits the pack's into its lock, which is what its mods are resolved against.
+	if r.Lock.Loader.Type == "" {
 		return out.Errorf("loader-required", "mods need a loader; pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
 	}
 	held := holdVersions(r.Lock)

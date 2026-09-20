@@ -33,6 +33,7 @@ outline: [2, 3]
 | [`shulker history prune`](#shulker-history-prune) | Remove history entries beyond the number the manifest keeps |
 | [`shulker rollback [n]`](#shulker-rollback) | Restore a history entry and build it in place |
 | [`shulker serve`](#shulker-serve) | Build the server side and run it in the foreground |
+| [`shulker link shulker [source]`](#shulker-link-shulker) | Create an instance shulker owns and launches itself |
 | [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
 | [`shulker link gdlauncher [source]`](#shulker-link-gdlauncher) | Create a GDLauncher instance for the client build |
 | [`shulker link mojang [source]`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
@@ -340,12 +341,15 @@ shulker get server.properties
 | --- | --- |
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
 | `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
+| `instances` | Where [`shulker link shulker`](#shulker-link-shulker) puts the instances shulker owns. Without it, `instances` in shulker's data directory |
+| `saves` | Where the save groups those instances share live. Without it, `saves` in the same data directory |
+| `store` | Where a launch assembles its shared versions, libraries and assets. Without it, `game` in shulker's cache, since it holds only what shulker can fetch again |
 
 The CurseForge key is always shown as its last four characters, like `••••c123`, unless you pass `config get --reveal`. With `--json`, `config set` and `config unset` return `{ "path", "from", "to" }` like `set`, plus `created` when they made a new registry file.
 
 ### `shulker config get`
 
-Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry` shows the file shulker actually uses, even when the key isn't set. A `curseforge.key` that isn't set fails with `path-not-set`.
+Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set. A `curseforge.key` that isn't set fails with `path-not-set`.
 
 ```sh
 shulker config get
@@ -559,6 +563,37 @@ shulker serve server --accept-eula
 | `--force` | Overwrite files edited in the build directory |
 | `--accept-eula` | Record acceptance of the Minecraft EULA in shulker.json without prompting |
 
+### `shulker link shulker`
+
+Create an instance shulker owns, under its own instances root, and register it like any other launcher's. No launcher is involved: shulker is the launcher here, so it runs the pre-launch sync and the post-exit record in process, writes no hook scripts, and fills no command slot.
+
+With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. The instance is a project of its own: a `shulker.json` that follows the source as a modpack and builds where it stands, so `shulker add` in the instance directory puts a mod on top of the pack and keeps it across syncs. shulker builds it before `link` returns.
+
+The instance's nickname names both the folder under the instances root and the id `-i` takes, so the two can never drift. Without `--as` it comes from the pack's name. If an instance of that name already follows a different source, `link` fails rather than repointing it: pass `--as` to name a second instance, or `--force` to repoint this one.
+
+Move the instances root with `shulker config set instances <path>`; `shulker config get instances` prints where it is now.
+
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`, the same way the other `link` commands do.
+
+```sh
+shulker link shulker
+shulker link shulker https://github.com/shulker-sh/base-pack.git
+shulker link shulker https://example.com/pack/shulker.json --as smp
+```
+
+| Flag | Description |
+| --- | --- |
+| `--as <nickname>` | Nickname for this instance, which names its folder and finds it with `-i` (default: from the pack's name) |
+| `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--force` | Repoint an instance that follows a different source |
+| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
+| `--no-pre-launch` | Don't sync this instance before each launch |
+| `--no-post-exit` | Don't record how each run ended |
+| `--no-marker` | Leave the marker mod out of this instance's builds |
+| `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
+| `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
+| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+
 ### `shulker link atlauncher`
 
 Create an ATLauncher instance that syncs the client build before each launch.
@@ -645,9 +680,9 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 
 Install the project's loader, if it has one, into the official launcher and add a profile that points at the client build. Alias: `vanilla`.
 
-With no source, it links the project in the current directory, and the profile's game directory is the project's `build/<side>`. Pass a project directory, git URL, or manifest URL to link that instead: the game directory is then `shulker/<slug>` inside the launcher directory, and shulker syncs it right away so it's ready to play. The official launcher runs no commands of its own, so shulker points the profile's Java at a small shim of its own that syncs the instance before each launch and then starts the game. That shim lives in the instance's own `.shulker` folder: a shell script on macOS and Linux, and on Windows a small executable shulker generates there, beside a file holding the two paths it needs.
+With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. Either way the game directory is `shulker/<slug>` inside the launcher directory, and what lands there is a project of its own: a `shulker.json` that follows the source as a modpack and builds where it stands. It takes its platform, its features and its override layers from the pack at every sync, so `shulker add` in the game directory puts a mod on top of the pack and keeps it. shulker builds it before `link` returns, so it's ready to play. The official launcher runs no commands of its own, so shulker points the profile's Java at a small shim of its own that syncs the instance before each launch and then starts the game. That shim lives in the instance's own `.shulker` folder: a shell script on macOS and Linux, and on Windows a small executable shulker generates there, beside a file holding the two paths it needs.
 
-If the profile already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one.
+If the profile already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
@@ -662,7 +697,6 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher directory (default: the official launcher's `.minecraft` folder) |
-| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--name <name>` | Profile name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |

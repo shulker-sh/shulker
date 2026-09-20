@@ -147,7 +147,7 @@ func TestLinkRegisters(t *testing.T) {
 	if len(instances) != 2 || withoutStamp(t, instances[0]) != prism {
 		t.Fatalf("instances after link mojang: %+v", instances)
 	}
-	if m := instances[1]; m.Launcher != "mojang" || m.LauncherDir != mojangDir || m.Dir != filepath.Join(h.dir, "build", "client") || m.Source != h.dir || m.ID != "pack" {
+	if m := instances[1]; m.Launcher != "mojang" || m.LauncherDir != mojangDir || m.Dir != mojangGameDir(mojangDir, "pack") || m.Source != h.dir || m.ID != "pack" {
 		t.Fatalf("mojang instance: %+v", m)
 	}
 
@@ -191,7 +191,7 @@ func TestInstancesList(t *testing.T) {
 	for _, e := range env.Data {
 		got = append(got, e.Launcher+":"+e.ID+":"+e.Status)
 	}
-	want := "prism:alpha:synced prism:gone:missing prism:locked:unreadable prism:zed:not-synced mojang:pack:not-synced"
+	want := "prism:alpha:synced prism:gone:missing prism:locked:unreadable prism:zed:not-synced mojang:pack:synced"
 	if strings.Join(got, " ") != want {
 		t.Fatalf("instances:\n got %s\nwant %s", strings.Join(got, " "), want)
 	}
@@ -203,7 +203,7 @@ func TestInstancesList(t *testing.T) {
 	for _, part := range []string{
 		"Prism Launcher\n    ├─ • alpha client (synced ",
 		"• zed client (not synced yet)\n         " + filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         Zed, from " + h.dir + ", side client\n",
-		"\n\n  Minecraft Launcher\n    └─ • pack client (not synced yet)\n",
+		"\n\n  Minecraft Launcher\n    └─ • pack client (synced ",
 		"• gone (directory is missing)\n",
 		"• locked (can't read the directory)\n",
 	} {

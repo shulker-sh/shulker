@@ -164,7 +164,7 @@ func TestLinkMojangRecordsTheManagedRuntime(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	launcherDir := writeMojangLauncher(t)
-	gameDir := filepath.Join(h.dir, "build", "client")
+	gameDir := mojangGameDir(launcherDir, "pack")
 	managed := filepath.Join(h.managedJavaDir(), filepath.FromSlash(runtimeHome), "bin", "java")
 
 	_, stderr := h.mustRunStderr(t, "link", "mojang", "--launcher-dir", launcherDir)
@@ -199,7 +199,7 @@ func TestClientJavaSettingStandsInForTheRuntime(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	launcherDir := writeMojangLauncher(t)
-	gameDir := filepath.Join(h.dir, "build", "client")
+	gameDir := mojangGameDir(launcherDir, "pack")
 	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
 	f, err := instance.Load(gameDir)
 	if err != nil {

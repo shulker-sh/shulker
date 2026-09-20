@@ -2,6 +2,8 @@ package cli
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,16 +12,44 @@ import (
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
-func TestLinkMojang(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
+// instanceManifest is the shulker.json a link leaves in a game directory, read as the map it
+// was written as so a test can see the keys that are absent as well as the ones that are there.
+func instanceManifest(t *testing.T, dir string) map[string]any {
+	t.Helper()
+	var m map[string]any
+	readJSONFile(t, filepath.Join(dir, manifest.FileName), &m)
+	return m
+}
 
-	launcherDir := t.TempDir()
-	existing := `{
+func onlyModpack(t *testing.T, m map[string]any) (string, map[string]any) {
+	t.Helper()
+	requires, _ := m["requires"].(map[string]any)
+	if len(requires) != 1 {
+		t.Fatalf("a link writes exactly one modpack entry: %v", requires)
+	}
+	for key, entry := range requires {
+		e, ok := entry.(map[string]any)
+		if !ok {
+			t.Fatalf("requires.%s: %v", key, entry)
+		}
+		return key, e
+	}
+	return "", nil
+}
+
+// mojangGameDir is where `link mojang` puts an instance: the launcher's own folder for it.
+func mojangGameDir(launcherDir, name string) string {
+	return filepath.Join(launcherDir, "shulker", strings.TrimPrefix(profileKey(name), "shulker-"))
+}
+
+func mojangLauncherDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	profiles := `{
   "profiles": {
     "other": {"name": "Other", "type": "custom", "lastVersionId": "26.1", "icon": "Grass"}
   },
@@ -27,13 +57,50 @@ func TestLinkMojang(t *testing.T) {
   "version": 3
 }
 `
-	if err := os.WriteFile(filepath.Join(launcherDir, "launcher_profiles.json"), []byte(existing), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "launcher_profiles.json"), []byte(profiles), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return dir
+}
 
+func TestLinkMojang(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+
+	launcherDir := mojangLauncherDir(t)
 	stdout := h.mustRun(t, "link", "vanilla", "--launcher-dir", launcherDir)
-	if !strings.Contains(stdout, "installed fabric-loader-0.17.3-26.2 »") || !strings.Contains(stdout, "$ shulker install") {
+	gameDir := filepath.Join(launcherDir, "shulker", "pack")
+	if !strings.Contains(stdout, "installed fabric-loader-0.17.3-26.2 »") {
 		t.Fatalf("link output: %s", stdout)
+	}
+	if !strings.Contains(stdout, "follows pack from "+h.dir) {
+		t.Fatalf("the tree should name the pack the instance follows: %s", stdout)
+	}
+	if strings.Contains(stdout, "shulker install") {
+		t.Fatalf("a link builds, so there is nothing left to nudge: %s", stdout)
+	}
+
+	m := instanceManifest(t, gameDir)
+	client, _ := m["client"].(map[string]any)
+	if m["name"] != "pack" || client["name"] != "pack" || client["build"] != "." {
+		t.Fatalf("instance manifest: %v", m)
+	}
+	for _, key := range []string{"minecraft", "loader", "features", "history"} {
+		if _, ok := m[key]; ok {
+			t.Fatalf("an instance inherits %s from its pack: %v", key, m)
+		}
+	}
+	key, entry := onlyModpack(t, m)
+	if key != "pack" || entry["source"] != h.dir || entry["ref"] != nil {
+		t.Fatalf("modpack entry %s: %v", key, entry)
+	}
+
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("a link builds the instance before it returns: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {
+		t.Fatalf("a link must not build in the source project: %v", err)
 	}
 
 	versionPath := filepath.Join(launcherDir, "versions", "fabric-loader-0.17.3-26.2", "fabric-loader-0.17.3-26.2.json")
@@ -57,8 +124,7 @@ func TestLinkMojang(t *testing.T) {
 	if linked == nil {
 		t.Fatalf("no linked profile: %v", profiles.Profiles)
 	}
-	wantGameDir, _ := filepath.Abs(filepath.Join(h.dir, "build", "client"))
-	if linked["gameDir"] != wantGameDir || linked["lastVersionId"] != "fabric-loader-0.17.3-26.2" || linked["type"] != "custom" || linked["name"] != "pack" {
+	if linked["gameDir"] != gameDir || linked["lastVersionId"] != "fabric-loader-0.17.3-26.2" || linked["type"] != "custom" || linked["name"] != "pack" {
 		t.Fatalf("linked profile: %v", linked)
 	}
 	created := linked["created"]
@@ -77,8 +143,11 @@ func TestLinkMojang(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Command != "link mojang" || env.Data.Profile != "shulker-pack" || env.Data.Side != "client" || env.Data.GameDir != wantGameDir {
+	if env.Command != "link mojang" || env.Data.Profile != "shulker-pack" || env.Data.GameDir != gameDir {
 		t.Fatalf("relink envelope: %s", stdout)
+	}
+	if env.Data.Modpack != "pack" || env.Data.Sync == nil || env.Data.Sync.Dir != gameDir {
+		t.Fatalf("every link reports the pack it follows and the build it did: %s", stdout)
 	}
 	profiles = readProfiles(t, launcherDir)
 	if len(profiles.Profiles) != 2 {
@@ -87,6 +156,75 @@ func TestLinkMojang(t *testing.T) {
 	linked = profiles.Profiles["shulker-pack"]
 	if linked["icon"] != "Furnace" || linked["created"] != created {
 		t.Fatalf("relink should keep user-edited fields: %v", linked)
+	}
+}
+
+// A mod added in the game directory sits on top of the pack, which is the whole point of
+// ADR 0001: a later sync relocks around it instead of sweeping it away.
+func TestLinkMojangKeepsWhatThePlayerAdds(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+
+	launcherDir := mojangLauncherDir(t)
+	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
+	gameDir := filepath.Join(launcherDir, "shulker", "pack")
+
+	h.mustRun(t, "-C", gameDir, "add", "fabric-api")
+	h.mustRun(t, "-C", gameDir, "sync")
+	for _, id := range []string{"sodium", "fabric-api"} {
+		if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars[id].filename)); err != nil {
+			t.Fatalf("%s should survive a sync: %v", id, err)
+		}
+	}
+	requires, _ := instanceManifest(t, gameDir)["requires"].(map[string]any)
+	pack, _ := requires["pack"].(map[string]any)
+	if len(requires) != 2 || pack["source"] != h.dir || requires["fabric-api"] == nil {
+		t.Fatalf("the player's own mod joins the modpack entry, it doesn't replace it: %v", requires)
+	}
+}
+
+// --force repoints the one modpack entry and leaves the player's own requires alone: ADR 0001
+// exists so what a player added survives the pack they follow changing.
+func TestLinkMojangForceRepointsTheModpack(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	other := filepath.Join(t.TempDir(), "other")
+	lockedPack(t, h, other, `"fabric-api": {}`)
+
+	launcherDir := mojangLauncherDir(t)
+	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
+	gameDir := mojangGameDir(launcherDir, "pack")
+	h.mustRun(t, "-C", gameDir, "add", "fresh-animations")
+
+	h.mustRun(t, "link", "mojang", other, "--launcher-dir", launcherDir, "--name", "pack", "--force")
+	requires, _ := instanceManifest(t, gameDir)["requires"].(map[string]any)
+	entry, _ := requires["pack"].(map[string]any)
+	if len(requires) != 2 || entry["source"] != other || requires["fresh-animations"] == nil {
+		t.Fatalf("--force repoints the pack and keeps the player's own entries: %v", requires)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["fabric-api"].filename)); err != nil {
+		t.Fatalf("the new pack's mods arrive: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "resourcepacks", "fresh-animations.zip")); err != nil {
+		t.Fatalf("what the player added stays: %v", err)
+	}
+}
+
+// A pack's retention is copied once, because the author is the one who knows how big a build is.
+// From then on the number is the player's.
+func TestLinkMojangCopiesTheHistoryRetention(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.editManifest(t, func(m map[string]any) { m["history"] = 2 })
+	h.mustRun(t, "lock")
+
+	launcherDir := mojangLauncherDir(t)
+	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
+	m := instanceManifest(t, filepath.Join(launcherDir, "shulker", "pack"))
+	if n, ok := m["history"].(float64); !ok || n != 2 {
+		t.Fatalf("the pack's retention should be copied into the instance: %v", m)
 	}
 }
 
@@ -114,23 +252,34 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 	if rep := env.Data; rep.Source != source || rep.Ref != "main" || rep.Name != "Friends" || rep.Profile != "shulker-friends" || rep.GameDir != gameDir || rep.Sync == nil {
 		t.Fatalf("link report: %+v", rep)
 	}
+	if env.Data.Modpack != "my-pack" {
+		t.Fatalf("a modpack is keyed by its manifest's name: %+v", env.Data)
+	}
 	if linked := readProfiles(t, launcherDir).Profiles["shulker-friends"]; linked["gameDir"] != gameDir || linked["name"] != "Friends" {
 		t.Fatalf("linked profile: %v", linked)
 	}
-	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
-		t.Fatalf("the first sync should ship the mods: %v", err)
+
+	m := instanceManifest(t, gameDir)
+	client, _ := m["client"].(map[string]any)
+	if m["name"] != "friends" || client["name"] != "Friends" || client["build"] != "." {
+		t.Fatalf("instance manifest: %v", m)
 	}
-	if st := build.LoadState(gameDir); st.Source != source || st.Ref != "main" {
-		t.Fatalf("state origin: %+v", st.Origin)
+	key, entry := onlyModpack(t, m)
+	if key != "my-pack" || entry["source"] != source || entry["ref"] != "main" {
+		t.Fatalf("a git source is written as it was given: %s %v", key, entry)
+	}
+
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("the first build should ship the mods: %v", err)
+	}
+	if st := build.LoadState(gameDir); st.Source != gameDir {
+		t.Fatalf("an instance builds from itself: %+v", st.Origin)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {
 		t.Fatalf("linking a remote source must not build in the current directory: %v", err)
 	}
-	if instances := readInstances(t, h); len(instances) != 1 || instances[0].Launcher != "mojang" || instances[0].Dir != gameDir || instances[0].Source != source {
+	if instances := readInstances(t, h); len(instances) != 1 || instances[0].ID != "friends" || instances[0].Launcher != "mojang" || instances[0].Dir != gameDir || instances[0].Source != source {
 		t.Fatalf("registry: %+v", instances)
-	}
-	if f := readIntent(t, gameDir); f.Ref != "main" || f.Side != "client" {
-		t.Fatalf("the ref and side live in the instance file: %+v", f)
 	}
 
 	other := t.TempDir()
@@ -152,6 +301,47 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 	}
 }
 
+func TestLinkMojangFromManifestURL(t *testing.T) {
+	h, dir := projectWithLockedPack(t, "base")
+	srv := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	defer srv.Close()
+	source := srv.URL + "/shulker.json"
+
+	launcherDir := mojangLauncherDir(t)
+	h.mustRun(t, "link", "mojang", source, "--launcher-dir", launcherDir, "--name", "Base")
+	gameDir := filepath.Join(launcherDir, "shulker", "base")
+
+	key, entry := onlyModpack(t, instanceManifest(t, gameDir))
+	if key != "base" || entry["source"] != source {
+		t.Fatalf("a manifest URL is written as it was given: %s %v", key, entry)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("a URL source is locked, so the link can build it: %v", err)
+	}
+}
+
+// A pack with no client block still contributes its shared mods and its overrides, so the link
+// goes ahead and says why the instance is thinner than the pack.
+func TestLinkMojangWarnsWhenTheSourceDeclaresNoClient(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fabric-api")
+	h.editManifest(t, func(m map[string]any) {
+		delete(m, "client")
+		m["server"] = map[string]any{"eula": true}
+	})
+	h.mustRun(t, "lock")
+
+	launcherDir := mojangLauncherDir(t)
+	_, stderr := h.mustRunStderr(t, "link", "mojang", "--launcher-dir", launcherDir)
+	if !strings.Contains(stderr, noClientPack) {
+		t.Fatalf("the warning explains the thin instance: %s", stderr)
+	}
+	if _, err := os.Stat(filepath.Join(launcherDir, "shulker", "pack", "mods", h.jars["fabric-api"].filename)); err != nil {
+		t.Fatalf("a both-side mod still reaches the client: %v", err)
+	}
+}
+
 func TestLinkMojangErrors(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
@@ -161,17 +351,8 @@ func TestLinkMojangErrors(t *testing.T) {
 	if code == 0 || failureCode(t, stdout).Code != "launcher-not-found" {
 		t.Fatalf("missing launcher: exit %d %s", code, stdout)
 	}
-
-	h.editManifest(t, func(m map[string]any) {
-		delete(m, "client")
-		m["server"] = map[string]any{"eula": true}
-	})
-	code, stdout, _ = h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "no-side" || e.Message != "shulker.json declares no client" {
-		t.Fatalf("no client side: exit %d %s", code, stdout)
-	}
-	if _, _, stderr := h.run(t, "link", "mojang", "--launcher-dir", t.TempDir()); !strings.Contains(stderr, "pass --assume-client to build one anyway") {
-		t.Fatalf("no-side hint names the flag: %s", stderr)
+	if code, stdout, _ := h.run(t, "link", "mojang", "--launcher-dir", t.TempDir(), "--assume-client", "--json"); code == 0 || !strings.Contains(stdout, "assume-client") {
+		t.Fatalf("an instance has a client block of its own, so the flag is gone: exit %d %s", code, stdout)
 	}
 }
 

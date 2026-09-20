@@ -3,19 +3,22 @@ package cli
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 type linkReport struct {
@@ -24,11 +27,11 @@ type linkReport struct {
 	Profile     string      `json:"profile"`
 	Name        string      `json:"name"`
 	VersionID   string      `json:"versionId"`
-	Side        string      `json:"side"`
 	GameDir     string      `json:"gameDir"`
 	Source      string      `json:"source"`
 	Ref         string      `json:"ref,omitempty"`
-	Sync        *syncResult `json:"sync,omitempty"`
+	Modpack     string      `json:"modpack"`
+	Sync        *syncResult `json:"sync"`
 }
 
 func (a *app) linkCmd() *cobra.Command {
@@ -36,14 +39,13 @@ func (a *app) linkCmd() *cobra.Command {
 		Use:   "link",
 		Short: "Point a launcher at this project's client build",
 	}
-	cmd.AddCommand(a.linkMojangCmd(), a.linkPrismCmd(), a.linkMultiMCCmd(), a.linkATLauncherCmd(), a.linkGDLauncherCmd())
+	cmd.AddCommand(a.linkShulkerCmd(), a.linkMojangCmd(), a.linkPrismCmd(), a.linkMultiMCCmd(), a.linkATLauncherCmd(), a.linkGDLauncherCmd())
 	return cmd
 }
 
 func (a *app) linkMojangCmd() *cobra.Command {
 	var launcherDir, instanceName, ref, as string
 	var force bool
-	var assumeClient bool
 	var ls linkSettings
 	cmd := &cobra.Command{
 		Use:     "mojang [project-dir | git-url | manifest-url]",
@@ -65,9 +67,8 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					return err
 				}
 			}
-			side, err := a.clientSide(p.Manifest, assumeClient)
-			if err != nil {
-				return err
+			if !p.Manifest.HasSide("client") {
+				a.printer.Warn("%s", noClientPack)
 			}
 			if launcherDir == "" {
 				if launcherDir, err = launcher.DefaultMojangDir(); err != nil {
@@ -83,7 +84,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			} else if err != nil {
 				return err
 			}
-			display := p.Manifest.DisplayName(side)
+			display := p.Manifest.DisplayName("client")
 			if instanceName != "" {
 				display = instanceName
 			}
@@ -91,11 +92,11 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if prev, ok := a.findLauncherInstance("mojang", launcherDir, display); ok && prev.Source != src.name && !force {
 				return out.Errorf("instance-exists", "profile %q already syncs from %s; pass --name to create a second profile, or --force to repoint this one", display, prev.Source)
 			}
-			gameDir := filepath.Join(src.Dir, p.Manifest.BuildDir(side))
-			if src.remote() {
-				gameDir = filepath.Join(launcherDir, "shulker", strings.TrimPrefix(key, "shulker-"))
+			gameDir, err := filepath.Abs(filepath.Join(launcherDir, "shulker", strings.TrimPrefix(key, "shulker-")))
+			if err != nil {
+				return err
 			}
-			if gameDir, err = filepath.Abs(gameDir); err != nil {
+			if err := a.checkID(as, gameDir); err != nil {
 				return err
 			}
 			versionID := p.Lock.Minecraft
@@ -119,65 +120,160 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					return err
 				}
 			}
+			id, err := a.linkID(as, display, gameDir)
+			if err != nil {
+				return err
+			}
+			inst, err := a.linkProject(gameDir, id, display, ref, src)
+			if err != nil {
+				return err
+			}
+			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
+				return err
+			}
+			if err := ls.save(gameDir, src.name, ref, "client", false, p.Manifest); err != nil {
+				return err
+			}
+			row := config.Instance{ID: id, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name}
+			a.registerInstance(row)
+			synced, err := a.syncInPlace(cmd, inst, "client", syncRequest{})
+			if err != nil {
+				return err
+			}
+			// The shim records the Java it falls back to, which the build just resolved.
+			a.reconcileOrWarn(row)
 			rep := linkReport{
 				Launcher:    "mojang",
 				LauncherDir: launcherDir,
 				Profile:     key,
 				Name:        display,
 				VersionID:   versionID,
-				Side:        side,
 				GameDir:     gameDir,
 				Source:      src.name,
 				Ref:         ref,
-			}
-			if err := a.checkID(as, gameDir); err != nil {
-				return err
-			}
-			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
-				return err
-			}
-			if err := ls.save(gameDir, src.name, ref, side, assumeClient, p.Manifest); err != nil {
-				return err
-			}
-			row := config.Instance{ID: as, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name}
-			a.registerInstance(row)
-			if !src.remote() {
-				if _, err := a.recordClientRuntime(cmd.Context(), p, side, gameDir); err != nil {
-					return err
-				}
-				// The shim records the Java it falls back to, which the runtime step just resolved.
-				a.reconcileOrWarn(row)
-			}
-			if src.remote() {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: gameDir, assumeClient: assumeClient})
-				if err != nil {
-					return err
-				}
-				rep.Sync = &r
+				Modpack:     modpackKey(inst.Manifest, src.name),
+				Sync:        &synced,
 			}
 			return a.printer.Emit(rep, func(l *out.Lines) {
 				if p.Lock.Loader.Type != "" {
 					l.OKInto("installed "+versionID, filepath.Join(launcherDir, "versions"), "")
 				}
 				l.OKInto("linked launcher profile "+display, gameDir, "")
-				if rep.Sync != nil {
-					rep.Sync.print(l)
-					return
-				}
-				if _, err := os.Stat(build.StatePath(gameDir)); err != nil {
-					l.Nudge("Download and build before launching", "shulker install")
-				}
+				l.Tree(out.Row{Text: "follows " + rep.Modpack + " from " + rep.Source})
+				synced.print(l)
 			})
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher directory (default: the official launcher's .minecraft folder)")
-	cmd.Flags().BoolVar(&assumeClient, "assume-client", false, "link a client even when the source declares none, built from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
 	cmd.Flags().BoolVar(&force, "force", false, "repoint a profile that syncs from a different source")
 	ls.register(cmd)
 	return cmd
+}
+
+// noClientPack is what a link says when the pack it is about to follow declares no client. The
+// instance has a client block of its own, so the build goes ahead on the pack's shared mods and
+// overrides; without the line a server-only pack would just give a near-empty instance.
+const noClientPack = "the source declares no client; building one from its shared mods and overrides"
+
+// linkID is the id a link gives a game directory: the one its registry row already holds, else
+// --as or a slug of the display name, made unique across the registry. A new instance takes it as
+// its manifest's name too, so the id a player types and the project they play are the same thing.
+func (a *app) linkID(as, display, dir string) (string, error) {
+	instances, err := a.loadInstances()
+	if err != nil {
+		return "", err
+	}
+	if as == "" {
+		if i, ok := config.FindInstance(instances, dir); ok && instances[i].ID != "" {
+			return instances[i].ID, nil
+		}
+	}
+	return uniqueID(instances, as, display, dir), nil
+}
+
+// linkProject is the project a link leaves in the game directory: the minimal manifest ADR 0001
+// calls an instance, following the link's source as a modpack and building where it stands. A
+// project already there is adopted, never replaced, so a relink keeps whatever the player added
+// on top of the pack.
+func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
+	p, err := a.openProjectAt(gameDir)
+	if errors.Is(err, project.ErrNoManifest) {
+		return newInstance(gameDir, id, display, ref, src)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if p.Lock == nil {
+		p.Lock = lock.New()
+	}
+	changed := false
+	// A project that builds elsewhere is not yet an instance; linking it here is what makes it one.
+	if !p.Manifest.InPlace("client") {
+		if p.Manifest.Client == nil {
+			p.Manifest.Client = &manifest.Client{Name: display}
+		}
+		p.Manifest.Client.Build, changed = ".", true
+	}
+	// Only --force reaches here with a source the instance doesn't follow yet. Repointing that one
+	// modpack entry leaves the player's own requires, and the lock holding them, where they are.
+	key := modpackKey(p.Manifest, src.name)
+	if key == "" {
+		key = src.project.Manifest.Name
+	}
+	entry, held := p.Manifest.Requires[key]
+	if held && entry.Kind() != manifest.TypeModpack {
+		return nil, manifest.KeyTaken(key, entry.Kind(), manifest.TypeModpack)
+	}
+	if entry.Source != src.name || entry.Ref != ref {
+		entry.Source, entry.Ref = src.name, ref
+		p.Manifest.Requires[key], changed = entry, true
+	}
+	if !changed {
+		return p, nil
+	}
+	return p, p.SaveManifest()
+}
+
+// newInstance writes the instance manifest. It pins no platform and lists no feature: the pack is
+// locked, so the relock inherits all of that, and a pack that moves platform is followed rather
+// than fought. The one thing copied is the pack's history retention, which only its author can
+// weigh; from then on the number is the player's.
+func newInstance(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
+	pack := src.project.Manifest
+	m := &manifest.Manifest{
+		Schema:   manifest.SchemaURL,
+		Name:     id,
+		Requires: map[string]manifest.Require{pack.Name: {Source: src.name, Ref: ref}},
+		Client:   &manifest.Client{Name: display, Build: "."},
+	}
+	if pack.History != nil {
+		keep := *pack.History
+		m.History = &keep
+	}
+	if err := os.MkdirAll(gameDir, 0o755); err != nil {
+		return nil, err
+	}
+	p := &project.Project{Dir: gameDir, Manifest: m, Lock: lock.New()}
+	return p, p.SaveManifest()
+}
+
+// modpackKey is the key the instance follows the link's source under: the source manifest's name
+// when this link wrote the entry, and whatever an earlier link or a hand edit chose when it didn't.
+// Empty where no single entry is the link's: with several packs required, none of them is the one.
+func modpackKey(m *manifest.Manifest, source string) string {
+	keys := slices.Sorted(maps.Keys(m.Modpacks()))
+	for _, key := range keys {
+		if m.Requires[key].Source == source {
+			return key
+		}
+	}
+	if len(keys) == 1 {
+		return keys[0]
+	}
+	return ""
 }
 
 // findLauncherInstance is the registry row a launcher already has under a name,

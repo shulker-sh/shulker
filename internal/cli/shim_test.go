@@ -33,10 +33,7 @@ func TestLinkMojangPointsTheProfileAtTheShim(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	launcherDir := writeMojangLauncher(t)
-	gameDir, err := filepath.Abs(filepath.Join(h.dir, "build", "client"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	gameDir := mojangGameDir(launcherDir, "pack")
 
 	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
 	shim := launcher.ShimPath(gameDir)
@@ -69,10 +66,7 @@ func TestMojangShimFollowsTheSwitchesAndGivesTheJavaBack(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	launcherDir := t.TempDir()
-	gameDir, err := filepath.Abs(filepath.Join(h.dir, "build", "client"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	gameDir := mojangGameDir(launcherDir, "pack")
 	// A profile from an earlier link, with a Java the player chose for it.
 	const playerJava = "/opt/jdk/bin/java"
 	if err := os.WriteFile(filepath.Join(launcherDir, "launcher_profiles.json"), fmt.Appendf(nil,

@@ -169,7 +169,7 @@ func TestNeoForgeLinkMojang(t *testing.T) {
 		t.Fatalf("the installer's profile was not put back: %v", own)
 	}
 	linked := profiles.Profiles["shulker-pack"]
-	wantGameDir, _ := filepath.Abs(filepath.Join(h.dir, "build", "client"))
+	wantGameDir := mojangGameDir(launcherDir, "pack")
 	if linked == nil || linked["lastVersionId"] != "neoforge-26.2.0.87" || linked["gameDir"] != wantGameDir {
 		t.Fatalf("linked profile: %v", linked)
 	}

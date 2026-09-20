@@ -29,10 +29,7 @@ func uninstallHarness(t *testing.T) (h *harness, prismDir, mojangDir, into strin
 
 func TestSelfUninstallClearsEveryInstanceAndLeavesTheRegistry(t *testing.T) {
 	h, prismDir, mojangDir, into := uninstallHarness(t)
-	gameDir, err := filepath.Abs(filepath.Join(h.dir, "build", "client"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	gameDir := mojangGameDir(mojangDir, "pack")
 	// A folder that moved away is still unhooked, from what the registry records about it.
 	moved := filepath.Join(prismDir, "instances", "shulker-pack", "minecraft")
 	prismCfg := filepath.Join(prismDir, "instances", "shulker-pack", launcher.InstanceConfigFile)
