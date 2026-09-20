@@ -58,6 +58,9 @@ outline: [2, 3]
 | [`shulker accounts remove <name>`](#shulker-accounts-remove) | Delete an offline account |
 | [`shulker accounts refresh [name...]`](#shulker-accounts-refresh) | Renew the accounts shulker signed in |
 | [`shulker accounts use <name>`](#shulker-accounts-use) | Switch the default account |
+| [`shulker accounts providers`](#shulker-accounts-providers) | List the launchers shulker reads accounts from |
+| [`shulker accounts providers add\|remove <launcher>`](#shulker-accounts-providers-add-remove) | Read accounts from another launcher, or stop |
+| [`shulker accounts providers set <launcher...>`](#shulker-accounts-providers-set) | Replace the list, in the order given |
 | [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
@@ -706,6 +709,40 @@ shulker accounts use 069a79f4-44e9-4726-a5be-fca90e38aaf5
 
 An account is named by its username, matched without regard to case; by `name@source`, where the source is `shulker`, `offline`, `prism` or `mojang`; or by its id, dashed or not. A name may hold spaces, because an account with no Java profile is named by its Xbox gamertag, so quote it. When several accounts match, shulker asks which one on a terminal, and fails with `ambiguous-account` anywhere else, listing each match with its qualifier and its id. An account that owns no Java profile can't launch anything, so it is refused with `account-not-playable`.
 
+### `shulker accounts providers`
+
+List the launchers shulker reads accounts from, in the order it reads them. The list is `accounts.providers` in `config.json`; without it, shulker reads only its own accounts.
+
+```sh
+shulker accounts providers
+```
+
+The order is what settles a Microsoft account signed in to more than one launcher: it is listed once, from the earliest provider that has it. A provider shulker has no reader for yet is shown as such, and contributes nothing. With `--json`, the list comes back as an array of names.
+
+Where a launcher's accounts are read is the directory a registered instance of it was linked against — the one named with [`shulker link prism --launcher-dir`](#shulker-link-prism) — and the launcher's usual directory on this machine otherwise. Prism's accounts come from `accounts.json` there, Microsoft and offline accounts alike. Shulker never renews a borrowed account and never writes to another launcher's files: a borrowed session token that has run out is shown as `token expired <ago>`, still plays, and warns at launch that online servers and Realms will reject it until that launcher renews it. A file shulker can't read warns, naming itself, and is skipped, so a corrupt one can't take the account list down.
+
+### `shulker accounts providers add|remove`
+
+Add a launcher to the list, or take one out.
+
+```sh
+shulker accounts providers add prism
+shulker accounts providers remove shulker
+```
+
+Both print the list before and after. A launcher shulker has no name for, one already in the list, one that isn't in it, and a change that would leave the list empty are all usage errors — unset `accounts.providers` to go back to the default instead of emptying it. Adding a launcher that isn't installed warns once, naming the directory that was checked; it is not an error, and nothing says it again afterwards.
+
+### `shulker accounts providers set`
+
+Replace the whole list, in the order given.
+
+```sh
+shulker accounts providers set shulker prism
+shulker accounts providers set prism
+```
+
+The same checks apply, and a launcher new to the list warns about a missing directory the way `add` does. The generic path is `shulker config set accounts.providers --literal '["shulker","prism"]'`, which checks the value the same way.
+
 ## Running
 
 ### `shulker play`
@@ -1028,7 +1065,11 @@ Other directories
 
 ### `shulker instances repair`
 
-Put the registry back in step with what is on disk. It works even when `registry.json` can't be read, rewriting it from what it finds: it scans each launcher's own instances directory, registers any folder shulker syncs that isn't in the index and wasn't unlinked, and writes a `.shulker/instance.json` for any instance missing one, from what that directory's last build recorded. A registered directory that is gone is reported rather than dropped, since an unmounted disk looks exactly like a deleted instance; [`shulker unlink`](#shulker-unlink) is what forgets one. `shulker self update` runs it after a successful update.
+Put the registry back in step with what is on disk. It works even when `registry.json` can't be read, rewriting it from what it finds: it scans each launcher's own instances directory, registers any folder shulker syncs that isn't in the index and wasn't unlinked, and writes a `.shulker/instance.json` for any instance missing one. A registered directory that is gone is reported rather than dropped, since an unmounted disk looks exactly like a deleted instance; [`shulker unlink`](#shulker-unlink) is what forgets one. `shulker self update` runs it after a successful update.
+
+A folder counts as one shulker syncs when it holds a `shulker.json` that builds where it stands — the project a [`link`](#shulker-link-prism) leaves in a game directory — or a `.shulker/` shulker wrote before, so an instance that lost its `.shulker/` is found by its manifest alone. Such an instance follows the one modpack that manifest requires, takes its name from the launcher's own file, and gets an instance file holding only its settings, since the manifest holds the rest. A directory that is no project of its own reads what it syncs from in its instance file, or in what its last build recorded where that file is the part that went missing. An instance marked unlinked stays unregistered either way.
+
+Repair writes rows and instance files, never a launcher's pre-launch command: a directory it finds again is listed and syncs with `-i`, and a [`link`](#shulker-link-prism) is what makes the launcher refresh it before each launch.
 
 A row written again keeps the time of the last sync that worked, which the directory's own `.shulker/instance.json` records, even when the sync after it failed: that time is when the directory was last built correctly. The message from that failure isn't kept, since it lives only on the registry row, so [`shulker instances`](#shulker-instances) reports no failure for a repaired row until the next sync.
 
