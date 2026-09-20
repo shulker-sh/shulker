@@ -33,6 +33,7 @@ outline: [2, 3]
 | [`shulker history show [n]`](#shulker-history-show) | Show a history entry and what restoring it would change |
 | [`shulker history prune`](#shulker-history-prune) | Remove history entries beyond the number the manifest keeps |
 | [`shulker rollback [n]`](#shulker-rollback) | Restore a history entry and build it in place |
+| [`shulker play [nickname]`](#shulker-play) | Start a shulker instance |
 | [`shulker serve`](#shulker-serve) | Build the server side and run it in the foreground |
 | [`shulker link shulker [source]`](#shulker-link-shulker) | Create an instance shulker owns and launches itself |
 | [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
@@ -711,9 +712,22 @@ An account is named by its username, matched without regard to case; by `name@so
 
 Start a shulker instance. With no nickname it plays the instance the current directory is; `-i` names one from anywhere.
 
+It updates the instance first, resolves the account, fetches whatever the store is missing, and then starts the game **detached**: `play` returns as soon as the game is running, and the game outlives the shell it was started from. `--no-sync` starts what is already on disk without updating it.
+
 Only the instances shulker owns can be played here: every other launcher starts its own, so an instance linked into one fails with `not-shulker`.
 
-`--dry-run` assembles the launch and prints it instead of starting the game. It fetches whatever the store is missing — the version JSON, the client jar, the libraries and natives for this machine, the asset index and its objects — then reports the version it resolved and what it inherits from, the Java it would use, the game and natives directories, the asset index, and the classpath as a count and a size. A second run downloads nothing. It needs no account, which is what makes the plan checkable on its own. The game's own arguments carry a session access token, so they are printed nowhere, in a dry run or out of one.
+```sh
+shulker play
+shulker play smp
+shulker play --account Notch
+shulker play --no-sync
+```
+
+The game gets no terminal, so everything it writes goes to `.shulker/logs/<time>.log` inside the instance, one file per launch, whether or not anyone is watching. The game's own arguments carry a session access token, so they are printed nowhere: not in the log, not in a progress line, not in an error.
+
+Who plays is the default account, or the one `--account` names for a single run, matched the way [`shulker accounts use`](#shulker-accounts-use) matches one. With no default account shulker takes the only account that could play and makes it the default, saying so; with several it asks on a terminal and records the answer, and off one it is a usage error naming `--account`. With no account at all it is `no-accounts`. An account whose sign-in has expired refuses the launch with the line that fixes it, and one playing on a token shulker couldn't renew — a borrowed one its launcher has let run out, or a cached one with no network — launches with a warning that online servers and Realms will reject the session.
+
+`--dry-run` assembles the launch and prints it instead of starting the game: the version it resolved and what it inherits from, the Java it would use, the game and natives directories, the asset index, and the classpath as a count and a size. A second run downloads nothing. It needs no account, which is what makes the plan checkable on its own.
 
 Everything a launch shares lives in the store: `versions/`, `libraries/` and `assets/` under the store root, laid out the way the Mojang launcher lays out its own directory. Move it with `shulker config set store <path>`. The natives a launch unpacks are per-instance and sit in `.shulker/natives`.
 
@@ -724,9 +738,11 @@ shulker play smp --dry-run
 
 | Flag | Description |
 | --- | --- |
+| `--account <name>` | Play as this account, for this run only (default: the default account) |
+| `--no-sync` | Start the game without updating the instance first |
 | `--dry-run` | Assemble the launch and print it instead of starting the game |
 
-With `--json`, the data is `{ "instance", "version", "inherits", "mainClass", "java", "gameDir", "nativesDir", "assetIndex", "classpath", "classpathBytes" }`.
+With `--json`, the data is `{ "instance", "version", "account", "pid", "gameDir", "log", "sync" }`, where `account` is the row [`shulker accounts`](#shulker-accounts) prints and `sync` is absent under `--no-sync`. Under `--dry-run` it is `{ "instance", "version", "inherits", "mainClass", "java", "gameDir", "nativesDir", "assetIndex", "classpath", "classpathBytes" }` instead.
 
 ### `shulker serve`
 
@@ -1363,7 +1379,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `java-version` | The Java found is outside the range in `shulker.json` |
 | `jvm-flags` | Unknown `jvmFlags` preset |
 | `key-not-found` | A `--key` isn't in the file. `candidates`: its keys |
-| `launch-not-started` | `hook wrap` never got as far as running the game: the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start. The exit is what makes the launcher show an error, since no window appears |
+| `launch-not-started` | Shulker never got as far as running the game: for `hook wrap`, the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start; for `play`, the Java it assembled wouldn't start. Under a launcher the exit is what makes it show an error, since no window appears |
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-not-found` | No launcher directory where shulker looked |
 | `loader-required` | `add` of a mod in a project without a loader; set one with `shulker set loader.type <loader>` |

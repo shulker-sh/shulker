@@ -308,12 +308,16 @@ func (a *app) reseatDefault(gone accountRow) (*account.Resolved, error) {
 	return &usable[0], nil
 }
 
-// accountSession is the signed-in account a launch uses: the stored one while its Minecraft token has
+// accountSession is the account a launch plays on: the stored one while its Minecraft token has
 // over an hour left, and a silently renewed one otherwise. Offline it falls back to the token it
 // has, which still opens singleplayer, LAN and offline-mode servers.
 func (a *app) accountSession(ctx context.Context, r account.Resolved) (account.Account, error) {
 	if err := r.State.Error(r.Name); err != nil {
 		return account.Account{}, err
+	}
+	if r.State == account.TokenExpired {
+		a.printer.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session", r.Name, r.Source)
+		return r.Account, nil
 	}
 	if r.Group != account.GroupOwn || r.Account.Fresh(time.Now()) {
 		return r.Account, nil

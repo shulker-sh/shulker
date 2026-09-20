@@ -26,7 +26,7 @@ func (a *app) accountsCmd() *cobra.Command {
 		Args:  exactArgs(0),
 		RunE:  func(cmd *cobra.Command, args []string) error { return a.listAccounts() },
 	}
-	cmd.AddCommand(a.accountsLoginCmd(), a.accountsLogoutCmd(), a.accountsAddCmd(), a.accountsRemoveCmd(), a.accountsRefreshCmd(), a.accountsUseCmd())
+	cmd.AddCommand(a.accountsLoginCmd(), a.accountsLogoutCmd(), a.accountsAddCmd(), a.accountsRemoveCmd(), a.accountsRefreshCmd(), a.accountsUseCmd(), a.accountsProvidersCmd())
 	return cmd
 }
 
@@ -183,5 +183,9 @@ func (a *app) accounts() ([]account.Resolved, config.Config, error) {
 	for _, p := range account.WithoutReader(providers) {
 		a.printer.Warn("shulker can't read %s's accounts yet, so accounts.providers lists it for nothing", p)
 	}
-	return account.Resolve(providers, store), cfg, nil
+	borrowed, err := a.borrowedAccounts(providers)
+	if err != nil {
+		return nil, config.Config{}, err
+	}
+	return account.Resolve(providers, store, borrowed), cfg, nil
 }

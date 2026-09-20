@@ -151,7 +151,7 @@ func TestResolveDedupesByIDKeepingTheEarliestProvider(t *testing.T) {
 		own("NOTCH", "069A79F444E94726A5BEFCA90E38AAF5"),
 		offline("Steve", "8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21"),
 	}}
-	got := Resolve(DefaultProviders(), store)
+	got := Resolve(DefaultProviders(), store, nil)
 	if len(got) != 2 {
 		t.Fatalf("got %d accounts, want 2: %+v", len(got), got)
 	}
@@ -165,11 +165,32 @@ func TestResolveDedupesByIDKeepingTheEarliestProvider(t *testing.T) {
 
 func TestResolveIgnoresAProviderWithNoReader(t *testing.T) {
 	store := Store{Accounts: []Account{own("Notch", "u1")}}
-	if got := Resolve([]string{"prism"}, store); len(got) != 0 {
+	if got := Resolve([]string{SourceMojang}, store, nil); len(got) != 0 {
 		t.Fatalf("got %+v, want nothing", got)
 	}
-	if got := Resolve(nil, store); len(got) != 0 {
+	if got := Resolve(nil, store, nil); len(got) != 0 {
 		t.Fatalf("an empty provider list should yield nothing, got %+v", got)
+	}
+}
+
+func TestResolveTakesTheEarliestProvidersCopyOfAnAccount(t *testing.T) {
+	id := "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+	borrowed := map[string][]Resolved{SourcePrism: {{
+		ID: "069A79F444E94726A5BEFCA90E38AAF5", Name: "Notch",
+		Source: SourcePrism, Group: GroupBorrowed, State: TokenExpired,
+	}}}
+	store := Store{Accounts: []Account{own("Notch", id)}}
+
+	got := Resolve([]string{SourceShulker, SourcePrism}, store, borrowed)
+	if len(got) != 1 || got[0].Source != SourceShulker {
+		t.Fatalf("shulker comes first, so its copy wins: %+v", got)
+	}
+	got = Resolve([]string{SourcePrism, SourceShulker}, store, borrowed)
+	if len(got) != 1 || got[0].Source != SourcePrism {
+		t.Fatalf("prism comes first, so its copy wins: %+v", got)
+	}
+	if got = Resolve([]string{SourcePrism}, store, borrowed); len(got) != 1 || got[0].State != TokenExpired {
+		t.Fatalf("without shulker only the borrowed copy is left: %+v", got)
 	}
 }
 
@@ -178,7 +199,7 @@ func TestFind(t *testing.T) {
 		own("Notch", "069a79f4-44e9-4726-a5be-fca90e38aaf5"),
 		offline("Notch", "8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21"),
 		offline("Big Dog 42", "1111ba71-b85a-3d5b-af5f-cb2f6e9c7d21"),
-	}})
+	}}, nil)
 	for _, c := range []struct {
 		query string
 		want  []string

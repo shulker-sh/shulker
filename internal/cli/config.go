@@ -328,18 +328,11 @@ func checkConfigValue(key string, v any, literal bool) (any, error) {
 	return v, nil
 }
 
-// providerList reads accounts.providers, refusing a list shulker can't act on: an empty one leaves
-// no account anywhere, a repeat says nothing the first mention didn't, and a launcher with no
-// reader yet would contribute nothing without saying so.
+// providerList reads accounts.providers out of a JSON value.
 func providerList(v any) ([]string, error) {
 	items, ok := v.([]any)
 	if !ok {
 		return nil, out.Errorf("usage", "%s takes a JSON array of provider names", accountsProviders)
-	}
-	if len(items) == 0 {
-		e := out.Errorf("usage", "%s can't be empty; unset it to go back to the default", accountsProviders)
-		e.Candidates = account.Providers()
-		return nil, e
 	}
 	names := make([]string, 0, len(items))
 	for _, item := range items {
@@ -347,17 +340,34 @@ func providerList(v any) ([]string, error) {
 		if !ok {
 			return nil, out.Errorf("usage", "%s takes provider names, not %s", accountsProviders, settingText(item))
 		}
-		if slices.Contains(names, name) {
-			return nil, out.Errorf("usage", "%s names %s twice", accountsProviders, name)
+		names = append(names, name)
+	}
+	if err := checkProviders(names); err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+// checkProviders refuses a provider list shulker can't act on, wherever it was typed: an empty one
+// leaves no account anywhere, a repeat says nothing the first mention didn't, and a name no
+// launcher answers to is a typo rather than a launcher shulker hasn't reached yet.
+func checkProviders(names []string) error {
+	if len(names) == 0 {
+		e := out.Errorf("usage", "%s can't be empty; unset it to go back to the default", accountsProviders)
+		e.Candidates = account.Providers()
+		return e
+	}
+	for i, name := range names {
+		if slices.Contains(names[:i], name) {
+			return out.Errorf("usage", "%s names %s twice", accountsProviders, name)
 		}
 		if !slices.Contains(account.Providers(), name) {
 			e := out.Errorf("usage", "shulker can't read accounts from %s", name)
 			e.Candidates, e.Given = account.Providers(), name
-			return nil, e
+			return e
 		}
-		names = append(names, name)
 	}
-	return names, nil
+	return nil
 }
 
 func configPut(doc map[string]any, key string, value any) {

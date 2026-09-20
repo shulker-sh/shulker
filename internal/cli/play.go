@@ -2,11 +2,17 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"io/fs"
+	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
@@ -33,73 +39,181 @@ type playReport struct {
 	ClasspathBytes int64  `json:"classpathBytes"`
 }
 
+// playResult is what a launch reports once the game is running: which instance started, who is
+// playing, and where its output is going. The argv is absent here for the same reason it is absent
+// from the dry run.
+type playResult struct {
+	Instance string      `json:"instance"`
+	Version  string      `json:"version"`
+	Account  accountRow  `json:"account"`
+	PID      int         `json:"pid"`
+	GameDir  string      `json:"gameDir"`
+	Log      string      `json:"log"`
+	Sync     *syncResult `json:"sync,omitempty"`
+}
+
 func (a *app) playCmd() *cobra.Command {
-	var dryRun bool
+	var dryRun, noSync bool
+	var selector string
 	cmd := &cobra.Command{
 		Use:   "play [nickname]",
 		Short: "Start a shulker instance",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !dryRun {
-				return out.Errorf("usage", "shulker play can't start the game yet; pass --dry-run to check the launch it would assemble")
+			if dryRun {
+				return a.dryRun(cmd.Context(), args)
 			}
-			return a.dryRun(cmd.Context(), args)
+			return a.play(cmd, args, selector, noSync)
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "assemble the launch and print it instead of starting the game")
+	cmd.Flags().BoolVar(&noSync, "no-sync", false, "start the game without updating the instance first")
+	cmd.Flags().StringVar(&selector, "account", "", "play as this account (default: the default account)")
 	return cmd
 }
 
+func (a *app) play(cmd *cobra.Command, args []string, selector string, noSync bool) error {
+	ctx := cmd.Context()
+	in, err := a.playInstance(args)
+	if err != nil {
+		return err
+	}
+	var synced *syncResult
+	if !noSync {
+		res, err := a.syncForLaunch(cmd, in.Dir)
+		if err != nil {
+			return err
+		}
+		synced = &res
+	}
+	// The project is opened after the sync, since a sync is what brings the lock the launch is
+	// assembled from up to date.
+	p, err := a.playProject(in.Dir)
+	if err != nil {
+		return err
+	}
+	who, adopted, err := a.launchAccount(selector)
+	if err != nil {
+		return err
+	}
+	signed, err := a.accountSession(ctx, who)
+	if err != nil {
+		return err
+	}
+	// Read back after resolving, so the row says the account is the default one when resolving it
+	// is what made it so.
+	_, cfg, err := a.accounts()
+	if err != nil {
+		return err
+	}
+	plan, err := a.assemble(ctx, in, p)
+	if err != nil {
+		return err
+	}
+	vars := plan.assembly.Vars(plan.store, "shulker", version, in.Dir, plan.natives)
+	for name, value := range gameSession(signed).Vars() {
+		vars[name] = value
+	}
+	log, err := launchLog(in.Dir, time.Now())
+	if err != nil {
+		return err
+	}
+	res := playResult{
+		Instance: in.ID,
+		Version:  plan.versionID,
+		Account:  rowFor(who, cfg),
+		GameDir:  in.Dir,
+		Log:      log,
+		Sync:     synced,
+	}
+	a.progress("starting %s as %s", in.ID, who.Name)
+	res.PID, err = game.Start(game.Launch{
+		Java: plan.java,
+		Argv: game.Argv(plan.version, game.Host(), nil, vars),
+		Dir:  in.Dir,
+		Log:  res.Log,
+	})
+	if err != nil {
+		return notStarted(runReason(plan.java, err))
+	}
+	return a.printer.Emit(res, func(l *out.Lines) {
+		if synced != nil {
+			synced.print(l)
+		}
+		if adopted {
+			l.Info(who.Name + " is the default account now")
+		}
+		l.OK("playing "+res.Instance, res.Version)
+		l.Tree(
+			out.Row{Label: "account", Text: res.Account.Name},
+			out.Row{Label: "log", Text: res.Log},
+		)
+	})
+}
+
+// gameSession is the account as the game's own arguments name it. An offline account presents the
+// placeholder token Prism uses: no offline-mode host looks at it, and no online one would take a
+// real one from an account that has none.
+func gameSession(acc account.Account) game.Session {
+	s := game.Session{Name: acc.Name(), UUID: acc.ID()}
+	if acc.Type == account.Offline {
+		s.Token, s.Type = "0", "offline"
+		return s
+	}
+	s.ClientID, s.Type = account.ClientID, "msa"
+	if acc.Minecraft != nil {
+		s.Token = acc.Minecraft.Token
+	}
+	if acc.Xbox != nil {
+		s.XUID = acc.Xbox.XUID
+	}
+	return s
+}
+
+// launchLog is where a run's output goes. Every launch gets a file of its own, named for when it
+// started, because a detached game has no terminal to write to and the last run's output is what
+// says why it stopped. Two launches in the same second are still two runs, so the second takes a
+// suffix, the way a history entry does.
+func launchLog(dir string, at time.Time) (string, error) {
+	logs := filepath.Join(dir, instance.Dir, "logs")
+	stamp := at.Format("20060102-150405")
+	for n := 2; ; n++ {
+		path := filepath.Join(logs, stamp+".log")
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+			return path, nil
+		} else if err != nil {
+			return "", err
+		}
+		stamp = at.Format("20060102-150405") + "-" + strconv.Itoa(n)
+	}
+}
+
 func (a *app) dryRun(ctx context.Context, args []string) error {
-	in, p, err := a.playInstance(args)
+	in, err := a.playInstance(args)
 	if err != nil {
 		return err
 	}
-	s, err := a.gameStore()
+	p, err := a.playProject(in.Dir)
 	if err != nil {
 		return err
 	}
-	versionID, err := a.storeVersion(ctx, p, s)
-	if err != nil {
-		return err
-	}
-	top, err := s.Version(versionID)
-	if err != nil {
-		return err
-	}
-	v, err := s.Resolve(versionID)
-	if err != nil {
-		return err
-	}
-	host := game.Host()
-	assembly, err := game.Assemble(v, host, nil)
-	if err != nil {
-		return err
-	}
-	if err := a.fillStore(ctx, s, assembly); err != nil {
-		return err
-	}
-	natives := nativesDir(in.Dir)
-	if err := assembly.ExtractNatives(s, natives, host); err != nil {
-		return err
-	}
-	java, err := a.clientJava(ctx, p, in.Dir)
+	plan, err := a.assemble(ctx, in, p)
 	if err != nil {
 		return err
 	}
 	rep := playReport{
 		Instance:       in.ID,
-		Version:        versionID,
-		Inherits:       top.InheritsFrom,
-		MainClass:      v.MainClass,
-		Java:           java,
+		Version:        plan.versionID,
+		Inherits:       plan.inherits,
+		MainClass:      plan.version.MainClass,
+		Java:           plan.java,
 		GameDir:        in.Dir,
-		NativesDir:     natives,
-		Classpath:      len(assembly.Libraries) + 1,
-		ClasspathBytes: assembly.ClasspathSize(s),
+		NativesDir:     plan.natives,
+		Classpath:      len(plan.assembly.Libraries) + 1,
+		ClasspathBytes: plan.assembly.ClasspathSize(plan.store),
 	}
-	if v.AssetIndex != nil {
-		rep.AssetIndex = v.AssetIndex.ID
+	if plan.version.AssetIndex != nil {
+		rep.AssetIndex = plan.version.AssetIndex.ID
 	}
 	return a.printer.Emit(rep, func(l *out.Lines) {
 		l.OK("would launch "+rep.Instance, rep.Version)
@@ -121,35 +235,86 @@ func (a *app) dryRun(ctx context.Context, args []string) error {
 	})
 }
 
+// launchPlan is everything a launch needs that doesn't depend on who is playing: the version it
+// runs, the store filled with what that version names, the natives unpacked, and the java to run
+// it with. A dry run prints it; a launch templates the account into it and starts the game.
+type launchPlan struct {
+	store     game.Store
+	versionID string
+	inherits  string
+	version   game.Version
+	assembly  game.Assembly
+	natives   string
+	java      string
+}
+
+func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Project) (launchPlan, error) {
+	s, err := a.gameStore()
+	if err != nil {
+		return launchPlan{}, err
+	}
+	versionID, err := a.storeVersion(ctx, p, s)
+	if err != nil {
+		return launchPlan{}, err
+	}
+	top, err := s.Version(versionID)
+	if err != nil {
+		return launchPlan{}, err
+	}
+	v, err := s.Resolve(versionID)
+	if err != nil {
+		return launchPlan{}, err
+	}
+	host := game.Host()
+	assembly, err := game.Assemble(v, host, nil)
+	if err != nil {
+		return launchPlan{}, err
+	}
+	if err := a.fillStore(ctx, s, assembly); err != nil {
+		return launchPlan{}, err
+	}
+	natives := nativesDir(in.Dir)
+	if err := assembly.ExtractNatives(s, natives, host); err != nil {
+		return launchPlan{}, err
+	}
+	java, err := a.clientJava(ctx, p, in.Dir)
+	if err != nil {
+		return launchPlan{}, err
+	}
+	return launchPlan{store: s, versionID: versionID, inherits: top.InheritsFrom, version: v, assembly: assembly, natives: natives, java: java}, nil
+}
+
 // playInstance is the instance a launch acts on: the nickname given, else the one the current
 // directory is. Only the instances shulker owns can be launched from here; every other launcher
 // starts its own.
-func (a *app) playInstance(args []string) (config.Instance, *project.Project, error) {
+func (a *app) playInstance(args []string) (config.Instance, error) {
 	if len(args) == 1 {
 		if a.instance != "" || a.dir != "" {
-			return config.Instance{}, nil, out.Errorf("usage", "pass a nickname, -i or -C, not more than one: each of them says which instance to launch")
+			return config.Instance{}, out.Errorf("usage", "pass a nickname, -i or -C, not more than one: each of them says which instance to launch")
 		}
 		a.instance = args[0]
 	}
 	dir, err := a.scopeDir()
 	if err != nil {
-		return config.Instance{}, nil, err
+		return config.Instance{}, err
 	}
 	in, ok := a.registeredInstance(dir)
 	if !ok {
-		return config.Instance{}, nil, out.Errorf("instance-not-found", "%s is not a registered instance; `shulker link shulker` makes one shulker launches itself", dir)
+		return config.Instance{}, out.Errorf("instance-not-found", "%s is not a registered instance; `shulker link shulker` makes one shulker launches itself", dir)
 	}
 	if in.Launcher != "shulker" {
-		return config.Instance{}, nil, out.Errorf("not-shulker", "%s belongs to %s, which starts it itself; shulker only launches the instances it owns", in.ID, in.Launcher)
+		return config.Instance{}, out.Errorf("not-shulker", "%s belongs to %s, which starts it itself; shulker only launches the instances it owns", in.ID, in.Launcher)
 	}
+	return in, nil
+}
+
+// playProject is the pack a launch runs, read after the sync that may have changed it.
+func (a *app) playProject(dir string) (*project.Project, error) {
 	p, err := a.openProjectAt(dir)
 	if err != nil {
-		return config.Instance{}, nil, err
+		return nil, err
 	}
-	if err := a.requireLock(p); err != nil {
-		return config.Instance{}, nil, err
-	}
-	return in, p, nil
+	return p, a.requireLock(p)
 }
 
 func (a *app) gameStore() (game.Store, error) {

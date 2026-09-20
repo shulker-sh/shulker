@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 )
@@ -117,17 +119,6 @@ func TestPlayDryRunMergesTheLoaderOverVanilla(t *testing.T) {
 	}
 }
 
-func TestPlayWithoutDryRunSaysItCannotLaunchYet(t *testing.T) {
-	h := newHarness(t)
-	playHarness(t, h)
-
-	code, stdout, _ := h.run(t, "-i", "pack", "play", "--json")
-
-	if code != out.ExitUsage || !strings.Contains(stdout, "--dry-run") {
-		t.Fatalf("exit %d: %s", code, stdout)
-	}
-}
-
 func TestPlayRefusesAnotherLaunchersInstance(t *testing.T) {
 	h := newHarness(t)
 	launcherDir := t.TempDir()
@@ -139,5 +130,202 @@ func TestPlayRefusesAnotherLaunchersInstance(t *testing.T) {
 
 	if code == 0 || !strings.Contains(stdout, `"not-shulker"`) {
 		t.Fatalf("exit %d: %s", code, stdout)
+	}
+}
+
+// waitForFile reads a file a detached game writes. `play` returns before the game has run at all,
+// so a launch is checked by what the process left behind rather than by what the command printed.
+func waitForFile(t *testing.T, path string) string {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		data, err := os.ReadFile(path)
+		if err == nil && len(data) > 0 {
+			return string(data)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s never turned up: %v", path, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// launchLogs is every log a launch left in the instance, newest name last.
+func launchLogs(t *testing.T, gameDir string) []string {
+	t.Helper()
+	dir := filepath.Join(gameDir, instance.Dir, "logs")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("no launch logs: %v", err)
+	}
+	var logs []string
+	for _, e := range entries {
+		logs = append(logs, filepath.Join(dir, e.Name()))
+	}
+	return logs
+}
+
+func playedJSON(t *testing.T, h *harness, args ...string) playResult {
+	t.Helper()
+	stdout := h.mustRun(t, append(args, "--json")...)
+	var env struct {
+		Data playResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	return env.Data
+}
+
+func TestPlayStartsTheGameDetachedAndLogsIt(t *testing.T) {
+	h := newHarness(t)
+	_, gameDir := playHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+
+	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play")
+
+	for _, want := range []string{"playing pack", "(26.2)", "account: Notch", "log: "} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("play: %q is missing from\n%s", want, stdout)
+		}
+	}
+	// The game ran with the account templated into its own arguments, and in the game directory.
+	argv := waitForFile(t, filepath.Join(gameDir, "args.txt"))
+	for _, want := range []string{"--username\nNotch\n", "--accessToken\nmc-notch\n", "net.minecraft.client.main.Main\n"} {
+		if !strings.Contains(argv, want) {
+			t.Fatalf("the game's argv is missing %q:\n%s", want, argv)
+		}
+	}
+	// Whatever it wrote went to the log, whether or not anyone was watching.
+	logs := launchLogs(t, gameDir)
+	if len(logs) != 1 {
+		t.Fatalf("one launch, one log: %v", logs)
+	}
+	if body := waitForFile(t, logs[0]); !strings.Contains(body, "[Server] Done") {
+		t.Fatalf("the game's output is missing from %s:\n%s", logs[0], body)
+	}
+	// The argv carries the session token, so no part of it reaches the output or the log.
+	for _, leak := range []string{"mc-notch", "--accessToken", "--username", "-cp"} {
+		if strings.Contains(stdout+stderr, leak) {
+			t.Fatalf("the argv leaked %q into the output:\n%s%s", leak, stdout, stderr)
+		}
+		if body, _ := os.ReadFile(logs[0]); strings.Contains(string(body), leak) {
+			t.Fatalf("the argv leaked %q into the log:\n%s", leak, body)
+		}
+	}
+
+	res := playedJSON(t, h, "-i", "pack", "play")
+	if res.Instance != "pack" || res.Version != "26.2" || res.GameDir != gameDir || res.PID == 0 {
+		t.Fatalf("result %+v", res)
+	}
+	if res.Account.Name != "Notch" || res.Account.ID != notchID || !res.Account.Default {
+		t.Fatalf("account %+v", res.Account)
+	}
+	if dir := filepath.Dir(res.Log); dir != filepath.Join(gameDir, instance.Dir, "logs") {
+		t.Fatalf("log %q", res.Log)
+	}
+	if len(launchLogs(t, gameDir)) != 2 {
+		t.Fatalf("a second launch writes a second log: %v", launchLogs(t, gameDir))
+	}
+}
+
+func TestPlaySyncsFirstUnlessToldNotTo(t *testing.T) {
+	h := newHarness(t)
+	_, gameDir := playHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+
+	synced := playedJSON(t, h, "-i", "pack", "play")
+	if synced.Sync == nil || synced.Sync.Build == nil {
+		t.Fatalf("play syncs before it launches: %+v", synced.Sync)
+	}
+	waitForFile(t, filepath.Join(gameDir, "args.txt"))
+
+	skipped := playedJSON(t, h, "-i", "pack", "play", "--no-sync")
+	if skipped.Sync != nil {
+		t.Fatalf("--no-sync syncs nothing: %+v", skipped.Sync)
+	}
+	if skipped.PID == 0 {
+		t.Fatalf("--no-sync still launches: %+v", skipped)
+	}
+}
+
+func TestPlayTakesTheAccountFromTheFlagOverTheDefault(t *testing.T) {
+	h := newHarness(t)
+	_, gameDir := playHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+	h.msa.signsIn("jeb", "Jeb_", dinnerbone)
+	h.mustRun(t, "accounts", "login")
+
+	res := playedJSON(t, h, "-i", "pack", "play", "--account", "Jeb_")
+
+	if res.Account.Name != "Jeb_" || res.Account.Default {
+		t.Fatalf("--account names who plays, and changes nothing: %+v", res.Account)
+	}
+	if argv := waitForFile(t, filepath.Join(gameDir, "args.txt")); !strings.Contains(argv, "--username\nJeb_\n") {
+		t.Fatalf("the game played as someone else:\n%s", argv)
+	}
+	// The flag is for one run: the default account is where it was.
+	if res := playedJSON(t, h, "-i", "pack", "play"); res.Account.Name != "Notch" {
+		t.Fatalf("default account %+v", res.Account)
+	}
+}
+
+func TestPlayWithNoDefaultTakesTheOnlyAccountThereIs(t *testing.T) {
+	h := newHarness(t)
+	playHarness(t, h)
+	h.mustRun(t, "accounts", "login")
+
+	stdout := h.mustRun(t, "-i", "pack", "play")
+
+	if !strings.Contains(stdout, "Notch is the default account now") {
+		t.Fatalf("a launch that settles the default account says so:\n%s", stdout)
+	}
+	if got := h.mustRun(t, "config", "get", "accounts.default"); !strings.Contains(got, notchID) {
+		t.Fatalf("accounts.default = %q", got)
+	}
+	// Settled, so the next launch says nothing about it.
+	if stdout := h.mustRun(t, "-i", "pack", "play"); strings.Contains(stdout, "default account now") {
+		t.Fatalf("the question is asked once:\n%s", stdout)
+	}
+}
+
+func TestPlayWithNoDefaultAndSeveralAccountsNamesTheFlag(t *testing.T) {
+	h := newHarness(t)
+	playHarness(t, h)
+	writeAccountStore(t, h, ownAccount("Notch", notchID), offlineAccount("Steve", steveID))
+
+	code, stdout, _ := h.run(t, "-i", "pack", "play", "--json")
+
+	if code != out.ExitUsage || !strings.Contains(stdout, "--account") {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+}
+
+func TestPlayWithNoAccountAtAllSaysThereIsNothingToPlayWith(t *testing.T) {
+	h := newHarness(t)
+	playHarness(t, h)
+
+	code, stdout, _ := h.run(t, "-i", "pack", "play", "--json")
+
+	if code == 0 || !strings.Contains(stdout, `"no-accounts"`) {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+}
+
+func TestPlayRefusesAnAccountWhoseSignInHasExpired(t *testing.T) {
+	h := newHarness(t)
+	playHarness(t, h)
+	writeAccountStore(t, h, account.Account{Type: account.Microsoft, Profile: &account.Profile{ID: dinnerbone, Name: "Dinnerbone"}})
+
+	code, stdout, stderr := h.run(t, "-i", "pack", "play")
+
+	if code == 0 || !strings.Contains(stderr, "Dinnerbone's Microsoft sign-in has expired") {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	if !strings.Contains(stderr, "shulker accounts login") {
+		t.Fatalf("the refusal has to carry its fix line:\n%s", stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("a launch that never happened is no result: %s", stdout)
 	}
 }

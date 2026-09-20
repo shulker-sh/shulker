@@ -12,6 +12,8 @@ import (
 const (
 	SourceShulker = "shulker"
 	SourceOffline = "offline"
+	SourcePrism   = "prism"
+	SourceMojang  = "mojang"
 )
 
 // DefaultProviders is accounts.providers when config.json doesn't set it.
@@ -20,14 +22,29 @@ func DefaultProviders() []string { return []string{SourceShulker} }
 // Providers is every name accounts.providers accepts, in the order they are offered. A launcher is
 // listed here before its reader exists, so a list can drop shulker for one of them; WithoutReader
 // says which of those a run can't act on yet.
-func Providers() []string { return []string{SourceShulker, "prism", "mojang"} }
+func Providers() []string { return []string{SourceShulker, SourcePrism, SourceMojang} }
+
+// HasReader says whether a run can act on a provider at all. One without a reader is still a
+// value accounts.providers takes, so the list a reader ticket lands does not become an error.
+func HasReader(provider string) bool {
+	return provider == SourceShulker || provider == SourcePrism
+}
+
+// Read is the accounts a launcher holds in its own data directory. Shulker's own file is loaded
+// where it lives instead, and a provider with no reader yields nothing.
+func Read(provider, dir string, now time.Time) ([]Resolved, error) {
+	if provider == SourcePrism {
+		return ReadPrism(dir, now)
+	}
+	return nil, nil
+}
 
 // WithoutReader is the configured providers shulker has no reader for, so a run can say why it
 // found nothing there instead of listing nothing and leaving the player to guess.
 func WithoutReader(providers []string) []string {
 	var missing []string
 	for _, p := range providers {
-		if p != SourceShulker {
+		if !HasReader(p) {
 			missing = append(missing, p)
 		}
 	}
@@ -58,13 +75,14 @@ type Resolved struct {
 // Qualifier is how a selector names this account when its name alone is ambiguous.
 func (r Resolved) Qualifier() string { return r.Name + "@" + r.Source }
 
-// Resolve is every account the providers yield, in provider order. One Microsoft account can sit in
-// several launchers, so the list is deduped by id and the earliest provider wins.
-func Resolve(providers []string, own Store) []Resolved {
+// Resolve is every account the providers yield, in provider order: shulker's own file, and what
+// each launcher's reader already took from it. One Microsoft account can sit in several launchers,
+// so the list is deduped by id and the earliest provider wins.
+func Resolve(providers []string, own Store, borrowed map[string][]Resolved) []Resolved {
 	var out []Resolved
 	seen := map[string]bool{}
 	for _, p := range providers {
-		for _, r := range fromProvider(p, own) {
+		for _, r := range fromProvider(p, own, borrowed) {
 			if r.ID == "" || seen[normalizeID(r.ID)] {
 				continue
 			}
@@ -75,11 +93,12 @@ func Resolve(providers []string, own Store) []Resolved {
 	return out
 }
 
-// fromProvider is what one provider contributes. Only shulker's own file has a reader today; the
-// launchers stay silent, which is what a provider with nothing to offer does.
-func fromProvider(provider string, own Store) []Resolved {
+// fromProvider is what one provider contributes. A launcher's accounts are read where they live,
+// before this; one shulker has no reader for yields nothing, which is what a provider with nothing
+// to offer does.
+func fromProvider(provider string, own Store, borrowed map[string][]Resolved) []Resolved {
 	if provider != SourceShulker {
-		return nil
+		return borrowed[provider]
 	}
 	out := make([]Resolved, 0, len(own.Accounts))
 	for _, a := range own.Accounts {
