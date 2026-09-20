@@ -46,11 +46,18 @@ type Ref struct {
 	UUID string
 }
 
+// IsName reports whether a string is a Minecraft username: three to sixteen letters, digits or
+// underscores, which is what an offline account's name is held to as well.
+func IsName(s string) bool { return namePattern.MatchString(s) }
+
+// IsUUID reports whether a string is a player UUID, dashed or not.
+func IsUUID(s string) bool { return uuidPattern.MatchString(s) }
+
 func ParseRef(s string) (Ref, error) {
 	switch {
-	case uuidPattern.MatchString(s):
+	case IsUUID(s):
 		return Ref{UUID: Dashed(s)}, nil
-	case namePattern.MatchString(s):
+	case IsName(s):
 		return Ref{Name: s}, nil
 	}
 	return Ref{}, out.Errorf("player-invalid", "%q is neither a player name nor a uuid", s)

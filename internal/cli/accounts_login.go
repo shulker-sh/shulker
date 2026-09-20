@@ -280,9 +280,10 @@ func notOwnAccount(r account.Resolved, verb string) error {
 	return out.Errorf("usage", "%s is borrowed from %s, so only %s can %s it", r.Name, r.Source, r.Source, verb)
 }
 
-// reseatDefault keeps accounts.default pointing at an account that is still there. Signing the
-// default one out leaves the single playable account behind it as the default, and no default at
-// all when there isn't exactly one to take over.
+// reseatDefault keeps accounts.default pointing at an account that is still there. Losing the
+// default one leaves the single account a launch could use behind it as the default, and no
+// default at all when there isn't exactly one to take over. An offline account inherits as
+// readily as a signed-in one, since it launches as readily; what can't is what a launch refuses.
 func (a *app) reseatDefault(gone accountRow) (*account.Resolved, error) {
 	if !gone.Default {
 		return nil, nil
@@ -291,20 +292,20 @@ func (a *app) reseatDefault(gone accountRow) (*account.Resolved, error) {
 	if err != nil {
 		return nil, err
 	}
-	var playable []account.Resolved
+	var usable []account.Resolved
 	for _, r := range accounts {
-		if r.State == account.Playable {
-			playable = append(playable, r)
+		if r.State.Error(r.Name) == nil {
+			usable = append(usable, r)
 		}
 	}
-	if len(playable) != 1 {
+	if len(usable) != 1 {
 		_, err := a.changeDefault("")
 		return nil, err
 	}
-	if _, err := a.changeDefault(playable[0].ID); err != nil {
+	if _, err := a.changeDefault(usable[0].ID); err != nil {
 		return nil, err
 	}
-	return &playable[0], nil
+	return &usable[0], nil
 }
 
 // accountSession is the signed-in account a launch uses: the stored one while its Minecraft token has
@@ -345,13 +346,16 @@ func ownAccountOf(a account.Account) account.Resolved {
 	return account.Resolved{ID: a.ID(), Name: a.Name(), Source: account.SourceShulker, Group: account.GroupOwn, State: a.State(), Account: a}
 }
 
-// accountSelector names an account the way it has to be typed back: a gamertag may hold spaces,
-// so one is quoted.
-func accountSelector(r account.Resolved) string {
-	if strings.ContainsAny(r.Name, " \t") {
-		return `"` + r.Name + `"`
+// accountSelector names an account the way it has to be typed back.
+func accountSelector(r account.Resolved) string { return quoteName(r.Name) }
+
+// quoteName quotes a name a shell would otherwise split: a gamertag may hold spaces, and so may an
+// offline name created with --allow-invalid-name.
+func quoteName(name string) string {
+	if strings.ContainsAny(name, " \t") {
+		return `"` + name + `"`
 	}
-	return r.Name
+	return name
 }
 
 // renewFailed is one account's failure as a warning, with the line that fixes it, since a refresh

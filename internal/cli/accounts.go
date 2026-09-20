@@ -26,7 +26,7 @@ func (a *app) accountsCmd() *cobra.Command {
 		Args:  exactArgs(0),
 		RunE:  func(cmd *cobra.Command, args []string) error { return a.listAccounts() },
 	}
-	cmd.AddCommand(a.accountsLoginCmd(), a.accountsLogoutCmd(), a.accountsRefreshCmd(), a.accountsUseCmd())
+	cmd.AddCommand(a.accountsLoginCmd(), a.accountsLogoutCmd(), a.accountsAddCmd(), a.accountsRemoveCmd(), a.accountsRefreshCmd(), a.accountsUseCmd())
 	return cmd
 }
 

@@ -53,6 +53,8 @@ outline: [2, 3]
 | [`shulker accounts`](#shulker-accounts) | List the accounts shulker can play with |
 | [`shulker accounts login`](#shulker-accounts-login) | Sign in to a Microsoft account |
 | [`shulker accounts logout [name]`](#shulker-accounts-logout) | Sign a Microsoft account out |
+| [`shulker accounts add <name>`](#shulker-accounts-add) | Create an offline account |
+| [`shulker accounts remove <name>`](#shulker-accounts-remove) | Delete an offline account |
 | [`shulker accounts refresh [name...]`](#shulker-accounts-refresh) | Renew the accounts shulker signed in |
 | [`shulker accounts use <name>`](#shulker-accounts-use) | Switch the default account |
 | [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
@@ -624,13 +626,56 @@ shulker accounts logout Notch
 shulker accounts logout Notch --yes
 ```
 
-Shulker asks before it signs anything out, and `--yes` answers the question ahead of time — which a run that isn't on a terminal has to pass, since there is nobody to ask. Signing out the default account leaves the one playable account behind it as the default, and no default at all when there isn't exactly one to take over.
+Shulker asks before it signs anything out, and `--yes` answers the question ahead of time — which a run that isn't on a terminal has to pass, since there is nobody to ask. Signing out the default account leaves the one account a launch could still use behind it as the default — offline or borrowed as readily as signed in — and no default at all when there isn't exactly one to take over.
 
-An offline account has no sign-in to end, so `logout` on one is an error naming [`shulker accounts remove`](#shulker-accounts-use); a borrowed account belongs to the launcher it came from, and only that launcher can sign it out.
+An offline account has no sign-in to end, so `logout` on one is an error naming [`shulker accounts remove`](#shulker-accounts-remove); a borrowed account belongs to the launcher it came from, and only that launcher can sign it out.
 
 | Flag | Description |
 | --- | --- |
 | `-y, --yes` | Sign out without being asked first |
+
+### `shulker accounts add`
+
+Create an offline account: a name and a UUID shulker keeps in `accounts.json`, with no sign-in behind it. It plays singleplayer, a LAN world a mod has opened in offline mode, and a server running `online-mode=false`; an online server and Realms reject it, and so does an unmodded LAN world, which authenticates every guest against Mojang.
+
+```sh
+shulker accounts add Steve
+shulker accounts add Steve --use
+shulker accounts add Steve --uuid 8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21
+```
+
+The UUID is Java's type 3 UUID over `OfflinePlayer:<name>`, which is the player an offline-mode host derives for that name by itself. `--uuid` pins another, and promises little: it sets this client's own identity — the player data in a singleplayer or LAN-host save, and the id the client claims at login — and no vanilla server keys a player by it. Its use is opening a world whose player data was written under another launcher's UUID scheme. Shulker never says the pinned UUID differs from the derived one, because that difference is the point of passing it.
+
+Names are held to the pattern a Minecraft username matches, three to sixteen letters, digits or underscores; `--allow-invalid-name` takes any other. Two offline accounts may share a name if `--force` says so, but never a UUID, since the UUID is what shulker's own file is keyed by — so a second account with the same name needs `--uuid` as well.
+
+Creating one needs an account in sight that owns Minecraft: Java Edition, own or borrowed. It is a statement of intent rather than a licence check, and it is checked only here: afterwards the offline account plays on, and stays the default, with every Microsoft account signed out.
+
+The default account is left alone, and the [`shulker accounts use`](#shulker-accounts-use) line that switches it is printed; `--use` switches at once.
+
+| Flag | Description |
+| --- | --- |
+| `--uuid <uuid>` | Play under this UUID instead of the one the name derives |
+| `--allow-invalid-name` | Take a name no Minecraft account could have |
+| `--force` | Create it even though an account already answers to that name |
+| `--use` | Make it the default account straight away |
+
+### `shulker accounts remove`
+
+Delete an offline account.
+
+```sh
+shulker accounts remove Steve
+shulker accounts remove Steve --yes
+```
+
+Shulker asks first, and `--yes` answers the question ahead of time — which a run that isn't on a terminal has to pass, since there is nobody to ask. Removing the default account reseats it the way [`shulker accounts logout`](#shulker-accounts-logout) does.
+
+With no account in sight that owns Java Edition, removing one is refused with `ownership-unproven`, since the same gate would block creating it again; `--force` removes it anyway. A Microsoft account is signed out rather than deleted, so `remove` on one is an error naming [`shulker accounts logout`](#shulker-accounts-logout), and a borrowed account belongs to the launcher it came from.
+
+| Flag | Description |
+| --- | --- |
+| `-y, --yes` | Remove it without being asked first |
+| `--force` | Remove it with no account in sight that could create it again |
 
 ### `shulker accounts refresh`
 
@@ -1274,6 +1319,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 
 | Code | Meaning |
 | --- | --- |
+| `account-exists` | An account already answers to that name, or already plays under that UUID. A name is shared with `--force`; a UUID never is |
+| `account-name-invalid` | An offline name outside the pattern a Minecraft username matches; `--allow-invalid-name` takes it |
 | `account-not-found` | No account matches the selector. `candidates`: every account, each as its qualifier and its id, `pass`: their ids |
 | `account-not-playable` | The account owns no Java profile, so it can't launch anything |
 | `account-sign-in-expired` | The Microsoft refresh token is gone or revoked, so shulker can't get a session for the account; `shulker accounts login` signs it in again |
@@ -1364,6 +1411,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
 | `modpack-unlocked` | A modpack has no commit in the lock; run `shulker update` |
+| `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
 | `path-invalid` | `shulker.json` or `config.json` has no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get` or `config get` names a field that isn't set |
 | `pin-mismatch` | The pinned version belongs to a different project |
