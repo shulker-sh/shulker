@@ -22,8 +22,8 @@ type Choice struct {
 }
 
 // CanPick reports whether a picker can be drawn: it takes over the screen, so the stream it draws
-// on has to be a terminal, not a pipe or a test's buffer.
-func (p *Printer) CanPick() bool { return !p.JSON && IsTerminal(p.Stderr) }
+// on has to be a terminal, not a pipe or a test's buffer, and the run has to be one that asks.
+func (p *Printer) CanPick() bool { return !p.JSON && !p.NoInput && IsTerminal(p.Stderr) }
 
 // pickRows is how many rows show before the list scrolls.
 const pickRows = 10
@@ -44,13 +44,16 @@ func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, er
 	keys := huh.NewDefaultKeyMap()
 	keys.Quit = key.NewBinding(key.WithKeys("esc", "ctrl+c"), key.WithHelp("esc", "cancel"))
 	var chosen string
+	// The field's own height is not enough: a form left to size itself gives every field the
+	// height of its whole content, so a long list prints in full instead of scrolling.
+	rows := min(len(choices), pickRows)
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title(gutter + title).
 			Options(options...).
 			Value(&chosen).
-			Height(min(len(choices), pickRows) + 1),
-	)).WithTheme(pickTheme(t)).WithOutput(p.Stderr).WithInput(in).
+			Height(rows + 1),
+	)).WithTheme(pickTheme(t)).WithOutput(p.Stderr).WithInput(in).WithHeight(rows + 3).
 		WithKeyMap(keys).WithLayout(gutterLayout{quit: keys.Quit})
 	if err := form.Run(); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
