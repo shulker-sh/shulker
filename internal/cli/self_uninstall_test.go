@@ -9,8 +9,8 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 )
 
-// uninstallHarness is a project with a Prism instance, an official launcher profile and a plain
-// synced directory, plus a stand-in for the running binary.
+// uninstallHarness is a project with a Prism instance, an official launcher profile and a
+// detached build, plus a stand-in for the running binary.
 func uninstallHarness(t *testing.T) (h *harness, prismDir, mojangDir, into string) {
 	t.Helper()
 	h = newHarness(t)
@@ -63,7 +63,7 @@ func TestSelfUninstallClearsEveryInstanceAndLeavesTheRegistry(t *testing.T) {
 			}
 		}
 	}
-	if instances := readInstances(t, h); len(instances) != 3 {
+	if instances := readInstances(t, h); len(instances) != 2 {
 		t.Fatalf("the registry survives an uninstall: %+v", instances)
 	}
 	if _, err := os.Stat(prismCfg); err != nil {
@@ -92,9 +92,10 @@ func TestSelfUninstallPurgeForgetsTheRegistry(t *testing.T) {
 	if !strings.Contains(stdout, "forgot the registry") || strings.Contains(stdout, "$ shulker instances repair") {
 		t.Fatalf("purge output: %s", stdout)
 	}
-	// The launchers still hold their own instances; a plain synced directory is in none of them.
-	if !strings.Contains(stdout, "can't be found again") || !strings.Contains(stdout, into) {
-		t.Fatalf("purge names what no repair can rebuild: %s", stdout)
+	// Every row is a launcher's, so a repair finds them all again; the detached build was
+	// never on the registry to lose.
+	if strings.Contains(stdout, "can't be found again") || strings.Contains(stdout, into) {
+		t.Fatalf("purge should have nothing to name: %s", stdout)
 	}
 	if _, err := os.Stat(registryPath(h)); !os.IsNotExist(err) {
 		t.Fatalf("the registry should be gone: %v", err)

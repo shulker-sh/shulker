@@ -21,10 +21,10 @@ func TestRegistryFollowsTheConfigRegistryPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	into := filepath.Join(t.TempDir(), "instance")
-	h.mustRun(t, "sync", h.dir, "--into", into)
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
 	instances, err := config.LoadInstances(filepath.Join(filepath.Dir(h.config), "shared", "instances.json"))
-	if err != nil || len(instances) != 1 || instances[0].Dir != into {
+	if err != nil || len(instances) != 1 || instances[0].ID != "friends" {
 		t.Fatalf("instances go to the registry path: %+v %v", instances, err)
 	}
 	if _, err := os.Stat(registryPath(h)); !os.IsNotExist(err) {

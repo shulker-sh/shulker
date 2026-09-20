@@ -35,6 +35,18 @@ func withoutStamp(t *testing.T, in config.Instance) config.Instance {
 	return in
 }
 
+func instanceDir(t *testing.T, h *harness, id string) string {
+	t.Helper()
+	instances := readInstances(t, h)
+	for _, in := range instances {
+		if in.ID == id {
+			return in.Dir
+		}
+	}
+	t.Fatalf("no instance is called %s: %+v", id, instances)
+	return ""
+}
+
 func readIntent(t *testing.T, dir string) *instance.File {
 	t.Helper()
 	f, err := instance.Load(dir)
@@ -44,7 +56,7 @@ func readIntent(t *testing.T, dir string) *instance.File {
 	return f
 }
 
-func TestSyncIntoRegisters(t *testing.T) {
+func TestSyncIntoTakesNoRegistryRow(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
@@ -52,22 +64,16 @@ func TestSyncIntoRegisters(t *testing.T) {
 	h.mustRun(t, "sync", h.dir)
 	h.mustRun(t, "sync", h.dir, "--into", filepath.Join(h.dir, "build", "client"))
 	if instances := readInstances(t, h); len(instances) != 0 {
-		t.Fatalf("syncing into the build directory must not register: %+v", instances)
-	}
-	code, stdout, _ := h.run(t, "sync", h.dir, "--name", "Mine", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "usage" {
-		t.Fatalf("--name without --into: exit %d %s", code, stdout)
+		t.Fatalf("syncing into the build directory registers nothing: %+v", instances)
 	}
 
 	into := filepath.Join(t.TempDir(), "instance")
-	stdout = h.mustRun(t, "sync", h.dir, "--into", into)
-	instances := readInstances(t, h)
-	want := config.Instance{ID: "pack", Name: "pack", Dir: into, Source: h.dir}
-	if len(instances) != 1 || withoutStamp(t, instances[0]) != want {
-		t.Fatalf("instance: %+v", instances)
+	stdout := h.mustRun(t, "sync", h.dir, "--into", into)
+	if instances := readInstances(t, h); len(instances) != 0 {
+		t.Fatalf("a detached build takes no registry row: %+v", instances)
 	}
-	if !strings.Contains(stdout, "registered pack") {
-		t.Fatalf("sync should say it registered the directory: %s", stdout)
+	if strings.Contains(strings.ToLower(stdout), "registered") {
+		t.Fatalf("sync should report no registration: %s", stdout)
 	}
 	f := readIntent(t, into)
 	if f.Source != h.dir || f.Side != "client" {
@@ -76,48 +82,40 @@ func TestSyncIntoRegisters(t *testing.T) {
 	if !f.Settings.PreLaunch() || !f.Settings.PostExit() || f.Settings.Marker != nil {
 		t.Fatalf("the hooks default on and the marker defers to the manifest: %+v", f.Settings)
 	}
-	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); strings.Contains(stdout, "Registered") {
-		t.Fatalf("an unchanged instance is not registered again: %s", stdout)
-	}
 
-	// The id is the key, so it stays put when the launcher-visible name changes.
-	if stdout := h.mustRun(t, "sync", h.dir, "--into", into, "--name", "Mine"); !strings.Contains(stdout, "registered Mine (pack)") {
-		t.Fatalf("--name renames the instance: %s", stdout)
+	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "Nothing is linked yet") {
+		t.Fatalf("a detached build is not an instance: %s", stdout)
 	}
-	h.mustRun(t, "sync", h.dir, "--into", into)
-	if instances := readInstances(t, h); len(instances) != 1 || instances[0].Name != "Mine" || instances[0].ID != "pack" {
-		t.Fatalf("a later sync keeps the name and id: %+v", instances)
+	code, stdout, _ := h.run(t, "sync", "-i", "pack", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "no-instances" {
+		t.Fatalf("-i must not reach a detached build: exit %d %s", code, stdout)
 	}
 }
 
-func TestSyncIntoTakesAnID(t *testing.T) {
+func TestSyncHasNoInstanceIDFlags(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
-	first := filepath.Join(t.TempDir(), "one")
-	h.mustRun(t, "sync", h.dir, "--into", first, "--as", "cozy")
-	if instances := readInstances(t, h); len(instances) != 1 || instances[0].ID != "cozy" {
-		t.Fatalf("--as sets the id: %+v", instances)
+	into := filepath.Join(t.TempDir(), "instance")
+	for _, flag := range []string{"--as", "--name"} {
+		code, stdout, stderr := h.run(t, "sync", h.dir, "--into", into, flag, "cozy")
+		if code == 0 || !strings.Contains(stderr, "unknown flag "+flag) {
+			t.Fatalf("%s should be gone from sync: exit %d\nstdout: %s\nstderr: %s", flag, code, stdout, stderr)
+		}
 	}
 
-	second := filepath.Join(t.TempDir(), "two")
-	code, stdout, _ := h.run(t, "sync", h.dir, "--into", second, "--as", "cozy", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-id-taken" || !strings.Contains(e.Message, first) {
-		t.Fatalf("a taken id names its holder: exit %d %s", code, stdout)
-	}
-	code, stdout, _ = h.run(t, "sync", h.dir, "--into", second, "--as", "Not An ID", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "usage" {
-		t.Fatalf("an invalid id is a usage error: exit %d %s", code, stdout)
-	}
-
-	// Two instances whose names slug the same still get ids of their own.
-	h.mustRun(t, "sync", h.dir, "--into", second, "--name", "pack")
-	third := filepath.Join(t.TempDir(), "three")
-	h.mustRun(t, "sync", h.dir, "--into", third, "--name", "pack")
+	// They stay on link, where an instance still has an id and a name of its own.
+	first := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", first, "--as", "cozy", "--name", "Friends")
 	instances := readInstances(t, h)
-	if len(instances) != 3 || instances[1].ID != "pack" || instances[2].ID != "pack-2" {
-		t.Fatalf("ids are unique: %+v", instances)
+	if len(instances) != 1 || instances[0].ID != "cozy" || instances[0].Name != "Friends" {
+		t.Fatalf("--as and --name still name a linked instance: %+v", instances)
+	}
+	second := t.TempDir()
+	code, stdout, _ := h.run(t, "link", "prism", h.dir, "--launcher-dir", second, "--as", "cozy", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-id-taken" || !strings.Contains(e.Message, instances[0].Dir) {
+		t.Fatalf("a taken id names its holder: exit %d %s", code, stdout)
 	}
 }
 
@@ -172,15 +170,12 @@ func TestInstancesList(t *testing.T) {
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Zed")
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Alpha")
 	h.mustRun(t, "link", "mojang", "--launcher-dir", t.TempDir())
-	plain := filepath.Join(t.TempDir(), "plain")
-	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "Plain")
-	gone := filepath.Join(t.TempDir(), "gone")
-	h.mustRun(t, "sync", h.dir, "--into", gone, "--name", "Gone")
-	if err := os.RemoveAll(gone); err != nil {
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Gone")
+	if err := os.RemoveAll(instanceDir(t, h, "gone")); err != nil {
 		t.Fatal(err)
 	}
-	locked := filepath.Join(t.TempDir(), "locked")
-	h.mustRun(t, "sync", h.dir, "--into", locked, "--name", "Locked")
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Locked")
+	locked := instanceDir(t, h, "locked")
 	if err := os.Chmod(locked, 0); err != nil {
 		t.Fatal(err)
 	}
@@ -196,12 +191,12 @@ func TestInstancesList(t *testing.T) {
 	for _, e := range env.Data {
 		got = append(got, e.Launcher+":"+e.ID+":"+e.Status)
 	}
-	want := "prism:alpha:synced prism:zed:not-synced mojang:pack:not-synced :gone:missing :locked:unreadable :plain:synced"
+	want := "prism:alpha:synced prism:gone:missing prism:locked:unreadable prism:zed:not-synced mojang:pack:not-synced"
 	if strings.Join(got, " ") != want {
 		t.Fatalf("instances:\n got %s\nwant %s", strings.Join(got, " "), want)
 	}
-	if env.Data[0].SyncedAt == "" || env.Data[1].SyncedAt != "" {
-		t.Fatalf("syncedAt comes from the state file: %+v", env.Data[:2])
+	if env.Data[0].SyncedAt == "" || env.Data[3].SyncedAt != "" {
+		t.Fatalf("syncedAt comes from the state file: %+v", env.Data)
 	}
 
 	stdout := h.mustRun(t, "instances")
@@ -209,7 +204,7 @@ func TestInstancesList(t *testing.T) {
 		"Prism Launcher\n    ├─ • alpha client (synced ",
 		"• zed client (not synced yet)\n         " + filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         Zed, from " + h.dir + ", side client\n",
 		"\n\n  Minecraft Launcher\n    └─ • pack client (not synced yet)\n",
-		"\n\n  Other directories\n    ├─ • gone (directory is missing)\n",
+		"• gone (directory is missing)\n",
 		"• locked (can't read the directory)\n",
 	} {
 		if !strings.Contains(stdout, part) {
@@ -225,8 +220,8 @@ func TestSyncInstance(t *testing.T) {
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
-	plain := filepath.Join(t.TempDir(), "plain")
-	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "friends")
+	h.mustRun(t, "link", "multimc", h.dir, "--launcher-dir", t.TempDir(), "--name", "friends")
+	plain := instanceDir(t, h, "friends-2")
 
 	syncDir := func(args ...string) string {
 		t.Helper()
@@ -280,13 +275,13 @@ func TestSyncInstance(t *testing.T) {
 
 	h.tty, h.stdin = true, strings.NewReader("2\n")
 	stdout, stderr := h.mustRunStderr(t, "sync", "-C", t.TempDir())
-	if !strings.Contains(stderr, " 2) friends client\n     "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "» "+plain) {
+	if !strings.Contains(stderr, " 2) friends client (MultiMC)\n     "+plain) || !strings.Contains(stderr, "Sync which one? [1-2]") || !strings.Contains(stdout, "» "+plain) {
 		t.Fatalf("picker:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
 	h.tty = false
 
 	stdout = h.mustRun(t, "sync", "--all")
-	if !strings.Contains(stdout, "  Friends client (Prism Launcher)\n  ✔ synced client") || !strings.Contains(stdout, "\n\n  friends client\n") {
+	if !strings.Contains(stdout, "  Friends client (Prism Launcher)\n  ✔ synced client") || !strings.Contains(stdout, "\n\n  friends client (MultiMC)\n") {
 		t.Fatalf("sync --all output: %s", stdout)
 	}
 	var all struct {

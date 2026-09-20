@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -29,15 +28,14 @@ type syncResult struct {
 	Dir        string               `json:"dir"`
 	Fetched    []string             `json:"fetched"`
 	Build      *build.Report        `json:"build"`
-	Registered *config.Instance     `json:"registered,omitempty"`
 	Changes    *lockChanges         `json:"changes,omitempty"`
 	Instances  []syncInstanceResult `json:"instances,omitempty"`
 }
 
 type syncRequest struct {
-	ref, side, into, os, name, as string
-	force, assumeClient           bool
-	features                      featureFlags
+	ref, side, into, os string
+	force, assumeClient bool
+	features            featureFlags
 }
 
 func (a *app) syncCmd() *cobra.Command {
@@ -60,15 +58,15 @@ func (a *app) syncCmd() *cobra.Command {
 				d.fetch.Offline = true
 			}
 			if len(args) == 0 {
-				if req.into != "" && req.side == "" && req.ref == "" && req.name == "" && a.instance == "" && !sel.all && !sel.narrows() {
+				if req.into != "" && req.side == "" && req.ref == "" && a.instance == "" && !sel.all && !sel.narrows() {
 					res, err := a.syncRecorded(cmd, req)
 					if err != nil {
 						return err
 					}
 					return a.printer.Emit(res, res.print)
 				}
-				if req.into != "" || req.ref != "" || req.name != "" {
-					return out.Errorf("usage", "--into, --ref, and --name need a source; a registered instance already has them")
+				if req.into != "" || req.ref != "" {
+					return out.Errorf("usage", "--into and --ref need a source; a registered instance already has them")
 				}
 				if a.instance == "" && !sel.all {
 					dir, err := a.scopeDir()
@@ -131,8 +129,6 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&req.assumeClient, "assume-client", false, "build a client even when the source declares none, from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&req.ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.os, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
-	cmd.Flags().StringVar(&req.name, "name", "", "name to register the --into directory under (default: the side's display name)")
-	cmd.Flags().StringVar(&req.as, "as", "", "id to register the --into directory under, for -i (default: from its name)")
 	sel.registerWith(cmd, "sync every instance (narrow with --launcher or --side)", "side to build from a source (default: the only declared side); with -i, --all, or the picker, only client or server instances")
 	cmd.Flags().BoolVar(&offline, "offline", false, "don't use the network; build from the last successful sync and cached files")
 	req.features.register(cmd, "for this run only")
@@ -145,13 +141,6 @@ func (res syncResult) print(l *out.Lines) {
 	}
 	l.OKInto("synced "+res.Side, res.Dir, reportAside(res.Build))
 	printReportDetails(l, res.Build)
-	if r := res.Registered; r != nil {
-		id := r.ID
-		if strings.EqualFold(id, r.Label()) {
-			id = ""
-		}
-		l.OK("registered "+r.Label(), id)
-	}
 }
 
 type syncSource struct {
@@ -211,16 +200,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	}
 	defer func() { a.stampSync(into, err) }()
 	ownBuild := sameDir(into, buildDir)
-	register := req.into != "" && !ownBuild
-	if req.name != "" && !register {
-		return syncResult{}, out.Errorf("usage", "--name needs --into a directory other than the build directory")
-	}
-	if req.as != "" && !register {
-		return syncResult{}, out.Errorf("usage", "--as needs --into a directory other than the build directory")
-	}
-	if err := a.checkID(req.as, into); err != nil {
-		return syncResult{}, err
-	}
+	syncedDir := req.into != "" && !ownBuild
 	lf, inst, err := sourceLocalFiles(src, into)
 	if err != nil {
 		return syncResult{}, err
@@ -268,14 +248,11 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	if !src.LastGood.IsZero() {
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
-	if register {
+	if syncedDir {
 		if err := saveIntent(into, src.name, req.ref, side, req.assumeClient); err != nil {
 			return syncResult{}, err
 		}
-		entry := config.Instance{ID: req.as, Name: req.name, Dir: into, Source: src.name}
-		if entry, changed := a.registerSync(entry, p.Manifest.DisplayName(side)); changed {
-			res.Registered = &entry
-		}
+		a.refreshRegistered(config.Instance{Dir: into, Source: src.name})
 	}
 	return res, nil
 }

@@ -57,7 +57,7 @@ func (a *app) buildInPlace(ctx context.Context, dir string, req syncRequest) (sy
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.ref, req.into, req.name, req.as = "", "", "", ""
+	req.ref, req.into = "", ""
 	return a.sync(ctx, src, req)
 }
 

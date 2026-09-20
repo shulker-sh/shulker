@@ -159,7 +159,7 @@ func relinkSync(l Linked) (args []string, in string) {
 	if l.AssumeClient {
 		args = append(args, "--assume-client")
 	}
-	return append(args, "--into", shellArg(l.Dir), "--name", shellArg(l.Label())), ""
+	return append(args, "--into", shellArg(l.Dir)), ""
 }
 
 func relinkInstance(e *Entry, l Linked) (args []string, in string) {

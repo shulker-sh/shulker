@@ -109,7 +109,7 @@ func TestSyncInPlaceThenItsChildren(t *testing.T) {
 	h := newInPlace(t)
 	h.mustRun(t, "install")
 	child := filepath.Join(t.TempDir(), "child")
-	h.mustRun(t, "sync", h.dir, "--into", child, "--as", "child")
+	h.mustRun(t, "sync", h.dir, "--into", child)
 	h.mustRun(t, "add", "sodium")
 
 	stdout := h.mustRun(t, "sync")
@@ -122,7 +122,12 @@ func TestSyncInPlaceThenItsChildren(t *testing.T) {
 		}
 	}
 
-	if stdout := h.mustRun(t, "sync", "-i", "child"); strings.Contains(stdout, "sodium") {
+	// The child is a detached build, so -i can't reach it; its own record of its source can.
+	code, stdout, _ := h.run(t, "sync", "-i", "child", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "no-instances" {
+		t.Fatalf("-i must not reach a detached build: exit %d %s", code, stdout)
+	}
+	if stdout := h.mustRun(t, "sync", "--into", child); strings.Contains(stdout, "sodium") {
 		t.Fatalf("a child sync has no lock of its own to change: %s", stdout)
 	}
 }
@@ -154,8 +159,7 @@ func TestCachePruneKeepsARemoteSourcedInstance(t *testing.T) {
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
 	gitRun(t, h.dir, "add", ".")
 	gitRun(t, h.dir, "commit", "-q", "-m", "one")
-	inst := filepath.Join(t.TempDir(), "inst")
-	h.mustRun(t, "sync", "file://"+h.dir, "--into", inst, "--as", "remote")
+	h.mustRun(t, "link", "prism", "file://"+h.dir, "--launcher-dir", t.TempDir(), "--name", "remote")
 
 	sodium := (&cache.Cache{Dir: h.cache}).Object(h.jars["sodium"].sha512)
 	h.mustRun(t, "--dir", t.TempDir(), "cache", "prune")

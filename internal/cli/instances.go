@@ -259,36 +259,30 @@ func (a *app) reconcileOrWarn(in config.Instance) {
 	}
 }
 
-// registerSync keeps the launcher of an instance that a link made, and its name unless in has one.
-// An instance with no launcher is matched against the launcher layouts, so a directory registered
-// before shulker recorded one, or synced into by hand, still lands under its launcher.
-func (a *app) registerSync(in config.Instance, defaultName string) (config.Instance, bool) {
-	changed := a.updateInstances(func(instances []config.Instance) []config.Instance {
+// refreshRegistered keeps a row that a link or a repair wrote in step with the directory it points
+// at: its source, and the launcher of a row written before shulker recorded one. A sync adds no
+// row of its own, so a directory without one is a detached build and gets no hooks either.
+func (a *app) refreshRegistered(in config.Instance) {
+	found := false
+	a.updateInstances(func(instances []config.Instance) []config.Instance {
 		i, ok := config.FindInstance(instances, in.Dir)
 		if !ok {
-			if in.Name == "" {
-				in.Name = defaultName
-			}
-			in.Launcher, in.LauncherDir = launcher.Detect(in.Dir)
-			in.ID = uniqueID(instances, in.ID, in.Name, in.Dir)
-			return append(instances, in)
+			return instances
 		}
+		found = true
 		old := instances[i]
+		in.ID, in.Name = old.ID, old.Name
 		in.Launcher, in.LauncherDir = old.Launcher, old.LauncherDir
+		in.LastSync, in.LastError = old.LastSync, old.LastError
 		if in.Launcher == "" {
 			in.Launcher, in.LauncherDir = launcher.Detect(in.Dir)
-		}
-		if in.Name == "" {
-			in.Name = old.Name
-		}
-		if in.ID == "" {
-			in.ID = old.ID
 		}
 		instances[i] = in
 		return instances
 	})
-	a.reconcileOrWarn(in)
-	return in, changed
+	if found {
+		a.reconcileOrWarn(in)
+	}
 }
 
 func (a *app) updateInstances(update func([]config.Instance) []config.Instance) bool {

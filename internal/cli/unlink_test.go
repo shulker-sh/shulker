@@ -35,15 +35,13 @@ func TestUnlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)
-	plain := filepath.Join(t.TempDir(), "plain")
-	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "Server Copy")
 
 	code, stdout, _ := h.run(t, "unlink", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || !strings.Contains(e.Message, "shulker instances") {
 		t.Fatalf("unlink with no name: exit %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "unlink", "nope", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-not-found" || len(e.Candidates) != 5 {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-not-found" || len(e.Candidates) != 4 {
 		t.Fatalf("unknown name: exit %d %s", code, stdout)
 	}
 
@@ -88,13 +86,6 @@ func TestUnlink(t *testing.T) {
 		t.Fatalf("only shulker's profile is removed: %+v", profiles.Profiles)
 	}
 
-	stdout = h.mustRun(t, "unlink", "Server Copy")
-	if !strings.Contains(stdout, `✔ forgot "Server Copy" (`+plain+`); its files stay`) || !strings.Contains(stdout, "To register it again:\n    $ shulker sync "+h.dir+" --side client --into "+plain+` --name "Server Copy"`) {
-		t.Fatalf("unlink plain: %s", stdout)
-	}
-	if _, err := os.Stat(filepath.Join(plain, "mods")); err != nil {
-		t.Fatalf("unlink must keep the files: %v", err)
-	}
 	if links := readInstances(t, h); len(links) != 0 {
 		t.Fatalf("every entry was unlinked: %+v", links)
 	}
@@ -112,8 +103,8 @@ func TestUnlinkLauncherNameInProject(t *testing.T) {
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "A")
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "B")
-	plain := filepath.Join(t.TempDir(), "plain")
-	h.mustRun(t, "sync", h.dir, "--into", plain, "--name", "atlauncher")
+	h.mustRun(t, "link", "multimc", h.dir, "--launcher-dir", t.TempDir(), "--name", "atlauncher")
+	named := instanceDir(t, h, "atlauncher")
 
 	if r := unlinkJSON(t, h, "vanilla"); len(r) != 1 || r[0].Removed != launcher.RemovedProfile {
 		t.Fatalf("unlink vanilla in the project: %+v", r)
@@ -125,7 +116,7 @@ func TestUnlinkLauncherNameInProject(t *testing.T) {
 	if r := unlinkJSON(t, h, "prism", "--all"); len(r) != 2 {
 		t.Fatalf("unlink prism --all: %+v", r)
 	}
-	if r := unlinkJSON(t, h, "atlauncher"); len(r) != 1 || r[0].Dir != plain {
+	if r := unlinkJSON(t, h, "atlauncher"); len(r) != 1 || r[0].Dir != named {
 		t.Fatalf("an entry named like a launcher comes first: %+v", r)
 	}
 }
@@ -134,8 +125,8 @@ func TestUnlinkAll(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
-	h.mustRun(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "a"), "--name", "Twin")
-	h.mustRun(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "b"), "--name", "Twin")
+	h.mustRun(t, "link", "multimc", h.dir, "--launcher-dir", t.TempDir(), "--name", "Twin")
+	h.mustRun(t, "link", "multimc", h.dir, "--launcher-dir", t.TempDir(), "--name", "Twin")
 	h.mustRun(t, "link", "prism", "--launcher-dir", t.TempDir(), "--name", "Twin")
 
 	code, stdout, _ := h.run(t, "unlink", "Twin", "--json")
