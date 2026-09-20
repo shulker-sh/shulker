@@ -144,6 +144,9 @@ func (c *Cache) keep(roots []Root) map[string]bool {
 				keep[c.PackManifest(mp.Sha256)] = true
 				keep[c.ProjectCheckout(mp.Sha256)] = true
 			}
+			if mp.LockSha256 != "" {
+				keep[c.PackLock(mp.LockSha256)] = true
+			}
 		}
 	}
 	return keep

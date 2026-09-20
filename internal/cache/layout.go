@@ -16,6 +16,7 @@ import (
 //	packs/git/<sha>.git            bare mirrors of git pack sources
 //	packs/src/<commit>             a commit exported as a tree, what a build reads
 //	packs/url/<sha>.json           a manifest fetched from a raw URL
+//	packs/url/<sha>.lock           a lock fetched from beside one
 //	projects/url/<sha>             a project source fetched from a URL
 //	projects/last-good/<sha>.json  the last sync from a source that built
 //	atlauncher/<loader>-<version>/ a loader installer's client install, whose libraries ATLauncher gets
@@ -46,6 +47,10 @@ func (c *Cache) PackSource(commit string) string {
 
 func (c *Cache) PackManifest(sha string) string {
 	return filepath.Join(c.Dir, "packs", "url", sha+".json")
+}
+
+func (c *Cache) PackLock(sha string) string {
+	return filepath.Join(c.Dir, "packs", "url", sha+".lock")
 }
 
 func (c *Cache) ProjectCheckout(sha string) string {

@@ -67,9 +67,8 @@ func (s *Store) checkoutURL(ctx context.Context, c *Checkout) (*Checkout, error)
 	s.log("fetching %s", c.Source)
 	manifestData, err := s.download(ctx, c.Source)
 	if err == nil {
-		lockURL := c.Source[:strings.LastIndex(c.Source, "/")+1] + lock.FileName
 		var lockData []byte
-		if lockData, err = s.download(ctx, lockURL); errors.Is(err, fetch.ErrNotFound) {
+		if lockData, err = s.download(ctx, lockURL(c.Source)); errors.Is(err, fetch.ErrNotFound) {
 			return nil, out.Errorf("source-lock", "no %s beside %s; the project must be locked before it can be synced", lock.FileName, c.Source)
 		} else if err == nil {
 			return c, s.storeURL(c, manifestData, lockData)
@@ -81,6 +80,12 @@ func (s *Store) checkoutURL(ctx context.Context, c *Checkout) (*Checkout, error)
 		return s.urlFallback(c, err)
 	}
 	return nil, out.Errorf("source-fetch", "%v", err)
+}
+
+// lockURL names the lock beside a manifest fetched from a raw URL, which holds for repo
+// raw URLs and gist raw URLs alike.
+func lockURL(manifestURL string) string {
+	return manifestURL[:strings.LastIndex(manifestURL, "/")+1] + lock.FileName
 }
 
 func (s *Store) storeURL(c *Checkout, manifestData, lockData []byte) error {

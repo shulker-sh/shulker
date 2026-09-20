@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -30,14 +31,15 @@ const (
 )
 
 type Loaded struct {
-	Name     string
-	Source   string
-	Kind     Kind
-	Dir      string
-	Manifest *manifest.Manifest
-	Lock     *lock.Lock
-	Locked   bool
-	Pin      lock.Modpack
+	Name       string
+	Source     string
+	Kind       Kind
+	Dir        string
+	Manifest   *manifest.Manifest
+	Lock       *lock.Lock
+	Locked     bool
+	Pin        lock.Modpack
+	lockSha256 string
 }
 
 type Store struct {
@@ -112,15 +114,15 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		if l.Pin.Sha256, err = s.storeManifest(data); err != nil {
 			return nil, err
 		}
+		if err := s.fetchPackLock(ctx, l); err != nil {
+			return nil, err
+		}
 	}
 	if err := l.resolveLocked(p); err != nil {
 		return nil, err
 	}
 	if l.Locked {
-		l.Pin.Locked = true
-		if l.Pin.LockSha256, err = lock.FileSha256(filepath.Join(l.Dir, lock.FileName)); err != nil {
-			return nil, err
-		}
+		l.Pin.Locked, l.Pin.LockSha256 = true, l.lockSha256
 	}
 	return l, nil
 }
@@ -169,8 +171,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 			if data, err = s.fetchManifest(ctx, name, p.Source); err != nil {
 				return nil, "", err
 			}
-			sum := sha256.Sum256(data)
-			if hex.EncodeToString(sum[:]) != pinned.Sha256 {
+			if sha256hex(data) != pinned.Sha256 {
 				return nil, "", out.Errorf("modpack-changed", "modpack %s at %s no longer matches the lock; run `shulker update`", name, p.Source)
 			}
 			if _, err := s.storeManifest(data); err != nil {
@@ -181,6 +182,11 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 		}
 		if l.Manifest, err = manifest.Parse(data); err != nil {
 			return nil, "", fmt.Errorf("modpack %s: %w", name, err)
+		}
+		if pinned.Locked {
+			if err := s.openPackLock(ctx, l, pinned.LockSha256); err != nil {
+				return nil, "", err
+			}
 		}
 	}
 	l.Locked = pinned.Locked
@@ -203,20 +209,65 @@ func (s *Store) loadDir(l *Loaded) error {
 		return fmt.Errorf("modpack %s: %w", l.Name, err)
 	}
 	l.Manifest = m
-	packLock, err := lock.Load(filepath.Join(l.Dir, lock.FileName))
+	data, err := os.ReadFile(filepath.Join(l.Dir, lock.FileName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return fmt.Errorf("modpack %s: %w", l.Name, err)
 	}
-	l.Lock = packLock
+	return l.parseLock(data)
+}
+
+func (l *Loaded) parseLock(data []byte) error {
+	packLock, err := lock.Parse(data)
+	if err != nil {
+		return fmt.Errorf("modpack %s: %w", l.Name, err)
+	}
+	l.Lock, l.lockSha256 = packLock, sha256hex(data)
 	return nil
 }
 
+// fetchPackLock loads the lock beside a fetched manifest, where checkoutURL looks for a
+// project's. A source with none there is floating, as a directory without one is.
+func (s *Store) fetchPackLock(ctx context.Context, l *Loaded) error {
+	data, err := s.download(ctx, lockURL(l.Source))
+	if errors.Is(err, fetch.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return out.Errorf("modpack-fetch", "modpack %s: %v", l.Name, err)
+	}
+	if err := l.parseLock(data); err != nil {
+		return err
+	}
+	return s.storeFile(s.Cache.PackLock(l.lockSha256), data)
+}
+
+// openPackLock loads the lock a URL modpack was locked from, from the cache when it is
+// there, so a build off a locked URL modpack needs no network.
+func (s *Store) openPackLock(ctx context.Context, l *Loaded, sha string) error {
+	data, err := os.ReadFile(s.Cache.PackLock(sha))
+	if os.IsNotExist(err) {
+		s.log("fetching pack %s lock", l.Name)
+		if data, err = s.download(ctx, lockURL(l.Source)); err != nil {
+			return out.Errorf("modpack-fetch", "modpack %s: %v", l.Name, err)
+		}
+		if sha256hex(data) != sha {
+			return out.Errorf("modpack-changed", "modpack %s: the %s at %s has changed since this project locked it; run `shulker update`", l.Name, lock.FileName, l.Source)
+		}
+		if err := s.storeFile(s.Cache.PackLock(sha), data); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
+	return l.parseLock(data)
+}
+
 // resolveLocked settles whether this modpack's mods come from its own lock. An
-// omitted "locked" follows the source: true when it ships a lock, false when it
-// can't have one, like a manifest fetched from a URL.
+// omitted "locked" follows the source: true when it ships a lock, false when
+// there is none beside it.
 func (l *Loaded) resolveLocked(p manifest.Require) error {
 	switch {
 	case l.Lock == nil && p.Locked != nil && *p.Locked:
@@ -241,16 +292,23 @@ func (s *Store) fetchManifest(ctx context.Context, name, url string) ([]byte, er
 }
 
 func (s *Store) storeManifest(data []byte) (string, error) {
-	sum := sha256.Sum256(data)
-	sha := hex.EncodeToString(sum[:])
-	path := s.Cache.PackManifest(sha)
+	sha := sha256hex(data)
+	return sha, s.storeFile(s.Cache.PackManifest(sha), data)
+}
+
+func (s *Store) storeFile(path string, data []byte) error {
 	if _, err := os.Stat(path); err == nil {
-		return sha, nil
+		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", err
+		return err
 	}
-	return sha, fsutil.Write(path, data)
+	return fsutil.Write(path, data)
+}
+
+func sha256hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 // Compatible checks a modpack against the project's platform. A locked modpack

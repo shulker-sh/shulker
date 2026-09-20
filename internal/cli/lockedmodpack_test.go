@@ -2,6 +2,8 @@ package cli
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +14,7 @@ type modpackLockView struct {
 	Modpacks map[string]struct {
 		Locked     bool   `json:"locked"`
 		LockSha256 string `json:"lockSha256"`
+		Sha256     string `json:"sha256"`
 	} `json:"modpacks"`
 	Mods map[string]struct {
 		Modpack       string `json:"modpack"`
@@ -154,5 +157,55 @@ func TestUpdateRefusesALockedModpacksMod(t *testing.T) {
 	code, stdout, _ := h.run(t, "update", "sodium", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "modpack-provided" {
 		t.Fatalf("a mod a locked modpack pins is not updatable here: code=%d %s", code, stdout)
+	}
+}
+
+// The manifest and the lock are both cached, so a build off a locked URL modpack needs
+// no network, and a prune keeps what the project's lock pins.
+func TestURLModpackWithALockIsLocked(t *testing.T) {
+	h, dir := projectWithLockedPack(t, "base")
+	srv := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	defer srv.Close()
+	source := srv.URL + "/shulker.json"
+
+	h.mustRun(t, "modpack", "add", source)
+
+	var l modpackLockView
+	h.readJSON(t, "shulker.lock", &l)
+	got := l.Modpacks["base"]
+	if !got.Locked || got.LockSha256 == "" || got.Sha256 == "" {
+		t.Fatalf("a URL modpack with a lock beside it should be locked: %+v", got)
+	}
+	for _, id := range []string{"sodium", "fabric-api"} {
+		if from := l.Mods[id].Modpack; from != "base" {
+			t.Fatalf("%s should come from the modpack, got %q", id, from)
+		}
+	}
+
+	h.mustRun(t, "cache", "prune")
+	srv.Close()
+	h.mustRun(t, "install")
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestURLModpackWithoutALockStaysFloating(t *testing.T) {
+	h, dir := projectWithLockedPack(t, "base")
+	if err := os.Remove(filepath.Join(dir, "shulker.lock")); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	defer srv.Close()
+
+	h.mustRun(t, "modpack", "add", srv.URL+"/shulker.json")
+
+	var l modpackLockView
+	h.readJSON(t, "shulker.lock", &l)
+	if got := l.Modpacks["base"]; got.Locked || got.LockSha256 != "" {
+		t.Fatalf("a URL modpack with no lock beside it should stay floating: %+v", got)
+	}
+	if from := l.Mods["sodium"].Modpack; from != "" {
+		t.Fatalf("a floating modpack's mods are resolved here, so they carry no origin, got %q", from)
 	}
 }
