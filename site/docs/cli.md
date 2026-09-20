@@ -71,6 +71,7 @@ These work with every command.
 | `-C, --dir <path>` | Project directory (default: current directory) |
 | `-i, --instance <id>` | Act on a registered instance instead of a project directory, by id, name, or directory; `--id` is accepted as an alias. Can't be combined with `-C`. [`shulker instances`](#shulker-instances) lists them |
 | `--json` | Print machine-readable JSON, including errors; see [JSON output](#json-output) |
+| `--no-input` | Ask nothing: every prompt takes its default, and a required value left unset is a usage error naming the flag that supplies it. Output that isn't going to a terminal implies it, and so does `--json` |
 | `--no-color` | Print without colour. Setting `NO_COLOR` or `TERM=dumb` does the same, and colour is off whenever the output is not a terminal |
 | `--ascii` | Print with ASCII glyphs (`*`, `x`, `|-`, `->`, `>>`) in place of `✔`, `✘`, `├─`, `⟶`, and `»` |
 
@@ -78,16 +79,19 @@ These work with every command.
 
 ### `shulker init`
 
-Create `shulker.json` and `shulker.lock` in the current directory. Pass `--yes` for the defaults, or set at least `--name` and `--minecraft`.
+Create `shulker.json` and `shulker.lock` in the current directory. On a terminal it asks six questions, in order: what you are making, which Minecraft version, whether to add mods, which mod loader, which version of it, and whether to start from an existing pack. Each question is skipped by the flag that answers it, and every answer starts on the default that flag has, so taking all six as they come creates what `--yes` creates. Answering *from an existing pack* asks for a source and adds it as a modpack, exactly as [`shulker add <source> --type modpack`](#shulker-add) would.
+
+Under [`--no-input`](#global-flags) — which a script gets without asking for it, since output that isn't going to a terminal implies it — nothing is asked and every answer is its default: the latest release, no loader, the client side, and no pack.
 
 ```sh
+shulker init
 shulker init --yes
 shulker init --name my-server --minecraft 1.21.1 --loader neoforge --side server
 ```
 
 | Flag | Description |
 | --- | --- |
-| `-y, --yes` | Accept defaults: latest release, no loader, client side |
+| `-y, --yes` | Accept the defaults without asking: latest release, no loader, client side. On this command it is an alias of [`--no-input`](#global-flags), which leaves it nothing else to mean |
 | `--name <name>` | Project name (default: directory name) |
 | `--minecraft <version>` | Minecraft version or range (default: latest release) |
 | `--loader <loader>` | Mod loader: `none` (the default, vanilla Minecraft), `fabric`, `quilt`, `neoforge`, `forge` |
@@ -634,11 +638,11 @@ Create an ATLauncher instance that syncs the client build before each launch.
 
 shulker writes the instance itself: the Minecraft version, the loader if the project has one, and a pre-launch command that runs `shulker sync`. ATLauncher downloads the game, its libraries and Java the first time you press Play. For NeoForge and Forge, shulker runs the loader's installer once per loader version and copies what it builds into ATLauncher's `libraries` folder. A new instance gets the shulker image; an image you pick in ATLauncher is kept when you link again. ATLauncher only reads its instances when it starts, so restart it if it is open.
 
-With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named after the letters and digits in the instance name. Running `link` again keeps the settings you changed in ATLauncher, such as memory and Java arguments.
+With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. The instance is a project of its own: a `shulker.json` that follows the source as a modpack and builds where it stands, taking its platform, its features and its override layers from the pack at every sync, so `shulker add` in the game directory puts a mod on top of the pack and keeps it. shulker builds it before `link` returns, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named after the letters and digits in the instance name. Running `link` again keeps the settings you changed in ATLauncher, such as memory and Java arguments.
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <instance folder>`, or run `link` again with new flags.
 
-If the instance already syncs from a different source, or is an ATLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one.
+If the instance already syncs from a different source, or is an ATLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
@@ -653,7 +657,6 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: ATLauncher's) |
-| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
@@ -674,13 +677,13 @@ Create a GDLauncher instance that syncs the client build before each launch.
 
 shulker writes the instance's `instance.json` itself: the Minecraft version, the loader if the project has one, and a pre-launch hook that runs `shulker sync`. GDLauncher downloads the game, the loader and Java the first time you press Play, NeoForge and Forge included. Every `link` marks the instance for setup again, so the next Play re-checks the install and takes a little longer. It can only install loader versions on its own list, which trails new releases by a few days. When the locked loader version isn't on that list yet, the instance uses the newest one GDLauncher has and `link` warns you; run `link` again once GDLauncher adds it, or pass `--force` to use the locked version anyway. A new instance gets the shulker icon; linking again never changes the icon, so one you pick in GDLauncher, or the default, stays. GDLauncher only reads its instances when it starts, and while open it writes its own copy back over them when you change settings or play, so quit it before linking and open it afterwards. On macOS and Linux, `link` and `unlink` warn you when GDLauncher is open.
 
-With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named the way GDLauncher names it. Running `link` again keeps the settings you changed in GDLauncher, such as memory and Java arguments. If you moved GDLauncher's runtime path in its settings, shulker follows it.
+With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. The instance is a project of its own: a `shulker.json` that follows the source as a modpack and builds where it stands, taking its platform, its features and its override layers from the pack at every sync, so `shulker add` in the game directory puts a mod on top of the pack and keeps it. shulker builds it before `link` returns, so it's ready to play, and keeps it up to date from the same source before each launch. The instance folder is named the way GDLauncher names it. Running `link` again keeps the settings you changed in GDLauncher, such as memory and Java arguments. If you moved GDLauncher's runtime path in its settings, shulker follows it.
 
 Renaming the instance in GDLauncher moves its folder. It keeps syncing before each launch, but `shulker instances` reports it missing; run `link` again with the new `--name`, and `shulker unlink` the old one.
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game folder>`, or run `link` again with new flags.
 
-If the instance already syncs from a different source, or is a GDLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one.
+If the instance already syncs from a different source, or is a GDLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
@@ -695,7 +698,6 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher runtime directory (default: GDLauncher's) |
-| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
@@ -747,13 +749,13 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 
 Create a Prism Launcher instance that syncs the client build before each launch.
 
-With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. shulker then syncs the instance right away, so it's ready to play, and keeps it up to date from the same source before each launch. Nothing is created in the directory you ran it from.
+With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. The instance is a project of its own: a `shulker.json` that follows the source as a modpack and builds where it stands, taking its platform, its features and its override layers from the pack at every sync, so `shulker add` in the game directory puts a mod on top of the pack and keeps it. shulker builds it before `link` returns, so it's ready to play, and keeps it up to date from the same source before each launch. Nothing is created in the directory you ran it from.
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game dir>`, or run `link` again with new flags.
 
-If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one. On the next sync, files the old source put there are removed, unless you changed them in-game.
+If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is. On the next sync, files the old pack put there are removed, unless you changed them in-game.
 
-`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`. In symlink mode there is no instance file to record them in, so these flags are refused.
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
 `--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours.
 
@@ -761,33 +763,30 @@ If the instance already syncs from a different source, `link` fails rather than 
 shulker link prism
 shulker link prism https://github.com/shulker-sh/base-pack.git
 shulker link prism https://example.com/pack/shulker.json --name "Friends SMP" --with shaders
-shulker link prism --mode symlink
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | Launcher data directory (default: Prism Launcher's) |
-| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
-| `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint an instance that syncs from a different source |
-| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended (sync mode only) |
-| `--no-pre-launch` | Don't sync this instance before each launch (sync mode only) |
-| `--no-post-exit` | Don't record how each run ended (sync mode only) |
-| `--no-marker` | Leave the marker mod out of this instance's builds (sync mode only) |
-| `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out (sync mode only) |
-| `--java <path>` | Absolute path to the Java this machine launches the instance with, in sync mode (default: shulker's managed runtime) |
-| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace (sync mode only) |
-| `--with <feature>` | Turn a feature on for this instance; repeat for more (sync mode only) |
-| `--without <feature>` | Turn a feature off for this instance; repeat for more (sync mode only) |
+| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
+| `--no-pre-launch` | Don't sync this instance before each launch |
+| `--no-post-exit` | Don't record how each run ended |
+| `--no-marker` | Leave the marker mod out of this instance's builds |
+| `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
+| `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
+| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--with <feature>` | Turn a feature on for this instance; repeat for more |
+| `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
 ### `shulker link multimc`
 
 Create a MultiMC instance that syncs the client build before each launch. It is [`shulker link prism`](#shulker-link-prism) for MultiMC's own `instance.cfg` dialect, with the same source argument, flags and behaviour, and one difference: MultiMC is portable and has no fixed data folder, so `--launcher-dir` is required and names the folder that holds `multimc.cfg` (`launcher-dir-required` without it). The instance is registered under the launcher name `multimc`, which is what `--launcher multimc` and `shulker unlink multimc` match.
 
-`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`. In symlink mode there is no instance file to record them in, so these flags are refused.
+`--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
 `--wrapper` is written into the launcher's own wrapper setting, and only when you pass one: with no `--wrapper`, that setting stays yours.
 
@@ -799,21 +798,19 @@ shulker link multimc https://github.com/shulker-sh/base-pack.git --launcher-dir 
 | Flag | Description |
 | --- | --- |
 | `--launcher-dir <path>` | The MultiMC folder, the one that holds `multimc.cfg` (required) |
-| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
-| `--mode <mode>` | `sync`: build into the instance before each launch; `symlink`: point the instance at the build directory (local projects only) |
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
 | `--force` | Repoint an instance that syncs from a different source |
-| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended (sync mode only) |
-| `--no-pre-launch` | Don't sync this instance before each launch (sync mode only) |
-| `--no-post-exit` | Don't record how each run ended (sync mode only) |
-| `--no-marker` | Leave the marker mod out of this instance's builds (sync mode only) |
-| `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out (sync mode only) |
-| `--java <path>` | Absolute path to the Java this machine launches the instance with, in sync mode (default: shulker's managed runtime) |
-| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace (sync mode only) |
-| `--with <feature>` | Turn a feature on for this instance; repeat for more (sync mode only) |
-| `--without <feature>` | Turn a feature off for this instance; repeat for more (sync mode only) |
+| `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
+| `--no-pre-launch` | Don't sync this instance before each launch |
+| `--no-post-exit` | Don't record how each run ended |
+| `--no-marker` | Leave the marker mod out of this instance's builds |
+| `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
+| `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
+| `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--with <feature>` | Turn a feature on for this instance; repeat for more |
+| `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
 ### `shulker sync`
 
@@ -846,7 +843,7 @@ A project whose side builds into its own directory is an instance, and `sync` ru
 | `--side <side>` | Side to build from a source (default: the only declared side); with `-i`, `--all`, or the picker, only `client` or `server` instances |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
-| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the instance so later syncs keep building it |
+| `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the directory so later syncs keep building it |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
@@ -1208,7 +1205,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `history-invalid` | A history entry's own record is unreadable; `history prune` removes it |
 | `history-missing` | There is no history entry with that number; the message says how many are kept |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
-| `instance-dir-not-empty` | The instance directory already has files |
 | `instance-exists` | An instance already syncs from a different source, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
@@ -1249,7 +1245,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
 | `no-instances` | Nothing is linked yet |
 | `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
-| `no-side` | `shulker.json` declares no side of the kind the command needs. A local command (`build`, `diff`, `serve`) says to add the block; a command that can take a remote source (`link *`, `sync`, `export *`) says to pass `--assume-client` |
+| `no-side` | `shulker.json` declares no side of the kind the command needs. A local command (`build`, `diff`, `serve`) says to add the block; a command that can take a remote source (`sync`, `export *`) says to pass `--assume-client` |
 | `not-built` | The side has no build directory yet; run `shulker build` |
 | `not-direct` | The mod is only a dependency. `items`: the mods that require it |
 | `not-drifted` | A file named to `pull` has no changes. `candidates`: the changed files |
@@ -1302,7 +1298,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | An override uses a variable that isn't set |
 | `unsupported-loader` | shulker doesn't support the loader yet |
-| `unsupported-mode` | `--mode symlink` isn't supported on Windows yet |
 | `update-paused` | The pre-launch hook stopped a GDLauncher update at four minutes so it could explain itself; the launch is aborted, and launching again resumes it. Shown in GDLauncher's own dialog, so it prints without shulker's usual error decoration |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |

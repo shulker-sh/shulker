@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
@@ -99,13 +98,6 @@ func (a *app) unlinkCmd() *cobra.Command {
 func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
 	r := unlinkResult{Instance: l.Instance, OK: true}
 	r.Relink, r.RelinkIn = launcher.Relink(launcher.Linked{Instance: l.Instance, Side: l.Side, AssumeClient: l.AssumeClient, Ref: l.Ref})
-	// An instance that never synced carries no shulker state, and without its hook link takes it for the
-	// player's own.
-	if l.Launcher == "atlauncher" || l.Launcher == "gdlauncher" {
-		if st, _ := build.ReadState(l.Dir); st.Source == "" {
-			r.Relink += " --force"
-		}
-	}
 	if l.Launcher == "gdlauncher" {
 		if running, _ := launcher.GDLauncherRunning(); running {
 			a.printer.Warn("GDLauncher is open; it may put back the pre-launch sync this removes from %q. Quit it, then check the instance's settings", l.Label())

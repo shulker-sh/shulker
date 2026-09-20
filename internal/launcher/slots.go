@@ -296,8 +296,7 @@ func writeGDLauncherSlots(instanceDir string, s Slots) error {
 // ReleaseSlots hands an instance's slots back to its launcher: a command shulker adopted returns to
 // the slot it came from, a command shulker never adopted is left exactly where it is, shulker's own
 // slots are cleared, and both generated scripts go. It reports which slots shulker was holding, so
-// the caller can say what it removed. Used by `unlink` and by a link that switches to symlink mode,
-// so letting go of a slot happens one way.
+// the caller can say what it removed.
 func ReleaseSlots(e *Entry, in config.Instance) (tookPreLaunch, tookPostExit bool, err error) {
 	gameDir := in.Dir
 	current, found, err := ReadSlots(e, in)

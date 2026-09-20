@@ -194,6 +194,30 @@ func (a *app) linkID(as, display, dir string) (string, error) {
 	return uniqueID(instances, as, display, dir), nil
 }
 
+// linkInstance is the half of a link every instanced launcher shares: the project its game
+// directory becomes, the settings this link seeds it with, the registry row that finds it again,
+// and the build that leaves it ready to play.
+func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref string, src *syncSource, ls linkSettings) (*project.Project, syncResult, error) {
+	if err := a.checkID(as, row.Dir); err != nil {
+		return nil, syncResult{}, err
+	}
+	id, err := a.linkID(as, row.Name, row.Dir)
+	if err != nil {
+		return nil, syncResult{}, err
+	}
+	p, err := a.linkProject(row.Dir, id, row.Name, ref, src)
+	if err != nil {
+		return nil, syncResult{}, err
+	}
+	if err := ls.save(row.Dir, src.name, ref, "client", false, src.project.Manifest); err != nil {
+		return nil, syncResult{}, err
+	}
+	row.ID = id
+	a.registerInstance(row)
+	synced, err := a.syncInPlace(cmd, p, "client", syncRequest{})
+	return p, synced, err
+}
+
 // linkProject is the project a link leaves in the game directory: the minimal manifest ADR 0001
 // calls an instance, following the link's source as a modpack and building where it stands. A
 // project already there is adopted, never replaced, so a relink keeps whatever the player added
@@ -239,8 +263,8 @@ func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*p
 
 // newInstance writes the instance manifest. It pins no platform and lists no feature: the pack is
 // locked, so the relock inherits all of that, and a pack that moves platform is followed rather
-// than fought. The one thing copied is the pack's history retention, which only its author can
-// weigh; from then on the number is the player's.
+// than fought. What it does copy is the two preferences only the pack's author can weigh, its
+// history retention and whether builds carry the marker mod; from then on both are the player's.
 func newInstance(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
 	pack := src.project.Manifest
 	m := &manifest.Manifest{
@@ -252,6 +276,10 @@ func newInstance(gameDir, id, display, ref string, src *syncSource) (*project.Pr
 	if pack.History != nil {
 		keep := *pack.History
 		m.History = &keep
+	}
+	if pack.Marker != nil {
+		marker := *pack.Marker
+		m.Marker = &marker
 	}
 	if err := os.MkdirAll(gameDir, 0o755); err != nil {
 		return nil, err

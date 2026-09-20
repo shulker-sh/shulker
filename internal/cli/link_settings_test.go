@@ -10,6 +10,14 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 )
 
+// markerJarIn is the marker an instance's own builds carry. It is named after the instance's
+// manifest, which a link makes unique across the registry, so two instances of one pack differ.
+func markerJarIn(t *testing.T, gameDir string) string {
+	t.Helper()
+	name, _ := instanceManifest(t, gameDir)["name"].(string)
+	return filepath.Join(gameDir, "mods", "shulker-"+name+".jar")
+}
+
 func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
@@ -31,9 +39,9 @@ func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	if cfg["PreLaunchCommand"] == "" || cfg["PostExitCommand"] != "" {
 		t.Fatalf("the switch that is off gets no slot: %+v", cfg)
 	}
-	markerJar := filepath.Join(gameDir, "mods", "shulker-pack.jar")
+	markerJar := markerJarIn(t, gameDir)
 	if _, err := os.Stat(markerJar); !os.IsNotExist(err) {
-		t.Fatalf("settings.marker off drops the marker jar: %v", err)
+		t.Fatalf("a pack that leaves the marker out gives an instance that leaves it out: %v", err)
 	}
 
 	// An instance that says on keeps the jar over a manifest that leaves it out.
@@ -41,7 +49,7 @@ func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	if err := f.Save(gameDir); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "sync", "--into", gameDir)
+	h.mustRun(t, "-C", gameDir, "sync")
 	if _, err := os.Stat(markerJar); err != nil {
 		t.Fatalf("settings.marker on wins over the manifest: %v", err)
 	}
@@ -72,7 +80,7 @@ func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	if f := readIntent(t, thirdGame); f.Settings.Marker == nil || !*f.Settings.Marker {
 		t.Fatalf("--with-marker writes the switch on: %+v", f.Settings)
 	}
-	if _, err := os.Stat(filepath.Join(thirdGame, "mods", "shulker-pack.jar")); err != nil {
+	if _, err := os.Stat(markerJarIn(t, thirdGame)); err != nil {
 		t.Fatalf("--with-marker keeps the marker jar: %v", err)
 	}
 
@@ -82,14 +90,16 @@ func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	if err := f.Save(secondGame); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "sync", "--into", secondGame)
+	h.mustRun(t, "-C", secondGame, "sync")
 	f = readIntent(t, secondGame)
 	if f.Settings.Java != filepath.Join(h.dir, "other", "bin", "java") || !f.Settings.PreLaunch() {
 		t.Fatalf("a sync must not rewrite the settings block: %+v", f.Settings)
 	}
+	// An in-place instance builds itself, so nothing touches the launcher's slots until a repair.
+	h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", second)
 	cfg = readINIFile(t, filepath.Join(second, "instances", "shulker-pack", launcher.InstanceConfigFile))
 	if cfg["PreLaunchCommand"] == "" {
-		t.Fatalf("a hand-edited switch takes effect on the next sync: %+v", cfg)
+		t.Fatalf("a hand-edited switch takes effect on the next repair: %+v", cfg)
 	}
 }
 
@@ -105,10 +115,6 @@ func TestLinkSettingsFlagsOnEveryLauncher(t *testing.T) {
 	code, stdout, _ = h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--no-marker", "--with-marker", "--json")
 	if code == 0 || failureCode(t, stdout).Code != "usage" {
 		t.Fatalf("--no-marker and --with-marker ask for opposite things: exit %d %s", code, stdout)
-	}
-	code, stdout, _ = h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--mode", "symlink", "--no-hooks", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "usage" {
-		t.Fatalf("symlink mode has no instance file to record settings in: exit %d %s", code, stdout)
 	}
 
 	for _, name := range []string{"mojang", "prism", "multimc", "atlauncher", "gdlauncher"} {

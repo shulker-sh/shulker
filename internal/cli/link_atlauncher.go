@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/launcher"
@@ -21,7 +20,6 @@ import (
 func (a *app) linkATLauncherCmd() *cobra.Command {
 	var launcherDir, instanceName, ref, as string
 	var force bool
-	var assumeClient bool
 	var ff featureFlags
 	var ls linkSettings
 	cmd := &cobra.Command{
@@ -43,9 +41,8 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 					return err
 				}
 			}
-			side, err := a.clientSide(p.Manifest, assumeClient)
-			if err != nil {
-				return err
+			if !p.Manifest.HasSide("client") {
+				a.printer.Warn("%s", noClientPack)
 			}
 			hasFeatures := len(ff.with)+len(ff.without) > 0
 			if hasFeatures {
@@ -71,7 +68,7 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 			} else if err != nil {
 				return err
 			}
-			display := p.Manifest.DisplayName(side)
+			display := p.Manifest.DisplayName("client")
 			if instanceName != "" {
 				display = instanceName
 			}
@@ -79,14 +76,16 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 				return out.Errorf("usage", "ATLauncher names an instance's folder after the letters and digits in its name, and %q has none; pass --name", display)
 			}
 			gameDir := atl.InstanceDir(display)
-			prevState, stateErr := build.ReadState(gameDir)
-			if stateErr != nil {
-				a.printer.Warn("%v", stateErr)
+			if prev, ok := a.findLauncherInstance("atlauncher", launcherDir, display); ok && prev.Source != src.name && !force {
+				return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev.Source)
 			}
-			if prev := prevState.Source; prev != "" && prev != src.name && !force {
-				return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev)
+			// An instance shulker linked is a project in its own game directory, and stays one after
+			// an unlink. Anything else in that folder is the player's own.
+			_, _, inPlace, err := a.inPlaceProject(gameDir)
+			if err != nil {
+				return err
 			}
-			if prevState.Source == "" && !force {
+			if !inPlace && !force {
 				command, found, err := launcher.ATLauncherPreLaunch(gameDir)
 				if err != nil {
 					return err
@@ -114,20 +113,10 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 					return err
 				}
 			}
-			if err := a.checkID(as, res.GameDir); err != nil {
+			row := config.Instance{Launcher: "atlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name}
+			inst, synced, err := a.linkInstance(cmd, row, as, ref, src, ls)
+			if err != nil {
 				return err
-			}
-			if err := ls.save(res.GameDir, src.name, ref, side, assumeClient, p.Manifest); err != nil {
-				return err
-			}
-			a.registerInstance(config.Instance{ID: as, Launcher: "atlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
-			var synced *syncResult
-			if len(args) == 1 {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: res.GameDir, assumeClient: assumeClient})
-				if err != nil {
-					return err
-				}
-				synced = &r
 			}
 			rep := prismReport{
 				Launcher:    "atlauncher",
@@ -135,13 +124,13 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 				Instance:    filepath.Base(res.Dir),
 				InstanceDir: res.Dir,
 				Name:        display,
-				Mode:        "sync",
-				Side:        side,
 				GameDir:     res.GameDir,
 				Command:     launcher.SlotCommand("atlauncher", res.GameDir, launcher.HookPreLaunch),
 				Created:     res.Created,
 				Source:      src.name,
-				Sync:        synced,
+				Ref:         ref,
+				Modpack:     modpackKey(inst.Manifest, src.name),
+				Sync:        &synced,
 			}
 			return a.printer.Emit(rep, func(l *out.Lines) {
 				verb := "created"
@@ -149,20 +138,20 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 					verb = "updated"
 				}
 				l.OKInto(verb+" instance "+display, res.Dir, "")
-				rows := []out.Row{{Text: "the launcher runs `shulker sync` for the " + side + " side before each launch"}}
+				rows := []out.Row{
+					{Text: "follows " + rep.Modpack + " from " + rep.Source},
+					{Text: "the launcher syncs this instance before each launch"},
+				}
 				if hasFeatures {
 					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
 				}
 				rows = append(rows, out.Row{Text: "restart ATLauncher if it is open so the instance shows up"})
 				l.Tree(rows...)
-				if synced != nil {
-					synced.print(l)
-				}
+				synced.print(l)
 			})
 		},
 	}
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: ATLauncher's)")
-	cmd.Flags().BoolVar(&assumeClient, "assume-client", false, "link a client even when the source declares none, built from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")

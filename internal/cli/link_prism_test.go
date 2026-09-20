@@ -2,6 +2,8 @@ package cli
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,8 +50,12 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("the first sync should ship the mod turned on by --with: %v", err)
 	}
-	if st := build.LoadState(gameDir); st.Source != source || st.Ref != "main" {
-		t.Fatalf("state origin: %+v", st.Origin)
+	if st := build.LoadState(gameDir); st.Source != gameDir {
+		t.Fatalf("an instance builds from itself: %+v", st.Origin)
+	}
+	key, entry := onlyModpack(t, instanceManifest(t, gameDir))
+	if key != "my-pack" || entry["source"] != source || entry["ref"] != "main" {
+		t.Fatalf("a git source is written as it was given: %s %v", key, entry)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {
 		t.Fatalf("linking a remote source must not build in the current directory: %v", err)
@@ -65,14 +71,13 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 	if intent := readFile(t, filepath.Join(instDir, "minecraft", instance.Dir, instance.FileName)); !strings.Contains(intent, h.dir) {
 		t.Fatalf("--force should repoint the instance: %s", intent)
 	}
+	if _, entry := onlyModpack(t, instanceManifest(t, gameDir)); entry["source"] != h.dir || entry["ref"] != nil {
+		t.Fatalf("--force repoints the modpack the instance follows: %v", entry)
+	}
 
 	code, stdout, _ = h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--ref", "main", "--json")
 	if code == 0 || failureCode(t, stdout).Code != "usage" {
 		t.Fatalf("--ref without a source: exit %d %s", code, stdout)
-	}
-	code, stdout, _ = h.run(t, "link", "prism", source, "--launcher-dir", launcherDir, "--mode", "symlink", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "usage" {
-		t.Fatalf("symlink from a remote source: exit %d %s", code, stdout)
 	}
 }
 
@@ -84,8 +89,26 @@ func TestLinkPrism(t *testing.T) {
 	launcherDir := t.TempDir()
 	stdout := h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir)
 	instDir := filepath.Join(launcherDir, "instances", "shulker-my-pack")
-	if !strings.Contains(stdout, "created instance my-pack » "+instDir) || !strings.Contains(stdout, "before each launch") {
+	gameDir := filepath.Join(instDir, "minecraft")
+	if !strings.Contains(stdout, "created instance my-pack » "+instDir) || !strings.Contains(stdout, "the launcher syncs this instance before each launch") {
 		t.Fatalf("link output: %s", stdout)
+	}
+	if !strings.Contains(stdout, "follows my-pack from "+h.dir) {
+		t.Fatalf("the tree should name the pack the instance follows: %s", stdout)
+	}
+	if strings.Contains(stdout, "shulker install") {
+		t.Fatalf("a link builds, so there is nothing left to nudge: %s", stdout)
+	}
+	m := instanceManifest(t, gameDir)
+	client, _ := m["client"].(map[string]any)
+	if m["name"] != "my-pack" || client["build"] != "." {
+		t.Fatalf("instance manifest: %v", m)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("a link builds the instance before it returns: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {
+		t.Fatalf("a link must not build in the source project: %v", err)
 	}
 	cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
 	if cfg["InstanceType"] != "OneSix" || cfg["name"] != "my-pack" || cfg["OverrideCommands"] != "true" {
@@ -95,7 +118,7 @@ func TestLinkPrism(t *testing.T) {
 	if cfg["PreLaunchCommand"] != wantCmd {
 		t.Fatalf("PreLaunchCommand = %q, want %q", cfg["PreLaunchCommand"], wantCmd)
 	}
-	if info, err := os.Lstat(filepath.Join(instDir, "minecraft")); err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+	if info, err := os.Lstat(gameDir); err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		t.Fatalf("minecraft dir: %v %v", info, err)
 	}
 	var pack struct {
@@ -117,35 +140,66 @@ func TestLinkPrism(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(instDir, launcher.PackFile), []byte(packWithLWJGL), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	stdout = h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--mode", "symlink")
-	if !strings.Contains(stdout, "updated instance") || !strings.Contains(stdout, "restart the launcher") || !strings.Contains(stdout, "$ shulker install") {
-		t.Fatalf("second link output: %s", stdout)
+	var env struct {
+		Data prismReport `json:"data"`
+	}
+	stdout = h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--json")
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	rep := env.Data
+	if rep.Launcher != "prism" || rep.Instance != "shulker-my-pack" || rep.Created || rep.GameDir != gameDir || rep.Command != wantCmd {
+		t.Fatalf("json report: %+v", rep)
+	}
+	if rep.Modpack != "my-pack" || rep.Sync == nil || rep.Sync.Dir != gameDir {
+		t.Fatalf("every link reports the pack it follows and the build it did: %+v", rep)
 	}
 	cfg = readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
-	if cfg["name"] != "my-pack" || cfg["lastLaunchTime"] != "5" || cfg["JavaPath"] != "/usr/bin/java" || cfg["PreLaunchCommand"] != "" {
-		t.Fatalf("instance.cfg after symlink mode: %v", cfg)
-	}
-	link, err := os.Readlink(filepath.Join(instDir, "minecraft"))
-	if err != nil || link != filepath.Join(h.dir, "build", "client") {
-		t.Fatalf("minecraft link = %q, %v", link, err)
+	if cfg["name"] != "my-pack" || cfg["lastLaunchTime"] != "5" || cfg["JavaPath"] != "/usr/bin/java" || cfg["PreLaunchCommand"] != wantCmd {
+		t.Fatalf("instance.cfg after a relink: %v", cfg)
 	}
 	readJSONFile(t, filepath.Join(instDir, launcher.PackFile), &pack)
 	if len(pack.Components) != 3 || pack.Components[0]["version"] != "26.2" || pack.Components[1]["uid"] != "org.lwjgl3" || pack.Components[2]["uid"] != "net.fabricmc.fabric-loader" {
 		t.Fatalf("merged mmc-pack.json: %+v", pack)
 	}
+}
 
-	var env struct {
-		Data prismReport `json:"data"`
+// A mod added in the game directory sits on top of the pack: the launcher's instance is a project
+// that follows it, so a later sync relocks around what the player put there.
+func TestLinkPrismKeepsWhatThePlayerAdds(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+
+	launcherDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir)
+	gameDir := filepath.Join(launcherDir, "instances", "shulker-pack", "minecraft")
+
+	h.mustRun(t, "-C", gameDir, "add", "fabric-api")
+	h.mustRun(t, "-C", gameDir, "sync")
+	for _, id := range []string{"sodium", "fabric-api"} {
+		if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars[id].filename)); err != nil {
+			t.Fatalf("%s should survive a sync: %v", id, err)
+		}
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--json")), &env); err != nil {
-		t.Fatal(err)
+}
+
+func TestLinkPrismFromManifestURL(t *testing.T) {
+	h, dir := projectWithLockedPack(t, "base")
+	srv := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	defer srv.Close()
+	source := srv.URL + "/shulker.json"
+
+	launcherDir := t.TempDir()
+	h.mustRun(t, "link", "prism", source, "--launcher-dir", launcherDir, "--name", "Base")
+	gameDir := filepath.Join(launcherDir, "instances", "shulker-base", "minecraft")
+
+	key, entry := onlyModpack(t, instanceManifest(t, gameDir))
+	if key != "base" || entry["source"] != source {
+		t.Fatalf("a manifest URL is written as it was given: %s %v", key, entry)
 	}
-	rep := env.Data
-	if rep.Launcher != "prism" || rep.Instance != "shulker-my-pack" || rep.Mode != "sync" || rep.Created || rep.GameDir != filepath.Join(instDir, "minecraft") || rep.Command != wantCmd {
-		t.Fatalf("json report: %+v", rep)
-	}
-	if info, err := os.Lstat(rep.GameDir); err != nil || !info.IsDir() {
-		t.Fatalf("switching back to sync mode must restore a real game directory: %v %v", info, err)
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("a URL source is locked, so the link can build it: %v", err)
 	}
 }
 
@@ -185,17 +239,14 @@ func TestLinkPrismTargetNameAndErrors(t *testing.T) {
 	if code == 0 || failureCode(t, stdout).Code != "launcher-not-found" {
 		t.Fatalf("missing launcher: exit %d %s", code, stdout)
 	}
-	code, stdout, _ = h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--mode", "hardlink", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "usage" {
-		t.Fatalf("bad mode: exit %d %s", code, stdout)
-	}
-	gameDir := filepath.Join(launcherDir, "custom", "shulker-pack-dev", "minecraft")
-	if err := os.WriteFile(filepath.Join(gameDir, "options.txt"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	code, stdout, _ = h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--mode", "symlink", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "instance-dir-not-empty" {
-		t.Fatalf("non-empty game dir: exit %d %s", code, stdout)
+	// An instance has a client block of its own, so there is nothing left for the flag to assume.
+	for _, name := range []string{"prism", "multimc", "atlauncher", "gdlauncher"} {
+		if code, stdout, _ := h.run(t, "link", name, "--launcher-dir", launcherDir, "--assume-client", "--json"); code == 0 || !strings.Contains(stdout, "assume-client") {
+			t.Fatalf("link %s --assume-client: exit %d %s", name, code, stdout)
+		}
+		if code, stdout, _ := h.run(t, "link", name, "--launcher-dir", launcherDir, "--mode", "symlink", "--json"); code == 0 || !strings.Contains(stdout, "mode") {
+			t.Fatalf("link %s --mode: exit %d %s", name, code, stdout)
+		}
 	}
 }
 

@@ -25,7 +25,7 @@ func TestLinkATLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	instDir := filepath.Join(launcherDir, "instances", "FriendsSMP")
-	if rep := env.Data; rep.Launcher != "atlauncher" || rep.InstanceDir != instDir || rep.GameDir != instDir || !rep.Created || rep.Sync != nil {
+	if rep := env.Data; rep.Launcher != "atlauncher" || rep.InstanceDir != instDir || rep.GameDir != instDir || !rep.Created || rep.Sync == nil || rep.Modpack != "my-pack" {
 		t.Fatalf("link report: %+v", rep)
 	}
 	if len(h.installs) != 0 {
@@ -55,10 +55,10 @@ func TestLinkATLauncher(t *testing.T) {
 	writeATLInstance(t, instDir, inst)
 	h.mustRun(t, "sync", "-i", "Friends SMP")
 	if _, err := os.Stat(filepath.Join(instDir, "mods", h.jars["sodium"].filename)); err != nil {
-		t.Fatalf("the pre-launch sync directory should hold the mods: %v", err)
+		t.Fatalf("the game directory should hold the mods: %v", err)
 	}
-	if st := build.LoadState(instDir); st.Source != h.dir {
-		t.Fatalf("state origin: %+v", st.Origin)
+	if st := build.LoadState(instDir); st.Source != instDir {
+		t.Fatalf("an instance builds from itself: %+v", st.Origin)
 	}
 
 	stdout = h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Friends SMP")
@@ -80,21 +80,16 @@ func TestLinkATLauncher(t *testing.T) {
 		t.Fatalf("links: %+v", listed.Data)
 	}
 
-	statePath := build.StatePath(instDir)
-	state := map[string]any{}
-	if err := json.Unmarshal([]byte(readFile(t, statePath)), &state); err != nil {
-		t.Fatal(err)
-	}
-	state["source"] = "/elsewhere"
-	data, _ := json.Marshal(state)
-	if err := os.WriteFile(statePath, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	code, stdout, _ := h.run(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Friends SMP", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-exists" || !strings.Contains(e.Message, "/elsewhere") {
+	other := filepath.Join(t.TempDir(), "other")
+	lockedPack(t, h, other, `"fabric-api": {}`)
+	code, stdout, _ := h.run(t, "link", "atlauncher", other, "--launcher-dir", launcherDir, "--name", "Friends SMP", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-exists" || !strings.Contains(e.Message, h.dir) {
 		t.Fatalf("linking over another source: exit %d %s", code, stdout)
 	}
-	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Friends SMP", "--force")
+	h.mustRun(t, "link", "atlauncher", other, "--launcher-dir", launcherDir, "--name", "Friends SMP", "--force")
+	if _, entry := onlyModpack(t, instanceManifest(t, instDir)); entry["source"] != other {
+		t.Fatalf("--force repoints the modpack the instance follows: %v", entry)
+	}
 
 	code, stdout, _ = h.run(t, "link", "atlauncher", "--launcher-dir", filepath.Join(launcherDir, "nope"), "--json")
 	if code == 0 || failureCode(t, stdout).Code != "launcher-not-found" {
@@ -146,9 +141,11 @@ func TestLinkATLauncherNeoForge(t *testing.T) {
 	}
 	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--force")
 
-	if r := unlinkJSON(t, h, "Neo"); len(r) != 1 || !strings.HasSuffix(r[0].Relink, " --force") {
-		t.Fatalf("an instance that never synced needs --force to link again: %+v", r)
+	// The instance stays a project of its own, so the relink hint picks it back up as it is.
+	if r := unlinkJSON(t, h, "Neo"); len(r) != 1 || strings.Contains(r[0].Relink, "--force") {
+		t.Fatalf("unlink leaves an instance a link can adopt: %+v", r)
 	}
+	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Neo")
 }
 
 func readATLInstance(t *testing.T, instDir string) map[string]any {

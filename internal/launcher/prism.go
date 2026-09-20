@@ -20,8 +20,6 @@ const (
 	PackFile           = "mmc-pack.json"
 )
 
-var ErrGameDirNotEmpty = errors.New("instance game directory is not empty")
-
 type Prism struct {
 	Dir     string
 	MultiMC bool
@@ -33,7 +31,6 @@ type Instance struct {
 	Minecraft     string
 	LoaderType    string
 	LoaderVersion string
-	GameDirLink   string
 }
 
 type InstanceResult struct {
@@ -102,7 +99,7 @@ func (l *Prism) WriteInstance(inst Instance) (InstanceResult, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return res, err
 	}
-	gameDir, err := l.prepareGameDir(dir, inst.GameDirLink)
+	gameDir, err := prepareGameDir(dir)
 	if err != nil {
 		return res, err
 	}
@@ -128,7 +125,10 @@ func gameDirIn(dir string) string {
 	return gameDir
 }
 
-func (l *Prism) prepareGameDir(dir, link string) (string, error) {
+// prepareGameDir is the real directory an instance plays out of. A symlink standing where it
+// belongs is replaced: the instance is a project of its own now, and it has to be somewhere
+// shulker can write a manifest, a lock and a history to.
+func prepareGameDir(dir string) (string, error) {
 	gameDir := gameDirIn(dir)
 	info, err := os.Lstat(gameDir)
 	switch {
@@ -136,34 +136,11 @@ func (l *Prism) prepareGameDir(dir, link string) (string, error) {
 	case err != nil:
 		return "", err
 	case info.Mode()&os.ModeSymlink != 0:
-		if link != "" {
-			if current, err := os.Readlink(gameDir); err == nil && current == link {
-				return gameDir, nil
-			}
-		}
 		if err := os.Remove(gameDir); err != nil {
-			return "", err
-		}
-	case link != "":
-		entries, err := os.ReadDir(gameDir)
-		if err != nil {
-			return "", err
-		}
-		// A game directory holding nothing but shulker's own state is shulker's to replace: it is
-		// what a sync-mode link leaves behind, and switching that instance to symlink mode drops it.
-		for _, entry := range entries {
-			if entry.Name() != shulkerDir {
-				return gameDir, fmt.Errorf("%w: %s", ErrGameDirNotEmpty, gameDir)
-			}
-		}
-		if err := os.RemoveAll(gameDir); err != nil {
 			return "", err
 		}
 	default:
 		return gameDir, nil
-	}
-	if link != "" {
-		return gameDir, os.Symlink(link, gameDir)
 	}
 	return gameDir, os.Mkdir(gameDir, 0o755)
 }

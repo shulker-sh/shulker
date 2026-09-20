@@ -191,18 +191,20 @@ func TestInstancesList(t *testing.T) {
 	for _, e := range env.Data {
 		got = append(got, e.Launcher+":"+e.ID+":"+e.Status)
 	}
-	want := "prism:alpha:synced prism:gone:missing prism:locked:unreadable prism:zed:not-synced mojang:pack:synced"
+	want := "prism:alpha:synced prism:gone:missing prism:locked:unreadable prism:zed:synced mojang:pack:synced"
 	if strings.Join(got, " ") != want {
 		t.Fatalf("instances:\n got %s\nwant %s", strings.Join(got, " "), want)
 	}
-	if env.Data[0].SyncedAt == "" || env.Data[3].SyncedAt != "" {
+	// Every link builds, so a linked instance is synced from the moment it exists.
+	if env.Data[0].SyncedAt == "" || env.Data[3].SyncedAt == "" {
 		t.Fatalf("syncedAt comes from the state file: %+v", env.Data)
 	}
 
 	stdout := h.mustRun(t, "instances")
 	for _, part := range []string{
 		"Prism Launcher\n    ├─ • alpha client (synced ",
-		"• zed client (not synced yet)\n         " + filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         Zed, from " + h.dir + ", side client\n",
+		"• zed client (synced ",
+		filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         Zed, from " + h.dir + ", side client\n",
 		"\n\n  Minecraft Launcher\n    └─ • pack client (synced ",
 		"• gone (directory is missing)\n",
 		"• locked (can't read the directory)\n",
@@ -310,21 +312,6 @@ func TestSyncInstance(t *testing.T) {
 	}
 }
 
-func TestSyncInstanceLinkedBySymlink(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-	h.mustRun(t, "build")
-	h.mustRun(t, "link", "prism", "--launcher-dir", t.TempDir(), "--mode", "symlink")
-	h.mustRun(t, "sync", "-i", "pack")
-	if instances := readInstances(t, h); len(instances) != 1 {
-		t.Fatalf("syncing through the symlink must not add an instance: %+v", instances)
-	}
-	if data, err := os.ReadFile(filepath.Join(h.dir, "shulker.local.json")); err == nil && strings.Contains(string(data), "syncDirs") {
-		t.Fatalf("the build directory reached through a symlink is not a sync dir: %s", data)
-	}
-}
-
 func TestFeatureInstance(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
@@ -411,7 +398,8 @@ func TestInstancesRepair(t *testing.T) {
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
 
 	// A registry shulker can't read is rebuilt from what the launcher holds, and
-	// an instance missing its file gets one from what its build recorded.
+	// an instance missing its file gets one from what its build recorded. An in-place instance
+	// builds from itself, so that record names the directory until repair reads the manifest.
 	if err := os.WriteFile(registryPath(h), []byte("{ not a registry"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -423,13 +411,13 @@ func TestInstancesRepair(t *testing.T) {
 		t.Fatalf("repair:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
 	instances := readInstances(t, h)
-	if len(instances) != 1 || instances[0].Dir != gameDir || instances[0].Source != h.dir || instances[0].Launcher != "prism" {
+	if len(instances) != 1 || instances[0].Dir != gameDir || instances[0].Launcher != "prism" {
 		t.Fatalf("the scan registers the instance again: %+v", instances)
 	}
 	if instances[0].LastSync != "" {
 		t.Fatalf("a directory with no record of a sync is registered without a time: %+v", instances[0])
 	}
-	if f := readIntent(t, gameDir); f.Source != h.dir || f.Side != "client" {
+	if f := readIntent(t, gameDir); f.Side != "client" {
 		t.Fatalf("repair writes the instance file: %+v", f)
 	}
 

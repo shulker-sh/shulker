@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -22,19 +23,18 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatal(err)
 	}
 	var env struct {
-		Data     prismReport `json:"data"`
-		Warnings []string    `json:"warnings"`
+		Data prismReport `json:"data"`
 	}
 	stdout := h.mustRun(t, "link", "gdlauncher", "--launcher-dir", unresolved, "--name", "Friends: SMP", "--json")
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if len(env.Warnings) != 0 {
-		t.Fatalf("GDLauncher lists the locked Fabric loader: %q", env.Warnings)
+	if w := gdlWarnings(t, stdout); len(w) != 0 {
+		t.Fatalf("GDLauncher lists the locked Fabric loader: %q", w)
 	}
 	instDir := filepath.Join(launcherDir, "instances", "Friends_ SMP")
 	gameDir := filepath.Join(instDir, "instance")
-	if rep := env.Data; rep.Launcher != "gdlauncher" || rep.InstanceDir != instDir || rep.GameDir != gameDir || !rep.Created || rep.Sync != nil {
+	if rep := env.Data; rep.Launcher != "gdlauncher" || rep.InstanceDir != instDir || rep.GameDir != gameDir || !rep.Created || rep.Sync == nil || rep.Modpack != "my-pack" {
 		t.Fatalf("link report: %+v", rep)
 	}
 	if len(h.installs) != 0 {
@@ -61,15 +61,11 @@ func TestLinkGDLauncher(t *testing.T) {
 	inst["game_configuration"].(map[string]any)["memory"] = map[string]any{"min_mb": 1024, "max_mb": 8192}
 	inst["icon"] = "mine.png"
 	writeGDLInstance(t, instDir, inst)
-	t.Run("hook", func(t *testing.T) {
-		t.Chdir(gameDir)
-		h.mustRun(t, "sync", h.dir, "--side", "client", "--into", ".")
-	})
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
-		t.Fatalf("the pre-launch sync directory should hold the mods: %v", err)
+		t.Fatalf("a link builds the instance before it returns: %v", err)
 	}
-	if st := build.LoadState(gameDir); st.Source != h.dir {
-		t.Fatalf("state origin: %+v", st.Origin)
+	if st := build.LoadState(gameDir); st.Source != gameDir {
+		t.Fatalf("an instance builds from itself: %+v", st.Origin)
 	}
 
 	stdout = h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Friends: SMP")
@@ -92,21 +88,17 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatalf("links: %+v", listed.Data)
 	}
 
-	statePath := build.StatePath(gameDir)
-	state := map[string]any{}
-	if err := json.Unmarshal([]byte(readFile(t, statePath)), &state); err != nil {
-		t.Fatal(err)
-	}
-	state["source"] = "/elsewhere"
-	data, _ := json.Marshal(state)
-	if err := os.WriteFile(statePath, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	code, stdout, _ := h.run(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Friends: SMP", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-exists" || !strings.Contains(e.Message, "/elsewhere") {
+	other := filepath.Join(t.TempDir(), "other")
+	lockedPack(t, h, other, `"fabric-api": {}`)
+	code, stdout, _ := h.run(t, "link", "gdlauncher", other, "--launcher-dir", launcherDir, "--name", "Friends: SMP", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-exists" || !strings.Contains(e.Message, h.dir) {
 		t.Fatalf("linking over another source: exit %d %s", code, stdout)
 	}
-	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Friends: SMP", "--force")
+	h.mustRun(t, "link", "gdlauncher", other, "--launcher-dir", launcherDir, "--name", "Friends: SMP", "--force")
+	if _, entry := onlyModpack(t, instanceManifest(t, gameDir)); entry["source"] != other {
+		t.Fatalf("--force repoints the modpack the instance follows: %v", entry)
+	}
+	h.mustRun(t, "link", "gdlauncher", h.dir, "--launcher-dir", launcherDir, "--name", "Friends: SMP", "--force")
 
 	code, stdout, _ = h.run(t, "link", "gdlauncher", "--launcher-dir", filepath.Join(launcherDir, "nope"), "--json")
 	if code == 0 || failureCode(t, stdout).Code != "launcher-not-found" {
@@ -159,13 +151,11 @@ func TestLinkGDLauncherNeoForge(t *testing.T) {
 	}
 	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Mine", "--force")
 
-	if r := unlinkJSON(t, h, "Neo"); len(r) != 1 || !strings.HasSuffix(r[0].Relink, " --force") {
-		t.Fatalf("an instance that never synced needs --force to link again: %+v", r)
+	// The instance stays a project of its own, so the relink hint picks it back up as it is.
+	if r := unlinkJSON(t, h, "Neo"); len(r) != 1 || strings.Contains(r[0].Relink, "--force") {
+		t.Fatalf("unlink leaves an instance a link can adopt: %+v", r)
 	}
-	code, stdout, _ = h.run(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Neo", "--json")
-	if code == 0 || failureCode(t, stdout).Code != "instance-exists" {
-		t.Fatalf("relinking without --force: exit %d %s", code, stdout)
-	}
+	h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Neo")
 }
 
 func TestLinkGDLauncherForge(t *testing.T) {
@@ -182,6 +172,8 @@ func TestLinkGDLauncherForge(t *testing.T) {
 	}
 }
 
+// gdlWarnings is what a link said about GDLauncher itself. Every fresh link relocks a modpack the
+// instance manifest has just started following, and that line is not what these tests are reading.
 func gdlWarnings(t *testing.T, stdout string) []string {
 	t.Helper()
 	var env struct {
@@ -190,7 +182,9 @@ func gdlWarnings(t *testing.T, stdout string) []string {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	return env.Warnings
+	return slices.DeleteFunc(env.Warnings, func(w string) bool {
+		return strings.Contains(w, "is not in the lock yet")
+	})
 }
 
 func gdlLoader(t *testing.T, instDir string) (release string, loader map[string]any) {

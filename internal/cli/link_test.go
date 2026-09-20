@@ -212,19 +212,29 @@ func TestLinkMojangForceRepointsTheModpack(t *testing.T) {
 	}
 }
 
-// A pack's retention is copied once, because the author is the one who knows how big a build is.
-// From then on the number is the player's.
-func TestLinkMojangCopiesTheHistoryRetention(t *testing.T) {
+// A pack's retention and its marker are copied once, because the author is the one who knows how
+// big a build is and whether the mod list has to match exactly. From then on both are the player's.
+func TestLinkMojangCopiesThePacksPreferences(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
-	h.editManifest(t, func(m map[string]any) { m["history"] = 2 })
+	h.editManifest(t, func(m map[string]any) {
+		m["history"] = 2
+		m["marker"] = false
+	})
 	h.mustRun(t, "lock")
 
 	launcherDir := mojangLauncherDir(t)
 	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
-	m := instanceManifest(t, filepath.Join(launcherDir, "shulker", "pack"))
+	gameDir := filepath.Join(launcherDir, "shulker", "pack")
+	m := instanceManifest(t, gameDir)
 	if n, ok := m["history"].(float64); !ok || n != 2 {
 		t.Fatalf("the pack's retention should be copied into the instance: %v", m)
+	}
+	if marker, ok := m["marker"].(bool); !ok || marker {
+		t.Fatalf("the pack's marker should be copied into the instance: %v", m)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", "shulker-pack.jar")); !os.IsNotExist(err) {
+		t.Fatalf("a pack that leaves the marker out gives an instance that leaves it out: %v", err)
 	}
 }
 

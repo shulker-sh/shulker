@@ -51,11 +51,11 @@ type Linked struct {
 
 var All = []*Entry{
 	{Name: "shulker", Title: "Shulker", Instanced: true, gameDirIsInstance: true, relink: relinkShulker, forget: forgetShulker},
-	{Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir, relink: relinkInstance, forget: forgetInstance},
-	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkInstance, forget: forgetInstance},
-	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkMojang, forget: forgetMojang},
-	{Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, relink: relinkMojang, forget: forgetInstance},
-	{Name: "gdlauncher", Title: "GDLauncher", Instanced: true, DefaultDir: DefaultGDLauncherDir, relink: relinkMojang, forget: forgetInstance},
+	{Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir, relink: relinkLauncher, forget: forgetInstance},
+	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkLauncher, forget: forgetInstance},
+	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkLauncher, forget: forgetMojang},
+	{Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, relink: relinkLauncher, forget: forgetInstance},
+	{Name: "gdlauncher", Title: "GDLauncher", Instanced: true, DefaultDir: DefaultGDLauncherDir, relink: relinkLauncher, forget: forgetInstance},
 }
 
 // InstanceDir is the instance folder that holds an instanced launcher's game directory.
@@ -180,42 +180,19 @@ func forgetShulker(e *Entry, l config.Instance) (Forgotten, error) {
 	return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance directory and its worlds stay.", l.Label(), e.Title)}, nil
 }
 
-func relinkInstance(e *Entry, l Linked) (args []string, in string) {
-	args = []string{"shulker", "link", e.Name}
-	if info, err := os.Lstat(l.Dir); err == nil && info.Mode()&os.ModeSymlink != 0 {
-		in = l.Source
-		args = append(args, "--mode", "symlink")
-	} else {
-		args = append(args, shellArg(l.Source))
-		if l.Ref != "" {
-			args = append(args, "--ref", shellArg(l.Ref))
-		}
-	}
-	if l.AssumeClient {
-		args = append(args, "--assume-client")
-	}
-	return append(args, "--name", shellArg(l.Label())), in
-}
-
-func relinkMojang(e *Entry, l Linked) (args []string, in string) {
+// relinkLauncher rebuilds an instance a launcher owns. Every one of them names the source and
+// follows it as a modpack, so the command is the same shape whichever launcher wrote the instance.
+func relinkLauncher(e *Entry, l Linked) (args []string, in string) {
 	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
-	}
-	if l.AssumeClient {
-		args = append(args, "--assume-client")
 	}
 	return append(args, "--name", shellArg(l.Label())), ""
 }
 
 func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
-	instanceDir := e.InstanceDir(l.Dir)
-	_, statErr := os.Stat(instanceDir)
-	switch info, err := os.Lstat(l.Dir); {
-	case errors.Is(statErr, os.ErrNotExist):
+	if _, err := os.Stat(e.InstanceDir(l.Dir)); errors.Is(err, os.ErrNotExist) {
 		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its instance was already gone.", l.Label(), e.Title)}, nil
-	case err == nil && info.Mode()&os.ModeSymlink != 0:
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance stays and still uses the build directory.", l.Label(), e.Title)}, nil
 	}
 	tookPreLaunch, tookPostExit, err := ReleaseSlots(e, l)
 	if err != nil {

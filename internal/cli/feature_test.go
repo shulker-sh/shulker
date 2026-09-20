@@ -234,8 +234,4 @@ func TestLinkPrismKeepsFeatureFlags(t *testing.T) {
 	if lf := readLocal(t, gameDir); len(lf.Features) != 1 {
 		t.Fatalf("re-linking without flags keeps the choices: %+v", lf)
 	}
-	code, stdout, _ := h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--mode", "symlink", "--with", "fancy", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
-		t.Fatalf("symlink with --with: exit %d %s", code, stdout)
-	}
 }

@@ -29,7 +29,6 @@ func TestUnlink(t *testing.T) {
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Custom")
-	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Sym", "--mode", "symlink")
 	mojangDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(mojangDir, launcher.ProfilesFile), []byte(`{"profiles":{"other":{"name":"Other","gameDir":"/elsewhere"}}}`), 0o644); err != nil {
 		t.Fatal(err)
@@ -41,7 +40,7 @@ func TestUnlink(t *testing.T) {
 		t.Fatalf("unlink with no name: exit %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "unlink", "nope", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-not-found" || len(e.Candidates) != 4 {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-not-found" || len(e.Candidates) != 3 {
 		t.Fatalf("unknown name: exit %d %s", code, stdout)
 	}
 
@@ -67,11 +66,6 @@ func TestUnlink(t *testing.T) {
 	// goes, and unlink reports the slot that actually went.
 	if r := unlinkJSON(t, h, "Custom"); r[0].Removed != launcher.RemovedPostExit || readINIFile(t, customCfg)["PreLaunchCommand"] != "echo hi" {
 		t.Fatalf("a pre-launch command that isn't shulker's is kept: %+v", r)
-	}
-
-	stdout = h.mustRun(t, "unlink", "Sym")
-	if !strings.Contains(stdout, "still uses the build directory") || !strings.Contains(stdout, "To link it again, in "+h.dir+":\n    $ shulker link prism --mode symlink --name Sym --launcher-dir "+prismDir) {
-		t.Fatalf("unlink symlink instance: %s", stdout)
 	}
 
 	r = unlinkJSON(t, h, "pack", "--launcher", "mojang")

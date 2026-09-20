@@ -317,7 +317,8 @@ func (a *app) syncRecorded(cmd *cobra.Command, req syncRequest) (syncResult, err
 	return a.syncInstance(cmd, e, req)
 }
 
-// sameDir also treats a symlink to dir as dir, e.g. a Prism instance linked in symlink mode.
+// sameDir also treats a symlink to dir as dir, since a launcher's game directory may be reached
+// through one.
 func sameDir(a, b string) bool {
 	if filepath.Clean(a) == filepath.Clean(b) {
 		return true

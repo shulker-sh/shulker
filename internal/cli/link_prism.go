@@ -5,10 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
@@ -23,13 +21,13 @@ type prismReport struct {
 	Instance    string      `json:"instance"`
 	InstanceDir string      `json:"instanceDir"`
 	Name        string      `json:"name"`
-	Mode        string      `json:"mode"`
-	Side        string      `json:"side"`
 	GameDir     string      `json:"gameDir"`
 	Command     string      `json:"command,omitempty"`
 	Created     bool        `json:"created"`
 	Source      string      `json:"source"`
-	Sync        *syncResult `json:"sync,omitempty"`
+	Ref         string      `json:"ref,omitempty"`
+	Modpack     string      `json:"modpack"`
+	Sync        *syncResult `json:"sync"`
 }
 
 func (a *app) linkPrismCmd() *cobra.Command { return a.linkPrismLikeCmd(false) }
@@ -40,9 +38,8 @@ func (a *app) linkMultiMCCmd() *cobra.Command { return a.linkPrismLikeCmd(true) 
 // layout Prism grew from, told apart by the launcher name, the instance.cfg dialect and MultiMC
 // having no default directory to find.
 func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
-	var launcherDir, mode, instanceName, ref, as string
+	var launcherDir, instanceName, ref, as string
 	var force bool
-	var assumeClient bool
 	var ff featureFlags
 	var ls linkSettings
 	launcherName, use, short := "prism", "prism", "Create a Prism Launcher instance that syncs the client build before each launch"
@@ -60,21 +57,9 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 			if multimc && launcherDir == "" {
 				return out.Errorf("launcher-dir-required", "MultiMC is portable; pass --launcher-dir with the folder that holds multimc.cfg")
 			}
-			if mode != "sync" && mode != "symlink" {
-				return out.Errorf("usage", "--mode must be sync or symlink, not %q", mode)
-			}
-			if mode != "sync" && ls.set() {
-				return out.Errorf("usage", "the instance settings need --mode sync; a symlinked instance has no instance file to record them in")
-			}
-			if mode == "symlink" && runtime.GOOS == "windows" {
-				return out.Errorf("unsupported-mode", "symlink mode is not supported on Windows yet; use --mode sync")
-			}
 			src, err := a.linkSource(cmd.Context(), args, ref)
 			if err != nil {
 				return err
-			}
-			if mode == "symlink" && src.remote() {
-				return out.Errorf("usage", "--mode symlink needs a local project; a remote source can only be synced")
 			}
 			p := src.project
 			if p.Lock.Loader.Type != "" {
@@ -82,15 +67,11 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 					return err
 				}
 			}
-			side, err := a.clientSide(p.Manifest, assumeClient)
-			if err != nil {
-				return err
+			if !p.Manifest.HasSide("client") {
+				a.printer.Warn("%s", noClientPack)
 			}
 			hasFeatures := len(ff.with)+len(ff.without) > 0
 			if hasFeatures {
-				if mode != "sync" {
-					return out.Errorf("usage", "--with and --without need --mode sync; a symlinked instance uses the build directory as built")
-				}
 				b, err := a.builder(cmd.Context(), p)
 				if err != nil {
 					return err
@@ -113,33 +94,20 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 			} else if err != nil {
 				return err
 			}
-			buildDir := filepath.Join(src.Dir, p.Manifest.BuildDir(side))
-			display := p.Manifest.DisplayName(side)
+			display := p.Manifest.DisplayName("client")
 			if instanceName != "" {
 				display = instanceName
 			}
-			inst := launcher.Instance{
+			if prev, ok := a.findLauncherInstance(launcherName, launcherDir, display); ok && prev.Source != src.name && !force {
+				return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev.Source)
+			}
+			res, err := l.WriteInstance(launcher.Instance{
 				ID:            profileKey(display),
 				Name:          display,
 				Minecraft:     p.Lock.Minecraft,
 				LoaderType:    p.Lock.Loader.Type,
 				LoaderVersion: p.Lock.Loader.Version,
-			}
-			if mode == "sync" {
-				prevState, stateErr := build.ReadState(l.GameDir(inst.ID))
-				if stateErr != nil {
-					a.printer.Warn("%v", stateErr)
-				}
-				if prev := prevState.Source; prev != "" && prev != src.name && !force {
-					return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev)
-				}
-			} else {
-				inst.GameDirLink = buildDir
-			}
-			res, err := l.WriteInstance(inst)
-			if errors.Is(err, launcher.ErrGameDirNotEmpty) {
-				return out.Errorf("instance-dir-not-empty", "%s already has files; move them away (or keep --mode sync) before linking in symlink mode", res.GameDir)
-			}
+			})
 			if err != nil {
 				return err
 			}
@@ -148,47 +116,24 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 					return err
 				}
 			}
-			// A symlink-mode instance gets no instance file and so no hooks; if it had them before,
-			// this is where it lets go of them.
-			if mode != "sync" {
-				if e := launcher.Find(launcherName); e != nil {
-					if _, _, err := launcher.ReleaseSlots(e, config.Instance{Launcher: launcherName, LauncherDir: launcherDir, Dir: res.GameDir}); err != nil {
-						return err
-					}
-				}
-			}
-			if err := a.checkID(as, res.GameDir); err != nil {
+			row := config.Instance{Launcher: launcherName, LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name}
+			inst, synced, err := a.linkInstance(cmd, row, as, ref, src, ls)
+			if err != nil {
 				return err
-			}
-			// In symlink mode the game directory is the project's own build directory, so the
-			// project holds the intent and nothing is written into its output.
-			if mode == "sync" {
-				if err := ls.save(res.GameDir, src.name, ref, side, assumeClient, p.Manifest); err != nil {
-					return err
-				}
-			}
-			a.registerInstance(config.Instance{ID: as, Launcher: launcherName, LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name})
-			var synced *syncResult
-			if len(args) == 1 && mode == "sync" {
-				r, err := a.sync(cmd.Context(), src, syncRequest{ref: ref, side: side, into: res.GameDir, assumeClient: assumeClient})
-				if err != nil {
-					return err
-				}
-				synced = &r
 			}
 			rep := prismReport{
 				Launcher:    launcherName,
 				LauncherDir: launcherDir,
-				Instance:    inst.ID,
+				Instance:    filepath.Base(res.Dir),
 				InstanceDir: res.Dir,
 				Name:        display,
-				Mode:        mode,
-				Side:        side,
 				GameDir:     res.GameDir,
-				Command:     linkedSlotCommand(launcherName, mode, res.GameDir),
+				Command:     launcher.SlotCommand(launcherName, res.GameDir, launcher.HookPreLaunch),
 				Created:     res.Created,
 				Source:      src.name,
-				Sync:        synced,
+				Ref:         ref,
+				Modpack:     modpackKey(inst.Manifest, src.name),
+				Sync:        &synced,
 			}
 			return a.printer.Emit(rep, func(l *out.Lines) {
 				verb := "created"
@@ -196,11 +141,9 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 					verb = "updated"
 				}
 				l.OKInto(verb+" instance "+display, res.Dir, "")
-				var rows []out.Row
-				if mode == "sync" {
-					rows = append(rows, out.Row{Text: "the launcher runs `shulker sync` for the " + side + " side before each launch"})
-				} else {
-					rows = append(rows, out.Row{Text: "the instance game directory links to " + buildDir})
+				rows := []out.Row{
+					{Text: "follows " + rep.Modpack + " from " + rep.Source},
+					{Text: "the launcher syncs this instance before each launch"},
 				}
 				if hasFeatures {
 					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
@@ -209,14 +152,7 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 					rows = append(rows, out.Row{Text: "restart the launcher if it is open so the change is picked up"})
 				}
 				l.Tree(rows...)
-				if mode != "sync" {
-					if _, err := os.Stat(build.StatePath(buildDir)); err != nil {
-						l.Nudge("Download and build before launching", "shulker install")
-					}
-				}
-				if synced != nil {
-					synced.print(l)
-				}
+				synced.print(l)
 			})
 		},
 	}
@@ -225,8 +161,6 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 	} else {
 		cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: Prism Launcher's)")
 	}
-	cmd.Flags().BoolVar(&assumeClient, "assume-client", false, "link a client even when the source declares none, built from the mods and overrides both sides share")
-	cmd.Flags().StringVar(&mode, "mode", "sync", "sync: build into the instance before each launch; symlink: point the instance at the build directory")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
@@ -263,15 +197,6 @@ func (a *app) saveInstanceFeatures(gameDir string, ff featureFlags) error {
 		lf.SetFeature(name, false)
 	}
 	return a.saveLocal(lf, false)
-}
-
-// linkedSlotCommand is what the launcher's slot holds once reconcile has written it. An instance
-// linked in symlink mode has no instance file and so no hooks, and nothing in its slot.
-func linkedSlotCommand(launcherName, mode, gameDir string) string {
-	if mode != "sync" {
-		return ""
-	}
-	return launcher.SlotCommand(launcherName, gameDir, launcher.HookPreLaunch)
 }
 
 // shulkerPath is the path reconcile records in settings.shulker for the generated scripts to call:
