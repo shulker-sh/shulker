@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
@@ -89,6 +90,13 @@ type harness struct {
 	quiltLoader    fakeJar
 	mixin          fakeJar
 	vanilla        fakeJar
+	clientJar      fakeJar
+	brigadier      fakeJar
+	fabricLoader   fakeJar
+	assetIndex     []byte
+	assets         map[string]string
+	storeMu        sync.Mutex
+	storeHits      int
 	quiltHits      int
 	neoInstaller   fakeJar
 	neoLibs        map[string]fakeJar
@@ -112,6 +120,14 @@ type harness struct {
 	msa            *fakeMSA
 	// exe stands in for the running binary, for the commands that move or remove it.
 	exe string
+}
+
+// hitStore counts one download out of the game store's fakes, which the store fetches several at a
+// time.
+func (h *harness) hitStore() {
+	h.storeMu.Lock()
+	defer h.storeMu.Unlock()
+	h.storeHits++
 }
 
 func newHarness(t *testing.T) *harness {
@@ -138,14 +154,55 @@ func newHarness(t *testing.T) *harness {
 		})
 	})
 	h.vanilla = makeJarFile(t, "minecraft", "server.jar", "version.json", `{"id":"26.2"}`)
+	h.clientJar = makeJarFile(t, "minecraft", "client.jar", "version.json", `{"id":"26.2"}`)
+	h.brigadier = makeJarFile(t, "brigadier", "brigadier-1.3.10.jar", "brigadier.txt", "brigadier")
+	h.fabricLoader = makeJarFile(t, "fabric_loader", "fabric-loader-0.17.3.jar", "fabric.mod.json", `{"id":"fabricloader"}`)
+	h.assets = map[string]string{"icons/icon_16x16.png": "icon bytes", "minecraft/lang/en_us.json": "{}"}
+	objects := map[string]any{}
+	for name, body := range h.assets {
+		objects[name] = map[string]any{"hash": sha1Hex([]byte(body)), "size": len(body)}
+	}
+	h.assetIndex, _ = json.Marshal(map[string]any{"objects": objects})
 	mux.HandleFunc("/piston/", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{
 			"id":          strings.TrimSuffix(filepath.Base(r.URL.Path), ".json"),
+			"type":        "release",
 			"mainClass":   "net.minecraft.client.main.Main",
-			"libraries":   []map[string]any{{"name": "com.mojang:brigadier:1.3.10", "downloads": map[string]any{"artifact": map[string]any{"path": "com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar", "url": base + "/mojang-libs/brigadier-1.3.10.jar"}}}},
+			"libraries":   []map[string]any{{"name": "com.mojang:brigadier:1.3.10", "downloads": map[string]any{"artifact": map[string]any{"path": "com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar", "url": base + "/mojang-libs/brigadier-1.3.10.jar", "sha1": h.brigadier.sha1, "size": len(h.brigadier.data)}}}},
 			"javaVersion": map[string]any{"component": "java-runtime-epsilon", "majorVersion": 25},
-			"downloads":   map[string]any{"server": map[string]any{"url": base + "/piston-data/server.jar", "sha1": h.vanilla.sha1}},
+			"assetIndex":  map[string]any{"id": "26", "url": base + "/piston/assets/26.json", "sha1": sha1Hex(h.assetIndex), "size": len(h.assetIndex), "totalSize": 21},
+			"arguments":   map[string]any{"game": []string{"--username", "${auth_player_name}", "--accessToken", "${auth_access_token}"}, "jvm": []string{"-Djava.library.path=${natives_directory}", "-cp", "${classpath}"}},
+			"downloads": map[string]any{
+				"server": map[string]any{"url": base + "/piston-data/server.jar", "sha1": h.vanilla.sha1},
+				"client": map[string]any{"url": base + "/piston-data/client.jar", "sha1": h.clientJar.sha1, "size": len(h.clientJar.data)},
+			},
 		})
+	})
+	mux.HandleFunc("/piston/assets/26.json", func(w http.ResponseWriter, r *http.Request) {
+		h.hitStore()
+		w.Write(h.assetIndex)
+	})
+	mux.HandleFunc("/piston-data/client.jar", func(w http.ResponseWriter, r *http.Request) {
+		h.hitStore()
+		w.Write(h.clientJar.data)
+	})
+	mux.HandleFunc("/mojang-libs/brigadier-1.3.10.jar", func(w http.ResponseWriter, r *http.Request) {
+		h.hitStore()
+		w.Write(h.brigadier.data)
+	})
+	mux.HandleFunc("/fmaven/net/fabricmc/fabric-loader/0.17.3/fabric-loader-0.17.3.jar", func(w http.ResponseWriter, r *http.Request) {
+		h.hitStore()
+		w.Write(h.fabricLoader.data)
+	})
+	mux.HandleFunc("/resources/", func(w http.ResponseWriter, r *http.Request) {
+		h.hitStore()
+		for _, body := range h.assets {
+			if strings.HasSuffix(r.URL.Path, sha1Hex([]byte(body))) {
+				io.WriteString(w, body)
+				return
+			}
+		}
+		http.NotFound(w, r)
 	})
 	h.quiltLoader = makeJarFile(t, "quilt_loader", "quilt-loader-0.30.1.jar", "quilt.mod.json",
 		`{"schema_version":1,"quilt_loader":{"id":"quilt_loader","version":"0.30.1","provides":[{"id":"fabricloader","version":"0.19.5"}]}}`)
@@ -200,7 +257,7 @@ func newHarness(t *testing.T) *harness {
 		writeJSON(w, map[string]any{
 			"id": "fabric-loader-0.17.3-26.2", "inheritsFrom": "26.2", "type": "release",
 			"mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
-			"libraries": []map[string]any{{"name": "net.fabricmc:fabric-loader:0.17.3", "url": "https://maven.fabricmc.net/"}},
+			"libraries": []map[string]any{{"name": "net.fabricmc:fabric-loader:0.17.3", "url": base + "/fmaven/"}},
 		})
 	})
 	mux.HandleFunc("/fabric/versions/installer", func(w http.ResponseWriter, r *http.Request) {
@@ -560,6 +617,7 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 		players:    players,
 		gdlauncher: &meta.GDLauncher{Client: f, BaseURL: h.server.URL + "/gdl"},
 		signin:     h.msa.signIn(f, h.server.URL),
+		resources:  h.server.URL + "/resources",
 	}
 	return a
 }

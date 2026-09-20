@@ -662,6 +662,27 @@ An account is named by its username, matched without regard to case; by `name@so
 
 ## Running
 
+### `shulker play`
+
+Start a shulker instance. With no nickname it plays the instance the current directory is; `-i` names one from anywhere.
+
+Only the instances shulker owns can be played here: every other launcher starts its own, so an instance linked into one fails with `not-shulker`.
+
+`--dry-run` assembles the launch and prints it instead of starting the game. It fetches whatever the store is missing — the version JSON, the client jar, the libraries and natives for this machine, the asset index and its objects — then reports the version it resolved and what it inherits from, the Java it would use, the game and natives directories, the asset index, and the classpath as a count and a size. A second run downloads nothing. It needs no account, which is what makes the plan checkable on its own. The game's own arguments carry a session access token, so they are printed nowhere, in a dry run or out of one.
+
+Everything a launch shares lives in the store: `versions/`, `libraries/` and `assets/` under the store root, laid out the way the Mojang launcher lays out its own directory. Move it with `shulker config set store <path>`. The natives a launch unpacks are per-instance and sit in `.shulker/natives`.
+
+```sh
+shulker play --dry-run
+shulker play smp --dry-run
+```
+
+| Flag | Description |
+| --- | --- |
+| `--dry-run` | Assemble the launch and print it instead of starting the game |
+
+With `--json`, the data is `{ "instance", "version", "inherits", "mainClass", "java", "gameDir", "nativesDir", "assetIndex", "classpath", "classpathBytes" }`.
+
 ### `shulker serve`
 
 Build the server side and run it in the foreground. It downloads whatever the lock needs first, the way `install` does, so a fresh clone reaches a running server in one command.
@@ -1329,6 +1350,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `not-in-place` | The project has no side that builds in place, so it keeps no history |
 | `not-installed` | A file isn't in the cache; run `shulker install` |
 | `not-pinned` | The mod has no pin |
+| `not-shulker` | The instance belongs to another launcher, which starts it itself |
 | `not-synced` | The directory has no record of the source it was synced from |
 | `modpack-changed` | A modpack no longer matches the lock; run `shulker update` |
 | `modpack-conflict` | Two modpacks list the same mod with different settings |
@@ -1368,6 +1390,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `source-lock` | The sync source has no `shulker.lock` |
 | `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
 | `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
+| `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a download whose checksum doesn't match, or a version JSON that doesn't hold together |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
 | `type-ambiguous` | A CurseForge slug matches projects of several types; pass `--type` to choose. `candidates`: the types it matched |

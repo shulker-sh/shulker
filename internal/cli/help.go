@@ -27,7 +27,7 @@ var helpGroups = []struct {
 	{"builds", "Builds", []string{"install", "build", "diff", "pull", "feature", "history", "rollback"}},
 	{"launchers", "Launchers", []string{"link", "instances", "sync", "unlink"}},
 	{"servers", "Servers", []string{"serve", "player"}},
-	{"play", "Play", []string{"accounts"}},
+	{"play", "Play", []string{"accounts", "play"}},
 	{"shulker", "Shulker", []string{"docs", "config", "cache", "self", "version", "completion"}},
 }
 

@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
@@ -34,6 +35,8 @@ type deps struct {
 	players    *player.Client
 	gdlauncher *meta.GDLauncher
 	signin     *account.SignIn
+	// resources is where the game store fetches asset objects from.
+	resources string
 }
 
 func (a *app) deps() (*deps, error) {
@@ -68,6 +71,7 @@ func (a *app) deps() (*deps, error) {
 		players:    player.New(f),
 		gdlauncher: meta.NewGDLauncher(f),
 		signin:     account.NewSignIn(f),
+		resources:  game.MojangResources,
 	}
 	return a.d, nil
 }

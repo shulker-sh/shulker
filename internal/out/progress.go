@@ -32,6 +32,8 @@ type Progress struct {
 	sizes   map[string]int64
 	totalBy int64
 	current string
+	one     string
+	many    string
 	longest int
 	drawn   []int
 	frame   int
@@ -72,6 +74,15 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 	return pr
 }
 
+// Counts names what the bar's summary adds up, for a bar covering something more particular than
+// files: a run that fetches libraries and then assets says so on each line.
+func (pr *Progress) Counts(one, many string) *Progress {
+	if pr != nil {
+		pr.one, pr.many = one, many
+	}
+	return pr
+}
+
 func (pr *Progress) Bytes(n int64) {
 	if pr == nil {
 		return
@@ -108,9 +119,12 @@ func (pr *Progress) Finish() {
 	}
 	pr.halt()
 	elapsed := time.Since(pr.start)
-	noun := "files"
+	noun, one := "files", "file"
+	if pr.many != "" {
+		noun, one = pr.many, pr.one
+	}
 	if pr.done == 1 {
-		noun = "file"
+		noun = one
 	}
 	pr.l.OK(fmt.Sprintf("%s %d %s", pastTense(pr.verb), pr.done, noun), fmt.Sprintf("%s in %.1fs", humanBytes(pr.bytes), elapsed.Seconds()))
 }

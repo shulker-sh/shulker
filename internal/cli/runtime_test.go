@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"shulker.sh/shulker/internal/instance"
@@ -49,6 +50,8 @@ type fakeRuntime struct {
 	links   map[string]string
 	dirs    []string
 	corrupt string
+	// mu guards hits, which several runtime downloads land on at once.
+	mu      sync.Mutex
 	hits    int
 	missing bool
 }
@@ -106,7 +109,9 @@ func (r *fakeRuntime) register(mux *http.ServeMux, base func() string) {
 		w.Write(r.manifest(base()))
 	})
 	mux.HandleFunc("/jrt/objects/", func(w http.ResponseWriter, req *http.Request) {
+		r.mu.Lock()
 		r.hits++
+		r.mu.Unlock()
 		want := strings.TrimPrefix(req.URL.Path, "/jrt/objects/")
 		for name, content := range r.files {
 			if sha1Hex([]byte(content)) == want {
