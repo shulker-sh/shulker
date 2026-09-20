@@ -24,3 +24,35 @@ func TestAnEntryWithNoLauncherFallsBackToADirectory(t *testing.T) {
 		t.Fatalf("Forget = %+v %v", f, err)
 	}
 }
+
+// Shulker is a launcher like the rest, so an instance it owns reaches every command through the
+// same entry. What it has none of is slots: it runs the hooks itself, so nothing writes a command
+// for another program to run, and forgetting one takes nothing away but the registry row.
+func TestShulkerOwnsItsInstances(t *testing.T) {
+	e := Find("shulker")
+	if e == nil {
+		t.Fatal("no shulker entry")
+	}
+	if !e.Instanced || e.InstanceDir("/d/instances/smp") != "/d/instances/smp" {
+		t.Fatalf("a shulker instance is its own game directory: %+v", e)
+	}
+	if _, fills := SlotOf("shulker"); fills {
+		t.Fatal("shulker fills no slot: it runs the hooks itself")
+	}
+	if Rank("shulker") >= Rank("prism") {
+		t.Fatalf("shulker's own instances sort first: %d", Rank("shulker"))
+	}
+	if Title("shulker") != "Shulker" {
+		t.Fatalf("Title = %q", Title("shulker"))
+	}
+
+	in := config.Instance{ID: "smp", Name: "SMP", Launcher: "shulker", Dir: "/d/instances/smp", Source: "/packs/smp"}
+	command, at := Relink(Linked{Instance: in, Side: "client", Ref: "main"})
+	if want := "shulker link shulker /packs/smp --ref main --as smp"; command != want || at != "" {
+		t.Fatalf("Relink = %q in %q, want %q", command, at, want)
+	}
+	f, err := Forget(in)
+	if err != nil || f.Removed != "" || f.Summary != `Unlinked "SMP" (Shulker); the instance directory and its worlds stay.` {
+		t.Fatalf("Forget = %+v %v", f, err)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 
 	"shulker.sh/shulker/internal/fsutil"
@@ -16,15 +17,19 @@ import (
 
 const (
 	PathEnv           = "SHULKER_CONFIG"
+	DataPathEnv       = "SHULKER_DATA"
 	RegistryFileName  = "registry.json"
 	RegistrySchemaURL = "https://shulker.sh/schema/v1/registry.json"
 )
 
-var Keys = []string{"curseforge.key", "registry"}
+var Keys = []string{"curseforge.key", "instances", "registry", "saves", "store"}
 
 type Config struct {
 	CurseForge CurseForge `json:"curseforge"`
+	Instances  string     `json:"instances,omitempty"`
 	Registry   string     `json:"registry,omitempty"`
+	Saves      string     `json:"saves,omitempty"`
+	Store      string     `json:"store,omitempty"`
 }
 
 type CurseForge struct {
@@ -63,6 +68,30 @@ func Path() (string, error) {
 		return "", err
 	}
 	return filepath.Join(base, "shulker", "config.json"), nil
+}
+
+// DataDir is where shulker keeps what a player would miss if it went: instances and save groups,
+// as against the cache, which holds only what it can fetch again. macOS and Windows keep data
+// beside the config; Linux separates the two, so XDG_DATA_HOME decides there.
+func DataDir() (string, error) {
+	if dir := os.Getenv(DataPathEnv); dir != "" {
+		return dir, nil
+	}
+	if runtime.GOOS == "linux" {
+		if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+			return filepath.Join(dir, "shulker"), nil
+		}
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, ".local", "share", "shulker"), nil
+	}
+	base, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(base, "shulker"), nil
 }
 
 func Load() (Config, error) {
@@ -133,13 +162,20 @@ func SaveDocument(path string, doc map[string]any) error {
 }
 
 func RegistryPath(configPath string, cfg Config) string {
+	return Root(configPath, cfg.Registry, filepath.Join(filepath.Dir(configPath), RegistryFileName))
+}
+
+// Root resolves a path-valued key of config.json: an absolute value as given, a relative one
+// against config.json's own directory, and an empty one to the default the caller passes. One rule
+// for the registry and for the instances, saves and store roots alike.
+func Root(configPath, value, fallback string) string {
 	switch {
-	case cfg.Registry == "":
-		return filepath.Join(filepath.Dir(configPath), RegistryFileName)
-	case filepath.IsAbs(cfg.Registry):
-		return cfg.Registry
+	case value == "":
+		return fallback
+	case filepath.IsAbs(value):
+		return value
 	default:
-		return filepath.Join(filepath.Dir(configPath), cfg.Registry)
+		return filepath.Join(filepath.Dir(configPath), value)
 	}
 }
 

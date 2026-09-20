@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/config"
 )
 
 func readConfigDoc(t *testing.T, path string) map[string]any {
@@ -84,7 +86,7 @@ func TestConfigCurseForgeKey(t *testing.T) {
 		t.Errorf("set to an empty value: %+v", env.Error)
 	}
 	env := h.runSetting(t, 1, "config", "set", "curseforge.keys", "x")
-	if env.Error == nil || env.Error.Code != "path-invalid" || !slices.Equal(env.Error.Candidates, []string{"curseforge.key", "registry"}) {
+	if env.Error == nil || env.Error.Code != "path-invalid" || !slices.Equal(env.Error.Candidates, config.Keys) {
 		t.Errorf("set of an unknown key: %+v", env.Error)
 	}
 }
@@ -158,5 +160,61 @@ func TestConfigUnsetRegistryCreatesDefault(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(defaultRegistry); !strings.Contains(string(data), "schema/v1/registry.json") {
 		t.Errorf("default registry = %q", data)
+	}
+}
+
+// The three roots are config keys that report the directory behind them, set or not, so a player
+// can see where shulker's own instances, their saves and the launch store will land.
+func TestConfigRoots(t *testing.T) {
+	h := newHarness(t)
+	data := t.TempDir()
+	t.Setenv("SHULKER_DATA", data)
+
+	for key, want := range map[string]string{
+		"instances": filepath.Join(data, "instances"),
+		"saves":     filepath.Join(data, "saves"),
+		"store":     filepath.Join(h.cache, "game"),
+	} {
+		if stdout := h.mustRun(t, "config", "get", key); stdout != want+"\n" {
+			t.Errorf("unset %s = %q, want %s", key, stdout, want)
+		}
+	}
+
+	elsewhere := t.TempDir()
+	h.mustRun(t, "config", "set", "instances", elsewhere)
+	if stdout := h.mustRun(t, "config", "get", "instances"); stdout != elsewhere+"\n" {
+		t.Errorf("set instances = %q, want %s", stdout, elsewhere)
+	}
+	// A relative value resolves against config.json's own directory, the rule `registry` follows.
+	h.mustRun(t, "config", "set", "saves", "worlds")
+	want := filepath.Join(filepath.Dir(h.config), "worlds")
+	if stdout := h.mustRun(t, "config", "get", "saves"); stdout != want+"\n" {
+		t.Errorf("relative saves = %q, want %s", stdout, want)
+	}
+
+	var all struct {
+		Instances string `json:"instances"`
+		Saves     string `json:"saves"`
+		Store     string `json:"store"`
+	}
+	if err := json.Unmarshal(h.runSetting(t, 0, "config", "get").Data, &all); err != nil {
+		t.Fatal(err)
+	}
+	if all.Instances != elsewhere || all.Saves != want || all.Store != filepath.Join(h.cache, "game") {
+		t.Errorf("get with no key = %+v", all)
+	}
+
+	h.mustRun(t, "config", "unset", "instances")
+	if stdout := h.mustRun(t, "config", "get", "instances"); stdout != filepath.Join(data, "instances")+"\n" {
+		t.Errorf("unset instances = %q, want the default back", stdout)
+	}
+
+	// `instances` held the registry itself before the split, as an array. It is a path now, and
+	// shulker keeps no reader for the shapes it wrote before release.
+	if err := os.WriteFile(h.config, []byte(`{"instances":[{"dir":"/old"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if env := h.runSetting(t, 1, "config", "get", "instances"); env.Error == nil || env.Error.Code != "config-invalid" {
+		t.Errorf("an instances array: %+v", env.Error)
 	}
 }

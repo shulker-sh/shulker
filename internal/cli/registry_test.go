@@ -16,8 +16,8 @@ func TestRegistryFollowsTheConfigRegistryPath(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(h.config), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	stray := `{"registry":"shared/instances.json","instances":[{"id":"old","name":"old","dir":"/old","source":"/old"}]}`
-	if err := os.WriteFile(h.config, []byte(stray), 0o600); err != nil {
+	elsewhere := `{"registry":"shared/instances.json"}`
+	if err := os.WriteFile(h.config, []byte(elsewhere), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -32,7 +32,7 @@ func TestRegistryFollowsTheConfigRegistryPath(t *testing.T) {
 	}
 
 	code, stdout, _ := h.run(t, "sync", "-C", t.TempDir(), "--json")
-	if e := failureCode(t, stdout); code == 0 || len(e.Candidates) != 1 || strings.HasPrefix(e.Candidates[0], "old") {
-		t.Fatalf("an instances key left in config.json is ignored: %d %s", code, stdout)
+	if e := failureCode(t, stdout); code == 0 || len(e.Candidates) != 1 || !strings.HasPrefix(e.Candidates[0], "friends") {
+		t.Fatalf("the candidates come from the registry the key names: %d %s", code, stdout)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -18,7 +19,7 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("missing file: %+v %v", cfg, err)
 	}
 
-	os.WriteFile(path, []byte(`{"curseforge":{"key":"abc"},"registry":"instances.json","instances":[{"dir":"/old"}]}`), 0o600)
+	os.WriteFile(path, []byte(`{"curseforge":{"key":"abc"},"registry":"instances.json","links":[{"dir":"/old"}]}`), 0o600)
 	cfg, err = Load()
 	if err != nil || cfg.CurseForge.Key != "abc" || cfg.Registry != "instances.json" {
 		t.Fatalf("load: %+v %v", cfg, err)
@@ -132,5 +133,46 @@ func TestOldRegistryFails(t *testing.T) {
 	}
 	if instances, err := LoadInstances(path); err != nil || len(instances) != 1 {
 		t.Fatalf("repair replaces a registry it can't read: %+v %v", instances, err)
+	}
+}
+
+func TestRoot(t *testing.T) {
+	configPath := filepath.Join(string(filepath.Separator)+"c", "shulker", "config.json")
+	fallback := filepath.Join(string(filepath.Separator)+"d", "shulker", "instances")
+	elsewhere := filepath.Join(string(filepath.Separator)+"elsewhere", "instances")
+	for _, c := range []struct{ value, want string }{
+		{"", fallback},
+		{"instances", filepath.Join(filepath.Dir(configPath), "instances")},
+		{filepath.Join("..", "shared", "instances"), filepath.Join(string(filepath.Separator)+"c", "shared", "instances")},
+		{elsewhere, elsewhere},
+	} {
+		if got := Root(configPath, c.value, fallback); got != c.want {
+			t.Errorf("root %q: got %s, want %s", c.value, got, c.want)
+		}
+	}
+}
+
+func TestDataDir(t *testing.T) {
+	t.Setenv(DataPathEnv, filepath.Join(string(filepath.Separator)+"scratch", "data"))
+	dir, err := DataDir()
+	if err != nil || dir != filepath.Join(string(filepath.Separator)+"scratch", "data") {
+		t.Fatalf("the environment wins: %s %v", dir, err)
+	}
+
+	t.Setenv(DataPathEnv, "")
+	dir, err = DataDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(dir) != "shulker" || !filepath.IsAbs(dir) {
+		t.Fatalf("a data dir is an absolute path ending in shulker: %s", dir)
+	}
+}
+
+func TestRootsAreKeys(t *testing.T) {
+	for _, key := range []string{"instances", "saves", "store"} {
+		if !slices.Contains(Keys, key) {
+			t.Errorf("%s is not a config key", key)
+		}
 	}
 }

@@ -50,6 +50,7 @@ type Linked struct {
 }
 
 var All = []*Entry{
+	{Name: "shulker", Title: "Shulker", Instanced: true, gameDirIsInstance: true, relink: relinkShulker, forget: forgetShulker},
 	{Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir, relink: relinkInstance, forget: forgetInstance},
 	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkInstance, forget: forgetInstance},
 	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkMojang, forget: forgetMojang},
@@ -160,6 +161,23 @@ func relinkSync(l Linked) (args []string, in string) {
 		args = append(args, "--assume-client")
 	}
 	return append(args, "--into", shellArg(l.Dir)), ""
+}
+
+// relinkShulker rebuilds an instance shulker owns. It names the instance with --as rather than
+// --name, because the id is also the folder under the instances root, and it carries no side: a
+// shulker instance is a client.
+func relinkShulker(e *Entry, l Linked) (args []string, in string) {
+	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
+	if l.Ref != "" {
+		args = append(args, "--ref", shellArg(l.Ref))
+	}
+	return append(args, "--as", shellArg(l.ID)), ""
+}
+
+// forgetShulker has nothing to take away. Shulker runs its own hooks in process, so no slot holds a
+// command and no script was generated; unlinking is the registry row going and nothing else.
+func forgetShulker(e *Entry, l config.Instance) (Forgotten, error) {
+	return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance directory and its worlds stay.", l.Label(), e.Title)}, nil
 }
 
 func relinkInstance(e *Entry, l Linked) (args []string, in string) {

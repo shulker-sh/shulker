@@ -20,8 +20,14 @@ import (
 //	projects/url/<sha>             a project source fetched from a URL
 //	projects/last-good/<sha>.json  the last sync from a source that built
 //	atlauncher/<loader>-<version>/ a loader installer's client install, whose libraries ATLauncher gets
+//	game/                          the store a direct launch assembles from: versions/, libraries/, assets/
 //
 // Paths are built here and nowhere else.
+
+// Game is the default store root, which config.json's `store` key moves.
+func (c *Cache) Game() string {
+	return filepath.Join(c.Dir, "game")
+}
 
 func (c *Cache) ATLauncherInstall(loader, version string) string {
 	return filepath.Join(c.Dir, "atlauncher", loader+"-"+version)

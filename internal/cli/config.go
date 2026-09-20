@@ -45,19 +45,25 @@ func (a *app) configGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			resolved, err := a.resolvedPaths(path, cfg)
+			if err != nil {
+				return err
+			}
 			var value any
-			switch key {
-			case "":
+			switch {
+			case key == "":
 				all := maps.Clone(doc)
-				all["registry"] = config.RegistryPath(path, cfg)
+				for k, v := range resolved {
+					all[k] = v
+				}
 				if secret, ok := configLookup(doc, curseForgeKey); ok && !reveal {
 					cf := maps.Clone(doc["curseforge"].(map[string]any))
 					cf["key"] = maskKey(secret)
 					all["curseforge"] = cf
 				}
 				value = all
-			case "registry":
-				value = config.RegistryPath(path, cfg)
+			case resolved[key] != "":
+				value = resolved[key]
 			default:
 				secret, ok := configLookup(doc, key)
 				if !ok {
@@ -147,6 +153,22 @@ func (a *app) configUnsetCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "change the registry even if it leaves linked instances behind")
 	return cmd
+}
+
+// resolvedPaths is what each path-valued key means on this machine: the value in config.json when
+// there is one, else the default behind it. `config get` prints these rather than the raw key, so
+// an unset root still names the directory it will use.
+func (a *app) resolvedPaths(configPath string, cfg config.Config) (map[string]string, error) {
+	r, err := a.rootsOf(configPath, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]string{
+		"registry":  config.RegistryPath(configPath, cfg),
+		"instances": r.Instances,
+		"saves":     r.Saves,
+		"store":     r.Store,
+	}, nil
 }
 
 func (a *app) openConfig(key string) (string, config.Config, map[string]any, error) {
