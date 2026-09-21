@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/launcher"
@@ -14,42 +13,21 @@ import (
 	"shulker.sh/shulker/internal/pack"
 )
 
-func (a *app) linkPrismCmd() *cobra.Command { return a.linkPrismLikeCmd(false) }
-
-func (a *app) linkMultiMCCmd() *cobra.Command { return a.linkPrismLikeCmd(true) }
-
-// linkPrismLikeCmd is `link prism` and `link multimc`: one implementation, since MultiMC is the
-// layout Prism grew from, told apart by the launcher name, the instance.cfg dialect and MultiMC
-// having no default directory to find.
-func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
+func (a *app) linkPrismCmd() *cobra.Command {
 	var k launcherLink
-	launcherName, use, short := "prism", "prism", "Create a Prism Launcher instance that syncs the client build before each launch"
-	if multimc {
-		launcherName, use, short = "multimc", "multimc", "Create a MultiMC instance that syncs the client build before each launch"
-	}
 	cmd := &cobra.Command{
-		Use:   use + " [project-dir | git-url | manifest-url]",
-		Short: short,
+		Use:   "prism [project-dir | git-url | manifest-url]",
+		Short: "Create a Prism Launcher instance that syncs the client build before each launch",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if multimc && k.launcherDir == "" {
-				if err := k.ls.check(); err != nil {
-					return err
-				}
-				dir, err := a.askMultiMCDir()
-				if err != nil {
-					return err
-				}
-				k.launcherDir = dir
-			}
 			src, _, err := a.startLauncherLink(cmd, args, &k, launcher.DefaultPrismDir)
 			if err != nil {
 				return err
 			}
 			p := src.project
-			l := &launcher.Prism{Dir: k.launcherDir, MultiMC: multimc}
+			l := &launcher.Prism{Dir: k.launcherDir}
 			if err := l.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no launcher directory at %s; run the launcher once or pass --launcher-dir", k.launcherDir)
+				return out.Errorf("launcher-not-found", "no Prism Launcher directory at %s; run Prism Launcher once or pass --launcher-dir", k.launcherDir)
 			} else if err != nil {
 				return err
 			}
@@ -69,42 +47,13 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 			}
 			var extra []out.Row
 			if !res.Created {
-				extra = append(extra, out.Row{Text: "restart the launcher if it is open so the change is picked up"})
+				extra = append(extra, out.Row{Text: "restart Prism Launcher if it is open so the change is picked up"})
 			}
-			return a.finishLauncherLink(cmd, &k, launcherName, display, src, res, extra...)
+			return a.finishLauncherLink(cmd, &k, "prism", display, src, res, extra...)
 		},
 	}
-	dirUsage := "launcher data directory (default: Prism Launcher's)"
-	if multimc {
-		dirUsage = "the MultiMC folder, the one that holds multimc.cfg (required)"
-	}
-	k.register(cmd, dirUsage, "repoint the modpack an instance already follows")
+	k.register(cmd, "launcher data directory (default: Prism Launcher's)", "repoint the modpack an instance already follows")
 	return cmd
-}
-
-// askMultiMCDir asks where MultiMC is: it is portable, so unlike every other launcher there is no
-// default to fall back on, and off a terminal the flag is required.
-func (a *app) askMultiMCDir() (string, error) {
-	required := out.Errorf("launcher-dir-required", "MultiMC is portable; pass --launcher-dir with the folder that holds multimc.cfg")
-	if !a.canPick() {
-		return "", required
-	}
-	dir, err := a.askText("Where is MultiMC installed?", "the folder that holds multimc.cfg", "")
-	if err != nil {
-		return "", err
-	}
-	if dir == "" {
-		return "", required
-	}
-	// A shell expands ~ in --launcher-dir, so the answer to the same question does too.
-	if rest, ok := strings.CutPrefix(dir, "~/"); ok {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		dir = filepath.Join(home, rest)
-	}
-	return dir, nil
 }
 
 func (a *app) projectSource() (*syncSource, error) {

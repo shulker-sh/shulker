@@ -84,7 +84,7 @@ func TestPrismSlotsWriteOverrideCommands(t *testing.T) {
 	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{PreLaunch: "sh pre", PostExit: "sh post"}); err != nil {
 		t.Fatal(err)
 	}
-	values, err := readINI(filepath.Join(dir, PrismInstanceFile), false)
+	values, err := readINI(filepath.Join(dir, PrismInstanceFile), prismUnescape)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestPrismSlotsWriteOverrideCommands(t *testing.T) {
 	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{PreLaunch: "sh pre"}); err != nil {
 		t.Fatal(err)
 	}
-	values, err = readINI(filepath.Join(dir, PrismInstanceFile), false)
+	values, err = readINI(filepath.Join(dir, PrismInstanceFile), prismUnescape)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestWrapperSlotIsFilledButNeverCleared(t *testing.T) {
 	if err := WriteSlots(e, slotRow(e.Name, prism), Slots{PreLaunch: "sh pre", Wrapper: "gamemoderun"}); err != nil {
 		t.Fatal(err)
 	}
-	values, err := readINI(filepath.Join(prism, PrismInstanceFile), false)
+	values, err := readINI(filepath.Join(prism, PrismInstanceFile), prismUnescape)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestWrapperSlotIsFilledButNeverCleared(t *testing.T) {
 	if err := WriteSlots(e, slotRow(e.Name, prism), Slots{PreLaunch: "sh pre"}); err != nil {
 		t.Fatal(err)
 	}
-	if values, err = readINI(filepath.Join(prism, PrismInstanceFile), false); err != nil {
+	if values, err = readINI(filepath.Join(prism, PrismInstanceFile), prismUnescape); err != nil {
 		t.Fatal(err)
 	}
 	if values["WrapperCommand"] != "gamemoderun" {

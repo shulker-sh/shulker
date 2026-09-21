@@ -26,6 +26,12 @@ type Forgotten struct {
 	Summary string
 }
 
+type InstanceResult struct {
+	Dir     string
+	GameDir string
+	Created bool
+}
+
 type Entry struct {
 	Name  string
 	Title string
@@ -36,8 +42,6 @@ type Entry struct {
 	// gameDirIsInstance marks launchers whose instance folder is the game directory itself,
 	// rather than holding it as minecraft/.
 	gameDirIsInstance bool
-	// multimcINI marks instance.cfg as read by MultiMC's old parser rather than Prism's QSettings.
-	multimcINI bool
 	// Slot is how the launcher's command slots behave. Nil means shulker fills none, as for its own
 	// instances, which run the hooks themselves.
 	Slot       *Slot
@@ -70,10 +74,10 @@ var All = []*Entry{
 		readSlots: readPrismSlots, writeSlots: writePrismSlots,
 	},
 	{
-		Name: "multimc", Title: "MultiMC", Instanced: true, multimcINI: true,
+		Name: "multimc", Title: "MultiMC", Instanced: true,
 		Slot:   &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
-		relink: relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
-		readSlots: readPrismSlots, writeSlots: writePrismSlots,
+		relink: relinkLauncher, forget: forgetInstance, name: multimcName, gameDirs: multimcGameDirs,
+		readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots,
 	},
 	{
 		Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir,

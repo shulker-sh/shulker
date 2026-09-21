@@ -35,3 +35,8 @@ func jsonObjectAt(path string, top map[string]json.RawMessage, key string) (map[
 	}
 	return obj, nil
 }
+
+func jsonString(s string) json.RawMessage {
+	data, _ := json.Marshal(s)
+	return data
+}

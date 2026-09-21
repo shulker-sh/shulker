@@ -150,7 +150,18 @@ func ReadSlots(e *Entry, in config.Instance) (Slots, bool, error) {
 }
 
 func readPrismSlots(e *Entry, in config.Instance) (Slots, bool, error) {
-	values, err := readINI(filepath.Join(e.InstanceDir(in.Dir), PrismInstanceFile), e.multimcINI)
+	values, err := readINI(filepath.Join(e.InstanceDir(in.Dir), PrismInstanceFile), prismUnescape)
+	if errors.Is(err, os.ErrNotExist) {
+		return Slots{}, false, nil
+	}
+	if err != nil {
+		return Slots{}, false, err
+	}
+	return Slots{PreLaunch: values["PreLaunchCommand"], PostExit: values["PostExitCommand"], Wrapper: values["WrapperCommand"]}, true, nil
+}
+
+func readMultiMCSlots(e *Entry, in config.Instance) (Slots, bool, error) {
+	values, err := readINI(filepath.Join(e.InstanceDir(in.Dir), MultiMCInstanceFile), multimcUnescape)
 	if errors.Is(err, os.ErrNotExist) {
 		return Slots{}, false, nil
 	}
@@ -201,10 +212,6 @@ func writePrismSlots(e *Entry, in config.Instance, s Slots) error {
 	if err != nil {
 		return err
 	}
-	escape := iniEscape
-	if e.multimcINI {
-		escape = multimcEscape
-	}
 	set := map[string]string{}
 	remove := map[string]bool{}
 	for key, command := range map[string]string{"PreLaunchCommand": s.PreLaunch, "PostExitCommand": s.PostExit} {
@@ -233,7 +240,7 @@ func writePrismSlots(e *Entry, in config.Instance, s Slots) error {
 				continue
 			}
 			if value, has := set[key]; has {
-				fmt.Fprintf(&buf, "%s=%s\n", key, escape(value))
+				fmt.Fprintf(&buf, "%s=%s\n", key, prismEscape(value))
 				done[key] = true
 				continue
 			}
@@ -242,7 +249,56 @@ func writePrismSlots(e *Entry, in config.Instance, s Slots) error {
 	}
 	for _, key := range []string{"OverrideCommands", "PreLaunchCommand", "PostExitCommand", "WrapperCommand"} {
 		if value, has := set[key]; has && !done[key] {
-			fmt.Fprintf(&buf, "%s=%s\n", key, escape(value))
+			fmt.Fprintf(&buf, "%s=%s\n", key, prismEscape(value))
+		}
+	}
+	return fsutil.Write(path, buf.Bytes())
+}
+
+func writeMultiMCSlots(e *Entry, in config.Instance, s Slots) error {
+	path := filepath.Join(e.InstanceDir(in.Dir), MultiMCInstanceFile)
+	lines, err := readINILines(path)
+	if err != nil {
+		return err
+	}
+	set := map[string]string{}
+	remove := map[string]bool{}
+	for key, command := range map[string]string{"PreLaunchCommand": s.PreLaunch, "PostExitCommand": s.PostExit} {
+		if command == "" {
+			remove[key] = true
+			continue
+		}
+		set[key] = command
+	}
+	if s.Wrapper != "" {
+		set["WrapperCommand"] = s.Wrapper
+	}
+	// MultiMC reads all three from the instance only with this on, so a wrapper needs it as much as
+	// a command does.
+	if len(set) > 0 {
+		set["OverrideCommands"] = "true"
+	}
+	var buf bytes.Buffer
+	if len(lines) == 0 {
+		lines = []string{"[General]"}
+	}
+	done := map[string]bool{}
+	for _, line := range lines {
+		if key, _, ok := splitINILine(line); ok {
+			if remove[key] {
+				continue
+			}
+			if value, has := set[key]; has {
+				fmt.Fprintf(&buf, "%s=%s\n", key, multimcEscape(value))
+				done[key] = true
+				continue
+			}
+		}
+		buf.WriteString(line + "\n")
+	}
+	for _, key := range []string{"OverrideCommands", "PreLaunchCommand", "PostExitCommand", "WrapperCommand"} {
+		if value, has := set[key]; has && !done[key] {
+			fmt.Fprintf(&buf, "%s=%s\n", key, multimcEscape(value))
 		}
 	}
 	return fsutil.Write(path, buf.Bytes())
@@ -387,4 +443,12 @@ func jsonStringValue(raw json.RawMessage) string {
 		return ""
 	}
 	return s
+}
+
+// IsSyncCommand reports whether a slot holds a command shulker owns: the generated script it writes
+// now, or the inline sync it wrote before those existed.
+func IsSyncCommand(command string) bool { return IsShulkerSlot(command) }
+
+func CommandArg(s string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
 }

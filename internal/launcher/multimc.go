@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
@@ -15,15 +14,15 @@ import (
 )
 
 const (
-	PrismInstanceFile = "instance.cfg"
-	PrismPackFile     = "mmc-pack.json"
+	MultiMCInstanceFile = "instance.cfg"
+	MultiMCPackFile     = "mmc-pack.json"
 )
 
-type Prism struct {
+type MultiMC struct {
 	Dir string
 }
 
-type PrismInstance struct {
+type MultiMCInstance struct {
 	ID            string
 	Name          string
 	Minecraft     string
@@ -31,33 +30,7 @@ type PrismInstance struct {
 	LoaderVersion string
 }
 
-func DefaultPrismDir() (string, error) {
-	switch runtime.GOOS {
-	case "darwin":
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, "Library", "Application Support", "PrismLauncher"), nil
-	case "windows":
-		appdata := os.Getenv("APPDATA")
-		if appdata == "" {
-			return "", errors.New("APPDATA is not set")
-		}
-		return filepath.Join(appdata, "PrismLauncher"), nil
-	default:
-		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-			return filepath.Join(xdg, "PrismLauncher"), nil
-		}
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, ".local", "share", "PrismLauncher"), nil
-	}
-}
-
-func (l *Prism) Check() error {
+func (l *MultiMC) Check() error {
 	info, err := os.Stat(l.Dir)
 	if err != nil || !info.IsDir() {
 		return fmt.Errorf("%w at %s", ErrNotFound, l.Dir)
@@ -65,8 +38,8 @@ func (l *Prism) Check() error {
 	return nil
 }
 
-func (l *Prism) InstancesDir() string {
-	values, err := readINI(filepath.Join(l.Dir, "prismlauncher.cfg"), prismUnescape)
+func (l *MultiMC) InstancesDir() string {
+	values, err := readINI(filepath.Join(l.Dir, "multimc.cfg"), multimcUnescape)
 	if dir := values["InstanceDir"]; err == nil && dir != "" {
 		if filepath.IsAbs(dir) {
 			return dir
@@ -76,27 +49,27 @@ func (l *Prism) InstancesDir() string {
 	return filepath.Join(l.Dir, "instances")
 }
 
-func (l *Prism) WriteInstance(inst PrismInstance) (InstanceResult, error) {
+func (l *MultiMC) WriteInstance(inst MultiMCInstance) (InstanceResult, error) {
 	dir := filepath.Join(l.InstancesDir(), inst.ID)
 	res := InstanceResult{Dir: dir}
-	cfgPath := filepath.Join(dir, PrismInstanceFile)
+	cfgPath := filepath.Join(dir, MultiMCInstanceFile)
 	if _, err := os.Stat(cfgPath); errors.Is(err, os.ErrNotExist) {
 		res.Created = true
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return res, err
 	}
-	res.GameDir = prismGameDirIn(dir)
+	res.GameDir = multimcGameDirIn(dir)
 	if err := prepareGameDir(res.GameDir); err != nil {
 		return res, err
 	}
-	if err := writePrismPack(filepath.Join(dir, PrismPackFile), inst); err != nil {
+	if err := writeMultiMCPack(filepath.Join(dir, MultiMCPackFile), inst); err != nil {
 		return res, err
 	}
-	return res, writePrismInstanceConfig(cfgPath, inst)
+	return res, writeMultiMCInstanceConfig(cfgPath, inst)
 }
 
-func prismGameDirIn(dir string) string {
+func multimcGameDirIn(dir string) string {
 	gameDir := filepath.Join(dir, "minecraft")
 	dotDir := filepath.Join(dir, ".minecraft")
 	if _, err := os.Lstat(dotDir); err == nil {
@@ -107,11 +80,11 @@ func prismGameDirIn(dir string) string {
 	return gameDir
 }
 
-func (l *Prism) GameDir(id string) string {
-	return prismGameDirIn(filepath.Join(l.InstancesDir(), id))
+func (l *MultiMC) GameDir(id string) string {
+	return multimcGameDirIn(filepath.Join(l.InstancesDir(), id))
 }
 
-func writePrismPack(path string, inst PrismInstance) error {
+func writeMultiMCPack(path string, inst MultiMCInstance) error {
 	var pack struct {
 		Components    []map[string]json.RawMessage `json:"components"`
 		FormatVersion int                          `json:"formatVersion"`
@@ -156,18 +129,17 @@ func writePrismPack(path string, inst PrismInstance) error {
 	return fsutil.Write(path, append(data, '\n'))
 }
 
-// Prism reads instance.cfg with QSettings only when ConfigVersion is present;
-// otherwise it uses the MultiMC-era parser, which strips backslashes but keeps
-// the surrounding quotes of a QSettings-quoted value.
+// MultiMC reads instance.cfg with its own parser only, so values are written unquoted with its
+// escapes.
 //
 // The command slots belong to reconcile, which writes them after this, and to ReleaseSlots, which
 // clears them. Touching them here would delete a command shulker hasn't had the chance to adopt.
-func writePrismInstanceConfig(path string, inst PrismInstance) error {
+func writeMultiMCInstanceConfig(path string, inst MultiMCInstance) error {
 	lines, err := readINILines(path)
 	if err != nil {
 		return err
 	}
-	set := map[string]string{"ConfigVersion": "1.3", "InstanceType": "OneSix", "name": inst.Name}
+	set := map[string]string{"InstanceType": "OneSix", "name": inst.Name}
 	var buf bytes.Buffer
 	if len(lines) == 0 {
 		lines = []string{"[General]"}
@@ -176,60 +148,38 @@ func writePrismInstanceConfig(path string, inst PrismInstance) error {
 	for _, line := range lines {
 		key, _, ok := splitINILine(line)
 		if ok {
-			if key == "ConfigVersion" {
-				done[key] = true
-			} else if value, has := set[key]; has {
-				fmt.Fprintf(&buf, "%s=%s\n", key, prismEscape(value))
+			if value, has := set[key]; has {
+				fmt.Fprintf(&buf, "%s=%s\n", key, multimcEscape(value))
 				done[key] = true
 				continue
 			}
 		}
 		buf.WriteString(line + "\n")
 	}
-	for _, key := range []string{"ConfigVersion", "InstanceType", "name", "OverrideCommands", "PreLaunchCommand"} {
+	for _, key := range []string{"InstanceType", "name", "OverrideCommands", "PreLaunchCommand"} {
 		if value, has := set[key]; has && !done[key] {
-			fmt.Fprintf(&buf, "%s=%s\n", key, prismEscape(value))
+			fmt.Fprintf(&buf, "%s=%s\n", key, multimcEscape(value))
 		}
 	}
 	return fsutil.Write(path, buf.Bytes())
 }
 
-func prismEscape(value string) string {
-	if value == "" {
-		return value
-	}
-	var b strings.Builder
-	for _, r := range value {
-		switch r {
-		case '\\':
-			b.WriteString(`\\`)
-		case '"':
-			b.WriteString(`\"`)
-		case '\n':
-			b.WriteString(`\n`)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	escaped := b.String()
-	if strings.ContainsAny(value, " \t;#=\"\\") || escaped != value || strings.TrimSpace(value) != value {
-		return `"` + escaped + `"`
-	}
-	return escaped
+func multimcEscape(value string) string {
+	return strings.NewReplacer(`\`, `\\`, "\n", `\n`, "\t", `\t`, "#", `\#`).Replace(value)
 }
 
-func prismUnescape(value string) string {
-	if len(value) >= 2 && strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`) {
-		value = value[1 : len(value)-1]
-	}
+func multimcUnescape(value string) string {
 	var b strings.Builder
 	escape := false
 	for _, r := range value {
 		switch {
 		case escape:
-			if r == 'n' {
+			switch r {
+			case 'n':
 				b.WriteRune('\n')
-			} else {
+			case 't':
+				b.WriteRune('\t')
+			default:
 				b.WriteRune(r)
 			}
 			escape = false

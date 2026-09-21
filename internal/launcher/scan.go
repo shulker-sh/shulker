@@ -20,8 +20,15 @@ func (e *Entry) GameDirs(launcherDir string) []string {
 	return e.gameDirs(e, launcherDir)
 }
 
-func prismGameDirs(e *Entry, launcherDir string) []string {
-	l := &Prism{Dir: launcherDir, MultiMC: e.multimcINI}
+func prismGameDirs(_ *Entry, launcherDir string) []string {
+	l := &Prism{Dir: launcherDir}
+	return gameDirsUnder(l.InstancesDir(), func(dir string) []string {
+		return []string{filepath.Join(dir, "minecraft"), filepath.Join(dir, ".minecraft")}
+	})
+}
+
+func multimcGameDirs(_ *Entry, launcherDir string) []string {
+	l := &MultiMC{Dir: launcherDir}
 	return gameDirsUnder(l.InstancesDir(), func(dir string) []string {
 		return []string{filepath.Join(dir, "minecraft"), filepath.Join(dir, ".minecraft")}
 	})
