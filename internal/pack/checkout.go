@@ -194,20 +194,22 @@ func neverSynced(c *Checkout, cause error) error {
 		e.Rows = append(e.Rows, out.Detail{Label: label, Text: reason})
 	}
 	e.Rows = append(e.Rows, out.Detail{Text: noCopy})
-	e.Help = "check the address and that the server is running, then try again"
+	e.Help = unreachableHelp
 	return e
 }
 
-var (
-	gitReasonPrefix  = regexp.MustCompile(`(?s)^.*? failed: (?:fatal: )?(?:unable to access '[^']*': )?`)
-	httpReasonPrefix = regexp.MustCompile(`(?s)^.*?(?:Get|Head) "[^"]*": `)
-)
+var httpReasonPrefix = regexp.MustCompile(`(?s)^.*?(?:Get|Head) "[^"]*": `)
 
 // unreachableReason is git's or the HTTP client's own words for the failure, without the
 // source URL they repeat.
 func unreachableReason(c *Checkout, cause error) (string, string) {
 	if c.Kind == Git {
-		return "git", strings.TrimSpace(gitReasonPrefix.ReplaceAllString(cause.Error(), ""))
+		for _, row := range out.AsError(cause).Rows {
+			if row.Label == "git" {
+				return "git", row.Text
+			}
+		}
+		return "git", ""
 	}
 	return "http", strings.TrimSpace(httpReasonPrefix.ReplaceAllString(cause.Error(), ""))
 }

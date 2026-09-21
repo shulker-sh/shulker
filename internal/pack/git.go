@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -47,7 +48,7 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 	if _, err := os.Stat(dir); err == nil {
 		s.log("fetching %s", source)
 		if _, err := s.git(ctx, "--git-dir="+dir, "fetch", "--quiet", "origin"); err != nil {
-			return "", gitFailure(err, what.code, "%s: fetching %s failed: %v", what.label, source, err)
+			return "", mirrorFailure(err, what, source, "fetching")
 		}
 		return dir, nil
 	}
@@ -57,7 +58,7 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 	s.log("cloning %s", source)
 	if _, err := s.git(ctx, "clone", "--quiet", "--mirror", source, dir); err != nil {
 		os.RemoveAll(dir)
-		return "", gitFailure(err, what.code, "%s: cloning %s failed: %v", what.label, source, err)
+		return "", mirrorFailure(err, what, source, "cloning")
 	}
 	return dir, nil
 }
@@ -177,6 +178,24 @@ type origin struct {
 }
 
 func packOrigin(name string) origin { return origin{label: "modpack " + name, code: "modpack-fetch"} }
+
+// mirrorFailure is a fetch or clone that failed. When the network is why, the headline names the
+// source once and git's own reason goes in a row, without the "fatal:" and repeated URL around it.
+func mirrorFailure(err error, what origin, source, verb string) error {
+	if out.CodeOf(err) != "git-missing" && gitNetworkError(err.Error()) {
+		e := out.Errorf(what.code, "%s: couldn't reach %s", what.label, source)
+		e.Rows = []out.Detail{{Label: "git", Text: gitReason(err.Error())}}
+		e.Help = unreachableHelp
+		return fetch.Unreachable(e)
+	}
+	return gitFailure(err, what.code, "%s: %s %s failed: %v", what.label, verb, source, err)
+}
+
+const unreachableHelp = "check the address and that the server is running, then try again"
+
+var gitFraming = regexp.MustCompile(`^(?:fatal: )?(?:unable to access '[^']*': )?`)
+
+func gitReason(msg string) string { return strings.TrimSpace(gitFraming.ReplaceAllString(msg, "")) }
 
 func gitFailure(err error, code, format string, args ...any) error {
 	if out.CodeOf(err) == "git-missing" {
