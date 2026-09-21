@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/saves"
@@ -24,12 +26,14 @@ type backupRow struct {
 	saves.Backup
 }
 
-// savesTarget is whose worlds and backups one command looks at: a save group, or an instance
-// directory keeping its own.
+// savesTarget is whose worlds and backups one command looks at: a save group, or a game
+// directory keeping its own. World is set for a server, whose only world is that folder in
+// WorldsDir.
 type savesTarget struct {
 	Group     string `json:"group,omitempty"`
 	Dir       string `json:"dir,omitempty"`
 	WorldsDir string `json:"worldsDir"`
+	World     string `json:"world,omitempty"`
 	backups   string
 }
 
@@ -160,6 +164,9 @@ func (a *app) showSaves(target savesTarget) error {
 	if err != nil {
 		return err
 	}
+	if target.World != "" {
+		worlds = slices.DeleteFunc(worlds, func(w string) bool { return w != target.World })
+	}
 	backups, err := saves.Backups(target.backups)
 	if err != nil {
 		return err
@@ -171,7 +178,11 @@ func (a *app) showSaves(target savesTarget) error {
 	return a.printer.Emit(view, func(l *out.Lines) {
 		t := l.T
 		l.Heading("Worlds")
-		if len(worlds) == 0 {
+		switch {
+		case len(worlds) > 0:
+		case target.World != "":
+			l.Info("no world " + target.World + " in " + target.WorldsDir)
+		default:
 			l.Info("no worlds in " + target.WorldsDir)
 		}
 		for _, w := range worlds {
@@ -214,7 +225,8 @@ func worldCount(n int) string {
 }
 
 // savesTargetOf resolves --group, or else the directory -i, -C or the current directory names. A
-// shulker instance in a group is that group; any other directory keeps its own worlds and backups.
+// shulker instance in a group is that group; any other directory keeps its own backups, and its
+// worlds wherever build.WorldsOf finds them.
 func (a *app) savesTargetOf(group string) (savesTarget, error) {
 	r, err := a.roots()
 	if err != nil {
@@ -246,7 +258,18 @@ func (a *app) savesTargetOf(group string) (savesTarget, error) {
 		t.Dir = dir
 		return t, nil
 	}
-	return savesTarget{Dir: dir, WorldsDir: filepath.Join(dir, saves.DirName), backups: filepath.Join(dir, instance.Dir, "backups")}, nil
+	m, _, inPlace, err := inPlaceManifest(dir)
+	if err != nil {
+		return savesTarget{}, err
+	}
+	if !inPlace {
+		m = nil
+	}
+	w, err := build.WorldsOf(dir, m)
+	if err != nil {
+		return savesTarget{}, err
+	}
+	return savesTarget{Dir: dir, WorldsDir: w.Dir, World: w.Level, backups: filepath.Join(dir, instance.Dir, "backups")}, nil
 }
 
 func groupTarget(r rootDirs, group string) savesTarget {

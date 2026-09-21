@@ -512,11 +512,14 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if err := b.collectPlayers(srv.Players, desired); err != nil {
 		return "", err
 	}
-	levelName := props["level-name"]
-	if levelName == "" {
-		levelName = "world"
+	return levelName(props), nil
+}
+
+func levelName(props properties) string {
+	if name := props["level-name"]; name != "" {
+		return name
 	}
-	return levelName, nil
+	return "world"
 }
 
 func (b *Builder) collectLauncher(desired map[string]source) error {

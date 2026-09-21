@@ -199,3 +199,95 @@ func TestSavesTargetsAnInstanceWithoutAGroup(t *testing.T) {
 		t.Fatalf("saves -C: %s", stdout)
 	}
 }
+
+func savesOf(t *testing.T, h *harness, args ...string) savesView {
+	t.Helper()
+	var env struct {
+		Data savesView `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, append(args, "--json")...)), &env); err != nil {
+		t.Fatal(err)
+	}
+	return env.Data
+}
+
+func wantWorlds(t *testing.T, v savesView, dir string, worlds ...string) {
+	t.Helper()
+	if v.WorldsDir != dir || strings.Join(v.Worlds, ",") != strings.Join(worlds, ",") {
+		t.Fatalf("worlds = %v in %s, want %v in %s", v.Worlds, v.WorldsDir, worlds, dir)
+	}
+}
+
+func TestSavesReadsASeparateDirBuildFromData(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "install")
+	data := filepath.Join(h.dir, "data", "client", "saves")
+	addWorld(t, data, "First")
+	buildDir := filepath.Join(h.dir, "build", "client")
+
+	wantWorlds(t, savesOf(t, h, "saves", "-C", buildDir), data, "First")
+	var env struct {
+		Data savesPruned `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "saves", "prune", "-C", buildDir, "--keep", "0", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Data.WorldsDir != data {
+		t.Fatalf("prune resolves %s, not %s", env.Data.WorldsDir, data)
+	}
+}
+
+func TestSavesReadsAnotherLaunchersInstanceInPlace(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	gameDir := filepath.Join(t.TempDir(), "game")
+	h.mustRun(t, "sync", h.dir, "--into", gameDir)
+	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
+	wantWorlds(t, savesOf(t, h, "saves", "-C", gameDir), filepath.Join(gameDir, "saves"), "mine")
+}
+
+func TestSavesReadsOnlyAServersLevelName(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.editManifest(t, func(m map[string]any) {
+		m["server"].(map[string]any)["properties"].(map[string]any)["level-name"] = "creative"
+	})
+	h.mustRun(t, "install")
+	data := filepath.Join(h.dir, "data", "server")
+	addWorld(t, data, "creative")
+	addWorld(t, data, "world")
+	v := savesOf(t, h, "saves", "-C", filepath.Join(h.dir, "build", "server"))
+	wantWorlds(t, v, data, "creative")
+	if v.World != "creative" {
+		t.Fatalf("world = %q", v.World)
+	}
+
+	bare := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bare, "server.properties"), []byte("motd=hi\nlevel-name=hub\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	addWorld(t, bare, "hub")
+	addWorld(t, bare, "world")
+	wantWorlds(t, savesOf(t, h, "saves", "-C", bare), bare, "hub")
+	if err := os.WriteFile(filepath.Join(bare, "server.properties"), []byte("motd=hi\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wantWorlds(t, savesOf(t, h, "saves", "-C", bare), bare, "world")
+}
+
+func TestSavesReadsAnInPlaceServersLevelNameFromItsManifest(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.editManifest(t, func(m map[string]any) {
+		server := m["server"].(map[string]any)
+		server["build"] = "."
+		server["properties"].(map[string]any)["level-name"] = "creative"
+	})
+	addWorld(t, h.dir, "creative")
+	addWorld(t, h.dir, "world")
+	if err := os.WriteFile(filepath.Join(h.dir, "server.properties"), []byte("level-name=world\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wantWorlds(t, savesOf(t, h, "saves", "-C", h.dir), h.dir, "creative")
+}
