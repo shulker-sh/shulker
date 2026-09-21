@@ -658,7 +658,7 @@ The UUID is Java's type 3 UUID over `OfflinePlayer:<name>`, which is the player 
 
 Names are held to the pattern a Minecraft username matches, three to sixteen letters, digits or underscores; `--allow-invalid-name` takes any other. Two offline accounts may share a name if `--force` says so, but never a UUID, since the UUID is what shulker's own file is keyed by — so a second account with the same name needs `--uuid` as well.
 
-Creating one needs an account in sight that owns Minecraft: Java Edition, own or borrowed. It is a statement of intent rather than a licence check, and it is checked only here: afterwards the offline account plays on, and stays the default, with every Microsoft account signed out.
+Creating one needs an account in sight that owns Minecraft: Java Edition, own or borrowed: any with a Java profile, even one whose sign-in or session token has run out. It is a statement of intent rather than a licence check, and it is checked only here: afterwards the offline account plays on, and stays the default, with every Microsoft account signed out.
 
 The default account is left alone, and the [`shulker accounts use`](#shulker-accounts-use) line that switches it is printed; `--use` switches at once.
 

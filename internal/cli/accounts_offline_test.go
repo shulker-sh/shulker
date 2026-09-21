@@ -155,6 +155,20 @@ func TestAccountsAddNeedsAnAccountThatOwnsTheGame(t *testing.T) {
 	}
 }
 
+func TestAccountsAddGateTakesAnyAccountWithAJavaProfile(t *testing.T) {
+	signedOut := newHarness(t)
+	expired := ownAccount("Notch", notchID)
+	expired.RefreshToken = ""
+	writeAccountStore(t, signedOut, expired)
+	signedOut.mustRun(t, "accounts", "add", "Steve")
+
+	borrowed := newHarness(t)
+	prismAccounts(t, borrowed, `{"formatVersion": 3, "accounts": [{"type": "MSA", "ygg": {"token": "stale", "exp": 1600000000},
+	  "profile": {"id": "853c80ef-3c37-49fd-aa49-938b674adae6", "name": "Jeb_"}}]}`)
+	borrowed.mustRun(t, "accounts", "providers", "add", "prism")
+	borrowed.mustRun(t, "accounts", "add", "Steve")
+}
+
 func TestAccountsAddGateIsCheckedOnlyAtCreation(t *testing.T) {
 	h := withOwner(t)
 	h.mustRun(t, "accounts", "add", "Steve", "--use")

@@ -144,10 +144,13 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 // ownsTheGame reports whether shulker can see an account that owns Java Edition: the gate an
 // offline account passes at creation, and again at deletion, since the gate would block creating
 // it a second time. It is a statement of intent rather than a licence check, so it reads the Java
-// profile an account already carries and asks nothing of anybody.
+// profile an account already carries and asks nothing of anybody. A profile is the proof whether
+// or not its session still works: an expired sign-in or borrowed token changes who can launch, not
+// who owns the game.
 func ownsTheGame(accounts []account.Resolved) bool {
 	for _, r := range accounts {
-		if r.State == account.Playable {
+		switch r.State {
+		case account.Playable, account.SignInExpired, account.TokenExpired:
 			return true
 		}
 	}
