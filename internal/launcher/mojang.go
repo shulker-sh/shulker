@@ -293,15 +293,26 @@ func (v *Mojang) SetJavaDir(gameDir, javaDir string) error {
 func shulkerProfiles(profiles map[string]json.RawMessage, gameDir string) []string {
 	var keys []string
 	for key, raw := range profiles {
-		var p struct {
-			GameDir string `json:"gameDir"`
-		}
-		if strings.HasPrefix(key, "shulker-") && json.Unmarshal(raw, &p) == nil && p.GameDir != "" && filepath.Clean(p.GameDir) == filepath.Clean(gameDir) {
+		if dir, ok := shulkerProfileGameDir(key, raw); ok && filepath.Clean(dir) == filepath.Clean(gameDir) {
 			keys = append(keys, key)
 		}
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// shulkerProfileGameDir is the game directory of a profile shulker made, and whether it is one.
+func shulkerProfileGameDir(key string, raw json.RawMessage) (string, bool) {
+	if !strings.HasPrefix(key, "shulker-") {
+		return "", false
+	}
+	var p struct {
+		GameDir string `json:"gameDir"`
+	}
+	if json.Unmarshal(raw, &p) != nil || p.GameDir == "" {
+		return "", false
+	}
+	return p.GameDir, true
 }
 
 func (v *Mojang) now() time.Time {

@@ -1,10 +1,8 @@
 package launcher
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"shulker.sh/shulker/internal/instance"
 )
@@ -76,17 +74,12 @@ func mojangGameDirs(_ *Entry, launcherDir string) []string {
 	}
 	var dirs []string
 	for key, raw := range profiles {
-		if !strings.HasPrefix(key, "shulker-") {
+		dir, ok := shulkerProfileGameDir(key, raw)
+		if !ok {
 			continue
 		}
-		var p struct {
-			GameDir string `json:"gameDir"`
-		}
-		if json.Unmarshal(raw, &p) != nil || p.GameDir == "" {
-			continue
-		}
-		if info, err := os.Stat(p.GameDir); err == nil && info.IsDir() {
-			dirs = append(dirs, p.GameDir)
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			dirs = append(dirs, dir)
 		}
 	}
 	return dirs
