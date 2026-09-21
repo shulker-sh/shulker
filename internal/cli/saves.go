@@ -243,7 +243,7 @@ func backupAside(b saves.Backup) string {
 		parts = append(parts, "Minecraft "+b.Minecraft)
 	}
 	if b.Loader != "" {
-		parts = append(parts, b.Loader)
+		parts = append(parts, strings.TrimSpace(b.Loader+" "+b.LoaderVersion))
 	}
 	return "(" + strings.Join(parts, ", ") + ")"
 }

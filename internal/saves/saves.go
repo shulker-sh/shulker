@@ -237,10 +237,11 @@ type Backup struct {
 	Size     int64     `json:"size"`
 	Worlds   int       `json:"worlds"`
 	// Names are the worlds the comment lists, when it had room for them.
-	Names     []string `json:"names,omitempty"`
-	Minecraft string   `json:"minecraft,omitempty"`
-	Loader    string   `json:"loader,omitempty"`
-	seq       int
+	Names         []string `json:"names,omitempty"`
+	Minecraft     string   `json:"minecraft,omitempty"`
+	Loader        string   `json:"loader,omitempty"`
+	LoaderVersion string   `json:"loaderVersion,omitempty"`
+	seq           int
 }
 
 // Backups are the zips in dir, newest first. A missing dir holds none, and a zip with neither

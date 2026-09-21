@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/saves"
 )
@@ -41,6 +44,9 @@ func TestSyncBacksUpWorldsBeforeTheModsChange(t *testing.T) {
 	if got := backupReasons(t, home); !slices.Equal(got, []string{"sync"}) {
 		t.Fatalf("a sync that adds a mod backs up first: %v", got)
 	}
+	if b, _ := saves.Backups(home); b[0].Minecraft != "26.2" || b[0].Loader != "fabric" || b[0].LoaderVersion != "0.17.3" {
+		t.Fatalf("the backup names the platform the directory was built with: %+v", b[0])
+	}
 	h.mustRun(t, "sync")
 	if got := backupReasons(t, home); len(got) != 1 {
 		t.Fatalf("the next sync changes nothing: %v", got)
@@ -56,6 +62,53 @@ func TestUpdateBacksUpAnInstancesWorlds(t *testing.T) {
 	h.mustRun(t, "update")
 	if got := backupReasons(t, filepath.Join(h.dir, instance.Dir, "backups")); !slices.Equal(got, []string{"update"}) {
 		t.Fatalf("update backs up the instance it changes: %v", got)
+	}
+}
+
+func TestUpdateBacksUpUnderThePlatformTheWorldsWerePlayedOn(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "install")
+	addWorld(t, filepath.Join(h.dir, "saves"), "mine")
+	state := build.LoadState(h.dir)
+	state.Minecraft, state.LoaderVersion = "26.1", "0.17.2"
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(build.StatePath(h.dir), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.newer = true
+	h.mustRun(t, "update")
+	backups, err := saves.Backups(filepath.Join(h.dir, instance.Dir, "backups"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(backups) != 1 || backups[0].Minecraft != "26.1" || backups[0].Loader != "fabric" || backups[0].LoaderVersion != "0.17.2" {
+		t.Fatalf("the backup names the platform the worlds were played on: %+v", backups)
+	}
+	if stdout := h.mustRun(t, "saves", "-C", h.dir); !strings.Contains(stdout, "Minecraft 26.1, fabric 0.17.2)") {
+		t.Fatalf("saves: %s", stdout)
+	}
+	if got := build.LoadState(h.dir); got.Minecraft != "26.2" || got.Loader != "fabric" || got.LoaderVersion != "0.17.3" {
+		t.Fatalf("the build records what it installed: %+v", got)
+	}
+}
+
+func TestAutomaticBackupRunsOncePerTargetPerRun(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "install")
+	addWorld(t, filepath.Join(h.dir, "saves"), "mine")
+	var stdout, stderr bytes.Buffer
+	backup := h.newApp(&stdout, &stderr).autoBackup("sync", h.dir)
+	for range 2 {
+		if err := backup(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := backupReasons(t, filepath.Join(h.dir, instance.Dir, "backups")); len(got) != 1 {
+		t.Fatalf("one backup per target per run: %v", got)
 	}
 }
 

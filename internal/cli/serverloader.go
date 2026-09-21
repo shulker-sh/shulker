@@ -24,7 +24,7 @@ func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *
 		return nil
 	}
 	want := build.InstalledLoader{Type: l.Name, Version: p.Lock.Loader.Version}
-	if installed := build.LoadState(rep.Dir).Loader; installed != nil && *installed == want {
+	if installed := build.LoadState(rep.Dir).InstalledLoader; installed != nil && *installed == want {
 		if _, err := os.Stat(filepath.Join(rep.Dir, build.InstallerArgsFile(p.Lock))); err == nil {
 			return nil
 		}

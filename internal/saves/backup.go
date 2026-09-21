@@ -26,11 +26,12 @@ var now = time.Now
 // Source is where a backup's worlds come from. Only narrows it to one world, a server's
 // level-name; the rest is what the zip comment records.
 type Source struct {
-	Dir       string
-	Only      string
-	Instance  string
-	Minecraft string
-	Loader    string
+	Dir           string
+	Only          string
+	Instance      string
+	Minecraft     string
+	Loader        string
+	LoaderVersion string
 }
 
 // Home is the folder backups go in. A shared one is a save group's, where the filename also names
@@ -42,14 +43,15 @@ type Home struct {
 
 // comment is the zip comment, the backup's record. Worlds is left out when the names would not fit.
 type comment struct {
-	Format     int      `json:"format"`
-	Taken      string   `json:"taken"`
-	Reason     string   `json:"reason"`
-	Instance   string   `json:"instance,omitempty"`
-	WorldCount int      `json:"worldCount"`
-	Worlds     []string `json:"worlds,omitempty"`
-	Minecraft  string   `json:"minecraft,omitempty"`
-	Loader     string   `json:"loader,omitempty"`
+	Format        int      `json:"format"`
+	Taken         string   `json:"taken"`
+	Reason        string   `json:"reason"`
+	Instance      string   `json:"instance,omitempty"`
+	WorldCount    int      `json:"worldCount"`
+	Worlds        []string `json:"worlds,omitempty"`
+	Minecraft     string   `json:"minecraft,omitempty"`
+	Loader        string   `json:"loader,omitempty"`
+	LoaderVersion string   `json:"loaderVersion,omitempty"`
 }
 
 // commentFor is c as a zip comment. One too long for the format's 16-bit length drops the world
@@ -97,14 +99,15 @@ func Take(src Source, home Home, reason string, each func(world string, open boo
 	}
 	id += "-" + reason
 	meta := commentFor(comment{
-		Format:     commentFormat,
-		Taken:      at.UTC().Format(time.RFC3339),
-		Reason:     reason,
-		Instance:   src.Instance,
-		WorldCount: len(worlds),
-		Worlds:     worlds,
-		Minecraft:  src.Minecraft,
-		Loader:     src.Loader,
+		Format:        commentFormat,
+		Taken:         at.UTC().Format(time.RFC3339),
+		Reason:        reason,
+		Instance:      src.Instance,
+		WorldCount:    len(worlds),
+		Worlds:        worlds,
+		Minecraft:     src.Minecraft,
+		Loader:        src.Loader,
+		LoaderVersion: src.LoaderVersion,
 	})
 	path := filepath.Join(home.Dir, id+".zip")
 	pr, pw := io.Pipe()
@@ -117,7 +120,7 @@ func Take(src Source, home Home, reason string, each func(world string, open boo
 	if err != nil {
 		return Backup{}, err
 	}
-	return Backup{ID: id, Path: path, Taken: at, Reason: reason, Instance: src.Instance, Size: info.Size(), Worlds: len(worlds), Names: worlds, Minecraft: src.Minecraft, Loader: src.Loader, seq: seq}, nil
+	return Backup{ID: id, Path: path, Taken: at, Reason: reason, Instance: src.Instance, Size: info.Size(), Worlds: len(worlds), Names: worlds, Minecraft: src.Minecraft, Loader: src.Loader, LoaderVersion: src.LoaderVersion, seq: seq}, nil
 }
 
 // nextSeq is the collision counter for a backup taken at at: 1 when none in dir shares its second,
@@ -238,7 +241,7 @@ func readBackup(r io.ReaderAt, size int64, id string) (Backup, bool) {
 		if taken, err := time.Parse(time.RFC3339, meta.Taken); err == nil {
 			b.Taken, b.Reason, b.Instance = taken.Local(), meta.Reason, meta.Instance
 			b.Worlds, b.Names = meta.WorldCount, meta.Worlds
-			b.Minecraft, b.Loader = meta.Minecraft, meta.Loader
+			b.Minecraft, b.Loader, b.LoaderVersion = meta.Minecraft, meta.Loader, meta.LoaderVersion
 			return b, true
 		}
 	}

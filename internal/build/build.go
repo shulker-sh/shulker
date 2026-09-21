@@ -53,13 +53,16 @@ type Origin struct {
 type State struct {
 	Side string `json:"side"`
 	Origin
-	BuiltAt    string                       `json:"builtAt"`
-	LockSha256 string                       `json:"lockSha256"`
-	Files      map[string]string            `json:"files"`
-	Values     map[string]map[string]string `json:"managedValues,omitempty"`
-	Links      []string                     `json:"links,omitempty"`
-	// Loader is the loader its own installer set up in the dir; the installer's files aren't tracked.
-	Loader *InstalledLoader `json:"loader,omitempty"`
+	BuiltAt       string                       `json:"builtAt"`
+	LockSha256    string                       `json:"lockSha256"`
+	Minecraft     string                       `json:"minecraft,omitempty"`
+	Loader        string                       `json:"loader,omitempty"`
+	LoaderVersion string                       `json:"loaderVersion,omitempty"`
+	Files         map[string]string            `json:"files"`
+	Values        map[string]map[string]string `json:"managedValues,omitempty"`
+	Links         []string                     `json:"links,omitempty"`
+	// InstalledLoader is the loader its own installer set up in the dir; the installer's files aren't tracked.
+	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
 }
 
 type InstalledLoader struct {
@@ -248,7 +251,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	if stateErr != nil {
 		report.Warnings = append(report.Warnings, stateErr.Error())
 	}
-	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, Loader: prev.Loader}
+	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader}
 	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
 		return nil, err
@@ -334,6 +337,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		return nil, err
 	}
 	next.BuiltAt = time.Now().UTC().Format(time.RFC3339)
+	next.Minecraft, next.Loader, next.LoaderVersion = b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version
 	if next.LockSha256, err = lock.FileSha256(b.LockPath); err != nil {
 		return nil, err
 	}
@@ -616,7 +620,7 @@ func InstallerArgsFile(lk *lock.Lock) string {
 
 func RecordLoader(dir string, l InstalledLoader) error {
 	s := LoadState(dir)
-	s.Loader = &l
+	s.InstalledLoader = &l
 	return writeState(dir, s)
 }
 

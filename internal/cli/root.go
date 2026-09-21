@@ -44,6 +44,7 @@ type app struct {
 	installer  func(ctx context.Context, java, jar string, args []string) error
 	watcher    func(req watchRequest) (int, error)
 	running    bool
+	backedUp   map[savesTarget]bool
 }
 
 func Execute(args []string, stdout, stderr io.Writer) int {

@@ -53,7 +53,7 @@ func TestNeoForgeServer(t *testing.T) {
 		t.Fatalf("installer runs: %v", h.installs)
 	}
 	state := build.LoadState(buildDir)
-	if got := state.Loader; got == nil || *got != (build.InstalledLoader{Type: "neoforge", Version: "26.2.0.87"}) {
+	if got := state.InstalledLoader; got == nil || *got != (build.InstalledLoader{Type: "neoforge", Version: "26.2.0.87"}) {
 		t.Fatalf("state loader: %+v", got)
 	}
 	for _, rel := range []string{"libraries/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "libraries/net/minecraft/server/26.2/server-26.2.jar"} {
@@ -73,7 +73,7 @@ func TestNeoForgeServer(t *testing.T) {
 	if len(h.installs) != 1 || h.neoHits != hits {
 		t.Fatalf("an installed loader ran the installer again (%d runs, %d downloads)", len(h.installs), h.neoHits-hits)
 	}
-	if !strings.Contains(stdout, "(5 unchanged)") || build.LoadState(buildDir).Loader == nil {
+	if !strings.Contains(stdout, "(5 unchanged)") || build.LoadState(buildDir).InstalledLoader == nil {
 		t.Fatalf("rebuild: %s", stdout)
 	}
 

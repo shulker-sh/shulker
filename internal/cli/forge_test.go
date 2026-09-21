@@ -49,7 +49,7 @@ func TestForgeServer(t *testing.T) {
 	if len(h.installs) != 1 || strings.Join(h.installs[0], " ") != "--installServer "+buildDir+" --offline" {
 		t.Fatalf("installer runs: %v", h.installs)
 	}
-	if got := build.LoadState(buildDir).Loader; got == nil || *got != (build.InstalledLoader{Type: "forge", Version: "65.1.3"}) {
+	if got := build.LoadState(buildDir).InstalledLoader; got == nil || *got != (build.InstalledLoader{Type: "forge", Version: "65.1.3"}) {
 		t.Fatalf("state loader: %+v", got)
 	}
 

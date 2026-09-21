@@ -2,12 +2,11 @@ package cli
 
 import (
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/saves"
 )
@@ -51,7 +50,8 @@ func (a *app) backupCmd() *cobra.Command {
 }
 
 // backupSource is where target's worlds are, and what the zip comment records about them: the
-// instance registered at its directory and the platform its lock pins, when there are any.
+// instance registered at its directory and the platform its last build installed, when there are
+// any. A build backs up before it records its own platform, so this is what the worlds were played on.
 func (a *app) backupSource(target savesTarget) saves.Source {
 	src := saves.Source{Dir: target.WorldsDir, Only: target.World}
 	if target.Dir == "" {
@@ -60,9 +60,8 @@ func (a *app) backupSource(target savesTarget) saves.Source {
 	if in, ok := a.registeredInstance(target.Dir); ok {
 		src.Instance = in.ID
 	}
-	if lk, err := lock.Load(filepath.Join(target.Dir, lock.FileName)); err == nil {
-		src.Minecraft, src.Loader = lk.Minecraft, lk.Loader.Type
-	}
+	state := build.LoadState(target.Dir)
+	src.Minecraft, src.Loader, src.LoaderVersion = state.Minecraft, state.Loader, state.LoaderVersion
 	return src
 }
 
@@ -84,7 +83,8 @@ func (t savesTarget) home() saves.Home {
 // autoBackup is the backup a build takes of dir's worlds before it changes the mod set, then trims
 // that target's automatic backups to play.saveBackups. Only a zip that can't be written stops the
 // build: a target with no worlds backs up as nothing, and one whose worlds can't be found, or
-// whose trim fails, is a warning.
+// whose trim fails, is a warning. A target is backed up once a run, so a build retried after
+// failing part way through its mods doesn't copy the same worlds again.
 func (a *app) autoBackup(reason, dir string) func() error {
 	if reason == "" {
 		return nil
@@ -100,6 +100,10 @@ func (a *app) autoBackup(reason, dir string) func() error {
 		target, err := a.savesTargetAt(dir)
 		if err != nil {
 			return skip(err)
+		}
+		key := savesTarget{WorldsDir: target.WorldsDir, World: target.World}
+		if a.backedUp[key] {
+			return nil
 		}
 		worlds, err := saves.Worlds(target.WorldsDir)
 		if err != nil {
@@ -119,6 +123,10 @@ func (a *app) autoBackup(reason, dir string) func() error {
 		if err != nil || taken.Path == "" {
 			return err
 		}
+		if a.backedUp == nil {
+			a.backedUp = map[savesTarget]bool{}
+		}
+		a.backedUp[key] = true
 		if err := saves.TrimAutomatic(target.backups, keep); err != nil {
 			a.printer.Warn("couldn't trim the automatic backups in %s: %v", target.backups, err)
 		}

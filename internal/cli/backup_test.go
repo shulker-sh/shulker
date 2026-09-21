@@ -8,8 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/saves"
 )
 
 func backupOf(t *testing.T, h *harness, args ...string) backupResult {
@@ -47,7 +49,7 @@ func TestBackupZipsAnInstancesSaveGroup(t *testing.T) {
 	h.dir = ""
 	stdout = h.mustRun(t, "saves", "-i", "pack")
 	h.dir = project
-	for _, want := range []string{"-pack-backup (taken", "on request, 2 worlds", "Minecraft 26.2, fabric"} {
+	for _, want := range []string{"-pack-backup (taken", "on request, 2 worlds", "Minecraft 26.2, fabric 0.17.3)"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("saves -i pack lacks %q: %s", want, stdout)
 		}
@@ -85,7 +87,7 @@ func TestBackupKeepsAnInstancesOwnWorldsInItsFolder(t *testing.T) {
 	if filepath.Dir(got.Path) != filepath.Join(gameDir, instance.Dir, "backups") || !regexp.MustCompile(`^\d{8}-\d{6}-backup\.zip$`).MatchString(filepath.Base(got.Path)) {
 		t.Fatalf("backup went to %s", got.Path)
 	}
-	if got.Worlds != 1 || strings.Join(got.Names, ",") != "mine" {
+	if got.Worlds != 1 || strings.Join(got.Names, ",") != "mine" || got.Minecraft != "26.2" || got.Loader != "fabric" || got.LoaderVersion != "0.17.3" {
 		t.Fatalf("backed up %+v", got)
 	}
 }
@@ -103,5 +105,35 @@ func TestBackupOfAServerTakesOnlyItsLevel(t *testing.T) {
 	addWorld(t, worlds, "old-world")
 	if got := backupOf(t, h, "-C", buildDir); strings.Join(got.Names, ",") != "world" {
 		t.Fatalf("backed up %v", got.Names)
+	}
+}
+
+func TestBackupOfAStateWithoutAPlatformNamesNone(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	gameDir := filepath.Join(t.TempDir(), "game")
+	h.mustRun(t, "sync", h.dir, "--into", gameDir)
+	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
+	state := build.LoadState(gameDir)
+	state.Minecraft, state.Loader, state.LoaderVersion = "", "", ""
+	raw, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(build.StatePath(gameDir), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := backupOf(t, h, "-C", gameDir); got.Minecraft != "" || got.Loader != "" || got.LoaderVersion != "" {
+		t.Fatalf("backed up %+v", got)
+	}
+	if stdout := h.mustRun(t, "saves", "-C", gameDir); strings.Contains(stdout, "Minecraft") {
+		t.Fatalf("saves: %s", stdout)
+	}
+}
+
+func TestBackupAsideNamesTheLoaderWithoutAVersion(t *testing.T) {
+	b := saves.Backup{Reason: "sync", Worlds: 1, Minecraft: "26.2", Loader: "fabric"}
+	if got := backupAside(b); !strings.HasSuffix(got, ", Minecraft 26.2, fabric)") {
+		t.Fatalf("aside: %s", got)
 	}
 }
