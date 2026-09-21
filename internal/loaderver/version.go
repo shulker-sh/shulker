@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"shulker.sh/shulker/internal/verrange"
 )
 
 type Version struct {
@@ -58,7 +60,7 @@ func Compare(a, b Version) int {
 	case b.Pre == "":
 		return -1
 	}
-	return comparePrerelease(a.Pre, b.Pre)
+	return verrange.ComparePrerelease(a.Pre, b.Pre)
 }
 
 func compareCore(a, b Version) int {
@@ -72,30 +74,4 @@ func compareCore(a, b Version) int {
 		}
 	}
 	return 0
-}
-
-func comparePrerelease(a, b string) int {
-	as, bs := strings.Split(a, "."), strings.Split(b, ".")
-	for i := 0; i < len(as) && i < len(bs); i++ {
-		an, aerr := strconv.Atoi(as[i])
-		bn, berr := strconv.Atoi(bs[i])
-		switch {
-		case aerr == nil && berr == nil:
-			if an != bn {
-				if an < bn {
-					return -1
-				}
-				return 1
-			}
-		case aerr == nil:
-			return -1
-		case berr == nil:
-			return 1
-		default:
-			if c := strings.Compare(as[i], bs[i]); c != 0 {
-				return c
-			}
-		}
-	}
-	return len(as) - len(bs)
 }
