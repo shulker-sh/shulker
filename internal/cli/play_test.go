@@ -249,6 +249,22 @@ func TestPlaySyncsFirstUnlessToldNotTo(t *testing.T) {
 	}
 }
 
+func TestPlaySkipsTheSyncWhenPreLaunchIsOff(t *testing.T) {
+	h := newHarness(t)
+	_, gameDir := playHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+	h.mustRun(t, "-i", "pack", "instance", "set", "hooks.preLaunch", "false")
+
+	res := playedJSON(t, h, "-i", "pack", "play")
+	if res.Sync != nil {
+		t.Fatalf("hooks.preLaunch off syncs nothing: %+v", res.Sync)
+	}
+	if res.PID == 0 {
+		t.Fatalf("hooks.preLaunch off still launches: %+v", res)
+	}
+	waitForFile(t, filepath.Join(gameDir, "args.txt"))
+}
+
 func TestPlayTakesTheAccountFromTheFlagOverTheDefault(t *testing.T) {
 	h := newHarness(t)
 	_, gameDir := playHarness(t, h)

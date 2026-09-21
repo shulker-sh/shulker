@@ -126,8 +126,12 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	// A run whose watcher was killed is still open in the record; this is the next command touching
 	// the instance, so it is the one that closes it.
 	a.reconcileRun(in.Dir)
+	f, err := instance.Load(in.Dir)
+	if err != nil {
+		return err
+	}
 	var synced *syncResult
-	if !opts.noSync {
+	if !opts.noSync && f.Settings.PreLaunch() {
 		res, err := a.syncForLaunch(cmd, in.Dir)
 		if err != nil {
 			return err

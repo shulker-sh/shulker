@@ -761,7 +761,7 @@ The same checks apply, and a launcher new to the list warns about a missing dire
 
 Start a shulker instance. With no nickname it plays the instance the current directory is; `-i` names one from anywhere.
 
-It updates the instance first, resolves the account, fetches whatever the store is missing, and then starts the game **detached**: `play` returns as soon as the game is running, and the game outlives the shell it was started from. `--no-sync` starts what is already on disk without updating it.
+It updates the instance first, resolves the account, fetches whatever the store is missing, and then starts the game **detached**: `play` returns as soon as the game is running, and the game outlives the shell it was started from. `--no-sync` starts what is already on disk without updating it, and so does every `play` of an instance whose `hooks.preLaunch` is `false`.
 
 A detached game is still recorded. `play` hands it to a watcher — shulker itself, started again in the background with no window — which starts the game, waits for it, writes how the run ended to the instance's launch history, and exits. The record is the same one a launcher's [post-exit hook](#shulker-hook-post-exit) writes, so `instances` and the history read it the same way, except that shulker started the game itself and so also knows the status it exited with: a non-zero status is `crashed` whether or not the game managed to write a crash report. If the watcher is killed while the game is running, the record stays open with the game's process id in it, and the next command that touches the instance — `play`, `sync`, `instances repair` — closes it from the crash reports once that process has gone.
 
@@ -803,7 +803,7 @@ shulker play smp --dry-run
 | `--window <w>x<h>` | Open the game at this size for this run only, like `1280x720` (default: the `window` setting) |
 | `--world <save>` | Boot straight into this save, named by its folder in `saves/`; needs Minecraft 1.20 or later |
 | `--server <address>[:<port>]` | Join this server straight away; can't be combined with `--world` |
-| `--no-sync` | Start the game without updating the instance first |
+| `--no-sync` | Start the game without updating the instance first, as `hooks.preLaunch` set to `false` does every time |
 | `--wait` | Wait for the game and record how the run ended before returning |
 | `--stream` | Wait for the game and show its output as it runs; the log is still written |
 | `--dry-run` | Assemble the launch and print it instead of starting the game |
@@ -1142,7 +1142,7 @@ A path is relative to the file's `settings` block and dotted the way `shulker se
 | `wrapper` | `play.wrapper` | A command the launch runs through, like `["gamemoderun"]` |
 | `account` | | The account `play` launches this instance as, over the default account |
 | `marker` | | Whether to include the marker mod, over the manifest's own `marker` |
-| `hooks.preLaunch`, `hooks.postExit` | | Whether another launcher syncs before each launch, and records each run |
+| `hooks.preLaunch`, `hooks.postExit` | | Whether the instance syncs before each launch, in another launcher or under `play`, and whether another launcher records each run |
 | `launchHistory` | | How many launch records to keep |
 | `savesGroup` | | The save group whose worlds this instance shares, `default` unless set; `none` keeps them in the instance. See [`shulker saves`](#shulker-saves) |
 
