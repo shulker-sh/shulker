@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 // readJSONObject reads a launcher file holding one JSON object. A missing file is an empty object
@@ -19,9 +21,15 @@ func readJSONObject(path string) (map[string]json.RawMessage, bool, error) {
 		return nil, false, err
 	}
 	if err := json.Unmarshal(data, &top); err != nil {
-		return nil, true, fmt.Errorf("%s: %w", path, err)
+		return nil, true, invalidFile(path, err)
 	}
 	return top, true, nil
+}
+
+func invalidFile(path string, err error) *out.Error {
+	e := out.Errorf("launcher-file-invalid", "shulker can't parse %s", path)
+	e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
+	return e
 }
 
 // jsonObjectAt decodes the object top holds under key, empty when the key is absent. path is the
@@ -30,7 +38,7 @@ func jsonObjectAt(path string, top map[string]json.RawMessage, key string) (map[
 	obj := map[string]json.RawMessage{}
 	if raw, ok := top[key]; ok {
 		if err := json.Unmarshal(raw, &obj); err != nil {
-			return nil, fmt.Errorf("%s: %s: %w", path, key, err)
+			return nil, invalidFile(path, fmt.Errorf("%s: %w", key, err))
 		}
 	}
 	return obj, nil

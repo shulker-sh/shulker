@@ -30,27 +30,27 @@ type MultiMCInstance struct {
 	LoaderVersion string
 }
 
-func (l *MultiMC) Check() error {
-	info, err := os.Stat(l.Dir)
+func (m *MultiMC) Check() error {
+	info, err := os.Stat(m.Dir)
 	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, l.Dir)
+		return fmt.Errorf("%w at %s", ErrNotFound, m.Dir)
 	}
 	return nil
 }
 
-func (l *MultiMC) InstancesDir() string {
-	values, err := readINI(filepath.Join(l.Dir, "multimc.cfg"), multimcUnescape)
+func (m *MultiMC) InstancesDir() string {
+	values, err := readINI(filepath.Join(m.Dir, "multimc.cfg"), multimcUnescape)
 	if dir := values["InstanceDir"]; err == nil && dir != "" {
 		if filepath.IsAbs(dir) {
 			return dir
 		}
-		return filepath.Join(l.Dir, dir)
+		return filepath.Join(m.Dir, dir)
 	}
-	return filepath.Join(l.Dir, "instances")
+	return filepath.Join(m.Dir, "instances")
 }
 
-func (l *MultiMC) WriteInstance(inst MultiMCInstance) (InstanceResult, error) {
-	dir := filepath.Join(l.InstancesDir(), inst.ID)
+func (m *MultiMC) WriteInstance(inst MultiMCInstance) (InstanceResult, error) {
+	dir := filepath.Join(m.InstancesDir(), inst.ID)
 	res := InstanceResult{Dir: dir}
 	cfgPath := filepath.Join(dir, MultiMCInstanceFile)
 	if _, err := os.Stat(cfgPath); errors.Is(err, os.ErrNotExist) {
@@ -80,8 +80,8 @@ func multimcGameDirIn(dir string) string {
 	return gameDir
 }
 
-func (l *MultiMC) GameDir(id string) string {
-	return multimcGameDirIn(filepath.Join(l.InstancesDir(), id))
+func (m *MultiMC) GameDir(id string) string {
+	return multimcGameDirIn(filepath.Join(m.InstancesDir(), id))
 }
 
 func writeMultiMCPack(path string, inst MultiMCInstance) error {
@@ -91,7 +91,7 @@ func writeMultiMCPack(path string, inst MultiMCInstance) error {
 	}
 	if data, err := os.ReadFile(path); err == nil {
 		if err := json.Unmarshal(data, &pack); err != nil {
-			return fmt.Errorf("%s: %w", path, err)
+			return invalidFile(path, err)
 		}
 	}
 	pack.FormatVersion = 1

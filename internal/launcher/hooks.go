@@ -71,7 +71,7 @@ func writeHook(h Hook, goos string) error {
 	return fsutil.Write(hookPath(h.Dir, h.Kind, goos), []byte(hookBody(h, goos)))
 }
 
-// RemoveHook drops both shapes of a hook's script, for a switch turned off or an instance unlinked.
+// RemoveHook drops both shapes of a hook's script.
 func RemoveHook(dir string, kind HookKind) error {
 	for _, goos := range []string{"unix", "windows"} {
 		if err := removeHookFile(hookPath(dir, kind, goos)); err != nil {

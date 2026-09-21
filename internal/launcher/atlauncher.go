@@ -21,8 +21,8 @@ const (
 	ATLauncherImageFile    = "instance.png"
 )
 
-// ATLauncher stretches a non-square image to its 300×150 card, so the logo is pre-placed on a
-// canvas of that size to stay sharp.
+// ATLauncherImage is the instance card image. ATLauncher stretches a non-square image to its
+// 300×150 card, so the logo is pre-placed on a canvas of that size to stay sharp.
 //
 //go:embed assets/atlauncher-instance.png
 var ATLauncherImage []byte
@@ -61,7 +61,7 @@ func DefaultATLauncherDir() (string, error) {
 	case "windows":
 		appdata := os.Getenv("APPDATA")
 		if appdata == "" {
-			return "", errors.New("APPDATA is not set")
+			return "", appDataUnset()
 		}
 		return filepath.Join(appdata, "ATLauncher"), nil
 	default:
@@ -76,10 +76,10 @@ func DefaultATLauncherDir() (string, error) {
 	}
 }
 
-func (l *ATLauncher) Check() error {
-	info, err := os.Stat(l.Dir)
+func (a *ATLauncher) Check() error {
+	info, err := os.Stat(a.Dir)
 	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, l.Dir)
+		return fmt.Errorf("%w at %s", ErrNotFound, a.Dir)
 	}
 	return nil
 }
@@ -94,18 +94,18 @@ func ATLauncherFolder(name string) string {
 }
 
 // InstanceDir is an instance's folder, which is also its game directory.
-func (l *ATLauncher) InstanceDir(name string) string {
-	return filepath.Join(l.Dir, "instances", ATLauncherFolder(name))
+func (a *ATLauncher) InstanceDir(name string) string {
+	return filepath.Join(a.Dir, "instances", ATLauncherFolder(name))
 }
 
-func (l *ATLauncher) LibrariesDir() string {
-	return filepath.Join(l.Dir, "libraries")
+func (a *ATLauncher) LibrariesDir() string {
+	return filepath.Join(a.Dir, "libraries")
 }
 
 // WriteInstance writes the instance's instance.json. A relink keeps the instance's uuid and every
 // launcher setting the player chose, such as memory or Java arguments.
-func (l *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, error) {
-	dir := l.InstanceDir(inst.Name)
+func (a *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, error) {
+	dir := a.InstanceDir(inst.Name)
 	res := InstanceResult{Dir: dir, GameDir: dir}
 	path := filepath.Join(dir, ATLauncherInstanceFile)
 	previous, found, err := readJSONObject(path)
@@ -185,7 +185,7 @@ func ATLauncherPreLaunch(instanceDir string) (command string, found bool, err er
 		} `json:"launcher"`
 	}
 	if err := json.Unmarshal(data, &inst); err != nil {
-		return "", true, fmt.Errorf("%s: %w", path, err)
+		return "", true, invalidFile(path, err)
 	}
 	return inst.Launcher.PreLaunchCommand, true, nil
 }

@@ -261,7 +261,7 @@ func (a *app) pickInstance(entries []instanceEntry) (instanceEntry, error) {
 }
 
 func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest) (syncResult, error) {
-	if l := launcher.Find(e.Launcher); l != nil && l.Instanced {
+	if l := launcher.Find(e.Launcher); l != nil && l.IsInstanced {
 		if _, err := os.Stat(l.InstanceDir(e.Dir)); errors.Is(err, os.ErrNotExist) {
 			return syncResult{}, out.Errorf("instance-missing", "the %s instance %q is gone (%s); `shulker unlink %s` forgets it", launcher.Title(e.Launcher), e.Label(), l.InstanceDir(e.Dir), e.ID)
 		}

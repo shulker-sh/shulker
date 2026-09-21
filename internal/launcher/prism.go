@@ -42,7 +42,7 @@ func DefaultPrismDir() (string, error) {
 	case "windows":
 		appdata := os.Getenv("APPDATA")
 		if appdata == "" {
-			return "", errors.New("APPDATA is not set")
+			return "", appDataUnset()
 		}
 		return filepath.Join(appdata, "PrismLauncher"), nil
 	default:
@@ -57,27 +57,27 @@ func DefaultPrismDir() (string, error) {
 	}
 }
 
-func (l *Prism) Check() error {
-	info, err := os.Stat(l.Dir)
+func (p *Prism) Check() error {
+	info, err := os.Stat(p.Dir)
 	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, l.Dir)
+		return fmt.Errorf("%w at %s", ErrNotFound, p.Dir)
 	}
 	return nil
 }
 
-func (l *Prism) InstancesDir() string {
-	values, err := readINI(filepath.Join(l.Dir, "prismlauncher.cfg"), prismUnescape)
+func (p *Prism) InstancesDir() string {
+	values, err := readINI(filepath.Join(p.Dir, "prismlauncher.cfg"), prismUnescape)
 	if dir := values["InstanceDir"]; err == nil && dir != "" {
 		if filepath.IsAbs(dir) {
 			return dir
 		}
-		return filepath.Join(l.Dir, dir)
+		return filepath.Join(p.Dir, dir)
 	}
-	return filepath.Join(l.Dir, "instances")
+	return filepath.Join(p.Dir, "instances")
 }
 
-func (l *Prism) WriteInstance(inst PrismInstance) (InstanceResult, error) {
-	dir := filepath.Join(l.InstancesDir(), inst.ID)
+func (p *Prism) WriteInstance(inst PrismInstance) (InstanceResult, error) {
+	dir := filepath.Join(p.InstancesDir(), inst.ID)
 	res := InstanceResult{Dir: dir}
 	cfgPath := filepath.Join(dir, PrismInstanceFile)
 	if _, err := os.Stat(cfgPath); errors.Is(err, os.ErrNotExist) {
@@ -107,8 +107,8 @@ func prismGameDirIn(dir string) string {
 	return gameDir
 }
 
-func (l *Prism) GameDir(id string) string {
-	return prismGameDirIn(filepath.Join(l.InstancesDir(), id))
+func (p *Prism) GameDir(id string) string {
+	return prismGameDirIn(filepath.Join(p.InstancesDir(), id))
 }
 
 func writePrismPack(path string, inst PrismInstance) error {
@@ -118,7 +118,7 @@ func writePrismPack(path string, inst PrismInstance) error {
 	}
 	if data, err := os.ReadFile(path); err == nil {
 		if err := json.Unmarshal(data, &pack); err != nil {
-			return fmt.Errorf("%s: %w", path, err)
+			return invalidFile(path, err)
 		}
 	}
 	pack.FormatVersion = 1

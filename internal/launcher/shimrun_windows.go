@@ -16,8 +16,7 @@ func commandLineTail() string {
 }
 
 // shimSpawn starts the child with a command line built by hand, since os/exec would re-quote an
-// argument list, and reports its exit code. An error is a program that never started at all, which
-// the caller says out loud rather than exiting on quietly.
+// argument list, and reports its exit code. An error is a program that never started at all.
 func shimSpawn(dir, program, arguments string) (int, error) {
 	cmd := exec.Command(program)
 	cmd.Dir = dir

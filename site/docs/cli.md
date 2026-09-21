@@ -1600,6 +1600,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-side` | The manifest declares both sides and the command works on one; `sync` and `pull` take `--side`, `diff --into` names it. `candidates`: the sides |
+| `appdata-unset` | `APPDATA` isn't set on Windows, so shulker can't find a launcher's default folder. `link` takes `--launcher-dir` instead |
 | `backup-failed` | `backup --all` failed for some targets; `data` has each target's result |
 | `backup-invalid` | `restore` was given a zip that won't open, or that holds anything other than world folders at its root |
 | `backup-missing` | `restore` found no backup with that number, or none by the name or at the path `--backup` gives |
@@ -1641,7 +1642,9 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `key-not-found` | A `--key` isn't in the file. `candidates`: its keys |
 | `launch-not-started` | Shulker never got as far as running the game: for `hook wrap`, the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start; for `play`, the Java it assembled wouldn't start, or the watcher it hands a detached launch to couldn't be started or stopped before it answered. Under a launcher the exit is what makes it show an error, since no window appears |
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
+| `launcher-file-invalid` | A launcher file shulker reads or rewrites (an instance's JSON, `launcher_profiles.json`, `mmc-pack.json`) isn't valid JSON, or not the shape shulker expects. A row carries the parser's own error |
 | `launcher-not-found` | No launcher directory where shulker looked |
+| `loader-profile-invalid` | The loader profile shulker fetched isn't a version JSON with an id, so it can't be installed into the launcher. A row says what was wrong with it |
 | `loader-required` | `add` of a mod in a project without a loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
@@ -1711,6 +1714,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `self-update-download` | The download failed |
 | `self-update-install` | The running binary couldn't be replaced |
 | `self-update-provenance` | `--require-attestation` is set and the build provenance couldn't be verified |
+| `shim-build-failed` | On Windows, shulker couldn't make an instance's `javaw.exe` shim from its own binary, because that binary isn't a Windows executable it can patch |
 | `sign-in-failed` | The Microsoft sign-in didn't finish: it was declined, the code ran out before it was used, or Microsoft or Xbox Live refused it — including an account with no Xbox profile, which can't reach Minecraft at all |
 | `server-exit` | The server exited with an error. `items`: its `logs/latest.log` and, when the server wrote one during the run, its crash report; `data` carries them as `log` and `crashReport` |
 | `source-fetch` | The sync source couldn't be fetched |

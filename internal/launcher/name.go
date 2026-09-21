@@ -9,8 +9,8 @@ import (
 )
 
 // InstanceName is the name the launcher shows for an instance, read back from the file shulker wrote
-// it into, or empty when there is none to read. An unreadable file is no failure: the one caller is
-// repair, which heals, so it falls back rather than warning about a file it is about to name around.
+// it into, or empty when there is none to read. An unreadable file reads as empty rather than
+// failing, since whoever asks is about to name the instance around it.
 func (e *Entry) InstanceName(launcherDir, gameDir string) string {
 	if e == nil || e.name == nil {
 		return ""

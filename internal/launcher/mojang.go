@@ -14,11 +14,22 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/out"
 )
 
 const ProfilesFile = "launcher_profiles.json"
 
 var ErrNotFound = errors.New("launcher not found")
+
+func appDataUnset() *out.Error {
+	return out.Errorf("appdata-unset", "APPDATA is not set")
+}
+
+func invalidLoaderProfile(problem string) *out.Error {
+	e := out.Errorf("loader-profile-invalid", "the loader profile isn't a version JSON shulker can install")
+	e.Rows = []out.Detail{{Label: "profile", Text: problem}}
+	return e
+}
 
 type Mojang struct {
 	Dir string
@@ -43,7 +54,7 @@ func DefaultMojangDir() (string, error) {
 	case "windows":
 		appdata := os.Getenv("APPDATA")
 		if appdata == "" {
-			return "", errors.New("APPDATA is not set")
+			return "", appDataUnset()
 		}
 		return filepath.Join(appdata, ".minecraft"), nil
 	default:
@@ -55,35 +66,35 @@ func DefaultMojangDir() (string, error) {
 	}
 }
 
-func (v *Mojang) Check() error {
-	info, err := os.Stat(v.Dir)
+func (m *Mojang) Check() error {
+	info, err := os.Stat(m.Dir)
 	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, v.Dir)
+		return fmt.Errorf("%w at %s", ErrNotFound, m.Dir)
 	}
 	return nil
 }
 
-func (v *Mojang) InstallVersion(profile json.RawMessage) (string, error) {
+func (m *Mojang) InstallVersion(profile json.RawMessage) (string, error) {
 	var head struct {
 		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(profile, &head); err != nil {
-		return "", fmt.Errorf("loader profile: %w", err)
+		return "", invalidLoaderProfile(err.Error())
 	}
 	if head.ID == "" {
-		return "", errors.New("loader profile has no id")
+		return "", invalidLoaderProfile("no id")
 	}
-	dir := filepath.Join(v.Dir, "versions", head.ID)
+	dir := filepath.Join(m.Dir, "versions", head.ID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
 	return head.ID, fsutil.Write(filepath.Join(dir, head.ID+".json"), profile)
 }
 
-func (v *Mojang) profilesPath() string { return filepath.Join(v.Dir, ProfilesFile) }
+func (m *Mojang) profilesPath() string { return filepath.Join(m.Dir, ProfilesFile) }
 
-func (v *Mojang) readProfiles() (top, profiles map[string]json.RawMessage, err error) {
-	path := v.profilesPath()
+func (m *Mojang) readProfiles() (top, profiles map[string]json.RawMessage, err error) {
+	path := m.profilesPath()
 	top = map[string]json.RawMessage{}
 	data, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -91,7 +102,7 @@ func (v *Mojang) readProfiles() (top, profiles map[string]json.RawMessage, err e
 	}
 	if len(data) > 0 {
 		if err := json.Unmarshal(data, &top); err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", path, err)
+			return nil, nil, invalidFile(path, err)
 		}
 	}
 	if profiles, err = jsonObjectAt(path, top, "profiles"); err != nil {
@@ -100,28 +111,28 @@ func (v *Mojang) readProfiles() (top, profiles map[string]json.RawMessage, err e
 	return top, profiles, nil
 }
 
-func (v *Mojang) writeProfiles(top, profiles map[string]json.RawMessage) error {
+func (m *Mojang) writeProfiles(top, profiles map[string]json.RawMessage) error {
 	raw, err := json.Marshal(profiles)
 	if err != nil {
 		return err
 	}
 	top["profiles"] = raw
-	return fsutil.WriteJSON(v.profilesPath(), top)
+	return fsutil.WriteJSON(m.profilesPath(), top)
 }
 
-func (v *Mojang) WriteProfile(p Profile) error {
-	path := v.profilesPath()
-	top, profiles, err := v.readProfiles()
+func (m *Mojang) WriteProfile(p Profile) error {
+	path := m.profilesPath()
+	top, profiles, err := m.readProfiles()
 	if err != nil {
 		return err
 	}
 	entry := map[string]any{}
 	if raw, ok := profiles[p.Key]; ok {
 		if err := json.Unmarshal(raw, &entry); err != nil {
-			return fmt.Errorf("%s: profile %s: %w", path, p.Key, err)
+			return invalidFile(path, fmt.Errorf("profile %s: %w", p.Key, err))
 		}
 	}
-	now := v.now().UTC().Format("2006-01-02T15:04:05.000Z")
+	now := m.now().UTC().Format("2006-01-02T15:04:05.000Z")
 	if _, ok := entry["created"]; !ok {
 		entry["created"] = now
 	}
@@ -136,26 +147,26 @@ func (v *Mojang) WriteProfile(p Profile) error {
 	if profiles[p.Key], err = json.Marshal(entry); err != nil {
 		return err
 	}
-	return v.writeProfiles(top, profiles)
+	return m.writeProfiles(top, profiles)
 }
 
 // EnsureProfilesFile writes an empty launcher_profiles.json when the launcher has never run, because
 // the NeoForge and Forge installers refuse a directory without one.
-func (v *Mojang) EnsureProfilesFile() error {
-	_, err := os.Stat(v.profilesPath())
+func (m *Mojang) EnsureProfilesFile() error {
+	_, err := os.Stat(m.profilesPath())
 	if err == nil {
 		return nil
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	return v.writeProfiles(map[string]json.RawMessage{}, map[string]json.RawMessage{})
+	return m.writeProfiles(map[string]json.RawMessage{}, map[string]json.RawMessage{})
 }
 
 // Profiles snapshots launcher_profiles.json so RestoreProfiles can undo what an installer run
 // writes into it.
-func (v *Mojang) Profiles() (map[string]json.RawMessage, error) {
-	_, profiles, err := v.readProfiles()
+func (m *Mojang) Profiles() (map[string]json.RawMessage, error) {
+	_, profiles, err := m.readProfiles()
 	return profiles, err
 }
 
@@ -164,8 +175,8 @@ func (v *Mojang) Profiles() (map[string]json.RawMessage, error) {
 // is the version id it installed. The installers rewrite the whole file in their own layout, so
 // profiles are compared as values, not bytes, and an entry the installer added outranks one it
 // merely rewrote.
-func (v *Mojang) RestoreProfiles(before map[string]json.RawMessage) (string, error) {
-	top, profiles, err := v.readProfiles()
+func (m *Mojang) RestoreProfiles(before map[string]json.RawMessage) (string, error) {
+	top, profiles, err := m.readProfiles()
 	if err != nil {
 		return "", err
 	}
@@ -207,7 +218,7 @@ func (v *Mojang) RestoreProfiles(before map[string]json.RawMessage) (string, err
 	if len(touched) == 0 {
 		return versionID, nil
 	}
-	return versionID, v.writeProfiles(top, profiles)
+	return versionID, m.writeProfiles(top, profiles)
 }
 
 func sameJSON(a, b json.RawMessage) bool {
@@ -222,8 +233,8 @@ func sameJSON(a, b json.RawMessage) bool {
 }
 
 // RemoveProfiles drops the shulker-made profiles that point at gameDir.
-func (v *Mojang) RemoveProfiles(gameDir string) (int, error) {
-	top, profiles, err := v.readProfiles()
+func (m *Mojang) RemoveProfiles(gameDir string) (int, error) {
+	top, profiles, err := m.readProfiles()
 	if err != nil {
 		return 0, err
 	}
@@ -234,13 +245,13 @@ func (v *Mojang) RemoveProfiles(gameDir string) (int, error) {
 	if len(keys) == 0 {
 		return 0, nil
 	}
-	return len(keys), v.writeProfiles(top, profiles)
+	return len(keys), m.writeProfiles(top, profiles)
 }
 
 // JavaDir is the Java the launcher runs for a game directory, and whether shulker has a profile
 // there at all. An empty path is a profile with no javaDir, which is the launcher's own runtime.
-func (v *Mojang) JavaDir(gameDir string) (string, bool, error) {
-	_, profiles, err := v.readProfiles()
+func (m *Mojang) JavaDir(gameDir string) (string, bool, error) {
+	_, profiles, err := m.readProfiles()
 	if err != nil {
 		return "", false, err
 	}
@@ -258,8 +269,8 @@ func (v *Mojang) JavaDir(gameDir string) (string, bool, error) {
 
 // SetJavaDir points every shulker profile for a game directory at a Java, an empty one deleting the
 // key so the launcher goes back to choosing the runtime itself.
-func (v *Mojang) SetJavaDir(gameDir, javaDir string) error {
-	top, profiles, err := v.readProfiles()
+func (m *Mojang) SetJavaDir(gameDir, javaDir string) error {
+	top, profiles, err := m.readProfiles()
 	if err != nil {
 		return err
 	}
@@ -267,7 +278,7 @@ func (v *Mojang) SetJavaDir(gameDir, javaDir string) error {
 	for _, key := range shulkerProfiles(profiles, gameDir) {
 		entry := map[string]any{}
 		if err := json.Unmarshal(profiles[key], &entry); err != nil {
-			return fmt.Errorf("%s: profile %s: %w", v.profilesPath(), key, err)
+			return invalidFile(m.profilesPath(), fmt.Errorf("profile %s: %w", key, err))
 		}
 		if current, _ := entry["javaDir"].(string); current == javaDir {
 			continue
@@ -285,7 +296,7 @@ func (v *Mojang) SetJavaDir(gameDir, javaDir string) error {
 	if !changed {
 		return nil
 	}
-	return v.writeProfiles(top, profiles)
+	return m.writeProfiles(top, profiles)
 }
 
 // shulkerProfiles are the profiles shulker made for a game directory: the ones `link mojang` writes,
@@ -315,9 +326,9 @@ func shulkerProfileGameDir(key string, raw json.RawMessage) (string, bool) {
 	return p.GameDir, true
 }
 
-func (v *Mojang) now() time.Time {
-	if v.Now != nil {
-		return v.Now()
+func (m *Mojang) now() time.Time {
+	if m.Now != nil {
+		return m.Now()
 	}
 	return time.Now()
 }

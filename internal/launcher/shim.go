@@ -44,8 +44,8 @@ func shimPath(dir, goos string) string {
 	return filepath.Join(dir, instance.Dir, shimScriptName)
 }
 
-// IsShulkerShim reports whether a profile's javaDir is one shulker wrote, which is how reconcile
-// tells its own value from the Java a player chose.
+// IsShulkerShim reports whether a profile's javaDir is one shulker wrote rather than a Java the
+// player chose.
 func IsShulkerShim(javaDir string) bool {
 	for _, sep := range []string{"/", `\`} {
 		for _, name := range []string{shimScriptName, shimWindowsName} {
@@ -74,12 +74,10 @@ func writeShim(s Shim, goos string, b shimBuild) error {
 	if err := fsutil.Write(path, []byte(shimSh(s))); err != nil {
 		return err
 	}
-	// The launcher runs the shim itself, so it has to be executable.
 	return os.Chmod(path, 0o755)
 }
 
-// RemoveShim drops both shapes of the shim and the sidecar, for a switch turned off or an instance
-// unlinked.
+// RemoveShim drops both shapes of the shim and the sidecar.
 func RemoveShim(dir string) error {
 	windows := shimPath(dir, "windows")
 	// A shim moved aside by an earlier rewrite may still be running, and Windows won't delete one of
@@ -94,11 +92,11 @@ func RemoveShim(dir string) error {
 	return nil
 }
 
-// ShimMode reports whether this binary is running as an instance's javaw.exe, which is what the
+// IsShim reports whether this binary is running as an instance's javaw.exe, which is what the
 // fallback route leaves there: one copy of shulker with its subsystem byte patched. The name comes
 // from GetModuleFileName, which os.Executable reads, so a caller can't spoof it the way it could
 // argv[0].
-func ShimMode() bool {
+func IsShim() bool {
 	if runtime.GOOS != "windows" {
 		return false
 	}

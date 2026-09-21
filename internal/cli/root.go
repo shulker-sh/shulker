@@ -50,7 +50,7 @@ type app struct {
 func Execute(args []string, stdout, stderr io.Writer) int {
 	// A copy of shulker installed as an instance's javaw.exe is a launcher's Java, not the CLI: it
 	// hands the launch on and never parses these arguments, which are the game's.
-	if launcher.ShimMode() {
+	if launcher.IsShim() {
 		return launcher.RunShim()
 	}
 	if runtime.GOOS == "windows" {

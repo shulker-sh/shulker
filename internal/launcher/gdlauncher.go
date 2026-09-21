@@ -25,6 +25,8 @@ const (
 	GDLauncherSetupDir = ".setup"
 )
 
+// GDLauncherIcon is the instance icon.
+//
 //go:embed assets/gdlauncher-icon.png
 var GDLauncherIcon []byte
 
@@ -100,7 +102,7 @@ func gdlauncherAppData() (string, error) {
 	case "windows":
 		appdata := os.Getenv("APPDATA")
 		if appdata == "" {
-			return "", errors.New("APPDATA is not set")
+			return "", appDataUnset()
 		}
 		return filepath.Join(appdata, "gdlauncher_carbon"), nil
 	default:
@@ -115,10 +117,10 @@ func gdlauncherAppData() (string, error) {
 	}
 }
 
-func (l *GDLauncher) Check() error {
-	info, err := os.Stat(l.Dir)
+func (g *GDLauncher) Check() error {
+	info, err := os.Stat(g.Dir)
 	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, l.Dir)
+		return fmt.Errorf("%w at %s", ErrNotFound, g.Dir)
 	}
 	return nil
 }
@@ -153,19 +155,19 @@ func GDLauncherLoaderVersion(minecraft, loaderType, version string) string {
 	return version
 }
 
-func (l *GDLauncher) InstanceDir(name string) string {
-	return filepath.Join(l.Dir, "instances", GDLauncherFolder(name))
+func (g *GDLauncher) InstanceDir(name string) string {
+	return filepath.Join(g.Dir, "instances", GDLauncherFolder(name))
 }
 
-func (l *GDLauncher) GameDir(name string) string {
-	return filepath.Join(l.InstanceDir(name), GDLauncherGameDir)
+func (g *GDLauncher) GameDir(name string) string {
+	return filepath.Join(g.InstanceDir(name), GDLauncherGameDir)
 }
 
 // WriteInstance writes the instance's instance.json, from which GDLauncher installs Minecraft, the loader
 // and Java on first Play. A relink replaces the name, version and hook and keeps everything else, such as
 // memory, Java arguments and playtime.
-func (l *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, error) {
-	dir := l.InstanceDir(inst.Name)
+func (g *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, error) {
+	dir := g.InstanceDir(inst.Name)
 	res := InstanceResult{Dir: dir, GameDir: filepath.Join(dir, GDLauncherGameDir)}
 	path := filepath.Join(dir, GDLauncherInstanceFile)
 	top, found, err := readJSONObject(path)
@@ -218,7 +220,7 @@ func GDLauncherPreLaunch(instanceDir string) (hook string, found bool, err error
 		Hook string `json:"pre_launch_hook"`
 	}
 	if err := json.Unmarshal(data, &inst); err != nil {
-		return "", true, fmt.Errorf("%s: %w", path, err)
+		return "", true, invalidFile(path, err)
 	}
 	return inst.Hook, true, nil
 }

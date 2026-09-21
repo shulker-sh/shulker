@@ -32,13 +32,15 @@ type InstanceResult struct {
 	Created bool
 }
 
+// Entry is one launcher shulker links into. Everything that differs between launchers is described
+// here, once, rather than switched on by name.
 type Entry struct {
 	Name  string
 	Title string
-	// Instanced launchers keep the game directory inside an instance directory
-	// they own, so the instance going away is the entry going away.
-	Instanced  bool
-	DefaultDir func() (string, error)
+	// IsInstanced marks launchers that keep the game directory inside an instance directory they
+	// own, so the instance going away is the entry going away.
+	IsInstanced bool
+	DefaultDir  func() (string, error)
 	// gameDirIsInstance marks launchers whose instance folder is the game directory itself,
 	// rather than holding it as minecraft/.
 	gameDirIsInstance bool
@@ -57,42 +59,43 @@ type Entry struct {
 // ref the relink command needs now live.
 type Linked struct {
 	config.Instance
-	Side         string
-	AssumeClient bool
-	Ref          string
+	Side          string
+	AssumesClient bool
+	Ref           string
 }
 
+// All is every launcher shulker knows, in the order Rank displays them.
 var All = []*Entry{
 	{
-		Name: "shulker", Title: "Shulker", Instanced: true, gameDirIsInstance: true,
+		Name: "shulker", Title: "Shulker", IsInstanced: true, gameDirIsInstance: true,
 		relink: relinkShulker, forget: forgetShulker, name: shulkerName, gameDirs: instanceGameDirs,
 	},
 	{
-		Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir,
+		Name: "prism", Title: "Prism Launcher", IsInstanced: true, DefaultDir: DefaultPrismDir,
 		Slot:   &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
 		relink: relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
 		readSlots: readPrismSlots, writeSlots: writePrismSlots,
 	},
 	{
-		Name: "multimc", Title: "MultiMC", Instanced: true,
+		Name: "multimc", Title: "MultiMC", IsInstanced: true,
 		Slot:   &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
 		relink: relinkLauncher, forget: forgetInstance, name: multimcName, gameDirs: multimcGameDirs,
 		readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots,
 	},
 	{
 		Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir,
-		Slot:   &Slot{Shim: true},
+		Slot:   &Slot{UsesShim: true},
 		relink: relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,
 		readSlots: readMojangSlots, writeSlots: writeMojangSlots,
 	},
 	{
-		Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true,
+		Name: "atlauncher", Title: "ATLauncher", IsInstanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true,
 		Slot:   &Slot{Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord},
 		relink: relinkLauncher, forget: forgetInstance, name: atlauncherName, gameDirs: atlauncherGameDirs,
 		readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots,
 	},
 	{
-		Name: "gdlauncher", Title: "GDLauncher", Instanced: true, DefaultDir: DefaultGDLauncherDir,
+		Name: "gdlauncher", Title: "GDLauncher", IsInstanced: true, DefaultDir: DefaultGDLauncherDir,
 		Slot:   &Slot{Deadline: "4m", Quote: gdlauncherHookArg},
 		relink: relinkLauncher, forget: forgetInstance, name: gdlauncherName, gameDirs: gdlauncherGameDirs,
 		readSlots: readGDLauncherSlots, writeSlots: writeGDLauncherSlots,
@@ -198,7 +201,7 @@ func relinkSync(l Linked) (args []string, in string) {
 		args = append(args, "--ref", shellArg(l.Ref))
 	}
 	args = append(args, "--side", shellArg(l.Side))
-	if l.AssumeClient {
+	if l.AssumesClient {
 		args = append(args, "--assume-client")
 	}
 	return append(args, "--into", shellArg(l.Dir)), ""

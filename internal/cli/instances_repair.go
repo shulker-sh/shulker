@@ -192,7 +192,7 @@ func scanLaunchers(only, dir, instancesRoot string) []config.Instance {
 			}
 			if name := e.InstanceName(launcherDir, gameDir); name != "" {
 				in.Name = name
-			} else if e.Instanced {
+			} else if e.IsInstanced {
 				in.Name = filepath.Base(e.InstanceDir(gameDir))
 			}
 			found = append(found, in)

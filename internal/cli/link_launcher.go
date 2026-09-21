@@ -119,7 +119,7 @@ func (a *app) refuseForeignInstance(k *launcherLink, gameDir, title, display str
 	if err != nil {
 		return err
 	}
-	if found && !launcher.IsSyncCommand(command) {
+	if found && !launcher.IsShulkerSlot(command) {
 		return out.Errorf("instance-exists", "%s already has an instance %q that shulker didn't link; pass --name to create a second instance, or --force to link this one", title, display)
 	}
 	return nil

@@ -39,7 +39,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 	}
 	f.Settings.Shulker = exe
 	a.adoptSlots(f, slot, current)
-	if slot.Shim {
+	if slot.UsesShim {
 		captureLauncherJava(f, current.Java)
 	}
 
@@ -79,7 +79,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 	} else if err := launcher.RemoveHook(in.Dir, launcher.HookPostExit); err != nil {
 		return err
 	}
-	if slot.Shim {
+	if slot.UsesShim {
 		if want.Java, err = reconcileShim(in, f, current.Java, exe); err != nil {
 			return err
 		}
@@ -96,7 +96,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 // slotCommandOf is what the launcher's own slot holds. A launcher with no command slots keeps them
 // empty: its generated scripts are there for the shim to reach, not for the launcher to run.
 func slotCommandOf(slot launcher.Slot, in config.Instance, kind launcher.HookKind) string {
-	if slot.Shim {
+	if slot.UsesShim {
 		return ""
 	}
 	return launcher.SlotCommand(in.Launcher, in.Dir, kind)

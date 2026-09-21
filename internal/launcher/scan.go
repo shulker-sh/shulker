@@ -7,7 +7,6 @@ import (
 	"shulker.sh/shulker/internal/instance"
 )
 
-// shulkerDir is the tool-owned directory inside an instance.
 const shulkerDir = instance.Dir
 
 // GameDirs lists the game directories a launcher's data directory holds, for the scan that repairs

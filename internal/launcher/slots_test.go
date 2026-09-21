@@ -145,10 +145,10 @@ func TestWriteSlotsWithNoInstanceIsNoOp(t *testing.T) {
 			t.Fatalf("%s: found=%v err=%v", name, found, err)
 		}
 	}
-	if slot := Find("mojang").Slot; slot == nil || !slot.Shim {
+	if slot := Find("mojang").Slot; slot == nil || !slot.UsesShim {
 		t.Fatalf("the Minecraft launcher fills the profile's Java: %+v", slot)
 	}
-	if slot := Find("prism").Slot; slot.Shim {
+	if slot := Find("prism").Slot; slot.UsesShim {
 		t.Fatal("a launcher with command slots must not take the profile's Java")
 	}
 }

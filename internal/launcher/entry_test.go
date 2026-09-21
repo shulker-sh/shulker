@@ -1,8 +1,10 @@
 package launcher
 
-import "testing"
+import (
+	"testing"
 
-import "shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/config"
+)
 
 // No command registers a row without a launcher any more: `link` always records one and
 // `instances repair` is launcher-only. The fallback stays for a row whose directory matches no
@@ -33,7 +35,7 @@ func TestShulkerOwnsItsInstances(t *testing.T) {
 	if e == nil {
 		t.Fatal("no shulker entry")
 	}
-	if !e.Instanced || e.InstanceDir("/d/instances/smp") != "/d/instances/smp" {
+	if !e.IsInstanced || e.InstanceDir("/d/instances/smp") != "/d/instances/smp" {
 		t.Fatalf("a shulker instance is its own game directory: %+v", e)
 	}
 	if e.Slot != nil {

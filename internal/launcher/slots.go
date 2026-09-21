@@ -27,11 +27,11 @@ type Slot struct {
 	// Deadline bounds the pre-launch refresh. Only GDLauncher sets one: it discards hook output on
 	// its own 300s timeout, so shulker stops first to explain itself.
 	Deadline string
-	// Reproducible is Tokens minus the ones shulker cannot reproduce, which adoption warns about.
+	// Unreproducible are the Tokens shulker can't reproduce, which adoption warns about.
 	Unreproducible []string
-	// Shim marks a launcher with no command slots at all, where what shulker fills is the profile's
+	// UsesShim marks a launcher with no command slots at all, where what shulker fills is the profile's
 	// Java instead, with a shim that hands the launch back to it.
-	Shim bool
+	UsesShim bool
 	// Quote quotes one word of a command the way the launcher splits it. Nil means CommandArg's
 	// plain double quotes, which every other parser reads alike.
 	Quote func(word, goos string) string
@@ -80,8 +80,7 @@ func slotCommand(launcherName, dir string, kind HookKind, goos string) string {
 	return "sh " + s.quote(script, goos)
 }
 
-// IsShulkerSlot reports whether a slot command is one shulker owns, which is how reconcile tells its
-// own slot from a command to adopt, and how link tells its own instance from a player's.
+// IsShulkerSlot reports whether a slot command is one shulker owns rather than a player's.
 //
 // Two shapes count. The generated script is what shulker writes now. The inline `sync --into` command
 // is what shulker wrote before the scripts existed, and it is still shulker's: treating it as a
@@ -193,8 +192,7 @@ func readMojangSlots(_ *Entry, in config.Instance) (Slots, bool, error) {
 }
 
 // WriteSlots puts commands in an instance's slots, an empty one clearing that slot, except for the
-// wrapper, which is only ever filled. It is what reconcile uses, so a hand-edited switch takes
-// effect through the same path that first set it.
+// wrapper, which is only ever filled.
 func WriteSlots(e *Entry, in config.Instance, s Slots) error {
 	if e.writeSlots == nil {
 		return nil
@@ -355,8 +353,7 @@ func writeGDLauncherSlots(e *Entry, in config.Instance, s Slots) error {
 
 // ReleaseSlots hands an instance's slots back to its launcher: a command shulker adopted returns to
 // the slot it came from, a command shulker never adopted is left exactly where it is, shulker's own
-// slots are cleared, and both generated scripts go. It reports which slots shulker was holding, so
-// the caller can say what it removed.
+// slots are cleared, and both generated scripts go. It reports which slots shulker was holding.
 func ReleaseSlots(e *Entry, in config.Instance) (tookPreLaunch, tookPostExit bool, err error) {
 	gameDir := in.Dir
 	current, found, err := ReadSlots(e, in)
@@ -369,7 +366,7 @@ func ReleaseSlots(e *Entry, in config.Instance) (tookPreLaunch, tookPostExit boo
 		adopted = Slots{PreLaunch: f.Settings.Commands.PreLaunch, PostExit: f.Settings.Commands.PostExit}
 	}
 	tookPreLaunch, tookPostExit = IsShulkerSlot(current.PreLaunch), IsShulkerSlot(current.PostExit)
-	if e.Slot != nil && e.Slot.Shim {
+	if e.Slot != nil && e.Slot.UsesShim {
 		// The profile keeps a Java shulker didn't set; the one it did set goes back to what the
 		// launcher had, which is usually no key at all.
 		if found && IsShulkerShim(current.Java) {
@@ -444,10 +441,6 @@ func jsonStringValue(raw json.RawMessage) string {
 	}
 	return s
 }
-
-// IsSyncCommand reports whether a slot holds a command shulker owns: the generated script it writes
-// now, or the inline sync it wrote before those existed.
-func IsSyncCommand(command string) bool { return IsShulkerSlot(command) }
 
 func CommandArg(s string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`

@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestReadJSONObjectReportsAMissingFileAsEmpty(t *testing.T) {
@@ -30,8 +32,8 @@ func TestReadJSONObjectDecodesANestedObject(t *testing.T) {
 	if err != nil || absent == nil || len(absent) != 0 {
 		t.Fatalf("absent key: %v %v", absent, err)
 	}
-	if _, err := jsonObjectAt(path, top, "name"); err == nil {
-		t.Fatal("a key holding no object must fail")
+	if _, err := jsonObjectAt(path, top, "name"); out.CodeOf(err) != "launcher-file-invalid" {
+		t.Fatalf("a key holding no object must fail as launcher-file-invalid: %v", err)
 	}
 }
 
@@ -40,7 +42,7 @@ func TestReadJSONObjectFailsOnAFileThatIsNoObject(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`[1]`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, found, err := readJSONObject(path); err == nil || !found {
+	if _, found, err := readJSONObject(path); out.CodeOf(err) != "launcher-file-invalid" || !found {
 		t.Fatalf("found=%v err=%v", found, err)
 	}
 }

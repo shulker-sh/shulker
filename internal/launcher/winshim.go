@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/out"
 )
 
 // The Windows shim is `.shulker\javaw.exe`, a GUI-subsystem executable: a console-subsystem one opens
@@ -232,7 +233,9 @@ func writeShimCopy(exe string, have []byte, b shimBuild) error {
 	}
 	patched, err := patchSubsystem(self)
 	if err != nil {
-		return err
+		e := out.Errorf("shim-build-failed", "can't make the Windows shim from shulker's own binary")
+		e.Rows = []out.Detail{{Label: "pe", Text: err.Error()}}
+		return e
 	}
 	if bytes.Equal(have, patched) {
 		return nil
