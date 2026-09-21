@@ -111,6 +111,9 @@ type Options struct {
 	NoOS        bool
 	Features    map[string]bool
 	Origin      Origin
+	// BeforeModChange runs once, before a build that adds, replaces or removes a mod writes
+	// anything.
+	BeforeModChange func() error
 }
 
 type Builder struct {
@@ -296,6 +299,11 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		e.Items = report.Conflicts
 		return report, e
 	}
+	if opts.BeforeModChange != nil && changesMods(writes, report.Removed) {
+		if err := opts.BeforeModChange(); err != nil {
+			return nil, err
+		}
+	}
 	if inPlace && !opts.NoHistory && planDrift(plans) {
 		if err := b.takeHistory(dir, side, "build", len(writes), len(report.Removed), report); err != nil {
 			return nil, err
@@ -333,6 +341,11 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		return nil, err
 	}
 	return report, nil
+}
+
+func changesMods(writes, removed []string) bool {
+	isMod := func(rel string) bool { return strings.HasPrefix(rel, "mods/") }
+	return slices.ContainsFunc(writes, isMod) || slices.ContainsFunc(removed, isMod)
 }
 
 func (b *Builder) collect(side string, opts Options, report *Report) (map[string]source, []string, error) {

@@ -277,6 +277,16 @@ func (a *app) savesTargetOf(group string) (savesTarget, error) {
 	if err != nil {
 		return savesTarget{}, err
 	}
+	return a.savesTargetAt(dir)
+}
+
+// savesTargetAt is the target a directory's worlds belong to: its save group when it is a shulker
+// instance in one, and the directory itself otherwise.
+func (a *app) savesTargetAt(dir string) (savesTarget, error) {
+	r, err := a.roots()
+	if err != nil {
+		return savesTarget{}, err
+	}
 	if dir, err = filepath.Abs(dir); err != nil {
 		return savesTarget{}, err
 	}

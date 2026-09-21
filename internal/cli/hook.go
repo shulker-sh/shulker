@@ -224,7 +224,7 @@ func (a *app) syncForLaunch(cmd *cobra.Command, dir string) (syncResult, error) 
 	case inPlace:
 		return a.syncInPlaceForLaunch(cmd, p, side)
 	default:
-		return a.syncRecorded(cmd, syncRequest{into: dir})
+		return a.syncRecorded(cmd, syncRequest{into: dir, backup: "sync"})
 	}
 }
 

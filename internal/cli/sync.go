@@ -38,6 +38,7 @@ type syncRequest struct {
 	ref, side, into, os string
 	force, assumeClient bool
 	features            featureFlags
+	backup              string
 }
 
 func (a *app) syncCmd() *cobra.Command {
@@ -52,6 +53,7 @@ func (a *app) syncCmd() *cobra.Command {
 			if err := checkOS(req.os); err != nil {
 				return err
 			}
+			req.backup = "sync"
 			if offline {
 				d, err := a.deps()
 				if err != nil {
@@ -230,7 +232,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 		return syncResult{}, err
 	}
 	origin := build.Origin{Source: src.name, Ref: req.ref, Commit: src.Commit, Sha256: src.Sha256}
-	rep, err := b.Build(side, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin})
+	rep, err := b.Build(side, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin, BeforeModChange: a.autoBackup(req.backup, into)})
 	if err != nil {
 		return syncResult{}, err
 	}

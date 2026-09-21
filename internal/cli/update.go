@@ -117,7 +117,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	}
 	// An instance plays its own directory, so an update there is only done once it is built.
 	if side, ok := p.Manifest.InPlaceSide(); ok && cmd.Name() == "update" {
-		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{side: side})
+		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{side: side, backup: "update"})
 		if err != nil {
 			return err
 		}

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/saves"
@@ -69,4 +70,63 @@ func (a *app) backupSource(target savesTarget) saves.Source {
 
 func (t savesTarget) home() saves.Home {
 	return saves.Home{Dir: t.backups, Shared: t.Group != ""}
+}
+
+// autoBackup is the backup a build takes of dir's worlds before it changes the mod set, then trims
+// that target's automatic backups to play.saveBackups. Only a zip that can't be written stops the
+// build: a target with no worlds backs up as nothing, and one whose worlds can't be found, or
+// whose trim fails, is a warning.
+func (a *app) autoBackup(reason, dir string) func() error {
+	if reason == "" {
+		return nil
+	}
+	return func() error {
+		skip := func(err error) error {
+			a.printer.Warn("couldn't back up the worlds in %s before the mods changed: %v", dir, err)
+			return nil
+		}
+		if _, err := a.loadInstances(); err != nil {
+			return skip(err)
+		}
+		target, err := a.savesTargetAt(dir)
+		if err != nil {
+			return skip(err)
+		}
+		worlds, err := saves.Worlds(target.WorldsDir)
+		if err != nil {
+			return skip(err)
+		}
+		if len(worlds) == 0 {
+			return nil
+		}
+		keep, err := a.saveBackups()
+		if err != nil {
+			a.printer.Warn("couldn't read play.saveBackups, keeping %d automatic backups: %v", keep, err)
+		}
+		if keep == 0 {
+			return nil
+		}
+		taken, err := saves.Take(a.backupSource(target), target.home(), reason, func(world string) {
+			a.printer.Step("backing up %s", world)
+		})
+		if err != nil || taken.Path == "" {
+			return err
+		}
+		if err := saves.TrimAutomatic(target.backups, keep); err != nil {
+			a.printer.Warn("couldn't trim the automatic backups in %s: %v", target.backups, err)
+		}
+		return nil
+	}
+}
+
+func (a *app) saveBackups() (int, error) {
+	path, err := a.configFile()
+	if err != nil {
+		return config.DefaultSaveBackups, err
+	}
+	cfg, err := config.LoadFile(path)
+	if err != nil {
+		return config.DefaultSaveBackups, err
+	}
+	return cfg.Play.Backups(), nil
 }

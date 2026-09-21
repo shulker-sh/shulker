@@ -255,7 +255,7 @@ shulker lock
 
 ### `shulker update`
 
-Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. In an instance (a project whose side builds into its own directory), `update` then builds that side in place; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
+Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. In an instance (a project whose side builds into its own directory), `update` then builds that side in place, backing up its worlds first when the mods change; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
 
 ```sh
 shulker update
@@ -386,7 +386,7 @@ shulker get server.properties
 | `play.java` | The java those launches run: the absolute path of a java binary, or of a Java home. Without it, shulker's managed runtime |
 | `play.window` | The window size those launches open at, like `1280x720` |
 | `play.wrapper` | A command those launches run through, as a JSON array like `["gamemoderun"]` |
-| `play.saveBackups` | How many automatic backups of a save group or instance's worlds to keep, taken before `update` or `sync` changes the mods. Without it, 5; `0` takes none. No instance setting overrides it |
+| `play.saveBackups` | How many automatic backups of a save group or instance's worlds to keep, taken before `update` or `sync` changes the mods. After each one, the oldest `before update` and `before sync` backups past this number are deleted; one taken by `shulker backup` or before a restore never counts and is never deleted. An instance with no worlds backs up as nothing. A backup that can't be written stops the `update` or `sync` before any mod changes; one whose worlds can't be found, because a file it reads is unreadable, is a warning, and the change goes ahead. Without it, 5; `0` takes none. No instance setting overrides it |
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
 | `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
 | `instances` | Where [`shulker link shulker`](#shulker-link-shulker) puts the instances shulker owns. Without it, `instances` in shulker's data directory |
@@ -1049,7 +1049,7 @@ shulker link multimc https://github.com/shulker-sh/base-pack.git --launcher-dir 
 
 ### `shulker sync`
 
-Download and build one side of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<side>/`.
+Download and build one side of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<side>/`. Before a sync adds, replaces or removes a mod, it backs up the directory's worlds, as [`shulker backup`](#shulker-backup) would, with the reason `sync`; `play.saveBackups` in [Configuration](#configuration) says how many it keeps.
 
 ```sh
 shulker sync https://github.com/shulker-sh/base-pack.git --side server --into /srv/minecraft
