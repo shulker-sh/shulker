@@ -191,7 +191,7 @@ func (a *app) showSaves(target savesTarget) error {
 		l.Blank()
 		l.Heading("Backups")
 		if len(view.Backups) == 0 {
-			l.Info("no backups yet; `" + a.backupCommand(target) + "` takes one")
+			l.Info("no backups yet; `" + a.savesCommand(target, "backup") + "` takes one")
 			return
 		}
 		width := len(strconv.Itoa(len(view.Backups)))
@@ -199,20 +199,22 @@ func (a *app) showSaves(target savesTarget) error {
 			label := fmt.Sprintf("%*d)", width, b.N)
 			l.Plain(t.Cyan(label) + " " + t.Bold(b.ID) + " " + t.Grey(backupAside(b.Backup)))
 		}
+		l.Nudge("Restore one", a.savesCommand(target, "restore <n>"))
 	})
 }
 
-// backupCommand is the backup command for the target saves shows, selected the way saves was.
-func (a *app) backupCommand(target savesTarget) string {
+// savesCommand is command, with any arguments, run on the target saves shows, selected the way
+// saves was.
+func (a *app) savesCommand(target savesTarget, command string) string {
 	switch {
 	case target.Dir == "":
-		return "shulker backup --group " + target.Group
+		return "shulker " + command + " --group " + target.Group
 	case a.instance != "":
-		return "shulker -i " + shellWord(a.instance) + " backup"
+		return "shulker -i " + shellWord(a.instance) + " " + command
 	case a.dir != "":
-		return "shulker backup -C " + shellWord(target.Dir)
+		return "shulker " + command + " -C " + shellWord(target.Dir)
 	}
-	return "shulker backup"
+	return "shulker " + command
 }
 
 func shellWord(s string) string {

@@ -1226,7 +1226,7 @@ shulker saves --group default
 | --- | --- |
 | `--group <group>` | Show this save group rather than an instance |
 
-With `--json`, the list is `[{ "name", "dir", "worlds", "size", "lastBackup" }]`, and a target is `{ "group", "dir", "worldsDir", "worlds", "backups" }` with each backup `{ "n", "id", "path", "taken", "reason", "instance", "size", "worlds", "names", "minecraft", "loader" }`. A backup's zip comment is its record: the time, reason, instance, world count, world names, Minecraft version and loader all come from it, and it wins over the filename for the listing, the order, and which backups are automatic. A zip without shulker's comment falls back to its filename for the time, reason and instance, and counts the world folders in the zip; it has no `names`, `minecraft` or `loader`. A row reads `on request` for a backup [`shulker backup`](#shulker-backup) took.
+With `--json`, the list is `[{ "name", "dir", "worlds", "size", "lastBackup" }]`, and a target is `{ "group", "dir", "worldsDir", "worlds", "backups" }` with each backup `{ "n", "id", "path", "taken", "reason", "instance", "size", "worlds", "names", "minecraft", "loader" }`. A backup's zip comment is its record: the time, reason, instance, world count, world names, Minecraft version and loader all come from it, and it wins over the filename for the listing, the order, and which backups are automatic. A zip without shulker's comment falls back to its filename for the time, reason and instance, and counts the world folders in the zip; it has no `names`, `minecraft` or `loader`. A row reads `on request` for a backup [`shulker backup`](#shulker-backup) took, and `before a restore` for one [`shulker restore`](#shulker-restore) took. The list ends with the `shulker restore <n>` that puts one back; the number is the one printed beside it.
 
 ### `shulker saves prune`
 
@@ -1261,6 +1261,28 @@ shulker backup --group default
 | `--group <group>` | Back up this save group rather than an instance |
 
 With `--json`, the data is `{ "group", "dir", "worldsDir", "id", "path", "taken", "reason", "instance", "size", "worlds", "names", "minecraft", "loader" }`, where `worlds` counts the worlds and `names` lists them.
+
+### `shulker restore`
+
+Put a backup's worlds back into a target: the one [`shulker saves`](#shulker-saves) would show, `--group`, `-i`, `-C`, or the current directory. `n` is the number `saves` prints beside the backup, newest first, and defaults to 1. `--backup` names one exactly instead: a value with a path separator, or naming a file that exists, is the path of any zip of world folders, from this target's backups or anywhere else and named however it is; any other value is a backup's name in this target's backups, with or without `.zip`. So restoring into a different target is `--backup <path>` with that target's `-i`, `-C` or `--group`.
+
+Before it writes anything, `restore` backs up the worlds the target holds, as [`shulker backup`](#shulker-backup) would with the reason `restore`, so a restore can itself be undone; that backup is never pruned automatically. A group restored with `--group` names no instance, so its backup is `<time>-restore.zip`. Each world folder in the zip, read from the zip's own entries, replaces the one of the same name whole: the old folder is removed and the zip's unzipped in its place, never merged file by file. Worlds the zip doesn't hold are left alone. A server takes only its `level-name` world from the zip, and fails with `world-not-found` when the zip doesn't hold it.
+
+`restore` fails with `backups-empty` when the target has no backups, `backup-missing` when there is no backup `n` or none by the name `--backup` gives, and `backup-invalid` for a zip that won't open or holds anything other than world folders, each with a `level.dat`, at its root.
+
+```sh
+shulker restore
+shulker restore 2
+shulker -i smp restore --backup 20260918-203015-smp-backup
+shulker restore --group default --backup ~/Downloads/worlds.zip
+```
+
+| Flag | Description |
+| --- | --- |
+| `--backup <name\|path>` | Restore this backup, by its name in the target's backups or a zip's path |
+| `--group <group>` | Restore into this save group rather than an instance |
+
+The output names the backup taken first, then `✔ restored 2 worlds from <id> » <folder>`, then `~ <world>` for each world replaced and `+ <world>` for one the target didn't have. With `--json`, the data is `{ "group", "dir", "worldsDir", "from", "snapshot", "worlds" }`: `from` and `snapshot` are backups as `saves` lists them (a zip that isn't shulker's has only `id`, `path` and `size`), `snapshot` absent when the target held no worlds to back up, and each world is `{ "name", "replaced" }`.
 
 ### `shulker hook pre-launch`
 
@@ -1550,6 +1572,9 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-side` | The manifest declares both sides and the command works on one; `sync` and `pull` take `--side`, `diff --into` names it. `candidates`: the sides |
+| `backup-invalid` | `restore` was given a zip that won't open, or that holds anything other than world folders at its root |
+| `backup-missing` | `restore` found no backup with that number, or none by the name or at the path `--backup` gives |
+| `backups-empty` | `restore` found no backups for the target |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need; `cache info` still reports and names the instance |
@@ -1675,3 +1700,4 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
+| `world-not-found` | `restore` into a server was given a zip without the world its `level-name` names; the message names it |

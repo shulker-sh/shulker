@@ -273,6 +273,21 @@ func Backups(dir string) ([]Backup, error) {
 	return backups, nil
 }
 
+// ReadBackup is the zip at path as a backup: its record when it is one of shulker's, and at least
+// its name, path and size when it is any other zip.
+func ReadBackup(path string) (Backup, error) {
+	id := strings.TrimSuffix(filepath.Base(path), ".zip")
+	b, ok, err := openBackup(path, id)
+	if err != nil || ok {
+		return b, err
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return Backup{}, err
+	}
+	return Backup{ID: id, Path: path, Size: info.Size()}, nil
+}
+
 func openBackup(path, id string) (Backup, bool, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
