@@ -229,7 +229,7 @@ func TestAccountsLoginStoresTheAccountAndItsTokens(t *testing.T) {
 	if a.RefreshToken != "refresh-notch-1" || a.Minecraft.Token != "mc-notch" {
 		t.Errorf("tokens = %q %+v", a.RefreshToken, a.Minecraft)
 	}
-	if !a.Fresh(time.Now()) {
+	if !a.IsFresh(time.Now()) {
 		t.Errorf("a token a day out should be fresh: %+v", a.Minecraft)
 	}
 	if a.Xbox.Token != "user-notch" || a.Xbox.UserHash != "uhs-notch" {

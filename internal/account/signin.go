@@ -93,10 +93,10 @@ func (s *SignIn) Start(ctx context.Context) (Device, error) {
 	}
 	form := url.Values{"client_id": {s.ClientID}, "scope": {Scope}}
 	if err := s.Client.PostForm(ctx, s.OAuthURL+"/devicecode", form, &res); err != nil {
-		return Device{}, signInFailed(err, "Microsoft wouldn't start a sign-in")
+		return Device{}, signInFailed(err, "microsoft", "the sign-in couldn't start at Microsoft")
 	}
 	if res.DeviceCode == "" || res.UserCode == "" {
-		return Device{}, out.Errorf("sign-in-failed", "Microsoft answered the sign-in request with no code")
+		return Device{}, out.Errorf("sign-in-failed", "the sign-in request came back with no code")
 	}
 	d := Device{
 		UserCode: res.UserCode,
@@ -126,7 +126,7 @@ func (s *SignIn) Wait(ctx context.Context, d Device) (Tokens, error) {
 		case "expired_token":
 			return Tokens{}, out.Errorf("sign-in-failed", "the code %s ran out before the sign-in finished", d.UserCode)
 		default:
-			return Tokens{}, signInFailed(oa, "Microsoft refused the sign-in")
+			return Tokens{}, signInFailed(oa, "microsoft", "the sign-in was refused by Microsoft")
 		}
 		if s.now().After(d.expires) {
 			return Tokens{}, out.Errorf("sign-in-failed", "the code %s ran out before the sign-in finished", d.UserCode)
@@ -179,9 +179,9 @@ func (s *SignIn) Renew(ctx context.Context, a Account) (Account, error) {
 	return s.Complete(ctx, t)
 }
 
-// Fresh reports whether a's Minecraft token has long enough left to launch on. One that expires
+// IsFresh reports whether a's Minecraft token has long enough left to launch on. One that expires
 // within the hour counts as stale: the chain runs before the game starts, not during it.
-func (a Account) Fresh(now time.Time) bool {
+func (a Account) IsFresh(now time.Time) bool {
 	return a.Minecraft != nil && a.Minecraft.Token != "" && holds(a.Minecraft.ExpiresAt, now.Add(renewWithin))
 }
 
@@ -238,7 +238,7 @@ func (s *SignIn) xboxUser(ctx context.Context, access string) (xboxUser, error) 
 	}
 	var res xboxAnswer
 	if err := s.Client.PostJSON(ctx, s.XboxURL+"/user/authenticate", body, &res); err != nil {
-		return xboxUser{}, signInFailed(err, "Xbox Live wouldn't take the Microsoft sign-in")
+		return xboxUser{}, signInFailed(err, "xbox", "the Microsoft sign-in wasn't accepted by Xbox Live")
 	}
 	return xboxUser{Token: res.Token, NotAfter: res.NotAfter}, nil
 }
@@ -289,7 +289,7 @@ func (s *SignIn) minecraftToken(ctx context.Context, userHash, xsts string) (tok
 		ExpiresIn int    `json:"expires_in"`
 	}
 	if err := s.Client.PostJSON(ctx, s.ServicesURL+"/authentication/login_with_xbox", body, &res); err != nil {
-		return "", "", signInFailed(err, "Minecraft services wouldn't take the Xbox sign-in")
+		return "", "", signInFailed(err, "minecraft", "the Xbox sign-in wasn't accepted by Minecraft services")
 	}
 	return res.Token, s.now().Add(time.Duration(res.ExpiresIn) * time.Second).UTC().Format(time.RFC3339), nil
 }
@@ -302,7 +302,7 @@ func (s *SignIn) profile(ctx context.Context, token string) (Profile, bool, erro
 	var p Profile
 	ok, err := client.GetJSONIfFound(ctx, s.ServicesURL+"/minecraft/profile", &p)
 	if err != nil {
-		return Profile{}, false, signInFailed(err, "Minecraft services wouldn't say who this account is")
+		return Profile{}, false, signInFailed(err, "minecraft", "couldn't read the account's Java profile from Minecraft services")
 	}
 	return p, ok, nil
 }
@@ -347,12 +347,12 @@ func oauth(err error) *oauthError {
 	return &oa
 }
 
-// xboxError is what an XSTS refusal carries: an XErr naming a Microsoft account with no Xbox side,
+// xboxErrors are what an XSTS refusal carries: an XErr naming a Microsoft account with no Xbox side,
 // which is an account shulker can't sign in at all, whatever it does next.
-var xboxErrors = map[int64]string{
-	2148916233: "this Microsoft account has no Xbox profile; sign in at minecraft.net once to make one",
-	2148916235: "Xbox Live isn't available in this account's region",
-	2148916238: "this account is a child account, and has to be added to a family to use Xbox Live",
+var xboxErrors = map[int64]struct{ message, help string }{
+	2148916233: {"this Microsoft account has no Xbox profile", "sign in at minecraft.net once to make one"},
+	2148916235: {"Xbox Live isn't available in this account's region", ""},
+	2148916238: {"this account is a child account", "add it to a family to use Xbox Live"},
 }
 
 func xstsFailed(err error) error {
@@ -362,21 +362,25 @@ func xstsFailed(err error) error {
 			XErr int64 `json:"XErr"`
 		}
 		if json.Unmarshal(status.Body, &res) == nil {
-			if message, ok := xboxErrors[res.XErr]; ok {
-				return out.Errorf("sign-in-failed", "%s", message)
+			if known, ok := xboxErrors[res.XErr]; ok {
+				e := out.Errorf("sign-in-failed", "%s", known.message)
+				e.Help = known.help
+				return e
 			}
 		}
 	}
-	return signInFailed(err, "Xbox Live wouldn't authorize the sign-in")
+	return signInFailed(err, "xbox", "the sign-in wasn't authorized by Xbox Live")
 }
 
 // signInFailed is any step of the chain going wrong. A network failure is left as it is, so the
 // caller can tell "Microsoft said no" from "Microsoft wasn't reachable".
-func signInFailed(err error, what string) error {
+func signInFailed(err error, service, what string) error {
 	if fetch.IsNetwork(err) {
 		return err
 	}
-	return out.Errorf("sign-in-failed", "%s (%v)", what, err)
+	e := out.Errorf("sign-in-failed", "%s", what)
+	e.Rows = []out.Detail{{Label: service, Text: err.Error()}}
+	return e
 }
 
 // Error is what a state that stops a launch reads as, with the line that fixes it.

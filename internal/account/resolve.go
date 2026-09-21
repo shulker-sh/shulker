@@ -19,13 +19,10 @@ const (
 // DefaultProviders is accounts.providers when config.json doesn't set it.
 func DefaultProviders() []string { return []string{SourceShulker} }
 
-// Providers is every name accounts.providers accepts, in the order they are offered. A launcher is
-// listed here before its reader exists, so a list can drop shulker for one of them; WithoutReader
-// says which of those a run can't act on yet.
+// Providers is every name accounts.providers accepts, in the order they are offered.
 func Providers() []string { return []string{SourceShulker, SourcePrism, SourceMojang} }
 
-// HasReader says whether a run can act on a provider at all. One without a reader is still a
-// value accounts.providers takes, so the list a reader ticket lands does not become an error.
+// HasReader says whether a run can act on a provider at all.
 func HasReader(provider string) bool {
 	return provider == SourceShulker || provider == SourcePrism || provider == SourceMojang
 }

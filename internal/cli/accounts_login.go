@@ -320,7 +320,7 @@ func (a *app) accountSession(ctx context.Context, r account.Resolved) (account.A
 		a.printer.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session", r.Name, launcher.Title(r.Source))
 		return r.Account, nil
 	}
-	if r.Group != account.GroupOwn || r.Account.Fresh(time.Now()) {
+	if r.Group != account.GroupOwn || r.Account.IsFresh(time.Now()) {
 		return r.Account, nil
 	}
 	d, err := a.deps()

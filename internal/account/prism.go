@@ -116,7 +116,7 @@ func (p prismAccount) resolve(now time.Time) (Resolved, bool) {
 		return r, true
 	}
 	r.Account.Minecraft.ExpiresAt = expires.UTC().Format(time.RFC3339)
-	// No margin, unlike an own account's Fresh: nothing renews this one, so the token is spent
+	// No margin, unlike an own account's IsFresh: nothing renews this one, so the token is spent
 	// only once it actually runs out and is worth using until then.
 	if expires.After(now) {
 		r.State = Playable

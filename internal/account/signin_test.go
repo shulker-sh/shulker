@@ -224,7 +224,7 @@ func TestSignInDeclinedAndExpired(t *testing.T) {
 	for _, c := range []struct{ refused, want string }{
 		{"authorization_declined", "declined"},
 		{"expired_token", "ran out"},
-		{"bad_verification_code", "refused the sign-in"},
+		{"bad_verification_code", "was refused"},
 	} {
 		t.Run(c.refused, func(t *testing.T) {
 			f := newFakeMSA(t)
@@ -241,7 +241,7 @@ func TestSignInWithoutAnXboxProfile(t *testing.T) {
 	f := newFakeMSA(t)
 	f.xerr = 2148916233
 	_, err := f.login(t)
-	if out.CodeOf(err) != "sign-in-failed" || !strings.Contains(err.Error(), "no Xbox profile") {
+	if e := out.AsError(err); e.Code != "sign-in-failed" || !strings.Contains(e.Message, "no Xbox profile") || !strings.Contains(e.Help, "minecraft.net") {
 		t.Fatalf("err = %v (%s)", err, out.CodeOf(err))
 	}
 }
@@ -328,15 +328,15 @@ func TestFreshReusesATokenWithOverAnHourLeft(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			a := Account{Minecraft: &Minecraft{Token: "t", ExpiresAt: signInNow.Add(c.in).Format(time.RFC3339)}}
-			if got := a.Fresh(signInNow); got != c.fresh {
-				t.Errorf("Fresh = %v, want %v", got, c.fresh)
+			if got := a.IsFresh(signInNow); got != c.fresh {
+				t.Errorf("IsFresh = %v, want %v", got, c.fresh)
 			}
 		})
 	}
-	if (Account{}).Fresh(signInNow) {
+	if (Account{}).IsFresh(signInNow) {
 		t.Error("an account with no token is never fresh")
 	}
-	if (Account{Minecraft: &Minecraft{Token: "t"}}).Fresh(signInNow) {
+	if (Account{Minecraft: &Minecraft{Token: "t"}}).IsFresh(signInNow) {
 		t.Error("a token with no expiry is never fresh")
 	}
 }

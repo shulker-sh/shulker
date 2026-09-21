@@ -27,11 +27,13 @@ type Account struct {
 	Minecraft    *Minecraft `json:"minecraft,omitempty"`
 }
 
+// Profile is an account's Java profile: its player UUID and username.
 type Profile struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
+// Xbox is who an account is on Xbox Live, and the user token a renewal starts from while it holds.
 type Xbox struct {
 	XUID     string `json:"xuid,omitempty"`
 	Gamertag string `json:"gamertag,omitempty"`
@@ -40,6 +42,7 @@ type Xbox struct {
 	NotAfter string `json:"notAfter,omitempty"`
 }
 
+// Minecraft is the session token a launch hands the game.
 type Minecraft struct {
 	Token     string `json:"token"`
 	ExpiresAt string `json:"expiresAt,omitempty"`
