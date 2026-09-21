@@ -1,3 +1,5 @@
+// Package provider is the interface shulker reads mod hosts through, and the rules for picking
+// which of a project's versions to use.
 package provider
 
 import (
@@ -51,6 +53,7 @@ type Version struct {
 	Page         string
 }
 
+// Provider is one mod host, such as Modrinth or CurseForge.
 type Provider interface {
 	Name() string
 	// Project looks a slug or id up. kind narrows the search to one project
@@ -69,6 +72,8 @@ type Provider interface {
 
 var channelRank = map[string]int{"release": 0, "beta": 1, "alpha": 2}
 
+// ChannelAllows reports whether a version on the actual channel is stable enough for a manifest
+// that accepts the accepted one. An empty accepted channel means release.
 func ChannelAllows(accepted, actual string) bool {
 	if accepted == "" {
 		accepted = "release"
