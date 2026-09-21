@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
@@ -55,9 +56,13 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 				return err
 			}
 			if multimc && launcherDir == "" {
-				return out.Errorf("launcher-dir-required", "MultiMC is portable; pass --launcher-dir with the folder that holds multimc.cfg")
+				dir, err := a.askMultiMCDir()
+				if err != nil {
+					return err
+				}
+				launcherDir = dir
 			}
-			src, err := a.linkSource(cmd.Context(), args, ref)
+			src, err := a.linkFrom(cmd, args, ref)
 			if err != nil {
 				return err
 			}
@@ -98,10 +103,8 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 			if instanceName != "" {
 				display = instanceName
 			}
-			if !force {
-				if err := checkAdopt(l.GameDir(profileKey(display)), src.name, "instance", display, "--name"); err != nil {
-					return err
-				}
+			if err := checkAdopt(l.GameDir(profileKey(display)), src, "instance", display, "--name", force); err != nil {
+				return err
 			}
 			res, err := l.WriteInstance(launcher.Instance{
 				ID:            profileKey(display),
@@ -143,10 +146,7 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 					verb = "updated"
 				}
 				l.OKInto(verb+" instance "+display, res.Dir, "")
-				rows := []out.Row{
-					{Text: "follows " + rep.Modpack + " from " + rep.Source},
-					{Text: "the launcher syncs this instance before each launch"},
-				}
+				rows := append(follows(rep.Modpack, rep.Source), out.Row{Text: "the launcher syncs this instance before each launch"})
 				if hasFeatures {
 					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
 				}
@@ -170,6 +170,31 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 	ff.register(cmd, "for this instance")
 	ls.register(cmd)
 	return cmd
+}
+
+// askMultiMCDir asks where MultiMC is: it is portable, so unlike every other launcher there is no
+// default to fall back on, and off a terminal the flag is required.
+func (a *app) askMultiMCDir() (string, error) {
+	required := out.Errorf("launcher-dir-required", "MultiMC is portable; pass --launcher-dir with the folder that holds multimc.cfg")
+	if !a.canPick() {
+		return "", required
+	}
+	dir, err := a.askText("Where is MultiMC installed?", "the folder that holds multimc.cfg", "")
+	if err != nil {
+		return "", err
+	}
+	if dir == "" {
+		return "", required
+	}
+	// A shell expands ~ in --launcher-dir, so the answer to the same question does too.
+	if rest, ok := strings.CutPrefix(dir, "~/"); ok {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		dir = filepath.Join(home, rest)
+	}
+	return dir, nil
 }
 
 func (a *app) projectSource() (*syncSource, error) {

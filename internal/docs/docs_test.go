@@ -46,7 +46,7 @@ func TestLookup(t *testing.T) {
 		{[]string{"sides"}, "section concepts: Sides"},
 		{[]string{"manifest", "require"}, "section manifest: require"},
 		{[]string{"Edits in the build directory"}, "section concepts: Edits in the build directory"},
-		{[]string{"link"}, "matches"},
+		{[]string{"completion"}, "matches"},
 		{[]string{"modpack"}, "section cli: shulker modpack add|remove|list"},
 		{[]string{"build", "directory"}, "hits"},
 		{[]string{"qqqq-nothing-matches"}, "none"},
@@ -61,11 +61,11 @@ func TestLookup(t *testing.T) {
 func TestLookupListsEveryPlaceANameIsDocumented(t *testing.T) {
 	pages := mustPages(t)
 	var got []string
-	for _, s := range Lookup(pages, []string{"link"}).Matches {
+	for _, s := range Lookup(pages, []string{"completion"}).Matches {
 		got = append(got, s.Page.Name+": "+s.Heading)
 	}
 	if len(got) < 2 {
-		t.Errorf("matches for link %q should name every place it is documented", got)
+		t.Errorf("matches for completion %q should name every place it is documented", got)
 	}
 }
 
@@ -125,8 +125,8 @@ func TestHelpFor(t *testing.T) {
 	if off, ok := HelpFor("shulker feature off"); !ok || off.Anchor != "shulker-feature-on-off" {
 		t.Errorf("feature off %v %+v", ok, off)
 	}
-	if _, ok := HelpFor("shulker link"); ok {
-		t.Error("link has no section of its own")
+	if _, ok := HelpFor("shulker completion"); ok {
+		t.Error("completion has no section of its own")
 	}
 }
 

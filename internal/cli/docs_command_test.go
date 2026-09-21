@@ -48,7 +48,7 @@ func TestDocsPrintsSectionMarkdown(t *testing.T) {
 }
 
 func TestDocsListsMatchesWithCommands(t *testing.T) {
-	matches := docsJSON(t, out.ExitOK, "link")["matches"].([]any)
+	matches := docsJSON(t, out.ExitOK, "completion")["matches"].([]any)
 	var commands []string
 	for _, m := range matches {
 		commands = append(commands, m.(map[string]any)["command"].(string))

@@ -38,6 +38,15 @@ func (a *app) linkCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "link",
 		Short: "Point a launcher at this project's client build",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return unknownSubcommand(cmd, args[0])
+			}
+			if !a.canPick() {
+				return cmd.Help()
+			}
+			return a.linkAsked(cmd)
+		},
 	}
 	cmd.AddCommand(a.linkShulkerCmd(), a.linkMojangCmd(), a.linkPrismCmd(), a.linkMultiMCCmd(), a.linkATLauncherCmd(), a.linkGDLauncherCmd())
 	return cmd
@@ -56,7 +65,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err := ls.check(); err != nil {
 				return err
 			}
-			src, err := a.linkSource(cmd.Context(), args, ref)
+			src, err := a.linkFrom(cmd, args, ref)
 			if err != nil {
 				return err
 			}
@@ -93,10 +102,8 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !force {
-				if err := checkAdopt(gameDir, src.name, "profile", display, "--name"); err != nil {
-					return err
-				}
+			if err := checkAdopt(gameDir, src, "profile", display, "--name", force); err != nil {
+				return err
 			}
 			if err := a.checkID(as, gameDir); err != nil {
 				return err
@@ -161,7 +168,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					l.OKInto("installed "+versionID, filepath.Join(launcherDir, "versions"), "")
 				}
 				l.OKInto("linked launcher profile "+display, gameDir, "")
-				l.Tree(out.Row{Text: "follows " + rep.Modpack + " from " + rep.Source})
+				l.Tree(follows(rep.Modpack, rep.Source)...)
 				synced.print(l)
 			})
 		},
@@ -173,6 +180,26 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack a profile already follows")
 	ls.register(cmd)
 	return cmd
+}
+
+// linkAsked is a bare link at a terminal: it asks which launcher, then runs that launcher's own
+// link as if it had been named, so everything after the question is the named command's.
+func (a *app) linkAsked(cmd *cobra.Command) error {
+	var choices []out.Choice
+	for _, name := range []string{"mojang", "prism", "multimc", "atlauncher", "gdlauncher"} {
+		choices = append(choices, out.Choice{Label: launcher.Title(name), Value: name})
+	}
+	name, err := a.ask("Which launcher?", choices)
+	if err != nil {
+		return err
+	}
+	sub, _, err := cmd.Find([]string{name})
+	if err != nil {
+		return err
+	}
+	sub.SetContext(cmd.Context())
+	a.printer.Command = strings.TrimPrefix(sub.CommandPath(), "shulker ")
+	return sub.RunE(sub, nil)
 }
 
 // noClientPack is what a link says when the pack it is about to follow declares no client. The
@@ -214,7 +241,7 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 	if err := ls.save(row.Dir, src.name, ref, "client", false, src.project.Manifest); err != nil {
 		return nil, syncResult{}, err
 	}
-	row.ID = id
+	row.ID, row.Source = id, src.name
 	a.registerInstance(row)
 	synced, err := a.syncInPlace(cmd, p, "client", syncRequest{})
 	return p, synced, err
@@ -226,6 +253,15 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 // on top of the pack. Its name is set to the id either way, since repair reads the id back from it.
 func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
 	p, err := a.openProjectAt(gameDir)
+	if src.author {
+		if err == nil {
+			return nil, authoredOver(gameDir)
+		}
+		if !errors.Is(err, project.ErrNoManifest) {
+			return nil, err
+		}
+		return authorInstance(gameDir, id, display, src)
+	}
 	if errors.Is(err, project.ErrNoManifest) {
 		a.linkedPack = src.project.Manifest.Name
 		return newInstance(gameDir, id, display, ref, src)
@@ -295,15 +331,51 @@ func newInstance(gameDir, id, display, ref string, src *syncSource) (*project.Pr
 	return p, p.SaveManifest()
 }
 
+// authorInstance writes the project the link's answers describe into the game directory, which
+// from then on is both the instance and the project it builds. It follows nothing, so it syncs from
+// itself, and that is the source its registry row records.
+func authorInstance(gameDir, id, display string, src *syncSource) (*project.Project, error) {
+	m := *src.project.Manifest
+	client := *m.Client
+	m.Name, client.Name, client.Build = id, display, "."
+	m.Client = &client
+	if err := os.MkdirAll(gameDir, 0o755); err != nil {
+		return nil, err
+	}
+	p := &project.Project{Dir: gameDir, Manifest: &m, Lock: src.project.Lock}
+	if err := p.SaveManifest(); err != nil {
+		return nil, err
+	}
+	if err := p.SaveLock(); err != nil {
+		return nil, err
+	}
+	src.name, src.Source, src.Dir = gameDir, gameDir, gameDir
+	return p, nil
+}
+
+// authoredOver refuses to author an instance where a project already stands: there is no pack to
+// repoint, so --force has nothing to do either, and the answers would only overwrite a player's
+// own instance.
+func authoredOver(gameDir string) error {
+	return out.Errorf("instance-exists", "%s already holds a project; give the new instance another name", gameDir)
+}
+
 // checkAdopt guards the project a link is about to adopt. A game directory holding an in-place
 // project keeps the pack it follows, so the source a link names has to agree with the manifest
 // before the link may take it over, and --force is what repoints that one entry. The manifest is
 // what decides, not the registry row: an unlink deletes the row and leaves the project whole.
-func checkAdopt(gameDir, source, noun, name, second string) error {
+func checkAdopt(gameDir string, src *syncSource, noun, name, second string, force bool) error {
 	m, _, inPlace, err := inPlaceManifest(gameDir)
 	if err != nil || !inPlace {
 		return err
 	}
+	if src.author {
+		return authoredOver(gameDir)
+	}
+	if force {
+		return nil
+	}
+	source := src.name
 	key := modpackKey(m, source)
 	if key == "" || m.Requires[key].Source == source {
 		return nil
@@ -337,6 +409,24 @@ func (a *app) linkSource(ctx context.Context, args []string, ref string) (*syncS
 		return nil, out.Errorf("usage", "--ref needs a git source argument")
 	}
 	return a.projectSource()
+}
+
+// linkFrom is linkSource for a link command: at a terminal, with nothing to follow, the link
+// authors the instance itself.
+func (a *app) linkFrom(cmd *cobra.Command, args []string, ref string) (*syncSource, error) {
+	src, err := a.linkSource(cmd.Context(), args, ref)
+	if len(args) > 0 || !errors.Is(err, project.ErrNoManifest) || !a.canPick() {
+		return src, err
+	}
+	return a.authorSource(cmd)
+}
+
+// follows is the row naming what an instance follows, which an authored instance has none of.
+func follows(modpack, source string) []out.Row {
+	if modpack == "" {
+		return nil
+	}
+	return []out.Row{{Text: "follows " + modpack + " from " + source}}
 }
 
 var unsafeKeyChars = regexp.MustCompile(`[^a-z0-9]+`)

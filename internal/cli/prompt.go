@@ -11,14 +11,15 @@ import (
 // otherwise draw over each other on stderr.
 func (a *app) ask(title string, choices []out.Choice) (string, error) {
 	a.printer.Settle()
-	answer, err := a.printer.Pick(title, choices, a.stdin)
+	answer, err := a.questions().Pick(title, choices, a.stdin)
 	return answer, escaped(err)
 }
 
-// askText puts a question no list can answer, like a path or a URL.
-func (a *app) askText(title, description string) (string, error) {
+// askText puts a question no list can answer, like a path or a URL. An empty answer is
+// placeholder.
+func (a *app) askText(title, description, placeholder string) (string, error) {
 	a.printer.Settle()
-	answer, err := a.printer.Ask(title, description, a.stdin)
+	answer, err := a.questions().Ask(title, description, placeholder, a.stdin)
 	return answer, escaped(err)
 }
 

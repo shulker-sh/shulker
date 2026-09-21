@@ -28,7 +28,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			if err := ls.check(); err != nil {
 				return err
 			}
-			src, err := a.linkSource(cmd.Context(), args, ref)
+			src, err := a.linkFrom(cmd, args, ref)
 			if err != nil {
 				return err
 			}
@@ -79,10 +79,8 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				return out.Errorf("usage", "GDLauncher needs an instance name that isn't blank; pass --name")
 			}
 			gameDir := gdl.GameDir(display)
-			if !force {
-				if err := checkAdopt(gameDir, src.name, "instance", display, "--name"); err != nil {
-					return err
-				}
+			if err := checkAdopt(gameDir, src, "instance", display, "--name", force); err != nil {
+				return err
 			}
 			// An instance shulker linked is a project in its own game directory, and stays one after
 			// an unlink. Anything else in that folder is the player's own.
@@ -146,10 +144,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 					verb = "updated"
 				}
 				l.OKInto(verb+" instance "+display, res.Dir, "")
-				rows := []out.Row{
-					{Text: "follows " + rep.Modpack + " from " + rep.Source},
-					{Text: "the launcher syncs this instance before each launch"},
-				}
+				rows := append(follows(rep.Modpack, rep.Source), out.Row{Text: "the launcher syncs this instance before each launch"})
 				if hasFeatures {
 					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
 				}

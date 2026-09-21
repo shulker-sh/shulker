@@ -153,6 +153,9 @@ type syncSource struct {
 	*pack.Checkout
 	name    string
 	project *project.Project
+	// author is a link's answers rather than a source: a project with no directory yet, which the
+	// link writes into the instance it creates.
+	author bool
 }
 
 func (s *syncSource) remote() bool { return s.Kind != pack.Local }

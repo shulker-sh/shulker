@@ -2,14 +2,35 @@ package cli
 
 import (
 	"errors"
+	"io"
 
 	"shulker.sh/shulker/internal/out"
 )
 
+// asker puts the questions: the printer, drawing on the terminal, everywhere but in tests, which
+// answer without one.
+type asker interface {
+	Pick(title string, choices []out.Choice, in io.Reader) (string, error)
+	Ask(title, description, placeholder string, in io.Reader) (string, error)
+}
+
 // canPick reports whether shulker can ask. A picker reads keys and redraws, so stdin and the
 // stream it draws on both have to be terminals.
 func (a *app) canPick() bool {
-	return a.tty != nil && a.tty() && a.printer.CanPick()
+	if a.tty == nil || !a.tty() {
+		return false
+	}
+	if a.asker != nil {
+		return !a.printer.JSON && !a.printer.NoInput
+	}
+	return a.printer.CanPick()
+}
+
+func (a *app) questions() asker {
+	if a.asker != nil {
+		return a.asker
+	}
+	return a.printer
 }
 
 // pickOne asks which of several things a command's argument meant. A run that can't draw a picker
@@ -24,7 +45,7 @@ func pickOne[T any](a *app, title string, matches []T, id func(T) string, label 
 	for i, m := range matches {
 		choices[i] = out.Choice{Label: label(m), Value: id(m)}
 	}
-	chosen, err := a.printer.Pick(title, choices, a.stdin)
+	chosen, err := a.questions().Pick(title, choices, a.stdin)
 	if errors.Is(err, out.ErrPickCancelled) {
 		return none, ambiguous()
 	}

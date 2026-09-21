@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -96,12 +97,7 @@ func (a *app) initCmd() *cobra.Command {
 				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
 			}
 			if opts.side == "client" {
-				m.Client = &manifest.Client{Options: map[string]any{
-					"onboardAccessibility":   false,
-					"skipMultiplayerWarning": true,
-					"tutorialStep":           "none",
-					"joinedFirstServer":      true,
-				}}
+				m.Client = newClient()
 			}
 			d, err := a.deps()
 			if err != nil {
@@ -164,13 +160,6 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 	if !a.canPick() {
 		return nil
 	}
-	d, err := a.deps()
-	if err != nil {
-		return err
-	}
-	ctx, t := cmd.Context(), a.printer.ErrTheme
-	// game is what the Minecraft answer resolves to, which the loader's version list needs.
-	var game string
 	if !cmd.Flags().Changed("side") {
 		side, err := a.ask("What are you making?", []out.Choice{
 			{Label: "a client pack", Value: "client"},
@@ -181,7 +170,41 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 		}
 		opts.side = side
 	}
-	if !cmd.Flags().Changed("minecraft") {
+	if err := a.askPlatform(cmd.Context(), opts, cmd.Flags().Changed); err != nil {
+		return err
+	}
+	from, err := a.ask("Start from an existing pack?", packChoices)
+	if err != nil {
+		return err
+	}
+	if from == "pack" {
+		if opts.pack, err = a.askPack(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+var packChoices = []out.Choice{
+	{Label: "start from scratch", Value: ""},
+	{Label: "from an existing pack", Value: "pack"},
+}
+
+func (a *app) askPack() (string, error) {
+	return a.askText("Which pack?", "a local path, git URL, or manifest URL", "")
+}
+
+// askPlatform asks the wizard's Minecraft and loader questions, skipping each one whose flag was
+// given.
+func (a *app) askPlatform(ctx context.Context, opts *initOptions, given func(flag string) bool) error {
+	d, err := a.deps()
+	if err != nil {
+		return err
+	}
+	t := a.printer.ErrTheme
+	// game is what the Minecraft answer resolves to, which the loader's version list needs.
+	var game string
+	if !given("minecraft") {
 		a.progress("fetching Minecraft versions")
 		releases, latest, err := d.meta.GameVersions(ctx)
 		if err != nil {
@@ -199,7 +222,7 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 			game = latest
 		}
 	}
-	if !cmd.Flags().Changed("loader") {
+	if !given("loader") {
 		mods, err := a.ask("Add mods?", []out.Choice{{Label: "no", Value: noLoader}, {Label: "yes", Value: "yes"}})
 		if err != nil {
 			return err
@@ -214,7 +237,7 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 			}
 		}
 	}
-	if opts.loaderName != noLoader && !cmd.Flags().Changed("loader-version") {
+	if opts.loaderName != noLoader && !given("loader-version") {
 		a.progress("fetching %s versions", opts.loaderName)
 		if game == "" {
 			if game, err = d.meta.GameVersion(ctx, orLatest(opts.minecraft)); err != nil {
@@ -233,19 +256,18 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 			return err
 		}
 	}
-	from, err := a.ask("Start from an existing pack?", []out.Choice{
-		{Label: "start from scratch", Value: ""},
-		{Label: "from an existing pack", Value: "pack"},
-	})
-	if err != nil {
-		return err
-	}
-	if from == "pack" {
-		if opts.pack, err = a.askText("Which pack?", "a local path, git URL, or manifest URL"); err != nil {
-			return err
-		}
-	}
 	return nil
+}
+
+// newClient is the client block a new project starts with, its options skipping the game's
+// first-run screens.
+func newClient() *manifest.Client {
+	return &manifest.Client{Options: map[string]any{
+		"onboardAccessibility":   false,
+		"skipMultiplayerWarning": true,
+		"tutorialStep":           "none",
+		"joinedFirstServer":      true,
+	}}
 }
 
 // orLatest is the range an unset version means, which is the newest release.

@@ -11,15 +11,16 @@ import (
 )
 
 // Ask reads one line of free text, for a value no list can offer. It draws on stderr beside the
-// pickers, with description under the question, and returns the answer trimmed.
-func (p *Printer) Ask(title, description string, in io.Reader) (string, error) {
+// pickers, with description under the question, and returns the answer trimmed. An empty answer
+// is placeholder, which shows greyed in the empty line.
+func (p *Printer) Ask(title, description, placeholder string, in io.Reader) (string, error) {
 	t := p.ErrTheme
 	if !t.Color {
 		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
 		lipgloss.SetColorProfile(termenv.Ascii)
 	}
 	var answer string
-	field := huh.NewInput().Title(gutter + title).Value(&answer).Prompt(gutter + "> ")
+	field := huh.NewInput().Title(gutter + title).Value(&answer).Prompt(gutter + "> ").Placeholder(placeholder)
 	// The question, the typed line, and the blank row above the key help.
 	height := 3
 	if description != "" {
@@ -34,7 +35,10 @@ func (p *Printer) Ask(title, description string, in io.Reader) (string, error) {
 		}
 		return "", err
 	}
-	return strings.TrimSpace(answer), nil
+	if answer = strings.TrimSpace(answer); answer == "" {
+		return placeholder, nil
+	}
+	return answer, nil
 }
 
 // askTheme is the picker's theme with the typed line added: the prompt in cyan, like the pick

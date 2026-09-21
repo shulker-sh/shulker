@@ -31,6 +31,7 @@ type app struct {
 	style      out.Options
 	stdin      io.Reader
 	tty        func() bool
+	asker      asker
 	dir        string
 	instance   string
 	d          *deps

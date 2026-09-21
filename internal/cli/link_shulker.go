@@ -35,7 +35,7 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 			if err := ls.check(); err != nil {
 				return err
 			}
-			src, err := a.linkSource(cmd.Context(), args, ref)
+			src, err := a.linkFrom(cmd, args, ref)
 			if err != nil {
 				return err
 			}
@@ -62,10 +62,8 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 			if err := a.checkID(as, gameDir); err != nil {
 				return err
 			}
-			if !force {
-				if err := checkAdopt(gameDir, src.name, "instance", nick, "--as"); err != nil {
-					return err
-				}
+			if err := checkAdopt(gameDir, src, "instance", nick, "--as", force); err != nil {
+				return err
 			}
 			created := false
 			if _, err := os.Stat(gameDir); os.IsNotExist(err) {
@@ -100,7 +98,7 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 					verb = "updated"
 				}
 				l.OKInto(verb+" instance "+nick, gameDir, "")
-				l.Tree(out.Row{Text: "follows " + rep.Modpack + " from " + rep.Source})
+				l.Tree(follows(rep.Modpack, rep.Source)...)
 				synced.print(l)
 			})
 		},

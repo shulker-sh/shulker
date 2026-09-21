@@ -5,6 +5,8 @@ import "shulker.sh/shulker/internal/out"
 
 type Loader struct {
 	Name string
+	// Title is the loader's name as its own project writes it, for a name a player reads.
+	Title string
 	// DependencyID is how a mod's metadata names the loader in its dependencies.
 	DependencyID    string
 	PrismUID        string
@@ -53,10 +55,10 @@ func (l Loader) CurseForgeModLoader(minecraft, version string) string {
 }
 
 var All = []Loader{
-	{Name: "fabric", DependencyID: "fabricloader", PrismUID: "net.fabricmc.fabric-loader", MrpackKey: "fabric-loader", CurseForgeType: "4", ServerLaunchJar: "fabric-server-launch.jar", MetadataFiles: []string{"fabric.mod.json"}, MarkerFile: "fabric.mod.json"},
-	{Name: "quilt", DependencyID: "quilt_loader", PrismUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}, ServerLaunchJar: "quilt-server-launch.jar", MetadataFiles: []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json"},
-	{Name: "neoforge", DependencyID: "neoforge", PrismUID: "net.neoforged", MrpackKey: "neoforge", CurseForgeType: "6", InstallServerFlag: "--install-server", InstallClientFlag: "--install-client", MetadataFiles: []string{"META-INF/neoforge.mods.toml", "META-INF/mods.toml"}, MarkerFile: "META-INF/neoforge.mods.toml", MavenPath: "net/neoforged/neoforge"},
-	{Name: "forge", DependencyID: "forge", PrismUID: "net.minecraftforge", MrpackKey: "forge", CurseForgeType: "1", InstallServerFlag: "--installServer", InstallClientFlag: "--installClient", MetadataFiles: []string{"META-INF/mods.toml"}, MarkerFile: "META-INF/mods.toml", MinecraftJarClassifier: "bundled", MavenPath: "net/minecraftforge/forge", MavenVersionPrefixesGame: true},
+	{Name: "fabric", Title: "Fabric", DependencyID: "fabricloader", PrismUID: "net.fabricmc.fabric-loader", MrpackKey: "fabric-loader", CurseForgeType: "4", ServerLaunchJar: "fabric-server-launch.jar", MetadataFiles: []string{"fabric.mod.json"}, MarkerFile: "fabric.mod.json"},
+	{Name: "quilt", Title: "Quilt", DependencyID: "quilt_loader", PrismUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}, ServerLaunchJar: "quilt-server-launch.jar", MetadataFiles: []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json"},
+	{Name: "neoforge", Title: "NeoForge", DependencyID: "neoforge", PrismUID: "net.neoforged", MrpackKey: "neoforge", CurseForgeType: "6", InstallServerFlag: "--install-server", InstallClientFlag: "--install-client", MetadataFiles: []string{"META-INF/neoforge.mods.toml", "META-INF/mods.toml"}, MarkerFile: "META-INF/neoforge.mods.toml", MavenPath: "net/neoforged/neoforge"},
+	{Name: "forge", Title: "Forge", DependencyID: "forge", PrismUID: "net.minecraftforge", MrpackKey: "forge", CurseForgeType: "1", InstallServerFlag: "--installServer", InstallClientFlag: "--installClient", MetadataFiles: []string{"META-INF/mods.toml"}, MarkerFile: "META-INF/mods.toml", MinecraftJarClassifier: "bundled", MavenPath: "net/minecraftforge/forge", MavenVersionPrefixesGame: true},
 }
 
 func Lookup(name string) (Loader, bool) {

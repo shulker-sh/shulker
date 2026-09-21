@@ -818,6 +818,16 @@ shulker serve server --accept-eula
 | `--force` | Overwrite files edited in the build directory |
 | `--accept-eula` | Record acceptance of the Minecraft EULA in shulker.json without prompting |
 
+### `shulker link`
+
+Point a launcher at a pack. Name the launcher as a subcommand below. At a terminal, a bare `shulker link` asks `Which launcher?` over the Minecraft Launcher, Prism Launcher, MultiMC, ATLauncher and GDLauncher, then carries on exactly as naming that launcher would. Under [`--no-input`](#global-flags), and so off a terminal or with `--json`, it prints this group's help instead.
+
+```sh
+shulker link
+```
+
+Every `link <launcher>` follows the source it is given, or else the project in the current directory. With neither, a terminal asks what `shulker init` would, in this order: whether to start from an existing pack, which is then followed as if it had been named; otherwise the Minecraft version, whether to add mods, the loader and its version, and what to call the instance, defaulting to what it runs, like `Fabric 26.2`. The instance directory then becomes a project of its own. It follows no pack, so `shulker add` inside it is how it grows, and the current directory is left alone. `--name` or `--as` answers the name question. Off a terminal, a link with no source outside a project fails with `manifest-not-found`.
+
 ### `shulker link shulker`
 
 Create an instance shulker owns, under its own instances root, and register it like any other launcher's. No launcher is involved: shulker is the launcher here, so it runs the pre-launch sync and the post-exit record in process, writes no hook scripts, and fills no command slot.
@@ -1001,7 +1011,7 @@ shulker link prism https://example.com/pack/shulker.json --name "Friends SMP" --
 
 ### `shulker link multimc`
 
-Create a MultiMC instance that syncs the client build before each launch. It is [`shulker link prism`](#shulker-link-prism) for MultiMC's own `instance.cfg` dialect, with the same source argument, flags and behaviour, and one difference: MultiMC is portable and has no fixed data folder, so `--launcher-dir` is required and names the folder that holds `multimc.cfg` (`launcher-dir-required` without it). The instance is registered under the launcher name `multimc`, which is what `--launcher multimc` and `shulker unlink multimc` match.
+Create a MultiMC instance that syncs the client build before each launch. It is [`shulker link prism`](#shulker-link-prism) for MultiMC's own `instance.cfg` dialect, with the same source argument, flags and behaviour, and one difference: MultiMC is portable and has no fixed data folder, so `--launcher-dir` names the folder that holds `multimc.cfg`. A terminal asks `Where is MultiMC installed?` when it is missing; under `--no-input` it is required (`launcher-dir-required` without it). The instance is registered under the launcher name `multimc`, which is what `--launcher multimc` and `shulker unlink multimc` match.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
