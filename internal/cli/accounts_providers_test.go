@@ -408,9 +408,13 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentMojangFile(t *testing.T) {
 		t.Errorf("a launcher signed out of says nothing: %q", stderr)
 	}
 
+	// Opting in to a launcher that isn't there warns once, where the opting in happens.
 	h = newHarness(t)
-	registerMojang(t, h, filepath.Join(t.TempDir(), "gone"))
-	h.mustRun(t, "accounts", "providers", "set", "mojang")
+	missing := filepath.Join(t.TempDir(), "gone")
+	registerMojang(t, h, missing)
+	if _, stderr := h.mustRunStderr(t, "accounts", "providers", "set", "mojang"); !strings.Contains(stderr, "Minecraft Launcher isn't at "+missing) {
+		t.Fatalf("opting in should name the directory it checked:\n%s", stderr)
+	}
 	if _, stderr := h.mustRunStderr(t, "accounts"); strings.TrimSpace(stderr) != "" {
 		t.Errorf("a launcher that isn't installed says nothing on a later run: %q", stderr)
 	}
