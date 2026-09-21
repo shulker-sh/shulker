@@ -1,3 +1,5 @@
+// Package project opens a directory's shulker.json and shulker.lock together, and tells how far the
+// lock has drifted from the manifest.
 package project
 
 import (
@@ -10,7 +12,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
-var ErrNoManifest = &out.Error{Code: "manifest-not-found", Message: "no shulker.json here; run `shulker init`", Exit: out.ExitError}
+var ErrNoManifest = &out.Error{Code: "manifest-not-found", Message: "no shulker.json here", Help: "run `shulker init`", Exit: out.ExitError}
 
 type Project struct {
 	Dir      string
@@ -41,7 +43,9 @@ func (p *Project) LockPath() string     { return filepath.Join(p.Dir, lock.FileN
 
 func (p *Project) RequireLock() error {
 	if p.Lock == nil {
-		return out.Errorf("lock-not-found", "no %s; run `shulker lock`", lock.FileName)
+		e := out.Errorf("lock-not-found", "no %s", lock.FileName)
+		e.Help = "run `shulker lock`"
+		return e
 	}
 	return nil
 }

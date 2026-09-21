@@ -86,6 +86,7 @@ func ProviderDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 	return diffs
 }
 
+// PackDifferences compares the modpacks shulker.json requires with what the lock records for them.
 func PackDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 	var diffs []string
 	modpacks := m.Modpacks()

@@ -985,7 +985,7 @@ func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
 	if err := os.Remove(filepath.Join(h.dir, "shulker.lock")); err != nil {
 		t.Fatal(err)
 	}
-	if code, stdout, _ := h.run(t, "build", "--json"); code == 0 || !strings.Contains(stdout, "run `shulker lock`") {
+	if code, stdout, _ := h.run(t, "build", "--json"); code == 0 || !strings.Contains(stdout, `"code": "lock-not-found"`) {
 		t.Fatalf("build without a lock: code=%d %s", code, stdout)
 	}
 	env = out.Envelope{}
