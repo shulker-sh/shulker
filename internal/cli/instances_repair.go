@@ -210,7 +210,7 @@ func scanLaunchers(only, dir, instancesRoot string) []config.Instance {
 // carried whatever the last sync did. lastError isn't: it belongs to the row shulker is replacing.
 func instanceAt(dir string) (config.Instance, bool) {
 	f, err := instance.Load(dir)
-	if err == nil && f.Unlinked {
+	if err == nil && f.IsUnlinked {
 		return config.Instance{}, false
 	}
 	// With several modpacks required none of them is the one the instance was linked from, so the

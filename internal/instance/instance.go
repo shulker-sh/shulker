@@ -1,3 +1,5 @@
+// Package instance reads and writes .shulker/instance.json, how shulker sets up a directory it
+// syncs into, and the launches it records there.
 package instance
 
 import (
@@ -34,14 +36,16 @@ type File struct {
 	// Source, Ref and Side are what a directory with no manifest of its own syncs from. An instance
 	// that is a project keeps all three in its manifest instead — the one modpack it requires, and
 	// the side carrying `build: "."` — so nothing here can go stale against it.
-	Source       string `json:"source,omitempty"`
-	Ref          string `json:"ref,omitempty"`
-	Side         string `json:"side,omitempty"`
-	AssumeClient bool   `json:"assumeClient,omitempty"`
-	// Unlinked keeps a directory `unlink` let go of from being registered again by a repair scan.
-	Unlinked bool      `json:"unlinked,omitempty"`
-	Settings Settings  `json:"settings"`
-	Resolved *Resolved `json:"resolved,omitempty"`
+	Source string `json:"source,omitempty"`
+	Ref    string `json:"ref,omitempty"`
+	Side   string `json:"side,omitempty"`
+	// AssumesClient builds a directory from the mods both sides share while its source declares no
+	// client.
+	AssumesClient bool `json:"assumeClient,omitempty"`
+	// IsUnlinked marks a directory `unlink` let go of, so a repair scan doesn't register it again.
+	IsUnlinked bool      `json:"unlinked,omitempty"`
+	Settings   Settings  `json:"settings"`
+	Resolved   *Resolved `json:"resolved,omitempty"`
 }
 
 // Settings are the instance's own. Memory, JvmArgs, Java, Window and Wrapper override the play.*
@@ -62,6 +66,7 @@ type Settings struct {
 	SavesGroup    string    `json:"savesGroup,omitempty"`
 }
 
+// Hooks switch shulker's pre-launch and post-exit work on and off. An absent switch is on.
 type Hooks struct {
 	PreLaunch *bool `json:"preLaunch,omitempty"`
 	PostExit  *bool `json:"postExit,omitempty"`
@@ -74,6 +79,8 @@ type Commands struct {
 	PostExit  string `json:"postExit,omitempty"`
 }
 
+// Resolved is what shulker found when it last synced, written for the player to read and never read
+// back as intent.
 type Resolved struct {
 	Java         string `json:"java,omitempty"`
 	LauncherJava string `json:"launcherJava,omitempty"`
@@ -131,8 +138,9 @@ func checkSchema(path string, data []byte) error {
 	if head.Schema != "" {
 		what = "names the schema " + head.Schema
 	}
-	return schema.Invalid("instance-invalid", path, data,
-		errors.New(what+", which this shulker doesn't know; `shulker instances repair` writes it again"))
+	e := schema.Invalid("instance-invalid", path, data, errors.New(what+", which this shulker doesn't know"))
+	e.Help = "run `shulker instances repair` to write it again"
+	return e
 }
 
 func (f *File) Save(dir string) error {

@@ -150,7 +150,7 @@ func TestUnlinkedInstanceStaysUnlinked(t *testing.T) {
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--as", "friends")
 	gameDir := filepath.Join(prismDir, "instances", "shulker-pack", "minecraft")
 	h.mustRun(t, "unlink", "friends")
-	if f := readIntent(t, gameDir); !f.Unlinked {
+	if f := readIntent(t, gameDir); !f.IsUnlinked {
 		t.Fatalf("unlink should mark the instance file: %+v", f)
 	}
 
@@ -165,7 +165,7 @@ func TestUnlinkedInstanceStaysUnlinked(t *testing.T) {
 	}
 
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--as", "friends")
-	if f := readIntent(t, gameDir); f.Unlinked {
+	if f := readIntent(t, gameDir); f.IsUnlinked {
 		t.Fatalf("link should clear the mark: %+v", f)
 	}
 }
@@ -197,7 +197,7 @@ func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 	}
 
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
-	if f := readIntent(t, gameDir); f.Unlinked {
+	if f := readIntent(t, gameDir); f.IsUnlinked {
 		t.Fatalf("adopting clears the unlinked mark: %+v", f)
 	}
 	if instances := readInstances(t, h); len(instances) != 1 || instances[0].Dir != gameDir {
@@ -237,7 +237,7 @@ func TestUnlinkDetachedBuild(t *testing.T) {
 	if lf, _ := local.Load(h.dir); len(lf.SyncDirs["client"]) != 0 {
 		t.Fatalf("unlink drops the directory from syncDirs: %+v", lf.SyncDirs)
 	}
-	if inf, err := instance.Load(into); err != nil || !inf.Unlinked {
+	if inf, err := instance.Load(into); err != nil || !inf.IsUnlinked {
 		t.Fatalf("unlink marks the detached build unlinked: %+v %v", inf, err)
 	}
 	if _, err := os.Stat(build.StatePath(into)); err != nil {

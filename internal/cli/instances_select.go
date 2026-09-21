@@ -218,7 +218,7 @@ func detachedBuild(query string) (instanceEntry, bool) {
 		return instanceEntry{}, false
 	}
 	f, err := instance.Load(dir)
-	if err != nil || f.Source == "" || f.Unlinked {
+	if err != nil || f.Source == "" || f.IsUnlinked {
 		return instanceEntry{}, false
 	}
 	e := inspectInstance(config.Instance{Name: filepath.Base(dir), Dir: dir})

@@ -209,7 +209,7 @@ func (a *app) resync(cmd *cobra.Command, sc *featureScope) (*syncResult, error) 
 		}
 	}
 	intent, err := instance.Load(sc.into)
-	assume := err == nil && intent.AssumeClient
+	assume := err == nil && intent.AssumesClient
 	res, err := a.sync(cmd.Context(), sc.source, syncRequest{ref: sc.state.Ref, side: sc.state.Side, into: sc.into, assumeClient: assume})
 	return &res, err
 }

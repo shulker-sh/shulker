@@ -102,7 +102,7 @@ func inspectInstance(in config.Instance) instanceEntry {
 		e.Problem = out.AsError(err).Message
 	default:
 		e.intent = f
-		e.Side, e.Ref, e.AssumeClient = f.Side, f.Ref, f.AssumeClient
+		e.Side, e.Ref, e.AssumeClient = f.Side, f.Ref, f.AssumesClient
 		if e.Source == "" {
 			e.Source = f.Source
 		}
@@ -331,14 +331,14 @@ func loadIntent(dir, source, ref, side string, assumeClient bool) (*instance.Fil
 	case err != nil:
 		return nil, false, err
 	default:
-		f.Unlinked = false
+		f.IsUnlinked = false
 	}
 	// One writer per fact: an instance that is a project holds the modpack it follows and the side
 	// that builds in place in its manifest, so its file keeps no copy of either to go stale.
 	if inPlace {
-		f.Source, f.Ref, f.Side, f.AssumeClient = "", "", "", false
+		f.Source, f.Ref, f.Side, f.AssumesClient = "", "", "", false
 	} else {
-		f.Source, f.Ref, f.Side, f.AssumeClient = source, ref, side, assumeClient
+		f.Source, f.Ref, f.Side, f.AssumesClient = source, ref, side, assumeClient
 	}
 	return f, fresh, nil
 }

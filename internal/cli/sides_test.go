@@ -118,7 +118,7 @@ func TestAssumeClientBuildsAnUndeclaredClient(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(into, "options.txt")); err == nil {
 		t.Fatal("an assumed client has no options.txt: there is no client block")
 	}
-	if f := readIntent(t, into); f.Side != "client" || !f.AssumeClient {
+	if f := readIntent(t, into); f.Side != "client" || !f.AssumesClient {
 		t.Fatalf("instance file records the assumption: %+v", f)
 	}
 

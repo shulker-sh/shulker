@@ -109,7 +109,7 @@ func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
 	}
 	r.Removed, r.summary = f.Removed, f.Summary
 	if inf, err := instance.Load(l.Dir); err == nil {
-		inf.Unlinked = true
+		inf.IsUnlinked = true
 		if err := inf.Save(l.Dir); err != nil {
 			return r, err
 		}
