@@ -1,3 +1,5 @@
+// Package mrpack reads Modrinth modpack archives, and the shulker project an export from shulker
+// carries inside one.
 package mrpack
 
 import (
@@ -21,6 +23,8 @@ const (
 	Game          = "minecraft"
 )
 
+// Layers are the archive's override folders: files for both sides, then client-only and
+// server-only ones.
 var Layers = []string{"overrides", "client-overrides", "server-overrides"}
 
 type Index struct {
@@ -41,6 +45,7 @@ type File struct {
 	FileSize  int64             `json:"fileSize"`
 }
 
+// Env is the index env for a file needed on side: "client", "server", or anything else for both.
 func Env(side string) map[string]string {
 	env := map[string]string{"client": "required", "server": "required"}
 	switch side {
@@ -78,6 +83,8 @@ type Override struct {
 	Data  []byte
 }
 
+// Marker is the shulker project an export carries, from the archive root or a marker jar. Layer
+// is empty when it came from the root.
 type Marker struct {
 	Layer    string
 	Path     string
@@ -103,7 +110,9 @@ func (a *Archive) Loader() (string, string, bool) {
 func Read(file string) (*Archive, error) {
 	zr, err := zip.OpenReader(file)
 	if err != nil {
-		return nil, out.Errorf("mrpack-invalid", "%s is not a readable mrpack: %v", file, err)
+		e := out.Errorf("mrpack-invalid", "%s is not a readable mrpack", file)
+		e.Rows = []out.Detail{{Label: "zip", Text: err.Error()}}
+		return nil, e
 	}
 	defer zr.Close()
 	a := &Archive{}
@@ -124,7 +133,9 @@ func Read(file string) (*Archive, error) {
 		if name == IndexName {
 			found = true
 			if err := json.Unmarshal(data, &a.Index); err != nil {
-				return nil, out.Errorf("mrpack-invalid", "%s: %s: %v", file, IndexName, err)
+				e := out.Errorf("mrpack-invalid", "shulker can't parse %s in %s", IndexName, file)
+				e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
+				return nil, e
 			}
 			continue
 		}
@@ -169,11 +180,11 @@ func (a *Archive) readRootIdentity(file string, root map[string][]byte) error {
 	}
 	m, err := manifest.Parse(manifestData)
 	if err != nil {
-		return out.Errorf("mrpack-marker", "%s: %s: %v", file, manifest.FileName, err)
+		return markerInvalid(file, manifest.FileName, err)
 	}
 	l, err := lock.Parse(lockData)
 	if err != nil {
-		return out.Errorf("mrpack-marker", "%s: %s: %v", file, lock.FileName, err)
+		return markerInvalid(file, lock.FileName, err)
 	}
 	a.Marker = &Marker{Path: manifest.FileName, Manifest: m, Lock: l}
 	return nil
@@ -243,11 +254,18 @@ func readMarker(o Override) (*Marker, error) {
 	}
 	m, err := manifest.Parse(manifestData)
 	if err != nil {
-		return nil, out.Errorf("mrpack-marker", "marker jar %s/%s: %s: %v", o.Layer, o.Path, manifest.FileName, err)
+		return nil, markerInvalid("marker jar "+o.Layer+"/"+o.Path, manifest.FileName, err)
 	}
 	l, err := lock.Parse(lockData)
 	if err != nil {
-		return nil, out.Errorf("mrpack-marker", "marker jar %s/%s: %s: %v", o.Layer, o.Path, lock.FileName, err)
+		return nil, markerInvalid("marker jar "+o.Layer+"/"+o.Path, lock.FileName, err)
 	}
 	return &Marker{Layer: o.Layer, Path: o.Path, Manifest: m, Lock: l}, nil
+}
+
+func markerInvalid(where, name string, err error) *out.Error {
+	parsed := out.AsError(err)
+	e := out.Errorf("mrpack-marker", "%s has a %s shulker can't read", where, name)
+	e.Rows = []out.Detail{{Label: name, Text: parsed.Message, Children: parsed.Rows}}
+	return e
 }
