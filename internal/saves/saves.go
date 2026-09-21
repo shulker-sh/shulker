@@ -234,7 +234,11 @@ type Backup struct {
 	Taken  time.Time `json:"taken"`
 	Reason string    `json:"reason"`
 	Size   int64     `json:"size"`
-	seq    int
+	// Worlds counts the folders at the zip's root; Minecraft and Loader come from its comment.
+	Worlds    int    `json:"worlds"`
+	Minecraft string `json:"minecraft,omitempty"`
+	Loader    string `json:"loader,omitempty"`
+	seq       int
 }
 
 // Backups are the zips in dir, newest first. A missing dir holds none, and a zip whose name doesn't
@@ -271,6 +275,7 @@ func Backups(dir string) ([]Backup, error) {
 		if len(segs) > 0 {
 			b.Reason = segs[len(segs)-1]
 		}
+		readZip(&b)
 		backups = append(backups, b)
 	}
 	slices.SortFunc(backups, func(x, y Backup) int {

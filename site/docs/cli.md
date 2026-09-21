@@ -1225,7 +1225,7 @@ shulker saves --group default
 | --- | --- |
 | `--group <group>` | Show this save group rather than an instance |
 
-With `--json`, the list is `[{ "name", "dir", "worlds", "size", "lastBackup" }]`, and a target is `{ "group", "dir", "worldsDir", "worlds", "backups" }` with each backup `{ "n", "id", "path", "taken", "reason", "size" }`.
+With `--json`, the list is `[{ "name", "dir", "worlds", "size", "lastBackup" }]`, and a target is `{ "group", "dir", "worldsDir", "worlds", "backups" }` with each backup `{ "n", "id", "path", "taken", "reason", "size", "worlds", "minecraft", "loader" }`. A backup row counts the world folders in its zip, reads `on request` for one [`shulker backup`](#shulker-backup) took, and names the Minecraft version and loader the zip's comment records, when it records them.
 
 ### `shulker saves prune`
 
@@ -1242,6 +1242,24 @@ shulker -i smp saves prune --keep 0
 | `--group <group>` | Prune this save group's backups rather than an instance's |
 
 With `--json`, the data is `{ "group", "dir", "worldsDir", "pruned", "kept" }`.
+
+### `shulker backup`
+
+Zip a target's worlds into its backups. The target is the one [`shulker saves`](#shulker-saves) would show: `--group`, `-i`, `-C`, or the current directory, with the worlds found the same way. A save group's backups go in `backups/<group>` in shulker's data directory, named `<time>-<instance>-backup.zip` for the instance that took them, or `<time>-backup.zip` when `--group` names the group alone; any other directory's go in its own `.shulker/backups/` as `<time>-backup.zip`. A second backup in the same second gets `-2` after the time. The zip holds the world folders at its root and nothing else, and its comment records the time, the instance, the worlds, and the Minecraft version and loader, for `saves` to show. A backup taken this way is never pruned automatically; [`saves prune`](#shulker-saves-prune) deletes it.
+
+A target with no worlds folder, or none in it, fails with `no-worlds`, naming the folder it looked in.
+
+```sh
+shulker backup
+shulker backup -i smp
+shulker backup --group default
+```
+
+| Flag | Description |
+| --- | --- |
+| `--group <group>` | Back up this save group rather than an instance |
+
+With `--json`, the data is `{ "group", "dir", "worldsDir", "id", "path", "taken", "reason", "size", "worlds", "minecraft", "loader", "names" }`, where `worlds` counts the worlds and `names` lists them.
 
 ### `shulker hook pre-launch`
 
@@ -1593,6 +1611,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `no-instances` | Nothing is linked yet |
 | `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
 | `no-side` | `shulker.json` declares no side of the kind the command needs. A local command (`build`, `diff`, `serve`) says to add the block; a command that can take a remote source (`sync`, `export *`) says to pass `--assume-client` |
+| `no-worlds` | `backup` found no worlds to zip; the message names the folder it looked in |
 | `not-built` | The side has no build directory yet; run `shulker build` |
 | `not-direct` | The mod is only a dependency. `items`: the mods that require it |
 | `not-drifted` | A file named to `pull` has no changes. `candidates`: the changed files |

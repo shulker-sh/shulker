@@ -213,7 +213,16 @@ func backupAside(b saves.Backup) string {
 	default:
 		parts = append(parts, "before "+b.Reason)
 	}
+	if b.Worlds > 0 {
+		parts = append(parts, plural(b.Worlds, "world", "worlds"))
+	}
 	parts = append(parts, out.HumanBytes(b.Size))
+	if b.Minecraft != "" {
+		parts = append(parts, "Minecraft "+b.Minecraft)
+	}
+	if b.Loader != "" {
+		parts = append(parts, b.Loader)
+	}
 	return "(" + strings.Join(parts, ", ") + ")"
 }
 
