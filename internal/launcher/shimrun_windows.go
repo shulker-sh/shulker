@@ -1,11 +1,11 @@
 package launcher
 
 import (
-	"errors"
 	"os/exec"
 	"syscall"
 
 	"golang.org/x/sys/windows"
+	"shulker.sh/shulker/internal/proc"
 )
 
 // commandLineTail is this process's own command line with its program name cut off. It comes from the
@@ -22,13 +22,5 @@ func shimSpawn(dir, program, arguments string) (int, error) {
 	cmd := exec.Command(program)
 	cmd.Dir = dir
 	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: `"` + program + `" ` + arguments, CreationFlags: windows.CREATE_NO_WINDOW}
-	err := cmd.Run()
-	var exit *exec.ExitError
-	switch {
-	case err == nil:
-		return 0, nil
-	case errors.As(err, &exit):
-		return exit.ExitCode(), nil
-	}
-	return 0, err
+	return proc.ExitCode(cmd.Run())
 }

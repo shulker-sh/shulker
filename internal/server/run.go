@@ -1,12 +1,13 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"sync"
+
+	"shulker.sh/shulker/internal/proc"
 )
 
 type Runner struct {
@@ -42,7 +43,7 @@ func (r *Runner) Run() (int, error) {
 	for {
 		select {
 		case err := <-done:
-			return exitCode(err)
+			return proc.ExitCode(err)
 		case <-r.Interrupt:
 			if stopped {
 				fmt.Fprintln(r.Log, "shulker: killing the server")
@@ -54,17 +55,6 @@ func (r *Runner) Run() (int, error) {
 			_, _ = console.Write([]byte("stop\n"))
 		}
 	}
-}
-
-func exitCode(err error) (int, error) {
-	if err == nil {
-		return 0, nil
-	}
-	var exit *exec.ExitError
-	if errors.As(err, &exit) {
-		return exit.ExitCode(), nil
-	}
-	return 0, err
 }
 
 type lockedWriter struct {

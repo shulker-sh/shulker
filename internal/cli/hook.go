@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/proc"
 )
 
 // hookCmd is what the generated scripts run. It is hidden: nothing should be typed by hand here, and
@@ -174,15 +175,7 @@ func (a *app) runExe(exe string, args []string) (int, error) {
 	}
 	cmd := exec.Command(exe, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = a.stdin, stdout, a.printer.Stderr
-	err := cmd.Run()
-	var exit *exec.ExitError
-	switch {
-	case err == nil:
-		return 0, nil
-	case errors.As(err, &exit):
-		return exit.ExitCode(), nil
-	}
-	return 0, err
+	return proc.ExitCode(cmd.Run())
 }
 
 // runReason is why a program never started, as one sentence. The operating system repeats the path

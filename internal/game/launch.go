@@ -1,12 +1,13 @@
 package game
 
 import (
-	"errors"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+
+	"shulker.sh/shulker/internal/proc"
 )
 
 // Session is who is playing, as the game's own arguments name them. Every field here reaches the
@@ -109,13 +110,5 @@ func Start(l Launch, stream io.Writer) (*Game, error) {
 // a status, not an error: only a game that never started at all is that.
 func (g *Game) Wait() (int, error) {
 	defer g.log.Close()
-	err := g.cmd.Wait()
-	var exit *exec.ExitError
-	switch {
-	case err == nil:
-		return 0, nil
-	case errors.As(err, &exit):
-		return exit.ExitCode(), nil
-	}
-	return 0, err
+	return proc.ExitCode(g.cmd.Wait())
 }
