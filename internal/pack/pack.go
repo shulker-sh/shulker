@@ -122,7 +122,7 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		return nil, err
 	}
 	if l.Locked {
-		l.Pin.Locked, l.Pin.LockSha256 = true, l.lockSha256
+		l.Pin.UsesLock, l.Pin.LockSha256 = true, l.lockSha256
 	}
 	return l, nil
 }
@@ -183,13 +183,13 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 		if l.Manifest, err = manifest.Parse(data); err != nil {
 			return nil, "", fmt.Errorf("modpack %s: %w", name, err)
 		}
-		if pinned.Locked {
+		if pinned.UsesLock {
 			if err := s.openPackLock(ctx, l, pinned.LockSha256); err != nil {
 				return nil, "", err
 			}
 		}
 	}
-	l.Locked = pinned.Locked
+	l.Locked = pinned.UsesLock
 	return l, warning, nil
 }
 

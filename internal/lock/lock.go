@@ -1,3 +1,4 @@
+// Package lock reads and writes shulker.lock, the exact files a project's manifest resolved to.
 package lock
 
 import (
@@ -53,15 +54,18 @@ type Java struct {
 }
 
 type Modpack struct {
-	Source     string `json:"source"`
-	Ref        string `json:"ref,omitempty"`
-	Commit     string `json:"commit,omitempty"`
-	DirSha256  string `json:"dirSha256,omitempty"`
-	Sha256     string `json:"sha256,omitempty"`
-	Locked     bool   `json:"locked,omitempty"`
+	Source    string `json:"source"`
+	Ref       string `json:"ref,omitempty"`
+	Commit    string `json:"commit,omitempty"`
+	DirSha256 string `json:"dirSha256,omitempty"`
+	Sha256    string `json:"sha256,omitempty"`
+	// UsesLock marks a modpack whose mods were copied from its own lock rather than resolved from its
+	// manifest.
+	UsesLock   bool   `json:"locked,omitempty"`
 	LockSha256 string `json:"lockSha256,omitempty"`
 }
 
+// Label is the short hash that names what the modpack resolved to.
 func (p Modpack) Label() string {
 	switch {
 	case p.Commit != "":
@@ -92,6 +96,7 @@ type Mod struct {
 	Aliases       Aliases  `json:"aliases"`
 }
 
+// Aliases are the same mod's project ids on the other providers.
 type Aliases struct {
 	Modrinth   string `json:"modrinth,omitempty"`
 	CurseForge int    `json:"curseforge,omitempty"`
@@ -189,6 +194,8 @@ func (l *Lock) Save(path string) error {
 	return fsutil.Write(path, data)
 }
 
+// AddRequiredBy records that by depends on the mod id, once. A mod the lock doesn't have is left
+// alone.
 func (l *Lock) AddRequiredBy(id, by string) {
 	m, ok := l.Mods[id]
 	if !ok {

@@ -19,7 +19,7 @@ func TestLockDifferencesIgnoresModpackEntries(t *testing.T) {
 		Lock: &lock.Lock{
 			Minecraft: "26.2",
 			Loader:    lock.Loader{Type: "fabric", Version: "0.17.3"},
-			Modpacks:  map[string]lock.Modpack{"mp": {Source: "https://example.com/mp.git", Locked: true}},
+			Modpacks:  map[string]lock.Modpack{"mp": {Source: "https://example.com/mp.git", UsesLock: true}},
 			Mods: map[string]lock.Mod{
 				"modmenu":         {Provider: "modrinth", Modpack: "mp", RequiredBy: []string{}},
 				"placeholder-api": {Provider: "modrinth", Modpack: "mp", RequiredBy: []string{"modmenu"}},

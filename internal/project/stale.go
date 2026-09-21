@@ -68,7 +68,7 @@ func inheritsLoader(m *manifest.Manifest, l *lock.Lock) bool {
 		return false
 	}
 	for _, mp := range l.Modpacks {
-		if mp.Locked {
+		if mp.UsesLock {
 			return true
 		}
 	}
@@ -99,8 +99,8 @@ func PackDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 			diffs = append(diffs, fmt.Sprintf("pack %s: source %s -> %s", name, lp.Source, mp.Source))
 		case lp.Ref != mp.Ref:
 			diffs = append(diffs, fmt.Sprintf("pack %s: ref %q -> %q", name, lp.Ref, mp.Ref))
-		case mp.Locked != nil && *mp.Locked != lp.Locked:
-			diffs = append(diffs, fmt.Sprintf("pack %s: locked %v -> %v", name, lp.Locked, *mp.Locked))
+		case mp.Locked != nil && *mp.Locked != lp.UsesLock:
+			diffs = append(diffs, fmt.Sprintf("pack %s: locked %v -> %v", name, lp.UsesLock, *mp.Locked))
 		}
 	}
 	for _, name := range slices.Sorted(maps.Keys(l.Modpacks)) {
