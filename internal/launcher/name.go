@@ -19,7 +19,7 @@ func (e *Entry) InstanceName(launcherDir, gameDir string) string {
 }
 
 func prismName(e *Entry, _, gameDir string) string {
-	cfg, err := readINI(filepath.Join(e.InstanceDir(gameDir), InstanceConfigFile), e.Name == "multimc")
+	cfg, err := readINI(filepath.Join(e.InstanceDir(gameDir), InstanceConfigFile), e.multimcINI)
 	if err != nil {
 		return ""
 	}

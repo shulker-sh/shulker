@@ -36,7 +36,7 @@ func TestShulkerOwnsItsInstances(t *testing.T) {
 	if !e.Instanced || e.InstanceDir("/d/instances/smp") != "/d/instances/smp" {
 		t.Fatalf("a shulker instance is its own game directory: %+v", e)
 	}
-	if _, fills := SlotOf("shulker"); fills {
+	if e.Slot != nil {
 		t.Fatal("shulker fills no slot: it runs the hooks itself")
 	}
 	if Rank("shulker") >= Rank("prism") {

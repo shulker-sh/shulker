@@ -58,7 +58,7 @@ func TestLinkShulker(t *testing.T) {
 			t.Fatalf("a shulker instance needs no %s script: %v", kind, err)
 		}
 	}
-	if _, fills := launcher.SlotOf("shulker"); fills {
+	if launcher.Find("shulker").Slot != nil {
 		t.Fatal("shulker fills no launcher slot")
 	}
 

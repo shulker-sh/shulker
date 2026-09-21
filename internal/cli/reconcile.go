@@ -19,8 +19,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 	// the ones shulker launches itself, which fill no slot and return below.
 	a.reconcileRun(in.Dir)
 	e := launcher.Find(in.Launcher)
-	slot, fills := launcher.SlotOf(in.Launcher)
-	if e == nil || !fills {
+	if e == nil || e.Slot == nil {
 		// A plain synced directory has no slot to fill, so it gets no scripts either.
 		return nil
 	}
@@ -28,6 +27,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 	if err != nil {
 		return err
 	}
+	slot := *e.Slot
 	instanceDir := e.InstanceDir(in.Dir)
 	current, found, err := launcher.ReadSlots(e, in)
 	if err != nil || !found {

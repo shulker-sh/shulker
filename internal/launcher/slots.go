@@ -48,18 +48,11 @@ func bareWord(word, _ string) string { return word }
 
 var instTokens = []string{"INST_NAME", "INST_ID", "INST_DIR", "INST_MC_DIR"}
 
-var slots = map[string]Slot{
-	"prism":      {Token: "$INST_MC_DIR", Tokens: instTokens},
-	"multimc":    {Token: "$INST_MC_DIR", Tokens: instTokens},
-	"atlauncher": {Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord},
-	"gdlauncher": {Deadline: "4m", Quote: gdlauncherHookArg},
-	"mojang":     {Shim: true},
-}
-
-// SlotOf is how a launcher's slots behave, and whether shulker fills them at all.
-func SlotOf(name string) (Slot, bool) {
-	s, ok := slots[name]
-	return s, ok
+func slotOf(launcherName string) Slot {
+	if e := Find(launcherName); e != nil && e.Slot != nil {
+		return *e.Slot
+	}
+	return Slot{}
 }
 
 // SlotCommand is what goes in the launcher's slot: the interpreter, then the generated script. It
@@ -72,7 +65,7 @@ func SlotCommand(launcherName, dir string, kind HookKind) string {
 // A literal path is quoted the way the launcher splits the command; a path through a token gets the
 // plain quoted shape every parser reads alike.
 func slotCommand(launcherName, dir string, kind HookKind, goos string) string {
-	s := slots[launcherName]
+	s := slotOf(launcherName)
 	base := dir
 	if s.Token != "" {
 		base = s.Token
@@ -144,68 +137,72 @@ func wrapperWord(launcherName, word, goos string) string {
 	if !strings.ContainsAny(word, " \t\"'\\") {
 		return word
 	}
-	return slots[launcherName].quote(word, goos)
+	return slotOf(launcherName).quote(word, goos)
 }
 
 // ReadSlots is what a launcher currently has in an instance's slots, and whether the instance exists
 // at all. A launcher shulker fills no slots for reports nothing found.
 func ReadSlots(e *Entry, in config.Instance) (Slots, bool, error) {
-	instanceDir := e.InstanceDir(in.Dir)
-	switch e.Name {
-	case "prism", "multimc":
-		values, err := readINI(filepath.Join(instanceDir, InstanceConfigFile), e.Name == "multimc")
-		if errors.Is(err, os.ErrNotExist) {
-			return Slots{}, false, nil
-		}
-		if err != nil {
-			return Slots{}, false, err
-		}
-		return Slots{PreLaunch: values["PreLaunchCommand"], PostExit: values["PostExitCommand"], Wrapper: values["WrapperCommand"]}, true, nil
-	case "atlauncher":
-		settings, _, found, err := atlauncherSettings(instanceDir)
-		if err != nil || !found {
-			return Slots{}, found, err
-		}
-		return Slots{PreLaunch: jsonStringValue(settings["preLaunchCommand"]), PostExit: jsonStringValue(settings["postExitCommand"]), Wrapper: jsonStringValue(settings["wrapperCommand"])}, true, nil
-	case "gdlauncher":
-		top, found, err := gdlauncherTop(instanceDir)
-		if err != nil || !found {
-			return Slots{}, found, err
-		}
-		return Slots{PreLaunch: jsonStringValue(top["pre_launch_hook"]), PostExit: jsonStringValue(top["post_exit_hook"]), Wrapper: jsonStringValue(top["wrapper_command"])}, true, nil
-	case "mojang":
-		java, found, err := (&Mojang{Dir: in.LauncherDir}).JavaDir(in.Dir)
-		return Slots{Java: java}, found, err
+	if e.readSlots == nil {
+		return Slots{}, false, nil
 	}
-	return Slots{}, false, nil
+	return e.readSlots(e, in)
+}
+
+func readPrismSlots(e *Entry, in config.Instance) (Slots, bool, error) {
+	values, err := readINI(filepath.Join(e.InstanceDir(in.Dir), InstanceConfigFile), e.multimcINI)
+	if errors.Is(err, os.ErrNotExist) {
+		return Slots{}, false, nil
+	}
+	if err != nil {
+		return Slots{}, false, err
+	}
+	return Slots{PreLaunch: values["PreLaunchCommand"], PostExit: values["PostExitCommand"], Wrapper: values["WrapperCommand"]}, true, nil
+}
+
+func readATLauncherSlots(e *Entry, in config.Instance) (Slots, bool, error) {
+	settings, _, found, err := atlauncherSettings(e.InstanceDir(in.Dir))
+	if err != nil || !found {
+		return Slots{}, found, err
+	}
+	return Slots{PreLaunch: jsonStringValue(settings["preLaunchCommand"]), PostExit: jsonStringValue(settings["postExitCommand"]), Wrapper: jsonStringValue(settings["wrapperCommand"])}, true, nil
+}
+
+func readGDLauncherSlots(e *Entry, in config.Instance) (Slots, bool, error) {
+	top, found, err := gdlauncherTop(e.InstanceDir(in.Dir))
+	if err != nil || !found {
+		return Slots{}, found, err
+	}
+	return Slots{PreLaunch: jsonStringValue(top["pre_launch_hook"]), PostExit: jsonStringValue(top["post_exit_hook"]), Wrapper: jsonStringValue(top["wrapper_command"])}, true, nil
+}
+
+func readMojangSlots(_ *Entry, in config.Instance) (Slots, bool, error) {
+	java, found, err := (&Mojang{Dir: in.LauncherDir}).JavaDir(in.Dir)
+	return Slots{Java: java}, found, err
 }
 
 // WriteSlots puts commands in an instance's slots, an empty one clearing that slot, except for the
 // wrapper, which is only ever filled. It is what reconcile uses, so a hand-edited switch takes
 // effect through the same path that first set it.
 func WriteSlots(e *Entry, in config.Instance, s Slots) error {
-	instanceDir := e.InstanceDir(in.Dir)
-	switch e.Name {
-	case "prism", "multimc":
-		return writePrismSlots(instanceDir, e.Name == "multimc", s)
-	case "atlauncher":
-		return writeATLauncherSlots(instanceDir, s)
-	case "gdlauncher":
-		return writeGDLauncherSlots(instanceDir, s)
-	case "mojang":
-		return (&Mojang{Dir: in.LauncherDir}).SetJavaDir(in.Dir, s.Java)
+	if e.writeSlots == nil {
+		return nil
 	}
-	return nil
+	return e.writeSlots(e, in, s)
 }
 
-func writePrismSlots(instanceDir string, multimc bool, s Slots) error {
-	path := filepath.Join(instanceDir, InstanceConfigFile)
+func writeMojangSlots(_ *Entry, in config.Instance, s Slots) error {
+	return (&Mojang{Dir: in.LauncherDir}).SetJavaDir(in.Dir, s.Java)
+}
+
+func writePrismSlots(e *Entry, in config.Instance, s Slots) error {
+	path := filepath.Join(e.InstanceDir(in.Dir), InstanceConfigFile)
 	lines, err := readINILines(path)
 	if err != nil {
 		return err
 	}
 	escape := iniEscape
-	if multimc {
+	if e.multimcINI {
 		escape = multimcEscape
 	}
 	set := map[string]string{}
@@ -251,7 +248,8 @@ func writePrismSlots(instanceDir string, multimc bool, s Slots) error {
 	return fsutil.Write(path, buf.Bytes())
 }
 
-func writeATLauncherSlots(instanceDir string, s Slots) error {
+func writeATLauncherSlots(e *Entry, in config.Instance, s Slots) error {
+	instanceDir := e.InstanceDir(in.Dir)
 	settings, top, found, err := atlauncherSettings(instanceDir)
 	if err != nil || !found {
 		return err
@@ -280,7 +278,8 @@ func writeATLauncherSlots(instanceDir string, s Slots) error {
 	return fsutil.WriteJSON(filepath.Join(instanceDir, ATLauncherInstanceFile), top)
 }
 
-func writeGDLauncherSlots(instanceDir string, s Slots) error {
+func writeGDLauncherSlots(e *Entry, in config.Instance, s Slots) error {
+	instanceDir := e.InstanceDir(in.Dir)
 	top, found, err := gdlauncherTop(instanceDir)
 	if err != nil || !found {
 		return err
@@ -314,7 +313,7 @@ func ReleaseSlots(e *Entry, in config.Instance) (tookPreLaunch, tookPostExit boo
 		adopted = Slots{PreLaunch: f.Settings.Commands.PreLaunch, PostExit: f.Settings.Commands.PostExit}
 	}
 	tookPreLaunch, tookPostExit = IsShulkerSlot(current.PreLaunch), IsShulkerSlot(current.PostExit)
-	if slot, _ := SlotOf(e.Name); slot.Shim {
+	if e.Slot != nil && e.Slot.Shim {
 		// The profile keeps a Java shulker didn't set; the one it did set goes back to what the
 		// launcher had, which is usually no key at all.
 		if found && IsShulkerShim(current.Java) {

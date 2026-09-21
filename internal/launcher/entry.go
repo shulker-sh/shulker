@@ -36,9 +36,17 @@ type Entry struct {
 	// gameDirIsInstance marks launchers whose instance folder is the game directory itself,
 	// rather than holding it as minecraft/.
 	gameDirIsInstance bool
-	relink            func(e *Entry, l Linked) (args []string, in string)
-	forget            func(e *Entry, l config.Instance) (Forgotten, error)
-	name              func(e *Entry, launcherDir, gameDir string) string
+	// multimcINI marks instance.cfg as read by MultiMC's old parser rather than Prism's QSettings.
+	multimcINI bool
+	// Slot is how the launcher's command slots behave. Nil means shulker fills none, as for its own
+	// instances, which run the hooks themselves.
+	Slot       *Slot
+	relink     func(e *Entry, l Linked) (args []string, in string)
+	forget     func(e *Entry, l config.Instance) (Forgotten, error)
+	name       func(e *Entry, launcherDir, gameDir string) string
+	gameDirs   func(e *Entry, launcherDir string) []string
+	readSlots  func(e *Entry, in config.Instance) (Slots, bool, error)
+	writeSlots func(e *Entry, in config.Instance, s Slots) error
 }
 
 // Linked is a registry row plus the intent its instance.json records, which is where the side and
@@ -51,12 +59,40 @@ type Linked struct {
 }
 
 var All = []*Entry{
-	{Name: "shulker", Title: "Shulker", Instanced: true, gameDirIsInstance: true, relink: relinkShulker, forget: forgetShulker, name: shulkerName},
-	{Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir, relink: relinkLauncher, forget: forgetInstance, name: prismName},
-	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkLauncher, forget: forgetInstance, name: prismName},
-	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkLauncher, forget: forgetMojang, name: mojangName},
-	{Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, relink: relinkLauncher, forget: forgetInstance, name: atlauncherName},
-	{Name: "gdlauncher", Title: "GDLauncher", Instanced: true, DefaultDir: DefaultGDLauncherDir, relink: relinkLauncher, forget: forgetInstance, name: gdlauncherName},
+	{
+		Name: "shulker", Title: "Shulker", Instanced: true, gameDirIsInstance: true,
+		relink: relinkShulker, forget: forgetShulker, name: shulkerName, gameDirs: instanceGameDirs,
+	},
+	{
+		Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir,
+		Slot:   &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
+		relink: relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
+		readSlots: readPrismSlots, writeSlots: writePrismSlots,
+	},
+	{
+		Name: "multimc", Title: "MultiMC", Instanced: true, multimcINI: true,
+		Slot:   &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
+		relink: relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
+		readSlots: readPrismSlots, writeSlots: writePrismSlots,
+	},
+	{
+		Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir,
+		Slot:   &Slot{Shim: true},
+		relink: relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,
+		readSlots: readMojangSlots, writeSlots: writeMojangSlots,
+	},
+	{
+		Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true,
+		Slot:   &Slot{Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord},
+		relink: relinkLauncher, forget: forgetInstance, name: atlauncherName, gameDirs: atlauncherGameDirs,
+		readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots,
+	},
+	{
+		Name: "gdlauncher", Title: "GDLauncher", Instanced: true, DefaultDir: DefaultGDLauncherDir,
+		Slot:   &Slot{Deadline: "4m", Quote: gdlauncherHookArg},
+		relink: relinkLauncher, forget: forgetInstance, name: gdlauncherName, gameDirs: gdlauncherGameDirs,
+		readSlots: readGDLauncherSlots, writeSlots: writeGDLauncherSlots,
+	},
 }
 
 // InstanceDir is the instance folder that holds an instanced launcher's game directory.
