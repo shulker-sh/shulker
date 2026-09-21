@@ -120,6 +120,26 @@ type harness struct {
 	msa            *fakeMSA
 	// exe stands in for the running binary, for the commands that move or remove it.
 	exe string
+	// watching counts the watchers a launch left running, so a test's directories outlive the runs
+	// they are still recording.
+	watching sync.WaitGroup
+}
+
+// watch stands in for the watcher process, because a test binary re-execed is a test binary and not
+// shulker. The run is watched here instead, on a goroutine that outlives the command that started
+// it exactly as the watcher outlives it.
+func (h *harness) watch(req watchRequest) (int, error) {
+	started := make(chan watchReply, 1)
+	h.watching.Add(1)
+	go func() {
+		defer h.watching.Done()
+		h.newApp(io.Discard, io.Discard).watchRun(req, nil, func(r watchReply) { started <- r })
+	}()
+	r := <-started
+	if r.Error != "" {
+		return 0, notStarted(r.Error)
+	}
+	return r.PID, nil
 }
 
 // hitStore counts one download out of the game store's fakes, which the store fetches several at a
@@ -133,6 +153,9 @@ func (h *harness) hitStore() {
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	h := &harness{dir: t.TempDir(), cache: t.TempDir(), config: filepath.Join(t.TempDir(), "config.json"), jars: map[string]fakeJar{}, runtime: newFakeRuntime()}
+	// A watcher writes its record after the command that spawned it has returned, so the test waits
+	// for it before its directories go.
+	t.Cleanup(h.watching.Wait)
 	sodium := makeJar(t, "sodium", "sodium-fabric-0.9.2+mc26.2.jar", "client")
 	fabricAPI := makeJar(t, "fabric-api", "fabric-api-0.130.0+26.2.jar", "*")
 	h.jars["sodium"], h.jars["fabric-api"] = sodium, fabricAPI
@@ -579,6 +602,7 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	a.stdin = h.stdin
 	a.tty = func() bool { return h.tty }
 	a.installer = h.fakeInstaller
+	a.watcher = h.watch
 	if h.exe != "" {
 		a.exe = func() (string, error) { return h.exe, nil }
 	}

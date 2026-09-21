@@ -751,6 +751,10 @@ Start a shulker instance. With no nickname it plays the instance the current dir
 
 It updates the instance first, resolves the account, fetches whatever the store is missing, and then starts the game **detached**: `play` returns as soon as the game is running, and the game outlives the shell it was started from. `--no-sync` starts what is already on disk without updating it.
 
+A detached game is still recorded. `play` hands it to a watcher — shulker itself, started again in the background with no window — which starts the game, waits for it, writes how the run ended to the instance's launch history, and exits. The record is the same one a launcher's [post-exit hook](#shulker-hook-post-exit) writes, so `instances` and the history read it the same way, except that shulker started the game itself and so also knows the status it exited with: a non-zero status is `crashed` whether or not the game managed to write a crash report. If the watcher is killed while the game is running, the record stays open with the game's process id in it, and the next command that touches the instance — `play`, `sync`, `instances repair` — closes it from the crash reports once that process has gone.
+
+`--wait` keeps the launch in the foreground instead: `play` starts the game itself, waits for it, records the run and says how it went. `--stream` does the same and shows the game's output as it runs, on stdout, or on stderr under `--json`. The log is written either way. A game that crashes is reported, not raised: `play` exits 0, because it got the game running, which is its job.
+
 Only the instances shulker owns can be played here: every other launcher starts its own, so an instance linked into one fails with `not-shulker`.
 
 ```sh
@@ -758,6 +762,8 @@ shulker play
 shulker play smp
 shulker play --account Notch
 shulker play --no-sync
+shulker play --wait
+shulker play --stream
 ```
 
 The game gets no terminal, so everything it writes goes to `.shulker/logs/<time>.log` inside the instance, one file per launch, whether or not anyone is watching. The game's own arguments carry a session access token, so they are printed nowhere: not in the log, not in a progress line, not in an error.
@@ -777,9 +783,11 @@ shulker play smp --dry-run
 | --- | --- |
 | `--account <name>` | Play as this account, for this run only (default: the default account) |
 | `--no-sync` | Start the game without updating the instance first |
+| `--wait` | Wait for the game and record how the run ended before returning |
+| `--stream` | Wait for the game and show its output as it runs; the log is still written |
 | `--dry-run` | Assemble the launch and print it instead of starting the game |
 
-With `--json`, the data is `{ "instance", "version", "account", "pid", "gameDir", "log", "sync" }`, where `account` is the row [`shulker accounts`](#shulker-accounts) prints and `sync` is absent under `--no-sync`. Under `--dry-run` it is `{ "instance", "version", "inherits", "mainClass", "java", "gameDir", "nativesDir", "assetIndex", "classpath", "classpathBytes" }` instead.
+With `--json`, the data is `{ "instance", "version", "account", "pid", "gameDir", "log", "outcome", "exitCode", "crashReport", "sync" }`, where `account` is the row [`shulker accounts`](#shulker-accounts) prints, `pid` is the game's own process, and `sync` is absent under `--no-sync`. `outcome` (`ok` or `crashed`), `exitCode` and `crashReport` are there only under `--wait` or `--stream`, since a detached launch returns while the game is still running; `exitCode` is absent when it is 0, and `crashReport` when the game wrote none. Under `--dry-run` it is `{ "instance", "version", "inherits", "mainClass", "java", "gameDir", "nativesDir", "assetIndex", "classpath", "classpathBytes" }` instead.
 
 ### `shulker serve`
 
@@ -1117,13 +1125,17 @@ A launcher that gives shulker no way to show a message gets a deadline instead, 
 
 What a launcher's own post-exit slot runs, recording how the run ended in the instance's `.shulker/launches.json`: when it started and finished, whether the game left a crash report, and where that report and the log are. `settings.launchHistory` in `.shulker/instance.json` is how many runs are kept — 5 by default, `-1` every one, and `0` none at all, which records nothing.
 
-A run's `outcome` is `ok`, `crashed`, or `not-started` for one the game never began, which also carries the reason in `error` and has the same `startedAt` and `endedAt`.
+A run's `outcome` is `ok`, `crashed`, or `not-started` for one the game never began, which also carries the reason in `error` and has the same `startedAt` and `endedAt`. A run [`play`](#shulker-play) started also has `exitCode`, the status the game left, which no launcher passes to its post-exit slot; and while it is still going, `pid`, the game's own process, which the record drops once it is closed.
 
 ### `shulker hook wrap -- <java arguments>`
 
 What the Mojang launcher's `javaDir` shim runs in place of Java, with the instance in `-C` and the game's own arguments after `--`. When those arguments carry `--gameDir` it does what the pre-launch and post-exit hooks do around the game: syncs the instance first (a failure is a warning, and the game still starts), runs Java with the arguments untouched, prefixed by `settings.wrapper` when that is set, then records the run. A `settings.wrapper` that can't be run at all is a warning and the game starts with Java on its own. Without `--gameDir` it is the launcher's version check, which only runs Java. Java is `settings.java` when set, else `resolved.java`, shulker's managed runtime. The game's exit status is passed back as its own (`game-exit`).
 
 Where no game started at all, `hook wrap` exits `launch-not-started`: the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start. That exit is what makes the launcher raise an error, which is all a player sees when no window appears, and the last two also leave a `not-started` launch record, so `instances` and the launch history say the launch never happened. Shulker's own failures around a launch that is going ahead never turn into one: a failed sync and a wrapper that gave way both exit 0, because the game is starting either way. The arguments carry the session access token and appear in no output or record.
+
+### `shulker watch`
+
+The watcher a detached [`play`](#shulker-play) leaves behind, and not something to run by hand. It reads the launch from its stdin — never from its arguments, since the game's own arguments carry the session access token and a process list is public — starts the game, writes one line back with the game's process id, or with why it couldn't start it, then waits for the game to exit and records the run. It writes nothing else anywhere but the launch history. On Windows it runs with no console at all, and starts the game with none either, so neither opens a window.
 
 ## Types
 
@@ -1420,7 +1432,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `java-version` | The Java found is outside the range in `shulker.json` |
 | `jvm-flags` | Unknown `jvmFlags` preset |
 | `key-not-found` | A `--key` isn't in the file. `candidates`: its keys |
-| `launch-not-started` | Shulker never got as far as running the game: for `hook wrap`, the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start; for `play`, the Java it assembled wouldn't start. Under a launcher the exit is what makes it show an error, since no window appears |
+| `launch-not-started` | Shulker never got as far as running the game: for `hook wrap`, the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start; for `play`, the Java it assembled wouldn't start, or the watcher it hands a detached launch to couldn't be started or stopped before it answered. Under a launcher the exit is what makes it show an error, since no window appears |
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-not-found` | No launcher directory where shulker looked |
 | `loader-required` | `add` of a mod in a project without a loader; set one with `shulker set loader.type <loader>` |

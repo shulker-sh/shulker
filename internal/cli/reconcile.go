@@ -9,12 +9,15 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 )
 
-// reconcileInstance makes a linked directory match its instance.json: the generated scripts and the
-// launcher slots for the switches that are on, both removed for the switches that are off, and
-// settings.shulker pointed at the binary now running. It is idempotent, so link, every registering
-// sync and `instances repair` can all call it, and a hand-edited switch takes effect through the
-// same path that first set it.
+// reconcileInstance makes a linked directory match its instance.json: a run left open by a watcher
+// that was killed closed, the generated scripts and the launcher slots written for the switches that
+// are on, both removed for the switches that are off, and settings.shulker pointed at the binary now
+// running. It is idempotent, so link, every registering sync and `instances repair` can all call it,
+// and a hand-edited switch takes effect through the same path that first set it.
 func (a *app) reconcileInstance(in config.Instance) error {
+	// A run whose watcher was killed comes first, because it is true of every instance, including
+	// the ones shulker launches itself, which fill no slot and return below.
+	a.reconcileRun(in.Dir)
 	e := launcher.Find(in.Launcher)
 	slot, fills := launcher.SlotOf(in.Launcher)
 	if e == nil || !fills {

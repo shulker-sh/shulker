@@ -20,17 +20,26 @@ const (
 	OutcomeNotStarted = "not-started"
 )
 
-// Launch is one run of the game: the pre-launch hook stamps it and the post-exit hook closes it.
-// No launcher hands a post-exit command the game's exit code, so the outcome is read from a crash
-// report newer than StartedAt. A run whose post-exit never fired keeps an open record, with no
-// EndedAt and no Outcome. A run the game never began is closed on the spot as OutcomeNotStarted,
-// with StartedAt and EndedAt the same moment, since none of the time that passed was the game's.
+// Launch is one run of the game: something stamps it as the game starts and closes it once the game
+// has gone. Under a launcher that is the pre-launch and post-exit hooks, which are handed no exit
+// code, so the outcome is read from a crash report newer than StartedAt; under `play` it is the
+// watcher, which waited for the game and knows the status it left. A run nothing closed keeps an
+// open record, with no EndedAt and no Outcome. A run the game never began is closed on the spot as
+// OutcomeNotStarted, with StartedAt and EndedAt the same moment, since none of the time that passed
+// was the game's.
 type Launch struct {
 	StartedAt   string `json:"startedAt"`
 	EndedAt     string `json:"endedAt,omitempty"`
 	Outcome     string `json:"outcome,omitempty"`
 	Log         string `json:"log,omitempty"`
 	CrashReport string `json:"crashReport,omitempty"`
+	// PID is the game's own process, and is there only while the record is open. A watcher writes
+	// it so that a later command can tell a run still going from one whose watcher was killed; a
+	// launcher-driven run has none, and is nobody's to close but its own post-exit hook.
+	PID int `json:"pid,omitempty"`
+	// ExitCode is the status the game left. Only a run shulker waited on itself has one: no
+	// launcher passes the game's exit code to a post-exit slot.
+	ExitCode int `json:"exitCode,omitempty"`
 	// Error names the executable that would not run and the operating system's reason. It never
 	// carries any part of the game's argv, which holds the session access token.
 	Error string `json:"error,omitempty"`

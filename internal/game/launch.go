@@ -1,6 +1,8 @@
 package game
 
 import (
+	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,24 +54,52 @@ type Launch struct {
 	Log  string
 }
 
-// Start runs the game and returns as soon as it is running. The process is detached, so it outlives
-// the shell that asked for it, and its output goes to the log rather than to a terminal that may
-// already be gone by the time the game has anything to say.
-func Start(l Launch) (int, error) {
+// Game is a game that has started: the process to record, and the wait that ends when it exits.
+type Game struct {
+	PID int
+
+	cmd *exec.Cmd
+	log *os.File
+}
+
+// Start runs the game and returns as soon as it is running. The game is in a session of its own, so
+// it outlives whatever started it — a shell that closed, or a watcher that was killed — and its
+// output goes to the log rather than to a terminal that may already be gone by the time the game
+// has anything to say. A non-nil stream is handed a copy of that output as it arrives.
+func Start(l Launch, stream io.Writer) (*Game, error) {
 	if err := os.MkdirAll(filepath.Dir(l.Log), 0o755); err != nil {
-		return 0, err
+		return nil, err
 	}
 	log, err := os.OpenFile(l.Log, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	defer log.Close()
 	cmd := exec.Command(l.Java, l.Argv...)
 	cmd.Dir = l.Dir
-	cmd.Stdout, cmd.Stderr = log, log
+	cmd.Stdout = io.Writer(log)
+	if stream != nil {
+		cmd.Stdout = io.MultiWriter(log, stream)
+	}
+	cmd.Stderr = cmd.Stdout
 	detach(cmd)
 	if err := cmd.Start(); err != nil {
-		return 0, err
+		log.Close()
+		return nil, err
 	}
-	return cmd.Process.Pid, cmd.Process.Release()
+	return &Game{PID: cmd.Process.Pid, cmd: cmd, log: log}, nil
+}
+
+// Wait blocks until the game exits and hands back the status it left. A game that ran and failed is
+// a status, not an error: only a game that never started at all is that.
+func (g *Game) Wait() (int, error) {
+	defer g.log.Close()
+	err := g.cmd.Wait()
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
+		return 0, nil
+	case errors.As(err, &exit):
+		return exit.ExitCode(), nil
+	}
+	return 0, err
 }

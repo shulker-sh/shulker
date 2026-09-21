@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -43,43 +44,67 @@ type playReport struct {
 // playing, and where its output is going. The argv is absent here for the same reason it is absent
 // from the dry run.
 type playResult struct {
-	Instance string      `json:"instance"`
-	Version  string      `json:"version"`
-	Account  accountRow  `json:"account"`
-	PID      int         `json:"pid"`
-	GameDir  string      `json:"gameDir"`
-	Log      string      `json:"log"`
-	Sync     *syncResult `json:"sync,omitempty"`
+	Instance string     `json:"instance"`
+	Version  string     `json:"version"`
+	Account  accountRow `json:"account"`
+	PID      int        `json:"pid"`
+	GameDir  string     `json:"gameDir"`
+	Log      string     `json:"log"`
+	// Outcome, ExitCode and CrashReport are how the run ended, and are there only when shulker
+	// waited for the game itself. A detached launch returns while the game is still running, so
+	// what it has to report is that the game started, and the record is the watcher's to close.
+	Outcome     string      `json:"outcome,omitempty"`
+	ExitCode    int         `json:"exitCode,omitempty"`
+	CrashReport string      `json:"crashReport,omitempty"`
+	Sync        *syncResult `json:"sync,omitempty"`
 }
 
 func (a *app) playCmd() *cobra.Command {
-	var dryRun, noSync bool
-	var selector string
+	var opts playOptions
 	cmd := &cobra.Command{
 		Use:   "play [nickname]",
 		Short: "Start a shulker instance",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if dryRun {
+			if opts.dryRun {
 				return a.dryRun(cmd.Context(), args)
 			}
-			return a.play(cmd, args, selector, noSync)
+			return a.play(cmd, args, opts)
 		},
 	}
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "assemble the launch and print it instead of starting the game")
-	cmd.Flags().BoolVar(&noSync, "no-sync", false, "start the game without updating the instance first")
-	cmd.Flags().StringVar(&selector, "account", "", "play as this account (default: the default account)")
+	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "assemble the launch and print it instead of starting the game")
+	cmd.Flags().BoolVar(&opts.noSync, "no-sync", false, "start the game without updating the instance first")
+	cmd.Flags().BoolVar(&opts.wait, "wait", false, "wait for the game and record how the run ended before returning")
+	cmd.Flags().BoolVar(&opts.stream, "stream", false, "wait for the game and mirror its output to the terminal")
+	cmd.Flags().StringVar(&opts.account, "account", "", "play as this account (default: the default account)")
 	return cmd
 }
 
-func (a *app) play(cmd *cobra.Command, args []string, selector string, noSync bool) error {
+// playOptions is how one launch differs from the next: which account plays it, whether the instance
+// is brought up to date first, and who waits for the game — the watcher, or this command.
+type playOptions struct {
+	dryRun  bool
+	noSync  bool
+	wait    bool
+	stream  bool
+	account string
+}
+
+// waits reports whether this command stays for the run. --stream is --wait that shows its working,
+// so either of them keeps the launch in the foreground.
+func (o playOptions) waits() bool { return o.wait || o.stream }
+
+func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	ctx := cmd.Context()
 	in, err := a.playInstance(args)
 	if err != nil {
 		return err
 	}
+	// A run whose watcher was killed is still open in the record; this is the next command touching
+	// the instance, so it is the one that closes it.
+	a.reconcileRun(in.Dir)
 	var synced *syncResult
-	if !noSync {
+	if !opts.noSync {
 		res, err := a.syncForLaunch(cmd, in.Dir)
 		if err != nil {
 			return err
@@ -92,7 +117,7 @@ func (a *app) play(cmd *cobra.Command, args []string, selector string, noSync bo
 	if err != nil {
 		return err
 	}
-	who, adopted, err := a.launchAccount(selector)
+	who, adopted, err := a.launchAccount(opts.account)
 	if err != nil {
 		return err
 	}
@@ -126,15 +151,19 @@ func (a *app) play(cmd *cobra.Command, args []string, selector string, noSync bo
 		Log:      log,
 		Sync:     synced,
 	}
-	a.progress("starting %s as %s", in.ID, who.Name)
-	res.PID, err = game.Start(game.Launch{
+	req := watchRequest{
+		Dir:  in.Dir,
 		Java: plan.java,
 		Argv: game.Argv(plan.version, game.Host(), nil, vars),
-		Dir:  in.Dir,
 		Log:  res.Log,
-	})
-	if err != nil {
-		return notStarted(runReason(plan.java, err))
+	}
+	a.progress("starting %s as %s", in.ID, who.Name)
+	if opts.waits() {
+		if err := a.playWaited(&res, req, opts.stream); err != nil {
+			return err
+		}
+	} else if res.PID, err = a.startWatcher(req); err != nil {
+		return err
 	}
 	return a.printer.Emit(res, func(l *out.Lines) {
 		if synced != nil {
@@ -143,12 +172,52 @@ func (a *app) play(cmd *cobra.Command, args []string, selector string, noSync bo
 		if adopted {
 			l.Info(who.Name + " is the default account now")
 		}
-		l.OK("playing "+res.Instance, res.Version)
-		l.Tree(
-			out.Row{Label: "account", Text: res.Account.Name},
-			out.Row{Label: "log", Text: res.Log},
-		)
+		res.print(l)
 	})
+}
+
+// playWaited keeps the launch in the foreground: this command starts the game, waits for it, and
+// closes the record itself, so no watcher is spawned and nothing is left running behind it.
+func (a *app) playWaited(res *playResult, req watchRequest, stream bool) error {
+	var mirror io.Writer
+	if stream {
+		mirror = a.printer.Stdout
+		if a.printer.JSON {
+			mirror = a.printer.Stderr
+		}
+	}
+	a.printer.Settle()
+	rec := a.watchRun(req, mirror, func(r watchReply) { res.PID = r.PID })
+	if rec.Outcome == instance.OutcomeNotStarted {
+		return notStarted(rec.Error)
+	}
+	res.Outcome, res.ExitCode, res.CrashReport = rec.Outcome, rec.ExitCode, rec.CrashReport
+	return nil
+}
+
+// print is the launch as a player reads it. A detached launch says the game is playing, because that
+// is all it knows; a run this command waited for says how it went instead, and a crash is reported
+// rather than raised — the game ran, so shulker did its job.
+func (r playResult) print(l *out.Lines) {
+	rows := []out.Row{
+		{Label: "account", Text: r.Account.Name},
+		{Label: "log", Text: r.Log},
+	}
+	switch r.Outcome {
+	case "":
+		l.OK("playing "+r.Instance, r.Version)
+	case instance.OutcomeCrashed:
+		l.Warn(r.Instance + " crashed")
+		if r.ExitCode != 0 {
+			rows = append(rows, out.Row{Label: "status", Text: strconv.Itoa(r.ExitCode)})
+		}
+		if r.CrashReport != "" {
+			rows = append(rows, out.Row{Label: "crash report", Text: r.CrashReport})
+		}
+	default:
+		l.OK("played "+r.Instance, r.Version)
+	}
+	l.Tree(rows...)
 }
 
 // gameSession is the account as the game's own arguments name it. An offline account presents the

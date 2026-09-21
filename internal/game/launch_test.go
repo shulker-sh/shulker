@@ -1,11 +1,8 @@
 package game
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestArgvIsTheJVMThenTheMainClassThenTheGame(t *testing.T) {
@@ -41,39 +38,4 @@ func TestSessionFillsEveryPlaceholderTheGameHasForAnAccount(t *testing.T) {
 	if !strings.Contains(line, "token:mc-token:069a79f4") || !strings.Contains(line, "--userType msa") {
 		t.Fatalf("game arguments %q", game)
 	}
-}
-
-func TestStartRunsTheGameDetachedWithItsOutputInTheLog(t *testing.T) {
-	dir := t.TempDir()
-	script := filepath.Join(dir, "java")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\npwd\necho \"$@\"\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	log := filepath.Join(dir, "game", ".shulker", "logs", "20260920-120000.log")
-
-	pid, err := Start(Launch{Java: script, Argv: []string{"-cp", "a.jar"}, Dir: dir, Log: log})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if pid == 0 {
-		t.Fatal("a launch answers with the pid it started")
-	}
-
-	body := waitFor(t, log)
-	if !strings.Contains(body, "-cp a.jar") || !strings.Contains(body, filepath.Base(dir)) {
-		t.Fatalf("the game's output and its directory should be in the log:\n%s", body)
-	}
-}
-
-// waitFor reads what a detached process wrote, which it has not written yet when Start returns.
-func waitFor(t *testing.T, path string) string {
-	t.Helper()
-	for i := 0; i < 2000; i++ {
-		if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
-			return string(data)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("%s stayed empty", path)
-	return ""
 }

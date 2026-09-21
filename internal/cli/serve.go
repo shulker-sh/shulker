@@ -39,17 +39,24 @@ func serverFailureFiles(dir string, started time.Time) (log, crashReport string)
 	if path := filepath.Join(dir, "logs", "latest.log"); fileExists(path) {
 		log = path
 	}
+	return log, crashReportSince(dir, started)
+}
+
+// crashReportSince is the newest crash report the game wrote after started, empty when there is
+// none. It is the only evidence of how a run ended that survives the process that ran it.
+func crashReportSince(dir string, started time.Time) string {
 	entries, _ := os.ReadDir(filepath.Join(dir, "crash-reports"))
 	var newest time.Time
+	var report string
 	for _, e := range entries {
 		info, err := e.Info()
 		if err != nil || e.IsDir() || info.ModTime().Before(started) || !info.ModTime().After(newest) {
 			continue
 		}
 		newest = info.ModTime()
-		crashReport = filepath.Join(dir, "crash-reports", e.Name())
+		report = filepath.Join(dir, "crash-reports", e.Name())
 	}
-	return log, crashReport
+	return report
 }
 
 func fileExists(path string) bool {
