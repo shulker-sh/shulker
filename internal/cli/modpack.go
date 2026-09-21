@@ -2,12 +2,14 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -154,9 +156,31 @@ func (a *app) addPackEntry(ctx context.Context, p *project.Project, r *resolve.R
 		return manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
 	}
 	loaded.Name = key
-	if err := r.AddPack(ctx, loaded); err != nil {
+	err = r.AddPack(ctx, loaded)
+	if a.offerUnlock(err, loaded, r.Lock.Minecraft) {
+		unlock, askErr := a.askYes(fmt.Sprintf("Unlock %s and resolve its mods for Minecraft %s?", key, r.Lock.Minecraft))
+		if askErr != nil {
+			return askErr
+		}
+		if unlock {
+			no := false
+			entry.Locked = &no
+			if loaded, err = store.Resolve(ctx, source, entry); err != nil {
+				return err
+			}
+			loaded.Name = key
+			err = r.AddPack(ctx, loaded)
+		}
+	}
+	if err != nil {
 		return err
 	}
 	p.Manifest.Requires[key] = entry
 	return nil
+}
+
+// offerUnlock reports whether a modpack refused for its platform is the one refusal unlocking
+// answers: locked, and built for another Minecraft than the project's.
+func (a *app) offerUnlock(err error, l *pack.Loaded, minecraft string) bool {
+	return out.CodeOf(err) == "modpack-mismatch" && a.canPick() && l.Locked && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
 }

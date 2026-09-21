@@ -47,7 +47,17 @@ func (r *Resolver) settleHeld(ctx context.Context, held heldMods, p provider.Pro
 		return err
 	}
 	if !withDeps {
-		return heldError(moves, added)
+		held := heldError(moves, added)
+		if r.AskMove == nil {
+			return held
+		}
+		move, err := r.AskMove(held)
+		if err != nil {
+			return err
+		}
+		if !move {
+			return held
+		}
 	}
 	for _, m := range moves {
 		r.log("moving %s %s, which %s needs another version of", m.dep, m.found, m.mod)
@@ -132,7 +142,7 @@ func (r *Resolver) keyFor(jarID string) string {
 	return ""
 }
 
-func heldError(moves []heldMove, added string) error {
+func heldError(moves []heldMove, added string) *out.Error {
 	items := make([]string, 0, len(moves))
 	rows := make([]out.Detail, 0, len(moves))
 	for _, m := range moves {

@@ -78,7 +78,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 					if name, ok := from[slug]; ok {
 						add.Provider = name
 					}
-					if err := r.Add(cmd.Context(), slug, add); err != nil {
+					if err := a.addAsking(cmd.Context(), r, slug, add); err != nil {
 						return "", err
 					}
 				}

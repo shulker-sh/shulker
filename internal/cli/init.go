@@ -228,11 +228,7 @@ func (a *app) askPlatform(ctx context.Context, opts *initOptions, given func(fla
 			return err
 		}
 		if mods == "yes" {
-			choices := make([]out.Choice, 0, len(loader.Names()))
-			for _, name := range loader.Names() {
-				choices = append(choices, out.Choice{Label: name, Value: name})
-			}
-			if opts.loaderName, err = a.ask("Which mod loader?", choices); err != nil {
+			if opts.loaderName, err = a.ask("Which mod loader?", loaderChoices()); err != nil {
 				return err
 			}
 		}
@@ -257,6 +253,14 @@ func (a *app) askPlatform(ctx context.Context, opts *initOptions, given func(fla
 		}
 	}
 	return nil
+}
+
+func loaderChoices() []out.Choice {
+	choices := make([]out.Choice, 0, len(loader.Names()))
+	for _, name := range loader.Names() {
+		choices = append(choices, out.Choice{Label: name, Value: name})
+	}
+	return choices
 }
 
 // newClient is the client block a new project starts with, its options skipping the game's

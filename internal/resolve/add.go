@@ -33,6 +33,9 @@ type Resolver struct {
 	Warnings []string
 	// Progress starts a download bar for the named files.
 	Progress func(verb string, files []out.Download) *out.Progress
+	// AskMove is shown the deps-held refusal before an add without --with-deps gives up;
+	// yes carries on as --with-deps would.
+	AskMove func(held *out.Error) (bool, error)
 }
 
 type AddOptions struct {
