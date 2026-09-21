@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"shulker.sh/shulker/internal/saves/savestest"
 )
 
 func frozen(t *testing.T, at time.Time) {
@@ -56,7 +58,7 @@ func TestTakeZipsOnlyWorldsAtTheRoot(t *testing.T) {
 	frozen(t, at)
 
 	var zipped []string
-	got, err := Take(Source{Dir: src, Instance: "pack", Minecraft: "26.2", Loader: "fabric"}, Home{Dir: home}, "backup", func(w string) { zipped = append(zipped, w) })
+	got, err := Take(Source{Dir: src, Instance: "pack", Minecraft: "26.2", Loader: "fabric"}, Home{Dir: home}, "backup", func(w string, _ bool) { zipped = append(zipped, w) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,5 +363,29 @@ func TestTakeDropsNamesThatOverflowTheComment(t *testing.T) {
 	}
 	if c := commentFor(comment{Format: commentFormat, Instance: strings.Repeat("x", 70000)}); c != "" {
 		t.Fatalf("an oversize comment = %d bytes", len(c))
+	}
+}
+
+func TestTakeZipsAnOpenWorldAndSaysSo(t *testing.T) {
+	src, home := t.TempDir(), t.TempDir()
+	world(t, src, "open")
+	world(t, src, "shut")
+	savestest.Hold(t, filepath.Join(src, "open"))
+
+	var open []string
+	got, err := Take(Source{Dir: src}, Home{Dir: home}, "backup", func(w string, held bool) {
+		if held {
+			open = append(open, w)
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(open, []string{"open"}) {
+		t.Fatalf("open = %v", open)
+	}
+	names, _ := zipEntries(t, got.Path)
+	if want := []string{"open/", "open/level.dat", "shut/", "shut/level.dat"}; !slices.Equal(names, want) {
+		t.Fatalf("entries = %v", names)
 	}
 }

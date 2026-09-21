@@ -65,10 +65,11 @@ func commentFor(c comment) string {
 	return ""
 }
 
-// Take zips src's worlds into a new backup in home, calling each before it zips a world. With no
-// worlds to zip it writes nothing and returns a zero Backup rather than failing, so a caller backing
-// up on the way past something else can carry on.
-func Take(src Source, home Home, reason string, each func(world string)) (Backup, error) {
+// Take zips src's worlds into a new backup in home, calling each before it zips a world with whether
+// a running game has it open, which zips anyway but may be torn. With no worlds to zip it writes
+// nothing and returns a zero Backup rather than failing, so a caller backing up on the way past
+// something else can carry on.
+func Take(src Source, home Home, reason string, each func(world string, open bool)) (Backup, error) {
 	worlds, err := Worlds(src.Dir)
 	if err != nil {
 		return Backup{}, err
@@ -136,17 +137,23 @@ func nextSeq(dir string, at time.Time) (int, error) {
 	return seq, nil
 }
 
-func writeZip(w io.Writer, dir string, worlds []string, meta string, each func(world string)) error {
+func writeZip(w io.Writer, dir string, worlds []string, meta string, each func(world string, open bool)) error {
 	zw := zip.NewWriter(w)
 	for _, world := range worlds {
 		if each != nil {
-			each(world)
+			open, _ := InUse(filepath.Join(dir, world))
+			each(world, open)
 		}
 		err := filepath.WalkDir(filepath.Join(dir, world), func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
 			if !d.IsDir() && !d.Type().IsRegular() {
+				return nil
+			}
+			// A running game's lock on Windows refuses reads of the file, and the game writes a
+			// fresh one whenever it opens the world.
+			if path == filepath.Join(dir, world, "session.lock") {
 				return nil
 			}
 			rel, err := filepath.Rel(dir, path)

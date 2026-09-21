@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/saves/savestest"
 )
 
 func restoreOf(t *testing.T, h *harness, args ...string) restoreResult {
@@ -172,5 +173,43 @@ func TestRestoreIntoAServerTakesOnlyItsLevel(t *testing.T) {
 	worlds := filepath.Join(h.dir, "data", "server")
 	if _, err := os.Stat(filepath.Join(worlds, "old-world")); err == nil {
 		t.Fatal("restored a world the server doesn't load")
+	}
+}
+
+func TestAWorldOpenInARunningGame(t *testing.T) {
+	h := newHarness(t)
+	root := savesRoot(t, h)
+	linkShulkerPack(t, h)
+	group := filepath.Join(root, "default")
+	addWorld(t, group, "survival")
+	addWorld(t, group, "creative")
+	data, err := config.DataDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(filepath.Join(data, "backups")) })
+	first := backupOf(t, h)
+	if err := os.WriteFile(filepath.Join(group, "survival", "since.mca"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	savestest.Hold(t, filepath.Join(group, "survival"))
+
+	stdout, stderr := h.mustRunStderr(t, "backup")
+	if !strings.Contains(stderr, "survival is open in a running game; its backup may be torn") || strings.Contains(stderr, "creative is open") {
+		t.Fatalf("backup warns about only the open world: %s", stderr)
+	}
+	if !strings.Contains(stdout, "backed up 2 worlds") {
+		t.Fatalf("backup zips anyway: %s", stdout)
+	}
+
+	env := h.runSetting(t, 1, "restore", "--backup", first.ID)
+	if env.Error == nil || env.Error.Code != "world-in-use" || strings.Join(env.Error.Items, ",") != "survival" {
+		t.Fatalf("restore over an open world: %+v", env.Error)
+	}
+	if _, err := os.Stat(filepath.Join(group, "survival", "since.mca")); err != nil {
+		t.Fatal("a refused restore changed the world")
+	}
+	if backups, _ := os.ReadDir(filepath.Join(data, "backups", "default")); len(backups) != 2 {
+		t.Fatalf("a refused restore took a backup: %d", len(backups))
 	}
 }

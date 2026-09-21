@@ -18,6 +18,7 @@ type settingEnvelope struct {
 		Code       string   `json:"code"`
 		Message    string   `json:"message"`
 		Candidates []string `json:"candidates"`
+		Items      []string `json:"items"`
 	} `json:"error"`
 }
 

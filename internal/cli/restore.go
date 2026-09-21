@@ -52,10 +52,18 @@ func (a *app) restoreCmd() *cobra.Command {
 				}
 				worlds = []string{target.World}
 			}
+			open, err := saves.OpenWorlds(target.WorldsDir, worlds)
+			if err != nil {
+				return err
+			}
+			if len(open) > 0 {
+				e := out.Errorf("world-in-use", "%s open in a running game", plural(len(open), "world is", "worlds are"))
+				e.Items = open
+				e.Help = "save and quit to the title screen, or stop the server, then restore again"
+				return e
+			}
 			res := restoreResult{savesTarget: target, From: from}
-			snapshot, err := saves.Take(a.backupSource(target), target.home(), "restore", func(world string) {
-				a.printer.Step("zipping %s", world)
-			})
+			snapshot, err := saves.Take(a.backupSource(target), target.home(), "restore", a.zipping("zipping"))
 			if err != nil {
 				return err
 			}

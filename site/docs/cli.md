@@ -1248,7 +1248,7 @@ With `--json`, the data is `{ "group", "dir", "worldsDir", "pruned", "kept" }`.
 
 Zip a target's worlds into its backups. The target is the one [`shulker saves`](#shulker-saves) would show: `--group`, `-i`, `-C`, or the current directory, with the worlds found the same way. A save group's backups go in `backups/<group>` in shulker's data directory, named `<time>-<instance>-backup.zip` for the instance that took them, or `<time>-backup.zip` when `--group` names the group alone; any other directory's go in its own `.shulker/backups/` as `<time>-backup.zip`. A second backup in the same second gets `-2` after the time. The zip holds the world folders at its root and nothing else, and its comment records the time, the reason, the instance, the world count and names, and the Minecraft version and loader, which `saves` and `restore` read in place of the filename. Names that wouldn't fit in a zip comment are left out of it, keeping the count. A backup taken this way is never pruned automatically; [`saves prune`](#shulker-saves-prune) deletes it.
 
-A target with no worlds folder, or none in it, fails with `no-worlds`, naming the folder it looked in.
+A target with no worlds folder, or none in it, fails with `no-worlds`, naming the folder it looked in. A world open in a running game, whose `session.lock` the game or server holds, is zipped anyway under the warning `! <world> is open in a running game; its backup may be torn`; the backups `update` and `sync` take first warn the same way.
 
 ```sh
 shulker backup
@@ -1268,7 +1268,7 @@ Put a backup's worlds back into a target: the one [`shulker saves`](#shulker-sav
 
 Before it writes anything, `restore` backs up the worlds the target holds, as [`shulker backup`](#shulker-backup) would with the reason `restore`, so a restore can itself be undone; that backup is never pruned automatically. A group restored with `--group` names no instance, so its backup is `<time>-restore.zip`. Each world folder in the zip, read from the zip's own entries, replaces the one of the same name whole: the old folder is removed and the zip's unzipped in its place, never merged file by file. Worlds the zip doesn't hold are left alone. A server takes only its `level-name` world from the zip, and fails with `world-not-found` when the zip doesn't hold it.
 
-`restore` fails with `backups-empty` when the target has no backups, `backup-missing` when there is no backup `n` or none by the name `--backup` gives, and `backup-invalid` for a zip that won't open or holds anything other than world folders, each with a `level.dat`, at its root.
+`restore` fails with `world-in-use`, listing each world, when a running game or server has open a world it would replace: the game writes a world it holds back at its next autosave, so a restore under it would undo itself. Save and quit to the title screen, or stop the server, first. A `session.lock` a crashed game left behind doesn't count. It also fails with `backups-empty` when the target has no backups, `backup-missing` when there is no backup `n` or none by the name `--backup` gives, and `backup-invalid` for a zip that won't open or holds anything other than world folders, each with a `level.dat`, at its root.
 
 ```sh
 shulker restore
@@ -1700,4 +1700,5 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
+| `world-in-use` | `restore` would replace a world a running game or server has open. `items`: the open worlds |
 | `world-not-found` | `restore` into a server was given a zip without the world its `level-name` names; the message names it |

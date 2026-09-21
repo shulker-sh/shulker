@@ -30,9 +30,7 @@ func (a *app) backupCmd() *cobra.Command {
 				return err
 			}
 			start := time.Now()
-			taken, err := saves.Take(a.backupSource(target), target.home(), "backup", func(world string) {
-				a.printer.Step("zipping %s", world)
-			})
+			taken, err := saves.Take(a.backupSource(target), target.home(), "backup", a.zipping("zipping"))
 			if err != nil {
 				return err
 			}
@@ -66,6 +64,17 @@ func (a *app) backupSource(target savesTarget) saves.Source {
 		src.Minecraft, src.Loader = lk.Minecraft, lk.Loader.Type
 	}
 	return src
+}
+
+// zipping is the step line saves.Take shows for each world, under a warning when a running game
+// has the world open.
+func (a *app) zipping(verb string) func(world string, open bool) {
+	return func(world string, open bool) {
+		if open {
+			a.printer.Warn("%s is open in a running game; its backup may be torn", world)
+		}
+		a.printer.Step("%s %s", verb, world)
+	}
 }
 
 func (t savesTarget) home() saves.Home {
@@ -106,9 +115,7 @@ func (a *app) autoBackup(reason, dir string) func() error {
 		if keep == 0 {
 			return nil
 		}
-		taken, err := saves.Take(a.backupSource(target), target.home(), reason, func(world string) {
-			a.printer.Step("backing up %s", world)
-		})
+		taken, err := saves.Take(a.backupSource(target), target.home(), reason, a.zipping("backing up"))
 		if err != nil || taken.Path == "" {
 			return err
 		}

@@ -4,11 +4,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"shulker.sh/shulker/internal/saves/savestest"
 )
 
 // TestMain points the config, cache and data directories at a scratch directory, so a test that
 // forgets its own never repairs or rewrites the instances registered on the machine running it.
 func TestMain(m *testing.M) {
+	if !savestest.Main() {
+		return
+	}
 	dir, err := os.MkdirTemp("", "shulker-cli-test")
 	if err != nil {
 		panic(err)
