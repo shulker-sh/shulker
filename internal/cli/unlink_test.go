@@ -211,4 +211,9 @@ func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(gameDir, "resourcepacks", "fresh-animations.zip")); err != nil {
 		t.Fatalf("what the player added is still there: %v", err)
 	}
+
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends", "--as", "smp")
+	if instances := readInstances(t, h); len(instances) != 1 || instances[0].ID != "smp" || instanceManifest(t, gameDir)["name"] != "smp" {
+		t.Fatalf("an adopted project's name is the id it is linked under, which repair reads back: %+v", instances)
+	}
 }

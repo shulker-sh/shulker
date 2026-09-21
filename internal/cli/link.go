@@ -223,7 +223,7 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 // linkProject is the project a link leaves in the game directory: the minimal manifest ADR 0001
 // calls an instance, following the link's source as a modpack and building where it stands. A
 // project already there is adopted, never replaced, so a relink keeps whatever the player added
-// on top of the pack.
+// on top of the pack. Its name is set to the id either way, since repair reads the id back from it.
 func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
 	p, err := a.openProjectAt(gameDir)
 	if errors.Is(err, project.ErrNoManifest) {
@@ -237,6 +237,9 @@ func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*p
 		p.Lock = lock.New()
 	}
 	changed := false
+	if p.Manifest.Name != id {
+		p.Manifest.Name, changed = id, true
+	}
 	// A project that builds elsewhere is not yet an instance; linking it here is what makes it one.
 	if !p.Manifest.InPlace("client") {
 		if p.Manifest.Client == nil {
