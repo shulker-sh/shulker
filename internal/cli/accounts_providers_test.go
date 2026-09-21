@@ -256,7 +256,7 @@ func TestLaunchWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
 	if signed.Minecraft == nil || signed.Minecraft.Token != "stale" {
 		t.Errorf("the launch plays on the token it has: %+v", signed.Minecraft)
 	}
-	if !strings.Contains(stderr, "only prism can renew it") ||
+	if !strings.Contains(stderr, "only Prism Launcher can renew it") ||
 		!strings.Contains(stderr, "online servers and Realms will reject this session") {
 		t.Errorf("the launch has to say what won't work and who can fix it: %s", stderr)
 	}

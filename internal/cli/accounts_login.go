@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -316,7 +317,7 @@ func (a *app) accountSession(ctx context.Context, r account.Resolved) (account.A
 		return account.Account{}, err
 	}
 	if r.State == account.TokenExpired {
-		a.printer.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session", r.Name, r.Source)
+		a.printer.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session", r.Name, launcher.Title(r.Source))
 		return r.Account, nil
 	}
 	if r.Group != account.GroupOwn || r.Account.Fresh(time.Now()) {
