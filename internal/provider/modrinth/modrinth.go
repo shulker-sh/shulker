@@ -1,3 +1,4 @@
+// Package modrinth reads projects and versions from Modrinth's API.
 package modrinth
 
 import (
