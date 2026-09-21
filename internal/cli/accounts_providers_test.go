@@ -243,3 +243,29 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentPrismFile(t *testing.T) {
 		t.Errorf("a launcher that isn't installed says nothing on a later run: %q", stderr)
 	}
 }
+
+func TestLaunchWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
+	h := newHarness(t)
+	prismAccounts(t, h, prismNotch)
+	h.mustRun(t, "accounts", "providers", "set", "prism")
+
+	signed, stderr, err := accountSession(t, h, "Jeb_")
+	if err != nil {
+		t.Fatalf("an expired borrowed account still launches: %v", err)
+	}
+	if signed.Minecraft == nil || signed.Minecraft.Token != "stale" {
+		t.Errorf("the launch plays on the token it has: %+v", signed.Minecraft)
+	}
+	if !strings.Contains(stderr, "only prism can renew it") ||
+		!strings.Contains(stderr, "online servers and Realms will reject this session") {
+		t.Errorf("the launch has to say what won't work and who can fix it: %s", stderr)
+	}
+	// Shulker never writes another launcher's account into its own file, renewed or not.
+	if _, err := os.Stat(account.Path(h.config)); !os.IsNotExist(err) {
+		t.Errorf("a borrowed account must not land in shulker's own store: %v", err)
+	}
+	// A borrowed account that is still good says nothing.
+	if _, stderr, err := accountSession(t, h, "Notch"); err != nil || strings.Contains(stderr, "Realms") {
+		t.Errorf("a token that still holds launches quietly: %q %v", stderr, err)
+	}
+}
