@@ -210,13 +210,14 @@ func TestAccountsProviders(t *testing.T) {
 	}
 
 	// shulker can be taken out of the list, and then its own accounts stop being visible.
+	registerMojang(t, h, t.TempDir())
 	h.mustRun(t, "config", "set", "accounts.providers", "--literal", `["mojang"]`)
 	stdout, stderr := h.mustRunStderr(t, "accounts")
 	if !strings.Contains(stdout, "no accounts yet") {
 		t.Errorf("without shulker its own accounts are not read:\n%s", stdout)
 	}
-	if !strings.Contains(stderr, "can't read mojang's accounts yet") {
-		t.Errorf("a provider with no reader should say so:\n%s", stderr)
+	if strings.TrimSpace(stderr) != "" {
+		t.Errorf("a launcher with nothing to read says nothing: %q", stderr)
 	}
 
 	// Unsetting the key goes back to the default, and the accounts come back.

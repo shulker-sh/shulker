@@ -58,7 +58,7 @@ func TestProvidersList(t *testing.T) {
 	stdout := h.mustRun(t, "accounts", "providers")
 	for _, want := range []string{
 		"• prism   Prism Launcher\n",
-		"• mojang  Minecraft Launcher no reader yet",
+		"• mojang  Minecraft Launcher\n",
 		"• shulker Shulker\n",
 	} {
 		if !strings.Contains(stdout, want) {
@@ -267,5 +267,151 @@ func TestLaunchWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
 	// A borrowed account that is still good says nothing.
 	if _, stderr, err := accountSession(t, h, "Notch"); err != nil || strings.Contains(stderr, "Realms") {
 		t.Errorf("a token that still holds launches quietly: %q %v", stderr, err)
+	}
+}
+
+// registerMojang puts a mojang instance in the registry so the reader looks in dir, the way
+// `link mojang --launcher-dir` leaves it, and never at the launcher's real place on this machine.
+func registerMojang(t *testing.T, h *harness, dir string) {
+	t.Helper()
+	if _, err := config.UpdateInstances(registryPath(h), func(instances []config.Instance) []config.Instance {
+		return append(instances, config.Instance{
+			ID: "official", Launcher: "mojang", LauncherDir: dir,
+			Dir: filepath.Join(dir, "instances", "official"), Source: ".",
+		})
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// mojangAccounts writes the official launcher's account files into a fresh directory, keyed by
+// file name, and registers it.
+func mojangAccounts(t *testing.T, h *harness, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	registerMojang(t, h, dir)
+	return dir
+}
+
+func mojangFile(entries ...string) string {
+	return `{"accounts":{` + strings.Join(entries, ",") + `},"activeAccountLocalId":"one","mojangClientToken":"ct"}`
+}
+
+func mojangAccountEntry(local, id, name, token, expires string) string {
+	return `"` + local + `":{"accessToken":"` + token + `","accessTokenExpiresAt":"` + expires + `",` +
+		`"username":"someone@example.com","localId":"` + local + `","type":"Xbox",` +
+		`"minecraftProfile":{"id":"` + id + `","name":"` + name + `"}}`
+}
+
+func TestAccountsBorrowsFromMojang(t *testing.T) {
+	h := newHarness(t)
+	mojangAccounts(t, h, map[string]string{
+		account.MojangFileName: mojangFile(
+			mojangAccountEntry("one", notchID, "Notch", "session", "2099-01-01T00:00:00Z"),
+			mojangAccountEntry("two", steveID, "Steve", "stale", "2020-01-01T00:00:00.0000000Z"),
+		),
+		// The Store file's suffix is per file, so its accounts come in too.
+		account.MojangStoreFileName: mojangFile(
+			mojangAccountEntry("three", dinnerbone, "Dinnerbone", "store", "2099-01-01T00:00:00Z"),
+		),
+		// Neither of these is ever opened: the Java profile is the ownership proof.
+		"launcher_entitlements.json":   "not json",
+		"launcher_msa_credentials.bin": "not json",
+	})
+	h.mustRun(t, "accounts", "providers", "set", "mojang")
+
+	stdout, stderr := h.mustRunStderr(t, "accounts")
+	if strings.TrimSpace(stderr) != "" {
+		t.Errorf("reading the launcher's own files says nothing: %q", stderr)
+	}
+	for _, want := range []string{
+		"  Borrowed\n",
+		"• Dinnerbone " + dinnerbone + " playable",
+		"• Notch      " + notchID + " playable",
+		"• Steve      " + steveID + " token expired ",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("accounts is missing %q:\n%s", want, stdout)
+		}
+	}
+	var rows []accountRow
+	if err := json.Unmarshal(h.runSetting(t, 0, "accounts", "--json").Data, &rows); err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if row.Source != account.SourceMojang || row.Group != account.GroupBorrowed {
+			t.Errorf("borrowed row = %+v", row)
+		}
+	}
+	h.mustRun(t, "accounts", "use", "Notch@mojang")
+	code, stdout, _ := h.run(t, "accounts", "logout", "Notch", "--yes", "--json")
+	if e := failureCode(t, stdout); code == 0 || !strings.Contains(e.Message, "borrowed from mojang") {
+		t.Fatalf("logout on a borrowed account: %s", stdout)
+	}
+}
+
+func TestAccountsMergesAnAccountInBothMojangFiles(t *testing.T) {
+	h := newHarness(t)
+	mojangAccounts(t, h, map[string]string{
+		account.MojangFileName: mojangFile(
+			mojangAccountEntry("one", notchID, "Notch", "stale", "2020-01-01T00:00:00Z")),
+		account.MojangStoreFileName: mojangFile(
+			mojangAccountEntry("two", notchID, "Notch", "session", "2099-01-01T00:00:00Z")),
+	})
+	h.mustRun(t, "accounts", "providers", "set", "mojang")
+
+	stdout := h.mustRun(t, "accounts")
+	if strings.Count(stdout, notchID) != 1 {
+		t.Errorf("one UUID is one account:\n%s", stdout)
+	}
+	signed, _, err := accountSession(t, h, "Notch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if signed.Minecraft == nil || signed.Minecraft.Token != "session" {
+		t.Errorf("the entry that expires later wins: %+v", signed.Minecraft)
+	}
+}
+
+func TestAccountsSkipsAMojangFileItCannotRead(t *testing.T) {
+	h := newHarness(t)
+	dir := mojangAccounts(t, h, map[string]string{
+		account.MojangFileName: `{"accounts":{`,
+		account.MojangStoreFileName: mojangFile(
+			mojangAccountEntry("two", notchID, "Notch", "session", "2099-01-01T00:00:00Z")),
+	})
+	h.mustRun(t, "accounts", "providers", "set", "mojang")
+
+	stdout, stderr := h.mustRunStderr(t, "accounts")
+	if !strings.Contains(stderr, filepath.Join(dir, account.MojangFileName)) {
+		t.Errorf("the warning should name the file:\n%s", stderr)
+	}
+	if !strings.Contains(stdout, "Notch") {
+		t.Errorf("the other accounts file in the directory still loads:\n%s", stdout)
+	}
+}
+
+func TestAccountsSaysNothingAboutAnEmptyOrAbsentMojangFile(t *testing.T) {
+	h := newHarness(t)
+	mojangAccounts(t, h, map[string]string{account.MojangFileName: `{"accounts":{}}`})
+	h.mustRun(t, "accounts", "providers", "set", "mojang")
+	stdout, stderr := h.mustRunStderr(t, "accounts")
+	if !strings.Contains(stdout, "no accounts yet") {
+		t.Errorf("stdout = %q", stdout)
+	}
+	if strings.TrimSpace(stderr) != "" {
+		t.Errorf("a launcher signed out of says nothing: %q", stderr)
+	}
+
+	h = newHarness(t)
+	registerMojang(t, h, filepath.Join(t.TempDir(), "gone"))
+	h.mustRun(t, "accounts", "providers", "set", "mojang")
+	if _, stderr := h.mustRunStderr(t, "accounts"); strings.TrimSpace(stderr) != "" {
+		t.Errorf("a launcher that isn't installed says nothing on a later run: %q", stderr)
 	}
 }

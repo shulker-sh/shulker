@@ -163,13 +163,32 @@ func TestResolveDedupesByIDKeepingTheEarliestProvider(t *testing.T) {
 	}
 }
 
-func TestResolveIgnoresAProviderWithNoReader(t *testing.T) {
+func TestResolveIgnoresAProviderThatFoundNothing(t *testing.T) {
 	store := Store{Accounts: []Account{own("Notch", "u1")}}
 	if got := Resolve([]string{SourceMojang}, store, nil); len(got) != 0 {
 		t.Fatalf("got %+v, want nothing", got)
 	}
 	if got := Resolve(nil, store, nil); len(got) != 0 {
 		t.Fatalf("an empty provider list should yield nothing, got %+v", got)
+	}
+}
+
+func TestReadersForEveryProviderTheListTakes(t *testing.T) {
+	// A launcher may be offered before its reader exists, so a list can drop shulker for one of
+	// them; today every name accounts.providers accepts has one.
+	for _, p := range Providers() {
+		if !HasReader(p) {
+			t.Errorf("%s is offered without a reader", p)
+		}
+	}
+	if len(WithoutReader(Providers())) != 0 {
+		t.Errorf("without a reader = %v", WithoutReader(Providers()))
+	}
+	if HasReader("multimc") {
+		t.Error("a launcher the list doesn't take has no reader either")
+	}
+	if got := WithoutReader([]string{SourceShulker, "multimc"}); len(got) != 1 || got[0] != "multimc" {
+		t.Errorf("without a reader = %v, want the one that has none", got)
 	}
 }
 

@@ -162,10 +162,9 @@ func (a *app) borrowedAccounts(providers []string) (map[string][]account.Resolve
 		if err != nil {
 			return nil, err
 		}
-		found, err := account.Read(p, dir, now)
-		if err != nil {
+		found, errs := account.Read(p, dir, now)
+		for _, err := range errs {
 			a.printer.Warn("%s", err)
-			continue
 		}
 		if len(found) == 0 {
 			continue

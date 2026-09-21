@@ -27,14 +27,23 @@ func Providers() []string { return []string{SourceShulker, SourcePrism, SourceMo
 // HasReader says whether a run can act on a provider at all. One without a reader is still a
 // value accounts.providers takes, so the list a reader ticket lands does not become an error.
 func HasReader(provider string) bool {
-	return provider == SourceShulker || provider == SourcePrism
+	return provider == SourceShulker || provider == SourcePrism || provider == SourceMojang
 }
 
 // Read is the accounts a launcher holds in its own data directory. Shulker's own file is loaded
-// where it lives instead, and a provider with no reader yields nothing.
-func Read(provider, dir string, now time.Time) ([]Resolved, error) {
-	if provider == SourcePrism {
-		return ReadPrism(dir, now)
+// where it lives instead, and a provider with no reader yields nothing. A launcher whose accounts
+// span several files gives back what the readable ones held alongside an error for each that did
+// not read, so one corrupt file costs only its own accounts.
+func Read(provider, dir string, now time.Time) ([]Resolved, []error) {
+	switch provider {
+	case SourcePrism:
+		found, err := ReadPrism(dir, now)
+		if err != nil {
+			return found, []error{err}
+		}
+		return found, nil
+	case SourceMojang:
+		return ReadMojang(dir, now)
 	}
 	return nil, nil
 }
