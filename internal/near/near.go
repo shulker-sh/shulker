@@ -1,3 +1,4 @@
+// Package near finds the names a mistyped one was likely meant to be.
 package near
 
 import (
@@ -25,15 +26,17 @@ func EditDistance(a, b string) int {
 	return prev[len(b)]
 }
 
+// Closest is up to limit candidates within reach of want, nearest first and then by name. Case is
+// ignored, and reach is a third of want's length plus one, never more than 3.
 func Closest(want string, candidates []string, limit int) []string {
 	type scored struct {
 		name string
 		dist int
 	}
-	max := min(len(want)/3+1, 3)
+	maxDist := min(len(want)/3+1, 3)
 	var hits []scored
 	for _, c := range candidates {
-		if d := EditDistance(strings.ToLower(want), strings.ToLower(c)); d <= max {
+		if d := EditDistance(strings.ToLower(want), strings.ToLower(c)); d <= maxDist {
 			hits = append(hits, scored{c, d})
 		}
 	}
