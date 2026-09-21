@@ -210,7 +210,8 @@ func writeWindowsShim(s Shim, b shimBuild) error {
 // shim's contract, so which one ran is not the player's business.
 func writeShimExe(exe string, b shimBuild) error {
 	marker := shimMarker()
-	if data, err := os.ReadFile(exe); err == nil && shimHasMarker(data, marker) {
+	have, err := os.ReadFile(exe)
+	if err == nil && shimHasMarker(have, marker) {
 		return nil
 	}
 	if b.csc != "" {
@@ -218,13 +219,13 @@ func writeShimExe(exe string, b shimBuild) error {
 			return replaceShimExe(exe, compiled)
 		}
 	}
-	return writeShimCopy(exe, b)
+	return writeShimCopy(exe, have, b)
 }
 
 // writeShimCopy is the fallback: shulker's own binary with the PE subsystem byte changed, which is
 // the only difference a -H=windowsgui build makes to the code. It costs 11 MB, so it is written only
-// when what is there isn't already it.
-func writeShimCopy(exe string, b shimBuild) error {
+// when what is there, have, isn't already it.
+func writeShimCopy(exe string, have []byte, b shimBuild) error {
 	self, err := b.self()
 	if err != nil {
 		return err
@@ -233,7 +234,7 @@ func writeShimCopy(exe string, b shimBuild) error {
 	if err != nil {
 		return err
 	}
-	if fileHolds(exe, patched) {
+	if bytes.Equal(have, patched) {
 		return nil
 	}
 	return replaceShimExe(exe, patched)

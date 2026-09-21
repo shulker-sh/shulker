@@ -112,11 +112,7 @@ func reconcileShim(in config.Instance, f *instance.File, current, exe string) (s
 		}
 		return restore, launcher.RemoveShim(in.Dir)
 	}
-	java := f.Settings.Java
-	if java == "" && f.Resolved != nil {
-		java = f.Resolved.Java
-	}
-	if err := launcher.WriteShim(launcher.Shim{Dir: in.Dir, Shulker: exe, Java: java}); err != nil {
+	if err := launcher.WriteShim(launcher.Shim{Dir: in.Dir, Shulker: exe, Java: f.Java()}); err != nil {
 		return "", err
 	}
 	return launcher.ShimPath(in.Dir), nil
@@ -135,10 +131,7 @@ func captureLauncherJava(f *instance.File, current string) {
 		}
 		return
 	}
-	if f.Resolved == nil {
-		f.Resolved = &instance.Resolved{}
-	}
-	f.Resolved.LauncherJava = current
+	f.EnsureResolved().LauncherJava = current
 }
 
 // adoptSlots moves a command shulker didn't write into the instance's own settings, so the generated

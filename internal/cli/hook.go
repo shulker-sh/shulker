@@ -122,10 +122,7 @@ func (a *app) hookWrapCmd() *cobra.Command {
 					f = synced
 				}
 			}
-			java := f.Settings.Java
-			if java == "" && f.Resolved != nil {
-				java = f.Resolved.Java
-			}
+			java := f.Java()
 			if java == "" {
 				reason := instance.Path(dir) + " records no Java to run the game with"
 				if launching {

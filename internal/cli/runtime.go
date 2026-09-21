@@ -48,9 +48,6 @@ func (a *app) recordClientRuntime(ctx context.Context, p *project.Project, side,
 		}
 		java = server.JavaBin(rt.Home)
 	}
-	if f.Resolved == nil {
-		f.Resolved = &instance.Resolved{}
-	}
-	f.Resolved.Java = java
+	f.EnsureResolved().Java = java
 	return rt, f.Save(dir)
 }

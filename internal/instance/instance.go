@@ -143,6 +143,22 @@ func (f *File) Save(dir string) error {
 	return fsutil.WriteJSON(Path(dir), f)
 }
 
+// Java is the Java the game runs with: the instance's own setting, else the one shulker resolved.
+func (f *File) Java() string {
+	if f.Settings.Java != "" || f.Resolved == nil {
+		return f.Settings.Java
+	}
+	return f.Resolved.Java
+}
+
+// EnsureResolved returns f.Resolved, creating it first if the file records none.
+func (f *File) EnsureResolved() *Resolved {
+	if f.Resolved == nil {
+		f.Resolved = &Resolved{}
+	}
+	return f.Resolved
+}
+
 func (s Settings) PreLaunch() bool { return s.Hooks.PreLaunch == nil || *s.Hooks.PreLaunch }
 
 func (s Settings) PostExit() bool { return s.Hooks.PostExit == nil || *s.Hooks.PostExit }

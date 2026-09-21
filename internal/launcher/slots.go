@@ -32,15 +32,27 @@ type Slot struct {
 	// Shim marks a launcher with no command slots at all, where what shulker fills is the profile's
 	// Java instead, with a shim that hands the launch back to it.
 	Shim bool
+	// Quote quotes one word of a command the way the launcher splits it. Nil means CommandArg's
+	// plain double quotes, which every other parser reads alike.
+	Quote func(word, goos string) string
 }
+
+func (s Slot) quote(word, goos string) string {
+	if s.Quote == nil {
+		return CommandArg(word)
+	}
+	return s.Quote(word, goos)
+}
+
+func bareWord(word, _ string) string { return word }
 
 var instTokens = []string{"INST_NAME", "INST_ID", "INST_DIR", "INST_MC_DIR"}
 
 var slots = map[string]Slot{
 	"prism":      {Token: "$INST_MC_DIR", Tokens: instTokens},
 	"multimc":    {Token: "$INST_MC_DIR", Tokens: instTokens},
-	"atlauncher": {Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}},
-	"gdlauncher": {Deadline: "4m"},
+	"atlauncher": {Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord},
+	"gdlauncher": {Deadline: "4m", Quote: gdlauncherHookArg},
 	"mojang":     {Shim: true},
 }
 
@@ -57,22 +69,22 @@ func SlotCommand(launcherName, dir string, kind HookKind) string {
 	return slotCommand(launcherName, dir, kind, runtime.GOOS)
 }
 
-// GDLauncher is the one launcher that sees a literal path here, and it splits the command itself, so
-// its path is quoted the way its parser reads; the others get the plain quoted shape every parser
-// reads alike.
+// A literal path is quoted the way the launcher splits the command; a path through a token gets the
+// plain quoted shape every parser reads alike.
 func slotCommand(launcherName, dir string, kind HookKind, goos string) string {
+	s := slots[launcherName]
 	base := dir
-	if s, ok := slots[launcherName]; ok && s.Token != "" {
+	if s.Token != "" {
 		base = s.Token
 	}
 	if goos == "windows" {
 		return `cmd /c "` + base + `\` + instance.Dir + `\` + string(kind) + `.cmd"`
 	}
 	script := base + "/" + instance.Dir + "/" + string(kind)
-	if launcherName == "gdlauncher" {
-		return "sh " + gdlauncherHookArg(script, goos)
+	if s.Token != "" {
+		return `sh "` + script + `"`
 	}
-	return `sh "` + script + `"`
+	return "sh " + s.quote(script, goos)
 }
 
 // IsShulkerSlot reports whether a slot command is one shulker owns, which is how reconcile tells its
@@ -132,14 +144,7 @@ func wrapperWord(launcherName, word, goos string) string {
 	if !strings.ContainsAny(word, " \t\"'\\") {
 		return word
 	}
-	switch launcherName {
-	case "atlauncher":
-		return word
-	case "gdlauncher":
-		return gdlauncherHookArg(word, goos)
-	default:
-		return CommandArg(word)
-	}
+	return slots[launcherName].quote(word, goos)
 }
 
 // ReadSlots is what a launcher currently has in an instance's slots, and whether the instance exists

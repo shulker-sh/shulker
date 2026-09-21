@@ -304,13 +304,11 @@ func (a *app) stampIntent(dir, at, result string) {
 		return
 	}
 	if err == nil {
-		if f.Resolved == nil {
-			f.Resolved = &instance.Resolved{}
-		}
+		r := f.EnsureResolved()
 		if result == instance.ResultOK {
-			f.Resolved.LastSyncAt = at
+			r.LastSyncAt = at
 		}
-		f.Resolved.LastResult = result
+		r.LastResult = result
 		err = f.Save(dir)
 	}
 	if err != nil {

@@ -47,3 +47,30 @@ func TestSaveLoadKeepsEverySetting(t *testing.T) {
 		t.Errorf("commands = %+v", got.Settings.Commands)
 	}
 }
+
+func TestJavaPrefersTheSettingOverTheResolvedOne(t *testing.T) {
+	f := New()
+	if got := f.Java(); got != "" {
+		t.Fatalf("no Java recorded: got %q", got)
+	}
+	f.Resolved = &Resolved{Java: "/cache/java/bin/java"}
+	if got := f.Java(); got != "/cache/java/bin/java" {
+		t.Fatalf("resolved only: got %q", got)
+	}
+	f.Settings.Java = "/opt/java/bin/java"
+	if got := f.Java(); got != "/opt/java/bin/java" {
+		t.Fatalf("setting and resolved: got %q", got)
+	}
+}
+
+func TestEnsureResolvedKeepsWhatIsRecorded(t *testing.T) {
+	f := New()
+	f.EnsureResolved().LastResult = ResultOK
+	if f.Resolved == nil || f.Resolved.LastResult != ResultOK {
+		t.Fatalf("resolved not created: %+v", f.Resolved)
+	}
+	f.EnsureResolved().Java = "/cache/java/bin/java"
+	if f.Resolved.LastResult != ResultOK {
+		t.Fatalf("existing resolved replaced: %+v", f.Resolved)
+	}
+}
