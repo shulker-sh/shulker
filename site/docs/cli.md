@@ -814,6 +814,8 @@ With `--json`, the data is `{ "instance", "version", "account", "pid", "gameDir"
 
 Build the server side and run it in the foreground. It downloads whatever the lock needs first, the way `install` does, so a fresh clone reaches a running server in one command.
 
+A server whose EULA isn't accepted yet asks `Accept and record "eula": true in shulker.json?` on a terminal, with no preselected, and yes records it before the server starts. Off a terminal, or with `--no-input` or `--json`, nothing is asked and it fails with `eula-required` unless `--accept-eula` is passed.
+
 ```sh
 shulker serve
 shulker serve server --accept-eula

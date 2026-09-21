@@ -68,7 +68,7 @@ func (a *app) initCmd() *cobra.Command {
 			if opts.loaderName == noLoader && cmd.Flags().Changed("loader-version") {
 				return out.Errorf("usage", "--loader-version needs --loader")
 			}
-			// D12: --yes is init's own spelling of --no-input, since the wizard leaves the
+			// --yes is init's own spelling of --no-input, since the wizard leaves the
 			// command no required value.
 			if opts.yes {
 				a.printer.NoInput = true

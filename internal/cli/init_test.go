@@ -31,7 +31,7 @@ func TestFailedInitLeavesNothingBehind(t *testing.T) {
 	}
 }
 
-// D12: --no-input is the mode and init --yes is its alias on this command, so both spellings,
+// --no-input is the mode and init --yes is its alias on this command, so both spellings,
 // and a run off a terminal that passes neither, create the same project and print the same lines.
 func TestInitWithoutAnswersTakesTheDefaults(t *testing.T) {
 	h := newHarness(t)
