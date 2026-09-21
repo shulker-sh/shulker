@@ -161,6 +161,9 @@ func TestRestoreAndSavesAllRunOverTheSameRows(t *testing.T) {
 	for _, args := range [][]string{
 		{"restore", "2", "--all"},
 		{"restore", "--all", "--backup", "x"},
+		{"restore", "--all", "--world", "survival"},
+		{"restore", "--all", "--as", "old"},
+		{"backup", "--all", "--world", "survival"},
 		{"saves", "--launcher", "prism"},
 		{"saves", "prune", "--all", "--group", "default", "--keep", "1"},
 	} {
