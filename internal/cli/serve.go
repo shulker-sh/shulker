@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -100,13 +99,12 @@ func (a *app) serveCmd() *cobra.Command {
 			if in == nil {
 				in = strings.NewReader("")
 			}
-			stdin := bufio.NewReader(in)
 			if p.Manifest.Server == nil {
 				p.Manifest.Server = &manifest.Server{}
 			}
 			srv := p.Manifest.Server
 			if !srv.Eula {
-				accepted, err := a.acceptEula(stdin, acceptEula)
+				accepted, err := a.acceptEula(acceptEula)
 				if err != nil {
 					return err
 				}
@@ -163,7 +161,7 @@ func (a *app) serveCmd() *cobra.Command {
 				Java:      java.Path,
 				Dir:       dir,
 				Args:      launchArgs,
-				Stdin:     stdin,
+				Stdin:     in,
 				Stdout:    gameOut,
 				Stderr:    a.printer.Stderr,
 				Interrupt: interrupt,
@@ -200,23 +198,14 @@ func (a *app) serveCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) acceptEula(stdin *bufio.Reader, flag bool) (bool, error) {
+func (a *app) acceptEula(flag bool) (bool, error) {
 	if flag {
 		return true, nil
 	}
-	if a.printer.JSON || a.tty == nil || !a.tty() {
+	if !a.canPick() {
 		return false, nil
 	}
 	l := a.printer.Err()
 	l.Text("Running a Minecraft server requires accepting the EULA: " + l.T.Cyan(eulaURL))
-	fmt.Fprint(a.printer.Stderr, "  Accept and record \"eula\": true in shulker.json? "+l.T.Grey("[y/N]")+" ")
-	line, err := stdin.ReadString('\n')
-	if err != nil && line == "" {
-		return false, nil
-	}
-	switch strings.ToLower(strings.TrimSpace(line)) {
-	case "y", "yes":
-		return true, nil
-	}
-	return false, nil
+	return a.askYes(`Accept and record "eula": true in shulker.json?`)
 }

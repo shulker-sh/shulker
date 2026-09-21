@@ -34,18 +34,19 @@ func TestServeRunsServerAndStops(t *testing.T) {
 		m["server"] = map[string]any{"eula": false, "memory": "2G", "jvmArgs": []any{"-Dshulker.test=1"}}
 	})
 	h.tty = true
-	h.stdin = strings.NewReader("n\n")
-	code, _, stderr = h.run(t, "serve")
-	if code == 0 || !strings.Contains(stderr, "Accept and record") || !strings.Contains(stderr, "--accept-eula") {
-		t.Fatalf("declined prompt: %d %s", code, stderr)
+	h.stdin = strings.NewReader("y\n")
+	code, _, stderr = h.run(t, "--no-input", "serve")
+	if code == 0 || strings.Contains(stderr, "Accept and record") || !strings.Contains(stderr, "--accept-eula") {
+		t.Fatalf("--no-input must decline without asking: %d %s", code, stderr)
 	}
 	h.readJSON(t, "shulker.json", &m)
 	if m["server"].(map[string]any)["eula"] != false {
 		t.Fatal("declining must not change the manifest")
 	}
+	h.tty = false
 
-	h.stdin = strings.NewReader("y\nsay hi\nstop\n")
-	code, stdout, stderr := h.run(t, "serve")
+	h.stdin = strings.NewReader("say hi\nstop\n")
+	code, stdout, stderr := h.run(t, "serve", "--accept-eula")
 	h.readJSON(t, "shulker.json", &m)
 	if m["server"].(map[string]any)["eula"] != true {
 		t.Fatal("accepting must record eula: true")
@@ -53,7 +54,6 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(h.dir, "build", "server", "eula.txt")); err != nil {
 		t.Fatal("eula.txt not written after accepting")
 	}
-	h.tty = false
 	if code != 0 {
 		t.Fatalf("serve: %d\n%s\n%s", code, stdout, stderr)
 	}

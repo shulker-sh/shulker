@@ -29,6 +29,11 @@ func (a *app) confirm(question, flag string) (bool, error) {
 	if !a.canPick() {
 		return false, out.Errorf("usage", "shulker asks before this, and can't ask here; pass %s to answer it", flag)
 	}
+	return a.askYes(question)
+}
+
+// askYes puts a yes-or-no question with "no" preselected, so a stray enter declines.
+func (a *app) askYes(question string) (bool, error) {
 	answer, err := a.ask(question, []out.Choice{{Label: "no", Value: "no"}, {Label: "yes", Value: "yes"}})
 	return answer == "yes", err
 }
