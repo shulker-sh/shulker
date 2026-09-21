@@ -21,6 +21,8 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
+// MrpackHosts are the hosts a Modrinth launcher downloads a pack's files from. A file hosted
+// anywhere else has to be bundled.
 var MrpackHosts = []string{"cdn.modrinth.com", "github.com", "raw.githubusercontent.com", "gitlab.com"}
 
 type MrpackOptions struct {
@@ -54,6 +56,7 @@ type mrpackSide struct {
 	packs map[string]bool
 }
 
+// ExportMrpack writes the project as a Modrinth modpack.
 func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 	sides, err := b.mrpackSides(opts.Sides)
 	if err != nil {
@@ -202,7 +205,7 @@ func (b *Builder) mrpackMods(sides []*mrpackSide, bundle bool, report *MrpackRep
 	add := func(key, kind, filePath, side, provider, sum512 string, u *string, owners []*mrpackSide, locked, bundled *[]string) error {
 		data, err := os.ReadFile(b.Cache.Object(sum512))
 		if err != nil {
-			return out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", key)
+			return notInstalled(key)
 		}
 		if u != nil && mrpackHostAllowed(*u) {
 			sum := sha1.Sum(data)

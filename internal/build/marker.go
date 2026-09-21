@@ -342,19 +342,19 @@ func markerLangKey(label string) string {
 
 // markerStyle renders a description for ModMenu, which parses it as QuickText, or as the plain text
 // the FML loaders show verbatim.
-type markerStyle struct{ rich bool }
+type markerStyle struct{ isRich bool }
 
-var quickText, plainText = markerStyle{rich: true}, markerStyle{}
+var quickText, plainText = markerStyle{isRich: true}, markerStyle{}
 
 func (s markerStyle) tag(name, text string) string {
-	if !s.rich {
+	if !s.isRich {
 		return text
 	}
 	return "<" + name + ">" + text + "</" + name + ">"
 }
 
 func (s markerStyle) escape(text string) string {
-	if !s.rich {
+	if !s.isRich {
 		return text
 	}
 	return strings.ReplaceAll(text, "<", "\\<")

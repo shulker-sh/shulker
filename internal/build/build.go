@@ -1,3 +1,5 @@
+// Package build writes a project's side into a directory: mods, packs, overrides and rendered
+// config, tracking what it wrote so a rebuild can tell its own files from the player's edits.
 package build
 
 import (
@@ -43,6 +45,8 @@ func StatePath(dir string) string {
 	return filepath.Join(dir, StateDir, StateFile)
 }
 
+// Origin is where the project a build came from was synced from: a source, a ref and commit, or
+// an archive's sha256. It is empty for a build of the local project.
 type Origin struct {
 	Source string `json:"source,omitempty"`
 	Ref    string `json:"ref,omitempty"`
@@ -50,6 +54,8 @@ type Origin struct {
 	Sha256 string `json:"sha256,omitempty"`
 }
 
+// State is .shulker/state.json: what the last build wrote into a directory, and the hash of each
+// file it owns.
 type State struct {
 	Side string `json:"side"`
 	Origin
@@ -65,6 +71,7 @@ type State struct {
 	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
 }
 
+// InstalledLoader is a loader that its own installer set up, rather than shulker.
 type InstalledLoader struct {
 	Type    string `json:"type"`
 	Version string `json:"version"`
@@ -86,6 +93,7 @@ func (s *State) record(rel string, f ownedFile) {
 	s.Values[rel] = f.values()
 }
 
+// Report is what a build did, file by file.
 type Report struct {
 	Side      string   `json:"side"`
 	Dir       string   `json:"dir"`
@@ -105,6 +113,8 @@ type Report struct {
 	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
 }
 
+// Options change how a build runs. Dir builds somewhere other than the side's build directory, and
+// Features turns features on or off over their defaults.
 type Options struct {
 	Force       bool
 	Dir         string
@@ -119,6 +129,7 @@ type Options struct {
 	BeforeModChange func() error
 }
 
+// Builder builds, diffs and exports one project from its manifest, lock and cached files.
 type Builder struct {
 	Dir      string
 	Manifest *manifest.Manifest
@@ -129,14 +140,14 @@ type Builder struct {
 }
 
 type source struct {
-	sha512   string
-	data     []byte
-	owned    ownedFile
-	origin   string
-	pack     string
-	feature  string
-	template bool
-	managed  ownedFile
+	sha512     string
+	data       []byte
+	owned      ownedFile
+	origin     string
+	pack       string
+	feature    string
+	isTemplate bool
+	managed    ownedFile
 }
 
 type fileState string
@@ -157,9 +168,9 @@ type planned struct {
 	src   source
 	hash  string
 	merge keyMerge
-	// forced is set where only --force let the plan overwrite or remove
+	// isForced is set where only --force let the plan overwrite or remove
 	// something the player changed.
-	forced bool
+	isForced bool
 }
 
 type ownedFile interface {
@@ -170,11 +181,11 @@ type ownedFile interface {
 }
 
 type keyMerge struct {
-	kept     map[string]bool
-	dropped  map[string]bool
-	overrode []string
-	changed  bool
-	forced   bool
+	kept       map[string]bool
+	dropped    map[string]bool
+	overrode   []string
+	hasChanged bool
+	isForced   bool
 }
 
 func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recordedKeys []string, force bool) keyMerge {
@@ -187,18 +198,18 @@ func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recorde
 		last, known := recorded[k]
 		switch {
 		case !present:
-			m.changed = true
+			m.hasChanged = true
 		case have == want:
 		case !known, have == last:
-			m.changed = true
+			m.hasChanged = true
 		case force:
-			m.changed = true
-			m.forced = true
+			m.hasChanged = true
+			m.isForced = true
 		case want == last:
 			m.kept[k] = true
 		default:
 			m.overrode = append(m.overrode, k)
-			m.changed = true
+			m.hasChanged = true
 		}
 	}
 	for _, k := range recordedKeys {
@@ -207,7 +218,7 @@ func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recorde
 		}
 		if _, present := current[k]; present {
 			m.dropped[k] = true
-			m.changed = true
+			m.hasChanged = true
 		}
 	}
 	return m
@@ -231,6 +242,8 @@ func (b *Builder) Target(side, dir string) string {
 	return filepath.Join(b.Dir, b.Manifest.BuildDir(side))
 }
 
+// Build writes side into its target directory, keeping the player's edits to files shulker owns
+// and failing on a conflict unless opts.Force is set.
 func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	dir := b.Target(side, opts.Dir)
 	inPlace := sameDir(dir, b.Dir)
@@ -298,7 +311,8 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		}
 	}
 	if len(report.Conflicts) > 0 {
-		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the output directory and in the source; run `shulker diff`, or `build --force` to overwrite", side, len(report.Conflicts))
+		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the output directory and in the source", side, len(report.Conflicts))
+		e.Help = "run `shulker diff`, or `shulker build --force` to overwrite"
 		e.Items = report.Conflicts
 		return report, e
 	}
@@ -365,7 +379,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 			continue
 		}
 		if !b.Cache.Has(m.Sha512) {
-			return nil, nil, out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", id)
+			return nil, nil, notInstalled(id)
 		}
 		desired["mods/"+m.Filename] = source{sha512: m.Sha512}
 	}
@@ -490,13 +504,13 @@ func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[st
 		src := source{origin: path, pack: pack, feature: l.feature}
 		if strings.HasSuffix(rel, TemplateSuffix) {
 			rel = strings.TrimSuffix(rel, TemplateSuffix)
-			src.template = true
+			src.isTemplate = true
 			if data, err = render(label+"/"+rel+TemplateSuffix, data, vars); err != nil {
 				return err
 			}
 		}
 		if strings.HasSuffix(rel, ".properties") && !whole(rel) {
-			desired[rel] = mergedProperties(desired[rel], data, keySource{path: path, pack: pack, feature: l.feature, template: src.template}, src, rel, report)
+			desired[rel] = mergedProperties(desired[rel], data, keySource{path: path, pack: pack, feature: l.feature, isTemplate: src.isTemplate}, src, rel, report)
 			return nil
 		}
 		if prev, taken := desired[rel]; taken {
@@ -547,18 +561,18 @@ func levelName(props properties) string {
 }
 
 func (b *Builder) collectLauncher(desired map[string]source) error {
-	notInstalled := out.Errorf("not-installed", "the server launcher is not in the cache; run `shulker install`")
+	launcherMissing := notInstalled("the server launcher")
 	l, _ := loader.Lookup(b.Lock.Loader.Type)
 	jar, vanilla := b.Lock.Loader.Server, b.Lock.Server
 	if vanilla == nil || !b.Cache.Has(vanilla.Sha512) {
-		return notInstalled
+		return launcherMissing
 	}
 	desired[vanillaServerPath(l, b.Lock.Minecraft)] = source{sha512: vanilla.Sha512}
 	if b.Lock.Loader.Type == "" {
 		return nil
 	}
 	if jar == nil || !b.Cache.Has(jar.Sha512) {
-		return notInstalled
+		return launcherMissing
 	}
 	if l.InstallServerFlag == "" {
 		desired[l.ServerLaunchJar] = source{sha512: jar.Sha512}
@@ -569,7 +583,7 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 			return err
 		}
 		if !b.Cache.Has(dl.Sha512) {
-			return notInstalled
+			return launcherMissing
 		}
 		desired["libraries/"+path] = source{sha512: dl.Sha512}
 	}
@@ -606,6 +620,8 @@ func LaunchArgs(lk *lock.Lock) []string {
 	return []string{"-jar", info.ServerLaunchJar}
 }
 
+// InstallerArgsFile is the args file a loader's server installer writes, relative to the server
+// directory, or empty when the loader has no installer.
 func InstallerArgsFile(lk *lock.Lock) string {
 	l, _ := loader.Lookup(lk.Loader.Type)
 	if l.InstallServerFlag == "" {
@@ -618,6 +634,7 @@ func InstallerArgsFile(lk *lock.Lock) string {
 	return "libraries/" + l.MavenPath + "/" + l.ArtifactVersion(lk.Minecraft, lk.Loader.Version) + "/" + name
 }
 
+// RecordLoader notes in dir's state that l was set up by its own installer.
 func RecordLoader(dir string, l InstalledLoader) error {
 	s := LoadState(dir)
 	s.InstalledLoader = &l
@@ -645,7 +662,9 @@ func (b *Builder) collectClient(side string, opts Options, desired map[string]so
 func (b *Builder) checkProperties(props properties, report *Report) error {
 	minecraft, err := mcver.Parse(b.Lock.Minecraft)
 	if err != nil {
-		return err
+		e := out.Errorf("properties-invalid", "server.properties can't be checked against Minecraft %s", b.Lock.Minecraft)
+		e.Rows = []out.Detail{{Label: "minecraft", Text: err.Error()}}
+		return e
 	}
 	check := server.CheckProperties(props, minecraft)
 	report.Warnings = append(report.Warnings, check.Warnings...)
@@ -662,7 +681,9 @@ func renderProperties(file string, raw map[string]any, vars map[string]string) (
 	for key, v := range raw {
 		value, err := formatProperty(v)
 		if err != nil {
-			return nil, fmt.Errorf("%s %s: %w", file, key, err)
+			e := out.Errorf("properties-invalid", "shulker.json %s key %s has a value shulker can't write", file, key)
+			e.Rows = []out.Detail{{Label: "value", Text: err.Error()}}
+			return nil, e
 		}
 		rendered, err := render("shulker.json "+file+" "+key, []byte(value), vars)
 		if err != nil {
@@ -708,9 +729,9 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 				return nil, err
 			}
 			f.merge = mergeKeys(src.owned, existing, prev.Values[rel], prev.recordedKeys(rel), force)
-			f.forced = f.merge.forced
+			f.isForced = f.merge.isForced
 			switch {
-			case f.merge.changed:
+			case f.merge.hasChanged:
 				f.state = stateWrite
 			case len(f.merge.kept) > 0:
 				f.state = stateKept
@@ -736,7 +757,7 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 			f.state = stateWrite
 		case force:
 			f.state = stateWrite
-			f.forced = true
+			f.isForced = true
 		case newHash == recorded:
 			f.state = stateKept
 		default:
@@ -765,7 +786,7 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 		if edited && !force {
 			state = stateOrphan
 		}
-		plans = append(plans, planned{rel: rel, state: state, forced: edited && force})
+		plans = append(plans, planned{rel: rel, state: state, isForced: edited && force})
 	}
 	return plans, nil
 }
@@ -811,6 +832,7 @@ func canonicalValues(values map[string]string) []byte {
 	return buf.Bytes()
 }
 
+// LoadState is ReadState without the reason: a state it can't read is empty.
 func LoadState(dir string) State {
 	s, _ := ReadState(dir)
 	return s
@@ -916,4 +938,10 @@ func (r *Report) Summary() string {
 		s += fmt.Sprintf(", %d excluded", len(r.Excluded))
 	}
 	return s
+}
+
+func notInstalled(what string) *out.Error {
+	e := out.Errorf("not-installed", "%s is not in the cache", what)
+	e.Help = "run `shulker install`"
+	return e
 }

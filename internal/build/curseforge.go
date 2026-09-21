@@ -85,6 +85,7 @@ type curseForgeFile struct {
 	Required  bool `json:"required"`
 }
 
+// ExportCurseForge writes the project as a CurseForge modpack.
 func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, error) {
 	side := opts.Side
 	if side == "" {
@@ -157,7 +158,7 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		}
 		data, err := os.ReadFile(b.Cache.Object(e.sha512))
 		if err != nil {
-			return nil, nil, out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", e.key)
+			return nil, nil, notInstalled(e.key)
 		}
 		blobs[e.key] = data
 		lookup = append(lookup, e.key)

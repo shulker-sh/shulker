@@ -23,14 +23,14 @@ const (
 type playerEntry map[string]any
 
 type playerFile struct {
-	order   []string
-	entries map[string]playerEntry
-	bans    bool
-	now     func() time.Time
+	order     []string
+	entries   map[string]playerEntry
+	isBanList bool
+	now       func() time.Time
 }
 
 func newPlayerFile(bans bool) *playerFile {
-	return &playerFile{entries: map[string]playerEntry{}, bans: bans, now: time.Now}
+	return &playerFile{entries: map[string]playerEntry{}, isBanList: bans, now: time.Now}
 }
 
 func (f *playerFile) add(uuid string, e playerEntry) {
@@ -104,7 +104,7 @@ func (f *playerFile) stamped(own, previous playerEntry) playerEntry {
 	for k, v := range own {
 		e[k] = v
 	}
-	if !f.bans {
+	if !f.isBanList {
 		return e
 	}
 	e["source"] = "shulker"
@@ -161,7 +161,9 @@ func (b *Builder) collectPlayers(players *manifest.Players, desired map[string]s
 	resolve := func(p manifest.Player) (playerEntry, string, error) {
 		locked, ok := player.Find(b.Lock.Players, player.Ref{Name: p.Name, UUID: p.UUID})
 		if !ok {
-			return nil, "", out.Errorf("player-unresolved", "player %s is not in the lock; run `shulker player` or `shulker build`", player.Ref{Name: p.Name, UUID: p.UUID})
+			e := out.Errorf("player-unresolved", "player %s is not in the lock", player.Ref{Name: p.Name, UUID: p.UUID})
+			e.Help = "run `shulker player` or `shulker build`"
+			return nil, "", e
 		}
 		return playerEntry{"uuid": locked.UUID, "name": locked.Name}, locked.UUID, nil
 	}

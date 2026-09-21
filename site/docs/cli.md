@@ -1619,13 +1619,13 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
-| `file-not-found` | A file named to `pull` isn't in the build directory |
+| `file-not-found` | A file named to `pull` isn't in the build directory. `candidates`: the closest file there |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |
 | `group-not-found` | `--group` names a save group that isn't under the saves root |
 | `history-empty` | The instance has no history entries yet; one is taken before an in-place build changes anything |
 | `history-invalid` | A history entry's own record or its lock is unreadable; the message names the entry to delete |
-| `history-missing` | There is no history entry with that number; the message says how many are kept |
+| `history-missing` | There is no history entry with that number; `shulker history` lists the ones kept |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
@@ -1701,7 +1701,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `player-unknown` | Players that don't exist at Mojang. `items`: the names |
 | `player-unresolved` | A player isn't in the lock; run `shulker player` |
 | `players-invalid` | A player entry in `shulker.json` is invalid |
-| `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid. Unknown keys only warn, with a did-you-mean. `items`: the problems |
+| `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid, including a `shulker.json` value that can't be written as a property. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a local `file`, or a modpack from a provider rather than a `source` |

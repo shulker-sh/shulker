@@ -9,7 +9,6 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/out"
 )
 
 const resourcePacksKey = "resourcePacks"
@@ -32,7 +31,7 @@ func (b *Builder) collectPacks(cond conditions, desired map[string]source, repor
 				}
 			}
 			if !b.Cache.Has(p.Sha512) {
-				return out.Errorf("not-installed", "%s is not in the cache; run `shulker install`", key)
+				return notInstalled(key)
 			}
 			desired[packPath(kind, key, p)] = source{sha512: p.Sha512}
 		}

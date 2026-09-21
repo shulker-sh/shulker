@@ -66,7 +66,7 @@ func (b *Builder) takeHistory(dir, side, reason string, written, removed int, re
 // already kept whatever it was about to rewrite.
 func planDrift(plans []planned) bool {
 	for _, f := range plans {
-		if f.forced {
+		if f.isForced {
 			return true
 		}
 		switch f.state {
@@ -223,7 +223,10 @@ func readHistoryEntry(dir, id string) (HistoryEntry, error) {
 		return e, err
 	}
 	if err := json.Unmarshal(data, &e); err != nil {
-		return HistoryEntry{}, out.Errorf("history-invalid", "history entry %s is unreadable (%v); delete %s to drop it", id, err, historyEntryPath(dir, id))
+		e := out.Errorf("history-invalid", "history entry %s is unreadable", id)
+		e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
+		e.Help = "delete " + historyEntryPath(dir, id) + " to drop it"
+		return HistoryEntry{}, e
 	}
 	e.ID = id
 	return e, nil
@@ -236,10 +239,13 @@ func PickHistory(dir string, n int) (HistoryEntry, error) {
 		return HistoryEntry{}, err
 	}
 	if len(entries) == 0 {
-		return HistoryEntry{}, out.Errorf("history-empty", "%s has no history entries yet; one is taken before a build changes anything", dir)
+		e := out.Errorf("history-empty", "%s has no history entries yet", dir)
+		e.Help = "one is taken before a build changes anything"
+		return HistoryEntry{}, e
 	}
 	if n < 1 || n > len(entries) {
-		e := out.Errorf("history-missing", "there is no history entry %d; %d are kept", n, len(entries))
+		e := out.Errorf("history-missing", "there is no history entry %d", n)
+		e.Rows = []out.Detail{{Label: "kept", Text: strconv.Itoa(len(entries))}}
 		return HistoryEntry{}, e
 	}
 	return entries[n-1], nil

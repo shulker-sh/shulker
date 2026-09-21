@@ -9,6 +9,8 @@ import (
 	"sort"
 )
 
+// DataDir is the project folder, one subfolder per side, that holds the saves, logs and other data
+// a build directory links to, so a rebuild never touches them.
 const DataDir = "data"
 
 var clientDataDirs = []string{"saves", "screenshots", "logs", "crash-reports"}
@@ -55,15 +57,16 @@ func (b *Builder) planLinks(dir, side string, dirs []string, prev State, report 
 			if err != nil {
 				return plan, err
 			}
-			if _, err := os.Lstat(data); err == nil && !empty {
+			_, err = os.Lstat(data)
+			inData := err == nil
+			if inData && !empty {
 				report.Conflicts = append(report.Conflicts, fmt.Sprintf("%s (exists in both %s and %s; merge by hand)", rel, dir, dataRoot))
 				continue
-			} else if err == nil || empty {
-				plan.link = append(plan.link, rel)
-			} else {
-				plan.move = append(plan.move, rel)
-				plan.link = append(plan.link, rel)
 			}
+			if !inData && !empty {
+				plan.move = append(plan.move, rel)
+			}
+			plan.link = append(plan.link, rel)
 		}
 	}
 	for _, rel := range prev.Links {

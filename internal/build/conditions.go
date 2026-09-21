@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 )
 
+// DetectOS is this machine's OS in a manifest's words: macos, windows or linux.
 func DetectOS() string {
 	if runtime.GOOS == "darwin" {
 		return "macos"
@@ -18,11 +19,12 @@ func DetectOS() string {
 }
 
 type conditions struct {
-	os       string
-	anyOS    bool
-	features map[string]bool
+	os          string
+	admitsAnyOS bool
+	features    map[string]bool
 }
 
+// ValidOS reports whether name is an OS a manifest can name.
 func ValidOS(name string) bool {
 	return name == "macos" || name == "windows" || name == "linux"
 }
@@ -53,6 +55,8 @@ func (b *Builder) featureDecls() []*manifest.Manifest {
 	return append(decls, b.Manifest)
 }
 
+// Feature is one feature with the mods it gates, a "!" before a mod the feature turns off.
+// Origin is the modpack that declares it, empty when the project does.
 type Feature struct {
 	Name    string   `json:"name"`
 	Mods    []string `json:"mods"`
@@ -60,6 +64,7 @@ type Feature struct {
 	Origin  string   `json:"origin,omitempty"`
 }
 
+// Features is every feature the project and its modpacks declare or gate a mod on, by name.
 func (b *Builder) Features() []Feature {
 	byName := map[string]*Feature{}
 	get := func(name string) *Feature {
@@ -116,7 +121,7 @@ func (b *Builder) Features() []Feature {
 }
 
 func (c conditions) admits(m manifest.Require) (bool, string) {
-	if ok, why := matches(m.OS, "os", func(name string) bool { return name == c.os }); !ok && !c.anyOS {
+	if ok, why := matches(m.OS, "os", func(name string) bool { return name == c.os }); !ok && !c.admitsAnyOS {
 		return false, why
 	}
 	return matches(m.Feature, "feature", func(name string) bool { return c.features[name] })
@@ -306,9 +311,10 @@ type Placement struct {
 	Feature manifest.StringList
 }
 
+// Placements is where each locked mod lands, by mod id.
 func (b *Builder) Placements() map[string]Placement {
 	placements := map[string]Placement{}
-	c := conditions{anyOS: true, features: map[string]bool{}}
+	c := conditions{admitsAnyOS: true, features: map[string]bool{}}
 	for _, m := range b.featureDecls() {
 		for name, f := range m.Features {
 			c.features[name] = f.Default
@@ -345,7 +351,7 @@ func (b *Builder) Placements() map[string]Placement {
 			placements[ref.key] = p
 		}
 	}
-	for id, m := range b.directEntries(conditions{anyOS: true}) {
+	for id, m := range b.directEntries(conditions{admitsAnyOS: true}) {
 		if _, locked := b.Lock.Mods[id]; !locked {
 			continue
 		}

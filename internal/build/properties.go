@@ -78,10 +78,10 @@ type propsFile struct {
 }
 
 type keySource struct {
-	path     string
-	pack     string
-	feature  string
-	template bool
+	path       string
+	pack       string
+	feature    string
+	isTemplate bool
 }
 
 func (f propsFile) keys() []string            { return f.props.keys() }

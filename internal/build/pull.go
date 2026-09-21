@@ -19,7 +19,8 @@ import (
 )
 
 type FileDiff struct {
-	Path  string `json:"path"`
+	Path string `json:"path"`
+	// State is kept, conflict, untracked or orphan.
 	State string `json:"state"`
 	Diff  string `json:"diff"`
 }
@@ -42,6 +43,7 @@ type PullReport struct {
 	ManifestChanged bool     `json:"manifestChanged"`
 }
 
+// Diff is how the files in side's build directory differ from what a build would write.
 func (b *Builder) Diff(side string, opts Options) (*DiffReport, error) {
 	d, err := b.drift(side, opts)
 	if err != nil {
@@ -109,11 +111,9 @@ func (b *Builder) checkNamed(side string, files []string, opts Options) error {
 				return err
 			}
 		}
-		msg := fmt.Sprintf("%s is not in %s", rel, dir)
-		if hits := near.Closest(rel, present, 1); len(hits) > 0 {
-			msg += fmt.Sprintf("; did you mean %s?", hits[0])
-		}
-		return out.Errorf("file-not-found", "%s", msg)
+		e := out.Errorf("file-not-found", "%s is not in %s", rel, dir)
+		e.Candidates, e.Given = near.Closest(rel, present, 1), rel
+		return e
 	}
 	return nil
 }
@@ -139,6 +139,8 @@ type PullRequest struct {
 	To    string
 }
 
+// Pull copies edits made in side's build directory back into the project: into its overrides, and
+// into the manifest for a key the manifest sets.
 func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport, error) {
 	files, adopt := req.Files, req.Keys
 	if len(adopt) > 0 && len(files) != 1 {
@@ -245,7 +247,7 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 				pulled = append(pulled, f.rel)
 			}
 			continue
-		case src.template:
+		case src.isTemplate:
 			report.Skipped = append(report.Skipped, fmt.Sprintf("%s (rendered from template %s)", f.rel, b.relPath(src.origin)))
 			continue
 		case src.pack != "":
@@ -342,7 +344,9 @@ func (b *Builder) drift(side string, opts Options) (*drift, error) {
 			e.Flag = "--into"
 			return nil, e
 		}
-		return nil, out.Errorf("not-built", "%s has no build directory; run `shulker build`", side)
+		e := out.Errorf("not-built", "%s has no build directory", side)
+		e.Help = "run `shulker build`"
+		return nil, e
 	}
 	prev, stateErr := ReadState(dir)
 	if stateErr != nil {
@@ -388,7 +392,7 @@ func (b *Builder) pullOverrideKeys(rel string, pf propsFile, kept map[string]boo
 			}
 		case o.pack != "":
 			report.Skipped = append(report.Skipped, fmt.Sprintf("%s %s (comes from pack %s)", rel, k, o.pack))
-		case o.template:
+		case o.isTemplate:
 			report.Skipped = append(report.Skipped, fmt.Sprintf("%s %s (rendered from template %s)", rel, k, b.relPath(o.path)))
 		default:
 			if byFile[o.path] == nil {
@@ -426,10 +430,14 @@ func (b *Builder) adoptKeys(rel string, keys []string, d *drift, report *PullRep
 	}
 	src := d.desired[rel]
 	if _, merged := src.owned.(propsFile); !merged && src.origin != "" {
-		return out.Errorf("usage", "%s is copied whole (wholeFiles); edit the override instead", rel)
+		e := out.Errorf("usage", "%s is copied whole (wholeFiles)", rel)
+		e.Help = "edit the override instead"
+		return e
 	}
-	if src.template && src.pack == "" {
-		return out.Errorf("usage", "%s is rendered from template %s; add the keys there by hand", rel, b.relPath(src.origin))
+	if src.isTemplate && src.pack == "" {
+		e := out.Errorf("usage", "%s is rendered from template %s", rel, b.relPath(src.origin))
+		e.Help = "add the keys there by hand"
+		return e
 	}
 	existing, err := os.ReadFile(filepath.Join(d.dir, filepath.FromSlash(rel)))
 	if errors.Is(err, fs.ErrNotExist) {
