@@ -161,6 +161,48 @@ func TestLinkPrism(t *testing.T) {
 
 // A mod added in the game directory sits on top of the pack: the launcher's instance is a project
 // that follows it, so a later sync relocks around what the player put there.
+func TestLinkPrismSaysNothingAboutThePackItJustFollowed(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+
+	launcherDir := t.TempDir()
+	var env struct {
+		Warnings []string `json:"warnings"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Warnings) != 0 {
+		t.Fatalf("a fresh link has nothing to warn about: %q", env.Warnings)
+	}
+
+	gameDir := filepath.Join(launcherDir, "instances", "shulker-pack", "minecraft")
+	lockPath := filepath.Join(gameDir, "shulker.lock")
+	var l map[string]any
+	data, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &l); err != nil {
+		t.Fatal(err)
+	}
+	delete(l["modpacks"].(map[string]any), "pack")
+	data, err = json.Marshal(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(lockPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "-C", gameDir, "sync", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(strings.Join(env.Warnings, "\n"), "modpack pack is not in the lock yet") {
+		t.Fatalf("a modpack the lock lost is still worth a warning: %q", env.Warnings)
+	}
+}
+
 func TestLinkPrismKeepsWhatThePlayerAdds(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")

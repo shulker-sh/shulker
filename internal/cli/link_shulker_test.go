@@ -115,3 +115,26 @@ func TestLinkShulkerNicknames(t *testing.T) {
 		t.Fatalf("the refused link must leave the first instance alone: %v", err)
 	}
 }
+
+func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
+	h := newHarness(t)
+	root := shulkerInstances(t, h)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "link", "shulker", "--as", "smp")
+
+	for _, args := range [][]string{
+		{"instances", "repair", "--launcher", "shulker"},
+		{"instances", "repair", "--launcher", "shulker", "--launcher-dir", root},
+	} {
+		if err := config.WriteInstances(registryPath(h), nil); err != nil {
+			t.Fatal(err)
+		}
+		if stdout := h.mustRun(t, args...); !strings.Contains(stdout, "registered smp") {
+			t.Fatalf("%v scans the instances root: %s", args, stdout)
+		}
+		in := readInstances(t, h)
+		if len(in) != 1 || in[0].ID != "smp" || in[0].Launcher != "shulker" || in[0].Dir != filepath.Join(root, "smp") || in[0].LauncherDir != "" {
+			t.Fatalf("%v rebuilds the row link wrote: %+v", args, in)
+		}
+	}
+}

@@ -1082,9 +1082,9 @@ Minecraft Launcher
 
 ### `shulker instances repair`
 
-Put the registry back in step with what is on disk. It works even when `registry.json` can't be read, rewriting it from what it finds: it scans each launcher's own instances directory, registers any folder shulker syncs that isn't in the index and wasn't unlinked, and writes a `.shulker/instance.json` for any instance missing one. A registered directory that is gone is reported rather than dropped, since an unmounted disk looks exactly like a deleted instance; [`shulker unlink`](#shulker-unlink) is what forgets one. `shulker self update` runs it after a successful update.
+Put the registry back in step with what is on disk. It works even when `registry.json` can't be read, rewriting it from what it finds: it scans each launcher's own instances directory and shulker's own instances root, registers any folder shulker syncs that isn't in the index and wasn't unlinked, and writes a `.shulker/instance.json` for any instance missing one. A registered directory that is gone is reported rather than dropped, since an unmounted disk looks exactly like a deleted instance; [`shulker unlink`](#shulker-unlink) is what forgets one. `shulker self update` runs it after a successful update.
 
-A folder counts as one shulker syncs when it holds a `shulker.json` that builds where it stands — the project a [`link`](#shulker-link-prism) leaves in a game directory — or a `.shulker/` shulker wrote before, so an instance that lost its `.shulker/` is found by its manifest alone. Such an instance follows the one modpack that manifest requires, takes its name from the launcher's own file, and gets an instance file holding only its settings, since the manifest holds the rest. A directory that is no project of its own reads what it syncs from in its instance file, or in what its last build recorded where that file is the part that went missing. An instance marked unlinked stays unregistered either way.
+A folder counts as one shulker syncs when it holds a `shulker.json` that builds where it stands — the project a [`link`](#shulker-link-prism) leaves in a game directory — or a `.shulker/` shulker wrote before, so an instance that lost its `.shulker/` is found by its manifest alone. Such an instance follows the one modpack that manifest requires, comes back under the id it was linked as, which the manifest's `name` records, takes its name from the launcher's own file, and gets an instance file holding only its settings, since the manifest holds the rest. A directory that is no project of its own reads what it syncs from in its instance file, or in what its last build recorded where that file is the part that went missing. An instance marked unlinked stays unregistered either way.
 
 Repair writes rows and instance files, never a launcher's pre-launch command: a directory it finds again is listed and syncs with `-i`, and a [`link`](#shulker-link-prism) is what makes the launcher refresh it before each launch.
 
@@ -1098,8 +1098,8 @@ shulker instances repair --launcher prism --launcher-dir ~/other-prism
 
 | Flag | Description |
 | --- | --- |
-| `--launcher <launcher>` | Only scan this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
-| `--launcher-dir <path>` | Scan this directory instead of the launcher's own; needs `--launcher` |
+| `--launcher <launcher>` | Only scan this launcher: `shulker`, `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--launcher-dir <path>` | Scan this directory instead of the launcher's own, or instead of the instances root for `shulker`; needs `--launcher` |
 
 ### `shulker instance`
 

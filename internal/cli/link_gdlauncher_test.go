@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -172,8 +171,6 @@ func TestLinkGDLauncherForge(t *testing.T) {
 	}
 }
 
-// gdlWarnings is what a link said about GDLauncher itself. Every fresh link relocks a modpack the
-// instance manifest has just started following, and that line is not what these tests are reading.
 func gdlWarnings(t *testing.T, stdout string) []string {
 	t.Helper()
 	var env struct {
@@ -182,9 +179,7 @@ func gdlWarnings(t *testing.T, stdout string) []string {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	return slices.DeleteFunc(env.Warnings, func(w string) bool {
-		return strings.Contains(w, "is not in the lock yet")
-	})
+	return env.Warnings
 }
 
 func gdlLoader(t *testing.T, instDir string) (release string, loader map[string]any) {

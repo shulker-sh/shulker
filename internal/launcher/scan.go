@@ -13,7 +13,8 @@ import (
 const shulkerDir = instance.Dir
 
 // GameDirs lists the game directories a launcher's data directory holds, for the scan that repairs
-// the registry. A launcher whose instances shulker can't enumerate returns nothing.
+// the registry. A launcher whose instances shulker can't enumerate returns nothing. For shulker
+// itself the directory is its instances root.
 func (e *Entry) GameDirs(launcherDir string) []string {
 	if e == nil || launcherDir == "" {
 		return nil
@@ -34,6 +35,10 @@ func (e *Entry) GameDirs(launcherDir string) []string {
 		})
 	case "mojang":
 		return mojangGameDirs(launcherDir)
+	case "shulker":
+		return gameDirsUnder(launcherDir, func(dir string) []string {
+			return []string{dir}
+		})
 	}
 	return nil
 }

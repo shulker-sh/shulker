@@ -227,6 +227,7 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
 	p, err := a.openProjectAt(gameDir)
 	if errors.Is(err, project.ErrNoManifest) {
+		a.linkedPack = src.project.Manifest.Name
 		return newInstance(gameDir, id, display, ref, src)
 	}
 	if err != nil {
@@ -256,6 +257,7 @@ func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*p
 	if entry.Source != src.name || entry.Ref != ref {
 		entry.Source, entry.Ref = src.name, ref
 		p.Manifest.Requires[key], changed = entry, true
+		a.linkedPack = key
 	}
 	if !changed {
 		return p, nil

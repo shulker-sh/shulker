@@ -37,6 +37,7 @@ type app struct {
 	configPath string
 	packs      []*pack.Loaded
 	relocking  bool
+	linkedPack string
 	releases   *selfupdate.Releases
 	exe        func() (string, error)
 	installer  func(ctx context.Context, java, jar string, args []string) error

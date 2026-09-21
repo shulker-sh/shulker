@@ -42,7 +42,7 @@ func (a *app) instancesRepairCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&launcherName, "launcher", "", "only scan this launcher: "+launcher.NameList())
-	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "scan this directory instead of the launcher's own")
+	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "scan this directory instead of the launcher's own, or instead of the instances root for shulker")
 	return cmd
 }
 
@@ -51,6 +51,10 @@ func (a *app) instancesRepairCmd() *cobra.Command {
 // because an unmounted volume looks exactly like a deleted instance and `unlink` is what forgets.
 func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, error) {
 	path, err := a.registryFile()
+	if err != nil {
+		return repairResult{}, err
+	}
+	r, err := a.roots()
 	if err != nil {
 		return repairResult{}, err
 	}
@@ -71,7 +75,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 			continue
 		}
 		if in.ID == "" {
-			in.ID = uniqueID(instances, "", in.Name, in.Dir)
+			in.ID = uniqueID(instances, inPlaceID(in.Dir), in.Name, in.Dir)
 		}
 		wrote, err := repairIntent(*in)
 		if err != nil {
@@ -82,12 +86,12 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		}
 		a.reconcileOrWarn(*in)
 	}
-	for _, found := range scanLaunchers(launcherName, launcherDir) {
+	for _, found := range scanLaunchers(launcherName, launcherDir, r.Instances) {
 		if registered[filepath.Clean(found.Dir)] {
 			continue
 		}
 		registered[filepath.Clean(found.Dir)] = true
-		found.ID = uniqueID(instances, "", found.Name, found.Dir)
+		found.ID = uniqueID(instances, inPlaceID(found.Dir), found.Name, found.Dir)
 		wrote, err := repairIntent(found)
 		if err != nil {
 			return res, err
@@ -128,17 +132,32 @@ func repairIntent(in config.Instance) (bool, error) {
 	return true, f.Save(in.Dir)
 }
 
-func scanLaunchers(only, dir string) []config.Instance {
+// inPlaceID is the id an instance that is a project was linked under: link makes the manifest's name
+// and the id one value, and the folder the launcher named after it is a different one.
+func inPlaceID(dir string) string {
+	m, _, inPlace, err := inPlaceManifest(dir)
+	if err != nil || !inPlace {
+		return ""
+	}
+	return m.Name
+}
+
+// scanLaunchers looks where each launcher keeps its instances, and for shulker's own that is the
+// instances root. A shulker row records no launcher directory, the same as the row link writes.
+func scanLaunchers(only, dir, instancesRoot string) []config.Instance {
 	var found []config.Instance
 	for _, e := range launcher.All {
 		if only != "" && e.Name != only {
 			continue
 		}
 		launcherDir := dir
-		if launcherDir == "" {
-			if e.DefaultDir == nil {
-				continue
-			}
+		switch {
+		case launcherDir != "":
+		case e.Name == "shulker":
+			launcherDir = instancesRoot
+		case e.DefaultDir == nil:
+			continue
+		default:
 			d, err := e.DefaultDir()
 			if err != nil {
 				continue
@@ -150,7 +169,10 @@ func scanLaunchers(only, dir string) []config.Instance {
 			if !ok {
 				continue
 			}
-			in.Launcher, in.LauncherDir = e.Name, launcherDir
+			in.Launcher = e.Name
+			if e.Name != "shulker" {
+				in.LauncherDir = launcherDir
+			}
 			if e.Instanced {
 				in.Name = filepath.Base(e.InstanceDir(gameDir))
 			}

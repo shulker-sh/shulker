@@ -514,8 +514,8 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir); !strings.Contains(stdout, "registered shulker-lost") {
-		t.Fatalf("repair registers the directory again: %s", stdout)
+	if stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir); !strings.Contains(stdout, "registered lost") {
+		t.Fatalf("repair registers the directory again, under the id it was linked as: %s", stdout)
 	}
 	instances := readInstances(t, h)
 	if len(instances) != 1 || instances[0].Dir != gameDir || instances[0].Source != h.dir {
@@ -523,6 +523,9 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 	}
 	if instances[0].Name != "shulker-lost" {
 		t.Fatalf("the name comes from the launcher, not from the manifest: %+v", instances[0])
+	}
+	if instances[0].ID != "lost" {
+		t.Fatalf("the id is the manifest's name, which the link set to the id: %+v", instances[0])
 	}
 
 	// The instance file it writes holds nothing the manifest holds.
@@ -548,7 +551,7 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "shulker-lost") {
 		t.Fatalf("instances lists it: %s", stdout)
 	}
-	h.mustRun(t, "sync", "-i", "shulker-lost")
+	h.mustRun(t, "sync", "-i", "lost")
 }
 
 // A directory shulker only syncs into is no project, so its source is its instance file's, and the

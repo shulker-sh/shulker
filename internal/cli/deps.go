@@ -178,6 +178,7 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 		// A relock reads local packs as they are on disk: they have no version to hold back.
 		if !ok || moved || (a.relocking && pack.Classify(mp.Source) == pack.Local) {
 			switch {
+			case name == a.linkedPack:
 			case !ok:
 				a.printer.Warn("modpack %s is not in the lock yet; resolving it", name)
 			case moved:
