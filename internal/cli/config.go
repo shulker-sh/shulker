@@ -340,7 +340,7 @@ func checkConfigValue(key string, v any, literal bool) (any, error) {
 var playHints = map[string]string{
 	"memory":  `a heap size like "6G"`,
 	"jvmArgs": `a list of JVM arguments; pass --literal '["-XX:+UseZGC"]'`,
-	"java":    "an absolute path to a java binary",
+	"java":    "an absolute path to a java binary or a Java home",
 	"window":  `a window size like "1280x720"`,
 	"wrapper": `a command as a list of words; pass --literal '["gamemoderun"]'`,
 }

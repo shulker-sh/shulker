@@ -18,10 +18,11 @@ import (
 // watchRequest is the launch `play` hands the watcher. It travels over the watcher's stdin and never
 // its argv, because Argv holds the session access token and a process table is public.
 type watchRequest struct {
-	Dir  string   `json:"dir"`
-	Java string   `json:"java"`
-	Argv []string `json:"argv"`
-	Log  string   `json:"log"`
+	Dir     string   `json:"dir"`
+	Java    string   `json:"java"`
+	Argv    []string `json:"argv"`
+	Log     string   `json:"log"`
+	Wrapper []string `json:"wrapper,omitempty"`
 }
 
 // watchReply is the one line the watcher writes back before it settles down to wait, so that `play`
@@ -68,9 +69,10 @@ func (a *app) watchRun(req watchRequest, stream io.Writer, running func(watchRep
 	}
 	// File times can be coarser than the clock, so a crash report from this run's first second counts.
 	started := time.Now().Truncate(time.Second)
-	g, err := game.Start(game.Launch{Java: req.Java, Argv: req.Argv, Dir: req.Dir, Log: req.Log}, stream)
+	launch := game.Launch{Java: req.Java, Argv: req.Argv, Dir: req.Dir, Log: req.Log, Wrapper: req.Wrapper}
+	g, err := game.Start(launch, stream)
 	if err != nil {
-		reason := runReason(req.Java, err)
+		reason := runReason(launch.Program(), err)
 		a.failLaunch(req.Dir, s, false, reason)
 		running(watchReply{Error: reason})
 		return instance.Launch{Outcome: instance.OutcomeNotStarted, Error: reason}

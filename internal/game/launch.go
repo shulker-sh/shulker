@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 )
 
 // Session is who is playing, as the game's own arguments name them. Every field here reaches the
@@ -34,13 +35,15 @@ func (s Session) Vars() map[string]string {
 	}
 }
 
-// Argv is everything java is handed for one launch: the version's JVM arguments, the main class it
-// names, then the game's own arguments. It carries the session's access token, so what comes back
-// is never printed, logged or recorded.
-func Argv(v Version, p Platform, features map[string]bool, vars map[string]string) []string {
+// Argv is everything java is handed for one launch: the version's JVM arguments and then extra, the
+// main class it names, then the game's own arguments. extra comes after the version's own so that a
+// player's -Xmx or -D wins over one the version sets. It carries the session's access token, so
+// what comes back is never printed, logged or recorded.
+func Argv(v Version, p Platform, features map[string]bool, vars map[string]string, extra ...string) []string {
 	jvm, game := Args(v, p, features, vars)
-	argv := make([]string, 0, len(jvm)+1+len(game))
+	argv := make([]string, 0, len(jvm)+len(extra)+1+len(game))
 	argv = append(argv, jvm...)
+	argv = append(argv, extra...)
 	argv = append(argv, v.MainClass)
 	return append(argv, game...)
 }
@@ -52,6 +55,16 @@ type Launch struct {
 	Argv []string
 	Dir  string
 	Log  string
+	// Wrapper is a command the launch runs through, handed java and its argv as its own arguments.
+	Wrapper []string
+}
+
+// Program is what a launch execs: its wrapper when it has one, else java.
+func (l Launch) Program() string {
+	if len(l.Wrapper) > 0 {
+		return l.Wrapper[0]
+	}
+	return l.Java
 }
 
 // Game is a game that has started: the process to record, and the wait that ends when it exits.
@@ -75,6 +88,9 @@ func Start(l Launch, stream io.Writer) (*Game, error) {
 		return nil, err
 	}
 	cmd := exec.Command(l.Java, l.Argv...)
+	if len(l.Wrapper) > 0 {
+		cmd = exec.Command(l.Wrapper[0], slices.Concat(l.Wrapper[1:], []string{l.Java}, l.Argv)...)
+	}
 	cmd.Dir = l.Dir
 	cmd.Stdout = io.Writer(log)
 	if stream != nil {

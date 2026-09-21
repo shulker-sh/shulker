@@ -8,7 +8,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -69,6 +71,11 @@ func (a *app) playCmd() *cobra.Command {
 		Short: "Start a shulker instance",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.window != "" {
+				if err := checkPlaySetting("--window", "window", opts.window); err != nil {
+					return err
+				}
+			}
 			if opts.dryRun {
 				return a.dryRun(cmd.Context(), args)
 			}
@@ -79,7 +86,8 @@ func (a *app) playCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.noSync, "no-sync", false, "start the game without updating the instance first")
 	cmd.Flags().BoolVar(&opts.wait, "wait", false, "wait for the game and record how the run ended before returning")
 	cmd.Flags().BoolVar(&opts.stream, "stream", false, "wait for the game and mirror its output to the terminal")
-	cmd.Flags().StringVar(&opts.account, "account", "", "play as this account (default: the default account)")
+	cmd.Flags().StringVar(&opts.account, "account", "", "play as this account (default: the instance's pinned account, else the default account)")
+	cmd.Flags().StringVar(&opts.window, "window", "", "open the game at this size for this run, like 1280x720")
 	return cmd
 }
 
@@ -91,6 +99,7 @@ type playOptions struct {
 	wait    bool
 	stream  bool
 	account string
+	window  string
 }
 
 // waits reports whether this command stays for the run. --stream is --wait that shows its working,
@@ -120,7 +129,17 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
-	who, adopted, err := a.launchAccount(opts.account)
+	settings, err := a.launchSettings(in.Dir)
+	if err != nil {
+		return err
+	}
+	selector := opts.account
+	if selector == "" && settings.Account != "" {
+		if selector, err = a.pinnedAccount(settings.Account); err != nil {
+			return err
+		}
+	}
+	who, adopted, err := a.launchAccount(selector)
 	if err != nil {
 		return err
 	}
@@ -154,11 +173,16 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		Log:      log,
 		Sync:     synced,
 	}
+	window := settings.Window
+	if opts.window != "" {
+		window = opts.window
+	}
 	req := watchRequest{
-		Dir:  in.Dir,
-		Java: plan.java,
-		Argv: game.Argv(plan.version, game.Host(), nil, vars),
-		Log:  res.Log,
+		Dir:     in.Dir,
+		Java:    plan.java,
+		Argv:    launchArgv(plan.version, vars, settings, window),
+		Log:     res.Log,
+		Wrapper: settings.Wrapper,
 	}
 	a.progress("starting %s as %s", in.ID, who.Name)
 	if opts.waits() {
@@ -224,6 +248,81 @@ func (r playResult) print(l *out.Lines) {
 		l.OK("played "+r.Instance, r.Version)
 	}
 	l.Tree(rows...)
+}
+
+// launchSettings are the settings a launch runs with: the instance's own where it sets one, and the
+// play.* default in config.json where it doesn't. A list the instance sets, even to nothing,
+// replaces the default rather than adding to it.
+func (a *app) launchSettings(dir string) (instance.Settings, error) {
+	f, err := instance.Load(dir)
+	if err != nil {
+		return instance.Settings{}, err
+	}
+	path, err := a.configFile()
+	if err != nil {
+		return instance.Settings{}, err
+	}
+	cfg, err := config.LoadFile(path)
+	if err != nil {
+		return instance.Settings{}, err
+	}
+	s := f.Settings
+	if s.Memory == "" {
+		s.Memory = cfg.Play.Memory
+	}
+	if s.JvmArgs == nil {
+		s.JvmArgs = cfg.Play.JvmArgs
+	}
+	if s.Java == "" {
+		s.Java = cfg.Play.Java
+	}
+	if s.Window == "" {
+		s.Window = cfg.Play.Window
+	}
+	if s.Wrapper == nil {
+		s.Wrapper = cfg.Play.Wrapper
+	}
+	return s, nil
+}
+
+// pinnedAccount is the selector for the account an instance is pinned to. A pin whose account has
+// gone fails the launch rather than playing as someone else: the pin is there because this
+// instance is meant to be played as that account.
+func (a *app) pinnedAccount(id string) (string, error) {
+	accounts, _, err := a.accounts()
+	if err != nil {
+		return "", err
+	}
+	for _, r := range accounts {
+		if r.ID == id {
+			return id, nil
+		}
+	}
+	e := out.Errorf("account-not-found", "this instance is pinned to account %s, which shulker can no longer see; `shulker instance unset account` plays it as the default account", id)
+	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)
+	return "", e
+}
+
+// launchArgv is the argv with this launch's own settings in it: the memory and JVM arguments after
+// the version's own, and the window through the arguments the version declares for a custom
+// resolution. A version from before those were declared takes the pair appended, as Prism does.
+func launchArgv(v game.Version, vars map[string]string, s instance.Settings, window string) []string {
+	var extra []string
+	if s.Memory != "" {
+		extra = append(extra, "-Xms"+s.Memory, "-Xmx"+s.Memory)
+	}
+	extra = append(extra, s.JvmArgs...)
+	features := map[string]bool{}
+	width, height, sized := strings.Cut(window, "x")
+	if sized {
+		features["has_custom_resolution"] = true
+		vars["resolution_width"], vars["resolution_height"] = width, height
+	}
+	argv := game.Argv(v, game.Host(), features, vars, extra...)
+	if sized && !slices.Contains(argv, "--width") {
+		argv = append(argv, "--width", width, "--height", height)
+	}
+	return argv
 }
 
 // gameSession is the account as the game's own arguments name it. An offline account presents the
@@ -556,15 +655,15 @@ func (a *app) fetchInto(ctx context.Context, s game.Store, files []game.File, on
 	return nil
 }
 
-// clientJava is what the launch runs: the instance's own `java` setting when it has one, and
-// otherwise shulker's managed runtime for the component the lock names.
+// clientJava is what the launch runs: the `java` setting when the instance or play.java has one,
+// and otherwise shulker's managed runtime for the component the lock names.
 func (a *app) clientJava(ctx context.Context, p *project.Project, dir string) (string, error) {
-	f, err := instance.Load(dir)
+	s, err := a.launchSettings(dir)
 	if err != nil {
 		return "", err
 	}
-	if f.Settings.Java != "" {
-		java, err := server.FindJava(f.Settings.Java, p.Lock.Java.Major)
+	if s.Java != "" {
+		java, err := server.ClientJava(s.Java, p.Lock.Java.Major)
 		if err != nil {
 			return "", err
 		}

@@ -377,7 +377,7 @@ shulker get server.properties
 | `accounts.default` | The id of the account a launch uses when nothing else names one. [`shulker accounts use`](#shulker-accounts-use) sets it |
 | `play.memory` | The heap size [`shulker play`](#shulker-play) gives the game, like `6G`. An instance's own `memory` wins over it, as each `play.` key's instance setting does; see [`shulker instance`](#shulker-instance). Without either, the JVM picks its own |
 | `play.jvmArgs` | Extra JVM arguments for those launches, as a JSON array |
-| `play.java` | The java binary those launches run, as an absolute path. Without it, shulker's managed runtime |
+| `play.java` | The java those launches run: the absolute path of a java binary, or of a Java home. Without it, shulker's managed runtime |
 | `play.window` | The window size those launches open at, like `1280x720` |
 | `play.wrapper` | A command those launches run through, as a JSON array like `["gamemoderun"]` |
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
@@ -773,7 +773,9 @@ shulker play --stream
 
 The game gets no terminal, so everything it writes goes to `.shulker/logs/<time>.log` inside the instance, one file per launch, whether or not anyone is watching. The game's own arguments carry a session access token, so they are printed nowhere: not in the log, not in a progress line, not in an error.
 
-Who plays is the default account, or the one `--account` names for a single run, matched the way [`shulker accounts use`](#shulker-accounts-use) matches one. With no default account shulker takes the only account that could play and makes it the default, saying so; with several it asks on a terminal and records the answer, and off one it is a usage error naming `--account`. With no account at all it is `no-accounts`. An account whose sign-in has expired refuses the launch with the line that fixes it, and one playing on a token shulker couldn't renew — a borrowed one its launcher has let run out, or a cached one with no network — launches with a warning that online servers and Realms will reject the session.
+Who plays is the instance's pinned `account` when it has one, and otherwise the default account; `--account` names another for a single run, matched the way [`shulker accounts use`](#shulker-accounts-use) matches one. [`shulker instance set account`](#shulker-instance-set) pins one. A pinned account that has since been removed fails with `account-not-found` rather than playing as someone else. With no default account shulker takes the only account that could play and makes it the default, saying so; with several it asks on a terminal and records the answer, and off one it is a usage error naming `--account`. With no account at all it is `no-accounts`. An account whose sign-in has expired refuses the launch with the line that fixes it, and one playing on a token shulker couldn't renew — a borrowed one its launcher has let run out, or a cached one with no network — launches with a warning that online servers and Realms will reject the session.
+
+The launch takes its memory, extra JVM arguments, Java, window size and wrapper from the instance's settings, and each one the instance leaves out from its `play.` default in `config.json` — see [`shulker instance`](#shulker-instance). `memory` becomes `-Xms` and `-Xmx`, and it and `jvmArgs` go after the version's own JVM arguments, so they win over them. The window becomes `--width` and `--height`, which the game takes for the run and never writes back; `--window` sets it for one run over both, and nothing is saved. Fullscreen isn't a launch setting: the game keeps it in `options.txt`, which the manifest's `client.options` owns. A wrapper runs the launch as its own command, with java and its arguments after the wrapper's.
 
 `--dry-run` assembles the launch and prints it instead of starting the game: the version it resolved and what it inherits from, the libraries a loader's version brings on top of that one as a count and a size, the Java it would use, the game and natives directories, the asset index, and the classpath as a count and a size. A second run downloads nothing. It needs no account, which is what makes the plan checkable on its own.
 
@@ -786,7 +788,8 @@ shulker play smp --dry-run
 
 | Flag | Description |
 | --- | --- |
-| `--account <name>` | Play as this account, for this run only (default: the default account) |
+| `--account <name>` | Play as this account, for this run only (default: the instance's pinned account, else the default account) |
+| `--window <w>x<h>` | Open the game at this size for this run only, like `1280x720` (default: the `window` setting) |
 | `--no-sync` | Start the game without updating the instance first |
 | `--wait` | Wait for the game and record how the run ended before returning |
 | `--stream` | Wait for the game and show its output as it runs; the log is still written |
@@ -1107,7 +1110,7 @@ A path is relative to the file's `settings` block and dotted the way `shulker se
 | --- | --- | --- |
 | `memory` | `play.memory` | Heap size, as `-Xms` and `-Xmx`, like `6G`. Without either, the JVM picks its own |
 | `jvmArgs` | `play.jvmArgs` | Extra JVM arguments, after the version's own and the memory, so one of them wins over both. An instance's list replaces the default rather than adding to it |
-| `java` | `play.java` | Absolute path to a java binary. Without either, shulker's managed runtime |
+| `java` | `play.java` | Absolute path to a java binary, or for `play` a Java home. Without either, shulker's managed runtime |
 | `window` | `play.window` | Window size, like `1280x720`. `play --window` wins over both for one run |
 | `wrapper` | `play.wrapper` | A command the launch runs through, like `["gamemoderun"]` |
 | `account` | | The account `play` launches this instance as, over the default account |
@@ -1457,7 +1460,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | --- | --- |
 | `account-exists` | An account already answers to that name, or already plays under that UUID. A name is shared with `--force`; a UUID never is |
 | `account-name-invalid` | An offline name outside the pattern a Minecraft username matches; `--allow-invalid-name` takes it |
-| `account-not-found` | No account matches the selector. `candidates`: every account, each as its qualifier and its id, `pass`: their ids |
+| `account-not-found` | No account matches the selector, or the account an instance is pinned to has since been removed. `candidates`: every account, each as its qualifier and its id, `pass`: their ids |
 | `account-not-playable` | The account owns no Java profile, so it can't launch anything |
 | `account-sign-in-expired` | The Microsoft refresh token is gone or revoked, so shulker can't get a session for the account; `shulker accounts login` signs it in again |
 | `accounts-invalid` | shulker's own `accounts.json` doesn't parse or doesn't match its schema |

@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -40,6 +41,24 @@ func JavaAt(home string) (Java, error) {
 		return Java{}, err
 	}
 	return Java{Path: bin, Major: major}, nil
+}
+
+// ClientJava is the java a `java` setting names: the binary at path, or the one under it when path
+// is a Java home. It is refused when it is older than the Minecraft version needs.
+func ClientJava(path string, required int) (Java, error) {
+	bin := path
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		bin = JavaBin(path)
+	}
+	if _, err := exec.LookPath(bin); err != nil {
+		return Java{}, out.Errorf("java-not-found", "no java executable at %s; the java setting takes the path of a java binary or a Java home", path)
+	}
+	major, err := javaMajor(bin)
+	if err != nil {
+		return Java{}, err
+	}
+	j := Java{Path: bin, Major: major}
+	return j, requireMajor(j, required)
 }
 
 func FindJava(override string, required int) (Java, error) {
