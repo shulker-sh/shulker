@@ -42,11 +42,13 @@ func (c *Cache) Object(sha string) string {
 	return filepath.Join(c.Dir, "objects", sha[:2], sha)
 }
 
+// PackMirror is the bare git mirror of a pack source.
 func (c *Cache) PackMirror(source string) string {
 	sum := sha256.Sum256([]byte(source))
 	return filepath.Join(c.Dir, "packs", "git", hex.EncodeToString(sum[:8])+".git")
 }
 
+// PackSource is the checkout of one commit of a pack source.
 func (c *Cache) PackSource(commit string) string {
 	return filepath.Join(c.Dir, "packs", "src", commit)
 }
@@ -63,6 +65,8 @@ func (c *Cache) ProjectCheckout(sha string) string {
 	return filepath.Join(c.Dir, "projects", "url", sha)
 }
 
+// LastGood is the record of what a remote source looked like the last time a sync from it built,
+// which an offline sync falls back to. An empty ref is the record for a source followed with no ref.
 func (c *Cache) LastGood(source, ref string) string {
 	sum := sha256.Sum256([]byte(source + "\x00" + ref))
 	return filepath.Join(c.Dir, "projects", "last-good", hex.EncodeToString(sum[:])+".json")

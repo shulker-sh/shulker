@@ -1608,6 +1608,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need; `cache info` still reports and names the instance |
+| `checksum-mismatch` | A download's sha512 isn't the one the lock or the provider recorded. Rows show both hashes |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs or shaders; pass `--bundle`. `items`: what is missing |

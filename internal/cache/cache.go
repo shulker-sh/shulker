@@ -1,16 +1,18 @@
+// Package cache is shulker's download cache: files kept by their sha512, the pack and project
+// checkouts remote sources build from, and the layout of both.
 package cache
 
 import (
 	"context"
 	"crypto/sha512"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/out"
 )
 
 type Cache struct {
@@ -62,6 +64,8 @@ func (c *Cache) commit(tmpPath, sha string) error {
 	return os.Rename(tmpPath, dst)
 }
 
+// Ensure is the cached file with this sha512, downloaded from url first when it isn't cached. A
+// download that hashes differently is refused.
 func (c *Cache) Ensure(ctx context.Context, client *fetch.Client, url, sha string) (string, error) {
 	if c.Has(sha) {
 		return c.Object(sha), nil
@@ -77,11 +81,14 @@ func (c *Cache) Ensure(ctx context.Context, client *fetch.Client, url, sha strin
 		return "", err
 	}
 	if got != sha {
-		return "", fmt.Errorf("%s: sha512 mismatch (expected %s…, got %s…)", url, sha[:12], got[:12])
+		e := out.Errorf("checksum-mismatch", "the download from %s doesn't match its sha512", url)
+		e.Rows = []out.Detail{{Label: "want", Text: sha}, {Label: "got", Text: got}}
+		return "", e
 	}
 	return c.Object(sha), c.commit(tmp.Name(), sha)
 }
 
+// Fetch downloads url into the cache when its hash isn't known in advance, and returns the path.
 func (c *Cache) Fetch(ctx context.Context, client *fetch.Client, url string) (string, error) {
 	tmp, err := c.TempFile("dl")
 	if err != nil {

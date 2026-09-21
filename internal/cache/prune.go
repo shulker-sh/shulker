@@ -65,9 +65,9 @@ func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
 		dir   string
 		depth int
 		count *int
-		// all removes every entry, referenced or not: these hold leftovers and
+		// pruneAll removes every entry, referenced or not: these hold leftovers and
 		// records of runs that are already over.
-		all bool
+		pruneAll bool
 	}{
 		{filepath.Join(c.Dir, "objects"), 2, &p.Files, false},
 		{filepath.Join(c.Dir, "packs", "git"), 1, &p.Checkouts, false},
@@ -85,7 +85,7 @@ func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
 			return Pruned{}, err
 		}
 		for _, path := range paths {
-			if !t.all && keep[path] {
+			if !t.pruneAll && keep[path] {
 				continue
 			}
 			size, err := treeSize(path)
