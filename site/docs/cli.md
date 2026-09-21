@@ -9,7 +9,7 @@ outline: [2, 3]
 | --- | --- |
 | [`shulker init`](#shulker-init) | Create shulker.json and a lock in the current directory |
 | [`shulker add <mod>...`](#shulker-add) | Add mods to the manifest and lock |
-| [`shulker search <words>...`](#shulker-search) | Search the providers for projects to add |
+| [`shulker search [words...]`](#shulker-search) | Search the providers for projects to add |
 | [`shulker remove <mod>...`](#shulker-remove) | Remove mods from the manifest and lock |
 | [`shulker lock`](#shulker-lock) | Bring the lock in line with shulker.json without upgrading |
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
@@ -197,7 +197,10 @@ shulker add ../base-pack --type modpack --as base
 
 Search every provider shulker has set up for projects matching the words, and print the ids to add them by. Results come in a block per provider, most downloaded first, and the command writes nothing: `shulker.json` and the lock only change through `add`. Projects CurseForge classes as something shulker has no entry type for, worlds and plugins among them, are left out. A `modpack` row is a provider modpack, which `add` can't take yet: add a modpack by source instead.
 
+With no words, `shulker search` opens a search box over a list of results that follows it as you type, searching once you pause for a quarter of a second and have typed at least two characters. Tab moves into the list to scroll it and shift+tab back to the box; enter does nothing, since nothing is chosen here. Esc or ctrl-c leaves and prints the results on screen, as `shulker search` with those words would. A query that fails keeps the last results on screen, with the error under the box. Off a terminal, or with `--no-input` or `--json`, the words are required.
+
 ```sh
+shulker search
 shulker search sodium
 shulker search fresh animations --type resourcepack
 shulker search jei --provider curseforge --limit 5

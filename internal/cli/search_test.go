@@ -130,11 +130,14 @@ func TestSearchFindsNothing(t *testing.T) {
 
 func TestSearchNeedsWords(t *testing.T) {
 	h := newHarness(t)
-	code, _, stderr := h.run(t, "search")
-	if code == 0 || !strings.Contains(stderr, "missing at least one argument") || !strings.Contains(stderr, "<words>") {
-		t.Errorf("exit %d, stderr %s", code, stderr)
+	h.tty = true
+	for _, args := range [][]string{{"search"}, {"search", "--no-input"}} {
+		code, _, stderr := h.run(t, args...)
+		if code == 0 || !strings.Contains(stderr, "missing at least one argument") || !strings.Contains(stderr, "[words...]") {
+			t.Errorf("%v: exit %d, stderr %s", args, code, stderr)
+		}
 	}
-	code, _, stderr = h.run(t, "search", "sodium", "--limit", "0")
+	code, _, stderr := h.run(t, "search", "sodium", "--limit", "0")
 	if code == 0 || !strings.Contains(stderr, "--limit takes a number of results to print") {
 		t.Errorf("exit %d, stderr %s", code, stderr)
 	}

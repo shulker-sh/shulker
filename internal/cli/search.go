@@ -32,9 +32,8 @@ func (a *app) searchCmd() *cobra.Command {
 	var typ, providerName string
 	var limit int
 	cmd := &cobra.Command{
-		Use:   "search <words>...",
+		Use:   "search [words...]",
 		Short: "Search the providers for projects to add",
-		Args:  minimumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkType(typ); err != nil {
 				return err
@@ -51,29 +50,16 @@ func (a *app) searchCmd() *cobra.Command {
 			if providerName != "" {
 				names = []string{providerName}
 			}
+			if len(args) == 0 {
+				return a.browseSearch(cmd, typ, names, limit)
+			}
 			query := strings.Join(args, " ")
-			res, searched, err := a.search(cmd.Context(), query, typ, names, limit)
+			reply, err := a.search(cmd.Context(), query, typ, names, limit, true)
 			if err != nil {
 				return err
 			}
-			return a.printer.Emit(res, func(l *out.Lines) {
-				if len(res.Results) == 0 {
-					l.Info(fmt.Sprintf("No projects match %q on %s.", query, strings.Join(searched, " or ")))
-					return
-				}
-				for i, name := range searched {
-					items := searchItems(res.Results, name)
-					if len(items) == 0 {
-						continue
-					}
-					if i > 0 {
-						l.Blank()
-					}
-					l.Heading(providerTitle(name))
-					l.Items(items...)
-				}
-				l.Nudge("Add one", "shulker add <id>")
-			})
+			a.warn(reply.warnings)
+			return a.printSearch(reply)
 		},
 	}
 	cmd.Flags().StringVar(&typ, "type", "", typeFlagUsage)
@@ -82,16 +68,24 @@ func (a *app) searchCmd() *cobra.Command {
 	return cmd
 }
 
-// search asks each provider in names, and reports which of them answered. A
-// provider that fails is warned about and left out; the search fails only when
-// none answered.
-func (a *app) search(ctx context.Context, query, kind string, names []string, limit int) (searchResults, []string, error) {
+// searchReply is one query's answer: every hit, the providers that answered, and a warning for
+// each that failed while another answered.
+type searchReply struct {
+	results  searchResults
+	searched []string
+	warnings []string
+}
+
+// search asks each provider in names. A provider that fails becomes a warning and is left out;
+// the search fails only when none answered. steps puts each provider's search on its own step
+// line, which the live search can't have drawing under its form.
+func (a *app) search(ctx context.Context, query, kind string, names []string, limit int, steps bool) (searchReply, error) {
 	d, err := a.deps()
 	if err != nil {
-		return searchResults{}, nil, err
+		return searchReply{}, err
 	}
-	res := searchResults{Query: query, Results: []searchHit{}}
-	var searched, skipped []string
+	reply := searchReply{results: searchResults{Query: query, Results: []searchHit{}}}
+	var skipped []string
 	var failures []error
 	for _, name := range names {
 		p, ok := d.providers[name]
@@ -99,31 +93,61 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 			skipped = append(skipped, resolve.Unavailable(name))
 			continue
 		}
-		a.progress("searching %s", name)
+		if steps {
+			a.progress("searching %s", name)
+		}
 		found, err := p.Search(ctx, query, kind, limit)
 		if err != nil {
-			a.printer.Drop()
+			if steps {
+				a.printer.Drop()
+			}
 			failures = append(failures, err)
 			continue
 		}
-		searched = append(searched, name)
+		reply.searched = append(reply.searched, name)
 		for _, proj := range found {
-			res.Results = append(res.Results, searchHitOf(name, proj))
+			reply.results.Results = append(reply.results.Results, searchHitOf(name, proj))
 		}
 	}
-	if len(searched) > 0 {
+	if len(reply.searched) > 0 {
 		for _, err := range failures {
-			a.printer.Warn("%s", out.AsError(err).Message)
+			reply.warnings = append(reply.warnings, out.AsError(err).Message)
 		}
-		return res, searched, nil
+		return reply, nil
 	}
 	switch {
 	case len(failures) > 0:
-		return res, nil, failures[0]
+		return reply, failures[0]
 	case len(names) == 1:
-		return res, nil, out.Errorf("provider-unavailable", "%s", skipped[0])
+		return reply, out.Errorf("provider-unavailable", "%s", skipped[0])
 	}
-	return res, nil, out.Errorf("provider-unavailable", "no provider is available: %s", strings.Join(skipped, "; "))
+	return reply, out.Errorf("provider-unavailable", "no provider is available: %s", strings.Join(skipped, "; "))
+}
+
+func (a *app) printSearch(reply searchReply) error {
+	res := reply.results
+	return a.printer.Emit(res, func(l *out.Lines) {
+		if len(res.Results) == 0 {
+			l.Info(noSearchMatches(reply))
+			return
+		}
+		for i, name := range reply.searched {
+			items := searchItems(res.Results, name)
+			if len(items) == 0 {
+				continue
+			}
+			if i > 0 {
+				l.Blank()
+			}
+			l.Heading(providerTitle(name))
+			l.Items(items...)
+		}
+		l.Nudge("Add one", "shulker add <id>")
+	})
+}
+
+func noSearchMatches(reply searchReply) string {
+	return fmt.Sprintf("No projects match %q on %s.", reply.results.Query, strings.Join(reply.searched, " or "))
 }
 
 func searchHitOf(providerName string, p provider.Project) searchHit {

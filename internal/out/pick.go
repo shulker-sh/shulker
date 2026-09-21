@@ -36,10 +36,6 @@ func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, er
 		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
 		lipgloss.SetColorProfile(termenv.Ascii)
 	}
-	options := make([]huh.Option[string], len(choices))
-	for i, c := range choices {
-		options[i] = huh.NewOption(c.Label, c.Value)
-	}
 	// huh binds quit to ctrl+c alone, which leaves a picker you can only leave by interrupting.
 	keys := huh.NewDefaultKeyMap()
 	keys.Quit = key.NewBinding(key.WithKeys("esc", "ctrl+c"), key.WithHelp("esc", "cancel"))
@@ -50,7 +46,7 @@ func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, er
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title(gutter + title).
-			Options(options...).
+			Options(options(choices)...).
 			Value(&chosen).
 			Height(rows + 1),
 	)).WithTheme(pickTheme(t)).WithOutput(p.Stderr).WithInput(in).WithHeight(rows + 3).
@@ -64,14 +60,28 @@ func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, er
 	return chosen, nil
 }
 
+func options(choices []Choice) []huh.Option[string] {
+	opts := make([]huh.Option[string], len(choices))
+	for i, c := range choices {
+		opts[i] = huh.NewOption(c.Label, c.Value)
+	}
+	return opts
+}
+
 // gutterLayout puts huh's help line in the two-space gutter every other line sits in. huh's own
 // Group.View joins the footer outside any container the theme can reach, so the only way to indent
-// it is to lay the form out here. A picker is always one group of one field, and its select has no
-// Validate, so the field's own view and the help line are the whole form.
-type gutterLayout struct{ quit key.Binding }
+// it is to lay the form out here. Every form is one group with no Validate, so its fields and the
+// help line are the whole form: the focused field alone for a picker, or all of group when set.
+type gutterLayout struct {
+	quit  key.Binding
+	group *huh.Group
+}
 
 func (l gutterLayout) View(f *huh.Form) string {
 	view := f.GetFocusedField().View()
+	if l.group != nil {
+		view = l.group.Content()
+	}
 	// The field lists only its own keys, and leaving the picker is the one a stuck player needs.
 	help := f.Help().ShortHelpView(append(f.KeyBinds(), l.quit))
 	if help == "" {
