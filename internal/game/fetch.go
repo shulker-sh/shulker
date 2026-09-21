@@ -41,7 +41,9 @@ func (s Store) Fetch(ctx context.Context, c *fetch.Client, f File) error {
 		return err
 	}
 	if sum := hex.EncodeToString(h.Sum(nil)); f.Sha1 != "" && !strings.EqualFold(sum, f.Sha1) {
-		return out.Errorf("store-incomplete", "%s came back with checksum %s, not the %s the version json gives", f.Path, sum, f.Sha1)
+		e := out.Errorf("checksum-mismatch", "the download of %s doesn't match the sha1 its version json gives", f.Path)
+		e.Rows = []out.Detail{{Label: "want", Text: f.Sha1}, {Label: "got", Text: sum}}
+		return e
 	}
 	return os.Rename(tmp.Name(), path)
 }
@@ -65,7 +67,9 @@ func (s Store) AssetFiles(indexID string) ([]File, error) {
 	}
 	var index AssetIndexFile
 	if err := json.Unmarshal(data, &index); err != nil {
-		return nil, out.Errorf("store-incomplete", "%s: %s", s.AssetIndex(indexID), err)
+		e := out.Errorf("store-incomplete", "shulker can't parse %s", s.AssetIndex(indexID))
+		e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
+		return nil, e
 	}
 	base := s.Resources
 	if base == "" {

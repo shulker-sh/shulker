@@ -9,6 +9,8 @@ import (
 // the version format has meant by an absent `url` since the format's first release.
 const MojangLibraries = "https://libraries.minecraft.net/"
 
+// Library is one entry of a version JSON's libraries: a jar for the classpath, or a native one to
+// unpack.
 type Library struct {
 	Name      string            `json:"name"`
 	Downloads *LibraryDownloads `json:"downloads,omitempty"`

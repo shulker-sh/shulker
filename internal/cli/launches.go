@@ -89,7 +89,7 @@ func (a *app) reconcileRun(dir string) {
 // abandoned is an open record for a game shulker was watching that has gone without its watcher
 // closing it.
 func abandoned(rec instance.Launch) bool {
-	return rec.EndedAt == "" && rec.PID != 0 && !game.Alive(rec.PID)
+	return rec.EndedAt == "" && rec.PID != 0 && !game.IsAlive(rec.PID)
 }
 
 // openRecord is the newest record nothing has closed for the game with this pid, or -1 where there

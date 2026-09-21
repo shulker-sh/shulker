@@ -84,6 +84,7 @@ func (a *Argument) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// ParseVersion reads a version JSON, which must name its id, and starts ClientID as that id.
 func ParseVersion(data []byte) (Version, error) {
 	var v Version
 	if err := json.Unmarshal(data, &v); err != nil {

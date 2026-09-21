@@ -2,10 +2,10 @@ package game
 
 import "golang.org/x/sys/windows"
 
-// Alive reports whether a process is still running. It is how a run whose watcher was killed is told
+// IsAlive reports whether a process is still running. It is how a run whose watcher was killed is told
 // from one that ended while nothing was watching: a handle that can't be opened, or one that is
 // already signalled, is a process that has gone.
-func Alive(pid int) bool {
+func IsAlive(pid int) bool {
 	if pid <= 0 {
 		return false
 	}

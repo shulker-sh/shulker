@@ -1,3 +1,5 @@
+// Package game launches Minecraft directly, from a store laid out the way the Mojang launcher lays
+// out its own directory.
 package game
 
 import (

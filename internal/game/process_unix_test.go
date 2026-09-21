@@ -74,7 +74,7 @@ func TestStartMirrorsTheOutputToTheStreamAndStillWritesTheLog(t *testing.T) {
 	}
 }
 
-func TestAliveTellsARunningProcessFromOneThatHasGone(t *testing.T) {
+func TestIsAliveTellsARunningProcessFromOneThatHasGone(t *testing.T) {
 	dir := t.TempDir()
 	script := fakeJava(t, dir, "sleep 1\n")
 	log := filepath.Join(dir, "run.log")
@@ -83,16 +83,16 @@ func TestAliveTellsARunningProcessFromOneThatHasGone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !Alive(g.PID) {
+	if !IsAlive(g.PID) {
 		t.Fatal("a game that has not exited is alive")
 	}
 	if _, err := g.Wait(); err != nil {
 		t.Fatal(err)
 	}
-	if Alive(g.PID) {
+	if IsAlive(g.PID) {
 		t.Fatal("a game that has exited and been reaped is not")
 	}
-	if Alive(0) || Alive(-1) {
+	if IsAlive(0) || IsAlive(-1) {
 		t.Fatal("no process is no process")
 	}
 }

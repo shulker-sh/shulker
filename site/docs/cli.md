@@ -1608,7 +1608,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need; `cache info` still reports and names the instance |
-| `checksum-mismatch` | A download's sha512 isn't the one the lock or the provider recorded. Rows show both hashes |
+| `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON. Rows show both hashes |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
@@ -1723,7 +1723,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `source-lock` | The sync source has no `shulker.lock` |
 | `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
 | `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
-| `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a download whose checksum doesn't match, or a version JSON that doesn't hold together |
+| `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a native jar that won't unpack, or a version JSON that doesn't hold together |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
 | `type-ambiguous` | A CurseForge slug matches projects of several types; pass `--type` to choose. `candidates`: the types it matched |

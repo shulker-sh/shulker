@@ -76,7 +76,9 @@ func (s Store) Version(id string) (Version, error) {
 	}
 	v, err := ParseVersion(data)
 	if err != nil {
-		return Version{}, out.Errorf("store-incomplete", "%s: %s", s.VersionJSON(id), err)
+		e := out.Errorf("store-incomplete", "shulker can't parse %s", s.VersionJSON(id))
+		e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
+		return Version{}, e
 	}
 	return v, nil
 }
@@ -137,7 +139,9 @@ func Assemble(v Version, p Platform, features map[string]bool) (Assembly, error)
 		}
 		f, err := l.File(p)
 		if err != nil {
-			return Assembly{}, out.Errorf("store-incomplete", "minecraft %s: %s", v.ID, err)
+			e := out.Errorf("store-incomplete", "minecraft %s names a library shulker can't place", v.ID)
+			e.Rows = []out.Detail{{Label: "library", Text: err.Error()}}
+			return Assembly{}, e
 		}
 		if seen[f.Path] {
 			continue
