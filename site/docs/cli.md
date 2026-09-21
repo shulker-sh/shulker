@@ -770,6 +770,8 @@ shulker play --account Notch
 shulker play --no-sync
 shulker play --wait
 shulker play --stream
+shulker play --world "New World"
+shulker play --server mc.example.com:25565
 ```
 
 The game gets no terminal, so everything it writes goes to `.shulker/logs/<time>.log` inside the instance, one file per launch, whether or not anyone is watching. The game's own arguments carry a session access token, so they are printed nowhere: not in the log, not in a progress line, not in an error.
@@ -777,6 +779,8 @@ The game gets no terminal, so everything it writes goes to `.shulker/logs/<time>
 Who plays is the instance's pinned `account` when it has one, and otherwise the default account; `--account` names another for a single run, matched the way [`shulker accounts use`](#shulker-accounts-use) matches one. [`shulker instance set account`](#shulker-instance-set) pins one. A pinned account that has since been removed fails with `account-not-found` rather than playing as someone else. With no default account shulker takes the only account that could play and makes it the default, saying so; with several it asks on a terminal and records the answer, and off one it is a usage error naming `--account`. With no account at all it is `no-accounts`. An account whose sign-in has expired refuses the launch with the line that fixes it, and one playing on a token shulker couldn't renew — a borrowed one its launcher has let run out, or a cached one with no network — launches with a warning that online servers and Realms will reject the session.
 
 The launch takes its memory, extra JVM arguments, Java, window size and wrapper from the instance's settings, and each one the instance leaves out from its `play.` default in `config.json` — see [`shulker instance`](#shulker-instance). `memory` becomes `-Xms` and `-Xmx`, and it and `jvmArgs` go after the version's own JVM arguments, so they win over them. The window becomes `--width` and `--height`, which the game takes for the run and never writes back; `--window` sets it for one run over both, and nothing is saved. Fullscreen isn't a launch setting: the game keeps it in `options.txt`, which the manifest's `client.options` owns. A wrapper runs the launch as its own command, with java and its arguments after the wrapper's.
+
+`--world` boots straight into a save, named by its folder in the instance's `saves/`, and `--server` straight into a server, as an address with an optional port. Only one can be given: the game boots into one target. They go to the game as its quick play arguments, `--quickPlaySingleplayer` and `--quickPlayMultiplayer`. A Minecraft before 1.20 has no quick play, so there `--server` joins through the older `--server` and `--port` pair, on port 25565 when none is given, and `--world` fails with `unsupported-quickplay` before anything is launched: there is no older way to boot into a save, and a game that opened on the title screen instead would look like one whose save failed to load.
 
 `--dry-run` assembles the launch and prints it instead of starting the game: the version it resolved and what it inherits from, the libraries a loader's version brings on top of that one as a count and a size, the Java it would use, the game and natives directories, the asset index, and the classpath as a count and a size. A second run downloads nothing. It needs no account, which is what makes the plan checkable on its own.
 
@@ -791,6 +795,8 @@ shulker play smp --dry-run
 | --- | --- |
 | `--account <name>` | Play as this account, for this run only (default: the instance's pinned account, else the default account) |
 | `--window <w>x<h>` | Open the game at this size for this run only, like `1280x720` (default: the `window` setting) |
+| `--world <save>` | Boot straight into this save, named by its folder in `saves/`; needs Minecraft 1.20 or later |
+| `--server <address>[:<port>]` | Join this server straight away; can't be combined with `--world` |
 | `--no-sync` | Start the game without updating the instance first |
 | `--wait` | Wait for the game and record how the run ended before returning |
 | `--stream` | Wait for the game and show its output as it runs; the log is still written |
@@ -1623,6 +1629,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | An override uses a variable that isn't set |
 | `unsupported-loader` | shulker doesn't support the loader yet |
+| `unsupported-quickplay` | `play --world` on a Minecraft before 1.20, which has no quick play to boot into a save with; nothing is launched |
 | `update-paused` | The pre-launch hook stopped a GDLauncher update at four minutes so it could explain itself; the launch is aborted, and launching again resumes it. Shown in GDLauncher's own dialog, so it prints without shulker's usual error decoration |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |

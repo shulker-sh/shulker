@@ -77,8 +77,13 @@ func (a *app) playCmd() *cobra.Command {
 					return err
 				}
 			}
+			target, err := parseQuickPlay(cmd, opts.world, opts.server)
+			if err != nil {
+				return err
+			}
+			opts.target = target
 			if opts.dryRun {
-				return a.dryRun(cmd.Context(), args)
+				return a.dryRun(cmd.Context(), args, target)
 			}
 			return a.play(cmd, args, opts)
 		},
@@ -89,6 +94,8 @@ func (a *app) playCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.stream, "stream", false, "wait for the game and mirror its output to the terminal")
 	cmd.Flags().StringVar(&opts.account, "account", "", "play as this account (default: the instance's pinned account, else the default account)")
 	cmd.Flags().StringVar(&opts.window, "window", "", "open the game at this size for this run, like 1280x720")
+	cmd.Flags().StringVar(&opts.world, "world", "", "boot straight into this save, named by its folder in saves/")
+	cmd.Flags().StringVar(&opts.server, "server", "", "join this server straight away, as <address>[:<port>]")
 	return cmd
 }
 
@@ -101,6 +108,9 @@ type playOptions struct {
 	stream  bool
 	account string
 	window  string
+	world   string
+	server  string
+	target  quickPlay
 }
 
 // waits reports whether this command stays for the run. --stream is --wait that shows its working,
@@ -128,6 +138,9 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	// assembled from up to date.
 	p, err := a.playProject(in.Dir)
 	if err != nil {
+		return err
+	}
+	if err := a.checkQuickPlay(ctx, p, opts.target); err != nil {
 		return err
 	}
 	settings, err := a.launchSettings(in.Dir)
@@ -181,7 +194,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	req := watchRequest{
 		Dir:     in.Dir,
 		Java:    plan.java,
-		Argv:    launchArgv(plan.version, vars, settings, window),
+		Argv:    launchArgv(plan.version, vars, settings, window, opts.target),
 		Log:     res.Log,
 		Wrapper: settings.Wrapper,
 	}
@@ -307,17 +320,19 @@ func (a *app) pinnedAccount(id string) (string, error) {
 
 // launchArgv is the argv with this launch's own settings in it: the memory and JVM arguments after
 // the version's own, and the window through the arguments the version declares for a custom
-// resolution. A version from before those were declared takes the pair appended, as Prism does.
-func launchArgv(v game.Version, vars map[string]string, s instance.Settings, window string) []string {
+// resolution, as is the quick play target. A version from before those were declared takes the
+// pairs appended, as Prism does.
+func launchArgv(v game.Version, vars map[string]string, s instance.Settings, window string, target quickPlay) []string {
 	var extra []string
 	if s.Memory != "" {
 		extra = append(extra, "-Xms"+s.Memory, "-Xmx"+s.Memory)
 	}
 	extra = append(extra, s.JvmArgs...)
 	features := map[string]bool{}
+	vars = maps.Clone(vars)
+	legacy := target.apply(v, features, vars)
 	width, height, sized := strings.Cut(window, "x")
 	if sized {
-		vars = maps.Clone(vars)
 		features["has_custom_resolution"] = true
 		vars["resolution_width"], vars["resolution_height"] = width, height
 	}
@@ -325,7 +340,7 @@ func launchArgv(v game.Version, vars map[string]string, s instance.Settings, win
 	if sized && !slices.Contains(argv, "--width") {
 		argv = append(argv, "--width", width, "--height", height)
 	}
-	return argv
+	return append(argv, legacy...)
 }
 
 // gameSession is the account as the game's own arguments name it. An offline account presents the
@@ -365,13 +380,16 @@ func launchLog(dir string, at time.Time) (string, error) {
 	}
 }
 
-func (a *app) dryRun(ctx context.Context, args []string) error {
+func (a *app) dryRun(ctx context.Context, args []string, target quickPlay) error {
 	in, err := a.playInstance(args)
 	if err != nil {
 		return err
 	}
 	p, err := a.playProject(in.Dir)
 	if err != nil {
+		return err
+	}
+	if err := a.checkQuickPlay(ctx, p, target); err != nil {
 		return err
 	}
 	plan, err := a.assemble(ctx, in, p)
@@ -527,15 +545,8 @@ func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store
 	if err != nil {
 		return "", err
 	}
-	if !s.HasVersion(p.Lock.Minecraft) {
-		a.progress("fetching the minecraft %s version json", p.Lock.Minecraft)
-		raw, err := d.meta.Piston.Version(ctx, p.Lock.Minecraft)
-		if err != nil {
-			return "", err
-		}
-		if _, err := s.SaveVersion(raw); err != nil {
-			return "", err
-		}
+	if err := a.storeVanillaVersion(ctx, s, p.Lock.Minecraft); err != nil {
+		return "", err
 	}
 	if p.Lock.Loader.Type == "" {
 		return p.Lock.Minecraft, nil
@@ -556,6 +567,25 @@ func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store
 		return "", err
 	}
 	return s.SaveVersion(profile)
+}
+
+// storeVanillaVersion puts the vanilla version JSON for the Minecraft version in the store, unless
+// it is there already.
+func (a *app) storeVanillaVersion(ctx context.Context, s game.Store, minecraft string) error {
+	if s.HasVersion(minecraft) {
+		return nil
+	}
+	d, err := a.deps()
+	if err != nil {
+		return err
+	}
+	a.progress("fetching the minecraft %s version json", minecraft)
+	raw, err := d.meta.Piston.Version(ctx, minecraft)
+	if err != nil {
+		return err
+	}
+	_, err = s.SaveVersion(raw)
+	return err
 }
 
 // fetchVanillaClient puts the vanilla client jar in the store before a loader's installer runs.

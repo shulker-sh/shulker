@@ -95,6 +95,7 @@ type harness struct {
 	fabricLoader   fakeJar
 	assetIndex     []byte
 	assets         map[string]string
+	noQuickPlay    bool
 	storeMu        sync.Mutex
 	storeHits      int
 	quiltHits      int
@@ -189,6 +190,13 @@ func newHarness(t *testing.T) *harness {
 	}
 	h.assetIndex, _ = json.Marshal(map[string]any{"objects": objects})
 	mux.HandleFunc("/piston/", func(w http.ResponseWriter, r *http.Request) {
+		gameArgs := []any{"--username", "${auth_player_name}", "--accessToken", "${auth_access_token}"}
+		if !h.noQuickPlay {
+			gameArgs = append(gameArgs,
+				map[string]any{"rules": []any{map[string]any{"action": "allow", "features": map[string]bool{"is_quick_play_singleplayer": true}}}, "value": []string{"--quickPlaySingleplayer", "${quickPlaySingleplayer}"}},
+				map[string]any{"rules": []any{map[string]any{"action": "allow", "features": map[string]bool{"is_quick_play_multiplayer": true}}}, "value": []string{"--quickPlayMultiplayer", "${quickPlayMultiplayer}"}},
+			)
+		}
 		writeJSON(w, map[string]any{
 			"id":          strings.TrimSuffix(filepath.Base(r.URL.Path), ".json"),
 			"type":        "release",
@@ -196,7 +204,7 @@ func newHarness(t *testing.T) *harness {
 			"libraries":   []map[string]any{{"name": "com.mojang:brigadier:1.3.10", "downloads": map[string]any{"artifact": map[string]any{"path": "com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar", "url": base + "/mojang-libs/brigadier-1.3.10.jar", "sha1": h.brigadier.sha1, "size": len(h.brigadier.data)}}}},
 			"javaVersion": map[string]any{"component": "java-runtime-epsilon", "majorVersion": 25},
 			"assetIndex":  map[string]any{"id": "26", "url": base + "/piston/assets/26.json", "sha1": sha1Hex(h.assetIndex), "size": len(h.assetIndex), "totalSize": 21},
-			"arguments":   map[string]any{"game": []string{"--username", "${auth_player_name}", "--accessToken", "${auth_access_token}"}, "jvm": []string{"-Djava.library.path=${natives_directory}", "-cp", "${classpath}"}},
+			"arguments":   map[string]any{"game": gameArgs, "jvm": []string{"-Djava.library.path=${natives_directory}", "-cp", "${classpath}"}},
 			"downloads": map[string]any{
 				"server": map[string]any{"url": base + "/piston-data/server.jar", "sha1": h.vanilla.sha1},
 				"client": map[string]any{"url": base + "/piston-data/client.jar", "sha1": h.clientJar.sha1, "size": len(h.clientJar.data)},

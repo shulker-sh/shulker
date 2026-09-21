@@ -75,3 +75,19 @@ func substitute(value string, vars map[string]string) string {
 	}
 	return value
 }
+
+// Declares reports whether any of the version's game arguments is gated on the launcher feature,
+// which is how a launcher learns what the version understands.
+func (v Version) Declares(feature string) bool {
+	if v.Arguments == nil {
+		return false
+	}
+	for _, a := range v.Arguments.Game {
+		for _, r := range a.Rules {
+			if _, ok := r.Features[feature]; ok {
+				return true
+			}
+		}
+	}
+	return false
+}
