@@ -295,22 +295,23 @@ func TestBackupsFallBackOnTheWholeComment(t *testing.T) {
 	zipOf(t, filepath.Join(home, "20260918-100000-sync.zip"), roots, "not json")
 	zipOf(t, filepath.Join(home, "20260917-100000-pack-sync.zip"), roots, `{"taken":"2026-09-01T00:00:00Z","reason":"update","worldCount":9,"minecraft":"26.2"}`)
 	zipOf(t, filepath.Join(home, "20260916-100000-2-backup.zip"), roots, "")
+	zipOf(t, filepath.Join(home, "20260915-100000-restore.zip"), roots, `{"format":2,"taken":"2026-09-01T00:00:00Z","reason":"update","worldCount":9}`)
 	zipOf(t, filepath.Join(home, "someone-elses.zip"), roots, "")
 
 	backups, err := Backups(home)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(backups) != 3 {
+	if len(backups) != 4 {
 		t.Fatalf("backups = %+v", backups)
 	}
-	want := []struct{ reason, instance string }{{"sync", ""}, {"sync", "pack"}, {"backup", ""}}
+	want := []struct{ reason, instance string }{{"sync", ""}, {"sync", "pack"}, {"backup", ""}, {"restore", ""}}
 	for i, b := range backups {
 		if b.Reason != want[i].reason || b.Instance != want[i].instance || b.Worlds != 2 || b.Minecraft != "" || b.Names != nil {
 			t.Fatalf("backup %d = %+v", i, b)
 		}
 	}
-	if !backups[1].Taken.Equal(time.Date(2026, 9, 17, 10, 0, 0, 0, time.Local)) || backups[2].seq != 2 {
+	if !backups[1].Taken.Equal(time.Date(2026, 9, 17, 10, 0, 0, 0, time.Local)) || backups[2].seq != 2 || !backups[3].Taken.Equal(time.Date(2026, 9, 15, 10, 0, 0, 0, time.Local)) {
 		t.Fatalf("from the filename: %+v", backups[1:])
 	}
 }

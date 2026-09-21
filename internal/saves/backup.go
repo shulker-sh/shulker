@@ -219,14 +219,15 @@ func tailComment(r io.ReaderAt, size int64) (string, bool) {
 }
 
 // readBackup reads the backup named id from its zip. A comment shulker wrote is the whole record;
-// without one, everything comes from the filename and the folders at the zip's root. A zip with
-// neither is not one of shulker's.
+// without one, everything comes from the filename and the folders at the zip's root. A format this
+// build doesn't know counts as no comment, so a newer shulker's backup still lists by its name. A
+// zip with neither is not one of shulker's.
 func readBackup(r io.ReaderAt, size int64, id string) (Backup, bool) {
 	b := Backup{ID: id, Size: size}
 	named := parseName(&b)
 	raw, _ := tailComment(r, size)
 	var meta comment
-	if json.Unmarshal([]byte(raw), &meta) == nil && meta.Format != 0 {
+	if json.Unmarshal([]byte(raw), &meta) == nil && meta.Format == commentFormat {
 		if taken, err := time.Parse(time.RFC3339, meta.Taken); err == nil {
 			b.Taken, b.Reason, b.Instance = taken.Local(), meta.Reason, meta.Instance
 			b.Worlds, b.Names = meta.WorldCount, meta.Worlds
