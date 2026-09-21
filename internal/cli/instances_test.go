@@ -338,7 +338,7 @@ func TestSyncInstance(t *testing.T) {
 	h.tty = false
 
 	stdout = h.mustRun(t, "sync", "--all")
-	if !strings.Contains(stdout, "  Friends client (Prism Launcher)\n  ✔ synced client") || !strings.Contains(stdout, "\n\n  friends client (MultiMC)\n") {
+	if !strings.Contains(stdout, "  Friends friends client (Prism Launcher)\n  ✔ synced client") || !strings.Contains(stdout, "\n\n  friends friends-2 client (MultiMC)\n") {
 		t.Fatalf("sync --all output: %s", stdout)
 	}
 	var all struct {

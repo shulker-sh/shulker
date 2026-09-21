@@ -210,7 +210,7 @@ func instanceAside(t out.Theme, e instanceEntry) string {
 }
 
 func instanceHeading(t out.Theme, e instanceEntry) string {
-	return t.Bold(e.Label()) + " " + t.Cyan(e.Side) + instanceAside(t, e)
+	return t.Bold(e.Label()) + " " + t.Grey(e.ID) + " " + t.Cyan(e.Side) + instanceAside(t, e)
 }
 
 func (a *app) pickInstance(entries []instanceEntry) (instanceEntry, error) {
