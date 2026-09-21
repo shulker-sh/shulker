@@ -8,11 +8,16 @@ type Loader struct {
 	// Title is the loader's name as its own project writes it, for a name a player reads.
 	Title string
 	// DependencyID is how a mod's metadata names the loader in its dependencies.
-	DependencyID    string
-	ComponentUID    string
-	MrpackKey       string
-	CurseForgeType  string
-	AlsoRuns        []string
+	DependencyID string
+	// ComponentUID is the loader's component uid in Prism's and MultiMC's mmc-pack.json.
+	ComponentUID string
+	// MrpackKey is the loader's key in an mrpack index's dependencies.
+	MrpackKey string
+	// CurseForgeType is CurseForge's numeric modLoaderType.
+	CurseForgeType string
+	// AlsoRuns are the loaders whose mods this one runs as well.
+	AlsoRuns []string
+	// ServerLaunchJar is the jar a server built for this loader starts from.
 	ServerLaunchJar string
 	// InstallServerFlag, when set, means the server is set up by running the loader's own installer
 	// jar with this flag and the server dir.
@@ -79,6 +84,8 @@ func ByComponentUID(uid string) (Loader, bool) {
 	return Loader{}, false
 }
 
+// ProviderLoaders are the loader names a mod may list to run on the named loader: the loader itself
+// and every loader it also runs.
 func ProviderLoaders(name string) []string {
 	if l, ok := Lookup(name); ok {
 		return append([]string{l.Name}, l.AlsoRuns...)
