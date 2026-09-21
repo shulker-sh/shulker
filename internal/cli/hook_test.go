@@ -34,7 +34,7 @@ func TestPreLaunchReportsTheSync(t *testing.T) {
 }
 
 const fakeGame = `#!/bin/sh
-printf '%s\n' "$@" > "@ARGS@"
+printf '%s\n' "$@" > "@ARGS@.tmp" && mv "@ARGS@.tmp" "@ARGS@"
 exit @EXIT@
 `
 

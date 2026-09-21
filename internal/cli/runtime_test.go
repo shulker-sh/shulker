@@ -20,7 +20,7 @@ if [ "$1" = "-version" ]; then
   echo 'openjdk version "@VERSION@" 2025-10-21' >&2
   exit 0
 fi
-printf '%s\n' "$@" > args.txt
+printf '%s\n' "$@" > args.txt.tmp && mv args.txt.tmp args.txt
 echo "[Server] Done"
 while read -r line; do
   echo "[Server] got: $line"

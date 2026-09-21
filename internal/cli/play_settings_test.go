@@ -88,7 +88,7 @@ func TestPlayRunsTheJavaAndWrapperEitherTierNames(t *testing.T) {
 
 	dir := t.TempDir()
 	wrapper, wrapperArgs := filepath.Join(dir, "wrapper"), filepath.Join(dir, "wrapper-args.txt")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"" + wrapperArgs + "\"\nshift\nexec \"$@\"\n"
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"" + wrapperArgs + ".tmp\" && mv \"" + wrapperArgs + ".tmp\" \"" + wrapperArgs + "\"\nshift\nexec \"$@\"\n"
 	if err := os.WriteFile(wrapper, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
