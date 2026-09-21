@@ -122,8 +122,11 @@ func TestPlayUsesTheInstancesPinnedAccount(t *testing.T) {
 
 	h.mustRun(t, "accounts", "logout", "Jeb_", "--yes")
 	env := h.runSetting(t, 1, "-i", "pack", "play", "--no-sync")
-	if env.Error == nil || env.Error.Code != "account-not-found" || !strings.Contains(env.Error.Message, "instance unset account") {
+	if env.Error == nil || env.Error.Code != "account-not-found" || !strings.Contains(env.Error.Message, "pinned") {
 		t.Fatalf("a pin whose account has gone fails rather than falling back: %+v", env.Error)
+	}
+	if _, _, stderr := h.run(t, "-i", "pack", "play", "--no-sync"); !strings.Contains(stderr, "shulker instance unset account") {
+		t.Fatalf("the error names the way back to the default account:\n%s", stderr)
 	}
 }
 

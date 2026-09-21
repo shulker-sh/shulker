@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -298,8 +299,9 @@ func (a *app) pinnedAccount(id string) (string, error) {
 			return id, nil
 		}
 	}
-	e := out.Errorf("account-not-found", "this instance is pinned to account %s, which shulker can no longer see; `shulker instance unset account` plays it as the default account", id)
+	e := out.Errorf("account-not-found", "this instance is pinned to account %s, which shulker can no longer see", id)
 	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)
+	e.Nudge = out.Nudge{Lead: "Play it as the default account instead with", Command: "shulker instance unset account"}
 	return "", e
 }
 
@@ -315,6 +317,7 @@ func launchArgv(v game.Version, vars map[string]string, s instance.Settings, win
 	features := map[string]bool{}
 	width, height, sized := strings.Cut(window, "x")
 	if sized {
+		vars = maps.Clone(vars)
 		features["has_custom_resolution"] = true
 		vars["resolution_width"], vars["resolution_height"] = width, height
 	}
