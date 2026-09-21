@@ -96,6 +96,8 @@ func parseComparator[V Version[V]](tok string, parse func(string) (V, error)) ([
 	return []comparator[V]{{opEq, v}}, err
 }
 
+// IsAny reports whether the range is *, which Matches reads as every release and Contains as every
+// version.
 func (r Range[V]) IsAny() bool { return len(r.sets) == 0 }
 
 // Matches reports whether v is in the range, where * holds only releases.
