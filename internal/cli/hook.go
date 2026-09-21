@@ -238,19 +238,21 @@ func (a *app) failLaunch(dir string, s instance.Settings, stamped bool, reason s
 	if keep == 0 {
 		return
 	}
-	records := instance.LoadLaunches(dir)
-	at := -1
-	if stamped {
-		at = openRecord(records, 0)
-	}
-	if at < 0 {
-		records = append(records, instance.Launch{StartedAt: nowStamp()})
-		at = len(records) - 1
-	}
-	records[at].EndedAt = records[at].StartedAt
-	records[at].Outcome = instance.OutcomeNotStarted
-	records[at].Error = reason
-	if err := instance.SaveLaunches(dir, records, keep); err != nil {
+	err := instance.UpdateLaunches(dir, keep, func(records []instance.Launch) []instance.Launch {
+		at := -1
+		if stamped {
+			at = openRecord(records, 0)
+		}
+		if at < 0 {
+			records = append(records, instance.Launch{StartedAt: nowStamp()})
+			at = len(records) - 1
+		}
+		records[at].EndedAt = records[at].StartedAt
+		records[at].Outcome = instance.OutcomeNotStarted
+		records[at].Error = reason
+		return records
+	})
+	if err != nil {
 		a.printer.Warn("%v", err)
 	}
 }

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"path/filepath"
+	"slices"
 	"time"
 
 	"shulker.sh/shulker/internal/game"
@@ -22,7 +23,10 @@ func (a *app) openRun(dir string, s instance.Settings, rec instance.Launch) {
 	if keep == 0 {
 		return
 	}
-	if err := instance.SaveLaunches(dir, append(instance.LoadLaunches(dir), rec), keep); err != nil {
+	err := instance.UpdateLaunches(dir, keep, func(records []instance.Launch) []instance.Launch {
+		return append(records, rec)
+	})
+	if err != nil {
 		a.printer.Warn("%v", err)
 	}
 }
@@ -34,18 +38,26 @@ func (a *app) openRun(dir string, s instance.Settings, rec instance.Launch) {
 // because it is what the command that waited for the game reports.
 func (a *app) closeRun(dir string, s instance.Settings, pid, exit int) instance.Launch {
 	keep := s.LaunchKeep()
-	records := instance.LoadLaunches(dir)
-	open := openRecord(records, pid)
-	if keep == 0 || open < 0 {
-		rec := instance.Launch{StartedAt: nowStamp()}
+	rec := instance.Launch{StartedAt: nowStamp()}
+	if keep == 0 {
 		endRecord(&rec, dir, exit)
 		return rec
 	}
-	endRecord(&records[open], dir, exit)
-	if err := instance.SaveLaunches(dir, records, keep); err != nil {
+	found := false
+	err := instance.UpdateLaunches(dir, keep, func(records []instance.Launch) []instance.Launch {
+		if open := openRecord(records, pid); open >= 0 {
+			endRecord(&records[open], dir, exit)
+			rec, found = records[open], true
+		}
+		return records
+	})
+	if err != nil {
 		a.printer.Warn("%v", err)
 	}
-	return records[open]
+	if !found {
+		endRecord(&rec, dir, exit)
+	}
+	return rec
 }
 
 // reconcileRun closes the runs whose watchers never did. A record left open with a pid belongs to a
@@ -58,20 +70,26 @@ func (a *app) reconcileRun(dir string) {
 		return
 	}
 	keep := f.Settings.LaunchKeep()
-	records := instance.LoadLaunches(dir)
-	closed := false
-	for i := range records {
-		if records[i].EndedAt == "" && records[i].PID != 0 && !game.Alive(records[i].PID) {
-			endRecord(&records[i], dir, noExitCode)
-			closed = true
-		}
-	}
-	if !closed || keep == 0 {
+	if keep == 0 || !slices.ContainsFunc(instance.LoadLaunches(dir), abandoned) {
 		return
 	}
-	if err := instance.SaveLaunches(dir, records, keep); err != nil {
+	err = instance.UpdateLaunches(dir, keep, func(records []instance.Launch) []instance.Launch {
+		for i := range records {
+			if abandoned(records[i]) {
+				endRecord(&records[i], dir, noExitCode)
+			}
+		}
+		return records
+	})
+	if err != nil {
 		a.printer.Warn("%v", err)
 	}
+}
+
+// abandoned is an open record for a game shulker was watching that has gone without its watcher
+// closing it.
+func abandoned(rec instance.Launch) bool {
+	return rec.EndedAt == "" && rec.PID != 0 && !game.Alive(rec.PID)
 }
 
 // openRecord is the newest record nothing has closed for the game with this pid, or -1 where there

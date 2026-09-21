@@ -87,3 +87,18 @@ func SaveLaunches(dir string, records []Launch, keep int) error {
 	}
 	return fsutil.WriteJSON(LaunchesPath(dir), records)
 }
+
+// UpdateLaunches reads the records, hands them to change and saves what it returns, holding a lock
+// throughout: a run's watcher is its own process, and one game ending while another starts would
+// otherwise save over the record the other just added.
+func UpdateLaunches(dir string, keep int, change func([]Launch) []Launch) error {
+	if err := os.MkdirAll(filepath.Join(dir, Dir), 0o755); err != nil {
+		return err
+	}
+	unlock, err := fsutil.Lock(LaunchesPath(dir) + ".lock")
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return SaveLaunches(dir, change(LoadLaunches(dir)), keep)
+}

@@ -2,6 +2,8 @@ package instance
 
 import (
 	"os"
+	"strconv"
+	"sync"
 	"testing"
 )
 
@@ -64,5 +66,29 @@ func TestLoadLaunchesIgnoresRubbish(t *testing.T) {
 	// A hook must never abort a launch over this file, and nothing hand-edits it.
 	if got := LoadLaunches(dir); got != nil {
 		t.Fatalf("unreadable records read as none: %+v", got)
+	}
+}
+
+// Each run of one instance is its own process, and a game that ends closes its record while another
+// run is opening one.
+func TestUpdateLaunchesLosesNoConcurrentRecord(t *testing.T) {
+	dir := t.TempDir()
+	const runs = 40
+	var wg sync.WaitGroup
+	for i := range runs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := UpdateLaunches(dir, -1, func(records []Launch) []Launch {
+				return append(records, Launch{StartedAt: strconv.Itoa(i)})
+			})
+			if err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := len(LoadLaunches(dir)); got != runs {
+		t.Fatalf("%d runs left %d records", runs, got)
 	}
 }
