@@ -96,7 +96,7 @@ type harness struct {
 	assetIndex     []byte
 	assets         map[string]string
 	noQuickPlay    bool
-	storeMu        sync.Mutex
+	hitsMu         sync.Mutex
 	storeHits      int
 	quiltHits      int
 	neoInstaller   fakeJar
@@ -145,12 +145,12 @@ func (h *harness) watch(req watchRequest) (int, error) {
 	return r.PID, nil
 }
 
-// hitStore counts one download out of the game store's fakes, which the store fetches several at a
-// time.
-func (h *harness) hitStore() {
-	h.storeMu.Lock()
-	defer h.storeMu.Unlock()
-	h.storeHits++
+// hit counts one request to a fake. Downloads run several at a time, so every counter a handler
+// bumps goes through here.
+func (h *harness) hit(counter *int) {
+	h.hitsMu.Lock()
+	defer h.hitsMu.Unlock()
+	*counter++
 }
 
 func newHarness(t *testing.T) *harness {
@@ -212,23 +212,23 @@ func newHarness(t *testing.T) *harness {
 		})
 	})
 	mux.HandleFunc("/piston/assets/26.json", func(w http.ResponseWriter, r *http.Request) {
-		h.hitStore()
+		h.hit(&h.storeHits)
 		w.Write(h.assetIndex)
 	})
 	mux.HandleFunc("/piston-data/client.jar", func(w http.ResponseWriter, r *http.Request) {
-		h.hitStore()
+		h.hit(&h.storeHits)
 		w.Write(h.clientJar.data)
 	})
 	mux.HandleFunc("/mojang-libs/brigadier-1.3.10.jar", func(w http.ResponseWriter, r *http.Request) {
-		h.hitStore()
+		h.hit(&h.storeHits)
 		w.Write(h.brigadier.data)
 	})
 	mux.HandleFunc("/fmaven/net/fabricmc/fabric-loader/0.17.3/fabric-loader-0.17.3.jar", func(w http.ResponseWriter, r *http.Request) {
-		h.hitStore()
+		h.hit(&h.storeHits)
 		w.Write(h.fabricLoader.data)
 	})
 	mux.HandleFunc("/resources/", func(w http.ResponseWriter, r *http.Request) {
-		h.hitStore()
+		h.hit(&h.storeHits)
 		for _, body := range h.assets {
 			if strings.HasSuffix(r.URL.Path, sha1Hex([]byte(body))) {
 				io.WriteString(w, body)
@@ -247,7 +247,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	for path, data := range mavenFiles {
 		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-			h.quiltHits++
+			h.hit(&h.quiltHits)
 			w.Write(data)
 		})
 	}
@@ -303,7 +303,7 @@ func newHarness(t *testing.T) *harness {
 		writeJSON(w, map[string]any{"isSnapshot": false, "versions": []string{"26.1.2.40", "26.2.0.56-beta", "26.2.0.87"}})
 	})
 	mux.HandleFunc("/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar", func(w http.ResponseWriter, r *http.Request) {
-		h.neoHits++
+		h.hit(&h.neoHits)
 		w.Write(h.neoInstaller.data)
 	})
 	mux.HandleFunc("/forge/net/minecraftforge/forge/maven-metadata.xml", func(w http.ResponseWriter, r *http.Request) {
@@ -314,7 +314,7 @@ func newHarness(t *testing.T) *harness {
 			`</versions></versioning></metadata>`)
 	})
 	mux.HandleFunc("/forge/net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-installer.jar", func(w http.ResponseWriter, r *http.Request) {
-		h.forgeHits++
+		h.hit(&h.forgeHits)
 		w.Write(h.forgeInstaller.data)
 	})
 	h.neoLibs = map[string]fakeJar{
@@ -329,10 +329,10 @@ func newHarness(t *testing.T) *harness {
 		jar, ok := h.neoLibs[path]
 		if !ok {
 			if jar, ok = h.forgeLibs[path]; ok {
-				h.forgeHits++
+				h.hit(&h.forgeHits)
 			}
 		} else {
-			h.neoHits++
+			h.hit(&h.neoHits)
 		}
 		if !ok {
 			http.NotFound(w, r)
@@ -342,7 +342,7 @@ func newHarness(t *testing.T) *harness {
 	})
 	h.serverJar = makeJar(t, "fabric-server-launch", "fabric-server-launch.jar", "server")
 	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/1.1.2/server/jar", func(w http.ResponseWriter, r *http.Request) {
-		h.serverJarHits++
+		h.hit(&h.serverJarHits)
 		w.Write(h.serverJar.data)
 	})
 	projects := map[string]map[string]any{
@@ -467,7 +467,7 @@ func newHarness(t *testing.T) *harness {
 	})
 	h.mojang = map[string]string{}
 	mux.HandleFunc("/mojang/profiles/minecraft", func(w http.ResponseWriter, r *http.Request) {
-		h.mojangHits++
+		h.hit(&h.mojangHits)
 		var names []string
 		_ = json.NewDecoder(r.Body).Decode(&names)
 		profiles := []map[string]string{}
@@ -503,7 +503,7 @@ func newHarness(t *testing.T) *harness {
 		writeJSON(w, map[string]any{"gameVersions": games})
 	})
 	mux.HandleFunc("/session/session/minecraft/profile/", func(w http.ResponseWriter, r *http.Request) {
-		h.mojangHits++
+		h.hit(&h.mojangHits)
 		want := strings.TrimPrefix(r.URL.Path, "/session/session/minecraft/profile/")
 		for name, id := range h.mojang {
 			if strings.ReplaceAll(id, "-", "") == want {

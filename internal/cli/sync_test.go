@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
@@ -186,9 +187,9 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 	remote := filepath.Join(served, "remote.git")
 	gitRun(t, h.dir, "clone", "-q", "--bare", h.dir, remote)
 	gitRun(t, remote, "update-server-info")
-	failing := false
+	var failing atomic.Bool
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if failing {
+		if failing.Load() {
 			http.Error(w, "broken", http.StatusInternalServerError)
 			return
 		}
@@ -207,7 +208,7 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 	if code, stdout, _ := h.run(t, "sync", source, "--into", into, "--json"); code == 0 {
 		t.Fatalf("a broken manifest must fail the sync: %s", stdout)
 	}
-	failing = true
+	failing.Store(true)
 	if code, stdout, _ := h.run(t, "sync", source, "--into", into, "--json"); code == 0 || failureCode(t, stdout).Code != "source-fetch" {
 		t.Fatalf("an HTTP error is not a reason to fall back: exit %d %s", code, stdout)
 	}

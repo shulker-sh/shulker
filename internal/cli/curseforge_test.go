@@ -103,7 +103,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		return files
 	}
 	authed := func(w http.ResponseWriter, r *http.Request) bool {
-		h.cfHits++
+		h.hit(&h.cfHits)
 		if r.Header.Get("X-Api-Key") != curseForgeTestKey {
 			w.WriteHeader(http.StatusForbidden)
 			return false
