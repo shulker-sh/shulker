@@ -16,9 +16,17 @@ import (
 type repairResult struct {
 	Rebuilt    bool              `json:"rebuilt"`
 	Registered []config.Instance `json:"registered"`
+	Renamed    []repairRename    `json:"renamed"`
 	Wrote      []string          `json:"wrote"`
 	Missing    []string          `json:"missing"`
 	total      int
+}
+
+type repairRename struct {
+	ID   string `json:"id"`
+	Dir  string `json:"dir"`
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 func (a *app) instancesRepairCmd() *cobra.Command {
@@ -74,8 +82,17 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 			res.Missing = append(res.Missing, in.Dir)
 			continue
 		}
+		// The launcher's file is the authority on the name, since renaming there is how a player renames
+		// an instance; nothing to read keeps the name, which unlink needs once the folder is gone.
+		from := in.Name
+		if name := launcher.Find(in.Launcher).InstanceName(in.LauncherDir, in.Dir); name != "" {
+			in.Name = name
+		}
 		if in.ID == "" {
 			in.ID = uniqueID(instances, inPlaceID(in.Dir), in.Name, in.Dir)
+		}
+		if in.Name != from {
+			res.Renamed = append(res.Renamed, repairRename{ID: in.ID, Dir: in.Dir, From: from, To: in.Name})
 		}
 		wrote, err := repairIntent(*in)
 		if err != nil {
@@ -173,7 +190,9 @@ func scanLaunchers(only, dir, instancesRoot string) []config.Instance {
 			if e.Name != "shulker" {
 				in.LauncherDir = launcherDir
 			}
-			if e.Instanced {
+			if name := e.InstanceName(launcherDir, gameDir); name != "" {
+				in.Name = name
+			} else if e.Instanced {
 				in.Name = filepath.Base(e.InstanceDir(gameDir))
 			}
 			found = append(found, in)
@@ -186,10 +205,9 @@ func scanLaunchers(only, dir, instancesRoot string) []config.Instance {
 // shulker.json, the manifest of a project that is an instance under ADR 0001, whose one modpack
 // entry says what it follows; the instance file's source; the state a build left before instance
 // files existed. An instance file saying unlinked wins over all three, because unlink is what
-// forgets. The name is never the manifest's: the row's name is the one the launcher shows, which
-// scanLaunchers reads from the launcher itself. lastSyncAt is when the directory was last built
-// correctly, which a failure after that doesn't undo, so it is carried whatever the last sync did.
-// lastError isn't: it belongs to the row shulker is replacing.
+// forgets. The name is the folder's until scanLaunchers reads the one the launcher shows. lastSyncAt
+// is when the directory was last built correctly, which a failure after that doesn't undo, so it is
+// carried whatever the last sync did. lastError isn't: it belongs to the row shulker is replacing.
 func instanceAt(dir string) (config.Instance, bool) {
 	f, err := instance.Load(dir)
 	if err == nil && f.Unlinked {
@@ -220,6 +238,9 @@ func (r repairResult) print(l *out.Lines) {
 	for _, in := range r.Registered {
 		l.OKInto("registered "+in.ID, in.Dir, launcher.Title(in.Launcher))
 	}
+	for _, rn := range r.Renamed {
+		l.OK("renamed "+rn.ID+"  "+l.T.Bump(rn.From, rn.To), "")
+	}
 	for _, path := range r.Wrote {
 		l.OK("wrote "+path, "")
 	}
@@ -233,7 +254,7 @@ func (r repairResult) print(l *out.Lines) {
 	switch {
 	case r.total == 0:
 		l.Info("Nothing is linked yet; `shulker link prism` adds an instance.")
-	case len(r.Registered) == 0 && len(r.Wrote) == 0 && len(r.Missing) == 0:
+	case len(r.Registered) == 0 && len(r.Renamed) == 0 && len(r.Wrote) == 0 && len(r.Missing) == 0:
 		l.Info("Every instance is registered and has its instance file.")
 	}
 }

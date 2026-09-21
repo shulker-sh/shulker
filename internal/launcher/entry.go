@@ -38,6 +38,7 @@ type Entry struct {
 	gameDirIsInstance bool
 	relink            func(e *Entry, l Linked) (args []string, in string)
 	forget            func(e *Entry, l config.Instance) (Forgotten, error)
+	name              func(e *Entry, launcherDir, gameDir string) string
 }
 
 // Linked is a registry row plus the intent its instance.json records, which is where the side and
@@ -50,12 +51,12 @@ type Linked struct {
 }
 
 var All = []*Entry{
-	{Name: "shulker", Title: "Shulker", Instanced: true, gameDirIsInstance: true, relink: relinkShulker, forget: forgetShulker},
-	{Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir, relink: relinkLauncher, forget: forgetInstance},
-	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkLauncher, forget: forgetInstance},
-	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkLauncher, forget: forgetMojang},
-	{Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, relink: relinkLauncher, forget: forgetInstance},
-	{Name: "gdlauncher", Title: "GDLauncher", Instanced: true, DefaultDir: DefaultGDLauncherDir, relink: relinkLauncher, forget: forgetInstance},
+	{Name: "shulker", Title: "Shulker", Instanced: true, gameDirIsInstance: true, relink: relinkShulker, forget: forgetShulker, name: shulkerName},
+	{Name: "prism", Title: "Prism Launcher", Instanced: true, DefaultDir: DefaultPrismDir, relink: relinkLauncher, forget: forgetInstance, name: prismName},
+	{Name: "multimc", Title: "MultiMC", Instanced: true, relink: relinkLauncher, forget: forgetInstance, name: prismName},
+	{Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir, relink: relinkLauncher, forget: forgetMojang, name: mojangName},
+	{Name: "atlauncher", Title: "ATLauncher", Instanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, relink: relinkLauncher, forget: forgetInstance, name: atlauncherName},
+	{Name: "gdlauncher", Title: "GDLauncher", Instanced: true, DefaultDir: DefaultGDLauncherDir, relink: relinkLauncher, forget: forgetInstance, name: gdlauncherName},
 }
 
 // InstanceDir is the instance folder that holds an instanced launcher's game directory.

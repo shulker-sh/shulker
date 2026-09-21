@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -521,8 +522,8 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 	if len(instances) != 1 || instances[0].Dir != gameDir || instances[0].Source != h.dir {
 		t.Fatalf("the source comes from the modpack the manifest requires: %+v", instances)
 	}
-	if instances[0].Name != "shulker-lost" {
-		t.Fatalf("the name comes from the launcher, not from the manifest: %+v", instances[0])
+	if instances[0].Name != "Lost" {
+		t.Fatalf("the name is the one the launcher shows, not the folder's: %+v", instances[0])
 	}
 	if instances[0].ID != "lost" {
 		t.Fatalf("the id is the manifest's name, which the link set to the id: %+v", instances[0])
@@ -552,6 +553,102 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 		t.Fatalf("instances lists it: %s", stdout)
 	}
 	h.mustRun(t, "sync", "-i", "lost")
+}
+
+// Every launcher's folder name is a mangled form of the name it shows, so a rebuilt registry reads
+// the name back from the file each one keeps it in.
+func TestInstancesRepairNamesAnInstanceTheWayItsLauncherShowsIt(t *testing.T) {
+	h := newHarness(t)
+	shulkerInstances(t, h)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	dirs := map[string]string{}
+	for _, name := range []string{"prism", "atlauncher", "gdlauncher", "mojang"} {
+		dir, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		dirs[name] = dir
+		h.mustRun(t, "link", name, h.dir, "--launcher-dir", dir, "--name", "Friends Pack", "--as", name)
+	}
+	h.mustRun(t, "link", "shulker", h.dir, "--as", "smp")
+
+	if err := config.WriteInstances(registryPath(h), nil); err != nil {
+		t.Fatal(err)
+	}
+	for name, dir := range dirs {
+		h.mustRun(t, "instances", "repair", "--launcher", name, "--launcher-dir", dir)
+	}
+	h.mustRun(t, "instances", "repair", "--launcher", "shulker")
+
+	instances := readInstances(t, h)
+	if len(instances) != 5 {
+		t.Fatalf("every instance is registered again: %+v", instances)
+	}
+	for _, in := range instances {
+		want := "Friends Pack"
+		if in.Launcher == "shulker" {
+			want = "pack"
+		}
+		if in.Name != want {
+			t.Errorf("%s: the row is named %q, want %q", in.Launcher, in.Name, want)
+		}
+	}
+}
+
+// Renaming an instance in the launcher is how a player renames it, so repair follows the launcher's
+// file and says so. The id is what scripts and -i use, so it stays.
+func TestInstancesRepairFollowsARenameInTheLauncher(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
+	cfgPath := filepath.Join(prismDir, "instances", "shulker-friends", launcher.InstanceConfigFile)
+
+	rename := func(name string) {
+		lines := strings.Split(readFile(t, cfgPath), "\n")
+		for i, line := range lines {
+			if strings.HasPrefix(line, "name=") {
+				lines[i] = "name=" + strconv.Quote(name)
+			}
+		}
+		writeFile(t, cfgPath, strings.Join(lines, "\n"))
+	}
+	repairJSON := func() repairResult {
+		var env struct {
+			Data repairResult `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "repair", "--json")), &env); err != nil {
+			t.Fatal(err)
+		}
+		return env.Data
+	}
+
+	rename("Friends SMP")
+	gameDir := filepath.Join(filepath.Dir(cfgPath), "minecraft")
+	if res := repairJSON(); len(res.Renamed) != 1 || res.Renamed[0] != (repairRename{ID: "friends", Dir: gameDir, From: "Friends", To: "Friends SMP"}) {
+		t.Fatalf("repair reports the rename: %+v", res.Renamed)
+	}
+	instances := readInstances(t, h)
+	if len(instances) != 1 || instances[0].Name != "Friends SMP" || instances[0].ID != "friends" {
+		t.Fatalf("the row takes the new name and keeps its id: %+v", instances)
+	}
+	if res := repairJSON(); len(res.Renamed) != 0 {
+		t.Fatalf("a name already in step is no rename: %+v", res.Renamed)
+	}
+
+	rename("Friends Survival")
+	if stdout := h.mustRun(t, "instances", "repair"); !strings.Contains(stdout, "renamed friends  Friends SMP ⟶ Friends Survival") {
+		t.Fatalf("repair prints the rename: %s", stdout)
+	}
+
+	// A launcher file with nothing to read never blanks the name unlink needs.
+	writeFile(t, cfgPath, "")
+	h.mustRun(t, "instances", "repair")
+	if instances := readInstances(t, h); instances[0].Name != "Friends Survival" {
+		t.Fatalf("an unreadable name keeps the row's: %+v", instances[0])
+	}
 }
 
 // A directory shulker only syncs into is no project, so its source is its instance file's, and the
