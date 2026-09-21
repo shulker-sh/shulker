@@ -1,3 +1,5 @@
+// Package fetch is shulker's HTTP client: every request it makes goes through one Client, which
+// honours --offline and tells network failures apart from a server's answer.
 package fetch
 
 import (
@@ -47,6 +49,8 @@ func IsNetwork(err error) bool {
 	return errors.As(err, &urlErr) || errors.As(err, &netErr)
 }
 
+// StatusError is a server answering with a status other than 2xx. errors.Is matches a 404 against
+// ErrNotFound and a 403 against ErrForbidden.
 type StatusError struct {
 	URL    string
 	Status int
@@ -206,6 +210,8 @@ func (c *Client) PostForm(ctx context.Context, url string, form url.Values, v an
 	return nil
 }
 
+// GetJSONIfFound is GetJSON where a 404 or a 204 is an answer, not an error: it reports whether v
+// was filled.
 func (c *Client) GetJSONIfFound(ctx context.Context, url string, v any) (bool, error) {
 	resp, err := c.get(ctx, url, "application/json")
 	if errors.Is(err, ErrNotFound) {
@@ -224,6 +230,7 @@ func (c *Client) GetJSONIfFound(ctx context.Context, url string, v any) (bool, e
 	return true, nil
 }
 
+// Download copies url's body into dst and returns its sha512 in hex.
 func (c *Client) Download(ctx context.Context, url string, dst io.Writer) (string, error) {
 	resp, err := c.get(ctx, url, "")
 	if err != nil {
