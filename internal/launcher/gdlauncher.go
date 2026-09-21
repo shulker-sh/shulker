@@ -168,23 +168,14 @@ func (l *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, err
 	dir := l.InstanceDir(inst.Name)
 	res := InstanceResult{Dir: dir, GameDir: filepath.Join(dir, GDLauncherGameDir)}
 	path := filepath.Join(dir, GDLauncherInstanceFile)
-	top := map[string]json.RawMessage{}
-	data, err := os.ReadFile(path)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		res.Created = true
-	case err != nil:
+	top, found, err := readJSONObject(path)
+	if err != nil {
 		return res, err
-	default:
-		if err := json.Unmarshal(data, &top); err != nil {
-			return res, fmt.Errorf("%s: %w", path, err)
-		}
 	}
-	config := map[string]json.RawMessage{}
-	if raw, ok := top["game_configuration"]; ok {
-		if err := json.Unmarshal(raw, &config); err != nil {
-			return res, fmt.Errorf("%s: game_configuration: %w", path, err)
-		}
+	res.Created = !found
+	config, err := jsonObjectAt(path, top, "game_configuration")
+	if err != nil {
+		return res, err
 	}
 	modloaders := []map[string]string{}
 	if loaderType, ok := gdlauncherLoaderTypes[inst.LoaderType]; ok {

@@ -84,7 +84,7 @@ func (v *Mojang) profilesPath() string { return filepath.Join(v.Dir, ProfilesFil
 
 func (v *Mojang) readProfiles() (top, profiles map[string]json.RawMessage, err error) {
 	path := v.profilesPath()
-	top, profiles = map[string]json.RawMessage{}, map[string]json.RawMessage{}
+	top = map[string]json.RawMessage{}
 	data, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, nil, err
@@ -94,10 +94,8 @@ func (v *Mojang) readProfiles() (top, profiles map[string]json.RawMessage, err e
 			return nil, nil, fmt.Errorf("%s: %w", path, err)
 		}
 	}
-	if raw, ok := top["profiles"]; ok {
-		if err := json.Unmarshal(raw, &profiles); err != nil {
-			return nil, nil, fmt.Errorf("%s: profiles: %w", path, err)
-		}
+	if profiles, err = jsonObjectAt(path, top, "profiles"); err != nil {
+		return nil, nil, err
 	}
 	return top, profiles, nil
 }

@@ -108,18 +108,11 @@ func (l *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, err
 	dir := l.InstanceDir(inst.Name)
 	res := InstanceResult{Dir: dir, GameDir: dir}
 	path := filepath.Join(dir, ATLauncherInstanceFile)
-	previous := map[string]json.RawMessage{}
-	data, err := os.ReadFile(path)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		res.Created = true
-	case err != nil:
+	previous, found, err := readJSONObject(path)
+	if err != nil {
 		return res, err
-	default:
-		if err := json.Unmarshal(data, &previous); err != nil {
-			return res, fmt.Errorf("%s: %w", path, err)
-		}
 	}
+	res.Created = !found
 	top := map[string]json.RawMessage{}
 	if err := json.Unmarshal(inst.Version, &top); err != nil {
 		return res, fmt.Errorf("version json: %w", err)
@@ -133,11 +126,9 @@ func (l *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, err
 		}
 		top["uuid"] = jsonString(id)
 	}
-	settings := map[string]json.RawMessage{}
-	if raw, ok := previous["launcher"]; ok {
-		if err := json.Unmarshal(raw, &settings); err != nil {
-			return res, fmt.Errorf("%s: launcher: %w", path, err)
-		}
+	settings, err := jsonObjectAt(path, previous, "launcher")
+	if err != nil {
+		return res, err
 	}
 	loaderVersion, err := json.Marshal(map[string]any{
 		"version":     inst.LoaderVersion,

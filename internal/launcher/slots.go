@@ -367,40 +367,18 @@ func releaseSlot(adopted, current string) string {
 
 func atlauncherSettings(instanceDir string) (settings, top map[string]json.RawMessage, found bool, err error) {
 	path := filepath.Join(instanceDir, ATLauncherInstanceFile)
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil, false, nil
+	top, found, err = readJSONObject(path)
+	if err != nil || !found {
+		return nil, nil, found, err
 	}
-	if err != nil {
-		return nil, nil, false, err
-	}
-	top = map[string]json.RawMessage{}
-	if err := json.Unmarshal(data, &top); err != nil {
-		return nil, nil, true, fmt.Errorf("%s: %w", path, err)
-	}
-	settings = map[string]json.RawMessage{}
-	if raw, ok := top["launcher"]; ok {
-		if err := json.Unmarshal(raw, &settings); err != nil {
-			return nil, nil, true, fmt.Errorf("%s: launcher: %w", path, err)
-		}
+	if settings, err = jsonObjectAt(path, top, "launcher"); err != nil {
+		return nil, nil, true, err
 	}
 	return settings, top, true, nil
 }
 
 func gdlauncherTop(instanceDir string) (map[string]json.RawMessage, bool, error) {
-	path := filepath.Join(instanceDir, GDLauncherInstanceFile)
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	top := map[string]json.RawMessage{}
-	if err := json.Unmarshal(data, &top); err != nil {
-		return nil, true, fmt.Errorf("%s: %w", path, err)
-	}
-	return top, true, nil
+	return readJSONObject(filepath.Join(instanceDir, GDLauncherInstanceFile))
 }
 
 func jsonStringValue(raw json.RawMessage) string {
