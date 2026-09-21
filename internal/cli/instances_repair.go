@@ -210,7 +210,7 @@ func (r repairResult) print(l *out.Lines) {
 	}
 	switch {
 	case r.total == 0:
-		l.Info("Nothing is linked yet; `shulker link prism` or `shulker sync --into <dir>` adds an instance.")
+		l.Info("Nothing is linked yet; `shulker link prism` adds an instance.")
 	case len(r.Registered) == 0 && len(r.Wrote) == 0 && len(r.Missing) == 0:
 		l.Info("Every instance is registered and has its instance file.")
 	}

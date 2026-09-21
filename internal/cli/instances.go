@@ -159,7 +159,7 @@ func sortInstanceEntries(entries []instanceEntry) {
 
 func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
 	if len(entries) == 0 {
-		l.Info("Nothing is linked yet; `shulker link prism` or `shulker sync --into <dir>` adds an instance.")
+		l.Info("Nothing is linked yet; `shulker link prism` adds an instance.")
 		return
 	}
 	var group []out.Entry

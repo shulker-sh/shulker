@@ -59,7 +59,7 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]instanceEntr
 		return nil, err
 	}
 	if len(entries) == 0 {
-		return nil, out.Errorf("no-instances", "nothing is linked yet; `shulker link prism` or `shulker sync --into <dir>` adds an instance")
+		return nil, out.Errorf("no-instances", "nothing is linked yet; `shulker link prism` adds an instance")
 	}
 	sortInstanceEntries(entries)
 	var pool []instanceEntry

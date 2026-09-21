@@ -54,7 +54,7 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 		}
 	}
 	if len(all) == 0 {
-		return nil, true, out.Errorf("no-instances", "nothing is synced from %s yet; `shulker sync --into <dir>` or `shulker link prism` adds an instance, and `shulker sync --all` syncs every one", dir)
+		return nil, true, out.Errorf("no-instances", "nothing is synced from %s yet; `shulker link prism` adds an instance and `shulker sync --into <dir>` a detached build, and `shulker sync --all` syncs every instance", dir)
 	}
 	sortInstanceEntries(all)
 	for _, e := range all {
