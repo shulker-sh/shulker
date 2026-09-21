@@ -28,13 +28,14 @@ type backupRow struct {
 
 // savesTarget is whose worlds and backups one command looks at: a save group, or a game
 // directory keeping its own. World is set for a server, whose only world is that folder in
-// WorldsDir.
+// WorldsDir. via is the -i the commands saves prints name it by, when --all reached it.
 type savesTarget struct {
 	Group     string `json:"group,omitempty"`
 	Dir       string `json:"dir,omitempty"`
 	WorldsDir string `json:"worldsDir"`
 	World     string `json:"world,omitempty"`
 	backups   string
+	via       string
 }
 
 type savesView struct {
@@ -50,30 +51,28 @@ type savesPruned struct {
 }
 
 func (a *app) savesCmd() *cobra.Command {
-	var group string
+	var where savesWhere
 	cmd := &cobra.Command{
 		Use:   "saves",
 		Short: "Show save groups, or one group's or instance's worlds and backups",
-		Long:  "Show the save groups shulker's own instances share worlds through. With -i, -C or --group, show that target's worlds and its backups instead, newest backup first.",
+		Long:  "Show the save groups shulker's own instances share worlds through. With -i, -C or --group, show that target's worlds and its backups instead, newest backup first; with --all, every registered instance's, each save group once.",
 		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if group == "" && a.instance == "" && !cmd.Flags().Changed("dir") {
+			if where.group == "" && a.instance == "" && !cmd.Flags().Changed("dir") && !where.sel.all && !where.sel.narrows() {
 				return a.listSaveGroups()
 			}
-			target, err := a.savesTargetOf(group)
-			if err != nil {
-				return err
-			}
-			return a.showSaves(target)
+			return onSaves(a, where, func(n, of int) *out.Error {
+				return out.Errorf("saves-failed", "%d of %d targets failed to read their saves", n, of)
+			}, a.savesView, a.printSavesView)
 		},
 	}
-	cmd.Flags().StringVar(&group, "group", "", "show this save group rather than an instance")
+	where.register(cmd, "show this save group rather than an instance", "show every instance's worlds and backups")
 	cmd.AddCommand(a.savesPruneCmd())
 	return cmd
 }
 
 func (a *app) savesPruneCmd() *cobra.Command {
-	var group string
+	var where savesWhere
 	var keep int
 	cmd := &cobra.Command{
 		Use:   "prune --keep <n>",
@@ -86,37 +85,40 @@ func (a *app) savesPruneCmd() *cobra.Command {
 			if keep < 0 {
 				return out.Errorf("usage", "--keep takes 0 or more, not %d", keep)
 			}
-			target, err := a.savesTargetOf(group)
-			if err != nil {
-				return err
-			}
-			pruned, err := saves.Prune(target.backups, keep)
-			if err != nil {
-				return err
-			}
-			left, err := saves.Backups(target.backups)
-			if err != nil {
-				return err
-			}
-			res := savesPruned{savesTarget: target, Pruned: pruned, Kept: len(left)}
-			return a.printer.Emit(res, func(l *out.Lines) {
-				kept := plural(len(left), "backup", "backups") + " left"
-				if len(pruned) == 0 {
-					l.Info("nothing to prune; " + kept)
-					return
-				}
-				items := make([]out.Item, 0, len(pruned))
-				for _, b := range pruned {
-					items = append(items, out.Item{Kind: out.Drop, Name: b.ID})
-				}
-				l.Items(items...)
-				l.OK("pruned "+plural(len(pruned), "backup", "backups"), kept)
-			})
+			return onSaves(a, where, func(n, of int) *out.Error {
+				return out.Errorf("saves-failed", "%d of %d targets failed to prune", n, of)
+			}, func(target savesTarget) (savesPruned, error) { return pruneBackups(target, keep) }, savesPruned.print)
 		},
 	}
-	cmd.Flags().StringVar(&group, "group", "", "prune this save group's backups rather than an instance's")
+	where.register(cmd, "prune this save group's backups rather than an instance's", "prune every instance's backups")
 	cmd.Flags().IntVar(&keep, "keep", 0, "how many of the newest backups to keep (required)")
 	return cmd
+}
+
+func pruneBackups(target savesTarget, keep int) (savesPruned, error) {
+	pruned, err := saves.Prune(target.backups, keep)
+	if err != nil {
+		return savesPruned{}, err
+	}
+	left, err := saves.Backups(target.backups)
+	if err != nil {
+		return savesPruned{}, err
+	}
+	return savesPruned{savesTarget: target, Pruned: pruned, Kept: len(left)}, nil
+}
+
+func (res savesPruned) print(l *out.Lines) {
+	kept := plural(res.Kept, "backup", "backups") + " left"
+	if len(res.Pruned) == 0 {
+		l.Info("nothing to prune; " + kept)
+		return
+	}
+	items := make([]out.Item, 0, len(res.Pruned))
+	for _, b := range res.Pruned {
+		items = append(items, out.Item{Kind: out.Drop, Name: b.ID})
+	}
+	l.Items(items...)
+	l.OK("pruned "+plural(len(res.Pruned), "backup", "backups"), kept)
 }
 
 func (a *app) listSaveGroups() error {
@@ -159,54 +161,58 @@ func (a *app) listSaveGroups() error {
 	})
 }
 
-func (a *app) showSaves(target savesTarget) error {
+func (a *app) savesView(target savesTarget) (savesView, error) {
 	worlds, err := saves.Worlds(target.WorldsDir)
 	if err != nil {
-		return err
+		return savesView{}, err
 	}
 	if target.World != "" {
 		worlds = slices.DeleteFunc(worlds, func(w string) bool { return w != target.World })
 	}
 	backups, err := saves.Backups(target.backups)
 	if err != nil {
-		return err
+		return savesView{}, err
 	}
 	view := savesView{savesTarget: target, Worlds: worlds, Backups: make([]backupRow, 0, len(backups))}
 	for i, b := range backups {
 		view.Backups = append(view.Backups, backupRow{N: i + 1, Backup: b})
 	}
-	return a.printer.Emit(view, func(l *out.Lines) {
-		t := l.T
-		l.Heading("Worlds")
-		switch {
-		case len(worlds) > 0:
-		case target.World != "":
-			l.Info("no world " + target.World + " in " + target.WorldsDir)
-		default:
-			l.Info("no worlds in " + target.WorldsDir)
-		}
-		for _, w := range worlds {
-			l.Plain(t.Grey(t.GlyphDot()) + " " + t.Bold(w))
-		}
-		l.Blank()
-		l.Heading("Backups")
-		if len(view.Backups) == 0 {
-			l.Info("no backups yet; `" + a.savesCommand(target, "backup") + "` takes one")
-			return
-		}
-		width := len(strconv.Itoa(len(view.Backups)))
-		for _, b := range view.Backups {
-			label := fmt.Sprintf("%*d)", width, b.N)
-			l.Plain(t.Cyan(label) + " " + t.Bold(b.ID) + " " + t.Grey(backupAside(b.Backup)))
-		}
-		l.Nudge("Restore one", a.savesCommand(target, "restore <n>"))
-	})
+	return view, nil
+}
+
+func (a *app) printSavesView(view savesView, l *out.Lines) {
+	t := l.T
+	l.Heading("Worlds")
+	switch {
+	case len(view.Worlds) > 0:
+	case view.World != "":
+		l.Info("no world " + view.World + " in " + view.WorldsDir)
+	default:
+		l.Info("no worlds in " + view.WorldsDir)
+	}
+	for _, w := range view.Worlds {
+		l.Plain(t.Grey(t.GlyphDot()) + " " + t.Bold(w))
+	}
+	l.Blank()
+	l.Heading("Backups")
+	if len(view.Backups) == 0 {
+		l.Info("no backups yet; `" + a.savesCommand(view.savesTarget, "backup") + "` takes one")
+		return
+	}
+	width := len(strconv.Itoa(len(view.Backups)))
+	for _, b := range view.Backups {
+		label := fmt.Sprintf("%*d)", width, b.N)
+		l.Plain(t.Cyan(label) + " " + t.Bold(b.ID) + " " + t.Grey(backupAside(b.Backup)))
+	}
+	l.Nudge("Restore one", a.savesCommand(view.savesTarget, "restore <n>"))
 }
 
 // savesCommand is command, with any arguments, run on the target saves shows, selected the way
 // saves was.
 func (a *app) savesCommand(target savesTarget, command string) string {
 	switch {
+	case target.via != "":
+		return "shulker -i " + shellWord(target.via) + " " + command
 	case target.Dir == "":
 		return "shulker " + command + " --group " + target.Group
 	case a.instance != "":
