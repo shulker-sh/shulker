@@ -70,3 +70,27 @@ func TestPlayRunsALoaderInstallerOnceWithTheClientJarInPlace(t *testing.T) {
 		t.Fatal("the installer had to download the vanilla client jar, with no progress line of its own")
 	}
 }
+
+func TestPlayLaunchesOfflineFromTheStore(t *testing.T) {
+	for _, loader := range []string{"", "fabric", "quilt", "forge", "neoforge"} {
+		t.Run("loader="+loader, func(t *testing.T) {
+			h := newHarness(t)
+			var args []string
+			if loader != "" {
+				args = []string{"--loader", loader}
+			}
+			_, gameDir := playHarness(t, h, args...)
+			h.mustRun(t, "accounts", "login", "--use")
+			h.mustRun(t, "-i", "pack", "play", "--no-sync")
+			argv := filepath.Join(gameDir, "args.txt")
+			waitForFile(t, argv)
+			if err := os.Remove(argv); err != nil {
+				t.Fatal(err)
+			}
+
+			h.server.Close()
+			h.mustRun(t, "-i", "pack", "play", "--no-sync")
+			waitForFile(t, argv)
+		})
+	}
+}

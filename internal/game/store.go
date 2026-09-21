@@ -247,9 +247,9 @@ func (s Store) Has(f File) bool {
 	return err == nil && strings.EqualFold(sum, f.Sha1)
 }
 
-// InstalledLoader is the version id a loader's own installer wrote into the store, remembered so a
-// launch doesn't run the installer again. The note is the store's own bookkeeping: losing it costs
-// one install and nothing else.
+// InstalledLoader is the version id a loader wrote into the store, by its own installer or from its
+// launcher profile, remembered so a launch needs neither again. The note is the store's own
+// bookkeeping: losing it costs one install or one download and nothing else.
 func (s Store) InstalledLoader(key string) (string, bool) {
 	data, err := os.ReadFile(s.loadersPath())
 	if err != nil {
@@ -263,7 +263,7 @@ func (s Store) InstalledLoader(key string) (string, bool) {
 	return id, ok
 }
 
-// RecordLoader remembers what an installer wrote, keeping the notes already there.
+// RecordLoader remembers the version id a loader wrote, keeping the notes already there.
 func (s Store) RecordLoader(key, versionID string) error {
 	installed := map[string]string{}
 	if data, err := os.ReadFile(s.loadersPath()); err == nil {

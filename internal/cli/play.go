@@ -543,7 +543,8 @@ func nativesDir(dir string) string { return filepath.Join(dir, instance.Dir, "na
 
 // storeVersion puts the version JSON a launch runs, and the vanilla one it inherits from, into the
 // store, and returns its id. A loader with an installer of its own is run against the store, which
-// is laid out as the Mojang launcher directory the installer expects.
+// is laid out as the Mojang launcher directory the installer expects. The store remembers the id
+// each loader wrote, so a later launch needs neither the installer nor the network.
 func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store) (string, error) {
 	d, err := a.deps()
 	if err != nil {
@@ -559,18 +560,27 @@ func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store
 	if err != nil {
 		return "", err
 	}
+	key := p.Lock.Loader.Type + "-" + p.Lock.Loader.Version + "-" + p.Lock.Minecraft
+	if id, ok := s.InstalledLoader(key); ok && s.HasVersion(id) {
+		return id, nil
+	}
+	var id string
 	if l.InstallClientFlag != "" {
 		if err := a.fetchVanillaClient(ctx, s, p.Lock.Minecraft); err != nil {
 			return "", err
 		}
-		return a.installedLoader(ctx, p, s, l)
+		id, err = a.installClientLoader(ctx, p, &launcher.Mojang{Dir: s.Root}, l)
+	} else {
+		a.progress("fetching %s loader %s for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
+		var profile []byte
+		if profile, err = d.meta.LoaderProfile(ctx, p.Lock.Loader, p.Lock.Minecraft); err == nil {
+			id, err = s.SaveVersion(profile)
+		}
 	}
-	a.progress("fetching %s loader %s for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
-	profile, err := d.meta.LoaderProfile(ctx, p.Lock.Loader, p.Lock.Minecraft)
 	if err != nil {
 		return "", err
 	}
-	return s.SaveVersion(profile)
+	return id, s.RecordLoader(key, id)
 }
 
 // storeVanillaVersion puts the vanilla version JSON for the Minecraft version in the store, unless
@@ -711,18 +721,4 @@ func (a *app) clientJava(ctx context.Context, p *project.Project, dir string) (s
 		return "", err
 	}
 	return server.JavaBin(rt.Home), nil
-}
-
-// installedLoader runs a loader's own installer against the store and remembers the version id it
-// wrote, so a second launch of the same pack doesn't pay for the installer again.
-func (a *app) installedLoader(ctx context.Context, p *project.Project, s game.Store, l loader.Loader) (string, error) {
-	key := p.Lock.Loader.Type + "-" + p.Lock.Loader.Version + "-" + p.Lock.Minecraft
-	if id, ok := s.InstalledLoader(key); ok && s.HasVersion(id) {
-		return id, nil
-	}
-	id, err := a.installClientLoader(ctx, p, &launcher.Mojang{Dir: s.Root}, l)
-	if err != nil {
-		return "", err
-	}
-	return id, s.RecordLoader(key, id)
 }
