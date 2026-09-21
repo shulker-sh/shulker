@@ -35,8 +35,8 @@ type Error struct {
 	Exit       int      `json:"-"`
 	// Data is the partial result of a command that failed part-way; it goes in the envelope's data.
 	Data any `json:"-"`
-	// Help is the human-only "help:" row under the error line.
-	Help string `json:"-"`
+	// Help is what to do about the error: the "help:" row under a human error line, and help in JSON.
+	Help string `json:"help,omitempty"`
 	// Nudge is the human-only command to run next, with its lead-in.
 	Nudge Nudge `json:"-"`
 	// IsPlain marks an error rendered as dialog body text: no glyph, no code aside, no gutter, and the

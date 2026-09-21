@@ -1543,9 +1543,9 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `lockStale` | `shulker.lock` doesn't match `shulker.json`; `shulker lock` brings it in line. Commands that build from the lock warn, naming each difference, and carry on; `export` refuses |
 | `warnings` | Everything shulker would print as a `!` line without `--json`. Always present, empty when there are none |
 | `data` | The command's result. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
-| `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `candidates` or `items` |
+| `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `help`, `candidates` or `items` |
 
-`candidates` lists values you could pass instead, like the sides when a command is given something that is not one. `items` lists what the error is about, like the files in conflict. Both are left out when empty.
+`help` says what to do about the error, like the command to run. `candidates` lists values you could pass instead, like the sides when a command is given something that is not one. `items` lists what the error is about, like the files in conflict. All three are left out when empty.
 
 | Exit status | Meaning |
 | --- | --- |
