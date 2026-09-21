@@ -204,13 +204,21 @@ func settingText(v any) string {
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
+// settingsSchema is the schema a dotted path is looked up in. base is where in the file the paths
+// start: a path is typed relative to it, and every field it resolves to is written beneath it.
 type settingsSchema struct {
-	root map[string]any
-	defs map[string]any
+	root  map[string]any
+	defs  map[string]any
+	base  []string
+	where string
 }
 
 func loadSettingsSchema() (*settingsSchema, error) {
-	raw, err := schema.Raw(schema.Manifest)
+	return loadSchemaAt(schema.Manifest, manifest.FileName)
+}
+
+func loadSchemaAt(kind schema.Kind, where string, base ...string) (*settingsSchema, error) {
+	raw, err := schema.Raw(kind)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +227,12 @@ func loadSettingsSchema() (*settingsSchema, error) {
 		return nil, err
 	}
 	defs, _ := root["$defs"].(map[string]any)
-	return &settingsSchema{root: root, defs: defs}, nil
+	s := &settingsSchema{root: root, defs: defs, base: base, where: where}
+	for _, key := range base {
+		props, _ := s.deref(s.root)["properties"].(map[string]any)
+		s.root, _ = props[key].(map[string]any)
+	}
+	return s, nil
 }
 
 func (s *settingsSchema) deref(node map[string]any) map[string]any {
@@ -277,7 +290,7 @@ func (s *settingsSchema) lookup(path string) (*settingField, error) {
 	}
 	segs := strings.Split(path, ".")
 	node := s.root
-	var keys []string
+	keys := slices.Clone(s.base)
 	for i, seg := range segs {
 		node = s.deref(node)
 		parent := strings.Join(segs[:i], ".")
@@ -298,7 +311,7 @@ func (s *settingsSchema) lookup(path string) (*settingField, error) {
 		case props != nil:
 			child, ok := props[seg].(map[string]any)
 			if !ok {
-				return nil, pathInvalid(segs, i, slices.Sorted(maps.Keys(props)))
+				return nil, pathInvalid(s.where, segs, i, slices.Sorted(maps.Keys(props)))
 			}
 			keys, node = append(keys, seg), child
 		case s.types(node)["array"]:
@@ -310,8 +323,7 @@ func (s *settingsSchema) lookup(path string) (*settingField, error) {
 	return &settingField{path: path, keys: keys, schema: s.deref(node), s: s}, nil
 }
 
-func pathInvalid(segs []string, i int, allowed []string) error {
-	where := manifest.FileName
+func pathInvalid(where string, segs []string, i int, allowed []string) error {
 	if parent := strings.Join(segs[:i], "."); parent != "" {
 		where = parent
 	}

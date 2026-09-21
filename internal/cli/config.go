@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"path/filepath"
@@ -10,7 +11,9 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/schema"
 )
 
 const (
@@ -325,7 +328,40 @@ func checkConfigValue(key string, v any, literal bool) (any, error) {
 			return nil, out.Errorf("usage", "%s is an account id, so it takes a string", key)
 		}
 	}
+	if name, ok := strings.CutPrefix(key, "play."); ok {
+		if err := checkPlaySetting(key, name, v); err != nil {
+			return nil, err
+		}
+	}
 	return v, nil
+}
+
+// playHints say what each launch setting takes, for the error that refuses a value it can't.
+var playHints = map[string]string{
+	"memory":  `a heap size like "6G"`,
+	"jvmArgs": `a list of JVM arguments; pass --literal '["-XX:+UseZGC"]'`,
+	"java":    "an absolute path to a java binary",
+	"window":  `a window size like "1280x720"`,
+	"wrapper": `a command as a list of words; pass --literal '["gamemoderun"]'`,
+}
+
+// checkPlaySetting holds a launch setting to the rules of the instance key of the same name, which
+// is the one the schema writes down, so a value an instance file would refuse can't be a default
+// either. path is the key as it was typed, for the message.
+func checkPlaySetting(path, name string, v any) error {
+	doc := map[string]any{"$schema": instance.SchemaURL, "settings": map[string]any{name: v}}
+	data, err := json.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	valid := schema.Validate(schema.Instance, data) == nil
+	if java, ok := v.(string); ok && name == "java" && !filepath.IsAbs(java) {
+		valid = false
+	}
+	if !valid {
+		return out.Errorf("usage", "%s takes %s, not %s", path, playHints[name], settingText(v))
+	}
+	return nil
 }
 
 // providerList reads accounts.providers out of a JSON value.

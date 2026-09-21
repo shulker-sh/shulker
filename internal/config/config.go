@@ -22,15 +22,26 @@ const (
 	RegistrySchemaURL = "https://shulker.sh/schema/v1/registry.json"
 )
 
-var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "registry", "saves", "store"}
+var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "play.java", "play.jvmArgs", "play.memory", "play.window", "play.wrapper", "registry", "saves", "store"}
 
 type Config struct {
 	Accounts   Accounts   `json:"accounts"`
 	CurseForge CurseForge `json:"curseforge"`
 	Instances  string     `json:"instances,omitempty"`
+	Play       Play       `json:"play"`
 	Registry   string     `json:"registry,omitempty"`
 	Saves      string     `json:"saves,omitempty"`
 	Store      string     `json:"store,omitempty"`
+}
+
+// Play is how shulker launches its own instances unless an instance says otherwise: each key here
+// is a default the same key in an instance's settings overrides, and an absent one inherits.
+type Play struct {
+	Memory  string   `json:"memory,omitempty"`
+	JvmArgs []string `json:"jvmArgs,omitempty"`
+	Java    string   `json:"java,omitempty"`
+	Window  string   `json:"window,omitempty"`
+	Wrapper []string `json:"wrapper,omitempty"`
 }
 
 type CurseForge struct {

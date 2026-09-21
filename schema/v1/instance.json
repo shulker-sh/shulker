@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://shulker.sh/schema/v1/instance.json",
   "title": ".shulker/instance.json",
-  "description": "The settings that decide how shulker sets an instance up, and, for a directory with no shulker.json of its own, what it syncs from. Hand-edit it to change what shulker does, then run `shulker sync` or `shulker instances repair`. Shulker never rewrites the settings block. What the last build actually did is recorded separately, in .shulker/state.json.",
+  "description": "The settings that decide how shulker sets an instance up, and, for a directory with no shulker.json of its own, what it syncs from. Change its settings with `shulker instance set` or `shulker instance edit`, or by hand, then run `shulker sync` or `shulker instances repair`. Shulker never rewrites the settings block on its own. What the last build actually did is recorded separately, in .shulker/state.json.",
   "type": "object",
   "required": ["$schema"],
   "additionalProperties": false,
@@ -47,10 +47,12 @@
           "properties": {
             "preLaunch": {
               "type": "boolean",
+              "default": true,
               "description": "Sync this instance from its source before each launch. Default true."
             },
             "postExit": {
               "type": "boolean",
+              "default": true,
               "description": "Record how each run ended when the game exits. Default true."
             }
           }
@@ -76,15 +78,35 @@
           "type": "boolean",
           "description": "Include the marker mod, which lists this pack in the in-game mod list and lets an export of it be recognised as this pack again. Off drops both. Set here it decides for this instance, over whatever the manifest says; absent, the manifest's marker decides, which defaults to true. Written by link --no-marker and --with-marker."
         },
+        "memory": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[MmGg]$",
+          "description": "Heap size `shulker play` gives the game, as -Xms and -Xmx, e.g. \"6G\". Omitted inherits `play.memory` from config.json, and without that the JVM picks its own. Another launcher's instance takes its memory from that launcher."
+        },
+        "jvmArgs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Extra JVM arguments for `shulker play`, after the version's own and the memory, so one of them wins over both. Omitted inherits `play.jvmArgs` from config.json. Replaces that list rather than adding to it."
+        },
         "java": {
           "type": "string",
           "minLength": 1,
-          "description": "Absolute path to the Java this machine launches the instance with. Omitted uses shulker's managed runtime. Per-machine, which is why it lives here rather than in the lock, which is shared, or the manifest, which is everyone's."
+          "description": "Absolute path to the Java this machine launches the instance with. Omitted inherits `play.java` from config.json when shulker launches it, and otherwise uses shulker's managed runtime. Per-machine, which is why it lives here rather than in the lock, which is shared, or the manifest, which is everyone's."
+        },
+        "window": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*x[1-9][0-9]*$",
+          "description": "Window size `shulker play` opens the game at, as \"<width>x<height>\", e.g. \"1280x720\". The game takes it for the run and never writes it back; fullscreen is the pack's, in `client.options`. Omitted inherits `play.window` from config.json, and `play --window` wins over both for one run."
         },
         "wrapper": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
-          "description": "Command prefix for the launch command, such as [\"gamemoderun\"]. Omitted leaves the launcher's own wrapper setting alone."
+          "description": "Command prefix for the launch command, such as [\"gamemoderun\"]. For another launcher's instance, omitted leaves that launcher's own wrapper setting alone; for one shulker launches, omitted inherits `play.wrapper` from config.json."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The id of the account `shulker play` launches this instance as, over the default account. `play --account` still wins for one run. An account that has since been removed fails the launch with `account-not-found` rather than falling back to another. `shulker instance set account <name>` records the id of the account it names."
         },
         "shulker": {
           "type": "string",

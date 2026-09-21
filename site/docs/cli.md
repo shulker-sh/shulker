@@ -375,6 +375,11 @@ shulker get server.properties
 | --- | --- |
 | `accounts.providers` | Where accounts are read from, in order, as a JSON array of `shulker`, `prism` or `mojang`. Without it, `["shulker"]`. An account in several providers is counted once, and the earliest one wins |
 | `accounts.default` | The id of the account a launch uses when nothing else names one. [`shulker accounts use`](#shulker-accounts-use) sets it |
+| `play.memory` | The heap size [`shulker play`](#shulker-play) gives the game, like `6G`. An instance's own `memory` wins over it, as each `play.` key's instance setting does; see [`shulker instance`](#shulker-instance). Without either, the JVM picks its own |
+| `play.jvmArgs` | Extra JVM arguments for those launches, as a JSON array |
+| `play.java` | The java binary those launches run, as an absolute path. Without it, shulker's managed runtime |
+| `play.window` | The window size those launches open at, like `1280x720` |
+| `play.wrapper` | A command those launches run through, as a JSON array like `["gamemoderun"]` |
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
 | `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
 | `instances` | Where [`shulker link shulker`](#shulker-link-shulker) puts the instances shulker owns. Without it, `instances` in shulker's data directory |
@@ -407,7 +412,7 @@ shulker config set registry ~/Dropbox/shulker/registry.json
 shulker config set accounts.providers --literal '["shulker","prism"]'
 ```
 
-A key that holds a list needs `--literal`, which reads the value as JSON. `accounts.providers` is checked as it is set: it must be a non-empty array of known provider names with no repeats, so a typo fails here rather than on the next run.
+A key that holds a list needs `--literal`, which reads the value as JSON. `accounts.providers` is checked as it is set: it must be a non-empty array of known provider names with no repeats, so a typo fails here rather than on the next run. The `play.` keys are checked the same way, against the rules of the instance setting of the same name.
 
 | Flag | Description |
 | --- | --- |
@@ -1092,6 +1097,68 @@ shulker instances repair --launcher prism --launcher-dir ~/other-prism
 | `--launcher <launcher>` | Only scan this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--launcher-dir <path>` | Scan this directory instead of the launcher's own; needs `--launcher` |
 
+### `shulker instance`
+
+`instance get`, `instance set`, `instance unset` and `instance edit` read and change the settings of one instance: the one the current directory is, or the one `-i` names from anywhere. That is its `.shulker/instance.json`, and every directory shulker syncs into has one, so an instance in another launcher has settings here too. The plural [`shulker instances`](#shulker-instances) is the list of them.
+
+A path is relative to the file's `settings` block and dotted the way `shulker set` dots the manifest: `memory`, `hooks.preLaunch`. Five settings are launch settings with a default in `config.json` under `play.`, which [`shulker config set`](#shulker-config-set) sets for every instance at once: an instance that sets one wins, and one that doesn't inherits the default. They apply when shulker launches the instance itself, with [`shulker play`](#shulker-play). `play.java` and `play.wrapper` don't reach another launcher, but an instance's own `java` and `wrapper` still point that launcher at a Java and a wrapper, as before.
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `memory` | `play.memory` | Heap size, as `-Xms` and `-Xmx`, like `6G`. Without either, the JVM picks its own |
+| `jvmArgs` | `play.jvmArgs` | Extra JVM arguments, after the version's own and the memory, so one of them wins over both. An instance's list replaces the default rather than adding to it |
+| `java` | `play.java` | Absolute path to a java binary. Without either, shulker's managed runtime |
+| `window` | `play.window` | Window size, like `1280x720`. `play --window` wins over both for one run |
+| `wrapper` | `play.wrapper` | A command the launch runs through, like `["gamemoderun"]` |
+| `account` | | The account `play` launches this instance as, over the default account |
+| `marker` | | Whether to include the marker mod, over the manifest's own `marker` |
+| `hooks.preLaunch`, `hooks.postExit` | | Whether another launcher syncs before each launch, and records each run |
+| `launchHistory` | | How many launch records to keep |
+
+### `shulker instance get`
+
+Print a setting as it is in effect, then where it came from: set in this instance, with the default it would return to; its `play.` default; or the setting's own default. A setting neither the instance nor `config.json` sets fails with `path-not-set`. With no path, print every setting the instance has, with the `play.` defaults it inherits filled in.
+
+```sh
+shulker instance get memory
+shulker -i smp instance get window
+shulker instance get
+```
+
+With `--json`, the data is `{ "path", "value", "from", "default" }`, where `from` is `instance`, `config` or `default`, and `default` is what `instance unset` returns the setting to, absent when there is nothing to return to. With no path it is the settings object.
+
+### `shulker instance set`
+
+Set a setting in this instance, over its default. The value is checked as it is set, against the instance file's schema: a list needs `--literal`, and `java` must be an absolute path. `account` takes an account's name or id, matched the way [`shulker accounts use`](#shulker-accounts-use) matches one, and records its id, so the pin still holds after the player renames themselves; an account shulker can't see fails with `account-not-found`.
+
+```sh
+shulker instance set memory 8G
+shulker instance set window 1920x1080
+shulker instance set jvmArgs --literal '["-XX:+UseZGC"]'
+shulker instance set account Notch
+shulker -i smp instance set hooks.preLaunch false
+```
+
+| Flag | Description |
+| --- | --- |
+| `--literal` | Parse the value as JSON, for a list |
+
+With `--json`, `instance set` and `instance unset` return `{ "path", "from", "to" }` like `set`.
+
+### `shulker instance unset`
+
+Remove a setting from this instance, so it returns to its default. Removing one that isn't set succeeds and says so.
+
+```sh
+shulker instance unset memory
+```
+
+### `shulker instance edit`
+
+Open the instance's `instance.json` in `$VISUAL` or `$EDITOR`, or in `vi` (`notepad` on Windows) when neither is set, and check the file once the editor exits. It opens a file that no longer matches its schema too, since that is the file most in need of an editor; a save that still doesn't fails with `instance-invalid` and leaves what you saved in place for the next edit. It needs a terminal, so under `--no-input` or off one it is a usage error, and an editor that exits with an error fails with `editor-failed`.
+
+With `--json`, the data is `{ "file", "changed" }`.
+
 ### `shulker unlink`
 
 Stop syncing a linked instance and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the instance directory and the installed loader. The directory's `.shulker/instance.json` is marked unlinked, so [`shulker instances repair`](#shulker-instances-repair) doesn't register it again; linking or syncing into it clears the mark. `unlink` also drops the directory from its source project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it. A `sync --into` directory is a detached build with no row on the list, so `unlink` doesn't take one.
@@ -1408,6 +1475,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
 | `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON; the message names the line and column |
+| `editor-failed` | The editor `instance edit` ran couldn't be started or exited with an error; set `$EDITOR` to the one you use |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
@@ -1421,7 +1489,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
-| `instance-not-found` | No instance matches. `candidates`: the instances shulker knows, `pass`: their ids |
+| `instance-not-found` | No instance matches, or the directory `shulker instance` acts on holds no `.shulker/instance.json`. `candidates`: the instances shulker knows, `pass`: their ids |
 | `instance-id-taken` | Another instance already has the `--as` id; the message names its directory |
 | `instance-invalid` | An instance's `.shulker/instance.json` doesn't parse, doesn't match its schema, or names a `$schema` this shulker doesn't know; `shulker instances repair` writes it again |
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
@@ -1481,8 +1549,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
 | `modpack-unlocked` | A modpack has no commit in the lock; run `shulker update` |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
-| `path-invalid` | `shulker.json` or `config.json` has no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
-| `path-not-set` | `get` or `config get` names a field that isn't set |
+| `path-invalid` | `shulker.json`, `config.json` or an instance's settings have no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
+| `path-not-set` | `get`, `config get` or `instance get` names a field that isn't set |
 | `pin-mismatch` | The pinned version belongs to a different project |
 | `player-invalid` | Neither a player name nor a uuid |
 | `player-reassigned` | Player names now belong to different accounts; pass `--accept-player-change`. `items`: the players |

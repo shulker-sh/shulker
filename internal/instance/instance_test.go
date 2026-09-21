@@ -14,6 +14,10 @@ func TestSaveLoadKeepsEverySetting(t *testing.T) {
 	f.Settings.Commands = &Commands{PreLaunch: "echo before", PostExit: "echo after"}
 	f.Settings.Java = "/opt/java/bin/java"
 	f.Settings.Wrapper = []string{"gamemoderun"}
+	f.Settings.Memory = "6G"
+	f.Settings.JvmArgs = []string{"-XX:+UseZGC"}
+	f.Settings.Window = "1280x720"
+	f.Settings.Account = "069a79f444e94726a5befca90e38aaf5"
 	f.Settings.Shulker = "/usr/local/bin/shulker"
 	f.Settings.LaunchHistory = &keep
 	if err := f.Save(dir); err != nil {
@@ -32,6 +36,12 @@ func TestSaveLoadKeepsEverySetting(t *testing.T) {
 	}
 	if len(got.Settings.Wrapper) != 1 || got.Settings.Wrapper[0] != "gamemoderun" {
 		t.Errorf("wrapper = %q", got.Settings.Wrapper)
+	}
+	if got.Settings.Memory != "6G" || got.Settings.Window != "1280x720" || got.Settings.Account != f.Settings.Account {
+		t.Errorf("memory = %q, window = %q, account = %q", got.Settings.Memory, got.Settings.Window, got.Settings.Account)
+	}
+	if len(got.Settings.JvmArgs) != 1 || got.Settings.JvmArgs[0] != "-XX:+UseZGC" {
+		t.Errorf("jvmArgs = %q", got.Settings.JvmArgs)
 	}
 	if got.Settings.Commands == nil || got.Settings.Commands.PreLaunch != "echo before" {
 		t.Errorf("commands = %+v", got.Settings.Commands)

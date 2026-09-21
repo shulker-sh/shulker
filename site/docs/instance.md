@@ -7,7 +7,7 @@ editLink: false
 
 One instance's own file. Hand-edit it to change what shulker does with that instance, then sync.
 
-The settings that decide how shulker sets an instance up, and, for a directory with no shulker.json of its own, what it syncs from. Hand-edit it to change what shulker does, then run `shulker sync` or `shulker instances repair`. Shulker never rewrites the settings block. What the last build actually did is recorded separately, in .shulker/state.json.
+The settings that decide how shulker sets an instance up, and, for a directory with no shulker.json of its own, what it syncs from. Change its settings with `shulker instance set` or `shulker instance edit`, or by hand, then run `shulker sync` or `shulker instances repair`. Shulker never rewrites the settings block on its own. What the last build actually did is recorded separately, in .shulker/state.json.
 
 Schema: [https://shulker.sh/schema/v1/instance.json](/schema/v1/instance.json)
 
