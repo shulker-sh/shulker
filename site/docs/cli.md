@@ -1031,9 +1031,9 @@ With `--into` and no source, shulker reads what the directory syncs from out of 
 
 If a git or manifest URL can't be reached because the network is down, `sync` warns and builds from the copy used by the last sync from that source that succeeded, so an instance still launches offline. The warning names the commit and says how old that copy is. A server that answers with an error, a missing ref, or a failed login still fails the sync, and so does a source that has never synced successfully here. `--offline` skips the network entirely, which is quicker than waiting for timeouts on a network that drops traffic. For the server side, an installed Java runtime is kept when its update check can't reach the network.
 
-Every directory shulker syncs into gets a `.shulker/instance.json` recording what it syncs from. An index of the instances shulker keeps in sync lives in `registry.json` beside shulker's `config.json` (a `registry` path in `config.json`, relative to that file, moves it), and [`link`](#shulker-link-prism) is what adds to it. A `sync --into` directory is a detached build, not an instance: it takes no row, so it never shows up in [`shulker instances`](#shulker-instances) or under `-i`. What records it is the source project's `shulker.local.json`, which is where [`diff`](#shulker-diff) and [`pull`](#shulker-pull) find it.
+A directory `sync --into` fills gets a `.shulker/instance.json` recording what it syncs from. An index of the instances shulker keeps in sync lives in `registry.json` beside shulker's `config.json` (a `registry` path in `config.json`, relative to that file, moves it), and [`link`](#shulker-link-prism) is what adds to it. A `sync --into` directory is a detached build, not an instance: it takes no row, so it never shows up in [`shulker instances`](#shulker-instances) or under `-i`. What records it is the source project's `shulker.local.json`, which is where [`diff`](#shulker-diff) and [`pull`](#shulker-pull) find it.
 
-To update an instance, name it instead of a source. `-i` takes an instance's id, its name, or its directory, and syncs it from what its instance file records. Ids are unique, so `-i <id>` always picks exactly one; a name several instances share needs `--launcher` or `--side` to narrow it, or `--all` to sync them all. `--all` alone syncs every instance. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` run inside a project syncs every instance synced from that project and every directory it has synced into, narrowed by `--launcher` or `--side`. Outside a project it asks which one to sync when run in a terminal, and fails with the list otherwise.
+To update an instance, name it instead of a source. `-i` takes an instance's id, its name, or its directory, and syncs it from the modpack its `shulker.json` follows. Ids are unique, so `-i <id>` always picks exactly one; a name several instances share needs `--launcher` or `--side` to narrow it, or `--all` to sync them all. `--all` alone syncs every instance. It keeps going when one fails, and exits with an error at the end. With no source and neither flag, `sync` run inside a project syncs every instance synced from that project and every directory it has synced into, narrowed by `--launcher` or `--side`. Outside a project it asks which one to sync when run in a terminal, and fails with the list otherwise.
 
 A project whose side builds into its own directory is an instance, and `sync` run inside it (or naming it with `-i`) updates the instance itself first: modpacks that follow their source are fetched again (every modpack except one set to `"autoUpdate": false`), the lock is resolved against them without moving your own mods, and the side is built in place. Nothing is written, and no history entry is taken, when the lock comes out unchanged. Every instance synced from it is synced after, since those build from its lock. A modpack update your own mods can't satisfy stops the sync with the reason, leaving the lock and the directory as they were; a launcher's pre-launch hook instead builds what the lock already has and starts the game.
 
@@ -1065,10 +1065,10 @@ Prism Launcher
     ~/Library/Application Support/PrismLauncher/instances/shulker-friends-smp/minecraft
     Friends SMP, from https://github.com/shulker-sh/base-pack.git, side client
 
-Other directories
-  smp-server (server), synced 2026-09-10 21:40
-    /srv/minecraft
-    My Pack server, from https://github.com/shulker-sh/base-pack.git, ref v3, side server
+Minecraft Launcher
+  my-pack (client), synced 2026-09-10 21:40
+    ~/Library/Application Support/minecraft/shulker/my-pack
+    My Pack, from https://github.com/shulker-sh/base-pack.git, ref v3, side client
 ```
 
 ### `shulker instances repair`
@@ -1094,7 +1094,7 @@ shulker instances repair --launcher prism --launcher-dir ~/other-prism
 
 ### `shulker unlink`
 
-Stop syncing a linked instance and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the build directory and the installed loader. The directory's `.shulker/instance.json` is marked unlinked, so [`shulker instances repair`](#shulker-instances-repair) doesn't register it again; linking or syncing into it clears the mark. `unlink` also drops the directory from its source project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it. A `sync --into` directory is a detached build with no row on the list, so `unlink` doesn't take one.
+Stop syncing a linked instance and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the instance directory and the installed loader. The directory's `.shulker/instance.json` is marked unlinked, so [`shulker instances repair`](#shulker-instances-repair) doesn't register it again; linking or syncing into it clears the mark. `unlink` also drops the directory from its source project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it. A `sync --into` directory is a detached build with no row on the list, so `unlink` doesn't take one.
 
 Name the instance by the id [`shulker instances`](#shulker-instances) shows, by the name its launcher shows, or by its directory. Inside a project, a launcher name (`mojang`, `prism`, `multimc`, `atlauncher`, `gdlauncher`) unlinks that project's instance in that launcher, the reverse of `shulker link <launcher>`; an instance actually called that name comes first. A name several instances share needs `--launcher`, `--side`, or `--all`, while an id always picks one. `unlink` prints the command that sets the instance up again.
 

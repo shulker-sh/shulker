@@ -230,7 +230,7 @@ func forgetMojang(e *Entry, l config.Instance) (Forgotten, error) {
 	}
 	return Forgotten{
 		Removed: RemovedProfile,
-		Summary: fmt.Sprintf("Unlinked %q (%s): removed its launcher profile; the build directory and the loader stay.", l.Label(), e.Title),
+		Summary: fmt.Sprintf("Unlinked %q (%s): removed its launcher profile; the instance directory and the loader stay.", l.Label(), e.Title),
 	}, nil
 }
 
