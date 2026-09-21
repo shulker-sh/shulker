@@ -85,7 +85,7 @@ func (a *app) hookPostExitCmd() *cobra.Command {
 			if !f.Settings.PostExit() {
 				return nil
 			}
-			a.closeRun(dir, f.Settings, noExitCode)
+			a.closeRun(dir, f.Settings, 0, noExitCode)
 			return nil
 		},
 	}
@@ -143,7 +143,7 @@ func (a *app) hookWrapCmd() *cobra.Command {
 				return notStarted(fmt.Sprintf("can't run Java at %s, so the game didn't start: %v", java, err))
 			}
 			if launching && f.Settings.PostExit() {
-				a.closeRun(dir, f.Settings, noExitCode)
+				a.closeRun(dir, f.Settings, 0, noExitCode)
 			}
 			if code != 0 {
 				return &out.Error{Code: "game-exit", Message: fmt.Sprintf("game exited with status %d", code), Exit: code}
@@ -241,7 +241,7 @@ func (a *app) failLaunch(dir string, s instance.Settings, stamped bool, reason s
 	records := instance.LoadLaunches(dir)
 	at := -1
 	if stamped {
-		at = openRecord(records)
+		at = openRecord(records, 0)
 	}
 	if at < 0 {
 		records = append(records, instance.Launch{StartedAt: nowStamp()})

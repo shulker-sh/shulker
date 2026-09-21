@@ -159,9 +159,11 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	}
 	a.progress("starting %s as %s", in.ID, who.Name)
 	if opts.waits() {
-		if err := a.playWaited(&res, req, opts.stream); err != nil {
+		var rec instance.Launch
+		if res.PID, rec, err = a.playWaited(req, opts.stream); err != nil {
 			return err
 		}
+		res.Outcome, res.ExitCode, res.CrashReport = rec.Outcome, rec.ExitCode, rec.CrashReport
 	} else if res.PID, err = a.startWatcher(req); err != nil {
 		return err
 	}
@@ -177,8 +179,9 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 }
 
 // playWaited keeps the launch in the foreground: this command starts the game, waits for it, and
-// closes the record itself, so no watcher is spawned and nothing is left running behind it.
-func (a *app) playWaited(res *playResult, req watchRequest, stream bool) error {
+// closes the record itself, so no watcher is spawned and nothing is left running behind it. It hands
+// back the game's pid and the record of how the run ended.
+func (a *app) playWaited(req watchRequest, stream bool) (int, instance.Launch, error) {
 	var mirror io.Writer
 	if stream {
 		mirror = a.printer.Stdout
@@ -187,12 +190,12 @@ func (a *app) playWaited(res *playResult, req watchRequest, stream bool) error {
 		}
 	}
 	a.printer.Settle()
-	rec := a.watchRun(req, mirror, func(r watchReply) { res.PID = r.PID })
+	var pid int
+	rec := a.watchRun(req, mirror, func(r watchReply) { pid = r.PID })
 	if rec.Outcome == instance.OutcomeNotStarted {
-		return notStarted(rec.Error)
+		return 0, rec, notStarted(rec.Error)
 	}
-	res.Outcome, res.ExitCode, res.CrashReport = rec.Outcome, rec.ExitCode, rec.CrashReport
-	return nil
+	return pid, rec, nil
 }
 
 // print is the launch as a player reads it. A detached launch says the game is playing, because that

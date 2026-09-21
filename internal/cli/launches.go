@@ -27,14 +27,15 @@ func (a *app) openRun(dir string, s instance.Settings, rec instance.Launch) {
 	}
 }
 
-// closeRun ends the newest open record with how the run finished, and hands back what it says. exit
-// is noExitCode where nothing passed the game's status on. With launchHistory at 0 the run was never
-// written down and nothing is written now, but the record still comes back filled in, because it is
-// what the command that waited for the game reports.
-func (a *app) closeRun(dir string, s instance.Settings, exit int) instance.Launch {
+// closeRun ends the open record for the game with this pid, with how the run finished, and hands
+// back what it says. A pid of 0 is a launcher's run, which has none, and closes the newest open
+// record. exit is noExitCode where nothing passed the game's status on. With launchHistory at 0 the
+// run was never written down and nothing is written now, but the record still comes back filled in,
+// because it is what the command that waited for the game reports.
+func (a *app) closeRun(dir string, s instance.Settings, pid, exit int) instance.Launch {
 	keep := s.LaunchKeep()
 	records := instance.LoadLaunches(dir)
-	open := openRecord(records)
+	open := openRecord(records, pid)
 	if keep == 0 || open < 0 {
 		rec := instance.Launch{StartedAt: nowStamp()}
 		endRecord(&rec, dir, exit)
@@ -47,27 +48,38 @@ func (a *app) closeRun(dir string, s instance.Settings, exit int) instance.Launc
 	return records[open]
 }
 
-// reconcileRun closes a run whose watcher never did. A record left open with a pid belongs to a run
-// shulker was watching itself, so while that process is alive the run is still going; once it has
-// gone the record is closed from the crash reports, which is all a watcher that was killed left
+// reconcileRun closes the runs whose watchers never did. A record left open with a pid belongs to a
+// run shulker was watching itself, so while that process is alive the run is still going; once it
+// has gone the record is closed from the crash reports, which is all a watcher that was killed left
 // behind. A record with no pid is a launcher's, and nothing but its own post-exit hook closes it.
 func (a *app) reconcileRun(dir string) {
 	f, err := instance.Load(dir)
 	if err != nil {
 		return
 	}
+	keep := f.Settings.LaunchKeep()
 	records := instance.LoadLaunches(dir)
-	open := openRecord(records)
-	if open < 0 || records[open].PID == 0 || game.Alive(records[open].PID) {
+	closed := false
+	for i := range records {
+		if records[i].EndedAt == "" && records[i].PID != 0 && !game.Alive(records[i].PID) {
+			endRecord(&records[i], dir, noExitCode)
+			closed = true
+		}
+	}
+	if !closed || keep == 0 {
 		return
 	}
-	a.closeRun(dir, f.Settings, noExitCode)
+	if err := instance.SaveLaunches(dir, records, keep); err != nil {
+		a.printer.Warn("%v", err)
+	}
 }
 
-// openRecord is the newest record nothing has closed, or -1 where every run is accounted for.
-func openRecord(records []instance.Launch) int {
+// openRecord is the newest record nothing has closed for the game with this pid, or -1 where there
+// is none. A pid of 0 takes the newest open record of any kind, which is what a launcher's hooks,
+// with no process of their own to go by, have always closed.
+func openRecord(records []instance.Launch, pid int) int {
 	for i := len(records) - 1; i >= 0; i-- {
-		if records[i].EndedAt == "" {
+		if records[i].EndedAt == "" && (pid == 0 || records[i].PID == pid) {
 			return i
 		}
 	}

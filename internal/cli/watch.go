@@ -86,7 +86,7 @@ func (a *app) watchRun(req watchRequest, stream io.Writer, running func(watchRep
 		// The game ran, so the run is real; what shulker lost is only the status it ended with.
 		code = noExitCode
 	}
-	return a.closeRun(req.Dir, s, code)
+	return a.closeRun(req.Dir, s, g.PID, code)
 }
 
 // startWatcher hands the launch to the watcher and reports the game it started. Tests replace it,
@@ -97,11 +97,11 @@ func (a *app) startWatcher(req watchRequest) (int, error) {
 	}
 	exe, err := os.Executable()
 	if err != nil {
-		return 0, err
+		return 0, notStarted("can't find shulker to start the watcher with: " + err.Error())
 	}
 	body, err := json.Marshal(req)
 	if err != nil {
-		return 0, err
+		return 0, notStarted(err.Error())
 	}
 	line, err := game.Watch(exe, []string{"watch"}, body)
 	if err != nil {

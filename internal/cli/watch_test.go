@@ -308,3 +308,47 @@ func TestTheWatcherReadsItsLaunchFromStdinAndAnswersWithOneLine(t *testing.T) {
 		t.Fatal("the watcher repeated the session token")
 	}
 }
+
+func TestTwoRunsOfOneInstanceEachCloseTheirOwnRecord(t *testing.T) {
+	h := newHarness(t)
+	_, gameDir := playHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+	// The first game ends while the second is still running, so the newest open record when the
+	// first watcher closes is the second run's, not its own.
+	playGame(t, gameDir, "sleep 1\nexit 7\n")
+	h.mustRun(t, "-i", "pack", "play", "--no-sync")
+	playGame(t, gameDir, "sleep 2\nexit 0\n")
+	h.mustRun(t, "-i", "pack", "play", "--no-sync")
+	h.watching.Wait()
+
+	records := instance.LoadLaunches(gameDir)
+	if len(records) != 2 {
+		t.Fatalf("two runs, two records: %+v", records)
+	}
+	if first := records[0]; first.ExitCode != 7 || first.Outcome != instance.OutcomeCrashed {
+		t.Fatalf("the first run's record got someone else's ending: %+v", first)
+	}
+	if second := records[1]; second.ExitCode != 0 || second.Outcome != instance.OutcomeOK {
+		t.Fatalf("the second run's record got someone else's ending: %+v", second)
+	}
+}
+
+func TestReconcileClosesEveryRunWhoseGameHasGone(t *testing.T) {
+	h := newHarness(t)
+	_, gameDir := playHarness(t, h)
+	started := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
+	writeRuns(t, gameDir,
+		instance.Launch{StartedAt: started, PID: deadPID(t)},
+		instance.Launch{StartedAt: started, PID: os.Getpid()},
+	)
+
+	h.mustRun(t, "instances", "repair")
+
+	records := instance.LoadLaunches(gameDir)
+	if records[0].EndedAt == "" {
+		t.Fatalf("a lost run under one still going is still lost: %+v", records[0])
+	}
+	if records[1].EndedAt != "" {
+		t.Fatalf("a run still going stays open: %+v", records[1])
+	}
+}
