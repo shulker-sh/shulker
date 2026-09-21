@@ -13,7 +13,7 @@ import (
 
 type backupResult struct {
 	savesTarget
-	saves.Taken
+	saves.Backup
 }
 
 func (a *app) backupCmd() *cobra.Command {
@@ -42,7 +42,7 @@ func (a *app) backupCmd() *cobra.Command {
 				return out.Errorf("no-worlds", "no worlds in %s to back up", target.WorldsDir)
 			}
 			elapsed := time.Since(start)
-			return a.printer.Emit(backupResult{savesTarget: target, Taken: taken}, func(l *out.Lines) {
+			return a.printer.Emit(backupResult{savesTarget: target, Backup: taken}, func(l *out.Lines) {
 				l.OKInto("backed up "+plural(taken.Worlds, "world", "worlds"), taken.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(taken.Size), elapsed.Seconds()))
 			})
 		},

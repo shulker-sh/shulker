@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -226,23 +225,26 @@ func Size(dir string) (int64, error) {
 	return total, err
 }
 
-// Backup is one zip in a backups folder, named <time>[-<n>]-…-<reason>.zip: the time it was taken,
-// a counter for a second backup in the same second, and the command that took it last.
+// Backup is one zip in a backups folder, named <time>[-<n>][-<instance>]-<reason>.zip: the time it
+// was taken, a counter for a second backup in the same second, the instance that took it into a
+// shared folder, and the command that took it. Its comment records the same and more, and wins.
 type Backup struct {
-	ID     string    `json:"id"`
-	Path   string    `json:"path"`
-	Taken  time.Time `json:"taken"`
-	Reason string    `json:"reason"`
-	Size   int64     `json:"size"`
-	// Worlds counts the folders at the zip's root; Minecraft and Loader come from its comment.
-	Worlds    int    `json:"worlds"`
-	Minecraft string `json:"minecraft,omitempty"`
-	Loader    string `json:"loader,omitempty"`
+	ID       string    `json:"id"`
+	Path     string    `json:"path"`
+	Taken    time.Time `json:"taken"`
+	Reason   string    `json:"reason"`
+	Instance string    `json:"instance,omitempty"`
+	Size     int64     `json:"size"`
+	Worlds   int       `json:"worlds"`
+	// Names are the worlds the comment lists, when it had room for them.
+	Names     []string `json:"names,omitempty"`
+	Minecraft string   `json:"minecraft,omitempty"`
+	Loader    string   `json:"loader,omitempty"`
 	seq       int
 }
 
-// Backups are the zips in dir, newest first. A missing dir holds none, and a zip whose name doesn't
-// start with a timestamp is not one of shulker's.
+// Backups are the zips in dir, newest first. A missing dir holds none, and a zip with neither
+// shulker's comment nor a name starting with a timestamp is not one of shulker's.
 func Backups(dir string) ([]Backup, error) {
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -254,34 +256,39 @@ func Backups(dir string) ([]Backup, error) {
 	backups := []Backup{}
 	for _, e := range entries {
 		id, ok := strings.CutSuffix(e.Name(), ".zip")
-		if !ok || e.IsDir() || len(id) < len(timeLayout) {
+		if !ok || e.IsDir() {
 			continue
 		}
-		taken, err := time.ParseInLocation(timeLayout, id[:len(timeLayout)], time.Local)
-		if err != nil {
-			continue
-		}
-		info, err := e.Info()
+		b, ok, err := openBackup(filepath.Join(dir, e.Name()), id)
 		if err != nil {
 			return nil, err
 		}
-		b := Backup{ID: id, Path: filepath.Join(dir, e.Name()), Taken: taken, Size: info.Size()}
-		segs := strings.Split(strings.TrimPrefix(id[len(timeLayout):], "-"), "-")
-		if len(segs) > 1 {
-			if n, err := strconv.Atoi(segs[0]); err == nil {
-				b.seq = n
-			}
+		if ok {
+			backups = append(backups, b)
 		}
-		if len(segs) > 0 {
-			b.Reason = segs[len(segs)-1]
-		}
-		readZip(&b)
-		backups = append(backups, b)
 	}
 	slices.SortFunc(backups, func(x, y Backup) int {
 		return cmp.Or(y.Taken.Compare(x.Taken), cmp.Compare(y.seq, x.seq), strings.Compare(y.ID, x.ID))
 	})
 	return backups, nil
+}
+
+func openBackup(path, id string) (Backup, bool, error) {
+	f, err := os.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return Backup{}, false, nil
+	}
+	if err != nil {
+		return Backup{}, false, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return Backup{}, false, err
+	}
+	b, ok := readBackup(f, info.Size(), id)
+	b.Path = path
+	return b, ok, nil
 }
 
 // Prune deletes all but the keep newest backups in dir and returns the ones it deleted, newest

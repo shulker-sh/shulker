@@ -2,9 +2,13 @@ package saves
 
 import (
 	"archive/zip"
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -36,44 +40,52 @@ type Home struct {
 	Shared bool
 }
 
-// Taken is a backup just written, and the worlds it holds.
-type Taken struct {
-	Backup
-	Names []string `json:"names"`
+// comment is the zip comment, the backup's record. Worlds is left out when the names would not fit.
+type comment struct {
+	Format     int      `json:"format"`
+	Taken      string   `json:"taken"`
+	Reason     string   `json:"reason"`
+	Instance   string   `json:"instance,omitempty"`
+	WorldCount int      `json:"worldCount"`
+	Worlds     []string `json:"worlds,omitempty"`
+	Minecraft  string   `json:"minecraft,omitempty"`
+	Loader     string   `json:"loader,omitempty"`
 }
 
-// comment is the zip comment: display only, since the filename is what retention and ordering read.
-type comment struct {
-	Format    int      `json:"format"`
-	Taken     string   `json:"taken"`
-	Reason    string   `json:"reason"`
-	Instance  string   `json:"instance,omitempty"`
-	Worlds    []string `json:"worlds"`
-	Minecraft string   `json:"minecraft,omitempty"`
-	Loader    string   `json:"loader,omitempty"`
+// commentFor is c as a zip comment. One too long for the format's 16-bit length drops the world
+// names, which the zip's entries still hold, and one too long even then is left off, never cut.
+func commentFor(c comment) string {
+	if meta, _ := json.Marshal(c); len(meta) <= math.MaxUint16 {
+		return string(meta)
+	}
+	c.Worlds = nil
+	if meta, _ := json.Marshal(c); len(meta) <= math.MaxUint16 {
+		return string(meta)
+	}
+	return ""
 }
 
 // Take zips src's worlds into a new backup in home, calling each before it zips a world. With no
-// worlds to zip it writes nothing and returns a zero Taken rather than failing, so a caller backing
+// worlds to zip it writes nothing and returns a zero Backup rather than failing, so a caller backing
 // up on the way past something else can carry on.
-func Take(src Source, home Home, reason string, each func(world string)) (Taken, error) {
+func Take(src Source, home Home, reason string, each func(world string)) (Backup, error) {
 	worlds, err := Worlds(src.Dir)
 	if err != nil {
-		return Taken{}, err
+		return Backup{}, err
 	}
 	if src.Only != "" {
 		worlds = slices.DeleteFunc(worlds, func(w string) bool { return w != src.Only })
 	}
 	if len(worlds) == 0 {
-		return Taken{}, nil
+		return Backup{}, nil
 	}
 	if err := os.MkdirAll(home.Dir, 0o755); err != nil {
-		return Taken{}, err
+		return Backup{}, err
 	}
 	at := now()
 	seq, err := nextSeq(home.Dir, at)
 	if err != nil {
-		return Taken{}, err
+		return Backup{}, err
 	}
 	id := at.Format(timeLayout)
 	if seq > 1 {
@@ -83,31 +95,28 @@ func Take(src Source, home Home, reason string, each func(world string)) (Taken,
 		id += "-" + src.Instance
 	}
 	id += "-" + reason
-	meta, err := json.Marshal(comment{
-		Format:    commentFormat,
-		Taken:     at.UTC().Format(time.RFC3339),
-		Reason:    reason,
-		Instance:  src.Instance,
-		Worlds:    worlds,
-		Minecraft: src.Minecraft,
-		Loader:    src.Loader,
+	meta := commentFor(comment{
+		Format:     commentFormat,
+		Taken:      at.UTC().Format(time.RFC3339),
+		Reason:     reason,
+		Instance:   src.Instance,
+		WorldCount: len(worlds),
+		Worlds:     worlds,
+		Minecraft:  src.Minecraft,
+		Loader:     src.Loader,
 	})
-	if err != nil {
-		return Taken{}, err
-	}
 	path := filepath.Join(home.Dir, id+".zip")
 	pr, pw := io.Pipe()
-	go func() { pw.CloseWithError(writeZip(pw, src.Dir, worlds, string(meta), each)) }()
+	go func() { pw.CloseWithError(writeZip(pw, src.Dir, worlds, meta, each)) }()
 	if err := fsutil.WriteFrom(path, pr); err != nil {
 		pr.CloseWithError(err)
-		return Taken{}, err
+		return Backup{}, err
 	}
 	info, err := os.Stat(path)
 	if err != nil {
-		return Taken{}, err
+		return Backup{}, err
 	}
-	b := Backup{ID: id, Path: path, Taken: at, Reason: reason, Size: info.Size(), Worlds: len(worlds), Minecraft: src.Minecraft, Loader: src.Loader, seq: seq}
-	return Taken{Backup: b, Names: worlds}, nil
+	return Backup{ID: id, Path: path, Taken: at, Reason: reason, Instance: src.Instance, Size: info.Size(), Worlds: len(worlds), Names: worlds, Minecraft: src.Minecraft, Loader: src.Loader, seq: seq}, nil
 }
 
 // nextSeq is the collision counter for a backup taken at at: 1 when none in dir shares its second,
@@ -120,7 +129,7 @@ func nextSeq(dir string, at time.Time) (int, error) {
 	stamp := at.Format(timeLayout)
 	seq := 1
 	for _, b := range backups {
-		if b.ID[:len(timeLayout)] == stamp {
+		if strings.HasPrefix(b.ID, stamp) {
 			seq = max(seq, max(b.seq, 1)+1)
 		}
 	}
@@ -181,23 +190,90 @@ func writeZip(w io.Writer, dir string, worlds []string, meta string, each func(w
 	return zw.Close()
 }
 
-// readZip counts the world folders at a zip's root and reads what its comment says it was taken
-// from. A zip that won't open, or has no comment, says what it can.
-func readZip(b *Backup) {
-	r, err := zip.OpenReader(b.Path)
-	if err != nil {
-		return
+const (
+	endLen  = 22
+	maxTail = endLen + math.MaxUint16
+)
+
+var endSignature = []byte("PK\x05\x06")
+
+// tailComment reads a zip's comment from its last bytes alone, since archive/zip reads the whole
+// central directory first. The end record is the first signature whose comment length reaches
+// exactly to the end of the file: a later one can only be inside the comment.
+func tailComment(r io.ReaderAt, size int64) (string, bool) {
+	n := min(size, maxTail)
+	buf := make([]byte, n)
+	if _, err := r.ReadAt(buf, size-n); err != nil && !errors.Is(err, io.EOF) {
+		return "", false
 	}
-	defer r.Close()
+	for i := 0; ; i++ {
+		j := bytes.Index(buf[i:], endSignature)
+		if j < 0 {
+			return "", false
+		}
+		i += j
+		if i+endLen <= len(buf) && i+endLen+int(binary.LittleEndian.Uint16(buf[i+20:])) == len(buf) {
+			return string(buf[i+endLen:]), true
+		}
+	}
+}
+
+// readBackup reads the backup named id from its zip. A comment shulker wrote is the whole record;
+// without one, everything comes from the filename and the folders at the zip's root. A zip with
+// neither is not one of shulker's.
+func readBackup(r io.ReaderAt, size int64, id string) (Backup, bool) {
+	b := Backup{ID: id, Size: size}
+	named := parseName(&b)
+	raw, _ := tailComment(r, size)
+	var meta comment
+	if json.Unmarshal([]byte(raw), &meta) == nil && meta.Format != 0 {
+		if taken, err := time.Parse(time.RFC3339, meta.Taken); err == nil {
+			b.Taken, b.Reason, b.Instance = taken.Local(), meta.Reason, meta.Instance
+			b.Worlds, b.Names = meta.WorldCount, meta.Worlds
+			b.Minecraft, b.Loader = meta.Minecraft, meta.Loader
+			return b, true
+		}
+	}
+	if !named {
+		return Backup{}, false
+	}
+	b.Worlds = countRoots(r, size)
+	return b, true
+}
+
+// parseName reads b's time, collision counter, instance and reason from its ID, named
+// <time>[-<n>][-<instance>]-<reason>, and reports whether it is named that way.
+func parseName(b *Backup) bool {
+	if len(b.ID) < len(timeLayout) {
+		return false
+	}
+	taken, err := time.ParseInLocation(timeLayout, b.ID[:len(timeLayout)], time.Local)
+	if err != nil {
+		return false
+	}
+	b.Taken = taken
+	segs := strings.Split(strings.TrimPrefix(b.ID[len(timeLayout):], "-"), "-")
+	if len(segs) > 1 {
+		if n, err := strconv.Atoi(segs[0]); err == nil {
+			b.seq, segs = n, segs[1:]
+		}
+	}
+	b.Reason = segs[len(segs)-1]
+	b.Instance = strings.Join(segs[:len(segs)-1], "-")
+	return true
+}
+
+// countRoots counts the folders at a zip's root. A zip that won't open holds none.
+func countRoots(r io.ReaderAt, size int64) int {
+	zr, err := zip.NewReader(r, size)
+	if err != nil {
+		return 0
+	}
 	roots := map[string]bool{}
-	for _, f := range r.File {
+	for _, f := range zr.File {
 		if root, _, ok := strings.Cut(f.Name, "/"); ok && root != "" {
 			roots[root] = true
 		}
 	}
-	b.Worlds = len(roots)
-	var meta comment
-	if json.Unmarshal([]byte(r.Comment), &meta) == nil {
-		b.Minecraft, b.Loader = meta.Minecraft, meta.Loader
-	}
+	return len(roots)
 }

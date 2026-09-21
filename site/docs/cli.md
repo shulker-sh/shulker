@@ -1225,7 +1225,7 @@ shulker saves --group default
 | --- | --- |
 | `--group <group>` | Show this save group rather than an instance |
 
-With `--json`, the list is `[{ "name", "dir", "worlds", "size", "lastBackup" }]`, and a target is `{ "group", "dir", "worldsDir", "worlds", "backups" }` with each backup `{ "n", "id", "path", "taken", "reason", "size", "worlds", "minecraft", "loader" }`. A backup row counts the world folders in its zip, reads `on request` for one [`shulker backup`](#shulker-backup) took, and names the Minecraft version and loader the zip's comment records, when it records them.
+With `--json`, the list is `[{ "name", "dir", "worlds", "size", "lastBackup" }]`, and a target is `{ "group", "dir", "worldsDir", "worlds", "backups" }` with each backup `{ "n", "id", "path", "taken", "reason", "instance", "size", "worlds", "names", "minecraft", "loader" }`. A backup's zip comment is its record: the time, reason, instance, world count, world names, Minecraft version and loader all come from it, and it wins over the filename for the listing, the order, and which backups are automatic. A zip without shulker's comment falls back to its filename for the time, reason and instance, and counts the world folders in the zip; it has no `names`, `minecraft` or `loader`. A row reads `on request` for a backup [`shulker backup`](#shulker-backup) took.
 
 ### `shulker saves prune`
 
@@ -1245,7 +1245,7 @@ With `--json`, the data is `{ "group", "dir", "worldsDir", "pruned", "kept" }`.
 
 ### `shulker backup`
 
-Zip a target's worlds into its backups. The target is the one [`shulker saves`](#shulker-saves) would show: `--group`, `-i`, `-C`, or the current directory, with the worlds found the same way. A save group's backups go in `backups/<group>` in shulker's data directory, named `<time>-<instance>-backup.zip` for the instance that took them, or `<time>-backup.zip` when `--group` names the group alone; any other directory's go in its own `.shulker/backups/` as `<time>-backup.zip`. A second backup in the same second gets `-2` after the time. The zip holds the world folders at its root and nothing else, and its comment records the time, the instance, the worlds, and the Minecraft version and loader, for `saves` to show. A backup taken this way is never pruned automatically; [`saves prune`](#shulker-saves-prune) deletes it.
+Zip a target's worlds into its backups. The target is the one [`shulker saves`](#shulker-saves) would show: `--group`, `-i`, `-C`, or the current directory, with the worlds found the same way. A save group's backups go in `backups/<group>` in shulker's data directory, named `<time>-<instance>-backup.zip` for the instance that took them, or `<time>-backup.zip` when `--group` names the group alone; any other directory's go in its own `.shulker/backups/` as `<time>-backup.zip`. A second backup in the same second gets `-2` after the time. The zip holds the world folders at its root and nothing else, and its comment records the time, the reason, the instance, the world count and names, and the Minecraft version and loader, which `saves` and `restore` read in place of the filename. Names that wouldn't fit in a zip comment are left out of it, keeping the count. A backup taken this way is never pruned automatically; [`saves prune`](#shulker-saves-prune) deletes it.
 
 A target with no worlds folder, or none in it, fails with `no-worlds`, naming the folder it looked in.
 
@@ -1259,7 +1259,7 @@ shulker backup --group default
 | --- | --- |
 | `--group <group>` | Back up this save group rather than an instance |
 
-With `--json`, the data is `{ "group", "dir", "worldsDir", "id", "path", "taken", "reason", "size", "worlds", "minecraft", "loader", "names" }`, where `worlds` counts the worlds and `names` lists them.
+With `--json`, the data is `{ "group", "dir", "worldsDir", "id", "path", "taken", "reason", "instance", "size", "worlds", "names", "minecraft", "loader" }`, where `worlds` counts the worlds and `names` lists them.
 
 ### `shulker hook pre-launch`
 
