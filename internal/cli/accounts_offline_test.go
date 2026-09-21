@@ -12,8 +12,8 @@ import (
 // gives an account it is not told one for.
 const steveOffline = "5627dd98-e6be-3c21-b8a8-e92344183641"
 
-// withOwner is a harness that can create offline accounts: the gate wants one playable account in
-// sight, and signing Notch in is how a player proves it.
+// withOwner is a harness that can create offline accounts: the gate wants an account with a Java
+// profile in sight, and signing Notch in is how a player proves it.
 func withOwner(t *testing.T) *harness {
 	t.Helper()
 	h := newHarness(t)
