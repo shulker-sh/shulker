@@ -122,12 +122,11 @@ type Assembly struct {
 // and that is how a loader shadows what vanilla ships; a path already on the classpath is left
 // where it is.
 func Assemble(v Version, p Platform, features map[string]bool) (Assembly, error) {
-	client, ok := v.Downloads["client"]
-	if !ok {
-		return Assembly{}, out.Errorf("store-incomplete", "minecraft %s has no client download", v.ID)
+	client, err := ClientJar(v)
+	if err != nil {
+		return Assembly{}, err
 	}
-	a := Assembly{Version: v, Excludes: map[string][]string{}}
-	a.Client = File{Path: clientPath(v.ClientID), URL: client.URL, Sha1: client.Sha1, Size: client.Size}
+	a := Assembly{Version: v, Client: client, Excludes: map[string][]string{}}
 	if v.AssetIndex != nil {
 		a.AssetIndex = File{Path: assetIndexPath(v.AssetIndex.ID), URL: v.AssetIndex.URL, Sha1: v.AssetIndex.Sha1, Size: v.AssetIndex.Size}
 	}
@@ -144,7 +143,7 @@ func Assemble(v Version, p Platform, features map[string]bool) (Assembly, error)
 			continue
 		}
 		seen[f.Path] = true
-		f.Path = "libraries/" + f.Path
+		f.Path = libraryPath(f.Path)
 		if !l.IsNative() {
 			a.Libraries = append(a.Libraries, f)
 			continue
@@ -157,6 +156,33 @@ func Assemble(v Version, p Platform, features map[string]bool) (Assembly, error)
 	return a, nil
 }
 
+// ClientJar is the client jar a version runs, filed under the version that declares it.
+func ClientJar(v Version) (File, error) {
+	client, ok := v.Downloads["client"]
+	if !ok {
+		return File{}, out.Errorf("store-incomplete", "minecraft %s has no client download", v.ID)
+	}
+	return File{Path: clientPath(v.ClientID), URL: client.URL, Sha1: client.Sha1, Size: client.Size}, nil
+}
+
+// LibrariesFrom is the part of the classpath one version in the chain declares itself: for a
+// loader's version, the jars the loader brings on top of vanilla.
+func (a Assembly) LibrariesFrom(v Version, p Platform) []File {
+	own := map[string]bool{}
+	for _, l := range v.Libraries {
+		if f, err := l.File(p); err == nil && !l.IsNative() {
+			own[libraryPath(f.Path)] = true
+		}
+	}
+	var files []File
+	for _, f := range a.Libraries {
+		if own[f.Path] {
+			files = append(files, f)
+		}
+	}
+	return files
+}
+
 // Classpath is what the launch runs with: every library jar in order, then the client jar last,
 // which is where the Mojang launcher puts it.
 func (a Assembly) Classpath(s Store) []string {
@@ -167,11 +193,16 @@ func (a Assembly) Classpath(s Store) []string {
 	return append(paths, s.Local(a.Client))
 }
 
-// ClasspathSize is what the classpath weighs, for the summary a dry run prints. A library the
-// version JSON gave no size for counts as what is on disk.
+// ClasspathSize is what the classpath weighs, for the summary a dry run prints.
 func (a Assembly) ClasspathSize(s Store) int64 {
+	return s.Size(append(a.Libraries[:len(a.Libraries):len(a.Libraries)], a.Client))
+}
+
+// Size is what a set of files weighs. A file the version JSON gave no size for counts as what is on
+// disk.
+func (s Store) Size(files []File) int64 {
 	total := int64(0)
-	for _, f := range append(a.Libraries[:len(a.Libraries):len(a.Libraries)], a.Client) {
+	for _, f := range files {
 		if f.Size > 0 {
 			total += f.Size
 			continue
@@ -184,6 +215,8 @@ func (a Assembly) ClasspathSize(s Store) int64 {
 }
 
 func clientPath(id string) string { return "versions/" + id + "/" + id + ".jar" }
+
+func libraryPath(rel string) string { return "libraries/" + rel }
 
 func versionPath(id string) string { return "versions/" + id + "/" + id + ".json" }
 

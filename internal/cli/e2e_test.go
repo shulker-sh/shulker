@@ -123,6 +123,8 @@ type harness struct {
 	// watching counts the watchers a launch left running, so a test's directories outlive the runs
 	// they are still recording.
 	watching sync.WaitGroup
+	// installerFetchedClient says a client install found no vanilla jar and downloaded one itself.
+	installerFetchedClient bool
 }
 
 // watch stands in for the watcher process, because a test binary re-execed is a test binary and not
@@ -519,17 +521,32 @@ func newHarness(t *testing.T) *harness {
 		library("org.ow2.asm:asm:9.10.1", "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"),
 		map[string]any{"name": "net.neoforged:bundled:1.0", "downloads": map[string]any{"artifact": map[string]any{"path": "net/neoforged/bundled/1.0/bundled-1.0.jar", "url": ""}}},
 	}})
-	version, _ := json.Marshal(map[string]any{"libraries": []any{
-		library("net.neoforged:neoforge:26.2.0.87:universal", "net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"),
-		library("org.ow2.asm:asm:9.10.1", "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"),
-	}})
+	version, _ := json.Marshal(map[string]any{
+		"id": "neoforge-26.2.0.87", "inheritsFrom": "26.2", "type": "release",
+		"mainClass": "cpw.mods.bootstraplauncher.BootstrapLauncher",
+		"arguments": map[string]any{"game": []any{"--launchTarget", "forgeclient"}, "jvm": []any{"-DlibraryDirectory=${library_directory}"}},
+		"libraries": []any{
+			library("net.neoforged:neoforge:26.2.0.87:universal", "net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"),
+			library("org.ow2.asm:asm:9.10.1", "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"),
+		},
+	})
 	h.neoInstaller = makeJarFiles(t, "neoforge-installer", "neoforge-26.2.0.87-installer.jar", map[string]string{"install_profile.json": string(profile), "version.json": string(version)})
 	forgeProfile, _ := json.Marshal(map[string]any{"minecraft": "26.2", "libraries": []any{
 		library("org.ow2.asm:asm:9.10.1", "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"),
 	}})
-	forgeVersion, _ := json.Marshal(map[string]any{"libraries": []any{
-		library("net.minecraftforge:forge:26.2-65.1.3:universal", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"),
-	}})
+	// The client jar has no URL: the installer's processors generate it, the way Forge's own does.
+	forgeClient := "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-client.jar"
+	forgeVersion, _ := json.Marshal(map[string]any{
+		"id": "26.2-forge-65.1.3", "inheritsFrom": "26.2", "type": "release",
+		"mainClass": "net.minecraftforge.bootstrap.ForgeBootstrap",
+		"arguments": map[string]any{"game": []any{"--launchTarget", "forge_client"}},
+		"libraries": []any{
+			library("net.minecraftforge:forge:26.2-65.1.3:universal", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"),
+			map[string]any{"name": "net.minecraftforge:forge:26.2-65.1.3:client", "downloads": map[string]any{"artifact": map[string]any{
+				"path": forgeClient, "url": "", "sha1": sha1Hex([]byte(fakeForgeClient)), "size": len(fakeForgeClient),
+			}}},
+		},
+	})
 	h.forgeInstaller = makeJarFiles(t, "forge-installer", "forge-26.2-65.1.3-installer.jar", map[string]string{"install_profile.json": string(forgeProfile), "version.json": string(forgeVersion)})
 	// The vanilla jar name comes off the real table, so the fake can't disagree with the code
 	// about which name a loader's installer looks for.
@@ -543,12 +560,13 @@ func newHarness(t *testing.T) *harness {
 	}
 	h.loaders = map[string]fakeLoaderInstall{
 		"neoforge": {
-			installer: h.neoInstaller, version: "26.2.0.87", versionID: "neoforge-26.2.0.87", profileKey: "NeoForge",
+			installer: h.neoInstaller, version: "26.2.0.87", versionID: "neoforge-26.2.0.87", profileKey: "NeoForge", versionJSON: version,
 			libs: append(slices.Sorted(maps.Keys(h.neoLibs)), vanillaLib("neoforge")),
 		},
 		"forge": {
-			installer: h.forgeInstaller, version: "65.1.3", versionID: "26.2-forge-65.1.3", profileKey: "forge",
-			libs: []string{"org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", vanillaLib("forge")},
+			installer: h.forgeInstaller, version: "65.1.3", versionID: "26.2-forge-65.1.3", profileKey: "forge", versionJSON: forgeVersion,
+			generated: map[string]string{forgeClient: fakeForgeClient},
+			libs:      []string{"org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", vanillaLib("forge")},
 		},
 	}
 	t.Cleanup(h.server.Close)
@@ -1393,13 +1411,19 @@ func TestDiffAndPull(t *testing.T) {
 	}
 }
 
+// fakeForgeClient is the jar the fake Forge installer's processors generate for a client.
+const fakeForgeClient = "forge client"
+
 // fakeLoaderInstall is what the harness pretends each loader's installer ships and generates.
 type fakeLoaderInstall struct {
-	installer  fakeJar
-	version    string
-	versionID  string
-	profileKey string
-	libs       []string
+	installer   fakeJar
+	version     string
+	versionID   string
+	profileKey  string
+	libs        []string
+	versionJSON []byte
+	// generated is what a client install's processors write under libraries/, by path.
+	generated map[string]string
 }
 
 func installerLoader(flag string) (loader.Loader, bool) {
@@ -1463,24 +1487,39 @@ func (h *harness) fakeInstaller(_ context.Context, java, jar string, args []stri
 }
 
 // fakeClientInstall stands in for the installer's client install: it writes the version it
-// installed into the launcher and, like the real one, leaves a launcher profile of its own behind.
+// installed into the launcher, runs its processors over the vanilla client jar, and, like the real
+// one, leaves a launcher profile of its own behind.
 func (h *harness) fakeClientInstall(args []string, fake fakeLoaderInstall) error {
 	if len(args) != 2 {
 		return fmt.Errorf("installer args %v", args)
 	}
 	dir, id := args[1], fake.versionID
+	vanilla := filepath.Join(dir, "versions", "26.2", "26.2.jar")
+	if _, err := os.Stat(vanilla); err != nil {
+		h.installerFetchedClient = true
+		if err := os.MkdirAll(filepath.Dir(vanilla), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(vanilla, []byte("client"), 0o644); err != nil {
+			return err
+		}
+	}
 	if err := os.MkdirAll(filepath.Join(dir, "versions", id), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, "versions", id, id+".json"), []byte(`{"id":"`+id+`"}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "versions", id, id+".json"), fake.versionJSON, 0o644); err != nil {
 		return err
 	}
-	patched := filepath.Join(dir, "libraries", "fake", id, "client-patched.jar")
-	if err := os.MkdirAll(filepath.Dir(patched), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(patched, []byte("patched"), 0o644); err != nil {
-		return err
+	generated := map[string]string{"fake/" + id + "/client-patched.jar": "patched"}
+	maps.Copy(generated, fake.generated)
+	for rel, content := range generated {
+		path := filepath.Join(dir, "libraries", filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			return err
+		}
 	}
 	path := filepath.Join(dir, "launcher_profiles.json")
 	top := map[string]json.RawMessage{}

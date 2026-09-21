@@ -38,6 +38,9 @@ type playReport struct {
 	AssetIndex     string `json:"assetIndex,omitempty"`
 	Classpath      int    `json:"classpath"`
 	ClasspathBytes int64  `json:"classpathBytes"`
+	// LoaderLibraries counts the jars the version brings on top of the one it inherits from.
+	LoaderLibraries      int   `json:"loaderLibraries,omitempty"`
+	LoaderLibrariesBytes int64 `json:"loaderLibrariesBytes,omitempty"`
 }
 
 // playResult is what a launch reports once the game is running: which instance started, who is
@@ -287,14 +290,21 @@ func (a *app) dryRun(ctx context.Context, args []string) error {
 	if plan.version.AssetIndex != nil {
 		rep.AssetIndex = plan.version.AssetIndex.ID
 	}
+	if plan.inherits != "" {
+		own := plan.assembly.LibrariesFrom(plan.top, game.Host())
+		rep.LoaderLibraries, rep.LoaderLibrariesBytes = len(own), plan.store.Size(own)
+	}
 	return a.printer.Emit(rep, func(l *out.Lines) {
 		l.OK("would launch "+rep.Instance, rep.Version)
 		rows := []out.Row{}
 		if rep.Inherits != "" {
 			rows = append(rows, out.Row{Label: "inherits", Text: rep.Inherits})
 		}
+		rows = append(rows, out.Row{Label: "main class", Text: rep.MainClass})
+		if rep.Inherits != "" {
+			rows = append(rows, out.Row{Label: "loader libraries", Text: plural(rep.LoaderLibraries, "jar", "jars") + ", " + out.HumanBytes(rep.LoaderLibrariesBytes)})
+		}
 		rows = append(rows,
-			out.Row{Label: "main class", Text: rep.MainClass},
 			out.Row{Label: "java", Text: rep.Java},
 			out.Row{Label: "game dir", Text: rep.GameDir},
 			out.Row{Label: "natives", Text: rep.NativesDir},
@@ -314,6 +324,7 @@ type launchPlan struct {
 	store     game.Store
 	versionID string
 	inherits  string
+	top       game.Version
 	version   game.Version
 	assembly  game.Assembly
 	natives   string
@@ -353,7 +364,7 @@ func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Proje
 	if err != nil {
 		return launchPlan{}, err
 	}
-	return launchPlan{store: s, versionID: versionID, inherits: top.InheritsFrom, version: v, assembly: assembly, natives: natives, java: java}, nil
+	return launchPlan{store: s, versionID: versionID, inherits: top.InheritsFrom, top: top, version: v, assembly: assembly, natives: natives, java: java}, nil
 }
 
 // playInstance is the instance a launch acts on: the nickname given, else the one the current
@@ -432,6 +443,9 @@ func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store
 		return "", err
 	}
 	if l.InstallClientFlag != "" {
+		if err := a.fetchVanillaClient(ctx, s, p.Lock.Minecraft); err != nil {
+			return "", err
+		}
 		return a.installedLoader(ctx, p, s, l)
 	}
 	a.progress("fetching %s loader %s for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
@@ -440,6 +454,21 @@ func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store
 		return "", err
 	}
 	return s.SaveVersion(profile)
+}
+
+// fetchVanillaClient puts the vanilla client jar in the store before a loader's installer runs.
+// The installer patches that jar and would download it itself when it is missing, but silently,
+// with no progress line of its own.
+func (a *app) fetchVanillaClient(ctx context.Context, s game.Store, minecraft string) error {
+	v, err := s.Version(minecraft)
+	if err != nil {
+		return err
+	}
+	client, err := game.ClientJar(v)
+	if err != nil {
+		return err
+	}
+	return a.fetchInto(ctx, s, []game.File{client}, "client jar", "client jars")
 }
 
 // fillStore fetches everything the assembly is missing, a bar per kind so each stage of the
