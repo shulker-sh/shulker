@@ -86,7 +86,7 @@ func TestSetGetUnset(t *testing.T) {
 		{"variables.port", m.Variables["port"], json.Number("25565")},
 		{"variables.fancy", m.Variables["fancy"], true},
 		{"variables.zip", m.Variables["zip"], "02134"},
-		{"jvmArgs", strings.Join(m.Server.JvmArgs, " "), "-XX:+UseZGC"},
+		{"jvmArgs", strings.Join(m.Server.JVMArgs, " "), "-XX:+UseZGC"},
 		{"loader.note", m.Loader.Note, "kept on save"},
 		{"op name", m.Server.Players.Ops[0].Name, "Notch"},
 		{"op uuid", m.Server.Players.Ops[1].UUID, "069a79f4-44e9-4726-a5be-fca90e38aaf5"},

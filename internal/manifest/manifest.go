@@ -52,8 +52,8 @@ type Server struct {
 	Variables  Variables      `json:"variables,omitempty"`
 	Eula       bool           `json:"eula"`
 	Memory     string         `json:"memory,omitempty"`
-	JvmFlags   string         `json:"jvmFlags,omitempty"`
-	JvmArgs    []string       `json:"jvmArgs,omitempty"`
+	JVMFlags   string         `json:"jvmFlags,omitempty"`
+	JVMArgs    []string       `json:"jvmArgs,omitempty"`
 	Properties map[string]any `json:"properties,omitempty"`
 	Players    *Players       `json:"players,omitempty"`
 	Note       string         `json:"note,omitempty"`

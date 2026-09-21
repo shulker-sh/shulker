@@ -288,8 +288,8 @@ func (a *app) launchSettings(dir string) (instance.Settings, error) {
 	if s.Memory == "" {
 		s.Memory = cfg.Play.Memory
 	}
-	if s.JvmArgs == nil {
-		s.JvmArgs = cfg.Play.JvmArgs
+	if s.JVMArgs == nil {
+		s.JVMArgs = cfg.Play.JVMArgs
 	}
 	if s.Java == "" {
 		s.Java = cfg.Play.Java
@@ -331,7 +331,7 @@ func launchArgv(v game.Version, vars map[string]string, s instance.Settings, win
 	if s.Memory != "" {
 		extra = append(extra, "-Xms"+s.Memory, "-Xmx"+s.Memory)
 	}
-	extra = append(extra, s.JvmArgs...)
+	extra = append(extra, s.JVMArgs...)
 	features := map[string]bool{}
 	vars = maps.Clone(vars)
 	legacy := target.apply(v, features, vars)

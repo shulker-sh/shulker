@@ -1,10 +1,11 @@
+// Package config reads and writes shulker's machine-wide files: config.json, and the registry of
+// the instances shulker syncs.
 package config
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"slices"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
 
@@ -22,8 +24,10 @@ const (
 	RegistrySchemaURL = "https://shulker.sh/schema/v1/registry.json"
 )
 
+// Keys are the config.json keys `shulker config` reads and sets.
 var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
 
+// Config is config.json.
 type Config struct {
 	Accounts   Accounts   `json:"accounts"`
 	CurseForge CurseForge `json:"curseforge"`
@@ -38,7 +42,7 @@ type Config struct {
 // is a default the same key in an instance's settings overrides, and an absent one inherits.
 type Play struct {
 	Memory  string   `json:"memory,omitempty"`
-	JvmArgs []string `json:"jvmArgs,omitempty"`
+	JVMArgs []string `json:"jvmArgs,omitempty"`
 	Java    string   `json:"java,omitempty"`
 	Window  string   `json:"window,omitempty"`
 	Wrapper []string `json:"wrapper,omitempty"`
@@ -94,13 +98,15 @@ func (i Instance) Label() string {
 	return i.ID
 }
 
+// Path is config.json: SHULKER_CONFIG when it is set, else shulker/config.json in the user config
+// directory.
 func Path() (string, error) {
 	if p := os.Getenv(PathEnv); p != "" {
 		return p, nil
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {
-		return "", err
+		return "", configDirUnset(err)
 	}
 	return filepath.Join(base, "shulker", "config.json"), nil
 }
@@ -118,15 +124,22 @@ func DataDir() (string, error) {
 		}
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", err
+			return "", configDirUnset(err)
 		}
 		return filepath.Join(home, ".local", "share", "shulker"), nil
 	}
 	base, err := os.UserConfigDir()
 	if err != nil {
-		return "", err
+		return "", configDirUnset(err)
 	}
 	return filepath.Join(base, "shulker"), nil
+}
+
+func configDirUnset(err error) *out.Error {
+	e := out.Errorf("config-dir-unset", "shulker can't tell where this user's config and data folders are")
+	e.Rows = []out.Detail{{Label: "os", Text: err.Error()}}
+	e.Help = "set " + PathEnv + " and " + DataPathEnv
+	return e
 }
 
 func Load() (Config, error) {
@@ -137,6 +150,7 @@ func Load() (Config, error) {
 	return LoadFile(path)
 }
 
+// LoadFile reads config.json at path. A file that isn't there is the zero Config.
 func LoadFile(path string) (Config, error) {
 	var cfg Config
 	data, err := os.ReadFile(path)
@@ -152,6 +166,8 @@ func LoadFile(path string) (Config, error) {
 	return cfg, nil
 }
 
+// LoadDocument reads config.json as a raw document, numbers kept exact, so a key can be set without
+// dropping the ones Config doesn't know. A file that isn't there is an empty document.
 func LoadDocument(path string) (map[string]any, error) {
 	doc := map[string]any{}
 	data, err := os.ReadFile(path)
@@ -196,13 +212,13 @@ func SaveDocument(path string, doc map[string]any) error {
 	return nil
 }
 
+// RegistryPath is the registry the config at configPath points to, registry.json beside it by default.
 func RegistryPath(configPath string, cfg Config) string {
 	return Root(configPath, cfg.Registry, filepath.Join(filepath.Dir(configPath), RegistryFileName))
 }
 
 // Root resolves a path-valued key of config.json: an absolute value as given, a relative one
-// against config.json's own directory, and an empty one to the default the caller passes. One rule
-// for the registry and for the instances, saves and store roots alike.
+// against config.json's own directory, and an empty one to the default the caller passes.
 func Root(configPath, value, fallback string) string {
 	switch {
 	case value == "":
@@ -214,6 +230,7 @@ func Root(configPath, value, fallback string) string {
 	}
 }
 
+// LoadInstances reads the registry at path. A registry that is missing or empty has no instances.
 func LoadInstances(path string) ([]Instance, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -240,9 +257,8 @@ func LoadInstances(path string) ([]Instance, error) {
 	return registry.Instances, nil
 }
 
-// checkRegistrySchema reports a registry written by another shulker as something to repair rather
-// than as a list of schema failures, which is what a registry from before the instances rewrite
-// produces.
+// checkRegistrySchema reports a registry with another $schema as something to repair, rather than
+// as the list of schema failures validating it would produce.
 func checkRegistrySchema(path string, data []byte) error {
 	var head struct {
 		Schema string `json:"$schema"`
@@ -257,11 +273,13 @@ func checkRegistrySchema(path string, data []byte) error {
 	if head.Schema != "" {
 		what = "names the schema " + head.Schema
 	}
-	return schema.Invalid("registry-invalid", path, data,
-		errors.New(what+", which this shulker doesn't know; `shulker instances repair` rebuilds it"))
+	e := schema.Invalid("registry-invalid", path, data, errors.New(what+", which this shulker doesn't know"))
+	e.Help = "run `shulker instances repair` to rebuild it"
+	return e
 }
 
-// CreateRegistry writes an empty registry at path when nothing is there yet.
+// CreateRegistry writes an empty registry at path when nothing is there yet, and reports whether it
+// did.
 func CreateRegistry(path string) (bool, error) {
 	if _, err := os.Stat(path); err == nil || !errors.Is(err, os.ErrNotExist) {
 		return false, err
@@ -323,7 +341,7 @@ func UpdateInstances(path string, update func([]Instance) []Instance) (bool, err
 	var instances []Instance
 	if raw, ok := top["instances"]; ok {
 		if err := json.Unmarshal(raw, &instances); err != nil {
-			return false, fmt.Errorf("%s: instances: %w", path, err)
+			return false, schema.Invalid("registry-invalid", path, data, err)
 		}
 	}
 	next := update(slices.Clone(instances))

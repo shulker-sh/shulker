@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestLoad(t *testing.T) {
@@ -119,7 +121,7 @@ func TestOldRegistryFails(t *testing.T) {
 	path := filepath.Join(t.TempDir(), RegistryFileName)
 	os.WriteFile(path, []byte(`{"links":[{"side":"client","name":"old","dir":"/old","source":"/old","target":"client"}]}`), 0o644)
 	_, err := LoadInstances(path)
-	if err == nil || !strings.Contains(err.Error(), "instances repair") {
+	if err == nil || !strings.Contains(out.AsError(err).Help, "instances repair") {
 		t.Fatalf("an old registry points at repair: %v", err)
 	}
 

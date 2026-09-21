@@ -48,7 +48,7 @@ type File struct {
 	Resolved   *Resolved `json:"resolved,omitempty"`
 }
 
-// Settings are the instance's own. Memory, JvmArgs, Java, Window and Wrapper override the play.*
+// Settings are the instance's own. Memory, JVMArgs, Java, Window and Wrapper override the play.*
 // default of the same name in config.json when shulker launches the instance itself; an absent one
 // inherits it.
 type Settings struct {
@@ -56,7 +56,7 @@ type Settings struct {
 	Commands      *Commands `json:"commands,omitempty"`
 	Marker        *bool     `json:"marker,omitempty"`
 	Memory        string    `json:"memory,omitempty"`
-	JvmArgs       []string  `json:"jvmArgs,omitempty"`
+	JVMArgs       []string  `json:"jvmArgs,omitempty"`
 	Java          string    `json:"java,omitempty"`
 	Window        string    `json:"window,omitempty"`
 	Wrapper       []string  `json:"wrapper,omitempty"`

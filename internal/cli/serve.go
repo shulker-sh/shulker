@@ -116,7 +116,7 @@ func (a *app) serveCmd() *cobra.Command {
 					return err
 				}
 			}
-			jvm, err := server.JVMArgs(srv.Memory, srv.JvmFlags, srv.JvmArgs)
+			jvm, err := server.JVMArgs(srv.Memory, srv.JVMFlags, srv.JVMArgs)
 			if err != nil {
 				return err
 			}

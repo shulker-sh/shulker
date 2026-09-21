@@ -91,7 +91,7 @@ func TestInstanceActsOnANicknameFromElsewhere(t *testing.T) {
 	h.mustRun(t, "-i", "pack", "instance", "set", "hooks.preLaunch", "false")
 
 	s := instanceSettings(t, gameDir)
-	if s.Window != "1280x720" || len(s.JvmArgs) != 1 || s.JvmArgs[0] != "-Dmine=1" || s.PreLaunch() {
+	if s.Window != "1280x720" || len(s.JVMArgs) != 1 || s.JVMArgs[0] != "-Dmine=1" || s.PreLaunch() {
 		t.Fatalf("settings %+v", s)
 	}
 	if got := instanceSettingJSON(t, h, "-i", "pack", "instance", "get", "window"); got.Value != "1280x720" || got.From != "instance" {
@@ -113,7 +113,7 @@ func TestInstanceRefusesWhatTheSettingsCantHold(t *testing.T) {
 			t.Fatalf("instance set %v should fail:\n%s", bad, stdout)
 		}
 	}
-	if s := instanceSettings(t, gameDir); s.Memory != "" || s.Window != "" || s.JvmArgs != nil {
+	if s := instanceSettings(t, gameDir); s.Memory != "" || s.Window != "" || s.JVMArgs != nil {
 		t.Fatalf("a refused value leaves the file alone: %+v", s)
 	}
 	// Outside an instance there is no instance file to change.
