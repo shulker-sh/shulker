@@ -1,3 +1,5 @@
+// Package player resolves the player names and uuids a manifest lists against Mojang, and decides
+// what the lock records for them.
 package player
 
 import (
@@ -70,6 +72,8 @@ func (r Ref) String() string {
 	return r.UUID
 }
 
+// Dashed is a uuid in lowercase with its four dashes. An id that isn't 32 characters once
+// undashed comes back lowercased with no dashes at all.
 func Dashed(id string) string {
 	id = strings.ToLower(strings.ReplaceAll(id, "-", ""))
 	if len(id) != 32 {
@@ -78,6 +82,8 @@ func Dashed(id string) string {
 	return id[:8] + "-" + id[8:12] + "-" + id[12:16] + "-" + id[16:20] + "-" + id[20:]
 }
 
+// State is how a player compares with the lock: Ok, Renamed (same uuid, new name), Reassigned
+// (same name, another uuid) or Unknown to Mojang.
 type State string
 
 const (
@@ -97,6 +103,7 @@ type Result struct {
 	ResolvedAt string   `json:"resolvedAt,omitempty"`
 }
 
+// Mode is which players Sync asks Mojang about: all of them, or only those the lock lacks.
 type Mode int
 
 const (
@@ -137,6 +144,8 @@ func (c *Client) ByUUID(ctx context.Context, uuid string) (Profile, bool, error)
 	return Profile{Name: p.Name, UUID: Dashed(p.ID)}, true, nil
 }
 
+// Dedupe drops later refs to a player already listed: by uuid when a ref has one, else by name
+// in any case.
 func Dedupe(refs []Ref) []Ref {
 	seen := map[string]bool{}
 	var unique []Ref
@@ -166,6 +175,7 @@ func Find(locked []lock.Player, ref Ref) (lock.Player, bool) {
 	return lock.Player{}, false
 }
 
+// Sync resolves refs against Mojang and classifies each against the lock.
 func (c *Client) Sync(ctx context.Context, refs []Ref, locked []lock.Player, mode Mode) ([]Result, error) {
 	refs = Dedupe(refs)
 	results := make([]Result, len(refs))
@@ -245,6 +255,8 @@ func lockedNames(locked []lock.Player) []string {
 	return names
 }
 
+// Policy turns renames, and reassignments the user accepted, into warnings. It fails on an
+// unknown player, and on a reassignment the user didn't accept.
 func Policy(results []Result, acceptChange bool) ([]string, error) {
 	var warnings, reassigned, unknown []string
 	for _, r := range results {
@@ -271,13 +283,16 @@ func Policy(results []Result, acceptChange bool) ([]string, error) {
 		return warnings, e
 	}
 	if len(reassigned) > 0 {
-		e := out.Errorf("player-reassigned", "%d player name(s) now belong to a different account; pass --accept-player-change to relock them", len(reassigned))
+		e := out.Errorf("player-reassigned", "%d player name(s) now belong to a different account", len(reassigned))
+		e.Help = "pass `--accept-player-change` to relock them"
 		e.Items = reassigned
 		return warnings, e
 	}
 	return warnings, nil
 }
 
+// Apply is the lock's new player list: the players results name, with a reassigned name kept on
+// its locked account unless the user accepted the change.
 func Apply(results []Result, locked []lock.Player, acceptChange bool) []lock.Player {
 	byUUID := map[string]lock.Player{}
 	for _, r := range results {
@@ -295,6 +310,7 @@ func Apply(results []Result, locked []lock.Player, acceptChange bool) []lock.Pla
 	return sorted(byUUID)
 }
 
+// Update refreshes the names of players already locked, adding and dropping none.
 func Update(results []Result, locked []lock.Player) []lock.Player {
 	byUUID := map[string]lock.Player{}
 	for _, p := range locked {
