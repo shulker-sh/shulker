@@ -1124,13 +1124,13 @@ A path is relative to the file's `settings` block and dotted the way `shulker se
 | `marker` | | Whether to include the marker mod, over the manifest's own `marker` |
 | `hooks.preLaunch`, `hooks.postExit` | | Whether another launcher syncs before each launch, and records each run |
 | `launchHistory` | | How many launch records to keep |
+| `savesGroup` | | The save group whose worlds this instance shares, `default` unless set; `none` keeps them in the instance. See [`shulker saves`](#shulker-saves) |
 
 ### `shulker instance get`
 
 Print a setting as it is in effect, then where it came from: set in this instance, with the default it would return to; its `play.` default; or the setting's own default. A setting neither the instance nor `config.json` sets fails with `path-not-set`. With no path, print every setting the instance has, with the `play.` defaults it inherits filled in.
 
 ```sh
-| `savesGroup` | | The save group whose worlds this instance shares, `default` unless set; `none` keeps them in the instance. See [`shulker saves`](#shulker-saves) |
 shulker instance get memory
 shulker -i smp instance get window
 shulker instance get
@@ -1189,12 +1189,6 @@ shulker unlink --all --side server
 | `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only `client` or `server` entries |
 
-### `shulker hook pre-launch`
-
-What a launcher's own pre-launch slot runs. shulker writes the script that calls it into the instance's `.shulker/` folder and points the launcher at that, so there is no reason to run this yourself: outside a launcher slot it would sync whatever directory it was run in. It syncs the instance from its source before the game starts, and a failure never stops the game — the launcher plays what is already on disk.
-
-A launcher that gives shulker no way to show a message gets a deadline instead, so a long update can explain itself rather than looking like a hang. That is GDLauncher only, which discards a hook's output when its own five-minute limit runs out.
-
 ### `shulker saves`
 
 Every instance [`shulker link shulker`](#shulker-link-shulker) makes shares its worlds through a save group: its `saves/` folder is a link (a directory junction on Windows) to the group's folder under the saves root, so every instance in a group lists the same worlds. Each joins `default`. Set another group with `shulker instance set savesGroup <name>`, or `none` to keep the worlds in the instance; the next sync relinks it and names the worlds the game now lists. Nothing is copied or merged: leaving a group leaves its worlds there. Joining one replaces an empty `saves/`, and one holding worlds is moved in as the group when the group has none; when both hold worlds, the sync warns and leaves `saves/` alone until you merge them by hand. Instances in other launchers keep their own worlds.
@@ -1228,6 +1222,12 @@ shulker -i smp saves prune --keep 0
 | `--group <group>` | Prune this save group's backups rather than an instance's |
 
 With `--json`, the data is `{ "group", "dir", "worldsDir", "pruned", "kept" }`.
+
+### `shulker hook pre-launch`
+
+What a launcher's own pre-launch slot runs. shulker writes the script that calls it into the instance's `.shulker/` folder and points the launcher at that, so there is no reason to run this yourself: outside a launcher slot it would sync whatever directory it was run in. It syncs the instance from its source before the game starts, and a failure never stops the game — the launcher plays what is already on disk.
+
+A launcher that gives shulker no way to show a message gets a deadline instead, so a long update can explain itself rather than looking like a hang. That is GDLauncher only, which discards a hook's output when its own five-minute limit runs out.
 
 | Flag | Description |
 | --- | --- |
@@ -1527,13 +1527,13 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `file-not-found` | A file named to `pull` isn't in the build directory |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |
+| `group-not-found` | `--group` names a save group that isn't under the saves root |
 | `history-empty` | The instance has no history entries yet; one is taken before an in-place build changes anything |
 | `history-invalid` | A history entry's own record is unreadable; `history prune` removes it |
 | `history-missing` | There is no history entry with that number; the message says how many are kept |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
-| `group-not-found` | `--group` names a save group that isn't under the saves root |
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `instance-not-found` | No instance matches, or the directory `shulker instance` acts on holds no `.shulker/instance.json`. `candidates`: the instances shulker knows, `pass`: their ids |
 | `instance-id-taken` | Another instance already has the `--as` id; the message names its directory |
