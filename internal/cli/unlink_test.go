@@ -166,3 +166,49 @@ func TestUnlinkedInstanceStaysUnlinked(t *testing.T) {
 		t.Fatalf("link should clear the mark: %+v", f)
 	}
 }
+
+// An unlink leaves a whole project behind, and the hint it prints picks that same folder back up.
+// The registry row is gone by then, so the manifest is the only thing that can say what the
+// instance follows — and a link that disagrees with it still has to ask for --force.
+func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	other := filepath.Join(t.TempDir(), "other")
+	lockedPack(t, h, other, `"fabric-api": {}`)
+
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Friends")
+	instDir := filepath.Join(prismDir, "instances", "shulker-friends")
+	gameDir := filepath.Join(instDir, "minecraft")
+	h.mustRun(t, "-C", gameDir, "add", "fresh-animations")
+
+	r := unlinkJSON(t, h, "Friends")
+	if len(r) != 1 || r[0].Relink != "shulker link prism "+h.dir+" --name Friends --launcher-dir "+prismDir {
+		t.Fatalf("the hint's source comes from the manifest: %+v", r)
+	}
+
+	code, stdout, _ := h.run(t, "link", "prism", other, "--launcher-dir", prismDir, "--name", "Friends", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-exists" || !strings.Contains(e.Message, h.dir) || !strings.Contains(e.Message, "repoint the modpack it follows") {
+		t.Fatalf("a source the unlinked project doesn't follow: exit %d %s", code, stdout)
+	}
+
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
+	if f := readIntent(t, gameDir); f.Unlinked {
+		t.Fatalf("adopting clears the unlinked mark: %+v", f)
+	}
+	if instances := readInstances(t, h); len(instances) != 1 || instances[0].Dir != gameDir {
+		t.Fatalf("adopting registers the same folder again: %+v", instances)
+	}
+	if cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile)); cfg["PreLaunchCommand"] == "" {
+		t.Fatalf("adopting rewrites the launcher's slots: %+v", cfg)
+	}
+	requires, _ := instanceManifest(t, gameDir)["requires"].(map[string]any)
+	entry, _ := requires["pack"].(map[string]any)
+	if len(requires) != 2 || entry["source"] != h.dir || requires["fresh-animations"] == nil {
+		t.Fatalf("adoption leaves the manifest as it found it: %v", requires)
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "resourcepacks", "fresh-animations.zip")); err != nil {
+		t.Fatalf("what the player added is still there: %v", err)
+	}
+}

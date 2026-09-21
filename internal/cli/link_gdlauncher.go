@@ -79,8 +79,10 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 				return out.Errorf("usage", "GDLauncher needs an instance name that isn't blank; pass --name")
 			}
 			gameDir := gdl.GameDir(display)
-			if prev, ok := a.findLauncherInstance("gdlauncher", launcherDir, display); ok && prev.Source != src.name && !force {
-				return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev.Source)
+			if !force {
+				if err := checkAdopt(gameDir, src.name, "instance", display, "--name"); err != nil {
+					return err
+				}
 			}
 			// An instance shulker linked is a project in its own game directory, and stays one after
 			// an unlink. Anything else in that folder is the player's own.
@@ -163,7 +165,7 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet")
+	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows, link over one shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet")
 	ff.register(cmd, "for this instance")
 	ls.register(cmd)
 	return cmd

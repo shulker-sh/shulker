@@ -89,12 +89,14 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				display = instanceName
 			}
 			key := profileKey(display)
-			if prev, ok := a.findLauncherInstance("mojang", launcherDir, display); ok && prev.Source != src.name && !force {
-				return out.Errorf("instance-exists", "profile %q already syncs from %s; pass --name to create a second profile, or --force to repoint this one", display, prev.Source)
-			}
 			gameDir, err := filepath.Abs(filepath.Join(launcherDir, "shulker", strings.TrimPrefix(key, "shulker-")))
 			if err != nil {
 				return err
+			}
+			if !force {
+				if err := checkAdopt(gameDir, src.name, "profile", display, "--name"); err != nil {
+					return err
+				}
 			}
 			if err := a.checkID(as, gameDir); err != nil {
 				return err
@@ -168,7 +170,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "repoint a profile that syncs from a different source")
+	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack a profile already follows")
 	ls.register(cmd)
 	return cmd
 }
@@ -288,6 +290,22 @@ func newInstance(gameDir, id, display, ref string, src *syncSource) (*project.Pr
 	return p, p.SaveManifest()
 }
 
+// checkAdopt guards the project a link is about to adopt. A game directory holding an in-place
+// project keeps the pack it follows, so the source a link names has to agree with the manifest
+// before the link may take it over, and --force is what repoints that one entry. The manifest is
+// what decides, not the registry row: an unlink deletes the row and leaves the project whole.
+func checkAdopt(gameDir, source, noun, name, second string) error {
+	m, _, inPlace, err := inPlaceManifest(gameDir)
+	if err != nil || !inPlace {
+		return err
+	}
+	key := modpackKey(m, source)
+	if key == "" || m.Requires[key].Source == source {
+		return nil
+	}
+	return out.Errorf("instance-exists", "%s %q already follows %s from %s; pass %s to create a second %s, or --force to repoint the modpack it follows", noun, name, key, m.Requires[key].Source, second, noun)
+}
+
 // modpackKey is the key the instance follows the link's source under: the source manifest's name
 // when this link wrote the entry, and whatever an earlier link or a hand edit chose when it didn't.
 // Empty where no single entry is the link's: with several packs required, none of them is the one.
@@ -302,24 +320,6 @@ func modpackKey(m *manifest.Manifest, source string) string {
 		return keys[0]
 	}
 	return ""
-}
-
-// findLauncherInstance is the registry row a launcher already has under a name,
-// when its directory is still there.
-func (a *app) findLauncherInstance(launcherName, launcherDir, name string) (config.Instance, bool) {
-	instances, err := a.loadInstances()
-	if err != nil {
-		return config.Instance{}, false
-	}
-	for _, in := range instances {
-		if in.Launcher != launcherName || in.Name != name || !sameDir(in.LauncherDir, launcherDir) {
-			continue
-		}
-		if _, err := os.Stat(in.Dir); err == nil {
-			return in, true
-		}
-	}
-	return config.Instance{}, false
 }
 
 // linkSource is the project a link command works from: the argument when there

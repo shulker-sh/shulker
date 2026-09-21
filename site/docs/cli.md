@@ -719,7 +719,7 @@ shulker accounts providers
 
 The order is what settles a Microsoft account signed in to more than one launcher: it is listed once, from the earliest provider that has it. A provider shulker has no reader for yet is shown as such, and contributes nothing. With `--json`, the list comes back as an array of names.
 
-Where a launcher's accounts are read is the directory a registered instance of it was linked against — the one named with [`shulker link prism --launcher-dir`](#shulker-link-prism) — and the launcher's usual directory on this machine otherwise. Prism's accounts come from `accounts.json` there, Microsoft and offline accounts alike. Shulker never renews a borrowed account and never writes to another launcher's files: a borrowed session token that has run out is shown as `token expired <ago>`, still plays, and warns at launch that online servers and Realms will reject it until that launcher renews it. A file shulker can't read warns, naming itself, and is skipped, so a corrupt one can't take the account list down.
+Where a launcher's accounts are read is the directory a registered instance of it was linked against — the one named with [`shulker link prism --launcher-dir`](#shulker-link-prism) — and the launcher's usual directory on this machine otherwise. Prism's accounts come from `accounts.json` there, Microsoft and offline accounts alike. The Minecraft Launcher's come from both `launcher_accounts.json` and `launcher_accounts_microsoft_store.json` in [its own directory](#shulker-link-mojang), because that suffix is per file rather than per install; an account in both is listed once, with the session that lasts longer. Shulker opens neither the entitlements file beside them nor the launcher's stored credentials: an account's Java profile is its own proof that it owns the game, and an account with no profile isn't listed at all, since its username and UUID both live there. Shulker never renews a borrowed account and never writes to another launcher's files: a borrowed session token that has run out is shown as `token expired <ago>`, still plays, and warns at launch that online servers and Realms will reject it until that launcher renews it. A file shulker can't read warns, naming itself, and is skipped, so a corrupt one can't take the account list down — the other accounts file in the same directory still loads.
 
 ### `shulker accounts providers add|remove`
 
@@ -801,7 +801,7 @@ Create an instance shulker owns, under its own instances root, and register it l
 
 With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. The instance is a project of its own: a `shulker.json` that follows the source as a modpack and builds where it stands, so `shulker add` in the instance directory puts a mod on top of the pack and keeps it across syncs. shulker builds it before `link` returns.
 
-The instance's nickname names both the folder under the instances root and the id `-i` takes, so the two can never drift. Without `--as` it comes from the pack's name. If an instance of that name already follows a different source, `link` fails rather than repointing it: pass `--as` to name a second instance, or `--force` to repoint this one.
+The instance's nickname names both the folder under the instances root and the id `-i` takes, so the two can never drift. Without `--as` it comes from the pack's name. `link` never writes over a `shulker.json` that is already in the instance directory: it adopts that project, clears the unlinked mark, re-registers it and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If an instance of that name already follows a different modpack, `link` fails rather than repointing it: pass `--as` to name a second instance, or `--force` to repoint the modpack it follows.
 
 Move the instances root with `shulker config set instances <path>`; `shulker config get instances` prints where it is now.
 
@@ -817,7 +817,7 @@ shulker link shulker https://example.com/pack/shulker.json --as smp
 | --- | --- |
 | `--as <nickname>` | Nickname for this instance, which names its folder and finds it with `-i` (default: from the pack's name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Repoint an instance that follows a different source |
+| `--force` | Repoint the modpack an instance already follows |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
 | `--no-post-exit` | Don't record how each run ended |
@@ -836,7 +836,7 @@ With no source, it links the project in the current directory. Pass a project di
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <instance folder>`, or run `link` again with new flags.
 
-If the instance already syncs from a different source, or is an ATLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
+`link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the instance already follows a different modpack, or is an ATLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
@@ -854,7 +854,7 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Link over an instance that syncs from a different source or that shulker didn't link |
+| `--force` | Repoint the modpack an instance already follows, or link over one shulker didn't link |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
 | `--no-post-exit` | Don't record how each run ended |
@@ -877,7 +877,7 @@ Renaming the instance in GDLauncher moves its folder. It keeps syncing before ea
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game folder>`, or run `link` again with new flags.
 
-If the instance already syncs from a different source, or is a GDLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
+`link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the instance already follows a different modpack, or is a GDLauncher instance shulker didn't link, `link` fails rather than taking it over. Use `--name` to create a second instance, or `--force` to link over this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
@@ -895,7 +895,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Link over an instance that syncs from a different source or that shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet |
+| `--force` | Repoint the modpack an instance already follows, link over one shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
 | `--no-post-exit` | Don't record how each run ended |
@@ -912,7 +912,7 @@ Install the project's loader, if it has one, into the official launcher and add 
 
 With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. Either way the game directory is `shulker/<slug>` inside the launcher directory, and what lands there is a project of its own: a `shulker.json` that follows the source as a modpack and builds where it stands. It takes its platform, its features and its override layers from the pack at every sync, so `shulker add` in the game directory puts a mod on top of the pack and keeps it. shulker builds it before `link` returns, so it's ready to play. The official launcher runs no commands of its own, so shulker points the profile's Java at a small shim of its own that syncs the instance before each launch and then starts the game. That shim lives in the instance's own `.shulker` folder: a shell script on macOS and Linux, and on Windows a small executable shulker generates there, beside a file holding the two paths it needs.
 
-If the profile already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
+`link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the profile already follows a different modpack, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
@@ -930,7 +930,7 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | `--name <name>` | Profile name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Repoint a profile that syncs from a different source |
+| `--force` | Repoint the modpack a profile already follows |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
 | `--no-post-exit` | Don't record how each run ended |
@@ -947,7 +947,7 @@ With no source, it links the project in the current directory. Pass a project di
 
 `--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game dir>`, or run `link` again with new flags.
 
-If the instance already syncs from a different source, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is. On the next sync, files the old pack put there are removed, unless you changed them in-game.
+`link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the instance already follows a different modpack, `link` fails rather than repointing it. Use `--name` to create a second instance, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is. On the next sync, files the old pack put there are removed, unless you changed them in-game.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
 
@@ -965,7 +965,7 @@ shulker link prism https://example.com/pack/shulker.json --name "Friends SMP" --
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Repoint an instance that syncs from a different source |
+| `--force` | Repoint the modpack an instance already follows |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
 | `--no-post-exit` | Don't record how each run ended |
@@ -995,7 +995,7 @@ shulker link multimc https://github.com/shulker-sh/base-pack.git --launcher-dir 
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
-| `--force` | Repoint an instance that syncs from a different source |
+| `--force` | Repoint the modpack an instance already follows |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
 | `--no-post-exit` | Don't record how each run ended |
@@ -1406,7 +1406,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `history-invalid` | A history entry's own record is unreadable; `history prune` removes it |
 | `history-missing` | There is no history entry with that number; the message says how many are kept |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
-| `instance-exists` | An instance already syncs from a different source, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
+| `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `instance-not-found` | No instance matches. `candidates`: the instances shulker knows, `pass`: their ids |

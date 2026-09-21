@@ -98,8 +98,10 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 			if instanceName != "" {
 				display = instanceName
 			}
-			if prev, ok := a.findLauncherInstance(launcherName, launcherDir, display); ok && prev.Source != src.name && !force {
-				return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev.Source)
+			if !force {
+				if err := checkAdopt(l.GameDir(profileKey(display)), src.name, "instance", display, "--name"); err != nil {
+					return err
+				}
 			}
 			res, err := l.WriteInstance(launcher.Instance{
 				ID:            profileKey(display),
@@ -164,7 +166,7 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "repoint an instance that syncs from a different source")
+	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows")
 	ff.register(cmd, "for this instance")
 	ls.register(cmd)
 	return cmd

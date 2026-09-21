@@ -62,8 +62,10 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 			if err := a.checkID(as, gameDir); err != nil {
 				return err
 			}
-			if i, ok := config.FindInstance(instances, gameDir); ok && instances[i].Source != src.name && !force {
-				return out.Errorf("instance-exists", "instance %q already follows %s; pass --as to name a second instance, or --force to repoint this one", nick, instances[i].Source)
+			if !force {
+				if err := checkAdopt(gameDir, src.name, "instance", nick, "--as"); err != nil {
+					return err
+				}
 			}
 			created := false
 			if _, err := os.Stat(gameDir); os.IsNotExist(err) {
@@ -105,7 +107,7 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&as, "as", "", "nickname for this instance, which names its folder and finds it with -i (default: from the pack's name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "repoint an instance that follows a different source")
+	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows")
 	ls.register(cmd)
 	return cmd
 }

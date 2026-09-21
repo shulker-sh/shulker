@@ -76,8 +76,10 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 				return out.Errorf("usage", "ATLauncher names an instance's folder after the letters and digits in its name, and %q has none; pass --name", display)
 			}
 			gameDir := atl.InstanceDir(display)
-			if prev, ok := a.findLauncherInstance("atlauncher", launcherDir, display); ok && prev.Source != src.name && !force {
-				return out.Errorf("instance-exists", "instance %q already syncs from %s; pass --name to create a second instance, or --force to repoint this one", display, prev.Source)
+			if !force {
+				if err := checkAdopt(gameDir, src.name, "instance", display, "--name"); err != nil {
+					return err
+				}
 			}
 			// An instance shulker linked is a project in its own game directory, and stays one after
 			// an unlink. Anything else in that folder is the player's own.
@@ -155,7 +157,7 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
 	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "link over an instance that syncs from a different source or that shulker didn't link")
+	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows, or link over one shulker didn't link")
 	ff.register(cmd, "for this instance")
 	ls.register(cmd)
 	return cmd
