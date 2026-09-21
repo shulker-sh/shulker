@@ -1637,6 +1637,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |
+| `jar-metadata-invalid` | A mod jar's metadata (`fabric.mod.json`, `quilt.mod.json` or `mods.toml`) can't be read, or the jar isn't a readable zip. The row names the file and what went wrong |
+| `jar-metadata-missing` | A mod jar has none of the metadata files the loader reads |
 | `java-not-found` | No working Java at the configured path or on PATH |
 | `java-range` | `java` in `shulker.json` is neither a path nor a version range |
 | `java-version` | The Java found is outside the range in `shulker.json` |

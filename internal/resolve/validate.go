@@ -266,7 +266,7 @@ var (
 )
 
 func satisfies(info *jarmeta.Info, version, declared string) (bool, error) {
-	if info.MavenRanges {
+	if info.UsesMavenRanges {
 		rng, err := mavenver.ParseRange(declared)
 		if err != nil {
 			return false, err

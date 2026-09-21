@@ -3,11 +3,12 @@ package jarmeta
 import (
 	"archive/zip"
 	"bytes"
-	"errors"
 	"maps"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 func buildZip(t *testing.T, files map[string]string) []byte {
@@ -163,7 +164,7 @@ modId="ignored"
 type="required"
 `,
 	}))
-	if info.ID != "sodium" || info.Loader != "neoforge" || info.Side != "both" || !info.MavenRanges {
+	if info.ID != "sodium" || info.Loader != "neoforge" || info.Side != "both" || !info.UsesMavenRanges {
 		t.Fatalf("parsed %+v", info)
 	}
 	if want := "0.8.1+mc26.2-build.12345678901234567890123456789012345678901234567890123"; info.Version != want {
@@ -231,7 +232,7 @@ func TestReadPrefersTheProjectLoader(t *testing.T) {
 			t.Errorf("%s read %s, want %s", loaderName, info.ID, want)
 		}
 	}
-	if _, err := Read(path, "forge"); !errors.Is(err, ErrNoMetadata) {
+	if _, err := Read(path, "forge"); out.CodeOf(err) != "jar-metadata-missing" {
 		t.Errorf("forge: %v, want no metadata", err)
 	}
 }

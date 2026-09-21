@@ -1,3 +1,4 @@
+// Package jarmeta reads the mod metadata inside a jar the way each loader reads it.
 package jarmeta
 
 import (
@@ -5,15 +6,24 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/out"
 )
 
-var ErrNoMetadata = errors.New("no mod metadata found in jar")
+var errNoMetadata = errors.New("no mod metadata found in jar")
 
+// fileError is a metadata file in the jar that doesn't read, named so the error can say which.
+type fileError struct {
+	name string
+	err  error
+}
+
+func (e *fileError) Error() string { return e.name + ": " + e.err.Error() }
+
+// Info is the mod a jar declares. Each dependency map is keyed by mod id and holds a version range.
 type Info struct {
 	ID         string
 	Version    string
@@ -27,8 +37,8 @@ type Info struct {
 	// Optional dependencies aren't required, but a present mod must match the range.
 	Optional map[string]string
 	Provides map[string]string
-	// MavenRanges marks ranges written in Maven syntax (NeoForge and Forge) rather than Fabric's.
-	MavenRanges bool
+	// UsesMavenRanges marks ranges written in Maven syntax (NeoForge and Forge) rather than Fabric's.
+	UsesMavenRanges bool
 }
 
 var allFiles = []string{"quilt.mod.json", "fabric.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml"}
@@ -38,7 +48,7 @@ var allFiles = []string{"quilt.mod.json", "fabric.mod.json", "META-INF/neoforge.
 func Read(path, loaderName string) (*Info, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
+		return nil, metadataInvalid(path, "zip", err)
 	}
 	defer zr.Close()
 	files := allFiles
@@ -46,10 +56,26 @@ func Read(path, loaderName string) (*Info, error) {
 		files = l.MetadataFiles
 	}
 	info, err := readZip(&zr.Reader, files)
+	if errors.Is(err, errNoMetadata) {
+		if loaderName == "" {
+			return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata", path)
+		}
+		return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata for %s", path, loaderName)
+	}
+	var bad *fileError
+	if errors.As(err, &bad) {
+		return nil, metadataInvalid(path, bad.name, bad.err)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
+		return nil, metadataInvalid(path, "zip", err)
 	}
 	return info, nil
+}
+
+func metadataInvalid(path, source string, err error) *out.Error {
+	e := out.Errorf("jar-metadata-invalid", "shulker can't read the mod metadata in %s", path)
+	e.Rows = []out.Detail{{Label: source, Text: err.Error()}}
+	return e
 }
 
 func readZip(zr *zip.Reader, files []string) (*Info, error) {
@@ -58,15 +84,22 @@ func readZip(zr *zip.Reader, files []string) (*Info, error) {
 		if f == nil {
 			continue
 		}
+		var info *Info
+		var err error
 		switch name {
 		case "quilt.mod.json":
-			return readQuilt(zr, f, files)
+			info, err = readQuilt(zr, f, files)
 		case "fabric.mod.json":
-			return readFabric(zr, f, files)
+			info, err = readFabric(zr, f, files)
+		default:
+			info, err = readModsTOML(zr, f, files)
 		}
-		return readModsTOML(zr, f, files)
+		if err != nil {
+			return nil, &fileError{name: name, err: err}
+		}
+		return info, nil
 	}
-	return nil, ErrNoMetadata
+	return nil, errNoMetadata
 }
 
 func readFile(f *zip.File) ([]byte, error) {
@@ -102,10 +135,10 @@ func readFabric(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		} `json:"jars"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("fabric.mod.json: %w", err)
+		return nil, err
 	}
 	if raw.ID == "" {
-		return nil, errors.New("fabric.mod.json: missing id")
+		return nil, errors.New("missing id")
 	}
 	info := &Info{
 		ID:         raw.ID,
@@ -148,10 +181,10 @@ func readQuilt(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		} `json:"minecraft"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("quilt.mod.json: %w", err)
+		return nil, err
 	}
 	if raw.Loader.ID == "" {
-		return nil, errors.New("quilt.mod.json: missing quilt_loader.id")
+		return nil, errors.New("missing quilt_loader.id")
 	}
 	info := &Info{
 		ID:         raw.Loader.ID,

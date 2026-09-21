@@ -3,7 +3,7 @@ package jarmeta
 import (
 	"archive/zip"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -31,10 +31,10 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	}
 	var raw modsTOML
 	if _, err := toml.Decode(string(data), &raw); err != nil {
-		return nil, fmt.Errorf("%s: %w", f.Name, err)
+		return nil, err
 	}
 	if len(raw.Mods) == 0 || raw.Mods[0].ModID == "" {
-		return nil, fmt.Errorf("%s: missing modId", f.Name)
+		return nil, errors.New("missing modId")
 	}
 	jarVersion := manifestAttribute(zr, "Implementation-Version")
 	if jarVersion == "" {
@@ -51,18 +51,18 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		loaderName = "neoforge"
 	}
 	info := &Info{
-		ID:          raw.Mods[0].ModID,
-		Version:     version(raw.Mods[0].Version),
-		Loader:      loaderName,
-		Side:        "both",
-		Depends:     map[string]string{},
-		Breaks:      map[string]string{},
-		Conflicts:   map[string]string{},
-		Recommends:  map[string]string{},
-		Suggests:    map[string]string{},
-		Optional:    map[string]string{},
-		Provides:    map[string]string{},
-		MavenRanges: true,
+		ID:              raw.Mods[0].ModID,
+		Version:         version(raw.Mods[0].Version),
+		Loader:          loaderName,
+		Side:            "both",
+		Depends:         map[string]string{},
+		Breaks:          map[string]string{},
+		Conflicts:       map[string]string{},
+		Recommends:      map[string]string{},
+		Suggests:        map[string]string{},
+		Optional:        map[string]string{},
+		Provides:        map[string]string{},
+		UsesMavenRanges: true,
 	}
 	own := map[string]bool{}
 	for _, m := range raw.Mods {
