@@ -213,3 +213,87 @@ func TestAWorldOpenInARunningGame(t *testing.T) {
 		t.Fatalf("a refused restore took a backup: %d", len(backups))
 	}
 }
+
+func TestRestoreOnlyTheWorldsNamed(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	gameDir := filepath.Join(t.TempDir(), "minecraft")
+	h.mustRun(t, "sync", h.dir, "--into", gameDir)
+	worlds := filepath.Join(gameDir, "saves")
+	addWorld(t, worlds, "a")
+	addWorld(t, worlds, "b")
+	zipped := backupOf(t, h, "-C", gameDir)
+	for _, w := range []string{"a", "b"} {
+		if err := os.WriteFile(filepath.Join(worlds, w, "since.mca"), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got := restoreOf(t, h, "-C", gameDir, "--backup", zipped.Path, "--world", "a")
+	if len(got.Worlds) != 1 || got.Worlds[0].Name != "a" || got.Snapshot == nil {
+		t.Fatalf("restore --world a: %+v", got)
+	}
+	if _, err := os.Stat(filepath.Join(worlds, "a", "since.mca")); err == nil {
+		t.Fatal("a was not restored")
+	}
+	if _, err := os.Stat(filepath.Join(worlds, "b", "since.mca")); err != nil {
+		t.Fatal("b was touched")
+	}
+	if env := h.runSetting(t, 1, "restore", "-C", gameDir, "--backup", zipped.Path, "--world", "nope"); env.Error == nil || env.Error.Code != "world-not-found" || !strings.Contains(env.Error.Message, "nope") {
+		t.Fatalf("a world the zip doesn't hold: %+v", env.Error)
+	}
+
+	if env := h.runSetting(t, 2, "restore", "-C", gameDir, "--backup", zipped.Path, "--as", "c"); env.Error == nil || env.Error.Code != "usage" {
+		t.Fatalf("--as with two worlds: %+v", env.Error)
+	}
+	for _, bad := range []string{".", "..", "x/y", "/tmp/z"} {
+		if env := h.runSetting(t, 2, "restore", "-C", gameDir, "--backup", zipped.Path, "--world", "b", "--as", bad); env.Error == nil || env.Error.Code != "usage" {
+			t.Fatalf("--as %s: %+v", bad, env.Error)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(worlds, "a", "level.dat")); err != nil {
+		t.Fatal("a refused --as touched the worlds")
+	}
+	addWorld(t, worlds, "held")
+	savestest.Hold(t, filepath.Join(worlds, "held"))
+	if env := h.runSetting(t, 1, "restore", "-C", gameDir, "--backup", zipped.Path, "--world", "b", "--as", "held"); env.Error == nil || env.Error.Code != "world-in-use" || strings.Join(env.Error.Items, ",") != "held" {
+		t.Fatalf("--as over an open world: %+v", env.Error)
+	}
+	stdout := h.mustRun(t, "restore", "-C", gameDir, "--backup", zipped.Path, "--world", "b", "--as", "c")
+	if !strings.Contains(stdout, "+ c (from b)") {
+		t.Fatalf("a renamed world: %s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(worlds, "c", "level.dat")); err != nil {
+		t.Fatal("--as didn't land the world under its new name")
+	}
+	if _, err := os.Stat(filepath.Join(worlds, "b", "since.mca")); err != nil {
+		t.Fatal("--as touched the world under its old name")
+	}
+}
+
+func TestRestoreIntoAServerWithAnotherLevel(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "install")
+	buildDir := filepath.Join(h.dir, "build", "server")
+	other := t.TempDir()
+	addWorld(t, other, "smp")
+	if err := os.WriteFile(filepath.Join(other, "server.properties"), []byte("level-name=smp\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	zipped := backupOf(t, h, "-C", other)
+
+	if env := h.runSetting(t, 1, "restore", "-C", buildDir, "--backup", zipped.Path); env.Error == nil || env.Error.Code != "world-not-found" || !strings.Contains(env.Error.Message, "no world world") {
+		t.Fatalf("another server's level: %+v", env.Error)
+	}
+	if env := h.runSetting(t, 2, "restore", "-C", buildDir, "--backup", zipped.Path, "--as", "elsewhere"); env.Error == nil || env.Error.Code != "usage" || !strings.Contains(env.Error.Message, "world") {
+		t.Fatalf("--as other than the level: %+v", env.Error)
+	}
+	got := restoreOf(t, h, "-C", buildDir, "--backup", zipped.Path, "--as", "world")
+	if len(got.Worlds) != 1 || got.Worlds[0].Name != "world" || got.Worlds[0].From != "smp" {
+		t.Fatalf("restore --as world: %+v", got.Worlds)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "data", "server", "world", "level.dat")); err != nil {
+		t.Fatal(err)
+	}
+}

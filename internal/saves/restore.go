@@ -21,9 +21,11 @@ type Archive struct {
 	zr     *zip.ReadCloser
 }
 
-// Restored is one world a restore put back, and whether it replaced one already there.
+// Restored is one world a restore put back, and whether it replaced one already there. From is
+// its name in the zip when it was restored under another.
 type Restored struct {
 	Name     string `json:"name"`
+	From     string `json:"from,omitempty"`
 	Replaced bool   `json:"replaced"`
 }
 
@@ -78,27 +80,40 @@ func (a *Archive) Close() error { return a.zr.Close() }
 // Restore puts worlds from the zip into dir, calling each before it unzips one. A world already in
 // dir is removed and unzipped fresh, never merged, and worlds the list leaves out are not touched.
 func (a *Archive) Restore(dir string, worlds []string, each func(world string)) ([]Restored, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
-	}
 	restored := make([]Restored, 0, len(worlds))
 	for _, world := range worlds {
-		if each != nil {
-			each(world)
-		}
-		replaced, err := a.restoreWorld(dir, world)
+		r, err := a.RestoreAs(dir, world, world, each)
 		if err != nil {
 			return restored, err
 		}
-		restored = append(restored, Restored{Name: world, Replaced: replaced})
+		restored = append(restored, r)
 	}
 	return restored, nil
 }
 
-// restoreWorld unzips world beside its folder in dir and only then swaps it in, so a zip that fails
+// RestoreAs puts world from the zip into dir under name, as Restore does.
+func (a *Archive) RestoreAs(dir, world, name string, each func(world string)) (Restored, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return Restored{}, err
+	}
+	if each != nil {
+		each(world)
+	}
+	replaced, err := a.restoreWorld(dir, world, name)
+	if err != nil {
+		return Restored{}, err
+	}
+	r := Restored{Name: name, Replaced: replaced}
+	if name != world {
+		r.From = world
+	}
+	return r, nil
+}
+
+// restoreWorld unzips world beside dest in dir and only then swaps it in, so a zip that fails
 // part-way leaves the world as it was.
-func (a *Archive) restoreWorld(dir, world string) (bool, error) {
-	tmp, err := os.MkdirTemp(dir, ".restore-"+world+"-")
+func (a *Archive) restoreWorld(dir, world, dest string) (bool, error) {
+	tmp, err := os.MkdirTemp(dir, ".restore-"+dest+"-")
 	if err != nil {
 		return false, err
 	}
@@ -125,16 +140,16 @@ func (a *Archive) restoreWorld(dir, world string) (bool, error) {
 			return false, err
 		}
 	}
-	dest := filepath.Join(dir, world)
-	_, err = os.Lstat(dest)
+	path := filepath.Join(dir, dest)
+	_, err = os.Lstat(path)
 	replaced := err == nil
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return false, err
 	}
-	if err := os.RemoveAll(dest); err != nil {
+	if err := os.RemoveAll(path); err != nil {
 		return false, err
 	}
-	return replaced, os.Rename(tmp, dest)
+	return replaced, os.Rename(tmp, path)
 }
 
 func (a *Archive) unzip(f *zip.File, path string) error {

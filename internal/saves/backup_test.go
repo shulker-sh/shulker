@@ -120,16 +120,20 @@ func TestTakeNamesAndCountsCollisions(t *testing.T) {
 	}
 }
 
-func TestTakeOnlyTheLevel(t *testing.T) {
+func TestTakeOnlyTheWorldsNamed(t *testing.T) {
 	src, home := t.TempDir(), t.TempDir()
 	world(t, src, "world")
 	world(t, src, "old-world")
-	got, err := Take(Source{Dir: src, Only: "world"}, Home{Dir: home}, "backup", nil)
+	world(t, src, "nether")
+	got, err := Take(Source{Dir: src, Only: []string{"world", "nether"}}, Home{Dir: home}, "backup", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if names, _ := zipEntries(t, got.Path); !slices.Equal(names, []string{"world/", "world/level.dat"}) {
+	if names, _ := zipEntries(t, got.Path); !slices.Equal(names, []string{"nether/", "nether/level.dat", "world/", "world/level.dat"}) {
 		t.Fatalf("entries = %v", names)
+	}
+	if got.Worlds != 2 || !slices.Equal(got.Names, []string{"nether", "world"}) {
+		t.Fatalf("the record counts only what it zipped: %+v", got)
 	}
 }
 
@@ -143,7 +147,7 @@ func TestTakeFindsNothing(t *testing.T) {
 	}
 	src := t.TempDir()
 	world(t, src, "old-world")
-	if got, err := Take(Source{Dir: src, Only: "world"}, Home{Dir: home}, "backup", nil); err != nil || got.Path != "" {
+	if got, err := Take(Source{Dir: src, Only: []string{"world"}}, Home{Dir: home}, "backup", nil); err != nil || got.Path != "" {
 		t.Fatalf("a missing level: %+v, %v", got, err)
 	}
 	if _, err := os.Stat(home); !os.IsNotExist(err) {

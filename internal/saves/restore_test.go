@@ -70,6 +70,34 @@ func TestRestoreOnlyTheWorldsAskedFor(t *testing.T) {
 	}
 }
 
+func TestRestoreAsRenamesTheWorld(t *testing.T) {
+	dir := t.TempDir()
+	world(t, dir, "world")
+	if err := os.WriteFile(filepath.Join(dir, "world", "old.mca"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "b.zip")
+	zipOf(t, path, []string{"survival/level.dat", "survival/region/r.0.0.mca", "creative/level.dat"}, "")
+	a, err := OpenArchive(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	got, err := a.RestoreAs(dir, "survival", "world", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != (Restored{Name: "world", From: "survival", Replaced: true}) {
+		t.Fatalf("restored %+v", got)
+	}
+	if !exists(filepath.Join(dir, "world", "region", "r.0.0.mca")) || exists(filepath.Join(dir, "world", "old.mca")) {
+		t.Fatal("the renamed world wasn't swapped in whole")
+	}
+	if exists(filepath.Join(dir, "survival")) || exists(filepath.Join(dir, "creative")) {
+		t.Fatal("restored under the zip's name, or more than the one world")
+	}
+}
+
 func TestOpenArchiveRefusesWhatIsNotWorlds(t *testing.T) {
 	notZip := filepath.Join(t.TempDir(), "not.zip")
 	if err := os.WriteFile(notZip, []byte("nope"), 0o644); err != nil {

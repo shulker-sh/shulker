@@ -22,15 +22,19 @@ type restoreResult struct {
 }
 
 func (a *app) restoreCmd() *cobra.Command {
-	var group, named string
+	var group, named, as string
+	var only []string
 	cmd := &cobra.Command{
 		Use:   "restore [n]",
 		Short: "Put a backup's worlds back, taking a backup of the worlds there first",
-		Long:  "Put the worlds of backup n, newest first and 1 by default, back into the current project or instance, -i or -C, or the save group --group names. --backup names a backup in that target's backups, or any zip of world folders by its path. Each world in the zip replaces the one there whole; worlds the zip doesn't hold are left alone.",
+		Long:  "Put the worlds of backup n, newest first and 1 by default, back into the current project or instance, -i or -C, or the save group --group names. --backup names a backup in that target's backups, or any zip of world folders by its path. Each world in the zip, or each --world names, replaces the one there whole; worlds left out are left alone. --as puts a single world back under another name.",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if named != "" && len(args) > 0 {
 				return out.Errorf("usage", "pass an index or --backup, not both: each names the backup to restore")
+			}
+			if as != "" && (as == "." || !filepath.IsLocal(as) || strings.ContainsAny(as, `/\`)) {
+				return out.Errorf("usage", "--as takes a world's folder name, not %q", as)
 			}
 			target, err := a.savesTargetOf(group)
 			if err != nil {
@@ -45,14 +49,15 @@ func (a *app) restoreCmd() *cobra.Command {
 				return err
 			}
 			defer archive.Close()
-			worlds := archive.Worlds
-			if target.World != "" {
-				if !slices.Contains(worlds, target.World) {
-					return out.Errorf("world-not-found", "%s holds no world %s, the level-name this server loads", from.Path, target.World)
-				}
-				worlds = []string{target.World}
+			worlds, err := restoreScope(archive, target, only, as)
+			if err != nil {
+				return err
 			}
-			open, err := saves.OpenWorlds(target.WorldsDir, worlds)
+			replacing := worlds
+			if as != "" {
+				replacing = []string{as}
+			}
+			open, err := saves.OpenWorlds(target.WorldsDir, replacing)
 			if err != nil {
 				return err
 			}
@@ -70,10 +75,14 @@ func (a *app) restoreCmd() *cobra.Command {
 			if snapshot.Path != "" {
 				res.Snapshot = &snapshot
 			}
-			res.Worlds, err = archive.Restore(target.WorldsDir, worlds, func(world string) {
-				a.printer.Step("unzipping %s", world)
-			})
-			if err != nil {
+			unzipping := func(world string) { a.printer.Step("unzipping %s", world) }
+			if as != "" {
+				w, err := archive.RestoreAs(target.WorldsDir, worlds[0], as, unzipping)
+				if err != nil {
+					return err
+				}
+				res.Worlds = []saves.Restored{w}
+			} else if res.Worlds, err = archive.Restore(target.WorldsDir, worlds, unzipping); err != nil {
 				return err
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
@@ -87,7 +96,11 @@ func (a *app) restoreCmd() *cobra.Command {
 					if w.Replaced {
 						kind = out.Change
 					}
-					items = append(items, out.Item{Kind: kind, Name: w.Name})
+					item := out.Item{Kind: kind, Name: w.Name}
+					if w.From != "" {
+						item.Aside = []string{"from " + w.From}
+					}
+					items = append(items, item)
 				}
 				l.Items(items...)
 			})
@@ -95,7 +108,40 @@ func (a *app) restoreCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&group, "group", "", "restore into this save group rather than an instance")
 	cmd.Flags().StringVar(&named, "backup", "", "restore this backup, by its name in the target's backups or a zip's path")
+	cmd.Flags().StringArrayVar(&only, "world", nil, "restore only this world from the backup, by its folder name; repeatable")
+	cmd.Flags().StringVar(&as, "as", "", "restore the backup's one world under this folder name")
 	return cmd
+}
+
+// restoreScope is the worlds a restore takes from archive: those only names, else all it holds. A
+// server takes only its level-name world, or with as, the one world renamed to it.
+func restoreScope(archive *saves.Archive, target savesTarget, only []string, as string) ([]string, error) {
+	worlds := archive.Worlds
+	if len(only) > 0 {
+		worlds = distinct(only)
+		for _, w := range worlds {
+			if !slices.Contains(archive.Worlds, w) {
+				return nil, out.Errorf("world-not-found", "%s holds no world %s", archive.Path, w)
+			}
+		}
+	}
+	switch {
+	case as != "":
+		if len(worlds) != 1 {
+			return nil, out.Errorf("usage", "--as renames one world, and this restore takes %d: %s; pick one with --world", len(worlds), strings.Join(worlds, ", "))
+		}
+		if target.World != "" && as != target.World {
+			return nil, out.Errorf("usage", "this server loads %s, its level-name, so --as must name %s, not %s", target.World, target.World, as)
+		}
+	case target.World != "" && !slices.Contains(worlds, target.World):
+		if len(only) > 0 {
+			return nil, out.Errorf("world-not-found", "this server loads only %s, its level-name, which --world leaves out; --as %s restores another world under that name", target.World, target.World)
+		}
+		return nil, out.Errorf("world-not-found", "%s holds no world %s, the level-name this server loads; --as %s restores another world under that name", archive.Path, target.World, target.World)
+	case target.World != "":
+		worlds = []string{target.World}
+	}
+	return worlds, nil
 }
 
 // pickBackup is the backup restore puts back: the one --backup names, else the nth of target's,

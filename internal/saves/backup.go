@@ -23,11 +23,11 @@ const commentFormat = 1
 
 var now = time.Now
 
-// Source is where a backup's worlds come from. Only narrows it to one world, a server's
-// level-name; the rest is what the zip comment records.
+// Source is where a backup's worlds come from. Only, when set, narrows it to the worlds named;
+// the rest is what the zip comment records.
 type Source struct {
 	Dir           string
-	Only          string
+	Only          []string
 	Instance      string
 	Minecraft     string
 	Loader        string
@@ -76,8 +76,8 @@ func Take(src Source, home Home, reason string, each func(world string, open boo
 	if err != nil {
 		return Backup{}, err
 	}
-	if src.Only != "" {
-		worlds = slices.DeleteFunc(worlds, func(w string) bool { return w != src.Only })
+	if src.Only != nil {
+		worlds = slices.DeleteFunc(worlds, func(w string) bool { return !slices.Contains(src.Only, w) })
 	}
 	if len(worlds) == 0 {
 		return Backup{}, nil

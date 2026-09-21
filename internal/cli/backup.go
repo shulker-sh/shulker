@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,18 +19,25 @@ type backupResult struct {
 
 func (a *app) backupCmd() *cobra.Command {
 	var group string
+	var only []string
 	cmd := &cobra.Command{
 		Use:   "backup",
 		Short: "Zip an instance's or save group's worlds into its backups",
-		Long:  "Zip the worlds of the current project or instance, of -i or -C, or of the save group --group names, into that target's backups. A save group's backups are in the data folder's backups/<group>/; any other directory keeps its own in .shulker/backups/.",
+		Long:  "Zip the worlds of the current project or instance, of -i or -C, or of the save group --group names, into that target's backups, or only the worlds --world names. A save group's backups are in the data folder's backups/<group>/; any other directory keeps its own in .shulker/backups/.",
 		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target, err := a.savesTargetOf(group)
 			if err != nil {
 				return err
 			}
+			src := a.backupSource(target)
+			if len(only) > 0 {
+				if src.Only, err = heldWorlds(target, only); err != nil {
+					return err
+				}
+			}
 			start := time.Now()
-			taken, err := saves.Take(a.backupSource(target), target.home(), "backup", a.zipping("zipping"))
+			taken, err := saves.Take(src, target.home(), "backup", a.zipping("zipping"))
 			if err != nil {
 				return err
 			}
@@ -46,14 +54,43 @@ func (a *app) backupCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&group, "group", "", "back up this save group rather than an instance")
+	cmd.Flags().StringArrayVar(&only, "world", nil, "back up only this world, by its folder name; repeatable")
 	return cmd
+}
+
+// heldWorlds is names, each checked against the worlds target holds: for a server, only the one its
+// level-name loads.
+func heldWorlds(target savesTarget, names []string) ([]string, error) {
+	held, err := saves.Worlds(target.WorldsDir)
+	if err != nil {
+		return nil, err
+	}
+	names = distinct(names)
+	for _, name := range names {
+		switch {
+		case target.World != "" && name != target.World:
+			return nil, out.Errorf("world-not-found", "this server loads only %s, its level-name, not %s", target.World, name)
+		case !slices.Contains(held, name):
+			return nil, out.Errorf("world-not-found", "no world %s in %s", name, target.WorldsDir)
+		}
+	}
+	return names, nil
+}
+
+func distinct(names []string) []string {
+	names = slices.Clone(names)
+	slices.Sort(names)
+	return slices.Compact(names)
 }
 
 // backupSource is where target's worlds are, and what the zip comment records about them: the
 // instance registered at its directory and the platform its last build installed, when there are
 // any. A build backs up before it records its own platform, so this is what the worlds were played on.
 func (a *app) backupSource(target savesTarget) saves.Source {
-	src := saves.Source{Dir: target.WorldsDir, Only: target.World}
+	src := saves.Source{Dir: target.WorldsDir}
+	if target.World != "" {
+		src.Only = []string{target.World}
+	}
 	if target.Dir == "" {
 		return src
 	}

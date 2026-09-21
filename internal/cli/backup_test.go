@@ -137,3 +137,43 @@ func TestBackupAsideNamesTheLoaderWithoutAVersion(t *testing.T) {
 		t.Fatalf("aside: %s", got)
 	}
 }
+
+func TestBackupOnlyTheWorldsNamed(t *testing.T) {
+	h := newHarness(t)
+	root := savesRoot(t, h)
+	linkShulkerPack(t, h)
+	group := filepath.Join(root, "default")
+	for _, w := range []string{"a", "b", "c"} {
+		addWorld(t, group, w)
+	}
+	data, err := config.DataDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(filepath.Join(data, "backups")) })
+
+	got := backupOf(t, h, "--world", "a", "--world", "b")
+	if got.Worlds != 2 || strings.Join(got.Names, ",") != "a,b" {
+		t.Fatalf("backup --world a --world b: %+v", got)
+	}
+	if env := h.runSetting(t, 1, "backup", "--world", "a", "--world", "nope"); env.Error == nil || env.Error.Code != "world-not-found" || !strings.Contains(env.Error.Message, "nope") {
+		t.Fatalf("a world the target doesn't hold: %+v", env.Error)
+	}
+}
+
+func TestBackupAServerHoldsOnlyItsLevel(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "install")
+	worlds := filepath.Join(h.dir, "data", "server")
+	addWorld(t, worlds, "world")
+	addWorld(t, worlds, "old-world")
+	buildDir := filepath.Join(h.dir, "build", "server")
+
+	if got := backupOf(t, h, "-C", buildDir, "--world", "world"); got.Worlds != 1 {
+		t.Fatalf("the level by name: %+v", got)
+	}
+	if env := h.runSetting(t, 1, "backup", "-C", buildDir, "--world", "old-world"); env.Error == nil || env.Error.Code != "world-not-found" || !strings.Contains(env.Error.Message, "loads only world") {
+		t.Fatalf("a world beside the level: %+v", env.Error)
+	}
+}
