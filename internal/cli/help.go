@@ -141,7 +141,7 @@ func (a *app) help(cmd *cobra.Command) {
 		}
 		l.Blank()
 	}
-	if doc.More {
+	if doc.HasMore {
 		l.Text(t.Grey("More:"))
 		l.Text(helpIndent + t.Grey("$") + " " + t.Command("shulker docs "+strings.TrimPrefix(cmd.CommandPath(), "shulker ")))
 		l.Blank()

@@ -113,13 +113,13 @@ func TestPagesAreCleaned(t *testing.T) {
 
 func TestHelpFor(t *testing.T) {
 	add, ok := HelpFor("shulker add")
-	if !ok || len(add.Description) != 2 || !strings.HasPrefix(add.Description[0], "Add mods to the manifest") || len(add.Examples) != 6 || add.Examples[0] != "shulker add sodium lithium" || add.More || add.Anchor != "shulker-add" {
+	if !ok || len(add.Description) != 2 || !strings.HasPrefix(add.Description[0], "Add mods to the manifest") || len(add.Examples) != 6 || add.Examples[0] != "shulker add sodium lithium" || add.HasMore || add.Anchor != "shulker-add" {
 		t.Fatalf("add %+v", add)
 	}
 	if lock, _ := HelpFor("shulker lock"); len(lock.Description) != 2 {
 		t.Errorf("lock description %q", lock.Description)
 	}
-	if sync, _ := HelpFor("shulker sync"); !sync.More {
+	if sync, _ := HelpFor("shulker sync"); !sync.HasMore {
 		t.Error("sync goes on past its example but More is false")
 	}
 	if off, ok := HelpFor("shulker feature off"); !ok || off.Anchor != "shulker-feature-on-off" {

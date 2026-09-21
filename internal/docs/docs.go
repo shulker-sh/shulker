@@ -1,3 +1,5 @@
+// Package docs reads the site's markdown pages built into the binary, for `shulker docs` and each
+// command's --help.
 package docs
 
 import (
@@ -22,6 +24,7 @@ var (
 	nonSlug      = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
+// Page is one site page, split into its sections.
 type Page struct {
 	Name        string
 	Title       string
@@ -31,6 +34,8 @@ type Page struct {
 	lines       []string
 }
 
+// Section is a heading and what it holds. Command is set only for a `shulker ...` heading, and
+// Parent is the heading of the section around it.
 type Section struct {
 	Page     *Page
 	Heading  string
@@ -42,6 +47,7 @@ type Section struct {
 	end      int
 }
 
+// Hit is a line that matched a search. Line counts from 1.
 type Hit struct {
 	Page    *Page
 	Section *Section
@@ -49,6 +55,8 @@ type Hit struct {
 	Text    string
 }
 
+// Result is what Lookup found: a whole page, one section, several sections that match, or search
+// hits. Only one is set.
 type Result struct {
 	Page    *Page
 	Section *Section
@@ -56,6 +64,7 @@ type Result struct {
 	Hits    []Hit
 }
 
+// Pages are the site's pages, parsed once from the embedded copy.
 var Pages = sync.OnceValues(func() ([]*Page, error) {
 	pages := make([]*Page, len(pageNames))
 	for i, name := range pageNames {
@@ -216,6 +225,7 @@ func (s *Section) documentsUnder(parent string) bool {
 	return false
 }
 
+// Search is every line that holds phrase, ignoring case and runs of spaces.
 func Search(pages []*Page, phrase string) []Hit {
 	q := normalize(phrase)
 	if q == "" {
@@ -261,19 +271,21 @@ func normalize(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
 
+// PlainLinks is markdown with each link reduced to its text.
 func PlainLinks(markdown string) string {
 	return markdownLink.ReplaceAllString(markdown, "$1")
 }
 
+// CommandHelp is what a command's --help shows.
 type CommandHelp struct {
 	Description []string
 	Examples    []string
-	More        bool
+	HasMore     bool
 	Anchor      string
 }
 
 // HelpFor reads a command's cli.md section into what --help shows: the
-// paragraphs before its example block and the example lines. More is set when
+// paragraphs before its example block and the example lines. HasMore is set when
 // the section goes on past them with anything but a flag table.
 func HelpFor(commandPath string) (CommandHelp, bool) {
 	pages, err := Pages()
@@ -326,7 +338,7 @@ func (s *Section) help() CommandHelp {
 		case strings.HasPrefix(line, "| Flag |"):
 			flagTable = true
 		case !flagTable:
-			h.More = true
+			h.HasMore = true
 		}
 	}
 	return h
