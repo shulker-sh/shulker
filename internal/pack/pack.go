@@ -236,7 +236,7 @@ func (s *Store) fetchPackLock(ctx context.Context, l *Loaded) error {
 		return nil
 	}
 	if err != nil {
-		return out.Errorf("modpack-fetch", "modpack %s: %v", l.Name, err)
+		return fetchFailure(l.Name, l.Source, err)
 	}
 	if err := l.parseLock(data); err != nil {
 		return err
@@ -251,7 +251,7 @@ func (s *Store) openPackLock(ctx context.Context, l *Loaded, sha string) error {
 	if os.IsNotExist(err) {
 		s.log("fetching pack %s lock", l.Name)
 		if data, err = s.download(ctx, lockURL(l.Source)); err != nil {
-			return out.Errorf("modpack-fetch", "modpack %s: %v", l.Name, err)
+			return fetchFailure(l.Name, l.Source, err)
 		}
 		if sha256hex(data) != sha {
 			return out.Errorf("modpack-changed", "modpack %s: the %s at %s has changed since this project locked it; run `shulker update`", l.Name, lock.FileName, l.Source)
@@ -286,9 +286,21 @@ func (s *Store) fetchManifest(ctx context.Context, name, url string) ([]byte, er
 	s.log("fetching pack %s", name)
 	var buf strings.Builder
 	if _, err := s.Fetch.Download(ctx, url, &buf); err != nil {
-		return nil, out.Errorf("modpack-fetch", "modpack %s: %v", name, err)
+		return nil, fetchFailure(name, url, err)
 	}
 	return []byte(buf.String()), nil
+}
+
+// fetchFailure is a URL modpack's manifest or lock that couldn't be fetched, in mirrorFailure's
+// shape when the network is why.
+func fetchFailure(name, source string, err error) error {
+	if errors.Is(err, fetch.ErrOffline) || !fetch.IsNetwork(err) {
+		return out.Errorf("modpack-fetch", "modpack %s: %v", name, err)
+	}
+	e := out.Errorf("modpack-fetch", "modpack %s: couldn't reach %s", name, source)
+	e.Rows = []out.Detail{{Label: "http", Text: httpReason(err)}}
+	e.Help = unreachableHelp
+	return fetch.Unreachable(e)
 }
 
 func (s *Store) storeManifest(data []byte) (string, error) {

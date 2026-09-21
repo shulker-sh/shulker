@@ -211,7 +211,11 @@ func unreachableReason(c *Checkout, cause error) (string, string) {
 		}
 		return "git", ""
 	}
-	return "http", strings.TrimSpace(httpReasonPrefix.ReplaceAllString(cause.Error(), ""))
+	return "http", httpReason(cause)
+}
+
+func httpReason(err error) string {
+	return strings.TrimSpace(httpReasonPrefix.ReplaceAllString(err.Error(), ""))
 }
 
 func exists(path string) bool {
