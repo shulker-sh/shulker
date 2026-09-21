@@ -66,7 +66,7 @@ func TestModpackAddSuppliesAPlatformTheManifestDoesNotSet(t *testing.T) {
 func TestLockedModpacksDisagreeingAboutThePlatform(t *testing.T) {
 	h, base := projectWithLockedPack(t, "base")
 	other := filepath.Join(h.dir, "other")
-	writePack(t, other, "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, other, "~26.2", `"sodium": {}`, nil)
 	copyLock(t, base, other)
 	editPackLock(t, other, func(m map[string]any) { m["minecraft"] = "26.1" })
 	h.editManifest(t, func(m map[string]any) {

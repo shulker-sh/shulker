@@ -35,7 +35,7 @@ func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	if !f.Settings.PreLaunch() || f.Settings.PostExit() || f.Settings.Marker != nil {
 		t.Fatalf("the hooks seed the instance and the marker is left to the manifest: %+v", f.Settings)
 	}
-	cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
+	cfg := readINIFile(t, filepath.Join(instDir, launcher.PrismInstanceFile))
 	if cfg["PreLaunchCommand"] == "" || cfg["PostExitCommand"] != "" {
 		t.Fatalf("the switch that is off gets no slot: %+v", cfg)
 	}
@@ -65,7 +65,7 @@ func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	if f.Settings.Java != filepath.Join(h.dir, "jdk", "bin", "java") || !slices.Equal(f.Settings.Wrapper, []string{"gamemoderun", "--dlsym"}) {
 		t.Fatalf("--java and --wrapper land in the settings: %+v", f.Settings)
 	}
-	cfg = readINIFile(t, filepath.Join(second, "instances", "shulker-pack", launcher.InstanceConfigFile))
+	cfg = readINIFile(t, filepath.Join(second, "instances", "shulker-pack", launcher.PrismInstanceFile))
 	if cfg["WrapperCommand"] != "gamemoderun --dlsym" || cfg["OverrideCommands"] != "true" {
 		t.Fatalf("the wrapper goes in the launcher's own slot, with the override it needs: %+v", cfg)
 	}
@@ -97,7 +97,7 @@ func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	}
 	// An in-place instance builds itself, so nothing touches the launcher's slots until a repair.
 	h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", second)
-	cfg = readINIFile(t, filepath.Join(second, "instances", "shulker-pack", launcher.InstanceConfigFile))
+	cfg = readINIFile(t, filepath.Join(second, "instances", "shulker-pack", launcher.PrismInstanceFile))
 	if cfg["PreLaunchCommand"] == "" {
 		t.Fatalf("a hand-edited switch takes effect on the next repair: %+v", cfg)
 	}

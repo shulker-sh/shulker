@@ -79,12 +79,12 @@ func TestATLauncherSlotsToggleEnableCommands(t *testing.T) {
 
 func TestPrismSlotsWriteOverrideCommands(t *testing.T) {
 	dir := t.TempDir()
-	write(t, filepath.Join(dir, InstanceConfigFile), "[General]\nConfigVersion=1.3\nname=Cozy\n")
+	write(t, filepath.Join(dir, PrismInstanceFile), "[General]\nConfigVersion=1.3\nname=Cozy\n")
 	e := Find("prism")
 	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{PreLaunch: "sh pre", PostExit: "sh post"}); err != nil {
 		t.Fatal(err)
 	}
-	values, err := readINI(filepath.Join(dir, InstanceConfigFile), false)
+	values, err := readINI(filepath.Join(dir, PrismInstanceFile), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestPrismSlotsWriteOverrideCommands(t *testing.T) {
 	if err := WriteSlots(e, slotRow(e.Name, dir), Slots{PreLaunch: "sh pre"}); err != nil {
 		t.Fatal(err)
 	}
-	values, err = readINI(filepath.Join(dir, InstanceConfigFile), false)
+	values, err = readINI(filepath.Join(dir, PrismInstanceFile), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,12 +228,12 @@ func TestGDLauncherSlotSurvivesAQuoteInTheLauncherDir(t *testing.T) {
 
 func TestWrapperSlotIsFilledButNeverCleared(t *testing.T) {
 	prism := t.TempDir()
-	write(t, filepath.Join(prism, InstanceConfigFile), "[General]\nConfigVersion=1.3\nWrapperCommand=mangohud\n")
+	write(t, filepath.Join(prism, PrismInstanceFile), "[General]\nConfigVersion=1.3\nWrapperCommand=mangohud\n")
 	e := Find("prism")
 	if err := WriteSlots(e, slotRow(e.Name, prism), Slots{PreLaunch: "sh pre", Wrapper: "gamemoderun"}); err != nil {
 		t.Fatal(err)
 	}
-	values, err := readINI(filepath.Join(prism, InstanceConfigFile), false)
+	values, err := readINI(filepath.Join(prism, PrismInstanceFile), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestWrapperSlotIsFilledButNeverCleared(t *testing.T) {
 	if err := WriteSlots(e, slotRow(e.Name, prism), Slots{PreLaunch: "sh pre"}); err != nil {
 		t.Fatal(err)
 	}
-	if values, err = readINI(filepath.Join(prism, InstanceConfigFile), false); err != nil {
+	if values, err = readINI(filepath.Join(prism, PrismInstanceFile), false); err != nil {
 		t.Fatal(err)
 	}
 	if values["WrapperCommand"] != "gamemoderun" {

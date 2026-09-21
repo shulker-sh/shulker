@@ -53,14 +53,14 @@ func TestUnlink(t *testing.T) {
 	if len(r) != 1 || r[0].Removed != launcher.RemovedPreLaunch || r[0].Relink != "shulker link prism "+h.dir+" --name Friends --launcher-dir "+prismDir || r[0].RelinkIn != "" {
 		t.Fatalf("unlink prism: %+v", r)
 	}
-	if cfg := readINIFile(t, filepath.Join(friendsDir, launcher.InstanceConfigFile)); cfg["PreLaunchCommand"] != "" || cfg["name"] != "Friends" {
+	if cfg := readINIFile(t, filepath.Join(friendsDir, launcher.PrismInstanceFile)); cfg["PreLaunchCommand"] != "" || cfg["name"] != "Friends" {
 		t.Fatalf("instance.cfg after unlink: %+v", cfg)
 	}
 	if _, err := os.Stat(filepath.Join(friendsDir, "minecraft", "mods")); err != nil {
 		t.Fatalf("unlink must keep the instance's files: %v", err)
 	}
 
-	customCfg := filepath.Join(prismDir, "instances", "shulker-custom", launcher.InstanceConfigFile)
+	customCfg := filepath.Join(prismDir, "instances", "shulker-custom", launcher.PrismInstanceFile)
 	data, _ := os.ReadFile(customCfg)
 	custom := strings.Replace(string(data), "PreLaunchCommand=", "PreLaunchCommand=echo hi\nOldPreLaunch=", 1)
 	if err := os.WriteFile(customCfg, []byte(custom), 0o644); err != nil {
@@ -203,7 +203,7 @@ func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 	if instances := readInstances(t, h); len(instances) != 1 || instances[0].Dir != gameDir {
 		t.Fatalf("adopting registers the same folder again: %+v", instances)
 	}
-	if cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile)); cfg["PreLaunchCommand"] == "" {
+	if cfg := readINIFile(t, filepath.Join(instDir, launcher.PrismInstanceFile)); cfg["PreLaunchCommand"] == "" {
 		t.Fatalf("adopting rewrites the launcher's slots: %+v", cfg)
 	}
 	requires, _ := instanceManifest(t, gameDir)["requires"].(map[string]any)

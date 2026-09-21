@@ -84,7 +84,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if instanceName != "" {
 				display = instanceName
 			}
-			key := profileKey(display)
+			key := instanceKey(display)
 			gameDir, err := filepath.Abs(filepath.Join(launcherDir, "shulker", strings.TrimPrefix(key, "shulker-")))
 			if err != nil {
 				return err
@@ -418,7 +418,7 @@ func follows(modpack, source string) []out.Row {
 
 var unsafeKeyChars = regexp.MustCompile(`[^a-z0-9]+`)
 
-func profileKey(name string) string {
+func instanceKey(name string) string {
 	slug := strings.Trim(unsafeKeyChars.ReplaceAllString(strings.ToLower(name), "-"), "-")
 	if slug == "" {
 		slug = "project"

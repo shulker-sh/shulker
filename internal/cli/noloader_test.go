@@ -140,7 +140,7 @@ func TestLinkWithoutALoader(t *testing.T) {
 	var pack struct {
 		Components []map[string]any `json:"components"`
 	}
-	readJSONFile(t, filepath.Join(prismDir, "instances", "shulker-pack", launcher.PackFile), &pack)
+	readJSONFile(t, filepath.Join(prismDir, "instances", "shulker-pack", launcher.PrismPackFile), &pack)
 	if len(pack.Components) != 1 || pack.Components[0]["uid"] != "net.minecraft" || pack.Components[0]["version"] != "26.2" {
 		t.Fatalf("mmc-pack.json: %+v", pack)
 	}

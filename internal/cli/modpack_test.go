@@ -13,7 +13,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
-func writePack(t *testing.T, dir, minecraft, mods string, files map[string]string) {
+func writePrismPack(t *testing.T, dir, minecraft, mods string, files map[string]string) {
 	t.Helper()
 	manifest := `{"name": "` + filepath.Base(dir) + `", "minecraft": "` + minecraft + `", "loader": {"type": "fabric", "version": "*"},
   "requires": {` + mods + `}, "variables": {"greeting": "hello"}, "client": {}}`
@@ -60,7 +60,7 @@ type lockView struct {
 func TestLocalModpack(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	writePack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, map[string]string{
+	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, map[string]string{
 		"config/base.txt":       "from pack\n",
 		"config/shared.txt":     "pack\n",
 		"config/greet.txt.tmpl": "${greeting} ${who}\n",
@@ -203,7 +203,7 @@ func TestLocalModpack(t *testing.T) {
 func TestModpackMismatchAndConflict(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	writePack(t, filepath.Join(h.dir, "old"), "~26.1", `"sodium": {}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "old"), "~26.1", `"sodium": {}`, nil)
 	code, stdout, _ := h.run(t, "modpack", "add", "./old", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
@@ -218,8 +218,8 @@ func TestModpackMismatchAndConflict(t *testing.T) {
 		t.Fatalf("manifest should be untouched: %v", m.Requires)
 	}
 
-	writePack(t, filepath.Join(h.dir, "one"), "~26.2", `"sodium": {}`, nil)
-	writePack(t, filepath.Join(h.dir, "two"), "~26.2", `"sodium": {"channel": "beta"}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "one"), "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "two"), "~26.2", `"sodium": {"channel": "beta"}`, nil)
 	h.mustRun(t, "add", "./one", "--type", "modpack")
 	code, stdout, _ = h.run(t, "modpack", "add", "./two", "--json")
 	_ = json.Unmarshal([]byte(stdout), &env)
@@ -234,8 +234,8 @@ func TestModpackMismatchAndConflict(t *testing.T) {
 func TestModpackMissingFromTheLockWarnsOnlyBesideOtherPins(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	writePack(t, filepath.Join(h.dir, "one"), "~26.2", `"sodium": {}`, nil)
-	writePack(t, filepath.Join(h.dir, "two"), "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "one"), "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "two"), "~26.2", `"sodium": {}`, nil)
 	h.mustRun(t, "modpack", "add", "./one")
 	h.mustRun(t, "modpack", "add", "./two")
 
@@ -269,7 +269,7 @@ func TestModpackMissingFromTheLockWarnsOnlyBesideOtherPins(t *testing.T) {
 func TestModpackSourceMovedUnderTheSameName(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	writePack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
 	h.mustRun(t, "modpack", "add", "./base")
 	if err := os.Rename(filepath.Join(h.dir, "base"), filepath.Join(h.dir, "moved")); err != nil {
 		t.Fatal(err)
@@ -307,7 +307,7 @@ func TestGitModpack(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	repo := filepath.Join(t.TempDir(), "shared-pack")
-	writePack(t, repo, "^26.1", `"sodium": {}`, map[string]string{"config/git.txt": "v1\n"})
+	writePrismPack(t, repo, "^26.1", `"sodium": {}`, map[string]string{"config/git.txt": "v1\n"})
 	gitRun(t, repo, "init", "-q", "-b", "main")
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-q", "-m", "one")
@@ -394,7 +394,7 @@ func TestURLModpackAndHandEdits(t *testing.T) {
 	if edited == string(data) {
 		t.Fatalf("manifest has no requires: %s", data)
 	}
-	writePack(t, filepath.Join(h.dir, "local"), "~26.2", `"fabric-api": {}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "local"), "~26.2", `"fabric-api": {}`, nil)
 	if err := os.WriteFile(path, []byte(edited), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -441,7 +441,7 @@ func TestModpackKeyComesFromTheManifestName(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	repo := filepath.Join(h.dir, "mc-pack-v3")
-	writePack(t, repo, "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, repo, "~26.2", `"sodium": {}`, nil)
 	renamePack(t, repo, "westcoast-smp")
 
 	stdout := h.mustRun(t, "modpack", "add", "./mc-pack-v3")
@@ -463,7 +463,7 @@ func TestModpackKeyComesFromTheManifestName(t *testing.T) {
 	}
 
 	twin := filepath.Join(h.dir, "eastcoast")
-	writePack(t, twin, "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, twin, "~26.2", `"sodium": {}`, nil)
 	renamePack(t, twin, "westcoast-smp")
 	code, stdout, _ := h.run(t, "modpack", "add", "./eastcoast", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "requires-taken" {

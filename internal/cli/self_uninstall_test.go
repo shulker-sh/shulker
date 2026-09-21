@@ -32,7 +32,7 @@ func TestSelfUninstallClearsEveryInstanceAndLeavesTheRegistry(t *testing.T) {
 	gameDir := mojangGameDir(mojangDir, "pack")
 	// A folder that moved away is still unhooked, from what the registry records about it.
 	moved := filepath.Join(prismDir, "instances", "shulker-pack", "minecraft")
-	prismCfg := filepath.Join(prismDir, "instances", "shulker-pack", launcher.InstanceConfigFile)
+	prismCfg := filepath.Join(prismDir, "instances", "shulker-pack", launcher.PrismInstanceFile)
 
 	stdout := h.mustRun(t, "self", "uninstall")
 	if !strings.Contains(stdout, "unhooked 2 instances") || !strings.Contains(stdout, "removed "+h.exe) {

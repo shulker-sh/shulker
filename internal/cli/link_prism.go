@@ -54,11 +54,11 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 				return err
 			}
 			display := k.display(p)
-			if err := checkAdopt(l.GameDir(profileKey(display)), src, "instance", display, "--name", k.force); err != nil {
+			if err := checkAdopt(l.GameDir(instanceKey(display)), src, "instance", display, "--name", k.force); err != nil {
 				return err
 			}
-			res, err := l.WriteInstance(launcher.Instance{
-				ID:            profileKey(display),
+			res, err := l.WriteInstance(launcher.PrismInstance{
+				ID:            instanceKey(display),
 				Name:          display,
 				Minecraft:     p.Lock.Minecraft,
 				LoaderType:    p.Lock.Loader.Type,

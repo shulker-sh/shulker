@@ -19,7 +19,7 @@ import (
 func gitPack(t *testing.T, name, mods, file string) (repo, source, first string) {
 	t.Helper()
 	repo = filepath.Join(t.TempDir(), name)
-	writePack(t, repo, "^26.1", mods, map[string]string{"config/" + file: "v1\n"})
+	writePrismPack(t, repo, "^26.1", mods, map[string]string{"config/" + file: "v1\n"})
 	gitRun(t, repo, "init", "-q", "-b", "main")
 	gitRun(t, repo, "add", ".")
 	gitRun(t, repo, "commit", "-q", "-m", "one")

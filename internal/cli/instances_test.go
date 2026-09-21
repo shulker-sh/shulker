@@ -503,7 +503,7 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 	if err := os.RemoveAll(filepath.Join(gameDir, instance.Dir)); err != nil {
 		t.Fatal(err)
 	}
-	cfgPath := filepath.Join(instDir, launcher.InstanceConfigFile)
+	cfgPath := filepath.Join(instDir, launcher.PrismInstanceFile)
 	var kept []string
 	for _, line := range strings.Split(readFile(t, cfgPath), "\n") {
 		if !strings.HasPrefix(line, "PreLaunchCommand") && !strings.HasPrefix(line, "OverrideCommands") {
@@ -604,7 +604,7 @@ func TestInstancesRepairFollowsARenameInTheLauncher(t *testing.T) {
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
-	cfgPath := filepath.Join(prismDir, "instances", "shulker-friends", launcher.InstanceConfigFile)
+	cfgPath := filepath.Join(prismDir, "instances", "shulker-friends", launcher.PrismInstanceFile)
 
 	rename := func(name string) {
 		lines := strings.Split(readFile(t, cfgPath), "\n")

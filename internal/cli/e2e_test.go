@@ -568,11 +568,11 @@ func newHarness(t *testing.T) *harness {
 	}
 	h.loaders = map[string]fakeLoaderInstall{
 		"neoforge": {
-			installer: h.neoInstaller, version: "26.2.0.87", versionID: "neoforge-26.2.0.87", profileKey: "NeoForge", versionJSON: version,
+			installer: h.neoInstaller, version: "26.2.0.87", versionID: "neoforge-26.2.0.87", instanceKey: "NeoForge", versionJSON: version,
 			libs: append(slices.Sorted(maps.Keys(h.neoLibs)), vanillaLib("neoforge")),
 		},
 		"forge": {
-			installer: h.forgeInstaller, version: "65.1.3", versionID: "26.2-forge-65.1.3", profileKey: "forge", versionJSON: forgeVersion,
+			installer: h.forgeInstaller, version: "65.1.3", versionID: "26.2-forge-65.1.3", instanceKey: "forge", versionJSON: forgeVersion,
 			generated: map[string]string{forgeClient: fakeForgeClient},
 			libs:      []string{"org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", vanillaLib("forge")},
 		},
@@ -1427,7 +1427,7 @@ type fakeLoaderInstall struct {
 	installer   fakeJar
 	version     string
 	versionID   string
-	profileKey  string
+	instanceKey string
 	libs        []string
 	versionJSON []byte
 	// generated is what a client install's processors write under libraries/, by path.
@@ -1544,7 +1544,7 @@ func (h *harness) fakeClientInstall(args []string, fake fakeLoaderInstall) error
 			return err
 		}
 	}
-	profiles[fake.profileKey] = json.RawMessage(`{"name":"` + fake.profileKey + `","type":"custom","lastVersionId":"` + id + `"}`)
+	profiles[fake.instanceKey] = json.RawMessage(`{"name":"` + fake.instanceKey + `","type":"custom","lastVersionId":"` + id + `"}`)
 	if top["profiles"], err = json.MarshalIndent(profiles, "", "  "); err != nil {
 		return err
 	}

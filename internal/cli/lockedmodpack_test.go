@@ -27,7 +27,7 @@ type modpackLockView struct {
 // matches exactly.
 func lockedPack(t *testing.T, h *harness, dir, mods string) {
 	t.Helper()
-	writePack(t, dir, "~26.2", mods, nil)
+	writePrismPack(t, dir, "~26.2", mods, nil)
 	copyLock(t, h.dir, dir)
 }
 
@@ -119,7 +119,7 @@ func TestLockedModpackNeedsAnExactPlatform(t *testing.T) {
 func TestModpackLockedWithoutALockFails(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	writePack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
 	h.mustRun(t, "modpack", "add", "./base")
 
 	h.editManifest(t, func(m map[string]any) {
@@ -134,7 +134,7 @@ func TestModpackLockedWithoutALockFails(t *testing.T) {
 func TestLockedModpacksPinningOneModDifferently(t *testing.T) {
 	h, base := projectWithLockedPack(t, "base")
 	other := filepath.Join(h.dir, "other")
-	writePack(t, other, "~26.2", `"sodium": {}`, nil)
+	writePrismPack(t, other, "~26.2", `"sodium": {}`, nil)
 	copyLock(t, base, other)
 	editPackLock(t, other, func(m map[string]any) {
 		mods := m["mods"].(map[string]any)

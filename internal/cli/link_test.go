@@ -43,7 +43,7 @@ func onlyModpack(t *testing.T, m map[string]any) (string, map[string]any) {
 
 // mojangGameDir is where `link mojang` puts an instance: the launcher's own folder for it.
 func mojangGameDir(launcherDir, name string) string {
-	return filepath.Join(launcherDir, "shulker", strings.TrimPrefix(profileKey(name), "shulker-"))
+	return filepath.Join(launcherDir, "shulker", strings.TrimPrefix(instanceKey(name), "shulker-"))
 }
 
 func mojangLauncherDir(t *testing.T) string {

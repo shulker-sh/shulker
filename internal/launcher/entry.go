@@ -301,10 +301,10 @@ func Detect(gameDir string) (name, dir string) {
 		return "", ""
 	}
 	instanceDir := filepath.Dir(gameDir)
-	if _, err := os.Stat(filepath.Join(instanceDir, PackFile)); err != nil {
+	if _, err := os.Stat(filepath.Join(instanceDir, PrismPackFile)); err != nil {
 		return "", ""
 	}
-	cfg, err := os.ReadFile(filepath.Join(instanceDir, InstanceConfigFile))
+	cfg, err := os.ReadFile(filepath.Join(instanceDir, PrismInstanceFile))
 	if err != nil {
 		return "", ""
 	}

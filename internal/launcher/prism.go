@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	InstanceConfigFile = "instance.cfg"
-	PackFile           = "mmc-pack.json"
+	PrismInstanceFile = "instance.cfg"
+	PrismPackFile     = "mmc-pack.json"
 )
 
 type Prism struct {
@@ -25,7 +25,7 @@ type Prism struct {
 	MultiMC bool
 }
 
-type Instance struct {
+type PrismInstance struct {
 	ID            string
 	Name          string
 	Minecraft     string
@@ -89,10 +89,10 @@ func (l *Prism) InstancesDir() string {
 	return filepath.Join(l.Dir, "instances")
 }
 
-func (l *Prism) WriteInstance(inst Instance) (InstanceResult, error) {
+func (l *Prism) WriteInstance(inst PrismInstance) (InstanceResult, error) {
 	dir := filepath.Join(l.InstancesDir(), inst.ID)
 	res := InstanceResult{Dir: dir}
-	cfgPath := filepath.Join(dir, InstanceConfigFile)
+	cfgPath := filepath.Join(dir, PrismInstanceFile)
 	if _, err := os.Stat(cfgPath); errors.Is(err, os.ErrNotExist) {
 		res.Created = true
 	}
@@ -104,10 +104,10 @@ func (l *Prism) WriteInstance(inst Instance) (InstanceResult, error) {
 		return res, err
 	}
 	res.GameDir = gameDir
-	if err := writePack(filepath.Join(dir, PackFile), inst); err != nil {
+	if err := writePrismPack(filepath.Join(dir, PrismPackFile), inst); err != nil {
 		return res, err
 	}
-	return res, writeInstanceConfig(cfgPath, inst, l.MultiMC)
+	return res, writePrismInstanceConfig(cfgPath, inst, l.MultiMC)
 }
 
 func (l *Prism) GameDir(id string) string {
@@ -145,7 +145,7 @@ func prepareGameDir(dir string) (string, error) {
 	return gameDir, os.Mkdir(gameDir, 0o755)
 }
 
-func writePack(path string, inst Instance) error {
+func writePrismPack(path string, inst PrismInstance) error {
 	var pack struct {
 		Components    []map[string]json.RawMessage `json:"components"`
 		FormatVersion int                          `json:"formatVersion"`
@@ -157,7 +157,7 @@ func writePack(path string, inst Instance) error {
 	}
 	pack.FormatVersion = 1
 	l, hasLoader := loader.Lookup(inst.LoaderType)
-	loaderUID := l.PrismUID
+	loaderUID := l.ComponentUID
 	wanted := map[string]string{"net.minecraft": inst.Minecraft}
 	if hasLoader {
 		wanted[loaderUID] = inst.LoaderVersion
@@ -167,7 +167,7 @@ func writePack(path string, inst Instance) error {
 	for _, c := range pack.Components {
 		var uid string
 		_ = json.Unmarshal(c["uid"], &uid)
-		if _, other := loader.ByPrismUID(uid); other && uid != loaderUID {
+		if _, other := loader.ByComponentUID(uid); other && uid != loaderUID {
 			continue
 		}
 		if version, ok := wanted[uid]; ok {
@@ -199,7 +199,7 @@ func jsonString(s string) json.RawMessage {
 // otherwise it uses the MultiMC-era parser, which strips backslashes but keeps
 // the surrounding quotes of a QSettings-quoted value. MultiMC only has the old
 // parser, so its values are written unquoted with old-style escapes.
-func writeInstanceConfig(path string, inst Instance, multimc bool) error {
+func writePrismInstanceConfig(path string, inst PrismInstance, multimc bool) error {
 	lines, err := readINILines(path)
 	if err != nil {
 		return err

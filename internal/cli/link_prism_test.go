@@ -43,7 +43,7 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 	// The slot names the generated script through Prism's own token, so it carries neither the
 	// source nor the binary's path.
 	wantCmd := `sh "$INST_MC_DIR/.shulker/pre-launch"`
-	if cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile)); cfg["PreLaunchCommand"] != wantCmd {
+	if cfg := readINIFile(t, filepath.Join(instDir, launcher.PrismInstanceFile)); cfg["PreLaunchCommand"] != wantCmd {
 		t.Fatalf("PreLaunchCommand = %q, want %q", cfg["PreLaunchCommand"], wantCmd)
 	}
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
@@ -105,7 +105,7 @@ func TestLinkPrism(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {
 		t.Fatalf("a link must not build in the source project: %v", err)
 	}
-	cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
+	cfg := readINIFile(t, filepath.Join(instDir, launcher.PrismInstanceFile))
 	if cfg["InstanceType"] != "OneSix" || cfg["name"] != "my-pack" || cfg["OverrideCommands"] != "true" {
 		t.Fatalf("instance.cfg: %v", cfg)
 	}
@@ -120,7 +120,7 @@ func TestLinkPrism(t *testing.T) {
 		Components    []map[string]any `json:"components"`
 		FormatVersion int              `json:"formatVersion"`
 	}
-	readJSONFile(t, filepath.Join(instDir, launcher.PackFile), &pack)
+	readJSONFile(t, filepath.Join(instDir, launcher.PrismPackFile), &pack)
 	if pack.FormatVersion != 1 || len(pack.Components) != 2 ||
 		pack.Components[0]["uid"] != "net.minecraft" || pack.Components[0]["version"] != "26.2" || pack.Components[0]["important"] != true ||
 		pack.Components[1]["uid"] != "net.fabricmc.fabric-loader" || pack.Components[1]["version"] != "0.17.3" {
@@ -128,11 +128,11 @@ func TestLinkPrism(t *testing.T) {
 	}
 
 	extra := "[General]\nInstanceType=OneSix\nname=Old\nlastLaunchTime=5\nJavaPath=/usr/bin/java\n"
-	if err := os.WriteFile(filepath.Join(instDir, launcher.InstanceConfigFile), []byte(extra), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(instDir, launcher.PrismInstanceFile), []byte(extra), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	packWithLWJGL := `{"components":[{"uid":"net.minecraft","version":"26.1","important":true},{"uid":"org.lwjgl3","version":"3.3.3","dependencyOnly":true},{"uid":"org.quiltmc.quilt-loader","version":"0.1"}],"formatVersion":1}`
-	if err := os.WriteFile(filepath.Join(instDir, launcher.PackFile), []byte(packWithLWJGL), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(instDir, launcher.PrismPackFile), []byte(packWithLWJGL), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	var env struct {
@@ -149,11 +149,11 @@ func TestLinkPrism(t *testing.T) {
 	if rep.Modpack != "my-pack" || rep.Sync == nil || rep.Sync.Dir != gameDir {
 		t.Fatalf("every link reports the pack it follows and the build it did: %+v", rep)
 	}
-	cfg = readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
+	cfg = readINIFile(t, filepath.Join(instDir, launcher.PrismInstanceFile))
 	if cfg["name"] != "my-pack" || cfg["lastLaunchTime"] != "5" || cfg["JavaPath"] != "/usr/bin/java" || cfg["PreLaunchCommand"] != wantCmd {
 		t.Fatalf("instance.cfg after a relink: %v", cfg)
 	}
-	readJSONFile(t, filepath.Join(instDir, launcher.PackFile), &pack)
+	readJSONFile(t, filepath.Join(instDir, launcher.PrismPackFile), &pack)
 	if len(pack.Components) != 3 || pack.Components[0]["version"] != "26.2" || pack.Components[1]["uid"] != "org.lwjgl3" || pack.Components[2]["uid"] != "net.fabricmc.fabric-loader" {
 		t.Fatalf("merged mmc-pack.json: %+v", pack)
 	}
@@ -228,7 +228,7 @@ func TestLinkPrismTargetNameAndErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir)
-	cfg := readINIFile(t, filepath.Join(launcherDir, "custom", "shulker-pack-dev", launcher.InstanceConfigFile))
+	cfg := readINIFile(t, filepath.Join(launcherDir, "custom", "shulker-pack-dev", launcher.PrismInstanceFile))
 	if cfg["name"] != "Pack (dev)" {
 		t.Fatalf("instance.cfg: %v", cfg)
 	}
@@ -290,7 +290,7 @@ func TestLinkPrismConfigFormats(t *testing.T) {
 
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir)
-	prismCfg := filepath.Join(prismDir, "instances", "shulker-my-pack", launcher.InstanceConfigFile)
+	prismCfg := filepath.Join(prismDir, "instances", "shulker-my-pack", launcher.PrismInstanceFile)
 	lines := rawINILines(t, prismCfg)
 	quoted := `PreLaunchCommand="` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(cmdValue) + `"`
 	if !lines["ConfigVersion=1.3"] || !lines[quoted] {
@@ -303,7 +303,7 @@ func TestLinkPrismConfigFormats(t *testing.T) {
 
 	multimcDir := t.TempDir()
 	h.mustRun(t, "link", "multimc", "--launcher-dir", multimcDir)
-	multimcCfg := filepath.Join(multimcDir, "instances", "shulker-my-pack", launcher.InstanceConfigFile)
+	multimcCfg := filepath.Join(multimcDir, "instances", "shulker-my-pack", launcher.PrismInstanceFile)
 	content := readFile(t, multimcCfg)
 	if strings.Contains(content, "ConfigVersion") || !rawINILines(t, multimcCfg)["PreLaunchCommand="+cmdValue] {
 		t.Fatalf("multimc instance.cfg:\n%s", content)

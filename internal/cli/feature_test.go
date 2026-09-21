@@ -218,7 +218,7 @@ func TestLinkPrismKeepsFeatureFlags(t *testing.T) {
 	launcherDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--with", "fancy")
 	instDir := filepath.Join(launcherDir, "instances", "shulker-my-pack")
-	cfg := readINIFile(t, filepath.Join(instDir, launcher.InstanceConfigFile))
+	cfg := readINIFile(t, filepath.Join(instDir, launcher.PrismInstanceFile))
 	if !strings.HasSuffix(cfg["PreLaunchCommand"], `/.shulker/pre-launch"`) {
 		t.Fatalf("PreLaunchCommand = %q", cfg["PreLaunchCommand"])
 	}

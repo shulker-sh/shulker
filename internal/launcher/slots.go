@@ -150,7 +150,7 @@ func ReadSlots(e *Entry, in config.Instance) (Slots, bool, error) {
 }
 
 func readPrismSlots(e *Entry, in config.Instance) (Slots, bool, error) {
-	values, err := readINI(filepath.Join(e.InstanceDir(in.Dir), InstanceConfigFile), e.multimcINI)
+	values, err := readINI(filepath.Join(e.InstanceDir(in.Dir), PrismInstanceFile), e.multimcINI)
 	if errors.Is(err, os.ErrNotExist) {
 		return Slots{}, false, nil
 	}
@@ -196,7 +196,7 @@ func writeMojangSlots(_ *Entry, in config.Instance, s Slots) error {
 }
 
 func writePrismSlots(e *Entry, in config.Instance, s Slots) error {
-	path := filepath.Join(e.InstanceDir(in.Dir), InstanceConfigFile)
+	path := filepath.Join(e.InstanceDir(in.Dir), PrismInstanceFile)
 	lines, err := readINILines(path)
 	if err != nil {
 		return err

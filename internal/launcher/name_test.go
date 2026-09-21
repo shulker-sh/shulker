@@ -20,10 +20,10 @@ func TestInstanceNameReadsTheLaunchersOwnFile(t *testing.T) {
 	root := t.TempDir()
 
 	prismGame := filepath.Join(root, "prism", "instances", "friends-pack", "minecraft")
-	writeTestFile(t, filepath.Join(filepath.Dir(prismGame), InstanceConfigFile), "[General]\nConfigVersion=1.2\nname=Friends Pack\n")
+	writeTestFile(t, filepath.Join(filepath.Dir(prismGame), PrismInstanceFile), "[General]\nConfigVersion=1.2\nname=Friends Pack\n")
 
 	multimcGame := filepath.Join(root, "multimc", "instances", "friends-pack", ".minecraft")
-	writeTestFile(t, filepath.Join(filepath.Dir(multimcGame), InstanceConfigFile), "name=Friends Pack\n")
+	writeTestFile(t, filepath.Join(filepath.Dir(multimcGame), PrismInstanceFile), "name=Friends Pack\n")
 
 	atGame := filepath.Join(root, "atlauncher", "instances", "FriendsPack")
 	writeTestFile(t, filepath.Join(atGame, ATLauncherInstanceFile), `{"launcher":{"name":"Friends Pack"}}`)

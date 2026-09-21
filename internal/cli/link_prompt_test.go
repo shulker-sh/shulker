@@ -88,7 +88,7 @@ func TestBareLinkAsksForTheLauncher(t *testing.T) {
 	if !strings.Contains(stdout, "created instance pack") || !strings.Contains(stdout, "follows pack from "+h.dir) {
 		t.Fatalf("a bare link reaches link multimc: %s", stdout)
 	}
-	cfg := filepath.Join(dir, "instances", "shulker-pack", launcher.InstanceConfigFile)
+	cfg := filepath.Join(dir, "instances", "shulker-pack", launcher.PrismInstanceFile)
 	if _, err := os.Stat(cfg); err != nil {
 		t.Fatalf("no MultiMC instance written: %v", err)
 	}
