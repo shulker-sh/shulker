@@ -309,3 +309,29 @@ func Prune(dir string, keep int) ([]Backup, error) {
 	}
 	return pruned, nil
 }
+
+// Automatic says whether a backup of this reason was taken on the way past a change rather than
+// asked for, which is what makes it one TrimAutomatic may delete.
+func Automatic(reason string) bool { return reason == "update" || reason == "sync" }
+
+// TrimAutomatic deletes all but the keep newest automatic backups in dir. A backup someone asked
+// for, and a zip shulker can't tell the reason of, never counts and is never deleted.
+func TrimAutomatic(dir string, keep int) error {
+	backups, err := Backups(dir)
+	if err != nil {
+		return err
+	}
+	kept := 0
+	for _, b := range backups {
+		if !Automatic(b.Reason) {
+			continue
+		}
+		if kept++; kept <= keep {
+			continue
+		}
+		if err := os.Remove(b.Path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
+}

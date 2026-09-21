@@ -271,6 +271,32 @@ func TestPruneKeepsNewest(t *testing.T) {
 	}
 }
 
+func TestTrimAutomaticLeavesKeptBackups(t *testing.T) {
+	dir := t.TempDir()
+	backup(t, dir, "20260915-000000-backup.zip")
+	backup(t, dir, "20260916-000000-sync.zip")
+	backup(t, dir, "20260917-000000-restore.zip")
+	backup(t, dir, "20260918-000000-smp-update.zip")
+	backup(t, dir, "20260919-000000-sync.zip")
+	backup(t, dir, "notes.zip")
+
+	if err := TrimAutomatic(dir, 2); err != nil {
+		t.Fatal(err)
+	}
+	left, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range left {
+		names = append(names, e.Name())
+	}
+	want := []string{"20260915-000000-backup.zip", "20260917-000000-restore.zip", "20260918-000000-smp-update.zip", "20260919-000000-sync.zip", "notes.zip"}
+	if !slices.Equal(names, want) {
+		t.Fatalf("left = %v", names)
+	}
+}
+
 func TestValidGroup(t *testing.T) {
 	for _, name := range []string{"default", "hardcore", "smp-2"} {
 		if !ValidGroup(name) {
