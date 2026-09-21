@@ -1,3 +1,6 @@
+// Package mcver orders Minecraft versions: releases, their snapshots, pre-releases and release
+// candidates, and weekly snapshots such as 24w14a, which sort as snapshots of the release their cycle
+// led to.
 package mcver
 
 import (
@@ -9,12 +12,14 @@ import (
 	"shulker.sh/shulker/internal/verrange"
 )
 
+// Kind is what a version is relative to its release. The constants are in the order they sort.
 type Kind int
 
 const (
 	Snapshot Kind = iota
 	Pre
 	RC
+	// Other is a tag shulker doesn't recognise, ordered by the tag itself.
 	Other
 	Release
 )
@@ -25,8 +30,10 @@ type Version struct {
 	Minor int
 	Patch int
 	Kind  Kind
-	Num   int
-	Tag   string
+	// Num orders versions of one Kind: the snapshot, pre or rc number, year*100+week for a weekly
+	// snapshot, and -1 for a bound below every snapshot of its release.
+	Num int
+	Tag string
 }
 
 var (
@@ -58,25 +65,29 @@ func Parse(id string) (Version, error) {
 	if m[3] != "" {
 		v.Patch, _ = strconv.Atoi(m[3])
 	}
-	if strings.HasSuffix(id, "-") {
+	switch {
+	case strings.HasSuffix(id, "-"):
 		v.Kind, v.Num = Snapshot, -1
-	} else if m[4] != "" {
+	case m[4] != "":
 		v.Tag = m[4]
-		if t := taggedRe.FindStringSubmatch(m[4]); t != nil {
-			v.Num, _ = strconv.Atoi(t[2])
-			switch t[1] {
-			case "snapshot":
-				v.Kind = Snapshot
-			case "pre":
-				v.Kind = Pre
-			case "rc":
-				v.Kind = RC
-			}
-		} else {
-			v.Kind = Other
-		}
+		v.Kind, v.Num = tagKind(m[4])
 	}
 	return v, nil
+}
+
+func tagKind(tag string) (Kind, int) {
+	t := taggedRe.FindStringSubmatch(tag)
+	if t == nil {
+		return Other, 0
+	}
+	num, _ := strconv.Atoi(t[2])
+	switch t[1] {
+	case "snapshot":
+		return Snapshot, num
+	case "pre":
+		return Pre, num
+	}
+	return RC, num
 }
 
 func MustParse(id string) Version {
