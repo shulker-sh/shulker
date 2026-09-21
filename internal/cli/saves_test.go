@@ -161,7 +161,7 @@ func TestSavesListsGroupsWorldsAndBackups(t *testing.T) {
 			t.Fatalf("saves -i pack lacks %q: %s", want, stdout)
 		}
 	}
-	if stdout := h.mustRun(t, "saves", "--group", "hardcore"); !strings.Contains(stdout, "no worlds") {
+	if stdout := h.mustRun(t, "saves", "--group", "hardcore"); !strings.Contains(stdout, "no worlds") || !strings.Contains(stdout, "shulker backup --group hardcore") {
 		t.Fatalf("saves --group: %s", stdout)
 	}
 	if env := h.runSetting(t, 1, "saves", "--group", "missing"); env.Error == nil || env.Error.Code != "group-not-found" {

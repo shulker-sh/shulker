@@ -78,6 +78,9 @@ func TestBackupKeepsAnInstancesOwnWorldsInItsFolder(t *testing.T) {
 		t.Fatalf("no worlds: %+v", env.Error)
 	}
 	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
+	if stdout := h.mustRun(t, "saves", "-C", gameDir); !strings.Contains(stdout, "no backups yet; shulker backup -C "+gameDir+" takes one") {
+		t.Fatalf("the hint names the backup for this target: %s", stdout)
+	}
 	got := backupOf(t, h, "-C", gameDir)
 	if filepath.Dir(got.Path) != filepath.Join(gameDir, instance.Dir, "backups") || !regexp.MustCompile(`^\d{8}-\d{6}-backup\.zip$`).MatchString(filepath.Base(got.Path)) {
 		t.Fatalf("backup went to %s", got.Path)

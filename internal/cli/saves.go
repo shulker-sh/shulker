@@ -191,7 +191,7 @@ func (a *app) showSaves(target savesTarget) error {
 		l.Blank()
 		l.Heading("Backups")
 		if len(view.Backups) == 0 {
-			l.Info("no backups yet; one is taken before update or sync changes the mods")
+			l.Info("no backups yet; `" + a.backupCommand(target) + "` takes one")
 			return
 		}
 		width := len(strconv.Itoa(len(view.Backups)))
@@ -200,6 +200,26 @@ func (a *app) showSaves(target savesTarget) error {
 			l.Plain(t.Cyan(label) + " " + t.Bold(b.ID) + " " + t.Grey(backupAside(b.Backup)))
 		}
 	})
+}
+
+// backupCommand is the backup command for the target saves shows, selected the way saves was.
+func (a *app) backupCommand(target savesTarget) string {
+	switch {
+	case target.Dir == "":
+		return "shulker backup --group " + target.Group
+	case a.instance != "":
+		return "shulker -i " + shellWord(a.instance) + " backup"
+	case a.dir != "":
+		return "shulker backup -C " + shellWord(target.Dir)
+	}
+	return "shulker backup"
+}
+
+func shellWord(s string) string {
+	if strings.ContainsAny(s, " \t'\"$`\\") {
+		return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+	}
+	return s
 }
 
 func backupAside(b saves.Backup) string {
