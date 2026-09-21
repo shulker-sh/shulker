@@ -7,8 +7,9 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
-// selectAccount resolves what an account argument names. One match is the answer; several get a
-// picker on a terminal, and ambiguous-account anywhere else.
+// selectAccount resolves what an account argument names. One match is the answer, and so is the
+// closest of several, with a warning; several the input can't tell apart get a picker on a
+// terminal, and ambiguous-account anywhere else.
 func (a *app) selectAccount(query string) (account.Resolved, error) {
 	accounts, _, err := a.accounts()
 	if err != nil {
@@ -19,13 +20,16 @@ func (a *app) selectAccount(query string) (account.Resolved, error) {
 		e.Nudge = out.Nudge{Lead: "Sign in to Microsoft", Command: "shulker accounts login"}
 		return account.Resolved{}, e
 	}
-	matches := account.Find(accounts, query)
-	switch len(matches) {
-	case 0:
+	matches, closest := account.Find(accounts, query)
+	switch {
+	case len(matches) == 0:
 		e := out.Errorf("account-not-found", "no account matches %q", query)
 		e.Candidates, e.Pass, e.Given = accountCandidates(accounts), accountPicks(accounts), query
 		return account.Resolved{}, e
-	case 1:
+	case closest:
+		a.printer.Warn("auto-selecting %s (%s), the closest match to %q", matches[0].Name, matches[0].ID, query)
+		return matches[0], nil
+	case len(matches) == 1:
 		return matches[0], nil
 	}
 	return a.pickAccount(query, matches)

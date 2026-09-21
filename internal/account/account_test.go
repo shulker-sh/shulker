@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 	"time"
 
@@ -214,38 +215,58 @@ func TestResolveTakesTheEarliestProvidersCopyOfAnAccount(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
+	const (
+		notch   = "069a79f4-44e9-4726-a5be-fca90e38aaf5"
+		offNotc = "8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21"
+		bigDog  = "1111ba71-b85a-3d5b-af5f-cb2f6e9c7d21"
+		upSteve = "5a1e0000-0000-3000-8000-000000000001"
+		loSteve = "5a1f0000-0000-3000-8000-000000000002"
+		stella  = "b1a00000-0000-3000-8000-000000000003"
+	)
 	accounts := Resolve(DefaultProviders(), Store{Accounts: []Account{
-		own("Notch", "069a79f4-44e9-4726-a5be-fca90e38aaf5"),
-		offline("Notch", "8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21"),
-		offline("Big Dog 42", "1111ba71-b85a-3d5b-af5f-cb2f6e9c7d21"),
+		own("Notch", notch),
+		offline("Notch", offNotc),
+		offline("Big Dog 42", bigDog),
+		offline("Steve", upSteve),
+		offline("steve", loSteve),
+		offline("Stella", stella),
 	}}, nil)
 	for _, c := range []struct {
-		query string
-		want  []string
+		query   string
+		want    []string
+		closest bool
 	}{
-		{"Notch", []string{"069a79f4-44e9-4726-a5be-fca90e38aaf5", "8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21"}},
-		{"nOtCh", []string{"069a79f4-44e9-4726-a5be-fca90e38aaf5", "8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21"}},
-		{"Notch@shulker", []string{"069a79f4-44e9-4726-a5be-fca90e38aaf5"}},
-		{"Notch@offline", []string{"8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21"}},
-		{"069a79f4-44e9-4726-a5be-fca90e38aaf5", []string{"069a79f4-44e9-4726-a5be-fca90e38aaf5"}},
-		{"069A79F444E94726A5BEFCA90E38AAF5", []string{"069a79f4-44e9-4726-a5be-fca90e38aaf5"}},
-		{"Big Dog 42", []string{"1111ba71-b85a-3d5b-af5f-cb2f6e9c7d21"}},
-		{"Dinnerbone", nil},
-		{"Notch@prism", nil},
+		{"Notch", []string{notch, offNotc}, false},
+		{"nOtCh", []string{notch, offNotc}, false},
+		{"Notch@shulker", []string{notch}, false},
+		{"Notch@offline", []string{offNotc}, false},
+		{"Not@offline", []string{offNotc}, false},
+		{notch, []string{notch}, false},
+		{"069A79F444E94726A5BEFCA90E38AAF5", []string{notch}, false},
+		{"Big Dog 42", []string{bigDog}, false},
+		{"big", []string{bigDog}, false},
+		{"steve", []string{loSteve, upSteve}, true},
+		{"Steve@offline", []string{upSteve, loSteve}, true},
+		{"ste", []string{loSteve, upSteve, stella}, true},
+		{"Ste", []string{upSteve, stella, loSteve}, true},
+		{"S", []string{upSteve, stella, loSteve}, true},
+		{"STE", []string{upSteve, loSteve, stella}, true},
+		{"5a1", []string{upSteve, loSteve}, false},
+		{"5A1E-0", []string{upSteve}, false},
+		{"b", []string{bigDog}, false},
+		{"b1", []string{stella}, false},
+		{"8", []string{offNotc}, false},
+		{"Dinnerbone", nil, false},
+		{"Notch@prism", nil, false},
+		{"", nil, false},
 	} {
+		matches, closest := Find(accounts, c.query)
 		var got []string
-		for _, a := range Find(accounts, c.query) {
+		for _, a := range matches {
 			got = append(got, a.ID)
 		}
-		if len(got) != len(c.want) {
-			t.Errorf("Find(%q) = %v, want %v", c.query, got, c.want)
-			continue
-		}
-		for i := range got {
-			if got[i] != c.want[i] {
-				t.Errorf("Find(%q) = %v, want %v", c.query, got, c.want)
-				break
-			}
+		if !slices.Equal(got, c.want) || closest != c.closest {
+			t.Errorf("Find(%q) = %v, %v; want %v, %v", c.query, got, closest, c.want, c.closest)
 		}
 	}
 }

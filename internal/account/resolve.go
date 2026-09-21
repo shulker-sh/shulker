@@ -123,12 +123,14 @@ func fromProvider(provider string, own Store, borrowed map[string][]Resolved) []
 // Sort orders a group's rows the way the list prints them: by name, and by id where two accounts
 // share one, so the order never depends on how the file happened to be written.
 func Sort(accounts []Resolved) {
-	slices.SortStableFunc(accounts, func(a, b Resolved) int {
-		if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
-			return c
-		}
-		return strings.Compare(a.ID, b.ID)
-	})
+	slices.SortStableFunc(accounts, compare)
+}
+
+func compare(a, b Resolved) int {
+	if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+		return c
+	}
+	return strings.Compare(a.ID, b.ID)
 }
 
 // InGroup is the accounts of one group, sorted.

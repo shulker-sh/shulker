@@ -198,6 +198,35 @@ func TestAccountsSelectorFailures(t *testing.T) {
 	}
 }
 
+func TestAccountsSelectorPicksTheClosestMatch(t *testing.T) {
+	h := newHarness(t)
+	writeAccountStore(t, h, offlineAccount("Steve", notchID), offlineAccount("steve", steveID))
+
+	_, stderr := h.mustRunStderr(t, "accounts", "use", "ste")
+	if readConfigDoc(t, h.config)["accounts"].(map[string]any)["default"] != steveID {
+		t.Error("ste should pick steve, which matches with case")
+	}
+	if want := `auto-selecting steve (` + steveID + `), the closest match to "ste"`; !strings.Contains(stderr, want) {
+		t.Errorf("stderr should warn %q:\n%s", want, stderr)
+	}
+
+	_, stderr = h.mustRunStderr(t, "accounts", "use", "Ste")
+	if readConfigDoc(t, h.config)["accounts"].(map[string]any)["default"] != notchID {
+		t.Error("Ste should pick Steve")
+	}
+	if !strings.Contains(stderr, "auto-selecting Steve") {
+		t.Errorf("stderr:\n%s", stderr)
+	}
+
+	_, stderr = h.mustRunStderr(t, "accounts", "use", steveID[:3])
+	if readConfigDoc(t, h.config)["accounts"].(map[string]any)["default"] != steveID {
+		t.Error("an id prefix that starts one id and no name should select")
+	}
+	if strings.Contains(stderr, "auto-selecting") {
+		t.Errorf("one match is no guess:\n%s", stderr)
+	}
+}
+
 func TestAccountsProviders(t *testing.T) {
 	h := newHarness(t)
 	writeAccountStore(t, h, ownAccount("Notch", notchID))

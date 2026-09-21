@@ -719,7 +719,7 @@ shulker accounts use Notch@offline
 shulker accounts use 069a79f4-44e9-4726-a5be-fca90e38aaf5
 ```
 
-An account is named by its username, matched without regard to case; by `name@source`, where the source is `shulker`, `offline`, `prism` or `mojang`; or by its id, dashed or not. A name may hold spaces, because an account with no Java profile is named by its Xbox gamertag, so quote it. When several accounts match, shulker asks which one on a terminal, and fails with `ambiguous-account` anywhere else, listing each match with its qualifier and its id. An account that owns no Java profile can't launch anything, so it is refused with `account-not-playable`.
+An account is named by its username or its id, dashed or not, or by the start of either, and `name@source` narrows it to one source: `shulker`, `offline`, `prism` or `mojang`. A name may hold spaces, because an account with no Java profile is named by its Xbox gamertag, so quote it. When several accounts match, shulker takes the closest and warns which one it chose: the full id, then the full name with its case, then without it, then the start of a name with its case, then without it, then a shorter name before a longer one. So with offline accounts `Steve` and `steve`, `ste` picks `steve` and `Ste` picks `Steve`. The start of an id counts only when no name starts that way, and only when it starts one id. When the input can't tell accounts apart, because they share the very same name or their ids share the prefix typed, shulker asks which one on a terminal, and fails with `ambiguous-account` anywhere else, listing each with its qualifier and its id. An account that owns no Java profile can't launch anything, so it is refused with `account-not-playable`.
 
 ### `shulker accounts providers`
 
@@ -1525,7 +1525,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `account-sign-in-expired` | The Microsoft refresh token is gone or revoked, so shulker can't get a session for the account; `shulker accounts login` signs it in again |
 | `accounts-invalid` | shulker's own `accounts.json` doesn't parse or doesn't match its schema |
 | `already-ignored` | The pair already has an ignore in `shulker.json`; pass `--force` to replace it |
-| `ambiguous-account` | Several accounts match the selector and shulker can't ask, because it isn't running on a terminal. `candidates`: the matches, each as its qualifier and its id, `pass`: their ids |
+| `ambiguous-account` | The selector can't tell several accounts apart, since they share the very same name or their ids share the prefix typed, and shulker can't ask, because it isn't running on a terminal. `candidates`: the matches, each as its qualifier and its id, `pass`: their ids |
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-side` | The manifest declares both sides and the command works on one; `sync` and `pull` take `--side`, `diff --into` names it. `candidates`: the sides |
