@@ -12,10 +12,10 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/game"
@@ -668,35 +668,24 @@ func (a *app) fetchInto(ctx context.Context, s game.Store, files []game.File, on
 		d.fetch.Progress = progress.Bytes
 		defer func() { d.fetch.Progress = nil }()
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var (
-		wg       sync.WaitGroup
-		once     sync.Once
-		firstErr error
-		slots    = make(chan struct{}, storeDownloadJobs)
-	)
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(storeDownloadJobs)
 	for i, f := range missing {
 		if ctx.Err() != nil {
 			break
 		}
-		slots <- struct{}{}
-		wg.Add(1)
-		go func(name string, f game.File) {
-			defer wg.Done()
-			defer func() { <-slots }()
-			progress.File(name)
+		g.Go(func() error {
+			progress.File(downloads[i].Name)
 			if err := s.Fetch(ctx, d.fetch, f); err != nil {
-				once.Do(func() { firstErr = err; cancel() })
-				return
+				return err
 			}
 			progress.Advance()
-		}(downloads[i].Name, f)
+			return nil
+		})
 	}
-	wg.Wait()
-	if firstErr != nil {
+	if err := g.Wait(); err != nil {
 		progress.Abort()
-		return firstErr
+		return err
 	}
 	progress.Finish()
 	return nil

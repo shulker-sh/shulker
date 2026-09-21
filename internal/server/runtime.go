@@ -12,8 +12,8 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
 
+	"golang.org/x/sync/errgroup"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
@@ -178,38 +178,19 @@ func materializeRuntime(ctx context.Context, client *fetch.Client, root string, 
 			return fmt.Errorf("java runtime manifest: unknown entry type %q for %s", files[name].Type, name)
 		}
 	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var (
-		wg       sync.WaitGroup
-		once     sync.Once
-		firstErr error
-		slots    = make(chan struct{}, runtimeDownloadJobs)
-	)
-	fail := func(err error) {
-		once.Do(func() {
-			firstErr = err
-			cancel()
-		})
-	}
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(runtimeDownloadJobs)
 	for _, name := range downloads {
 		if ctx.Err() != nil {
 			break
 		}
-		slots <- struct{}{}
-		wg.Add(1)
-		go func(name string) {
-			defer wg.Done()
-			defer func() { <-slots }()
+		g.Go(func() error {
 			path, _ := runtimePath(root, name)
-			if err := downloadRuntimeFile(ctx, client, path, files[name]); err != nil {
-				fail(err)
-			}
-		}(name)
+			return downloadRuntimeFile(ctx, client, path, files[name])
+		})
 	}
-	wg.Wait()
-	if firstErr != nil {
-		return firstErr
+	if err := g.Wait(); err != nil {
+		return err
 	}
 	for _, name := range links {
 		path, _ := runtimePath(root, name)
