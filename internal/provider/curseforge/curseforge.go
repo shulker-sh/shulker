@@ -1,3 +1,5 @@
+// Package curseforge reads projects and files from CurseForge's API, with either the user's own
+// API key or the shared one shulker ships and refreshes from shulker.sh.
 package curseforge
 
 import (
@@ -56,14 +58,16 @@ type CurseForge struct {
 	KeyURL  string
 	// KeyFile is where a key fetched from KeyURL is saved. It is empty for the user's own key,
 	// which is never replaced.
-	KeyFile    string
-	key        string
-	refreshed  bool
-	refreshErr error
-	slugs      map[string]string
-	classes    map[string]int
+	KeyFile      string
+	key          string
+	hasRefreshed bool
+	refreshErr   error
+	slugs        map[string]string
+	classes      map[string]int
 }
 
+// Key is the user's own API key: SHULKER_CURSEFORGE_KEY when it is set, else the configured one.
+// It is empty when the user has none.
 func Key(configured string) string {
 	if k := os.Getenv(KeyEnv); k != "" {
 		return k
@@ -71,6 +75,8 @@ func Key(configured string) string {
 	return configured
 }
 
+// SharedKey is shulker's shared API key: the one last fetched from shulker.sh into cacheDir, or
+// the one built into the binary.
 func SharedKey(cacheDir string) string {
 	var saved struct {
 		Key string `json:"key"`
@@ -89,6 +95,8 @@ func New(c *fetch.Client, key string) *CurseForge {
 	return &CurseForge{Client: withKey(c, key), BaseURL: APIURL, key: key, slugs: map[string]string{}, classes: map[string]int{}}
 }
 
+// NewShared is a CurseForge that uses the shared key, and replaces it from shulker.sh when
+// CurseForge rejects it.
 func NewShared(c *fetch.Client, key, cacheDir string) *CurseForge {
 	cf := New(c, key)
 	cf.KeyURL = KeyURL
@@ -186,7 +194,8 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID, kind string) (*provi
 			kinds = append(kinds, classTypes[m.ClassID])
 		}
 		sort.Strings(kinds)
-		e := out.Errorf("type-ambiguous", "curseforge has %s as %s; pass `--type` to say which one you mean", slugOrID, strings.Join(kinds, " and "))
+		e := out.Errorf("type-ambiguous", "curseforge has %s as %s", slugOrID, strings.Join(kinds, " and "))
+		e.Help = "pass `--type` to say which one you mean"
 		e.Candidates, e.Given, e.Flag = kinds, slugOrID, "--type"
 		return nil, e
 	}
@@ -320,8 +329,8 @@ func (c *CurseForge) remember(m mod) *provider.Project {
 func (c *CurseForge) call(ctx context.Context, what string, request func() error) error {
 	err := request()
 	if errors.Is(err, fetch.ErrForbidden) && c.KeyFile != "" {
-		if !c.refreshed {
-			c.refreshed = true
+		if !c.hasRefreshed {
+			c.hasRefreshed = true
 			if c.refreshErr = c.refreshKey(ctx); c.refreshErr == nil {
 				err = request()
 			}
@@ -337,7 +346,9 @@ func (c *CurseForge) call(ctx context.Context, what string, request func() error
 		if c.KeyFile != "" {
 			return sharedKeyRejected("the newer one from shulker.sh was rejected too")
 		}
-		return out.Errorf("curseforge-key-rejected", "curseforge %s: the API key was rejected; set %s or run `shulker config set curseforge.key <key>`", what, KeyEnv)
+		e := out.Errorf("curseforge-key-rejected", "curseforge %s: the API key was rejected", what)
+		e.Help = "set " + KeyEnv + " or run `shulker config set curseforge.key <key>`"
+		return e
 	}
 	return fmt.Errorf("curseforge %s: %w", what, err)
 }
@@ -366,7 +377,9 @@ func (c *CurseForge) refreshKey(ctx context.Context) error {
 }
 
 func sharedKeyRejected(detail string) error {
-	return out.Errorf("curseforge-key-rejected", "CurseForge rejected shulker's built-in API key and %s; set %s or run `shulker config set curseforge.key <key>`, or report it at https://github.com/shulker-sh/shulker/issues", detail, KeyEnv)
+	e := out.Errorf("curseforge-key-rejected", "curseforge rejected shulker's built-in API key and %s", detail)
+	e.Help = "set " + KeyEnv + " or run `shulker config set curseforge.key <key>`, or report it at https://github.com/shulker-sh/shulker/issues"
+	return e
 }
 
 // classPaths are the url segments curseforge.com uses per class.

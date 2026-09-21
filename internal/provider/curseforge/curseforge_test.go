@@ -70,7 +70,8 @@ func TestSharedKeyFailsWhenShulkerHasNoNewerKey(t *testing.T) {
 	c := NewShared(fetch.New("test"), "old", t.TempDir())
 	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
 	_, err := c.Project(context.Background(), "10", "")
-	if out.CodeOf(err) != "curseforge-key-rejected" || !strings.Contains(err.Error(), "shulker.sh has no newer one") || !strings.Contains(err.Error(), "report it") {
+	e := out.AsError(err)
+	if e.Code != "curseforge-key-rejected" || !strings.Contains(e.Message, "shulker.sh has no newer one") || !strings.Contains(e.Help, "report it") {
 		t.Fatalf("error %v", err)
 	}
 	if _, err := c.Project(context.Background(), "10", ""); err == nil || k.keyFetches != 1 {
