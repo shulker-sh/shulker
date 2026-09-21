@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,5 +127,112 @@ func TestHistoryNeedsAnInstance(t *testing.T) {
 	code, stdout, _ := h.run(t, "--json", "history", "list")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "not-in-place" {
 		t.Fatalf("history outside an instance: code=%d %+v", code, e)
+	}
+}
+
+// A forced build overwrites what the player changed, so it is the build that most
+// needs to keep the state first.
+func TestForcedBuildKeepsTheDriftItOverwrites(t *testing.T) {
+	h := newInPlace(t)
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "x.txt"), "from the pack\n")
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "gone.txt"), "from the pack\n")
+	h.mustRun(t, "install")
+	writeFile(t, filepath.Join(h.dir, "config", "x.txt"), "mine\n")
+	writeFile(t, filepath.Join(h.dir, "config", "gone.txt"), "mine too\n")
+	if err := os.Remove(filepath.Join(h.dir, "overrides", "config", "gone.txt")); err != nil {
+		t.Fatal(err)
+	}
+
+	h.mustRun(t, "build", "--force")
+	if got := readFile(t, filepath.Join(h.dir, "config", "x.txt")); got != "from the pack\n" {
+		t.Fatalf("force should overwrite the edit: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "config", "gone.txt")); !os.IsNotExist(err) {
+		t.Fatalf("force should remove the edited file the source dropped: %v", err)
+	}
+	entries, err := build.History(h.dir)
+	if err != nil || len(entries) != 1 || entries[0].Reason != "build" {
+		t.Fatalf("a forced build over edits should keep them: %+v %v", entries, err)
+	}
+	kept := filepath.Join(build.HistoryPath(h.dir), entries[0].ID, "config")
+	if got := readFile(t, filepath.Join(kept, "x.txt")); got != "mine\n" {
+		t.Fatalf("the entry should hold the overwritten edit: %q", got)
+	}
+	if got := readFile(t, filepath.Join(kept, "gone.txt")); got != "mine too\n" {
+		t.Fatalf("the entry should hold the removed edit: %q", got)
+	}
+}
+
+func TestForcedBuildKeepsAnOverwrittenOption(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "install")
+	options := filepath.Join(h.dir, "options.txt")
+	writeFile(t, options, strings.Replace(readFile(t, options), "tutorialStep:none", "tutorialStep:movement", 1))
+
+	h.mustRun(t, "build", "--force")
+	if got := readFile(t, options); !strings.Contains(got, "tutorialStep:none") {
+		t.Fatalf("force should overwrite the edited key: %s", got)
+	}
+	entries, err := build.History(h.dir)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("a forced build over an edited key should keep it: %+v %v", entries, err)
+	}
+	kept := filepath.Join(build.HistoryPath(h.dir), entries[0].ID, "options.txt")
+	if got := readFile(t, kept); !strings.Contains(got, "tutorialStep:movement") {
+		t.Fatalf("the entry should hold the edited key: %s", got)
+	}
+}
+
+func TestRollbackPrune(t *testing.T) {
+	h := newInPlace(t)
+	h.editManifest(t, func(m map[string]any) { m["history"] = 1 })
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "install")
+	h.mustRun(t, "remove", "sodium")
+	before, err := build.History(h.dir)
+	if err != nil || len(before) != 2 {
+		t.Fatalf("entries before the rollback: %+v %v", before, err)
+	}
+
+	var env struct {
+		Data rollbackResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "--json", "rollback", "--prune")), &env); err != nil {
+		t.Fatal(err)
+	}
+	res := env.Data
+	if res.Entry.ID != before[0].ID || len(res.Pruned) != 2 || res.Pruned[0].ID != before[0].ID || res.Pruned[1].ID != before[1].ID {
+		t.Fatalf("rollback --prune should drop both older entries: %+v", res)
+	}
+	after, err := build.History(h.dir)
+	if err != nil || len(after) != 1 || after[0].ID != res.Snapshot || after[0].Reason != "rollback" {
+		t.Fatalf("only the state the rollback replaced should be left: %+v %v", after, err)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("the rollback should still restore sodium: %v", err)
+	}
+}
+
+// Every entry holds a lock, since init writes one before anything can take an
+// entry, so an entry without a readable one is damaged.
+func TestHistoryShowOnAnEntryWithoutItsLock(t *testing.T) {
+	for name, damage := range map[string]func(path string){
+		"missing":    func(path string) { os.Remove(path) },
+		"unreadable": func(path string) { writeFile(t, path, "{") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newInPlace(t)
+			h.mustRun(t, "add", "sodium")
+			entries, err := build.History(h.dir)
+			if err != nil || len(entries) != 1 {
+				t.Fatalf("entries: %+v %v", entries, err)
+			}
+			damage(filepath.Join(build.HistoryPath(h.dir), entries[0].ID, "shulker.lock"))
+
+			code, stdout, _ := h.run(t, "--json", "history", "show")
+			if e := failureCode(t, stdout); code == 0 || e.Code != "history-invalid" || !strings.Contains(e.Message, entries[0].ID) {
+				t.Fatalf("a damaged entry: code=%d %+v", code, e)
+			}
+		})
 	}
 }

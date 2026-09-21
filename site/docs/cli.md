@@ -1547,7 +1547,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `git-missing` | A git source needs `git` on PATH |
 | `group-not-found` | `--group` names a save group that isn't under the saves root |
 | `history-empty` | The instance has no history entries yet; one is taken before an in-place build changes anything |
-| `history-invalid` | A history entry's own record is unreadable; `history prune` removes it |
+| `history-invalid` | A history entry's own record or its lock is unreadable; the message names the entry to delete |
 | `history-missing` | There is no history entry with that number; the message says how many are kept |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |

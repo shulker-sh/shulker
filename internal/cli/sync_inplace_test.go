@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/local"
 )
 
 func gitPack(t *testing.T, name, mods, file string) (repo, source, first string) {
@@ -190,5 +193,29 @@ func TestPreLaunchInPlaceFallsBackToTheLock(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("the fallback should build the lock in place: %v", err)
+	}
+}
+
+// Syncing a project into its own directory is a build of it: the directory is
+// neither recorded as one the project was synced into nor made an instance.
+func TestSyncIntoTheProjectsOwnDirectory(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "sodium")
+
+	stdout := h.mustRun(t, "sync", h.dir, "--into", h.dir)
+	if !strings.Contains(stdout, "synced client » "+h.dir) {
+		t.Fatalf("sync output: %s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("the project directory should hold the build: %v", err)
+	}
+	if lf, err := local.Load(h.dir); err != nil || len(lf.SyncDirs) != 0 {
+		t.Fatalf("its own directory is no sync directory: %+v %v", lf, err)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, instance.FileName)); !os.IsNotExist(err) {
+		t.Fatalf("its own directory takes no instance file: %v", err)
+	}
+	if _, ok := h.newApp(io.Discard, io.Discard).registeredInstance(h.dir); ok {
+		t.Fatal("its own directory should not be registered as a synced instance")
 	}
 }

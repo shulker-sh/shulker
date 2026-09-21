@@ -66,6 +66,9 @@ func (b *Builder) takeHistory(dir, side, reason string, written, removed int, re
 // already kept whatever it was about to rewrite.
 func planDrift(plans []planned) bool {
 	for _, f := range plans {
+		if f.forced {
+			return true
+		}
 		switch f.state {
 		case stateKept, stateConflict, stateUntracked, stateOrphan:
 			return true
@@ -220,7 +223,7 @@ func readHistoryEntry(dir, id string) (HistoryEntry, error) {
 		return e, err
 	}
 	if err := json.Unmarshal(data, &e); err != nil {
-		return HistoryEntry{}, out.Errorf("history-invalid", "history entry %s is unreadable (%v); remove it with `shulker history prune`", id, err)
+		return HistoryEntry{}, out.Errorf("history-invalid", "history entry %s is unreadable (%v); delete %s to drop it", id, err, historyEntryPath(dir, id))
 	}
 	e.ID = id
 	return e, nil

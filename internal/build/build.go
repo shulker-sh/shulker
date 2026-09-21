@@ -151,6 +151,9 @@ type planned struct {
 	src   source
 	hash  string
 	merge keyMerge
+	// forced is set where only --force let the plan overwrite or remove
+	// something the player changed.
+	forced bool
 }
 
 type ownedFile interface {
@@ -165,6 +168,7 @@ type keyMerge struct {
 	dropped  map[string]bool
 	overrode []string
 	changed  bool
+	forced   bool
 }
 
 func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recordedKeys []string, force bool) keyMerge {
@@ -179,8 +183,11 @@ func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recorde
 		case !present:
 			m.changed = true
 		case have == want:
-		case force, !known, have == last:
+		case !known, have == last:
 			m.changed = true
+		case force:
+			m.changed = true
+			m.forced = true
 		case want == last:
 			m.kept[k] = true
 		default:
@@ -684,6 +691,7 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 				return nil, err
 			}
 			f.merge = mergeKeys(src.owned, existing, prev.Values[rel], prev.recordedKeys(rel), force)
+			f.forced = f.merge.forced
 			switch {
 			case f.merge.changed:
 				f.state = stateWrite
@@ -707,8 +715,11 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 			f.state = stateUnchanged
 		case recorded == "" && !force:
 			f.state = stateUntracked
-		case current == recorded || force:
+		case current == recorded:
 			f.state = stateWrite
+		case force:
+			f.state = stateWrite
+			f.forced = true
 		case newHash == recorded:
 			f.state = stateKept
 		default:
@@ -733,10 +744,11 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 			continue
 		}
 		state := stateRemove
-		if current != prev.Files[rel] && !force {
+		edited := current != prev.Files[rel]
+		if edited && !force {
 			state = stateOrphan
 		}
-		plans = append(plans, planned{rel: rel, state: state})
+		plans = append(plans, planned{rel: rel, state: state, forced: edited && force})
 	}
 	return plans, nil
 }

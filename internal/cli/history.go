@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -184,9 +186,15 @@ func changeItem(c historyChange) out.Item {
 // across mods, resource packs and shaders, so From is what is installed and To
 // is what restoring would put back.
 func historyChanges(p *project.Project, e build.HistoryEntry) ([]historyChange, error) {
-	was, err := lock.Load(filepath.Join(build.HistoryPath(p.Dir), e.ID, lock.FileName))
+	entry := filepath.Join(build.HistoryPath(p.Dir), e.ID)
+	was, err := lock.Load(filepath.Join(entry, lock.FileName))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, out.Errorf("history-invalid", "history entry %s has no lock; delete %s to drop it", e.ID, entry)
+	}
 	if err != nil {
-		return nil, err
+		invalid := out.Errorf("history-invalid", "history entry %s has an unreadable lock; delete %s to drop it", e.ID, entry)
+		invalid.Rows = []out.Detail{{Label: "lock", Text: out.AsError(err).Message}}
+		return nil, invalid
 	}
 	sections := []struct {
 		kind string
