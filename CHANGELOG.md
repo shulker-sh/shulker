@@ -54,6 +54,7 @@ All notable changes to shulker are documented here. The format is based on
 - Installers for macOS and Linux (`curl -fsSL https://shulker.sh/install.sh | sh`) and Windows (`irm https://shulker.sh/install.ps1 | iex`), and `self update`, all checking releases against their SHA256 checksums and, when `gh` is installed, their build provenance.
 - `completion bash|zsh|fish|powershell` prints a shell completion script, and the CLI reference shows how to load it in each shell.
 - `search` finds projects on Modrinth and CurseForge and prints the ids to add them by; with no words it opens a search box whose results follow what you type.
+- A bare `add` on a terminal opens the same search box, where you mark as many results as you like and add them all at once.
 - `docs` prints the documentation built into the binary, so it matches the installed version and works offline: a page, a command's section, or any heading, with a list to pick from when several match, and `--search` finds a phrase on every page.
 
 ### Changed

@@ -172,12 +172,15 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 
 Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug. With `--type modpack` the argument is a modpack source instead: a local path, git URL, or raw manifest URL. Each type takes only the flags that mean something for it, so `--ref` on a mod or `--side` on a modpack is refused.
 
+With no arguments, `shulker add` asks `Add which mods?` over the search box [`shulker search`](#shulker-search) opens. Tab or enter moves into the results, space marks one, and shift+tab goes back to refine the query without losing the marks. Enter adds everything marked, or the row under the cursor when nothing is, in one change to the lock, each from the provider it was found on. `--type`, `--provider` and the other flags still apply, and `shulker resourcepack add` and `shulker shader add` search their own type. Off a terminal, or with `--no-input` or `--json`, the argument is required, and a modpack always takes its source.
+
 ```sh
 shulker add sodium lithium
 shulker add iris --channel beta
 shulker add betterthirdperson --provider curseforge --side client
 shulker add sodium --as speed
 shulker add ../base-pack --type modpack --as base
+shulker add
 ```
 
 | Flag | Description |

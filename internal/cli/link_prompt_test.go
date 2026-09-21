@@ -19,7 +19,9 @@ import (
 // was asked. A question with no answer fails the run, so a test also pins which questions come.
 type scripted struct {
 	answers map[string]string
-	asked   []string
+	// marks answers a search by title: each step types its query, then marks one of the rows.
+	marks map[string][]markStep
+	asked []string
 }
 
 func (s *scripted) Pick(title string, choices []out.Choice, _ io.Reader) (string, error) {
@@ -125,6 +127,10 @@ func (o offering) Pick(_ string, choices []out.Choice, _ io.Reader) (string, err
 
 func (o offering) Ask(string, string, string, io.Reader) (string, error) {
 	return "", out.ErrPickCancelled
+}
+
+func (o offering) BrowseMarks(string, string, out.BrowseSource, io.Reader) ([]string, error) {
+	return nil, out.ErrPickCancelled
 }
 
 func TestBareLinkIsTheGroupHelpWhenItCantAsk(t *testing.T) {

@@ -21,11 +21,26 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add " + addArgs(kind),
 		Short: addShort(kind),
-		Args:  minimumArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 && a.canPick() {
+				return nil
+			}
+			return minimumArgs(1)(cmd, args)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chosen, err := chooseType(cmd, kind, typ, "")
 			if err != nil {
 				return err
+			}
+			// from is the provider each project picked from a search was found on.
+			var from map[string]string
+			if len(args) == 0 {
+				if chosen == manifest.TypeModpack {
+					return minimumArgs(1)(cmd, args)
+				}
+				if args, from, err = a.askAdd(cmd, chosen, opts.Provider); err != nil {
+					return err
+				}
 			}
 			if as != "" && !manifest.ValidKey(as) {
 				return out.Errorf("usage", "--as takes up to 64 lowercase letters, digits, dots, dashes and underscores, starting with a letter or digit, not %q", as)
@@ -59,7 +74,11 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			}
 			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				for _, slug := range args {
-					if err := r.Add(cmd.Context(), slug, opts); err != nil {
+					add := opts
+					if name, ok := from[slug]; ok {
+						add.Provider = name
+					}
+					if err := r.Add(cmd.Context(), slug, add); err != nil {
 						return "", err
 					}
 				}

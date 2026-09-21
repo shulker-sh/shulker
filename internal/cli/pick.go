@@ -12,6 +12,7 @@ import (
 type asker interface {
 	Pick(title string, choices []out.Choice, in io.Reader) (string, error)
 	Ask(title, description, placeholder string, in io.Reader) (string, error)
+	BrowseMarks(title, description string, src out.BrowseSource, in io.Reader) ([]string, error)
 }
 
 // canPick reports whether shulker can ask. A picker reads keys and redraws, so stdin and the
