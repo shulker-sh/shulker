@@ -7,7 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
 )
 
@@ -215,5 +218,34 @@ func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends", "--as", "smp")
 	if instances := readInstances(t, h); len(instances) != 1 || instances[0].ID != "smp" || instanceManifest(t, gameDir)["name"] != "smp" {
 		t.Fatalf("an adopted project's name is the id it is linked under, which repair reads back: %+v", instances)
+	}
+}
+
+func TestUnlinkDetachedBuild(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	into := filepath.Join(t.TempDir(), "detached")
+	h.mustRun(t, "sync", h.dir, "--into", into)
+	if lf, _ := local.Load(h.dir); len(lf.SyncDirs["client"]) != 1 {
+		t.Fatalf("sync --into records the directory: %+v", lf.SyncDirs)
+	}
+
+	r := unlinkJSON(t, h, into)
+	if len(r) != 1 || r[0].Dir != into || r[0].Relink != "shulker sync "+h.dir+" --side client --into "+into {
+		t.Fatalf("unlink a detached build: %+v", r)
+	}
+	if lf, _ := local.Load(h.dir); len(lf.SyncDirs["client"]) != 0 {
+		t.Fatalf("unlink drops the directory from syncDirs: %+v", lf.SyncDirs)
+	}
+	if inf, err := instance.Load(into); err != nil || !inf.Unlinked {
+		t.Fatalf("unlink marks the detached build unlinked: %+v %v", inf, err)
+	}
+	if _, err := os.Stat(build.StatePath(into)); err != nil {
+		t.Fatalf("unlink keeps the detached build's files: %v", err)
+	}
+
+	code, stdout, _ := h.run(t, "unlink", into, "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "no-instances" && e.Code != "instance-not-found" {
+		t.Fatalf("unlinking it again: exit %d %s", code, stdout)
 	}
 }

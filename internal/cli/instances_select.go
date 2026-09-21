@@ -11,7 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -157,7 +159,7 @@ func instanceDirs(entries []instanceEntry) []string {
 func (a *app) unlinkTargets(query string, s instanceSelection) ([]instanceEntry, error) {
 	name := launcherArg(query)
 	if name == "" || s.launcher != "" {
-		return a.selectInstances(query, s)
+		return a.selectOrDetached(query, s)
 	}
 	registry, err := a.loadInstances()
 	if err != nil {
@@ -175,7 +177,7 @@ func (a *app) unlinkTargets(query string, s instanceSelection) ([]instanceEntry,
 		return nil, err
 	}
 	if !inProject {
-		return a.selectInstances(query, s)
+		return a.selectOrDetached(query, s)
 	}
 	var matches []instanceEntry
 	for _, e := range entries {
@@ -189,6 +191,39 @@ func (a *app) unlinkTargets(query string, s instanceSelection) ([]instanceEntry,
 		return nil, e
 	}
 	return matches, nil
+}
+
+// selectOrDetached falls back, when no registered instance matches, to a directory the query names
+// that holds a detached build: one with a source in its instance file and no registry row.
+func (a *app) selectOrDetached(query string, s instanceSelection) ([]instanceEntry, error) {
+	entries, err := a.selectInstances(query, s)
+	if err == nil || query == "" {
+		return entries, err
+	}
+	if code := out.AsError(err).Code; code != "instance-not-found" && code != "no-instances" {
+		return nil, err
+	}
+	if e, ok := detachedBuild(query); ok && s.admits(e) {
+		return []instanceEntry{e}, nil
+	}
+	return nil, err
+}
+
+func detachedBuild(query string) (instanceEntry, bool) {
+	dir, err := filepath.Abs(query)
+	if err != nil {
+		return instanceEntry{}, false
+	}
+	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
+		return instanceEntry{}, false
+	}
+	f, err := instance.Load(dir)
+	if err != nil || f.Source == "" || f.Unlinked {
+		return instanceEntry{}, false
+	}
+	e := inspectInstance(config.Instance{Name: filepath.Base(dir), Dir: dir})
+	e.ID = slugID(e.Name)
+	return e, true
 }
 
 func launcherArg(arg string) string {

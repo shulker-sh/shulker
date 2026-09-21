@@ -1192,7 +1192,7 @@ With `--json`, the data is `{ "file", "changed" }`.
 
 ### `shulker unlink`
 
-Stop syncing a linked instance and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the instance directory and the installed loader. The directory's `.shulker/instance.json` is marked unlinked, so [`shulker instances repair`](#shulker-instances-repair) doesn't register it again; linking or syncing into it clears the mark. `unlink` also drops the directory from its source project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it. A `sync --into` directory is a detached build with no row on the list, so `unlink` doesn't take one.
+Stop syncing a linked instance and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the instance directory and the installed loader. The directory's `.shulker/instance.json` is marked unlinked, so [`shulker instances repair`](#shulker-instances-repair) doesn't register it again; linking or syncing into it clears the mark. `unlink` also drops the directory from its source project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it. A `sync --into` directory is a detached build with no row on the list: name it by its directory, from anywhere, and `unlink` marks it unlinked and drops it from its source project's `syncDirs`, keeping its files, so `shulker sync <source> --into <dir>` picks it up again.
 
 Name the instance by the id [`shulker instances`](#shulker-instances) shows, by the name its launcher shows, or by its directory. Inside a project, a launcher name (`mojang`, `prism`, `multimc`, `atlauncher`, `gdlauncher`) unlinks that project's instance in that launcher, the reverse of `shulker link <launcher>`; an instance actually called that name comes first. A name several instances share needs `--launcher`, `--side`, or `--all`, while an id always picks one. `unlink` prints the command that sets the instance up again.
 
@@ -1201,6 +1201,7 @@ shulker unlink mojang
 shulker unlink "Friends SMP"
 shulker unlink "My Pack" --launcher prism
 shulker unlink --all --side server
+shulker unlink ~/servers/smp
 ```
 
 | Flag | Description |
@@ -1373,7 +1374,7 @@ shulker cache info
 
 ### `shulker cache prune`
 
-Remove everything in the cache that no root references. A root is a registered instance or the project you run it in: its `shulker.lock`, the lock of every history entry it keeps, and the modpack checkouts and offline sync fallbacks its sources need. Installer logs and half-finished downloads always go. The managed Java runtimes and your CurseForge key are never touched, and nothing a build placed can be removed from a directory without its bytes reaching the cache first, so rolling an instance back still works offline. A registered folder that no longer exists is skipped; one that is there but whose lock can't be read stops the prune, since it may be an instance that still needs its files.
+Remove everything in the cache that no root references. A root is a registered instance or the project you run it in: its `shulker.lock`, the lock of every history entry it keeps, and the modpack checkouts and offline sync fallbacks its sources need. Installer logs and half-finished downloads always go. The managed Java runtimes and your CurseForge key are never touched, and nothing a build placed can be removed from a directory without its bytes reaching the cache first, so rolling an instance back still works offline. A registered folder that no longer exists is skipped; one that is there but whose lock can't be read stops the prune, since it may be an instance that still needs its files. A detached build from `sync --into` is no root of its own: it runs on its source project's lock, which is kept while that project is a registered instance's source, a registered instance itself, or the project you run the prune in. Otherwise, and always for a detached build from a git or URL source, the prune may remove its files from the cache, and its next sync downloads them again; its own directory keeps them either way.
 
 ```sh
 shulker cache prune

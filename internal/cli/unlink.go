@@ -76,7 +76,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 					} else if r.Launcher != "" {
 						l.Nudge("To link it again", r.Relink)
 					} else {
-						l.Nudge("To register it again", r.Relink)
+						l.Nudge("To sync it again", r.Relink)
 					}
 				}
 			}
