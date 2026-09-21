@@ -231,6 +231,41 @@ func TestModpackMismatchAndConflict(t *testing.T) {
 	}
 }
 
+func TestModpackMissingFromTheLockWarnsOnlyBesideOtherPins(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	writePack(t, filepath.Join(h.dir, "one"), "~26.2", `"sodium": {}`, nil)
+	writePack(t, filepath.Join(h.dir, "two"), "~26.2", `"sodium": {}`, nil)
+	h.mustRun(t, "modpack", "add", "./one")
+	h.mustRun(t, "modpack", "add", "./two")
+
+	lockPath := filepath.Join(h.dir, "shulker.lock")
+	var l map[string]any
+	h.readJSON(t, "shulker.lock", &l)
+	delete(l["modpacks"].(map[string]any), "two")
+	data, err := json.Marshal(l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(lockPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var env out.Envelope
+	_ = json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env)
+	if !strings.Contains(strings.Join(env.Warnings, "\n"), "modpack two is not in the lock yet") {
+		t.Fatalf("a pack missing from a lock that pins others: %q", env.Warnings)
+	}
+
+	if err := os.Remove(lockPath); err != nil {
+		t.Fatal(err)
+	}
+	env = out.Envelope{}
+	_ = json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env)
+	if len(env.Warnings) != 0 {
+		t.Fatalf("a manifest with no lock beside it has nothing to warn about: %q", env.Warnings)
+	}
+}
+
 func TestModpackSourceMovedUnderTheSameName(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")

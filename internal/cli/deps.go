@@ -179,7 +179,7 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 		if !ok || moved || (a.relocking && pack.Classify(mp.Source) == pack.Local) {
 			switch {
 			case name == a.linkedPack:
-			case !ok:
+			case !ok && len(p.Lock.Modpacks) > 0:
 				a.printer.Warn("modpack %s is not in the lock yet; resolving it", name)
 			case moved:
 				a.printer.Warn("modpack %s has a new source since the lock; resolving it", name)
