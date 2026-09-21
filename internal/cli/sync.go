@@ -15,6 +15,7 @@ import (
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/saves"
 )
 
 type syncResult struct {
@@ -30,6 +31,7 @@ type syncResult struct {
 	Build      *build.Report        `json:"build"`
 	Changes    *lockChanges         `json:"changes,omitempty"`
 	Instances  []syncInstanceResult `json:"instances,omitempty"`
+	Saves      *saves.Result        `json:"saves,omitempty"`
 }
 
 type syncRequest struct {
@@ -140,7 +142,11 @@ func (res syncResult) print(l *out.Lines) {
 		res.Changes.printItems(l)
 	}
 	l.OKInto("synced "+res.Side, res.Dir, reportAside(res.Build))
-	printReportDetails(l, res.Build)
+	rows := reportDetailRows(l, res.Build)
+	if row, ok := savesRow(res.Saves); ok {
+		rows = append(rows, row)
+	}
+	l.Tree(rows...)
 }
 
 type syncSource struct {
@@ -234,6 +240,10 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	} else if rt.Fetched {
 		fetched = append(fetched, rt.Component+" "+rt.Version)
 	}
+	linked, err := a.linkSaves(into)
+	if err != nil {
+		return syncResult{}, err
+	}
 	recorded := !remote && !ownBuild && lf.RecordSyncDir(side, into)
 	a.refreshLocal(lf, !remote, recorded)
 	if !remote {
@@ -244,7 +254,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 			a.printer.Warn("couldn't record %s as the offline fallback: %v", src.name, err)
 		}
 	}
-	res = syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep}
+	res = syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep, Saves: linked}
 	if !src.LastGood.IsZero() {
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}

@@ -1,0 +1,201 @@
+package cli
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
+)
+
+func savesRoot(t *testing.T, h *harness) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "saves")
+	h.mustRun(t, "config", "set", "saves", root)
+	return root
+}
+
+func addWorld(t *testing.T, dir, name string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, name), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name, "level.dat"), []byte("nbt"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func savesLink(t *testing.T, gameDir string) string {
+	t.Helper()
+	target, err := os.Readlink(filepath.Join(gameDir, "saves"))
+	if err != nil {
+		t.Fatalf("saves is not a link: %v", err)
+	}
+	return target
+}
+
+// linkShulkerPack makes a shulker instance named pack and returns its game directory, with h.dir
+// pointed at it so later commands act on the instance.
+func linkShulkerPack(t *testing.T, h *harness) string {
+	t.Helper()
+	root := shulkerInstances(t, h)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	stdout := h.mustRun(t, "link", "shulker")
+	if !strings.Contains(stdout, "saves: group default") {
+		t.Fatalf("link reports the group it joined: %s", stdout)
+	}
+	h.dir = filepath.Join(root, "pack")
+	return h.dir
+}
+
+func TestShulkerInstanceJoinsDefaultGroup(t *testing.T) {
+	h := newHarness(t)
+	root := savesRoot(t, h)
+	gameDir := linkShulkerPack(t, h)
+	if got := savesLink(t, gameDir); got != filepath.Join(root, "default") {
+		t.Fatalf("saves points at %s", got)
+	}
+	if stdout := h.mustRun(t, "sync"); strings.Contains(stdout, "saves:") {
+		t.Fatalf("an unchanged link reports nothing: %s", stdout)
+	}
+}
+
+func TestSavesGroupRelinksOnSync(t *testing.T) {
+	h := newHarness(t)
+	root := savesRoot(t, h)
+	gameDir := linkShulkerPack(t, h)
+	addWorld(t, filepath.Join(root, "default"), "survival")
+	addWorld(t, filepath.Join(root, "hardcore"), "one-life")
+
+	h.mustRun(t, "instance", "set", "savesGroup", "hardcore")
+	if got := savesLink(t, gameDir); got != filepath.Join(root, "default") {
+		t.Fatalf("setting the group waits for the next sync: %s", got)
+	}
+	stdout := h.mustRun(t, "sync")
+	if !strings.Contains(stdout, "saves: group hardcore") || !strings.Contains(stdout, "one-life") {
+		t.Fatalf("sync reports the worlds now visible: %s", stdout)
+	}
+	if got := savesLink(t, gameDir); got != filepath.Join(root, "hardcore") {
+		t.Fatalf("saves points at %s", got)
+	}
+
+	h.mustRun(t, "instance", "set", "savesGroup", "none")
+	var env struct {
+		Data syncResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if s := env.Data.Saves; s == nil || !s.Changed || s.Group != "none" || len(s.Worlds) != 0 {
+		t.Fatalf("saves = %+v", env.Data.Saves)
+	}
+	info, err := os.Lstat(filepath.Join(gameDir, "saves"))
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("with none the instance keeps its own saves folder: %v %v", info, err)
+	}
+	for _, w := range []string{filepath.Join(root, "default", "survival"), filepath.Join(root, "hardcore", "one-life")} {
+		if _, err := os.Stat(filepath.Join(w, "level.dat")); err != nil {
+			t.Fatalf("leaving a group leaves its worlds: %v", err)
+		}
+	}
+}
+
+func TestSavesGroupRefusesABadName(t *testing.T) {
+	h := newHarness(t)
+	linkShulkerPack(t, h)
+	if env := h.runSetting(t, 1, "instance", "set", "savesGroup", "../elsewhere"); env.Error == nil {
+		t.Fatal("a group is a single folder name")
+	}
+	h.mustRun(t, "sync")
+}
+
+func TestOtherLaunchersKeepTheirSaves(t *testing.T) {
+	h := newHarness(t)
+	savesRoot(t, h)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	gameDir := filepath.Join(t.TempDir(), "game")
+	h.mustRun(t, "sync", h.dir, "--into", gameDir)
+	if _, err := os.Readlink(filepath.Join(gameDir, "saves")); err == nil {
+		t.Fatal("only shulker's own instances join a save group")
+	}
+}
+
+func TestSavesListsGroupsWorldsAndBackups(t *testing.T) {
+	h := newHarness(t)
+	root := savesRoot(t, h)
+	linkShulkerPack(t, h)
+	addWorld(t, filepath.Join(root, "default"), "survival")
+	addWorld(t, filepath.Join(root, "default"), "creative")
+	if err := os.MkdirAll(filepath.Join(root, "hardcore"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, err := config.DataDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	backups := filepath.Join(data, "backups", "default")
+	if err := os.MkdirAll(backups, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(filepath.Join(data, "backups")) })
+	for _, name := range []string{"20260917-101500-pack-sync.zip", "20260918-203015-pack-update.zip", "20260918-210000-pack-backup.zip"} {
+		if err := os.WriteFile(filepath.Join(backups, name), []byte("zip"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout := h.mustRun(t, "saves")
+	if !strings.Contains(stdout, "default (2 worlds") || !strings.Contains(stdout, "last backup 2026-09-18 21:00") || !strings.Contains(stdout, "hardcore (no worlds") {
+		t.Fatalf("saves: %s", stdout)
+	}
+
+	project := h.dir
+	h.dir = ""
+	stdout = h.mustRun(t, "saves", "-i", "pack")
+	h.dir = project
+	for _, want := range []string{"Worlds", "creative", "survival", "Backups", "1) 20260918-210000-pack-backup", "on request", "3) 20260917-101500-pack-sync", "before sync"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("saves -i pack lacks %q: %s", want, stdout)
+		}
+	}
+	if stdout := h.mustRun(t, "saves", "--group", "hardcore"); !strings.Contains(stdout, "no worlds") {
+		t.Fatalf("saves --group: %s", stdout)
+	}
+	if env := h.runSetting(t, 1, "saves", "--group", "missing"); env.Error == nil || env.Error.Code != "group-not-found" {
+		t.Fatalf("an unknown group: %+v", env.Error)
+	}
+
+	if env := h.runSetting(t, 2, "saves", "prune", "--group", "default"); env.Error == nil || env.Error.Code != "usage" {
+		t.Fatalf("prune needs --keep: %+v", env.Error)
+	}
+	stdout = h.mustRun(t, "saves", "prune", "--group", "default", "--keep", "1")
+	if !strings.Contains(stdout, "- 20260918-203015-pack-update") || !strings.Contains(stdout, "- 20260917-101500-pack-sync") || !strings.Contains(stdout, "pruned 2 backups") {
+		t.Fatalf("prune: %s", stdout)
+	}
+	left, _ := os.ReadDir(backups)
+	if len(left) != 1 || left[0].Name() != "20260918-210000-pack-backup.zip" {
+		t.Fatalf("left = %v", left)
+	}
+}
+
+func TestSavesTargetsAnInstanceWithoutAGroup(t *testing.T) {
+	h := newHarness(t)
+	gameDir := linkShulkerPack(t, h)
+	h.mustRun(t, "instance", "set", "savesGroup", "none")
+	h.mustRun(t, "sync")
+	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
+	own := filepath.Join(gameDir, instance.Dir, "backups")
+	if err := os.MkdirAll(own, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(own, "20260918-203015-update.zip"), []byte("zip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout := h.mustRun(t, "saves", "-C", gameDir)
+	if !strings.Contains(stdout, "mine") || !strings.Contains(stdout, "1) 20260918-203015-update") || !strings.Contains(stdout, "before update") {
+		t.Fatalf("saves -C: %s", stdout)
+	}
+}

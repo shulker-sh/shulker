@@ -22,7 +22,7 @@ const (
 	RegistrySchemaURL = "https://shulker.sh/schema/v1/registry.json"
 )
 
-var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "play.java", "play.jvmArgs", "play.memory", "play.window", "play.wrapper", "registry", "saves", "store"}
+var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
 
 type Config struct {
 	Accounts   Accounts   `json:"accounts"`
@@ -42,6 +42,19 @@ type Play struct {
 	Java    string   `json:"java,omitempty"`
 	Window  string   `json:"window,omitempty"`
 	Wrapper []string `json:"wrapper,omitempty"`
+	// SaveBackups is how many automatic pre-change backups a save group or instance keeps. It is
+	// global only: no instance setting overrides it.
+	SaveBackups *int `json:"saveBackups,omitempty"`
+}
+
+const DefaultSaveBackups = 5
+
+// Backups is SaveBackups with its default filled in; 0 takes no automatic backups.
+func (p Play) Backups() int {
+	if p.SaveBackups == nil {
+		return DefaultSaveBackups
+	}
+	return *p.SaveBackups
 }
 
 type CurseForge struct {

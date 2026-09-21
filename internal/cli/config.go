@@ -6,6 +6,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,6 +21,7 @@ const (
 	curseForgeKey     = "curseforge.key"
 	accountsProviders = "accounts.providers"
 	accountsDefault   = "accounts.default"
+	playSaveBackups   = "play.saveBackups"
 )
 
 type configChange struct {
@@ -307,6 +309,9 @@ func configDefault(key string) (any, bool) {
 	if key == accountsProviders {
 		return account.DefaultProviders(), true
 	}
+	if key == playSaveBackups {
+		return config.DefaultSaveBackups, true
+	}
 	return nil, false
 }
 
@@ -327,6 +332,8 @@ func checkConfigValue(key string, v any, literal bool) (any, error) {
 		if _, ok := v.(string); !ok {
 			return nil, out.Errorf("usage", "%s is an account id, so it takes a string", key)
 		}
+	case playSaveBackups:
+		return backupCount(key, v)
 	}
 	if name, ok := strings.CutPrefix(key, "play."); ok {
 		if err := checkPlaySetting(key, name, v); err != nil {
@@ -334,6 +341,15 @@ func checkConfigValue(key string, v any, literal bool) (any, error) {
 		}
 	}
 	return v, nil
+}
+
+// backupCount reads a count typed plainly or with --literal; 0 turns automatic backups off.
+func backupCount(key string, v any) (any, error) {
+	n, err := strconv.Atoi(fmt.Sprint(v))
+	if err != nil || n < 0 {
+		return nil, out.Errorf("usage", "%s takes a whole number of backups, 0 for none, not %s", key, settingText(v))
+	}
+	return n, nil
 }
 
 // playHints say what each launch setting takes, for the error that refuses a value it can't.

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 )
 
@@ -214,5 +215,28 @@ func TestConfigSetChecksThePlayDefaults(t *testing.T) {
 	h.mustRun(t, "config", "set", "play.wrapper", "--literal", `["gamemoderun"]`)
 	if got := strings.TrimSpace(h.mustRun(t, "config", "get", "play.window")); got != "1280x720" {
 		t.Fatalf("play.window = %q", got)
+	}
+}
+
+func TestConfigSaveBackups(t *testing.T) {
+	h := newHarness(t)
+	if got := strings.TrimSpace(h.mustRun(t, "config", "get", "play.saveBackups")); got != "5" {
+		t.Fatalf("default play.saveBackups = %q", got)
+	}
+	for _, bad := range []string{"-1", "five", "2.5"} {
+		if env := h.runSetting(t, 2, "config", "set", "play.saveBackups", bad); env.Error == nil || env.Error.Code != "usage" {
+			t.Fatalf("config set play.saveBackups %s: %+v", bad, env.Error)
+		}
+	}
+	h.mustRun(t, "config", "set", "play.saveBackups", "0")
+	if got := strings.TrimSpace(h.mustRun(t, "config", "get", "play.saveBackups")); got != "0" {
+		t.Fatalf("play.saveBackups = %q", got)
+	}
+	cfg, err := config.LoadFile(h.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Play.Backups() != 0 {
+		t.Fatalf("Backups() = %d", cfg.Play.Backups())
 	}
 }

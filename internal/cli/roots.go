@@ -10,10 +10,12 @@ import (
 // shulker owns live, where their save groups live, and where a launch assembles its shared game
 // files from. Instances and saves are data a player would miss, so they default under the data
 // directory; the store holds only what shulker can fetch again, so it defaults into the cache.
+// Backups holds each save group's backups and has no key of its own: it stays in the data directory.
 type rootDirs struct {
 	Instances string
 	Saves     string
 	Store     string
+	Backups   string
 }
 
 func (a *app) roots() (rootDirs, error) {
@@ -41,5 +43,6 @@ func (a *app) rootsOf(configPath string, cfg config.Config) (rootDirs, error) {
 		Instances: config.Root(configPath, cfg.Instances, filepath.Join(data, "instances")),
 		Saves:     config.Root(configPath, cfg.Saves, filepath.Join(data, "saves")),
 		Store:     config.Root(configPath, cfg.Store, d.cache.Game()),
+		Backups:   filepath.Join(data, "backups"),
 	}, nil
 }

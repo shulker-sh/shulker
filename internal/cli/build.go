@@ -103,6 +103,10 @@ func reportAside(rep *build.Report) string {
 }
 
 func printReportDetails(l *out.Lines, rep *build.Report) {
+	l.Tree(reportDetailRows(l, rep)...)
+}
+
+func reportDetailRows(l *out.Lines, rep *build.Report) []out.Row {
 	var rows []out.Row
 	for _, m := range rep.Moved {
 		rows = append(rows, out.Row{Label: "moved", Text: m + " " + l.T.Grey(l.T.ArrowInto()) + " " + filepath.Join(build.DataDir, rep.Side, m)})
@@ -119,5 +123,5 @@ func printReportDetails(l *out.Lines, rep *build.Report) {
 	if ld := rep.InstalledLoader; ld != nil {
 		rows = append(rows, out.Row{Label: "installed", Text: ld.Type + " " + ld.Version})
 	}
-	l.Tree(rows...)
+	return rows
 }

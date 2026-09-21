@@ -380,6 +380,7 @@ shulker get server.properties
 | `play.java` | The java those launches run: the absolute path of a java binary, or of a Java home. Without it, shulker's managed runtime |
 | `play.window` | The window size those launches open at, like `1280x720` |
 | `play.wrapper` | A command those launches run through, as a JSON array like `["gamemoderun"]` |
+| `play.saveBackups` | How many automatic backups of a save group or instance's worlds to keep, taken before `update` or `sync` changes the mods. Without it, 5; `0` takes none. No instance setting overrides it |
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
 | `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
 | `instances` | Where [`shulker link shulker`](#shulker-link-shulker) puts the instances shulker owns. Without it, `instances` in shulker's data directory |
@@ -390,7 +391,7 @@ The CurseForge key is always shown as its last four characters, like `•••�
 
 ### `shulker config get`
 
-Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set, and `accounts.providers` shows its default the same way. A `curseforge.key` that isn't set fails with `path-not-set`.
+Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set, and `accounts.providers` and `play.saveBackups` show their defaults the same way. A `curseforge.key` that isn't set fails with `path-not-set`.
 
 ```sh
 shulker config get
@@ -1123,6 +1124,7 @@ A path is relative to the file's `settings` block and dotted the way `shulker se
 Print a setting as it is in effect, then where it came from: set in this instance, with the default it would return to; its `play.` default; or the setting's own default. A setting neither the instance nor `config.json` sets fails with `path-not-set`. With no path, print every setting the instance has, with the `play.` defaults it inherits filled in.
 
 ```sh
+| `savesGroup` | | The save group whose worlds this instance shares, `default` unless set; `none` keeps them in the instance. See [`shulker saves`](#shulker-saves) |
 shulker instance get memory
 shulker -i smp instance get window
 shulker instance get
@@ -1186,6 +1188,40 @@ shulker unlink --all --side server
 What a launcher's own pre-launch slot runs. shulker writes the script that calls it into the instance's `.shulker/` folder and points the launcher at that, so there is no reason to run this yourself: outside a launcher slot it would sync whatever directory it was run in. It syncs the instance from its source before the game starts, and a failure never stops the game — the launcher plays what is already on disk.
 
 A launcher that gives shulker no way to show a message gets a deadline instead, so a long update can explain itself rather than looking like a hang. That is GDLauncher only, which discards a hook's output when its own five-minute limit runs out.
+
+### `shulker saves`
+
+Every instance [`shulker link shulker`](#shulker-link-shulker) makes shares its worlds through a save group: its `saves/` folder is a link (a directory junction on Windows) to the group's folder under the saves root, so every instance in a group lists the same worlds. Each joins `default`. Set another group with `shulker instance set savesGroup <name>`, or `none` to keep the worlds in the instance; the next sync relinks it and names the worlds the game now lists. Nothing is copied or merged: leaving a group leaves its worlds there. Joining one replaces an empty `saves/`, and one holding worlds is moved in as the group when the group has none; when both hold worlds, the sync warns and leaves `saves/` alone until you merge them by hand. Instances in other launchers keep their own worlds.
+
+With no target, `saves` lists the groups with how many worlds each holds, its size, and when it was last backed up. With `-i`, `-C` or `--group`, it lists that target's worlds and its backups, newest first. A shulker instance in a group shows the group; any other directory shows its own `saves/` and the backups in its `.shulker/backups/`. A group's backups live in `backups/<group>` in shulker's data directory.
+
+```sh
+shulker saves
+shulker saves -i smp
+shulker saves --group default
+```
+
+| Flag | Description |
+| --- | --- |
+| `--group <group>` | Show this save group rather than an instance |
+
+With `--json`, the list is `[{ "name", "dir", "worlds", "size", "lastBackup" }]`, and a target is `{ "group", "dir", "worldsDir", "worlds", "backups" }` with each backup `{ "n", "id", "path", "taken", "reason", "size" }`.
+
+### `shulker saves prune`
+
+Delete all but the newest `--keep` backups of a save group or instance, whichever backup took them. `--keep` is required, so a prune always says how many survive. The target is the one `shulker saves` would show: `--group`, `-i`, `-C`, or the current directory.
+
+```sh
+shulker saves prune --group default --keep 3
+shulker -i smp saves prune --keep 0
+```
+
+| Flag | Description |
+| --- | --- |
+| `--keep <n>` | How many of the newest backups to keep (required) |
+| `--group <group>` | Prune this save group's backups rather than an instance's |
+
+With `--json`, the data is `{ "group", "dir", "worldsDir", "pruned", "kept" }`.
 
 | Flag | Description |
 | --- | --- |
@@ -1491,6 +1527,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
 | `instance-missing` | A linked instance's directory is gone |
+| `group-not-found` | `--group` names a save group that isn't under the saves root |
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `instance-not-found` | No instance matches, or the directory `shulker instance` acts on holds no `.shulker/instance.json`. `candidates`: the instances shulker knows, `pass`: their ids |
 | `instance-id-taken` | Another instance already has the `--as` id; the message names its directory |

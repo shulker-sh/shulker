@@ -118,6 +118,12 @@
           "minimum": -1,
           "default": 5,
           "description": "How many launch records `launches.json` keeps, newest first. -1 keeps every record; 0 keeps none and removes the file."
+        },
+        "savesGroup": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+          "default": "default",
+          "description": "The save group whose worlds this instance shares: its `saves/` links to that folder under the saves root, so every instance in a group sees the same worlds. \"none\" keeps the worlds in the instance. Only instances shulker launches itself join a group. A change relinks on the next sync; nothing is copied or merged."
         }
       }
     },

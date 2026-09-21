@@ -59,6 +59,7 @@ type Settings struct {
 	Account       string    `json:"account,omitempty"`
 	Shulker       string    `json:"shulker,omitempty"`
 	LaunchHistory *int      `json:"launchHistory,omitempty"`
+	SavesGroup    string    `json:"savesGroup,omitempty"`
 }
 
 type Hooks struct {
