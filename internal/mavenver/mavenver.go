@@ -116,7 +116,7 @@ func qualifierItem(s string, followedByDigit bool) *item {
 	return &item{kind: qualifier, value: s}
 }
 
-func comparable(q string) string {
+func qualifierRank(q string) string {
 	if i := slices.Index(qualifiers, q); i >= 0 {
 		return strconv.Itoa(i)
 	}
@@ -128,7 +128,7 @@ func (it *item) isNull() bool {
 	case number:
 		return it.value == "0"
 	case qualifier:
-		return comparable(it.value) == release
+		return qualifierRank(it.value) == release
 	}
 	return len(it.items) == 0
 }
@@ -163,12 +163,12 @@ func (it *item) compare(b *item) int {
 		return strings.Compare(it.value, b.value)
 	case qualifier:
 		if b == nil {
-			return strings.Compare(comparable(it.value), release)
+			return strings.Compare(qualifierRank(it.value), release)
 		}
 		if b.kind != qualifier {
 			return -1
 		}
-		return strings.Compare(comparable(it.value), comparable(b.value))
+		return strings.Compare(qualifierRank(it.value), qualifierRank(b.value))
 	}
 	if b == nil {
 		if len(it.items) == 0 {
@@ -217,20 +217,20 @@ func Compare(a, b Version) int {
 }
 
 type restriction struct {
-	lower, upper         *Version
-	lowerIncl, upperIncl bool
+	lower, upper                 *Version
+	includesLower, includesUpper bool
 }
 
 func (r restriction) contains(v Version) bool {
 	if r.lower != nil {
 		c := Compare(*r.lower, v)
-		if c > 0 || c == 0 && !r.lowerIncl {
+		if c > 0 || c == 0 && !r.includesLower {
 			return false
 		}
 	}
 	if r.upper != nil {
 		c := Compare(*r.upper, v)
-		if c < 0 || c == 0 && !r.upperIncl {
+		if c < 0 || c == 0 && !r.includesUpper {
 			return false
 		}
 	}
@@ -241,13 +241,15 @@ func (r restriction) contains(v Version) bool {
 // `[1,2),[3,)`. A bare version is Maven's soft requirement and matches everything.
 type Range struct {
 	restrictions []restriction
-	any          bool
+	matchesAll   bool
 }
 
+// ParseRange reads a Maven range. * and a bare version both match everything, as Maven's soft
+// requirement does.
 func ParseRange(spec string) (Range, error) {
 	rest := strings.TrimSpace(spec)
 	if rest == "" || rest == "*" {
-		return Range{any: true}, nil
+		return Range{matchesAll: true}, nil
 	}
 	var r Range
 	var upper *Version
@@ -272,17 +274,17 @@ func ParseRange(spec string) (Range, error) {
 		if len(r.restrictions) > 0 {
 			return Range{}, fmt.Errorf("range %q mixes a bare version with sets", spec)
 		}
-		return Range{any: true}, nil
+		return Range{matchesAll: true}, nil
 	}
 	return r, nil
 }
 
 func parseRestriction(spec string) (restriction, error) {
-	res := restriction{lowerIncl: spec[0] == '[', upperIncl: spec[len(spec)-1] == ']'}
+	res := restriction{includesLower: spec[0] == '[', includesUpper: spec[len(spec)-1] == ']'}
 	body := strings.TrimSpace(spec[1 : len(spec)-1])
 	lower, upper, found := strings.Cut(body, ",")
 	if !found {
-		if !res.lowerIncl || !res.upperIncl {
+		if !res.includesLower || !res.includesUpper {
 			return restriction{}, fmt.Errorf("a single version must be written [%s]", body)
 		}
 		v := Parse(body)
@@ -308,7 +310,7 @@ func parseRestriction(spec string) (restriction, error) {
 }
 
 func (r Range) Contains(v Version) bool {
-	if r.any {
+	if r.matchesAll {
 		return true
 	}
 	for _, res := range r.restrictions {
