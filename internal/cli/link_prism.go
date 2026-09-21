@@ -8,28 +8,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 )
-
-type prismReport struct {
-	Launcher    string      `json:"launcher"`
-	LauncherDir string      `json:"launcherDir"`
-	Instance    string      `json:"instance"`
-	InstanceDir string      `json:"instanceDir"`
-	Name        string      `json:"name"`
-	GameDir     string      `json:"gameDir"`
-	Command     string      `json:"command,omitempty"`
-	Created     bool        `json:"created"`
-	Source      string      `json:"source"`
-	Ref         string      `json:"ref,omitempty"`
-	Modpack     string      `json:"modpack"`
-	Sync        *syncResult `json:"sync"`
-}
 
 func (a *app) linkPrismCmd() *cobra.Command { return a.linkPrismLikeCmd(false) }
 
@@ -39,10 +22,7 @@ func (a *app) linkMultiMCCmd() *cobra.Command { return a.linkPrismLikeCmd(true) 
 // layout Prism grew from, told apart by the launcher name, the instance.cfg dialect and MultiMC
 // having no default directory to find.
 func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
-	var launcherDir, instanceName, ref, as string
-	var force bool
-	var ff featureFlags
-	var ls linkSettings
+	var k launcherLink
 	launcherName, use, short := "prism", "prism", "Create a Prism Launcher instance that syncs the client build before each launch"
 	if multimc {
 		launcherName, use, short = "multimc", "multimc", "Create a MultiMC instance that syncs the client build before each launch"
@@ -52,58 +32,29 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 		Short: short,
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := ls.check(); err != nil {
-				return err
-			}
-			if multimc && launcherDir == "" {
+			if multimc && k.launcherDir == "" {
+				if err := k.ls.check(); err != nil {
+					return err
+				}
 				dir, err := a.askMultiMCDir()
 				if err != nil {
 					return err
 				}
-				launcherDir = dir
+				k.launcherDir = dir
 			}
-			src, err := a.linkFrom(cmd, args, ref)
+			src, _, err := a.startLauncherLink(cmd, args, &k, launcher.DefaultPrismDir)
 			if err != nil {
 				return err
 			}
 			p := src.project
-			if p.Lock.Loader.Type != "" {
-				if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
-					return err
-				}
-			}
-			if !p.Manifest.HasSide("client") {
-				a.printer.Warn("%s", noClientPack)
-			}
-			hasFeatures := len(ff.with)+len(ff.without) > 0
-			if hasFeatures {
-				b, err := a.builder(cmd.Context(), p)
-				if err != nil {
-					return err
-				}
-				if err := ff.check(b); err != nil {
-					return err
-				}
-			}
-			if launcherDir == "" {
-				if launcherDir, err = launcher.DefaultPrismDir(); err != nil {
-					return err
-				}
-			}
-			if launcherDir, err = filepath.Abs(launcherDir); err != nil {
-				return err
-			}
-			l := &launcher.Prism{Dir: launcherDir, MultiMC: multimc}
+			l := &launcher.Prism{Dir: k.launcherDir, MultiMC: multimc}
 			if err := l.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no launcher directory at %s; run the launcher once or pass --launcher-dir", launcherDir)
+				return out.Errorf("launcher-not-found", "no launcher directory at %s; run the launcher once or pass --launcher-dir", k.launcherDir)
 			} else if err != nil {
 				return err
 			}
-			display := p.Manifest.DisplayName("client")
-			if instanceName != "" {
-				display = instanceName
-			}
-			if err := checkAdopt(l.GameDir(profileKey(display)), src, "instance", display, "--name", force); err != nil {
+			display := k.display(p)
+			if err := checkAdopt(l.GameDir(profileKey(display)), src, "instance", display, "--name", k.force); err != nil {
 				return err
 			}
 			res, err := l.WriteInstance(launcher.Instance{
@@ -116,59 +67,18 @@ func (a *app) linkPrismLikeCmd(multimc bool) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if hasFeatures {
-				if err := a.saveInstanceFeatures(res.GameDir, ff); err != nil {
-					return err
-				}
+			var extra []out.Row
+			if !res.Created {
+				extra = append(extra, out.Row{Text: "restart the launcher if it is open so the change is picked up"})
 			}
-			row := config.Instance{Launcher: launcherName, LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name}
-			inst, synced, err := a.linkInstance(cmd, row, as, ref, src, ls)
-			if err != nil {
-				return err
-			}
-			rep := prismReport{
-				Launcher:    launcherName,
-				LauncherDir: launcherDir,
-				Instance:    filepath.Base(res.Dir),
-				InstanceDir: res.Dir,
-				Name:        display,
-				GameDir:     res.GameDir,
-				Command:     launcher.SlotCommand(launcherName, res.GameDir, launcher.HookPreLaunch),
-				Created:     res.Created,
-				Source:      src.name,
-				Ref:         ref,
-				Modpack:     modpackKey(inst.Manifest, src.name),
-				Sync:        &synced,
-			}
-			return a.printer.Emit(rep, func(l *out.Lines) {
-				verb := "created"
-				if !res.Created {
-					verb = "updated"
-				}
-				l.OKInto(verb+" instance "+display, res.Dir, "")
-				rows := append(follows(rep.Modpack, rep.Source), out.Row{Text: "the launcher syncs this instance before each launch"})
-				if hasFeatures {
-					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
-				}
-				if !res.Created {
-					rows = append(rows, out.Row{Text: "restart the launcher if it is open so the change is picked up"})
-				}
-				l.Tree(rows...)
-				synced.print(l)
-			})
+			return a.finishLauncherLink(cmd, &k, launcherName, display, src, res, extra...)
 		},
 	}
+	dirUsage := "launcher data directory (default: Prism Launcher's)"
 	if multimc {
-		cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "the MultiMC folder, the one that holds multimc.cfg (required)")
-	} else {
-		cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: Prism Launcher's)")
+		dirUsage = "the MultiMC folder, the one that holds multimc.cfg (required)"
 	}
-	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
-	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
-	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows")
-	ff.register(cmd, "for this instance")
-	ls.register(cmd)
+	k.register(cmd, dirUsage, "repoint the modpack an instance already follows")
 	return cmd
 }
 

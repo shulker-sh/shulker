@@ -7,97 +7,50 @@ import (
 	"slices"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/mavenver"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
 
 func (a *app) linkGDLauncherCmd() *cobra.Command {
-	var launcherDir, instanceName, ref, as string
-	var force bool
-	var ff featureFlags
-	var ls linkSettings
+	var k launcherLink
 	cmd := &cobra.Command{
 		Use:   "gdlauncher [project-dir | git-url | manifest-url]",
 		Short: "Create a GDLauncher instance that syncs the client build before each launch",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := ls.check(); err != nil {
-				return err
-			}
-			src, err := a.linkFrom(cmd, args, ref)
+			src, _, err := a.startLauncherLink(cmd, args, &k, launcher.DefaultGDLauncherDir)
 			if err != nil {
 				return err
 			}
 			p := src.project
-			if p.Lock.Loader.Type != "" {
-				if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
-					return err
-				}
-			}
-			if !p.Manifest.HasSide("client") {
-				a.printer.Warn("%s", noClientPack)
-			}
-			hasFeatures := len(ff.with)+len(ff.without) > 0
-			if hasFeatures {
-				b, err := a.builder(cmd.Context(), p)
-				if err != nil {
-					return err
-				}
-				if err := ff.check(b); err != nil {
-					return err
-				}
-			}
-			if launcherDir == "" {
-				if launcherDir, err = launcher.DefaultGDLauncherDir(); err != nil {
-					return err
-				}
-			}
-			if launcherDir, err = filepath.Abs(launcherDir); err != nil {
-				return err
-			}
-			gdl := &launcher.GDLauncher{Dir: launcherDir}
+			gdl := &launcher.GDLauncher{Dir: k.launcherDir}
 			if err := gdl.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no GDLauncher directory at %s; run GDLauncher once or pass --launcher-dir", launcherDir)
+				return out.Errorf("launcher-not-found", "no GDLauncher directory at %s; run GDLauncher once or pass --launcher-dir", k.launcherDir)
 			} else if err != nil {
 				return err
 			}
 			// GDLauncher resolves its runtime path and starts hooks there, so the sync a hook runs only
 			// matches this link under the resolved path.
-			if launcherDir, err = filepath.EvalSymlinks(launcherDir); err != nil {
+			if k.launcherDir, err = filepath.EvalSymlinks(k.launcherDir); err != nil {
 				return err
 			}
-			gdl.Dir = launcherDir
-			display := p.Manifest.DisplayName("client")
-			if instanceName != "" {
-				display = instanceName
-			}
+			gdl.Dir = k.launcherDir
+			display := k.display(p)
 			if launcher.GDLauncherFolder(display) == "" {
 				return out.Errorf("usage", "GDLauncher needs an instance name that isn't blank; pass --name")
 			}
 			gameDir := gdl.GameDir(display)
-			if err := checkAdopt(gameDir, src, "instance", display, "--name", force); err != nil {
+			if err := checkAdopt(gameDir, src, "instance", display, "--name", k.force); err != nil {
 				return err
 			}
-			// An instance shulker linked is a project in its own game directory, and stays one after
-			// an unlink. Anything else in that folder is the player's own.
-			_, _, inPlace, err := a.inPlaceProject(gameDir)
-			if err != nil {
+			if err := a.refuseForeignInstance(&k, gameDir, "GDLauncher", display, func() (string, bool, error) {
+				return launcher.GDLauncherPreLaunch(gdl.InstanceDir(display))
+			}); err != nil {
 				return err
 			}
-			if !inPlace && !force {
-				hook, found, err := launcher.GDLauncherPreLaunch(gdl.InstanceDir(display))
-				if err != nil {
-					return err
-				}
-				if found && !launcher.IsSyncCommand(hook) {
-					return out.Errorf("instance-exists", "GDLauncher already has an instance %q that shulker didn't link; pass --name to create a second instance, or --force to link this one", display)
-				}
-			}
-			loaderVersion, err := a.gdlauncherLoaderVersion(cmd.Context(), p, force)
+			loaderVersion, err := a.gdlauncherLoaderVersion(cmd.Context(), p, k.force)
 			if err != nil {
 				return err
 			}
@@ -114,55 +67,14 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if hasFeatures {
-				if err := a.saveInstanceFeatures(res.GameDir, ff); err != nil {
-					return err
-				}
+			var extra []out.Row
+			if !detectable {
+				extra = append(extra, out.Row{Text: "restart GDLauncher if it is open so the instance shows up"})
 			}
-			row := config.Instance{Launcher: "gdlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name}
-			inst, synced, err := a.linkInstance(cmd, row, as, ref, src, ls)
-			if err != nil {
-				return err
-			}
-			rep := prismReport{
-				Launcher:    "gdlauncher",
-				LauncherDir: launcherDir,
-				Instance:    filepath.Base(res.Dir),
-				InstanceDir: res.Dir,
-				Name:        display,
-				GameDir:     res.GameDir,
-				Command:     launcher.SlotCommand("gdlauncher", res.GameDir, launcher.HookPreLaunch),
-				Created:     res.Created,
-				Source:      src.name,
-				Ref:         ref,
-				Modpack:     modpackKey(inst.Manifest, src.name),
-				Sync:        &synced,
-			}
-			return a.printer.Emit(rep, func(l *out.Lines) {
-				verb := "created"
-				if !res.Created {
-					verb = "updated"
-				}
-				l.OKInto(verb+" instance "+display, res.Dir, "")
-				rows := append(follows(rep.Modpack, rep.Source), out.Row{Text: "the launcher syncs this instance before each launch"})
-				if hasFeatures {
-					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
-				}
-				if !detectable {
-					rows = append(rows, out.Row{Text: "restart GDLauncher if it is open so the instance shows up"})
-				}
-				l.Tree(rows...)
-				synced.print(l)
-			})
+			return a.finishLauncherLink(cmd, &k, "gdlauncher", display, src, res, extra...)
 		},
 	}
-	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher runtime directory (default: GDLauncher's)")
-	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
-	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
-	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows, link over one shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet")
-	ff.register(cmd, "for this instance")
-	ls.register(cmd)
+	k.register(cmd, "launcher runtime directory (default: GDLauncher's)", "repoint the modpack an instance already follows, link over one shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet")
 	return cmd
 }
 

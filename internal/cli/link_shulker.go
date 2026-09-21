@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -32,22 +31,11 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 		Short: "Create an instance shulker owns and launches itself",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := ls.check(); err != nil {
-				return err
-			}
-			src, err := a.linkFrom(cmd, args, ref)
+			src, _, err := a.openLinkSource(cmd, args, ref, ls)
 			if err != nil {
 				return err
 			}
 			p := src.project
-			if p.Lock.Loader.Type != "" {
-				if _, err := loader.Require(p.Lock.Loader.Type); err != nil {
-					return err
-				}
-			}
-			if !p.Manifest.HasSide("client") {
-				a.printer.Warn("%s", noClientPack)
-			}
 			r, err := a.roots()
 			if err != nil {
 				return err

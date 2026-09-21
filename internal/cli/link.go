@@ -14,7 +14,6 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -62,23 +61,11 @@ func (a *app) linkMojangCmd() *cobra.Command {
 		Short:   "Add a profile for the client build to the official launcher, installing its loader if it has one",
 		Args:    maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := ls.check(); err != nil {
-				return err
-			}
-			src, err := a.linkFrom(cmd, args, ref)
+			src, l, err := a.openLinkSource(cmd, args, ref, ls)
 			if err != nil {
 				return err
 			}
 			p := src.project
-			var l loader.Loader
-			if p.Lock.Loader.Type != "" {
-				if l, err = loader.Require(p.Lock.Loader.Type); err != nil {
-					return err
-				}
-			}
-			if !p.Manifest.HasSide("client") {
-				a.printer.Warn("%s", noClientPack)
-			}
 			if launcherDir == "" {
 				if launcherDir, err = launcher.DefaultMojangDir(); err != nil {
 					return err

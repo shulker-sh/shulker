@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
@@ -18,81 +17,35 @@ import (
 )
 
 func (a *app) linkATLauncherCmd() *cobra.Command {
-	var launcherDir, instanceName, ref, as string
-	var force bool
-	var ff featureFlags
-	var ls linkSettings
+	var k launcherLink
 	cmd := &cobra.Command{
 		Use:   "atlauncher [project-dir | git-url | manifest-url]",
 		Short: "Create an ATLauncher instance that syncs the client build before each launch",
 		Args:  maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := ls.check(); err != nil {
-				return err
-			}
-			src, err := a.linkFrom(cmd, args, ref)
+			src, l, err := a.startLauncherLink(cmd, args, &k, launcher.DefaultATLauncherDir)
 			if err != nil {
 				return err
 			}
 			p := src.project
-			var l loader.Loader
-			if p.Lock.Loader.Type != "" {
-				if l, err = loader.Require(p.Lock.Loader.Type); err != nil {
-					return err
-				}
-			}
-			if !p.Manifest.HasSide("client") {
-				a.printer.Warn("%s", noClientPack)
-			}
-			hasFeatures := len(ff.with)+len(ff.without) > 0
-			if hasFeatures {
-				b, err := a.builder(cmd.Context(), p)
-				if err != nil {
-					return err
-				}
-				if err := ff.check(b); err != nil {
-					return err
-				}
-			}
-			if launcherDir == "" {
-				if launcherDir, err = launcher.DefaultATLauncherDir(); err != nil {
-					return err
-				}
-			}
-			if launcherDir, err = filepath.Abs(launcherDir); err != nil {
-				return err
-			}
-			atl := &launcher.ATLauncher{Dir: launcherDir}
+			atl := &launcher.ATLauncher{Dir: k.launcherDir}
 			if err := atl.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no ATLauncher directory at %s; run ATLauncher once or pass --launcher-dir", launcherDir)
+				return out.Errorf("launcher-not-found", "no ATLauncher directory at %s; run ATLauncher once or pass --launcher-dir", k.launcherDir)
 			} else if err != nil {
 				return err
 			}
-			display := p.Manifest.DisplayName("client")
-			if instanceName != "" {
-				display = instanceName
-			}
+			display := k.display(p)
 			if launcher.ATLauncherFolder(display) == "" {
 				return out.Errorf("usage", "ATLauncher names an instance's folder after the letters and digits in its name, and %q has none; pass --name", display)
 			}
 			gameDir := atl.InstanceDir(display)
-			if err := checkAdopt(gameDir, src, "instance", display, "--name", force); err != nil {
+			if err := checkAdopt(gameDir, src, "instance", display, "--name", k.force); err != nil {
 				return err
 			}
-			// An instance shulker linked is a project in its own game directory, and stays one after
-			// an unlink. Anything else in that folder is the player's own.
-			_, _, inPlace, err := a.inPlaceProject(gameDir)
-			if err != nil {
+			if err := a.refuseForeignInstance(&k, gameDir, "ATLauncher", display, func() (string, bool, error) {
+				return launcher.ATLauncherPreLaunch(gameDir)
+			}); err != nil {
 				return err
-			}
-			if !inPlace && !force {
-				command, found, err := launcher.ATLauncherPreLaunch(gameDir)
-				if err != nil {
-					return err
-				}
-				if found && !launcher.IsSyncCommand(command) {
-					return out.Errorf("instance-exists", "ATLauncher already has an instance %q that shulker didn't link; pass --name to create a second instance, or --force to link this one", display)
-				}
 			}
 			version, err := a.atlauncherVersion(cmd.Context(), p, l, atl)
 			if err != nil {
@@ -108,53 +61,10 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if hasFeatures {
-				if err := a.saveInstanceFeatures(res.GameDir, ff); err != nil {
-					return err
-				}
-			}
-			row := config.Instance{Launcher: "atlauncher", LauncherDir: launcherDir, Name: display, Dir: res.GameDir, Source: src.name}
-			inst, synced, err := a.linkInstance(cmd, row, as, ref, src, ls)
-			if err != nil {
-				return err
-			}
-			rep := prismReport{
-				Launcher:    "atlauncher",
-				LauncherDir: launcherDir,
-				Instance:    filepath.Base(res.Dir),
-				InstanceDir: res.Dir,
-				Name:        display,
-				GameDir:     res.GameDir,
-				Command:     launcher.SlotCommand("atlauncher", res.GameDir, launcher.HookPreLaunch),
-				Created:     res.Created,
-				Source:      src.name,
-				Ref:         ref,
-				Modpack:     modpackKey(inst.Manifest, src.name),
-				Sync:        &synced,
-			}
-			return a.printer.Emit(rep, func(l *out.Lines) {
-				verb := "created"
-				if !res.Created {
-					verb = "updated"
-				}
-				l.OKInto(verb+" instance "+display, res.Dir, "")
-				rows := append(follows(rep.Modpack, rep.Source), out.Row{Text: "the launcher syncs this instance before each launch"})
-				if hasFeatures {
-					rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
-				}
-				rows = append(rows, out.Row{Text: "restart ATLauncher if it is open so the instance shows up"})
-				l.Tree(rows...)
-				synced.print(l)
-			})
+			return a.finishLauncherLink(cmd, &k, "atlauncher", display, src, res, out.Row{Text: "restart ATLauncher if it is open so the instance shows up"})
 		},
 	}
-	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher data directory (default: ATLauncher's)")
-	cmd.Flags().StringVar(&instanceName, "name", "", "instance name (default: the side's display name)")
-	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
-	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows, or link over one shulker didn't link")
-	ff.register(cmd, "for this instance")
-	ls.register(cmd)
+	k.register(cmd, "launcher data directory (default: ATLauncher's)", "repoint the modpack an instance already follows, or link over one shulker didn't link")
 	return cmd
 }
 

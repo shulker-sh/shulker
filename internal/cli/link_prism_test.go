@@ -29,7 +29,7 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 
 	launcherDir := t.TempDir()
 	var env struct {
-		Data prismReport `json:"data"`
+		Data launcherReport `json:"data"`
 	}
 	stdout := h.mustRun(t, "link", "prism", source, "--launcher-dir", launcherDir, "--name", "Friends", "--with", "fancy", "--ref", "main", "--json")
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
@@ -136,7 +136,7 @@ func TestLinkPrism(t *testing.T) {
 		t.Fatal(err)
 	}
 	var env struct {
-		Data prismReport `json:"data"`
+		Data launcherReport `json:"data"`
 	}
 	stdout = h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--json")
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
