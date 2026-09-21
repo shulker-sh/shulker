@@ -1,3 +1,5 @@
+// Package local reads and writes shulker.local.json, a project's settings for this machine alone,
+// which stay out of version control.
 package local
 
 import (
@@ -21,8 +23,8 @@ type File struct {
 	SyncDirs   map[string][]string `json:"syncDirs,omitempty"`
 	DetectedOS string              `json:"detectedOs,omitempty"`
 
-	dir    string
-	exists bool
+	dir      string
+	isOnDisk bool
 }
 
 func Load(dir string) (*File, error) {
@@ -37,17 +39,17 @@ func Load(dir string) (*File, error) {
 	if err := json.Unmarshal(data, f); err != nil {
 		return nil, schema.Invalid("local-invalid", FileName, data, err)
 	}
-	f.exists = true
+	f.isOnDisk = true
 	return f, nil
 }
 
-func (f *File) Exists() bool { return f.exists }
+func (f *File) Exists() bool { return f.isOnDisk }
 
 func (f *File) Save() error {
 	if err := fsutil.WriteJSON(filepath.Join(f.dir, FileName), f); err != nil {
 		return err
 	}
-	f.exists = true
+	f.isOnDisk = true
 	return nil
 }
 
@@ -58,12 +60,14 @@ func (f *File) SetFeature(name string, on bool) {
 	f.Features[name] = on
 }
 
+// ResetFeature drops this machine's setting for a feature, and reports whether it had one.
 func (f *File) ResetFeature(name string) bool {
 	_, ok := f.Features[name]
 	delete(f.Features, name)
 	return ok
 }
 
+// RecordSyncDir remembers a directory a side was synced into, and reports whether it was new.
 func (f *File) RecordSyncDir(side, dir string) bool {
 	if slices.Contains(f.SyncDirs[side], dir) {
 		return false
@@ -90,6 +94,7 @@ func (f *File) RemoveSyncDir(side, dir string) bool {
 	return true
 }
 
+// ExistingSyncDirs are a side's recorded sync directories that haven't since been deleted.
 func (f *File) ExistingSyncDirs(side string) []string {
 	var dirs []string
 	for _, d := range f.SyncDirs[side] {
@@ -100,6 +105,8 @@ func (f *File) ExistingSyncDirs(side string) []string {
 	return dirs
 }
 
+// AddToGitignore lists shulker.local.json in the project's .gitignore, when there is one and it
+// doesn't already, and reports whether it changed the file.
 func AddToGitignore(dir string) (bool, error) {
 	path := filepath.Join(dir, ".gitignore")
 	data, err := os.ReadFile(path)
