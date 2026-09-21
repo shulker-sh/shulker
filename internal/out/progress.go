@@ -66,7 +66,7 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 	if !known {
 		pr.totalBy = 0
 	}
-	if f, ok := p.Stderr.(*os.File); ok && isTerminal(f) {
+	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
 		pr.tty = f
 		pr.stop, pr.stopped = make(chan struct{}), make(chan struct{})
 		go pr.spin()

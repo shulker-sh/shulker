@@ -16,6 +16,7 @@ const (
 	ExitInterrupted = 130
 )
 
+// Envelope is what every command prints under --json, whether it succeeded or failed.
 type Envelope struct {
 	OK        bool     `json:"ok"`
 	Command   string   `json:"command"`
@@ -25,6 +26,7 @@ type Envelope struct {
 	Error     *Error   `json:"error,omitempty"`
 }
 
+// Error is a failure the user sees. Code is its stable name, matched by code and never by message.
 type Error struct {
 	Code       string   `json:"code"`
 	Message    string   `json:"message"`
@@ -37,10 +39,10 @@ type Error struct {
 	Help string `json:"-"`
 	// Nudge is the human-only command to run next, with its lead-in.
 	Nudge Nudge `json:"-"`
-	// Plain renders the error as dialog body text: no glyph, no code aside, no gutter, and the
+	// IsPlain marks an error rendered as dialog body text: no glyph, no code aside, no gutter, and the
 	// nudge's command without its prompt. A launcher shows what a hook wrote with no terminal
 	// around it, where that decoration reads as noise.
-	Plain bool `json:"-"`
+	IsPlain bool `json:"-"`
 	// Given is the argument the user typed that a pick replaces in the example command.
 	Given string `json:"-"`
 	// Flag receives the pick in the example command when no typed argument is replaced.
@@ -55,12 +57,12 @@ type Error struct {
 }
 
 // Detail is one row under an error line; Children nest one level beneath it.
-// Command marks Text as something to type.
+// IsCommand marks Text as something to type.
 type Detail struct {
-	Label    string
-	Text     string
-	Command  bool
-	Children []Detail
+	Label     string
+	Text      string
+	IsCommand bool
+	Children  []Detail
 }
 
 type Nudge struct {
@@ -86,6 +88,7 @@ func CodeOf(err error) string {
 	return ""
 }
 
+// AsError is err as an *Error, giving one that carries no code the generic code "error".
 func AsError(err error) *Error {
 	var e *Error
 	if errors.As(err, &e) {
@@ -97,6 +100,7 @@ func AsError(err error) *Error {
 	return &Error{Code: "error", Message: err.Error(), Exit: ExitError}
 }
 
+// Printer is one run's output: JSON or human, never both, on the run's two streams.
 type Printer struct {
 	JSON bool
 	// NoInput is --no-input: the run asks nothing, so a prompt takes its default and a required
@@ -144,6 +148,8 @@ func (p *Printer) envelope(ok bool, data any, e *Error) Envelope {
 	return Envelope{OK: ok, Command: p.Command, LockStale: p.LockStale, Warnings: warnings, Data: data, Error: e}
 }
 
+// Emit prints a command's result: data as the JSON envelope under --json, otherwise whatever human
+// writes.
 func (p *Printer) Emit(data any, human func(l *Lines)) error {
 	if p.JSON {
 		return p.encode(p.envelope(true, data, nil))
@@ -152,6 +158,7 @@ func (p *Printer) Emit(data any, human func(l *Lines)) error {
 	return nil
 }
 
+// Fail prints err as the run's error and returns the exit code the run ends with.
 func (p *Printer) Fail(err error) int {
 	p.settle(false)
 	e := AsError(err)

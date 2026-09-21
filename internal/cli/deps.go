@@ -250,7 +250,7 @@ func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool,
 var serverJavaFix = out.Detail{Label: "Fix", Text: `set "java" in shulker.json to a JDK path`}
 
 func linkJavaFix(launcherName string) out.Detail {
-	return out.Detail{Label: "Fix", Text: "shulker link " + launcherName + " --java <path>", Command: true}
+	return out.Detail{Label: "Fix", Text: "shulker link " + launcherName + " --java <path>", IsCommand: true}
 }
 
 // runtimeWarning is a runtime-unavailable error as one line, for a command that carries on without

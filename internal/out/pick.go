@@ -32,7 +32,7 @@ const pickRows = 10
 // takes its rows already styled, so the picker decides nothing about colour that the theme hasn't.
 func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, error) {
 	t := p.ErrTheme
-	if !t.Color {
+	if !t.HasColor {
 		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
 		lipgloss.SetColorProfile(termenv.Ascii)
 	}
@@ -104,7 +104,7 @@ func pickTheme(t Theme) *huh.Theme {
 	h := huh.ThemeBase()
 	plain := lipgloss.NewStyle()
 	cursor := plain.SetString(gutter + t.ArrowPick() + " ")
-	if t.Color {
+	if t.HasColor {
 		cursor = cursor.Foreground(lipgloss.Color("6"))
 	}
 	for _, f := range []*huh.FieldStyles{&h.Focused, &h.Blurred} {
@@ -114,7 +114,7 @@ func pickTheme(t Theme) *huh.Theme {
 		f.SelectSelector = cursor
 	}
 	h.Form.Base, h.Group.Base = plain, plain
-	if t.Color {
+	if t.HasColor {
 		grey := lipgloss.Color(strconv.Itoa(t.GreyIndex))
 		h.Help.ShortKey = plain.Foreground(grey)
 		h.Help.ShortDesc = plain.Foreground(grey)

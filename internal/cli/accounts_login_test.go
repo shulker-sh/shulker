@@ -571,7 +571,7 @@ func TestSignInPromptIsStyled(t *testing.T) {
 	device := account.Device{UserCode: "FTBNSQMV", URL: "https://www.microsoft.com/link"}
 	var stdout, stderr bytes.Buffer
 	a := h.newApp(&stdout, &stderr)
-	a.printer.ErrTheme = out.Theme{Color: true, Links: true, GreyIndex: out.GreyFallback}
+	a.printer.ErrTheme = out.Theme{HasColor: true, HasLinks: true, GreyIndex: out.GreyFallback}
 	a.showDeviceCode(device)
 	painted := stderr.String()
 	for _, want := range []string{

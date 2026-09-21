@@ -91,7 +91,7 @@ func (p *Printer) Step(format string, args ...any) {
 		return
 	}
 	s := &step{text: text}
-	if f, ok := p.Stderr.(*os.File); ok && isTerminal(f) {
+	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
 		s.tty = f
 		s.stop, s.stopped = make(chan struct{}), make(chan struct{})
 		go s.spin(p.ErrTheme, &p.waits)

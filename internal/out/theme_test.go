@@ -8,7 +8,7 @@ import (
 
 var sgrSeq = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
-func coloured() Theme { return Theme{Color: true, GreyIndex: GreyDark} }
+func coloured() Theme { return Theme{HasColor: true, GreyIndex: GreyDark} }
 
 func render(t Theme, draw func(l *Lines)) []string {
 	var b strings.Builder
@@ -104,7 +104,7 @@ func TestErrorRowsRenderStructured(t *testing.T) {
 	e := &Error{Code: "validation-failed", Message: "1 problem(s) in the locked mods:\n  Problem 1\n    - ignored text", Items: []string{"ignored text"}}
 	e.Rows = []Detail{{Text: "sodium 1.0 requires fabric-api >=2, not installed", Children: []Detail{
 		{Text: "the ignore is stale"},
-		{Label: "Fix", Text: "shulker add fabric-api", Command: true},
+		{Label: "Fix", Text: "shulker add fabric-api", IsCommand: true},
 		{Label: "Ignore", Text: `{"rule":"depends"}`},
 	}}}
 	lines := render(Theme{}, func(l *Lines) { l.Error(e) })
@@ -128,7 +128,7 @@ func TestPlainErrorDropsTerminalDecoration(t *testing.T) {
 	e := &Error{
 		Code:    "update-paused",
 		Message: "This pack's update took longer than 4 minutes, so shulker paused it.",
-		Plain:   true,
+		IsPlain: true,
 		Nudge:   Nudge{Lead: "Launch again to resume it, or finish the download first with", Command: "shulker sync -i cozy"},
 	}
 	want := []string{

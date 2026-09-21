@@ -384,7 +384,7 @@ func (s State) Error(name string) error {
 	switch s {
 	case SignInExpired:
 		e := out.Errorf("account-sign-in-expired", "%s's Microsoft sign-in has expired", name)
-		e.Rows = []out.Detail{{Label: "Fix", Text: "shulker accounts login", Command: true}}
+		e.Rows = []out.Detail{{Label: "Fix", Text: "shulker accounts login", IsCommand: true}}
 		return e
 	case NoProfile:
 		e := out.Errorf("account-not-playable", "%s owns no Java profile, so it can't launch anything", name)

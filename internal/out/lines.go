@@ -9,11 +9,13 @@ import (
 
 const gutter = "  "
 
+// Lines writes human output to one stream in the house shape: the two-space gutter and the theme.
 type Lines struct {
 	W io.Writer
 	T Theme
 }
 
+// Kind is the gutter glyph an Item carries.
 type Kind int
 
 const (
@@ -143,10 +145,12 @@ func pad(s string, width int) string {
 	return s
 }
 
+// Bump is a version change: the old version grey, the new one yellow.
 func (t Theme) Bump(from, to string) string {
 	return t.Grey(from) + " " + t.Grey(t.ArrowBump()) + " " + t.Yellow(to)
 }
 
+// Sides lists the sides something lands on, of the of sides the manifest declares.
 func (t Theme) Sides(names []string, of int) string {
 	switch {
 	case len(names) == 0:
@@ -189,6 +193,7 @@ func (l *Lines) Plain(text string) { l.line(text) }
 // Done is a finished step: the ok glyph and the text, all grey, so the result line stays the only green one.
 func (l *Lines) Done(text string) { l.line(l.T.Grey(l.T.GlyphOK() + " " + text)) }
 
+// Row is one row of a result's tree. An error's rows are Details instead.
 type Row struct {
 	Label    string
 	Text     string
@@ -232,6 +237,7 @@ func (l *Lines) Nudge(lead, command string) {
 	l.line(gutter + l.T.Grey("$") + " " + l.T.Command(command))
 }
 
+// Entry is one row of Entries.
 type Entry struct {
 	Synced bool
 	Name   string
@@ -279,7 +285,7 @@ func (l *Lines) Entries(heading string, entries []Entry) {
 // Error renders the error tree: the red line with its code, then the items,
 // candidates, and help underneath.
 func (l *Lines) Error(e *Error) {
-	if e.Plain {
+	if e.IsPlain {
 		l.plainError(e)
 		return
 	}
@@ -344,7 +350,7 @@ func (l *Lines) detailRows(e *Error, extra string) []Row {
 				switch {
 				case c.Label == "":
 					row.Children = append(row.Children, t.Grey(c.Text))
-				case c.Command:
+				case c.IsCommand:
 					row.Children = append(row.Children, t.Grey(c.Label+":")+" "+t.Command(c.Text))
 				default:
 					row.Children = append(row.Children, t.Grey(c.Label+":")+" "+c.Text)

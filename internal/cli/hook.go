@@ -130,7 +130,7 @@ func (a *app) hookWrapCmd() *cobra.Command {
 					a.failLaunch(dir, f.Settings, stamped, reason)
 				}
 				e := notStarted(reason)
-				e.Rows = []out.Detail{{Label: "Fix", Text: "shulker instances repair", Command: true}}
+				e.Rows = []out.Detail{{Label: "Fix", Text: "shulker instances repair", IsCommand: true}}
 				return e
 			}
 			code, err := a.runGame(f.Settings, java, argv)
@@ -299,7 +299,7 @@ func (a *app) registeredInstance(dir string) (config.Instance, bool) {
 // terminal, so it prints without shulker's usual error decoration.
 func updatePaused(after time.Duration, id string) *out.Error {
 	e := out.Errorf("update-paused", "This pack's update took longer than %s, so shulker paused it.", humanMinutes(after))
-	e.Plain = true
+	e.IsPlain = true
 	if id != "" {
 		e.Nudge = out.Nudge{Lead: "Launch again to resume it, or finish the download first with", Command: "shulker sync -i " + id}
 	}

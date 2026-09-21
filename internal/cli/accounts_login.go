@@ -367,7 +367,7 @@ func quoteName(name string) string {
 // of several accounts carries on past the ones it can't renew.
 func renewFailed(err error) string {
 	e := out.AsError(err)
-	if len(e.Rows) > 0 && e.Rows[0].Command {
+	if len(e.Rows) > 0 && e.Rows[0].IsCommand {
 		return e.Message + "; run `" + e.Rows[0].Text + "`"
 	}
 	return e.Message

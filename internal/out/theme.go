@@ -18,11 +18,12 @@ const (
 	GreyFallback = 244
 )
 
+// Theme is how one stream renders: whether it takes colour and links, and which grey it uses.
 type Theme struct {
-	Color     bool
+	HasColor  bool
 	ASCII     bool
 	GreyIndex int
-	Links     bool
+	HasLinks  bool
 }
 
 type Options struct {
@@ -34,15 +35,15 @@ type Options struct {
 // stream and no NO_COLOR or TERM=dumb; the grey is queried from the terminal
 // once when any stream is coloured.
 func Detect(stdout, stderr io.Writer, opts Options) (out, err Theme) {
-	outTTY, errTTY := isTerminal(stdout), isTerminal(stderr)
+	outTTY, errTTY := IsTerminal(stdout), IsTerminal(stderr)
 	color := !opts.NoColor && os.Getenv("NO_COLOR") == "" && os.Getenv("TERM") != "dumb"
 	base := Theme{ASCII: opts.ASCII, GreyIndex: GreyFallback}
 	if color && (outTTY || errTTY) {
 		base.GreyIndex = queryGrey(stdout, stderr, outTTY)
 	}
 	out, err = base, base
-	out.Color, err.Color = color && outTTY, color && errTTY
-	out.Links, err.Links = hyperlinks(outTTY), hyperlinks(errTTY)
+	out.HasColor, err.HasColor = color && outTTY, color && errTTY
+	out.HasLinks, err.HasLinks = supportsHyperlinks(outTTY), supportsHyperlinks(errTTY)
 	return out, err
 }
 
@@ -52,8 +53,6 @@ func IsTerminal(w io.Writer) bool {
 	f, ok := w.(*os.File)
 	return ok && term.IsTerminal(int(f.Fd()))
 }
-
-func isTerminal(w io.Writer) bool { return IsTerminal(w) }
 
 func queryGrey(stdout, stderr io.Writer, outTTY bool) int {
 	tty := stderr
@@ -74,7 +73,7 @@ func queryGrey(stdout, stderr io.Writer, outTTY bool) int {
 	return GreyDark
 }
 
-func hyperlinks(tty bool) bool {
+func supportsHyperlinks(tty bool) bool {
 	env := os.Getenv
 	if v, ok := os.LookupEnv("FORCE_HYPERLINK"); ok {
 		return v != "0" && v != "false"
@@ -132,7 +131,7 @@ const (
 )
 
 func (t Theme) paint(text string, codes ...string) string {
-	if !t.Color || text == "" {
+	if !t.HasColor || text == "" {
 		return text
 	}
 	open := strings.Join(codes, "")
@@ -196,7 +195,7 @@ func (t Theme) Ellipsis() string   { return t.glyph("…", "...") }
 
 // Link wraps text in an OSC 8 file:// hyperlink when the terminal follows them.
 func (t Theme) Link(text, path string) string {
-	if !t.Links || !t.Color {
+	if !t.HasLinks || !t.HasColor {
 		return text
 	}
 	abs, err := filepath.Abs(path)
@@ -209,7 +208,7 @@ func (t Theme) Link(text, path string) string {
 
 // LinkURL wraps text in an OSC 8 hyperlink to a page, for one the player has to open themselves.
 func (t Theme) LinkURL(text, target string) string {
-	if !t.Links || !t.Color {
+	if !t.HasLinks || !t.HasColor {
 		return text
 	}
 	return hyperlink(text, target)

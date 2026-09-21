@@ -15,7 +15,7 @@ import (
 // is placeholder, which shows greyed in the empty line.
 func (p *Printer) Ask(title, description, placeholder string, in io.Reader) (string, error) {
 	t := p.ErrTheme
-	if !t.Color {
+	if !t.HasColor {
 		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
 		lipgloss.SetColorProfile(termenv.Ascii)
 	}
@@ -48,7 +48,7 @@ func askTheme(t Theme) *huh.Theme {
 	plain := lipgloss.NewStyle()
 	for _, f := range []*huh.FieldStyles{&h.Focused, &h.Blurred} {
 		f.TextInput.Prompt, f.TextInput.Text = plain, plain
-		if t.Color {
+		if t.HasColor {
 			f.TextInput.Prompt = plain.Foreground(lipgloss.Color("6"))
 		}
 	}

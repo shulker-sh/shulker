@@ -28,7 +28,7 @@ type BrowseSource interface {
 // out, and leaving that way is the normal end, so it returns nil.
 func (p *Printer) Browse(title string, src BrowseSource, in io.Reader) error {
 	t := p.ErrTheme
-	if !t.Color {
+	if !t.HasColor {
 		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
 		lipgloss.SetColorProfile(termenv.Ascii)
 	}
@@ -99,7 +99,7 @@ func browseTheme(t Theme) *huh.Theme {
 // ErrPickCancelled.
 func (p *Printer) BrowseMarks(title, description string, src BrowseSource, in io.Reader) ([]string, error) {
 	t := p.ErrTheme
-	if !t.Color {
+	if !t.HasColor {
 		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
 		lipgloss.SetColorProfile(termenv.Ascii)
 	}
@@ -238,7 +238,7 @@ func marksTheme(t Theme) *huh.Theme {
 	plain := lipgloss.NewStyle()
 	marked := plain.SetString("[" + t.GlyphOK() + "] ")
 	cursor := plain.PaddingLeft(len(gutter)).SetString(t.ArrowPick() + " ")
-	if t.Color {
+	if t.HasColor {
 		marked = marked.Foreground(lipgloss.Color("2"))
 		cursor = cursor.Foreground(lipgloss.Color("6"))
 	}

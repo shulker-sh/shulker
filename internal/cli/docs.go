@@ -98,7 +98,7 @@ func (a *app) emitDocsIndex(pages []*docs.Page) error {
 
 func (a *app) emitDocsText(text docsText) error {
 	return a.printer.Emit(text, func(l *out.Lines) {
-		if !l.T.Color {
+		if !l.T.HasColor {
 			fmt.Fprint(l.W, text.Markdown)
 			return
 		}

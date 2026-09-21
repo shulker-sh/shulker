@@ -43,7 +43,7 @@ func luminance(rgb [3]float64) float64 {
 
 // TerminalWidth is w's column count, or 80 when w isn't a terminal.
 func TerminalWidth(w io.Writer) int {
-	if f, ok := w.(*os.File); ok && isTerminal(w) {
+	if f, ok := w.(*os.File); ok && IsTerminal(w) {
 		return terminalWidth(f)
 	}
 	return 80
