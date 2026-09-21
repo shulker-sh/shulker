@@ -93,14 +93,22 @@ func renderDocsPage(page docsPage) ([]byte, error) {
 		"Required properties are marked with *.",
 		"",
 	}
-	lines = append(lines, describe(root, "")...)
+	props, err := describe(root, "")
+	if err != nil {
+		return nil, err
+	}
+	lines = append(lines, props...)
 	lines = append(lines, "## Definitions", "")
 	defs, _ := root.get("$defs")
 	if defs, ok := defs.(*object); ok {
 		for _, name := range defs.keys {
 			def, _ := defs.values[name].(*object)
 			lines = append(lines, "### "+name, "")
-			lines = append(lines, describe(def, def.field("description"))...)
+			described, err := describe(def, def.field("description"))
+			if err != nil {
+				return nil, fmt.Errorf("%s $defs/%s: %w", page.kind, name, err)
+			}
+			lines = append(lines, described...)
 		}
 	}
 	return []byte(blankRuns.ReplaceAllString(strings.Join(lines, "\n"), "\n\n")), nil
@@ -146,30 +154,49 @@ func decodeOrdered(dec *json.Decoder) (any, error) {
 	return tok, nil
 }
 
-func describe(s *object, description string) []string {
+func describe(s *object, description string) ([]string, error) {
 	var lines []string
 	if description != "" {
 		lines = append(lines, escape(description), "")
 	}
-	if table := propertyTable(s); table != "" {
-		lines = append(lines, table, "")
-		if ap, ok := s.get("additionalProperties"); ok && ap == false {
-			lines = append(lines, "No other properties are allowed.", "")
+	v, _ := s.get("properties")
+	if props, _ := v.(*object); props == nil || len(props.keys) == 0 {
+		if t := typeOf(s); t != "" {
+			if c := constraints(s); len(c) > 0 {
+				t += ". " + strings.Join(c, ", ")
+			}
+			lines = append(lines, "Type: "+t, "")
 		}
-	} else if t := typeOf(s); t != "" {
-		if c := constraints(s); len(c) > 0 {
-			t += ". " + strings.Join(c, ", ")
-		}
-		lines = append(lines, "Type: "+t, "")
+		return lines, nil
 	}
-	return lines
+	var t table
+	if err := t.add(s, ""); err != nil {
+		return nil, err
+	}
+	lines = append(lines, "| Property | Type | Description |", "| --- | --- | --- |")
+	lines = append(lines, t.rows...)
+	lines = append(lines, "")
+	for _, rule := range t.rules {
+		lines = append(lines, rule, "")
+	}
+	if ap, ok := s.get("additionalProperties"); ok && ap == false {
+		lines = append(lines, "No other properties are allowed.", "")
+	}
+	return lines, nil
 }
 
-func propertyTable(s *object) string {
+// table flattens nested objects into dotted rows, so an object's rules
+// name their keys with the same prefix the rows do.
+type table struct {
+	rows  []string
+	rules []string
+}
+
+func (t *table) add(s *object, prefix string) error {
 	v, _ := s.get("properties")
 	props, _ := v.(*object)
-	if props == nil || len(props.keys) == 0 {
-		return ""
+	if props == nil {
+		return nil
 	}
 	required := map[string]bool{}
 	if v, ok := s.get("required"); ok {
@@ -178,30 +205,219 @@ func propertyTable(s *object) string {
 		}
 	}
 	conditional := conditionalTypes(s)
-	rows := []string{"| Property | Type | Description |", "| --- | --- | --- |"}
 	for _, name := range props.keys {
 		p, _ := props.values[name].(*object)
-		t := typeOf(p)
-		if t == "" {
-			t = strings.Join(conditional[name], " \\| ")
+		t.rows = append(t.rows, propertyRow(p, prefix+name, required[name], conditional[name]))
+		for _, nested := range nestedObjects(p, prefix+name) {
+			if err := t.add(nested.schema, nested.prefix); err != nil {
+				return err
+			}
 		}
-		var cells []string
-		for _, c := range constraints(p) {
-			cells = append(cells, cell(c))
-		}
-		desc := cell(p.field("description"))
-		if joined := strings.Join(cells, ", "); desc == "" {
-			desc = joined
-		} else if joined != "" {
-			desc += "<br>" + joined
-		}
-		mark := ""
-		if required[name] {
-			mark = " *"
-		}
-		rows = append(rows, "| "+code(name)+mark+" | "+t+" | "+desc+" |")
 	}
-	return strings.Join(rows, "\n")
+	rules, err := objectRules(s, prefix)
+	if err != nil {
+		return fmt.Errorf("%s: %w", strings.TrimSuffix(prefix, "."), err)
+	}
+	t.rules = append(t.rules, rules...)
+	return nil
+}
+
+func propertyRow(p *object, name string, required bool, conditional []string) string {
+	t := typeOf(p)
+	if t == "" {
+		t = strings.Join(conditional, " \\| ")
+	}
+	var cells []string
+	for _, c := range constraints(p) {
+		cells = append(cells, cell(c))
+	}
+	desc := cell(p.field("description"))
+	if joined := strings.Join(cells, ", "); desc == "" {
+		desc = joined
+	} else if joined != "" {
+		desc += "<br>" + joined
+	}
+	mark := ""
+	if required {
+		mark = " *"
+	}
+	return "| " + code(name) + mark + " | " + t + " | " + desc + " |"
+}
+
+type nestedObject struct {
+	schema *object
+	prefix string
+}
+
+func nestedObjects(p *object, name string) []nestedObject {
+	if p == nil || p.truthy("$ref") {
+		return nil
+	}
+	if p.truthy("properties") {
+		return []nestedObject{{p, name + "."}}
+	}
+	if t, _ := p.get("type"); t == "array" {
+		items, _ := p.get("items")
+		i, _ := items.(*object)
+		return nestedObjects(i, name+"[]")
+	}
+	var found []nestedObject
+	for _, key := range []string{"allOf", "oneOf", "anyOf"} {
+		branches, _ := p.get(key)
+		for _, b := range list(branches) {
+			b, _ := b.(*object)
+			found = append(found, nestedObjects(b, name)...)
+		}
+	}
+	return found
+}
+
+func objectRules(s *object, prefix string) ([]string, error) {
+	var rules []string
+	for _, key := range []string{"if", "then", "else", "not", "dependentSchemas"} {
+		if _, ok := s.get(key); ok {
+			return nil, fmt.Errorf("the docs renderer cannot state %s", key)
+		}
+	}
+	for _, key := range []string{"anyOf", "oneOf"} {
+		branches, ok := s.get(key)
+		if !ok {
+			continue
+		}
+		var options []string
+		for _, b := range list(branches) {
+			names, ok := requiredOnly(b)
+			if !ok {
+				return nil, fmt.Errorf("the docs renderer cannot state an %s branch other than required", key)
+			}
+			options = append(options, join(names, prefix, "and"))
+		}
+		quantity := "At least one"
+		if key == "oneOf" {
+			quantity = "Exactly one"
+		}
+		rules = append(rules, quantity+" of "+joinWords(options, "or")+" is required.")
+	}
+	dependent, _ := s.get("dependentRequired")
+	if d, _ := dependent.(*object); d != nil {
+		var order []string
+		groups := map[string][]string{}
+		for _, key := range d.keys {
+			target := join(strs(d.values[key]), prefix, "and")
+			if _, seen := groups[target]; !seen {
+				order = append(order, target)
+			}
+			groups[target] = append(groups[target], key)
+		}
+		for _, target := range order {
+			verb := " require "
+			if len(groups[target]) == 1 {
+				verb = " requires "
+			}
+			rules = append(rules, join(groups[target], prefix, "and")+verb+target+".")
+		}
+	}
+	allOf, _ := s.get("allOf")
+	for _, branch := range list(allOf) {
+		b, _ := branch.(*object)
+		if b == nil || !b.truthy("if") {
+			if b != nil && (b.truthy("$ref") || b.truthy("properties")) {
+				continue
+			}
+			return nil, fmt.Errorf("the docs renderer cannot state an allOf branch without if")
+		}
+		rule, err := conditionalRule(b, prefix)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, rule)
+	}
+	return rules, nil
+}
+
+func conditionalRule(b *object, prefix string) (string, error) {
+	cond, _ := b.get("if")
+	names, ok := requiredOnly(cond)
+	if !ok {
+		return "", fmt.Errorf("the docs renderer cannot state an if other than required")
+	}
+	if _, ok := b.get("else"); ok {
+		return "", fmt.Errorf("the docs renderer cannot state else")
+	}
+	then, _ := b.get("then")
+	t, _ := then.(*object)
+	if t == nil {
+		return "", fmt.Errorf("the docs renderer cannot state an if without then")
+	}
+	var clauses []string
+	for _, key := range t.keys {
+		switch key {
+		case "required":
+			names := strs(t.values[key])
+			clauses = append(clauses, join(names, prefix, "and")+plural(names, " is", " are")+" required")
+		case "properties":
+			props, _ := t.values[key].(*object)
+			for _, name := range props.keys {
+				clauses = append(clauses, code(prefix+name)+" must be "+typeOf(props.values[name]))
+			}
+		case "not":
+			not, _ := t.values[key].(*object)
+			anyOf, _ := not.get("anyOf")
+			var banned []string
+			for _, branch := range list(anyOf) {
+				names, ok := requiredOnly(branch)
+				if !ok || len(names) != 1 {
+					return "", fmt.Errorf("the docs renderer cannot state this not")
+				}
+				banned = append(banned, names[0])
+			}
+			if len(banned) == 0 || len(not.keys) != 1 {
+				return "", fmt.Errorf("the docs renderer cannot state this not")
+			}
+			clauses = append(clauses, join(banned, prefix, "and")+plural(banned, " is", " are")+" not allowed")
+		default:
+			return "", fmt.Errorf("the docs renderer cannot state then.%s", key)
+		}
+	}
+	return "When " + join(names, prefix, "and") + plural(names, " is", " are") + " set, " + strings.Join(clauses, ", and ") + ".", nil
+}
+
+func requiredOnly(v any) ([]string, bool) {
+	b, _ := v.(*object)
+	if b == nil || len(b.keys) != 1 || b.keys[0] != "required" {
+		return nil, false
+	}
+	return strs(b.values["required"]), true
+}
+
+func strs(v any) []string {
+	var out []string
+	for _, item := range list(v) {
+		out = append(out, str(item))
+	}
+	return out
+}
+
+func plural(items []string, one, many string) string {
+	if len(items) == 1 {
+		return one
+	}
+	return many
+}
+
+func join(names []string, prefix, conj string) string {
+	coded := make([]string, len(names))
+	for i, name := range names {
+		coded[i] = code(prefix + name)
+	}
+	return joinWords(coded, conj)
+}
+
+func joinWords(words []string, conj string) string {
+	if len(words) <= 1 {
+		return strings.Join(words, "")
+	}
+	return strings.Join(words[:len(words)-1], ", ") + " " + conj + " " + words[len(words)-1]
 }
 
 func conditionalTypes(s *object) map[string][]string {

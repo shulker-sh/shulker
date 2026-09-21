@@ -39,6 +39,8 @@ Required properties are marked with *.
 | `history` | `integer` | How many history entries `history prune` leaves, and the count a build warns above. An instance takes an entry before anything it manages changes: the manifest and lock before a relock saves them, and the files before a build writes over ones you edited. -1 keeps every entry and never warns; 0 takes none.<br>min -1, default `5` |
 | `note` | [`note`](#note) |  |
 
+At least one of `client` or `server` is required.
+
 No other properties are allowed.
 
 ## Definitions
@@ -149,6 +151,8 @@ Type: map of `string` \| `number` \| `boolean`. keys match `^[A-Za-z_][A-Za-z0-9
 | --- | --- | --- |
 | `default` | `boolean` | Whether the feature is on when nothing else decides it. A recorded choice, --with and --without all win over it.<br>default `false` |
 | `overrides` | [`relativePath`](#relativepath) \| object | Override folder this feature adds while it is on, layered after the base folders in feature name order. A string is one folder for both sides; an object gives a folder per side, either key alone. Defaults to &lt;name&gt;-overrides/. |
+| `overrides.client` | [`relativePath`](#relativepath) |  |
+| `overrides.server` | [`relativePath`](#relativepath) |  |
 | `note` | [`note`](#note) |  |
 
 No other properties are allowed.
@@ -178,6 +182,12 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `feature` | [`featureCondition`](#featurecondition) \| [`featureCondition`](#featurecondition)[] | Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Every name must be declared in features, which is where its default lives. |
 | `note` | [`note`](#note) |  |
 
+`ref`, `autoUpdate` and `locked` require `source`.
+
+When `source` is set, `type` must be `"modpack"`, and `file`, `project`, `pin`, `channel`, `side`, `provider`, `os` and `feature` are not allowed.
+
+When `file` is set, `project`, `pin`, `channel` and `provider` are not allowed.
+
 No other properties are allowed.
 
 ### ignore
@@ -201,6 +211,8 @@ A player by name, uuid, or both. The lock stores both after resolution.
 | `name` | `string` | pattern `^[A-Za-z0-9_]{3,16}$` |
 | `uuid` | `string` | pattern `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$` |
 | `note` | [`note`](#note) |  |
+
+At least one of `name` or `uuid` is required.
 
 ### propertyValue
 
@@ -295,6 +307,13 @@ Keys written into server.properties. Values may reference ${variables}. Known ke
 | `jvmArgs` | `string`[] | Extra JVM arguments appended after the preset, e.g. ZGC flags. |
 | `properties` | [`serverProperties`](#serverproperties) |  |
 | `players` | object |  |
+| `players.whitelist` | [`player`](#player)[] |  |
+| `players.ops` | [`player`](#player)[] |  |
+| `players.ops[].level` | `integer` | min 1, max 4, default `4` |
+| `players.ops[].bypassesPlayerLimit` | `boolean` | default `false` |
+| `players.bans` | [`player`](#player)[] |  |
+| `players.bans[].reason` | `string` |  |
+| `players.bans[].expires` | `string` | format `date-time` |
 | `note` | [`note`](#note) |  |
 
 No other properties are allowed.
@@ -320,6 +339,9 @@ No other properties are allowed.
 | `hooks` | [`clientHooks`](#clienthooks) |  |
 | `options` | map of `string` \| `number` \| `boolean` | Keys written into options.txt as key:value. Other keys already in the file are left alone.<br>keys match `^[A-Za-z][A-Za-z0-9_.:]*$` |
 | `servers` | object[] | Entries written into servers.dat. |
+| `servers[].name` * | `string` | min length 1 |
+| `servers[].ip` * | `string` | host or host:port, as typed into the multiplayer screen.<br>min length 1 |
+| `servers[].note` | [`note`](#note) |  |
 | `note` | [`note`](#note) |  |
 
 No other properties are allowed.

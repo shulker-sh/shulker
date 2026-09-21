@@ -24,7 +24,27 @@ Required properties are marked with *.
 | `assumeClient` | `boolean` | Set by `--assume-client`: the source declares no client, so this directory is built from the mods and overrides both sides share. Ignored once the source declares one. |
 | `unlinked` | `boolean` | Set by `shulker unlink`: shulker no longer syncs this directory, and `shulker instances repair` leaves it alone. Linking or syncing into it again clears it. |
 | `settings` | object | Yours to change. Shulker seeds these when the instance is created and reads them from then on. |
+| `settings.hooks` | object | Which commands the launcher runs for this instance. A hook that is off isn't installed in the launcher, and turning it off removes it on the next repair. |
+| `settings.hooks.preLaunch` | `boolean` | Sync this instance from its source before each launch. Default true.<br>default `true` |
+| `settings.hooks.postExit` | `boolean` | Record how each run ended when the game exits. Default true.<br>default `true` |
+| `settings.commands` | object | A command shulker found in the launcher's own slot and adopted when it took the slot over, so it keeps running. The generated script runs it before anything else, and a non-zero exit from it still aborts the launch, exactly as it did before shulker was involved. `shulker unlink` puts it back in the launcher and clears this. |
+| `settings.commands.preLaunch` | `string` | The pre-launch command adopted from the launcher.<br>min length 1 |
+| `settings.commands.postExit` | `string` | The post-exit command adopted from the launcher.<br>min length 1 |
+| `settings.marker` | `boolean` | Include the marker mod, which lists this pack in the in-game mod list and lets an export of it be recognised as this pack again. Off drops both. Set here it decides for this instance, over whatever the manifest says; absent, the manifest's marker decides, which defaults to true. Written by link --no-marker and --with-marker. |
+| `settings.memory` | `string` | Heap size `shulker play` gives the game, as -Xms and -Xmx, e.g. "6G". Omitted inherits `play.memory` from config.json, and without that the JVM picks its own. Another launcher's instance takes its memory from that launcher.<br>pattern `^[1-9][0-9]*[MmGg]$` |
+| `settings.jvmArgs` | `string`[] | Extra JVM arguments for `shulker play`, after the version's own and the memory, so one of them wins over both. Omitted inherits `play.jvmArgs` from config.json. Replaces that list rather than adding to it. |
+| `settings.java` | `string` | Absolute path to the Java this machine launches the instance with. Omitted inherits `play.java` from config.json when shulker launches it, and otherwise uses shulker's managed runtime. Per-machine, which is why it lives here rather than in the lock, which is shared, or the manifest, which is everyone's.<br>min length 1 |
+| `settings.window` | `string` | Window size `shulker play` opens the game at, as "&lt;width&gt;x&lt;height&gt;", e.g. "1280x720". The game takes it for the run and never writes it back; fullscreen is the pack's, in `client.options`. Omitted inherits `play.window` from config.json, and `play --window` wins over both for one run.<br>pattern `^[1-9][0-9]*x[1-9][0-9]*$` |
+| `settings.wrapper` | `string`[] | Command prefix for the launch command, such as ["gamemoderun"]. For another launcher's instance, omitted leaves that launcher's own wrapper setting alone; for one shulker launches, omitted inherits `play.wrapper` from config.json. |
+| `settings.account` | `string` | The id of the account `shulker play` launches this instance as, over the default account. `play --account` still wins for one run. An account that has since been removed fails the launch with `account-not-found` rather than falling back to another. `shulker instance set account &lt;name&gt;` records the id of the account it names.<br>min length 1 |
+| `settings.shulker` | `string` | Absolute path of the shulker binary the generated hook scripts call. Written when the scripts are, and repointed by `shulker instances repair` after the binary moves.<br>min length 1 |
+| `settings.launchHistory` | `integer` | How many launch records `launches.json` keeps, newest first. -1 keeps every record; 0 keeps none and removes the file.<br>min -1, default `5` |
+| `settings.savesGroup` | `string` | The save group whose worlds this instance shares: its `saves/` links to that folder under the saves root, so every instance in a group sees the same worlds. "none" keeps the worlds in the instance. Only instances shulker launches itself join a group. A change relinks on the next sync; nothing is copied or merged.<br>pattern `^[a-z0-9][a-z0-9._-]{0,63}$`, default `"default"` |
 | `resolved` | object | Written by shulker, for you to read. Editing it changes nothing; the next sync writes it again. |
+| `resolved.java` | `string` | The Java the last sync resolved, whether the managed runtime or the `java` setting. |
+| `resolved.launcherJava` | `string` | The Java path the launcher used before shulker pointed it at its own, so `unlink` and `self uninstall` can put it back. |
+| `resolved.lastSyncAt` | `string` | When this instance last synced.<br>format `date-time` |
+| `resolved.lastResult` | `"ok"` \| `"failed"` | How that sync ended. A failed sync leaves the instance's files as they were, so the launcher still starts what is on disk. |
 
 No other properties are allowed.
 
