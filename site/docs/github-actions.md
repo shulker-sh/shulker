@@ -88,19 +88,6 @@ Export never relocks. When `shulker.lock` doesn't match `shulker.json`, it fails
 
 `export curseforge` refers to each file by its CurseForge file ID. A file locked from Modrinth or anywhere else is looked up on CurseForge by its fingerprint, and one that isn't there fails the export. Pass `--bundle` to put those files inside the archive instead; the CurseForge app warns about them on import. `export mrpack --bundle` does the same for files Modrinth launchers won't download.
 
-The lookup needs a CurseForge API key. Release binaries, which the action installs, carry one. A build from `go install` has none, so set `SHULKER_CURSEFORGE_KEY` from a repository secret:
-
-```yaml
-      - name: Export
-        run: |
-          shulker export mrpack --version "${GITHUB_REF_NAME#v}"
-          shulker export curseforge --version "${GITHUB_REF_NAME#v}"
-        env:
-          SHULKER_CURSEFORGE_KEY: ${{ secrets.CURSEFORGE_KEY }}
-```
-
-A pack locked entirely from CurseForge needs no key.
-
 ## Release notes
 
 Shulker doesn't write a changelog for a pack. The workflow lists the commit subjects since the previous tag, which is why the checkout fetches the full history with `fetch-depth: 0`. To write the notes by hand instead, keep them in a file in the repository and pass that to `--notes-file`.
@@ -128,4 +115,4 @@ Shulker doesn't write a changelog for a pack. The workflow lists the commit subj
           game-versions: ${{ steps.shulker.outputs.minecraft-version }}
 ```
 
-The IDs are your project's on each site, and the tokens are your own upload tokens, stored as repository secrets. The CurseForge upload token is not the API key `export curseforge` uses.
+The IDs are your project's on each site, and the tokens are your own upload tokens, stored as repository secrets.
