@@ -173,9 +173,6 @@ func (s *Store) cacheArchive(name, rel string) (lock.Modpack, error) {
 	if err != nil {
 		return lock.Modpack{}, err
 	}
-	if !st.Mode().IsRegular() {
-		return lock.Modpack{}, NotAFile(name, rel)
-	}
 	sha, err := s.Cache.Put(f)
 	if err != nil {
 		return lock.Modpack{}, err
@@ -202,12 +199,6 @@ func FileMissing(name, rel string) *out.Error {
 	e := out.Errorf("local-file-missing", "%s: %s is gone, and the cache has no copy of it", name, rel)
 	e.Help = fmt.Sprintf("put the file back at %s, or remove %s from shulker.json", rel, name)
 	return e
-}
-
-// NotAFile is a local file entry whose path names a folder or something else that isn't a file, where
-// only a resource pack or shader may name a folder.
-func NotAFile(name, rel string) *out.Error {
-	return out.Errorf("file-not-found", "%s: %s is not a file", name, rel)
 }
 
 // CheckArchive refuses a file that isn't a modpack archive shulker consumes, before anything is

@@ -6,8 +6,6 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -86,72 +84,5 @@ func TestBuildIsRepeatable(t *testing.T) {
 	}
 	if !bytes.Equal(a, b) {
 		t.Fatal("two builds of the same entries differ")
-	}
-}
-
-func writeTree(t *testing.T, files map[string]string) string {
-	t.Helper()
-	root := t.TempDir()
-	for rel, body := range files {
-		path := filepath.Join(root, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return root
-}
-
-func TestFolderZipsEveryFileBySlashPath(t *testing.T) {
-	root := writeTree(t, map[string]string{"pack.mcmeta": "{}", "assets/a/b.json": "b"})
-	data, err := Folder(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want, err := Build(map[string][]byte{"pack.mcmeta": []byte("{}"), "assets/a/b.json": []byte("b")}, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(data, want) {
-		t.Fatal("a folder's zip differs from Build over its files")
-	}
-}
-
-func TestFolderLeavesOutJunk(t *testing.T) {
-	files := map[string]string{"pack.mcmeta": "{}", "assets/a/b.json": "b"}
-	clean, err := Folder(writeTree(t, files))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, junk := range []string{".DS_Store", "assets/.DS_Store", ".git/HEAD", "assets/.idea/x.xml", ".gitignore", "Thumbs.db", "assets/desktop.ini", "pack.mcmeta~", "assets/a/.b.json.swp", "assets/a/b.json.swp"} {
-		files[junk] = "junk"
-	}
-	dirty, err := Folder(writeTree(t, files))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(clean, dirty) {
-		t.Fatal("excluded files changed the zip")
-	}
-}
-
-func TestFolderFollowsASymlinkedRoot(t *testing.T) {
-	root := writeTree(t, map[string]string{"pack.mcmeta": "{}"})
-	link := filepath.Join(t.TempDir(), "pack")
-	if err := os.Symlink(root, link); err != nil {
-		t.Fatal(err)
-	}
-	direct, err := Folder(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	linked, err := Folder(link)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(direct, linked) {
-		t.Fatal("a symlinked folder zips differently")
 	}
 }

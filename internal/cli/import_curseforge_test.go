@@ -190,15 +190,94 @@ func TestImportCurseForgeRoundTrip(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "demo")
 	h.mustRun(t, "import", "curseforge", archive, "--dir", dir)
 	m, l := readProject(t, dir)
-	if m.Name != "demo-pack" || m.Version != "1.0" || strings.Join(m.Authors, ",") != "Ann, Bo" || l.Loader.Type != "fabric" || l.Loader.Version != exported.Loader.Version {
+	if m.Name != "pack" || m.Version != "1.0" || strings.Join(m.Authors, ",") != "Ann,Bo" || m.Server == nil || l.Loader.Type != "fabric" || l.Loader.Version != exported.Loader.Version {
 		t.Fatalf("project: %+v %+v", m, l.Loader)
 	}
 	for _, id := range []string{"sodium", "jei", "fabric-api"} {
-		if l.Mods[id].Provider != "curseforge" || l.Mods[id].Sha512 != exported.Mods[id].Sha512 {
+		if l.Mods[id].Provider != exported.Mods[id].Provider || l.Mods[id].Sha512 != exported.Mods[id].Sha512 {
 			t.Fatalf("%s: %+v, exported %+v", id, l.Mods[id], exported.Mods[id])
 		}
 	}
 	if len(l.Mods) != 3 {
 		t.Fatalf("mods: %v", l.Mods)
+	}
+}
+
+// exportedCurseForgeProject exports a project with a feature, a Modrinth mod CurseForge also
+// hosts, a CurseForge mod under a key of its own and a bundled local jar.
+func exportedCurseForgeProject(t *testing.T) (*harness, string) {
+	t.Helper()
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "add", "jei", "--provider", "curseforge", "--as", "recipes")
+	writeProjectFile(t, h, "files/private-mod-1.4.jar", makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17"}`).data)
+	h.editManifest(t, func(m map[string]any) {
+		m["version"] = "1.0"
+		m["features"] = map[string]any{"fast": map[string]any{"default": true}}
+		m["server"] = map[string]any{"eula": true}
+		requires := m["requires"].(map[string]any)
+		requires["sodium"].(map[string]any)["feature"] = "fast"
+		requires["private-mod"] = map[string]any{"file": "files/private-mod-1.4.jar"}
+	})
+	h.mustRun(t, "lock")
+	h.mustRun(t, "install")
+	h.mustRun(t, "export", "curseforge", "--bundle")
+	return h, filepath.Join(h.dir, "build", "pack-1.0.zip")
+}
+
+func TestImportCurseForgeRestoresAShulkerExport(t *testing.T) {
+	h, archive := exportedCurseForgeProject(t)
+	dir := filepath.Join(t.TempDir(), "imported")
+	var env struct {
+		Data importResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "curseforge", archive, "--dir", dir, "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if res := env.Data; !res.Marker || strings.Join(res.Mods.Reused, ",") != "fabric-api,private-mod,recipes,sodium" || len(res.Mods.Locked) != 0 || len(res.Mods.Dropped) != 0 || len(res.Mods.Unmanaged) != 0 {
+		t.Fatalf("result: %+v %+v", res, res.Mods)
+	}
+	m, l := readProject(t, dir)
+	if _, ok := m.Features["fast"]; !ok || m.Server == nil || !m.Server.EULA || m.Version != "1.0" {
+		t.Fatalf("manifest: %+v", m)
+	}
+	if sodium := m.Requires["sodium"]; strings.Join(sodium.Feature, ",") != "fast" || l.Mods["sodium"].Provider != "modrinth" {
+		t.Fatalf("sodium comes back from Modrinth behind its feature: %+v %+v", sodium, l.Mods["sodium"])
+	}
+	if l.Mods["recipes"].Provider != "curseforge" || l.Mods["jei"].Sha512 != "" {
+		t.Fatalf("jei keeps its key: %+v", l.Mods["recipes"])
+	}
+	if m.Requires["private-mod"].File != "files/private-mod-1.4.jar" || l.Mods["private-mod"].File != "files/private-mod-1.4.jar" {
+		t.Fatalf("the bundled jar is the project's own: %+v", l.Mods["private-mod"])
+	}
+	if _, err := os.Stat(filepath.Join(dir, "files", "private-mod-1.4.jar")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "overrides", "mods", "private-mod-1.4.jar")); err == nil {
+		t.Fatal("the bundled jar is also an override")
+	}
+
+	h.dir = dir
+	h.mustRun(t, "install")
+	if stdout := h.mustRun(t, "lock"); strings.Contains(stdout, "sodium") || strings.Contains(stdout, "recipes") {
+		t.Fatalf("lock after import moved something: %s", stdout)
+	}
+}
+
+func TestImportCurseForgeIgnoreShulker(t *testing.T) {
+	h, archive := exportedCurseForgeProject(t)
+	dir := filepath.Join(t.TempDir(), "imported")
+	var env struct {
+		Data importResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "curseforge", archive, "--dir", dir, "--ignore-shulker", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if res := env.Data; res.Marker || len(res.Mods.Reused) != 0 || strings.Join(res.Mods.Locked, ",") != "fabric-api,jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/private-mod-1.4.jar" {
+		t.Fatalf("result: %+v %+v", res, res.Mods)
+	}
+	if m, l := readProject(t, dir); len(m.Features) != 0 || m.Server != nil || l.Mods["sodium"].Provider != "curseforge" {
+		t.Fatalf("an ignored project leaves nothing behind: %+v %+v", m, l.Mods["sodium"])
 	}
 }

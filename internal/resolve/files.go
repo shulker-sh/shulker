@@ -1,7 +1,6 @@
 package resolve
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -16,24 +15,20 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
-	"shulker.sh/shulker/internal/zipfile"
 )
 
-// localCopy is a local file's bytes as the cache holds them. isFile is false for a folder, whose
-// bytes are its zip, and for a file that is gone.
+// localCopy is a local file's bytes as the cache holds them.
 type localCopy struct {
 	path   string
 	sha512 string
 	size   int64
-	isFile bool
 }
 
-// cacheLocal hashes a local file entry's file, rel under dir, into the cache, and a folder's zip
-// when folders is set. A file that is gone is served from the cache by the sha512 it was locked at,
-// with a warning, so the lock is only wrong when neither has it.
-func (r *Resolver) cacheLocal(dir, key, rel, lockedSha512 string, folders bool) (localCopy, error) {
-	path := filepath.Join(dir, filepath.FromSlash(rel))
-	st, err := os.Stat(path)
+// cacheLocal hashes a local file entry's file, rel under dir, into the cache. A file that is gone is
+// served from the cache by the sha512 it was locked at, with a warning, so the lock is only wrong
+// when neither has it.
+func (r *Resolver) cacheLocal(dir, key, rel, lockedSha512 string) (localCopy, error) {
+	f, err := os.Open(filepath.Join(dir, filepath.FromSlash(rel)))
 	if errors.Is(err, os.ErrNotExist) {
 		if lockedSha512 == "" || !r.Cache.Has(lockedSha512) {
 			return localCopy{}, pack.FileMissing(key, rel)
@@ -49,36 +44,13 @@ func (r *Resolver) cacheLocal(dir, key, rel, lockedSha512 string, folders bool) 
 	if err != nil {
 		return localCopy{}, err
 	}
-	if !st.Mode().IsRegular() && !(folders && st.IsDir()) {
-		return localCopy{}, pack.NotAFile(key, rel)
-	}
-	return r.putLocal(path, st)
-}
-
-// putLocal puts the file at path in the cache, or the zip of the folder there.
-func (r *Resolver) putLocal(path string, st os.FileInfo) (localCopy, error) {
-	if st.IsDir() {
-		data, err := zipfile.Folder(path)
-		if err != nil {
-			return localCopy{}, err
-		}
-		sha, err := r.Cache.Put(bytes.NewReader(data))
-		if err != nil {
-			return localCopy{}, err
-		}
-		return localCopy{path: r.Cache.Object(sha), sha512: sha, size: int64(len(data))}, nil
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return localCopy{}, err
-	}
 	defer f.Close()
 	counted := &countingReader{r: f}
 	sha, err := r.Cache.Put(counted)
 	if err != nil {
 		return localCopy{}, err
 	}
-	return localCopy{path: r.Cache.Object(sha), sha512: sha, size: counted.n, isFile: true}, nil
+	return localCopy{path: r.Cache.Object(sha), sha512: sha, size: counted.n}, nil
 }
 
 // fileDir is the directory a locked local file entry's path is relative to: the project's own for
@@ -100,7 +72,7 @@ func (r *Resolver) fileDir(id, modpack, file string) string {
 // modpack's directory. An entry the modpack took from a modpack of its own names a path in a
 // directory this project never sees, so only the cache can serve it.
 func (r *Resolver) cachePackFiles(p *pack.Loaded) error {
-	check := func(key, file, modpack, sha512 string, folders bool) error {
+	check := func(key, file, modpack, sha512 string) error {
 		if file == "" {
 			return nil
 		}
@@ -111,7 +83,7 @@ func (r *Resolver) cachePackFiles(p *pack.Loaded) error {
 			}
 			return nil
 		}
-		got, err := r.cacheLocal(p.Dir, label, file, sha512, folders)
+		got, err := r.cacheLocal(p.Dir, label, file, sha512)
 		if err != nil {
 			return err
 		}
@@ -124,13 +96,13 @@ func (r *Resolver) cachePackFiles(p *pack.Loaded) error {
 	}
 	for _, id := range sortedKeys(p.Lock.Mods) {
 		m := p.Lock.Mods[id]
-		if err := check(id, m.File, m.Modpack, m.Sha512, false); err != nil {
+		if err := check(id, m.File, m.Modpack, m.Sha512); err != nil {
 			return err
 		}
 	}
 	for _, section := range []map[string]lock.Pack{p.Lock.ResourcePacks, p.Lock.Shaders} {
 		for _, key := range sortedKeys(section) {
-			if err := check(key, section[key].File, section[key].Modpack, section[key].Sha512, true); err != nil {
+			if err := check(key, section[key].File, section[key].Modpack, section[key].Sha512); err != nil {
 				return err
 			}
 		}
@@ -189,13 +161,13 @@ func (r *Resolver) restoreLocal(f downloadable) string {
 		return fmt.Sprintf("%s: %s comes from modpack %s inside modpack %s, so only the cache can serve it, and the cache has no copy of it", f.id, f.file, inner, f.modpack)
 	}
 	dir := r.fileDir(f.id, f.modpack, f.file)
-	path := filepath.Join(dir, filepath.FromSlash(f.file))
-	st, err := os.Stat(path)
+	file, err := os.Open(filepath.Join(dir, filepath.FromSlash(f.file)))
 	if dir == "" || err != nil {
 		return fmt.Sprintf("%s: %s is gone, and the cache has no copy of it", f.id, f.file)
 	}
-	got, err := r.putLocal(path, st)
-	if err != nil || got.sha512 != f.sha512 {
+	defer file.Close()
+	sha, err := r.Cache.Put(file)
+	if err != nil || sha != f.sha512 {
 		return fmt.Sprintf("%s: %s changed since it was locked; run `shulker lock`", f.id, f.file)
 	}
 	return ""
@@ -219,7 +191,7 @@ func (r *Resolver) relockFile(ctx context.Context, dir, id string, entry manifes
 	if prev.File == entry.File {
 		locked = prev.Sha512
 	}
-	got, err := r.cacheLocal(dir, id, entry.File, locked, false)
+	got, err := r.cacheLocal(dir, id, entry.File, locked)
 	if err != nil {
 		return err
 	}
@@ -316,14 +288,9 @@ func (r *Resolver) lockFilePack(key, kind string, entry manifest.Require) error 
 	if prev, ok := section[key]; ok && prev.File == entry.File {
 		locked = prev.Sha512
 	}
-	got, err := r.cacheLocal(r.Dir, key, entry.File, locked, true)
+	got, err := r.cacheLocal(r.Dir, key, entry.File, locked)
 	if err != nil {
 		return err
-	}
-	if got.isFile {
-		if err := manifest.CheckFileExtension(key, entry); err != nil {
-			return err
-		}
 	}
 	p := lock.Pack{
 		File:     entry.File,

@@ -189,20 +189,31 @@ func Read(file string) (*Archive, error) {
 // the marker carries them, while the jar reaches only a client-side export of a
 // project with a loader.
 func (a *Archive) readRootIdentity(file string, root map[string][]byte) error {
-	manifestData, lockData := root[manifest.FileName], root[lock.FileName]
+	m, err := ReadRootIdentity(file, root[manifest.FileName], root[lock.FileName])
+	if err != nil {
+		return err
+	}
+	if m != nil {
+		a.Marker = m
+	}
+	return nil
+}
+
+// ReadRootIdentity reads the shulker.json and shulker.lock an export writes at an archive's root
+// as its marker, or nil when the archive lacks either.
+func ReadRootIdentity(file string, manifestData, lockData []byte) (*Marker, error) {
 	if manifestData == nil || lockData == nil {
-		return nil
+		return nil, nil
 	}
 	m, err := manifest.Parse(manifestData)
 	if err != nil {
-		return markerInvalid(file, manifest.FileName, err)
+		return nil, markerInvalid(file, manifest.FileName, err)
 	}
 	l, err := lock.Parse(lockData)
 	if err != nil {
-		return markerInvalid(file, lock.FileName, err)
+		return nil, markerInvalid(file, lock.FileName, err)
 	}
-	a.Marker = &Marker{Path: manifest.FileName, Manifest: m, Lock: l}
-	return nil
+	return &Marker{Path: manifest.FileName, Manifest: m, Lock: l}, nil
 }
 
 func readEntry(f *zip.File) ([]byte, error) {

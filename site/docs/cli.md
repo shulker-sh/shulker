@@ -130,6 +130,8 @@ shulker import mrpack pack.mrpack -C my-pack --name my-pack
 
 Create a project from a CurseForge modpack `.zip`, the kind the CurseForge app exports and [`export curseforge`](#shulker-export-curseforge) writes. Each mod, resource pack and shader the pack names is locked by its CurseForge project and file ID, so the project gets the exact files the pack ships, and the pack's overrides folder becomes the project's `overrides/`, less the marker jar of the shulker project that exported it, since the project builds its own. A file the pack marks optional is skipped with a warning. A file whose author doesn't allow third-party downloads stops the import with `missing-files`, naming each one and its page: download them into the new project's `downloads/` and run the import again, and they lock as manual downloads. A zip that isn't a CurseForge modpack is refused by what it holds, whatever its name.
 
+A zip shulker exported carries its own `shulker.json` and `shulker.lock` at its root unless its manifest turns `marker` off, and those are read the way `import mrpack` reads them, so the project comes back as it was: features, side blocks, conditions and keys chosen with `--as` included. Each file the zip names is matched to that project's lock by its bytes once it is downloaded, and comes back as the project locked it, so a mod it locked from Modrinth is locked from Modrinth again. A local file the export bundled becomes the new project's own local file in `files/`. `--ignore-shulker` skips both and imports the zip as any other CurseForge modpack.
+
 ```sh
 shulker import curseforge ~/Downloads/all-the-mods.zip
 shulker import curseforge pack.zip -C my-pack --name my-pack
@@ -138,6 +140,7 @@ shulker import curseforge pack.zip -C my-pack --name my-pack
 | Flag | Description |
 | --- | --- |
 | `--name <name>` | Project name (default: the modpack name, slugified) |
+| `--ignore-shulker` | Ignore the shulker manifest and lock inside the modpack and import it as any other one |
 
 ### `shulker export mrpack`
 
@@ -1687,7 +1690,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
-| `file-not-found` | A file named to `pull` isn't in the build directory, a path given to `add` isn't a file, or a mod or modpack's `file` in `shulker.json` names a folder. `candidates`: the closest file there, for `pull` |
+| `file-not-found` | A file named to `pull` isn't in the build directory, or a path given to `add` isn't a file. `candidates`: the closest file there, for `pull` |
 | `file-taken` | `add` would copy a local file into `files/`, which already holds a different file of that name that no entry of the same key names; rename one or remove the one in `files/`. Also an `import` whose pack names two different local files of one name |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |

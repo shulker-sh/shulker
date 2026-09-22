@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 )
@@ -58,6 +60,10 @@ type Archive struct {
 	// Overrides are the files under the folder the manifest names, all in OverridesLayer, less the
 	// marker jar of the project that exported it.
 	Overrides []mrpack.Override
+	// Marker is the shulker project that exported the pack, from the shulker.json and shulker.lock
+	// at its root.
+	Marker *mrpack.Marker
+	Icon   []byte
 }
 
 // Loader is the pack's primary mod loader, or its first when none is marked primary. A pack for
@@ -146,6 +152,24 @@ func Read(file string) (*Archive, error) {
 	}
 	if a.Manifest.Minecraft.Version == "" {
 		return nil, out.Errorf("curseforge-invalid", "%s names no minecraft version", file)
+	}
+	root := map[string][]byte{}
+	names := []string{manifest.FileName, lock.FileName}
+	if a.Manifest.Image != "" {
+		names = append(names, path.Clean(a.Manifest.Image))
+	}
+	for _, name := range names {
+		if f, ok := entries[name]; ok {
+			if root[name], err = readEntry(f); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if a.Marker, err = mrpack.ReadRootIdentity(file, root[manifest.FileName], root[lock.FileName]); err != nil {
+		return nil, err
+	}
+	if a.Manifest.Image != "" {
+		a.Icon = root[path.Clean(a.Manifest.Image)]
 	}
 	folder := "overrides"
 	if a.Manifest.Overrides != "" {

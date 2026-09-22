@@ -130,6 +130,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 
 func (a *app) importCurseForgeCmd() *cobra.Command {
 	var name string
+	var ignoreShulker bool
 	cmd := &cobra.Command{
 		Use:         "curseforge <file>",
 		Annotations: acts(),
@@ -140,6 +141,9 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if ignoreShulker {
+				arc.Marker = nil
+			}
 			if name == "" {
 				name = slugify(arc.Manifest.Name)
 			}
@@ -147,29 +151,32 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			loaderType, loaderVersion, err := arc.Loader()
+			asMrpack, err := arc.Mrpack()
 			if err != nil {
 				return err
 			}
-			m := &manifest.Manifest{
-				Schema:    manifest.SchemaURL,
-				Name:      name,
-				Version:   arc.Manifest.Version,
-				Minecraft: arc.Manifest.Minecraft.Version,
-				Loader:    manifest.Loader{Type: loaderType, Version: loaderVersion},
-				Requires:  map[string]manifest.Require{},
-				Client:    &manifest.Client{},
+			asMrpack.Marker = arc.Marker
+			m, warnings, err := importManifest(asMrpack, name)
+			if err != nil {
+				return err
 			}
-			if arc.Manifest.Author != "" {
+			a.warn(warnings)
+			if arc.Marker == nil && arc.Manifest.Author != "" {
 				m.Authors = []string{arc.Manifest.Author}
 			}
 			d, err := a.deps()
 			if err != nil {
 				return err
 			}
-			l, err := a.importLock(cmd.Context(), d, m)
+			exact := *m
+			exact.Minecraft = arc.Manifest.Minecraft.Version
+			exact.Loader.Type, exact.Loader.Version, _ = arc.Loader()
+			l, err := a.importLock(cmd.Context(), d, &exact)
 			if err != nil {
 				return err
+			}
+			if arc.Marker != nil && arc.Marker.Manifest.Server != nil && arc.Marker.Manifest.Server.Players != nil {
+				l.Players = arc.Marker.Lock.Players
 			}
 			r := &resolve.Resolver{Dir: dir, Manifest: m, Lock: l, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
 			mods, err := r.ImportCurseForge(cmd.Context(), arc)
@@ -177,21 +184,39 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 				return err
 			}
 			a.warn(mods.Warnings)
+			if err := r.AdoptLocalFiles(); err != nil {
+				return err
+			}
+			if arc.Marker != nil {
+				mods.Overrides = dropManifestOwned(m, mods.Overrides)
+			}
+			if err := writeImportIcon(dir, m, arc.Icon); err != nil {
+				return err
+			}
 			if err := writeImport(dir, m, l, mods.Overrides); err != nil {
 				return err
 			}
-			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
+			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
-				l.Tree(
-					out.Row{Text: plural(len(mods.Locked), "file", "files") + " locked from CurseForge"},
-					out.Row{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
-				)
+				locked := plural(len(mods.Locked), "file", "files") + " locked from CurseForge"
+				if res.Marker {
+					locked += fmt.Sprintf(", %d reused from the shulker marker", len(mods.Reused))
+				}
+				rows := []out.Row{
+					{Text: locked},
+					{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
+				}
+				if len(mods.Dropped) > 0 {
+					rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
+				}
+				l.Tree(rows...)
 				l.Nudge("Download and build it", "cd "+dir+" && shulker install")
 			})
 		},
 	}
 	cmd.Flags().StringVar(&name, "name", "", "project name (default: the pack name, slugified)")
+	cmd.Flags().BoolVar(&ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
 	return cmd
 }
 

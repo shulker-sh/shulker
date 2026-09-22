@@ -5,11 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"io"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/klauspost/compress/flate"
@@ -51,51 +47,4 @@ func Build(entries map[string][]byte, first string) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// Folder zips the regular files under root, leaving out what editors and file managers leave behind:
-// any name starting with a dot, Thumbs.db, desktop.ini, and *~ and *.swp.
-func Folder(root string) ([]byte, error) {
-	// WalkDir doesn't follow a symlinked root, which would zip nothing.
-	root, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return nil, err
-	}
-	entries := map[string][]byte{}
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if path != root && isJunk(d.Name()) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		entries[filepath.ToSlash(rel)] = data
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return Build(entries, "")
-}
-
-func isJunk(name string) bool {
-	switch {
-	case strings.HasPrefix(name, "."), name == "Thumbs.db", name == "desktop.ini":
-		return true
-	}
-	return strings.HasSuffix(name, "~") || strings.HasSuffix(name, ".swp")
 }

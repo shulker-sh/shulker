@@ -44,6 +44,8 @@ type importer struct {
 	bySha     map[string]string
 	packBySha map[string]importedPack
 	matched   map[string]bool
+	// keepSides reuses the marker's side for each entry, for an archive whose layers don't say.
+	keepSides bool
 }
 
 // importedPack is a resource pack or shader the pack's own lock names, found by
@@ -51,6 +53,29 @@ type importer struct {
 type importedPack struct {
 	key  string
 	kind string
+}
+
+func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
+	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}}
+	if a.Marker == nil {
+		return im
+	}
+	for id, m := range a.Marker.Lock.Mods {
+		if reuseLocal || m.File == "" {
+			im.bySha[m.Sha512] = id
+		}
+	}
+	for key, p := range a.Marker.Lock.ResourcePacks {
+		if reuseLocal || p.File == "" {
+			im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeResourcePack}
+		}
+	}
+	for key, p := range a.Marker.Lock.Shaders {
+		if reuseLocal || p.File == "" {
+			im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeShader}
+		}
+	}
+	return im
 }
 
 // ImportMrpack locks the mods a Modrinth pack lists, reporting what it locked, reused, dropped and
@@ -63,26 +88,9 @@ func (r *Resolver) ImportMrpack(ctx context.Context, a *mrpack.Archive) (*Import
 // as an override rather than reused: its path is the exporter's, and outside the archive only the
 // cache holds its bytes.
 func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLocal bool) (*Imported, error) {
-	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}}
+	im := newImporter(r, a, reuseLocal)
 	if p, ok := r.Providers["modrinth"].(hashLookup); ok {
 		im.modrinth = p
-	}
-	if a.Marker != nil {
-		for id, m := range a.Marker.Lock.Mods {
-			if reuseLocal || m.File == "" {
-				im.bySha[m.Sha512] = id
-			}
-		}
-		for key, p := range a.Marker.Lock.ResourcePacks {
-			if reuseLocal || p.File == "" {
-				im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeResourcePack}
-			}
-		}
-		for key, p := range a.Marker.Lock.Shaders {
-			if reuseLocal || p.File == "" {
-				im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeShader}
-			}
-		}
 	}
 	for _, f := range a.Index.Files {
 		if err := im.indexFile(ctx, f); err != nil {
@@ -200,7 +208,11 @@ func (im *importer) override(o mrpack.Override) error {
 		if _, err := im.r.Cache.Put(bytes.NewReader(o.Data)); err != nil {
 			return err
 		}
-		im.reuse(id, layerSide(o.Layer))
+		side := layerSide(o.Layer)
+		if im.keepSides {
+			side = ""
+		}
+		im.reuse(id, side)
 		return nil
 	}
 	im.rep.Overrides = append(im.rep.Overrides, o)
@@ -214,7 +226,7 @@ func (im *importer) reuse(id, side string) {
 	}
 	im.matched[id] = true
 	entry := im.a.Marker.Lock.Mods[id]
-	if entry.Side != side {
+	if side != "" && entry.Side != side {
 		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: the marker says side %s but the pack ships it for %s; using %s", id, entry.Side, side, side))
 		entry.Side = side
 	}

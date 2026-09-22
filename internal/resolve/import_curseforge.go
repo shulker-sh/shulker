@@ -17,20 +17,23 @@ import (
 
 // ImportCurseForge locks every file a CurseForge pack names, by its project and file id. A file
 // CurseForge won't serve is taken from DownloadsDir, and every one missing there is named in one
-// missing-files error, so a single pass says everything to download.
+// missing-files error, so a single pass says everything to download. A file the exporting shulker
+// project locked, matched by sha512, comes back as that project locked it.
 func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Imported, error) {
 	p, ok := r.Providers["curseforge"]
 	if !ok {
 		return nil, Unavailable("curseforge")
 	}
-	rep := &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}
+	im := newImporter(r, &mrpack.Archive{Marker: a.Marker}, true)
+	im.keepSides = true
+	rep := im.rep
 	var missing []string
 	for _, f := range a.Manifest.Files {
 		if !f.Required {
 			rep.Warnings = append(rep.Warnings, fmt.Sprintf("skipped CurseForge project %d file %d: the pack marks it optional", f.ProjectID, f.FileID))
 			continue
 		}
-		proj, v, err := r.importCurseForgeFile(ctx, p, f, rep)
+		proj, v, err := im.curseForgeFile(ctx, p, f)
 		if out.CodeOf(err) == "manual-download" {
 			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", proj.Slug, v.File.Filename, v.Page, filepath.Join(r.Dir, DownloadsDir)))
 			continue
@@ -46,17 +49,44 @@ func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Im
 		return nil, e
 	}
 	for _, o := range a.Overrides {
-		rep.Overrides = append(rep.Overrides, o)
-		if mrpack.IsModJar(o.Path) || mrpack.IsPackZip(o.Path) {
-			rep.Unmanaged = append(rep.Unmanaged, o.Layer+"/"+o.Path)
+		if err := im.override(o); err != nil {
+			return nil, err
 		}
 	}
+	im.dropUnmatched()
 	sort.Strings(rep.Locked)
+	sort.Strings(rep.Reused)
+	sort.Strings(rep.Dropped)
 	sort.Strings(rep.Unmanaged)
 	return rep, nil
 }
 
-func (r *Resolver) importCurseForgeFile(ctx context.Context, p provider.Provider, f cfpack.File, rep *Imported) (*provider.Project, *provider.Version, error) {
+// lockedFromCurseForge keeps what curseForgeFile locked under key, unless the exporting project
+// locked the same bytes, which then come back as it locked them.
+func (im *importer) lockedFromCurseForge(key, kind string, listed manifest.Require) {
+	if kind == manifest.TypeMod {
+		if id, ok := im.bySha[im.r.Lock.Mods[key].Sha512]; ok {
+			delete(im.r.Lock.Mods, key)
+			im.reuse(id, "")
+			return
+		}
+	} else {
+		packs := im.r.Lock.ResourcePacks
+		if kind == manifest.TypeShader {
+			packs = im.r.Lock.Shaders
+		}
+		if p, ok := im.packBySha[packs[key].Sha512]; ok && p.kind == kind {
+			delete(packs, key)
+			im.reusePack(p)
+			return
+		}
+	}
+	im.r.Manifest.Requires[key] = listed
+	im.rep.Locked = append(im.rep.Locked, key)
+}
+
+func (im *importer) curseForgeFile(ctx context.Context, p provider.Provider, f cfpack.File) (*provider.Project, *provider.Version, error) {
+	r, rep := im.r, im.rep
 	projectID, fileID := strconv.Itoa(f.ProjectID), strconv.Itoa(f.FileID)
 	proj, err := p.Project(ctx, projectID, "")
 	if errors.Is(err, provider.ErrNotFound) {
@@ -96,8 +126,7 @@ func (r *Resolver) importCurseForgeFile(ctx context.Context, p provider.Provider
 			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, r.Lock.Mods[id].Filename))
 			return proj, v, nil
 		}
-		r.Manifest.Requires[id] = listed
-		rep.Locked = append(rep.Locked, id)
+		im.lockedFromCurseForge(id, kind, listed)
 	case manifest.TypeResourcePack, manifest.TypeShader:
 		key := proj.Slug
 		if held, taken := r.Manifest.Requires[key]; taken && held.Kind() == kind {
@@ -114,8 +143,7 @@ func (r *Resolver) importCurseForgeFile(ctx context.Context, p provider.Provider
 			return proj, v, err
 		}
 		listed.Type = kind
-		r.Manifest.Requires[key] = listed
-		rep.Locked = append(rep.Locked, key)
+		im.lockedFromCurseForge(key, kind, listed)
 	default:
 		return nil, nil, out.Errorf("requires-unsupported", "%s is a %s, which a pack can't carry", proj.Slug, kind)
 	}

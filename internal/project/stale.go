@@ -1,8 +1,6 @@
 package project
 
 import (
-	"crypto/sha512"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -17,7 +15,6 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
-	"shulker.sh/shulker/internal/zipfile"
 )
 
 func (p *Project) IsLockStale() bool {
@@ -250,9 +247,9 @@ func ModDifferences(dir, id string, e manifest.Require, lm lock.Mod) []string {
 }
 
 // FileDifferences compares a local file entry with the file on disk: its path, then its size, and
-// its sha512 only when the size still matches. A folder is zipped to compare its zip. A file that is
-// gone is no difference, since the cache still serves the bytes the lock names.
-func FileDifferences(dir, key, listed, locked string, size int64, lockedSha512 string) []string {
+// its sha512 only when the size still matches. A file that is gone is no difference, since the cache
+// still serves the bytes the lock names.
+func FileDifferences(dir, key, listed, locked string, size int64, sha512 string) []string {
 	switch {
 	case listed == "":
 		return []string{fmt.Sprintf("%s: locked as a local file, shulker.json names a provider", key)}
@@ -266,18 +263,8 @@ func FileDifferences(dir, key, listed, locked string, size int64, lockedSha512 s
 	if err != nil {
 		return nil
 	}
-	if st.IsDir() {
-		data, err := zipfile.Folder(path)
-		if err != nil {
-			return nil
-		}
-		if sum := sha512.Sum512(data); hex.EncodeToString(sum[:]) == lockedSha512 {
-			return nil
-		}
-		return []string{key + ": the file's bytes changed"}
-	}
 	if st.Size() == size {
-		if got, err := fsutil.SHA512(path); err != nil || got == lockedSha512 {
+		if got, err := fsutil.SHA512(path); err != nil || got == sha512 {
 			return nil
 		}
 	}
