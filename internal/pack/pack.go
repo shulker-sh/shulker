@@ -1,3 +1,5 @@
+// Package pack loads the modpacks a project requires from a directory, a git repository or a URL,
+// and checks them against the project's platform.
 package pack
 
 import (
@@ -22,6 +24,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
+// Kind is where a source lives, which decides how it is fetched.
 type Kind string
 
 const (
@@ -30,6 +33,7 @@ const (
 	URL   Kind = "url"
 )
 
+// Loaded is a modpack read from its source.
 type Loaded struct {
 	Name       string
 	Source     string
@@ -37,7 +41,7 @@ type Loaded struct {
 	Dir        string
 	Manifest   *manifest.Manifest
 	Lock       *lock.Lock
-	Locked     bool
+	UsesLock   bool
 	Pin        lock.Modpack
 	lockSha256 string
 }
@@ -49,7 +53,7 @@ type Store struct {
 	Log        func(format string, args ...any)
 }
 
-func (s *Store) offline() bool { return s.Fetch != nil && s.Fetch.Offline }
+func (s *Store) isOffline() bool { return s.Fetch != nil && s.Fetch.Offline }
 
 func (s *Store) log(format string, args ...any) {
 	if s.Log != nil {
@@ -57,6 +61,8 @@ func (s *Store) log(format string, args ...any) {
 	}
 }
 
+// Classify tells a source's kind from its form: git URLs and http URLs not ending in .json are git,
+// other http URLs are a manifest to fetch, and anything else is a local directory.
 func Classify(source string) Kind {
 	if strings.HasPrefix(source, "git@") || strings.HasPrefix(source, "ssh://") || strings.HasPrefix(source, "git://") || strings.HasPrefix(source, "git+") {
 		return Git
@@ -70,6 +76,7 @@ func Classify(source string) Kind {
 	return Local
 }
 
+// Resolve reads a modpack at its source's current state, for locking.
 func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*Loaded, error) {
 	var err error
 	kind := Classify(p.Source)
@@ -93,7 +100,7 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		}
 		commit, err := s.revParse(ctx, mirror, p.Ref)
 		if err != nil {
-			return nil, out.Errorf("modpack-ref", "modpack %s: ref %q not found in %s: %v", name, refOrHead(p.Ref), p.Source, err)
+			return nil, inModpack(name, refNotFound("modpack-ref", p.Ref, p.Source, err))
 		}
 		l.Pin.Ref = p.Ref
 		l.Pin.Commit = commit
@@ -109,7 +116,7 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 			return nil, err
 		}
 		if l.Manifest, err = manifest.Parse(data); err != nil {
-			return nil, fmt.Errorf("modpack %s: %w", name, err)
+			return nil, inModpack(name, err)
 		}
 		if l.Pin.Sha256, err = s.storeManifest(data); err != nil {
 			return nil, err
@@ -121,12 +128,13 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 	if err := l.resolveLocked(p); err != nil {
 		return nil, err
 	}
-	if l.Locked {
+	if l.UsesLock {
 		l.Pin.UsesLock, l.Pin.LockSha256 = true, l.lockSha256
 	}
 	return l, nil
 }
 
+// Open reads a modpack at the state the lock pinned, and warns when a local one has changed since.
 func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinned lock.Modpack) (*Loaded, string, error) {
 	kind := Classify(p.Source)
 	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: pinned}
@@ -146,7 +154,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 		}
 	case Git:
 		if pinned.Commit == "" {
-			return nil, "", out.Errorf("modpack-unlocked", "modpack %s has no commit in the lock; run `shulker update`", name)
+			return nil, "", unlocked(name, "commit")
 		}
 		dir := s.Cache.PackSource(pinned.Commit)
 		if _, err := os.Stat(dir); err != nil {
@@ -164,7 +172,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 		}
 	case URL:
 		if pinned.Sha256 == "" {
-			return nil, "", out.Errorf("modpack-unlocked", "modpack %s has no hash in the lock; run `shulker update`", name)
+			return nil, "", unlocked(name, "hash")
 		}
 		data, err := os.ReadFile(s.Cache.PackManifest(pinned.Sha256))
 		if os.IsNotExist(err) {
@@ -172,7 +180,9 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 				return nil, "", err
 			}
 			if sha256hex(data) != pinned.Sha256 {
-				return nil, "", out.Errorf("modpack-changed", "modpack %s at %s no longer matches the lock; run `shulker update`", name, p.Source)
+				e := out.Errorf("modpack-changed", "modpack %s at %s no longer matches the lock", name, p.Source)
+				e.Help = "run `shulker update`"
+				return nil, "", e
 			}
 			if _, err := s.storeManifest(data); err != nil {
 				return nil, "", err
@@ -181,7 +191,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 			return nil, "", err
 		}
 		if l.Manifest, err = manifest.Parse(data); err != nil {
-			return nil, "", fmt.Errorf("modpack %s: %w", name, err)
+			return nil, "", inModpack(name, err)
 		}
 		if pinned.UsesLock {
 			if err := s.openPackLock(ctx, l, pinned.LockSha256); err != nil {
@@ -189,7 +199,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 			}
 		}
 	}
-	l.Locked = pinned.UsesLock
+	l.UsesLock = pinned.UsesLock
 	return l, warning, nil
 }
 
@@ -206,7 +216,7 @@ func (s *Store) loadDir(l *Loaded) error {
 		if os.IsNotExist(err) {
 			return out.Errorf("modpack-manifest", "modpack %s: no %s in %s", l.Name, manifest.FileName, l.Source)
 		}
-		return fmt.Errorf("modpack %s: %w", l.Name, err)
+		return inModpack(l.Name, err)
 	}
 	l.Manifest = m
 	data, err := os.ReadFile(filepath.Join(l.Dir, lock.FileName))
@@ -214,7 +224,7 @@ func (s *Store) loadDir(l *Loaded) error {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return fmt.Errorf("modpack %s: %w", l.Name, err)
+		return inModpack(l.Name, err)
 	}
 	return l.parseLock(data)
 }
@@ -222,7 +232,7 @@ func (s *Store) loadDir(l *Loaded) error {
 func (l *Loaded) parseLock(data []byte) error {
 	packLock, err := lock.Parse(data)
 	if err != nil {
-		return fmt.Errorf("modpack %s: %w", l.Name, err)
+		return inModpack(l.Name, err)
 	}
 	l.Lock, l.lockSha256 = packLock, sha256hex(data)
 	return nil
@@ -254,7 +264,9 @@ func (s *Store) openPackLock(ctx context.Context, l *Loaded, sha string) error {
 			return fetchFailure(l.Name, l.Source, err)
 		}
 		if sha256hex(data) != sha {
-			return out.Errorf("modpack-changed", "modpack %s: the %s at %s has changed since this project locked it; run `shulker update`", l.Name, lock.FileName, l.Source)
+			e := out.Errorf("modpack-changed", "modpack %s: the %s at %s has changed since this project locked it", l.Name, lock.FileName, l.Source)
+			e.Help = "run `shulker update`"
+			return e
 		}
 		if err := s.storeFile(s.Cache.PackLock(sha), data); err != nil {
 			return err
@@ -271,13 +283,15 @@ func (s *Store) openPackLock(ctx context.Context, l *Loaded, sha string) error {
 func (l *Loaded) resolveLocked(p manifest.Require) error {
 	switch {
 	case l.Lock == nil && p.Locked != nil && *p.Locked:
-		return out.Errorf("modpack-lock-missing", "modpack %s has no %s, so \"locked\": true can't be honoured; run `shulker lock` in the modpack, or set locked false", l.Name, lock.FileName)
+		e := out.Errorf("modpack-lock-missing", "modpack %s has no %s, so \"locked\": true can't be honoured", l.Name, lock.FileName)
+		e.Help = "run `shulker lock` in the modpack, or set locked false"
+		return e
 	case l.Lock == nil:
-		l.Locked = false
+		l.UsesLock = false
 	case p.Locked != nil:
-		l.Locked = *p.Locked
+		l.UsesLock = *p.Locked
 	default:
-		l.Locked = true
+		l.UsesLock = true
 	}
 	return nil
 }
@@ -295,7 +309,9 @@ func (s *Store) fetchManifest(ctx context.Context, name, url string) ([]byte, er
 // shape when the network is why.
 func fetchFailure(name, source string, err error) error {
 	if errors.Is(err, fetch.ErrOffline) || !fetch.IsNetwork(err) {
-		return out.Errorf("modpack-fetch", "modpack %s: %v", name, err)
+		e := out.Errorf("modpack-fetch", "modpack %s: couldn't fetch %s", name, source)
+		e.Rows = []out.Detail{{Label: "http", Text: httpReason(err)}}
+		return e
 	}
 	e := out.Errorf("modpack-fetch", "modpack %s: couldn't reach %s", name, source)
 	e.Rows = []out.Detail{{Label: "http", Text: httpReason(err)}}
@@ -327,7 +343,7 @@ func sha256hex(data []byte) string {
 // contributes exact versions, so its own lock has to match; a floating one is
 // resolved here and only has to admit the project's versions in its ranges.
 func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
-	if l.Locked {
+	if l.UsesLock {
 		return compatibleLocked(l, minecraft, loader)
 	}
 	pm := l.Manifest
@@ -337,7 +353,7 @@ func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
 	}
 	rng, err := mcver.ParseRange(pm.Minecraft)
 	if err != nil {
-		return fmt.Errorf("modpack %s minecraft: %w", l.Name, err)
+		return rangeInvalid(l.Name, "minecraft", err)
 	}
 	if !rng.Matches(game) {
 		return out.Errorf("modpack-mismatch", "modpack %s wants minecraft %s; this project locked %s", l.Name, pm.Minecraft, minecraft)
@@ -350,7 +366,7 @@ func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
 	}
 	lrng, err := loaderver.ParseRange(pm.Loader.Version)
 	if err != nil {
-		return fmt.Errorf("modpack %s loader version: %w", l.Name, err)
+		return rangeInvalid(l.Name, "loader", err)
 	}
 	lv, err := loaderver.Parse(loader.Version)
 	if err != nil {
@@ -364,12 +380,41 @@ func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
 
 func compatibleLocked(l *Loaded, minecraft string, loader lock.Loader) error {
 	if l.Lock.Minecraft != minecraft {
-		return out.Errorf("modpack-mismatch", "locked modpack %s is built for minecraft %s; this project locked %s. Unlock it with `shulker set requires.%s.locked false`", l.Name, l.Lock.Minecraft, minecraft, l.Name)
+		return lockedMismatch(l.Name, "minecraft "+l.Lock.Minecraft, minecraft)
 	}
 	if l.Lock.Loader.Type != loader.Type || l.Lock.Loader.Version != loader.Version {
-		return out.Errorf("modpack-mismatch", "locked modpack %s is built for %s; this project locked %s. Unlock it with `shulker set requires.%s.locked false`", l.Name, lockedLoaderLabel(l.Lock.Loader), lockedLoaderLabel(loader), l.Name)
+		return lockedMismatch(l.Name, lockedLoaderLabel(l.Lock.Loader), lockedLoaderLabel(loader))
 	}
 	return nil
+}
+
+func lockedMismatch(name, built, locked string) *out.Error {
+	e := out.Errorf("modpack-mismatch", "locked modpack %s is built for %s; this project locked %s", name, built, locked)
+	e.Help = fmt.Sprintf("unlock it with `shulker set requires.%s.locked false`", name)
+	return e
+}
+
+func rangeInvalid(name, what string, err error) *out.Error {
+	e := out.Errorf("manifest-invalid", "modpack %s has a %s range shulker can't read", name, what)
+	e.Rows = []out.Detail{{Label: what, Text: err.Error()}}
+	return e
+}
+
+func unlocked(name, what string) *out.Error {
+	e := out.Errorf("modpack-unlocked", "modpack %s has no %s in the lock", name, what)
+	e.Help = "run `shulker update`"
+	return e
+}
+
+// inModpack names the modpack err came from. Wrapping an *out.Error with fmt.Errorf wouldn't: the
+// error renders from the *out.Error inside, whose headline doesn't carry the prefix.
+func inModpack(name string, err error) error {
+	var e *out.Error
+	if errors.As(err, &e) {
+		e.Message = "modpack " + name + ": " + e.Message
+		return err
+	}
+	return fmt.Errorf("modpack %s: %w", name, err)
 }
 
 func lockedLoaderLabel(l lock.Loader) string {
@@ -438,6 +483,7 @@ func refOrHead(ref string) string {
 	return ref
 }
 
+// Status is where a modpack stands against the lock, as `shulker modpack list` shows it.
 type Status struct {
 	Name   string `json:"name"`
 	Kind   Kind   `json:"kind"`
@@ -447,6 +493,8 @@ type Status struct {
 	State  string `json:"state"`
 }
 
+// Status is where a modpack stands against the lock. Only a local one is read, to see whether it
+// has changed; a remote one is taken as pinned.
 func (s *Store) Status(name string, p manifest.Require, pinned lock.Modpack, locked bool) (Status, error) {
 	st := Status{Name: name, Kind: Classify(p.Source), Source: p.Source, Ref: p.Ref, State: "unlocked"}
 	if !locked {

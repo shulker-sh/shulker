@@ -108,7 +108,7 @@ func inheritedPlatform(m *manifest.Manifest, packs []*pack.Loaded) (*Platform, e
 	p := &Platform{}
 	var minecraftFrom, loaderFrom string
 	for _, l := range packs {
-		if !l.Locked || l.Lock == nil {
+		if !l.UsesLock || l.Lock == nil {
 			continue
 		}
 		if m.Minecraft == "" {

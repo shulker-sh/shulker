@@ -40,7 +40,7 @@ func (r *Resolver) directMods() map[string]directMod {
 				cur = directMod{entry: p.Manifest.Requires[id]}
 			}
 			cur.packs = append(cur.packs, p.Name)
-			if _, project := own[id]; p.Locked && !project && cur.locked == "" {
+			if _, project := own[id]; p.UsesLock && !project && cur.locked == "" {
 				cur.locked = p.Name
 			}
 			d[id] = cur
@@ -52,7 +52,7 @@ func (r *Resolver) directMods() map[string]directMod {
 // packMods lists the mod ids a modpack provides: the entries of its own lock
 // when it is locked, dependencies included, and its manifest's otherwise.
 func packMods(p *pack.Loaded) []string {
-	if p.Locked && p.Lock != nil {
+	if p.UsesLock && p.Lock != nil {
 		return sortedKeys(p.Lock.Mods)
 	}
 	return sortedKeys(p.Manifest.Mods())
@@ -104,8 +104,8 @@ func (r *Resolver) CheckPacks() error {
 // the version each pins, floating ones by the settings each lists. A locked
 // modpack and a floating one don't conflict, because the locked version wins.
 func packConflict(prev, p *pack.Loaded, id string) error {
-	if prev.Locked || p.Locked {
-		if !prev.Locked || !p.Locked {
+	if prev.UsesLock || p.UsesLock {
+		if !prev.UsesLock || !p.UsesLock {
 			return nil
 		}
 		was, now := prev.Lock.Mods[id], p.Lock.Mods[id]
@@ -128,7 +128,7 @@ func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
 		return err
 	}
 	r.Lock.Modpacks[l.Name] = l.Pin
-	if l.Locked {
+	if l.UsesLock {
 		r.applyLockedPacks()
 		for _, id := range sortedKeys(l.Manifest.Mods()) {
 			r.Lock.AddRequiredBy(id, l.Name)
@@ -156,7 +156,7 @@ func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
 func (r *Resolver) applyLockedPacks() {
 	own := r.Manifest.Mods()
 	for _, p := range r.Packs {
-		if !p.Locked || p.Lock == nil {
+		if !p.UsesLock || p.Lock == nil {
 			continue
 		}
 		for _, id := range sortedKeys(p.Lock.Mods) {

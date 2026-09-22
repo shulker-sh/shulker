@@ -182,5 +182,5 @@ func (a *app) addPackEntry(ctx context.Context, p *project.Project, r *resolve.R
 // offerUnlock reports whether a modpack refused for its platform is the one refusal unlocking
 // answers: locked, and built for another Minecraft than the project's.
 func (a *app) offerUnlock(err error, l *pack.Loaded, minecraft string) bool {
-	return out.CodeOf(err) == "modpack-mismatch" && a.canPick() && l.Locked && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
+	return out.CodeOf(err) == "modpack-mismatch" && a.canPick() && l.UsesLock && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
 }

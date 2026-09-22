@@ -41,7 +41,7 @@ func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {
 }
 
 func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (string, error) {
-	if s.offline() {
+	if s.isOffline() {
 		return "", fmt.Errorf("%s: %s: %w", what.label, source, fetch.ErrOffline)
 	}
 	dir := s.Cache.PackMirror(source)
@@ -81,7 +81,7 @@ var gitNetworkErrors = []string{
 	"tls handshake",
 }
 
-func gitNetworkError(msg string) bool {
+func isGitNetworkError(msg string) bool {
 	msg = strings.ToLower(msg)
 	for _, s := range gitNetworkErrors {
 		if strings.Contains(msg, s) {
@@ -106,7 +106,7 @@ func (s *Store) export(ctx context.Context, what origin, mirror, commit string) 
 	}
 	archive, err := s.git(ctx, "--git-dir="+mirror, "archive", "--format=tar", commit)
 	if err != nil {
-		return "", gitFailure(err, what.code, "%s: commit %s is not available from the repository: %v", what.label, commit, err)
+		return "", gitFailure(err, what.code, "%s: commit %s is not available from the repository", what.label, commit)
 	}
 	tmp, err := s.Cache.TempDir("src")
 	if err != nil {
@@ -182,13 +182,13 @@ func packOrigin(name string) origin { return origin{label: "modpack " + name, co
 // mirrorFailure is a fetch or clone that failed. When the network is why, the headline names the
 // source once and git's own reason goes in a row, without the "fatal:" and repeated URL around it.
 func mirrorFailure(err error, what origin, source, verb string) error {
-	if out.CodeOf(err) != "git-missing" && gitNetworkError(err.Error()) {
+	if out.CodeOf(err) != "git-missing" && isGitNetworkError(err.Error()) {
 		e := out.Errorf(what.code, "%s: couldn't reach %s", what.label, source)
 		e.Rows = []out.Detail{{Label: "git", Text: gitReason(err.Error())}}
 		e.Help = unreachableHelp
 		return fetch.Unreachable(e)
 	}
-	return gitFailure(err, what.code, "%s: %s %s failed: %v", what.label, verb, source, err)
+	return gitFailure(err, what.code, "%s: %s %s failed", what.label, verb, source)
 }
 
 const unreachableHelp = "check the address and that the server is running, then try again"
@@ -201,8 +201,10 @@ func gitFailure(err error, code, format string, args ...any) error {
 	if out.CodeOf(err) == "git-missing" {
 		return err
 	}
-	if gitNetworkError(err.Error()) {
-		return fetch.Unreachable(out.Errorf(code, format, args...))
+	e := out.Errorf(code, format, args...)
+	e.Rows = []out.Detail{{Label: "git", Text: gitReason(err.Error())}}
+	if isGitNetworkError(err.Error()) {
+		return fetch.Unreachable(e)
 	}
-	return out.Errorf(code, format, args...)
+	return e
 }

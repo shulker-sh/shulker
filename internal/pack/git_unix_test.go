@@ -41,7 +41,7 @@ func TestGitGivesUpOnAStalledTransfer(t *testing.T) {
 		t.Fatalf("git env: %q, %v", out, err)
 	}
 	stalled := "fatal: unable to access 'http://127.0.0.1:8765/mp.git/': Operation too slow. Less than 1 bytes/sec transferred the last 60 seconds"
-	if !gitNetworkError(stalled) {
+	if !isGitNetworkError(stalled) {
 		t.Fatal("a stalled transfer should read as a network failure")
 	}
 }

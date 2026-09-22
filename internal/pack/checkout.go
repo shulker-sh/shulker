@@ -20,6 +20,8 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
+// Checkout is a project source fetched for a sync, or the copy kept from its last good sync when
+// the source can't be reached.
 type Checkout struct {
 	Source   string    `json:"source"`
 	Kind     Kind      `json:"kind"`
@@ -34,6 +36,7 @@ type Checkout struct {
 
 var projectOrigin = origin{label: "project", code: "source-fetch"}
 
+// Checkout fetches a project from a directory, git repository or manifest URL.
 func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, error) {
 	kind := Classify(source)
 	if ref != "" && kind != Git {
@@ -54,7 +57,7 @@ func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, er
 			return nil, err
 		}
 		if c.Commit, err = s.revParse(ctx, mirror, ref); err != nil {
-			return nil, out.Errorf("source-ref", "ref %q not found in %s: %v", refOrHead(ref), source, err)
+			return nil, refNotFound("source-ref", ref, source, err)
 		}
 		c.Dir, err = s.export(ctx, projectOrigin, mirror, c.Commit)
 		return c, err
@@ -66,20 +69,40 @@ func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, er
 func (s *Store) checkoutURL(ctx context.Context, c *Checkout) (*Checkout, error) {
 	s.log("fetching %s", c.Source)
 	manifestData, err := s.download(ctx, c.Source)
-	if err == nil {
-		var lockData []byte
-		if lockData, err = s.download(ctx, lockURL(c.Source)); errors.Is(err, fetch.ErrNotFound) {
-			return nil, out.Errorf("source-lock", "no %s beside %s; the project must be locked before it can be synced", lock.FileName, c.Source)
-		} else if err == nil {
-			return c, s.storeURL(c, manifestData, lockData)
-		}
-	} else if errors.Is(err, fetch.ErrNotFound) {
+	if errors.Is(err, fetch.ErrNotFound) {
 		return nil, out.Errorf("source-fetch", "no %s at %s", manifest.FileName, c.Source)
 	}
+	if err != nil {
+		return s.urlFailure(ctx, c, err)
+	}
+	lockData, err := s.download(ctx, lockURL(c.Source))
+	if errors.Is(err, fetch.ErrNotFound) {
+		e := out.Errorf("source-lock", "no %s beside %s", lock.FileName, c.Source)
+		e.Help = "run `shulker lock` in the project and publish its lock beside the manifest"
+		return nil, e
+	}
+	if err != nil {
+		return s.urlFailure(ctx, c, err)
+	}
+	return c, s.storeURL(c, manifestData, lockData)
+}
+
+func (s *Store) urlFailure(ctx context.Context, c *Checkout, err error) (*Checkout, error) {
 	if ctx.Err() == nil && fetch.IsNetwork(err) {
 		return s.urlFallback(c, err)
 	}
-	return nil, out.Errorf("source-fetch", "%v", err)
+	e := out.Errorf("source-fetch", "couldn't fetch %s", c.Source)
+	e.Rows = []out.Detail{{Label: "http", Text: httpReason(err)}}
+	return nil, e
+}
+
+func refNotFound(code, ref, source string, err error) error {
+	if out.CodeOf(err) == "git-missing" {
+		return err
+	}
+	e := out.Errorf(code, "ref %q not found in %s", refOrHead(ref), source)
+	e.Rows = []out.Detail{{Label: "git", Text: gitReason(err.Error())}}
+	return e
 }
 
 // lockURL names the lock beside a manifest fetched from a raw URL, which holds for repo
@@ -144,7 +167,7 @@ var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)
 func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 	c.Offline = true
 	if fullCommit.MatchString(c.ref) {
-		if dir := s.Cache.PackSource(c.ref); exists(dir) {
+		if dir := s.Cache.PackSource(c.ref); isOnDisk(dir) {
 			c.Commit, c.Dir = c.ref, dir
 			c.Warning = fmt.Sprintf("%s, using %s at %s, already downloaded", offlineReason(cause), c.Source, c.ref[:12])
 			return c, nil
@@ -152,7 +175,7 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 		return nil, neverSynced(c, cause)
 	}
 	rec, ok := s.readLastGood(c.Source, c.ref)
-	if !ok || rec.Commit == "" || !exists(s.Cache.PackSource(rec.Commit)) {
+	if !ok || rec.Commit == "" || !isOnDisk(s.Cache.PackSource(rec.Commit)) {
 		return nil, neverSynced(c, cause)
 	}
 	c.Commit, c.Dir, c.LastGood = rec.Commit, s.Cache.PackSource(rec.Commit), rec.At
@@ -163,7 +186,7 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 func (s *Store) urlFallback(c *Checkout, cause error) (*Checkout, error) {
 	c.Offline = true
 	rec, ok := s.readLastGood(c.Source, "")
-	if !ok || rec.Sha256 == "" || !exists(filepath.Join(s.Cache.ProjectCheckout(rec.Sha256), lock.FileName)) {
+	if !ok || rec.Sha256 == "" || !isOnDisk(filepath.Join(s.Cache.ProjectCheckout(rec.Sha256), lock.FileName)) {
 		return nil, neverSynced(c, cause)
 	}
 	c.Sha256, c.Dir, c.LastGood = rec.Sha256, s.Cache.ProjectCheckout(rec.Sha256), rec.At
@@ -218,7 +241,7 @@ func httpReason(err error) string {
 	return strings.TrimSpace(httpReasonPrefix.ReplaceAllString(err.Error(), ""))
 }
 
-func exists(path string) bool {
+func isOnDisk(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
