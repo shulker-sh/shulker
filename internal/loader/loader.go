@@ -1,7 +1,11 @@
 // Package loader is the one table of what shulker knows about each mod loader.
 package loader
 
-import "shulker.sh/shulker/internal/out"
+import (
+	"strings"
+
+	"shulker.sh/shulker/internal/out"
+)
 
 type Loader struct {
 	Name string
@@ -57,6 +61,22 @@ func (l Loader) CurseForgeModLoader(minecraft, version string) string {
 		return l.Name + "-1.20.1-" + version
 	}
 	return l.Name + "-" + version
+}
+
+// ParseCurseForgeModLoader reads a loader id from a CurseForge modpack manifest, the inverse of
+// CurseForgeModLoader.
+func ParseCurseForgeModLoader(id string) (string, string, bool) {
+	name, version, ok := strings.Cut(id, "-")
+	if !ok || version == "" {
+		return "", "", false
+	}
+	if _, known := Lookup(name); !known {
+		return "", "", false
+	}
+	if name == "neoforge" {
+		version = strings.TrimPrefix(version, "1.20.1-")
+	}
+	return name, version, true
 }
 
 var All = []Loader{

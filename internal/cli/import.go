@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -38,7 +40,7 @@ func (a *app) importCmd() *cobra.Command {
 		Use:   "import",
 		Short: "Create a project from another modpack format",
 	}
-	cmd.AddCommand(a.importMrpackCmd())
+	cmd.AddCommand(a.importMrpackCmd(), a.importCurseForgeCmd())
 	return cmd
 }
 
@@ -60,15 +62,9 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			if name == "" {
 				name = slugify(arc.Index.Name)
 			}
-			dir := a.dir
-			if dir == "" {
-				dir = name
-			}
-			if dir, err = filepath.Abs(dir); err != nil {
+			dir, err := a.importDir(name)
+			if err != nil {
 				return err
-			}
-			if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
-				return out.Errorf("manifest-exists", "%s already exists in %s", manifest.FileName, dir)
 			}
 			m, warnings, err := importManifest(arc, name)
 			if err != nil {
@@ -85,15 +81,10 @@ func (a *app) importMrpackCmd() *cobra.Command {
 				return out.Errorf("mrpack-invalid", "the modpack's index names no minecraft version")
 			}
 			_, exact.Loader.Version, _ = arc.Loader()
-			a.progress("%s", resolvingLine(exact.Minecraft, exact.Loader))
-			platform, err := d.meta.Platform(cmd.Context(), &exact, nil)
+			l, err := a.importLock(cmd.Context(), d, &exact)
 			if err != nil {
 				return err
 			}
-			l := lock.New()
-			l.Minecraft = platform.Minecraft
-			l.Loader = platform.Loader
-			l.Java = platform.Java
 			if arc.Marker != nil && arc.Marker.Manifest.Server != nil && arc.Marker.Manifest.Server.Players != nil {
 				l.Players = arc.Marker.Lock.Players
 			}
@@ -127,6 +118,103 @@ func (a *app) importMrpackCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "project name (default: the pack name, slugified)")
 	cmd.Flags().BoolVar(&ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
 	return cmd
+}
+
+func (a *app) importCurseForgeCmd() *cobra.Command {
+	var name string
+	cmd := &cobra.Command{
+		Use:   "curseforge <file>",
+		Short: "Create a project from a CurseForge modpack (.zip)",
+		Args:  exactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			arc, err := cfpack.Read(args[0])
+			if err != nil {
+				return err
+			}
+			if name == "" {
+				name = slugify(arc.Manifest.Name)
+			}
+			dir, err := a.importDir(name)
+			if err != nil {
+				return err
+			}
+			loaderType, loaderVersion, err := arc.Loader()
+			if err != nil {
+				return err
+			}
+			m := &manifest.Manifest{
+				Schema:    manifest.SchemaURL,
+				Name:      name,
+				Version:   arc.Manifest.Version,
+				Minecraft: arc.Manifest.Minecraft.Version,
+				Loader:    manifest.Loader{Type: loaderType, Version: loaderVersion},
+				Requires:  map[string]manifest.Require{},
+				Client:    &manifest.Client{},
+			}
+			if arc.Manifest.Author != "" {
+				m.Authors = []string{arc.Manifest.Author}
+			}
+			d, err := a.deps()
+			if err != nil {
+				return err
+			}
+			l, err := a.importLock(cmd.Context(), d, m)
+			if err != nil {
+				return err
+			}
+			r := &resolve.Resolver{Dir: dir, Manifest: m, Lock: l, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+			mods, err := r.ImportCurseForge(cmd.Context(), arc)
+			if err != nil {
+				return err
+			}
+			a.warn(mods.Warnings)
+			if err := writeImport(dir, m, l, mods.Overrides); err != nil {
+				return err
+			}
+			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
+			return a.printer.Emit(res, func(l *out.Lines) {
+				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
+				l.Tree(
+					out.Row{Text: plural(len(mods.Locked), "file", "files") + " locked from CurseForge"},
+					out.Row{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
+				)
+				l.Nudge("Download and build it", "cd "+dir+" && shulker install")
+			})
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "project name (default: the pack name, slugified)")
+	return cmd
+}
+
+// importDir is where an import creates its project: --dir, else a folder named for the project.
+// It refuses one that already holds a manifest.
+func (a *app) importDir(name string) (string, error) {
+	dir := a.dir
+	if dir == "" {
+		dir = name
+	}
+	dir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
+		return "", out.Errorf("manifest-exists", "%s already exists in %s", manifest.FileName, dir)
+	}
+	return dir, nil
+}
+
+// importLock starts the new project's lock from the exact platform the pack names.
+func (a *app) importLock(ctx context.Context, d *deps, exact *manifest.Manifest) (*lock.Lock, error) {
+	a.progress("%s", resolvingLine(exact.Minecraft, exact.Loader))
+	platform, err := d.meta.Platform(ctx, exact, nil)
+	if err != nil {
+		return nil, err
+	}
+	l := lock.New()
+	l.Minecraft = platform.Minecraft
+	l.Loader = platform.Loader
+	l.Java = platform.Java
+	return l, nil
 }
 
 func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []string, error) {

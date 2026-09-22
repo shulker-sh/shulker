@@ -62,6 +62,7 @@ outline: [2, 3]
 | [`shulker accounts providers add\|remove <launcher>`](#shulker-accounts-providers-add-remove) | Read accounts from another launcher, or stop |
 | [`shulker accounts providers set <launcher...>`](#shulker-accounts-providers-set) | Replace the list, in the order given |
 | [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
+| [`shulker import curseforge <file>`](#shulker-import-curseforge) | Create a project from a CurseForge modpack |
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
 | [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
@@ -124,6 +125,19 @@ shulker import mrpack pack.mrpack -C my-pack --name my-pack
 | --- | --- |
 | `--name <name>` | Project name (default: the modpack name, slugified) |
 | `--ignore-shulker` | Ignore the shulker manifest and lock inside the modpack and import it as any other one |
+
+### `shulker import curseforge`
+
+Create a project from a CurseForge modpack `.zip`, the kind the CurseForge app exports and [`export curseforge`](#shulker-export-curseforge) writes. Each mod, resource pack and shader the pack names is locked by its CurseForge project and file ID, so the project gets the exact files the pack ships, and the pack's overrides folder becomes the project's `overrides/`. A file the pack marks optional is skipped with a warning. A file whose author doesn't allow third-party downloads stops the import with `missing-files`, naming each one and its page: download them into the new project's `downloads/` and run the import again, and they lock as manual downloads. A zip that isn't a CurseForge modpack is refused by what it holds, whatever its name.
+
+```sh
+shulker import curseforge ~/Downloads/all-the-mods.zip
+shulker import curseforge pack.zip -C my-pack --name my-pack
+```
+
+| Flag | Description |
+| --- | --- |
+| `--name <name>` | Project name (default: the modpack name, slugified) |
 
 ### `shulker export mrpack`
 
@@ -1622,6 +1636,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-side` | The manifest declares both sides and the command works on one; `sync` and `pull` take `--side`, `diff --into` names it. `candidates`: the sides |
+| `archive-not-modpack` | The file given as a modpack isn't one: not a zip, or a zip without the index its format needs, like a CurseForge `manifest.json` of type `minecraftModpack` |
 | `appdata-unset` | `APPDATA` isn't set on Windows, so shulker can't find a launcher's default folder. `link` takes `--launcher-dir` instead |
 | `backup-failed` | `backup --all` failed for some targets; `data` has each target's result |
 | `backup-invalid` | `restore` was given a zip that won't open, or that holds anything other than world folders at its root |
@@ -1633,6 +1648,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
+| `curseforge-invalid` | The CurseForge modpack is malformed: its `manifest.json` doesn't parse, names no Minecraft version, is a manifest version other than 1, or the zip holds an unsafe path |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs or shaders; pass `--bundle`. `items`: what is missing |
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
@@ -1671,7 +1687,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `launcher-file-invalid` | A launcher file shulker reads or rewrites (an instance's JSON, `launcher_profiles.json`, `mmc-pack.json`) isn't valid JSON, or not the shape shulker expects. A row carries the parser's own error |
 | `launcher-not-found` | No launcher directory where shulker looked |
 | `loader-profile-invalid` | The loader profile shulker fetched isn't a version JSON with an id, so it can't be installed into the launcher. A row says what was wrong with it |
-| `loader-required` | `add` of a mod in a project without a loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
+| `loader-required` | `add` of a mod in a project without a loader, or `import curseforge` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
 | `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
@@ -1685,7 +1701,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `meta-fetch` | Version metadata couldn't be read from Mojang, a loader's meta or Maven, or GDLauncher's meta. The row names the service and what went wrong |
 | `meta-invalid` | Version metadata was read but lacks what shulker needs, like a Minecraft version Mojang doesn't list, a Java runtime manifest with no java in it, or a loader installer whose files won't parse |
 | `minecraft-required` | `shulker.json` sets no `minecraft` and no locked modpack supplies one; set it with `shulker set minecraft <version>` |
-| `missing-files` | Mods that need a manual download are missing. `items`: what to download |
+| `missing-files` | Mods that need a manual download are missing, at `install`, or files a CurseForge modpack names at `import curseforge`. `items`: what to download |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
 | `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files; pass `--bundle`. `items`: the files |
@@ -1763,7 +1779,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
 | `version-no-file` | The provider's version has no file shulker can download, or no hash to check it against |
-| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; its help links the mod's versions page |
+| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or no file with an id a CurseForge modpack names; for a pin its help links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
 | `world-in-use` | `restore` would replace a world a running game or server has open. `items`: the open worlds |
 | `world-not-found` | `backup --world` named a world the target doesn't hold, `restore --world` one the zip doesn't hold, or `restore` into a server was given a zip without the world its `level-name` names and no `--as`; the message names the `level-name` |

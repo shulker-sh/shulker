@@ -9,13 +9,12 @@ import (
 	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider/curseforge"
 )
-
-const curseForgeManifestName = "manifest.json"
 
 type CurseForgeOptions struct {
 	Side     string
@@ -57,34 +56,6 @@ type curseForgeEntry struct {
 	version  any
 }
 
-type curseForgeManifest struct {
-	Minecraft       curseForgeMinecraft `json:"minecraft"`
-	ManifestType    string              `json:"manifestType"`
-	ManifestVersion int                 `json:"manifestVersion"`
-	Name            string              `json:"name"`
-	Version         string              `json:"version"`
-	Author          string              `json:"author,omitempty"`
-	Files           []curseForgeFile    `json:"files"`
-	Overrides       string              `json:"overrides"`
-	Image           string              `json:"image"`
-}
-
-type curseForgeMinecraft struct {
-	Version    string                `json:"version"`
-	ModLoaders []curseForgeModLoader `json:"modLoaders"`
-}
-
-type curseForgeModLoader struct {
-	ID      string `json:"id"`
-	Primary bool   `json:"primary"`
-}
-
-type curseForgeFile struct {
-	ProjectID int  `json:"projectID"`
-	FileID    int  `json:"fileID"`
-	Required  bool `json:"required"`
-}
-
 // ExportCurseForge writes the project as a CurseForge modpack.
 func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, error) {
 	side := opts.Side
@@ -110,14 +81,14 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 		report.Overrides = append(report.Overrides, path)
 	}
 	sort.Strings(report.Overrides)
-	modLoaders := []curseForgeModLoader{}
+	modLoaders := []cfpack.ModLoader{}
 	if l, ok := loader.Lookup(b.Lock.Loader.Type); ok {
-		modLoaders = append(modLoaders, curseForgeModLoader{ID: l.CurseForgeModLoader(b.Lock.Minecraft, b.Lock.Loader.Version), Primary: true})
+		modLoaders = append(modLoaders, cfpack.ModLoader{ID: l.CurseForgeModLoader(b.Lock.Minecraft, b.Lock.Loader.Version), Primary: true})
 	}
-	profile := curseForgeManifest{
-		Minecraft:       curseForgeMinecraft{Version: b.Lock.Minecraft, ModLoaders: modLoaders},
-		ManifestType:    "minecraftModpack",
-		ManifestVersion: 1,
+	profile := cfpack.Manifest{
+		Minecraft:       cfpack.Minecraft{Version: b.Lock.Minecraft, ModLoaders: modLoaders},
+		ManifestType:    cfpack.ManifestType,
+		ManifestVersion: cfpack.ManifestVersion,
 		Name:            report.Name,
 		Version:         opts.Version,
 		Author:          strings.Join(b.Manifest.Authors, ", "),
@@ -129,13 +100,13 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 	if err != nil {
 		return nil, err
 	}
-	entries[curseForgeManifestName] = append(data, '\n')
+	entries[cfpack.ManifestName] = append(data, '\n')
 	entries[profile.Image] = markerIcon
 	entries["modlist.html"] = curseForgeModlist(names, files)
 	if err := b.addIdentity(entries); err != nil {
 		return nil, err
 	}
-	if err := writeArchive(opts.Output, curseForgeManifestName, entries); err != nil {
+	if err := writeArchive(opts.Output, cfpack.ManifestName, entries); err != nil {
 		return nil, err
 	}
 	return report, nil
@@ -143,9 +114,9 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 
 // curseForgeMods returns the profile's files and the names that pair with them
 // in the modlist, in the order the archive lists them.
-func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *CurseForgeReport) ([]curseForgeFile, []string, error) {
+func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *CurseForgeReport) ([]cfpack.File, []string, error) {
 	entries := b.curseForgeEntries(t)
-	byKey := map[string]curseForgeFile{}
+	byKey := map[string]cfpack.File{}
 	byEntry := map[string]curseForgeEntry{}
 	blobs := map[string][]byte{}
 	var lookup []string
@@ -153,7 +124,7 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 	for _, e := range entries {
 		byEntry[e.key] = e
 		if project, file, ok := curseForgeLocked(e); ok {
-			byKey[e.key] = curseForgeFile{ProjectID: project, FileID: file, Required: true}
+			byKey[e.key] = cfpack.File{ProjectID: project, FileID: file, Required: true}
 			continue
 		}
 		data, err := os.ReadFile(b.Cache.Object(e.sha512))
@@ -182,7 +153,7 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 	for i, key := range lookup {
 		e := byEntry[key]
 		if match, ok := matches[fingerprints[i]]; ok {
-			byKey[key] = curseForgeFile{ProjectID: match.ModID, FileID: match.FileID, Required: true}
+			byKey[key] = cfpack.File{ProjectID: match.ModID, FileID: match.FileID, Required: true}
 			report.Matched = append(report.Matched, key)
 			continue
 		}
@@ -203,7 +174,7 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		}
 		return nil, nil, bundleNudge(out.Errorf("curseforge-not-found", "%s %s on CurseForge", kindCount(missing.counts), verb), missing.items, "shulker export curseforge --bundle")
 	}
-	files := []curseForgeFile{}
+	files := []cfpack.File{}
 	names := []string{}
 	for _, e := range entries {
 		f, ok := byKey[e.key]
@@ -276,7 +247,7 @@ func lockInt(v any) (int, bool) {
 	return 0, false
 }
 
-func curseForgeModlist(names []string, files []curseForgeFile) []byte {
+func curseForgeModlist(names []string, files []cfpack.File) []byte {
 	var sb strings.Builder
 	sb.WriteString("<ul>\n")
 	for i, f := range files {
