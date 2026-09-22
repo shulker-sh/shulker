@@ -357,3 +357,55 @@ func TestSkips(t *testing.T) {
 		}
 	}
 }
+
+func TestParseChecksTheMarker(t *testing.T) {
+	doc := func(schema string) []byte {
+		return []byte(`{"$schema":"` + schema + `","name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"requires":{},"client":{}}`)
+	}
+	newer := []byte(`{"$schema":"https://shulker.sh/schema/v2/manifest.json","name":"p","sides":["client"],"mods":{}}`)
+	_, err := Parse(newer)
+	e := out.AsError(err)
+	if out.CodeOf(err) != "schema-newer" || len(e.Items) != 0 {
+		t.Fatalf("newer marker: %v (items %v)", err, e.Items)
+	}
+	if want := "shulker.json was written by a newer shulker: its schema is v2, and this shulker knows v1"; e.Message != want {
+		t.Errorf("newer message = %q, want %q", e.Message, want)
+	}
+
+	const foreign = "https://example.com/manifest.json"
+	_, err = Parse(doc(foreign))
+	if out.CodeOf(err) != "manifest-invalid" {
+		t.Fatalf("foreign marker: code %q (%v)", out.CodeOf(err), err)
+	}
+	if want := "names the schema " + foreign + ", which this shulker doesn't know"; !strings.Contains(err.Error(), want) {
+		t.Errorf("foreign message = %q, want it to contain %q", err.Error(), want)
+	}
+
+	if _, err := Parse(doc(SchemaURL)); err != nil {
+		t.Errorf("current marker: %v", err)
+	}
+}
+
+func TestSaveWritesTheMarker(t *testing.T) {
+	m, err := Parse([]byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"requires":{},"client":{}}`))
+	if err != nil {
+		t.Fatalf("a manifest with no $schema should load: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), FileName)
+	if err := m.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var head struct {
+		Schema string `json:"$schema"`
+	}
+	if err := json.Unmarshal(data, &head); err != nil {
+		t.Fatal(err)
+	}
+	if head.Schema != SchemaURL {
+		t.Errorf("saved $schema = %q, want %q", head.Schema, SchemaURL)
+	}
+}

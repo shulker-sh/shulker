@@ -327,6 +327,16 @@ func Load(path string) (*Manifest, error) {
 
 // Parse decodes a shulker.json and checks it against the schema and the rules the schema can't express.
 func Parse(data []byte) (*Manifest, error) {
+	// A manifest with no $schema is read as the current version: it is the one managed file
+	// people write by hand.
+	var head struct {
+		Schema json.RawMessage `json:"$schema"`
+	}
+	if json.Unmarshal(data, &head) != nil || head.Schema != nil {
+		if err := schema.CheckMarker(schema.Manifest, "manifest-invalid", FileName, data); err != nil {
+			return nil, err
+		}
+	}
 	// Before the schema, whose anyOf reports the same thing as two missing
 	// properties.
 	var declared struct {
@@ -466,6 +476,7 @@ func (m *Manifest) Encode() ([]byte, error) {
 
 // Save refuses to write a manifest that fails the schema.
 func (m *Manifest) Save(path string) error {
+	m.Schema = SchemaURL
 	data, err := m.Encode()
 	if err != nil {
 		return err
