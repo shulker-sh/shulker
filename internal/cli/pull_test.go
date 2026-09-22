@@ -151,3 +151,20 @@ func TestPullAdoptsADroppedJarOrPackAsAFileEntry(t *testing.T) {
 		t.Fatalf("--as takes a single file: exit %d %s", code, stdout)
 	}
 }
+
+func TestPullReportsWhereAnAdoptedFileLives(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "install")
+	jar := makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17"}`)
+	synced := filepath.Join(h.dir, "synced")
+	writeOverride(t, synced, "mods/private-mod-1.4.jar", string(jar.data))
+
+	rep := pullReport(t, h, "mods/private-mod-1.4.jar", "--into", synced)
+	if want := []string{"mods/private-mod-1.4.jar -> synced/mods/private-mod-1.4.jar"}; !reflect.DeepEqual(rep.Entries, want) {
+		t.Fatalf("the report names the path the entry points at: %q", rep.Entries)
+	}
+	if got := h.readManifest(t).Requires["private-mod"].File; got != "synced/mods/private-mod-1.4.jar" {
+		t.Fatalf("a file inside the project is referenced where it lies: %q", got)
+	}
+}

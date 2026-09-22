@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -241,7 +240,11 @@ func (a *app) adoptFiles(cmd *cobra.Command, p *project.Project, rep *build.Pull
 	_, err := a.relockProject(cmd, p, true, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 		for _, rel := range rep.Adoptable {
 			abs := filepath.Join(rep.Dir, filepath.FromSlash(rel))
-			err := r.Add(cmd.Context(), abs, resolve.AddOptions{Type: build.AdoptedType(rel), As: as})
+			dest, _, err := r.ProjectPath(abs)
+			if err != nil {
+				return "", err
+			}
+			err = r.Add(cmd.Context(), abs, resolve.AddOptions{Type: build.AdoptedType(rel), As: as})
 			var taken *out.Error
 			if errors.As(err, &taken) && taken.Code == "requires-taken" {
 				skip := taken.Message
@@ -254,7 +257,7 @@ func (a *app) adoptFiles(cmd *cobra.Command, p *project.Project, rep *build.Pull
 			if err != nil {
 				return "", err
 			}
-			rep.Entries = append(rep.Entries, rel+" -> "+manifest.FilesDir+"/"+path.Base(rel))
+			rep.Entries = append(rep.Entries, rel+" -> "+dest)
 		}
 		return "", nil
 	})
