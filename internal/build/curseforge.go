@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,10 +58,12 @@ type CurseForgeReport struct {
 	Mods                 []string `json:"mods"`
 	ResourcePacks        []string `json:"resourcepacks"`
 	Shaders              []string `json:"shaders"`
+	Datapacks            []string `json:"datapacks"`
 	Matched              []string `json:"matched"`
 	BundledMods          []string `json:"bundledMods"`
 	BundledResourcePacks []string `json:"bundledResourcepacks"`
 	BundledShaders       []string `json:"bundledShaders"`
+	BundledDatapacks     []string `json:"bundledDatapacks"`
 	Overrides            []string `json:"overrides"`
 	Warnings             []string `json:"-"`
 }
@@ -82,6 +85,9 @@ type curseForgeEntry struct {
 	providerFilename string
 	alias            int
 	loaders          []string
+	// bundleOnly marks a file the CurseForge app can't place where the build does: a datapack
+	// outside datapacks/, the one folder the app installs datapacks in.
+	bundleOnly bool
 }
 
 // ExportCurseForge writes the project as a CurseForge modpack.
@@ -95,7 +101,7 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 		return nil, err
 	}
 	t := sides[0]
-	report := &CurseForgeReport{Path: opts.Output, Version: opts.Version, Name: b.mrpackName(sides), Side: t.side, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, Matched: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}}
+	report := &CurseForgeReport{Path: opts.Output, Version: opts.Version, Name: b.mrpackName(sides), Side: t.side, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, Datapacks: []string{}, Matched: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, BundledDatapacks: []string{}, Overrides: []string{}}
 	if report.Warnings, err = b.mrpackCollect(t, opts.Version, opts.OS, opts.Features); err != nil {
 		return nil, err
 	}
@@ -156,10 +162,25 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 	fileNames := map[string]string{}
 	byEntry := map[string]curseForgeEntry{}
 	blobs := map[string][]byte{}
-	var lookup []string
+	var lookup, unplaceable []string
 	var fingerprints []uint32
 	for _, e := range entries {
 		byEntry[e.key] = e
+		if e.bundleOnly {
+			data, err := os.ReadFile(b.Cache.Object(e.sha512))
+			if err != nil {
+				return nil, nil, nil, notInstalled(e.key)
+			}
+			if !opts.Bundle {
+				unplaceable = append(unplaceable, e.key+" ("+path.Dir(e.path)+"/)")
+				continue
+			}
+			t.files[e.path] = data
+			bundled := reportList(report, e.kind, true)
+			*bundled = append(*bundled, e.key)
+			report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s into the archive at %s, since the CurseForge app would install it in datapacks/", e.key, e.path))
+			continue
+		}
 		if project, file, ok := curseForgeLocked(e); ok {
 			byKey[e.key] = cfpack.File{ProjectID: project, FileID: file, Required: true}
 			fileNames[e.path] = e.filename
@@ -172,6 +193,10 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		blobs[e.key] = data
 		lookup = append(lookup, e.key)
 		fingerprints = append(fingerprints, curseforge.Fingerprint(data))
+	}
+	if len(unplaceable) > 0 {
+		e := out.Errorf("curseforge-cant-place", "%s can't go in by file ID: the CurseForge app installs datapacks in datapacks/, and this build places them in a global datapack mod's folder", kindCount(map[string]int{manifest.TypeDatapack: len(unplaceable)}))
+		return nil, nil, nil, bundleNudge(e, unplaceable, "shulker export curseforge --bundle")
 	}
 	matches := map[uint32]curseforge.Match{}
 	lookalikes := opts.Lookalike != nil
@@ -349,6 +374,10 @@ func reportList(report *CurseForgeReport, kind string, bundled bool) *[]string {
 		return &report.BundledShaders
 	case kind == manifest.TypeShader:
 		return &report.Shaders
+	case kind == manifest.TypeDatapack && bundled:
+		return &report.BundledDatapacks
+	case kind == manifest.TypeDatapack:
+		return &report.Datapacks
 	case bundled:
 		return &report.BundledMods
 	}
@@ -371,6 +400,14 @@ func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 			continue
 		}
 		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.ProviderFilename, providerFilename: ref.pack.ProviderFilename, loaders: ref.pack.Loaders})
+	}
+	for _, key := range sortedPacks(b.Lock.Datapacks) {
+		rel, ok := t.datapacks[key]
+		if !ok {
+			continue
+		}
+		p := b.Lock.Datapacks[key]
+		entries = append(entries, curseForgeEntry{key: key, kind: manifest.TypeDatapack, path: rel, provider: p.Provider, sha512: p.Sha512, url: p.URL, project: p.Project, version: p.Version, filename: p.ProviderFilename, providerFilename: p.ProviderFilename, bundleOnly: path.Dir(rel) != "datapacks"})
 	}
 	return entries
 }

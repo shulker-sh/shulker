@@ -139,3 +139,70 @@ func TestInPlaceServerBuildWritesItsWorldsDatapacks(t *testing.T) {
 		t.Fatal("an in-place server writes its world's datapacks")
 	}
 }
+
+func TestExportMrpackCarriesDatapacksBySide(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.editManifest(t, func(m map[string]any) {
+		m["server"] = map[string]any{}
+	})
+	h.mustRun(t, "add", "terralith")
+	h.mustRun(t, "install")
+	h.allowMrpackHost(t)
+
+	stdout := h.mustRun(t, "export", "mrpack", "--version", "1.0")
+	if !strings.Contains(stdout, "1 datapack by download") {
+		t.Fatalf("export output counts the datapack: %s", stdout)
+	}
+	index, _ := readMrpack(t, filepath.Join(h.dir, "build", "pack-1.0.mrpack"))
+	paths := map[string]map[string]string{}
+	for _, f := range index.Files {
+		paths[f.Path] = f.Env
+	}
+	if env := paths["datapacks/terralith.zip"]; env["client"] != "required" || env["server"] != "unsupported" {
+		t.Fatalf("the client's copy goes to datapacks/: %+v", index.Files)
+	}
+	if env := paths["world/datapacks/terralith.zip"]; env["server"] != "required" || env["client"] != "unsupported" {
+		t.Fatalf("the server's copy goes to its world: %+v", index.Files)
+	}
+
+	paxi := makeJar(t, "paxi", "Paxi-26.2-Fabric-5.1.jar", "*")
+	h.mustRun(t, "add", writeOutside(t, paxi.filename, paxi.data))
+	h.mustRun(t, "export", "mrpack", "--version", "1.1", "--bundle")
+	index, _ = readMrpack(t, filepath.Join(h.dir, "build", "pack-1.1.mrpack"))
+	var datapacks []string
+	for _, f := range index.Files {
+		if strings.Contains(f.Path, "terralith") {
+			datapacks = append(datapacks, f.Path)
+			if f.Env["client"] != "required" || f.Env["server"] != "required" {
+				t.Fatalf("one copy serves both sides: %+v", f)
+			}
+		}
+	}
+	if !reflect.DeepEqual(datapacks, []string{"config/paxi/datapacks/terralith.zip"}) {
+		t.Fatalf("with Paxi on both sides the datapack goes in once: %v", datapacks)
+	}
+}
+
+func TestExportCurseForgeBundlesADatapackOutsideDatapacks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	loot := makeJarFiles(t, "loot", "loot.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/loot/loot_table/chest.json": "{}"})
+	h.mustRun(t, "add", writeOutside(t, loot.filename, loot.data))
+	paxi := makeJar(t, "paxi", "Paxi-26.2-Fabric-5.1.jar", "*")
+	h.mustRun(t, "add", writeOutside(t, paxi.filename, paxi.data))
+	h.mustRun(t, "install")
+
+	code, stdout, _ := h.run(t, "--json", "export", "curseforge", "--version", "1.0")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "curseforge-cant-place" {
+		t.Fatalf("a datapack in Paxi's folder can't go by file ID: code=%d %+v", code, e)
+	}
+	stdout = h.mustRun(t, "export", "curseforge", "--version", "1.0", "--bundle")
+	if !strings.Contains(stdout, "1 datapack bundled") {
+		t.Fatalf("export output counts the bundled datapack: %s", stdout)
+	}
+	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
+	if entries["overrides/config/paxi/datapacks/loot.zip"] != string(loot.data) {
+		t.Fatal("the datapack is bundled where Paxi reads it")
+	}
+}

@@ -126,9 +126,11 @@ type exportTally struct {
 	mods                 []string
 	resourcePacks        []string
 	shaders              []string
+	datapacks            []string
 	bundledMods          []string
 	bundledResourcePacks []string
 	bundledShaders       []string
+	bundledDatapacks     []string
 	overrides            []string
 }
 
@@ -147,9 +149,11 @@ func (e exportTally) rows() []out.Row {
 	add(e.mods, "mod", "mods", e.how)
 	add(e.resourcePacks, "resource pack", "resource packs", e.how)
 	add(e.shaders, "shader", "shaders", e.how)
+	add(e.datapacks, "datapack", "datapacks", e.how)
 	add(e.bundledMods, "mod", "mods", "bundled")
 	add(e.bundledResourcePacks, "resource pack", "resource packs", "bundled")
 	add(e.bundledShaders, "shader", "shaders", "bundled")
+	add(e.bundledDatapacks, "datapack", "datapacks", "bundled")
 	add(e.overrides, "override file", "override files", "")
 	return rows
 }
@@ -175,7 +179,7 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 			a.warn(rep.Warnings)
 			return a.printer.Emit(rep, func(l *out.Lines) {
 				l.OKInto("wrote "+rep.Name+" "+rep.VersionID, rep.Path, strings.Join(rep.Sides, " and "))
-				l.Tree(exportTally{how: "by download", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, overrides: rep.Overrides}.rows()...)
+				l.Tree(exportTally{how: "by download", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, datapacks: rep.Datapacks, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, bundledDatapacks: rep.BundledDatapacks, overrides: rep.Overrides}.rows()...)
 			})
 		},
 	}
@@ -222,7 +226,7 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 			a.warn(rep.Warnings)
 			return a.printer.Emit(rep, func(l *out.Lines) {
 				l.OKInto("wrote "+rep.Name+" "+rep.Version, rep.Path, "")
-				rows := exportTally{how: "by file ID", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, overrides: rep.Overrides}.rows()
+				rows := exportTally{how: "by file ID", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, datapacks: rep.Datapacks, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, bundledDatapacks: rep.BundledDatapacks, overrides: rep.Overrides}.rows()
 				if len(rep.Matched) > 0 {
 					rows = append(rows, out.Row{Label: "matched on CurseForge", Text: strings.Join(rep.Matched, ", ")})
 				}

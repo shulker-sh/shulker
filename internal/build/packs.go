@@ -257,6 +257,7 @@ var kindLabels = map[string][2]string{
 	manifest.TypeMod:          {"mod", "mods"},
 	manifest.TypeResourcePack: {"resource pack", "resource packs"},
 	manifest.TypeShader:       {"shader", "shaders"},
+	manifest.TypeDatapack:     {"datapack", "datapacks"},
 }
 
 // kindTally collects what an export can't point at, keeping each kind's own
@@ -280,7 +281,7 @@ func (t *kindTally) total() int { return len(t.items) }
 // a mod.
 func kindCount(counts map[string]int) string {
 	var parts []string
-	for _, kind := range []string{manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader} {
+	for _, kind := range append([]string{manifest.TypeMod}, manifest.PackKinds...) {
 		n := counts[kind]
 		if n == 0 {
 			continue

@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -42,9 +44,11 @@ type MrpackReport struct {
 	Mods                 []string `json:"mods"`
 	ResourcePacks        []string `json:"resourcepacks"`
 	Shaders              []string `json:"shaders"`
+	Datapacks            []string `json:"datapacks"`
 	BundledMods          []string `json:"bundledMods"`
 	BundledResourcePacks []string `json:"bundledResourcepacks"`
 	BundledShaders       []string `json:"bundledShaders"`
+	BundledDatapacks     []string `json:"bundledDatapacks"`
 	Overrides            []string `json:"overrides"`
 	Warnings             []string `json:"-"`
 }
@@ -54,6 +58,8 @@ type mrpackSide struct {
 	files map[string][]byte
 	mods  map[string]bool
 	packs map[string]bool
+	// datapacks is where the side places each datapack, by key.
+	datapacks map[string]string
 }
 
 // ExportMrpack writes the project as a Modrinth modpack.
@@ -62,7 +68,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(sides), Sides: []string{}, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}, Warnings: []string{}}
+	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(sides), Sides: []string{}, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, Datapacks: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, BundledDatapacks: []string{}, Overrides: []string{}, Warnings: []string{}}
 	for _, t := range sides {
 		report.Sides = append(report.Sides, t.side)
 		warnings, err := b.mrpackCollect(t, opts.VersionID, opts.OS, opts.Features)
@@ -170,7 +176,7 @@ func (b *Builder) mrpackName(sides []*mrpackSide) string {
 // mrpackCollect fills a side's override files and the mods it ships, returning the warnings.
 func (b *Builder) mrpackCollect(t *mrpackSide, version, osName string, features map[string]bool) ([]string, error) {
 	rep := &Report{}
-	desired, _, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features, NoLauncher: true, PackVersion: version}, rep)
+	desired, dirs, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features, NoLauncher: true, PackVersion: version}, rep)
 	if err != nil {
 		return nil, err
 	}
@@ -185,6 +191,12 @@ func (b *Builder) mrpackCollect(t *mrpackSide, version, osName string, features 
 	for _, ref := range b.packRefs() {
 		if _, ok := desired[ref.path]; ok {
 			t.packs[ref.key] = true
+		}
+	}
+	t.datapacks = map[string]string{}
+	for key, p := range b.Lock.Datapacks {
+		if rel := b.Lock.PackPath(manifest.TypeDatapack, p, t.side, dirs[0]); desired[rel].sha512 != "" {
+			t.datapacks[key] = rel
 		}
 	}
 	for _, e := range rep.Excluded {
@@ -273,6 +285,28 @@ func (b *Builder) mrpackMods(sides []*mrpackSide, bundle bool, report *MrpackRep
 			return nil, nil, err
 		}
 	}
+	for _, key := range sortedPacks(b.Lock.Datapacks) {
+		p := b.Lock.Datapacks[key]
+		// Each side may place a datapack in its own folder, so each folder is a file of its own,
+		// for the sides that place it there.
+		bySide := map[string][]*mrpackSide{}
+		for _, t := range sides {
+			if rel, ok := t.datapacks[key]; ok {
+				bySide[rel] = append(bySide[rel], t)
+			}
+		}
+		for _, rel := range slices.Sorted(maps.Keys(bySide)) {
+			owners := bySide[rel]
+			side := "both"
+			if len(owners) == 1 {
+				side = owners[0].side
+			}
+			if err := add(key, manifest.TypeDatapack, rel, side, p.Provider, p.Sha512, p.URL, owners, &report.Datapacks, &report.BundledDatapacks); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	report.Datapacks, report.BundledDatapacks = slices.Compact(report.Datapacks), slices.Compact(report.BundledDatapacks)
 	if blocked.total() > 0 {
 		return nil, nil, bundleNudge(out.Errorf("mrpack-host-not-allowed", "%s can't be downloaded by Modrinth launchers", kindCount(blocked.counts)), blocked.items, "shulker export mrpack --bundle")
 	}
