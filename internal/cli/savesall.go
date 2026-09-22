@@ -147,9 +147,7 @@ func eachTarget[T any](a *app, picks []savesPick, failed func(n, of int) *out.Er
 			} else {
 				failures++
 				r.OK, r.Error = false, e
-				if !a.printer.JSON {
-					a.printer.Err().Error(e)
-				}
+				a.printer.Report(e)
 			}
 		}
 		runs = append(runs, r)

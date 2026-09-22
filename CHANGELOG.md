@@ -57,6 +57,7 @@ All notable changes to shulker are documented here. The format is based on
 - A bare `add` on a terminal opens the same search box, where you mark as many results as you like and add them all at once.
 - `init` on a terminal asks what you are making, which Minecraft version, whether to add mods, which loader and which version of it, and whether to start from an existing pack, each starting on the default its flag has, so taking them all creates what `--yes` creates. `--no-input` asks nothing anywhere and takes every default, which output that isn't going to a terminal and `--json` imply; `init --yes` is its alias on that command. Every question is a picker you can leave with esc, including the ones that already existed: which instance to sync, which account, and the EULA.
 - `docs` prints the documentation built into the binary, so it matches the installed version and works offline: a page, a command's section, or any heading, with a list to pick from when several match, and `--search` finds a phrase on every page.
+- Every run appends to `log.jsonl` beside `config.json`: when it started and ended, with its flags, instance and exit code, and every warning and error it showed. The file is readable only by you, and never holds the game's arguments `hook wrap` hands on, which carry the session token.
 
 ### Changed
 - `.shulker/state.json` records `side` in place of `target`. A state file from an earlier build decodes with an empty side, so the next build treats that directory as fresh and writes everything again; there is no migration.

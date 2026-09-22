@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
+	"shulker.sh/shulker/internal/auditlog"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
@@ -46,6 +48,8 @@ type app struct {
 	watcher     func(req watchRequest) (int, error)
 	isRunning   bool
 	backedUp    map[savesTarget]bool
+	log         *auditlog.Log
+	logState    logState
 }
 
 // Execute runs shulker with args and returns the process exit code.
@@ -77,11 +81,15 @@ func (a *app) run(ctx context.Context, args []string) int {
 	if !a.printer.JSON {
 		a.printer.Theme, a.printer.ErrTheme = out.Detect(a.printer.Stdout, a.printer.Stderr, a.style)
 	}
+	a.openLog(args)
 	root := a.root()
 	root.SetArgs(args)
 	root.SetOut(a.printer.Stdout)
 	root.SetErr(a.printer.Stderr)
-	if cmd, err := root.ExecuteContextC(ctx); err != nil {
+	cmd, err := root.ExecuteContextC(ctx)
+	a.startLog(cmp.Or(cmd, root))
+	code := out.ExitOK
+	if err != nil {
 		if !a.isRunning && out.CodeOf(err) == "" {
 			err = usageError(root, err)
 		}
@@ -91,10 +99,12 @@ func (a *app) run(ctx context.Context, args []string) int {
 		if ctx.Err() != nil {
 			err = &out.Error{Code: "interrupted", Message: "interrupted", Exit: out.ExitInterrupted, Data: out.AsError(err).Data}
 		}
-		return a.printer.Fail(err)
+		code = a.printer.Fail(err)
+	} else {
+		a.printer.Settle()
 	}
-	a.printer.Settle()
-	return out.ExitOK
+	a.endLog(code)
+	return code
 }
 
 // markRunning tells cobra's own errors (unknown command or flag, bad
@@ -121,6 +131,7 @@ func (a *app) root() *cobra.Command {
 		DisableSuggestions: true,
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 			a.printer.Command = strings.TrimPrefix(cmd.CommandPath(), "shulker ")
+			a.startLog(cmd)
 		},
 	}
 	// These values are read from the arguments before cobra parses them, so
@@ -143,7 +154,7 @@ func (a *app) root() *cobra.Command {
 	a.printer.JSON, a.printer.NoInput, a.dir, a.style.NoColor, a.style.ASCII = jsonOut, noInput, dir, noColor, ascii
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.searchCmd(), a.removeCmd(), a.listCmd(), a.lockCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.ignoreCmd(), a.unignoreCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.instancesCmd(), a.instanceCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.historyCmd(), a.rollbackCmd(), a.backupCmd(), a.restoreCmd(), a.savesCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.accountsCmd(), a.playCmd(), a.watchCmd(), a.selfCmd(), a.docsCmd(), a.cacheCmd(), a.completionCmd())
 	root.AddCommand(a.typeGroupCmds()...)
-	// hook is hidden and in no help group: the generated scripts run it, nobody types it.
+	// hook is hidden: the generated scripts run it, nobody types it.
 	root.AddCommand(a.hookCmd())
 	root.CompletionOptions.DisableDefaultCmd = true
 	groupCommands(root)

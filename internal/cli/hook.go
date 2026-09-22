@@ -259,6 +259,7 @@ func (a *app) hookInstance() (string, *instance.File, error) {
 	if err != nil {
 		return "", nil, err
 	}
+	a.logInstance(a.instanceID(dir))
 	return dir, f, nil
 }
 

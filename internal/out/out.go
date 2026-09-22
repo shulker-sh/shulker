@@ -107,6 +107,12 @@ func AsError(err error) *Error {
 	return &Error{Code: "error", Message: err.Error(), Exit: ExitError}
 }
 
+// Recorder is told every warning and error a run shows, whether it prints for a person or as JSON.
+type Recorder interface {
+	Warn(msg string)
+	Error(code, msg string)
+}
+
 // Printer is one run's output: JSON or human, never both, on the run's two streams.
 type Printer struct {
 	JSON bool
@@ -121,11 +127,13 @@ type Printer struct {
 	Args []string
 	// WarnPrefix names the side or instance a multi-part run is on.
 	WarnPrefix string
-	warnings   []string
-	steps      stepState
-	waits      waits
-	Theme      Theme
-	ErrTheme   Theme
+	// Recorder, when set, hears each warning once, the way the run shows it.
+	Recorder Recorder
+	warnings []string
+	steps    stepState
+	waits    waits
+	Theme    Theme
+	ErrTheme Theme
 }
 
 // Out is the results stream; Err carries warnings, errors, and progress.
@@ -138,6 +146,9 @@ func (p *Printer) Warn(format string, args ...any) {
 		return
 	}
 	p.warnings = append(p.warnings, msg)
+	if p.Recorder != nil {
+		p.Recorder.Warn(msg)
+	}
 	if !p.JSON {
 		text := fmt.Sprintf(format, args...)
 		if p.WarnPrefix != "" {
@@ -165,10 +176,26 @@ func (p *Printer) Emit(data any, human func(l *Lines)) error {
 	return nil
 }
 
+// Report shows one failure of a run that goes on to the next part, such as one instance of several.
+// Under --json it prints nothing, since the failure is in the command's own data.
+func (p *Printer) Report(e *Error) {
+	p.record(e)
+	if !p.JSON {
+		p.Err().Error(e)
+	}
+}
+
+func (p *Printer) record(e *Error) {
+	if p.Recorder != nil {
+		p.Recorder.Error(e.Code, e.Message)
+	}
+}
+
 // Fail prints err as the run's error and returns the exit code the run ends with.
 func (p *Printer) Fail(err error) int {
 	p.settle(false)
 	e := AsError(err)
+	p.record(e)
 	if p.JSON {
 		_ = p.encode(p.envelope(false, e.Data, e))
 		return e.Exit

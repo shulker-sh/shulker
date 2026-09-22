@@ -327,9 +327,7 @@ func (a *app) syncEach(cmd *cobra.Command, entries []instanceEntry, req syncRequ
 		if err != nil {
 			failed++
 			r.OK, r.Error = false, out.AsError(err)
-			if !a.printer.JSON {
-				a.printer.Err().Error(r.Error)
-			}
+			a.printer.Report(r.Error)
 		} else {
 			r.Sync = &res
 			if !a.printer.JSON {

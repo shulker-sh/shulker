@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -220,6 +221,15 @@ func TestRootHelpTellsAgentsToUseJSON(t *testing.T) {
 	}
 	if strings.Contains(stdout, "Other commands") {
 		t.Fatalf("a root command is missing from helpGroups:\n%s", stdout)
+	}
+	root := newApp(io.Discard, io.Discard).root()
+	for _, c := range root.Commands() {
+		if helpGroupOf(c.Name()) == "" {
+			t.Errorf("root command %q has no group in helpGroups, so its runs are logged under none", c.Name())
+		}
+		if c.Hidden && strings.Contains(stdout, "\n    "+c.Name()+" ") {
+			t.Errorf("hidden command %q shows in root help", c.Name())
+		}
 	}
 	if _, stdout, _ := run(t, "add", "--help"); strings.Contains(stdout, "Scripts and agents") {
 		t.Fatalf("add help = %q", stdout)

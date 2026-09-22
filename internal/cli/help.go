@@ -25,28 +25,35 @@ var helpGroups = []struct {
 	{"project", "Project", []string{"init", "get", "set", "unset", "lock", "import", "export"}},
 	{"mods", "Mods and modpacks", []string{"add", "search", "remove", "list", "update", "outdated", "pin", "unpin", "ignore", "unignore", "suggests", "mod", "modpack", "resourcepack", "shader"}},
 	{"builds", "Builds", []string{"install", "build", "diff", "pull", "feature", "history", "rollback"}},
-	{"launchers", "Launchers", []string{"link", "instances", "instance", "sync", "unlink", "saves", "backup", "restore"}},
+	{"launchers", "Launchers", []string{"link", "instances", "instance", "sync", "unlink", "saves", "backup", "restore", "hook"}},
 	{"servers", "Servers", []string{"serve", "player"}},
-	{"play", "Play", []string{"accounts", "play"}},
-	{"shulker", "Shulker", []string{"docs", "config", "cache", "self", "version", "completion"}},
+	{"play", "Play", []string{"accounts", "play", "watch"}},
+	{"shulker", "Shulker", []string{"docs", "config", "cache", "self", "version", "completion", "help"}},
+}
+
+// helpGroupOf is the group a root command is filed in. Hidden commands have one too, so their runs
+// are logged under it, though help never shows them.
+func helpGroupOf(name string) string {
+	for _, g := range helpGroups {
+		if slices.Contains(g.Commands, name) {
+			return g.ID
+		}
+	}
+	return ""
 }
 
 // installHelp files the root's commands into groups and renders every --help
 // through the theme instead of cobra's template.
 func (a *app) installHelp(root *cobra.Command) {
-	byName := map[string]string{}
 	for _, g := range helpGroups {
 		root.AddGroup(&cobra.Group{ID: g.ID, Title: g.Title})
-		for _, name := range g.Commands {
-			byName[name] = g.ID
-		}
-	}
-	for _, c := range root.Commands() {
-		c.GroupID = byName[c.Name()]
 	}
 	help := helpCommand()
 	root.SetHelpCommand(help)
 	root.AddCommand(help)
+	for _, c := range root.Commands() {
+		c.GroupID = helpGroupOf(c.Name())
+	}
 	root.SetHelpFunc(func(cmd *cobra.Command, _ []string) { a.help(cmd) })
 	root.SetUsageFunc(func(cmd *cobra.Command) error { a.help(cmd); return nil })
 }

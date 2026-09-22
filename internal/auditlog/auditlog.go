@@ -1,0 +1,166 @@
+// Package auditlog appends what every shulker run did to log.jsonl, one JSON entry per line: the
+// run's start and end, and every warning and error it showed.
+package auditlog
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"time"
+)
+
+// FileName is the log's name in the config folder, beside config.json.
+const FileName = "log.jsonl"
+
+// The levels an entry takes: a run's start and end are info, the rest what the printer showed.
+const (
+	LevelInfo  = "info"
+	LevelWarn  = "warn"
+	LevelError = "error"
+)
+
+// ErrNoPath is a run that has nowhere to keep its log, because the config folder can't be found.
+var ErrNoPath = errors.New("no config folder to keep " + FileName + " in")
+
+// refused stands in for a piece of the game's argv wherever one turns up in an entry.
+const refused = "[argv]"
+
+// Shorter pieces of argv are values like "msa" or "26.2" that read as ordinary words inside a
+// message, and none of them is a secret.
+const minRefused = 8
+
+// Entry is one line of the log.
+type Entry struct {
+	At         string            `json:"at"`
+	Group      string            `json:"group"`
+	Cmd        string            `json:"cmd"`
+	Instance   string            `json:"instance,omitempty"`
+	Level      string            `json:"level"`
+	Code       string            `json:"code,omitempty"`
+	Msg        string            `json:"msg"`
+	Flags      map[string]string `json:"flags,omitempty"`
+	Exit       *int              `json:"exit,omitempty"`
+	DurationMS *int64            `json:"durationMs,omitempty"`
+}
+
+// Log writes one run's entries. Cmd, Group and Instance go on every entry; Instance may be filled in
+// once the run has resolved it.
+type Log struct {
+	Path     string
+	Cmd      string
+	Group    string
+	Instance string
+	Now      func() time.Time
+	// OnFail hears the first write that fails. Nothing is written after it, so it is heard once.
+	OnFail  func(error)
+	argv    []string
+	started time.Time
+	err     error
+}
+
+// New is the log for a run with the command line args. Everything after the first "--" is argv
+// handed on to another program, which for `hook wrap` carries the game's session access token, so
+// no piece of it is ever written, whichever entry or field it turns up in. A piece shulker was also
+// given before the "--", like the instance directory, is shulker's own and stays.
+func New(path string, args []string) *Log {
+	l := &Log{Path: path, Now: time.Now}
+	dash := slices.Index(args, "--")
+	if dash < 0 {
+		return l
+	}
+	for _, arg := range args[dash+1:] {
+		if len(arg) >= minRefused && !slices.Contains(args[:dash], arg) {
+			l.argv = append(l.argv, arg)
+		}
+	}
+	return l
+}
+
+// Start opens the run, which End measures from.
+func (l *Log) Start(cmd, group, instance string, flags map[string]string) {
+	l.Cmd, l.Group, l.Instance = cmd, group, instance
+	l.started = l.Now()
+	l.append(Entry{Level: LevelInfo, Msg: "start", Flags: flags})
+}
+
+// Warn records a warning the run showed.
+func (l *Log) Warn(msg string) {
+	l.append(Entry{Level: LevelWarn, Msg: msg})
+}
+
+// Error records an error the run showed, with its code.
+func (l *Log) Error(code, msg string) {
+	l.append(Entry{Level: LevelError, Code: code, Msg: msg})
+}
+
+// End closes the run with its exit code and how long it took.
+func (l *Log) End(exit int) {
+	ms := l.Now().Sub(l.started).Milliseconds()
+	l.append(Entry{Level: LevelInfo, Msg: "end", Exit: &exit, DurationMS: &ms})
+}
+
+func (l *Log) append(e Entry) {
+	if l.err != nil {
+		return
+	}
+	e.At = l.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00")
+	e.Cmd, e.Group, e.Instance = l.Cmd, l.Group, l.Instance
+	l.refuseArgv(&e)
+	var line bytes.Buffer
+	enc := json.NewEncoder(&line)
+	enc.SetEscapeHTML(false)
+	err := enc.Encode(e)
+	if err == nil {
+		err = appendFile(l.Path, line.Bytes())
+	}
+	if err != nil {
+		l.err = err
+		if l.OnFail != nil {
+			l.OnFail(err)
+		}
+	}
+}
+
+func (l *Log) refuseArgv(e *Entry) {
+	if len(l.argv) == 0 {
+		return
+	}
+	refuse := func(s string) string {
+		for _, arg := range l.argv {
+			s = strings.ReplaceAll(s, arg, refused)
+		}
+		return s
+	}
+	e.Cmd, e.Group, e.Instance, e.Code, e.Msg = refuse(e.Cmd), refuse(e.Group), refuse(e.Instance), refuse(e.Code), refuse(e.Msg)
+	if e.Flags != nil {
+		flags := make(map[string]string, len(e.Flags))
+		for name, value := range e.Flags {
+			flags[refuse(name)] = refuse(value)
+		}
+		e.Flags = flags
+	}
+}
+
+// appendFile adds data to the end of path in one write, so entries from runs appending at the same
+// time never interleave. The file holds unredacted detail, so only its owner reads it.
+func appendFile(path string, data []byte) error {
+	if path == "" {
+		return ErrNoPath
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}

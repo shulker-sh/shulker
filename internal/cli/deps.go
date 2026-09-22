@@ -100,6 +100,7 @@ func (a *app) scopeDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	a.logInstance(entries[0].ID)
 	return entries[0].Dir, nil
 }
 
