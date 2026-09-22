@@ -93,7 +93,8 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 	modJSON := func(m *cfMod) map[string]any {
 		return map[string]any{
 			"id": m.id, "name": strings.ToUpper(m.slug), "slug": m.slug, "classId": m.classID(), "downloadCount": m.downloads,
-			"links": map[string]any{"websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/" + m.slug},
+			"links":   map[string]any{"websiteUrl": "https://www.curseforge.com/minecraft/mc-mods/" + m.slug},
+			"authors": []map[string]any{{"name": m.slug + "-dev"}, {"name": "helper"}},
 		}
 	}
 	allFiles := func(m *cfMod) []cfFile {
@@ -158,6 +159,22 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		data := []map[string]any{}
 		for _, m := range matched {
 			data = append(data, modJSON(m))
+		}
+		writeJSON(w, map[string]any{"data": data})
+	})
+	mux.HandleFunc("/curseforge/mods", func(w http.ResponseWriter, r *http.Request) {
+		if !authed(w, r) {
+			return
+		}
+		var body struct {
+			ModIDs []int `json:"modIds"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		data := []map[string]any{}
+		for _, id := range body.ModIDs {
+			if m, ok := h.cfMods[id]; ok {
+				data = append(data, modJSON(m))
+			}
 		}
 		writeJSON(w, map[string]any{"data": data})
 	})

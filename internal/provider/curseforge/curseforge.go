@@ -138,6 +138,37 @@ type mod struct {
 	Links     struct {
 		WebsiteURL string `json:"websiteUrl"`
 	} `json:"links"`
+	Authors []struct {
+		Name string `json:"name"`
+	} `json:"authors"`
+}
+
+// Record is what a modpack's modlist.html shows for a project.
+type Record struct {
+	Name       string
+	Author     string
+	WebsiteURL string
+}
+
+// Records looks the projects up in one request. A project CurseForge doesn't return is absent from the map.
+func (c *CurseForge) Records(ctx context.Context, projectIDs []int) (map[int]Record, error) {
+	var res struct {
+		Data []mod `json:"data"`
+	}
+	if err := c.call(ctx, "mods", func() error {
+		return c.Client.PostJSON(ctx, c.BaseURL+"/mods", map[string]any{"modIds": projectIDs}, &res)
+	}); err != nil {
+		return nil, err
+	}
+	records := map[int]Record{}
+	for _, m := range res.Data {
+		r := Record{Name: m.Name, WebsiteURL: m.Links.WebsiteURL}
+		if len(m.Authors) > 0 {
+			r.Author = m.Authors[0].Name
+		}
+		records[m.ID] = r
+	}
+	return records, nil
 }
 
 type file struct {

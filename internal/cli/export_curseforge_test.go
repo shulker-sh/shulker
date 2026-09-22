@@ -119,7 +119,7 @@ func TestExportCurseForge(t *testing.T) {
 			t.Fatalf("file %d: %+v", i, f)
 		}
 	}
-	if !strings.Contains(entries["modlist.html"], `<li><a href="https://www.curseforge.com/projects/238222">jei</a></li>`) {
+	if modlist := entries["modlist.html"]; !strings.HasPrefix(modlist, "<ul>") || !strings.Contains(modlist, `<li><a href="https://www.curseforge.com/minecraft/mc-mods/jei">JEI (by jei-dev)</a></li>`) {
 		t.Fatalf("modlist: %s", entries["modlist.html"])
 	}
 	if _, ok := entries["overrides/options.txt"]; !ok {
@@ -185,6 +185,13 @@ func TestExportCurseForgeLockedModsNeedNoLookup(t *testing.T) {
 	stdout, stderr := h.mustRunStderr(t, "export", "curseforge")
 	if !strings.Contains(stdout, "2 mods by file ID") || strings.Contains(stdout, "matched on CurseForge") || strings.Contains(stderr, "looked up") {
 		t.Fatalf("export of CurseForge-locked mods: stdout=%s stderr=%s", stdout, stderr)
+	}
+	if !strings.Contains(stderr, "modlist.html links project IDs") {
+		t.Fatalf("offline modlist warning: %s", stderr)
+	}
+	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
+	if !strings.Contains(entries["modlist.html"], `<li><a href="https://www.curseforge.com/projects/238222">jei</a></li>`) {
+		t.Fatalf("offline modlist: %s", entries["modlist.html"])
 	}
 }
 

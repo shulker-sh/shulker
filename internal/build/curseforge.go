@@ -25,6 +25,8 @@ type CurseForgeOptions struct {
 	Features map[string]bool
 	// Match looks fingerprints up on CurseForge. It only runs when a mod isn't locked from CurseForge.
 	Match func(fingerprints []uint32) (map[uint32]curseforge.Match, error)
+	// Records looks the file-ID projects up for modlist.html.
+	Records func(projectIDs []int) (map[int]curseforge.Record, error)
 }
 
 type CurseForgeReport struct {
@@ -108,7 +110,7 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 	if profile.Image != "" {
 		entries[profile.Image] = markerIcon
 	}
-	entries["modlist.html"] = curseForgeModlist(names, files)
+	entries["modlist.html"] = curseForgeModlist(names, files, curseForgeRecords(files, opts, report))
 	if err := b.addIdentity(entries); err != nil {
 		return nil, err
 	}
@@ -292,12 +294,36 @@ func lockInt(v any) (int, bool) {
 	return 0, false
 }
 
-func curseForgeModlist(names []string, files []cfpack.File) []byte {
+func curseForgeRecords(files []cfpack.File, opts CurseForgeOptions, report *CurseForgeReport) map[int]curseforge.Record {
+	if len(files) == 0 || opts.Records == nil {
+		return nil
+	}
+	ids := make([]int, len(files))
+	for i, f := range files {
+		ids[i] = f.ProjectID
+	}
+	records, err := opts.Records(ids)
+	if err != nil {
+		report.Warnings = append(report.Warnings, fmt.Sprintf("CurseForge project lookup failed, so modlist.html links project IDs: %s", out.AsError(err).Message))
+		return nil
+	}
+	return records
+}
+
+// curseForgeModlist writes each line as the CurseForge app does, less its byte-order mark, and
+// falls back to the project ID and shulker key for a project it has no record of.
+func curseForgeModlist(names []string, files []cfpack.File, records map[int]curseforge.Record) []byte {
 	var sb strings.Builder
 	sb.WriteString("<ul>\n")
 	for i, f := range files {
-		page := curseforge.ProjectPage(strconv.Itoa(f.ProjectID))
-		fmt.Fprintf(&sb, "<li><a href=\"%s\">%s</a></li>\n", html.EscapeString(page), html.EscapeString(names[i]))
+		page, text := curseforge.ProjectPage(strconv.Itoa(f.ProjectID)), names[i]
+		if r, ok := records[f.ProjectID]; ok && r.WebsiteURL != "" && r.Name != "" {
+			page, text = r.WebsiteURL, r.Name
+			if r.Author != "" {
+				text += " (by " + r.Author + ")"
+			}
+		}
+		fmt.Fprintf(&sb, "<li><a href=\"%s\">%s</a></li>\n", html.EscapeString(page), html.EscapeString(text))
 	}
 	sb.WriteString("</ul>\n")
 	return []byte(sb.String())

@@ -206,6 +206,9 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 				Match: func(fingerprints []uint32) (map[uint32]curseforge.Match, error) {
 					return a.matchFingerprints(cmd.Context(), fingerprints)
 				},
+				Records: func(projectIDs []int) (map[int]curseforge.Record, error) {
+					return a.curseForgeRecords(cmd.Context(), projectIDs)
+				},
 			})
 			if err != nil {
 				return a.withBundleNudge(err)
@@ -226,6 +229,24 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 }
 
 func (a *app) matchFingerprints(ctx context.Context, fingerprints []uint32) (map[uint32]curseforge.Match, error) {
+	cf, err := a.curseForgeLookup()
+	if err != nil {
+		return nil, err
+	}
+	a.progress("looking up %s on CurseForge", plural(len(fingerprints), "mod", "mods"))
+	return cf.MatchFingerprints(ctx, fingerprints)
+}
+
+func (a *app) curseForgeRecords(ctx context.Context, projectIDs []int) (map[int]curseforge.Record, error) {
+	cf, err := a.curseForgeLookup()
+	if err != nil {
+		return nil, err
+	}
+	a.progress("looking up %s for modlist.html", plural(len(projectIDs), "CurseForge project", "CurseForge projects"))
+	return cf.Records(ctx, projectIDs)
+}
+
+func (a *app) curseForgeLookup() (*curseforge.CurseForge, error) {
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
@@ -236,6 +257,5 @@ func (a *app) matchFingerprints(ctx context.Context, fingerprints []uint32) (map
 		e.Help = "set " + curseforge.KeyEnv + " or run `shulker config set curseforge.key <key>`"
 		return nil, e
 	}
-	a.progress("looking up %s on CurseForge", plural(len(fingerprints), "mod", "mods"))
-	return cf.MatchFingerprints(ctx, fingerprints)
+	return cf, nil
 }
