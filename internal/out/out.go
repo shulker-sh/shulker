@@ -107,10 +107,12 @@ func AsError(err error) *Error {
 	return &Error{Code: "error", Message: err.Error(), Exit: ExitError}
 }
 
-// Recorder is told every warning and error a run shows, whether it prints for a person or as JSON.
+// Recorder is told every warning, error and result a run shows, whether it prints for a person or
+// as JSON.
 type Recorder interface {
 	Warn(msg string)
 	Error(code, msg string)
+	Result(data any)
 }
 
 // Printer is one run's output: JSON or human, never both, on the run's two streams.
@@ -127,7 +129,8 @@ type Printer struct {
 	Args []string
 	// WarnPrefix names the side or instance a multi-part run is on.
 	WarnPrefix string
-	// Recorder, when set, hears each warning once, the way the run shows it.
+	// Recorder, when set, hears each warning once, the way the run shows it, and each result as the
+	// data --json prints.
 	Recorder Recorder
 	warnings []string
 	steps    stepState
@@ -169,6 +172,9 @@ func (p *Printer) envelope(ok bool, data any, e *Error) Envelope {
 // Emit prints a command's result: data as the JSON envelope under --json, otherwise whatever human
 // writes.
 func (p *Printer) Emit(data any, human func(l *Lines)) error {
+	if p.Recorder != nil {
+		p.Recorder.Result(data)
+	}
 	if p.JSON {
 		return p.encode(p.envelope(true, data, nil))
 	}

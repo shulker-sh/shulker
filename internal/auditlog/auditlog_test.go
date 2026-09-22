@@ -75,6 +75,26 @@ func TestRunWritesItsEnvelopeAndWhatItShowed(t *testing.T) {
 	}
 }
 
+func TestResultCarriesThePayloadAsJSONWouldPrintIt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	l := New(path, []string{"sync"})
+	l.Start("sync", "launchers", "friends", nil)
+	l.Result(struct {
+		Fetched []string `json:"fetched"`
+		Wrote   int      `json:"wrote"`
+		Skipped []string `json:"skipped,omitempty"`
+	}{Fetched: []string{"jei 15.2.0"}, Wrote: 4})
+
+	entries := readEntries(t, path)
+	result := entries[1]
+	if result.Level != LevelInfo || result.Msg != "result" || result.Cmd != "sync" || result.Instance != "friends" {
+		t.Errorf("result = %+v", result)
+	}
+	if string(result.Data) != `{"fetched":["jei 15.2.0"],"wrote":4}` {
+		t.Errorf("data = %s", result.Data)
+	}
+}
+
 func TestLaterRunsAppend(t *testing.T) {
 	path := filepath.Join(t.TempDir(), FileName)
 	for range 2 {
@@ -96,6 +116,7 @@ func TestWriterRefusesTheGamesArgv(t *testing.T) {
 	l.Start("hook wrap", "launchers", dir, map[string]string{"dir": dir, "leak": token})
 	l.Warn("game said --accessToken " + token + " for Steve1234")
 	l.Error("launch-not-started", "can't run Java for "+dir+" with "+token)
+	l.Result(map[string][]any{"dirs": {dir}, token: {"--accessToken " + token, 3}})
 	l.End(1)
 
 	data, err := os.ReadFile(path)
@@ -108,11 +129,15 @@ func TestWriterRefusesTheGamesArgv(t *testing.T) {
 		}
 	}
 	entries := readEntries(t, path)
-	if entries[0].Flags["dir"] != dir || entries[0].Instance != dir || !strings.Contains(entries[2].Msg, dir) {
+	if entries[0].Flags["dir"] != dir || entries[0].Instance != dir || !strings.Contains(entries[2].Msg, dir) || !strings.Contains(string(entries[3].Data), dir) {
 		t.Errorf("shulker's own -C was refused too: %+v", entries)
 	}
 	if !strings.Contains(entries[1].Msg, refused) {
 		t.Errorf("warn = %q", entries[1].Msg)
+	}
+	var result map[string][]any
+	if err := json.Unmarshal(entries[3].Data, &result); err != nil || len(result[refused]) != 2 {
+		t.Errorf("result = %s", entries[3].Data)
 	}
 }
 

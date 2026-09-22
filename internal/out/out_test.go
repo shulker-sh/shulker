@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 )
@@ -41,6 +42,7 @@ type recorded struct{ lines []string }
 
 func (r *recorded) Warn(msg string)        { r.lines = append(r.lines, "warn "+msg) }
 func (r *recorded) Error(code, msg string) { r.lines = append(r.lines, "error "+code+" "+msg) }
+func (r *recorded) Result(data any)        { r.lines = append(r.lines, fmt.Sprintf("result %v", data)) }
 
 func TestRecorderHearsEachWarningOnceAndEveryError(t *testing.T) {
 	for _, json := range []bool{false, true} {
@@ -60,6 +62,21 @@ func TestRecorderHearsEachWarningOnceAndEveryError(t *testing.T) {
 			"error git-fetch can't fetch the pack",
 		}
 		if !slices.Equal(r.lines, want) {
+			t.Errorf("json %v: recorded %q", json, r.lines)
+		}
+	}
+}
+
+func TestRecorderHearsEachResultWhetherOrNotItPrintsAsJSON(t *testing.T) {
+	for _, json := range []bool{false, true} {
+		r := &recorded{}
+		p := &Printer{JSON: json, Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}, Recorder: r}
+		p.Step("fetching jei")
+		p.Settle()
+		if err := p.Emit(map[string]int{"wrote": 4}, func(l *Lines) { l.Info("wrote 4") }); err != nil {
+			t.Fatal(err)
+		}
+		if want := []string{"result map[wrote:4]"}; !slices.Equal(r.lines, want) {
 			t.Errorf("json %v: recorded %q", json, r.lines)
 		}
 	}

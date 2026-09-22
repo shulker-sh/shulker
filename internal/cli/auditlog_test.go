@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -46,10 +47,10 @@ func TestRunIsLoggedFromStartToEnd(t *testing.T) {
 		t.Fatalf("exit %d", code)
 	}
 	entries := logEntries(t, path)
-	if len(entries) != 2 {
+	if len(entries) != 3 {
 		t.Fatalf("entries = %+v", entries)
 	}
-	start, end := entries[0], entries[1]
+	start, end := entries[0], entries[2]
 	if start.Cmd != "version" || start.Group != "shulker" || start.Msg != "start" || start.Flags["no-color"] != "true" {
 		t.Errorf("start = %+v", start)
 	}
@@ -131,5 +132,36 @@ func TestBrokenConfigIsStillLogged(t *testing.T) {
 	entries := logEntries(t, path)
 	if len(entries) != 3 || entries[1].Level != auditlog.LevelError || entries[2].Exit == nil || *entries[2].Exit == 0 {
 		t.Fatalf("entries = %+v", entries)
+	}
+}
+
+func TestBuildLogsTheResultJSONWouldPrint(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "sodium")
+	path := isolatedLog(t)
+	h.mustRun(t, "build")
+	entries := logEntries(t, path)
+	if len(entries) != 3 || entries[1].Msg != "result" || entries[1].Cmd != "build" || entries[1].Group != "builds" {
+		t.Fatalf("entries = %+v", entries)
+	}
+	if !strings.Contains(string(entries[1].Data), h.jars["sodium"].filename) {
+		t.Errorf("result doesn't name what the build wrote: %s", entries[1].Data)
+	}
+
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	stdout := h.mustRun(t, "build", "--json")
+	var env struct{ Data json.RawMessage }
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	logged := logEntries(t, path)[1].Data
+	var printed bytes.Buffer
+	if err := json.Compact(&printed, env.Data); err != nil {
+		t.Fatal(err)
+	}
+	if string(logged) != printed.String() {
+		t.Errorf("logged %s\nprinted %s", logged, printed.String())
 	}
 }

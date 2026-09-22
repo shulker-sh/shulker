@@ -1,5 +1,5 @@
 // Package auditlog appends what every shulker run did to log.jsonl, one JSON entry per line: the
-// run's start and end, and every warning and error it showed.
+// run's start and end, the result it reported, and every warning and error it showed.
 package auditlog
 
 import (
@@ -45,6 +45,7 @@ type Entry struct {
 	Flags      map[string]string `json:"flags,omitempty"`
 	Exit       *int              `json:"exit,omitempty"`
 	DurationMS *int64            `json:"durationMs,omitempty"`
+	Data       json.RawMessage   `json:"data,omitempty"`
 }
 
 // Log writes one run's entries. Cmd, Group and Instance go on every entry; Instance may be filled in
@@ -97,6 +98,27 @@ func (l *Log) Error(code, msg string) {
 	l.append(Entry{Level: LevelError, Code: code, Msg: msg})
 }
 
+// Result records the payload the run reported, as --json prints it under "data".
+func (l *Log) Result(data any) {
+	if l.err != nil {
+		return
+	}
+	payload, err := encode(data)
+	if err != nil {
+		l.fail(err)
+		return
+	}
+	l.append(Entry{Level: LevelInfo, Msg: "result", Data: payload})
+}
+
+func encode(v any) ([]byte, error) {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	err := enc.Encode(v)
+	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), err
+}
+
 // End closes the run with its exit code and how long it took.
 func (l *Log) End(exit int) {
 	ms := l.Now().Sub(l.started).Milliseconds()
@@ -110,18 +132,19 @@ func (l *Log) append(e Entry) {
 	e.At = l.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00")
 	e.Cmd, e.Group, e.Instance = l.Cmd, l.Group, l.Instance
 	l.refuseArgv(&e)
-	var line bytes.Buffer
-	enc := json.NewEncoder(&line)
-	enc.SetEscapeHTML(false)
-	err := enc.Encode(e)
+	line, err := encode(e)
 	if err == nil {
-		err = appendFile(l.Path, line.Bytes())
+		err = appendFile(l.Path, append(line, '\n'))
 	}
 	if err != nil {
-		l.err = err
-		if l.OnFail != nil {
-			l.OnFail(err)
-		}
+		l.fail(err)
+	}
+}
+
+func (l *Log) fail(err error) {
+	l.err = err
+	if l.OnFail != nil {
+		l.OnFail(err)
 	}
 }
 
@@ -143,6 +166,44 @@ func (l *Log) refuseArgv(e *Entry) {
 		}
 		e.Flags = flags
 	}
+	if e.Data != nil {
+		e.Data = refuseData(e.Data, refuse)
+	}
+}
+
+// refuseData refuses argv in every string of a payload, map keys included, by decoding it: a
+// replace over the raw JSON could cut into an escape sequence. A payload it can't read is dropped.
+func refuseData(raw json.RawMessage, refuse func(string) string) json.RawMessage {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var data any
+	if err := dec.Decode(&data); err != nil {
+		return nil
+	}
+	refused, err := encode(refuseValue(data, refuse))
+	if err != nil {
+		return nil
+	}
+	return refused
+}
+
+func refuseValue(v any, refuse func(string) string) any {
+	switch v := v.(type) {
+	case string:
+		return refuse(v)
+	case []any:
+		for i, item := range v {
+			v[i] = refuseValue(item, refuse)
+		}
+		return v
+	case map[string]any:
+		kept := make(map[string]any, len(v))
+		for key, item := range v {
+			kept[refuse(key)] = refuseValue(item, refuse)
+		}
+		return kept
+	}
+	return v
 }
 
 // appendFile adds data to the end of path in one write, so entries from runs appending at the same
