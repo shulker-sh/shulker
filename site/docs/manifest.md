@@ -319,6 +319,7 @@ Keys written into server.properties. Values may reference ${variables}. Known ke
 | `jvmFlags` | `"aikars"` \| `"none"` | JVM flags preset used by serve. aikars applies Aikar's G1 flags (12 GB+ variant chosen from memory, -Xms set equal to -Xmx); none passes only the memory flags.<br>default `"aikars"` |
 | `jvmArgs` | `string`[] | Extra JVM arguments appended after the preset, e.g. ZGC flags. |
 | `properties` | [`serverProperties`](#serverproperties) |  |
+| `resourcePack` | `string` | Requires key of a locked resource pack for joining clients to download. The build writes its URL and sha1 as resource-pack and resource-pack-sha1, which must not also be set in properties. A feature on the entry decides whether it is pushed; an os doesn't.<br>min length 1 |
 | `players` | object |  |
 | `players.whitelist` | [`player`](#player)[] |  |
 | `players.ops` | [`player`](#player)[] |  |

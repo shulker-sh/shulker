@@ -543,6 +543,11 @@
           "description": "Extra JVM arguments appended after the preset, e.g. ZGC flags."
         },
         "properties": { "$ref": "#/$defs/serverProperties" },
+        "resourcePack": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Requires key of a locked resource pack for joining clients to download. The build writes its URL and sha1 as resource-pack and resource-pack-sha1, which must not also be set in properties. A feature on the entry decides whether it is pushed; an os doesn't."
+        },
         "players": {
           "type": "object",
           "additionalProperties": false,

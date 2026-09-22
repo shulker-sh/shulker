@@ -62,8 +62,11 @@ type Server struct {
 	JVMFlags   string         `json:"jvmFlags,omitempty"`
 	JVMArgs    []string       `json:"jvmArgs,omitempty"`
 	Properties map[string]any `json:"properties,omitempty"`
-	Players    *Players       `json:"players,omitempty"`
-	Note       string         `json:"note,omitempty"`
+	// ResourcePack is the requires key of the locked resource pack whose URL and sha1 the build
+	// writes into server.properties, for joining clients to download.
+	ResourcePack string   `json:"resourcePack,omitempty"`
+	Players      *Players `json:"players,omitempty"`
+	Note         string   `json:"note,omitempty"`
 }
 
 type Players struct {

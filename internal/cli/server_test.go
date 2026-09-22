@@ -256,3 +256,32 @@ func TestServerBuildValidatesPropertyKeys(t *testing.T) {
 		t.Fatalf("server.properties: %q", got)
 	}
 }
+
+func TestServerBuildPushesResourcePack(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "add", "fresh-animations")
+	h.editManifest(t, func(m map[string]any) {
+		m["server"].(map[string]any)["resourcePack"] = "fresh-animations"
+	})
+	h.mustRun(t, "install")
+	p := h.readLock(t).ResourcePacks["fresh-animations"]
+	propsPath := filepath.Join(h.dir, "build", "server", "server.properties")
+	data, err := os.ReadFile(propsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "resource-pack="+*p.URL+"\n") || !strings.Contains(string(data), "resource-pack-sha1="+p.Sha1+"\n") || p.Sha1 == "" {
+		t.Fatalf("server.properties:\n%s", data)
+	}
+
+	edited := strings.Replace(string(data), "resource-pack="+*p.URL, "resource-pack=https://example.com/other.zip", 1)
+	if err := os.WriteFile(propsPath, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout := h.mustRun(t, "pull")
+	if !strings.Contains(stdout, "server.resourcePack") {
+		t.Fatalf("pull: %s", stdout)
+	}
+	h.mustRun(t, "build", "--force")
+}

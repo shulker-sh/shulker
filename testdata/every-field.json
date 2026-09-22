@@ -56,6 +56,7 @@
     "jvmFlags": "aikars",
     "jvmArgs": ["-XX:+UseZGC"],
     "properties": { "motd": "${motd}", "max-players": 20, "hardcore": false },
+    "resourcePack": "extras",
     "players": {
       "whitelist": [{ "name": "Notch", "uuid": "069a79f4-44e9-4726-a5be-fca90e38aaf5", "note": "whitelist" }],
       "ops": [

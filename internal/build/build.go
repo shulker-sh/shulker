@@ -410,7 +410,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 	}
 	vars := b.Manifest.SideVariables(side).Text()
 	if side == "server" {
-		levelName, err := b.collectServer(desired, vars, opts.NoLauncher, report)
+		levelName, err := b.collectServer(desired, vars, cond, opts.NoLauncher, report)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -586,7 +586,7 @@ func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole 
 	return nil
 }
 
-func (b *Builder) collectServer(desired map[string]source, vars map[string]string, noLauncher bool, report *Report) (string, error) {
+func (b *Builder) collectServer(desired map[string]source, vars map[string]string, cond conditions, noLauncher bool, report *Report) (string, error) {
 	if !noLauncher {
 		if err := b.collectLauncher(desired); err != nil {
 			return "", err
@@ -602,6 +602,11 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	props, err := renderProperties(PropertiesFile, srv.Properties, vars)
 	if err != nil {
 		return "", err
+	}
+	if srv.ResourcePack != "" {
+		if err := b.pushResourcePack(srv.ResourcePack, cond, props, report); err != nil {
+			return "", err
+		}
 	}
 	if err := b.checkProperties(props, report); err != nil {
 		return "", err

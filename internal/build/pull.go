@@ -259,7 +259,7 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 				}
 				continue
 			}
-			keys := b.pullKeys(f.rel, src.owned.(propsFile), existing)
+			keys := b.pullKeys(f.rel, src.owned.(propsFile), existing, report)
 			report.Keys = append(report.Keys, keys...)
 			if len(keys) > 0 {
 				report.ManifestChanged = true
@@ -282,7 +282,7 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 			dest = filepath.Join(toDir, filepath.FromSlash(f.rel))
 		}
 		if src.managed != nil {
-			keys := b.pullKeys(f.rel, src.managed.(propsFile), existing)
+			keys := b.pullKeys(f.rel, src.managed.(propsFile), existing, report)
 			report.Keys = append(report.Keys, keys...)
 			if len(keys) > 0 {
 				report.ManifestChanged = true
@@ -420,6 +420,8 @@ func (b *Builder) pullOverrideKeys(rel string, pf propsFile, kept map[string]boo
 	for _, k := range sortedKeys(kept) {
 		o := pf.origins[k]
 		switch {
+		case o.path == "" && b.isPushedKey(rel, k):
+			report.Skipped = append(report.Skipped, fmt.Sprintf("%s %s (filled from server.resourcePack %s)", rel, k, b.Manifest.Server.ResourcePack))
 		case o.path == "":
 			if raw := b.manifestBlock(rel); raw != nil {
 				raw[k] = typedProperty(raw[k], current[k])
@@ -507,7 +509,7 @@ func (b *Builder) adoptKeys(rel string, keys []string, d *drift, report *PullRep
 	return nil
 }
 
-func (b *Builder) pullKeys(rel string, f propsFile, existing []byte) []string {
+func (b *Builder) pullKeys(rel string, f propsFile, existing []byte, report *PullReport) []string {
 	raw := b.manifestBlock(rel)
 	if raw == nil {
 		return nil
@@ -519,10 +521,20 @@ func (b *Builder) pullKeys(rel string, f propsFile, existing []byte) []string {
 		if !ok || value == f.props[k] {
 			continue
 		}
+		if b.isPushedKey(rel, k) {
+			report.Skipped = append(report.Skipped, fmt.Sprintf("%s %s (filled from server.resourcePack %s)", rel, k, b.Manifest.Server.ResourcePack))
+			continue
+		}
 		raw[k] = typedProperty(raw[k], value)
 		changed = append(changed, rel+" "+k+"="+value)
 	}
 	return changed
+}
+
+// isPushedKey reports whether k is a server.properties key the build fills from
+// server.resourcePack, which pulling into the manifest would turn into a conflict.
+func (b *Builder) isPushedKey(rel, k string) bool {
+	return rel == PropertiesFile && b.Manifest.Server != nil && b.Manifest.Server.ResourcePack != "" && (k == "resource-pack" || k == "resource-pack-sha1")
 }
 
 func (b *Builder) manifestBlock(rel string) map[string]any {

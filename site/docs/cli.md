@@ -1800,6 +1800,10 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry or a project being added is a kind shulker can't resolve |
+| `resourcepack-conflict` | `server.resourcePack` is set and `resource-pack` or `resource-pack-sha1` is also set in `server.properties` |
+| `resourcepack-local-file` | `server.resourcePack` names a local `file` entry, which has no URL for clients to download it from |
+| `resourcepack-not-distributed` | `server.resourcePack` names a pack its provider forbids redistributing, so the lock has no URL for it |
+| `resourcepack-not-found` | `server.resourcePack` isn't a locked resource pack. `candidates`: the locked resource packs |
 | `restore-failed` | `restore --all` failed for some targets; `data` has each target's result |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |
