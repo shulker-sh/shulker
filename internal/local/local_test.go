@@ -79,9 +79,9 @@ func TestLoadReplacesAFileItCannotRead(t *testing.T) {
 				t.Fatal(err)
 			}
 			f, err := Load(dir)
-			var replaced *ReplacedError
+			var replaced *UnreadableError
 			if !errors.As(err, &replaced) {
-				t.Fatalf("err = %v, want a *ReplacedError", err)
+				t.Fatalf("err = %v, want a *UnreadableError", err)
 			}
 			if want := path + " " + fmt.Sprintf(c.reason, path+".replaced"); err.Error() != want {
 				t.Errorf("err = %v\nwant %s", err, want)
@@ -116,9 +116,9 @@ func TestLoadGoesOnWhenItCannotMoveTheFileAside(t *testing.T) {
 	}
 	t.Cleanup(func() { os.Chmod(dir, 0o755) })
 	f, err := Load(dir)
-	var replaced *ReplacedError
+	var replaced *UnreadableError
 	if !errors.As(err, &replaced) || f == nil || f.Exists() {
-		t.Fatalf("Load = %+v, %v; want an empty file and a *ReplacedError", f, err)
+		t.Fatalf("Load = %+v, %v; want an empty file and a *UnreadableError", f, err)
 	}
 	if want := path + " is unreadable (unexpected end of JSON input); couldn't move it aside, so using the manifest's feature defaults"; !strings.HasPrefix(err.Error(), want) {
 		t.Errorf("err = %v\nwant it to start %s", err, want)

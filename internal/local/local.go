@@ -28,9 +28,9 @@ type File struct {
 	isOnDisk bool
 }
 
-// ReplacedError says Load moved aside a file it couldn't read, or tried to. The file Load returns
-// with it is empty and usable: the caller warns and carries on.
-type ReplacedError struct {
+// UnreadableError is a file Load couldn't read, and moved aside when it could. The file Load
+// returns with it is empty and usable: the caller warns and carries on.
+type UnreadableError struct {
 	path, kept string
 	reason     string
 	newer      bool
@@ -38,9 +38,9 @@ type ReplacedError struct {
 }
 
 // Newer reports whether a newer shulker wrote the file, whose fix is `shulker self update`.
-func (e *ReplacedError) Newer() bool { return e.newer }
+func (e *UnreadableError) Newer() bool { return e.newer }
 
-func (e *ReplacedError) Error() string {
+func (e *UnreadableError) Error() string {
 	msg := e.path + " " + e.reason + "; moved it to " + e.kept + " and using the manifest's feature defaults"
 	if e.moveErr != nil {
 		msg = e.path + " " + e.reason + "; couldn't move it aside, so using the manifest's feature defaults (" + e.moveErr.Error() + ")"
@@ -53,7 +53,7 @@ func (e *ReplacedError) Error() string {
 
 // Load reads dir's shulker.local.json. One that is corrupt, foreign, lacks its $schema or was written
 // by a newer shulker is renamed to shulker.local.json.replaced, and Load returns an empty file with a
-// *ReplacedError, since this per-machine file never stops a command.
+// *UnreadableError, since this per-machine file never stops a command.
 func Load(dir string) (*File, error) {
 	path := filepath.Join(dir, FileName)
 	data, err := os.ReadFile(path)
@@ -79,7 +79,7 @@ func Load(dir string) (*File, error) {
 		f.isOnDisk = true
 		return f, nil
 	}
-	e := &ReplacedError{path: path, kept: path + ".replaced", reason: reason, newer: got > want}
+	e := &UnreadableError{path: path, kept: path + ".replaced", reason: reason, newer: got > want}
 	e.moveErr = os.Rename(e.path, e.kept)
 	return &File{dir: dir}, e
 }

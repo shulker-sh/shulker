@@ -363,9 +363,9 @@ func isSameDir(a, b string) bool {
 // move an unreadable file aside.
 func (a *app) loadLocal(dir string) (*local.File, error) {
 	lf, err := local.Load(dir)
-	var replaced *local.ReplacedError
-	if errors.As(err, &replaced) {
-		if replaced.Newer() {
+	var unreadable *local.UnreadableError
+	if errors.As(err, &unreadable) {
+		if unreadable.Newer() {
 			a.printer.WarnNudge(schema.UpdateNudge, "%v", err)
 		} else {
 			a.printer.Warn("%v", err)
