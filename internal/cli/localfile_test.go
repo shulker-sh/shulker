@@ -165,3 +165,33 @@ func TestLocalFileGoneBuildsFromCache(t *testing.T) {
 		t.Fatalf("lock with neither file nor cache: code=%d env=%+v", code, env)
 	}
 }
+
+func TestLocalModKeyedAndChanged(t *testing.T) {
+	h, _ := localFiles(t)
+	h.editManifest(t, func(m map[string]any) {
+		requires := m["requires"].(map[string]any)
+		delete(requires, "private-mod")
+		requires["mine"] = map[string]any{"file": "files/private-mod-1.4.jar", "side": "both"}
+	})
+	h.mustRun(t, "lock")
+	if l := h.readLock(t); l.Mods["mine"].ModID != "private-mod" || l.Mods["mine"].Side != "both" || l.Mods["fabric-api"].RequiredBy[0] != "mine" {
+		t.Fatalf("a local jar under another key: %+v", l.Mods)
+	}
+
+	changed := makeJarVersion(t, "private-mod", "private-mod-1.4.jar", "client", "1.5.0", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
+	writeProjectFile(t, h, "files/private-mod-1.4.jar", changed.data)
+	code, stdout, _ := h.run(t, "build", "--json")
+	var env out.Envelope
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code != 0 || !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "mine: the file's bytes changed") {
+		t.Fatalf("code=%d env=%+v", code, env)
+	}
+	h.mustRun(t, "lock")
+	if l := h.readLock(t); l.Mods["mine"].Sha512 != changed.sha512 || l.Mods["mine"].ModID != "private-mod" {
+		t.Fatalf("lock adopts the new jar: %+v", l.Mods["mine"])
+	}
+	h.mustRun(t, "install")
+	if got := readBuilt(t, h, "mods/private-mod-1.4.jar"); got != string(changed.data) {
+		t.Fatal("the build places the new jar")
+	}
+}
