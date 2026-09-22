@@ -124,12 +124,18 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		return err
 	}
 	// An instance plays its own directory, so an update there is only done once it is built.
+	hasChildren := false
 	if side, ok := p.Manifest.InPlaceSide(); ok && cmd.Name() == "update" {
 		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{side: side, backup: "update"})
 		if err != nil {
 			return err
 		}
 		rl.Synced = &synced
+		children, _, err := a.projectInstances(instanceSelection{})
+		if err != nil && out.CodeOf(err) != "no-instances" {
+			return err
+		}
+		hasChildren = len(children) > 0
 	}
 	res := rl.lockChanges
 	var local []string
@@ -162,6 +168,9 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		}
 		if res.Synced != nil {
 			res.Synced.print(l)
+			if hasChildren {
+				l.Nudge("Build the instances synced from here", "shulker sync")
+			}
 			return
 		}
 		if !res.IsEmpty() {

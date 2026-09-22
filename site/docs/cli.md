@@ -284,7 +284,7 @@ shulker lock
 
 ### `shulker update`
 
-Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. Local `file` entries have no newer version to move to: a bare `update` leaves them as they are, and naming one says it is a local file. In an instance (a project whose side builds into its own directory), `update` then builds that side in place, backing up its worlds first when the mods change; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
+Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. Local `file` entries have no newer version to move to: a bare `update` leaves them as they are, and naming one says it is a local file. In an instance (a project whose side builds into its own directory), `update` then builds that side in place, backing up its worlds first when the mods change, and leaves the instances synced from it to `shulker sync`, which it names when there are any; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
 
 ```sh
 shulker update

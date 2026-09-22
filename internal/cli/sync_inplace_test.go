@@ -135,6 +135,44 @@ func TestSyncInPlaceThenItsChildren(t *testing.T) {
 	}
 }
 
+func TestUpdateInPlaceNudgesAtItsChildren(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "install")
+	child := filepath.Join(t.TempDir(), "child")
+	h.mustRun(t, "sync", h.dir, "--into", child)
+	h.mustRun(t, "add", "sodium")
+
+	stdout := h.mustRun(t, "update")
+	synced, nudge := strings.Index(stdout, "synced client"), strings.Index(stdout, "Build the instances synced from here")
+	if synced < 0 || nudge < synced || !strings.Contains(stdout[nudge:], "shulker sync") {
+		t.Fatalf("update should nudge at its children after the synced line: %s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(child, "mods", h.jars["sodium"].filename)); !os.IsNotExist(err) {
+		t.Fatalf("update must not build a child: %v", err)
+	}
+	if stdout := h.mustRun(t, "update", "--json"); strings.Contains(stdout, "shulker sync") {
+		t.Fatalf("the nudge is human-only: %s", stdout)
+	}
+	if stdout := h.mustRun(t, "sync"); strings.Contains(stdout, "Build the instances synced from here") {
+		t.Fatalf("sync builds its children rather than nudging: %s", stdout)
+	}
+}
+
+func TestUpdateWithoutChildrenHasNoSyncNudge(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "sodium")
+	if stdout := h.mustRun(t, "update"); !strings.Contains(stdout, "synced client") || strings.Contains(stdout, "shulker sync") {
+		t.Fatalf("an instance with no children has nothing to nudge at: %s", stdout)
+	}
+
+	h = newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	if stdout := h.mustRun(t, "update"); strings.Contains(stdout, "shulker sync") {
+		t.Fatalf("a project that doesn't build in place has no children to nudge at: %s", stdout)
+	}
+}
+
 func TestSyncInPlaceByInstance(t *testing.T) {
 	h := newInPlace(t)
 	h.mustRun(t, "install")
