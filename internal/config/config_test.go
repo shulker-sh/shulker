@@ -21,7 +21,7 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("missing file: %+v %v", cfg, err)
 	}
 
-	os.WriteFile(path, []byte(`{"curseforge":{"key":"abc"},"registry":"instances.json","links":[{"dir":"/old"}]}`), 0o600)
+	os.WriteFile(path, []byte(`{"$schema":"https://shulker.sh/schema/v1/config.json","curseforge":{"key":"abc"},"registry":"instances.json","links":[{"dir":"/old"}]}`), 0o600)
 	cfg, err = Load()
 	if err != nil || cfg.CurseForge.Key != "abc" || cfg.Registry != "instances.json" {
 		t.Fatalf("load: %+v %v", cfg, err)
@@ -30,6 +30,56 @@ func TestLoad(t *testing.T) {
 	os.WriteFile(path, []byte(`{`), 0o600)
 	if _, err := Load(); err == nil {
 		t.Fatal("expected a parse error")
+	}
+}
+
+func TestConfigMarker(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	for _, c := range []struct{ name, data, code string }{
+		{"current", `{"$schema":"https://shulker.sh/schema/v1/config.json","unknown":1}`, ""},
+		{"newer", `{"$schema":"https://shulker.sh/schema/v2/config.json"}`, "schema-newer"},
+		{"foreign", `{"$schema":"https://example.com/config.json"}`, "config-invalid"},
+		{"no marker", `{"curseforge":{"key":"abc"}}`, "config-invalid"},
+	} {
+		os.WriteFile(path, []byte(c.data), 0o600)
+		_, err := LoadFile(path)
+		_, docErr := LoadDocument(path)
+		if out.CodeOf(err) != c.code || out.CodeOf(docErr) != c.code {
+			t.Errorf("%s: LoadFile %v, LoadDocument %v, want %q", c.name, err, docErr, c.code)
+		}
+		if c.code == "config-invalid" && out.AsError(err).Help != "run `shulker config set <key> <value>` to start a new one" {
+			t.Errorf("%s: help %q", c.name, out.AsError(err).Help)
+		}
+	}
+}
+
+func TestSaveDocumentMarks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := SaveDocument(path, map[string]any{"store": "x"}); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.HasPrefix(string(data), "{\n  \"$schema\": \"https://shulker.sh/schema/v1/config.json\"") {
+		t.Errorf("saved %s", data)
+	}
+}
+
+func TestReplaceDocument(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	os.WriteFile(path, []byte(`{"curseforge":`), 0o600)
+	kept, err := ReplaceDocument(path, map[string]any{"store": "x"})
+	if err != nil || kept != path+".replaced" {
+		t.Fatalf("kept %q, %v", kept, err)
+	}
+	if data, _ := os.ReadFile(kept); string(data) != `{"curseforge":` {
+		t.Errorf("replaced = %q", data)
+	}
+	cfg, err := LoadFile(path)
+	if err != nil || cfg.Store != "x" {
+		t.Errorf("new config: %+v %v", cfg, err)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Errorf("mode %v", info.Mode().Perm())
 	}
 }
 

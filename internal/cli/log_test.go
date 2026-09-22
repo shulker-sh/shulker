@@ -278,7 +278,7 @@ func TestLogRefusesABadWindowOrLevel(t *testing.T) {
 
 func TestLogAfterATrimReadsWhatWasKept(t *testing.T) {
 	f := seedLog(t)
-	writeFile(t, filepath.Join(filepath.Dir(f.path), "config.json"), `{"log":{"keepDays":1}}`)
+	writeFile(t, filepath.Join(filepath.Dir(f.path), "config.json"), `{"$schema":"https://shulker.sh/schema/v1/config.json","log":{"keepDays":1}}`)
 	seeded, err := os.ReadFile(f.path)
 	if err != nil {
 		t.Fatal(err)

@@ -1,0 +1,103 @@
+{
+  "$id": "https://shulker.sh/schema/v1/config.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shulker config",
+  "description": "Shulker's own settings for this user, kept in config.json and applying to every project. `shulker config set` writes this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The version of this file, as a published schema URL."
+    },
+    "accounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "providers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["shulker", "prism", "mojang"] },
+          "description": "Where accounts are read from, in order. The earliest provider wins an account several hold."
+        },
+        "default": {
+          "type": "string",
+          "description": "The id of the account a launch uses when nothing else names one."
+        }
+      }
+    },
+    "curseforge": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The CurseForge API key. SHULKER_CURSEFORGE_KEY takes priority when it is set."
+        }
+      }
+    },
+    "instances": {
+      "type": "string",
+      "description": "The directory shulker's own instances live in, absolute or relative to config.json's directory."
+    },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "keepDays": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many days of runs log.jsonl keeps."
+        }
+      }
+    },
+    "play": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "memory": {
+          "type": "string",
+          "description": "The heap size shulker play gives the game, like 6G."
+        },
+        "jvmArgs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Extra JVM arguments for those launches."
+        },
+        "java": {
+          "type": "string",
+          "description": "The java those launches run: the absolute path of a java binary, or of a Java home."
+        },
+        "window": {
+          "type": "string",
+          "description": "The window size those launches open at, like 1280x720."
+        },
+        "wrapper": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A command those launches run through."
+        },
+        "saveBackups": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many automatic backups of a save group or instance's worlds to keep."
+        }
+      }
+    },
+    "registry": {
+      "type": "string",
+      "description": "The registry of the instances shulker syncs, absolute or relative to config.json's directory."
+    },
+    "saves": {
+      "type": "string",
+      "description": "The directory save groups live in, absolute or relative to config.json's directory."
+    },
+    "store": {
+      "type": "string",
+      "description": "The directory launches share versions, libraries and assets from, absolute or relative to config.json's directory."
+    }
+  }
+}

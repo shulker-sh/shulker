@@ -194,7 +194,7 @@ func TestBuildLogsTheResultJSONWouldPrint(t *testing.T) {
 
 func TestRunTrimsTheLogToLogKeepDays(t *testing.T) {
 	path := isolatedLog(t)
-	if err := os.WriteFile(filepath.Join(filepath.Dir(path), "config.json"), []byte(`{"log":{"keepDays":2}}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(filepath.Dir(path), "config.json"), []byte(`{"$schema":"https://shulker.sh/schema/v1/config.json","log":{"keepDays":2}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	old := time.Now().Add(-3 * 24 * time.Hour).UTC().Format(time.RFC3339)

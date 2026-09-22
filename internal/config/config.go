@@ -177,8 +177,11 @@ func LoadFile(path string) (Config, error) {
 	if err != nil {
 		return cfg, err
 	}
+	if err := checkConfigSchema(path, data); err != nil {
+		return cfg, err
+	}
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return cfg, schema.Invalid("config-invalid", path, data, err)
+		return cfg, configInvalid(schema.Invalid("config-invalid", path, data, err))
 	}
 	return cfg, nil
 }
@@ -194,15 +197,33 @@ func LoadDocument(path string) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := checkConfigSchema(path, data); err != nil {
+		return nil, err
+	}
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(&doc); err != nil {
-		return nil, schema.Invalid("config-invalid", path, data, err)
+		return nil, configInvalid(schema.Invalid("config-invalid", path, data, err))
 	}
 	if doc == nil {
 		doc = map[string]any{}
 	}
 	return doc, nil
+}
+
+// checkConfigSchema reads config.json's $schema line before anything else, so a config this shulker
+// can't read says so in one sentence. The file itself is never validated against the schema.
+func checkConfigSchema(path string, data []byte) error {
+	return configInvalid(schema.CheckMarker(schema.Config, "config-invalid", path, data))
+}
+
+func configInvalid(err error) error {
+	if out.CodeOf(err) == "config-invalid" {
+		e := out.AsError(err)
+		e.Help = "run `shulker config set <key> <value>` to start a new one"
+		return e
+	}
+	return err
 }
 
 // SaveDocument creates a missing config.json readable by its owner only, since it can hold an API
@@ -220,6 +241,7 @@ func SaveDocument(path string, doc map[string]any) error {
 	case !errors.Is(err, fs.ErrExist):
 		return err
 	}
+	doc["$schema"] = schema.URL(schema.Config)
 	if err := fsutil.WriteJSON(path, doc); err != nil {
 		if created {
 			os.Remove(path)
@@ -227,6 +249,17 @@ func SaveDocument(path string, doc map[string]any) error {
 		return err
 	}
 	return nil
+}
+
+// ReplaceDocument writes doc over a config.json that couldn't be read, keeping the old file as
+// config.json.replaced, and returns where that went. The new file keeps the old one's mode.
+func ReplaceDocument(path string, doc map[string]any) (kept string, err error) {
+	doc["$schema"] = schema.URL(schema.Config)
+	data, err := fsutil.MarshalJSON(doc)
+	if err != nil {
+		return "", err
+	}
+	return fsutil.Replace(path, data)
 }
 
 // RegistryPath is the registry the config at configPath points to, registry.json beside it by default.

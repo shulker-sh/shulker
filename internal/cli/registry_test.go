@@ -16,7 +16,7 @@ func TestRegistryFollowsTheConfigRegistryPath(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(h.config), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	elsewhere := `{"registry":"shared/instances.json"}`
+	elsewhere := `{"$schema":"https://shulker.sh/schema/v1/config.json","registry":"shared/instances.json"}`
 	if err := os.WriteFile(h.config, []byte(elsewhere), 0o600); err != nil {
 		t.Fatal(err)
 	}
