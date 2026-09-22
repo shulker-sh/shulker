@@ -57,7 +57,10 @@ type Log struct {
 	Instance string
 	Now      func() time.Time
 	// OnFail hears the first write that fails. Nothing is written after it, so it is heard once.
-	OnFail  func(error)
+	OnFail func(error)
+	// Before is the log's size when the run opened it, so a reader can leave out the run's own
+	// entries.
+	Before  int64
 	argv    []string
 	started time.Time
 	err     error
@@ -69,6 +72,9 @@ type Log struct {
 // given before the "--", like the instance directory, is shulker's own and stays.
 func New(path string, args []string) *Log {
 	l := &Log{Path: path, Now: time.Now}
+	if info, err := os.Stat(path); err == nil {
+		l.Before = info.Size()
+	}
 	dash := slices.Index(args, "--")
 	if dash < 0 {
 		return l

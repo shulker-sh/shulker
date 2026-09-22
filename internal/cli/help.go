@@ -28,7 +28,7 @@ var helpGroups = []struct {
 	{"launchers", "Launchers", []string{"link", "instances", "instance", "sync", "unlink", "saves", "backup", "restore", "hook"}},
 	{"servers", "Servers", []string{"serve", "player"}},
 	{"play", "Play", []string{"accounts", "play", "watch"}},
-	{"shulker", "Shulker", []string{"docs", "config", "cache", "self", "version", "completion", "help"}},
+	{"shulker", "Shulker", []string{"docs", "config", "cache", "log", "self", "version", "completion", "help"}},
 }
 
 // helpGroupOf is the group a root command is filed in. Hidden commands have one too, so their runs

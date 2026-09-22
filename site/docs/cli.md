@@ -67,6 +67,7 @@ outline: [2, 3]
 | [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
 | [`shulker cache info`](#shulker-cache-info) | Show the cache's size and how much prune would free |
 | [`shulker cache prune`](#shulker-cache-prune) | Remove cached files no instance or project references |
+| [`shulker log`](#shulker-log) | Show what shulker did, from its log |
 | [`shulker version`](#shulker-version) | Print the shulker version |
 | [`shulker self update`](#shulker-self-update) | Update shulker to the latest release |
 | [`shulker completion bash`](#shulker-completion-bash) | Print the bash completion script |
@@ -1429,6 +1430,26 @@ Remove everything in the cache that no root references. A root is a registered i
 ```sh
 shulker cache prune
 ```
+
+### `shulker log`
+
+Show what shulker did, from `log.jsonl` beside `config.json`: when each run started and ended, and every warning and error it showed. It prints the last 24 hours by default, under a preamble that names the shulker version, the platform, the window and the filter that ran, and how many entries matched out of how many the log holds, so a slice pasted into an issue explains itself. An error is marked `✘` with its code, and its message goes on the line below. The report ends with the `--since` that widens it to every day the log keeps. A filter that matches nothing still prints the preamble, with `0 of <n> entries`, so it reads differently from a log that holds nothing. A log that isn't there is an empty report, and one that can't be read is a warning; neither fails the command. The filters combine, and `-i` takes an instance's id, name or directory, the way every other command does. A warning shown several times in one run is logged once, so the log isn't a count. Under `--json`, `data` holds the preamble's facts and the matching entries.
+
+```sh
+shulker log
+shulker log --since 7d --level error
+shulker log -i friends --group launchers
+shulker log --cmd "hook wrap" --code launch-not-started
+```
+
+| Flag | Description |
+| --- | --- |
+| `--since` | Entries from this long ago (`24h`, `90m`, `7d`) or this date (`2026-09-01`) on. Default `24h` |
+| `--group` | Only commands in this help group: `project`, `mods`, `builds`, `launchers`, `servers`, `play`, `shulker` |
+| `--cmd` | Only this command and the ones under it, like `sync` or `"hook wrap"` |
+| `--code` | Only entries with this error code |
+| `--level` | Only entries at this level: `info`, `warn` or `error` |
+| `-i, --instance` | Only entries about this instance, by id, name or directory |
 
 ### `shulker version`
 
