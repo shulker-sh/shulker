@@ -421,7 +421,7 @@ func (b *Builder) pullOverrideKeys(rel string, pf propsFile, kept map[string]boo
 		o := pf.origins[k]
 		switch {
 		case o.path == "" && b.isPushedKey(rel, k):
-			report.Skipped = append(report.Skipped, fmt.Sprintf("%s %s (filled from server.resourcePack %s)", rel, k, b.Manifest.Server.ResourcePack))
+			report.Skipped = append(report.Skipped, b.pushedKeySkip(rel, k))
 		case o.path == "":
 			if raw := b.manifestBlock(rel); raw != nil {
 				raw[k] = typedProperty(raw[k], current[k])
@@ -522,7 +522,7 @@ func (b *Builder) pullKeys(rel string, f propsFile, existing []byte, report *Pul
 			continue
 		}
 		if b.isPushedKey(rel, k) {
-			report.Skipped = append(report.Skipped, fmt.Sprintf("%s %s (filled from server.resourcePack %s)", rel, k, b.Manifest.Server.ResourcePack))
+			report.Skipped = append(report.Skipped, b.pushedKeySkip(rel, k))
 			continue
 		}
 		raw[k] = typedProperty(raw[k], value)
@@ -535,6 +535,10 @@ func (b *Builder) pullKeys(rel string, f propsFile, existing []byte, report *Pul
 // server.resourcePack, which pulling into the manifest would turn into a conflict.
 func (b *Builder) isPushedKey(rel, k string) bool {
 	return rel == PropertiesFile && b.Manifest.Server != nil && b.Manifest.Server.ResourcePack != "" && (k == "resource-pack" || k == "resource-pack-sha1")
+}
+
+func (b *Builder) pushedKeySkip(rel, k string) string {
+	return fmt.Sprintf("%s %s (filled from server.resourcePack %s)", rel, k, b.Manifest.Server.ResourcePack)
 }
 
 func (b *Builder) manifestBlock(rel string) map[string]any {
