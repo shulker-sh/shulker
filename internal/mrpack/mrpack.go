@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -74,10 +75,22 @@ func IsModJar(p string) bool {
 	return path.Dir(p) == "mods" && strings.EqualFold(path.Ext(p), ".jar")
 }
 
-// IsPackZip reports whether an archive path is a zip in resourcepacks/ or shaderpacks/.
+// IsPackZip reports whether an archive path is a zip in resourcepacks/, shaderpacks/ or one of
+// lock.DatapackFolders.
 func IsPackZip(p string) bool {
 	dir := path.Dir(p)
-	return (dir == "resourcepacks" || dir == "shaderpacks") && strings.EqualFold(path.Ext(p), ".zip")
+	return (dir == "resourcepacks" || dir == "shaderpacks" || IsDatapackZip(p)) && strings.EqualFold(path.Ext(p), ".zip")
+}
+
+// IsDatapackZip reports whether an archive path is a zip in one of lock.DatapackFolders.
+func IsDatapackZip(p string) bool {
+	return slices.Contains(lock.DatapackFolders, path.Dir(p)) && strings.EqualFold(path.Ext(p), ".zip")
+}
+
+// IsLoadedDatapackZip reports whether an archive path is a zip in a global datapack mod's own
+// folder, which the mod loads whatever the Minecraft version.
+func IsLoadedDatapackZip(p string) bool {
+	return IsDatapackZip(p) && path.Dir(p) != "datapacks"
 }
 
 func (f File) Layer() string {

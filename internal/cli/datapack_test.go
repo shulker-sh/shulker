@@ -1,13 +1,17 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/resolve"
 )
 
 const datapackMcmeta = `{"pack":{"pack_format":48,"description":"loot"}}`
@@ -204,5 +208,71 @@ func TestExportCurseForgeBundlesADatapackOutsideDatapacks(t *testing.T) {
 	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
 	if entries["overrides/config/paxi/datapacks/loot.zip"] != string(loot.data) {
 		t.Fatal("the datapack is bundled where Paxi reads it")
+	}
+}
+
+func TestImportMrpackLocksDatapacks(t *testing.T) {
+	h := newHarness(t)
+	terralith, autoslabs := h.jars["terralith"], h.jars["autoslabs"]
+	file := func(rel string, jar fakeJar) mrpack.File {
+		return mrpack.File{Path: rel, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	}
+	unknown := makeJarFiles(t, "inmis", "inmis_recipe_fix.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/inmis/recipe/fix.json": "{}"})
+	index := mrpack.Index{
+		FormatVersion: 1, Game: "minecraft", VersionID: "40", Name: "Better",
+		Files: []mrpack.File{
+			file("resourcepacks/Terralith.zip", terralith),
+			file("datapacks/Terralith.zip", terralith),
+			file("resourcepacks/AutoslabsCompat.zip", autoslabs),
+		},
+		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
+	}
+	archive := filepath.Join(t.TempDir(), "better.mrpack")
+	writeMrpack(t, archive, index, map[string][]byte{
+		"overrides/config/paxi/datapacks/Terralith.zip":        terralith.data,
+		"overrides/config/paxi/datapacks/inmis_recipe_fix.zip": unknown.data,
+	})
+
+	dir := filepath.Join(t.TempDir(), "better")
+	h.dir = filepath.Dir(dir)
+	var env struct {
+		Data importResult `json:"data"`
+	}
+	stdout := h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	res := env.Data.Mods
+	wantLocked := []resolve.LockedFile{{ID: "autoslabs-compat-bmc", Type: "resourcepack", Provider: "modrinth"}, {ID: "terralith", Type: "datapack", Provider: "modrinth"}}
+	if !slices.Equal(res.Locked, wantLocked) {
+		t.Fatalf("locked: %+v", res.Locked)
+	}
+	if strings.Join(res.Duplicates, ",") != "overrides/datapacks/Terralith.zip,overrides/resourcepacks/Terralith.zip" {
+		t.Fatalf("index copies of a loaded datapack are dropped: %+v", res.Duplicates)
+	}
+	if strings.Join(res.Unmanaged, ",") != "overrides/config/paxi/datapacks/inmis_recipe_fix.zip" {
+		t.Fatalf("a datapack no provider has stays an override: %+v", res.Unmanaged)
+	}
+	m, l := readProject(t, dir)
+	if got := m.Requires["terralith"]; got.Type != manifest.TypeDatapack || got.Filename != "Terralith.zip" || got.Pin != "urbokcOc" {
+		t.Fatalf("terralith entry: %+v", got)
+	}
+	if p := l.Datapacks["terralith"]; p.Side != "both" || p.Filename != "Terralith.zip" {
+		t.Fatalf("terralith lock: %+v", p)
+	}
+	if got := m.Requires["autoslabs-compat-bmc"]; got.Type != manifest.TypeResourcePack || got.Filename != "AutoslabsCompat.zip" || got.Project != "AutoSlb1" {
+		t.Fatalf("a datapack carrying assets/ is a resource pack, keyed by its slug made a key: %+v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "overrides", "config", "paxi", "datapacks", "Terralith.zip")); !os.IsNotExist(err) {
+		t.Fatalf("the locked datapack isn't kept as an override: %v", err)
+	}
+
+	stray := filepath.Join(t.TempDir(), "stray.mrpack")
+	index.Files = index.Files[:1]
+	writeMrpack(t, stray, index, nil)
+	dir = filepath.Join(t.TempDir(), "stray")
+	h.mustRun(t, "import", "mrpack", stray, "--dir", dir)
+	if _, l := readProject(t, dir); l.Datapacks["terralith"].Filename != "Terralith.zip" {
+		t.Fatalf("a datapack under resourcepacks/ with no loaded copy is locked as a datapack: %+v", l.Datapacks)
 	}
 }

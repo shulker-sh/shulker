@@ -3,7 +3,9 @@ package resolve
 import (
 	"archive/zip"
 	"bytes"
+	"cmp"
 	"context"
+	"crypto/sha1"
 	"crypto/sha512"
 	"encoding/hex"
 	"errors"
@@ -48,12 +50,15 @@ type hosted struct {
 }
 
 type Imported struct {
-	Locked    []LockedFile      `json:"locked"`
-	Reused    []string          `json:"reused"`
-	Dropped   []string          `json:"dropped"`
-	Unmanaged []string          `json:"unmanaged"`
-	Warnings  []string          `json:"-"`
-	Overrides []mrpack.Override `json:"-"`
+	Locked  []LockedFile `json:"locked"`
+	Reused  []string     `json:"reused"`
+	Dropped []string     `json:"dropped"`
+	// Duplicates are the pack's copies of a datapack a global datapack mod's folder also holds,
+	// left out for the copy that mod loads.
+	Duplicates []string          `json:"duplicates"`
+	Unmanaged  []string          `json:"unmanaged"`
+	Warnings   []string          `json:"-"`
+	Overrides  []mrpack.Override `json:"-"`
 }
 
 // LockedFile is a file an import locked from a provider, under its key in the lock.
@@ -85,6 +90,7 @@ func (rep *Imported) sort() {
 	})
 	sort.Strings(rep.Reused)
 	sort.Strings(rep.Dropped)
+	sort.Strings(rep.Duplicates)
 	sort.Strings(rep.Unmanaged)
 }
 
@@ -96,8 +102,11 @@ type importer struct {
 	bySha     map[string]string
 	packBySha map[string]importedPack
 	matched   map[string]bool
-	// onModrinth is what Modrinth found of the index's files, by sha1.
+	// onModrinth is what Modrinth found of the index's files and the datapack zips in the
+	// overrides, by sha1.
 	onModrinth map[string]hosted
+	// loadedDatapacks are the sha512s of the zips in a global datapack mod's folder.
+	loadedDatapacks map[string]bool
 	// unmatched are the mod jars and pack zips Modrinth didn't find, for CurseForge to look up.
 	unmatched []mrpack.Override
 	// keepSides reuses the marker's side for each entry, for an archive whose layers don't say.
@@ -107,7 +116,7 @@ type importer struct {
 	inProject bool
 }
 
-// importedPack is a resource pack or shader the pack's own lock names, found by
+// importedPack is a pack the pack's own lock names, found by
 // the digest of the file the archive ships.
 type importedPack struct {
 	key  string
@@ -115,7 +124,7 @@ type importedPack struct {
 }
 
 func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
-	im := &importer{r: r, a: a, rep: &Imported{Locked: []LockedFile{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}}
+	im := &importer{r: r, a: a, rep: &Imported{Locked: []LockedFile{}, Reused: []string{}, Dropped: []string{}, Duplicates: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}, loadedDatapacks: map[string]bool{}}
 	if a.Marker == nil {
 		return im
 	}
@@ -124,14 +133,11 @@ func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
 			im.bySha[m.Sha512] = id
 		}
 	}
-	for key, p := range a.Marker.Lock.ResourcePacks {
-		if reuseLocal || p.File == "" {
-			im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeResourcePack}
-		}
-	}
-	for key, p := range a.Marker.Lock.Shaders {
-		if reuseLocal || p.File == "" {
-			im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeShader}
+	for _, kind := range manifest.PackKinds {
+		for key, p := range a.Marker.Lock.Packs(kind) {
+			if reuseLocal || p.File == "" {
+				im.packBySha[p.Sha512] = importedPack{key: key, kind: kind}
+			}
 		}
 	}
 	return im
@@ -151,7 +157,8 @@ func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLoc
 	if p, ok := r.Providers["modrinth"].(hashLookup); ok {
 		im.modrinth = p
 	}
-	if err := im.findOnModrinth(ctx, a.Index.Files); err != nil {
+	im.findLoadedDatapacks(a)
+	if err := im.findOnModrinth(ctx, a.Index.Files, a.Overrides); err != nil {
 		return nil, err
 	}
 	for _, f := range a.Index.Files {
@@ -160,7 +167,7 @@ func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLoc
 		}
 	}
 	for _, o := range a.Overrides {
-		if err := im.override(o); err != nil {
+		if err := im.override(ctx, o); err != nil {
 			return nil, err
 		}
 	}
@@ -188,21 +195,29 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if !mrpack.IsModJar(f.Path) && !mrpack.IsPackZip(f.Path) {
 		return im.unmanagedDownload(ctx, f)
 	}
+	if im.duplicateDatapack(f.Layer(), f.Path, sha512Sum) {
+		return nil
+	}
 	found, ok := im.onModrinth[sha1Sum]
 	if !ok {
 		return im.leaveForCurseForge(ctx, f)
 	}
-	locked, err := im.lockFile(ctx, im.modrinth, f.Layer(), f.Path, "", found.proj, found.v)
+	// A pack's side is its env; a mod's comes from its provider.
+	side := ""
+	if mrpack.IsPackZip(f.Path) {
+		side = f.Side()
+	}
+	locked, err := im.lockFile(ctx, im.modrinth, f.Layer(), f.Path, side, found.proj, found.v)
 	if err != nil || locked {
 		return err
 	}
 	return im.unmanagedDownload(ctx, f)
 }
 
-// findOnModrinth looks every mod jar and pack zip the index lists up on Modrinth in two requests,
-// whatever the pack's size, since Modrinth rate-limits by the request. A version whose project
-// Modrinth no longer has counts as not found.
-func (im *importer) findOnModrinth(ctx context.Context, files []mrpack.File) error {
+// findOnModrinth looks every mod jar and pack zip the index lists, and every datapack zip in the
+// overrides, up on Modrinth in two requests, whatever the pack's size, since Modrinth rate-limits by
+// the request. A version whose project Modrinth no longer has counts as not found.
+func (im *importer) findOnModrinth(ctx context.Context, files []mrpack.File, overrides []mrpack.Override) error {
 	if im.modrinth == nil {
 		return nil
 	}
@@ -215,7 +230,39 @@ func (im *importer) findOnModrinth(ctx context.Context, files []mrpack.File) err
 			sha1s = append(sha1s, sha1Sum)
 		}
 	}
+	for _, o := range overrides {
+		if mrpack.IsDatapackZip(o.Path) {
+			sum := sha1.Sum(o.Data)
+			sha1s = append(sha1s, hex.EncodeToString(sum[:]))
+		}
+	}
 	return im.lookUpOnModrinth(ctx, sha1s)
+}
+
+// findLoadedDatapacks notes the zips the pack keeps in a global datapack mod's folder, which are
+// the copies that load.
+func (im *importer) findLoadedDatapacks(a *mrpack.Archive) {
+	for _, f := range a.Index.Files {
+		if mrpack.IsLoadedDatapackZip(f.Path) {
+			im.loadedDatapacks[f.Hashes["sha512"]] = true
+		}
+	}
+	for _, o := range a.Overrides {
+		if mrpack.IsLoadedDatapackZip(o.Path) {
+			sum := sha512.Sum512(o.Data)
+			im.loadedDatapacks[hex.EncodeToString(sum[:])] = true
+		}
+	}
+}
+
+// duplicateDatapack reports, and records, a pack zip outside a global datapack mod's folder with
+// the bytes of one inside it: a leftover copy the game never loads.
+func (im *importer) duplicateDatapack(layer, filePath, sha512Sum string) bool {
+	if mrpack.IsLoadedDatapackZip(filePath) || !im.loadedDatapacks[sha512Sum] {
+		return false
+	}
+	im.rep.Duplicates = append(im.rep.Duplicates, layer+"/"+filePath)
+	return true
 }
 
 func (im *importer) lookUpOnModrinth(ctx context.Context, sha1s []string) error {
@@ -350,30 +397,18 @@ func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provide
 	return nil
 }
 
-// lockFile locks the mod jar, resource pack or shader at filePath in layer as p's version v,
-// reporting false, with nothing locked, when proj isn't the kind its folder holds (a datapack
-// under resourcepacks/, which Modrinth calls a mod, stays unmanaged) or p fails to serve it. The
-// lock downloads it from p even when the pack ships the same bytes, since every later install will.
+// lockFile locks the mod jar or pack zip at filePath in layer as p's version v, reporting false,
+// with nothing locked, when v isn't the kind its folder holds or p fails to serve it. The lock
+// downloads it from p even when the pack ships the same bytes, since every later install will.
 func (im *importer) lockFile(ctx context.Context, p provider.Provider, layer, filePath, side string, proj *provider.Project, v *provider.Version) (bool, error) {
-	kind := manifest.TypeMod
-	switch path.Dir(filePath) {
-	case "resourcepacks":
-		kind = manifest.TypeResourcePack
-	case "shaderpacks":
-		kind = manifest.TypeShader
-	}
-	projKind := proj.Type
-	if projKind == "" {
-		projKind = manifest.TypeMod
-	}
-	if projKind != kind {
+	kind, err := im.fileKind(ctx, filePath, proj, v)
+	if err == nil && kind == "" {
 		return false, nil
 	}
-	var err error
-	if kind == manifest.TypeMod {
+	if err == nil && kind == manifest.TypeMod {
 		err = im.lockMod(ctx, p, side, proj, v)
-	} else {
-		err = im.lockPack(ctx, p, path.Base(filePath), kind, proj, v)
+	} else if err == nil {
+		err = im.lockPack(ctx, p, path.Base(filePath), kind, side, proj, v)
 	}
 	if why, failed := downloadFailure(err); failed {
 		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s/%s: %s's download failed (%s); kept as an override, so try matching it again later", layer, filePath, provider.Title(p.Name()), why))
@@ -401,6 +436,53 @@ func downloadFailure(err error) (string, bool) {
 		return "the connection failed", true
 	}
 	return "", false
+}
+
+// fileKind is what the file at filePath locks as, empty when v isn't the kind its folder holds.
+// A datapack version, which Modrinth files under a mod project, locks as a datapack in a datapack
+// folder, and under resourcepacks/ as well unless it carries assets/, which make it load as a
+// resource pack there.
+func (im *importer) fileKind(ctx context.Context, filePath string, proj *provider.Project, v *provider.Version) (string, error) {
+	kind := manifest.TypeMod
+	switch {
+	case path.Dir(filePath) == "resourcepacks":
+		kind = manifest.TypeResourcePack
+	case path.Dir(filePath) == "shaderpacks":
+		kind = manifest.TypeShader
+	case mrpack.IsDatapackZip(filePath):
+		kind = manifest.TypeDatapack
+	}
+	datapack := proj.Type == manifest.TypeDatapack || slices.Contains(v.Loaders, "datapack")
+	switch {
+	case kind == manifest.TypeDatapack && datapack:
+		return kind, nil
+	case kind == manifest.TypeResourcePack && datapack && proj.Type != manifest.TypeResourcePack:
+		got, err := im.r.obtain(ctx, proj, v)
+		if err != nil {
+			return "", err
+		}
+		if hasAssets(got.path) {
+			return kind, nil
+		}
+		return manifest.TypeDatapack, nil
+	case kind == manifest.TypeDatapack:
+		return "", nil
+	}
+	if cmp.Or(proj.Type, manifest.TypeMod) != kind {
+		return "", nil
+	}
+	return kind, nil
+}
+
+// hasAssets reports whether the zip at path carries assets/, which the game reads as a resource
+// pack's.
+func hasAssets(path string) bool {
+	zr, err := zip.OpenReader(path)
+	if err != nil {
+		return false
+	}
+	defer zr.Close()
+	return slices.ContainsFunc(zr.File, func(f *zip.File) bool { return strings.HasPrefix(f.Name, "assets/") })
 }
 
 func (im *importer) lockMod(ctx context.Context, p provider.Provider, side string, proj *provider.Project, v *provider.Version) error {
@@ -433,9 +515,13 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, side strin
 
 // lockPack locks a resource pack or shader the pack carries under the file name it ships, which
 // the game enables it by, pinned to the version it ships.
-func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename, kind string, proj *provider.Project, v *provider.Version) error {
+func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename, kind, side string, proj *provider.Project, v *provider.Version) error {
 	r := im.r
 	key := proj.Slug
+	if !manifest.IsValidKey(key) {
+		// Modrinth slugs may hold what a key can't, such as parentheses.
+		key = nameKey(key)
+	}
 	if ok, err := im.canListPack(key, kind); !ok {
 		return err
 	}
@@ -448,11 +534,14 @@ func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename,
 	if filename != key+manifest.FileExtension(kind) {
 		listed.Filename = filename
 	}
-	if p.Name() != "modrinth" {
+	if p.Name() != "modrinth" || key != proj.Slug {
 		listed.Project = lockID(p.Name(), proj.ID)
 	}
 	if p.Name() != r.Manifest.ProviderOrder()[0] {
 		listed.Provider = p.Name()
+	}
+	if kind == manifest.TypeDatapack && (side == "client" || side == "server") {
+		listed.Side = side
 	}
 	r.Manifest.Requires[key] = listed
 	if err := r.lockPackVersion(ctx, p, proj, v, key, kind, ""); err != nil {
@@ -519,7 +608,7 @@ func (im *importer) keepUnmanaged(files []mrpack.Override) {
 	}
 }
 
-func (im *importer) override(o mrpack.Override) error {
+func (im *importer) override(ctx context.Context, o mrpack.Override) error {
 	if !mrpack.IsModJar(o.Path) && !mrpack.IsPackZip(o.Path) {
 		im.rep.Overrides = append(im.rep.Overrides, o)
 		return nil
@@ -543,6 +632,19 @@ func (im *importer) override(o mrpack.Override) error {
 		}
 		im.reuse(id, side)
 		return nil
+	}
+	if im.duplicateDatapack(o.Layer, o.Path, digest) {
+		return nil
+	}
+	if mrpack.IsDatapackZip(o.Path) {
+		sum := sha1.Sum(o.Data)
+		if found, ok := im.onModrinth[hex.EncodeToString(sum[:])]; ok {
+			locked, err := im.lockFile(ctx, im.modrinth, o.Layer, o.Path, layerSide(o.Layer), found.proj, found.v)
+			if !locked && err == nil {
+				im.unmanaged(o)
+			}
+			return err
+		}
 	}
 	im.unmatched = append(im.unmatched, o)
 	return nil
@@ -572,12 +674,8 @@ func (im *importer) reusePack(p importedPack) {
 		return
 	}
 	im.matched[p.key] = true
-	locked, listed, into := im.a.Marker.Lock.ResourcePacks, im.a.Marker.Manifest.ResourcePacks(), im.r.Lock.ResourcePacks
-	if p.kind == manifest.TypeShader {
-		locked, listed, into = im.a.Marker.Lock.Shaders, im.a.Marker.Manifest.Shaders(), im.r.Lock.Shaders
-	}
-	into[p.key] = locked[p.key]
-	if entry, ok := listed[p.key]; ok {
+	im.r.Lock.Packs(p.kind)[p.key] = im.a.Marker.Lock.Packs(p.kind)[p.key]
+	if entry, ok := im.a.Marker.Manifest.Packs(p.kind)[p.key]; ok {
 		im.r.Manifest.Requires[p.key] = entry
 	}
 	im.rep.Reused = append(im.rep.Reused, p.key)
@@ -617,8 +715,9 @@ func (im *importer) dropUnmatched() {
 			im.rep.Dropped = append(im.rep.Dropped, key)
 		}
 	}
-	dropPacks(im.a.Marker.Lock.ResourcePacks, im.r.Lock.ResourcePacks)
-	dropPacks(im.a.Marker.Lock.Shaders, im.r.Lock.Shaders)
+	for _, kind := range manifest.PackKinds {
+		dropPacks(im.a.Marker.Lock.Packs(kind), im.r.Lock.Packs(kind))
+	}
 	for id, m := range im.r.Lock.Mods {
 		kept := m.RequiredBy[:0]
 		for _, by := range m.RequiredBy {
