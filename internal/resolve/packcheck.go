@@ -2,7 +2,6 @@ package resolve
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path"
 	"path/filepath"
@@ -30,15 +29,15 @@ func (r *Resolver) checkPackFolder(key, kind string, entry manifest.Require) {
 func packFolderProblems(dir, rel, kind string) []string {
 	root := filepath.Join(dir, filepath.FromSlash(rel))
 	if kind == manifest.TypeShader {
-		if st, err := os.Stat(filepath.Join(root, "shaders")); err != nil || !st.IsDir() {
+		if !hasShaders(root) {
 			return []string{rel + " has no shaders/ folder at its root, so Iris won't load it"}
 		}
 		return nil
 	}
-	data, err := os.ReadFile(filepath.Join(root, "pack.mcmeta"))
-	if errors.Is(err, os.ErrNotExist) {
+	if !hasPackMcmeta(root) {
 		return []string{rel + " has no pack.mcmeta at its root, so the game won't load it"}
 	}
+	data, err := os.ReadFile(filepath.Join(root, "pack.mcmeta"))
 	mcmeta := path.Join(rel, "pack.mcmeta")
 	if err != nil || !json.Valid(data) {
 		return []string{mcmeta + " is not valid JSON, so the game won't load it"}
@@ -59,4 +58,15 @@ func packFolderProblems(dir, rel, kind string) []string {
 		problems = append(problems, mcmeta+" has no pack format (min_format and max_format, or pack_format), so the game won't load it")
 	}
 	return problems
+}
+
+// hasPackMcmeta reports whether the folder root has the pack.mcmeta a resource pack keeps there.
+func hasPackMcmeta(root string) bool {
+	st, err := os.Stat(filepath.Join(root, "pack.mcmeta"))
+	return err == nil && st.Mode().IsRegular()
+}
+
+// hasShaders reports whether the folder root has the shaders/ folder a shader keeps there.
+func hasShaders(root string) bool {
+	return IsLocalFolder(filepath.Join(root, "shaders"))
 }

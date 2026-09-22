@@ -225,10 +225,10 @@ func folderKind(path, asked string) (string, error) {
 		e.Help = "add a mod as its jar"
 		return "", e
 	}
-	if st, err := os.Stat(filepath.Join(path, "pack.mcmeta")); err == nil && st.Mode().IsRegular() {
+	if hasPackMcmeta(path) {
 		return manifest.TypeResourcePack, nil
 	}
-	if IsLocalFolder(filepath.Join(path, "shaders")) {
+	if hasShaders(path) {
 		return manifest.TypeShader, nil
 	}
 	return "", typeAmbiguous(path, manifest.TypeResourcePack, manifest.TypeShader)
