@@ -219,7 +219,13 @@ const (
 	TypeModpack      = "modpack"
 	TypeResourcePack = "resourcepack"
 	TypeShader       = "shader"
+	TypeDatapack     = "datapack"
 )
+
+// PackKinds are the kinds locked as packs: zips placed under their requires key.
+var PackKinds = []string{TypeResourcePack, TypeShader, TypeDatapack}
+
+func IsPackKind(kind string) bool { return slices.Contains(PackKinds, kind) }
 
 var keyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
@@ -375,7 +381,7 @@ func (m *Manifest) check() error {
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
-		// A resource pack or shader may name a folder, so whether its file is a .zip waits for lock.
+		// A pack may name a folder, so whether its file is a .zip waits for lock.
 		if r := m.Requires[key]; r.File != "" && r.Kind() == TypeMod {
 			if err := CheckFileExtension(key, r); err != nil {
 				return err
@@ -421,7 +427,9 @@ func (m *Manifest) ResourcePacks() map[string]Require { return m.byKind(TypeReso
 
 func (m *Manifest) Shaders() map[string]Require { return m.byKind(TypeShader) }
 
-// PackFilename is the name a resource pack or shader is placed under: the
+func (m *Manifest) Datapacks() map[string]Require { return m.byKind(TypeDatapack) }
+
+// PackFilename is the name a pack is placed under: the
 // entry's own filename, or its key, which stays put when the pack updates.
 func PackFilename(key string, e Require) string {
 	if e.Filename != "" {
@@ -430,7 +438,7 @@ func PackFilename(key string, e Require) string {
 	return key + ".zip"
 }
 
-// IsLocalFile reports whether key is a mod, resource pack or shader taken from a local file, which
+// IsLocalFile reports whether key is a mod or pack taken from a local file, which
 // has no provider to ask for a newer version.
 func (m *Manifest) IsLocalFile(key string) bool {
 	r, ok := m.Requires[key]
@@ -438,7 +446,7 @@ func (m *Manifest) IsLocalFile(key string) bool {
 }
 
 // CheckFileExtension refuses a local file whose name doesn't end the way the lock records its kind:
-// .jar for a mod, .zip for a resource pack or shader.
+// .jar for a mod, .zip for a pack.
 func CheckFileExtension(key string, r Require) error {
 	want := FileExtension(r.Kind())
 	if strings.HasSuffix(r.File, want) {

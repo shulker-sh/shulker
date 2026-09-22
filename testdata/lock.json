@@ -125,6 +125,23 @@
     }
   },
 
+  "datapacks": {
+    "terralith": {
+      "provider": "modrinth",
+      "project": "8oi3bsk5",
+      "channel": "release",
+      "version": "urbokcOc",
+      "versionNumber": "2.5.8",
+      "filename": "terralith.zip",
+      "providerFilename": "Terralith_1.21_v2.5.8.zip",
+      "url": "https://cdn.modrinth.com/data/8oi3bsk5/versions/urbokcOc/Terralith_1.21_v2.5.8.zip",
+      "sha512": "31dfba2a60d144ca3af3c0aa8662db84f3e966fdb555b9eadbd5bdf4e4d864d2e4a8393b99388c0eaa0f03052bf35b6ae44b1858fa046fae35d408c40b789166",
+      "sha1": "fc1349e387e480bec84c6813d1d75e85c3a5ac4f",
+      "size": 3112105,
+      "side": "both"
+    }
+  },
+
   "players": [
     { "name": "AndrewMast", "uuid": "21dffd6e-b89b-4d18-8b3a-8227201e71be", "resolvedAt": "2026-09-09T14:20:03Z" },
     { "name": "Ayrix", "uuid": "fead01dc-ec27-4e78-8c6b-e8b9a679be98", "resolvedAt": "2026-09-09T14:20:03Z" },

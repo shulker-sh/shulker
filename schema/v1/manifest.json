@@ -73,7 +73,7 @@
       "propertyNames": { "$ref": "#/$defs/requireKey" },
       "additionalProperties": { "$ref": "#/$defs/require" },
       "default": {},
-      "description": "Mods, modpacks, resource packs and shaders this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id; a resource pack's or shader's key is the file name it is placed under, so a pack enabled in game stays enabled when it updates. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader."
+      "description": "Mods, modpacks, resource packs, shaders and datapacks this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id; a pack's key is the file name it is placed under, so a pack enabled in game stays enabled when it updates. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader."
     },
     "ignore": {
       "type": "array",
@@ -239,7 +239,7 @@
     "requireKey": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
-      "description": "Name of a requires entry, unique across mods, modpacks, resource packs and shaders. Used in messages and requiredBy, and as the placed file name for a resource pack or shader."
+      "description": "Name of a requires entry, unique across mods, modpacks, resource packs, shaders and datapacks. Used in messages and requiredBy, and as the placed file name for a pack."
     },
     "require": {
       "type": "object",
@@ -247,8 +247,8 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["mod", "modpack", "resourcepack", "shader"],
-          "description": "What the entry is. Omitted means modpack for an entry with source and mod otherwise, unless the provider says otherwise; when given it must agree with the entry. Resource packs and shaders are resolved from the provider's own project type and placed in resourcepacks/ or shaderpacks/."
+          "enum": ["mod", "modpack", "resourcepack", "shader", "datapack"],
+          "description": "What the entry is. Omitted means modpack for an entry with source and mod otherwise, unless the provider says otherwise; when given it must agree with the entry. Resource packs and shaders are resolved from the provider's own project type and placed in resourcepacks/ or shaderpacks/. A datapack is resolved from the provider's datapack files and placed on both sides unless side says otherwise, in the folder of a global datapack mod such as Paxi or Open Loader, or with none, in a server's world."
         },
         "source": {
           "type": "string",
@@ -270,13 +270,13 @@
         },
         "file": {
           "$ref": "#/$defs/relativePath",
-          "description": "A local jar or zip that is on no provider, placed like any other entry of its kind. On a resource pack or shader it may name a folder, which shulker zips and places as a zip, leaving out any name starting with a dot, Thumbs.db, desktop.ini, *~ and *.swp at any depth and zipping what a symlink in it points at. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date."
+          "description": "A local jar or zip that is on no provider, placed like any other entry of its kind. On a resource pack, shader or datapack it may name a folder, which shulker zips and places as a zip, leaving out any name starting with a dot, Thumbs.db, desktop.ini, *~ and *.swp at any depth and zipping what a symlink in it points at. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date."
         },
         "filename": {
           "type": "string",
           "minLength": 1,
           "pattern": "^[^/\\\\]+\\.zip$",
-          "description": "Resource packs and shaders only: the file name the pack is placed under, in place of <key>.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case."
+          "description": "Resource packs, shaders and datapacks only: the file name the pack is placed under, in place of <key>.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case."
         },
         "project": {
           "$ref": "#/$defs/projectId",
@@ -373,7 +373,7 @@
         },
         {
           "if": { "required": ["filename"] },
-          "then": { "required": ["type"], "properties": { "type": { "enum": ["resourcepack", "shader"] } } }
+          "then": { "required": ["type"], "properties": { "type": { "enum": ["resourcepack", "shader", "datapack"] } } }
         },
         {
           "if": { "required": ["autoUpdate"] },

@@ -4,7 +4,7 @@
   "title": "shulker.lock",
   "description": "Shulker lock file. Tool-owned, key-sorted, pretty-printed. Records the exact resolution of shulker.json; install and build read only this file.",
   "type": "object",
-  "required": ["$schema", "minecraft", "java", "modpacks", "mods", "resourcepacks", "shaders", "players"],
+  "required": ["$schema", "minecraft", "java", "modpacks", "mods", "resourcepacks", "shaders", "datapacks", "players"],
   "additionalProperties": false,
   "properties": {
     "$schema": {
@@ -88,6 +88,12 @@
       "propertyNames": { "$ref": "#/$defs/requireKey" },
       "additionalProperties": { "$ref": "#/$defs/pack" },
       "description": "Every shader in the resolved set, keyed by its requires key. The build places each as shaderpacks/<key>.zip, or resourcepacks/<key>.zip when it targets vanilla core shaders."
+    },
+    "datapacks": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/requireKey" },
+      "additionalProperties": { "$ref": "#/$defs/pack" },
+      "description": "Every datapack in the resolved set, keyed by its requires key. The build places each as <key>.zip in the folder of a global datapack mod the side places (Paxi's config/paxi/datapacks/, Open Loader's config/openloader/data/ before Minecraft 1.21 and config/openloader/packs/ from it); with none, in a server's <level-name>/datapacks/, or a client's datapacks/ with a warning."
     },
     "players": {
       "type": "array",
@@ -310,7 +316,8 @@
           "uniqueItems": true,
           "minItems": 1,
           "description": "Shaders only: the shader mods that can load this file, from the provider's tags. Absent for a local shader, which any shader mod can load. A shader tagged only vanilla is a core-shader resource pack, placed in resourcepacks/ and enabled like one; the rest are placed in shaderpacks/, and the build enables the first one a placed shader mod can load through that mod's .properties file."
-        }
+        },
+        "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Datapacks only: the sides the datapack is placed on, the manifest's side or both. Resource packs and shaders are client-only." }
       },
       "allOf": [
         {

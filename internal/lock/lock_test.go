@@ -52,7 +52,7 @@ func TestNewSaves(t *testing.T) {
 }
 
 func TestParseChecksTheMarker(t *testing.T) {
-	body := `"minecraft":"26.2","java":{"major":25,"component":"java-runtime-epsilon"},"modpacks":{},"mods":{},"resourcepacks":{},"shaders":{},"players":[]}`
+	body := `"minecraft":"26.2","java":{"major":25,"component":"java-runtime-epsilon"},"modpacks":{},"mods":{},"resourcepacks":{},"shaders":{},"datapacks":{},"players":[]}`
 	for _, c := range []struct{ name, data, code string }{
 		{"own", `{"$schema":"https://shulker.sh/schema/v1/lock.json",` + body, ""},
 		{"newer", `{"$schema":"https://shulker.sh/schema/v2/lock.json","future":true}`, "schema-newer"},
@@ -76,7 +76,7 @@ func TestFileEntries(t *testing.T) {
 	sha := strings.Repeat("ab", 64)
 	doc := func(mod, pack string) []byte {
 		return []byte(`{"$schema":"https://shulker.sh/schema/v1/lock.json","minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},"modpacks":{},` +
-			`"mods":{"extras":{` + mod + `}},"resourcepacks":{"faithful":{` + pack + `}},"shaders":{},"players":[]}`)
+			`"mods":{"extras":{` + mod + `}},"resourcepacks":{"faithful":{` + pack + `}},"shaders":{},"datapacks":{},"players":[]}`)
 	}
 	mod := `"file":"files/extras.jar","filename":"extras.jar","sha512":"` + sha + `","size":10,"side":"both","requiredBy":[],"aliases":{}`
 	pack := `"file":"files/faithful.zip","filename":"faithful.zip","sha512":"` + sha + `","size":10`
@@ -111,7 +111,7 @@ func TestArchiveModpackEntries(t *testing.T) {
 	sha := strings.Repeat("ab", 64)
 	doc := func(modpack string) []byte {
 		return []byte(`{"$schema":"https://shulker.sh/schema/v1/lock.json","minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},` +
-			`"modpacks":{"cozy":{` + modpack + `}},"mods":{},"resourcepacks":{},"shaders":{},"players":[]}`)
+			`"modpacks":{"cozy":{` + modpack + `}},"mods":{},"resourcepacks":{},"shaders":{},"datapacks":{},"players":[]}`)
 	}
 	archive := `"file":"packs/cozy.mrpack","sha512":"` + sha + `","size":10,"locked":true,"unmanaged":{"server-overrides/mods/extra.jar":"` + sha + `"}`
 	l, err := Parse(doc(archive))
@@ -147,7 +147,7 @@ func TestHostedModpackEntries(t *testing.T) {
 	sha := strings.Repeat("ab", 64)
 	doc := func(modpack string) []byte {
 		return []byte(`{"$schema":"https://shulker.sh/schema/v1/lock.json","minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},` +
-			`"modpacks":{"cozy":{` + modpack + `}},"mods":{},"resourcepacks":{},"shaders":{},"players":[]}`)
+			`"modpacks":{"cozy":{` + modpack + `}},"mods":{},"resourcepacks":{},"shaders":{},"datapacks":{},"players":[]}`)
 	}
 	identity := `"provider":"curseforge","project":600001,"version":7000001,"versionNumber":"Cozy 2.0","channel":"release","filename":"cozy-2.0.zip","sha512":"` + sha + `","size":10,"locked":true`
 	hosted := identity + `,"url":"https://edge.forgecdn.net/files/cozy-2.0.zip"`
@@ -186,6 +186,34 @@ func TestHostedModpackEntries(t *testing.T) {
 	} {
 		if _, err := Parse(doc(entry)); err == nil {
 			t.Errorf("%s should be invalid", name)
+		}
+	}
+}
+
+func TestDatapackFolder(t *testing.T) {
+	cases := []struct {
+		name, minecraft, side string
+		mods                  map[string]Mod
+		folder                string
+		loaded                bool
+	}{
+		{"paxi", "1.20.1", "client", map[string]Mod{"paxi": {Side: "both"}}, "config/paxi/datapacks", true},
+		{"paxi renamed", "26.2", "server", map[string]Mod{"globals": {ModID: "paxi", Side: "both"}}, "config/paxi/datapacks", true},
+		{"open loader before 1.21", "1.20.4", "client", map[string]Mod{"openloader": {Side: "both"}}, "config/openloader/data", true},
+		{"open loader from 1.21", "1.21.1", "client", map[string]Mod{"openloader": {Side: "both"}}, "config/openloader/packs", true},
+		{"loader on the other side", "26.2", "server", map[string]Mod{"paxi": {Side: "client"}}, "adventure/datapacks", true},
+		{"server world", "26.2", "server", nil, "adventure/datapacks", true},
+		{"client without a loader", "26.2", "client", nil, "datapacks", false},
+	}
+	for _, c := range cases {
+		l := New()
+		l.Minecraft = c.minecraft
+		for id, m := range c.mods {
+			l.Mods[id] = m
+		}
+		folder, loaded := l.DatapackFolder(c.side, "adventure")
+		if folder != c.folder || loaded != c.loaded {
+			t.Errorf("%s: got %s %v, want %s %v", c.name, folder, loaded, c.folder, c.loaded)
 		}
 	}
 }

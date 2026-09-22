@@ -30,7 +30,7 @@ Required properties are marked with *.
 | `java` | `string` | Optional override. Either an absolute path to a JDK/JRE home or a semver range over the Java major version, e.g. "&gt;=25". Omit to derive from the Minecraft version json and use the managed runtime.<br>min length 1 |
 | `providers` | [`provider`](#provider)[] | Provider preference order. A single entry makes the tool single-provider.<br>min items 1, unique items, default `["modrinth","curseforge"]` |
 | `features` | map of [`featureDecl`](#featuredecl) | Optional parts of the pack, each one switch over the mods gated with feature and over the feature's own override folder. --with and --without decide a feature for one build; feature on and feature off record the choice.<br>keys are [`featureName`](#featurename) |
-| `requires` | map of [`require`](#require) | Mods, modpacks, resource packs and shaders this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id; a resource pack's or shader's key is the file name it is placed under, so a pack enabled in game stays enabled when it updates. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader.<br>keys are [`requireKey`](#requirekey), default `{}` |
+| `requires` | map of [`require`](#require) | Mods, modpacks, resource packs, shaders and datapacks this project requires, in one map keyed by a name unique across them. A mod's key is its in-jar mod id; a pack's key is the file name it is placed under, so a pack enabled in game stays enabled when it updates. An entry with source is a modpack whose mods and overrides merge into this project; an empty entry is a mod at the newest release-channel file for the locked Minecraft and loader.<br>keys are [`requireKey`](#requirekey), default `{}` |
 | `ignore` | [`ignore`](#ignore)[] | Per-pair overrides for unmet depends or matched breaks found in jar metadata. |
 | `wholeFiles` | [`relativePath`](#relativepath)[] | Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone.<br>unique items |
 | `skipFiles` | [`relativePath`](#relativepath)[] | Globs (* and ? match within one path segment) of override files to leave out of builds and exports. A glob with no slash matches a file name at any depth; one with a slash matches the build-relative path. .DS_Store, ._* files, Thumbs.db and desktop.ini are always left out.<br>unique items |
@@ -161,7 +161,7 @@ No other properties are allowed.
 
 ### requireKey
 
-Name of a requires entry, unique across mods, modpacks, resource packs and shaders. Used in messages and requiredBy, and as the placed file name for a resource pack or shader.
+Name of a requires entry, unique across mods, modpacks, resource packs, shaders and datapacks. Used in messages and requiredBy, and as the placed file name for a pack.
 
 Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 
@@ -169,13 +169,13 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `type` | `"mod"` \| `"modpack"` \| `"resourcepack"` \| `"shader"` | What the entry is. Omitted means modpack for an entry with source and mod otherwise, unless the provider says otherwise; when given it must agree with the entry. Resource packs and shaders are resolved from the provider's own project type and placed in resourcepacks/ or shaderpacks/. |
+| `type` | `"mod"` \| `"modpack"` \| `"resourcepack"` \| `"shader"` \| `"datapack"` | What the entry is. Omitted means modpack for an entry with source and mod otherwise, unless the provider says otherwise; when given it must agree with the entry. Resource packs and shaders are resolved from the provider's own project type and placed in resourcepacks/ or shaderpacks/. A datapack is resolved from the provider's datapack files and placed on both sides unless side says otherwise, in the folder of a global datapack mod such as Paxi or Open Loader, or with none, in a server's world. |
 | `source` | `string` | Local path, git URL, or raw manifest URL of a modpack.<br>min length 1 |
 | `ref` | `string` | Branch, tag, or commit for a git source. The lock records the resolved commit.<br>min length 1 |
 | `autoUpdate` | `boolean` | Whether sync refreshes this modpack from its source, or re-reads its archive when the archive's bytes change. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless. |
 | `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock, and always for an archive, which pins exact files; a source without a lock is always resolved from its manifest. |
-| `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. On a resource pack or shader it may name a folder, which shulker zips and places as a zip, leaving out any name starting with a dot, Thumbs.db, desktop.ini, *~ and *.swp at any depth and zipping what a symlink in it points at. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date. |
-| `filename` | `string` | Resource packs and shaders only: the file name the pack is placed under, in place of &lt;key&gt;.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case.<br>pattern `^[^/\\]+\.zip$`, min length 1 |
+| `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. On a resource pack, shader or datapack it may name a folder, which shulker zips and places as a zip, leaving out any name starting with a dot, Thumbs.db, desktop.ini, *~ and *.swp at any depth and zipping what a symlink in it points at. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date. |
+| `filename` | `string` | Resource packs, shaders and datapacks only: the file name the pack is placed under, in place of &lt;key&gt;.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case.<br>pattern `^[^/\\]+\.zip$`, min length 1 |
 | `project` | [`projectId`](#projectid) | The provider project, by slug or id. Omitted means the key. Written by add when the provider slug differs from the key or the provider is CurseForge, and always for a modpack. |
 | `pin` | [`versionId`](#versionid) | Pin to one provider version. update skips pinned mods and modpacks. |
 | `channel` | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted. A channel admits itself and anything more stable.<br>default `"release"` |
@@ -195,7 +195,7 @@ When `file` is set and `type` is `"modpack"`, `side`, `os` and `feature` are not
 
 When `type` is `"modpack"` and neither `source` nor `file` is set, `ref`, `autoUpdate`, `locked`, `side`, `os` and `feature` are not allowed.
 
-When `filename` is set, `type` is required, and `type` must be `"resourcepack"` \| `"shader"`.
+When `filename` is set, `type` is required, and `type` must be `"resourcepack"` \| `"shader"` \| `"datapack"`.
 
 When `autoUpdate` is set, `source` or `file` is required.
 
