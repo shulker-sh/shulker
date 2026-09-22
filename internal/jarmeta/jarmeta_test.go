@@ -52,6 +52,21 @@ func TestReadFabricSkipsByteOrderMark(t *testing.T) {
 	}
 }
 
+func TestReadAcceptsRawControlCharactersInStrings(t *testing.T) {
+	fabric := readBytes(t, buildZip(t, map[string]string{
+		"fabric.mod.json": "{\"id\":\"etf\",\"version\":\"7.0\",\"description\":\"Adds features\nSupports:\n\t- \\\"quoted\\\" textures\",\"environment\":\"client\"}",
+	}))
+	if fabric.ID != "etf" || fabric.Side != "client" {
+		t.Fatalf("parsed %+v", fabric)
+	}
+	quilt := readBytes(t, buildZip(t, map[string]string{
+		"quilt.mod.json": "{\"quilt_loader\":{\"id\":\"qetf\",\"version\":\"1.0\",\"metadata\":{\"description\":\"line one\nline two\"}}}",
+	}))
+	if quilt.ID != "qetf" {
+		t.Fatalf("parsed %+v", quilt)
+	}
+}
+
 func TestReadQuilt(t *testing.T) {
 	nested := buildZip(t, map[string]string{
 		"fabric.mod.json": `{"id":"inner","version":"2.0"}`,

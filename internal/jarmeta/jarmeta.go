@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -113,11 +114,43 @@ func readFile(f *zip.File) ([]byte, error) {
 	return bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")), nil
 }
 
+// escapeControlCharacters escapes raw control characters inside JSON strings.
+// Fabric and Quilt read mod metadata with Gson-derived readers that accept a
+// raw newline or tab in a string, and published jars rely on it.
+func escapeControlCharacters(data []byte) []byte {
+	var out []byte
+	inString, escaped := false, false
+	for i, c := range data {
+		switch {
+		case escaped:
+			escaped = false
+		case inString && c == '\\':
+			escaped = true
+		case c == '"':
+			inString = !inString
+		case inString && c < 0x20:
+			if out == nil {
+				out = append(make([]byte, 0, len(data)+16), data[:i]...)
+			}
+			out = fmt.Appendf(out, `\u%04x`, c)
+			continue
+		}
+		if out != nil {
+			out = append(out, c)
+		}
+	}
+	if out == nil {
+		return data
+	}
+	return out
+}
+
 func readFabric(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	data, err := readFile(f)
 	if err != nil {
 		return nil, err
 	}
+	data = escapeControlCharacters(data)
 	var raw struct {
 		ID          string          `json:"id"`
 		Version     string          `json:"version"`
@@ -165,6 +198,7 @@ func readQuilt(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	if err != nil {
 		return nil, err
 	}
+	data = escapeControlCharacters(data)
 	var raw struct {
 		Loader struct {
 			ID       string            `json:"id"`
