@@ -285,3 +285,29 @@ func TestServerBuildPushesResourcePack(t *testing.T) {
 	}
 	h.mustRun(t, "build", "--force")
 }
+
+func TestPullSkipsAPushedKeyBesideAnOverrideServerProperties(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "add", "fresh-animations")
+	h.editManifest(t, func(m map[string]any) {
+		m["server"].(map[string]any)["resourcePack"] = "fresh-animations"
+	})
+	override := filepath.Join(h.dir, "overrides", "server.properties")
+	writeFile(t, override, "motd=Hi\n")
+	h.mustRun(t, "install")
+	p := h.readLock(t).ResourcePacks["fresh-animations"]
+	propsPath := filepath.Join(h.dir, "build", "server", "server.properties")
+	edited := strings.Replace(readFile(t, propsPath), "resource-pack="+*p.URL, "resource-pack=https://example.com/other.zip", 1)
+	if err := os.WriteFile(propsPath, []byte(edited), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if stdout := h.mustRun(t, "pull"); !strings.Contains(stdout, "server.resourcePack") {
+		t.Fatalf("pull: %s", stdout)
+	}
+	if got := readFile(t, override); got != "motd=Hi\n" {
+		t.Fatalf("the override took the pushed key: %q", got)
+	}
+	h.mustRun(t, "build", "--force")
+}
