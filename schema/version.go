@@ -3,6 +3,7 @@ package schema
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path"
 	"strconv"
 	"strings"
@@ -49,11 +50,21 @@ func CheckMarker(kind Kind, code, file string, data []byte) error {
 		return Invalid(code, file, data, err)
 	}
 	if got > want {
-		e := out.Errorf("schema-newer", "%s was written by a newer shulker: its schema is v%d, and this shulker knows v%d", file, got, want)
-		e.Nudge = out.Nudge{Lead: "Update shulker", Command: "shulker self update"}
+		e := out.Errorf("schema-newer", "%s %s", file, Newer(got, want))
+		e.Nudge = UpdateNudge
 		return e
 	}
 	return nil
+}
+
+// UpdateNudge is the fix for a file written by a newer shulker, on the error or the warning that
+// reports it.
+var UpdateNudge = out.Nudge{Lead: "Update shulker", Command: "shulker self update"}
+
+// Newer says a file was written by a newer shulker, naming both versions; the file's path goes
+// before it.
+func Newer(got, want int) string {
+	return fmt.Sprintf("was written by a newer shulker (schema v%d; this one reads up to v%d)", got, want)
 }
 
 // ReadMarker returns the version data's $schema line names and the one this shulker knows for kind.

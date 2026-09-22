@@ -44,7 +44,7 @@ func TestCheckMarker(t *testing.T) {
 			"newer",
 			`{"$schema":"https://shulker.sh/schema/v2/accounts.json"}`,
 			"schema-newer",
-			"/tmp/accounts.json was written by a newer shulker: its schema is v2, and this shulker knows v1",
+			"/tmp/accounts.json was written by a newer shulker (schema v2; this one reads up to v1)",
 		},
 		{
 			"older",

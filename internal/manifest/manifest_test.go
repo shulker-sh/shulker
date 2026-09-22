@@ -368,7 +368,7 @@ func TestParseChecksTheMarker(t *testing.T) {
 	if out.CodeOf(err) != "schema-newer" || len(e.Items) != 0 {
 		t.Fatalf("newer marker: %v (items %v)", err, e.Items)
 	}
-	if want := "shulker.json was written by a newer shulker: its schema is v2, and this shulker knows v1"; e.Message != want {
+	if want := "shulker.json was written by a newer shulker (schema v2; this one reads up to v1)"; e.Message != want {
 		t.Errorf("newer message = %q, want %q", e.Message, want)
 	}
 
