@@ -138,7 +138,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	}
 	optional := 0
 	for _, s := range rl.validation.Suggestions {
-		if s.Kind == "optional" && slices.ContainsFunc(res.Added, func(m resolve.AddedMod) bool { return m.ID == s.Mod }) {
+		if s.Kind == "optional" && s.InstalledAs == "" && slices.ContainsFunc(res.Added, func(m resolve.AddedMod) bool { return m.ID == s.Mod }) {
 			optional++
 		}
 	}
@@ -423,7 +423,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 		items = append(items, it)
 	}
 	for _, s := range suggestions {
-		if s.Kind != "optional" {
+		if s.Kind != "optional" && s.InstalledAs == "" {
 			items = append(items, out.Item{Kind: out.Note, Name: s.Mod, Aside: []string{s.Kind + " " + s.On + ", not installed"}})
 		}
 	}

@@ -371,6 +371,10 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			e.Help = fmt.Sprintf("pass `--as <key>` to give %s another key", info.ID)
 			return "", nil, e
 		}
+		if existing.Provider == p.Name() && existing.Slug == "" && proj.Slug != id {
+			existing.Slug = proj.Slug
+			r.Lock.Mods[id] = existing
+		}
 		prior = &existing
 		if requiredBy != "" {
 			r.Lock.AddRequiredBy(id, requiredBy)
@@ -426,6 +430,9 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	if info.ID != id {
 		entry.ModID = info.ID
+	}
+	if proj.Slug != id {
+		entry.Slug = proj.Slug
 	}
 	if was := r.Lock.JarID(id); prior != nil && was != info.ID {
 		r.log("%s %s now identifies itself as %s", id, v.Number, info.ID)

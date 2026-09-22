@@ -177,6 +177,7 @@
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked: the manifest's channel for a mod listed there or in a pack, the requiring mod's for a dependency. A listed mod whose manifest channel differs makes the lock out of date." },
         "modpack": { "$ref": "#/$defs/requireKey", "description": "Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own mods and the dependencies resolved for them." },
         "modId": { "$ref": "#/$defs/modId", "description": "The jar's in-jar mod id. Present only when it differs from the entry's key; dependency matching and validation use it, while requiredBy and every other reference use the key." },
+        "slug": { "type": "string", "minLength": 1, "description": "The provider's project slug. Present only when it differs from the entry's key; a recommends, suggests or optional dependency naming it is reported as installed under the key, though the loader does not match it." },
         "requiredBy": {
           "type": "array",
           "uniqueItems": true,

@@ -55,6 +55,9 @@ func (a *app) suggestsCmd() *cobra.Command {
 					if s.Declared != "" && s.Declared != "*" {
 						aside += " " + s.Declared
 					}
+					if s.InstalledAs != "" {
+						aside += ", installed as " + s.InstalledAs
+					}
 					items = append(items, out.Item{Kind: out.Note, Name: s.Mod, Aside: []string{aside}})
 				}
 				l.Items(items...)

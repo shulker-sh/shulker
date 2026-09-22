@@ -305,7 +305,9 @@ shulker suggests --optional
 | --- | --- |
 | `--optional` | Also list optional dependencies, labelled `optional` |
 
-With `--json`, `data.suggestions` lists each one as `{ "mod", "kind", "on", "declared" }`, where `kind` is `recommends`, `suggests`, or `optional`.
+A mod can name another by its Modrinth or CurseForge slug, which the loader never matches. When that slug, or a key in `requires`, belongs to a locked mod, `suggests` marks the line `installed as <key>` and `add` and `update` leave it out.
+
+With `--json`, `data.suggestions` lists each one as `{ "mod", "kind", "on", "declared" }`, where `kind` is `recommends`, `suggests`, or `optional`, plus `installedAs` for such a match.
 
 ### `shulker pin`
 

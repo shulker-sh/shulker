@@ -37,6 +37,9 @@ type Suggestion struct {
 	Kind     string `json:"kind"`
 	On       string `json:"on"`
 	Declared string `json:"declared"`
+	// InstalledAs is the lock key of a mod whose provider slug or key matches On
+	// though no jar declares that id. The loader still sees nothing installed.
+	InstalledAs string `json:"installedAs,omitempty"`
 }
 
 var suggestionKinds = []string{"recommends", "suggests", "optional"}
@@ -45,7 +48,7 @@ var suggestionKinds = []string{"recommends", "suggests", "optional"}
 func (v *Validation) Recommended() []string {
 	lines := []string{}
 	for _, s := range v.Suggestions {
-		if s.Kind != "optional" {
+		if s.Kind != "optional" && s.InstalledAs == "" {
 			lines = append(lines, fmt.Sprintf("%s %s %s", s.Mod, s.Kind, s.On))
 		}
 	}
@@ -103,6 +106,13 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 			}
 		}
 	}
+	byName := map[string]string{}
+	for _, id := range r.lockIDs() {
+		byName[id] = id
+		if slug := r.Lock.Mods[id].Slug; slug != "" {
+			byName[slug] = id
+		}
+	}
 	ignores := r.ignores()
 	used := map[int]bool{}
 	for _, id := range sortedKeys(infos) {
@@ -129,7 +139,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 			declared := info.Optional[on]
 			found, ok := installed[on]
 			if !ok {
-				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared})
+				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared, InstalledAs: byName[on]})
 				continue
 			}
 			match, err := satisfies(info, found, declared)
@@ -168,7 +178,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 		for kind, set := range map[string]map[string]string{"recommends": info.Recommends, "suggests": info.Suggests} {
 			for _, on := range sortedKeys(set) {
 				if _, ok := installed[on]; !ok {
-					v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: kind, On: on, Declared: set[on]})
+					v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: kind, On: on, Declared: set[on], InstalledAs: byName[on]})
 				}
 			}
 		}

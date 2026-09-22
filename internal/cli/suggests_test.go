@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -53,5 +54,44 @@ func TestSuggestsKeepsOptionalIntegrationsBehindAFlag(t *testing.T) {
 	stdout = h.mustRun(t, "suggests", "--optional")
 	if !strings.Contains(stdout, "  • sodium (optional iris ^1.8)\n  • sodium (optional modmenu)\n") {
 		t.Fatalf("suggests --optional text:\n%s", stdout)
+	}
+}
+
+func TestSuggestsRecognisesAModLockedUnderItsSlug(t *testing.T) {
+	h := newHarness(t)
+	h.jars["sodium"] = makeJar(t, "sodium_fabric", h.jars["sodium"].filename, "client")
+	h.jars["fabric-api"] = makeJarWith(t, "fabric-api", h.jars["fabric-api"].filename, "*", `"depends":{"fabricloader":">=0.17"},"suggests":{"sodium":"*","indium":"*"}`)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+
+	stdout := h.mustRun(t, "add", "sodium", "--as", "speed")
+	if strings.Contains(stdout, "suggests sodium") || !strings.Contains(stdout, "• fabric-api (suggests indium, not installed)") {
+		t.Fatalf("add should treat a slug match as installed:\n%s", stdout)
+	}
+	if got := h.readLock(t).Mods["speed"].Slug; got != "sodium" {
+		t.Fatalf("the lock should record the slug, got %q", got)
+	}
+
+	stdout = h.mustRun(t, "suggests")
+	if want := "  • fabric-api (suggests indium)\n  • fabric-api (suggests sodium, installed as speed)\n"; stdout != want {
+		t.Fatalf("suggests text:\n%s", stdout)
+	}
+}
+
+func TestAddRecordsTheSlugOfAModAlreadyLocked(t *testing.T) {
+	h := newHarness(t)
+	h.jars["sodium"] = makeJar(t, "sodium_fabric", h.jars["sodium"].filename, "client")
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "add", "sodium", "--as", "speed")
+	l := h.readLock(t)
+	m := l.Mods["speed"]
+	m.Slug = ""
+	l.Mods["speed"] = m
+	if err := l.Save(filepath.Join(h.dir, "shulker.lock")); err != nil {
+		t.Fatal(err)
+	}
+
+	h.mustRun(t, "add", "sodium", "--as", "speed")
+	if got := h.readLock(t).Mods["speed"].Slug; got != "sodium" {
+		t.Fatalf("re-adding should record the slug, got %q", got)
 	}
 }

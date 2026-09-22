@@ -105,6 +105,7 @@ type Mod struct {
 	Channel       string   `json:"channel,omitempty"`
 	Modpack       string   `json:"modpack,omitempty"`
 	ModID         string   `json:"modId,omitempty"`
+	Slug          string   `json:"slug,omitempty"`
 	RequiredBy    []string `json:"requiredBy"`
 	Aliases       Aliases  `json:"aliases"`
 }
