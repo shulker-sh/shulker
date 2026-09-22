@@ -163,3 +163,37 @@ func TestPropertiesMovingIntoWholeFiles(t *testing.T) {
 		t.Fatalf("moving back out of wholeFiles: %s", stdout)
 	}
 }
+
+func TestPropertiesOverrideNothingMergesIntoKeepsItsBytes(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	upstream := "#Iris config\r\nenableShaders: true\r\nshaderPack = pack.zip\r\ncolorSpace=SRGB"
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "iris.properties"), upstream)
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "repeated.properties"), "shaderPack=pack.zip\n")
+	writeFile(t, filepath.Join(h.dir, "client-overrides", "config", "repeated.properties"), upstream)
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "layered.properties"), "z=1\ny=2\nshaderPack=pack.zip\n")
+	writeFile(t, filepath.Join(h.dir, "client-overrides", "config", "layered.properties"), strings.Replace(upstream, "pack.zip", "other.zip", 1))
+	layered := "#Iris config\r\nenableShaders=true\nshaderPack=other.zip\ncolorSpace=SRGB\ny=2\nz=1\n"
+
+	h.mustRun(t, "build")
+	built := filepath.Join(h.dir, "build", "client", "config")
+	if got := readFile(t, filepath.Join(built, "iris.properties")); got != upstream {
+		t.Fatalf("a fresh build should place a file nothing merges into as written: %q", got)
+	}
+	if got := readFile(t, filepath.Join(built, "repeated.properties")); got != upstream {
+		t.Fatalf("a lower layer repeating the top file's value merges nothing into it: %q", got)
+	}
+	if got := readFile(t, filepath.Join(built, "layered.properties")); got != layered {
+		t.Fatalf("a merged file: %q", got)
+	}
+
+	h.allowMrpackHost(t)
+	h.mustRun(t, "export", "mrpack", "--version", "1.0")
+	_, entries := readMrpack(t, filepath.Join(h.dir, "build", "pack-1.0.mrpack"))
+	if got := entries["overrides/config/iris.properties"]; got != upstream {
+		t.Fatalf("export should carry a file nothing merges into as written: %q (entries: %v)", got, keys(entries))
+	}
+	if got := entries["overrides/config/layered.properties"]; got != layered {
+		t.Fatalf("exported merged file: %q (entries: %v)", got, keys(entries))
+	}
+}

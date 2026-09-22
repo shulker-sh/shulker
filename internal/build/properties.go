@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -90,6 +91,9 @@ func (f propsFile) existingValues(existing []byte) map[string]string {
 
 func (f propsFile) render(existing []byte, kept, dropped map[string]bool) ([]byte, error) {
 	if len(existing) == 0 {
+		if maps.Equal(f.props, parseProperties(f.base)) && len(kept) == 0 && len(dropped) == 0 {
+			return f.base, nil
+		}
 		existing = f.base
 	}
 	write := properties{}
