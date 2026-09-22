@@ -186,6 +186,9 @@ func TestPropertiesOverrideNothingMergesIntoKeepsItsBytes(t *testing.T) {
 	if got := readFile(t, filepath.Join(built, "layered.properties")); got != layered {
 		t.Fatalf("a merged file: %q", got)
 	}
+	if stdout := h.mustRun(t, "build"); strings.Contains(stdout, "iris.properties") || readFile(t, filepath.Join(built, "iris.properties")) != upstream {
+		t.Fatalf("a rebuild should leave the kept bytes alone: %s", stdout)
+	}
 
 	h.allowMrpackHost(t)
 	h.mustRun(t, "export", "mrpack", "--version", "1.0")
