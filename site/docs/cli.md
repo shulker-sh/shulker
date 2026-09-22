@@ -388,6 +388,7 @@ shulker get server.properties
 | `play.window` | The window size those launches open at, like `1280x720` |
 | `play.wrapper` | A command those launches run through, as a JSON array like `["gamemoderun"]` |
 | `play.saveBackups` | How many automatic backups of a save group or instance's worlds to keep, taken before `update` or `sync` changes the mods. After each one, the oldest `before update` and `before sync` backups past this number are deleted; one taken by `shulker backup` or before a restore never counts and is never deleted. An instance with no worlds backs up as nothing. A backup that can't be written stops the `update` or `sync` before any mod changes; one whose worlds can't be found, because a file it reads is unreadable, is a warning, and the change goes ahead. Without it, 5; `0` takes none. No instance setting overrides it |
+| `log.keepDays` | How many days of runs `log.jsonl`, beside `config.json`, keeps. Each run drops the entries older than this before it writes its own. Without it, 30; the least is 1. Past 4 MiB the oldest entries go whatever their age, down to 3 MiB |
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
 | `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
 | `instances` | Where [`shulker link shulker`](#shulker-link-shulker) puts the instances shulker owns. Without it, `instances` in shulker's data directory |
@@ -398,7 +399,7 @@ The CurseForge key is always shown as its last four characters, like `•••�
 
 ### `shulker config get`
 
-Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set, and `accounts.providers` and `play.saveBackups` show their defaults the same way. A `curseforge.key` that isn't set fails with `path-not-set`.
+Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set, and `accounts.providers`, `play.saveBackups` and `log.keepDays` show their defaults the same way. A `curseforge.key` that isn't set fails with `path-not-set`.
 
 ```sh
 shulker config get
@@ -1433,7 +1434,7 @@ shulker cache prune
 
 ### `shulker log`
 
-Show what shulker did, from `log.jsonl` beside `config.json`: when each run started and ended, and every warning and error it showed. It prints the last 24 hours by default, under a preamble that names the shulker version, the platform, the window and the filter that ran, and how many entries matched out of how many the log holds, so a slice pasted into an issue explains itself. An error is marked `✘` with its code, and its message goes on the line below. The report ends with the `--since` that widens it to every day the log keeps. A filter that matches nothing still prints the preamble, with `0 of <n> entries`, so it reads differently from a log that holds nothing. A log that isn't there is an empty report, and one that can't be read is a warning; neither fails the command. The filters combine, and `-i` takes an instance's id, name or directory, the way every other command does. A warning shown several times in one run is logged once, so the log isn't a count. Under `--json`, `data` holds the preamble's facts and the matching entries.
+Show what shulker did, from `log.jsonl` beside `config.json`: when each run started and ended, and every warning and error it showed. It prints the last 24 hours by default, under a preamble that names the shulker version, the platform, the window and the filter that ran, and how many entries matched out of how many the log holds, so a slice pasted into an issue explains itself. An error is marked `✘` with its code, and its message goes on the line below. The report ends with the `--since` that widens it to every day the log keeps. A filter that matches nothing still prints the preamble, with `0 of <n> entries`, so it reads differently from a log that holds nothing. A log that isn't there is an empty report, and one that can't be read is a warning; neither fails the command. The filters combine, and `-i` takes an instance's id, name or directory, the way every other command does. A warning shown several times in one run is logged once, so the log isn't a count. Under `--json`, `data` holds the preamble's facts and the matching entries. The log keeps the last [`log.keepDays`](#configuration) days, 30 unless it is set.
 
 ```sh
 shulker log

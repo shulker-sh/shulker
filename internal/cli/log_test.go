@@ -229,3 +229,24 @@ func TestLogRefusesABadWindowOrLevel(t *testing.T) {
 		}
 	}
 }
+
+func TestLogAfterATrimReadsWhatWasKept(t *testing.T) {
+	f := seedLog(t)
+	writeFile(t, filepath.Join(filepath.Dir(f.path), "config.json"), `{"log":{"keepDays":1}}`)
+	seeded, err := os.ReadFile(f.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Longer than this run's own start, so reading the log at its size before the trim would take
+	// that start in.
+	old := `{"at":"2026-01-01T00:00:00Z","group":"mods","cmd":"add","level":"warn","msg":"` + strings.Repeat("x", 2000) + `"}` + "\n"
+	writeFile(t, f.path, old+string(seeded))
+	code, stdout, _ := run(t, "log", "--json", "--since", "7d")
+	if code != out.ExitOK {
+		t.Fatalf("exit %d", code)
+	}
+	r := logReportOf(t, stdout)
+	if r.KeepDays != 1 || r.Read != 3 || !slices.Equal(logCmds(r), []string{"sync", "hook wrap", "cache prune"}) {
+		t.Fatalf("report = %+v", r)
+	}
+}

@@ -14,9 +14,6 @@ import (
 	"time"
 )
 
-// KeepDays is how many days of entries the log keeps.
-const KeepDays = 30
-
 const maxLine = 1 << 20
 
 // Read is every entry in the first size bytes of the log at path, or the whole log when size is

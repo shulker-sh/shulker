@@ -22,6 +22,7 @@ const (
 	accountsProviders = "accounts.providers"
 	accountsDefault   = "accounts.default"
 	playSaveBackups   = "play.saveBackups"
+	logKeepDays       = "log.keepDays"
 )
 
 type configChange struct {
@@ -315,6 +316,9 @@ func configDefault(key string) (any, bool) {
 	if key == playSaveBackups {
 		return config.DefaultSaveBackups, true
 	}
+	if key == logKeepDays {
+		return config.DefaultLogKeepDays, true
+	}
 	return nil, false
 }
 
@@ -339,6 +343,8 @@ func checkConfigValue(key string, v any, literal bool) (any, error) {
 		}
 	case playSaveBackups:
 		return backupCount(key, v)
+	case logKeepDays:
+		return dayCount(key, v)
 	}
 	if name, ok := strings.CutPrefix(key, "play."); ok {
 		if err := checkPlaySetting(key, name, v); err != nil {
@@ -353,6 +359,16 @@ func backupCount(key string, v any) (any, error) {
 	n, err := strconv.Atoi(fmt.Sprint(v))
 	if err != nil || n < 0 {
 		return nil, out.Errorf("usage", "%s takes a whole number of backups, 0 for none, not %s", key, settingText(v))
+	}
+	return n, nil
+}
+
+// dayCount reads a count of days typed plainly or with --literal. A log keeping no days would
+// drop every earlier run on each write, so the least is 1.
+func dayCount(key string, v any) (any, error) {
+	n, err := strconv.Atoi(fmt.Sprint(v))
+	if err != nil || n < 1 {
+		return nil, out.Errorf("usage", "%s takes a whole number of days, at least 1, not %s", key, settingText(v))
 	}
 	return n, nil
 }

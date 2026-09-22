@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"shulker.sh/shulker/internal/auditlog"
 	"shulker.sh/shulker/internal/out"
@@ -163,5 +164,62 @@ func TestBuildLogsTheResultJSONWouldPrint(t *testing.T) {
 	}
 	if string(logged) != printed.String() {
 		t.Errorf("logged %s\nprinted %s", logged, printed.String())
+	}
+}
+
+func TestRunTrimsTheLogToLogKeepDays(t *testing.T) {
+	path := isolatedLog(t)
+	if err := os.WriteFile(filepath.Join(filepath.Dir(path), "config.json"), []byte(`{"log":{"keepDays":2}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-3 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	recent := time.Now().Add(-24 * time.Hour).UTC().Format(time.RFC3339)
+	lines := `{"at":"` + old + `","group":"shulker","cmd":"version","level":"info","msg":"old"}` + "\n" +
+		`{"at":"` + recent + `","group":"shulker","cmd":"version","level":"info","msg":"recent"}` + "\n"
+	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, _ := run(t, "version"); code != out.ExitOK {
+		t.Fatalf("exit %d", code)
+	}
+	entries := logEntries(t, path)
+	if len(entries) < 2 || entries[0].Msg != "recent" || entries[1].Msg != "start" {
+		t.Fatalf("entries = %+v", entries)
+	}
+	if runtime.GOOS != "windows" {
+		if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+			t.Errorf("stat = %v, %v", info, err)
+		}
+	}
+}
+
+func TestFailedTrimLeavesTheExitCode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a write-only file is a unix mode")
+	}
+	path := isolatedLog(t)
+	old := time.Now().Add(-40 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	if err := os.WriteFile(path, []byte(`{"at":"`+old+`","msg":"old"}`+"\n"), 0o200); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr := run(t, "version")
+	if code != out.ExitOK || strings.Count(stderr, "can't trim shulker's log") != 1 {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	code, _, stderr = run(t, "hook", "post-exit", "-C", t.TempDir())
+	if code != out.ExitOK || strings.Contains(stderr, "log") {
+		t.Fatalf("exit %d, stderr %q", code, stderr)
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	warned := 0
+	for _, e := range logEntries(t, path) {
+		if e.Cmd == "hook post-exit" && strings.Contains(e.Msg, "can't trim") {
+			warned++
+		}
+	}
+	if warned != 1 {
+		t.Fatalf("the hook logged %d trim warnings", warned)
 	}
 }

@@ -64,12 +64,13 @@ func (a *app) logCmd() *cobra.Command {
 				a.printer.Warn("can't read shulker's log at %s, so there is nothing to show: %v", a.log.Path, err)
 				entries = nil
 			}
+			keepDays := configuredKeepDays()
 			r := logReport{
 				Version:  version,
 				Platform: runtime.GOOS + "/" + runtime.GOARCH,
 				Since:    f.since,
 				From:     from.UTC().Format(time.RFC3339),
-				KeepDays: auditlog.KeepDays,
+				KeepDays: keepDays,
 				Filter:   f.described(a.instance),
 				Read:     len(entries),
 				Entries:  []auditlog.Entry{},
@@ -80,7 +81,7 @@ func (a *app) logCmd() *cobra.Command {
 				}
 			}
 			r.Matched = len(r.Entries)
-			isWidest := !from.After(now.AddDate(0, 0, -auditlog.KeepDays))
+			isWidest := !from.After(now.AddDate(0, 0, -keepDays))
 			return a.printer.Emit(r, func(l *out.Lines) { printLog(l, r, isWidest) })
 		},
 	}

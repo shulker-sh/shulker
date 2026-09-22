@@ -240,3 +240,27 @@ func TestConfigSaveBackups(t *testing.T) {
 		t.Fatalf("Backups() = %d", cfg.Play.Backups())
 	}
 }
+
+func TestConfigLogKeepDays(t *testing.T) {
+	h := newHarness(t)
+	if got := strings.TrimSpace(h.mustRun(t, "config", "get", "log.keepDays")); got != "30" {
+		t.Fatalf("default log.keepDays = %q", got)
+	}
+	for _, bad := range []string{"0", "-1", "week", "2.5"} {
+		if env := h.runSetting(t, 2, "config", "set", "log.keepDays", bad); env.Error == nil || env.Error.Code != "usage" {
+			t.Fatalf("config set log.keepDays %s: %+v", bad, env.Error)
+		}
+	}
+	h.mustRun(t, "config", "set", "log.keepDays", "7")
+	cfg, err := config.LoadFile(h.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Log.Days() != 7 {
+		t.Fatalf("Days() = %d", cfg.Log.Days())
+	}
+	h.mustRun(t, "config", "unset", "log.keepDays")
+	if got := strings.TrimSpace(h.mustRun(t, "config", "get", "log.keepDays")); got != "30" {
+		t.Fatalf("unset log.keepDays = %q", got)
+	}
+}

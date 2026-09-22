@@ -25,13 +25,14 @@ const (
 )
 
 // Keys are the config.json keys `shulker config` reads and sets.
-var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
+var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
 
 // Config is config.json.
 type Config struct {
 	Accounts   Accounts   `json:"accounts"`
 	CurseForge CurseForge `json:"curseforge"`
 	Instances  string     `json:"instances,omitempty"`
+	Log        Log        `json:"log"`
 	Play       Play       `json:"play"`
 	Registry   string     `json:"registry,omitempty"`
 	Saves      string     `json:"saves,omitempty"`
@@ -59,6 +60,22 @@ func (p Play) Backups() int {
 		return DefaultSaveBackups
 	}
 	return *p.SaveBackups
+}
+
+// Log is how long log.jsonl keeps what each run did.
+type Log struct {
+	KeepDays *int `json:"keepDays,omitempty"`
+}
+
+const DefaultLogKeepDays = 30
+
+// Days is KeepDays with its default filled in, which also stands in for a count too small to keep
+// anything.
+func (l Log) Days() int {
+	if l.KeepDays == nil || *l.KeepDays < 1 {
+		return DefaultLogKeepDays
+	}
+	return *l.KeepDays
 }
 
 type CurseForge struct {

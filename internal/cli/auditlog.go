@@ -2,6 +2,7 @@ package cli
 
 import (
 	"cmp"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -51,9 +52,34 @@ func (a *app) startLog(cmd *cobra.Command) {
 		return
 	}
 	a.logState = logStarted
+	trimErr := auditlog.Trim(a.log.Path, configuredKeepDays(), a.log.Now())
 	flags := map[string]string{}
 	cmd.Flags().Visit(func(f *pflag.Flag) { flags[f.Name] = f.Value.String() })
 	a.log.Start(strings.TrimPrefix(strings.TrimPrefix(cmd.CommandPath(), "shulker"), " "), commandGroup(cmd), cmp.Or(a.instance, a.dir), flags)
+	if trimErr == nil {
+		return
+	}
+	msg := fmt.Sprintf("can't trim shulker's log, so it keeps entries past log.keepDays: %v", trimErr)
+	// A hook's output lands in a launcher, so the log alone hears it there.
+	if isHook(a.log.Cmd) {
+		a.log.Warn(msg)
+		return
+	}
+	a.printer.Warn("%s", msg)
+}
+
+// configuredKeepDays is log.keepDays, or its default when config.json can't be read: the run reports
+// that itself, and its log still trims.
+func configuredKeepDays() int {
+	path, err := config.Path()
+	if err != nil {
+		return config.DefaultLogKeepDays
+	}
+	cfg, err := config.LoadFile(path)
+	if err != nil {
+		return config.DefaultLogKeepDays
+	}
+	return cfg.Log.Days()
 }
 
 func (a *app) endLog(exit int) {

@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"shulker.sh/shulker/internal/fsutil"
 )
 
 // FileName is the log's name in the config folder, beside config.json.
@@ -58,8 +60,8 @@ type Log struct {
 	Now      func() time.Time
 	// OnFail hears the first write that fails. Nothing is written after it, so it is heard once.
 	OnFail func(error)
-	// Before is the log's size when the run opened it, so a reader can leave out the run's own
-	// entries.
+	// Before is the log's size when the run started, after its trim, so a reader can leave out the
+	// run's own entries.
 	Before  int64
 	argv    []string
 	started time.Time
@@ -72,9 +74,6 @@ type Log struct {
 // given before the "--", like the instance directory, is shulker's own and stays.
 func New(path string, args []string) *Log {
 	l := &Log{Path: path, Now: time.Now}
-	if info, err := os.Stat(path); err == nil {
-		l.Before = info.Size()
-	}
 	dash := slices.Index(args, "--")
 	if dash < 0 {
 		return l
@@ -91,6 +90,9 @@ func New(path string, args []string) *Log {
 func (l *Log) Start(cmd, group, instance string, flags map[string]string) {
 	l.Cmd, l.Group, l.Instance = cmd, group, instance
 	l.started = l.Now()
+	if info, err := os.Stat(l.Path); err == nil {
+		l.Before = info.Size()
+	}
 	l.append(Entry{Level: LevelInfo, Msg: "start", Flags: flags})
 }
 
@@ -221,6 +223,11 @@ func appendFile(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
+	unlock, err := fsutil.Lock(lockPath(path))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
