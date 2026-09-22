@@ -15,6 +15,16 @@ import (
 
 var ErrNotFound = errors.New("project not found")
 
+var titles = map[string]string{"modrinth": "Modrinth", "curseforge": "CurseForge"}
+
+// Title is a provider's name as the user reads it: CurseForge for curseforge.
+func Title(name string) string {
+	if title, ok := titles[name]; ok {
+		return title
+	}
+	return name
+}
+
 type Project struct {
 	ID    string
 	Slug  string

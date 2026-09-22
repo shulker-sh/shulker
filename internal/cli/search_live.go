@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
 )
 
 // searchDebounce is how long the query has to sit still before it is searched: one or two
@@ -43,7 +44,7 @@ func (a *app) searchTitle(names []string) string {
 	var titles []string
 	for _, name := range names {
 		if _, ok := a.d.providers[name]; ok {
-			titles = append(titles, providerTitle(name))
+			titles = append(titles, provider.Title(name))
 		}
 	}
 	if len(titles) == 0 {
@@ -133,7 +134,7 @@ func (l *liveSearch) Rows() []out.Choice {
 	t := l.theme
 	var rows []out.Choice
 	for _, hit := range l.shown.reply.results.Results {
-		aside := append([]string{providerTitle(hit.Provider)}, searchAside(hit)...)
+		aside := append([]string{provider.Title(hit.Provider)}, searchAside(hit)...)
 		rows = append(rows, out.Choice{
 			Label: t.Bold(hit.Title) + " " + t.Grey(hit.ID) + t.Aside(strings.Join(aside, ", ")),
 			Value: hit.Provider + ":" + hit.ID,

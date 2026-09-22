@@ -140,7 +140,7 @@ func (a *app) printSearch(reply searchReply) error {
 			if i > 0 {
 				l.Blank()
 			}
-			l.Heading(providerTitle(name))
+			l.Heading(provider.Title(name))
 			l.Items(items...)
 		}
 		l.Nudge("Add one", "shulker add <id>")
@@ -193,13 +193,4 @@ func downloadCount(n int64) string {
 		return "1 download"
 	}
 	return fmt.Sprintf("%d downloads", n)
-}
-
-var providerTitles = map[string]string{"modrinth": "Modrinth", "curseforge": "CurseForge"}
-
-func providerTitle(name string) string {
-	if title, ok := providerTitles[name]; ok {
-		return title
-	}
-	return name
 }
