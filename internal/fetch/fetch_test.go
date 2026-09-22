@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+	"time"
 )
 
 func TestIsNetwork(t *testing.T) {
@@ -33,5 +35,20 @@ func TestIsNetwork(t *testing.T) {
 	}
 	if !IsNetwork(fmt.Errorf("wrapped: %w", Unreachable(errors.New("could not resolve host")))) {
 		t.Fatal("Unreachable marks an error as a network error")
+	}
+}
+
+func TestRateLimitedSaysWhenToRetry(t *testing.T) {
+	for header, want := range map[string]time.Duration{"X-Ratelimit-Reset": 7 * time.Second, "Retry-After": 3 * time.Second} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(header, strconv.Itoa(int(want/time.Second)))
+			w.WriteHeader(http.StatusTooManyRequests)
+		}))
+		err := New("test").GetJSON(context.Background(), srv.URL, &struct{}{})
+		srv.Close()
+		var se *StatusError
+		if !errors.Is(err, ErrRateLimited) || !errors.As(err, &se) || se.RetryAfter != want {
+			t.Errorf("%s: %v", header, err)
+		}
 	}
 }

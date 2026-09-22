@@ -15,14 +15,16 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
 
 var (
-	ErrNotFound  = errors.New("not found")
-	ErrForbidden = errors.New("forbidden")
-	ErrOffline   = errors.New("not using the network (--offline)")
+	ErrNotFound    = errors.New("not found")
+	ErrForbidden   = errors.New("forbidden")
+	ErrRateLimited = errors.New("rate limited")
+	ErrOffline     = errors.New("not using the network (--offline)")
 )
 
 type unreachableError struct{ err error }
@@ -50,10 +52,13 @@ func IsNetwork(err error) bool {
 }
 
 // StatusError is a server answering with a status other than 2xx. errors.Is matches a 404 against
-// ErrNotFound and a 403 against ErrForbidden.
+// ErrNotFound, a 403 against ErrForbidden and a 429 against ErrRateLimited.
 type StatusError struct {
 	URL    string
 	Status int
+	// RetryAfter is how long a 429 said to wait, from Retry-After or Modrinth's X-Ratelimit-Reset;
+	// zero when it didn't say.
+	RetryAfter time.Duration
 	// Body is what the server answered with, up to errorBody bytes. The sign-in chain reads it:
 	// its endpoints put the reason a request failed in a JSON body, not in the status.
 	Body []byte
@@ -70,6 +75,8 @@ func (e *StatusError) Is(target error) bool {
 		return e.Status == http.StatusNotFound
 	case ErrForbidden:
 		return e.Status == http.StatusForbidden
+	case ErrRateLimited:
+		return e.Status == http.StatusTooManyRequests
 	}
 	return false
 }
@@ -151,7 +158,7 @@ func (c *Client) do(ctx context.Context, method, url, accept, contentType string
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		answer, _ := io.ReadAll(io.LimitReader(resp.Body, errorBody))
 		resp.Body.Close()
-		return nil, &StatusError{URL: url, Status: resp.StatusCode, Body: answer}
+		return nil, &StatusError{URL: url, Status: resp.StatusCode, Body: answer, RetryAfter: retryAfter(resp)}
 	}
 	return resp, nil
 }
@@ -246,4 +253,16 @@ func (c *Client) Download(ctx context.Context, url string, dst io.Writer) (strin
 		return "", fmt.Errorf("%s: %w", url, err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func retryAfter(resp *http.Response) time.Duration {
+	if resp.StatusCode != http.StatusTooManyRequests {
+		return 0
+	}
+	for _, header := range []string{"Retry-After", "X-Ratelimit-Reset"} {
+		if seconds, err := strconv.Atoi(resp.Header.Get(header)); err == nil && seconds >= 0 {
+			return time.Duration(seconds) * time.Second
+		}
+	}
+	return 0
 }
