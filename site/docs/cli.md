@@ -1687,7 +1687,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
-| `file-not-found` | A file named to `pull` isn't in the build directory, or a path given to `add` isn't a file. `candidates`: the closest file there, for `pull` |
+| `file-not-found` | A file named to `pull` isn't in the build directory, a path given to `add` isn't a file, or a mod or modpack's `file` in `shulker.json` names a folder. `candidates`: the closest file there, for `pull` |
 | `file-taken` | `add` would copy a local file into `files/`, which already holds a different file of that name that no entry of the same key names; rename one or remove the one in `files/`. Also an `import` whose pack names two different local files of one name |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |

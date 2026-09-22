@@ -362,8 +362,11 @@ func (m *Manifest) check() error {
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
-		if err := checkFileExtension(key, m.Requires[key]); err != nil {
-			return err
+		// A resource pack or shader may name a folder, so whether its file is a .zip waits for lock.
+		if r := m.Requires[key]; r.File != "" && r.Kind() == TypeMod {
+			if err := CheckFileExtension(key, r); err != nil {
+				return err
+			}
 		}
 		for _, name := range m.Requires[key].Feature {
 			if _, ok := m.Features[strings.TrimPrefix(name, "!")]; !ok {
@@ -421,17 +424,14 @@ func (m *Manifest) IsLocalFile(key string) bool {
 	return ok && r.File != "" && r.Kind() != TypeModpack
 }
 
-// checkFileExtension holds a local file to the extension its kind is placed with, since the lock
-// records a mod as a .jar and a pack as a .zip.
-func checkFileExtension(key string, r Require) error {
-	want := ""
-	switch r.Kind() {
-	case TypeMod:
+// CheckFileExtension refuses a local file whose name doesn't end the way the lock records its kind:
+// .jar for a mod, .zip for a resource pack or shader.
+func CheckFileExtension(key string, r Require) error {
+	want := ".zip"
+	if r.Kind() == TypeMod {
 		want = ".jar"
-	case TypeResourcePack, TypeShader:
-		want = ".zip"
 	}
-	if r.File == "" || want == "" || strings.HasSuffix(r.File, want) {
+	if strings.HasSuffix(r.File, want) {
 		return nil
 	}
 	e := out.Errorf("manifest-invalid", "requires.%s: a %s's file must be a %s", key, r.Kind(), want)
