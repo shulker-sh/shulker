@@ -397,6 +397,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 	sel := b.selectMods(cond)
 	report.Excluded = append(report.Excluded, sel.excluded...)
 	report.Warnings = append(report.Warnings, sel.warnings...)
+	placed := map[string]bool{}
 	for id, m := range b.Lock.Mods {
 		if !sel.included[id] || (m.Side != "both" && m.Side != side) {
 			continue
@@ -405,6 +406,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 			return nil, nil, notInstalled(id)
 		}
 		desired["mods/"+m.Filename] = source{sha512: m.Sha512}
+		placed[b.Lock.JarID(id)] = true
 	}
 	vars := b.Manifest.SideVariables(side).Text()
 	if side == "server" {
@@ -418,7 +420,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectPacks(cond, desired, report); err != nil {
 			return nil, nil, err
 		}
-		b.enableShader(desired)
+		b.enableShader(desired, placed)
 		if err := b.collectClient(side, opts, desired, vars, report); err != nil {
 			return nil, nil, err
 		}

@@ -121,7 +121,7 @@
       "sha512": "3e90731bbfb53275aadd8306b94e5a3dcfd97e95ce687bb6c54a744a2987885cb9b2863513391ef6ccabeea957b1084e07714d17979cd6ac89978dedde05e604",
       "sha1": "b2d4f6a8c0e1d3f5a7b9c1d3e5f7a9b1c3d5e7f9",
       "size": 1858231,
-      "loader": "iris"
+      "loaders": ["iris"]
     }
   },
 

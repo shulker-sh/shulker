@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -62,26 +63,29 @@ func (b *Builder) packRefs() []packRef {
 	return refs
 }
 
-// shaderConfigs are the config files each shader loader enables its pack in.
-// Canvas has none, and a vanilla shader is a resource pack, so neither appears.
-var shaderConfigs = map[string]string{"iris": "config/iris.properties", "oculus": "config/oculus.properties"}
+// shaderConfigs are the config files each shader mod enables its pack in, in the
+// order they are tried. Canvas has none, and a vanilla shader is a resource pack,
+// so neither appears.
+var shaderConfigs = []struct{ mod, file string }{{"iris", "config/iris.properties"}, {"oculus", "config/oculus.properties"}}
 
-// enableShader points the shader mod at the pack this build placed. Only the two
-// keys shulker owns are written, through the per-key merge, so the rest of the
-// player's shader settings survive a rebuild.
-func (b *Builder) enableShader(desired map[string]source) {
+// enableShader points a shader mod this build placed at the first placed pack it
+// can load. placed holds the placed mods' jar ids, so a renamed mod or one from
+// another provider is still found. Only the two keys shulker owns are written,
+// through the per-key merge, so the rest of the player's shader settings survive
+// a rebuild.
+func (b *Builder) enableShader(desired map[string]source, placed map[string]bool) {
 	for _, key := range sortedPacks(b.Lock.Shaders) {
 		p := b.Lock.Shaders[key]
-		file, ok := shaderConfigs[p.Loader]
-		if !ok {
+		if _, ok := desired[p.Path(manifest.TypeShader)]; !ok || p.IsVanillaShader() {
 			continue
 		}
-		if _, placed := desired[p.Path(manifest.TypeShader)]; !placed {
-			continue
+		for _, c := range shaderConfigs {
+			if placed[c.mod] && (len(p.Loaders) == 0 || slices.Contains(p.Loaders, c.mod)) {
+				props := properties{"shaderPack": p.Filename, "enableShaders": "true"}
+				desired[c.file] = source{owned: propsFile{props: props, sep: "="}}
+				return
+			}
 		}
-		props := properties{"shaderPack": p.Filename, "enableShaders": "true"}
-		desired[file] = source{owned: propsFile{props: props, sep: "="}}
-		return
 	}
 }
 

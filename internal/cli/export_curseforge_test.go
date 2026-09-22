@@ -336,6 +336,7 @@ func TestExportCurseForgeEnablesPacksByTheirCurseForgeNames(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations", "--provider", "curseforge")
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	h.mustRun(t, "add", "irisshaders", "--provider", "curseforge")
 	h.mustRun(t, "install")
 
 	h.mustRun(t, "export", "curseforge", "--version", "1.0")

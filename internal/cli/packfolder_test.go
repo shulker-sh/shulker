@@ -55,7 +55,7 @@ func TestPackFolderLocksAndBuildsAsAZip(t *testing.T) {
 	if got := l.ResourcePacks["mod-menu-helper"]; got.File != "Resource Packs/Mod Menu Helper" || got.Filename != "Mod Menu Helper.zip" || got.Sha512 != helperSha || got.Size != int64(len(helper)) {
 		t.Fatalf("locked pack folder: %+v", got)
 	}
-	if got := l.Shaders["bsl"]; got.File != "shaders/bsl" || got.Filename != "bsl.zip" || got.Sha512 != bslSha || got.Loader != "iris" {
+	if got := l.Shaders["bsl"]; got.File != "shaders/bsl" || got.Filename != "bsl.zip" || got.Sha512 != bslSha || got.Loaders != nil {
 		t.Fatalf("locked shader folder: %+v", got)
 	}
 

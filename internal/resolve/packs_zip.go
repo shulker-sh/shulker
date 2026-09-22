@@ -49,24 +49,21 @@ func (r *Resolver) packSection(kind string) map[string]lock.Pack {
 	return r.Lock.ResourcePacks
 }
 
-// shaderLoader decides which shader mod will load a pack. One tagged only for
-// vanilla ships core shaders, needs no shader mod at all, and is placed and
-// enabled as a resource pack instead.
-func (r *Resolver) shaderLoader(v *provider.Version) string {
-	if slices.Contains(v.Loaders, "vanilla") && !slices.Contains(v.Loaders, "iris") && !slices.Contains(v.Loaders, "oculus") {
-		return "vanilla"
+// shaderLoaders are the shader mods a provider tagged a version for. Modrinth
+// files them as loaders; CurseForge keeps them among the game versions, and tags
+// OptiFine rather than Oculus, whose OptiFine-format packs Iris and Oculus both read.
+func shaderLoaders(v *provider.Version) []string {
+	tags := map[string]bool{}
+	for _, tag := range slices.Concat(v.Loaders, v.GameVersions) {
+		tags[strings.ToLower(tag)] = true
 	}
-	return r.installedShaderLoader()
-}
-
-// installedShaderLoader is the shader mod the lock has, or Iris when it has none.
-func (r *Resolver) installedShaderLoader() string {
-	for _, name := range []string{"iris", "oculus", "canvas"} {
-		if _, installed := r.Lock.Mods[name]; installed {
-			return name
+	var loaders []string
+	for _, name := range []string{"iris", "oculus", "canvas", "vanilla"} {
+		if tags[name] || (tags["optifine"] && (name == "iris" || name == "oculus")) {
+			loaders = append(loaders, name)
 		}
 	}
-	return "iris"
+	return loaders
 }
 
 func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provider.Project, kind string, opts AddOptions) error {
@@ -303,7 +300,7 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 		Channel:          channelLabel(channel),
 	}
 	if kind == manifest.TypeShader {
-		locked.Loader = r.shaderLoader(v)
+		locked.Loaders = shaderLoaders(v)
 	}
 	r.packSection(kind)[key] = locked
 	return nil

@@ -49,6 +49,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 	h.jars["nodist"] = makeJar(t, "nodist", "nodist-1.0.0.jar", "client")
 	h.jars["locked"] = makeJar(t, "locked", "locked-1.0.0.jar", "*")
 	h.jars["cf-fresh-animations"] = makeJarFile(t, "fresh-animations", "FreshAnimations_CF_v1.9.4.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"fresh"}}`)
+	h.jars["irisshaders"] = makeJar(t, "iris", "iris-fabric-1.11.3+mc26.2.jar", "client")
 	h.jars["stale"] = makeJarVersion(t, "jei", "jei-26.1-fabric-0.9.0.jar", "*", "0.9.0", `"depends":{"fabricloader":">=0.17"}`)
 	h.cfMods = map[int]*cfMod{
 		238222: {id: 238222, slug: "jei", downloads: 300_000_000, files: []cfFile{
@@ -60,6 +61,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		300000: {id: 300000, slug: "nodist", files: []cfFile{{id: 5100001, jar: h.jars["nodist"], date: "2026-09-01T00:00:00Z", channel: 1, url: "null"}}},
 		400000: {id: 400000, slug: "locked", files: []cfFile{{id: 5200001, jar: h.jars["locked"], date: "2026-09-01T00:00:00Z", channel: 1, forbidden: true}}},
 		600000: {id: 600000, slug: "fresh-animations", class: 12, downloads: 4_000_000, files: []cfFile{{id: 5300001, jar: h.jars["cf-fresh-animations"], date: "2026-09-01T00:00:00Z", channel: 1}}},
+		455508: {id: 455508, slug: "irisshaders", downloads: 60_000_000, files: []cfFile{{id: 5500001, jar: h.jars["irisshaders"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 		700000: {id: 700000, slug: "complementary-cf", class: 6552, files: []cfFile{{id: 5400001, jar: h.jars["complementary"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 	}
 	fileJSON := func(f cfFile, m *cfMod) map[string]any {
@@ -80,7 +82,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		case 12:
 			gameVersions = []string{"26.2"}
 		case 6552:
-			gameVersions = []string{"26.2", "Iris"}
+			gameVersions = []string{"26.2", "OptiFine"}
 		}
 		return map[string]any{
 			"id": f.id, "modId": m.id, "displayName": strings.TrimSuffix(f.jar.filename, ".jar"), "fileName": f.jar.filename,

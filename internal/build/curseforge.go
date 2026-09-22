@@ -316,7 +316,7 @@ func enableByCurseForgeNames(t *mrpackSide, fileNames map[string]string, options
 	}
 	rewriteProperty(t.files, optionsPath, resourcePacksKey+":", func(list string) string { return renamePacks(list, renamed) })
 	for _, config := range shaderConfigs {
-		rewriteProperty(t.files, config, "shaderPack=", func(v string) string {
+		rewriteProperty(t.files, config.file, "shaderPack=", func(v string) string {
 			if name := fileNames["shaderpacks/"+v]; name != "" {
 				return name
 			}
@@ -370,11 +370,7 @@ func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 		if !t.packs[ref.key] {
 			continue
 		}
-		var loaders []string
-		if ref.pack.Loader != "" {
-			loaders = []string{ref.pack.Loader}
-		}
-		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.ProviderFilename, providerFilename: ref.pack.ProviderFilename, loaders: loaders})
+		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.ProviderFilename, providerFilename: ref.pack.ProviderFilename, loaders: ref.pack.Loaders})
 	}
 	return entries
 }

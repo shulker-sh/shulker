@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -17,9 +18,9 @@ type packLock struct {
 		Channel          string `json:"channel"`
 	} `json:"resourcepacks"`
 	Shaders map[string]struct {
-		Filename         string `json:"filename"`
-		ProviderFilename string `json:"providerFilename"`
-		Loader           string `json:"loader"`
+		Filename         string   `json:"filename"`
+		ProviderFilename string   `json:"providerFilename"`
+		Loaders          []string `json:"loaders"`
 	} `json:"shaders"`
 }
 
@@ -34,13 +35,14 @@ func TestResourcePacksAndShaders(t *testing.T) {
 		t.Fatalf("a pack should name the sides it reaches: %s", stdout)
 	}
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	h.mustRun(t, "add", "irisshaders", "--provider", "curseforge")
 
 	var l packLock
 	h.readJSON(t, "shulker.lock", &l)
 	if got := l.ResourcePacks["fresh-animations"]; got.Filename != "fresh-animations.zip" || got.ProviderFilename != "FreshAnimations_v1.9.4.zip" || got.Channel != "release" {
 		t.Fatalf("locked resource pack: %+v", l.ResourcePacks)
 	}
-	if got := l.Shaders["complementary-reimagined"]; got.Filename != "complementary-reimagined.zip" || got.ProviderFilename != "ComplementaryReimagined_r5.5.1.zip" || got.Loader != "iris" {
+	if got := l.Shaders["complementary-reimagined"]; got.Filename != "complementary-reimagined.zip" || got.ProviderFilename != "ComplementaryReimagined_r5.5.1.zip" || !slices.Equal(got.Loaders, []string{"iris"}) {
 		t.Fatalf("locked shader: %+v", l.Shaders)
 	}
 	var manifest struct {
@@ -106,6 +108,7 @@ func TestPackFilename(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	h.mustRun(t, "add", "irisshaders", "--provider", "curseforge")
 	h.mustRun(t, "install")
 	options := filepath.Join(h.dir, "build", "client", "options.txt")
 	if err := os.WriteFile(options, []byte("resourcePacks:[\"vanilla\",\"file/fresh-animations.zip\",\"file/other.zip\"]\n"), 0o644); err != nil {

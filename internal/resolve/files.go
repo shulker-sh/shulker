@@ -346,9 +346,6 @@ func (r *Resolver) lockFilePack(key, kind string, entry manifest.Require) error 
 		Sha512:   got.sha512,
 		Size:     got.size,
 	}
-	if kind == manifest.TypeShader {
-		p.Loader = r.installedShaderLoader()
-	}
 	section[key] = p
 	return nil
 }

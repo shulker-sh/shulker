@@ -300,10 +300,12 @@
         "size": { "type": "integer", "minimum": 1, "description": "File size in bytes as the provider reports it, for the download bar; for a local file, its length, compared before rehashing it." },
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked. A listed entry whose manifest channel differs makes the lock out of date." },
         "modpack": { "$ref": "#/$defs/requireKey", "description": "Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own entries." },
-        "loader": {
-          "type": "string",
-          "enum": ["iris", "oculus", "canvas", "vanilla"],
-          "description": "Shaders only: the shader loader this file targets. vanilla shaders are core-shader resource packs, placed in resourcepacks/ and enabled like one; the rest are placed in shaderpacks/ and enabled through their shader mod's own .properties file."
+        "loaders": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["iris", "oculus", "canvas", "vanilla"] },
+          "uniqueItems": true,
+          "minItems": 1,
+          "description": "Shaders only: the shader mods that can load this file, from the provider's tags. Absent for a local shader, which any shader mod can load. A shader tagged only vanilla is a core-shader resource pack, placed in resourcepacks/ and enabled like one; the rest are placed in shaderpacks/, and the build enables the first one a placed shader mod can load through that mod's .properties file."
         }
       },
       "allOf": [

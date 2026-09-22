@@ -67,7 +67,7 @@ func TestLocalFilesLockAndBuild(t *testing.T) {
 			}
 		}
 	}
-	if raw.ResourcePacks["faithful"]["file"] != "files/faithful.zip" || raw.Shaders["bsl"]["loader"] != "iris" {
+	if raw.ResourcePacks["faithful"]["file"] != "files/faithful.zip" || raw.Shaders["bsl"]["loaders"] != nil {
 		t.Fatalf("local packs: %v %v", raw.ResourcePacks, raw.Shaders)
 	}
 	if dep := raw.Mods["fabric-api"]; dep["provider"] != "modrinth" || dep["requiredBy"].([]any)[0] != "private-mod" {

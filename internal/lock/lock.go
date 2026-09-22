@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"slices"
 	"sort"
 
 	"shulker.sh/shulker/internal/fsutil"
@@ -146,19 +147,24 @@ type Pack struct {
 	Size             int64   `json:"size,omitempty"`
 	Channel          string  `json:"channel,omitempty"`
 	Modpack          string  `json:"modpack,omitempty"`
-	// Loader is the shader loader the file targets. A vanilla shader needs no
-	// shader mod and is placed and enabled as a resource pack.
-	Loader string `json:"loader,omitempty"`
+	// Loaders are the shader mods that can load a shader; none means any can.
+	Loaders []string `json:"loaders,omitempty"`
 }
 
 // Path is where the build places the pack. Shaders go to shaderpacks/, except the
 // vanilla ones: those are resource packs carrying core shaders, and no shader mod
 // loads them.
 func (p Pack) Path(kind string) string {
-	if kind == manifest.TypeShader && p.Loader != "vanilla" {
+	if kind == manifest.TypeShader && !p.IsVanillaShader() {
 		return "shaderpacks/" + p.Filename
 	}
 	return "resourcepacks/" + p.Filename
+}
+
+// IsVanillaShader reports a shader tagged only for vanilla. One tagged for a
+// shader mod as well is a shader pack.
+func (p Pack) IsVanillaShader() bool {
+	return slices.Equal(p.Loaders, []string{"vanilla"})
 }
 
 func (m Mod) MarshalJSON() ([]byte, error) {
