@@ -76,31 +76,9 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 	if err := r.packKeyFree(key, kind); err != nil {
 		return err
 	}
-	v, err := r.pickPack(ctx, p, proj, kind, opts.Pin, opts.Channel)
-	if err != nil {
+	if err := r.lockPack(ctx, p, proj, key, kind, opts.Pin, opts.Channel); err != nil {
 		return err
 	}
-	r.log("fetching %s %s", proj.Slug, v.Number)
-	got, err := r.obtain(ctx, proj, v)
-	if err != nil {
-		return err
-	}
-	entry := lock.Pack{
-		Provider:      p.Name(),
-		Project:       lockID(p.Name(), proj.ID),
-		Version:       lockID(p.Name(), v.ID),
-		VersionNumber: v.Number,
-		Filename:      v.File.Filename,
-		URL:           got.url,
-		Page:          got.page,
-		Sha512:        got.sha512,
-		Size:          v.File.Size,
-		Channel:       channelLabel(opts.Channel),
-	}
-	if kind == manifest.TypeShader {
-		entry.Loader = r.shaderLoader(v)
-	}
-	r.packSection(kind)[key] = entry
 	listed := manifest.Require{Type: kind}
 	if opts.Channel != "" && opts.Channel != "release" {
 		listed.Channel = opts.Channel
@@ -263,7 +241,13 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 	if entry.Pin != nil {
 		pin = fmt.Sprint(entry.Pin)
 	}
-	v, err := r.pickPack(ctx, p, proj, kind, pin, entry.Channel)
+	return r.lockPack(ctx, p, proj, key, kind, pin, entry.Channel)
+}
+
+// lockPack picks the resource pack or shader's version, fetches it into the cache and records it in
+// the lock under key.
+func (r *Resolver) lockPack(ctx context.Context, p provider.Provider, proj *provider.Project, key, kind, pin, channel string) error {
+	v, err := r.pickPack(ctx, p, proj, kind, pin, channel)
 	if err != nil {
 		return err
 	}
@@ -282,7 +266,7 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 		Page:          got.page,
 		Sha512:        got.sha512,
 		Size:          v.File.Size,
-		Channel:       channelLabel(entry.Channel),
+		Channel:       channelLabel(channel),
 	}
 	if kind == manifest.TypeShader {
 		locked.Loader = r.shaderLoader(v)
