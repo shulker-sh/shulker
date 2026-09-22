@@ -131,6 +131,12 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 	return res, err
 }
 
+// warnReplaced warns that a managed file shulker couldn't read was written over, naming where the
+// old one was kept.
+func (a *app) warnReplaced(unreadable error, kept string) {
+	a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(unreadable).Message, kept)
+}
+
 // repairIntent writes the instance file for a directory shulker synced before it kept one, from
 // what the build recorded. An instance that is a project gets a defaults-only file: its manifest
 // holds what it follows, so anything written here could only go stale against it. A file it can't
@@ -154,7 +160,7 @@ func (a *app) repairIntent(in config.Instance) (bool, error) {
 	}
 	kept, err := f.Replace(in.Dir)
 	if kept != "" {
-		a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(loadErr).Message, kept)
+		a.warnReplaced(loadErr, kept)
 	}
 	return true, err
 }

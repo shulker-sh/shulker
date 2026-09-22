@@ -145,7 +145,7 @@ func (a *app) configSetCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(unreadable).Message, kept)
+				a.warnReplaced(unreadable, kept)
 			} else if err := config.SaveDocument(path, doc); err != nil {
 				return err
 			}

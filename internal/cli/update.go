@@ -133,7 +133,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		if rel, err := filepath.Rel(p.Dir, kept); err == nil && filepath.IsLocal(rel) {
 			kept = rel
 		}
-		a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(p.UnreadableLock).Message, kept)
+		a.warnReplaced(p.UnreadableLock, kept)
 	}
 	// An instance plays its own directory, so an update there is only done once it is built.
 	hasChildren := false
