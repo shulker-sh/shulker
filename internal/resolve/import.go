@@ -126,7 +126,7 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 		im.reusePack(p)
 		return nil
 	}
-	if !mrpack.IsModJar(f.Path) || im.modrinth == nil {
+	if (!mrpack.IsModJar(f.Path) && !mrpack.IsPackZip(f.Path)) || im.modrinth == nil {
 		return im.unmanagedDownload(ctx, f)
 	}
 	v, found, err := im.modrinth.VersionByHash(ctx, sha1Sum)
@@ -139,6 +139,9 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	proj, err := im.modrinth.Project(ctx, v.ProjectID, "")
 	if err != nil {
 		return lookupFailed(f.Path, err)
+	}
+	if mrpack.IsPackZip(f.Path) {
+		return im.lockPack(ctx, f, proj, v)
 	}
 	id, prior, err := im.r.place(ctx, im.modrinth, proj, v, "", "", "", "", false)
 	if err != nil {
@@ -165,6 +168,50 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	im.r.Manifest.Requires[id] = entry
 	im.rep.Locked = append(im.rep.Locked, id)
 	return nil
+}
+
+// lockPack locks a resource pack or shader the pack lists under the file name it ships, which
+// the game enables it by. A file whose project is some other type, a datapack Modrinth calls a
+// mod for one, stays unmanaged.
+func (im *importer) lockPack(ctx context.Context, f mrpack.File, proj *provider.Project, v *provider.Version) error {
+	r := im.r
+	kind := manifest.TypeResourcePack
+	if path.Dir(f.Path) == "shaderpacks" {
+		kind = manifest.TypeShader
+	}
+	if proj.Type != kind {
+		return im.unmanagedDownload(ctx, f)
+	}
+	key := proj.Slug
+	if ok, err := im.canListPack(key, kind); !ok {
+		return err
+	}
+	listed := manifest.Require{Type: kind, Pin: lockID(im.modrinth.Name(), v.ID)}
+	if name := path.Base(f.Path); name != key+manifest.FileExtension(kind) {
+		listed.Filename = name
+	}
+	if im.modrinth.Name() != r.Manifest.ProviderOrder()[0] {
+		listed.Provider = im.modrinth.Name()
+	}
+	r.Manifest.Requires[key] = listed
+	if err := r.lockPackVersion(ctx, im.modrinth, proj, v, key, kind, ""); err != nil {
+		return err
+	}
+	im.rep.Locked = append(im.rep.Locked, key)
+	return nil
+}
+
+// canListPack reports whether the pack's resource pack or shader can be listed under key. One the
+// pack already listed is a duplicate: the first is kept, with a warning.
+func (im *importer) canListPack(key, kind string) (bool, error) {
+	if held, taken := im.r.Manifest.Requires[key]; taken && held.Kind() == kind {
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept the first", key))
+		return false, nil
+	}
+	if !manifest.IsValidKey(key) {
+		return false, out.Errorf("requires-unsupported", "%s can't be a requires key", key)
+	}
+	return true, im.r.packKeyFree(key, kind)
 }
 
 // lookupFailed is a file in the pack that couldn't be looked up on Modrinth, with the provider's

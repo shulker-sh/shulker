@@ -126,15 +126,8 @@ func (im *importer) curseForgeFile(ctx context.Context, p provider.Provider, f c
 		im.lockedFromCurseForge(id, kind, listed)
 	case manifest.TypeResourcePack, manifest.TypeShader:
 		key := proj.Slug
-		if held, taken := r.Manifest.Requires[key]; taken && held.Kind() == kind {
-			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept the first", key))
-			return proj, v, nil
-		}
-		if !manifest.IsValidKey(key) {
-			return nil, nil, out.Errorf("requires-unsupported", "%s can't be a requires key", key)
-		}
-		if err := r.packKeyFree(key, kind); err != nil {
-			return nil, nil, err
+		if ok, err := im.canListPack(key, kind); !ok {
+			return proj, v, err
 		}
 		if err := r.lockPackVersion(ctx, p, proj, v, key, kind, ""); err != nil {
 			return proj, v, err

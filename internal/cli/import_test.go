@@ -302,3 +302,60 @@ func TestImportMrpackForeign(t *testing.T) {
 		}
 	}
 }
+
+func TestImportMrpackLocksHostedPacks(t *testing.T) {
+	h := newHarness(t)
+	fresh, complementary, sodium := h.jars["fresh-animations"], h.jars["complementary"], h.jars["sodium"]
+	file := func(dir string, jar fakeJar, name string) mrpack.File {
+		return mrpack.File{Path: dir + "/" + name, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env("client"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	}
+	index := mrpack.Index{
+		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Packs",
+		Files: []mrpack.File{
+			file("resourcepacks", fresh, "Fresh Animations.zip"),
+			file("shaderpacks", complementary, complementary.filename),
+			file("resourcepacks", sodium, "sodium-datapack.zip"),
+			file("datapacks", sodium, "sodium-datapack.zip"),
+		},
+		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
+	}
+	archive := filepath.Join(t.TempDir(), "packs.mrpack")
+	writeMrpack(t, archive, index, nil)
+
+	dir := filepath.Join(t.TempDir(), "packs")
+	h.dir = filepath.Dir(dir)
+	var env struct {
+		Data importResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	res := env.Data.Mods
+	if strings.Join(res.Locked, ",") != "complementary-reimagined,fresh-animations" || strings.Join(res.Unmanaged, ",") != "client-overrides/datapacks/sodium-datapack.zip,client-overrides/resourcepacks/sodium-datapack.zip" {
+		t.Fatalf("import: %+v", res)
+	}
+	m, l := readProject(t, dir)
+	if got := m.Requires["fresh-animations"]; got.Type != manifest.TypeResourcePack || got.Filename != "Fresh Animations.zip" || got.Project != nil || got.Pin != "Vb7Kq2Xn" {
+		t.Fatalf("fresh-animations entry: %+v", got)
+	}
+	if got := m.Requires["complementary-reimagined"]; got.Type != manifest.TypeShader || got.Filename != complementary.filename || got.Pin != "pcrMhvuU" {
+		t.Fatalf("complementary entry: %+v", got)
+	}
+	if l.ResourcePacks["fresh-animations"].VersionNumber != "1.9.4" || l.ResourcePacks["fresh-animations"].Filename != "Fresh Animations.zip" || l.Shaders["complementary-reimagined"].VersionNumber != "r5.5.1" {
+		t.Fatalf("lock: %+v %+v", l.ResourcePacks, l.Shaders)
+	}
+	if len(m.Mods()) != 0 || len(l.Mods) != 0 {
+		t.Fatalf("mods: %+v", l.Mods)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "client-overrides/resourcepacks/Fresh Animations.zip")); !os.IsNotExist(err) {
+		t.Fatalf("locked pack vendored as an override: %v", err)
+	}
+
+	h.dir = dir
+	h.mustRun(t, "install")
+	for _, rel := range []string{"build/client/resourcepacks/Fresh Animations.zip", "build/client/shaderpacks/" + complementary.filename} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
