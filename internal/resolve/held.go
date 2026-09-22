@@ -70,7 +70,7 @@ func (r *Resolver) settleHeld(ctx context.Context, held heldMods, p provider.Pro
 	direct := r.directMods()
 	for _, m := range moves {
 		if d, isDirect := direct[m.dep]; isDirect && d.locked == "" {
-			if err := r.relock(ctx, m.dep); err != nil {
+			if err := r.relock(ctx, m.dep, lock.Mod{}); err != nil {
 				return err
 			}
 		}

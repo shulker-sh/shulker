@@ -56,7 +56,7 @@ func (r *Resolver) Update(ctx context.Context, ids []string) error {
 		r.Lock.Mods[id] = m
 	}
 	for _, id := range targets {
-		if err := r.relock(ctx, id); err != nil {
+		if err := r.relock(ctx, id, before[id]); err != nil {
 			return err
 		}
 	}
@@ -108,6 +108,9 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 	scope := r.scope(targets)
 	for _, id := range sortedKeys(scope) {
 		m := r.Lock.Mods[id]
+		if m.File != "" {
+			continue
+		}
 		p, err := r.provider(m.Provider)
 		if err != nil {
 			return nil, err
@@ -157,9 +160,23 @@ func (r *Resolver) Unpin(ctx context.Context, id string) error {
 	return r.Update(ctx, []string{id})
 }
 
-func (r *Resolver) relock(ctx context.Context, id string) error {
+// relock resolves one direct mod again. prev is its entry before the relock, which a local file whose
+// file is gone falls back to.
+func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 	direct := r.directMods()[id]
 	entry := direct.entry
+	if entry.File != "" {
+		if _, own := r.Manifest.Requires[id]; !own {
+			return out.Errorf("requires-unsupported", "%s: local files in a modpack aren't supported yet", id)
+		}
+		if err := r.relockFile(ctx, id, entry, prev); err != nil {
+			return err
+		}
+		for _, name := range direct.packs {
+			r.Lock.AddRequiredBy(id, name)
+		}
+		return nil
+	}
 	p, err := r.provider(entry.Provider)
 	if err != nil {
 		return err

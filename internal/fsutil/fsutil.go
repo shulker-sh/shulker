@@ -5,8 +5,10 @@ package fsutil
 import (
 	"bytes"
 	"crypto/sha1"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"hash"
 	"io"
 	"io/fs"
 	"os"
@@ -76,12 +78,20 @@ func WriteJSON(path string, v any) error {
 
 // SHA1 is the hex sha1 of the file at path, the hash Mojang and CurseForge publish.
 func SHA1(path string) (string, error) {
+	return hashFile(path, sha1.New())
+}
+
+// SHA512 is the hex sha512 of the file at path, the key the cache stores it under.
+func SHA512(path string) (string, error) {
+	return hashFile(path, sha512.New())
+}
+
+func hashFile(path string, h hash.Hash) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
-	h := sha1.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}

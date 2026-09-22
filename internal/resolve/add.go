@@ -533,6 +533,12 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 		if r.Cache.Has(f.sha512) {
 			continue
 		}
+		if f.file != "" {
+			if problem := r.restoreLocal(f); problem != "" {
+				missing = append(missing, problem)
+			}
+			continue
+		}
 		if f.url == nil {
 			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", f.id, f.filename, f.page, DownloadsDir))
 			continue
@@ -587,6 +593,8 @@ func pageFor(m lock.Mod) string {
 		return m.Page
 	case m.Provider == "curseforge":
 		return curseforge.ProjectPage(fmt.Sprint(m.Project))
+	case m.URL == nil:
+		return ""
 	}
 	return *m.URL
 }

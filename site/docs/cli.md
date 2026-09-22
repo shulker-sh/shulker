@@ -1689,6 +1689,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `loader-profile-invalid` | The loader profile shulker fetched isn't a version JSON with an id, so it can't be installed into the launcher. A row says what was wrong with it |
 | `loader-required` | `add` of a mod in a project without a loader, or `import curseforge` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
+| `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. While the cache still has them, a gone file only warns and builds from the cache |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
 | `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock` |
@@ -1701,7 +1702,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `meta-fetch` | Version metadata couldn't be read from Mojang, a loader's meta or Maven, or GDLauncher's meta. The row names the service and what went wrong |
 | `meta-invalid` | Version metadata was read but lacks what shulker needs, like a Minecraft version Mojang doesn't list, a Java runtime manifest with no java in it, or a loader installer whose files won't parse |
 | `minecraft-required` | `shulker.json` sets no `minecraft` and no locked modpack supplies one; set it with `shulker set minecraft <version>` |
-| `missing-files` | Mods that need a manual download are missing, at `install`, or files a CurseForge modpack names at `import curseforge`. `items`: what to download |
+| `missing-files` | Mods that need a manual download are missing, at `install`, or files a CurseForge modpack names at `import curseforge`; also a local `file` entry whose file is gone or changed when the cache has no copy either. `items`: what to download or restore |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
 | `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files; pass `--bundle`. `items`: the files |
@@ -1748,7 +1749,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid, including a `shulker.json` value that can't be written as a property. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
-| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a local `file`, or a modpack from a provider rather than a `source` |
+| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a modpack from a local `file` or from a provider rather than a `source`, or a local `file` inside a modpack |
 | `restore-failed` | `restore --all` failed for some targets; `data` has each target's result |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |

@@ -194,8 +194,23 @@ func TestRequiresEntryKinds(t *testing.T) {
 	if _, ok := packs.Shaders()["complementary"]; !ok || len(packs.Shaders()) != 1 {
 		t.Errorf("shaders %v", packs.Shaders())
 	}
+	local, err := Parse(doc(`"extras":{"file":"files/extras.jar"},"faithful":{"type":"resourcepack","file":"files/faithful.zip"},"bsl":{"type":"shader","file":"files/bsl.zip"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := local.CheckSupported(); err != nil {
+		t.Fatal(err)
+	}
+	if local.Mods()["extras"].File != "files/extras.jar" || len(local.ResourcePacks()) != 1 || len(local.Shaders()) != 1 {
+		t.Errorf("local files: mods %v, resource packs %v, shaders %v", local.Mods(), local.ResourcePacks(), local.Shaders())
+	}
+	for _, entries := range []string{`"extras":{"file":"files/extras.zip"}`, `"faithful":{"type":"resourcepack","file":"files/faithful.jar"}`} {
+		if _, err := Parse(doc(entries)); out.CodeOf(err) != "manifest-invalid" {
+			t.Errorf("%s: a file of the wrong extension should be invalid, got %v", entries, err)
+		}
+	}
 	for _, entries := range []string{
-		`"extras":{"type":"mod","file":"mods/extras.jar"}`,
+		`"cozy":{"type":"modpack","file":"files/cozy.mrpack"}`,
 		`"cozy":{"type":"modpack","provider":"modrinth"}`,
 	} {
 		m, err := Parse(doc(entries))

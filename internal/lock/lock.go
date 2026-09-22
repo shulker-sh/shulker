@@ -78,18 +78,21 @@ func (p Modpack) Label() string {
 	return ""
 }
 
+// Mod is a locked mod jar. One with File is a local file: it names no provider, so every
+// provider-shaped field stays empty and url is left out rather than written null.
 type Mod struct {
-	Provider      string   `json:"provider"`
-	Project       any      `json:"project"`
-	Version       any      `json:"version"`
-	VersionNumber string   `json:"versionNumber"`
+	File          string   `json:"file,omitempty"`
+	Provider      string   `json:"provider,omitempty"`
+	Project       any      `json:"project,omitempty"`
+	Version       any      `json:"version,omitempty"`
+	VersionNumber string   `json:"versionNumber,omitempty"`
 	Filename      string   `json:"filename"`
 	URL           *string  `json:"url"`
 	Page          string   `json:"page,omitempty"`
 	Sha512        string   `json:"sha512"`
 	Size          int64    `json:"size,omitempty"`
 	Side          string   `json:"side"`
-	Channel       string   `json:"channel"`
+	Channel       string   `json:"channel,omitempty"`
 	Modpack       string   `json:"modpack,omitempty"`
 	ModID         string   `json:"modId,omitempty"`
 	RequiredBy    []string `json:"requiredBy"`
@@ -105,20 +108,55 @@ type Aliases struct {
 // Pack is a resource pack or shader: a zip placed by its requires key, with no
 // jar metadata to read and nothing depending on it.
 type Pack struct {
-	Provider      string  `json:"provider"`
-	Project       any     `json:"project"`
-	Version       any     `json:"version"`
-	VersionNumber string  `json:"versionNumber"`
+	File          string  `json:"file,omitempty"`
+	Provider      string  `json:"provider,omitempty"`
+	Project       any     `json:"project,omitempty"`
+	Version       any     `json:"version,omitempty"`
+	VersionNumber string  `json:"versionNumber,omitempty"`
 	Filename      string  `json:"filename"`
 	URL           *string `json:"url"`
 	Page          string  `json:"page,omitempty"`
 	Sha512        string  `json:"sha512"`
 	Size          int64   `json:"size,omitempty"`
-	Channel       string  `json:"channel"`
+	Channel       string  `json:"channel,omitempty"`
 	Modpack       string  `json:"modpack,omitempty"`
 	// Loader is the shader loader the file targets. A vanilla shader needs no
 	// shader mod and is placed and enabled as a resource pack.
 	Loader string `json:"loader,omitempty"`
+}
+
+func (m Mod) MarshalJSON() ([]byte, error) {
+	type plain Mod
+	if m.File == "" {
+		return marshalPlain(plain(m))
+	}
+	return marshalPlain(struct {
+		plain
+		URL *string `json:"url,omitempty"`
+	}{plain: plain(m)})
+}
+
+func (p Pack) MarshalJSON() ([]byte, error) {
+	type plain Pack
+	if p.File == "" {
+		return marshalPlain(plain(p))
+	}
+	return marshalPlain(struct {
+		plain
+		URL *string `json:"url,omitempty"`
+	}{plain: plain(p)})
+}
+
+// marshalPlain leaves & < > unescaped, as the file encoder around it does, so a url keeps its
+// query string readable.
+func marshalPlain(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }
 
 type Player struct {

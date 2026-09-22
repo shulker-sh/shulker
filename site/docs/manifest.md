@@ -172,7 +172,7 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `ref` | `string` | Branch, tag, or commit for a git source. The lock records the resolved commit.<br>min length 1 |
 | `autoUpdate` | `boolean` | Whether sync refreshes this modpack from its source. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless. |
 | `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock; a source without a lock is always resolved from its manifest. |
-| `file` | [`relativePath`](#relativepath) | A local zip or jar that is on no provider. Not supported yet. |
+| `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. The lock records its sha512, and changed bytes make the lock out of date. |
 | `project` | [`projectId`](#projectid) | Written by add when the provider slug differs from the mod id or the provider is CurseForge. |
 | `pin` | [`versionId`](#versionid) | Pin to one provider version. update skips pinned mods. |
 | `channel` | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted. A channel admits itself and anything more stable.<br>default `"release"` |

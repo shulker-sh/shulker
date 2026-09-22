@@ -131,9 +131,10 @@
     },
     "mod": {
       "type": "object",
-      "required": ["provider", "project", "version", "versionNumber", "filename", "url", "sha512", "side", "channel", "requiredBy", "aliases"],
+      "required": ["filename", "sha512", "side", "requiredBy", "aliases"],
       "additionalProperties": false,
       "properties": {
+        "file": { "$ref": "#/$defs/relativePath", "description": "A local file: the path shulker.json gives it. Such an entry names no provider, and its sha512 is its identity." },
         "provider": { "type": "string", "enum": ["modrinth", "curseforge"] },
         "project": { "description": "Provider project id, typed as the provider types it." },
         "version": { "description": "Provider version id (Modrinth) or file id (CurseForge)." },
@@ -150,7 +151,7 @@
           "description": "Provider file page for manual download. Present only when url is null."
         },
         "sha512": { "$ref": "#/$defs/sha512", "description": "Cache key and install verification hash." },
-        "size": { "type": "integer", "minimum": 1, "description": "Jar size in bytes as the provider reports it, for the download bar. Absent on entries locked before shulker recorded sizes; filled in when the mod is next resolved." },
+        "size": { "type": "integer", "minimum": 1, "description": "Jar size in bytes as the provider reports it, for the download bar; for a local file, its length, compared before rehashing it. Absent on entries locked before shulker recorded sizes; filled in when the mod is next resolved." },
         "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Effective side after any manifest override." },
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked: the manifest's channel for a mod listed there or in a pack, the requiring mod's for a dependency. A listed mod whose manifest channel differs makes the lock out of date." },
         "modpack": { "$ref": "#/$defs/requireKey", "description": "Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own mods and the dependencies resolved for them." },
@@ -191,17 +192,26 @@
           }
         },
         {
-          "if": { "properties": { "url": { "type": "null" } } },
-          "then": { "required": ["page"] },
-          "else": { "not": { "required": ["page"] } }
+          "if": { "required": ["file"] },
+          "then": {
+            "required": ["size"],
+            "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["channel"] }] }
+          },
+          "else": {
+            "required": ["provider", "project", "version", "versionNumber", "url", "channel"],
+            "if": { "properties": { "url": { "type": "null" } } },
+            "then": { "required": ["page"] },
+            "else": { "not": { "required": ["page"] } }
+          }
         }
       ]
     },
     "pack": {
       "type": "object",
-      "required": ["provider", "project", "version", "versionNumber", "filename", "url", "sha512", "channel"],
+      "required": ["filename", "sha512"],
       "additionalProperties": false,
       "properties": {
+        "file": { "$ref": "#/$defs/relativePath", "description": "A local file: the path shulker.json gives it. Such an entry names no provider, and its sha512 is its identity." },
         "provider": { "type": "string", "enum": ["modrinth", "curseforge"] },
         "project": { "description": "Provider project id, typed as the provider types it." },
         "version": { "description": "Provider version id (Modrinth) or file id (CurseForge)." },
@@ -210,7 +220,7 @@
           "type": "string",
           "minLength": 1,
           "pattern": "^[^/\\\\]+\\.zip$",
-          "description": "The provider's own file name. The build places the file as <key>.zip instead, so a pack enabled in game stays enabled when it updates."
+          "description": "The provider's own file name, or a local file's. The build places the file as <key>.zip instead, so a pack enabled in game stays enabled when it updates."
         },
         "url": {
           "type": ["string", "null"],
@@ -223,7 +233,7 @@
           "description": "Provider file page for manual download. Present only when url is null."
         },
         "sha512": { "$ref": "#/$defs/sha512", "description": "Cache key and install verification hash." },
-        "size": { "type": "integer", "minimum": 1, "description": "File size in bytes as the provider reports it, for the download bar." },
+        "size": { "type": "integer", "minimum": 1, "description": "File size in bytes as the provider reports it, for the download bar; for a local file, its length, compared before rehashing it." },
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked. A listed entry whose manifest channel differs makes the lock out of date." },
         "modpack": { "$ref": "#/$defs/requireKey", "description": "Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own entries." },
         "loader": {
@@ -252,11 +262,25 @@
           }
         },
         {
-          "if": { "properties": { "url": { "type": "null" } } },
-          "then": { "required": ["page"] },
-          "else": { "not": { "required": ["page"] } }
+          "if": { "required": ["file"] },
+          "then": {
+            "required": ["size"],
+            "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["channel"] }] }
+          },
+          "else": {
+            "required": ["provider", "project", "version", "versionNumber", "url", "channel"],
+            "if": { "properties": { "url": { "type": "null" } } },
+            "then": { "required": ["page"] },
+            "else": { "not": { "required": ["page"] } }
+          }
         }
       ]
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\]",
+      "description": "Path relative to the project root, forward slashes, no leading slash."
     },
     "player": {
       "type": "object",

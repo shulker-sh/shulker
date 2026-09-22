@@ -258,7 +258,7 @@
         },
         "file": {
           "$ref": "#/$defs/relativePath",
-          "description": "A local zip or jar that is on no provider. Not supported yet."
+          "description": "A local jar or zip that is on no provider, placed like any other entry of its kind. The lock records its sha512, and changed bytes make the lock out of date."
         },
         "project": {
           "$ref": "#/$defs/projectId",

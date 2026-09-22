@@ -55,6 +55,11 @@ func (r *Resolver) shaderLoader(v *provider.Version) string {
 	if slices.Contains(v.Loaders, "vanilla") && !slices.Contains(v.Loaders, "iris") && !slices.Contains(v.Loaders, "oculus") {
 		return "vanilla"
 	}
+	return r.installedShaderLoader()
+}
+
+// installedShaderLoader is the shader mod the lock has, or Iris when it has none.
+func (r *Resolver) installedShaderLoader() string {
 	for _, name := range []string{"iris", "oculus", "canvas"} {
 		if _, installed := r.Lock.Mods[name]; installed {
 			return name
@@ -215,7 +220,7 @@ func (r *Resolver) reconcilePacks(ctx context.Context) error {
 		}
 		for _, key := range sortedKeys(listed) {
 			locked, ok := section[key]
-			if ok && len(project.ZipEntryDifferences(key, listed[key], locked)) == 0 {
+			if ok && len(project.ZipEntryDifferences(r.Dir, key, listed[key], locked)) == 0 {
 				continue
 			}
 			if err := r.relockPack(ctx, key, kind, listed[key]); err != nil {
@@ -229,6 +234,9 @@ func (r *Resolver) reconcilePacks(ctx context.Context) error {
 // relockPack resolves one listed resource pack or shader from its manifest
 // entry, the way relock does for a mod.
 func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manifest.Require) error {
+	if entry.File != "" {
+		return r.lockFilePack(key, kind, entry)
+	}
 	slug := key
 	if entry.Project != nil {
 		slug = fmt.Sprint(entry.Project)
@@ -330,7 +338,7 @@ func (r *Resolver) outdatedPacks(ctx context.Context, ids []string) ([]Outdated,
 		section := r.packSection(kind)
 		for _, key := range sortedKeys(listed) {
 			locked, ok := section[key]
-			if !ok || (len(ids) > 0 && !slices.Contains(ids, key)) {
+			if !ok || locked.File != "" || (len(ids) > 0 && !slices.Contains(ids, key)) {
 				continue
 			}
 			p, err := r.provider(locked.Provider)
@@ -354,6 +362,7 @@ func (r *Resolver) outdatedPacks(ctx context.Context, ids []string) ([]Outdated,
 // downloadable is one file the lock names, whichever section holds it.
 type downloadable struct {
 	id       string
+	file     string
 	filename string
 	sha512   string
 	url      *string
@@ -367,12 +376,12 @@ func (r *Resolver) lockFiles() []downloadable {
 	var files []downloadable
 	for _, id := range sortedKeys(r.Lock.Mods) {
 		m := r.Lock.Mods[id]
-		files = append(files, downloadable{id: id, filename: m.Filename, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size})
+		files = append(files, downloadable{id: id, file: m.File, filename: m.Filename, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size})
 	}
 	for _, section := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
 		for _, key := range sortedKeys(section) {
 			p := section[key]
-			files = append(files, downloadable{id: key, filename: p.Filename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size})
+			files = append(files, downloadable{id: key, file: p.File, filename: p.Filename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size})
 		}
 	}
 	return files

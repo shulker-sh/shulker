@@ -316,6 +316,9 @@ func (m *Manifest) check() error {
 		}
 	}
 	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
+		if err := checkFileExtension(key, m.Requires[key]); err != nil {
+			return err
+		}
 		for _, name := range m.Requires[key].Feature {
 			if _, ok := m.Features[strings.TrimPrefix(name, "!")]; !ok {
 				e := out.Errorf("manifest-invalid", "requires.%s gates on the feature %q, which %s doesn't declare", key, strings.TrimPrefix(name, "!"), FileName)
@@ -332,17 +335,34 @@ func (m *Manifest) check() error {
 	return nil
 }
 
-// Mods, ResourcePacks and Shaders leave out entries that name a local file.
 func (m *Manifest) Mods() map[string]Require { return m.byKind(TypeMod) }
 
 func (m *Manifest) ResourcePacks() map[string]Require { return m.byKind(TypeResourcePack) }
 
 func (m *Manifest) Shaders() map[string]Require { return m.byKind(TypeShader) }
 
+// checkFileExtension holds a local file to the extension its kind is placed with, since the lock
+// records a mod as a .jar and a pack as a .zip.
+func checkFileExtension(key string, r Require) error {
+	want := ""
+	switch r.Kind() {
+	case TypeMod:
+		want = ".jar"
+	case TypeResourcePack, TypeShader:
+		want = ".zip"
+	}
+	if r.File == "" || want == "" || strings.HasSuffix(r.File, want) {
+		return nil
+	}
+	e := out.Errorf("manifest-invalid", "requires.%s: a %s's file must be a %s", key, r.Kind(), want)
+	e.Rows = []out.Detail{{Label: "File", Text: r.File}}
+	return e
+}
+
 func (m *Manifest) byKind(kind string) map[string]Require {
 	found := map[string]Require{}
 	for key, r := range m.Requires {
-		if r.Kind() == kind && r.File == "" {
+		if r.Kind() == kind {
 			found[key] = r
 		}
 	}
@@ -365,8 +385,8 @@ func (m *Manifest) CheckSupported() error {
 	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
 		r := m.Requires[key]
 		switch {
-		case r.File != "":
-			return out.Errorf("requires-unsupported", "requires.%s: local files aren't supported yet", key)
+		case r.Kind() == TypeModpack && r.File != "":
+			return out.Errorf("requires-unsupported", "requires.%s: local modpacks aren't supported yet", key)
 		case r.Kind() == TypeModpack && r.Source == "":
 			e := out.Errorf("requires-unsupported", "requires.%s: modpacks from a provider aren't supported yet", key)
 			e.Help = "give the modpack a source"

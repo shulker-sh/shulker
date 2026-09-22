@@ -1,11 +1,15 @@
 package project
 
 import (
+	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
@@ -24,7 +28,7 @@ func (p *Project) LockDifferences() []string {
 	m, l := p.Manifest, p.Lock
 	diffs := append(PlatformDifferences(m, l), ProviderDifferences(m, l)...)
 	diffs = append(diffs, PackDifferences(m, l)...)
-	diffs = append(diffs, ZipDifferences(m, l)...)
+	diffs = append(diffs, ZipDifferences(p.Dir, m, l)...)
 	mods := m.Mods()
 	for _, id := range slices.Sorted(maps.Keys(mods)) {
 		lm, ok := l.Mods[id]
@@ -32,7 +36,7 @@ func (p *Project) LockDifferences() []string {
 			diffs = append(diffs, id+": in shulker.json, not in shulker.lock")
 			continue
 		}
-		diffs = append(diffs, ModDifferences(id, mods[id], lm)...)
+		diffs = append(diffs, ModDifferences(p.Dir, id, mods[id], lm)...)
 	}
 	for _, id := range slices.Sorted(maps.Keys(l.Mods)) {
 		if _, listed := mods[id]; !listed && len(l.Mods[id].RequiredBy) == 0 && l.Mods[id].Modpack == "" {
@@ -79,6 +83,9 @@ func ProviderDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 	order := m.ProviderOrder()
 	var diffs []string
 	for _, id := range slices.Sorted(maps.Keys(l.Mods)) {
+		if l.Mods[id].File != "" {
+			continue
+		}
 		if name := l.Mods[id].Provider; !slices.Contains(order, name) {
 			diffs = append(diffs, fmt.Sprintf("providers: %s is locked from %s, which shulker.json does not list", id, name))
 		}
@@ -115,7 +122,7 @@ func PackDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 // ZipDifferences compares the resource packs and shaders shulker.json lists with
 // what the lock records. An entry a locked modpack supplied is not listed here,
 // so it never reads as drift.
-func ZipDifferences(m *manifest.Manifest, l *lock.Lock) []string {
+func ZipDifferences(dir string, m *manifest.Manifest, l *lock.Lock) []string {
 	var diffs []string
 	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
 		listed, locked := m.ResourcePacks(), l.ResourcePacks
@@ -128,7 +135,7 @@ func ZipDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 				diffs = append(diffs, key+": in shulker.json, not in shulker.lock")
 				continue
 			}
-			diffs = append(diffs, ZipEntryDifferences(key, listed[key], lp)...)
+			diffs = append(diffs, ZipEntryDifferences(dir, key, listed[key], lp)...)
 		}
 		for _, key := range slices.Sorted(maps.Keys(locked)) {
 			if _, ok := listed[key]; !ok && locked[key].Modpack == "" {
@@ -141,7 +148,10 @@ func ZipDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 
 // ZipEntryDifferences compares one listed resource pack or shader with what the
 // lock records for it.
-func ZipEntryDifferences(key string, e manifest.Require, lp lock.Pack) []string {
+func ZipEntryDifferences(dir, key string, e manifest.Require, lp lock.Pack) []string {
+	if e.File != "" || lp.File != "" {
+		return FileDifferences(dir, key, e.File, lp.File, lp.Size, lp.Sha512)
+	}
 	var diffs []string
 	channel := e.Channel
 	if channel == "" {
@@ -159,7 +169,14 @@ func ZipEntryDifferences(key string, e manifest.Require, lp lock.Pack) []string 
 	return diffs
 }
 
-func ModDifferences(id string, e manifest.Require, lm lock.Mod) []string {
+func ModDifferences(dir, id string, e manifest.Require, lm lock.Mod) []string {
+	if e.File != "" || lm.File != "" {
+		diffs := FileDifferences(dir, id, e.File, lm.File, lm.Size, lm.Sha512)
+		if e.Side != "" && e.Side != lm.Side {
+			diffs = append(diffs, fmt.Sprintf("%s: side %s -> %s", id, lm.Side, e.Side))
+		}
+		return diffs
+	}
 	var diffs []string
 	channel := e.Channel
 	if channel == "" {
@@ -186,6 +203,62 @@ func ModDifferences(id string, e manifest.Require, lm lock.Mod) []string {
 		diffs = append(diffs, fmt.Sprintf("%s: project %s -> %v", id, project, e.Project))
 	}
 	return diffs
+}
+
+// FileDifferences compares a local file entry with the file on disk: its path, then its size, and
+// its sha512 only when the size still matches. A file that is gone is no difference, since the cache
+// still serves the bytes the lock names.
+func FileDifferences(dir, key, listed, locked string, size int64, sha512 string) []string {
+	switch {
+	case listed == "":
+		return []string{fmt.Sprintf("%s: locked as a local file, shulker.json names a provider", key)}
+	case locked == "":
+		return []string{fmt.Sprintf("%s: a local file in shulker.json, locked from a provider", key)}
+	case listed != locked:
+		return []string{fmt.Sprintf("%s: file %s -> %s", key, locked, listed)}
+	}
+	path := filepath.Join(dir, filepath.FromSlash(listed))
+	st, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	if st.Size() == size {
+		if got, err := fsutil.SHA512(path); err != nil || got == sha512 {
+			return nil
+		}
+	}
+	return []string{key + ": the file's bytes changed"}
+}
+
+// GoneFiles warns about each local file entry whose file is gone but whose locked bytes cached
+// has, which the build places instead. One the cache lacks too is install's missing-files.
+func (p *Project) GoneFiles(cached func(sha512 string) bool) []string {
+	if p.Lock == nil {
+		return nil
+	}
+	var gone []string
+	check := func(key, rel, sha512 string) {
+		if rel == "" || !cached(sha512) {
+			return
+		}
+		if _, err := os.Stat(filepath.Join(p.Dir, filepath.FromSlash(rel))); errors.Is(err, os.ErrNotExist) {
+			gone = append(gone, FileGone(key, rel))
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(p.Lock.Mods)) {
+		check(id, p.Lock.Mods[id].File, p.Lock.Mods[id].Sha512)
+	}
+	for _, section := range []map[string]lock.Pack{p.Lock.ResourcePacks, p.Lock.Shaders} {
+		for _, key := range slices.Sorted(maps.Keys(section)) {
+			check(key, section[key].File, section[key].Sha512)
+		}
+	}
+	return gone
+}
+
+// FileGone is the warning for a local file entry whose file has been deleted.
+func FileGone(key, rel string) string {
+	return fmt.Sprintf("%s: %s is gone; using the copy in the cache", key, rel)
 }
 
 func lockedProject(lm lock.Mod, provider string) (string, bool) {
