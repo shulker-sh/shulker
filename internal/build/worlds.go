@@ -48,8 +48,13 @@ func serverLevelName(dir string, m *manifest.Manifest) (string, error) {
 		if m.Server != nil {
 			raw = m.Server.Properties
 		}
-		l, _ := lock.Load(filepath.Join(dir, lock.FileName))
+		l, lockErr := lock.Load(filepath.Join(dir, lock.FileName))
 		props, err := renderProperties(PropertiesFile, raw, templateVars(m, l, "server"))
+		// The lock only matters for a value that uses its variables, so a lock that can't be read
+		// is only the error once rendering needs it.
+		if err != nil && lockErr != nil && !errors.Is(lockErr, fs.ErrNotExist) {
+			return "", lockErr
+		}
 		if err != nil {
 			return "", err
 		}
