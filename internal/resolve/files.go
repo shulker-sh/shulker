@@ -191,11 +191,17 @@ func (r *Resolver) restoreLocal(f downloadable) string {
 	dir := r.fileDir(f.id, f.modpack, f.file)
 	path := filepath.Join(dir, filepath.FromSlash(f.file))
 	st, err := os.Stat(path)
-	if dir == "" || err != nil {
+	if dir == "" || errors.Is(err, os.ErrNotExist) {
 		return fmt.Sprintf("%s: %s is gone, and the cache has no copy of it", f.id, f.file)
 	}
-	got, err := r.putLocal(path, st)
-	if err != nil || got.sha512 != f.sha512 {
+	var got localCopy
+	if err == nil {
+		got, err = r.putLocal(path, st)
+	}
+	if err != nil {
+		return fmt.Sprintf("%s: %s can't be read: %s", f.id, f.file, err)
+	}
+	if got.sha512 != f.sha512 {
 		return fmt.Sprintf("%s: %s changed since it was locked; run `shulker lock`", f.id, f.file)
 	}
 	return ""
