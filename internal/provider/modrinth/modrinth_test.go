@@ -2,12 +2,16 @@ package modrinth
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -53,5 +57,95 @@ func TestSearchAsksForTheTypeAsAFacet(t *testing.T) {
 	}
 	if got.Has("facets") || got.Get("limit") != "100" {
 		t.Errorf("search without a type asked for %v", got)
+	}
+}
+
+func TestWaitsOutARateLimitOnce(t *testing.T) {
+	for _, tc := range []struct {
+		name, reset string
+		limited     int
+		wantWait    time.Duration
+		wantErr     bool
+	}{
+		{"retries after the reset", "2", 1, 2 * time.Second, false},
+		{"fails when limited again", "2", 2, 2 * time.Second, true},
+		{"fails when the reset is too far", "120", 1, 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if calls <= tc.limited {
+					w.Header().Set("X-Ratelimit-Reset", tc.reset)
+					w.WriteHeader(http.StatusTooManyRequests)
+					return
+				}
+				w.Write([]byte(`{"id":"AANobbMI","slug":"sodium","project_type":"mod"}`))
+			}))
+			defer srv.Close()
+			m := New(fetch.New("test"))
+			m.BaseURL = srv.URL
+			var waited time.Duration
+			var logged string
+			m.sleep = func(_ context.Context, d time.Duration) error { waited += d; return nil }
+			m.Log = func(format string, args ...any) { logged = fmt.Sprintf(format, args...) }
+			_, err := m.Project(context.Background(), "sodium", "")
+			if (err != nil) != tc.wantErr || waited != tc.wantWait {
+				t.Fatalf("err %v, waited %s", err, waited)
+			}
+			if tc.wantErr && out.CodeOf(err) != "rate-limited" {
+				t.Fatalf("code: %v", err)
+			}
+			if tc.wantWait > 0 && logged != "waiting 2s for Modrinth's rate limit" {
+				t.Fatalf("logged %q", logged)
+			}
+		})
+	}
+}
+
+func TestVersionsByHashAsksOnce(t *testing.T) {
+	calls := 0
+	var body struct {
+		Hashes    []string `json:"hashes"`
+		Algorithm string   `json:"algorithm"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method != http.MethodPost || r.URL.Path != "/version_files" {
+			http.NotFound(w, r)
+			return
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		w.Write([]byte(`{"aaa":{"id":"v1","project_id":"p1","version_number":"1.0","files":[{"url":"u","filename":"a.jar","primary":true,"hashes":{"sha1":"aaa","sha512":"ccc"}}]}}`))
+	}))
+	defer srv.Close()
+	m := New(fetch.New("test"))
+	m.BaseURL = srv.URL
+	found, err := m.VersionsByHash(context.Background(), []string{"aaa", "bbb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || body.Algorithm != "sha1" || len(body.Hashes) != 2 || len(found) != 1 || found["aaa"].ProjectID != "p1" {
+		t.Fatalf("calls %d, body %+v, found %+v", calls, body, found)
+	}
+}
+
+func TestProjectsAsksOnce(t *testing.T) {
+	calls := 0
+	var ids string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		ids = r.URL.Query().Get("ids")
+		w.Write([]byte(`[{"id":"p1","slug":"one","project_type":"mod"}]`))
+	}))
+	defer srv.Close()
+	m := New(fetch.New("test"))
+	m.BaseURL = srv.URL
+	found, err := m.Projects(context.Background(), []string{"p1", "p2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || ids != `["p1","p2"]` || len(found) != 1 || found["p1"].Slug != "one" {
+		t.Fatalf("calls %d, ids %s, found %+v", calls, ids, found)
 	}
 }

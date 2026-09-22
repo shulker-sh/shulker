@@ -20,13 +20,62 @@ const (
 	searchLimit = 100
 )
 
+// longestWait is the longest rate-limit reset worth waiting out. Modrinth's window is a minute.
+const longestWait = time.Minute
+
 type Modrinth struct {
 	Client  *fetch.Client
 	BaseURL string
+	// Log, when set, is told when a request waits out the rate limit.
+	Log   func(format string, args ...any)
+	sleep func(ctx context.Context, d time.Duration) error
 }
 
 func New(c *fetch.Client) *Modrinth {
-	return &Modrinth{Client: c, BaseURL: APIURL}
+	return &Modrinth{Client: c, BaseURL: APIURL, sleep: sleep}
+}
+
+// call runs request, and when Modrinth rate-limits it, waits out the reset the answer names and
+// runs it once more.
+func (m *Modrinth) call(ctx context.Context, request func() error) error {
+	err := request()
+	var se *fetch.StatusError
+	if !errors.Is(err, fetch.ErrRateLimited) || !errors.As(err, &se) {
+		return err
+	}
+	if se.RetryAfter <= 0 || se.RetryAfter > longestWait {
+		return rateLimited(se.RetryAfter)
+	}
+	if m.Log != nil {
+		m.Log("waiting %s for Modrinth's rate limit", se.RetryAfter)
+	}
+	if err := m.sleep(ctx, se.RetryAfter); err != nil {
+		return err
+	}
+	if err := request(); !errors.Is(err, fetch.ErrRateLimited) {
+		return err
+	}
+	return rateLimited(longestWait)
+}
+
+func rateLimited(reset time.Duration) error {
+	e := out.Errorf("rate-limited", "modrinth is rate-limiting shulker's requests")
+	e.Help = "run the command again in a minute"
+	if reset > longestWait {
+		e.Help = fmt.Sprintf("run the command again in %s", reset.Round(time.Minute))
+	}
+	return e
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 func (m *Modrinth) Name() string { return "modrinth" }
@@ -73,7 +122,7 @@ type version struct {
 // Modrinth slugs are unique across project types, so the kind hint is unused.
 func (m *Modrinth) Project(ctx context.Context, slugOrID, _ string) (*provider.Project, error) {
 	var p project
-	if err := m.Client.GetJSON(ctx, m.BaseURL+"/project/"+url.PathEscape(slugOrID), &p); err != nil {
+	if err := m.call(ctx, func() error { return m.Client.GetJSON(ctx, m.BaseURL+"/project/"+url.PathEscape(slugOrID), &p) }); err != nil {
 		if errors.Is(err, fetch.ErrNotFound) {
 			err = provider.ErrNotFound
 		}
@@ -91,7 +140,7 @@ func (m *Modrinth) Search(ctx context.Context, query, kind string, limit int) ([
 	var res struct {
 		Hits []hit `json:"hits"`
 	}
-	if err := m.Client.GetJSON(ctx, m.BaseURL+"/search?"+q.Encode(), &res); err != nil {
+	if err := m.call(ctx, func() error { return m.Client.GetJSON(ctx, m.BaseURL+"/search?"+q.Encode(), &res) }); err != nil {
 		return nil, fmt.Errorf("modrinth search %s: %w", query, err)
 	}
 	projects := make([]provider.Project, 0, len(res.Hits))
@@ -116,7 +165,9 @@ func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders
 		q.Set("game_versions", jsonList(game))
 	}
 	var raw []version
-	if err := m.Client.GetJSON(ctx, m.BaseURL+"/project/"+url.PathEscape(projectID)+"/version?"+q.Encode(), &raw); err != nil {
+	if err := m.call(ctx, func() error {
+		return m.Client.GetJSON(ctx, m.BaseURL+"/project/"+url.PathEscape(projectID)+"/version?"+q.Encode(), &raw)
+	}); err != nil {
 		return nil, fmt.Errorf("modrinth versions for %s: %w", projectID, err)
 	}
 	out := make([]provider.Version, 0, len(raw))
@@ -132,7 +183,11 @@ func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders
 
 func (m *Modrinth) Version(ctx context.Context, versionID string) (*provider.Version, error) {
 	var raw version
-	found, err := m.Client.GetJSONIfFound(ctx, m.BaseURL+"/version/"+url.PathEscape(versionID), &raw)
+	var found bool
+	err := m.call(ctx, func() (err error) {
+		found, err = m.Client.GetJSONIfFound(ctx, m.BaseURL+"/version/"+url.PathEscape(versionID), &raw)
+		return err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("modrinth version %s: %w", versionID, err)
 	}
@@ -148,7 +203,11 @@ func (m *Modrinth) Version(ctx context.Context, versionID string) (*provider.Ver
 
 func (m *Modrinth) VersionByHash(ctx context.Context, sha1 string) (*provider.Version, bool, error) {
 	var raw version
-	found, err := m.Client.GetJSONIfFound(ctx, m.BaseURL+"/version_file/"+url.PathEscape(sha1)+"?algorithm=sha1", &raw)
+	var found bool
+	err := m.call(ctx, func() (err error) {
+		found, err = m.Client.GetJSONIfFound(ctx, m.BaseURL+"/version_file/"+url.PathEscape(sha1)+"?algorithm=sha1", &raw)
+		return err
+	})
 	if err != nil {
 		return nil, false, fmt.Errorf("modrinth version_file %s: %w", sha1, err)
 	}
@@ -160,6 +219,40 @@ func (m *Modrinth) VersionByHash(ctx context.Context, sha1 string) (*provider.Ve
 		return nil, false, err
 	}
 	return &pv, true, nil
+}
+
+// VersionsByHash finds the versions whose files have these sha1s, in one request, by sha1. A hash
+// Modrinth doesn't know is left out.
+func (m *Modrinth) VersionsByHash(ctx context.Context, sha1s []string) (map[string]provider.Version, error) {
+	raw := map[string]version{}
+	if err := m.call(ctx, func() error {
+		return m.Client.PostJSON(ctx, m.BaseURL+"/version_files", map[string]any{"hashes": sha1s, "algorithm": "sha1"}, &raw)
+	}); err != nil {
+		return nil, fmt.Errorf("modrinth version_files: %w", err)
+	}
+	found := make(map[string]provider.Version, len(raw))
+	for sha1, v := range raw {
+		if pv, err := convert(v); err == nil {
+			found[sha1] = pv
+		}
+	}
+	return found, nil
+}
+
+// Projects finds these projects in one request, by id. A project Modrinth no longer has is left
+// out.
+func (m *Modrinth) Projects(ctx context.Context, ids []string) (map[string]provider.Project, error) {
+	var raw []project
+	if err := m.call(ctx, func() error {
+		return m.Client.GetJSON(ctx, m.BaseURL+"/projects?"+url.Values{"ids": {jsonList(ids...)}}.Encode(), &raw)
+	}); err != nil {
+		return nil, fmt.Errorf("modrinth projects: %w", err)
+	}
+	found := make(map[string]provider.Project, len(raw))
+	for _, p := range raw {
+		found[p.ID] = convertProject(p)
+	}
+	return found, nil
 }
 
 func convert(v version) (provider.Version, error) {

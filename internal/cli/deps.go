@@ -66,7 +66,9 @@ func (a *app) deps() (*deps, error) {
 	}
 	f := fetch.New(version)
 	f.Waiting = a.printer.Waiting
-	providers := map[string]provider.Provider{"modrinth": modrinth.New(f)}
+	mr := modrinth.New(f)
+	mr.Log = a.progress
+	providers := map[string]provider.Provider{"modrinth": mr}
 	if key := curseforge.Key(cfg.CurseForge.Key); key != "" {
 		providers["curseforge"] = curseforge.New(f, key)
 	} else if key := curseforge.SharedKey(c.Dir); key != "" {
