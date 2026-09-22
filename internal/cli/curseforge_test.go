@@ -60,6 +60,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		300000: {id: 300000, slug: "nodist", files: []cfFile{{id: 5100001, jar: h.jars["nodist"], date: "2026-09-01T00:00:00Z", channel: 1, url: "null"}}},
 		400000: {id: 400000, slug: "locked", files: []cfFile{{id: 5200001, jar: h.jars["locked"], date: "2026-09-01T00:00:00Z", channel: 1, forbidden: true}}},
 		600000: {id: 600000, slug: "fresh-animations", class: 12, downloads: 4_000_000, files: []cfFile{{id: 5300001, jar: h.jars["cf-fresh-animations"], date: "2026-09-01T00:00:00Z", channel: 1}}},
+		700000: {id: 700000, slug: "complementary-cf", class: 6552, files: []cfFile{{id: 5400001, jar: h.jars["complementary"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 	}
 	fileJSON := func(f cfFile, m *cfMod) map[string]any {
 		var url any = base() + "/cfcdn/" + f.jar.filename

@@ -42,7 +42,7 @@ func (h *harness) fingerprintMatches(fingerprints []uint32) []map[string]any {
 			fp := curseforge.Fingerprint(f.jar.data)
 			for _, want := range fingerprints {
 				if fp == want {
-					matches = append(matches, map[string]any{"id": f.id, "file": map[string]any{"id": f.id, "modId": m.id, "fileFingerprint": fp}})
+					matches = append(matches, map[string]any{"id": f.id, "file": map[string]any{"id": f.id, "modId": m.id, "fileName": f.jar.filename, "fileFingerprint": fp}})
 				}
 			}
 		}
@@ -220,6 +220,23 @@ func TestExportCurseForgeCarriesPacks(t *testing.T) {
 		if strings.HasPrefix(name, "overrides/resourcepacks/") {
 			t.Fatalf("a pack locked from CurseForge was bundled: %s", name)
 		}
+	}
+}
+
+func TestExportCurseForgeEnablesPacksByTheirCurseForgeNames(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fresh-animations", "--provider", "curseforge")
+	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	h.mustRun(t, "install")
+
+	h.mustRun(t, "export", "curseforge", "--version", "1.0")
+	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
+	if options := entries["overrides/options.txt"]; !strings.Contains(options, `"file/FreshAnimations_CF_v1.9.4.zip"`) || strings.Contains(options, "fresh-animations.zip") {
+		t.Fatalf("options.txt: %s", options)
+	}
+	if iris := entries["overrides/config/iris.properties"]; !strings.Contains(iris, "shaderPack=ComplementaryReimagined_r5.5.1.zip") {
+		t.Fatalf("iris.properties: %s", iris)
 	}
 }
 

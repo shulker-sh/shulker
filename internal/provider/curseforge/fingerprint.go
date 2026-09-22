@@ -48,8 +48,9 @@ func Fingerprint(data []byte) uint32 {
 }
 
 type Match struct {
-	ModID  int
-	FileID int
+	ModID    int
+	FileID   int
+	FileName string
 }
 
 // MatchFingerprints finds the CurseForge files with exactly these fingerprints.
@@ -60,6 +61,7 @@ func (c *CurseForge) MatchFingerprints(ctx context.Context, fingerprints []uint3
 				File struct {
 					ID              int    `json:"id"`
 					ModID           int    `json:"modId"`
+					FileName        string `json:"fileName"`
 					FileFingerprint uint32 `json:"fileFingerprint"`
 				} `json:"file"`
 			} `json:"exactMatches"`
@@ -72,7 +74,7 @@ func (c *CurseForge) MatchFingerprints(ctx context.Context, fingerprints []uint3
 	}
 	matches := map[uint32]Match{}
 	for _, m := range res.Data.ExactMatches {
-		matches[m.File.FileFingerprint] = Match{ModID: m.File.ModID, FileID: m.File.ID}
+		matches[m.File.FileFingerprint] = Match{ModID: m.File.ModID, FileID: m.File.ID, FileName: m.File.FileName}
 	}
 	return matches, nil
 }

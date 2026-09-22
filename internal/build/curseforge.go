@@ -54,6 +54,7 @@ type curseForgeEntry struct {
 	url      *string
 	project  any
 	version  any
+	filename string
 }
 
 // ExportCurseForge writes the project as a CurseForge modpack.
@@ -71,10 +72,11 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 	if report.Warnings, err = b.mrpackCollect(t, opts.OS, opts.Features); err != nil {
 		return nil, err
 	}
-	files, names, err := b.curseForgeMods(t, opts, report)
+	files, names, fileNames, err := b.curseForgeMods(t, opts, report)
 	if err != nil {
 		return nil, err
 	}
+	enableByCurseForgeNames(t, fileNames)
 	entries := map[string][]byte{}
 	for path, data := range t.files {
 		entries["overrides/"+path] = data
@@ -117,10 +119,12 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 }
 
 // curseForgeMods returns the profile's files and the names that pair with them
-// in the modlist, in the order the archive lists them.
-func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *CurseForgeReport) ([]cfpack.File, []string, error) {
+// in the modlist, in the order the archive lists them, and the fileName
+// CurseForge gives each placed path that goes by file ID.
+func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *CurseForgeReport) ([]cfpack.File, []string, map[string]string, error) {
 	entries := b.curseForgeEntries(t)
 	byKey := map[string]cfpack.File{}
+	fileNames := map[string]string{}
 	byEntry := map[string]curseForgeEntry{}
 	blobs := map[string][]byte{}
 	var lookup []string
@@ -129,11 +133,12 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		byEntry[e.key] = e
 		if project, file, ok := curseForgeLocked(e); ok {
 			byKey[e.key] = cfpack.File{ProjectID: project, FileID: file, Required: true}
+			fileNames[e.path] = e.filename
 			continue
 		}
 		data, err := os.ReadFile(b.Cache.Object(e.sha512))
 		if err != nil {
-			return nil, nil, notInstalled(e.key)
+			return nil, nil, nil, notInstalled(e.key)
 		}
 		blobs[e.key] = data
 		lookup = append(lookup, e.key)
@@ -150,7 +155,7 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		default:
 			e := out.AsError(err)
 			e.Items = lookup
-			return nil, nil, e
+			return nil, nil, nil, e
 		}
 	}
 	missing := &kindTally{}
@@ -158,6 +163,7 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		e := byEntry[key]
 		if match, ok := matches[fingerprints[i]]; ok {
 			byKey[key] = cfpack.File{ProjectID: match.ModID, FileID: match.FileID, Required: true}
+			fileNames[e.path] = match.FileName
 			report.Matched = append(report.Matched, key)
 			continue
 		}
@@ -176,7 +182,7 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		if missing.total() == 1 {
 			verb = "isn't"
 		}
-		return nil, nil, bundleNudge(out.Errorf("curseforge-not-found", "%s %s on CurseForge", kindCount(missing.counts), verb), missing.items, "shulker export curseforge --bundle")
+		return nil, nil, nil, bundleNudge(out.Errorf("curseforge-not-found", "%s %s on CurseForge", kindCount(missing.counts), verb), missing.items, "shulker export curseforge --bundle")
 	}
 	files := []cfpack.File{}
 	names := []string{}
@@ -190,7 +196,43 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		locked := reportList(report, e.kind, false)
 		*locked = append(*locked, e.key)
 	}
-	return files, names, nil
+	return files, names, fileNames, nil
+}
+
+// enableByCurseForgeNames points options.txt and the shader loader's config at
+// the names the launcher saves file-ID packs under, which are CurseForge's own
+// file names rather than the <key>.zip a build places.
+func enableByCurseForgeNames(t *mrpackSide, fileNames map[string]string) {
+	var pairs []string
+	for placed, name := range fileNames {
+		if base, ok := strings.CutPrefix(placed, "resourcepacks/"); ok && name != "" {
+			pairs = append(pairs, `"file/`+base+`"`, `"file/`+name+`"`)
+		}
+	}
+	// One pass, so a CurseForge name that is another pack's <key>.zip isn't renamed twice.
+	rewriteProperty(t.files, OptionsFile, resourcePacksKey+":", strings.NewReplacer(pairs...).Replace)
+	for _, config := range shaderConfigs {
+		rewriteProperty(t.files, config, "shaderPack=", func(v string) string {
+			if name := fileNames["shaderpacks/"+v]; name != "" {
+				return name
+			}
+			return v
+		})
+	}
+}
+
+func rewriteProperty(files map[string][]byte, path, prefix string, rewrite func(string) string) {
+	data, ok := files[path]
+	if !ok {
+		return
+	}
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if v, ok := strings.CutPrefix(line, prefix); ok {
+			lines[i] = prefix + rewrite(v)
+		}
+	}
+	files[path] = []byte(strings.Join(lines, "\n"))
 }
 
 func reportList(report *CurseForgeReport, kind string, bundled bool) *[]string {
@@ -224,7 +266,7 @@ func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 		if !t.packs[ref.key] {
 			continue
 		}
-		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version})
+		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.Filename})
 	}
 	return entries
 }
