@@ -114,7 +114,7 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --side server
 
 ### `shulker import mrpack`
 
-Create a project from a Modrinth modpack (`.mrpack`). A pack shulker exported carries its own `shulker.json` and `shulker.lock` at the archive root unless its manifest turns `marker` off, and those are read in preference to the marker jar, so the project comes back as it was, resource packs and shaders included, and its `icon` is put back from the archive's `icon.png`. `--ignore-shulker` skips both and imports the archive as any other Modrinth modpack.
+Create a project from a Modrinth modpack (`.mrpack`). A pack shulker exported carries its own `shulker.json` and `shulker.lock` at the archive root unless its manifest turns `marker` off, and those are read in preference to the marker jar, so the project comes back as it was, resource packs and shaders included, and its `icon` is put back from the archive's `icon.png`. A local file that project had, bundled into the archive with `export mrpack --bundle`, becomes the new project's own local file in `files/`, so it builds on a machine that never read the archive; two of one name fail with `file-taken`. `--ignore-shulker` skips both and imports the archive as any other Modrinth modpack.
 
 ```sh
 shulker import mrpack ~/Downloads/fabulously-optimized.mrpack
@@ -1688,7 +1688,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
 | `file-not-found` | A file named to `pull` isn't in the build directory, or a path given to `add` isn't a file. `candidates`: the closest file there, for `pull` |
-| `file-taken` | `add` would copy a local file into `files/`, which already holds a different file of that name that no entry of the same key names; rename one or remove the one in `files/` |
+| `file-taken` | `add` would copy a local file into `files/`, which already holds a different file of that name that no entry of the same key names; rename one or remove the one in `files/`. Also an `import` whose pack names two different local files of one name |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |
 | `group-not-found` | `--group` names a save group that isn't under the saves root |

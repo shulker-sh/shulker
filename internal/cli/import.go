@@ -96,6 +96,9 @@ func (a *app) importMrpackCmd() *cobra.Command {
 				return err
 			}
 			a.warn(mods.Warnings)
+			if err := r.AdoptLocalFiles(); err != nil {
+				return err
+			}
 			if arc.Marker != nil {
 				mods.Overrides = dropManifestOwned(m, mods.Overrides)
 			}

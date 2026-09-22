@@ -6,7 +6,11 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"os"
+	"path"
+	"path/filepath"
+	"slices"
 	"sort"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -285,6 +289,74 @@ func (im *importer) dropUnmatched() {
 		m.RequiredBy = kept
 		im.r.Lock.Mods[id] = m
 	}
+}
+
+// AdoptLocalFiles makes the local files an imported lock names the project's own: each is copied
+// from the cache into manifest.FilesDir, and its lock and requires entries point at the copy. Their
+// paths are the exporter's, and until then only the cache holds their bytes.
+func (r *Resolver) AdoptLocalFiles() error {
+	owner := map[string]string{}
+	digest := map[string]string{}
+	claim := func(key, file, sha512 string) error {
+		if file == "" {
+			return nil
+		}
+		to := manifest.FilesDir + "/" + path.Base(file)
+		if prior, ok := owner[to]; ok && digest[to] != sha512 {
+			return out.Errorf("file-taken", "%s and %s are both local files named %s", prior, key, path.Base(to))
+		}
+		owner[to], digest[to] = key, sha512
+		return nil
+	}
+	for _, key := range slices.Sorted(maps.Keys(r.Lock.Mods)) {
+		if err := claim(key, r.Lock.Mods[key].File, r.Lock.Mods[key].Sha512); err != nil {
+			return err
+		}
+	}
+	for _, packs := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
+		for _, key := range slices.Sorted(maps.Keys(packs)) {
+			if err := claim(key, packs[key].File, packs[key].Sha512); err != nil {
+				return err
+			}
+		}
+	}
+
+	adopt := func(key, file, sha512 string) (string, error) {
+		to := manifest.FilesDir + "/" + path.Base(file)
+		if err := r.Cache.CopyTo(sha512, filepath.Join(r.Dir, filepath.FromSlash(to))); err != nil {
+			return "", err
+		}
+		if req, ok := r.Manifest.Requires[key]; ok {
+			req.File = to
+			r.Manifest.Requires[key] = req
+		}
+		return to, nil
+	}
+	for key, m := range r.Lock.Mods {
+		if m.File == "" {
+			continue
+		}
+		to, err := adopt(key, m.File, m.Sha512)
+		if err != nil {
+			return err
+		}
+		m.File = to
+		r.Lock.Mods[key] = m
+	}
+	for _, packs := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
+		for key, p := range packs {
+			if p.File == "" {
+				continue
+			}
+			to, err := adopt(key, p.File, p.Sha512)
+			if err != nil {
+				return err
+			}
+			p.File = to
+			packs[key] = p
+		}
+	}
+	return nil
 }
 
 func layerSide(layer string) string {

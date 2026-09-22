@@ -229,6 +229,68 @@ func TestExportMrpackBundlesLocalFiles(t *testing.T) {
 	}
 }
 
+func TestImportMrpackTakesBundledLocalFilesAsItsOwn(t *testing.T) {
+	h, jar := localFiles(t)
+	h.editManifest(t, func(m map[string]any) {
+		requires := m["requires"].(map[string]any)
+		requires["faithful"] = map[string]any{"type": "resourcepack", "file": "packs/faithful.zip", "side": "client"}
+	})
+	if err := os.MkdirAll(filepath.Join(h.dir, "packs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(h.dir, "files", "faithful.zip"), filepath.Join(h.dir, "packs", "faithful.zip")); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "lock")
+	h.allowMrpackHost(t)
+	h.mustRun(t, "export", "mrpack", "--version", "1.0.0", "--bundle")
+
+	dir := filepath.Join(t.TempDir(), "imported")
+	h.mustRun(t, "import", "mrpack", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir)
+	m, l := readProject(t, dir)
+	for key, want := range map[string]string{"private-mod": "files/private-mod-1.4.jar", "faithful": "files/faithful.zip", "bsl": "files/bsl.zip"} {
+		if m.Requires[key].File != want {
+			t.Errorf("%s requires file %q, want %q", key, m.Requires[key].File, want)
+		}
+		if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(want))); err != nil {
+			t.Errorf("%s is not in the new project: %v", key, err)
+		}
+	}
+	if m.Requires["faithful"].Side != "client" || l.Mods["private-mod"].File != "files/private-mod-1.4.jar" || l.ResourcePacks["faithful"].File != "files/faithful.zip" || l.Shaders["bsl"].File != "files/bsl.zip" {
+		t.Fatalf("lock entries: %+v %+v %+v", l.Mods["private-mod"], l.ResourcePacks["faithful"], l.Shaders["bsl"])
+	}
+
+	if err := os.RemoveAll(h.cache); err != nil {
+		t.Fatal(err)
+	}
+	h.dir = dir
+	h.mustRun(t, "install")
+	if got := readBuilt(t, h, "mods/private-mod-1.4.jar"); got != string(jar.data) {
+		t.Fatal("the imported project builds its local jar with an empty cache")
+	}
+}
+
+func TestImportMrpackRefusesTwoLocalFilesOfOneName(t *testing.T) {
+	h, _ := localFiles(t)
+	pack := makeJarFile(t, "other", "faithful.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"other"}}`).data
+	writeProjectFile(t, h, "packs/faithful.zip", pack)
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"].(map[string]any)["other"] = map[string]any{"type": "resourcepack", "file": "packs/faithful.zip"}
+	})
+	h.mustRun(t, "lock")
+	h.allowMrpackHost(t)
+	h.mustRun(t, "export", "mrpack", "--version", "1.0.0", "--bundle")
+
+	dir := filepath.Join(t.TempDir(), "imported")
+	code, stdout, _ := h.run(t, "import", "mrpack", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir, "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "file-taken" {
+		t.Fatalf("two local files named faithful.zip: code=%d %+v", code, e)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "shulker.json")); err == nil {
+		t.Fatal("a refused import writes no project")
+	}
+}
+
 func TestExportCurseForgeMatchesLocalCopy(t *testing.T) {
 	h, _ := localFiles(t)
 	writeProjectFile(t, h, "files/jei.jar", h.jars["jei"].data)
