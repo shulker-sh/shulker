@@ -153,11 +153,12 @@ func Read(file string) (*Archive, error) {
 	if a.Manifest.Minecraft.Version == "" {
 		return nil, out.Errorf("curseforge-invalid", "%s names no minecraft version", file)
 	}
-	root := map[string][]byte{}
-	names := []string{manifest.FileName, lock.FileName}
+	image := ""
 	if a.Manifest.Image != "" {
-		names = append(names, path.Clean(a.Manifest.Image))
+		image = path.Clean(strings.ReplaceAll(a.Manifest.Image, "\\", "/"))
 	}
+	root := map[string][]byte{}
+	names := []string{manifest.FileName, lock.FileName, image}
 	for _, name := range names {
 		if f, ok := entries[name]; ok {
 			if root[name], err = readEntry(f); err != nil {
@@ -168,9 +169,7 @@ func Read(file string) (*Archive, error) {
 	if a.Marker, err = mrpack.ReadRootIdentity(file, root[manifest.FileName], root[lock.FileName]); err != nil {
 		return nil, err
 	}
-	if a.Manifest.Image != "" {
-		a.Icon = root[path.Clean(a.Manifest.Image)]
-	}
+	a.Icon = root[image]
 	folder := "overrides"
 	if a.Manifest.Overrides != "" {
 		folder = strings.Trim(path.Clean(strings.ReplaceAll(a.Manifest.Overrides, "\\", "/")), "/")

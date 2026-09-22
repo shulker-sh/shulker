@@ -64,22 +64,19 @@ func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Im
 // lockedFromCurseForge keeps what curseForgeFile locked under key, unless the exporting project
 // locked the same bytes, which then come back as it locked them.
 func (im *importer) lockedFromCurseForge(key, kind string, listed manifest.Require) {
-	if kind == manifest.TypeMod {
-		if id, ok := im.bySha[im.r.Lock.Mods[key].Sha512]; ok {
-			delete(im.r.Lock.Mods, key)
-			im.reuse(id, "")
-			return
-		}
-	} else {
-		packs := im.r.Lock.ResourcePacks
-		if kind == manifest.TypeShader {
-			packs = im.r.Lock.Shaders
-		}
-		if p, ok := im.packBySha[packs[key].Sha512]; ok && p.kind == kind {
-			delete(packs, key)
-			im.reusePack(p)
-			return
-		}
+	packs := im.r.Lock.ResourcePacks
+	if kind == manifest.TypeShader {
+		packs = im.r.Lock.Shaders
+	}
+	if id, ok := im.bySha[im.r.Lock.Mods[key].Sha512]; ok && kind == manifest.TypeMod {
+		delete(im.r.Lock.Mods, key)
+		im.reuse(id, "")
+		return
+	}
+	if p, ok := im.packBySha[packs[key].Sha512]; ok && kind != manifest.TypeMod && p.kind == kind {
+		delete(packs, key)
+		im.reusePack(p)
+		return
 	}
 	im.r.Manifest.Requires[key] = listed
 	im.rep.Locked = append(im.rep.Locked, key)
