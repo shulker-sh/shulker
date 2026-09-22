@@ -117,14 +117,21 @@ func (a *app) openProjectAt(dir string) (*project.Project, error) {
 	return a.openWith(project.Open, dir)
 }
 
-// openReplacingLock opens the project with no lock when the one there can't be read, so the
-// relock writes a fresh one over it.
-func (a *app) openReplacingLock() (*project.Project, error) {
+// openForLock opens the project the way `shulker lock` needs it: a lock that can't be read is left
+// out, so the relock writes a fresh one over it, and a missing one starts empty.
+func (a *app) openForLock() (*project.Project, error) {
 	dir, err := a.scopeDir()
 	if err != nil {
 		return nil, err
 	}
-	return a.openWith(project.OpenReplacingLock, dir)
+	p, err := a.openWith(project.OpenReplacingLock, dir)
+	if err != nil {
+		return nil, err
+	}
+	if p.Lock == nil {
+		p.Lock = lock.New()
+	}
+	return p, nil
 }
 
 func (a *app) openWith(open func(string) (*project.Project, error), dir string) (*project.Project, error) {

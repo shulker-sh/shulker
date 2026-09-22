@@ -115,14 +115,11 @@ type relocked struct {
 func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
 	open := a.openProject
 	if cmd.Name() == "lock" {
-		open = a.openReplacingLock
+		open = a.openForLock
 	}
 	p, err := open()
 	if err != nil {
 		return err
-	}
-	if p.Lock == nil && cmd.Name() == "lock" {
-		p.Lock = lock.New()
 	}
 	rl, err := a.relockProject(cmd, p, false, run)
 	if err != nil {
