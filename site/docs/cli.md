@@ -141,7 +141,7 @@ shulker import curseforge pack.zip -C my-pack --name my-pack
 
 ### `shulker export mrpack`
 
-Export the project as a Modrinth modpack for the Modrinth app and other launchers. Resource packs and shaders go in alongside the mods, as client-only files. The archive carries the project's own `shulker.json` and `shulker.lock` at its root, so [`import mrpack`](#shulker-import-mrpack) restores the project it came from. The source is the project in the current directory, or a project directory, git URL, or manifest URL; a git or URL source is downloaded first and the archive is written to the current directory. Locked files the exported sides use and the cache lacks are downloaded first, so a fresh checkout exports without `shulker install`. With a warm cache the export stays offline.
+Export the project as a Modrinth modpack for the Modrinth app and other launchers. Resource packs and shaders go in alongside the mods, as client-only files. The archive carries the project's own `shulker.json` and `shulker.lock` at its root, so [`import mrpack`](#shulker-import-mrpack) restores the project it came from. The source is the project in the current directory, or a project directory, git URL, or manifest URL; a git or URL source is downloaded first and the archive is written to the current directory. Locked files the exported sides use and the cache lacks are downloaded first, so a fresh checkout exports without `shulker install`. With a warm cache the export stays offline. A local `file` entry has no download link, so it needs `--bundle` and goes inside the archive, labelled `local file`.
 
 ```sh
 shulker export mrpack
@@ -1736,7 +1736,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `missing-files` | Mods that need a manual download are missing, at `install`, or files a CurseForge modpack names at `import curseforge` or when a modpack's CurseForge zip is read, or a hosted modpack's archive when its author turned off third-party downloads; also a local `file` entry whose file is gone or changed when the cache has no copy either. `items`: what to download or restore |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
-| `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files; pass `--bundle`. `items`: the files |
+| `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files, and a local `file` entry has no download at all; pass `--bundle`. `items`: the files |
 | `mrpack-invalid` | The modpack is malformed |
 | `mrpack-lookup` | A file in a Modrinth modpack couldn't be looked up on Modrinth, by `import mrpack` or when a modpack archive is read. The `modrinth` row says why; offline, it is the network the lookup needs |
 | `mrpack-marker` | The modpack's own `shulker.json` or `shulker.lock` can't be read, whether it came from the archive root or the marker jar |
