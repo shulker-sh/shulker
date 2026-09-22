@@ -118,7 +118,8 @@ type harness struct {
 	cfSearchFails  bool
 	cfMods         map[int]*cfMod
 	cfHits         int
-	cfFingerprints int
+	// modrinthBatches counts version_files and projects requests.
+	modrinthBatches int
 	// modrinthPacks are the modpack projects the Modrinth fake knows, by project id.
 	modrinthPacks map[string]*modrinthPack
 	// modrinthNoSha1 has the Modrinth fake publish only a file's sha512.
@@ -430,6 +431,38 @@ func newHarness(t *testing.T) *harness {
 			}
 		}
 		http.NotFound(w, r)
+	})
+	mux.HandleFunc("/modrinth/version_files", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Hashes []string `json:"hashes"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		h.modrinthBatches++
+		found := map[string]any{}
+		for _, sha1 := range body.Hashes {
+			for _, projectID := range []string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1"} {
+				for _, v := range versions(projectID) {
+					for _, jar := range h.jars {
+						if jar.sha1 == sha1 && v["files"].([]map[string]any)[0]["filename"] == jar.filename {
+							found[sha1] = v
+						}
+					}
+				}
+			}
+		}
+		writeJSON(w, found)
+	})
+	mux.HandleFunc("/modrinth/projects", func(w http.ResponseWriter, r *http.Request) {
+		var ids []string
+		_ = json.Unmarshal([]byte(r.URL.Query().Get("ids")), &ids)
+		h.modrinthBatches++
+		found := []map[string]any{}
+		for _, id := range ids {
+			if p, ok := projects[id]; ok {
+				found = append(found, p)
+			}
+		}
+		writeJSON(w, found)
 	})
 	mux.HandleFunc("/modrinth/project/", func(w http.ResponseWriter, r *http.Request) {
 		rest := strings.TrimPrefix(r.URL.Path, "/modrinth/project/")

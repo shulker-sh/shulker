@@ -201,26 +201,6 @@ func (m *Modrinth) Version(ctx context.Context, versionID string) (*provider.Ver
 	return &pv, nil
 }
 
-func (m *Modrinth) VersionByHash(ctx context.Context, sha1 string) (*provider.Version, bool, error) {
-	var raw version
-	var found bool
-	err := m.call(ctx, func() (err error) {
-		found, err = m.Client.GetJSONIfFound(ctx, m.BaseURL+"/version_file/"+url.PathEscape(sha1)+"?algorithm=sha1", &raw)
-		return err
-	})
-	if err != nil {
-		return nil, false, fmt.Errorf("modrinth version_file %s: %w", sha1, err)
-	}
-	if !found {
-		return nil, false, nil
-	}
-	pv, err := convert(raw)
-	if err != nil {
-		return nil, false, err
-	}
-	return &pv, true, nil
-}
-
 // VersionsByHash finds the versions whose files have these sha1s, in one request, by sha1. A hash
 // Modrinth doesn't know is left out.
 func (m *Modrinth) VersionsByHash(ctx context.Context, sha1s []string) (map[string]provider.Version, error) {

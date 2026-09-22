@@ -391,12 +391,13 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 		return env.Data, env.Warnings, dir
 	}
 
+	h.cfHits = 0
 	res, warnings, dir := importMixed(t)
+	if h.modrinthBatches != 2 || h.cfHits != 3 {
+		t.Fatalf("requests: %d to Modrinth, %d to CurseForge", h.modrinthBatches, h.cfHits)
+	}
 	if strings.Join(res.Mods.Locked, ",") != "iris,jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/"+nodist.filename+",overrides/mods/unknown-1.0.jar" {
 		t.Fatalf("import: %+v", res.Mods)
-	}
-	if h.cfFingerprints != 1 {
-		t.Fatalf("fingerprint requests: %d", h.cfFingerprints)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") {
 		t.Fatalf("warnings: %v", warnings)

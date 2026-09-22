@@ -2,9 +2,9 @@ package resolve
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 
@@ -20,9 +20,13 @@ import (
 // missing-files error, so a single pass says everything to download. A file the exporting shulker
 // project locked, matched by sha512, comes back as that project locked it.
 func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Imported, error) {
-	p, ok := r.Providers["curseforge"]
+	p, ok := r.Providers["curseforge"].(curseForgeLookup)
 	if !ok {
 		return nil, Unavailable("curseforge")
+	}
+	found, err := findManifestFiles(ctx, p, a.Manifest.Files)
+	if err != nil {
+		return nil, err
 	}
 	im := newImporter(r, &mrpack.Archive{Marker: a.Marker}, true)
 	im.keepSides = true
@@ -33,7 +37,7 @@ func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Im
 			rep.Warnings = append(rep.Warnings, fmt.Sprintf("skipped CurseForge project %d file %d: the pack marks it optional", f.ProjectID, f.FileID))
 			continue
 		}
-		proj, v, err := im.curseForgeFile(ctx, p, f)
+		proj, v, err := im.curseForgeFile(ctx, p, found, f)
 		if out.CodeOf(err) == "manual-download" {
 			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", proj.Slug, v.File.Filename, v.Page, filepath.Join(r.Dir, DownloadsDir)))
 			continue
@@ -83,23 +87,55 @@ func (im *importer) lockedFromCurseForge(key, kind string, listed manifest.Requi
 	im.rep.Locked = append(im.rep.Locked, key)
 }
 
-func (im *importer) curseForgeFile(ctx context.Context, p provider.Provider, f cfpack.File) (*provider.Project, *provider.Version, error) {
+// cfFound is what CurseForge has of a pack's files: their projects and files, by id, and why a
+// file it has can't be used.
+type cfFound struct {
+	projects map[int]*provider.Project
+	files    map[int]provider.Version
+	unusable map[int]error
+}
+
+// findManifestFiles fetches the projects and files of every file the pack requires in two
+// requests, whatever the pack's size.
+func findManifestFiles(ctx context.Context, cf curseForgeLookup, files []cfpack.File) (cfFound, error) {
+	var modIDs, fileIDs []int
+	for _, f := range files {
+		if f.Required {
+			modIDs = append(modIDs, f.ProjectID)
+			fileIDs = append(fileIDs, f.FileID)
+		}
+	}
+	if len(fileIDs) == 0 {
+		return cfFound{}, nil
+	}
+	slices.Sort(modIDs)
+	slices.Sort(fileIDs)
+	projects, err := cf.Mods(ctx, slices.Compact(modIDs))
+	if err != nil {
+		return cfFound{}, err
+	}
+	versions, unusable, err := cf.Files(ctx, slices.Compact(fileIDs))
+	if err != nil {
+		return cfFound{}, err
+	}
+	return cfFound{projects: projects, files: versions, unusable: unusable}, nil
+}
+
+func (im *importer) curseForgeFile(ctx context.Context, p provider.Provider, found cfFound, f cfpack.File) (*provider.Project, *provider.Version, error) {
 	r, rep := im.r, im.rep
 	projectID, fileID := strconv.Itoa(f.ProjectID), strconv.Itoa(f.FileID)
-	proj, err := p.Project(ctx, projectID, "")
-	if errors.Is(err, provider.ErrNotFound) {
+	proj, ok := found.projects[f.ProjectID]
+	if !ok {
 		return nil, nil, out.Errorf("mod-not-found", "curseforge has no project %s", projectID)
 	}
-	if err != nil {
+	if err := found.unusable[f.FileID]; err != nil {
 		return nil, nil, err
 	}
-	v, err := p.Version(ctx, fileID)
-	if errors.Is(err, provider.ErrNotFound) {
+	file, ok := found.files[f.FileID]
+	if !ok {
 		return nil, nil, out.Errorf("version-not-found", "curseforge has no file %s for %s", fileID, proj.Slug)
 	}
-	if err != nil {
-		return nil, nil, err
-	}
+	v := &file
 	if v.ProjectID != proj.ID {
 		return nil, nil, out.Errorf("pin-mismatch", "file %s belongs to project %s, not %s", fileID, v.ProjectID, proj.Slug)
 	}

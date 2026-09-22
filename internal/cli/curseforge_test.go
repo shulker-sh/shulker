@@ -118,7 +118,6 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		if !authed(w, r) {
 			return
 		}
-		h.cfFingerprints++
 		var body struct {
 			Fingerprints []uint32 `json:"fingerprints"`
 		}

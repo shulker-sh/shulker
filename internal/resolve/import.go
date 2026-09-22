@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -29,12 +28,21 @@ import (
 
 type hashLookup interface {
 	provider.Provider
-	VersionByHash(ctx context.Context, sha1 string) (*provider.Version, bool, error)
+	VersionsByHash(ctx context.Context, sha1s []string) (map[string]provider.Version, error)
+	Projects(ctx context.Context, ids []string) (map[string]provider.Project, error)
 }
 
-type fingerprintLookup interface {
+type curseForgeLookup interface {
 	provider.Provider
 	MatchFingerprints(ctx context.Context, fingerprints []uint32) (map[uint32]curseforge.Match, error)
+	Mods(ctx context.Context, ids []int) (map[int]*provider.Project, error)
+	Files(ctx context.Context, ids []int) (found map[int]provider.Version, unusable map[int]error, err error)
+}
+
+// hosted is a file found on a provider: the version it is and that version's project.
+type hosted struct {
+	proj *provider.Project
+	v    *provider.Version
 }
 
 type Imported struct {
@@ -54,6 +62,8 @@ type importer struct {
 	bySha     map[string]string
 	packBySha map[string]importedPack
 	matched   map[string]bool
+	// onModrinth is what Modrinth found of the index's files, by sha1.
+	onModrinth map[string]hosted
 	// unmatched are the mod jars and pack zips Modrinth didn't find, for CurseForge to look up.
 	unmatched []mrpack.Override
 	// keepSides reuses the marker's side for each entry, for an archive whose layers don't say.
@@ -68,7 +78,7 @@ type importedPack struct {
 }
 
 func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
-	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}}
+	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}}
 	if a.Marker == nil {
 		return im
 	}
@@ -103,6 +113,9 @@ func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLoc
 	im := newImporter(r, a, reuseLocal)
 	if p, ok := r.Providers["modrinth"].(hashLookup); ok {
 		im.modrinth = p
+	}
+	if err := im.findOnModrinth(ctx, a.Index.Files); err != nil {
+		return nil, err
 	}
 	for _, f := range a.Index.Files {
 		if err := im.indexFile(ctx, f); err != nil {
@@ -141,25 +154,60 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if !mrpack.IsModJar(f.Path) && !mrpack.IsPackZip(f.Path) {
 		return im.unmanagedDownload(ctx, f)
 	}
-	if im.modrinth == nil {
+	found, ok := im.onModrinth[sha1Sum]
+	if !ok {
 		return im.leaveForCurseForge(ctx, f)
 	}
-	v, found, err := im.modrinth.VersionByHash(ctx, sha1Sum)
-	if err != nil {
-		return lookupFailed("Modrinth", f.Path, err)
-	}
-	if !found {
-		return im.leaveForCurseForge(ctx, f)
-	}
-	proj, err := im.modrinth.Project(ctx, v.ProjectID, "")
-	if err != nil {
-		return lookupFailed("Modrinth", f.Path, err)
-	}
-	locked, err := im.lockFile(ctx, im.modrinth, f.Path, "", proj, v)
+	locked, err := im.lockFile(ctx, im.modrinth, f.Path, "", found.proj, found.v)
 	if err != nil || locked {
 		return err
 	}
 	return im.unmanagedDownload(ctx, f)
+}
+
+// findOnModrinth looks every mod jar and pack zip the index lists up on Modrinth in two requests,
+// whatever the pack's size, since Modrinth rate-limits by the request. A version whose project
+// Modrinth no longer has counts as not found.
+func (im *importer) findOnModrinth(ctx context.Context, files []mrpack.File) error {
+	if im.modrinth == nil {
+		return nil
+	}
+	var sha1s []string
+	for _, f := range files {
+		sha1Sum, sha512Sum := f.Hashes["sha1"], f.Hashes["sha512"]
+		_, reused := im.bySha[sha512Sum]
+		_, reusedPack := im.packBySha[sha512Sum]
+		if sha1Sum != "" && !reused && !reusedPack && (mrpack.IsModJar(f.Path) || mrpack.IsPackZip(f.Path)) {
+			sha1s = append(sha1s, sha1Sum)
+		}
+	}
+	if len(sha1s) == 0 {
+		return nil
+	}
+	im.r.log("looking up %d file(s) on Modrinth", len(sha1s))
+	failed := func(err error) error { return lookupFailed("Modrinth", fmt.Sprintf("%d file(s)", len(sha1s)), err) }
+	versions, err := im.modrinth.VersionsByHash(ctx, sha1s)
+	if err != nil {
+		return failed(err)
+	}
+	var ids []string
+	for _, v := range versions {
+		ids = append(ids, v.ProjectID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	slices.Sort(ids)
+	projects, err := im.modrinth.Projects(ctx, slices.Compact(ids))
+	if err != nil {
+		return failed(err)
+	}
+	for sha1Sum, v := range versions {
+		if proj, ok := projects[v.ProjectID]; ok {
+			im.onModrinth[sha1Sum] = hosted{proj: &proj, v: &v}
+		}
+	}
+	return nil
 }
 
 func (im *importer) leaveForCurseForge(ctx context.Context, f mrpack.File) error {
@@ -180,7 +228,7 @@ func (im *importer) matchCurseForge(ctx context.Context) error {
 	if len(left) == 0 {
 		return nil
 	}
-	cf, ok := im.r.Providers["curseforge"].(fingerprintLookup)
+	cf, ok := im.r.Providers["curseforge"].(curseForgeLookup)
 	if !ok {
 		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%d file(s) Modrinth doesn't host weren't looked up on CurseForge, which needs an API key; kept as overrides", len(left)))
 		im.keepUnmanaged(left)
@@ -195,9 +243,13 @@ func (im *importer) matchCurseForge(ctx context.Context) error {
 	if err != nil {
 		return lookupFailed("CurseForge", fmt.Sprintf("%d file(s)", len(left)), err)
 	}
+	found, err := findOnCurseForge(ctx, cf, matches)
+	if err != nil {
+		return lookupFailed("CurseForge", fmt.Sprintf("%d file(s)", len(left)), err)
+	}
 	for i, o := range left {
-		m, found := matches[fingerprints[i]]
-		if !found {
+		m, ok := found[fingerprints[i]]
+		if !ok {
 			im.unmanaged(o)
 			continue
 		}
@@ -208,20 +260,45 @@ func (im *importer) matchCurseForge(ctx context.Context) error {
 	return nil
 }
 
-func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provider, o mrpack.Override, m curseforge.Match) error {
-	file := o.Layer + "/" + o.Path
-	v, err := cf.Version(ctx, strconv.Itoa(m.FileID))
-	if err != nil {
-		return lookupFailed("CurseForge", file, err)
+// findOnCurseForge fetches the projects and files of every match in two requests, leaving out a
+// match whose project or file CurseForge no longer has.
+func findOnCurseForge(ctx context.Context, cf curseForgeLookup, matches map[uint32]curseforge.Match) (map[uint32]hosted, error) {
+	if len(matches) == 0 {
+		return nil, nil
 	}
+	var modIDs, fileIDs []int
+	for _, m := range matches {
+		modIDs = append(modIDs, m.ModID)
+		fileIDs = append(fileIDs, m.FileID)
+	}
+	slices.Sort(modIDs)
+	slices.Sort(fileIDs)
+	projects, err := cf.Mods(ctx, slices.Compact(modIDs))
+	if err != nil {
+		return nil, err
+	}
+	files, _, err := cf.Files(ctx, slices.Compact(fileIDs))
+	if err != nil {
+		return nil, err
+	}
+	found := map[uint32]hosted{}
+	for fp, m := range matches {
+		proj, hasProject := projects[m.ModID]
+		v, hasFile := files[m.FileID]
+		if hasProject && hasFile {
+			found[fp] = hosted{proj: proj, v: &v}
+		}
+	}
+	return found, nil
+}
+
+func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provider, o mrpack.Override, m hosted) error {
+	file := o.Layer + "/" + o.Path
+	proj, v := m.proj, m.v
 	if v.File.URL == "" {
 		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s is on CurseForge, but its author doesn't allow third-party downloads; kept as an override", file))
 		im.unmanaged(o)
 		return nil
-	}
-	proj, err := cf.Project(ctx, strconv.Itoa(m.ModID), "")
-	if err != nil {
-		return lookupFailed("CurseForge", file, err)
 	}
 	side := layerSide(o.Layer)
 	if side == "both" {
