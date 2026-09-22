@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"slices"
 
 	"shulker.sh/shulker/internal/cache"
@@ -215,7 +216,7 @@ func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) 
 	if err != nil {
 		return nil, err
 	}
-	info, err := jarmeta.Read(mt.Cache.Object(sha), name)
+	info, err := jarmeta.Read(mt.Cache.Object(sha), path.Base(url), name)
 	if err != nil {
 		return nil, prefixed("quilt loader "+version, err)
 	}

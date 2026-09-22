@@ -45,11 +45,12 @@ type Info struct {
 var allFiles = []string{"quilt.mod.json", "fabric.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml"}
 
 // Read reads the metadata the named loader would, so a jar built for several loaders yields the
-// right one. An unknown loader reads whichever metadata the jar has.
-func Read(path, loaderName string) (*Info, error) {
+// right one. An unknown loader reads whichever metadata the jar has. Errors call the jar name, since
+// path may be a cache object named by its hash.
+func Read(path, name, loaderName string) (*Info, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
-		return nil, metadataInvalid(path, "zip", err)
+		return nil, metadataInvalid(name, "zip", err)
 	}
 	defer zr.Close()
 	files := allFiles
@@ -59,22 +60,22 @@ func Read(path, loaderName string) (*Info, error) {
 	info, err := readZip(&zr.Reader, files)
 	if errors.Is(err, errNoMetadata) {
 		if loaderName == "" {
-			return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata", path)
+			return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata", name)
 		}
-		return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata for %s", path, loaderName)
+		return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata for %s", name, loaderName)
 	}
 	var bad *fileError
 	if errors.As(err, &bad) {
-		return nil, metadataInvalid(path, bad.name, bad.err)
+		return nil, metadataInvalid(name, bad.name, bad.err)
 	}
 	if err != nil {
-		return nil, metadataInvalid(path, "zip", err)
+		return nil, metadataInvalid(name, "zip", err)
 	}
 	return info, nil
 }
 
-func metadataInvalid(path, source string, err error) *out.Error {
-	return out.Errorf("jar-metadata-invalid", "shulker can't read the mod metadata in %s", path).WithCause(source, err)
+func metadataInvalid(name, source string, err error) *out.Error {
+	return out.Errorf("jar-metadata-invalid", "shulker can't read the mod metadata in %s", name).WithCause(source, err)
 }
 
 func readZip(zr *zip.Reader, files []string) (*Info, error) {

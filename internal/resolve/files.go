@@ -229,7 +229,7 @@ func (r *Resolver) relockFile(ctx context.Context, dir, id string, entry manifes
 	if err != nil {
 		return err
 	}
-	info, err := jarmeta.Read(got.path, r.Lock.Loader.Type)
+	info, err := jarmeta.Read(got.path, entry.File, r.Lock.Loader.Type)
 	if err != nil {
 		return prefixed("mod "+id, err)
 	}

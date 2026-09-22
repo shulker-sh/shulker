@@ -94,7 +94,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 			unread[r.Lock.JarID(id)] = true
 			continue
 		}
-		info, err := jarmeta.Read(r.Cache.Object(m.Sha512), r.Lock.Loader.Type)
+		info, err := jarmeta.Read(r.Cache.Object(m.Sha512), m.Filename, r.Lock.Loader.Type)
 		if err != nil {
 			return nil, prefixed("mod "+id, err)
 		}

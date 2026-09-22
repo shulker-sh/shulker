@@ -69,7 +69,7 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 		if r.Lock.Loader.Type == "" {
 			return loaderRequired()
 		}
-		if info, err = jarmeta.Read(path, r.Lock.Loader.Type); err != nil {
+		if info, err = jarmeta.Read(path, path, r.Lock.Loader.Type); err != nil {
 			return prefixed("mod "+filepath.Base(path), err)
 		}
 		if key == "" {
