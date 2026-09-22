@@ -1,5 +1,5 @@
 {
-  "lockVersion": 1,
+  "$schema": "https://shulker.sh/schema/v1/lock.json",
   "minecraft": "26.2",
   "loader": { "type": "fabric", "version": "0.17.3" },
   "java": { "major": 25, "component": "java-runtime-epsilon" },

@@ -1738,7 +1738,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
-| `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
+| `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock`. Also a lock file named with `--lock` to `cache info` or `cache prune` that isn't there |
 | `lock-stale` | `export` needs a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |

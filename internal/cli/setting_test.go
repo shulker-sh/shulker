@@ -217,7 +217,7 @@ func TestGetLocked(t *testing.T) {
 		t.Fatalf("get --locked loader --json = %v (%v)", loader, err)
 	}
 	var whole map[string]any
-	if err := json.Unmarshal(h.runSetting(t, 0, "get", "--locked").Data, &whole); err != nil || whole["minecraft"] != "26.2" || whole["lockVersion"] == nil {
+	if err := json.Unmarshal(h.runSetting(t, 0, "get", "--locked").Data, &whole); err != nil || whole["minecraft"] != "26.2" || whole["$schema"] == nil {
 		t.Fatalf("get --locked = %v (%v)", whole, err)
 	}
 

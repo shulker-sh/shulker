@@ -18,7 +18,7 @@ import (
 const FileName = "shulker.lock"
 
 type Lock struct {
-	LockVersion   int                `json:"lockVersion"`
+	Schema        string             `json:"$schema"`
 	Minecraft     string             `json:"minecraft"`
 	Loader        Loader             `json:"loader,omitzero"`
 	Java          Java               `json:"java"`
@@ -220,7 +220,7 @@ type Player struct {
 }
 
 func New() *Lock {
-	return &Lock{LockVersion: 1, Modpacks: map[string]Modpack{}, Mods: map[string]Mod{}, ResourcePacks: map[string]Pack{}, Shaders: map[string]Pack{}, Players: []Player{}}
+	return &Lock{Schema: schema.URL(schema.Lock), Modpacks: map[string]Modpack{}, Mods: map[string]Mod{}, ResourcePacks: map[string]Pack{}, Shaders: map[string]Pack{}, Players: []Player{}}
 }
 
 // JarID is the in-jar mod id dependencies name, which is the entry's key unless
@@ -241,6 +241,9 @@ func Load(path string) (*Lock, error) {
 }
 
 func Parse(data []byte) (*Lock, error) {
+	if err := schema.CheckMarker(schema.Lock, "lock-invalid", FileName, data); err != nil {
+		return nil, err
+	}
 	if err := schema.Validate(schema.Lock, data); err != nil {
 		return nil, schema.Invalid("lock-invalid", FileName, data, err)
 	}
@@ -254,6 +257,7 @@ func Parse(data []byte) (*Lock, error) {
 }
 
 func (l *Lock) Encode() ([]byte, error) {
+	l.Schema = schema.URL(schema.Lock)
 	for id, m := range l.Mods {
 		if m.RequiredBy == nil {
 			m.RequiredBy = []string{}

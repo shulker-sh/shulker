@@ -4,10 +4,14 @@
   "title": "shulker.lock",
   "description": "Shulker lock file. Tool-owned, key-sorted, pretty-printed. Records the exact resolution of shulker.json; install and build read only this file.",
   "type": "object",
-  "required": ["lockVersion", "minecraft", "java", "modpacks", "mods", "resourcepacks", "shaders", "players"],
+  "required": ["$schema", "minecraft", "java", "modpacks", "mods", "resourcepacks", "shaders", "players"],
   "additionalProperties": false,
   "properties": {
-    "lockVersion": { "type": "integer", "const": 1 },
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "Always https://shulker.sh/schema/v1/lock.json. Shulker refuses a lock that names a schema it doesn't know, rather than guessing at its shape."
+    },
     "minecraft": {
       "type": "string",
       "minLength": 1,

@@ -1,9 +1,12 @@
 package lock
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestRoundTrip(t *testing.T) {
@@ -32,15 +35,47 @@ func TestNewSaves(t *testing.T) {
 	l.Minecraft = "26.2"
 	l.Loader = Loader{Type: "fabric", Version: "0.17.3"}
 	l.Java = Java{Major: 25, Component: "java-runtime-epsilon"}
-	if err := l.Save(filepath.Join(t.TempDir(), FileName)); err != nil {
+	path := filepath.Join(t.TempDir(), FileName)
+	if err := l.Save(path); err != nil {
 		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(data), "{\n  \"$schema\": \"https://shulker.sh/schema/v1/lock.json\",\n") {
+		t.Fatalf("a written lock must open with its $schema line:\n%s", data)
+	}
+	if strings.Contains(string(data), "lockVersion") {
+		t.Fatalf("a written lock must not carry lockVersion:\n%s", data)
+	}
+}
+
+func TestParseChecksTheMarker(t *testing.T) {
+	body := `"minecraft":"26.2","java":{"major":25,"component":"java-runtime-epsilon"},"modpacks":{},"mods":{},"resourcepacks":{},"shaders":{},"players":[]}`
+	for _, c := range []struct{ name, data, code string }{
+		{"own", `{"$schema":"https://shulker.sh/schema/v1/lock.json",` + body, ""},
+		{"newer", `{"$schema":"https://shulker.sh/schema/v2/lock.json","future":true}`, "schema-newer"},
+		{"foreign", `{"$schema":"https://example.com/lock.json",` + body, "lock-invalid"},
+		{"missing", `{` + body, "lock-invalid"},
+		{"old lockVersion", `{"lockVersion":1,` + body, "lock-invalid"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := Parse([]byte(c.data))
+			if got := out.CodeOf(err); got != c.code {
+				t.Fatalf("code = %q, want %q (%v)", got, c.code, err)
+			}
+			if c.code == "lock-invalid" && !strings.Contains(err.Error(), "which this shulker doesn't know") {
+				t.Fatalf("an unrecognized lock must say so in one sentence, got %v", err)
+			}
+		})
 	}
 }
 
 func TestFileEntries(t *testing.T) {
 	sha := strings.Repeat("ab", 64)
 	doc := func(mod, pack string) []byte {
-		return []byte(`{"lockVersion":1,"minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},"modpacks":{},` +
+		return []byte(`{"$schema":"https://shulker.sh/schema/v1/lock.json","minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},"modpacks":{},` +
 			`"mods":{"extras":{` + mod + `}},"resourcepacks":{"faithful":{` + pack + `}},"shaders":{},"players":[]}`)
 	}
 	mod := `"file":"files/extras.jar","filename":"extras.jar","sha512":"` + sha + `","size":10,"side":"both","requiredBy":[],"aliases":{}`
@@ -75,7 +110,7 @@ func TestFileEntries(t *testing.T) {
 func TestArchiveModpackEntries(t *testing.T) {
 	sha := strings.Repeat("ab", 64)
 	doc := func(modpack string) []byte {
-		return []byte(`{"lockVersion":1,"minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},` +
+		return []byte(`{"$schema":"https://shulker.sh/schema/v1/lock.json","minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},` +
 			`"modpacks":{"cozy":{` + modpack + `}},"mods":{},"resourcepacks":{},"shaders":{},"players":[]}`)
 	}
 	archive := `"file":"packs/cozy.mrpack","sha512":"` + sha + `","size":10,"locked":true,"unmanaged":{"server-overrides/mods/extra.jar":"` + sha + `"}`
@@ -111,7 +146,7 @@ func TestArchiveModpackEntries(t *testing.T) {
 func TestHostedModpackEntries(t *testing.T) {
 	sha := strings.Repeat("ab", 64)
 	doc := func(modpack string) []byte {
-		return []byte(`{"lockVersion":1,"minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},` +
+		return []byte(`{"$schema":"https://shulker.sh/schema/v1/lock.json","minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},` +
 			`"modpacks":{"cozy":{` + modpack + `}},"mods":{},"resourcepacks":{},"shaders":{},"players":[]}`)
 	}
 	identity := `"provider":"curseforge","project":600001,"version":7000001,"versionNumber":"Cozy 2.0","channel":"release","filename":"cozy-2.0.zip","sha512":"` + sha + `","size":10,"locked":true`
