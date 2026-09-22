@@ -195,3 +195,147 @@ func TestLocalModKeyedAndChanged(t *testing.T) {
 		t.Fatal("the build places the new jar")
 	}
 }
+
+func TestExportMrpackBundlesLocalFiles(t *testing.T) {
+	h, jar := localFiles(t)
+	h.mustRun(t, "lock")
+	h.mustRun(t, "install")
+	h.allowMrpackHost(t)
+
+	code, stdout, _ := h.run(t, "export", "mrpack", "--version", "1.0.0", "--json")
+	var env out.Envelope
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code == 0 || env.Error == nil || env.Error.Code != "mrpack-host-not-allowed" || len(env.Error.Items) != 3 {
+		t.Fatalf("export without --bundle: code=%d env=%+v", code, env)
+	}
+	for _, item := range env.Error.Items {
+		if !strings.HasSuffix(item, " (local file)") {
+			t.Errorf("blocked item %q is not labelled a local file", item)
+		}
+	}
+
+	_, stderr := h.mustRunStderr(t, "export", "mrpack", "--version", "1.0.0", "--bundle")
+	for _, key := range []string{"private-mod", "faithful", "bsl"} {
+		if !strings.Contains(stderr, "bundled "+key+" from local file into the archive; recipients receive the file itself") {
+			t.Errorf("no bundle warning for %s: %s", key, stderr)
+		}
+	}
+	index, entries := readMrpack(t, filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"))
+	if len(index.Files) != 1 || index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename {
+		t.Fatalf("only the provider mod ships by download: %+v", index.Files)
+	}
+	if entries["overrides/mods/private-mod-1.4.jar"] != string(jar.data) || entries["overrides/resourcepacks/faithful.zip"] == "" || entries["overrides/shaderpacks/bsl.zip"] == "" {
+		t.Fatalf("bundled entries: %v", keys(entries))
+	}
+}
+
+func TestExportCurseForgeMatchesLocalCopy(t *testing.T) {
+	h, _ := localFiles(t)
+	writeProjectFile(t, h, "files/jei.jar", h.jars["jei"].data)
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"] = map[string]any{
+			"private-mod": map[string]any{"file": "files/private-mod-1.4.jar"},
+			"jei-copy":    map[string]any{"file": "files/jei.jar"},
+		}
+	})
+	h.mustRun(t, "lock")
+	h.mustRun(t, "install")
+
+	code, stdout, _ := h.run(t, "export", "curseforge", "--version", "1.0.0", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "curseforge-not-found" || len(e.Items) != 1 || e.Items[0] != "private-mod (local file)" {
+		t.Fatalf("only the unpublished file is unknown: code=%d %+v", code, e)
+	}
+
+	h.mustRun(t, "export", "curseforge", "--version", "1.0.0", "--bundle")
+	entries := readArchive(t, filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.zip"))
+	var pack curseForgePack
+	if err := json.Unmarshal([]byte(entries["manifest.json"]), &pack); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, f := range pack.Files {
+		if f.ProjectID == 238222 && f.FileID == 5000001 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the local copy of jei exports by file id: %+v", pack.Files)
+	}
+	if _, ok := entries["overrides/mods/jei-26.2-fabric-1.0.0.jar"]; ok {
+		t.Fatal("the local copy of jei was bundled")
+	}
+	if _, ok := entries["overrides/mods/private-mod-1.4.jar"]; !ok {
+		t.Fatalf("the unpublished jar is bundled: %v", keys(entries))
+	}
+}
+
+func TestListShowsLocalFiles(t *testing.T) {
+	h, _ := localFiles(t)
+	h.mustRun(t, "lock")
+
+	stdout := h.mustRun(t, "list")
+	for _, want := range []string{"files/private-mod-1.4.jar", "files/faithful.zip", "files/bsl.zip", "local file"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("list lacks %q:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "not locked") {
+		t.Fatalf("a local file reads as not locked:\n%s", stdout)
+	}
+
+	var entries []map[string]any
+	if err := json.Unmarshal([]byte(dataJSON(t, h.mustRun(t, "list", "--json"))), &entries); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{"private-mod": "files/private-mod-1.4.jar", "faithful": "files/faithful.zip", "bsl": "files/bsl.zip"}
+	for _, e := range entries {
+		key := e["key"].(string)
+		want, local := files[key]
+		if !local {
+			continue
+		}
+		_, hasVersion := e["version"]
+		_, hasProvider := e["provider"]
+		if e["file"] != want || hasVersion || hasProvider {
+			t.Errorf("list --json entry for %s: %v", key, e)
+		}
+		delete(files, key)
+	}
+	if len(files) != 0 {
+		t.Fatalf("list --json lacks %v", files)
+	}
+}
+
+func TestOutdatedAndUpdateSkipLocalFiles(t *testing.T) {
+	h, _ := localFiles(t)
+	h.mustRun(t, "lock")
+
+	stdout := h.mustRun(t, "outdated")
+	if strings.Contains(stdout, "private-mod") || strings.Contains(stdout, "faithful") {
+		t.Fatalf("a bare outdated names a local file:\n%s", stdout)
+	}
+	for _, args := range [][]string{{"outdated", "private-mod"}, {"outdated", "faithful"}, {"update", "private-mod"}, {"update", "bsl"}} {
+		stdout := h.mustRun(t, args...)
+		if !strings.Contains(stdout, args[1]+" is a local file; nothing to check") || strings.Contains(stdout, "up to date") {
+			t.Errorf("%v:\n%s", args, stdout)
+		}
+	}
+	stdout = h.mustRun(t, "update")
+	if strings.Contains(stdout, "local file") || strings.Contains(stdout, "private-mod") {
+		t.Fatalf("a bare update names a local file:\n%s", stdout)
+	}
+}
+
+func TestPinRefusesLocalFiles(t *testing.T) {
+	h, _ := localFiles(t)
+	h.mustRun(t, "lock")
+
+	for _, args := range [][]string{{"pin", "private-mod"}, {"pin", "private-mod", "abc"}, {"unpin", "private-mod"}, {"pin", "faithful"}, {"unpin", "bsl"}} {
+		code, stdout, _ := h.run(t, append(args, "--json")...)
+		var env out.Envelope
+		_ = json.Unmarshal([]byte(stdout), &env)
+		if code == 0 || env.Error == nil || env.Error.Code != "local-file" || env.Error.Message != args[1]+" is a local file; there is no provider version to pin" {
+			t.Errorf("%v: code=%d env=%+v", args, code, env)
+		}
+	}
+}

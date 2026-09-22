@@ -283,6 +283,9 @@ func mrpackOwners(sides []*mrpackSide, ships func(*mrpackSide) bool) []*mrpackSi
 var providerDomains = map[string][]string{"modrinth": {"modrinth.com"}, "curseforge": {"forgecdn.net", "curseforge.com"}}
 
 func mrpackOrigin(provider string, u *string) string {
+	if provider == "" {
+		return "local file"
+	}
 	if u == nil {
 		return provider + ", manual download"
 	}
