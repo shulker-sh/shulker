@@ -1701,6 +1701,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `path-invalid` | `shulker.json`, `config.json` or an instance's settings have no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get`, `config get` or `instance get` names a field that isn't set |
 | `pin-mismatch` | The pinned version belongs to a different project |
+| `platform-not-found` | No published Minecraft or loader version matches the manifest's `minecraft` or `loader.version` range |
 | `player-invalid` | Neither a player name nor a uuid |
 | `player-reassigned` | Player names now belong to different accounts; pass `--accept-player-change`. `items`: the players |
 | `player-unknown` | Players that don't exist at Mojang. `items`: the names |
@@ -1739,7 +1740,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `update-paused` | The pre-launch hook stopped a GDLauncher update at four minutes so it could explain itself; the launch is aborted, and launching again resumes it. Shown in GDLauncher's own dialog, so it prints without shulker's usual error decoration |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
-| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; the message links the mod's versions page |
+| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; its help links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
 | `world-in-use` | `restore` would replace a world a running game or server has open. `items`: the open worlds |
 | `world-not-found` | `backup --world` named a world the target doesn't hold, `restore --world` one the zip doesn't hold, or `restore` into a server was given a zip without the world its `level-name` names and no `--as`; the message names the `level-name` |

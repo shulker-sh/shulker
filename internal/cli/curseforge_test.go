@@ -336,11 +336,11 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 
 	h.noCurseForge = true
 	code, stdout, _ := h.run(t, "--json", "add", "jei", "--provider", "curseforge")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "provider-unavailable" || !strings.Contains(e.Message, "SHULKER_CURSEFORGE_KEY") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "provider-unavailable" || !strings.Contains(e.Help, "SHULKER_CURSEFORGE_KEY") {
 		t.Fatalf("expected provider-unavailable naming the key, got %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "--json", "add", "jei")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || !strings.Contains(e.Message, "not found on modrinth (skipped: curseforge needs an API key") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || !strings.Contains(e.Message, "not found on modrinth") || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "skipped: curseforge needs an API key") {
 		t.Fatalf("expected a modrinth miss naming the skipped curseforge, got %d %s", code, stdout)
 	}
 }
@@ -354,7 +354,7 @@ func TestCurseForgeManualDownloads(t *testing.T) {
 
 	code, stdout, _ := h.run(t, "--json", "add", "nodist")
 	e := failureCode(t, stdout)
-	if code == 0 || e.Code != "manual-download" || !strings.Contains(e.Message, "https://www.curseforge.com/minecraft/mc-mods/nodist/files/5100001") || !strings.Contains(e.Message, "nodist-1.0.0.jar") {
+	if code == 0 || e.Code != "manual-download" || !strings.Contains(e.Help, "https://www.curseforge.com/minecraft/mc-mods/nodist/files/5100001") || !strings.Contains(e.Help, "nodist-1.0.0.jar") {
 		t.Fatalf("expected manual-download, got %d %s", code, stdout)
 	}
 
@@ -371,7 +371,7 @@ func TestCurseForgeManualDownloads(t *testing.T) {
 	}
 
 	code, stdout, _ = h.run(t, "--json", "add", "locked")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "manual-download" || !strings.Contains(e.Message, "mc-mods/locked/files/5200001") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "manual-download" || !strings.Contains(e.Help, "mc-mods/locked/files/5200001") {
 		t.Fatalf("expected manual-download after 403, got %d %s", code, stdout)
 	}
 	os.WriteFile(filepath.Join(downloads, "locked-1.0.0.jar"), h.jars["locked"].data, 0o644)

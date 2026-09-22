@@ -1,3 +1,5 @@
+// Package resolve keeps a project's manifest and lock in step: adding, updating, pinning and removing
+// mods and modpacks, and resolving the platform they run on.
 package resolve
 
 import (
@@ -19,6 +21,8 @@ import (
 	"shulker.sh/shulker/internal/provider/curseforge"
 )
 
+// Resolver changes a project's manifest and lock together: it picks versions from the providers,
+// downloads them into the cache and records them in the lock.
 type Resolver struct {
 	Dir       string
 	Manifest  *manifest.Manifest
@@ -58,7 +62,7 @@ func (r *Resolver) provider(name string) (provider.Provider, error) {
 	if name != "" {
 		p, ok := r.Providers[name]
 		if !ok {
-			return nil, out.Errorf("provider-unavailable", "%s", Unavailable(name))
+			return nil, unavailable(name)
 		}
 		return p, nil
 	}
@@ -69,7 +73,18 @@ func (r *Resolver) provider(name string) (provider.Provider, error) {
 		}
 		reasons = append(reasons, Unavailable(n))
 	}
-	return nil, out.Errorf("provider-unavailable", "no manifest provider is available: %s", strings.Join(reasons, "; "))
+	e := out.Errorf("provider-unavailable", "no manifest provider is available")
+	e.Items = reasons
+	return nil, e
+}
+
+func unavailable(name string) *out.Error {
+	if name == "curseforge" {
+		e := out.Errorf("provider-unavailable", "curseforge needs an API key")
+		e.Help = "set " + curseforge.KeyEnv + " or run `shulker config set curseforge.key <key>`"
+		return e
+	}
+	return out.Errorf("provider-unavailable", "%s is not a known provider", name)
 }
 
 // Unavailable says why a provider can't be used, for a caller that reaches the
@@ -111,10 +126,11 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 		_, err := r.provider("")
 		return nil, nil, err
 	}
-	if len(skipped) > 0 {
-		return nil, nil, out.Errorf("mod-not-found", "%s was not found on %s (skipped: %s)", slug, strings.Join(missed, " or "), strings.Join(skipped, "; "))
+	e := out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(missed, " or "))
+	for _, reason := range skipped {
+		e.Items = append(e.Items, "skipped: "+reason)
 	}
-	return nil, nil, out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(missed, " or "))
+	return nil, nil, e
 }
 
 func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error {
@@ -137,7 +153,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	switch kind {
 	case manifest.TypeMod:
 	case manifest.TypeModpack:
-		return out.Errorf("requires-unsupported", "%s is a modpack; modpacks from a provider aren't supported yet, so give a source instead", slug)
+		e := out.Errorf("requires-unsupported", "%s is a modpack, and modpacks from a provider aren't supported yet", slug)
+		e.Help = "give the modpack a source"
+		return e
 	case manifest.TypeResourcePack, manifest.TypeShader:
 		return r.addPack(ctx, p, proj, kind, opts)
 	default:
@@ -146,7 +164,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	// The lock, not the manifest: an instance following a modpack sets no loader of its own and
 	// inherits the pack's into its lock, which is what its mods are resolved against.
 	if r.Lock.Loader.Type == "" {
-		return out.Errorf("loader-required", "mods need a loader; pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
+		e := out.Errorf("loader-required", "mods need a loader")
+		e.Help = fmt.Sprintf("pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
+		return e
 	}
 	held := holdVersions(r.Lock)
 	v, err := r.pick(ctx, p, proj, opts.Pin, opts.Channel)
@@ -204,7 +224,9 @@ func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider
 			if p.Name() == "curseforge" {
 				page = "https://www.curseforge.com/minecraft/mc-mods/" + proj.Slug + "/files"
 			}
-			return nil, out.Errorf("version-not-found", "%s has no version %s for %s; list versions at %s", p.Name(), pin, proj.Slug, page)
+			e := out.Errorf("version-not-found", "%s has no version %s for %s", p.Name(), pin, proj.Slug)
+			e.Help = "list versions at " + page
+			return nil, e
 		}
 		if err != nil {
 			return nil, err
@@ -269,7 +291,9 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 				return obtained{}, err
 			}
 			if got != v.File.Sha1 {
-				return obtained{}, fmt.Errorf("%s: sha1 mismatch (expected %s…, got %s…)", v.File.URL, v.File.Sha1[:12], got[:12])
+				e := out.Errorf("checksum-mismatch", "the download from %s doesn't match the sha1 its provider gives", v.File.URL)
+				e.Rows = []out.Detail{{Label: "want", Text: v.File.Sha1}, {Label: "got", Text: got}}
+				return obtained{}, e
 			}
 			url := v.File.URL
 			return obtained{path: r.Cache.Object(sha), sha512: sha, url: &url}, nil
@@ -288,7 +312,9 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 			return obtained{path: r.Cache.Object(f.Sha512), sha512: f.Sha512, page: v.Page}, nil
 		}
 	}
-	return obtained{}, out.Errorf("manual-download", "%s %s is not distributed by its provider: download %s from %s into %s/ and run the command again", proj.Slug, v.Number, v.File.Filename, v.Page, DownloadsDir)
+	e := out.Errorf("manual-download", "%s %s is not distributed by its provider", proj.Slug, v.Number)
+	e.Help = fmt.Sprintf("download %s from %s into %s/ and run the command again", v.File.Filename, v.Page, DownloadsDir)
+	return obtained{}, e
 }
 
 func (r *Resolver) settle(id, side, channel string) {
@@ -311,7 +337,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	info, err := jarmeta.Read(got.path, r.Lock.Loader.Type)
 	if err != nil {
-		return "", nil, err
+		return "", nil, prefixed("mod "+proj.Slug, err)
 	}
 	id := key
 	if id == "" {
@@ -327,8 +353,10 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	var prior *lock.Mod
 	if existing, ok := r.Lock.Mods[id]; ok {
-		if !sameMod(existing, r.Lock.JarID(id), p.Name(), proj.ID, info.ID) {
-			return "", nil, out.Errorf("requires-taken", "requires already has %s as %s; pass `--as <key>` to give %s another key", id, r.Lock.JarID(id), info.ID)
+		if !isSameMod(existing, r.Lock.JarID(id), p.Name(), proj.ID, info.ID) {
+			e := out.Errorf("requires-taken", "requires already has %s as %s", id, r.Lock.JarID(id))
+			e.Help = fmt.Sprintf("pass `--as <key>` to give %s another key", info.ID)
+			return "", nil, e
 		}
 		prior = &existing
 		if requiredBy != "" {
@@ -393,10 +421,10 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	return id, prior, nil
 }
 
-// sameMod reports whether a lock entry and a freshly resolved jar are the same
+// isSameMod reports whether a lock entry and a freshly resolved jar are the same
 // mod: the provider's own project id where it can be compared, an alias where
 // the entry came from another provider, and the jar's id otherwise.
-func sameMod(existing lock.Mod, jarID, providerName, projectID, resolvedJarID string) bool {
+func isSameMod(existing lock.Mod, jarID, providerName, projectID, resolvedJarID string) bool {
 	if jarID == resolvedJarID {
 		return true
 	}
@@ -455,7 +483,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 		if dv == nil {
 			dv, err = r.pick(ctx, p, dproj, "", channel)
 			if err != nil {
-				return fmt.Errorf("dependency of %s: %w", parentID, err)
+				return prefixed("dependency of "+parentID, err)
 			}
 		}
 		id, _, err := r.place(ctx, p, dproj, dv, "", parentID, "", channel, false)
@@ -478,6 +506,8 @@ func contains(list []string, s string) bool {
 	return false
 }
 
+// Install downloads every locked mod the cache lacks, taking manual downloads from DownloadsDir. It
+// returns the mods it fetched and warnings for files there that match no locked mod.
 func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 	files, err := r.sweepDownloads()
 	if err != nil {

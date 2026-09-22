@@ -58,7 +58,7 @@ func (a *app) clientInstaller(ctx context.Context, p *project.Project) (string, 
 	if err != nil {
 		return "", err
 	}
-	if jar.Locked {
+	if jar.ChangedLock {
 		if err := p.Lock.Save(p.LockPath()); err != nil {
 			return "", err
 		}

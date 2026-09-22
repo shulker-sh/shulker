@@ -49,6 +49,8 @@ type importedPack struct {
 	kind string
 }
 
+// ImportMrpack locks the mods a Modrinth pack lists, reporting what it locked, reused, dropped and
+// left unmanaged.
 func (r *Resolver) ImportMrpack(ctx context.Context, a *mrpack.Archive) (*Imported, error) {
 	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}}
 	if p, ok := r.Providers["modrinth"].(hashLookup); ok {
@@ -141,7 +143,9 @@ func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error 
 	im.r.log("fetching %s", f.Path)
 	p, err := im.r.Cache.Ensure(ctx, im.r.Fetch, f.Downloads[0], f.Hashes["sha512"])
 	if err != nil {
-		return out.Errorf("mrpack-download", "%s: %v", f.Path, err)
+		e := out.Errorf("mrpack-download", "couldn't download %s", f.Path)
+		e.Rows = []out.Detail{{Label: "download", Text: err.Error()}}
+		return e
 	}
 	data, err := os.ReadFile(p)
 	if err != nil {

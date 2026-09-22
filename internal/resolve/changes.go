@@ -6,6 +6,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 )
 
+// Snapshot is the lock as it stood before a change, for Changes to compare against.
 type Snapshot struct {
 	minecraft string
 	loader    lock.Loader
@@ -51,7 +52,7 @@ type Changes struct {
 	Modpacks []ModpackChange `json:"modpacks"`
 }
 
-func (c *Changes) Empty() bool {
+func (c *Changes) IsEmpty() bool {
 	return len(c.Platform)+len(c.Added)+len(c.Updated)+len(c.Removed)+len(c.Modpacks) == 0
 }
 
@@ -72,6 +73,7 @@ func (r *Resolver) Snapshot() Snapshot {
 	return s
 }
 
+// Changes is what the lock gained, lost and moved since before.
 func (r *Resolver) Changes(before Snapshot) *Changes {
 	c := &Changes{Platform: []Change{}, Added: []AddedMod{}, Updated: []Change{}, Removed: []RemovedMod{}, Modpacks: ModpackChanges(before.packs, r.Lock.Modpacks)}
 	if before.minecraft != r.Lock.Minecraft {

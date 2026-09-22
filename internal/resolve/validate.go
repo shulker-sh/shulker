@@ -52,7 +52,7 @@ func (v *Validation) Recommended() []string {
 	return lines
 }
 
-func builtin(id string) bool {
+func isBuiltin(id string) bool {
 	if id == "minecraft" || id == "java" {
 		return true
 	}
@@ -64,9 +64,13 @@ func builtin(id string) bool {
 	return false
 }
 
+// Validate checks the locked mods' own metadata against each other: dependencies, their versions
+// and conflicts.
 func (r *Resolver) Validate() (*Validation, error) {
 	if r.Lock.Minecraft == "" {
-		return nil, out.Errorf("minecraft-required", "this project sets no minecraft and has no locked modpack to take one from; set one with `shulker set minecraft <version>`")
+		e := out.Errorf("minecraft-required", "this project sets no minecraft and has no locked modpack to take one from")
+		e.Help = "set one with `shulker set minecraft <version>`"
+		return nil, e
 	}
 	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []Suggestion{}}
 	installed := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
@@ -85,7 +89,7 @@ func (r *Resolver) Validate() (*Validation, error) {
 		}
 		info, err := jarmeta.Read(r.Cache.Object(m.Sha512), r.Lock.Loader.Type)
 		if err != nil {
-			return nil, err
+			return nil, prefixed("mod "+id, err)
 		}
 		infos[id] = info
 		installed[r.Lock.JarID(id)] = info.Version
@@ -212,6 +216,7 @@ func (v *Validation) record(ignores []ignoreEntry, used map[int]bool, p Problem)
 	v.Problems = append(v.Problems, p)
 }
 
+// Err is the validation-failed error for the problems found, nil when there are none.
 func (v *Validation) Err() error {
 	if len(v.Problems) == 0 {
 		return nil
@@ -229,7 +234,7 @@ func (v *Validation) Err() error {
 			fmt.Fprintf(&b, "\n      %s", p.StaleNote)
 			row.Children = append(row.Children, out.Detail{Text: p.StaleNote})
 		}
-		if p.Rule == "depends" && p.Found == "" && !builtin(p.On) {
+		if p.Rule == "depends" && p.Found == "" && !isBuiltin(p.On) {
 			fmt.Fprintf(&b, "\n      Fix: shulker add %s", p.On)
 			row.Children = append(row.Children, out.Detail{Label: "Fix", Text: "shulker add " + p.On, IsCommand: true})
 		}

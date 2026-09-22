@@ -69,7 +69,9 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 		key = proj.Slug
 	}
 	if !manifest.IsValidKey(key) {
-		return out.Errorf("usage", "%s can't be a requires key; pass `--as <key>` to give this %s one", proj.Slug, kind)
+		e := out.Errorf("usage", "%s can't be a requires key", proj.Slug)
+		e.Help = fmt.Sprintf("pass `--as <key>` to give this %s one", kind)
+		return e
 	}
 	if err := r.packKeyFree(key, kind); err != nil {
 		return err
@@ -208,7 +210,7 @@ func (r *Resolver) removePacks(ids []string) ([]string, error) {
 		}
 		if _, listed := r.Manifest.Requires[id]; !listed {
 			if from := r.packSection(kind)[id].Modpack; from != "" {
-				return nil, out.Errorf("modpack-provided", "%s is provided by modpack %s; remove the modpack or list it in shulker.json yourself", id, from)
+				return nil, providedBy(id, from, "remove the modpack or list it in shulker.json yourself")
 			}
 		}
 		delete(r.Manifest.Requires, id)
@@ -300,7 +302,7 @@ func (r *Resolver) splitPackTargets(ids []string) (mods, packs []string, err err
 		}
 		if _, listed := r.Manifest.Requires[id]; !listed {
 			if from := r.packSection(kind)[id].Modpack; from != "" {
-				return nil, nil, out.Errorf("modpack-provided", "%s is provided by modpack %s; update the modpack, or list it in shulker.json to resolve it here", id, from)
+				return nil, nil, providedBy(id, from, "update the modpack, or list it in shulker.json to resolve it here")
 			}
 		}
 		packs = append(packs, id)

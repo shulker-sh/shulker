@@ -18,6 +18,8 @@ type Outdated struct {
 	Pinned  bool   `json:"pinned"`
 }
 
+// Update re-resolves the named mods and modpacks to their newest allowed versions, or all of them
+// when ids is empty.
 func (r *Resolver) Update(ctx context.Context, ids []string) error {
 	mods, packs, err := r.splitPackTargets(ids)
 	if err != nil {
@@ -127,6 +129,7 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 	return res, nil
 }
 
+// Pin holds a mod at version, the locked one when version is empty, and returns the version pinned.
 func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, error) {
 	if _, err := r.directTargets([]string{id}); err != nil {
 		return "", err
@@ -140,6 +143,7 @@ func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, 
 	return version, r.Update(ctx, []string{id})
 }
 
+// Unpin lets a pinned mod update again, and updates it.
 func (r *Resolver) Unpin(ctx context.Context, id string) error {
 	if _, err := r.directTargets([]string{id}); err != nil {
 		return err
@@ -196,7 +200,9 @@ func (r *Resolver) directTargets(ids []string) ([]string, error) {
 	for _, id := range ids {
 		if d, ok := direct[id]; ok {
 			if d.locked != "" {
-				return nil, out.Errorf("modpack-provided", "%s is pinned by locked modpack %s; update the modpack, or list %s in shulker.json to resolve it here", id, d.locked, id)
+				e := out.Errorf("modpack-provided", "%s is pinned by locked modpack %s", id, d.locked)
+				e.Help = fmt.Sprintf("update the modpack, or list %s in shulker.json to resolve it here", id)
+				return nil, e
 			}
 			if !contains(targets, id) {
 				targets = append(targets, id)

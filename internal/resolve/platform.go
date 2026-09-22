@@ -18,12 +18,14 @@ import (
 	"shulker.sh/shulker/internal/pack"
 )
 
+// Platform is the Minecraft version, loader and Java a project resolves to.
 type Platform struct {
 	Minecraft string
 	Loader    lock.Loader
 	Java      lock.Java
 }
 
+// Meta reads the version metadata a platform is resolved from.
 type Meta struct {
 	Piston   *meta.Piston
 	Fabric   *meta.Fabric
@@ -113,13 +115,17 @@ func inheritedPlatform(m *manifest.Manifest, packs []*pack.Loaded) (*Platform, e
 		}
 		if m.Minecraft == "" {
 			if minecraftFrom != "" && l.Lock.Minecraft != p.Minecraft {
-				return nil, out.Errorf("modpack-platform", "locked modpacks %s and %s are built for minecraft %s and %s, and this project sets none; set minecraft in shulker.json, or unlock one", minecraftFrom, l.Name, p.Minecraft, l.Lock.Minecraft)
+				e := out.Errorf("modpack-platform", "locked modpacks %s and %s are built for minecraft %s and %s, and this project sets none", minecraftFrom, l.Name, p.Minecraft, l.Lock.Minecraft)
+				e.Help = "set minecraft in shulker.json, or unlock one"
+				return nil, e
 			}
 			p.Minecraft, minecraftFrom = l.Lock.Minecraft, l.Name
 		}
 		if m.Loader.Type == "" {
 			if loaderFrom != "" && (l.Lock.Loader.Type != p.Loader.Type || l.Lock.Loader.Version != p.Loader.Version) {
-				return nil, out.Errorf("modpack-platform", "locked modpacks %s and %s are built for %s and %s, and this project sets no loader; set loader in shulker.json, or unlock one", loaderFrom, l.Name, loader.Describe(p.Loader.Type, p.Loader.Version), loader.Describe(l.Lock.Loader.Type, l.Lock.Loader.Version))
+				e := out.Errorf("modpack-platform", "locked modpacks %s and %s are built for %s and %s, and this project sets no loader", loaderFrom, l.Name, loader.Describe(p.Loader.Type, p.Loader.Version), loader.Describe(l.Lock.Loader.Type, l.Lock.Loader.Version))
+				e.Help = "set loader in shulker.json, or unlock one"
+				return nil, e
 			}
 			p.Loader, loaderFrom = l.Lock.Loader, l.Name
 		}
@@ -142,7 +148,7 @@ func (mt *Meta) versions(name string) (loaderVersions, error) {
 	case "forge":
 		return mt.Forge, nil
 	}
-	return nil, fmt.Errorf("no version list for the %s loader", name)
+	return nil, out.Errorf("unsupported-loader", "shulker has no version list for the %s loader", name)
 }
 
 func (mt *Meta) LoaderProfile(ctx context.Context, l lock.Loader, game string) (json.RawMessage, error) {
@@ -152,7 +158,7 @@ func (mt *Meta) LoaderProfile(ctx context.Context, l lock.Loader, game string) (
 	case "quilt":
 		return mt.Quilt.LoaderProfile(ctx, game, l.Version)
 	}
-	return nil, fmt.Errorf("no launcher profile for the %s loader", l.Type)
+	return nil, out.Errorf("unsupported-loader", "shulker has no launcher profile for the %s loader", l.Type)
 }
 
 func (mt *Meta) InstallerURL(lk *lock.Lock) (string, error) {
@@ -162,13 +168,13 @@ func (mt *Meta) InstallerURL(lk *lock.Lock) (string, error) {
 	case "forge":
 		return mt.Forge.InstallerURL(lk.Minecraft, lk.Loader.Version), nil
 	}
-	return "", fmt.Errorf("no installer for the %s loader", lk.Loader.Type)
+	return "", out.Errorf("unsupported-loader", "shulker has no installer for the %s loader", lk.Loader.Type)
 }
 
 func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game string) (string, error) {
 	rng, err := loaderver.ParseRange(l.Version)
 	if err != nil {
-		return "", fmt.Errorf("manifest loader version: %w", err)
+		return "", rangeInvalid("loader.version", l.Version, err)
 	}
 	src, err := mt.versions(l.Type)
 	if err != nil {
@@ -186,7 +192,7 @@ func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game strin
 	}
 	v, ok := loaderver.Newest(candidates, rng)
 	if !ok {
-		return "", fmt.Errorf("no %s loader version matches %q for Minecraft %s", l.Type, l.Version, game)
+		return "", out.Errorf("platform-not-found", "no %s loader version matches %q for minecraft %s", l.Type, l.Version, game)
 	}
 	return v.ID, nil
 }
@@ -205,7 +211,7 @@ func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) 
 	}
 	info, err := jarmeta.Read(mt.Cache.Object(sha), name)
 	if err != nil {
-		return nil, err
+		return nil, prefixed("quilt loader "+version, err)
 	}
 	return info.Provides, nil
 }
@@ -225,7 +231,7 @@ func (mt *Meta) GameVersion(ctx context.Context, minecraft string) (string, erro
 func newestGame(games *meta.GameManifest, minecraft string) (string, error) {
 	rng, err := mcver.ParseRange(minecraft)
 	if err != nil {
-		return "", fmt.Errorf("manifest minecraft: %w", err)
+		return "", rangeInvalid("minecraft", minecraft, err)
 	}
 	var candidates []mcver.Version
 	for _, g := range games.Versions {
@@ -235,7 +241,9 @@ func newestGame(games *meta.GameManifest, minecraft string) (string, error) {
 	}
 	game, ok := mcver.Newest(candidates, rng)
 	if !ok {
-		return "", fmt.Errorf("no Minecraft version matches %q (latest release is %s)", minecraft, games.Latest.Release)
+		e := out.Errorf("platform-not-found", "no minecraft version matches %q", minecraft)
+		e.Rows = []out.Detail{{Label: "latest release", Text: games.Latest.Release}}
+		return "", e
 	}
 	return game.ID, nil
 }

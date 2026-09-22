@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"reflect"
 	"slices"
@@ -72,6 +73,8 @@ func (r *Resolver) directIDs() []string {
 	return ids
 }
 
+// CheckPacks refuses modpacks that don't fit the project's platform, or that disagree about a mod
+// the project doesn't list itself.
 func (r *Resolver) CheckPacks() error {
 	own := r.Manifest.Mods()
 	owner := map[string]*pack.Loaded{}
@@ -110,14 +113,20 @@ func packConflict(prev, p *pack.Loaded, id string) error {
 		}
 		was, now := prev.Lock.Mods[id], p.Lock.Mods[id]
 		if was.Sha512 != now.Sha512 {
-			return out.Errorf("modpack-conflict", "locked modpacks %s and %s pin %s at different versions (%s and %s); list %s in shulker.json to decide", prev.Name, p.Name, id, was.VersionNumber, now.VersionNumber, id)
+			return packConflictError(fmt.Sprintf("locked modpacks %s and %s pin %s at different versions (%s and %s)", prev.Name, p.Name, id, was.VersionNumber, now.VersionNumber), id)
 		}
 		return nil
 	}
 	if !reflect.DeepEqual(prev.Manifest.Requires[id], p.Manifest.Requires[id]) {
-		return out.Errorf("modpack-conflict", "modpacks %s and %s both list %s with different settings; list %s in shulker.json to decide", prev.Name, p.Name, id, id)
+		return packConflictError(fmt.Sprintf("modpacks %s and %s both list %s with different settings", prev.Name, p.Name, id), id)
 	}
 	return nil
+}
+
+func packConflictError(headline, id string) *out.Error {
+	e := out.Errorf("modpack-conflict", "%s", headline)
+	e.Help = fmt.Sprintf("list %s in shulker.json to decide", id)
+	return e
 }
 
 func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
@@ -208,6 +217,8 @@ func (r *Resolver) RemovePack(name string) error {
 	return nil
 }
 
+// RefreshPacks makes loaded the project's modpacks, pinning each in the lock and dropping the pins of
+// any no longer loaded.
 func (r *Resolver) RefreshPacks(loaded []*pack.Loaded) error {
 	r.Packs = loaded
 	if err := r.CheckPacks(); err != nil {
@@ -228,6 +239,7 @@ func (r *Resolver) RefreshPacks(loaded []*pack.Loaded) error {
 	return nil
 }
 
+// ModpackChanges lists the modpack pins that differ between two locks.
 func ModpackChanges(before, after map[string]lock.Modpack) []ModpackChange {
 	changes := []ModpackChange{}
 	for name, now := range after {

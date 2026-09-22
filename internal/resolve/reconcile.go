@@ -7,6 +7,8 @@ import (
 	"shulker.sh/shulker/internal/project"
 )
 
+// Reconcile brings the lock in line with the manifest. A platform or provider order that moved
+// re-resolves every mod and returns why; otherwise only the mods whose entries changed re-resolve.
 func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err error) {
 	platform := project.PlatformDifferences(r.Manifest, r.Lock)
 	inherited, err := r.inheritedDifferences()

@@ -47,7 +47,7 @@ func TestAddNeedsALoader(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--name", "pack")
 	code, stdout, _ := h.run(t, "add", "sodium", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "loader-required" || !strings.Contains(e.Message, "shulker set loader.type <fabric|quilt|neoforge|forge>") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "loader-required" || !strings.Contains(e.Help, "shulker set loader.type <fabric|quilt|neoforge|forge>") {
 		t.Fatalf("add without a loader: code=%d %s", code, stdout)
 	}
 	h.mustRun(t, "set", "loader.type", "fabric")

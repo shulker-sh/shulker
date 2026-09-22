@@ -144,14 +144,14 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		if optional > 0 {
 			optionalNudge(l, optional)
 		}
-		if res.Empty() {
+		if res.IsEmpty() {
 			l.OK("already up to date", "")
 		}
 		if res.Synced != nil {
 			res.Synced.print(l)
 			return
 		}
-		if !res.Empty() {
+		if !res.IsEmpty() {
 			l.Nudge("Download and build what changed", "shulker install")
 		}
 	})

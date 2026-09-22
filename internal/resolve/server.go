@@ -4,8 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"errors"
-	"fmt"
 	"hash/crc32"
 	"sort"
 	"strings"
@@ -14,21 +12,23 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/out"
 )
 
 type ServerJarResult struct {
-	Locked  bool
-	Fetched bool
+	ChangedLock bool
+	WasFetched  bool
 }
 
+// EnsureServerJar caches the vanilla and loader server jars, locking any the lock doesn't have yet.
 func (r *Resolver) EnsureServerJar(ctx context.Context, mt *Meta) (ServerJarResult, error) {
 	res, err := r.ensureLoaderServer(ctx, mt)
 	if err != nil {
 		return res, err
 	}
 	vanilla, err := r.ensureVanillaServer(ctx, mt.Piston)
-	res.Locked = res.Locked || vanilla.Locked
-	res.Fetched = res.Fetched || vanilla.Fetched
+	res.ChangedLock = res.ChangedLock || vanilla.ChangedLock
+	res.WasFetched = res.WasFetched || vanilla.WasFetched
 	return res, err
 }
 
@@ -63,7 +63,7 @@ func (r *Resolver) ensureVanillaServer(ctx context.Context, piston *meta.Piston)
 		if _, err := r.Cache.Ensure(ctx, r.Fetch, locked.URL, locked.Sha512); err != nil {
 			return res, err
 		}
-		res.Fetched = true
+		res.WasFetched = true
 		return res, nil
 	}
 	r.log("downloading the Minecraft %s server", r.Lock.Minecraft)
@@ -76,13 +76,13 @@ func (r *Resolver) ensureVanillaServer(ctx context.Context, piston *meta.Piston)
 		return res, err
 	}
 	r.Lock.Server = &lock.Download{URL: dl.URL, Sha512: sha}
-	res.Locked, res.Fetched = true, true
+	res.ChangedLock, res.WasFetched = true, true
 	return res, nil
 }
 
 type InstallerJar struct {
-	Path   string
-	Locked bool
+	Path        string
+	ChangedLock bool
 }
 
 // EnsureClientInstaller caches the loader's own installer jar for a client install and locks it as
@@ -100,7 +100,7 @@ func (r *Resolver) EnsureClientInstaller(ctx context.Context, mt *Meta) (Install
 	}
 	if s := l.Server; s != nil && s.URL == url && r.Cache.Has(s.Sha512) {
 		l.Client = &lock.Download{URL: url, Sha512: s.Sha512}
-		return InstallerJar{Path: r.Cache.Object(s.Sha512), Locked: true}, nil
+		return InstallerJar{Path: r.Cache.Object(s.Sha512), ChangedLock: true}, nil
 	}
 	r.log("downloading the %s installer %s", l.Type, l.Version)
 	sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
@@ -108,7 +108,7 @@ func (r *Resolver) EnsureClientInstaller(ctx context.Context, mt *Meta) (Install
 		return InstallerJar{}, err
 	}
 	l.Client = &lock.Download{URL: url, Sha512: sha}
-	return InstallerJar{Path: r.Cache.Object(sha), Locked: true}, nil
+	return InstallerJar{Path: r.Cache.Object(sha), ChangedLock: true}, nil
 }
 
 // ensureInstallerServer locks a loader's own installer jar plus everything it would download: the
@@ -118,14 +118,14 @@ func (r *Resolver) ensureInstallerServer(ctx context.Context, mt *Meta, installe
 	var res ServerJarResult
 	l := &r.Lock.Loader
 	if locked := l.Server; locked != nil && locked.URL != "" {
-		if r.serverCached(locked) {
+		if r.isServerCached(locked) {
 			return res, nil
 		}
 		r.log("downloading %s server files %s", l.Type, l.Version)
 		if _, err := r.Cache.Ensure(ctx, r.Fetch, locked.URL, locked.Sha512); err != nil {
 			return res, err
 		}
-		res.Fetched = true
+		res.WasFetched = true
 		return res, r.ensureDownloads(ctx, locked)
 	}
 	r.log("downloading %s server files (loader %s)", l.Type, l.Version)
@@ -146,7 +146,7 @@ func (r *Resolver) ensureInstallerServer(ctx context.Context, mt *Meta, installe
 		next.Libraries[lib.Name] = lock.Download{URL: lib.URL, Sha512: sha}
 	}
 	l.Server = next
-	res.Locked, res.Fetched = true, true
+	res.ChangedLock, res.WasFetched = true, true
 	return res, nil
 }
 
@@ -165,12 +165,12 @@ func (r *Resolver) ensureFabricServer(ctx context.Context, fabric *meta.Fabric) 
 			return res, err
 		}
 		l.Server = &lock.ServerJar{Installer: installer, URL: url, Sha512: sha}
-		res.Locked, res.Fetched = true, true
+		res.ChangedLock, res.WasFetched = true, true
 		return res, nil
 	}
 	if l.Server.URL == "" {
 		l.Server.URL = fabric.ServerJarURL(r.Lock.Minecraft, l.Version, l.Server.Installer)
-		res.Locked = true
+		res.ChangedLock = true
 	}
 	if r.Cache.Has(l.Server.Sha512) {
 		return res, nil
@@ -179,7 +179,7 @@ func (r *Resolver) ensureFabricServer(ctx context.Context, fabric *meta.Fabric) 
 	if _, err := r.Cache.Ensure(ctx, r.Fetch, l.Server.URL, l.Server.Sha512); err != nil {
 		return res, err
 	}
-	res.Fetched = true
+	res.WasFetched = true
 	return res, nil
 }
 
@@ -187,14 +187,14 @@ func (r *Resolver) ensureQuiltServer(ctx context.Context, mt *Meta) (ServerJarRe
 	var res ServerJarResult
 	l := &r.Lock.Loader
 	if locked := l.Server; locked != nil && len(locked.Libraries) > 0 {
-		if r.serverCached(locked) {
+		if r.isServerCached(locked) {
 			return res, nil
 		}
 		r.log("downloading the quilt server %s", l.Version)
 		if err := r.ensureDownloads(ctx, locked); err != nil {
 			return res, err
 		}
-		res.Fetched = true
+		res.WasFetched = true
 		if r.Cache.Has(locked.Sha512) {
 			return res, nil
 		}
@@ -207,7 +207,9 @@ func (r *Resolver) ensureQuiltServer(ctx context.Context, mt *Meta) (ServerJarRe
 			return res, err
 		}
 		if sha != locked.Sha512 {
-			return res, errors.New("the generated quilt server launch jar doesn't match shulker.lock; remove loader.server from shulker.lock to relock it")
+			e := out.Errorf("lock-stale", "the generated quilt server launch jar doesn't match shulker.lock")
+			e.Help = "remove loader.server from shulker.lock to relock it"
+			return res, e
 		}
 		return res, nil
 	}
@@ -232,7 +234,7 @@ func (r *Resolver) ensureQuiltServer(ctx context.Context, mt *Meta) (ServerJarRe
 		return res, err
 	}
 	l.Server = next
-	res.Locked, res.Fetched = true, true
+	res.ChangedLock, res.WasFetched = true, true
 	return res, nil
 }
 
@@ -244,7 +246,7 @@ func (r *Resolver) putQuiltLaunchJar(profile *meta.ServerProfile, libraries map[
 	return r.Cache.Put(bytes.NewReader(jar))
 }
 
-func (r *Resolver) serverCached(s *lock.ServerJar) bool {
+func (r *Resolver) isServerCached(s *lock.ServerJar) bool {
 	if !r.Cache.Has(s.Sha512) {
 		return false
 	}
@@ -280,7 +282,9 @@ func (r *Resolver) fetchChecked(ctx context.Context, url, sha1 string) (string, 
 		return "", err
 	}
 	if got != sha1 {
-		return "", fmt.Errorf("%s: sha1 mismatch (expected %s, got %s)", url, sha1, got)
+		e := out.Errorf("checksum-mismatch", "the download from %s doesn't match the sha1 its metadata gives", url)
+		e.Rows = []out.Detail{{Label: "want", Text: sha1}, {Label: "got", Text: got}}
+		return "", e
 	}
 	return sha, nil
 }
