@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/sha512"
@@ -12,8 +13,10 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
@@ -309,18 +312,21 @@ func (im *importer) dropUnmatched() {
 func (r *Resolver) AdoptLocalFiles() error {
 	type local struct {
 		key, sha512, to string
+		isFolder        bool
 		set             func(string)
 	}
 	var locals []local
 	for _, key := range slices.Sorted(maps.Keys(r.Lock.Mods)) {
 		if m := r.Lock.Mods[key]; m.File != "" {
-			locals = append(locals, local{key, m.Sha512, manifest.FilesDir + "/" + path.Base(m.File), func(to string) { m.File = to; r.Lock.Mods[key] = m }})
+			locals = append(locals, local{key, m.Sha512, manifest.FilesDir + "/" + path.Base(m.File), false, func(to string) { m.File = to; r.Lock.Mods[key] = m }})
 		}
 	}
 	for _, packs := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
 		for _, key := range slices.Sorted(maps.Keys(packs)) {
 			if p := packs[key]; p.File != "" {
-				locals = append(locals, local{key, p.Sha512, manifest.FilesDir + "/" + path.Base(p.File), func(to string) { p.File = to; packs[key] = p }})
+				// A pack's file that isn't a .zip is a folder, which the lock holds as its zip.
+				isFolder := !strings.HasSuffix(p.File, manifest.FileExtension(manifest.TypeResourcePack))
+				locals = append(locals, local{key, p.Sha512, manifest.FilesDir + "/" + path.Base(p.File), isFolder, func(to string) { p.File = to; packs[key] = p }})
 			}
 		}
 	}
@@ -334,7 +340,12 @@ func (r *Resolver) AdoptLocalFiles() error {
 		owner[l.to] = l
 	}
 	for _, l := range locals {
-		if err := r.Cache.CopyTo(l.sha512, filepath.Join(r.Dir, filepath.FromSlash(l.to))); err != nil {
+		to := filepath.Join(r.Dir, filepath.FromSlash(l.to))
+		copyOut := r.Cache.CopyTo
+		if l.isFolder {
+			copyOut = r.unpackFolder
+		}
+		if err := copyOut(l.sha512, to); err != nil {
 			return err
 		}
 		l.set(l.to)
@@ -354,6 +365,41 @@ func layerSide(layer string) string {
 		return "server"
 	}
 	return "both"
+}
+
+// unpackFolder lays the pack folder zip the cache holds under sha512 out as the folder at to. It
+// zips back to the same bytes, since zipfile.Folder writes a folder's files alone, in path order.
+func (r *Resolver) unpackFolder(sha512, to string) error {
+	zr, err := zip.OpenReader(r.Cache.Object(sha512))
+	if err != nil {
+		return err
+	}
+	defer zr.Close()
+	if err := os.RemoveAll(to); err != nil {
+		return err
+	}
+	for _, f := range zr.File {
+		rel := filepath.FromSlash(f.Name)
+		if !filepath.IsLocal(rel) || strings.HasSuffix(f.Name, "/") {
+			return out.Errorf("lock-invalid", "the pack folder %s holds %s, which can't be laid out in it", filepath.Base(to), f.Name)
+		}
+		if err := unpackFile(f, filepath.Join(to, rel)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func unpackFile(f *zip.File, to string) error {
+	src, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		return err
+	}
+	return fsutil.WriteFrom(to, src)
 }
 
 // ConsumeArchive locks what a modpack archive holds as that modpack's own lock and manifest, the

@@ -270,6 +270,33 @@ func TestImportMrpackTakesBundledLocalFilesAsItsOwn(t *testing.T) {
 	}
 }
 
+func TestImportMrpackRestoresAPackFolder(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	writeFolder(t, filepath.Join(h.dir, "packs", "Helper"), helperFiles)
+	h.mustRun(t, "resourcepack", "add", "packs/Helper")
+	_, sha := folderZip(t, h, "packs/Helper")
+	h.allowMrpackHost(t)
+	h.mustRun(t, "export", "mrpack", "--version", "1.0.0", "--bundle")
+
+	dir := filepath.Join(t.TempDir(), "imported")
+	h.mustRun(t, "import", "mrpack", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir)
+	h.dir = dir
+	m, l := readProject(t, dir)
+	if m.Requires["helper"].File != "files/Helper" || l.ResourcePacks["helper"].File != "files/Helper" {
+		t.Fatalf("the pack comes back as a folder: %+v %+v", m.Requires["helper"], l.ResourcePacks["helper"])
+	}
+	for rel, body := range helperFiles {
+		if got := readProjectFile(t, h, "files/Helper/"+rel); got != body {
+			t.Errorf("files/Helper/%s = %q, want %q", rel, got, body)
+		}
+	}
+	if _, got := folderZip(t, h, "files/Helper"); got != sha || l.ResourcePacks["helper"].Sha512 != sha {
+		t.Fatalf("the restored folder zips to the locked bytes: %s, lock %s, want %s", got, l.ResourcePacks["helper"].Sha512, sha)
+	}
+	h.mustRun(t, "resourcepack", "add", "files/Helper")
+}
+
 func TestImportMrpackRefusesTwoLocalFilesOfOneName(t *testing.T) {
 	h, _ := localFiles(t)
 	pack := makeJarFile(t, "other", "faithful.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"other"}}`).data
