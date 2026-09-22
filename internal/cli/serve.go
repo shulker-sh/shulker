@@ -81,9 +81,10 @@ func (a *app) projectJava(ctx context.Context, p *project.Project) (server.Java,
 func (a *app) serveCmd() *cobra.Command {
 	var force, acceptEula bool
 	cmd := &cobra.Command{
-		Use:   "serve",
-		Short: "Build the server side and run it in the foreground",
-		Args:  noArgs,
+		Use:         "serve",
+		Annotations: acts(),
+		Short:       "Build the server side and run it in the foreground",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			p, err := a.openProject()
 			if err != nil {

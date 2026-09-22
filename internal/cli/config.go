@@ -44,9 +44,10 @@ func (a *app) configCmd() *cobra.Command {
 func (a *app) configGetCmd() *cobra.Command {
 	var reveal bool
 	cmd := &cobra.Command{
-		Use:   "get [key]",
-		Short: "Print a key of config.json, or all of it",
-		Args:  maximumArgs(1),
+		Use:         "get [key]",
+		Annotations: reads(),
+		Short:       "Print a key of config.json, or all of it",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var key string
 			if len(args) == 1 {
@@ -99,9 +100,10 @@ func (a *app) configGetCmd() *cobra.Command {
 func (a *app) configSetCmd() *cobra.Command {
 	var force, literal bool
 	cmd := &cobra.Command{
-		Use:   "set <key> <value>",
-		Short: "Set a key in config.json",
-		Args:  exactArgs(2),
+		Use:         "set <key> <value>",
+		Annotations: acts(),
+		Short:       "Set a key in config.json",
+		Args:        exactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
 			path, cfg, doc, err := a.openConfig(key)
@@ -148,9 +150,10 @@ func (a *app) configSetCmd() *cobra.Command {
 func (a *app) configUnsetCmd() *cobra.Command {
 	var force bool
 	cmd := &cobra.Command{
-		Use:   "unset <key>",
-		Short: "Remove a key from config.json",
-		Args:  exactArgs(1),
+		Use:         "unset <key>",
+		Annotations: acts(),
+		Short:       "Remove a key from config.json",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 			path, cfg, doc, err := a.openConfig(key)

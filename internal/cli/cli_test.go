@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -210,6 +211,19 @@ func TestWrapWordsKeepsCodeSpansPaired(t *testing.T) {
 	if strings.Join(lines, " ") != "run `shulker lock` `--force now` to fix it" {
 		t.Fatalf("lines %q", lines)
 	}
+}
+
+func TestEveryRunnableCommandDeclaresWhatItsRunsDo(t *testing.T) {
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		if c.Runnable() && !slices.Contains([]string{logReads, logActs, logDecides, logNever}, c.Annotations[logMode]) {
+			t.Errorf("%q declares neither reads nor acts, so the log can't tell whether to keep a clean run", c.CommandPath())
+		}
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	walk(newApp(io.Discard, io.Discard).root())
 }
 
 func TestRootHelpTellsAgentsToUseJSON(t *testing.T) {

@@ -44,7 +44,7 @@ func logEntries(t *testing.T, path string) []auditlog.Entry {
 
 func TestRunIsLoggedFromStartToEnd(t *testing.T) {
 	path := isolatedLog(t)
-	if code, _, _ := run(t, "version", "--no-color"); code != out.ExitOK {
+	if code, _, _ := run(t, "instances", "repair", "--no-color"); code != out.ExitOK {
 		t.Fatalf("exit %d", code)
 	}
 	entries := logEntries(t, path)
@@ -52,10 +52,10 @@ func TestRunIsLoggedFromStartToEnd(t *testing.T) {
 		t.Fatalf("entries = %+v", entries)
 	}
 	start, end := entries[0], entries[2]
-	if start.Cmd != "version" || start.Group != "shulker" || start.Msg != "start" || start.Flags["no-color"] != "true" {
+	if start.Cmd != "instances repair" || start.Group != "launchers" || start.Msg != "start" || start.Flags["no-color"] != "true" {
 		t.Errorf("start = %+v", start)
 	}
-	if end.Cmd != "version" || end.Msg != "end" || end.Exit == nil || *end.Exit != 0 || end.DurationMS == nil {
+	if end.Cmd != "instances repair" || end.Msg != "end" || end.Exit == nil || *end.Exit != 0 || end.DurationMS == nil {
 		t.Errorf("end = %+v", end)
 	}
 	if runtime.GOOS != "windows" {
@@ -106,13 +106,11 @@ func TestHookWrapLogsItsFlagsAndNeverTheArgv(t *testing.T) {
 }
 
 func TestUnwritableLogWarnsOnceOutsideHooks(t *testing.T) {
-	blocker := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
+	if err := os.Mkdir(isolatedLog(t), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("SHULKER_CONFIG", filepath.Join(blocker, "config.json"))
 
-	code, _, stderr := run(t, "version")
+	code, _, stderr := run(t, "instances", "repair")
 	if code != out.ExitOK || strings.Count(stderr, "can't write shulker's log") != 1 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
@@ -131,8 +129,35 @@ func TestBrokenConfigIsStillLogged(t *testing.T) {
 		t.Fatalf("exit %d", code)
 	}
 	entries := logEntries(t, path)
-	if len(entries) != 3 || entries[1].Level != auditlog.LevelError || entries[2].Exit == nil || *entries[2].Exit == 0 {
+	if len(entries) != 3 || entries[0].Msg != "start" || entries[0].Flags["json"] != "true" || entries[1].Level != auditlog.LevelError || entries[2].Exit == nil || *entries[2].Exit == 0 {
 		t.Fatalf("entries = %+v", entries)
+	}
+}
+
+func TestCleanReadOnlyRunLeavesTheLogUntouched(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "sodium")
+	path := isolatedLog(t)
+	for _, args := range [][]string{{"version"}, {"list"}, {"docs", "cli"}, {"config", "get"}, {"completion", "zsh"}} {
+		h.mustRun(t, args...)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("a clean read-only run wrote to the log: %v", err)
+	}
+}
+
+func TestActingRunWithNothingToDoIsStillLogged(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "build")
+	path := isolatedLog(t)
+	h.mustRun(t, "build")
+	var msgs []string
+	for _, e := range logEntries(t, path) {
+		msgs = append(msgs, e.Msg)
+	}
+	if strings.Join(msgs, ",") != "start,result,end" {
+		t.Fatalf("entries = %q", msgs)
 	}
 }
 
@@ -179,7 +204,7 @@ func TestRunTrimsTheLogToLogKeepDays(t *testing.T) {
 	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if code, _, _ := run(t, "version"); code != out.ExitOK {
+	if code, _, _ := run(t, "instances", "repair"); code != out.ExitOK {
 		t.Fatalf("exit %d", code)
 	}
 	entries := logEntries(t, path)
@@ -202,7 +227,7 @@ func TestFailedTrimLeavesTheExitCode(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"at":"`+old+`","msg":"old"}`+"\n"), 0o200); err != nil {
 		t.Fatal(err)
 	}
-	code, _, stderr := run(t, "version")
+	code, _, stderr := run(t, "instances", "repair")
 	if code != out.ExitOK || strings.Count(stderr, "can't trim shulker's log") != 1 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}

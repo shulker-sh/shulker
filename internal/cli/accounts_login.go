@@ -16,9 +16,10 @@ import (
 func (a *app) accountsLoginCmd() *cobra.Command {
 	var use bool
 	cmd := &cobra.Command{
-		Use:   "login",
-		Short: "Sign in to a Microsoft account",
-		Args:  noArgs,
+		Use:         "login",
+		Annotations: acts(),
+		Short:       "Sign in to a Microsoft account",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			d, err := a.deps()
 			if err != nil {
@@ -93,9 +94,10 @@ func (a *app) showDeviceCode(d account.Device) {
 func (a *app) accountsLogoutCmd() *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "logout [name]",
-		Short: "Sign out a Microsoft account",
-		Args:  maximumArgs(1),
+		Use:         "logout [name]",
+		Annotations: acts(),
+		Short:       "Sign out a Microsoft account",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r, err := a.selectOwnAccount(args, "sign out")
 			if err != nil {
@@ -141,8 +143,9 @@ func (a *app) accountsLogoutCmd() *cobra.Command {
 func (a *app) accountsRefreshCmd() *cobra.Command {
 	var missingProfile bool
 	cmd := &cobra.Command{
-		Use:   "refresh [name...]",
-		Short: "Renew the accounts shulker signed in",
+		Use:         "refresh [name...]",
+		Annotations: acts(),
+		Short:       "Renew the accounts shulker signed in",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := a.deps()
 			if err != nil {

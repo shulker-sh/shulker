@@ -34,10 +34,11 @@ func (a *app) restoreCmd() *cobra.Command {
 	var where savesWhere
 	var req restoreRequest
 	cmd := &cobra.Command{
-		Use:   "restore [n]",
-		Short: "Put a backup's worlds back, taking a backup of the worlds there first",
-		Long:  "Put the worlds of backup n, newest first and 1 by default, back into the current project or instance, -i or -C, or the save group --group names; with --all, each registered instance's newest backup into it, each save group once. --backup names a backup in that target's backups, or any zip of world folders by its path. Each world in the zip, or each --world names, replaces the one there whole; worlds left out are left alone. --as puts a single world back under another name.",
-		Args:  maximumArgs(1),
+		Use:         "restore [n]",
+		Annotations: acts(),
+		Short:       "Put a backup's worlds back, taking a backup of the worlds there first",
+		Long:        "Put the worlds of backup n, newest first and 1 by default, back into the current project or instance, -i or -C, or the save group --group names; with --all, each registered instance's newest backup into it, each save group once. --backup names a backup in that target's backups, or any zip of world folders by its path. Each world in the zip, or each --world names, replaces the one there whole; worlds left out are left alone. --as puts a single world back under another name.",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			req.args = args
 			if req.named != "" && len(args) > 0 {

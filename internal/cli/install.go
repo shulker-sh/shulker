@@ -21,9 +21,10 @@ func (a *app) installCmd() *cobra.Command {
 	var osName string
 	var ff featureFlags
 	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "Download everything in the lock and build every side",
-		Args:  noArgs,
+		Use:         "install",
+		Annotations: acts(),
+		Short:       "Download everything in the lock and build every side",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			p, err := a.openProject()
 			if err != nil {

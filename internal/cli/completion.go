@@ -38,6 +38,7 @@ func (a *app) completionCmd() *cobra.Command {
 		var noDescriptions bool
 		sub := &cobra.Command{
 			Use:               shell.name,
+			Annotations:       reads(),
 			Short:             "Print the " + shell.title + " completion script",
 			Args:              noArgs,
 			ValidArgsFunction: cobra.NoFileCompletions,

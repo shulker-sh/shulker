@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"slices"
@@ -16,9 +15,9 @@ import (
 
 const maxLine = 1 << 20
 
-// Read is every entry in the first size bytes of the log at path, or the whole log when size is
-// negative. A line that isn't an entry is skipped, and a log that isn't there has no entries.
-func Read(path string, size int64) ([]Entry, error) {
+// Read is every entry in the log at path. A line that isn't an entry is skipped, and a log that
+// isn't there has no entries.
+func Read(path string) ([]Entry, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
@@ -27,11 +26,7 @@ func Read(path string, size int64) ([]Entry, error) {
 		return nil, err
 	}
 	defer f.Close()
-	var r io.Reader = f
-	if size >= 0 {
-		r = io.LimitReader(f, size)
-	}
-	scan := bufio.NewScanner(r)
+	scan := bufio.NewScanner(f)
 	scan.Buffer(make([]byte, 0, 64*1024), maxLine)
 	var entries []Entry
 	for scan.Scan() {

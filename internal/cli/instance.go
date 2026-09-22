@@ -55,9 +55,10 @@ func (a *app) instanceCmd() *cobra.Command {
 
 func (a *app) instanceGetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get [path]",
-		Short: "Print a setting in effect and the default behind it, or every setting",
-		Args:  maximumArgs(1),
+		Use:         "get [path]",
+		Annotations: reads(),
+		Short:       "Print a setting in effect and the default behind it, or every setting",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := a.openInstanceFile()
 			if err != nil {
@@ -142,9 +143,10 @@ func globalKey(field *settingField) string {
 func (a *app) instanceSetCmd() *cobra.Command {
 	var literal bool
 	cmd := &cobra.Command{
-		Use:   "set <path> <value>",
-		Short: "Set a setting in this instance, over the default",
-		Args:  exactArgs(2),
+		Use:         "set <path> <value>",
+		Annotations: acts(),
+		Short:       "Set a setting in this instance, over the default",
+		Args:        exactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := a.openInstanceFile()
 			if err != nil {
@@ -201,9 +203,10 @@ func (a *app) pinnedAccountID(v any) (string, error) {
 
 func (a *app) instanceUnsetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unset <path>",
-		Short: "Remove a setting from this instance, back to the default",
-		Args:  exactArgs(1),
+		Use:         "unset <path>",
+		Annotations: acts(),
+		Short:       "Remove a setting from this instance, back to the default",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := a.openInstanceFile()
 			if err != nil {
@@ -230,9 +233,10 @@ func (a *app) instanceUnsetCmd() *cobra.Command {
 
 func (a *app) instanceEditCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "edit",
-		Short: "Open this instance's instance.json in your editor",
-		Args:  noArgs,
+		Use:         "edit",
+		Annotations: acts(),
+		Short:       "Open this instance's instance.json in your editor",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if a.printer.NoInput || !a.tty() {
 				e := out.Errorf("usage", "instance edit opens an editor, and there is no terminal to open it on")

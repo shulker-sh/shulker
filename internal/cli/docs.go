@@ -37,8 +37,9 @@ type docsMatch struct {
 func (a *app) docsCmd() *cobra.Command {
 	var search bool
 	cmd := &cobra.Command{
-		Use:   "docs [page|command|section]...",
-		Short: "Print shulker's documentation",
+		Use:         "docs [page|command|section]...",
+		Annotations: reads(),
+		Short:       "Print shulker's documentation",
 		RunE: func(_ *cobra.Command, args []string) error {
 			pages, err := docs.Pages()
 			if err != nil {

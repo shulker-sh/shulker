@@ -28,9 +28,10 @@ type settingChange struct {
 func (a *app) setCmd() *cobra.Command {
 	var literal bool
 	cmd := &cobra.Command{
-		Use:   "set <path> <value>",
-		Short: "Set a field in shulker.json by its dotted path",
-		Args:  exactArgs(2),
+		Use:         "set <path> <value>",
+		Annotations: acts(),
+		Short:       "Set a field in shulker.json by its dotted path",
+		Args:        exactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, doc, s, err := a.openSettings()
 			if err != nil {
@@ -60,9 +61,10 @@ func (a *app) setCmd() *cobra.Command {
 
 func (a *app) unsetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unset <path>",
-		Short: "Remove a field from shulker.json by its dotted path",
-		Args:  exactArgs(1),
+		Use:         "unset <path>",
+		Annotations: acts(),
+		Short:       "Remove a field from shulker.json by its dotted path",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, doc, s, err := a.openSettings()
 			if err != nil {
@@ -86,9 +88,10 @@ func (a *app) unsetCmd() *cobra.Command {
 
 func (a *app) getCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "get [path]",
-		Short: "Print a field of shulker.json, or all of it",
-		Args:  maximumArgs(1),
+		Use:         "get [path]",
+		Annotations: reads(),
+		Short:       "Print a field of shulker.json, or all of it",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, doc, s, err := a.openSettings()
 			if err != nil {

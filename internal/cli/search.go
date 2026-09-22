@@ -32,8 +32,9 @@ func (a *app) searchCmd() *cobra.Command {
 	var typ, providerName string
 	var limit int
 	cmd := &cobra.Command{
-		Use:   "search [words...]",
-		Short: "Search the providers for projects to add",
+		Use:         "search [words...]",
+		Annotations: reads(),
+		Short:       "Search the providers for projects to add",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkType(typ); err != nil {
 				return err

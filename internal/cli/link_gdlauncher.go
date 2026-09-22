@@ -16,9 +16,10 @@ import (
 func (a *app) linkGDLauncherCmd() *cobra.Command {
 	var k launcherLink
 	cmd := &cobra.Command{
-		Use:   "gdlauncher [project-dir | git-url | manifest-url]",
-		Short: "Create a GDLauncher instance that syncs the client build before each launch",
-		Args:  maximumArgs(1),
+		Use:         "gdlauncher [project-dir | git-url | manifest-url]",
+		Annotations: acts(),
+		Short:       "Create a GDLauncher instance that syncs the client build before each launch",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, _, err := a.startLauncherLink(cmd, args, &k, launcher.DefaultGDLauncherDir)
 			if err != nil {

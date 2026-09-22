@@ -62,9 +62,10 @@ func (a *app) installHelp(root *cobra.Command) {
 // exits 0, and ignores words after the last command it recognises.
 func helpCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:    "help [command]...",
-		Short:  "Show help for a command",
-		Hidden: true,
+		Use:         "help [command]...",
+		Annotations: reads(),
+		Short:       "Show help for a command",
+		Hidden:      true,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
 			parent := cmd.Root()
 			for _, word := range args {

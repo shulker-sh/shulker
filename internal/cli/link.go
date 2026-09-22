@@ -36,8 +36,9 @@ type linkReport struct {
 
 func (a *app) linkCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "link",
-		Short: "Point a launcher at this project's client build",
+		Use:         "link",
+		Annotations: decides(),
+		Short:       "Point a launcher at this project's client build",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				return unknownSubcommand(cmd, args[0])
@@ -45,6 +46,7 @@ func (a *app) linkCmd() *cobra.Command {
 			if !a.canPick() {
 				return cmd.Help()
 			}
+			a.logActing()
 			return a.linkAsked(cmd)
 		},
 	}
@@ -57,10 +59,11 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	var force bool
 	var ls linkSettings
 	cmd := &cobra.Command{
-		Use:     "mojang [project-dir | git-url | manifest-url]",
-		Aliases: []string{"vanilla"},
-		Short:   "Add a profile for the client build to the official launcher, installing its loader if it has one",
-		Args:    maximumArgs(1),
+		Use:         "mojang [project-dir | git-url | manifest-url]",
+		Annotations: acts(),
+		Aliases:     []string{"vanilla"},
+		Short:       "Add a profile for the client build to the official launcher, installing its loader if it has one",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, l, err := a.openLinkSource(cmd, args, ref, ls)
 			if err != nil {

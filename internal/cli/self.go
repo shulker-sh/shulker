@@ -45,9 +45,10 @@ type selfUninstallResult struct {
 func (a *app) selfUninstallCmd() *cobra.Command {
 	var purge bool
 	cmd := &cobra.Command{
-		Use:   "uninstall",
-		Short: "Take shulker out of every launcher it hooked, then remove the binary",
-		Args:  noArgs,
+		Use:         "uninstall",
+		Annotations: acts(),
+		Short:       "Take shulker out of every launcher it hooked, then remove the binary",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return a.selfUninstall(purge)
 		},
@@ -154,12 +155,16 @@ func (s selfUninstallResult) print(l *out.Lines) {
 func (a *app) selfUpdateCmd() *cobra.Command {
 	var check, without, require bool
 	cmd := &cobra.Command{
-		Use:   "update",
-		Short: "Update shulker to the latest release",
-		Args:  noArgs,
+		Use:         "update",
+		Annotations: decides(),
+		Short:       "Update shulker to the latest release",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if without && require {
 				return out.Errorf("usage", "--without-attestation and --require-attestation can't be used together")
+			}
+			if !check {
+				a.logActing()
 			}
 			return a.selfUpdate(cmd.Context(), check, without, require)
 		},

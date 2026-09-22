@@ -15,10 +15,11 @@ import (
 
 func (a *app) accountsProvidersCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "providers",
-		Short: "List the launchers shulker reads accounts from",
-		Args:  exactArgs(0),
-		RunE:  func(cmd *cobra.Command, args []string) error { return a.listProviders() },
+		Use:         "providers",
+		Annotations: reads(),
+		Short:       "List the launchers shulker reads accounts from",
+		Args:        exactArgs(0),
+		RunE:        func(cmd *cobra.Command, args []string) error { return a.listProviders() },
 	}
 	cmd.AddCommand(a.providersAddCmd(), a.providersRemoveCmd(), a.providersSetCmd())
 	return cmd
@@ -43,9 +44,10 @@ func (a *app) listProviders() error {
 
 func (a *app) providersAddCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "add <launcher>",
-		Short: "Read accounts from another launcher as well",
-		Args:  exactArgs(1),
+		Use:         "add <launcher>",
+		Annotations: acts(),
+		Short:       "Read accounts from another launcher as well",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			from, err := a.providers()
 			if err != nil {
@@ -61,9 +63,10 @@ func (a *app) providersAddCmd() *cobra.Command {
 
 func (a *app) providersRemoveCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove <launcher>",
-		Short: "Stop reading accounts from a launcher",
-		Args:  exactArgs(1),
+		Use:         "remove <launcher>",
+		Annotations: acts(),
+		Short:       "Stop reading accounts from a launcher",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			from, err := a.providers()
 			if err != nil {
@@ -82,8 +85,9 @@ func (a *app) providersRemoveCmd() *cobra.Command {
 
 func (a *app) providersSetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "set <launcher...>",
-		Short: "Replace the list, in the order given",
+		Use:         "set <launcher...>",
+		Annotations: acts(),
+		Short:       "Replace the list, in the order given",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			from, err := a.providers()
 			if err != nil {

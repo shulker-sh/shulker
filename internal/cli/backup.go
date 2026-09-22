@@ -22,10 +22,11 @@ func (a *app) backupCmd() *cobra.Command {
 	var where savesWhere
 	var only []string
 	cmd := &cobra.Command{
-		Use:   "backup",
-		Short: "Zip an instance's or save group's worlds into its backups",
-		Long:  "Zip the worlds of the current project or instance, of -i or -C, or of the save group --group names, into that target's backups, or only the worlds --world names; with --all, of every registered instance, each save group once. A save group's backups are in the data folder's backups/<group>/; any other directory keeps its own in .shulker/backups/.",
-		Args:  noArgs,
+		Use:         "backup",
+		Annotations: acts(),
+		Short:       "Zip an instance's or save group's worlds into its backups",
+		Long:        "Zip the worlds of the current project or instance, of -i or -C, or of the save group --group names, into that target's backups, or only the worlds --world names; with --all, of every registered instance, each save group once. A save group's backups are in the data folder's backups/<group>/; any other directory keeps its own in .shulker/backups/.",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if where.sel.all && len(only) > 0 {
 				e := out.Errorf("usage", "--all backs up every world of each target")

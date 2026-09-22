@@ -18,9 +18,10 @@ import (
 
 func (a *app) updateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "update [mod...]",
-		Aliases: []string{"upgrade"},
-		Short:   "Re-resolve mods to the newest compatible versions",
+		Use:         "update [mod...]",
+		Annotations: acts(),
+		Aliases:     []string{"upgrade"},
+		Short:       "Re-resolve mods to the newest compatible versions",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
 				packNames := map[string]bool{}
@@ -60,9 +61,10 @@ func (a *app) updateCmd() *cobra.Command {
 
 func (a *app) pinCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "pin <mod> [version]",
-		Short: "Pin a mod to a provider version id, or to its locked version",
-		Args:  rangeArgs(1, 2),
+		Use:         "pin <mod> [version]",
+		Annotations: acts(),
+		Short:       "Pin a mod to a provider version id, or to its locked version",
+		Args:        rangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := ""
 			if len(args) == 2 {
@@ -77,9 +79,10 @@ func (a *app) pinCmd() *cobra.Command {
 
 func (a *app) unpinCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unpin <mod>",
-		Short: "Remove a mod's pin and re-resolve it",
-		Args:  exactArgs(1),
+		Use:         "unpin <mod>",
+		Annotations: acts(),
+		Short:       "Remove a mod's pin and re-resolve it",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				return "", r.Unpin(cmd.Context(), args[0])
@@ -266,8 +269,9 @@ func (a *app) resolveMovedRefs(ctx context.Context, p *project.Project, r *resol
 
 func (a *app) outdatedCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "outdated [mod...]",
-		Short: "Show mods with a newer compatible version (dry run of update)",
+		Use:         "outdated [mod...]",
+		Annotations: reads(),
+		Short:       "Show mods with a newer compatible version (dry run of update)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {

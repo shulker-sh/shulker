@@ -16,9 +16,10 @@ import (
 func (a *app) linkPrismCmd() *cobra.Command {
 	var k launcherLink
 	cmd := &cobra.Command{
-		Use:   "prism [project-dir | git-url | manifest-url]",
-		Short: "Create a Prism Launcher instance that syncs the client build before each launch",
-		Args:  maximumArgs(1),
+		Use:         "prism [project-dir | git-url | manifest-url]",
+		Annotations: acts(),
+		Short:       "Create a Prism Launcher instance that syncs the client build before each launch",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, _, err := a.startLauncherLink(cmd, args, &k, launcher.DefaultPrismDir)
 			if err != nil {

@@ -302,9 +302,10 @@ func (a *app) emitFeatureChange(cmd *cobra.Command, sc *featureScope, sync, chan
 func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
 	var where featureWhere
 	cmd := &cobra.Command{
-		Use:   verb + " <feature>",
-		Short: fmt.Sprintf("Turn a feature %s for every side on this machine", verb),
-		Args:  exactArgs(1),
+		Use:         verb + " <feature>",
+		Annotations: acts(),
+		Short:       fmt.Sprintf("Turn a feature %s for every side on this machine", verb),
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			into, err := a.featureChangeDir(&where)
@@ -336,9 +337,10 @@ func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
 func (a *app) featureResetCmd() *cobra.Command {
 	var where featureWhere
 	cmd := &cobra.Command{
-		Use:   "reset <feature>",
-		Short: "Forget your choice for a feature and follow its default again",
-		Args:  exactArgs(1),
+		Use:         "reset <feature>",
+		Annotations: acts(),
+		Short:       "Forget your choice for a feature and follow its default again",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			into, err := a.featureChangeDir(&where)
@@ -374,10 +376,11 @@ func (a *app) featureResetCmd() *cobra.Command {
 func (a *app) featureListCmd() *cobra.Command {
 	var where featureWhere
 	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List features with the mods they gate, their defaults, and your choices",
-		Args:    noArgs,
+		Use:         "list",
+		Annotations: reads(),
+		Aliases:     []string{"ls"},
+		Short:       "List features with the mods they gate, their defaults, and your choices",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			into, err := a.featureDir(&where)
 			if err != nil {

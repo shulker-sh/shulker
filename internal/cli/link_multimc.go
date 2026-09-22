@@ -14,9 +14,10 @@ import (
 func (a *app) linkMultiMCCmd() *cobra.Command {
 	var k launcherLink
 	cmd := &cobra.Command{
-		Use:   "multimc [project-dir | git-url | manifest-url]",
-		Short: "Create a MultiMC instance that syncs the client build before each launch",
-		Args:  maximumArgs(1),
+		Use:         "multimc [project-dir | git-url | manifest-url]",
+		Annotations: acts(),
+		Short:       "Create a MultiMC instance that syncs the client build before each launch",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if k.launcherDir == "" {
 				if err := k.ls.check(); err != nil {

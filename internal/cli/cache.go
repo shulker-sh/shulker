@@ -55,9 +55,10 @@ func (a *app) cacheCmd() *cobra.Command {
 
 func (a *app) cacheInfoCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "info",
-		Short: "Show where the cache is, how big it is, and how much prune would free",
-		Args:  noArgs,
+		Use:         "info",
+		Annotations: reads(),
+		Short:       "Show where the cache is, how big it is, and how much prune would free",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := a.deps()
 			if err != nil {
@@ -101,9 +102,10 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 
 func (a *app) cachePruneCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "prune",
-		Short: "Remove cached files no instance or project references",
-		Args:  noArgs,
+		Use:         "prune",
+		Annotations: acts(),
+		Short:       "Remove cached files no instance or project references",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			d, err := a.deps()
 			if err != nil {

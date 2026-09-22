@@ -48,9 +48,10 @@ func (a *app) importMrpackCmd() *cobra.Command {
 	var name string
 	var ignoreShulker bool
 	cmd := &cobra.Command{
-		Use:   "mrpack <file>",
-		Short: "Create a project from a Modrinth modpack (.mrpack)",
-		Args:  exactArgs(1),
+		Use:         "mrpack <file>",
+		Annotations: acts(),
+		Short:       "Create a project from a Modrinth modpack (.mrpack)",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arc, err := mrpack.Read(args[0])
 			if err != nil {
@@ -123,9 +124,10 @@ func (a *app) importMrpackCmd() *cobra.Command {
 func (a *app) importCurseForgeCmd() *cobra.Command {
 	var name string
 	cmd := &cobra.Command{
-		Use:   "curseforge <file>",
-		Short: "Create a project from a CurseForge modpack (.zip)",
-		Args:  exactArgs(1),
+		Use:         "curseforge <file>",
+		Annotations: acts(),
+		Short:       "Create a project from a CurseForge modpack (.zip)",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arc, err := cfpack.Read(args[0])
 			if err != nil {

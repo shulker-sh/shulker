@@ -32,9 +32,10 @@ type repairRename struct {
 func (a *app) instancesRepairCmd() *cobra.Command {
 	var launcherName, launcherDir string
 	cmd := &cobra.Command{
-		Use:   "repair",
-		Short: "Register instances shulker has lost track of and write any missing instance files",
-		Args:  noArgs,
+		Use:         "repair",
+		Annotations: acts(),
+		Short:       "Register instances shulker has lost track of and write any missing instance files",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if launcherName != "" && launcher.Find(launcherName) == nil {
 				return out.Errorf("usage", "--launcher must be %s, not %q", launcher.NameList(), launcherName)

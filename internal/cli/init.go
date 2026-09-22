@@ -42,9 +42,10 @@ type initOptions struct {
 func (a *app) initCmd() *cobra.Command {
 	var opts initOptions
 	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Create shulker.json and a lock in the current directory",
-		Args:  noArgs,
+		Use:         "init",
+		Annotations: acts(),
+		Short:       "Create shulker.json and a lock in the current directory",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dir := a.dir
 			if dir == "" {

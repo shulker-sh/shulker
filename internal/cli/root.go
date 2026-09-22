@@ -171,6 +171,7 @@ func groupCommands(c *cobra.Command) {
 	for _, sub := range c.Commands() {
 		if sub.HasSubCommands() && sub.Run == nil && sub.RunE == nil {
 			sub.Args = nil
+			sub.Annotations = reads()
 			sub.RunE = func(cmd *cobra.Command, args []string) error {
 				if len(args) == 0 {
 					return cmd.Help()

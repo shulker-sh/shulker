@@ -53,10 +53,11 @@ type savesPruned struct {
 func (a *app) savesCmd() *cobra.Command {
 	var where savesWhere
 	cmd := &cobra.Command{
-		Use:   "saves",
-		Short: "Show save groups, or one group's or instance's worlds and backups",
-		Long:  "Show the save groups shulker's own instances share worlds through. With -i, -C or --group, show that target's worlds and its backups instead, newest backup first; with --all, every registered instance's, each save group once.",
-		Args:  noArgs,
+		Use:         "saves",
+		Annotations: reads(),
+		Short:       "Show save groups, or one group's or instance's worlds and backups",
+		Long:        "Show the save groups shulker's own instances share worlds through. With -i, -C or --group, show that target's worlds and its backups instead, newest backup first; with --all, every registered instance's, each save group once.",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if where.group == "" && a.instance == "" && !cmd.Flags().Changed("dir") && !where.sel.all && !where.sel.narrows() {
 				return a.listSaveGroups()
@@ -75,9 +76,10 @@ func (a *app) savesPruneCmd() *cobra.Command {
 	var where savesWhere
 	var keep int
 	cmd := &cobra.Command{
-		Use:   "prune --keep <n>",
-		Short: "Delete all but the newest backups of a save group or instance",
-		Args:  noArgs,
+		Use:         "prune --keep <n>",
+		Annotations: acts(),
+		Short:       "Delete all but the newest backups of a save group or instance",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !cmd.Flags().Changed("keep") {
 				return out.Errorf("usage", "saves prune needs --keep <n>, the number of backups to keep, so it never guesses how many to delete")

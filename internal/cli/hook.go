@@ -37,9 +37,10 @@ func (a *app) hookCmd() *cobra.Command {
 func (a *app) hookPreLaunchCmd() *cobra.Command {
 	var deadline time.Duration
 	cmd := &cobra.Command{
-		Use:   "pre-launch",
-		Short: "Sync the instance before the launcher starts the game",
-		Args:  noArgs,
+		Use:         "pre-launch",
+		Annotations: acts(),
+		Short:       "Sync the instance before the launcher starts the game",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dir, f, err := a.hookInstance()
 			if err != nil {
@@ -74,9 +75,10 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 
 func (a *app) hookPostExitCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "post-exit",
-		Short: "Record how the run ended after the game exits",
-		Args:  noArgs,
+		Use:         "post-exit",
+		Annotations: acts(),
+		Short:       "Record how the run ended after the game exits",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dir, f, err := a.hookInstance()
 			if err != nil {
@@ -97,9 +99,10 @@ func (a *app) hookPostExitCmd() *cobra.Command {
 // token, so it goes to Java and nowhere else: no warning, no record and no output repeats it.
 func (a *app) hookWrapCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "wrap -- <java arguments>",
-		Short: "Sync the instance, then run the game with this machine's Java",
-		Args:  cobra.ArbitraryArgs,
+		Use:         "wrap -- <java arguments>",
+		Annotations: acts(),
+		Short:       "Sync the instance, then run the game with this machine's Java",
+		Args:        cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, argv []string) error {
 			// The launcher's version check runs the shim without --gameDir, and that call just
 			// wants Java.

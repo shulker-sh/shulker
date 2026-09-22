@@ -20,9 +20,10 @@ func (a *app) ignoreCmd() *cobra.Command {
 	var note, rule, declared string
 	var force bool
 	cmd := &cobra.Command{
-		Use:   "ignore <mod> <on>",
-		Short: "Record that a dependency problem between two mods is safe to ignore",
-		Args:  exactArgs(2),
+		Use:         "ignore <mod> <on>",
+		Annotations: acts(),
+		Short:       "Record that a dependency problem between two mods is safe to ignore",
+		Args:        exactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mod, on := args[0], args[1]
 			if note == "" {
@@ -141,9 +142,10 @@ func noProblem(problems []resolve.Problem, mod, on string) error {
 
 func (a *app) unignoreCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "unignore <mod> <on>",
-		Short: "Drop an ignored dependency problem so it is checked again",
-		Args:  exactArgs(2),
+		Use:         "unignore <mod> <on>",
+		Annotations: acts(),
+		Short:       "Drop an ignored dependency problem so it is checked again",
+		Args:        exactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mod, on := args[0], args[1]
 			p, err := a.openProject()

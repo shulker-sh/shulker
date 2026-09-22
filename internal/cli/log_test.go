@@ -121,14 +121,19 @@ func TestLogJSONIsTheEnvelope(t *testing.T) {
 
 func TestLogLeavesOutItsOwnRun(t *testing.T) {
 	path := isolatedLog(t)
-	run(t, "version")
+	run(t, "instances", "repair")
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
 	_, stdout, _ := run(t, "log", "--json")
 	r := logReportOf(t, stdout)
-	if r.Read == 0 || slices.ContainsFunc(r.Entries, func(e auditlog.Entry) bool { return e.Cmd != "version" }) {
+	if r.Read == 0 || slices.ContainsFunc(r.Entries, func(e auditlog.Entry) bool { return e.Cmd != "instances repair" }) {
 		t.Fatalf("report = %+v", r)
 	}
-	if entries := logEntries(t, path); entries[len(entries)-1].Cmd != "log" {
-		t.Fatalf("the log run is still logged: %+v", entries)
+	run(t, "log", "--since", "nope")
+	if after, err := os.ReadFile(path); err != nil || string(after) != string(before) {
+		t.Fatalf("the log run logged itself:\n%s", after)
 	}
 }
 

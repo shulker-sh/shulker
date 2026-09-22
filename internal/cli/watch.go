@@ -37,10 +37,11 @@ type watchReply struct {
 // but `play` has to hand.
 func (a *app) watchCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:    "watch",
-		Short:  "Wait for a detached game and record how the run ended",
-		Hidden: true,
-		Args:   noArgs,
+		Use:         "watch",
+		Annotations: acts(),
+		Short:       "Wait for a detached game and record how the run ended",
+		Hidden:      true,
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var req watchRequest
 			if err := json.NewDecoder(a.stdin).Decode(&req); err != nil {

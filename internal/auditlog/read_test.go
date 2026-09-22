@@ -24,7 +24,7 @@ func TestReadSkipsLinesThatArentEntries(t *testing.T) {
 		``,
 		`{"at":"2026-09-19T18:02:11.000Z","group":"launchers","cmd":"hook wrap","level":"error","code":"launch-not-started","msg":"can't run Java"}`,
 	)
-	entries, err := Read(path, -1)
+	entries, err := Read(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,41 +33,10 @@ func TestReadSkipsLinesThatArentEntries(t *testing.T) {
 	}
 }
 
-func TestReadStopsAtTheSizeGiven(t *testing.T) {
-	first := `{"at":"2026-09-19T18:02:04.000Z","cmd":"sync","level":"info","msg":"start"}`
-	path := writeLog(t, first, `{"at":"2026-09-19T18:02:05.000Z","cmd":"log","level":"info","msg":"start"}`)
-	entries, err := Read(path, int64(len(first)+1))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != 1 || entries[0].Cmd != "sync" {
-		t.Fatalf("entries = %+v", entries)
-	}
-}
-
 func TestReadOfNoLogIsEmpty(t *testing.T) {
-	entries, err := Read(filepath.Join(t.TempDir(), FileName), -1)
+	entries, err := Read(filepath.Join(t.TempDir(), FileName))
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("entries = %+v, err = %v", entries, err)
-	}
-}
-
-func TestNewNotesTheSizeBeforeTheRun(t *testing.T) {
-	path := writeLog(t, `{"at":"2026-09-19T18:02:04.000Z","cmd":"sync","level":"info","msg":"start"}`)
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	l := New(path, []string{"log"})
-	l.Start("log", "shulker", "", nil)
-	if l.Before != info.Size() {
-		t.Fatalf("Before = %d, want %d", l.Before, info.Size())
-	}
-	if entries, _ := Read(path, l.Before); len(entries) != 1 {
-		t.Fatalf("entries = %+v", entries)
-	}
-	if New(filepath.Join(t.TempDir(), FileName), nil).Before != 0 {
-		t.Fatal("a log that isn't there yet has nothing before the run")
 	}
 }
 

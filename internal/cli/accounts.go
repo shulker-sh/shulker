@@ -21,10 +21,11 @@ type accountRow struct {
 
 func (a *app) accountsCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "accounts",
-		Short: "List the accounts shulker can play with",
-		Args:  exactArgs(0),
-		RunE:  func(cmd *cobra.Command, args []string) error { return a.listAccounts() },
+		Use:         "accounts",
+		Annotations: reads(),
+		Short:       "List the accounts shulker can play with",
+		Args:        exactArgs(0),
+		RunE:        func(cmd *cobra.Command, args []string) error { return a.listAccounts() },
 	}
 	cmd.AddCommand(a.accountsLoginCmd(), a.accountsLogoutCmd(), a.accountsAddCmd(), a.accountsRemoveCmd(), a.accountsRefreshCmd(), a.accountsUseCmd(), a.accountsProvidersCmd())
 	return cmd
@@ -106,9 +107,10 @@ func isDefault(r account.Resolved, cfg config.Config) bool {
 
 func (a *app) accountsUseCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "use <name>",
-		Short: "Switch the default account",
-		Args:  exactArgs(1),
+		Use:         "use <name>",
+		Annotations: acts(),
+		Short:       "Switch the default account",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r, err := a.selectAccount(args[0])
 			if err != nil {

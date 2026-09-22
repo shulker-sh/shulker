@@ -68,9 +68,10 @@ type playResult struct {
 func (a *app) playCmd() *cobra.Command {
 	var opts playOptions
 	cmd := &cobra.Command{
-		Use:   "play [nickname]",
-		Short: "Start a shulker instance",
-		Args:  maximumArgs(1),
+		Use:         "play [nickname]",
+		Annotations: acts(),
+		Short:       "Start a shulker instance",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.window != "" {
 				if err := checkPlaySetting("--window", "window", opts.window); err != nil {

@@ -18,8 +18,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	var typ, as, ref string
 	var unlocked, noAutoUpdate bool
 	cmd := &cobra.Command{
-		Use:   "add " + addArgs(kind),
-		Short: addShort(kind),
+		Use:         "add " + addArgs(kind),
+		Annotations: acts(),
+		Short:       addShort(kind),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 && a.canPick() {
 				return nil

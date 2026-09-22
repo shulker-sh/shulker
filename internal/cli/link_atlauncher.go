@@ -19,9 +19,10 @@ import (
 func (a *app) linkATLauncherCmd() *cobra.Command {
 	var k launcherLink
 	cmd := &cobra.Command{
-		Use:   "atlauncher [project-dir | git-url | manifest-url]",
-		Short: "Create an ATLauncher instance that syncs the client build before each launch",
-		Args:  maximumArgs(1),
+		Use:         "atlauncher [project-dir | git-url | manifest-url]",
+		Annotations: acts(),
+		Short:       "Create an ATLauncher instance that syncs the client build before each launch",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, l, err := a.startLauncherLink(cmd, args, &k, launcher.DefaultATLauncherDir)
 			if err != nil {

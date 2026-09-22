@@ -167,3 +167,78 @@ func TestNoPathFailsOnce(t *testing.T) {
 		t.Fatalf("failures = %v", failures)
 	}
 }
+
+func TestCleanReadOnlyRunWritesNothing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	opened := 0
+	l := New(path, []string{"list"})
+	l.ReadOnly = true
+	l.Opened = func() { opened++ }
+	l.Start("list", "mods", "", map[string]string{"json": "true"})
+	l.Result(map[string]int{"mods": 3})
+	l.End(0)
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) || opened != 0 {
+		t.Fatalf("stat = %v, opened %d times", err, opened)
+	}
+}
+
+func TestReadOnlyRunThatGoesWrongWritesItsStartWhenItDoes(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	clock := time.Date(2026, 9, 21, 9, 0, 0, 0, time.UTC)
+	opened := 0
+	l := New(path, []string{"instances"})
+	l.Now = func() time.Time { return clock }
+	l.ReadOnly = true
+	l.Opened = func() { opened++ }
+	l.Start("instances", "instances", "", map[string]string{"json": "true"})
+	clock = clock.Add(time.Second)
+	l.Result(map[string]int{"instances": 0})
+	l.Warn("one")
+	l.Error("config-invalid", "config.json doesn't parse")
+	l.End(1)
+
+	entries := readEntries(t, path)
+	var msgs []string
+	for _, e := range entries {
+		msgs = append(msgs, e.Msg)
+	}
+	if strings.Join(msgs, ",") != "start,one,config.json doesn't parse,end" || opened != 1 {
+		t.Fatalf("entries = %+v, opened %d times", entries, opened)
+	}
+	if start := entries[0]; start.At != "2026-09-21T09:00:00.000Z" || start.Flags["json"] != "true" || start.Cmd != "instances" {
+		t.Errorf("start = %+v", start)
+	}
+	if end := entries[3]; end.At != "2026-09-21T09:00:01.000Z" || *end.DurationMS != 1000 {
+		t.Errorf("end = %+v", end)
+	}
+}
+
+func TestReadOnlyRunThatActsIsLoggedFromItsStart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	l := New(path, []string{"link"})
+	l.ReadOnly = true
+	l.Start("link", "launchers", "", nil)
+	l.Acts()
+	l.Result(map[string]string{"linked": "prism"})
+	l.End(0)
+	var msgs []string
+	for _, e := range readEntries(t, path) {
+		msgs = append(msgs, e.Msg)
+	}
+	if strings.Join(msgs, ",") != "start,result,end" {
+		t.Fatalf("entries = %v", msgs)
+	}
+}
+
+func TestOpenedHearsTheFirstWriteOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), FileName)
+	var seen []int
+	l := New(path, []string{"sync"})
+	l.Opened = func() { seen = append(seen, len(readEntries(t, path))) }
+	l.Start("sync", "launchers", "", nil)
+	l.Warn("one")
+	l.End(0)
+	if len(seen) != 1 || seen[0] != 1 {
+		t.Fatalf("Opened saw %v entries", seen)
+	}
+}

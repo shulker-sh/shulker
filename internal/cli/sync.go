@@ -46,9 +46,10 @@ func (a *app) syncCmd() *cobra.Command {
 	var sel instanceSelection
 	var offline bool
 	cmd := &cobra.Command{
-		Use:   "sync [project-dir | git-url | manifest-url]",
-		Short: "Download and build one side of a project straight into a directory",
-		Args:  maximumArgs(1),
+		Use:         "sync [project-dir | git-url | manifest-url]",
+		Annotations: acts(),
+		Short:       "Download and build one side of a project straight into a directory",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := checkOS(req.os); err != nil {
 				return err

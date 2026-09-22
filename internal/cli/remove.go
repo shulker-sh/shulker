@@ -15,10 +15,11 @@ func (a *app) removeCmd() *cobra.Command { return a.removeCmdFor("") }
 func (a *app) removeCmdFor(kind string) *cobra.Command {
 	var typ string
 	cmd := &cobra.Command{
-		Use:     "remove " + removeArgs(kind),
-		Aliases: []string{"rm"},
-		Short:   removeShort(kind),
-		Args:    minimumArgs(1),
+		Use:         "remove " + removeArgs(kind),
+		Annotations: acts(),
+		Aliases:     []string{"rm"},
+		Short:       removeShort(kind),
+		Args:        minimumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chosen, err := chooseType(cmd, kind, typ, "")
 			if err != nil {

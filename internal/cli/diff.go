@@ -53,9 +53,10 @@ func (a *app) buildDirs(p *project.Project, lf *local.File, side string) (string
 func (a *app) diffCmd() *cobra.Command {
 	var into string
 	cmd := &cobra.Command{
-		Use:   "diff [side]",
-		Short: "Show build files that differ from what build would write",
-		Args:  maximumArgs(1),
+		Use:         "diff [side]",
+		Annotations: reads(),
+		Short:       "Show build files that differ from what build would write",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {
@@ -139,8 +140,9 @@ func (a *app) pullCmd() *cobra.Command {
 	var side, into, to string
 	var keys []string
 	cmd := &cobra.Command{
-		Use:   "pull [file...]",
-		Short: "Copy edits made in a build directory back into their source",
+		Use:         "pull [file...]",
+		Annotations: acts(),
+		Short:       "Copy edits made in a build directory back into their source",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {

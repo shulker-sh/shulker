@@ -42,8 +42,9 @@ func (i instanceEntry) intentPath() string { return filepath.Join(instance.Dir, 
 
 func (a *app) instancesCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "instances",
-		Short: "List the instances shulker keeps in sync",
+		Use:         "instances",
+		Annotations: reads(),
+		Short:       "List the instances shulker keeps in sync",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				return unknownSubcommand(cmd, args[0])

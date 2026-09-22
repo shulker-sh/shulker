@@ -27,9 +27,10 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 	var force bool
 	var ls linkSettings
 	cmd := &cobra.Command{
-		Use:   "shulker [project-dir | git-url | manifest-url]",
-		Short: "Create an instance shulker owns and launches itself",
-		Args:  maximumArgs(1),
+		Use:         "shulker [project-dir | git-url | manifest-url]",
+		Annotations: acts(),
+		Short:       "Create an instance shulker owns and launches itself",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, _, err := a.openLinkSource(cmd, args, ref, ls)
 			if err != nil {

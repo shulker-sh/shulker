@@ -37,9 +37,10 @@ type logFlags struct {
 func (a *app) logCmd() *cobra.Command {
 	var f logFlags
 	cmd := &cobra.Command{
-		Use:   "log",
-		Short: "Show what shulker did, from its log",
-		Args:  noArgs,
+		Use:         "log",
+		Annotations: map[string]string{logMode: logNever},
+		Short:       "Show what shulker did, from its log",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			now := time.Now()
 			from, err := auditlog.ParseSince(f.since, now)
@@ -58,8 +59,7 @@ func (a *app) logCmd() *cobra.Command {
 				in := found[0]
 				filter.Instance = slices.DeleteFunc([]string{in.ID, in.Name, in.Dir}, func(s string) bool { return s == "" })
 			}
-			// The log leaves out this run's own entries, which are only its start so far.
-			entries, err := auditlog.Read(a.log.Path, a.log.Before)
+			entries, err := auditlog.Read(a.log.Path)
 			if err != nil {
 				a.printer.Warn("can't read shulker's log at %s, so there is nothing to show: %v", a.log.Path, err)
 				entries = nil

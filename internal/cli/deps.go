@@ -292,6 +292,7 @@ func (a *app) requireLock(p *project.Project) error {
 		return err
 	}
 	a.warnLockDifferences(p)
+	a.warn(p.GoneFiles())
 	return nil
 }
 

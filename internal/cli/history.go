@@ -86,10 +86,11 @@ func historyIndex(args []string) (int, error) {
 
 func (a *app) historyListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   "List history entries, newest first",
-		Args:    noArgs,
+		Use:         "list",
+		Annotations: reads(),
+		Aliases:     []string{"ls"},
+		Short:       "List history entries, newest first",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, _, err := a.instanceProject()
 			if err != nil {
@@ -123,9 +124,10 @@ func (a *app) historyListCmd() *cobra.Command {
 
 func (a *app) historyShowCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "show [n]",
-		Short: "Show a history entry and what restoring it would change",
-		Args:  maximumArgs(1),
+		Use:         "show [n]",
+		Annotations: reads(),
+		Short:       "Show a history entry and what restoring it would change",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, _, err := a.instanceProject()
 			if err != nil {
@@ -256,9 +258,10 @@ func packVersions(packs map[string]lock.Pack) map[string]string {
 
 func (a *app) historyPruneCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "prune",
-		Short: "Remove history entries beyond the number the manifest keeps",
-		Args:  noArgs,
+		Use:         "prune",
+		Annotations: acts(),
+		Short:       "Remove history entries beyond the number the manifest keeps",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, _, err := a.instanceProject()
 			if err != nil {
@@ -295,9 +298,10 @@ func (a *app) historyPruneCmd() *cobra.Command {
 func (a *app) rollbackCmd() *cobra.Command {
 	var prune bool
 	cmd := &cobra.Command{
-		Use:   "rollback [n]",
-		Short: "Restore a history entry and build it in place",
-		Args:  maximumArgs(1),
+		Use:         "rollback [n]",
+		Annotations: acts(),
+		Short:       "Restore a history entry and build it in place",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, side, err := a.instanceProject()
 			if err != nil {

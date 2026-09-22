@@ -37,10 +37,11 @@ func (a *app) listCmd() *cobra.Command { return a.listCmdFor("") }
 func (a *app) listCmdFor(kind string) *cobra.Command {
 	var typ string
 	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls"},
-		Short:   listShort(kind),
-		Args:    noArgs,
+		Use:         "list",
+		Annotations: reads(),
+		Aliases:     []string{"ls"},
+		Short:       listShort(kind),
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			chosen, err := chooseType(cmd, kind, typ, "")
 			if err != nil {

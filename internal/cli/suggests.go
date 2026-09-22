@@ -15,9 +15,10 @@ type suggestions struct {
 func (a *app) suggestsCmd() *cobra.Command {
 	var optional bool
 	cmd := &cobra.Command{
-		Use:   "suggests",
-		Short: "List mods that locked mods recommend or suggest and that aren't installed",
-		Args:  noArgs,
+		Use:         "suggests",
+		Annotations: reads(),
+		Short:       "List mods that locked mods recommend or suggest and that aren't installed",
+		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {

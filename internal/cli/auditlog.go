@@ -12,6 +12,28 @@ import (
 	"shulker.sh/shulker/internal/config"
 )
 
+// logMode is the annotation every runnable command declares what its runs do with, which decides
+// what the log keeps of them.
+const logMode = "log"
+
+const (
+	// logReads is a command that changes no file and nothing on the machine. A clean run of it
+	// writes nothing to the log, and one that goes wrong writes everything but its result.
+	logReads = "reads"
+	// logActs is a command that writes a file or starts the game, logged in full even when it
+	// turns out to have nothing to do.
+	logActs = "acts"
+	// logDecides is a command that reads or acts by its arguments. It is logged as reading until
+	// it calls a.logActing.
+	logDecides = "decides"
+	// logNever is `shulker log`, which reads the log and never adds to it.
+	logNever = "never"
+)
+
+func reads() map[string]string   { return map[string]string{logMode: logReads} }
+func acts() map[string]string    { return map[string]string{logMode: logActs} }
+func decides() map[string]string { return map[string]string{logMode: logDecides} }
+
 type logState int
 
 const (
@@ -45,21 +67,40 @@ func (a *app) startLog(cmd *cobra.Command) {
 	if a.log == nil || a.logState != logOpen {
 		return
 	}
+	mode := cmd.Annotations[logMode]
 	// The shell runs these on every tab press; they are its questions, not something shulker did.
-	if name := cmd.Name(); name == cobra.ShellCompRequestCmd || name == cobra.ShellCompNoDescRequestCmd {
+	if name := cmd.Name(); mode == logNever || name == cobra.ShellCompRequestCmd || name == cobra.ShellCompNoDescRequestCmd {
 		a.logState = logOff
 		a.printer.Recorder = nil
+		// What `shulker log` shows is what log.keepDays keeps, though it writes nothing itself.
+		if mode == logNever {
+			a.trimLog()
+		}
 		return
 	}
 	a.logState = logStarted
-	trimErr := auditlog.Trim(a.log.Path, configuredKeepDays(), a.log.Now())
+	// Cobra's own help and its errors, like an unknown command, change nothing either.
+	a.log.ReadOnly = mode != logActs
+	a.log.Opened = a.trimLog
 	flags := map[string]string{}
 	cmd.Flags().Visit(func(f *pflag.Flag) { flags[f.Name] = f.Value.String() })
 	a.log.Start(strings.TrimPrefix(strings.TrimPrefix(cmd.CommandPath(), "shulker"), " "), commandGroup(cmd), cmp.Or(a.instance, a.dir), flags)
-	if trimErr == nil {
+}
+
+// logActing tells the log a logDecides command is going to change something.
+func (a *app) logActing() {
+	if a.logState == logStarted {
+		a.log.Acts()
+	}
+}
+
+// trimLog drops the entries past log.keepDays.
+func (a *app) trimLog() {
+	err := auditlog.Trim(a.log.Path, configuredKeepDays(), a.log.Now())
+	if err == nil {
 		return
 	}
-	msg := fmt.Sprintf("can't trim shulker's log, so it keeps entries past log.keepDays: %v", trimErr)
+	msg := fmt.Sprintf("can't trim shulker's log, so it keeps entries past log.keepDays: %v", err)
 	// A hook's output lands in a launcher, so the log alone hears it there.
 	if isHook(a.log.Cmd) {
 		a.log.Warn(msg)

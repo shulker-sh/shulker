@@ -16,8 +16,9 @@ import (
 func (a *app) playerCmd() *cobra.Command {
 	var all bool
 	cmd := &cobra.Command{
-		Use:   "player [name|uuid]... | --all",
-		Short: "Check player names and uuids against Mojang and the lock",
+		Use:         "player [name|uuid]... | --all",
+		Annotations: reads(),
+		Short:       "Check player names and uuids against Mojang and the lock",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if all == (len(args) > 0) {
 				return out.Errorf("usage", "pass player names or uuids, or --all for every player in the manifest")

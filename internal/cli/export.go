@@ -151,9 +151,10 @@ func (e exportTally) rows() []out.Row {
 func (a *app) exportMrpackCmd() *cobra.Command {
 	var f exportFlags
 	cmd := &cobra.Command{
-		Use:   "mrpack [source]",
-		Short: "Export a Modrinth modpack (.mrpack) for the Modrinth app and other launchers",
-		Args:  maximumArgs(1),
+		Use:         "mrpack [source]",
+		Annotations: acts(),
+		Short:       "Export a Modrinth modpack (.mrpack) for the Modrinth app and other launchers",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			job, err := a.openExport(cmd.Context(), args, &f, build.MrpackFileName)
 			if err != nil {
@@ -182,9 +183,10 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 func (a *app) exportCurseForgeCmd() *cobra.Command {
 	var f exportFlags
 	cmd := &cobra.Command{
-		Use:   "curseforge [source]",
-		Short: "Export a CurseForge modpack (.zip) for the CurseForge app",
-		Args:  maximumArgs(1),
+		Use:         "curseforge [source]",
+		Annotations: acts(),
+		Short:       "Export a CurseForge modpack (.zip) for the CurseForge app",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			job, err := a.openExport(cmd.Context(), args, &f, build.CurseForgeFileName)
 			if err != nil {

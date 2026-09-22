@@ -18,9 +18,10 @@ func (a *app) accountsAddCmd() *cobra.Command {
 		use          bool
 	)
 	cmd := &cobra.Command{
-		Use:   "add <name>",
-		Short: "Create an offline account",
-		Args:  exactArgs(1),
+		Use:         "add <name>",
+		Annotations: acts(),
+		Short:       "Create an offline account",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			if !allowInvalid && !player.IsName(name) {
@@ -84,9 +85,10 @@ func (a *app) accountsAddCmd() *cobra.Command {
 func (a *app) accountsRemoveCmd() *cobra.Command {
 	var yes, force bool
 	cmd := &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Delete an offline account",
-		Args:  exactArgs(1),
+		Use:         "remove <name>",
+		Annotations: acts(),
+		Short:       "Delete an offline account",
+		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			r, err := a.selectAccount(args[0])
 			if err != nil {

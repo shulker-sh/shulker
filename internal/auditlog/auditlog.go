@@ -1,5 +1,5 @@
-// Package auditlog appends what every shulker run did to log.jsonl, one JSON entry per line: the
-// run's start and end, the result it reported, and every warning and error it showed.
+// Package auditlog appends what shulker runs did to log.jsonl, one JSON entry per line: the run's
+// start and end, the result it reported, and every warning and error it showed.
 package auditlog
 
 import (
@@ -58,13 +58,17 @@ type Log struct {
 	Group    string
 	Instance string
 	Now      func() time.Time
+	// ReadOnly is a run that changes nothing, which is kept only if it goes wrong: its start waits
+	// for its first warning or error, and its result is never written.
+	ReadOnly bool
 	// OnFail hears the first write that fails. Nothing is written after it, so it is heard once.
 	OnFail func(error)
-	// Before is the log's size when the run started, after its trim, so a reader can leave out the
-	// run's own entries.
-	Before  int64
+	// Opened hears the run's first entry land in the log, once.
+	Opened  func()
 	argv    []string
 	started time.Time
+	held    *Entry
+	opened  bool
 	err     error
 }
 
@@ -90,25 +94,43 @@ func New(path string, args []string) *Log {
 func (l *Log) Start(cmd, group, instance string, flags map[string]string) {
 	l.Cmd, l.Group, l.Instance = cmd, group, instance
 	l.started = l.Now()
-	if info, err := os.Stat(l.Path); err == nil {
-		l.Before = info.Size()
+	start := Entry{At: stamp(l.started), Level: LevelInfo, Msg: "start", Flags: flags}
+	if l.ReadOnly {
+		l.held = &start
+		return
 	}
-	l.append(Entry{Level: LevelInfo, Msg: "start", Flags: flags})
+	l.append(start)
+}
+
+// Acts turns a read-only run into one that changes something, which is logged from its start.
+func (l *Log) Acts() {
+	l.ReadOnly = false
+	l.release()
+}
+
+func (l *Log) release() {
+	if l.held != nil {
+		start := *l.held
+		l.held = nil
+		l.append(start)
+	}
 }
 
 // Warn records a warning the run showed.
 func (l *Log) Warn(msg string) {
+	l.release()
 	l.append(Entry{Level: LevelWarn, Msg: msg})
 }
 
 // Error records an error the run showed, with its code.
 func (l *Log) Error(code, msg string) {
+	l.release()
 	l.append(Entry{Level: LevelError, Code: code, Msg: msg})
 }
 
 // Result records the payload the run reported, as --json prints it under "data".
 func (l *Log) Result(data any) {
-	if l.err != nil {
+	if l.err != nil || l.ReadOnly {
 		return
 	}
 	payload, err := encode(data)
@@ -127,8 +149,12 @@ func encode(v any) ([]byte, error) {
 	return bytes.TrimSuffix(b.Bytes(), []byte("\n")), err
 }
 
-// End closes the run with its exit code and how long it took.
+// End closes the run with its exit code and how long it took. A read-only run that went right has
+// nothing to close.
 func (l *Log) End(exit int) {
+	if l.held != nil {
+		return
+	}
 	ms := l.Now().Sub(l.started).Milliseconds()
 	l.append(Entry{Level: LevelInfo, Msg: "end", Exit: &exit, DurationMS: &ms})
 }
@@ -137,7 +163,9 @@ func (l *Log) append(e Entry) {
 	if l.err != nil {
 		return
 	}
-	e.At = l.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00")
+	if e.At == "" {
+		e.At = stamp(l.Now())
+	}
 	e.Cmd, e.Group, e.Instance = l.Cmd, l.Group, l.Instance
 	l.refuseArgv(&e)
 	line, err := encode(e)
@@ -146,7 +174,18 @@ func (l *Log) append(e Entry) {
 	}
 	if err != nil {
 		l.fail(err)
+		return
 	}
+	if !l.opened {
+		l.opened = true
+		if l.Opened != nil {
+			l.Opened()
+		}
+	}
+}
+
+func stamp(t time.Time) string {
+	return t.UTC().Format("2006-01-02T15:04:05.000Z07:00")
 }
 
 func (l *Log) fail(err error) {

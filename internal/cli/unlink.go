@@ -25,9 +25,10 @@ type unlinkResult struct {
 func (a *app) unlinkCmd() *cobra.Command {
 	var sel instanceSelection
 	cmd := &cobra.Command{
-		Use:   "unlink [id | name | dir | launcher]",
-		Short: "Stop syncing an instance and forget it, keeping its files",
-		Args:  maximumArgs(1),
+		Use:         "unlink [id | name | dir | launcher]",
+		Annotations: acts(),
+		Short:       "Stop syncing an instance and forget it, keeping its files",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			query := ""
 			if len(args) == 1 {

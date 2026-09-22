@@ -17,9 +17,10 @@ func (a *app) buildCmd() *cobra.Command {
 	var osName string
 	var ff featureFlags
 	cmd := &cobra.Command{
-		Use:   "build [side]",
-		Short: "Assemble build directories from the lock and overrides",
-		Args:  maximumArgs(1),
+		Use:         "build [side]",
+		Annotations: acts(),
+		Short:       "Assemble build directories from the lock and overrides",
+		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := a.openProject()
 			if err != nil {
