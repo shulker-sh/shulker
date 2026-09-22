@@ -347,9 +347,29 @@ func copyFolder(from, to string) error {
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		return err
+	}
+	// The copy is made beside to and swapped in, since from may be to itself, reached through a
+	// symlink, and removing to first would remove it.
+	staged, err := os.MkdirTemp(filepath.Dir(to), "."+filepath.Base(to)+"-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(staged)
+	if err := os.Chmod(staged, 0o755); err != nil {
+		return err
+	}
+	if err := copyTree(from, staged); err != nil {
+		return err
+	}
 	if err := os.RemoveAll(to); err != nil {
 		return err
 	}
+	return os.Rename(staged, to)
+}
+
+func copyTree(from, to string) error {
 	return filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err

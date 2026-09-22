@@ -162,6 +162,24 @@ func TestAddFolderThroughASymlinkCopiesItsTarget(t *testing.T) {
 	}
 }
 
+func TestAddFolderThroughASymlinkToItsOwnCopyKeepsIt(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	writeFolder(t, filepath.Join(h.dir, "files", "Helper"), helperFiles)
+	link := filepath.Join(t.TempDir(), "Helper")
+	if err := os.Symlink(filepath.Join(h.dir, "files", "Helper"), link); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "resourcepack", "add", link)
+	h.mustRun(t, "resourcepack", "add", link)
+	if readProjectFile(t, h, "files/Helper/pack.mcmeta") != helperFiles["pack.mcmeta"] {
+		t.Fatal("copying a folder onto itself keeps it")
+	}
+	if got := h.readManifest(t).Requires["helper"].File; got != "files/Helper" {
+		t.Fatalf("the entry names the folder: %q", got)
+	}
+}
+
 func TestAddFolderHoldingTheProjectIsRefused(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
