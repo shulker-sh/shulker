@@ -42,6 +42,9 @@ type Resolver struct {
 	// AskMove is shown the deps-held refusal before an add without --with-deps gives up;
 	// yes carries on as --with-deps would.
 	AskMove func(held *out.Error) (bool, error)
+	// LockModpack locks a hosted modpack entry and puts it in the manifest under key, in place of
+	// the modpack already there.
+	LockModpack func(ctx context.Context, key string, entry manifest.Require) error
 }
 
 type AddOptions struct {
@@ -162,9 +165,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	switch kind {
 	case manifest.TypeMod:
 	case manifest.TypeModpack:
-		e := out.Errorf("requires-unsupported", "%s is a modpack, and modpacks from a provider aren't supported yet", slug)
-		e.Help = "give the modpack a source"
-		return e
+		return r.addModpack(ctx, p, proj, opts)
 	case manifest.TypeResourcePack, manifest.TypeShader:
 		return r.addPack(ctx, p, proj, kind, opts)
 	default:

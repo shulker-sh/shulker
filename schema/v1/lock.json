@@ -113,19 +113,31 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "provider": { "type": "string", "enum": ["modrinth", "curseforge"], "description": "The provider a hosted modpack was locked from. Hosted modpacks only." },
+        "project": { "description": "Provider project id, typed as the provider types it. Hosted modpacks only." },
+        "version": { "description": "Provider version id (Modrinth) or file id (CurseForge). Hosted modpacks only." },
+        "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed. Hosted modpacks only." },
+        "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked. Hosted modpacks only." },
+        "url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "description": "The archive's download url. null when the author disabled third-party distribution; page is then required. Hosted modpacks only."
+        },
+        "page": { "type": "string", "format": "uri", "description": "Provider file page for manual download. Present only when url is null." },
+        "filename": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\]+$", "description": "The provider's name for the archive. Hosted modpacks only." },
         "source": { "type": "string", "minLength": 1, "description": "The manifest source at resolution time. A different source in the manifest makes the lock out of date." },
         "ref": { "type": "string", "minLength": 1, "description": "The manifest ref at resolution time. Git sources only." },
         "commit": { "$ref": "#/$defs/gitCommit", "description": "Resolved commit. Git sources only." },
         "dirSha256": { "$ref": "#/$defs/sha256", "description": "Content hash of the modpack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only." },
         "sha256": { "$ref": "#/$defs/sha256", "description": "Hash of the fetched manifest. Raw manifest URL sources only." },
         "file": { "$ref": "#/$defs/relativePath", "description": "A local modpack archive: the path shulker.json gives it. Its sha512 is its identity and its key in the cache." },
-        "sha512": { "$ref": "#/$defs/sha512", "description": "Hash of the archive's bytes. Local archives only." },
-        "size": { "type": "integer", "minimum": 1, "description": "The archive's length, compared before rehashing it. Local archives only." },
+        "sha512": { "$ref": "#/$defs/sha512", "description": "Hash of the archive's bytes, its identity and its key in the cache. Archives, local or hosted, only." },
+        "size": { "type": "integer", "minimum": 1, "description": "The archive's length, compared before rehashing a local one. Archives only." },
         "unmanaged": {
           "type": "object",
           "propertyNames": { "type": "string", "pattern": "^(overrides|client-overrides|server-overrides)/" },
           "additionalProperties": { "$ref": "#/$defs/sha512" },
-          "description": "The files the archive lays as its own overrides, by layer and path, each with its sha512: files in its index no provider matched, and jars and pack zips in its override folders no lock entry took. The build lays these and the archive's other override files, and nothing else. Local archives only."
+          "description": "The files the archive lays as its own overrides, by layer and path, each with its sha512: files in its index no provider matched, and jars and pack zips in its override folders no lock entry took. The build lays these and the archive's other override files, and nothing else. Archives only."
         },
         "locked": { "type": "boolean", "const": true, "description": "Present when the modpack's mods were copied from its lock. Absent means they were resolved from its manifest." },
         "lockSha256": { "$ref": "#/$defs/sha256", "description": "Hash of the modpack's lock at resolution time. Present exactly when locked is, on a source modpack." }
@@ -136,10 +148,33 @@
         { "required": ["source", "sha256"], "not": { "required": ["ref"] } },
         {
           "required": ["file", "sha512", "size"],
-          "not": { "anyOf": [{ "required": ["source"] }, { "required": ["ref"] }, { "required": ["commit"] }, { "required": ["dirSha256"] }, { "required": ["sha256"] }, { "required": ["lockSha256"] }] }
+          "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["source"] }, { "required": ["ref"] }, { "required": ["commit"] }, { "required": ["dirSha256"] }, { "required": ["sha256"] }, { "required": ["lockSha256"] }] }
+        },
+        {
+          "required": ["provider", "project", "version", "versionNumber", "channel", "url", "filename", "sha512", "size"],
+          "not": { "anyOf": [{ "required": ["source"] }, { "required": ["ref"] }, { "required": ["commit"] }, { "required": ["dirSha256"] }, { "required": ["sha256"] }, { "required": ["lockSha256"] }, { "required": ["file"] }] }
         }
       ],
       "allOf": [
+        {
+          "if": { "required": ["provider"] },
+          "then": {
+            "if": { "properties": { "url": { "type": "null" } } },
+            "then": { "required": ["page"] },
+            "else": { "not": { "required": ["page"] } }
+          },
+          "else": {
+            "not": { "anyOf": [{ "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["channel"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["filename"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "provider": { "const": "modrinth" } } },
+          "then": { "properties": { "project": { "$ref": "#/$defs/modrinthId" }, "version": { "$ref": "#/$defs/modrinthId" } } }
+        },
+        {
+          "if": { "properties": { "provider": { "const": "curseforge" } } },
+          "then": { "properties": { "project": { "$ref": "#/$defs/curseforgeId" }, "version": { "$ref": "#/$defs/curseforgeId" } } }
+        },
         {
           "if": { "required": ["source"] },
           "then": {

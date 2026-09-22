@@ -312,8 +312,11 @@ func (a *app) outdatedCmd() *cobra.Command {
 				var items []out.Item
 				for _, o := range res {
 					it := out.Item{Kind: out.Change, Name: o.ID, From: o.Current, To: o.Latest}
+					if o.Modpack {
+						it.Aside = append(it.Aside, "modpack")
+					}
 					if o.Pinned {
-						it.Aside = []string{"pinned"}
+						it.Aside = append(it.Aside, "pinned")
 					}
 					items = append(items, it)
 				}

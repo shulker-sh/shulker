@@ -176,11 +176,11 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock, and always for an archive, which pins exact files; a source without a lock is always resolved from its manifest. |
 | `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date. |
 | `filename` | `string` | Resource packs and shaders only: the file name the pack is placed under, in place of &lt;key&gt;.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case.<br>pattern `^[^/\\]+\.zip$`, min length 1 |
-| `project` | [`projectId`](#projectid) | Written by add when the provider slug differs from the mod id or the provider is CurseForge. |
-| `pin` | [`versionId`](#versionid) | Pin to one provider version. update skips pinned mods. |
+| `project` | [`projectId`](#projectid) | The provider project, by slug or id. Omitted means the key. Written by add when the provider slug differs from the key or the provider is CurseForge, and always for a modpack. |
+| `pin` | [`versionId`](#versionid) | Pin to one provider version. update skips pinned mods and modpacks. |
 | `channel` | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted. A channel admits itself and anything more stable.<br>default `"release"` |
 | `side` | [`side`](#side) | Overrides the side derived from provider environment data. |
-| `provider` | [`provider`](#provider) | Overrides the provider preference list for this mod. |
+| `provider` | [`provider`](#provider) | Overrides the provider preference list for this entry. Omitted means the first provider in the list that has the project. |
 | `os` | [`osCondition`](#oscondition) \| [`osCondition`](#oscondition)[] | Ship only on these operating systems, evaluated where the build runs. Names are any-of, !names are none-of; both must hold. A dependency needed only by excluded mods is excluded too. |
 | `feature` | [`featureCondition`](#featurecondition) \| [`featureCondition`](#featurecondition)[] | Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Every name must be declared in features, which is where its default lives. |
 | `note` | [`note`](#note) |  |
@@ -192,6 +192,8 @@ When `source` is set, `type` must be `"modpack"`, and `file`, `project`, `pin`, 
 When `file` is set, `project`, `pin`, `channel` and `provider` are not allowed.
 
 When `file` is set and `type` is `"modpack"`, `side`, `os` and `feature` are not allowed.
+
+When `type` is `"modpack"` and neither `source` nor `file` is set, `ref`, `autoUpdate`, `locked`, `side`, `os` and `feature` are not allowed.
 
 When `filename` is set, `type` is required, and `type` must be `"resourcepack"` \| `"shader"`.
 

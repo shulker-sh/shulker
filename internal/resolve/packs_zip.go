@@ -2,7 +2,6 @@ package resolve
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -123,17 +122,7 @@ func (r *Resolver) packKeyFree(key, kind string) error {
 
 func (r *Resolver) pickPack(ctx context.Context, p provider.Provider, proj *provider.Project, kind, pin, channel string) (*provider.Version, error) {
 	if pin != "" {
-		v, err := p.Version(ctx, pin)
-		if errors.Is(err, provider.ErrNotFound) {
-			return nil, out.Errorf("version-not-found", "%s has no version %s for %s", p.Name(), pin, proj.Slug)
-		}
-		if err != nil {
-			return nil, err
-		}
-		if v.ProjectID != proj.ID {
-			return nil, out.Errorf("pin-mismatch", "version %s belongs to project %s, not %s", pin, v.ProjectID, proj.Slug)
-		}
-		return v, nil
+		return pinnedVersion(ctx, p, proj, pin)
 	}
 	versions, err := p.Versions(ctx, proj.ID, r.Lock.Minecraft, packTags(p.Name(), kind))
 	if err != nil {

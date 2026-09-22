@@ -109,8 +109,12 @@ func convertProject(p project) provider.Project {
 
 func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {
 	q := url.Values{}
-	q.Set("loaders", jsonList(loaders...))
-	q.Set("game_versions", jsonList(game))
+	if len(loaders) > 0 {
+		q.Set("loaders", jsonList(loaders...))
+	}
+	if game != "" {
+		q.Set("game_versions", jsonList(game))
+	}
 	var raw []version
 	if err := m.Client.GetJSON(ctx, m.BaseURL+"/project/"+url.PathEscape(projectID)+"/version?"+q.Encode(), &raw); err != nil {
 		return nil, fmt.Errorf("modrinth versions for %s: %w", projectID, err)

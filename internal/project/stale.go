@@ -105,6 +105,10 @@ func PackDifferences(dir string, m *manifest.Manifest, l *lock.Lock) []string {
 		switch {
 		case !ok:
 			diffs = append(diffs, fmt.Sprintf("pack %s: in shulker.json, not in shulker.lock", name))
+		case mp.IsHosted():
+			diffs = append(diffs, HostedDifferences(name, mp, lp)...)
+		case lp.Provider != "":
+			diffs = append(diffs, fmt.Sprintf("pack %s: %s -> %s", name, lp.Provider, mp.Source+mp.File))
 		case (mp.File == "") != (lp.File == ""):
 			diffs = append(diffs, fmt.Sprintf("pack %s: %s -> %s", name, lp.Source+lp.File, mp.Source+mp.File))
 		case mp.File != "":
@@ -126,6 +130,29 @@ func PackDifferences(dir string, m *manifest.Manifest, l *lock.Lock) []string {
 		if _, listed := modpacks[name]; !listed {
 			diffs = append(diffs, fmt.Sprintf("pack %s: in shulker.lock, not in shulker.json", name))
 		}
+	}
+	return diffs
+}
+
+// HostedDifferences compares a hosted modpack entry with its lock entry, as ZipEntryDifferences
+// does a resource pack's: the provider, the channel and the pin.
+func HostedDifferences(name string, e manifest.Require, lp lock.Modpack) []string {
+	if lp.Provider == "" {
+		return []string{fmt.Sprintf("pack %s: %s -> a provider", name, lp.Source+lp.File)}
+	}
+	var diffs []string
+	if e.Provider != "" && e.Provider != lp.Provider {
+		diffs = append(diffs, fmt.Sprintf("pack %s: provider %s -> %s", name, lp.Provider, e.Provider))
+	}
+	channel := e.Channel
+	if channel == "" {
+		channel = "release"
+	}
+	if channel != lp.Channel {
+		diffs = append(diffs, fmt.Sprintf("pack %s: channel %s -> %s", name, lp.Channel, channel))
+	}
+	if e.Pin != nil && fmt.Sprint(e.Pin) != fmt.Sprint(lp.Version) {
+		diffs = append(diffs, fmt.Sprintf("pack %s: pinned to %v, locked %v", name, e.Pin, lp.Version))
 	}
 	return diffs
 }

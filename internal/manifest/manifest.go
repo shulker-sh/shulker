@@ -259,7 +259,17 @@ func (r Require) Kind() string {
 	return TypeMod
 }
 
-func (r Require) AutoUpdates() bool { return r.AutoUpdate == nil || *r.AutoUpdate }
+// AutoUpdates reports whether sync refreshes a modpack. A hosted one never follows anything: a
+// provider version's archive doesn't change, and only update moves it to another.
+func (r Require) AutoUpdates() bool {
+	return !r.IsHosted() && (r.AutoUpdate == nil || *r.AutoUpdate)
+}
+
+// IsHosted reports whether the entry is a modpack on a provider: one with neither a source nor a
+// file.
+func (r Require) IsHosted() bool {
+	return r.Kind() == TypeModpack && r.Source == "" && r.File == ""
+}
 
 // StringList is a list that shulker.json may also write as a single string.
 type StringList []string
@@ -439,30 +449,8 @@ func (m *Manifest) byKind(kind string) map[string]Require {
 	return found
 }
 
-// Modpacks lists the modpacks that give a source or an archive file.
-func (m *Manifest) Modpacks() map[string]Require {
-	modpacks := map[string]Require{}
-	for key, r := range m.Requires {
-		if r.Kind() == TypeModpack && (r.Source != "" || r.File != "") {
-			modpacks[key] = r
-		}
-	}
-	return modpacks
-}
-
-// CheckSupported refuses the requires entries shulker can't resolve yet.
-func (m *Manifest) CheckSupported() error {
-	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
-		r := m.Requires[key]
-		switch {
-		case r.Kind() == TypeModpack && r.Source == "" && r.File == "":
-			e := out.Errorf("requires-unsupported", "requires.%s: modpacks from a provider aren't supported yet", key)
-			e.Help = "give the modpack a source"
-			return e
-		}
-	}
-	return nil
-}
+// Modpacks lists the modpacks, from a source, an archive file or a provider.
+func (m *Manifest) Modpacks() map[string]Require { return m.byKind(TypeModpack) }
 
 func (m *Manifest) Encode() ([]byte, error) {
 	return fsutil.MarshalJSON(m)

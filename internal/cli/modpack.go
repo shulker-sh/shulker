@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -24,7 +25,7 @@ var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.Typ
 // and its `--type` spelling take the same flags.
 var typeFlags = map[string][]string{
 	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as", "with-deps"},
-	manifest.TypeModpack:      {"ref", "as", "unlocked", "no-auto-update"},
+	manifest.TypeModpack:      {"ref", "as", "unlocked", "no-auto-update", "channel", "pin", "provider"},
 	manifest.TypeResourcePack: {"channel", "pin", "provider", "as"},
 	manifest.TypeShader:       {"channel", "pin", "provider", "as"},
 }
@@ -112,12 +113,26 @@ func unsupportedType(kind string) error {
 	return out.Errorf("requires-unsupported", "%s entries aren't supported yet", kind)
 }
 
-func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, unlocked, noAutoUpdate bool) error {
+func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.AddOptions, ref string, unlocked, noAutoUpdate bool) error {
+	as := opts.As
 	if as != "" && len(sources) > 1 {
 		return out.Errorf("usage", "--as applies to a single modpack")
 	}
+	if opts.Pin != "" && len(sources) > 1 {
+		return out.Errorf("usage", "--pin applies to a single modpack")
+	}
+	hosted := slices.ContainsFunc(sources, a.isSlug)
+	if err := refuseModpackFlags(cmd, hosted, !slices.ContainsFunc(sources, func(s string) bool { return !a.isSlug(s) })); err != nil {
+		return err
+	}
 	return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
 		for _, source := range sources {
+			if a.isSlug(source) {
+				if err := r.Add(cmd.Context(), source, opts); err != nil {
+					return "", err
+				}
+				continue
+			}
 			entry := manifest.Require{Source: source, Ref: ref}
 			if unlocked {
 				no := false
@@ -139,6 +154,70 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, 
 		}
 		return "", nil
 	})
+}
+
+// isSlug reports whether a modpack argument names a project on a provider rather than a source: it
+// is no URL, no path and no directory that exists.
+func (a *app) isSlug(arg string) bool {
+	if pack.Classify(arg) != pack.Local || strings.ContainsAny(arg, `/\`) || arg == "." || arg == ".." || resolve.IsLocalPath(a.localPath(arg)) {
+		return false
+	}
+	dir := arg
+	if a.dir != "" {
+		dir = filepath.Join(a.dir, arg)
+	}
+	_, err := os.Stat(dir)
+	return err != nil
+}
+
+// refuseModpackFlags refuses the flags that don't apply to the modpacks being added, each with its
+// reason: a hosted modpack is a provider version, and a source or archive is not.
+func refuseModpackFlags(cmd *cobra.Command, hosted, onlyHosted bool) error {
+	given := func(name string) bool { return cmd.Flags().Changed(name) }
+	if hosted {
+		for _, flag := range []struct{ name, reason string }{
+			{"ref", "a ref names a git commit, and a modpack from a provider is a provider version"},
+			{"unlocked", "a modpack from a provider is always locked: its archive pins every file"},
+			{"no-auto-update", "a modpack from a provider never auto-updates: `shulker update` moves it and `shulker pin` holds it"},
+		} {
+			if given(flag.name) {
+				return out.Errorf("usage", "--%s doesn't apply to a modpack from a provider: %s", flag.name, flag.reason)
+			}
+		}
+	}
+	if !onlyHosted {
+		for _, name := range []string{"pin", "channel", "provider"} {
+			if given(name) {
+				return out.Errorf("usage", "--%s only applies to a modpack from a provider, not a source or archive", name)
+			}
+		}
+	}
+	return nil
+}
+
+// lockHostedEntry locks the hosted modpack entry and puts it in the manifest under key, in place of
+// the modpack already loaded there.
+func (a *app) lockHostedEntry(ctx context.Context, p *project.Project, r *resolve.Resolver, key string, entry manifest.Require) error {
+	store, err := a.packStore(p)
+	if err != nil {
+		return err
+	}
+	loaded, err := store.Resolve(ctx, key, entry)
+	if err != nil {
+		return err
+	}
+	i := slices.IndexFunc(r.Packs, func(l *pack.Loaded) bool { return l.Name == key })
+	if i < 0 {
+		return a.addLoadedPack(ctx, p, r, store, key, key, loaded, entry)
+	}
+	packs := slices.Clone(r.Packs)
+	packs[i] = loaded
+	if err := r.RefreshPacks(packs); err != nil {
+		return err
+	}
+	a.packs = packs
+	p.Manifest.Requires[key] = entry
+	return nil
 }
 
 // addPackEntry resolves one modpack source and puts it in the manifest under the key as names,
@@ -261,5 +340,5 @@ func (a *app) addLoadedPack(ctx context.Context, p *project.Project, r *resolve.
 // offerUnlock reports whether a modpack refused for its platform is the one refusal unlocking
 // answers: locked, and built for another Minecraft than the project's.
 func (a *app) offerUnlock(err error, l *pack.Loaded, minecraft string) bool {
-	return out.CodeOf(err) == "modpack-mismatch" && a.canPick() && l.UsesLock && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
+	return out.CodeOf(err) == "modpack-mismatch" && a.canPick() && l.Kind != pack.Hosted && l.UsesLock && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
 }

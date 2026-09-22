@@ -106,10 +106,15 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 			if err != nil {
 				return nil, err
 			}
-			res = append(res, listEntry{
+			e := listEntry{
 				Key: key, Type: manifest.TypeModpack, Listed: true, Version: st.Pin,
 				Source: st.Source, Kind: st.Kind, Ref: st.Ref, State: st.State,
-			})
+			}
+			if st.Kind == pack.Hosted {
+				e.Source, e.Provider = "", st.Source
+				e.Channel, e.Pinned = modpacks[key].Channel, modpacks[key].Pin != nil
+			}
+			res = append(res, e)
 		}
 	}
 	if kind == "" || kind == manifest.TypeMod {
@@ -247,6 +252,19 @@ func printList(l *out.Lines, res []listEntry) {
 }
 
 func listItem(l *out.Lines, e listEntry) out.Item {
+	if e.Kind == pack.Hosted {
+		it := out.Item{Kind: out.Note, Name: e.Key, Version: e.Version, Aside: []string{"modpack"}}
+		if e.Version == "" {
+			it.Aside = append(it.Aside, "not locked")
+		}
+		if e.Channel != "" && e.Channel != "release" {
+			it.Aside = append(it.Aside, "channel: "+e.Channel)
+		}
+		if e.Pinned {
+			it.Aside = append(it.Aside, "pinned")
+		}
+		return it
+	}
 	if e.Type == manifest.TypeModpack {
 		aside := []string{string(e.Kind), e.State}
 		if e.Version != "" {

@@ -66,6 +66,8 @@ type Provider interface {
 	// by popularity where it doesn't. kind narrows the search to one project
 	// type; "" spans every type the provider offers that shulker can add.
 	Search(ctx context.Context, query, kind string, limit int) ([]Project, error)
+	// Versions lists a project's versions for the game version and loaders. An empty game or no
+	// loaders leaves that filter off.
 	Versions(ctx context.Context, projectID, game string, loaders []string) ([]Version, error)
 	Version(ctx context.Context, versionID string) (*Version, error)
 }

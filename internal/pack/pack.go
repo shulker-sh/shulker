@@ -1,5 +1,5 @@
-// Package pack loads the modpacks a project requires from a directory, a git repository, a URL or
-// a local archive, and checks them against the project's platform.
+// Package pack loads the modpacks a project requires from a directory, a git repository, a URL, a
+// local archive or a provider, and checks them against the project's platform.
 package pack
 
 import (
@@ -36,6 +36,8 @@ const (
 	Git   Kind = "git"
 	URL   Kind = "url"
 	File  Kind = "file"
+	// Hosted is a modpack on a provider, named by neither a source nor a file.
+	Hosted Kind = "hosted"
 )
 
 // Loaded is a modpack read from its source.
@@ -68,6 +70,9 @@ type Store struct {
 	// Consume locks what a File modpack's archive holds into its Lock and Manifest, and records
 	// in its Pin the files the archive lays itself.
 	Consume func(ctx context.Context, l *Loaded) error
+	// Obtain picks a Hosted modpack's provider version and puts its archive in the cache,
+	// returning the pin that names both.
+	Obtain func(ctx context.Context, name string, p manifest.Require) (lock.Modpack, error)
 }
 
 func (s *Store) isOffline() bool { return s.Fetch != nil && s.Fetch.Offline }
@@ -101,9 +106,15 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		return nil, out.Errorf("modpack-ref", "modpack %s: \"ref\" only applies to git sources", name)
 	}
 	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: lock.Modpack{Source: p.Source}}
-	if kind == File {
+	switch kind {
+	case File:
 		l.Source = p.File
 		if err := s.resolveArchive(ctx, l, p); err != nil {
+			return nil, err
+		}
+		return l, nil
+	case Hosted:
+		if err := s.resolveHosted(ctx, l, p); err != nil {
 			return nil, err
 		}
 		return l, nil
@@ -170,6 +181,11 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 	case File:
 		l.Source = p.File
 		if err := s.openArchive(ctx, l, p); err != nil {
+			return nil, "", err
+		}
+	case Hosted:
+		l.Source = pinned.Provider
+		if err := s.openHosted(ctx, l); err != nil {
 			return nil, "", err
 		}
 	case Local:
@@ -553,8 +569,14 @@ type Status struct {
 // see whether it has changed; a remote one is taken as pinned.
 func (s *Store) Status(name string, p manifest.Require, pinned lock.Modpack, locked bool) (Status, error) {
 	st := Status{Name: name, Kind: KindOf(p), Source: p.Source, Ref: p.Ref, State: "unlocked"}
-	if st.Kind == File {
+	switch st.Kind {
+	case File:
 		st.Source = p.File
+	case Hosted:
+		st.Source = p.Provider
+		if locked {
+			st.Source = pinned.Provider
+		}
 	}
 	if !locked {
 		return st, nil

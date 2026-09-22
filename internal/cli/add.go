@@ -53,7 +53,8 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			}
 			switch chosen {
 			case manifest.TypeModpack:
-				return a.addModpacks(cmd, args, as, ref, unlocked, noAutoUpdate)
+				opts.As = as
+				return a.addModpacks(cmd, args, opts, ref, unlocked, noAutoUpdate)
 			case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader:
 				// An empty type is settled by the provider during resolution.
 			default:
@@ -123,7 +124,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another")
 	}
 	if applies(kind, "as") {
-		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a pack or modpack archive file's name, the name in a modpack's manifest)")
+		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a pack or hosted modpack's provider slug, a modpack archive file's name, the name in a modpack's manifest)")
 	}
 	return cmd
 }
@@ -160,7 +161,7 @@ func (a *app) localPath(arg string) string {
 func addArgs(kind string) string {
 	switch kind {
 	case manifest.TypeModpack:
-		return "<source>..."
+		return "<source|slug>..."
 	case "":
 		return "<mod|source>..."
 	}
@@ -172,7 +173,7 @@ func addShort(kind string) string {
 	case manifest.TypeMod:
 		return "Add mods to the manifest and lock"
 	case manifest.TypeModpack:
-		return "Add a modpack from a local path, git URL, or raw manifest URL"
+		return "Add a modpack from a local path, git URL, raw manifest URL, archive, or provider slug"
 	case "":
 		return "Add mods or modpacks to the manifest and lock"
 	}

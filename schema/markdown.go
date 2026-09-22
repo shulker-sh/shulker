@@ -392,8 +392,8 @@ func conditionalRule(b *object, prefix string) (string, error) {
 	return "When " + when + ", " + strings.Join(clauses, ", and ") + ".", nil
 }
 
-// condition states an if that requires keys, some of which it may also hold to a const: "`file` is
-// set and `type` is `\"modpack\"`".
+// condition states an if that requires keys, some of which it may also hold to a const, and that
+// may rule others out: "`type` is `\"modpack\"` and neither `source` nor `file` is set".
 func condition(v any, prefix string) (string, bool) {
 	b, _ := v.(*object)
 	if b == nil {
@@ -405,6 +405,7 @@ func condition(v any, prefix string) (string, bool) {
 		return "", false
 	}
 	valued := map[string]string{}
+	var unset []string
 	for _, key := range b.keys {
 		switch key {
 		case "required":
@@ -417,6 +418,22 @@ func condition(v any, prefix string) (string, bool) {
 					return "", false
 				}
 				valued[name] = code(stringify(c))
+			}
+		case "not":
+			not, _ := b.values[key].(*object)
+			anyOf, _ := not.get("anyOf")
+			if len(not.keys) != 1 {
+				return "", false
+			}
+			for _, branch := range list(anyOf) {
+				names, ok := requiredOnly(branch)
+				if !ok || len(names) != 1 {
+					return "", false
+				}
+				unset = append(unset, names[0])
+			}
+			if len(unset) == 0 {
+				return "", false
 			}
 		default:
 			return "", false
@@ -432,6 +449,15 @@ func condition(v any, prefix string) (string, bool) {
 	}
 	if len(set) > 0 {
 		parts = append([]string{join(set, prefix, "and") + plural(set, " is", " are") + " set"}, parts...)
+	}
+	switch len(unset) {
+	case 0:
+	case 1:
+		parts = append(parts, join(unset, prefix, "")+" is not set")
+	case 2:
+		parts = append(parts, "neither "+code(prefix+unset[0])+" nor "+code(prefix+unset[1])+" is set")
+	default:
+		parts = append(parts, "none of "+join(unset, prefix, "or")+" is set")
 	}
 	return strings.Join(parts, " and "), true
 }

@@ -117,8 +117,10 @@ type harness struct {
 	cfSearchFails  bool
 	cfMods         map[int]*cfMod
 	cfHits         int
-	ctx            context.Context
-	msa            *fakeMSA
+	// modrinthPacks are the modpack projects the Modrinth fake knows, by project id.
+	modrinthPacks map[string]*modrinthPack
+	ctx           context.Context
+	msa           *fakeMSA
 	// exe stands in for the running binary, for the commands that move or remove it.
 	exe string
 	// watching counts the watchers a launch left running, so a test's directories outlive the runs
@@ -386,11 +388,18 @@ func newHarness(t *testing.T) *harness {
 		case "HVnmMxH1":
 			return []map[string]any{versionTagged("pcrMhvuU", "HVnmMxH1", "r5.5.1", "2026-09-01T00:00:00Z", h.jars["complementary"], nil, []string{"iris"})}
 		}
+		if mp, ok := h.modrinthPacks[projectID]; ok {
+			list := []map[string]any{}
+			for _, v := range mp.versions {
+				list = append(list, versionTagged(v.id, projectID, v.number, v.published, v.archive, nil, []string{"fabric"}))
+			}
+			return list
+		}
 		return nil
 	}
 	mux.HandleFunc("/modrinth/version/", func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/modrinth/version/")
-		for _, projectID := range []string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1"} {
+		for _, projectID := range append([]string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1"}, slices.Collect(maps.Keys(h.modrinthPacks))...) {
 			for _, v := range versions(projectID) {
 				if v["id"] == id {
 					writeJSON(w, v)
@@ -425,6 +434,11 @@ func newHarness(t *testing.T) *harness {
 			return
 		}
 		p, ok := projects[rest]
+		for id, mp := range h.modrinthPacks {
+			if !ok && (rest == id || rest == mp.slug) {
+				p, ok = map[string]any{"id": id, "slug": mp.slug, "title": mp.slug, "client_side": "required", "server_side": "required", "project_type": "modpack"}, true
+			}
+		}
 		if !ok {
 			http.NotFound(w, r)
 			return

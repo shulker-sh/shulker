@@ -263,7 +263,11 @@ func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []str
 	if modpacks := m.Modpacks(); len(modpacks) > 0 {
 		sources := make([]string, 0, len(modpacks))
 		for _, name := range slices.Sorted(maps.Keys(modpacks)) {
-			sources = append(sources, modpacks[name].Source)
+			source := modpacks[name].Source + modpacks[name].File
+			if source == "" {
+				source = name
+			}
+			sources = append(sources, source)
 		}
 		warnings = append(warnings, fmt.Sprintf("pack layers were flattened into the overrides: %s", strings.Join(sources, ", ")))
 	}

@@ -185,9 +185,9 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 
 ### `shulker add`
 
-Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug, or by a path to a local jar or zip, which becomes a local `file` entry. With `--type modpack` the argument is a modpack source instead: a local path, git URL, or raw manifest URL. Each type takes only the flags that mean something for it, so `--ref` on a mod or `--side` on a modpack is refused.
+Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug, or by a path to a local jar or zip, which becomes a local `file` entry. With `--type modpack` the argument is a modpack instead: a local path, git URL, raw manifest URL, archive, or the slug of a Modrinth or CurseForge modpack. A bare `add` of a slug the provider files as a modpack adds it as one too. Each type takes only the flags that mean something for it, so `--ref` on a mod or `--side` on a modpack is refused.
 
-With no arguments, `shulker add` asks `Add which mods?` over the search box [`shulker search`](#shulker-search) opens. Tab or enter moves into the results, space marks one, and shift+tab goes back to refine the query without losing the marks. Enter adds everything marked, or the row under the cursor when nothing is, in one change to the lock, each from the provider it was found on. `--type`, `--provider` and the other flags still apply, and `shulker resourcepack add` and `shulker shader add` search their own type. Off a terminal, or with `--no-input` or `--json`, the argument is required, and a modpack always takes its source.
+With no arguments, `shulker add` asks `Add which mods?` over the search box [`shulker search`](#shulker-search) opens. Tab or enter moves into the results, space marks one, and shift+tab goes back to refine the query without losing the marks. Enter adds everything marked, or the row under the cursor when nothing is, in one change to the lock, each from the provider it was found on. `--type`, `--provider` and the other flags still apply, and `shulker resourcepack add` and `shulker shader add` search their own type. Off a terminal, or with `--no-input` or `--json`, the argument is required, and so is a modpack's.
 
 ```sh
 shulker add sodium lithium
@@ -195,6 +195,7 @@ shulker add iris --channel beta
 shulker add betterthirdperson --provider curseforge --side client
 shulker add sodium --as speed
 shulker add ../base-pack --type modpack --as base
+shulker add cobblemon-official --type modpack
 shulker add
 ```
 
@@ -203,10 +204,10 @@ shulker add
 | `--type <type>` | What the arguments name: `mod` (default), `modpack`, `resourcepack`, `shader` |
 | `--side <side>` | Override side: `client`, `server`, `both` |
 | `--channel <channel>` | Least stable channel accepted: `release`, `beta`, `alpha` |
-| `--pin <version-id>` | Pin to a provider version id (one mod only) |
-| `--provider <provider>` | Provider to use for this mod: `modrinth` or `curseforge` |
+| `--pin <version-id>` | Pin to a provider version id (one mod or modpack only) |
+| `--provider <provider>` | Provider to use for this mod or modpack: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
-| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a pack or modpack archive file's name, the name in a modpack's manifest) |
+| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a pack or hosted modpack's provider slug, a modpack archive file's name, the name in a modpack's manifest) |
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack. On a terminal, an add without it prints what would have to move and asks `Move it?` (`Move them?` for several), and yes does the same |
@@ -220,7 +221,7 @@ shulker resourcepack add ~/Downloads/Faithful.zip
 
 ### `shulker search`
 
-Search every provider shulker has set up for projects matching the words, and print the ids to add them by. Results come in a block per provider, most downloaded first, and the command writes nothing: `shulker.json` and the lock only change through `add`. Projects CurseForge classes as something shulker has no entry type for, worlds and plugins among them, are left out. A `modpack` row is a provider modpack, which `add` can't take yet: add a modpack by source instead.
+Search every provider shulker has set up for projects matching the words, and print the ids to add them by. Results come in a block per provider, most downloaded first, and the command writes nothing: `shulker.json` and the lock only change through `add`. Projects CurseForge classes as something shulker has no entry type for, worlds and plugins among them, are left out. A `modpack` row is a provider modpack, which `add` takes by its slug.
 
 With no words, `shulker search` opens a search box over a list of results that follows it as you type, searching once you pause for a quarter of a second and have typed at least two characters. Tab moves into the list to scroll it and shift+tab back to the box; enter does nothing, since nothing is chosen here. Esc or ctrl-c leaves and prints the results on screen, as `shulker search` with those words would. A query that fails keeps the last results on screen, with the error under the box. Off a terminal, or with `--no-input` or `--json`, the words are required.
 
@@ -286,7 +287,7 @@ shulker update sodium iris
 
 ### `shulker outdated`
 
-Show mods with a newer compatible version without changing anything, like a dry run of `update`. Local `file` entries are skipped, and naming one says it is a local file rather than that it is up to date.
+Show mods, and modpacks from a provider, with a newer compatible version without changing anything, like a dry run of `update`. A modpack's row is marked `modpack`. Local `file` entries are skipped, and naming one says it is a local file rather than that it is up to date.
 
 ```sh
 shulker outdated
@@ -311,7 +312,7 @@ With `--json`, `data.suggestions` lists each one as `{ "mod", "kind", "on", "dec
 
 ### `shulker pin`
 
-Pin a mod to a provider version id. Without a version, pins it to the version already in the lock. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`.
+Pin a mod, or a modpack from a provider, to a provider version id. Without a version, pins it to the version already in the lock. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`.
 
 ```sh
 shulker pin iris k9RhZq2X
@@ -320,7 +321,7 @@ shulker pin sodium
 
 ### `shulker unpin`
 
-Remove a mod's pin and re-resolve it.
+Remove a mod's or a hosted modpack's pin and re-resolve it.
 
 ```sh
 shulker unpin iris
@@ -1390,7 +1391,9 @@ shulker mod list
 
 ### `shulker modpack add|remove|list`
 
-A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`, `--unlocked`, `--no-auto-update`.
+A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`, `--unlocked`, `--no-auto-update`, and for a modpack from a provider `--pin`, `--channel`, `--provider`.
+
+A modpack can be a Modrinth or CurseForge modpack, named by its slug: `shulker modpack add cozy` looks it up on each provider in the manifest's order, or on the one `--provider` names, and writes `{"type": "modpack", "provider", "project"}` under the slug unless `--as` says otherwise. It picks its version like a mod: the newest in its channel that fits the project's Minecraft and loader, or the newest overall when the project sets neither, in which case the project takes the pack's platform. None fitting fails with `no-compatible-version`. That version's archive is fetched into the cache and read as an archive is below, so its mods lock as the modpack's and its overrides are laid before your own; the lock records its provider, version and `sha512`. `pin`, `unpin`, `update` and `outdated` treat it as they treat a mod, and `sync` never moves it. A locked one builds offline from the cache; one not yet locked can't be fetched offline. `--ref`, `--unlocked` and `--no-auto-update` are refused: the archive is a provider version, always locked, and moves only with `update`. An archive whose author turned off third-party downloads stops with `missing-files` until you put it in `downloads/`.
 
 A modpack can also be a Modrinth modpack archive: `shulker modpack add packs/cozy.mrpack`, or a bare `shulker add packs/cozy.mrpack`, writes a `file` entry, taking the path the way `add` takes a local file — referenced where it lies inside the project, copied into `files/` from outside it, and keyed by the file name unless `--as` says otherwise. Its mods lock as the modpack's: each is found by its hash on Modrinth, or reused from the shulker project an exported archive carries, and a file neither knows is laid by the modpack itself, as are its `overrides`, `client-overrides` and `server-overrides` folders, before your own. An archive is locked unless `--unlocked` says otherwise. The lock records its bytes, so changing the file makes the lock out of date and the next `lock` or `sync` reads it again, unless `--no-auto-update` holds it until `shulker update`. With the file deleted, the build lays the archive from the cache and warns. A CurseForge modpack zip is taken the same way, by `shulker modpack add packs/craft.zip` or by a bare `add` of a zip that holds a CurseForge `manifest.json`: each file it names locks as the modpack's by its CurseForge project and file ID, a file whose author doesn't allow third-party downloads stops the lock with `missing-files` until you put it in `downloads/`, where it locks as a manual download, and the pack's overrides folder is laid by the modpack. Those IDs carry no hash, so the cache can't stand in for CurseForge: reading the zip needs the network even when every file it names is cached, and offline it fails with `curseforge-offline`. A locked zip whose bytes haven't changed builds from the lock and needs no network. A file that is neither a Modrinth nor a CurseForge modpack is refused.
 
@@ -1725,12 +1728,12 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
 | `manifest-invalid` | `shulker.json` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |
-| `manual-download` | The provider doesn't distribute this mod; download it into `downloads/` |
+| `manual-download` | The provider doesn't distribute this mod or modpack; download it into `downloads/` |
 | `memory` | Server memory isn't a whole number of M or G |
 | `meta-fetch` | Version metadata couldn't be read from Mojang, a loader's meta or Maven, or GDLauncher's meta. The row names the service and what went wrong |
 | `meta-invalid` | Version metadata was read but lacks what shulker needs, like a Minecraft version Mojang doesn't list, a Java runtime manifest with no java in it, or a loader installer whose files won't parse |
 | `minecraft-required` | `shulker.json` sets no `minecraft` and no locked modpack supplies one; set it with `shulker set minecraft <version>` |
-| `missing-files` | Mods that need a manual download are missing, at `install`, or files a CurseForge modpack names at `import curseforge` or when a modpack's CurseForge zip is read; also a local `file` entry whose file is gone or changed when the cache has no copy either. `items`: what to download or restore |
+| `missing-files` | Mods that need a manual download are missing, at `install`, or files a CurseForge modpack names at `import curseforge` or when a modpack's CurseForge zip is read, or a hosted modpack's archive when its author turned off third-party downloads; also a local `file` entry whose file is gone or changed when the cache has no copy either. `items`: what to download or restore |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
 | `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files; pass `--bundle`. `items`: the files |
@@ -1764,7 +1767,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-platform` | Locked modpacks disagree about Minecraft or the loader, and `shulker.json` sets neither; set `minecraft`/`loader`, or unlock one |
 | `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
-| `modpack-unlocked` | A modpack has no commit in the lock; run `shulker update` |
+| `modpack-unlocked` | A modpack has no commit, archive hash or version in the lock; run `shulker update`, or `shulker lock` before pinning a hosted one |
 | `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
 | `pack-filename-taken` | Two resource packs or shaders would be placed under one file name in the same folder, compared without case. Give one a different `filename` |
@@ -1780,7 +1783,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid, including a `shulker.json` value that can't be written as a property. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
-| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a modpack from a provider rather than a `source` or a `file` |
+| `requires-unsupported` | A `requires` entry or a project being added is a kind shulker can't resolve |
 | `restore-failed` | `restore --all` failed for some targets; `data` has each target's result |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |
@@ -1802,7 +1805,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
 | `type-ambiguous` | A CurseForge slug matches projects of several types, or a zip given to `add` holds neither a resource pack nor a shader; pass `--type` to choose. `candidates`: the types it could be |
-| `type-mismatch` | `--type` disagrees with what the provider says the project is. `candidates`: the provider's own type |
+| `type-mismatch` | `--type`, or a hosted modpack entry, disagrees with what the provider says the project is. `candidates`: the provider's own type |
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | An override uses a variable that isn't set |
 | `unsupported-loader` | shulker doesn't support the loader yet |

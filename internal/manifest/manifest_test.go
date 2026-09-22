@@ -178,14 +178,8 @@ func TestRequiresEntryKinds(t *testing.T) {
 	if _, ok := m.Modpacks()["base"]; !ok || len(m.Modpacks()) != 1 || len(m.Mods()) != 1 || m.Mods()["sodium"].Channel != "beta" {
 		t.Fatalf("mods %v, modpacks %v", m.Mods(), m.Modpacks())
 	}
-	if err := m.CheckSupported(); err != nil {
-		t.Fatal(err)
-	}
 	packs, err := Parse(doc(`"fresh":{"type":"resourcepack"},"complementary":{"type":"shader"}`))
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := packs.CheckSupported(); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := packs.ResourcePacks()["fresh"]; !ok || len(packs.ResourcePacks()) != 1 {
@@ -196,9 +190,6 @@ func TestRequiresEntryKinds(t *testing.T) {
 	}
 	local, err := Parse(doc(`"extras":{"file":"files/extras.jar"},"faithful":{"type":"resourcepack","file":"files/faithful.zip"},"bsl":{"type":"shader","file":"files/bsl.zip"}`))
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := local.CheckSupported(); err != nil {
 		t.Fatal(err)
 	}
 	if local.Mods()["extras"].File != "files/extras.jar" || len(local.ResourcePacks()) != 1 || len(local.Shaders()) != 1 {
@@ -213,9 +204,6 @@ func TestRequiresEntryKinds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := archive.CheckSupported(); err != nil {
-		t.Fatal(err)
-	}
 	if len(archive.Mods()) != 0 || archive.Modpacks()["cozy"].File != "files/cozy.mrpack" {
 		t.Errorf("an archive is a modpack: mods %v, modpacks %v", archive.Mods(), archive.Modpacks())
 	}
@@ -223,11 +211,13 @@ func TestRequiresEntryKinds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := hosted.CheckSupported(); out.CodeOf(err) != "requires-unsupported" {
-		t.Errorf("CheckSupported = %v", err)
+	if cozy, ok := hosted.Modpacks()["cozy"]; len(hosted.Mods()) != 0 || !ok || !cozy.IsHosted() || cozy.AutoUpdates() {
+		t.Errorf("a hosted modpack is a modpack that follows nothing: mods %v, modpacks %v", hosted.Mods(), hosted.Modpacks())
 	}
-	if len(hosted.Mods()) != 0 || len(hosted.Modpacks()) != 0 {
-		t.Error("a hosted modpack is counted as a mod or a modpack")
+	for _, key := range []string{`"ref":"main"`, `"autoUpdate":true`, `"locked":true`, `"side":"client"`, `"os":"linux"`} {
+		if _, err := Parse(doc(`"cozy":{"type":"modpack",` + key + `}`)); out.CodeOf(err) != "manifest-invalid" {
+			t.Errorf("a hosted modpack with %s should be invalid, got %v", key, err)
+		}
 	}
 }
 

@@ -17,11 +17,14 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
-// KindOf is where a modpack entry comes from: an archive when it names a file, and its source's
-// kind otherwise.
+// KindOf is where a modpack entry comes from: an archive when it names a file, a provider when it
+// names neither a file nor a source, and its source's kind otherwise.
 func KindOf(p manifest.Require) Kind {
-	if p.File != "" {
+	switch {
+	case p.File != "":
 		return File
+	case p.Source == "":
+		return Hosted
 	}
 	return Classify(p.Source)
 }
@@ -69,13 +72,86 @@ func (s *Store) openArchive(ctx context.Context, l *Loaded, p manifest.Require) 
 			return err
 		}
 	}
+	return s.openCached(ctx, l, p.File)
+}
+
+// openCached reads the archive the lock pinned from the cache, and rebuilds its lock and manifest
+// from the entries the project's lock took from it.
+func (s *Store) openCached(ctx context.Context, l *Loaded, rel string) error {
 	var err error
-	if l.Archive, l.CurseForge, err = readArchive(l.Name, p.File, s.Cache.Object(l.Pin.Sha512)); err != nil {
+	if l.Archive, l.CurseForge, err = readArchive(l.Name, rel, s.Cache.Object(l.Pin.Sha512)); err != nil {
 		return err
 	}
 	l.Manifest, l.Lock = archiveEntries(l.Name, l.Archive, s.Lock)
 	return s.layArchive(ctx, l)
 }
+
+// resolveHosted picks a hosted modpack's version, puts its archive in the cache, and has Consume
+// lock what it holds. The archive is a pin, so the modpack is always locked.
+func (s *Store) resolveHosted(ctx context.Context, l *Loaded, p manifest.Require) error {
+	pin, err := s.Obtain(ctx, l.Name, p)
+	if err != nil {
+		return err
+	}
+	l.Pin, l.Source = pin, pin.Provider
+	if l.Archive, l.CurseForge, err = readArchive(l.Name, pin.Filename, s.Cache.Object(pin.Sha512)); err != nil {
+		return err
+	}
+	if err := s.Consume(ctx, l); err != nil {
+		return err
+	}
+	l.UsesLock, l.Pin.UsesLock = true, true
+	return s.layArchive(ctx, l)
+}
+
+// openHosted reads a hosted modpack's archive at the version the lock pinned: from the cache, else
+// from its url, else from a copy dropped in the downloads folder when its author turned
+// distribution off.
+func (s *Store) openHosted(ctx context.Context, l *Loaded) error {
+	if l.Pin.Sha512 == "" {
+		return unlocked(l.Name, "archive hash")
+	}
+	if !s.Cache.Has(l.Pin.Sha512) {
+		if err := s.fetchHosted(ctx, l); err != nil {
+			return err
+		}
+	}
+	return s.openCached(ctx, l, l.Pin.Filename)
+}
+
+func (s *Store) fetchHosted(ctx context.Context, l *Loaded) error {
+	if l.Pin.URL != nil {
+		s.log("fetching modpack %s %s", l.Name, l.Pin.VersionNumber)
+		if _, err := s.Cache.Ensure(ctx, s.Fetch, *l.Pin.URL, l.Pin.Sha512); err != nil {
+			return fetchFailure(l.Name, *l.Pin.URL, err)
+		}
+		return nil
+	}
+	dir := filepath.Join(s.ProjectDir, DownloadsDir)
+	entries, err := os.ReadDir(dir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	for _, e := range entries {
+		if !e.Type().IsRegular() || e.Name()[0] == '.' {
+			continue
+		}
+		path := filepath.Join(dir, e.Name())
+		got, err := fsutil.SHA512(path)
+		if err != nil {
+			return err
+		}
+		if got == l.Pin.Sha512 {
+			return s.cacheFile(path)
+		}
+	}
+	e := out.Errorf("missing-files", "modpack %s %s needs a manual download", l.Name, l.Pin.VersionNumber)
+	e.Items = []string{fmt.Sprintf("%s: download %s from %s and place it in %s/", l.Name, l.Pin.Filename, l.Pin.Page, DownloadsDir)}
+	return e
+}
+
+// DownloadsDir is the project folder files a provider won't serve are dropped into by hand.
+const DownloadsDir = "downloads"
 
 // cacheArchive puts the archive at rel in the cache and pins it. One that is gone is served from
 // the cache at the bytes the lock pinned, as a gone local file is.

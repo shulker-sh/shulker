@@ -16,6 +16,7 @@ type Outdated struct {
 	Current string `json:"current"`
 	Latest  string `json:"latest"`
 	Pinned  bool   `json:"pinned"`
+	Modpack bool   `json:"modpack,omitempty"`
 }
 
 // Update re-resolves the named mods and modpacks to their newest allowed versions, or all of them
@@ -87,18 +88,28 @@ func (r *Resolver) Update(ctx context.Context, ids []string) error {
 }
 
 func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, error) {
-	mods, packIDs, err := r.splitPackTargets(ids)
-	if err != nil {
-		return nil, err
-	}
-	res, err := r.outdatedPacks(ctx, packIDs)
-	if err != nil {
-		return nil, err
-	}
-	if len(ids) > 0 && len(mods) == 0 {
-		if res == nil {
-			res = []Outdated{}
+	rest, hosted := r.splitHosted(ids)
+	res := []Outdated{}
+	if len(ids) == 0 || len(hosted) > 0 {
+		modpacks, err := r.outdatedModpacks(ctx, hosted)
+		if err != nil {
+			return nil, err
 		}
+		res = append(res, modpacks...)
+	}
+	if len(ids) > 0 && len(rest) == 0 {
+		return res, nil
+	}
+	mods, packIDs, err := r.splitPackTargets(rest)
+	if err != nil {
+		return nil, err
+	}
+	zips, err := r.outdatedPacks(ctx, packIDs)
+	if err != nil {
+		return nil, err
+	}
+	res = append(res, zips...)
+	if len(rest) > 0 && len(mods) == 0 {
 		return res, nil
 	}
 	targets, err := r.directTargets(mods)
@@ -132,8 +143,12 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 	return res, nil
 }
 
-// Pin holds a mod at version, the locked one when version is empty, and returns the version pinned.
+// Pin holds a mod or hosted modpack at version, the locked one when version is empty, and returns
+// the version pinned.
 func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, error) {
+	if r.Manifest.Requires[id].IsHosted() {
+		return r.pinModpack(ctx, id, version)
+	}
 	if err := r.refuseLocalPin(id); err != nil {
 		return "", err
 	}
@@ -149,8 +164,11 @@ func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, 
 	return version, r.Update(ctx, []string{id})
 }
 
-// Unpin lets a pinned mod update again, and updates it.
+// Unpin lets a pinned mod or hosted modpack update again, and updates it.
 func (r *Resolver) Unpin(ctx context.Context, id string) error {
+	if r.Manifest.Requires[id].IsHosted() {
+		return r.unpinModpack(ctx, id)
+	}
 	if err := r.refuseLocalPin(id); err != nil {
 		return err
 	}

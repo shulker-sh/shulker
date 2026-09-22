@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+
+	"shulker.sh/shulker/internal/pack"
 )
 
-const DownloadsDir = "downloads"
+const DownloadsDir = pack.DownloadsDir
 
 type dropped struct {
 	Name   string

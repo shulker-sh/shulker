@@ -115,9 +115,6 @@ func (a *app) openProjectAt(dir string) (*project.Project, error) {
 }
 
 func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolver, error) {
-	if err := p.Manifest.CheckSupported(); err != nil {
-		return nil, err
-	}
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
@@ -126,7 +123,7 @@ func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolv
 	if err != nil {
 		return nil, err
 	}
-	return &resolve.Resolver{
+	r := &resolve.Resolver{
 		Dir:       p.Dir,
 		Manifest:  p.Manifest,
 		Lock:      p.Lock,
@@ -137,13 +134,14 @@ func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolv
 		Meta:      d.meta,
 		Log:       a.progress,
 		Progress:  a.printer.Progress,
-	}, nil
+	}
+	r.LockModpack = func(ctx context.Context, key string, entry manifest.Require) error {
+		return a.lockHostedEntry(ctx, p, r, key, entry)
+	}
+	return r, nil
 }
 
 func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, error) {
-	if err := p.Manifest.CheckSupported(); err != nil {
-		return nil, err
-	}
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
@@ -164,7 +162,11 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 		r := &resolve.Resolver{Dir: p.Dir, Manifest: p.Manifest, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
 		return r.ConsumeArchive(ctx, l)
 	}
-	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Lock: p.Lock, Consume: consume}, nil
+	obtain := func(ctx context.Context, name string, entry manifest.Require) (lock.Modpack, error) {
+		r := &resolve.Resolver{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+		return r.ObtainModpack(ctx, name, entry)
+	}
+	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
 }
 
 func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded, error) {
@@ -180,13 +182,15 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
 		mp := modpacks[name]
 		pinned, ok := p.Lock.Modpacks[name]
-		moved := ok && (pinned.Source != mp.Source || pinned.File != mp.File)
+		moved := ok && (pinned.Source != mp.Source || pinned.File != mp.File || (mp.IsHosted() && len(project.HostedDifferences(name, mp, pinned)) > 0))
 		// A relock reads local packs as they are on disk: they have no version to hold back.
 		if !ok || moved || (a.isRelocking && a.rereads(p, mp, pinned)) {
 			switch {
 			case name == a.linkedPack:
 			case !ok && len(p.Lock.Modpacks) > 0:
 				a.printer.Warn("modpack %s is not in the lock yet; resolving it", name)
+			case moved && mp.IsHosted():
+				a.printer.Warn("modpack %s has changed since the lock; resolving it", name)
 			case moved:
 				a.printer.Warn("modpack %s has a new source since the lock; resolving it", name)
 			}

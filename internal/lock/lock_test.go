@@ -107,3 +107,50 @@ func TestArchiveModpackEntries(t *testing.T) {
 		}
 	}
 }
+
+func TestHostedModpackEntries(t *testing.T) {
+	sha := strings.Repeat("ab", 64)
+	doc := func(modpack string) []byte {
+		return []byte(`{"lockVersion":1,"minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},` +
+			`"modpacks":{"cozy":{` + modpack + `}},"mods":{},"resourcepacks":{},"shaders":{},"players":[]}`)
+	}
+	identity := `"provider":"curseforge","project":600001,"version":7000001,"versionNumber":"Cozy 2.0","channel":"release","filename":"cozy-2.0.zip","sha512":"` + sha + `","size":10,"locked":true`
+	hosted := identity + `,"url":"https://edge.forgecdn.net/files/cozy-2.0.zip"`
+	l, err := Parse(doc(hosted))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, err := l.Encode(); err != nil || !strings.Contains(string(data), `"url": "https://edge.forgecdn.net/files/cozy-2.0.zip"`) {
+		t.Fatalf("a hosted entry writes its url: %v\n%s", err, data)
+	}
+	mp := l.Modpacks["cozy"]
+	if mp.Provider != "curseforge" || mp.VersionNumber != "Cozy 2.0" || mp.URL == nil || mp.Sha512 != sha || mp.Label() != "Cozy 2.0" {
+		t.Fatalf("hosted entry: %+v", mp)
+	}
+	manual, err := Parse(doc(identity + `,"url":null,"page":"https://www.curseforge.com/minecraft/modpacks/cozy/files/7000001"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := manual.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"url": null`) {
+		t.Fatalf("a hosted entry writes a null url:\n%s", data)
+	}
+	if _, err := Parse(data); err != nil {
+		t.Fatalf("a hosted entry must survive a round trip: %v\n%s", err, data)
+	}
+	for name, entry := range map[string]string{
+		"a hosted pack with a source":       hosted + `,"source":"../base"`,
+		"a hosted pack with a file":         hosted + `,"file":"packs/cozy.zip"`,
+		"a hosted pack without its version": `"provider":"modrinth","project":"AAAAAAAA","filename":"cozy.mrpack","url":"https://cdn.modrinth.com/cozy.mrpack","sha512":"` + sha + `","size":10`,
+		"a hosted pack without a url":       identity,
+		"a null url with no page":           identity + `,"url":null`,
+		"a source with a version":           `"source":"../base","dirSha256":"` + strings.Repeat("ab", 32) + `","version":"AAAAAAAA"`,
+	} {
+		if _, err := Parse(doc(entry)); err == nil {
+			t.Errorf("%s should be invalid", name)
+		}
+	}
+}

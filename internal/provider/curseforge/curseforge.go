@@ -288,7 +288,10 @@ func (c *CurseForge) Versions(ctx context.Context, projectID, game string, loade
 	}
 	for _, name := range tags {
 		for index := 0; ; {
-			q := url.Values{"gameVersion": {game}, "index": {strconv.Itoa(index)}, "pageSize": {strconv.Itoa(pageSize)}}
+			q := url.Values{"index": {strconv.Itoa(index)}, "pageSize": {strconv.Itoa(pageSize)}}
+			if game != "" {
+				q.Set("gameVersion", game)
+			}
 			// Mod loaders filter server-side; shader loaders are tagged in
 			// gameVersions instead, alongside the Minecraft versions.
 			if l, ok := loader.Lookup(name); ok {
@@ -304,7 +307,7 @@ func (c *CurseForge) Versions(ctx context.Context, projectID, game string, loade
 				return nil, err
 			}
 			for _, f := range res.Data {
-				if seen[f.ID] || !f.IsAvailable || !contains(f.GameVersions, game) {
+				if seen[f.ID] || !f.IsAvailable || (game != "" && !contains(f.GameVersions, game)) {
 					continue
 				}
 				if name != "" && !containsFold(f.GameVersions, name) {

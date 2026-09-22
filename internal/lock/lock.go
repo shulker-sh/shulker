@@ -54,16 +54,25 @@ type Java struct {
 	Component string `json:"component"`
 }
 
-// Modpack is where a modpack resolved to: a source's commit or digest, or a local archive's bytes.
+// Modpack is where a modpack resolved to: a source's commit or digest, a local archive's bytes, or
+// a provider version and its archive's bytes.
 type Modpack struct {
-	Source    string `json:"source,omitempty"`
-	Ref       string `json:"ref,omitempty"`
-	Commit    string `json:"commit,omitempty"`
-	DirSha256 string `json:"dirSha256,omitempty"`
-	Sha256    string `json:"sha256,omitempty"`
-	File      string `json:"file,omitempty"`
-	Sha512    string `json:"sha512,omitempty"`
-	Size      int64  `json:"size,omitempty"`
+	Provider      string  `json:"provider,omitempty"`
+	Project       any     `json:"project,omitempty"`
+	Version       any     `json:"version,omitempty"`
+	VersionNumber string  `json:"versionNumber,omitempty"`
+	Channel       string  `json:"channel,omitempty"`
+	URL           *string `json:"url,omitempty"`
+	Page          string  `json:"page,omitempty"`
+	Filename      string  `json:"filename,omitempty"`
+	Source        string  `json:"source,omitempty"`
+	Ref           string  `json:"ref,omitempty"`
+	Commit        string  `json:"commit,omitempty"`
+	DirSha256     string  `json:"dirSha256,omitempty"`
+	Sha256        string  `json:"sha256,omitempty"`
+	File          string  `json:"file,omitempty"`
+	Sha512        string  `json:"sha512,omitempty"`
+	Size          int64   `json:"size,omitempty"`
 	// Unmanaged is what an archive lays as its own override files, by layer and path, each with
 	// its sha512: the files no lock entry took.
 	Unmanaged map[string]string `json:"unmanaged,omitempty"`
@@ -73,9 +82,11 @@ type Modpack struct {
 	LockSha256 string `json:"lockSha256,omitempty"`
 }
 
-// Label is the short hash that names what the modpack resolved to.
+// Label names what the modpack resolved to: a hosted one's version, and a short hash otherwise.
 func (p Modpack) Label() string {
 	switch {
+	case p.Provider != "":
+		return p.VersionNumber
 	case p.Commit != "":
 		return p.Commit[:12]
 	case p.DirSha256 != "":
@@ -158,6 +169,18 @@ func (m Mod) MarshalJSON() ([]byte, error) {
 		plain
 		URL *string `json:"url,omitempty"`
 	}{plain: plain(m)})
+}
+
+// MarshalJSON writes a hosted modpack's url even when it is null, as a provider entry's is.
+func (p Modpack) MarshalJSON() ([]byte, error) {
+	type plain Modpack
+	if p.Provider == "" {
+		return marshalPlain(plain(p))
+	}
+	return marshalPlain(struct {
+		plain
+		URL *string `json:"url"`
+	}{plain: plain(p), URL: p.URL})
 }
 
 func (p Pack) MarshalJSON() ([]byte, error) {
