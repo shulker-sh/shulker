@@ -5,8 +5,8 @@ import (
 	"slices"
 	"time"
 
-	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/proc"
 )
 
 // noExitCode stands for a run nothing passed the game's status on from, which is every run a
@@ -89,7 +89,7 @@ func (a *app) reconcileRun(dir string) {
 // isAbandoned is an open record for a game shulker was watching that has gone without its watcher
 // closing it.
 func isAbandoned(rec instance.Launch) bool {
-	return rec.EndedAt == "" && rec.PID != 0 && !game.IsAlive(rec.PID)
+	return rec.EndedAt == "" && rec.PID != 0 && !proc.IsAlive(rec.PID)
 }
 
 // openRecord is the newest record nothing has closed for the game with this pid, or -1 where there

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/proc"
 )
 
 const (
@@ -88,7 +89,7 @@ func GDLauncherRunning() (running, detectable bool) {
 	if err != nil {
 		return false, true
 	}
-	return processAlive(pid), true
+	return proc.IsAlive(pid), true
 }
 
 func gdlauncherAppData() (string, error) {

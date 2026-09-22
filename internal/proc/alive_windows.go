@@ -1,4 +1,4 @@
-package game
+package proc
 
 import "golang.org/x/sys/windows"
 
