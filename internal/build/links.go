@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"shulker.sh/shulker/internal/fsutil"
 )
 
 // DataDir is the project folder, one subfolder per side, that holds the saves, logs and other data
@@ -36,18 +38,15 @@ func (b *Builder) planLinks(dir, side string, dirs []string, prev State, report 
 		wanted[rel] = true
 		abs := filepath.Join(dir, rel)
 		data := filepath.Join(dataRoot, rel)
-		want, err := filepath.Rel(dir, data)
-		if err != nil {
-			return plan, err
-		}
+		current, linked := fsutil.ReadLink(abs)
 		info, err := os.Lstat(abs)
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
 			plan.link = append(plan.link, rel)
 		case err != nil:
 			return plan, err
-		case info.Mode()&fs.ModeSymlink != 0:
-			if current, err := os.Readlink(abs); err != nil || current != want {
+		case linked:
+			if !fsutil.SameTarget(abs, current, data) {
 				plan.link = append(plan.link, rel)
 			}
 		case !info.IsDir():
@@ -73,7 +72,7 @@ func (b *Builder) planLinks(dir, side string, dirs []string, prev State, report 
 		if wanted[rel] {
 			continue
 		}
-		if info, err := os.Lstat(filepath.Join(dir, rel)); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+		if _, linked := fsutil.ReadLink(filepath.Join(dir, rel)); linked {
 			plan.remove = append(plan.remove, rel)
 		}
 	}
@@ -103,7 +102,7 @@ func (b *Builder) applyLinks(dir, side string, plan linkPlan, report *Report) er
 		if !filepath.IsAbs(data) {
 			data = filepath.Join(filepath.Dir(abs), data)
 		}
-		if err := os.Remove(abs); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err := fsutil.UnlinkDir(abs); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
 		report.Removed = append(report.Removed, rel)
@@ -129,7 +128,7 @@ func (b *Builder) applyLinks(dir, side string, plan linkPlan, report *Report) er
 		if err != nil {
 			return err
 		}
-		if err := os.Symlink(want, abs); err != nil {
+		if err := fsutil.LinkDir(want, abs); err != nil {
 			return err
 		}
 		report.Linked = append(report.Linked, rel)

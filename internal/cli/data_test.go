@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/fsutil"
 )
 
 func TestBuildLinksDataDirs(t *testing.T) {
@@ -23,9 +25,10 @@ func TestBuildLinksDataDirs(t *testing.T) {
 		t.Fatalf("first build: %s", stdout)
 	}
 	for _, rel := range []string{"saves", "screenshots", "logs", "crash-reports"} {
-		target, err := os.Readlink(filepath.Join(buildDir, rel))
-		if err != nil || target != filepath.Join("..", "..", "data", "client", rel) {
-			t.Fatalf("%s: %q %v", rel, target, err)
+		link := filepath.Join(buildDir, rel)
+		target, ok := fsutil.ReadLink(link)
+		if !ok || !fsutil.SameTarget(link, target, filepath.Join(h.dir, "data", "client", rel)) {
+			t.Fatalf("%s: %q %v", rel, target, ok)
 		}
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "data", "client", "saves", "First", "level.dat")); err != nil {
@@ -70,8 +73,8 @@ func TestServerBuildLinksWorldByLevelName(t *testing.T) {
 	if !strings.Contains(stdout, "3 linked") {
 		t.Fatalf("first build: %s", stdout)
 	}
-	if target, err := os.Readlink(filepath.Join(buildDir, "world")); err != nil || target != filepath.Join("..", "..", "data", "server", "world") {
-		t.Fatalf("world link: %q %v", target, err)
+	if link := filepath.Join(buildDir, "world"); !isLinkTo(link, filepath.Join(h.dir, "data", "server", "world")) {
+		t.Fatalf("world link: %s", link)
 	}
 
 	h.editManifest(t, func(m map[string]any) {
@@ -87,7 +90,52 @@ func TestServerBuildLinksWorldByLevelName(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(h.dir, "data", "server", "world")); err != nil {
 		t.Fatal("old world data must stay:", err)
 	}
-	if target, err := os.Readlink(filepath.Join(buildDir, "creative")); err != nil || target != filepath.Join("..", "..", "data", "server", "creative") {
-		t.Fatalf("creative link: %q %v", target, err)
+	if link := filepath.Join(buildDir, "creative"); !isLinkTo(link, filepath.Join(h.dir, "data", "server", "creative")) {
+		t.Fatalf("creative link: %s", link)
 	}
+}
+
+func TestBuildKeepsAbsoluteDataLinks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	buildDir := filepath.Join(h.dir, "build", "server")
+	h.mustRun(t, "install")
+	world := filepath.Join(h.dir, "data", "server", "world")
+	if err := os.WriteFile(filepath.Join(world, "level.dat"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"world", "logs", "crash-reports"} {
+		link := filepath.Join(buildDir, rel)
+		if err := os.Remove(link); err != nil {
+			t.Fatal(err)
+		}
+		if err := fsutil.LinkDir(filepath.Join(h.dir, "data", "server", rel), link); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stdout := h.mustRun(t, "build")
+	if strings.Contains(stdout, "linked") || strings.Contains(stdout, "conflict") {
+		t.Fatalf("absolute links should be kept: %s", stdout)
+	}
+
+	h.editManifest(t, func(m map[string]any) {
+		m["server"].(map[string]any)["properties"].(map[string]any)["level-name"] = "creative"
+	})
+	stdout = h.mustRun(t, "build")
+	if !strings.Contains(stdout, "1 removed, 1 linked") {
+		t.Fatalf("level-name change: %s", stdout)
+	}
+	info, err := os.Lstat(filepath.Join(buildDir, "world"))
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("world should be moved back as a real folder: %v %v", info, err)
+	}
+	if _, err := os.Stat(filepath.Join(buildDir, "world", "level.dat")); err != nil {
+		t.Fatal("moved-back world lost its data:", err)
+	}
+}
+
+func isLinkTo(link, want string) bool {
+	target, ok := fsutil.ReadLink(link)
+	return ok && fsutil.SameTarget(link, target, want)
 }
