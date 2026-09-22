@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
@@ -299,6 +300,17 @@ func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provide
 		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s is on CurseForge, but its author doesn't allow third-party downloads; kept as an override", file))
 		im.unmanaged(o)
 		return nil
+	}
+	// A fingerprint ignores whitespace bytes, so only a matching sha1 proves the pack's bytes are
+	// CurseForge's file; those lock from the cache without downloading it again.
+	if sum := sha1.Sum(o.Data); hex.EncodeToString(sum[:]) == v.File.Sha1 {
+		sha512Sum, err := im.r.Cache.Put(bytes.NewReader(o.Data))
+		if err != nil {
+			return err
+		}
+		same := *v
+		same.File.Sha512 = sha512Sum
+		v = &same
 	}
 	side := layerSide(o.Layer)
 	if side == "both" {

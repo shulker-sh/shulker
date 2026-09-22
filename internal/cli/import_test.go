@@ -391,6 +391,7 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 		return env.Data, env.Warnings, dir
 	}
 
+	h.cfMods[455508].files[0].forbidden = true
 	h.cfHits = 0
 	res, warnings, dir := importMixed(t)
 	if h.modrinthBatches != 2 || h.cfHits != 3 {
