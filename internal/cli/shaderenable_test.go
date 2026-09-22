@@ -22,7 +22,10 @@ func TestShaderIsEnabledByTheShaderModTheBuildPlaced(t *testing.T) {
 	})
 	h.mustRun(t, "lock")
 
-	h.mustRun(t, "install")
+	_, _, stderr := h.run(t, "install")
+	if !strings.Contains(stderr, "! complementary-reimagined is placed, but nothing in this build can load it; shulker add iris") {
+		t.Fatalf("no unloadable line with iris turned off: %s", stderr)
+	}
 	if readBuilt(t, h, "shaderpacks/complementary-reimagined.zip") == "" {
 		t.Fatal("the shader was not placed")
 	}
@@ -31,9 +34,21 @@ func TestShaderIsEnabledByTheShaderModTheBuildPlaced(t *testing.T) {
 	}
 
 	h.mustRun(t, "feature", "on", "shaders")
-	h.mustRun(t, "build")
+	if _, _, stderr := h.run(t, "build"); strings.Contains(stderr, "complementary-reimagined is placed") {
+		t.Fatalf("the enabled shader was reported: %s", stderr)
+	}
 	if got := readBuilt(t, h, "config/iris.properties"); !strings.Contains(got, "shaderPack=complementary-reimagined.zip") || !strings.Contains(got, "enableShaders=true") {
 		t.Fatalf("iris.properties: %q", got)
+	}
+}
+
+func TestShaderWithNoShaderModIsReported(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	_, _, stderr := h.run(t, "install")
+	if !strings.Contains(stderr, "! complementary-reimagined is placed, but nothing in this build can load it; shulker add iris") {
+		t.Fatalf("no unloadable line: %s", stderr)
 	}
 }
 

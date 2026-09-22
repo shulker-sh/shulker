@@ -21,6 +21,7 @@ func localFiles(t *testing.T) (*harness, fakeJar) {
 		"files/private-mod-1.4.jar": jar.data,
 		"files/faithful.zip":        makeJarFile(t, "faithful", "faithful.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"faithful"}}`).data,
 		"files/bsl.zip":             makeJarFile(t, "bsl", "bsl.zip", "shaders/gbuffers_basic.vsh", "// bsl").data,
+		"files/iris-1.9.jar":        makeJar(t, "iris", "iris-1.9.jar", "client").data,
 	}
 	for rel, data := range files {
 		writeProjectFile(t, h, rel, data)
@@ -30,6 +31,7 @@ func localFiles(t *testing.T) (*harness, fakeJar) {
 			"private-mod": map[string]any{"file": "files/private-mod-1.4.jar"},
 			"faithful":    map[string]any{"type": "resourcepack", "file": "files/faithful.zip"},
 			"bsl":         map[string]any{"type": "shader", "file": "files/bsl.zip"},
+			"iris":        map[string]any{"file": "files/iris-1.9.jar"},
 		}
 	})
 	return h, jar
@@ -205,7 +207,7 @@ func TestExportMrpackBundlesLocalFiles(t *testing.T) {
 	code, stdout, _ := h.run(t, "export", "mrpack", "--version", "1.0.0", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error == nil || env.Error.Code != "mrpack-host-not-allowed" || len(env.Error.Items) != 3 {
+	if code == 0 || env.Error == nil || env.Error.Code != "mrpack-host-not-allowed" || len(env.Error.Items) != 4 {
 		t.Fatalf("export without --bundle: code=%d env=%+v", code, env)
 	}
 	for _, item := range env.Error.Items {

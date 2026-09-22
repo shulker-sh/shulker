@@ -26,8 +26,10 @@ func packFolders(t *testing.T) *harness {
 	} {
 		writeProjectFile(t, h, rel, []byte(body))
 	}
+	writeProjectFile(t, h, "files/iris-1.9.jar", makeJar(t, "iris", "iris-1.9.jar", "client").data)
 	h.editManifest(t, func(m map[string]any) {
 		m["requires"] = map[string]any{
+			"iris":            map[string]any{"file": "files/iris-1.9.jar"},
 			"mod-menu-helper": map[string]any{"type": "resourcepack", "file": "Resource Packs/Mod Menu Helper", "filename": "Mod Menu Helper.zip"},
 			"bsl":             map[string]any{"type": "shader", "file": "shaders/bsl"},
 		}

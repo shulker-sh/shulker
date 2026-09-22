@@ -69,23 +69,41 @@ func (b *Builder) packRefs() []packRef {
 var shaderConfigs = []struct{ mod, file string }{{"iris", "config/iris.properties"}, {"oculus", "config/oculus.properties"}}
 
 // enableShader points a shader mod this build placed at the first placed pack it
-// can load. placed holds the placed mods' jar ids, so a renamed mod or one from
+// can load, and reports every other placed pack with what it takes to turn it
+// on. placed holds the placed mods' jar ids, so a renamed mod or one from
 // another provider is still found. Only the two keys shulker owns are written,
 // through the per-key merge, so the rest of the player's shader settings survive
 // a rebuild.
-func (b *Builder) enableShader(desired map[string]source, placed map[string]bool) {
+func (b *Builder) enableShader(desired map[string]source, placed map[string]bool, report *Report) {
+	enabled := false
 	for _, key := range sortedPacks(b.Lock.Shaders) {
 		p := b.Lock.Shaders[key]
 		if _, ok := desired[p.Path(manifest.TypeShader)]; !ok || p.IsVanillaShader() {
 			continue
 		}
+		loads := func(mod string) bool { return placed[mod] && (len(p.Loaders) == 0 || slices.Contains(p.Loaders, mod)) }
+		config := ""
 		for _, c := range shaderConfigs {
-			if placed[c.mod] && (len(p.Loaders) == 0 || slices.Contains(p.Loaders, c.mod)) {
-				props := properties{"shaderPack": p.Filename, "enableShaders": "true"}
-				desired[c.file] = source{owned: propsFile{props: props, sep: "="}}
-				return
+			if loads(c.mod) {
+				config = c.file
+				break
 			}
 		}
+		var hint string
+		switch {
+		case config != "" && !enabled:
+			props := properties{"shaderPack": p.Filename, "enableShaders": "true"}
+			desired[config] = source{owned: propsFile{props: props, sep: "="}}
+			enabled = true
+			continue
+		case config != "":
+			hint = " is placed but not enabled; turn it on in game under Options, Video Settings, Shader Packs"
+		case loads("canvas"):
+			hint = " is placed but not enabled; turn it on in Canvas's own menu"
+		default:
+			hint = " is placed, but nothing in this build can load it; shulker add iris"
+		}
+		report.Warnings = append(report.Warnings, key+hint)
 	}
 }
 

@@ -143,7 +143,7 @@ func TestGitModpackUncommittedFile(t *testing.T) {
 	repo := filepath.Join(t.TempDir(), "base")
 	h, jar := packWithLocalFiles(t, repo)
 	gitRun(t, repo, "init", "-q", "-b", "main")
-	gitRun(t, repo, "add", "shulker.json", "shulker.lock", "files/faithful.zip", "files/bsl.zip")
+	gitRun(t, repo, "add", "shulker.json", "shulker.lock", "files/faithful.zip", "files/bsl.zip", "files/iris-1.9.jar")
 	gitRun(t, repo, "commit", "-q", "-m", "one")
 
 	code, stdout, _ := h.run(t, "modpack", "add", "file://"+repo, "--json")
@@ -241,7 +241,7 @@ func TestNestedModpackFileServedOnlyFromCache(t *testing.T) {
 		t.Fatalf("install with the nested files uncached: code=%d env=%+v", code, env)
 	}
 	var want []string
-	for _, entry := range []string{"private-mod: files/private-mod-1.4.jar", "faithful: files/faithful.zip", "bsl: files/bsl.zip"} {
+	for _, entry := range []string{"iris: files/iris-1.9.jar", "private-mod: files/private-mod-1.4.jar", "faithful: files/faithful.zip", "bsl: files/bsl.zip"} {
 		want = append(want, entry+" comes from modpack base inside modpack outer, so only the cache can serve it, and the cache has no copy of it")
 	}
 	if !reflect.DeepEqual(env.Error.Items, want) {
