@@ -3,13 +3,13 @@ package meta
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"shulker.sh/shulker/internal/fetch"
 )
 
 const PistonManifestURL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
+// Piston reads Mojang's version manifest and the version JSON each entry points at.
 type Piston struct {
 	Client      *fetch.Client
 	ManifestURL string
@@ -42,7 +42,7 @@ func NewPiston(c *fetch.Client) *Piston {
 func (p *Piston) Manifest(ctx context.Context) (*GameManifest, error) {
 	var m GameManifest
 	if err := p.Client.GetJSON(ctx, p.ManifestURL, &m); err != nil {
-		return nil, fmt.Errorf("minecraft version list: %w", err)
+		return nil, fetchFailed(err, "mojang", "couldn't read the Minecraft version list")
 	}
 	return &m, nil
 }
@@ -68,7 +68,7 @@ func (p *Piston) ServerDownload(ctx context.Context, game string) (Download, err
 	}
 	v, ok := m.Find(game)
 	if !ok {
-		return Download{}, fmt.Errorf("minecraft %s is not in the version list", game)
+		return Download{}, notListed(game)
 	}
 	var detail struct {
 		Downloads struct {
@@ -76,10 +76,10 @@ func (p *Piston) ServerDownload(ctx context.Context, game string) (Download, err
 		} `json:"downloads"`
 	}
 	if err := p.Client.GetJSON(ctx, v.URL, &detail); err != nil {
-		return Download{}, fmt.Errorf("minecraft %s version json: %w", v.ID, err)
+		return Download{}, versionFetchFailed(err, v.ID)
 	}
 	if detail.Downloads.Server.URL == "" || detail.Downloads.Server.Sha1 == "" {
-		return Download{}, fmt.Errorf("minecraft %s has no server download", v.ID)
+		return Download{}, invalid("minecraft %s has no server download", v.ID)
 	}
 	return detail.Downloads.Server, nil
 }
@@ -92,24 +92,33 @@ func (p *Piston) Version(ctx context.Context, game string) (json.RawMessage, err
 	}
 	v, ok := m.Find(game)
 	if !ok {
-		return nil, fmt.Errorf("minecraft %s is not in the version list", game)
+		return nil, notListed(game)
 	}
 	var detail json.RawMessage
 	if err := p.Client.GetJSON(ctx, v.URL, &detail); err != nil {
-		return nil, fmt.Errorf("minecraft %s version json: %w", v.ID, err)
+		return nil, versionFetchFailed(err, v.ID)
 	}
 	return detail, nil
 }
 
+// Java is the runtime component and major version Mojang names for a game version.
 func (p *Piston) Java(ctx context.Context, v GameVersion) (JavaRuntime, error) {
 	var detail struct {
 		JavaVersion JavaRuntime `json:"javaVersion"`
 	}
 	if err := p.Client.GetJSON(ctx, v.URL, &detail); err != nil {
-		return JavaRuntime{}, fmt.Errorf("minecraft %s version json: %w", v.ID, err)
+		return JavaRuntime{}, versionFetchFailed(err, v.ID)
 	}
 	if detail.JavaVersion.Component == "" {
-		return JavaRuntime{}, fmt.Errorf("minecraft %s version json has no javaVersion", v.ID)
+		return JavaRuntime{}, invalid("minecraft %s names no Java runtime", v.ID)
 	}
 	return detail.JavaVersion, nil
+}
+
+func notListed(game string) error {
+	return invalid("minecraft %s is not in Mojang's version list", game)
+}
+
+func versionFetchFailed(err error, game string) error {
+	return fetchFailed(err, "mojang", "couldn't read the minecraft %s version JSON", game)
 }

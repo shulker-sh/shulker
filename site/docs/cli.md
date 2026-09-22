@@ -1660,6 +1660,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |
 | `manual-download` | The provider doesn't distribute this mod; download it into `downloads/` |
 | `memory` | Server memory isn't a whole number of M or G |
+| `meta-fetch` | Version metadata couldn't be read from Mojang, a loader's meta or Maven, or GDLauncher's meta. The row names the service and what went wrong |
+| `meta-invalid` | Version metadata was read but lacks what shulker needs, like a Minecraft version Mojang doesn't list, or a loader installer whose files won't parse |
 | `minecraft-required` | `shulker.json` sets no `minecraft` and no locked modpack supplies one; set it with `shulker set minecraft <version>` |
 | `missing-files` | Mods that need a manual download are missing. `items`: what to download |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |

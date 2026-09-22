@@ -2,7 +2,6 @@ package meta
 
 import (
 	"context"
-	"fmt"
 
 	"shulker.sh/shulker/internal/fetch"
 )
@@ -35,7 +34,7 @@ func (g *GDLauncher) LoaderVersions(ctx context.Context, loader, game string) ([
 		} `json:"gameVersions"`
 	}
 	if err := g.Client.GetJSON(ctx, g.BaseURL+"/"+loader+"/v2/manifest.json", &manifest); err != nil {
-		return nil, fmt.Errorf("GDLauncher's %s versions: %w", loader, err)
+		return nil, fetchFailed(err, "gdlauncher", "couldn't read GDLauncher's %s versions", loader)
 	}
 	var versions []string
 	for _, gv := range manifest.GameVersions {

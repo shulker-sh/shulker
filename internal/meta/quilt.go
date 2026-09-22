@@ -14,6 +14,7 @@ const (
 	QuiltMavenURL = "https://maven.quiltmc.org/repository/release"
 )
 
+// Quilt reads Quilt's meta and Maven.
 type Quilt struct {
 	Client   *fetch.Client
 	BaseURL  string
@@ -33,11 +34,11 @@ func (q *Quilt) LoaderJarURL(ctx context.Context, game, loader string) (string, 
 		} `json:"loader"`
 	}
 	if err := q.Client.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s", q.BaseURL, game, loader), &entry); err != nil {
-		return "", fmt.Errorf("quilt loader %s for %s: %w", loader, game, err)
+		return "", fetchFailed(err, "quilt", "couldn't read Quilt loader %s for minecraft %s", loader, game)
 	}
 	path, err := MavenPath(entry.Loader.Maven)
 	if err != nil {
-		return "", fmt.Errorf("quilt loader %s for %s: meta has no maven coordinate", loader, game)
+		return "", invalid("Quilt's meta gives no Maven coordinate for loader %s on minecraft %s", loader, game)
 	}
 	return q.MavenURL + "/" + path, nil
 }
@@ -53,21 +54,23 @@ type ServerProfile struct {
 	Libraries         []Library `json:"libraries"`
 }
 
+// ServerProfile is what a Quilt server launches: its main classes and libraries.
 func (q *Quilt) ServerProfile(ctx context.Context, game, loader string) (*ServerProfile, error) {
 	var p ServerProfile
 	if err := q.Client.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s/server/json", q.BaseURL, game, loader), &p); err != nil {
-		return nil, fmt.Errorf("quilt server profile for %s with loader %s: %w", game, loader, err)
+		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt %s server profile for minecraft %s", loader, game)
 	}
 	if p.MainClass == "" || p.LauncherMainClass == "" || len(p.Libraries) == 0 {
-		return nil, fmt.Errorf("quilt server profile for %s with loader %s is incomplete", game, loader)
+		return nil, invalid("the Quilt %s server profile for minecraft %s is incomplete", loader, game)
 	}
 	return &p, nil
 }
 
+// LoaderProfile is the launcher profile JSON Quilt's meta serves for a loader on a game version.
 func (q *Quilt) LoaderProfile(ctx context.Context, game, loader string) (json.RawMessage, error) {
 	var raw json.RawMessage
 	if err := q.Client.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s/profile/json", q.BaseURL, game, loader), &raw); err != nil {
-		return nil, fmt.Errorf("quilt profile for %s with loader %s: %w", game, loader, err)
+		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt %s profile for minecraft %s", loader, game)
 	}
 	return raw, nil
 }
@@ -80,10 +83,11 @@ func (l Library) JarURL() (string, error) {
 	return strings.TrimSuffix(l.URL, "/") + "/" + path, nil
 }
 
+// MavenPath is where a group:artifact:version[:classifier] coordinate's jar sits under a Maven root.
 func MavenPath(name string) (string, error) {
 	parts := strings.Split(name, ":")
 	if len(parts) < 3 || len(parts) > 4 {
-		return "", fmt.Errorf("maven coordinate %q is not group:artifact:version[:classifier]", name)
+		return "", invalid("the Maven coordinate %q is not group:artifact:version[:classifier]", name)
 	}
 	group, artifact, version := strings.ReplaceAll(parts[0], ".", "/"), parts[1], parts[2]
 	file := artifact + "-" + version
@@ -102,7 +106,7 @@ func (q *Quilt) LoaderVersions(ctx context.Context, game string) ([]LoaderVersio
 		} `json:"loader"`
 	}
 	if err := q.Client.GetJSON(ctx, q.BaseURL+"/versions/loader/"+game, &entries); err != nil {
-		return nil, fmt.Errorf("quilt loader versions for %s: %w", game, err)
+		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt loaders for minecraft %s", game)
 	}
 	out := make([]LoaderVersion, 0, len(entries))
 	for _, e := range entries {

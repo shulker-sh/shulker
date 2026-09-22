@@ -27,7 +27,7 @@ func (f *Forge) LoaderVersions(ctx context.Context, game string) ([]LoaderVersio
 		Versions []string `xml:"versioning>versions>version"`
 	}
 	if err := f.Client.GetXML(ctx, f.BaseURL+"/net/minecraftforge/forge/maven-metadata.xml", &body); err != nil {
-		return nil, fmt.Errorf("forge versions: %w", err)
+		return nil, fetchFailed(err, "forge", "couldn't read the Forge versions")
 	}
 	var out []LoaderVersion
 	for _, v := range body.Versions {

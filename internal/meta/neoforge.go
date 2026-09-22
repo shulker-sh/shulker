@@ -31,7 +31,7 @@ func (n *NeoForge) LoaderVersions(ctx context.Context, game string) ([]LoaderVer
 		Versions []string `json:"versions"`
 	}
 	if err := n.Client.GetJSON(ctx, n.BaseURL+"/api/maven/versions/releases/net/neoforged/neoforge", &body); err != nil {
-		return nil, fmt.Errorf("neoforge versions: %w", err)
+		return nil, fetchFailed(err, "neoforge", "couldn't read the NeoForge versions")
 	}
 	var out []LoaderVersion
 	for _, v := range body.Versions {

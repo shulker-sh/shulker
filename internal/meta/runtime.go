@@ -2,7 +2,6 @@ package meta
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -10,6 +9,7 @@ import (
 
 const RuntimeIndexURL = "https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json"
 
+// Runtimes reads Mojang's Java runtime index and the file manifests it points at.
 type Runtimes struct {
 	Client   *fetch.Client
 	IndexURL string
@@ -50,6 +50,7 @@ func NewRuntimes(c *fetch.Client) *Runtimes {
 	return &Runtimes{Client: c, IndexURL: RuntimeIndexURL}
 }
 
+// RuntimePlatform is Mojang's name for this OS and architecture, false where Mojang publishes no runtime.
 func RuntimePlatform() (string, bool) {
 	switch runtime.GOOS + "/" + runtime.GOARCH {
 	case "darwin/amd64":
@@ -70,10 +71,11 @@ func RuntimePlatform() (string, bool) {
 	return "", false
 }
 
+// Release is the release Mojang lists first for a runtime component on a platform, false when it lists none.
 func (r *Runtimes) Release(ctx context.Context, platform, component string) (RuntimeRelease, bool, error) {
 	var index map[string]map[string][]runtimeIndexEntry
 	if err := r.Client.GetJSON(ctx, r.IndexURL, &index); err != nil {
-		return RuntimeRelease{}, false, fmt.Errorf("java runtime index: %w", err)
+		return RuntimeRelease{}, false, fetchFailed(err, "mojang", "couldn't read Mojang's Java runtime index")
 	}
 	entries := index[platform][component]
 	if len(entries) == 0 {
@@ -83,12 +85,13 @@ func (r *Runtimes) Release(ctx context.Context, platform, component string) (Run
 	return RuntimeRelease{Version: e.Version.Name, ManifestURL: e.Manifest.URL, ManifestSha1: e.Manifest.Sha1}, true, nil
 }
 
+// Files maps each path in a runtime release to how to materialize it.
 func (r *Runtimes) Files(ctx context.Context, release RuntimeRelease) (map[string]RuntimeFile, error) {
 	var m struct {
 		Files map[string]RuntimeFile `json:"files"`
 	}
 	if err := r.Client.GetJSON(ctx, release.ManifestURL, &m); err != nil {
-		return nil, fmt.Errorf("java runtime manifest: %w", err)
+		return nil, fetchFailed(err, "mojang", "couldn't read the Java runtime %s manifest", release.Version)
 	}
 	return m.Files, nil
 }

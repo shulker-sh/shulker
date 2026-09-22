@@ -3,7 +3,6 @@ package meta
 import (
 	"archive/zip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"sort"
 )
@@ -19,7 +18,7 @@ type InstallerLibrary struct {
 func InstallerLibraries(path string) ([]InstallerLibrary, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
-		return nil, fmt.Errorf("installer %s: %w", path, err)
+		return nil, unreadable(err, "zip", "the loader installer %s can't be read", path)
 	}
 	defer zr.Close()
 	byName := map[string]InstallerLibrary{}
@@ -37,15 +36,15 @@ func InstallerLibraries(path string) ([]InstallerLibrary, error) {
 		}
 		f, err := zr.Open(name)
 		if err != nil {
-			return nil, fmt.Errorf("installer %s: %w", path, err)
+			return nil, unreadable(err, "zip", "the loader installer %s can't be read", path)
 		}
 		data, err := io.ReadAll(f)
 		f.Close()
 		if err != nil {
-			return nil, fmt.Errorf("installer %s: %w", path, err)
+			return nil, unreadable(err, "zip", "the loader installer %s can't be read", path)
 		}
 		if err := json.Unmarshal(data, &profile); err != nil {
-			return nil, fmt.Errorf("installer %s: %s: %w", path, name, err)
+			return nil, unreadable(err, name, "the loader installer %s can't be read", path)
 		}
 		for _, lib := range profile.Libraries {
 			if a := lib.Downloads.Artifact; a.URL != "" {
@@ -65,20 +64,20 @@ func InstallerLibraries(path string) ([]InstallerLibrary, error) {
 func InstallerVersion(path string) (json.RawMessage, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
-		return nil, fmt.Errorf("installer %s: %w", path, err)
+		return nil, unreadable(err, "zip", "the loader installer %s can't be read", path)
 	}
 	defer zr.Close()
 	f, err := zr.Open("version.json")
 	if err != nil {
-		return nil, fmt.Errorf("installer %s: %w", path, err)
+		return nil, unreadable(err, "zip", "the loader installer %s can't be read", path)
 	}
 	defer f.Close()
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return nil, fmt.Errorf("installer %s: %w", path, err)
+		return nil, unreadable(err, "zip", "the loader installer %s can't be read", path)
 	}
 	if !json.Valid(data) {
-		return nil, fmt.Errorf("installer %s: version.json is not valid JSON", path)
+		return nil, invalid("the loader installer %s holds a version.json that isn't valid JSON", path)
 	}
 	return data, nil
 }

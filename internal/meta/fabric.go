@@ -1,9 +1,9 @@
+// Package meta reads the version metadata that Mojang, the loaders and GDLauncher publish.
 package meta
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -11,6 +11,7 @@ import (
 
 const FabricMetaURL = "https://meta.fabricmc.net/v2"
 
+// Fabric reads Fabric's meta.
 type Fabric struct {
 	Client  *fetch.Client
 	BaseURL string
@@ -33,7 +34,7 @@ func (f *Fabric) LoaderVersions(ctx context.Context, game string) ([]LoaderVersi
 		} `json:"loader"`
 	}
 	if err := f.Client.GetJSON(ctx, f.BaseURL+"/versions/loader/"+game, &entries); err != nil {
-		return nil, fmt.Errorf("fabric loader versions for %s: %w", game, err)
+		return nil, fetchFailed(err, "fabric", "couldn't read the Fabric loaders for minecraft %s", game)
 	}
 	out := make([]LoaderVersion, 0, len(entries))
 	for _, e := range entries {
@@ -42,22 +43,24 @@ func (f *Fabric) LoaderVersions(ctx context.Context, game string) ([]LoaderVersi
 	return out, nil
 }
 
+// LoaderProfile is the launcher profile JSON Fabric's meta serves for a loader on a game version.
 func (f *Fabric) LoaderProfile(ctx context.Context, game, loader string) (json.RawMessage, error) {
 	var raw json.RawMessage
 	url := fmt.Sprintf("%s/versions/loader/%s/%s/profile/json", f.BaseURL, game, loader)
 	if err := f.Client.GetJSON(ctx, url, &raw); err != nil {
-		return nil, fmt.Errorf("fabric profile for %s with loader %s: %w", game, loader, err)
+		return nil, fetchFailed(err, "fabric", "couldn't read the Fabric %s profile for minecraft %s", loader, game)
 	}
 	return raw, nil
 }
 
+// InstallerVersion is the first stable Fabric installer listed, or the first of any when none is stable.
 func (f *Fabric) InstallerVersion(ctx context.Context) (string, error) {
 	var entries []struct {
 		Version string `json:"version"`
 		Stable  bool   `json:"stable"`
 	}
 	if err := f.Client.GetJSON(ctx, f.BaseURL+"/versions/installer", &entries); err != nil {
-		return "", fmt.Errorf("fabric installer versions: %w", err)
+		return "", fetchFailed(err, "fabric", "couldn't read the Fabric installer versions")
 	}
 	for _, e := range entries {
 		if e.Stable {
@@ -67,7 +70,7 @@ func (f *Fabric) InstallerVersion(ctx context.Context) (string, error) {
 	if len(entries) > 0 {
 		return entries[0].Version, nil
 	}
-	return "", errors.New("fabric meta lists no installer versions")
+	return "", invalid("Fabric's meta lists no installer versions")
 }
 
 func (f *Fabric) ServerJarURL(game, loader, installer string) string {
