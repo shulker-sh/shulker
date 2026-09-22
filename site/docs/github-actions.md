@@ -64,7 +64,7 @@ git push origin v1.2.0
 
 Export reads every locked file from Shulker's cache, and downloads the ones a fresh checkout is missing. The action keeps that cache between runs, keyed on `shulker.lock`: while the lock is unchanged the export downloads nothing, and after a change it starts from the previous cache and downloads only what's new. It then prunes the files the new lock no longer needs, so the cache doesn't grow with every change.
 
-A pack that isn't at the root of its repository names its lock with `lock-files`, one path per line. A repository holding several packs lists each one's lock. The cache is then keyed on all of them, and not pruned:
+A pack that isn't at the root of its repository names its lock with `lock-files`, one path per line. A repository holding several packs lists each one's lock. The cache is then keyed on all of them, and a prune keeps what any of them needs:
 
 ```yaml
       - id: shulker
