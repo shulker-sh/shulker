@@ -125,10 +125,8 @@ func TestSyncInPlaceThenItsChildren(t *testing.T) {
 		}
 	}
 
-	// The child is a detached build, so -i can't reach it; its own record of its source can.
-	code, stdout, _ := h.run(t, "sync", "-i", "child", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "no-instances" {
-		t.Fatalf("-i must not reach a detached build: exit %d %s", code, stdout)
+	if stdout := h.mustRun(t, "sync", "-i", "child", "--json"); !strings.Contains(stdout, `"dir": "`+child+`"`) {
+		t.Fatalf("-i reaches the project's detached build by its folder's id: %s", stdout)
 	}
 	if stdout := h.mustRun(t, "sync", "--into", child); strings.Contains(stdout, "sodium") {
 		t.Fatalf("a child sync has no lock of its own to change: %s", stdout)

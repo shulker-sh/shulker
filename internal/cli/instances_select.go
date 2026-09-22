@@ -134,7 +134,9 @@ func instanceCandidates(entries []instanceEntry) []string {
 			label += " (" + e.Name + ")"
 		}
 		names[i] = fmt.Sprintf("%s — %s", label, e.Dir)
-		if e.Launcher != "" {
+		if e.detached {
+			names[i] = fmt.Sprintf("%s — detached build, %s", label, e.Dir)
+		} else if e.Launcher != "" {
 			names[i] = fmt.Sprintf("%s — %s, %s", label, launcher.Title(e.Launcher), e.Dir)
 		}
 	}
@@ -227,6 +229,7 @@ func detachedBuild(query string) (instanceEntry, bool) {
 	}
 	e := inspectInstance(config.Instance{Name: filepath.Base(dir), Dir: dir})
 	e.ID = slugID(e.Name)
+	e.detached = true
 	return e, true
 }
 
@@ -242,21 +245,36 @@ func launcherArg(arg string) string {
 }
 
 func instanceAside(t out.Theme, e instanceEntry) string {
+	if e.detached {
+		return t.Aside("detached build")
+	}
 	if e.Launcher == "" {
 		return ""
 	}
 	return t.Aside(launcher.Title(e.Launcher))
 }
 
+// instanceHeading shows a detached build's directory, since unlink takes one by path.
 func instanceHeading(t out.Theme, e instanceEntry) string {
-	return t.Bold(e.Label()) + " " + t.Grey(e.ID) + " " + t.Cyan(e.Side) + instanceAside(t, e)
+	heading := t.Bold(e.Label()) + " " + t.Grey(e.ID) + " " + t.Cyan(e.Side) + instanceAside(t, e)
+	if e.detached {
+		heading += " " + t.Link(t.Grey(e.Dir), e.Dir)
+	}
+	return heading
+}
+
+func instancePickLabel(t out.Theme, e instanceEntry) string {
+	if e.detached {
+		return instanceHeading(t, e)
+	}
+	return instanceHeading(t, e) + " " + t.Link(t.Grey(e.Dir), e.Dir)
 }
 
 func (a *app) pickInstance(entries []instanceEntry) (instanceEntry, error) {
 	t := a.printer.ErrTheme
 	return pickOne(a, "Sync which one?", entries,
 		func(e instanceEntry) string { return e.ID },
-		func(e instanceEntry) string { return instanceHeading(t, e) + " " + t.Link(t.Grey(e.Dir), e.Dir) },
+		func(e instanceEntry) string { return instancePickLabel(t, e) },
 		func() error {
 			e := out.Errorf("ambiguous-instance", "pass a source, -i <id>, or --all to choose what to sync")
 			e.Candidates, e.Pass, e.Flag = instanceCandidates(entries), instanceIDs(entries), "--instance"
@@ -289,9 +307,10 @@ func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest)
 
 type syncInstanceResult struct {
 	config.Instance
-	OK    bool        `json:"ok"`
-	Sync  *syncResult `json:"sync,omitempty"`
-	Error *out.Error  `json:"error,omitempty"`
+	Detached bool        `json:"detached,omitempty"`
+	OK       bool        `json:"ok"`
+	Sync     *syncResult `json:"sync,omitempty"`
+	Error    *out.Error  `json:"error,omitempty"`
 }
 
 func (a *app) syncInstances(cmd *cobra.Command, entries []instanceEntry, req syncRequest) error {
@@ -317,7 +336,7 @@ func (a *app) syncEach(cmd *cobra.Command, entries []instanceEntry, req syncRequ
 			}
 			lines.Heading(instanceHeading(lines.T, e))
 		}
-		r := syncInstanceResult{Instance: e.Instance, OK: true}
+		r := syncInstanceResult{Instance: e.Instance, Detached: e.detached, OK: true}
 		restore := func() {}
 		if len(entries) > 1 || after {
 			restore = a.scopeWarnings(e.Label())

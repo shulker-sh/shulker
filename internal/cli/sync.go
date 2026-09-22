@@ -93,6 +93,9 @@ func (a *app) syncCmd() *cobra.Command {
 					}
 				}
 				entries, err := a.selectInstances(a.instance, sel)
+				if err != nil && a.instance != "" {
+					entries, err = a.selectProjectDetached(a.instance, sel, err)
+				}
 				if err != nil {
 					return err
 				}

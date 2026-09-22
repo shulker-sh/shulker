@@ -29,6 +29,7 @@ type instanceEntry struct {
 	Problem       string `json:"problem,omitempty"`
 	LaunchError   string `json:"launchError,omitempty"`
 	intent        *instance.File
+	detached      bool
 }
 
 const (
