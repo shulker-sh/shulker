@@ -191,3 +191,39 @@ func TestAddFolderHoldingTheProjectIsRefused(t *testing.T) {
 		t.Fatalf("nothing is copied: %v", err)
 	}
 }
+
+func TestAddFolderFollowsSymlinksInsideWithAWarning(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	outside := filepath.Join(t.TempDir(), "Helper")
+	writeFolder(t, outside, helperFiles)
+	shared := filepath.Join(t.TempDir(), "logo.png")
+	if err := os.WriteFile(shared, []byte("logo"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(shared, filepath.Join(outside, "pack.png")); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr := h.mustRunStderr(t, "resourcepack", "add", outside)
+
+	st, err := os.Lstat(filepath.Join(h.dir, "files", "Helper", "pack.png"))
+	if err != nil || !st.Mode().IsRegular() || readProjectFile(t, h, "files/Helper/pack.png") != "logo" {
+		t.Fatalf("the copy holds what the symlink points at: %v %v", st, err)
+	}
+	if strings.Contains(stderr, "symlink") {
+		t.Fatalf("the copy has no symlink left to warn about: %s", stderr)
+	}
+
+	writeFolder(t, filepath.Join(h.dir, "packs", "Inside"), helperFiles)
+	if err := os.Symlink(shared, filepath.Join(h.dir, "packs", "Inside", "pack.png")); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr = h.mustRunStderr(t, "resourcepack", "add", "packs/Inside")
+	if !strings.Contains(stderr, "packs/Inside/pack.png is a symlink") {
+		t.Fatalf("add warns about a symlink it follows: %s", stderr)
+	}
+	_, sha := folderZip(t, h, "packs/Inside")
+	if got := h.readLock(t).ResourcePacks["inside"].Sha512; got != sha {
+		t.Fatalf("the symlinked file is locked in the zip: %s", got)
+	}
+}

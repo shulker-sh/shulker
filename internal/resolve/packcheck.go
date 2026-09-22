@@ -5,8 +5,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/zipfile"
 )
 
 // checkPackFolder warns about each problem packFolderProblems finds when a local pack entry's file
@@ -28,19 +30,20 @@ func (r *Resolver) checkPackFolder(key, kind string, entry manifest.Require) {
 // wants shaders/ at a shader's. The format is not held to the project's Minecraft version.
 func packFolderProblems(dir, rel, kind string) []string {
 	root := filepath.Join(dir, filepath.FromSlash(rel))
+	problems := symlinkProblems(root, rel)
 	if kind == manifest.TypeShader {
 		if !hasShaders(root) {
-			return []string{rel + " has no shaders/ folder at its root, so Iris won't load it"}
+			problems = append(problems, rel+" has no shaders/ folder at its root, so Iris won't load it")
 		}
-		return nil
+		return problems
 	}
 	if !hasPackMcmeta(root) {
-		return []string{rel + " has no pack.mcmeta at its root, so the game won't load it"}
+		return append(problems, rel+" has no pack.mcmeta at its root, so the game won't load it")
 	}
 	data, err := os.ReadFile(filepath.Join(root, "pack.mcmeta"))
 	mcmeta := path.Join(rel, "pack.mcmeta")
 	if err != nil || !json.Valid(data) {
-		return []string{mcmeta + " is not valid JSON, so the game won't load it"}
+		return append(problems, mcmeta+" is not valid JSON, so the game won't load it")
 	}
 	var doc struct {
 		Pack map[string]json.RawMessage `json:"pack"`
@@ -50,12 +53,28 @@ func packFolderProblems(dir, rel, kind string) []string {
 		v, ok := doc.Pack[key]
 		return ok && string(v) != "null"
 	}
-	var problems []string
 	if !has("description") {
 		problems = append(problems, mcmeta+" has no pack.description, so the game won't load it")
 	}
 	if !has("pack_format") && !(has("min_format") && has("max_format")) {
 		problems = append(problems, mcmeta+" has no pack format (min_format and max_format, or pack_format), so the game won't load it")
+	}
+	return problems
+}
+
+// symlinkProblems names each symlink the folder's zip follows, since what it points at lies outside
+// the folder and can change without it.
+func symlinkProblems(root, rel string) []string {
+	files, err := zipfile.FolderFiles(root)
+	if err != nil {
+		return nil
+	}
+	var problems []string
+	for _, f := range files {
+		problem := path.Join(rel, f.Link) + " is a symlink, so the pack holds a copy of what it points at"
+		if f.Link != "" && !slices.Contains(problems, problem) {
+			problems = append(problems, problem)
+		}
 	}
 	return problems
 }

@@ -7,12 +7,16 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/klauspost/compress/flate"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 // Modified is the time every entry carries.
@@ -53,43 +57,96 @@ func Build(entries map[string][]byte, first string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// Folder zips the regular files under root, leaving out what editors and file managers leave behind:
-// any name starting with a dot, Thumbs.db, desktop.ini, and *~ and *.swp.
+// Folder zips the files under root, leaving out what editors and file managers leave behind: any
+// name starting with a dot, Thumbs.db, desktop.ini, and *~ and *.swp. A symlink zips as what it
+// points at.
 func Folder(root string) ([]byte, error) {
-	// WalkDir doesn't follow a symlinked root, which would zip nothing.
+	files, err := FolderFiles(root)
+	if err != nil {
+		return nil, err
+	}
+	entries := make(map[string][]byte, len(files))
+	for _, f := range files {
+		data, err := os.ReadFile(f.Path)
+		if err != nil {
+			return nil, err
+		}
+		entries[f.Name] = data
+	}
+	return Build(entries, "")
+}
+
+// A FolderFile is a file Folder zips: Name is its slash path in the zip, Path where its bytes are
+// read from, and Link the symlink under the folder it was reached through, as a slash path, or ""
+// for a file reached without one.
+type FolderFile struct {
+	Name, Path, Link string
+}
+
+// FolderFiles is every file Folder zips from the folder at root, following symlinks to files and
+// folders alike. A symlink to nothing, or to a folder it lies in, is refused.
+func FolderFiles(root string) ([]FolderFile, error) {
 	root, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return nil, err
 	}
-	entries := map[string][]byte{}
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if path != root && Excluded(d.Name()) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !d.Type().IsRegular() {
-			return nil
-		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		entries[filepath.ToSlash(rel)] = data
-		return nil
-	})
-	if err != nil {
+	w := folderWalk{folder: filepath.Base(root)}
+	if err := w.walk(root, "", "", []string{root}); err != nil {
 		return nil, err
 	}
-	return Build(entries, "")
+	return w.files, nil
+}
+
+type folderWalk struct {
+	folder string
+	files  []FolderFile
+}
+
+// walk adds the files under dir, a real path, whose slash path in the zip is name. open holds the
+// real paths of the folders being walked, which a symlinked folder may not lead back into.
+func (w *folderWalk) walk(dir, name, link string, open []string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, d := range entries {
+		if Excluded(d.Name()) {
+			continue
+		}
+		from, rel, via := filepath.Join(dir, d.Name()), path.Join(name, d.Name()), link
+		isLink := d.Type()&fs.ModeSymlink != 0
+		if isLink {
+			target, err := filepath.EvalSymlinks(from)
+			if err != nil {
+				return out.Errorf("file-not-found", "%s: %s is a symlink to nothing", w.folder, rel)
+			}
+			from = target
+			if via == "" {
+				via = rel
+			}
+		}
+		st, err := os.Stat(from)
+		if err != nil {
+			return err
+		}
+		switch {
+		case st.IsDir():
+			if isLink && slices.ContainsFunc(open, func(o string) bool { return within(from, o) }) {
+				return out.Errorf("usage", "%s: %s is a symlink to a folder it lies in, so it can't be followed", w.folder, rel)
+			}
+			if err := w.walk(from, rel, via, append(open, from)); err != nil {
+				return err
+			}
+		case st.Mode().IsRegular():
+			w.files = append(w.files, FolderFile{Name: rel, Path: from, Link: via})
+		}
+	}
+	return nil
+}
+
+func within(dir, sub string) bool {
+	rel, err := filepath.Rel(dir, sub)
+	return err == nil && filepath.IsLocal(rel)
 }
 
 // Excluded reports whether Folder leaves a file or folder of this name out.

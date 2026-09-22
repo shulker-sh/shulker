@@ -270,7 +270,7 @@
         },
         "file": {
           "$ref": "#/$defs/relativePath",
-          "description": "A local jar or zip that is on no provider, placed like any other entry of its kind. On a resource pack or shader it may name a folder, which shulker zips and places as a zip, leaving out any name starting with a dot, Thumbs.db, desktop.ini, *~ and *.swp at any depth. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date."
+          "description": "A local jar or zip that is on no provider, placed like any other entry of its kind. On a resource pack or shader it may name a folder, which shulker zips and places as a zip, leaving out any name starting with a dot, Thumbs.db, desktop.ini, *~ and *.swp at any depth and zipping what a symlink in it points at. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date."
         },
         "filename": {
           "type": "string",

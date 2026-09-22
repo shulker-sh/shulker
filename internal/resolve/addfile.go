@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -339,11 +338,6 @@ func copyFile(from, to string) error {
 // copyFolder replaces the folder at to with a copy of the one at from, leaving out what a pack
 // folder's zip leaves out, so a file gone from from is gone from the copy too.
 func copyFolder(from, to string) error {
-	// WalkDir doesn't follow a symlinked root, which would copy nothing.
-	from, err := filepath.EvalSymlinks(from)
-	if err != nil {
-		return err
-	}
 	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
 		return err
 	}
@@ -367,28 +361,16 @@ func copyFolder(from, to string) error {
 }
 
 func copyTree(from, to string) error {
-	return filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
+	files, err := zipfile.FolderFiles(from)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if err := copyFile(f.Path, filepath.Join(to, filepath.FromSlash(f.Name))); err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(from, path)
-		if err != nil {
-			return err
-		}
-		if path != from && zipfile.Excluded(d.Name()) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		switch {
-		case d.IsDir():
-			return os.MkdirAll(filepath.Join(to, rel), 0o755)
-		case d.Type().IsRegular():
-			return copyFile(path, filepath.Join(to, rel))
-		}
-		return nil
-	})
+	}
+	return nil
 }
 
 // sameFolderIfAny refuses anything already at to but a folder that zips to the same bytes, since

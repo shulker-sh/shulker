@@ -155,3 +155,54 @@ func TestFolderFollowsASymlinkedRoot(t *testing.T) {
 		t.Fatal("a symlinked folder zips differently")
 	}
 }
+
+func TestFolderFollowsSymlinksInside(t *testing.T) {
+	root := writeTree(t, map[string]string{"pack.mcmeta": "{}"})
+	shared := writeTree(t, map[string]string{"logo.png": "logo", "textures/a.png": "a"})
+	for link, target := range map[string]string{"assets/logo.png": "logo.png", "assets/tex": "textures"} {
+		if err := os.MkdirAll(filepath.Join(root, "assets"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(filepath.Join(shared, target), filepath.Join(root, filepath.FromSlash(link))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := Folder(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := Build(map[string][]byte{"pack.mcmeta": []byte("{}"), "assets/logo.png": []byte("logo"), "assets/tex/a.png": []byte("a")}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, want) {
+		t.Fatal("a symlink inside the folder zips as what it points at")
+	}
+	files, err := FolderFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	links := map[string]string{}
+	for _, f := range files {
+		links[f.Name] = f.Link
+	}
+	if links["pack.mcmeta"] != "" || links["assets/logo.png"] != "assets/logo.png" || links["assets/tex/a.png"] != "assets/tex" {
+		t.Fatalf("each file names the link it was reached through: %v", links)
+	}
+}
+
+func TestFolderRefusesALoopOrADanglingLink(t *testing.T) {
+	loop := writeTree(t, map[string]string{"pack.mcmeta": "{}", "assets/a.png": "a"})
+	if err := os.Symlink(loop, filepath.Join(loop, "assets", "up")); err != nil {
+		t.Fatal(err)
+	}
+	dangling := writeTree(t, map[string]string{"pack.mcmeta": "{}"})
+	if err := os.Symlink(filepath.Join(t.TempDir(), "gone.png"), filepath.Join(dangling, "gone.png")); err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range []string{loop, dangling} {
+		if _, err := Folder(root); err == nil {
+			t.Errorf("%s zipped", root)
+		}
+	}
+}
