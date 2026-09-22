@@ -55,7 +55,8 @@ type File struct {
 
 type Archive struct {
 	Manifest Manifest
-	// Overrides are the files under the folder the manifest names, all in OverridesLayer.
+	// Overrides are the files under the folder the manifest names, all in OverridesLayer, less the
+	// marker jar of the project that exported it.
 	Overrides []mrpack.Override
 }
 
@@ -159,7 +160,14 @@ func Read(file string) (*Archive, error) {
 		if err != nil {
 			return nil, err
 		}
-		a.Overrides = append(a.Overrides, mrpack.Override{Layer: OverridesLayer, Path: rel, Data: data})
+		o := mrpack.Override{Layer: OverridesLayer, Path: rel, Data: data}
+		marker, err := mrpack.ReadMarker(o)
+		if err != nil {
+			return nil, err
+		}
+		if marker == nil {
+			a.Overrides = append(a.Overrides, o)
+		}
 	}
 	sort.Slice(a.Overrides, func(i, j int) bool { return a.Overrides[i].Path < a.Overrides[j].Path })
 	return a, nil

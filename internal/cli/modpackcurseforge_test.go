@@ -136,3 +136,33 @@ func TestAddCurseForgeArchiveModpack(t *testing.T) {
 		t.Fatalf("a bare add reads a CurseForge zip as a modpack by what it holds: %+v", entry)
 	}
 }
+
+func TestCurseForgeArchiveModpackLeavesTheExportersMarkerOut(t *testing.T) {
+	h := archiveProject(t)
+	h.mustRun(t, "install")
+	markers, err := filepath.Glob(filepath.Join(h.dir, "build", "client", "mods", "shulker-*.jar"))
+	if err != nil || len(markers) != 1 {
+		t.Fatalf("the project builds one marker jar: %v %v", markers, err)
+	}
+	marker, err := os.ReadFile(markers[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(h.dir, "packs", "craft.zip")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeCurseForgeZip(t, path, importedCurseForgePack(craftFiles...), map[string][]byte{
+		"extras/mods/shulker-exporter.jar": marker,
+	})
+	curseForgeModpack(t, h)
+	h.mustRun(t, "lock")
+
+	if u := h.readLock(t).Modpacks["craft"].Unmanaged; len(u) != 0 {
+		t.Fatalf("the exporter's marker is not the pack's to lay: %v", u)
+	}
+	h.mustRun(t, "install")
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "mods", "shulker-exporter.jar")); !os.IsNotExist(err) {
+		t.Fatalf("a second marker jar reaches the build: %v", err)
+	}
+}

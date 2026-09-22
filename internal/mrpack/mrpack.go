@@ -226,7 +226,7 @@ func splitLayer(name string) (string, string, bool) {
 func (a *Archive) findMarker() error {
 	kept := a.Overrides[:0]
 	for _, o := range a.Overrides {
-		m, err := readMarker(o)
+		m, err := ReadMarker(o)
 		if err != nil {
 			return err
 		}
@@ -243,7 +243,8 @@ func (a *Archive) findMarker() error {
 	return nil
 }
 
-func readMarker(o Override) (*Marker, error) {
+// ReadMarker reads the shulker marker jar o is, or gives nil when o is some other file.
+func ReadMarker(o Override) (*Marker, error) {
 	if path.Dir(o.Path) != "mods" || path.Ext(o.Path) != ".jar" {
 		return nil, nil
 	}

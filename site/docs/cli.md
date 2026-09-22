@@ -128,7 +128,7 @@ shulker import mrpack pack.mrpack -C my-pack --name my-pack
 
 ### `shulker import curseforge`
 
-Create a project from a CurseForge modpack `.zip`, the kind the CurseForge app exports and [`export curseforge`](#shulker-export-curseforge) writes. Each mod, resource pack and shader the pack names is locked by its CurseForge project and file ID, so the project gets the exact files the pack ships, and the pack's overrides folder becomes the project's `overrides/`. A file the pack marks optional is skipped with a warning. A file whose author doesn't allow third-party downloads stops the import with `missing-files`, naming each one and its page: download them into the new project's `downloads/` and run the import again, and they lock as manual downloads. A zip that isn't a CurseForge modpack is refused by what it holds, whatever its name.
+Create a project from a CurseForge modpack `.zip`, the kind the CurseForge app exports and [`export curseforge`](#shulker-export-curseforge) writes. Each mod, resource pack and shader the pack names is locked by its CurseForge project and file ID, so the project gets the exact files the pack ships, and the pack's overrides folder becomes the project's `overrides/`, less the marker jar of the shulker project that exported it, since the project builds its own. A file the pack marks optional is skipped with a warning. A file whose author doesn't allow third-party downloads stops the import with `missing-files`, naming each one and its page: download them into the new project's `downloads/` and run the import again, and they lock as manual downloads. A zip that isn't a CurseForge modpack is refused by what it holds, whatever its name.
 
 ```sh
 shulker import curseforge ~/Downloads/all-the-mods.zip
