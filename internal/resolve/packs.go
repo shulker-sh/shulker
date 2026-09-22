@@ -182,21 +182,16 @@ func (r *Resolver) applyLockedPacks() error {
 			entry.RequiredBy = append([]string{}, entry.RequiredBy...)
 			r.Lock.Mods[id] = entry
 		}
-		for _, key := range sortedKeys(p.Lock.ResourcePacks) {
-			if _, listed := r.Manifest.Requires[key]; listed {
-				continue
+		for _, kind := range manifest.PackKinds {
+			section := p.Lock.Packs(kind)
+			for _, key := range sortedKeys(section) {
+				if _, listed := r.Manifest.Requires[key]; listed {
+					continue
+				}
+				entry := section[key]
+				entry.Modpack = p.Name
+				r.packSection(kind)[key] = entry
 			}
-			entry := p.Lock.ResourcePacks[key]
-			entry.Modpack = p.Name
-			r.Lock.ResourcePacks[key] = entry
-		}
-		for _, key := range sortedKeys(p.Lock.Shaders) {
-			if _, listed := r.Manifest.Requires[key]; listed {
-				continue
-			}
-			entry := p.Lock.Shaders[key]
-			entry.Modpack = p.Name
-			r.Lock.Shaders[key] = entry
 		}
 	}
 	return nil
@@ -224,9 +219,9 @@ func (r *Resolver) RemovePack(name string) error {
 	return nil
 }
 
-// dropPackZips drops the resource packs and shaders the named modpack supplied.
+// dropPackZips drops the packs the named modpack supplied.
 func (r *Resolver) dropPackZips(name string) {
-	for _, section := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
+	for _, section := range r.Lock.PackSections() {
 		for key, p := range section {
 			if p.Modpack == name {
 				delete(section, key)

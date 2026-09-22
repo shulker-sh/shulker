@@ -52,7 +52,7 @@ func (a *app) askAdd(cmd *cobra.Command, kind, providerName string) ([]string, m
 // provider lists kinds shulker has no entry for at all.
 func isAddable(kind string) bool {
 	switch kind {
-	case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader:
+	case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack:
 		return true
 	}
 	return false
@@ -64,6 +64,8 @@ func addNoun(kind string) string {
 		return "resource packs"
 	case manifest.TypeShader:
 		return "shaders"
+	case manifest.TypeDatapack:
+		return "datapacks"
 	}
 	return "mods"
 }

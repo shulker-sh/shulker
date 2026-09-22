@@ -1,8 +1,10 @@
 package resolve
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -14,15 +16,16 @@ import (
 	"shulker.sh/shulker/internal/provider"
 )
 
-// Resource packs and shaders resolve like mods with the jar taken away: there is
+// Resource packs, shaders and datapacks resolve like mods with the jar taken away: there is
 // no metadata to read, no dependencies to follow, and nothing else can require
 // them. Each is keyed by its requires key, which is also the name the build
 // places it under, so a pack enabled in game survives its own updates.
 
-// packTags is how each provider files the two kinds. Modrinth tags resource pack
-// versions with the minecraft loader and shaders with the shader loader they
-// target; CurseForge has no loader tag for resource packs, and keeps shader
-// loaders in gameVersions, where only Iris and OptiFine appear.
+// packTags is how each provider files the pack kinds. Modrinth tags resource pack
+// versions with the minecraft loader, datapacks with the datapack loader and
+// shaders with the shader loader they target; CurseForge has no loader tag for
+// resource packs or datapacks, and keeps shader loaders in gameVersions, where
+// only Iris and OptiFine appear.
 func packTags(providerName, kind string) []string {
 	if kind == manifest.TypeShader {
 		if providerName == "curseforge" {
@@ -33,20 +36,24 @@ func packTags(providerName, kind string) []string {
 	if providerName == "curseforge" {
 		return nil
 	}
+	if kind == manifest.TypeDatapack {
+		return []string{"datapack"}
+	}
 	return []string{"minecraft"}
 }
 
-func (r *Resolver) packSection(kind string) map[string]lock.Pack {
-	if kind == manifest.TypeShader {
-		if r.Lock.Shaders == nil {
-			r.Lock.Shaders = map[string]lock.Pack{}
-		}
-		return r.Lock.Shaders
+func (r *Resolver) packSection(kind string) map[string]lock.Pack { return r.Lock.Packs(kind) }
+
+// packSide is where a datapack is placed: its entry's side, or both. The other
+// kinds are client-only and record none.
+func packSide(kind string, e manifest.Require) string {
+	switch {
+	case kind != manifest.TypeDatapack:
+		return ""
+	case e.Side != "":
+		return e.Side
 	}
-	if r.Lock.ResourcePacks == nil {
-		r.Lock.ResourcePacks = map[string]lock.Pack{}
-	}
-	return r.Lock.ResourcePacks
+	return "both"
 }
 
 // shaderLoaders are the shader mods a provider tagged a version for. Modrinth
@@ -95,6 +102,12 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 	if p.Name() != r.Manifest.ProviderOrder()[0] {
 		listed.Provider = p.Name()
 	}
+	if kind == manifest.TypeDatapack {
+		listed.Side = opts.Side
+		locked := r.packSection(kind)[key]
+		locked.Side = packSide(kind, listed)
+		r.packSection(kind)[key] = locked
+	}
 	r.Manifest.Requires[key] = listed
 	return nil
 }
@@ -108,12 +121,10 @@ func (r *Resolver) packKeyFree(key, kind string) error {
 	if _, ok := r.Lock.Mods[key]; ok {
 		return manifest.KeyTaken(key, manifest.TypeMod, kind)
 	}
-	other := manifest.TypeShader
-	if kind == manifest.TypeShader {
-		other = manifest.TypeResourcePack
-	}
-	if _, ok := r.packSection(other)[key]; ok {
-		return manifest.KeyTaken(key, other, kind)
+	for _, other := range manifest.PackKinds {
+		if _, ok := r.packSection(other)[key]; ok && other != kind {
+			return manifest.KeyTaken(key, other, kind)
+		}
 	}
 	return nil
 }
@@ -136,40 +147,31 @@ func (r *Resolver) pickPack(ctx context.Context, p provider.Provider, proj *prov
 	return &v, nil
 }
 
-// lockedPacks is every resource pack and shader in the lock, by key. Keys are
-// one namespace, so the two sections never collide.
+// lockedPacks is every pack in the lock, by key. Keys are one namespace, so the
+// sections never collide.
 func (r *Resolver) lockedPacks() map[string]lock.Pack {
-	all := make(map[string]lock.Pack, len(r.Lock.ResourcePacks)+len(r.Lock.Shaders))
-	for key, p := range r.Lock.ResourcePacks {
-		all[key] = p
-	}
-	for key, p := range r.Lock.Shaders {
-		all[key] = p
+	all := map[string]lock.Pack{}
+	for _, kind := range manifest.PackKinds {
+		maps.Copy(all, r.packSection(kind))
 	}
 	return all
 }
 
-// packKind reports which section holds a key, when a resource pack or shader
-// does. The manifest decides it where the key is listed, so a hand-written entry
+// packKind reports which section holds a key, when a pack does. The manifest decides it where the key is listed, so a hand-written entry
 // resolves before it has ever been locked.
 func (r *Resolver) packKind(key string) (string, bool) {
 	if e, listed := r.Manifest.Requires[key]; listed {
-		switch e.Kind() {
-		case manifest.TypeResourcePack, manifest.TypeShader:
-			return e.Kind(), true
+		return e.Kind(), manifest.IsPackKind(e.Kind())
+	}
+	for _, kind := range manifest.PackKinds {
+		if _, ok := r.packSection(kind)[key]; ok {
+			return kind, true
 		}
-		return "", false
-	}
-	if _, ok := r.Lock.ResourcePacks[key]; ok {
-		return manifest.TypeResourcePack, true
-	}
-	if _, ok := r.Lock.Shaders[key]; ok {
-		return manifest.TypeShader, true
 	}
 	return "", false
 }
 
-// removePacks takes the resource packs and shaders out of a remove, leaving the
+// removePacks takes the packs out of a remove, leaving the
 // ids the mod path handles.
 func (r *Resolver) removePacks(ids []string) ([]string, error) {
 	var mods []string
@@ -190,16 +192,13 @@ func (r *Resolver) removePacks(ids []string) ([]string, error) {
 	return mods, nil
 }
 
-// reconcilePacks brings the lock's two zip sections in line with shulker.json:
+// reconcilePacks brings the lock's pack sections in line with shulker.json:
 // an entry listed but not locked, or locked against different settings, is
 // resolved again, and one the manifest no longer lists is dropped. Entries a
 // locked modpack supplied are left alone, because applyLockedPacks owns them.
 func (r *Resolver) reconcilePacks(ctx context.Context) error {
-	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
-		listed := r.Manifest.ResourcePacks()
-		if kind == manifest.TypeShader {
-			listed = r.Manifest.Shaders()
-		}
+	for _, kind := range manifest.PackKinds {
+		listed := r.Manifest.Packs(kind)
 		section := r.packSection(kind)
 		for _, key := range sortedKeys(section) {
 			if _, still := listed[key]; !still && section[key].Modpack == "" {
@@ -209,8 +208,9 @@ func (r *Resolver) reconcilePacks(ctx context.Context) error {
 		for _, key := range sortedKeys(listed) {
 			locked, ok := section[key]
 			if ok {
-				// A new name needs no new version, so it is taken without resolving again.
+				// A new name or side needs no new version, so it is taken without resolving again.
 				locked.Filename = manifest.PackFilename(key, listed[key])
+				locked.Side = packSide(kind, listed[key])
 				section[key] = locked
 			}
 			if ok && len(project.ZipEntryDifferences(r.Dir, key, listed[key], locked)) == 0 {
@@ -225,7 +225,7 @@ func (r *Resolver) reconcilePacks(ctx context.Context) error {
 	return nil
 }
 
-// relockPack resolves one listed resource pack or shader from its manifest
+// relockPack resolves one listed pack from its manifest
 // entry, the way relock does for a mod.
 func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manifest.Require) error {
 	if entry.File != "" {
@@ -250,10 +250,10 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 // case since macOS and Windows see one file there.
 func (r *Resolver) checkPackFilenames() error {
 	placed := map[string]string{}
-	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
+	for _, kind := range manifest.PackKinds {
 		section := r.packSection(kind)
 		for _, key := range sortedKeys(section) {
-			path := section[key].Path(kind)
+			path := r.Lock.PackPath(kind, section[key], "client", "")
 			if other, ok := placed[strings.ToLower(path)]; ok {
 				return out.Errorf("pack-filename-taken", "%s and %s are both placed as %s", other, key, path)
 			}
@@ -263,7 +263,7 @@ func (r *Resolver) checkPackFilenames() error {
 	return nil
 }
 
-// lockPack picks the resource pack or shader's version, fetches it into the cache and records it in
+// lockPack picks the pack's version, fetches it into the cache and records it in
 // the lock under key.
 func (r *Resolver) lockPack(ctx context.Context, p provider.Provider, proj *provider.Project, key, kind, pin, channel string) error {
 	v, err := r.pickPack(ctx, p, proj, kind, pin, channel)
@@ -298,6 +298,7 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 		Sha1:             sha1,
 		Size:             v.File.Size,
 		Channel:          channelLabel(channel),
+		Side:             packSide(kind, r.Manifest.Requires[key]),
 	}
 	if kind == manifest.TypeShader {
 		locked.Loaders = shaderLoaders(v)
@@ -306,7 +307,7 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 	return nil
 }
 
-// splitPackTargets takes the resource packs and shaders out of a command's
+// splitPackTargets takes the packs out of a command's
 // arguments, so the mod path never sees a key it would call unknown.
 func (r *Resolver) splitPackTargets(ids []string) (mods, packs []string, err error) {
 	for _, id := range ids {
@@ -325,14 +326,11 @@ func (r *Resolver) splitPackTargets(ids []string) (mods, packs []string, err err
 	return mods, packs, nil
 }
 
-// updatePacks re-resolves listed resource packs and shaders to the newest
+// updatePacks re-resolves listed packs to the newest
 // version their channel allows. No ids means every one the manifest lists.
 func (r *Resolver) updatePacks(ctx context.Context, ids []string) error {
-	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
-		listed := r.Manifest.ResourcePacks()
-		if kind == manifest.TypeShader {
-			listed = r.Manifest.Shaders()
-		}
+	for _, kind := range manifest.PackKinds {
+		listed := r.Manifest.Packs(kind)
 		for _, key := range sortedKeys(listed) {
 			if len(ids) > 0 && !slices.Contains(ids, key) {
 				continue
@@ -345,15 +343,12 @@ func (r *Resolver) updatePacks(ctx context.Context, ids []string) error {
 	return nil
 }
 
-// outdatedPacks reports the listed resource packs and shaders a newer version is
+// outdatedPacks reports the listed packs a newer version is
 // published for, without changing the lock.
 func (r *Resolver) outdatedPacks(ctx context.Context, ids []string) ([]Outdated, error) {
 	var res []Outdated
-	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
-		listed := r.Manifest.ResourcePacks()
-		if kind == manifest.TypeShader {
-			listed = r.Manifest.Shaders()
-		}
+	for _, kind := range manifest.PackKinds {
+		listed := r.Manifest.Packs(kind)
 		section := r.packSection(kind)
 		for _, key := range sortedKeys(listed) {
 			locked, ok := section[key]
@@ -399,10 +394,12 @@ func (r *Resolver) lockFiles() []downloadable {
 		m := r.Lock.Mods[id]
 		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size, side: m.Side})
 	}
-	for _, section := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
+	for _, kind := range manifest.PackKinds {
+		section := r.packSection(kind)
 		for _, key := range sortedKeys(section) {
 			p := section[key]
-			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size, side: "client"})
+			side := cmp.Or(p.Side, "client")
+			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size, side: side})
 		}
 	}
 	return files
@@ -421,6 +418,9 @@ func packPage(p lock.Pack) string {
 // addKind settles what is being added: what --type said, what the provider says
 // the project is, and a mod when neither knows.
 func addKind(asked string, proj *provider.Project, slug string) (string, error) {
+	if asked == manifest.TypeDatapack && proj.Datapack {
+		return asked, nil
+	}
 	if asked != "" && proj.Type != "" && asked != proj.Type {
 		e := out.Errorf("type-mismatch", "%s is a %s, not a %s", slug, proj.Type, asked)
 		e.Candidates, e.Given, e.Flag = []string{proj.Type}, asked, "--type"

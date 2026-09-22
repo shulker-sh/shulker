@@ -429,6 +429,9 @@ func (m *Manifest) Shaders() map[string]Require { return m.byKind(TypeShader) }
 
 func (m *Manifest) Datapacks() map[string]Require { return m.byKind(TypeDatapack) }
 
+// Packs lists the entries of one pack kind.
+func (m *Manifest) Packs(kind string) map[string]Require { return m.byKind(kind) }
+
 // PackFilename is the name a pack is placed under: the
 // entry's own filename, or its key, which stays put when the pack updates.
 func PackFilename(key string, e Require) string {

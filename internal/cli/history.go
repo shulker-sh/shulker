@@ -210,6 +210,7 @@ func historyChanges(p *project.Project, e build.HistoryEntry) ([]historyChange, 
 		{"", modVersions(p.Lock.Mods), modVersions(was.Mods)},
 		{manifest.TypeResourcePack, packVersions(p.Lock.ResourcePacks), packVersions(was.ResourcePacks)},
 		{manifest.TypeShader, packVersions(p.Lock.Shaders), packVersions(was.Shaders)},
+		{manifest.TypeDatapack, packVersions(p.Lock.Datapacks), packVersions(was.Datapacks)},
 	}
 	changes := []historyChange{}
 	for _, s := range sections {

@@ -115,7 +115,7 @@ func (c *Cache) keep(roots []Root) map[string]bool {
 		for _, m := range l.Mods {
 			keep[c.Object(m.Sha512)] = true
 		}
-		for _, packs := range []map[string]lock.Pack{l.ResourcePacks, l.Shaders} {
+		for _, packs := range l.PackSections() {
 			for _, p := range packs {
 				keep[c.Object(p.Sha512)] = true
 			}

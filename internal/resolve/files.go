@@ -128,7 +128,7 @@ func (r *Resolver) cachePackFiles(p *pack.Loaded) error {
 			return err
 		}
 	}
-	for _, section := range []map[string]lock.Pack{p.Lock.ResourcePacks, p.Lock.Shaders} {
+	for _, section := range p.Lock.PackSections() {
 		for _, key := range sortedKeys(section) {
 			if err := check(key, section[key].File, section[key].Modpack, section[key].Sha512, true); err != nil {
 				return err
@@ -172,7 +172,7 @@ func (r *Resolver) nestedPack(f downloadable) string {
 		if m, ok := p.Lock.Mods[f.id]; ok && m.File == f.file {
 			return m.Modpack
 		}
-		for _, section := range []map[string]lock.Pack{p.Lock.ResourcePacks, p.Lock.Shaders} {
+		for _, section := range p.Lock.PackSections() {
 			if e, ok := section[f.id]; ok && e.File == f.file {
 				return e.Modpack
 			}
@@ -345,6 +345,7 @@ func (r *Resolver) lockFilePack(key, kind string, entry manifest.Require) error 
 		Filename: manifest.PackFilename(key, entry),
 		Sha512:   got.sha512,
 		Size:     got.size,
+		Side:     packSide(kind, entry),
 	}
 	section[key] = p
 	return nil

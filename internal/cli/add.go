@@ -55,7 +55,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			case manifest.TypeModpack:
 				opts.As = as
 				return a.addModpacks(cmd, args, opts, ref, unlocked, noAutoUpdate)
-			case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader:
+			case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack:
 				// An empty type is settled by the provider during resolution.
 			default:
 				return unsupportedType(chosen)

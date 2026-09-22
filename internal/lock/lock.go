@@ -155,7 +155,7 @@ type Pack struct {
 	Side string `json:"side,omitempty"`
 }
 
-// Path is where the build places the pack. Shaders go to shaderpacks/, except the
+// Path is where the build places a resource pack or shader. Shaders go to shaderpacks/, except the
 // vanilla ones: those are resource packs carrying core shaders, and no shader mod
 // loads them.
 func (p Pack) Path(kind string) string {
@@ -240,6 +240,25 @@ func (l *Lock) Packs(kind string) map[string]Pack {
 		*section = map[string]Pack{}
 	}
 	return *section
+}
+
+// PackSections are the lock's pack sections, in manifest.PackKinds order.
+func (l *Lock) PackSections() []map[string]Pack {
+	sections := make([]map[string]Pack, len(manifest.PackKinds))
+	for i, kind := range manifest.PackKinds {
+		sections[i] = l.Packs(kind)
+	}
+	return sections
+}
+
+// PackPath is where a side's build places a pack of kind: a datapack in DatapackFolder, the
+// other kinds by Pack.Path.
+func (l *Lock) PackPath(kind string, p Pack, side, levelName string) string {
+	if kind == manifest.TypeDatapack {
+		folder, _ := l.DatapackFolder(side, levelName)
+		return folder + "/" + p.Filename
+	}
+	return p.Path(kind)
 }
 
 // DatapackFolder is where a datapack placed on side goes: the folder of a global datapack mod

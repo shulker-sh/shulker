@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 
@@ -81,19 +82,21 @@ func sleep(ctx context.Context, d time.Duration) error {
 func (m *Modrinth) Name() string { return "modrinth" }
 
 type project struct {
-	ID          string `json:"id"`
-	Slug        string `json:"slug"`
-	Title       string `json:"title"`
-	ClientSide  string `json:"client_side"`
-	ServerSide  string `json:"server_side"`
-	ProjectType string `json:"project_type"`
-	Downloads   int64  `json:"downloads"`
+	ID          string   `json:"id"`
+	Slug        string   `json:"slug"`
+	Title       string   `json:"title"`
+	ClientSide  string   `json:"client_side"`
+	ServerSide  string   `json:"server_side"`
+	ProjectType string   `json:"project_type"`
+	Downloads   int64    `json:"downloads"`
+	Loaders     []string `json:"loaders"`
 }
 
 // hit is a search result, which names the project id differently from the
 // project itself.
 type hit struct {
-	ProjectID string `json:"project_id"`
+	ProjectID  string   `json:"project_id"`
+	Categories []string `json:"categories"`
 	project
 }
 
@@ -147,13 +150,22 @@ func (m *Modrinth) Search(ctx context.Context, query, kind string, limit int) ([
 	for _, h := range res.Hits {
 		found := convertProject(h.project)
 		found.ID = h.ProjectID
+		found.Datapack = slices.Contains(h.Categories, loaderDatapack)
 		projects = append(projects, found)
 	}
 	return projects, nil
 }
 
+// loaderDatapack is the loader Modrinth tags a datapack version with. It files datapacks as mods,
+// so a project whose only loader is this one is a datapack.
+const loaderDatapack = "datapack"
+
 func convertProject(p project) provider.Project {
-	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: p.ProjectType, Downloads: p.Downloads}
+	kind := p.ProjectType
+	if kind == "mod" && len(p.Loaders) > 0 && !slices.ContainsFunc(p.Loaders, func(l string) bool { return l != loaderDatapack }) {
+		kind = loaderDatapack
+	}
+	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: kind, Datapack: slices.Contains(p.Loaders, loaderDatapack), Downloads: p.Downloads}
 }
 
 func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {

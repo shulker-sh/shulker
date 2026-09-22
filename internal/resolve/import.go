@@ -646,7 +646,7 @@ func (r *Resolver) AdoptLocalFiles() error {
 			locals = append(locals, local{key, m.Sha512, manifest.FilesDir + "/" + path.Base(m.File), false, func(to string) { m.File = to; r.Lock.Mods[key] = m }})
 		}
 	}
-	for _, packs := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
+	for _, packs := range r.Lock.PackSections() {
 		for _, key := range slices.Sorted(maps.Keys(packs)) {
 			if p := packs[key]; p.File != "" {
 				// A pack's file that isn't a .zip is a folder, which the lock holds as its zip.

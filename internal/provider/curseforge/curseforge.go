@@ -41,11 +41,12 @@ const (
 	classModpack      = "4471"
 	classResourcePack = "12"
 	classShader       = "6552"
+	classDatapack     = "6945"
 )
 
-var classTypes = map[int]string{6: "mod", 4471: "modpack", 12: "resourcepack", 6552: "shader"}
+var classTypes = map[int]string{6: "mod", 4471: "modpack", 12: "resourcepack", 6552: "shader", 6945: "datapack"}
 
-var typeClasses = map[string]string{"mod": classMod, "modpack": classModpack, "resourcepack": classResourcePack, "shader": classShader}
+var typeClasses = map[string]string{"mod": classMod, "modpack": classModpack, "resourcepack": classResourcePack, "shader": classShader, "datapack": classDatapack}
 
 var embeddedKey string
 
@@ -489,7 +490,7 @@ func sharedKeyRejected(detail string) error {
 }
 
 // classPaths are the url segments curseforge.com uses per class.
-var classPaths = map[int]string{6: "mc-mods", 4471: "modpacks", 12: "texture-packs", 6552: "shaders"}
+var classPaths = map[int]string{6: "mc-mods", 4471: "modpacks", 12: "texture-packs", 6552: "shaders", 6945: "data-packs"}
 
 func FilePage(slug, fileID string, class int) string {
 	path, ok := classPaths[class]
@@ -504,7 +505,7 @@ func ProjectPage(projectID string) string {
 }
 
 func convertMod(m mod) *provider.Project {
-	return &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Type: classTypes[m.ClassID], Downloads: m.Downloads}
+	return &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Type: classTypes[m.ClassID], Datapack: m.ClassID == 6945, Downloads: m.Downloads}
 }
 
 func convertFile(f file) (provider.Version, error) {

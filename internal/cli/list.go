@@ -158,7 +158,7 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 			res = append(res, e)
 		}
 	}
-	for _, packKind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
+	for _, packKind := range manifest.PackKinds {
 		if kind == "" || kind == packKind {
 			res = append(res, packEntries(p, packKind)...)
 		}
@@ -166,19 +166,13 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 	return res, nil
 }
 
-// packEntries lists the resource packs or shaders, spanning what shulker.json
+// packEntries lists the packs of one kind, spanning what shulker.json
 // lists and what the lock holds, so one a locked modpack supplied shows up too.
 func packEntries(p *project.Project, kind string) []listEntry {
-	listed := p.Manifest.ResourcePacks()
+	listed := p.Manifest.Packs(kind)
 	var locked map[string]lock.Pack
-	if kind == manifest.TypeShader {
-		listed = p.Manifest.Shaders()
-	}
 	if p.Lock != nil {
-		locked = p.Lock.ResourcePacks
-		if kind == manifest.TypeShader {
-			locked = p.Lock.Shaders
-		}
+		locked = p.Lock.Packs(kind)
 	}
 	keys := map[string]bool{}
 	for key := range listed {

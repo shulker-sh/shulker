@@ -16,9 +16,9 @@ import (
 	"shulker.sh/shulker/internal/resolve"
 )
 
-const typeFlagUsage = "entry type: mod, modpack, resourcepack, shader"
+const typeFlagUsage = "entry type: mod, modpack, resourcepack, shader, datapack"
 
-var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.TypeResourcePack, manifest.TypeShader}
+var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack}
 
 // typeFlags lists the flags each type accepts. The plain verbs register every
 // flag and refuse the ones the chosen type has no use for, so a group command
@@ -28,6 +28,7 @@ var typeFlags = map[string][]string{
 	manifest.TypeModpack:      {"ref", "as", "unlocked", "no-auto-update", "channel", "pin", "provider"},
 	manifest.TypeResourcePack: {"channel", "pin", "provider", "as"},
 	manifest.TypeShader:       {"channel", "pin", "provider", "as"},
+	manifest.TypeDatapack:     {"side", "channel", "pin", "provider", "as"},
 }
 
 var allTypeFlags = []string{"as", "channel", "no-auto-update", "pin", "provider", "ref", "side", "unlocked", "with-deps"}

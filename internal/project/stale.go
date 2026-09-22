@@ -1,6 +1,7 @@
 package project
 
 import (
+	"cmp"
 	"crypto/sha512"
 	"encoding/hex"
 	"errors"
@@ -160,16 +161,13 @@ func HostedDifferences(name string, e manifest.Require, lp lock.Modpack) []strin
 	return diffs
 }
 
-// ZipDifferences compares the resource packs and shaders shulker.json lists with
+// ZipDifferences compares the packs shulker.json lists with
 // what the lock records. An entry a locked modpack supplied is not listed here,
 // so it never reads as drift.
 func ZipDifferences(dir string, m *manifest.Manifest, l *lock.Lock) []string {
 	var diffs []string
-	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
-		listed, locked := m.ResourcePacks(), l.ResourcePacks
-		if kind == manifest.TypeShader {
-			listed, locked = m.Shaders(), l.Shaders
-		}
+	for _, kind := range manifest.PackKinds {
+		listed, locked := m.Packs(kind), l.Packs(kind)
 		for _, key := range slices.Sorted(maps.Keys(listed)) {
 			lp, ok := locked[key]
 			if !ok {
@@ -187,12 +185,16 @@ func ZipDifferences(dir string, m *manifest.Manifest, l *lock.Lock) []string {
 	return diffs
 }
 
-// ZipEntryDifferences compares one listed resource pack or shader with what the
-// lock records for it.
+// ZipEntryDifferences compares one listed pack with what the lock records for it.
 func ZipEntryDifferences(dir, key string, e manifest.Require, lp lock.Pack) []string {
 	var diffs []string
 	if name := manifest.PackFilename(key, e); name != lp.Filename {
 		diffs = append(diffs, fmt.Sprintf("%s: filename %s -> %s", key, lp.Filename, name))
+	}
+	if e.Kind() == manifest.TypeDatapack {
+		if side := cmp.Or(e.Side, "both"); side != lp.Side {
+			diffs = append(diffs, fmt.Sprintf("%s: side %s -> %s", key, lp.Side, side))
+		}
 	}
 	if e.File != "" || lp.File != "" {
 		return append(diffs, FileDifferences(dir, key, e.File, lp.File, lp.Size, lp.Sha512)...)
@@ -304,7 +306,7 @@ func (p *Project) GoneFiles(cached func(sha512 string) bool) []string {
 	for _, id := range slices.Sorted(maps.Keys(p.Lock.Mods)) {
 		check(id, p.Lock.Mods[id].File, p.Lock.Mods[id].Sha512)
 	}
-	for _, section := range []map[string]lock.Pack{p.Lock.ResourcePacks, p.Lock.Shaders} {
+	for _, section := range p.Lock.PackSections() {
 		for _, key := range slices.Sorted(maps.Keys(section)) {
 			check(key, section[key].File, section[key].Sha512)
 		}

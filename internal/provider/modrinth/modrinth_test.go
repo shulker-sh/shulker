@@ -149,3 +149,31 @@ func TestProjectsAsksOnce(t *testing.T) {
 		t.Fatalf("calls %d, ids %s, found %+v", calls, ids, found)
 	}
 }
+
+func TestProjectTellsDatapacksApart(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/project/terralith":
+			w.Write([]byte(`{"id":"8oi3bsk5","slug":"terralith","project_type":"mod","loaders":["datapack","fabric","neoforge"]}`))
+		case "/project/witch-huts-compat":
+			w.Write([]byte(`{"id":"p2","slug":"witch-huts-compat","project_type":"mod","loaders":["datapack"]}`))
+		}
+	}))
+	defer srv.Close()
+	m := New(fetch.New("test"))
+	m.BaseURL = srv.URL
+	both, err := m.Project(context.Background(), "terralith", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if both.Type != "mod" || !both.Datapack {
+		t.Errorf("a mod that also ships a datapack: %+v", both)
+	}
+	only, err := m.Project(context.Background(), "witch-huts-compat", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if only.Type != "datapack" || !only.Datapack {
+		t.Errorf("a datapack-only project: %+v", only)
+	}
+}

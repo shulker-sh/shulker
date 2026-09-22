@@ -30,9 +30,12 @@ type Project struct {
 	Slug  string
 	Title string
 	Side  string
-	// Type is the provider's own project type: mod, modpack, resourcepack or
-	// shader. Empty when the provider doesn't say.
-	Type      string
+	// Type is the provider's own project type: mod, modpack, resourcepack,
+	// shader or datapack. Empty when the provider doesn't say.
+	Type string
+	// Datapack reports a project with datapack files, whatever its Type:
+	// Modrinth files a mod that also ships as a datapack as a mod.
+	Datapack  bool
 	Downloads int64
 }
 

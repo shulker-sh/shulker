@@ -50,6 +50,7 @@ outline: [2, 3]
 | [`shulker modpack add\|remove\|list`](#shulker-modpack-add-remove-list) | Manage modpacks whose mods and overrides merge into this project |
 | [`shulker resourcepack add\|remove\|list`](#shulker-resourcepack-add-remove-list) | The plain verbs with `--type resourcepack` |
 | [`shulker shader add\|remove\|list`](#shulker-shader-add-remove-list) | The plain verbs with `--type shader` |
+| [`shulker datapack add\|remove\|list`](#shulker-datapack-add-remove-list) | The plain verbs with `--type datapack` |
 | [`shulker player [name\|uuid]...`](#shulker-player) | Check player names and uuids against Mojang and the lock |
 | [`shulker accounts`](#shulker-accounts) | List the accounts shulker can play with |
 | [`shulker accounts login`](#shulker-accounts-login) | Sign in to a Microsoft account |
@@ -204,7 +205,7 @@ shulker add
 
 | Flag | Description |
 | --- | --- |
-| `--type <type>` | What the arguments name: `mod` (default), `modpack`, `resourcepack`, `shader` |
+| `--type <type>` | What the arguments name: `mod` (default), `modpack`, `resourcepack`, `shader`, `datapack` |
 | `--side <side>` | Override side: `client`, `server`, `both` |
 | `--channel <channel>` | Least stable channel accepted: `release`, `beta`, `alpha` |
 | `--pin <version-id>` | Pin to a provider version id (one mod or modpack only) |
@@ -215,9 +216,9 @@ shulker add
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack. On a terminal, an add without it prints what would have to move and asks `Move it?` (`Move them?` for several), and yes does the same |
 
-An argument that names an existing file, or ends in `.jar`, `.zip` or `.mrpack`, is a local file rather than a slug, and is locked in the same run. A file inside the project is referenced where it lies. One outside it is copied into `files/`, and so is one in `downloads/`, an overrides folder or a folder a side builds into, since those files aren't the project's to keep. Adding the same file again refreshes its copy and relocks it, which is how a rebuilt jar gets in; a different file already in `files/` under the same name is never replaced. The key is a jar's mod id or, for a pack, its file name without the extension, lowercased with anything a key can't hold turned into dashes, and `--as` overrides either. A jar is a mod, and a bare `add` reads a zip's type from what it holds: a resource pack holds `pack.mcmeta`, a shader `shaders/`. `--pin`, `--channel` and `--provider` don't apply to a local file.
+An argument that names an existing file, or ends in `.jar`, `.zip` or `.mrpack`, is a local file rather than a slug, and is locked in the same run. A file inside the project is referenced where it lies. One outside it is copied into `files/`, and so is one in `downloads/`, an overrides folder or a folder a side builds into, since those files aren't the project's to keep. Adding the same file again refreshes its copy and relocks it, which is how a rebuilt jar gets in; a different file already in `files/` under the same name is never replaced. The key is a jar's mod id or, for a pack, its file name without the extension, lowercased with anything a key can't hold turned into dashes, and `--as` overrides either. A jar is a mod, and a bare `add` reads a zip's type from what it holds: a resource pack holds `pack.mcmeta`, a datapack `pack.mcmeta` and `data/` without `assets/`, a shader `shaders/`. One with both `data/` and `assets/` needs `--type`. `--pin`, `--channel` and `--provider` don't apply to a local file.
 
-A folder is taken the same way, as a resource pack or shader built from its sources, which `lock` zips. One inside the project is referenced where it lies; one outside it, or in one of those folders, is copied whole into `files/<name>/`, leaving out what the zip leaves out, and `add` says so. Adding it again replaces the copy. Its key is the folder's name, made a key the same way, and a bare `add` reads its type from its root: `pack.mcmeta` for a resource pack, a `shaders/` folder for a shader. A folder can't be a mod, and one the project lies in can't be copied into it. A folder the game or Iris wouldn't load is locked all the same, with a warning at `add` and `lock` naming what is missing: a resource pack needs `pack.mcmeta` at its root, valid JSON with `pack.description` and a format (`min_format` and `max_format`, or `pack_format`), and a shader needs `shaders/`. The format isn't checked against the project's Minecraft version.
+A folder is taken the same way, as a resource pack, shader or datapack built from its sources, which `lock` zips. One inside the project is referenced where it lies; one outside it, or in one of those folders, is copied whole into `files/<name>/`, leaving out what the zip leaves out, and `add` says so. Adding it again replaces the copy. Its key is the folder's name, made a key the same way, and a bare `add` reads its type from its root the way it reads a zip's: `pack.mcmeta` for a resource pack or datapack, a `shaders/` folder for a shader. A folder can't be a mod, and one the project lies in can't be copied into it. A folder the game or Iris wouldn't load is locked all the same, with a warning at `add` and `lock` naming what is missing: a resource pack needs `pack.mcmeta` at its root, valid JSON with `pack.description` and a format (`min_format` and `max_format`, or `pack_format`), and a shader needs `shaders/`. The format isn't checked against the project's Minecraft version.
 
 ```sh
 shulker add ./build/libs/my-mod-1.0.jar
@@ -240,7 +241,7 @@ shulker search jei --provider curseforge --limit 5
 
 | Flag | Description |
 | --- | --- |
-| `--type <type>` | Only projects of one type: `mod`, `modpack`, `resourcepack`, `shader` |
+| `--type <type>` | Only projects of one type: `mod`, `modpack`, `resourcepack`, `shader`, `datapack` |
 | `--provider <provider>` | Search one provider instead of every available one: `modrinth` or `curseforge` |
 | `--limit <n>` | Results to print per provider (default 10, as many as each provider answers with: at most 100 from Modrinth, 50 from CurseForge) |
 
@@ -257,7 +258,7 @@ shulker remove base --type modpack
 
 | Flag | Description |
 | --- | --- |
-| `--type <type>` | What the arguments name: `mod` (default), `modpack`, `resourcepack`, `shader` |
+| `--type <type>` | What the arguments name: `mod` (default), `modpack`, `resourcepack`, `shader`, `datapack` |
 
 ### `shulker list`
 
@@ -270,7 +271,7 @@ shulker list --type modpack
 
 | Flag | Description |
 | --- | --- |
-| `--type <type>` | Only entries of one type: `mod`, `modpack`, `resourcepack`, `shader` |
+| `--type <type>` | Only entries of one type: `mod`, `modpack`, `resourcepack`, `shader`, `datapack` |
 
 ### `shulker lock`
 
@@ -1449,6 +1450,15 @@ shulker shader add complementary-reimagined
 shulker shader list
 ```
 
+### `shulker datapack add|remove|list`
+
+`shulker datapack add terralith` is `shulker add terralith --type datapack`, and the same for `remove` and `list`. Modrinth files datapacks as mods, so a project whose only files are datapacks adds as one without `--type`, and one that ships both a mod and a datapack, like Terralith, adds as the mod unless `--type datapack` asks for its datapack files. A datapack is placed on both sides as `<key>.zip`, or under its entry's `filename`, in the folder of a global datapack mod the side places: `config/paxi/datapacks/` for Paxi, and `config/openloader/data/` before Minecraft 1.21 or `config/openloader/packs/` from it for Open Loader. With neither, a server places it in its world's `datapacks/` folder, named by `level-name`, which the game loads without a mod; a client places it in `datapacks/` and warns, since only some global datapack mods read that folder. `--side` narrows it to one side. Load order isn't managed: ship Paxi's `datapack_load_order.json` as an override. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`.
+
+```sh
+shulker datapack add terralith
+shulker datapack list
+```
+
 ## Players
 
 ### `shulker player`
@@ -1843,7 +1853,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a native jar that won't unpack, or a version JSON that doesn't hold together |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
-| `type-ambiguous` | A CurseForge slug matches projects of several types, or a zip or folder given to `add` holds neither a resource pack nor a shader; pass `--type` to choose. `candidates`: the types it could be |
+| `type-ambiguous` | A CurseForge slug matches projects of several types, or a zip or folder given to `add` holds no pack whose kind it can tell, including one with both `data/` and `assets/`; pass `--type` to choose. `candidates`: the types it could be |
 | `type-mismatch` | `--type`, or a hosted modpack entry, disagrees with what the provider says the project is. `candidates`: the provider's own type |
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | A `.tmpl` override or a `server.properties` or `client.options` value uses a variable that isn't set |

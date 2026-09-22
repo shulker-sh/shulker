@@ -272,14 +272,11 @@ func archiveEntries(name string, a *mrpack.Archive, project *lock.Lock) (*manife
 			m.Requires[id] = requireFor(mod)
 		}
 	}
-	for key, p := range project.ResourcePacks {
-		if p.Modpack == name {
-			l.ResourcePacks[key] = p
-		}
-	}
-	for key, p := range project.Shaders {
-		if p.Modpack == name {
-			l.Shaders[key] = p
+	for _, kind := range manifest.PackKinds {
+		for key, p := range project.Packs(kind) {
+			if p.Modpack == name {
+				l.Packs(kind)[key] = p
+			}
 		}
 	}
 	return m, l

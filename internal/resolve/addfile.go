@@ -29,8 +29,7 @@ func IsLocalPath(arg string) bool {
 	return err == nil && st.Mode().IsRegular()
 }
 
-// IsLocalFolder reports whether an add argument names a folder, which a resource pack or shader
-// can be built from.
+// IsLocalFolder reports whether an add argument names a folder, which a pack can be built from.
 func IsLocalFolder(arg string) bool {
 	st, err := os.Stat(arg)
 	return err == nil && st.IsDir()
@@ -60,8 +59,8 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 	if err != nil {
 		return err
 	}
-	if kind != manifest.TypeMod && opts.Side != "" {
-		return out.Errorf("usage", "--side applies to a mod, not a %s", kind)
+	if kind != manifest.TypeMod && kind != manifest.TypeDatapack && opts.Side != "" {
+		return out.Errorf("usage", "--side applies to a mod or datapack, not a %s", kind)
 	}
 	key := opts.As
 	var info *jarmeta.Info
@@ -203,41 +202,60 @@ func guessFileKind(path, asked string) (string, error) {
 	}
 	if zr, err := zip.OpenReader(path); err == nil {
 		defer zr.Close()
+		var mcmeta, assets, data bool
 		for _, f := range zr.File {
 			switch {
 			case f.Name == "pack.mcmeta":
-				return manifest.TypeResourcePack, nil
-			case strings.HasPrefix(f.Name, "shaders/"):
+				mcmeta = true
+			case strings.HasPrefix(f.Name, "assets/"):
+				assets = true
+			case strings.HasPrefix(f.Name, "data/"):
+				data = true
+			case strings.HasPrefix(f.Name, "shaders/") && !mcmeta:
 				return manifest.TypeShader, nil
 			}
 		}
+		if mcmeta {
+			return mcmetaKind(path, assets, data)
+		}
 	}
-	return "", typeAmbiguous(path, manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader)
+	return "", typeAmbiguous(path, manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack)
+}
+
+// mcmetaKind is what a pack with pack.mcmeta at its root is: a datapack when it holds data/ and
+// no assets/, a resource pack otherwise, and either when it holds both.
+func mcmetaKind(path string, assets, data bool) (string, error) {
+	switch {
+	case data && assets:
+		return "", typeAmbiguous(path, manifest.TypeResourcePack, manifest.TypeDatapack)
+	case data:
+		return manifest.TypeDatapack, nil
+	}
+	return manifest.TypeResourcePack, nil
 }
 
 // folderKind is what a pack folder is: the type asked for, and otherwise whatever its root holds.
-// Only a resource pack or a shader can be built from a folder.
+// Only a pack can be built from a folder.
 func folderKind(path, asked string) (string, error) {
-	switch asked {
-	case manifest.TypeResourcePack, manifest.TypeShader:
+	switch {
+	case manifest.IsPackKind(asked):
 		return asked, nil
-	case "":
-	default:
-		e := out.Errorf("usage", "%s is a folder, and only a resource pack or shader can be built from one", filepath.Base(path))
+	case asked != "":
+		e := out.Errorf("usage", "%s is a folder, and only a resource pack, shader or datapack can be built from one", filepath.Base(path))
 		e.Help = "add a mod as its jar"
 		return "", e
 	}
 	if hasPackMcmeta(path) {
-		return manifest.TypeResourcePack, nil
+		return mcmetaKind(path, IsLocalFolder(filepath.Join(path, "assets")), IsLocalFolder(filepath.Join(path, "data")))
 	}
 	if hasShaders(path) {
 		return manifest.TypeShader, nil
 	}
-	return "", typeAmbiguous(path, manifest.TypeResourcePack, manifest.TypeShader)
+	return "", typeAmbiguous(path, manifest.PackKinds...)
 }
 
 func typeAmbiguous(path string, candidates ...string) error {
-	e := out.Errorf("type-ambiguous", "%s holds no resource pack or shader shulker recognises", filepath.Base(path))
+	e := out.Errorf("type-ambiguous", "%s holds no pack shulker can tell the kind of", filepath.Base(path))
 	e.Candidates = candidates
 	e.Flag = "--type"
 	return e
@@ -312,7 +330,7 @@ func (r *Resolver) fileKeyFree(key, kind string, info *jarmeta.Info) error {
 	if kind != manifest.TypeMod {
 		return r.packKeyFree(key, kind)
 	}
-	for _, other := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
+	for _, other := range manifest.PackKinds {
 		if _, ok := r.packSection(other)[key]; ok {
 			return manifest.KeyTaken(key, other, kind)
 		}

@@ -168,7 +168,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	case manifest.TypeMod:
 	case manifest.TypeModpack:
 		return r.addModpack(ctx, p, proj, opts)
-	case manifest.TypeResourcePack, manifest.TypeShader:
+	case manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack:
 		return r.addPack(ctx, p, proj, kind, opts)
 	default:
 		return out.Errorf("requires-unsupported", "%s is a %s, which shulker can't add yet", slug, kind)
