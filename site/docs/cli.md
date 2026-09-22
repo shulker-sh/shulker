@@ -282,6 +282,20 @@ Bring `shulker.lock` in line with `shulker.json` after you edit it by hand, with
 shulker lock
 ```
 
+### `shulker match`
+
+Look the jars and pack zips in `mods/`, `resourcepacks/` and `shaderpacks/` of `overrides/`, `client-overrides/` and `server-overrides/` up on Modrinth by sha1, then the ones Modrinth lacks on CurseForge by fingerprint, the way `import mrpack` does, and lock each match: it joins `requires` with the side of the folder it was in, and its file leaves the override folder. Naming paths looks up only those files. A file stays an override when no provider has it, when its author doesn't allow third-party downloads, when the provider's download fails, or when `requires` already has its key, with a warning for each but the first. Feature override folders and datapacks are left alone. `locked` lists the keys, `moved` the files they came from, and `kept` the files left as overrides. Every match is locked without asking; a lookup needs the network, and without a CurseForge API key only Modrinth is asked.
+
+```sh
+shulker match
+shulker match overrides/mods/sodium-fabric-0.6.13+mc1.21.1.jar
+shulker match --dry-run
+```
+
+| Flag | Description |
+| --- | --- |
+| `--dry-run` | Look the files up and report what would be locked, changing nothing |
+
 ### `shulker update`
 
 Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. Local `file` entries have no newer version to move to: a bare `update` leaves them as they are, and naming one says it is a local file. In an instance (a project whose side builds into its own directory), `update` then builds that side in place, backing up its worlds first when the mods change, and leaves the instances synced from it to `shulker sync`, which it names when there are any; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
@@ -1707,7 +1721,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
-| `file-not-found` | A file named to `pull` isn't in the build directory, a path given to `add` isn't a file, or a mod or modpack's `file` in `shulker.json` names a folder. `candidates`: the closest file there, for `pull` |
+| `file-not-found` | A file named to `pull` isn't in the build directory, a path given to `add` or `match` isn't a file, or a mod or modpack's `file` in `shulker.json` names a folder. `candidates`: the closest file there, for `pull` |
 | `file-taken` | `add` would copy a local file or folder into `files/`, which already holds a different one of that name that no entry of the same key names; rename one or remove the one in `files/`. Also an `import` whose pack names two different local files of one name |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |
@@ -1757,7 +1771,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
 | `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files, and a local `file` entry has no download at all; pass `--bundle`. `items`: the files |
 | `mrpack-invalid` | The modpack is malformed |
-| `mrpack-lookup` | A file in a Modrinth modpack couldn't be looked up on Modrinth or CurseForge, by `import mrpack` or when a modpack archive is read. The `modrinth` or `curseforge` row says why; offline, it is the network the lookup needs |
+| `mrpack-lookup` | A file in a Modrinth modpack or an override folder couldn't be looked up on Modrinth or CurseForge, by `import mrpack`, `match`, or when a modpack archive is read. The `modrinth` or `curseforge` row says why; offline, it is the network the lookup needs |
 | `mrpack-marker` | The modpack's own `shulker.json` or `shulker.lock` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-accounts` | shulker can see no account at all, so there is nothing to play with |
@@ -1788,6 +1802,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
 | `modpack-unlocked` | A modpack has no commit, archive hash or version in the lock; run `shulker update`, or `shulker lock` before pinning a hosted one |
 | `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
+| `override-path` | A path named to `match` isn't a jar in `mods/` or a zip in `resourcepacks/` or `shaderpacks/` of `overrides/`, `client-overrides/` or `server-overrides/` |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
 | `pack-filename-taken` | Two resource packs or shaders would be placed under one file name in the same folder, compared without case. Give one a different `filename` |
 | `path-invalid` | `shulker.json`, `config.json` or an instance's settings have no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |

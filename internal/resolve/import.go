@@ -70,6 +70,9 @@ type importer struct {
 	unmatched []mrpack.Override
 	// keepSides reuses the marker's side for each entry, for an archive whose layers don't say.
 	keepSides bool
+	// inProject marks the files as a project's own overrides rather than a pack's: one whose key
+	// requires already holds stays an override instead of being dropped as a duplicate.
+	inProject bool
 }
 
 // importedPack is a resource pack or shader the pack's own lock names, found by
@@ -183,7 +186,11 @@ func (im *importer) findOnModrinth(ctx context.Context, files []mrpack.File) err
 			sha1s = append(sha1s, sha1Sum)
 		}
 	}
-	if len(sha1s) == 0 {
+	return im.lookUpOnModrinth(ctx, sha1s)
+}
+
+func (im *importer) lookUpOnModrinth(ctx context.Context, sha1s []string) error {
+	if im.modrinth == nil || len(sha1s) == 0 {
 		return nil
 	}
 	im.r.log("looking up %d file(s) on Modrinth", len(sha1s))
@@ -251,7 +258,7 @@ func (im *importer) matchCurseForge(ctx context.Context) error {
 	}
 	for i, o := range left {
 		m, ok := found[fingerprints[i]]
-		if !ok {
+		if !ok || im.alreadyRequired(o, m.proj) {
 			im.unmanaged(o)
 			continue
 		}
