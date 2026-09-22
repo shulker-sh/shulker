@@ -255,3 +255,84 @@ func TestLogAfterATrimReadsWhatWasKept(t *testing.T) {
 		t.Fatalf("report = %+v", r)
 	}
 }
+
+const logKey = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
+
+// seedSecretLog writes a log whose entries hold a credentialed source URL, the configured CurseForge
+// key and paths under the home directory, which the test points at a temp dir.
+func seedSecretLog(t *testing.T) (home string) {
+	t.Helper()
+	path := isolatedLog(t)
+	home = t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if code, _, stderr := run(t, "config", "set", "curseforge.key", logKey); code != out.ExitOK {
+		t.Fatalf("config set: exit %d: %s", code, stderr)
+	}
+	game := filepath.Join(home, "Games", "friends")
+	at := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339Nano)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	for _, e := range []auditlog.Entry{
+		{At: at, Group: "mods", Cmd: "search", Level: auditlog.LevelWarn, Msg: "curseforge: GET https://api.curseforge.com/v1/mods/search?key=" + logKey + " failed"},
+		{At: at, Group: "launchers", Cmd: "sync", Instance: game, Level: auditlog.LevelError, Code: "source-fetch-failed", Msg: "can't clone https://ghp_s3cr3t@github.com/org/pack.git into " + game},
+	} {
+		line, err := json.Marshal(e)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.Write(append(line, '\n')); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return home
+}
+
+func TestLogRedactsByDefault(t *testing.T) {
+	home := seedSecretLog(t)
+	for _, args := range [][]string{{"log", "--no-color"}, {"log", "--json"}} {
+		code, stdout, stderr := run(t, args...)
+		if code != out.ExitOK {
+			t.Fatalf("%v: exit %d: %s", args, code, stderr)
+		}
+		for _, secret := range []string{logKey, "ghp_s3cr3t", home} {
+			if strings.Contains(stdout, secret) || strings.Contains(stdout, strings.ReplaceAll(secret, `\`, `\\`)) {
+				t.Errorf("%v shows %q:\n%s", args, secret, stdout)
+			}
+		}
+		for _, want := range []string{"https://github.com/org/pack.git", filepath.Join("~", "Games", "friends"), "[key]"} {
+			if !strings.Contains(stdout, strings.ReplaceAll(want, `\`, `\\`)) && !strings.Contains(stdout, want) {
+				t.Errorf("%v is missing %q:\n%s", args, want, stdout)
+			}
+		}
+	}
+	_, stdout, _ := run(t, "log", "--no-color")
+	if !strings.Contains(stdout, "days kept • redacted") {
+		t.Errorf("the preamble says the output is redacted:\n%s", stdout)
+	}
+	_, stdout, _ = run(t, "log", "--json")
+	if !logReportOf(t, stdout).Redacted {
+		t.Errorf("--json says it is redacted:\n%s", stdout)
+	}
+}
+
+func TestLogUnredactedPrintsEntriesAsStored(t *testing.T) {
+	home := seedSecretLog(t)
+	code, stdout, stderr := run(t, "log", "--no-color", "--unredacted")
+	if code != out.ExitOK {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	for _, want := range []string{"days kept • unredacted", logKey, "https://ghp_s3cr3t@github.com/org/pack.git", filepath.Join(home, "Games", "friends")} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("missing %q in:\n%s", want, stdout)
+		}
+	}
+	_, stdout, _ = run(t, "log", "--json", "--unredacted")
+	r := logReportOf(t, stdout)
+	if r.Redacted || len(r.Entries) == 0 || r.Entries[len(r.Entries)-1].Instance != filepath.Join(home, "Games", "friends") {
+		t.Fatalf("report = %+v", r)
+	}
+}

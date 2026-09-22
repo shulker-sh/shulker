@@ -205,48 +205,55 @@ func (l *Log) refuseArgv(e *Entry) {
 		}
 		return s
 	}
-	e.Cmd, e.Group, e.Instance, e.Code, e.Msg = refuse(e.Cmd), refuse(e.Group), refuse(e.Instance), refuse(e.Code), refuse(e.Msg)
+	*e = e.rewrite(refuse)
+}
+
+// rewrite is e with f applied to every string it holds, the flags' names and the payload's keys
+// included.
+func (e Entry) rewrite(f func(string) string) Entry {
+	e.Cmd, e.Group, e.Instance, e.Code, e.Msg = f(e.Cmd), f(e.Group), f(e.Instance), f(e.Code), f(e.Msg)
 	if e.Flags != nil {
 		flags := make(map[string]string, len(e.Flags))
 		for name, value := range e.Flags {
-			flags[refuse(name)] = refuse(value)
+			flags[f(name)] = f(value)
 		}
 		e.Flags = flags
 	}
 	if e.Data != nil {
-		e.Data = refuseData(e.Data, refuse)
+		e.Data = rewriteData(e.Data, f)
 	}
+	return e
 }
 
-// refuseData refuses argv in every string of a payload, map keys included, by decoding it: a
-// replace over the raw JSON could cut into an escape sequence. A payload it can't read is dropped.
-func refuseData(raw json.RawMessage, refuse func(string) string) json.RawMessage {
+// rewriteData applies f to every string of a payload by decoding it: a replace over the raw JSON
+// could cut into an escape sequence. A payload it can't read is dropped.
+func rewriteData(raw json.RawMessage, f func(string) string) json.RawMessage {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	var data any
 	if err := dec.Decode(&data); err != nil {
 		return nil
 	}
-	refused, err := encode(refuseValue(data, refuse))
+	rewritten, err := encode(rewriteValue(data, f))
 	if err != nil {
 		return nil
 	}
-	return refused
+	return rewritten
 }
 
-func refuseValue(v any, refuse func(string) string) any {
+func rewriteValue(v any, f func(string) string) any {
 	switch v := v.(type) {
 	case string:
-		return refuse(v)
+		return f(v)
 	case []any:
 		for i, item := range v {
-			v[i] = refuseValue(item, refuse)
+			v[i] = rewriteValue(item, f)
 		}
 		return v
 	case map[string]any:
 		kept := make(map[string]any, len(v))
 		for key, item := range v {
-			kept[refuse(key)] = refuseValue(item, refuse)
+			kept[f(key)] = rewriteValue(item, f)
 		}
 		return kept
 	}

@@ -3,6 +3,7 @@ package cli
 import (
 	"cmp"
 	"fmt"
+	"os"
 	"runtime"
 	"slices"
 	"strconv"
@@ -11,7 +12,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/auditlog"
+	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider/curseforge"
 )
 
 const defaultLogWindow = "24h"
@@ -27,11 +31,13 @@ type logReport struct {
 	Filter   map[string]string `json:"filter"`
 	Read     int               `json:"read"`
 	Matched  int               `json:"matched"`
+	Redacted bool              `json:"redacted"`
 	Entries  []auditlog.Entry  `json:"entries"`
 }
 
 type logFlags struct {
 	since, group, cmd, code, level string
+	unredacted                     bool
 }
 
 func (a *app) logCmd() *cobra.Command {
@@ -81,6 +87,9 @@ func (a *app) logCmd() *cobra.Command {
 				}
 			}
 			r.Matched = len(r.Entries)
+			if !f.unredacted {
+				redact(&r, logRedaction())
+			}
 			isWidest := !from.After(now.AddDate(0, 0, -keepDays))
 			return a.printer.Emit(r, func(l *out.Lines) { printLog(l, r, isWidest) })
 		},
@@ -94,7 +103,35 @@ func (a *app) logCmd() *cobra.Command {
 	cmd.Flags().StringVar(&f.cmd, "cmd", "", "only this command and the ones under it, like sync or \"hook wrap\"")
 	cmd.Flags().StringVar(&f.code, "code", "", "only entries with this error code")
 	cmd.Flags().StringVar(&f.level, "level", "", "only entries at this level: info, warn, error")
+	cmd.Flags().BoolVar(&f.unredacted, "unredacted", false, "print entries as stored, with the credentials, keys and home directory the default hides")
 	return cmd
+}
+
+// logRedaction is what `shulker log` hides by default: the home directory, and every CurseForge key
+// shulker may have sent.
+func logRedaction() auditlog.Redaction {
+	home, _ := os.UserHomeDir()
+	var configured, cacheDir string
+	if path, err := config.Path(); err == nil {
+		if cfg, err := config.LoadFile(path); err == nil {
+			configured = cfg.CurseForge.Key
+		}
+	}
+	if c, err := cache.Open(); err == nil {
+		cacheDir = c.Dir
+	}
+	return auditlog.Redaction{Home: home, Keys: curseforge.Keys(configured, cacheDir)}
+}
+
+// redact scrubs the report's entries, and the filter it names, which can hold an instance's path.
+func redact(r *logReport, with auditlog.Redaction) {
+	r.Redacted = true
+	for i, e := range r.Entries {
+		r.Entries[i] = with.Entry(e)
+	}
+	for name, value := range r.Filter {
+		r.Filter[name] = with.String(value)
+	}
 }
 
 var logFilterOrder = []string{"instance", "group", "cmd", "code", "level"}
@@ -118,7 +155,11 @@ func printLog(l *out.Lines, r logReport, isWidest bool) {
 	if strings.Contains(r.Since, "-") {
 		window = "since " + r.Since
 	}
-	l.Plain(t.Bold("shulker "+r.Version) + t.Grey(dot+r.Platform+dot+window+" of "+strconv.Itoa(r.KeepDays)+" days kept"))
+	redaction := t.Grey(dot + "redacted")
+	if !r.Redacted {
+		redaction = t.Grey(dot) + t.Yellow("unredacted")
+	}
+	l.Plain(t.Bold("shulker "+r.Version) + t.Grey(dot+r.Platform+dot+window+" of "+strconv.Itoa(r.KeepDays)+" days kept") + redaction)
 	var filter []string
 	for _, name := range logFilterOrder {
 		if value, ok := r.Filter[name]; ok {

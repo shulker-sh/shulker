@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -85,6 +86,22 @@ func SharedKey(cacheDir string) string {
 		return saved.Key
 	}
 	return embeddedKey
+}
+
+// Keys is every API key shulker may have sent: the user's own from the environment and from config,
+// and the shared one, fetched and built in. None of them is empty.
+func Keys(configured, cacheDir string) []string {
+	candidates := []string{os.Getenv(KeyEnv), configured, embeddedKey}
+	if cacheDir != "" {
+		candidates = append(candidates, SharedKey(cacheDir))
+	}
+	var keys []string
+	for _, k := range candidates {
+		if k != "" && !slices.Contains(keys, k) {
+			keys = append(keys, k)
+		}
+	}
+	return keys
 }
 
 func keyFile(cacheDir string) string {
