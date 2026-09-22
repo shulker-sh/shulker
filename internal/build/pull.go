@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -33,11 +34,15 @@ type DiffReport struct {
 }
 
 type PullReport struct {
-	Side            string   `json:"side"`
-	Dir             string   `json:"dir"`
-	Pulled          []string `json:"pulled"`
-	Keys            []string `json:"keys"`
-	Adopted         []string `json:"adopted"`
+	Side    string   `json:"side"`
+	Dir     string   `json:"dir"`
+	Pulled  []string `json:"pulled"`
+	Keys    []string `json:"keys"`
+	Adopted []string `json:"adopted"`
+	// Entries are the jars and packs adopted as file entries, filled by the caller from Adoptable.
+	Entries []string `json:"entries"`
+	// Adoptable are the named files to adopt as file entries rather than copy to an override.
+	Adoptable       []string `json:"-"`
 	Skipped         []string `json:"skipped"`
 	Warnings        []string `json:"-"`
 	ManifestChanged bool     `json:"manifestChanged"`
@@ -158,7 +163,7 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 		return nil, err
 	}
 	dir, desired, prev, plans := d.dir, d.desired, d.prev, d.plans
-	report := &PullReport{Side: side, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Skipped: []string{}, Warnings: d.warnings}
+	report := &PullReport{Side: side, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Entries: []string{}, Skipped: []string{}, Warnings: d.warnings}
 	var pulled []string
 	if len(adopt) > 0 {
 		rel := filepath.ToSlash(filepath.Clean(files[0]))
@@ -186,6 +191,10 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 		}
 	}
 	for _, rel := range fresh {
+		if req.To == "" && AdoptedType(rel) != "" {
+			report.Adoptable = append(report.Adoptable, rel)
+			continue
+		}
 		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
 		if err != nil {
 			return nil, err
@@ -222,6 +231,10 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 					reason = "edited; no longer in source"
 				}
 				report.Skipped = append(report.Skipped, f.rel+" ("+reason+"; name it to adopt it)")
+				continue
+			}
+			if f.state == stateUntracked && req.To == "" && AdoptedType(f.rel) != "" {
+				report.Adoptable = append(report.Adoptable, f.rel)
 				continue
 			}
 			dest = filepath.Join(b.Dir, "overrides", filepath.FromSlash(f.rel))
@@ -300,6 +313,22 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 		return nil, err
 	}
 	return report, nil
+}
+
+// AdoptedType is the requires type of a build directory file the game loads as a mod or a pack,
+// which pull adopts as a file entry: a jar directly under mods/, or a zip directly under
+// resourcepacks/ or shaderpacks/. It is "" for any other file.
+func AdoptedType(rel string) string {
+	dir, name := path.Split(rel)
+	switch ext := strings.ToLower(path.Ext(name)); {
+	case dir == "mods/" && ext == ".jar":
+		return manifest.TypeMod
+	case dir == "resourcepacks/" && ext == ".zip":
+		return manifest.TypeResourcePack
+	case dir == "shaderpacks/" && ext == ".zip":
+		return manifest.TypeShader
+	}
+	return ""
 }
 
 func (b *Builder) pullDest(side, to string) (string, error) {

@@ -1,10 +1,16 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestPullToChoosesTheOverrideFolder(t *testing.T) {
@@ -59,5 +65,89 @@ func TestPullToChoosesTheOverrideFolder(t *testing.T) {
 	code, stdout, _ := h.run(t, "pull", "--to", "nope", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,shaders,voice" {
 		t.Fatalf("unknown --to: exit %d %s", code, stdout)
+	}
+}
+
+func pullReport(t *testing.T, h *harness, args ...string) build.PullReport {
+	t.Helper()
+	stdout := h.mustRun(t, append([]string{"pull", "--json"}, args...)...)
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(env.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rep build.PullReport
+	if err := json.Unmarshal(data, &rep); err != nil {
+		t.Fatal(err)
+	}
+	return rep
+}
+
+func TestPullAdoptsADroppedJarOrPackAsAFileEntry(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "install")
+	buildDir := filepath.Join(h.dir, "build", "client")
+	jar := makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17"}`)
+	pack := makeJarFile(t, "stay", "Stay True.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"stay true"}}`)
+	shader := makeJarFile(t, "bsl", "bsl.zip", "shaders/gbuffers_basic.vsh", "// bsl")
+	writeOverride(t, buildDir, "mods/private-mod-1.4.jar", string(jar.data))
+	writeOverride(t, buildDir, "resourcepacks/Stay True.zip", string(pack.data))
+	writeOverride(t, buildDir, "shaderpacks/bsl.zip", string(shader.data))
+	writeOverride(t, buildDir, "resourcepacks/nested/deep.zip", string(pack.data))
+	writeOverride(t, buildDir, "config/plain.txt", "a=1\n")
+
+	rep := pullReport(t, h, "mods/private-mod-1.4.jar", "resourcepacks/Stay True.zip", "shaderpacks/bsl.zip", "resourcepacks/nested/deep.zip", "config/plain.txt")
+	if want := []string{"mods/private-mod-1.4.jar -> files/private-mod-1.4.jar", "resourcepacks/Stay True.zip -> files/Stay True.zip", "shaderpacks/bsl.zip -> files/bsl.zip"}; !reflect.DeepEqual(rep.Entries, want) {
+		t.Fatalf("jars and packs are adopted: %q", rep.Entries)
+	}
+	if want := []string{"config/plain.txt -> overrides/config/plain.txt", "resourcepacks/nested/deep.zip -> overrides/resourcepacks/nested/deep.zip"}; !reflect.DeepEqual(rep.Pulled, want) {
+		t.Fatalf("everything else is overridden: %q", rep.Pulled)
+	}
+	m := h.readManifest(t)
+	for key, want := range map[string]manifest.Require{
+		"private-mod": {File: "files/private-mod-1.4.jar"},
+		"stay-true":   {Type: manifest.TypeResourcePack, File: "files/Stay True.zip"},
+		"bsl":         {Type: manifest.TypeShader, File: "files/bsl.zip"},
+	} {
+		if got := m.Requires[key]; !reflect.DeepEqual(got, want) {
+			t.Fatalf("%s is written unconditional: %+v", key, got)
+		}
+	}
+	if readProjectFile(t, h, "files/private-mod-1.4.jar") != string(jar.data) {
+		t.Fatal("the jar is copied into files/")
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "overrides", "mods")); !os.IsNotExist(err) {
+		t.Fatalf("an adopted jar is not also overridden: %v", err)
+	}
+	l := h.readLock(t)
+	if mod := l.Mods["private-mod"]; mod.Sha512 != jar.sha512 || mod.Side != "client" {
+		t.Fatalf("the jar is locked with the side it declares: %+v", mod)
+	}
+	if l.ResourcePacks["stay-true"].Sha512 != pack.sha512 || l.Shaders["bsl"].Sha512 != shader.sha512 {
+		t.Fatalf("packs are locked: %+v %+v", l.ResourcePacks, l.Shaders)
+	}
+
+	other := makeJarFile(t, "stay2", "Stay+True.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"another"}}`)
+	writeOverride(t, buildDir, "resourcepacks/Stay+True.zip", string(other.data))
+	rep = pullReport(t, h, "resourcepacks/Stay+True.zip")
+	if len(rep.Entries) != 0 || len(rep.Skipped) != 1 || !strings.Contains(rep.Skipped[0], "requires already has stay-true as a resourcepack") || !strings.Contains(rep.Skipped[0], "pass `--as <key>`") {
+		t.Fatalf("a taken key is skipped with the --as hint: %+v", rep)
+	}
+	rep = pullReport(t, h, "resourcepacks/Stay+True.zip", "--as", "stay-true-2")
+	if len(rep.Entries) != 1 || h.readManifest(t).Requires["stay-true-2"].File != "files/Stay+True.zip" {
+		t.Fatalf("--as adopts under the given key: %+v %+v", rep, h.readManifest(t).Requires)
+	}
+	h.mustRun(t, "install")
+	if data, _ := os.ReadFile(filepath.Join(buildDir, "mods", "private-mod-1.4.jar")); string(data) != string(jar.data) {
+		t.Fatal("the build lays the adopted jar where it was found")
+	}
+
+	code, stdout, _ := h.run(t, "pull", "config/plain.txt", "resourcepacks/Stay+True.zip", "--as", "x", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
+		t.Fatalf("--as takes a single file: exit %d %s", code, stdout)
 	}
 }

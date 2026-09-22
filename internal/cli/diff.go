@@ -4,14 +4,18 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/local"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/resolve"
 )
 
 // buildDirs is the build directory plus every directory this side was synced
@@ -137,13 +141,16 @@ func (a *app) diffCmd() *cobra.Command {
 }
 
 func (a *app) pullCmd() *cobra.Command {
-	var side, into, to string
+	var side, into, to, as string
 	var keys []string
 	cmd := &cobra.Command{
 		Use:         "pull [file...]",
 		Annotations: acts(),
 		Short:       "Copy edits made in a build directory back into their source",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := checkPullAs(as, to, args); err != nil {
+				return err
+			}
 			p, err := a.openProject()
 			if err != nil {
 				return err
@@ -180,8 +187,11 @@ func (a *app) pullCmd() *cobra.Command {
 					return err
 				}
 			}
+			if err := a.adoptFiles(cmd, p, rep, as); err != nil {
+				return err
+			}
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OK("pulled "+rep.Side, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", plural(len(rep.Pulled), "file", "files"), plural(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
+				l.OK("pulled "+rep.Side, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", plural(len(rep.Pulled)+len(rep.Entries), "file", "files"), plural(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
 				var rows []out.Row
 				arrow := " " + l.T.ArrowBump() + " "
 				for _, f := range rep.Pulled {
@@ -190,7 +200,7 @@ func (a *app) pullCmd() *cobra.Command {
 				for _, k := range rep.Keys {
 					rows = append(rows, out.Row{Label: "set", Text: k})
 				}
-				for _, k := range rep.Adopted {
+				for _, k := range slices.Concat(rep.Entries, rep.Adopted) {
 					rows = append(rows, out.Row{Label: "adopted", Text: strings.ReplaceAll(k, " -> ", arrow)})
 				}
 				for _, s := range rep.Skipped {
@@ -203,8 +213,52 @@ func (a *app) pullCmd() *cobra.Command {
 	cmd.Flags().StringVar(&side, "side", "", "side whose build directory to pull from (default: the only declared side)")
 	cmd.Flags().StringVar(&into, "into", "", "directory the side was synced into (default: whichever of the build directory and its sync directories has edits)")
 	cmd.Flags().StringArrayVar(&keys, "key", nil, "start managing this key of the named .properties file; repeat for more")
+	cmd.Flags().StringVar(&as, "as", "", "requires key for the one named jar or pack adopted as a file entry (default: a jar's mod id, a pack file's name)")
 	cmd.Flags().StringVar(&to, "to", "", "override folder to write into: client, server, or a feature name (default: where the file already lives, or overrides/ for a new one)")
 	return cmd
+}
+
+func checkPullAs(as, to string, files []string) error {
+	switch {
+	case as == "":
+		return nil
+	case len(files) != 1:
+		return out.Errorf("usage", "--as needs exactly one file")
+	case !manifest.IsValidKey(as):
+		return out.Errorf("usage", "--as takes up to 64 lowercase letters, digits, dots, dashes and underscores, starting with a letter or digit, not %q", as)
+	case to != "" || build.AdoptedType(filepath.ToSlash(filepath.Clean(files[0]))) == "":
+		return out.Errorf("usage", "--as applies to a jar in mods/ or a zip in resourcepacks/ or shaderpacks/, which pull adopts as a file entry")
+	}
+	return nil
+}
+
+// adoptFiles adds each jar and pack that pull set aside as a file entry, and skips one whose key
+// requires already holds.
+func (a *app) adoptFiles(cmd *cobra.Command, p *project.Project, rep *build.PullReport, as string) error {
+	if len(rep.Adoptable) == 0 {
+		return nil
+	}
+	_, err := a.relockProject(cmd, p, true, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+		for _, rel := range rep.Adoptable {
+			abs := filepath.Join(rep.Dir, filepath.FromSlash(rel))
+			err := r.Add(cmd.Context(), abs, resolve.AddOptions{Type: build.AdoptedType(rel), As: as})
+			var taken *out.Error
+			if errors.As(err, &taken) && taken.Code == "requires-taken" {
+				skip := taken.Message
+				if taken.Help != "" {
+					skip += "; " + taken.Help
+				}
+				rep.Skipped = append(rep.Skipped, rel+" ("+skip+")")
+				continue
+			}
+			if err != nil {
+				return "", err
+			}
+			rep.Entries = append(rep.Entries, rel+" -> "+manifest.FilesDir+"/"+path.Base(rel))
+		}
+		return "", nil
+	})
+	return err
 }
 
 func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, side string, files []string) (string, error) {
