@@ -169,3 +169,70 @@ func TestSearchSortsByPopularityAndKeepsClassesShulkerCanAdd(t *testing.T) {
 		t.Errorf("search for shaders asked for %v", got)
 	}
 }
+
+func TestModsThenFilesAskTwice(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		switch r.URL.Path {
+		case "/mods":
+			w.Write([]byte(`{"data":[{"id":10,"slug":"jei","name":"JEI","classId":6},{"id":11,"slug":"pack","name":"Pack","classId":12}]}`))
+		case "/mods/files":
+			w.Write([]byte(`{"data":[{"id":100,"modId":10,"displayName":"1.0","fileName":"jei.jar","downloadUrl":"https://x/jei.jar","hashes":[{"algo":1,"value":"abc"}]},{"id":101,"modId":11,"displayName":"2.0","fileName":"pack.zip","downloadUrl":null,"hashes":[{"algo":1,"value":"def"}]}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+	ctx := context.Background()
+	projects, err := c.Mods(ctx, []int{10, 11, 12})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, unusable, err := c.Files(ctx, []int{100, 101})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(unusable) != 0 {
+		t.Fatalf("unusable: %v", unusable)
+	}
+	if len(paths) != 2 || paths[0] != "POST /mods" || paths[1] != "POST /mods/files" {
+		t.Fatalf("requests: %v", paths)
+	}
+	if projects[11].Type != "resourcepack" || len(projects) != 2 {
+		t.Fatalf("projects: %+v", projects)
+	}
+	if files[100].File.URL != "https://x/jei.jar" || files[101].File.URL != "" || files[101].Page != "https://www.curseforge.com/minecraft/texture-packs/pack/files/101" {
+		t.Fatalf("files: %+v", files)
+	}
+}
+
+func TestRateLimitIsNamed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+	if _, err := c.Mods(context.Background(), []int{10}); out.CodeOf(err) != "rate-limited" {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestFilesNamesAFileWithNothingToDownload(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"data":[{"id":100,"modId":10,"displayName":"1.0","fileName":"jei.jar","downloadUrl":"https://x/jei.jar","hashes":[]}]}`))
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+	files, unusable, err := c.Files(context.Background(), []int{100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 0 || out.CodeOf(unusable[100]) != "version-no-file" {
+		t.Fatalf("files %v, unusable %v", files, unusable)
+	}
+}

@@ -356,6 +356,56 @@ func (c *CurseForge) Version(ctx context.Context, versionID string) (*provider.V
 	return &list[0], nil
 }
 
+// Mods finds these projects in one request, by id. A project CurseForge doesn't have is left out.
+func (c *CurseForge) Mods(ctx context.Context, ids []int) (map[int]*provider.Project, error) {
+	var res struct {
+		Data []mod `json:"data"`
+	}
+	if err := c.call(ctx, "projects", func() error {
+		return c.Client.PostJSON(ctx, c.BaseURL+"/mods", map[string]any{"modIds": ids}, &res)
+	}); err != nil {
+		return nil, err
+	}
+	found := make(map[int]*provider.Project, len(res.Data))
+	for _, m := range res.Data {
+		found[m.ID] = c.remember(m)
+	}
+	return found, nil
+}
+
+// Files finds these files in one request, by id. A file CurseForge doesn't have is left out, and
+// one it has nothing to download for is in unusable with the reason. Call Mods for their projects
+// first, or each file's page costs a request of its own.
+func (c *CurseForge) Files(ctx context.Context, ids []int) (found map[int]provider.Version, unusable map[int]error, err error) {
+	var res struct {
+		Data []file `json:"data"`
+	}
+	if err := c.call(ctx, "files", func() error {
+		return c.Client.PostJSON(ctx, c.BaseURL+"/mods/files", map[string]any{"fileIds": ids}, &res)
+	}); err != nil {
+		return nil, nil, err
+	}
+	var versions []provider.Version
+	unusable = map[int]error{}
+	for _, f := range res.Data {
+		v, err := convertFile(f)
+		if err != nil {
+			unusable[f.ID] = err
+			continue
+		}
+		versions = append(versions, v)
+	}
+	if versions, err = c.withPages(ctx, versions); err != nil {
+		return nil, nil, err
+	}
+	found = make(map[int]provider.Version, len(versions))
+	for _, v := range versions {
+		id, _ := strconv.Atoi(v.ID)
+		found[id] = v
+	}
+	return found, unusable, nil
+}
+
 func (c *CurseForge) withPages(ctx context.Context, versions []provider.Version) ([]provider.Version, error) {
 	for i, v := range versions {
 		if _, ok := c.slugs[v.ProjectID]; !ok {
@@ -392,6 +442,11 @@ func (c *CurseForge) call(ctx context.Context, what string, request func() error
 	}
 	if err == nil {
 		return nil
+	}
+	if errors.Is(err, fetch.ErrRateLimited) {
+		e := out.Errorf("rate-limited", "curseforge is rate-limiting shulker's requests")
+		e.Help = "CurseForge doesn't say for how long, and reports put it at an hour or more; run the command again later"
+		return e
 	}
 	if errors.Is(err, fetch.ErrForbidden) {
 		if c.KeyFile != "" {
