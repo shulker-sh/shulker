@@ -571,7 +571,7 @@ func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole 
 	if strings.HasSuffix(rel, TemplateSuffix) {
 		rel = strings.TrimSuffix(rel, TemplateSuffix)
 		src.isTemplate = true
-		if data, err = render(l.label+"/"+rel+TemplateSuffix, data, l.vars); err != nil {
+		if data, err = render(l.label+"/"+rel+TemplateSuffix, l.pack, data, l.vars); err != nil {
 			return err
 		}
 	}
@@ -761,7 +761,7 @@ func renderProperties(file string, raw map[string]any, vars map[string]string) (
 		if err != nil {
 			return nil, out.Errorf("properties-invalid", "shulker.json %s key %s has a value shulker can't write", file, key).WithCause("value", err)
 		}
-		rendered, err := render("shulker.json "+file+" "+key, []byte(value), vars)
+		rendered, err := render("shulker.json "+file+" "+key, "", []byte(value), vars)
 		if err != nil {
 			return nil, err
 		}

@@ -272,7 +272,13 @@ func TestBuiltinVariables(t *testing.T) {
 
 	h.editManifest(t, func(m map[string]any) { delete(m, "version") })
 	code, _, stderr = h.run(t, "install")
-	if code == 0 || !strings.Contains(stderr, "${pack.version} is not set") {
+	if code == 0 || !strings.Contains(stderr, "${pack.version} is not set") || !strings.Contains(stderr, "help: run shulker set version <version>") {
 		t.Fatalf("a manifest without a version leaves ${pack.version} unset: %d %s", code, stderr)
+	}
+
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "stamp.txt.tmpl"), "${pack.nme}\n")
+	code, _, stderr = h.run(t, "install")
+	if code == 0 || !strings.Contains(stderr, "did you mean:") || !strings.Contains(stderr, "‣ pack.name") {
+		t.Fatalf("a misspelt variable suggests the closest: %d %s", code, stderr)
 	}
 }

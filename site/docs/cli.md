@@ -1830,7 +1830,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `type-ambiguous` | A CurseForge slug matches projects of several types, or a zip or folder given to `add` holds neither a resource pack nor a shader; pass `--type` to choose. `candidates`: the types it could be |
 | `type-mismatch` | `--type`, or a hosted modpack entry, disagrees with what the provider says the project is. `candidates`: the provider's own type |
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
-| `unset-variable` | An override uses a variable that isn't set |
+| `unset-variable` | A `.tmpl` override or a `server.properties` or `client.options` value uses a variable that isn't set |
 | `unsupported-loader` | shulker doesn't support the loader yet |
 | `unsupported-quickplay` | `play --world` on a Minecraft before 1.20, which has no quick play to boot into a save with; nothing is launched |
 | `update-paused` | The pre-launch hook stopped a GDLauncher update at four minutes so it could explain itself; the launch is aborted, and launching again resumes it. Shown in GDLauncher's own dialog, so it prints without shulker's usual error decoration |
