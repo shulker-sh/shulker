@@ -110,7 +110,7 @@ func TestPullAdoptsADroppedJarOrPackAsAFileEntry(t *testing.T) {
 	m := h.readManifest(t)
 	for key, want := range map[string]manifest.Require{
 		"private-mod": {File: "files/private-mod-1.4.jar"},
-		"stay-true":   {Type: manifest.TypeResourcePack, File: "files/Stay True.zip"},
+		"stay-true":   {Type: manifest.TypeResourcePack, File: "files/Stay True.zip", Filename: "Stay True.zip"},
 		"bsl":         {Type: manifest.TypeShader, File: "files/bsl.zip"},
 	} {
 		if got := m.Requires[key]; !reflect.DeepEqual(got, want) {
@@ -138,7 +138,7 @@ func TestPullAdoptsADroppedJarOrPackAsAFileEntry(t *testing.T) {
 		t.Fatalf("a taken key is skipped with the --as hint: %+v", rep)
 	}
 	rep = pullReport(t, h, "resourcepacks/Stay+True.zip", "--as", "stay-true-2")
-	if len(rep.Entries) != 1 || h.readManifest(t).Requires["stay-true-2"].File != "files/Stay+True.zip" {
+	if got := h.readManifest(t).Requires["stay-true-2"]; len(rep.Entries) != 1 || got.File != "files/Stay+True.zip" || got.Filename != "Stay+True.zip" {
 		t.Fatalf("--as adopts under the given key: %+v %+v", rep, h.readManifest(t).Requires)
 	}
 	h.mustRun(t, "install")
@@ -149,6 +149,48 @@ func TestPullAdoptsADroppedJarOrPackAsAFileEntry(t *testing.T) {
 	code, stdout, _ := h.run(t, "pull", "config/plain.txt", "resourcepacks/Stay+True.zip", "--as", "x", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
 		t.Fatalf("--as takes a single file: exit %d %s", code, stdout)
+	}
+}
+
+func TestPullKeepsAnAdoptedPacksName(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "install")
+	buildDir := filepath.Join(h.dir, "build", "client")
+	pack := makeJarFile(t, "stay", "Stay True.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"stay true"}}`)
+	plain := makeJarFile(t, "plain", "plain-pack.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"plain"}}`)
+	shader := makeJarFile(t, "bsl", "BSL v8.zip", "shaders/gbuffers_basic.vsh", "// bsl")
+	plainShader := makeJarFile(t, "plain-shader", "plain-shader.zip", "shaders/gbuffers_basic.vsh", "// plain")
+	writeOverride(t, buildDir, "resourcepacks/Stay True.zip", string(pack.data))
+	writeOverride(t, buildDir, "resourcepacks/plain-pack.zip", string(plain.data))
+	writeOverride(t, buildDir, "shaderpacks/BSL v8.zip", string(shader.data))
+	writeOverride(t, buildDir, "shaderpacks/plain-shader.zip", string(plainShader.data))
+
+	pullReport(t, h, "resourcepacks/Stay True.zip", "resourcepacks/plain-pack.zip", "shaderpacks/BSL v8.zip", "shaderpacks/plain-shader.zip")
+	m := h.readManifest(t)
+	for key, want := range map[string]string{"stay-true": "Stay True.zip", "plain-pack": "", "bsl-v8": "BSL v8.zip", "plain-shader": ""} {
+		if got := m.Requires[key].Filename; got != want {
+			t.Fatalf("%s gets filename %q only when its name isn't <key>.zip: %q", key, want, got)
+		}
+	}
+	l := h.readLock(t)
+	if l.ResourcePacks["stay-true"].Filename != "Stay True.zip" || l.Shaders["bsl-v8"].Filename != "BSL v8.zip" {
+		t.Fatalf("the lock places the packs under their names: %+v %+v", l.ResourcePacks, l.Shaders)
+	}
+
+	h.mustRun(t, "install")
+	for dir, want := range map[string][]string{"resourcepacks": {"Stay True.zip", "plain-pack.zip"}, "shaderpacks": {"BSL v8.zip", "plain-shader.zip"}} {
+		entries, err := os.ReadDir(filepath.Join(buildDir, dir))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, e := range entries {
+			got = append(got, e.Name())
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("the build leaves one copy of each pack in %s/: %q", dir, got)
+		}
 	}
 }
 

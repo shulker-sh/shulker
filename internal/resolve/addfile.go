@@ -106,6 +106,9 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 		if kind != manifest.TypeMod {
 			entry.Type = kind
 		}
+		if name := filepath.Base(path); opts.KeepFilename && kind != manifest.TypeMod && !folder && strings.HasSuffix(name, ".zip") && name != key+".zip" {
+			entry.Filename = name
+		}
 	}
 	if opts.Side != "" {
 		entry.Side = opts.Side

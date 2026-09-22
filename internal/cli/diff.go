@@ -244,7 +244,7 @@ func (a *app) adoptFiles(cmd *cobra.Command, p *project.Project, rep *build.Pull
 			if err != nil {
 				return "", err
 			}
-			err = r.Add(cmd.Context(), abs, resolve.AddOptions{Type: build.AdoptedType(rel), As: as})
+			err = r.Add(cmd.Context(), abs, resolve.AddOptions{Type: build.AdoptedType(rel), As: as, KeepFilename: true})
 			var taken *out.Error
 			if errors.As(err, &taken) && taken.Code == "requires-taken" {
 				skip := taken.Message

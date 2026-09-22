@@ -587,7 +587,7 @@ shulker diff server --into /srv/minecraft
 
 Copy edits made in a build directory back into their source, an override file or keys in shulker.json, so the next build keeps them. With no files, pulls every changed file. Paths are relative to the build directory. A file some override folder already holds is updated there; a file no folder holds yet goes to `overrides/`, and `--to` names another folder instead. For a `.properties` override, only the keys it lists are pulled; name more with `--key` to start managing them.
 
-A named file that is a mod or a pack the game loads, a `.jar` directly under `mods/` or a `.zip` directly under `resourcepacks/` or `shaderpacks/`, is adopted as a `file` entry instead of an override: copied into `files/`, written into `requires` with no conditions, and locked. Its key is the jar's mod id or the pack file's name; a jar's side is the one the jar declares. A key `requires` already holds skips the file, and `--as` names another. The result's `entries` lists the adopted files.
+A named file that is a mod or a pack the game loads, a `.jar` directly under `mods/` or a `.zip` directly under `resourcepacks/` or `shaderpacks/`, is adopted as a `file` entry instead of an override: copied into `files/`, written into `requires` with no conditions, and locked. Its key is the jar's mod id or the pack file's name; a jar's side is the one the jar declares. A pack whose file name isn't `<key>.zip` gets that name as its `filename`, so builds keep placing it under the name the game already enables it by. A key `requires` already holds skips the file, and `--as` names another. The result's `entries` lists the adopted files.
 
 ```sh
 shulker pull
