@@ -1,3 +1,4 @@
+// Package selfupdate finds, verifies and installs shulker's own releases from GitHub.
 package selfupdate
 
 import (
@@ -20,10 +21,12 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 )
 
+// Owner is the GitHub account shulker releases, and their build attestations, come from.
 const Owner = "shulker-sh"
 
 const bundleName = "shulker.attestation.jsonl"
 
+// Releases reads shulker's releases on GitHub.
 type Releases struct {
 	Fetch       *fetch.Client
 	LatestURL   string
@@ -38,6 +41,7 @@ func New(f *fetch.Client) *Releases {
 	}
 }
 
+// Latest is the tag of the newest published release.
 func (r *Releases) Latest(ctx context.Context) (string, error) {
 	var rel struct {
 		TagName string `json:"tag_name"`
@@ -51,6 +55,7 @@ func (r *Releases) Latest(ctx context.Context) (string, error) {
 	return rel.TagName, nil
 }
 
+// AssetName is the release archive built for an OS and architecture.
 func AssetName(tag, goos, goarch string) string {
 	ext := "tar.gz"
 	if goos == "windows" {
@@ -59,6 +64,8 @@ func AssetName(tag, goos, goarch string) string {
 	return fmt.Sprintf("shulker_%s_%s_%s.%s", strings.TrimPrefix(tag, "v"), goos, goarch, ext)
 }
 
+// Download saves this platform's archive for a release into dir and returns its path, once its
+// sha256 matches the release's checksums.txt.
 func (r *Releases) Download(ctx context.Context, tag, dir string) (string, error) {
 	asset := AssetName(tag, runtime.GOOS, runtime.GOARCH)
 	var sums strings.Builder
@@ -88,12 +95,14 @@ func (r *Releases) Download(ctx context.Context, tag, dir string) (string, error
 	return path, nil
 }
 
+// ChecksumError is a downloaded archive whose sha256 isn't the one checksums.txt lists.
 type ChecksumError struct{ Asset, Want, Got string }
 
 func (e *ChecksumError) Error() string {
 	return fmt.Sprintf("checksum mismatch for %s (want %s, got %s)", e.Asset, e.Want, e.Got)
 }
 
+// VerifyProvenance checks the archive against the release's build attestation with the gh CLI.
 func (r *Releases) VerifyProvenance(ctx context.Context, tag, archive string) error {
 	bundle := filepath.Join(filepath.Dir(archive), bundleName)
 	f, err := os.Create(bundle)
@@ -118,6 +127,7 @@ func (r *Releases) url(tag, name string) string {
 	return r.DownloadURL + "/" + tag + "/" + name
 }
 
+// ParseChecksums reads a sha256sum listing into a map from file name to hash.
 func ParseChecksums(data string) map[string]string {
 	sums := map[string]string{}
 	for _, line := range strings.Split(data, "\n") {
@@ -156,6 +166,8 @@ func splitVersion(v string) []int {
 	return nums
 }
 
+// Executable is the running binary's path with symlinks resolved, so an install replaces the file
+// itself and not a link to it.
 func Executable() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -164,6 +176,7 @@ func Executable() (string, error) {
 	return filepath.EvalSymlinks(exe)
 }
 
+// Install replaces exe with the binary inside archive.
 func Install(archive, exe string) error {
 	staged := exe + ".new"
 	if err := extractBinary(archive, staged); err != nil {
@@ -192,6 +205,7 @@ func Install(archive, exe string) error {
 	return nil
 }
 
+// RemoveOld deletes the copy a Windows install renamed aside, which couldn't be deleted while it ran.
 func RemoveOld() {
 	if exe, err := Executable(); err == nil {
 		os.Remove(exe + ".old")
