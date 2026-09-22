@@ -55,13 +55,15 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 	if err != nil {
 		return nil, err
 	}
+	taken := slices.Clone(registry)
 	for _, side := range p.Manifest.Sides() {
 		for _, d := range lf.ExistingSyncDirs(side) {
 			if isSameDir(d, dir) || slices.ContainsFunc(all, func(e instanceEntry) bool { return isSameDir(e.Dir, d) }) {
 				continue
 			}
 			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(side), Dir: d, Source: dir})
-			e.ID = uniqueID(registry, "", filepath.Base(d), d)
+			e.ID = uniqueID(taken, "", filepath.Base(d), d)
+			taken = append(taken, config.Instance{ID: e.ID, Dir: d})
 			e.detached = true
 			if e.Side == "" {
 				e.Side = side
@@ -110,20 +112,10 @@ func (a *app) selectProjectDetached(query string, s instanceSelection, miss erro
 	if err != nil {
 		return nil, miss
 	}
-	var matches []instanceEntry
 	for _, e := range entries {
 		if e.detached && e.ID == query {
-			matches = append(matches, e)
+			return []instanceEntry{e}, nil
 		}
 	}
-	if len(matches) > 1 {
-		e := out.Errorf("ambiguous-instance", "%d detached builds match %s", len(matches), describeSelection(query, s))
-		e.Help = "sync one with `shulker sync --into <dir>`"
-		e.Candidates, e.Given = instanceCandidates(matches), query
-		return nil, e
-	}
-	if len(matches) == 0 {
-		return nil, miss
-	}
-	return matches, nil
+	return nil, miss
 }

@@ -124,10 +124,13 @@ func TestProjectSyncGivesADetachedBuildItsDirectorysID(t *testing.T) {
 		t.Fatalf("sync -i client-2 picks the colliding directory: %s", got)
 	}
 
-	h.mustRun(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "fo-test"))
-	code, stdout, _ := h.run(t, "sync", "-i", "fo-test", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-instance" || len(e.Candidates) != 2 {
-		t.Fatalf("two detached builds in same-named folders are ambiguous: %d %s", code, stdout)
+	twin := filepath.Join(t.TempDir(), "fo-test")
+	h.mustRun(t, "sync", h.dir, "--into", twin)
+	if got := ids("sync"); got["fo-test"] != foTest || got["fo-test-2"] != twin {
+		t.Fatalf("a second detached build in a same-named folder takes a suffixed id: %v", got)
+	}
+	if got := syncedDir("fo-test-2"); got != twin {
+		t.Fatalf("sync -i fo-test-2 picks the second directory: %s", got)
 	}
 
 	text := h.mustRun(t, "sync")
