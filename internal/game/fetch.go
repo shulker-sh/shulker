@@ -94,16 +94,3 @@ func (s Store) AssetFiles(indexID string) ([]File, error) {
 // MojangResources is where an asset object is fetched from, by the first two characters of its
 // hash and then the hash itself.
 const MojangResources = "https://resources.download.minecraft.net/"
-
-func sha1File(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	h := sha1.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}

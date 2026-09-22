@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/meta"
@@ -277,7 +278,7 @@ func (r *Resolver) fetchChecked(ctx context.Context, url, sha1 string) (string, 
 	if err != nil || sha1 == "" {
 		return sha, err
 	}
-	got, err := sha1Of(r.Cache.Object(sha))
+	got, err := fsutil.SHA1(r.Cache.Object(sha))
 	if err != nil {
 		return "", err
 	}

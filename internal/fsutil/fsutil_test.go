@@ -68,3 +68,16 @@ func TestMarshalJSON(t *testing.T) {
 		t.Fatalf("%q", data)
 	}
 }
+
+func TestSHA1HashesTheFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "a.jar")
+	if err := Write(path, []byte("abc")); err != nil {
+		t.Fatal(err)
+	}
+	if sum, err := SHA1(path); err != nil || sum != "a9993e364706816aba3e25717850c26c9cd0d89d" {
+		t.Fatalf("sha1 = %q, %v", sum, err)
+	}
+	if _, err := SHA1(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Fatal("a missing file has no hash")
+	}
+}

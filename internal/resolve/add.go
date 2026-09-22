@@ -11,6 +11,7 @@ import (
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
@@ -290,7 +291,7 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	if v.File.URL != "" {
 		sha, err := r.Cache.Fetch(ctx, r.Fetch, v.File.URL)
 		if err == nil {
-			got, err := sha1Of(r.Cache.Object(sha))
+			got, err := fsutil.SHA1(r.Cache.Object(sha))
 			if err != nil {
 				return obtained{}, err
 			}

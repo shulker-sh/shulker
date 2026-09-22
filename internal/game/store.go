@@ -243,7 +243,7 @@ func (s Store) Has(f File) bool {
 	case f.Sha1 == "":
 		return true
 	}
-	sum, err := sha1File(path)
+	sum, err := fsutil.SHA1(path)
 	return err == nil && strings.EqualFold(sum, f.Sha1)
 }
 

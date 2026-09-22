@@ -4,6 +4,8 @@ package fsutil
 
 import (
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"io/fs"
@@ -70,4 +72,18 @@ func WriteJSON(path string, v any) error {
 		return err
 	}
 	return Write(path, data)
+}
+
+// SHA1 is the hex sha1 of the file at path, the hash Mojang and CurseForge publish.
+func SHA1(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha1.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
