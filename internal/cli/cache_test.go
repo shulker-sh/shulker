@@ -208,3 +208,52 @@ func TestBuildIngestsFilesBeforeSweepingThem(t *testing.T) {
 		t.Fatal("the bytes should reach the cache before the file is removed")
 	}
 }
+
+// A CI runner registers no instances, so a repo holding several packs names
+// each pack's lock to keep; the prune runs from a folder that is no project.
+func TestCachePruneKeepsNamedLocks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "install")
+	named := filepath.Join(t.TempDir(), "other.lock")
+	writeFile(t, named, readFile(t, filepath.Join(h.dir, "shulker.lock")))
+
+	elsewhere := t.TempDir()
+	stdout := h.mustRun(t, "--dir", elsewhere, "cache", "info", "--lock", named)
+	if !strings.Contains(stdout, "1 root (1 lock file)") {
+		t.Fatalf("a named lock should count as a root: %s", stdout)
+	}
+	sodium := (&cache.Cache{Dir: h.cache}).Object(h.jars["sodium"].sha512)
+	h.mustRun(t, "--dir", elsewhere, "cache", "prune", "--lock", named)
+	if _, err := os.Stat(sodium); err != nil {
+		t.Fatalf("a named lock's mods must survive a prune: %v", err)
+	}
+	h.mustRun(t, "--dir", elsewhere, "cache", "prune")
+	if _, err := os.Stat(sodium); !os.IsNotExist(err) {
+		t.Fatalf("without the lock nothing keeps sodium: %v", err)
+	}
+}
+
+func TestCachePruneRefusesAMissingNamedLock(t *testing.T) {
+	h := newInPlace(t)
+	code, stdout, _ := h.run(t, "--json", "cache", "prune", "--lock", filepath.Join(t.TempDir(), "shulker.lock"))
+	if e := failureCode(t, stdout); code == 0 || e.Code != "lock-not-found" {
+		t.Fatalf("missing named lock: code=%d %+v", code, e)
+	}
+}
+
+func TestCachePruneRefusesAnUnreadableNamedLock(t *testing.T) {
+	h := newInPlace(t)
+	broken := filepath.Join(t.TempDir(), "shulker.lock")
+	writeFile(t, broken, "{ not a lock")
+
+	stdout, stderr := h.mustRunStderr(t, "cache", "info", "--lock", broken)
+	if !strings.Contains(stderr, "can't be read") || !strings.Contains(stdout, "2 roots (this project, 1 lock file)") {
+		t.Fatalf("info should report and name the broken lock: stdout=%s stderr=%s", stdout, stderr)
+	}
+	code, stdout, _ := h.run(t, "--json", "cache", "prune", "--lock", broken)
+	if e := failureCode(t, stdout); code == 0 || e.Code != "cache-root-unreadable" {
+		t.Fatalf("unreadable named lock: code=%d %+v", code, e)
+	}
+}

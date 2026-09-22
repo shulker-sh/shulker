@@ -1465,19 +1465,29 @@ shulker docs --search build directory
 
 ### `shulker cache info`
 
-Show where the shared download cache is, how much space it uses, how many files it holds, and how much `cache prune` would free. The roots line names what is keeping files: every instance in the registry, and the project you are standing in when there is one. A registered instance whose lock can't be read is named as a warning and no prune line is suggested, since `cache prune` refuses while one is unreadable; the prunable figure is then counted as if that instance needed nothing.
+Show where the shared download cache is, how much space it uses, how many files it holds, and how much `cache prune` would free. The roots line names what is keeping files: every instance in the registry, the project you are standing in when there is one, and each lock file `--lock` names, counted as `lock files`. A registered instance or named lock file whose lock can't be read is named as a warning and no prune line is suggested, since `cache prune` refuses while one is unreadable; the prunable figure is then counted as if that instance needed nothing.
 
 ```sh
 shulker cache info
 ```
 
+| Flag | Description |
+| --- | --- |
+| `--lock` | Also keep what this lock file references, as `cache prune --lock` would; repeat for more |
+
 ### `shulker cache prune`
 
 Remove everything in the cache that no root references. A root is a registered instance or the project you run it in: its `shulker.lock`, the lock of every history entry it keeps, and the modpack checkouts and offline sync fallbacks its sources need. Installer logs and half-finished downloads always go. The managed Java runtimes and your CurseForge key are never touched, and nothing a build placed can be removed from a directory without its bytes reaching the cache first, so rolling an instance back still works offline. A registered folder that no longer exists is skipped; one that is there but whose lock can't be read stops the prune, since it may be an instance that still needs its files. A detached build from `sync --into` is no root of its own: it runs on its source project's lock, which is kept while that project is a registered instance's source, a registered instance itself, or the project you run the prune in. Otherwise, and always for a detached build from a git or URL source, the prune may remove its files from the cache, and its next sync downloads them again; its own directory keeps them either way.
 
+`--lock` adds a lock file as a root of its own, by path, whatever its name, a relative one taken from the directory you run shulker in rather than `--dir`, so a machine with no registered instances, like a CI runner caching several packs, can keep every pack's files in one prune: `shulker cache prune --lock a/shulker.lock --lock b/shulker.lock`. Only that lock is kept, not the history entries or sources of the project it came from. A named lock that isn't there fails with `lock-not-found`, and one that can't be read stops the prune like an unreadable instance.
+
 ```sh
 shulker cache prune
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--lock` | Also keep what this lock file references; repeat for more |
 
 ### `shulker log`
 
@@ -1678,7 +1688,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `backups-empty` | `restore` found no backups for the target |
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
-| `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need; `cache info` still reports and names the instance |
+| `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
 | `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
@@ -1729,7 +1739,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
 | `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
-| `lock-not-found` | No `shulker.lock`; run `shulker lock` |
+| `lock-not-found` | No `shulker.lock`; run `shulker lock`. Also a lock file named with `--lock` to `cache info` or `cache prune` that isn't there |
 | `lock-stale` | `export` needs a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
 | `manifest-invalid` | `shulker.json` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
