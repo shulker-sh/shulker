@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -357,5 +358,66 @@ func TestImportMrpackLocksHostedPacks(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestImportMrpackMatchesCurseForge(t *testing.T) {
+	h := newHarness(t)
+	jei, nodist, iris := h.jars["jei"], h.jars["nodist"], h.jars["irisshaders"]
+	file := func(jar fakeJar) mrpack.File {
+		return mrpack.File{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	}
+	index := mrpack.Index{
+		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Mixed",
+		Files:        []mrpack.File{file(jei), file(nodist), file(h.jars["sodium"])},
+		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
+	}
+	archive := filepath.Join(t.TempDir(), "mixed.mrpack")
+	writeMrpack(t, archive, index, map[string][]byte{
+		"client-overrides/mods/" + iris.filename: iris.data,
+		"overrides/mods/unknown-1.0.jar":         []byte("not on any provider"),
+	})
+	importMixed := func(t *testing.T) (importResult, []string, string) {
+		t.Helper()
+		dir := filepath.Join(t.TempDir(), "mixed")
+		h.dir = filepath.Dir(dir)
+		var env struct {
+			Warnings []string     `json:"warnings"`
+			Data     importResult `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+			t.Fatal(err)
+		}
+		return env.Data, env.Warnings, dir
+	}
+
+	res, warnings, dir := importMixed(t)
+	if strings.Join(res.Mods.Locked, ",") != "iris,jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/"+nodist.filename+",overrides/mods/unknown-1.0.jar" {
+		t.Fatalf("import: %+v", res.Mods)
+	}
+	if h.cfFingerprints != 1 {
+		t.Fatalf("fingerprint requests: %d", h.cfFingerprints)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") {
+		t.Fatalf("warnings: %v", warnings)
+	}
+	m, l := readProject(t, dir)
+	if l.Mods["jei"].Provider != "curseforge" || l.Mods["iris"].Provider != "curseforge" || l.Mods["iris"].Side != "client" || l.Mods["sodium"].Provider != "modrinth" {
+		t.Fatalf("lock: %+v", l.Mods)
+	}
+	if got := m.Requires["jei"]; got.Provider != "curseforge" || fmt.Sprint(got.Project) != "238222" {
+		t.Fatalf("jei entry: %+v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "client-overrides/mods", iris.filename)); !os.IsNotExist(err) {
+		t.Fatalf("locked jar kept as an override: %v", err)
+	}
+
+	h.noCurseForge = true
+	res, warnings, _ = importMixed(t)
+	if strings.Join(res.Mods.Locked, ",") != "sodium" || len(res.Mods.Unmanaged) != 4 {
+		t.Fatalf("import without CurseForge: %+v", res.Mods)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "CurseForge") {
+		t.Fatalf("warnings without CurseForge: %v", warnings)
 	}
 }

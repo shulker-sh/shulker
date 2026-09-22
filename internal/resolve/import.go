@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -23,11 +24,17 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/provider/curseforge"
 )
 
 type hashLookup interface {
 	provider.Provider
 	VersionByHash(ctx context.Context, sha1 string) (*provider.Version, bool, error)
+}
+
+type fingerprintLookup interface {
+	provider.Provider
+	MatchFingerprints(ctx context.Context, fingerprints []uint32) (map[uint32]curseforge.Match, error)
 }
 
 type Imported struct {
@@ -47,6 +54,8 @@ type importer struct {
 	bySha     map[string]string
 	packBySha map[string]importedPack
 	matched   map[string]bool
+	// unmatched are the mod jars and pack zips Modrinth didn't find, for CurseForge to look up.
+	unmatched []mrpack.Override
 	// keepSides reuses the marker's side for each entry, for an archive whose layers don't say.
 	keepSides bool
 }
@@ -105,6 +114,9 @@ func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLoc
 			return nil, err
 		}
 	}
+	if err := im.matchCurseForge(ctx); err != nil {
+		return nil, err
+	}
 	im.dropUnmatched()
 	sort.Strings(im.rep.Locked)
 	sort.Strings(im.rep.Reused)
@@ -126,24 +138,129 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 		im.reusePack(p)
 		return nil
 	}
-	if (!mrpack.IsModJar(f.Path) && !mrpack.IsPackZip(f.Path)) || im.modrinth == nil {
+	if !mrpack.IsModJar(f.Path) && !mrpack.IsPackZip(f.Path) {
 		return im.unmanagedDownload(ctx, f)
+	}
+	if im.modrinth == nil {
+		return im.leaveForCurseForge(ctx, f)
 	}
 	v, found, err := im.modrinth.VersionByHash(ctx, sha1Sum)
 	if err != nil {
-		return lookupFailed(f.Path, err)
+		return lookupFailed("Modrinth", f.Path, err)
 	}
 	if !found {
-		return im.unmanagedDownload(ctx, f)
+		return im.leaveForCurseForge(ctx, f)
 	}
 	proj, err := im.modrinth.Project(ctx, v.ProjectID, "")
 	if err != nil {
-		return lookupFailed(f.Path, err)
+		return lookupFailed("Modrinth", f.Path, err)
 	}
-	if mrpack.IsPackZip(f.Path) {
-		return im.lockPack(ctx, f, proj, v)
+	locked, err := im.lockFile(ctx, im.modrinth, f.Path, "", proj, v)
+	if err != nil || locked {
+		return err
 	}
-	id, prior, err := im.r.place(ctx, im.modrinth, proj, v, "", "", "", "", false)
+	return im.unmanagedDownload(ctx, f)
+}
+
+func (im *importer) leaveForCurseForge(ctx context.Context, f mrpack.File) error {
+	o, err := im.download(ctx, f)
+	if err != nil {
+		return err
+	}
+	im.unmatched = append(im.unmatched, o)
+	return nil
+}
+
+// matchCurseForge looks every file Modrinth didn't find up on CurseForge by fingerprint, in one
+// request, and locks each exact match CurseForge lets third parties download. The rest stay
+// unmanaged.
+func (im *importer) matchCurseForge(ctx context.Context) error {
+	left := im.unmatched
+	im.unmatched = nil
+	if len(left) == 0 {
+		return nil
+	}
+	cf, ok := im.r.Providers["curseforge"].(fingerprintLookup)
+	if !ok {
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%d file(s) Modrinth doesn't host weren't looked up on CurseForge, which needs an API key; kept as overrides", len(left)))
+		im.keepUnmanaged(left)
+		return nil
+	}
+	fingerprints := make([]uint32, len(left))
+	for i, o := range left {
+		fingerprints[i] = curseforge.Fingerprint(o.Data)
+	}
+	im.r.log("looking up %d file(s) on CurseForge", len(left))
+	matches, err := cf.MatchFingerprints(ctx, fingerprints)
+	if err != nil {
+		return lookupFailed("CurseForge", fmt.Sprintf("%d file(s)", len(left)), err)
+	}
+	for i, o := range left {
+		m, found := matches[fingerprints[i]]
+		if !found {
+			im.unmanaged(o)
+			continue
+		}
+		if err := im.lockCurseForgeMatch(ctx, cf, o, m); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provider, o mrpack.Override, m curseforge.Match) error {
+	file := o.Layer + "/" + o.Path
+	v, err := cf.Version(ctx, strconv.Itoa(m.FileID))
+	if err != nil {
+		return lookupFailed("CurseForge", file, err)
+	}
+	if v.File.URL == "" {
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s is on CurseForge, but its author doesn't allow third-party downloads; kept as an override", file))
+		im.unmanaged(o)
+		return nil
+	}
+	proj, err := cf.Project(ctx, strconv.Itoa(m.ModID), "")
+	if err != nil {
+		return lookupFailed("CurseForge", file, err)
+	}
+	side := layerSide(o.Layer)
+	if side == "both" {
+		side = ""
+	}
+	locked, err := im.lockFile(ctx, cf, o.Path, side, proj, v)
+	if err != nil || locked {
+		return err
+	}
+	im.unmanaged(o)
+	return nil
+}
+
+// lockFile locks the mod jar, resource pack or shader at filePath as p's version v, reporting
+// false, with nothing locked, when proj isn't the kind its folder holds: a datapack under
+// resourcepacks/, which Modrinth calls a mod, stays unmanaged.
+func (im *importer) lockFile(ctx context.Context, p provider.Provider, filePath, side string, proj *provider.Project, v *provider.Version) (bool, error) {
+	kind := manifest.TypeMod
+	switch path.Dir(filePath) {
+	case "resourcepacks":
+		kind = manifest.TypeResourcePack
+	case "shaderpacks":
+		kind = manifest.TypeShader
+	}
+	projKind := proj.Type
+	if projKind == "" {
+		projKind = manifest.TypeMod
+	}
+	if projKind != kind {
+		return false, nil
+	}
+	if kind == manifest.TypeMod {
+		return true, im.lockMod(ctx, p, side, proj, v)
+	}
+	return true, im.lockPack(ctx, p, path.Base(filePath), kind, proj, v)
+}
+
+func (im *importer) lockMod(ctx context.Context, p provider.Provider, side string, proj *provider.Project, v *provider.Version) error {
+	id, prior, err := im.r.place(ctx, p, proj, v, "", "", side, "", false)
 	if err != nil {
 		return err
 	}
@@ -159,42 +276,37 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 			entry.Pin = nil
 		}
 	}
-	if proj.Slug != id {
-		entry.Project = proj.ID
+	if proj.Slug != id || p.Name() != "modrinth" {
+		entry.Project = lockID(p.Name(), proj.ID)
 	}
-	if im.modrinth.Name() != im.r.Manifest.ProviderOrder()[0] {
-		entry.Provider = im.modrinth.Name()
+	if p.Name() != im.r.Manifest.ProviderOrder()[0] {
+		entry.Provider = p.Name()
 	}
 	im.r.Manifest.Requires[id] = entry
 	im.rep.Locked = append(im.rep.Locked, id)
 	return nil
 }
 
-// lockPack locks a resource pack or shader the pack lists under the file name it ships, which
-// the game enables it by. A file whose project is some other type, a datapack Modrinth calls a
-// mod for one, stays unmanaged.
-func (im *importer) lockPack(ctx context.Context, f mrpack.File, proj *provider.Project, v *provider.Version) error {
+// lockPack locks a resource pack or shader the pack carries under the file name it ships, which
+// the game enables it by, pinned to the version it ships.
+func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename, kind string, proj *provider.Project, v *provider.Version) error {
 	r := im.r
-	kind := manifest.TypeResourcePack
-	if path.Dir(f.Path) == "shaderpacks" {
-		kind = manifest.TypeShader
-	}
-	if proj.Type != kind {
-		return im.unmanagedDownload(ctx, f)
-	}
 	key := proj.Slug
 	if ok, err := im.canListPack(key, kind); !ok {
 		return err
 	}
-	listed := manifest.Require{Type: kind, Pin: lockID(im.modrinth.Name(), v.ID)}
-	if name := path.Base(f.Path); name != key+manifest.FileExtension(kind) {
-		listed.Filename = name
+	listed := manifest.Require{Type: kind, Pin: lockID(p.Name(), v.ID)}
+	if filename != key+manifest.FileExtension(kind) {
+		listed.Filename = filename
 	}
-	if im.modrinth.Name() != r.Manifest.ProviderOrder()[0] {
-		listed.Provider = im.modrinth.Name()
+	if p.Name() != "modrinth" {
+		listed.Project = lockID(p.Name(), proj.ID)
+	}
+	if p.Name() != r.Manifest.ProviderOrder()[0] {
+		listed.Provider = p.Name()
 	}
 	r.Manifest.Requires[key] = listed
-	if err := r.lockPackVersion(ctx, im.modrinth, proj, v, key, kind, ""); err != nil {
+	if err := r.lockPackVersion(ctx, p, proj, v, key, kind, ""); err != nil {
 		return err
 	}
 	im.rep.Locked = append(im.rep.Locked, key)
@@ -214,10 +326,10 @@ func (im *importer) canListPack(key, kind string) (bool, error) {
 	return true, im.r.packKeyFree(key, kind)
 }
 
-// lookupFailed is a file in the pack that couldn't be looked up on Modrinth, with the provider's
+// lookupFailed is a file in the pack that couldn't be looked up on a provider, with the provider's
 // error in a row. A network failure stays one for fetch.IsNetwork.
-func lookupFailed(file string, err error) error {
-	e := out.Errorf("mrpack-lookup", "couldn't look up %s on Modrinth", file).WithCause("modrinth", err)
+func lookupFailed(on, file string, err error) error {
+	e := out.Errorf("mrpack-lookup", "couldn't look up %s on %s", file, on).WithCause(strings.ToLower(on), err)
 	if !fetch.IsNetwork(err) {
 		return e
 	}
@@ -226,18 +338,36 @@ func lookupFailed(file string, err error) error {
 }
 
 func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error {
-	im.r.log("fetching %s", f.Path)
-	p, err := im.r.Cache.Ensure(ctx, im.r.Fetch, f.Downloads[0], f.Hashes["sha512"])
-	if err != nil {
-		return out.Errorf("mrpack-download", "couldn't download %s", f.Path).WithCause("download", err)
-	}
-	data, err := os.ReadFile(p)
+	o, err := im.download(ctx, f)
 	if err != nil {
 		return err
 	}
-	im.rep.Overrides = append(im.rep.Overrides, mrpack.Override{Layer: f.Layer(), Path: f.Path, Data: data})
-	im.rep.Unmanaged = append(im.rep.Unmanaged, f.Layer()+"/"+f.Path)
+	im.unmanaged(o)
 	return nil
+}
+
+func (im *importer) download(ctx context.Context, f mrpack.File) (mrpack.Override, error) {
+	im.r.log("fetching %s", f.Path)
+	p, err := im.r.Cache.Ensure(ctx, im.r.Fetch, f.Downloads[0], f.Hashes["sha512"])
+	if err != nil {
+		return mrpack.Override{}, out.Errorf("mrpack-download", "couldn't download %s", f.Path).WithCause("download", err)
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return mrpack.Override{}, err
+	}
+	return mrpack.Override{Layer: f.Layer(), Path: f.Path, Data: data}, nil
+}
+
+func (im *importer) unmanaged(o mrpack.Override) {
+	im.rep.Overrides = append(im.rep.Overrides, o)
+	im.rep.Unmanaged = append(im.rep.Unmanaged, o.Layer+"/"+o.Path)
+}
+
+func (im *importer) keepUnmanaged(files []mrpack.Override) {
+	for _, o := range files {
+		im.unmanaged(o)
+	}
 }
 
 func (im *importer) override(o mrpack.Override) error {
@@ -265,8 +395,7 @@ func (im *importer) override(o mrpack.Override) error {
 		im.reuse(id, side)
 		return nil
 	}
-	im.rep.Overrides = append(im.rep.Overrides, o)
-	im.rep.Unmanaged = append(im.rep.Unmanaged, o.Layer+"/"+o.Path)
+	im.unmatched = append(im.unmatched, o)
 	return nil
 }
 

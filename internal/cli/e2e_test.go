@@ -118,6 +118,7 @@ type harness struct {
 	cfSearchFails  bool
 	cfMods         map[int]*cfMod
 	cfHits         int
+	cfFingerprints int
 	// modrinthPacks are the modpack projects the Modrinth fake knows, by project id.
 	modrinthPacks map[string]*modrinthPack
 	// modrinthNoSha1 has the Modrinth fake publish only a file's sha512.
