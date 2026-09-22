@@ -140,6 +140,7 @@ func TestAddLocalFileRefusals(t *testing.T) {
 	pack := makeJarFile(t, "faithful", "faithful.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"faithful"}}`)
 	writeProjectFile(t, h, "files/faithful.zip", []byte("another"))
 	unknown := makeJarFile(t, "notes", "notes.zip", "notes.txt", "hi")
+	zippedMod := makeJarWith(t, "zipped-mod", "zipped-mod.zip", "client", `"depends":{}`)
 	for _, c := range []struct {
 		args []string
 		code string
@@ -149,6 +150,9 @@ func TestAddLocalFileRefusals(t *testing.T) {
 		{[]string{"add", writeOutside(t, "pack.mrpack", pack.data)}, "archive-not-modpack"},
 		{[]string{"resourcepack", "add", writeOutside(t, "other.zip", pack.data), "--pin", "abc"}, "usage"},
 		{[]string{"add", filepath.Join(t.TempDir(), "gone.jar")}, "file-not-found"},
+		{[]string{"add", writeOutside(t, zippedMod.filename, zippedMod.data), "--type", "mod"}, "usage"},
+		{[]string{"add", writeOutside(t, "readme.txt", pack.data), "--type", "resourcepack"}, "usage"},
+		{[]string{"add", writeOutside(t, "Shouty.JAR", zippedMod.data)}, "usage"},
 	} {
 		code, stdout, _ := h.run(t, append([]string{"--json"}, c.args...)...)
 		if e := failureCode(t, stdout); code == 0 || e.Code != c.code {
@@ -158,9 +162,12 @@ func TestAddLocalFileRefusals(t *testing.T) {
 	if readProjectFile(t, h, "files/faithful.zip") != "another" {
 		t.Fatal("a different file in files/ is never replaced")
 	}
-	if _, err := os.Stat(filepath.Join(h.dir, "files", "pack.mrpack")); !os.IsNotExist(err) {
-		t.Fatalf("a refused archive is not copied in: %v", err)
+	for _, name := range []string{"pack.mrpack", "zipped-mod.zip", "readme.txt", "Shouty.JAR"} {
+		if _, err := os.Stat(filepath.Join(h.dir, "files", name)); !os.IsNotExist(err) {
+			t.Fatalf("a refused %s is not copied in: %v", name, err)
+		}
 	}
+	h.mustRun(t, "list")
 }
 
 func TestAddLocalJarOverADependencyKeepsItsDependents(t *testing.T) {

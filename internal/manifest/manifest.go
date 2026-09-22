@@ -427,16 +427,21 @@ func (m *Manifest) IsLocalFile(key string) bool {
 // CheckFileExtension refuses a local file whose name doesn't end the way the lock records its kind:
 // .jar for a mod, .zip for a resource pack or shader.
 func CheckFileExtension(key string, r Require) error {
-	want := ".zip"
-	if r.Kind() == TypeMod {
-		want = ".jar"
-	}
+	want := FileExtension(r.Kind())
 	if strings.HasSuffix(r.File, want) {
 		return nil
 	}
 	e := out.Errorf("manifest-invalid", "requires.%s: a %s's file must be a %s", key, r.Kind(), want)
 	e.Rows = []out.Detail{{Label: "File", Text: r.File}}
 	return e
+}
+
+// FileExtension is how the name of a local file of kind ends: .jar for a mod, .zip for the rest.
+func FileExtension(kind string) string {
+	if kind == TypeMod {
+		return ".jar"
+	}
+	return ".zip"
 }
 
 func (m *Manifest) byKind(kind string) map[string]Require {

@@ -170,9 +170,23 @@ func (r *Resolver) notHoldingProject(path string) error {
 	return nil
 }
 
-// fileKind is what a local file is: the type asked for, a mod for a jar, and for a zip whatever it
-// holds.
+// fileKind is what a local file is, refused unless its name ends the way the manifest holds that
+// kind's file to.
 func fileKind(path, asked string) (string, error) {
+	kind, err := guessFileKind(path, asked)
+	if err != nil {
+		return "", err
+	}
+	if want := manifest.FileExtension(kind); !strings.HasSuffix(path, want) {
+		e := out.Errorf("usage", "%s isn't a %s, so it can't be added as a %s", filepath.Base(path), want, kind)
+		e.Help = "rename it to end in " + want
+		return "", e
+	}
+	return kind, nil
+}
+
+// guessFileKind is the type asked for, a mod for a jar, and for a zip whatever it holds.
+func guessFileKind(path, asked string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".mrpack" {
 		e := out.Errorf("usage", "%s is a modpack archive", filepath.Base(path))
