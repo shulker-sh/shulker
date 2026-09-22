@@ -69,9 +69,13 @@ func (a *app) installCmd() *cobra.Command {
 				res.Builds = append(res.Builds, rep)
 			}
 			a.refreshLocal(lf, true, false)
+			nudge := a.awaitsALauncher(p)
 			return a.printer.Emit(res, func(l *out.Lines) {
 				for _, rep := range res.Builds {
 					printReport(l, rep)
+				}
+				if nudge {
+					l.Nudge("Play it in a launcher", "shulker link <launcher>")
 				}
 			})
 		},
@@ -80,6 +84,19 @@ func (a *app) installCmd() *cobra.Command {
 	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	ff.register(cmd, "for this run only")
 	return cmd
+}
+
+// awaitsALauncher reports a client project that builds out of place and has nothing linked or
+// synced from it yet.
+func (a *app) awaitsALauncher(p *project.Project) bool {
+	if !p.Manifest.HasSide("client") {
+		return false
+	}
+	if _, ok := p.Manifest.InPlaceSide(); ok {
+		return false
+	}
+	_, _, err := a.projectInstances(instanceSelection{})
+	return out.CodeOf(err) == "no-instances"
 }
 
 // fetchLocked puts the locked files the given sides use in the cache, every locked file with no

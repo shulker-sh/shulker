@@ -142,7 +142,7 @@ func (a *app) initCmd() *cobra.Command {
 				case opts.side == "server":
 					l.Nudge("Download and build it", "shulker install")
 				default:
-					l.Nudge("Add a resource pack or shader", "shulker add <name>")
+					l.Nudge("Play it in a launcher", "shulker link <launcher>")
 				}
 			})
 		},
