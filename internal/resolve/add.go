@@ -143,7 +143,7 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 }
 
 func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error {
-	if IsLocalPath(slug) {
+	if IsLocalPath(slug) || IsLocalFolder(slug) {
 		return r.addFile(ctx, slug, opts)
 	}
 	explicit := opts.Provider != ""

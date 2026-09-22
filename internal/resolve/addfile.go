@@ -2,9 +2,11 @@ package resolve
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/zipfile"
 )
 
 // IsLocalPath reports whether an add argument names a local file rather than a provider slug: a
@@ -27,19 +30,34 @@ func IsLocalPath(arg string) bool {
 	return err == nil && st.Mode().IsRegular()
 }
 
-// addFile adds the file at path as a local file entry and locks it. A file outside the project, or
-// in a folder whose files something else owns, is copied into manifest.FilesDir and the entry
-// names the copy.
+// IsLocalFolder reports whether an add argument names a folder, which a resource pack or shader
+// can be built from.
+func IsLocalFolder(arg string) bool {
+	st, err := os.Stat(arg)
+	return err == nil && st.IsDir()
+}
+
+// addFile adds the file or pack folder at path as a local file entry and locks it. One outside the
+// project, or in a folder whose files something else owns, is copied into manifest.FilesDir and the
+// entry names the copy.
 func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) error {
 	for _, flag := range []struct{ name, value string }{{"pin", opts.Pin}, {"channel", opts.Channel}, {"provider", opts.Provider}} {
 		if flag.value != "" {
 			return out.Errorf("usage", "--%s doesn't apply to a local file", flag.name)
 		}
 	}
-	if st, err := os.Stat(path); err != nil || !st.Mode().IsRegular() {
+	path = filepath.Clean(path)
+	st, err := os.Stat(path)
+	if err != nil || !st.Mode().IsRegular() && !st.IsDir() {
 		return out.Errorf("file-not-found", "%s is not a file", path)
 	}
-	kind, err := fileKind(path, opts.Type)
+	folder := st.IsDir()
+	var kind string
+	if folder {
+		kind, err = folderKind(path, opts.Type)
+	} else {
+		kind, err = fileKind(path, opts.Type)
+	}
 	if err != nil {
 		return err
 	}
@@ -58,6 +76,8 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 		if key == "" {
 			key = info.ID
 		}
+	} else if key == "" && folder {
+		key = nameKey(filepath.Base(path))
 	} else if key == "" {
 		key = StemKey(path)
 	}
@@ -105,12 +125,21 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 	return nil
 }
 
-// CopyIn copies the file at path to rel in the project. A re-add refreshes the copy its own entry
-// names, which is how a rebuilt jar gets back in; otherwise a different file already at rel is
-// refused rather than replaced.
+// CopyIn copies the file or pack folder at path to rel in the project. A re-add refreshes the copy
+// its own entry names, which is how a rebuilt jar gets back in; otherwise a different one already
+// at rel is refused rather than replaced.
 func (r *Resolver) CopyIn(path, rel string, isReadded bool) error {
-	r.log("copying %s into %s/", filepath.Base(path), manifest.FilesDir)
 	to := filepath.Join(r.Dir, filepath.FromSlash(rel))
+	if IsLocalFolder(path) {
+		r.log("copying %s/ into %s/", filepath.Base(path), manifest.FilesDir)
+		if !isReadded {
+			if err := sameFolderIfAny(path, to); err != nil {
+				return err
+			}
+		}
+		return copyFolder(path, to)
+	}
+	r.log("copying %s into %s/", filepath.Base(path), manifest.FilesDir)
 	if !isReadded {
 		if err := sameFileIfAny(path, to); err != nil {
 			return err
@@ -151,11 +180,40 @@ func fileKind(path, asked string) (string, error) {
 	return "", e
 }
 
+// folderKind is what a pack folder is: the type asked for, and otherwise whatever its root holds.
+// Only a resource pack or a shader can be built from a folder.
+func folderKind(path, asked string) (string, error) {
+	switch asked {
+	case manifest.TypeResourcePack, manifest.TypeShader:
+		return asked, nil
+	case "":
+	default:
+		e := out.Errorf("usage", "%s is a folder, and only a resource pack or shader can be built from one", filepath.Base(path))
+		e.Help = "add a mod as its jar"
+		return "", e
+	}
+	if st, err := os.Stat(filepath.Join(path, "pack.mcmeta")); err == nil && st.Mode().IsRegular() {
+		return manifest.TypeResourcePack, nil
+	}
+	if IsLocalFolder(filepath.Join(path, "shaders")) {
+		return manifest.TypeShader, nil
+	}
+	e := out.Errorf("type-ambiguous", "%s holds no resource pack or shader shulker recognises", filepath.Base(path))
+	e.Candidates = []string{manifest.TypeResourcePack, manifest.TypeShader}
+	e.Flag = "--type"
+	return "", e
+}
+
 // StemKey is a requires key made from a file's name without its extension.
 func StemKey(path string) string {
-	stem := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	return nameKey(strings.TrimSuffix(filepath.Base(path), filepath.Ext(path)))
+}
+
+// nameKey is a requires key made from a name: lowercased, with anything a key can't hold made a
+// dash.
+func nameKey(name string) string {
 	var b strings.Builder
-	for _, c := range strings.ToLower(stem) {
+	for _, c := range strings.ToLower(name) {
 		if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '.' || c == '_' {
 			b.WriteRune(c)
 		} else if b.Len() > 0 && !strings.HasSuffix(b.String(), "-") {
@@ -244,6 +302,62 @@ func copyFile(from, to string) error {
 	return fsutil.WriteFrom(to, f)
 }
 
+// copyFolder replaces the folder at to with a copy of the one at from, leaving out what a pack
+// folder's zip leaves out, so a file gone from from is gone from the copy too.
+func copyFolder(from, to string) error {
+	if err := os.RemoveAll(to); err != nil {
+		return err
+	}
+	return filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(from, path)
+		if err != nil {
+			return err
+		}
+		if path != from && zipfile.Excluded(d.Name()) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		switch {
+		case d.IsDir():
+			return os.MkdirAll(filepath.Join(to, rel), 0o755)
+		case d.Type().IsRegular():
+			return copyFile(path, filepath.Join(to, rel))
+		}
+		return nil
+	})
+}
+
+// sameFolderIfAny refuses anything already at to but a folder that zips to the same bytes, since
+// another entry may name it.
+func sameFolderIfAny(from, to string) error {
+	st, err := os.Stat(to)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if st.IsDir() {
+		want, err := zipfile.Folder(from)
+		if err != nil {
+			return err
+		}
+		have, err := zipfile.Folder(to)
+		if err != nil {
+			return err
+		}
+		if bytes.Equal(want, have) {
+			return nil
+		}
+	}
+	return fileTaken(to)
+}
+
 // sameFileIfAny refuses a different file already at to rather than replacing it, since another
 // entry may name it.
 func sameFileIfAny(from, to string) error {
@@ -269,7 +383,11 @@ func sameFile(from, to string) error {
 	if have == want {
 		return nil
 	}
+	return fileTaken(to)
+}
+
+func fileTaken(to string) error {
 	e := out.Errorf("file-taken", "%s already holds a different %s", manifest.FilesDir, filepath.Base(to))
-	e.Help = "rename the file, or remove the one in " + manifest.FilesDir + "/ first"
+	e.Help = "rename it, or remove the one in " + manifest.FilesDir + "/ first"
 	return e
 }

@@ -142,14 +142,14 @@ func (a *app) isArchive(arg string) bool {
 	return false
 }
 
-// localPath is an argument naming a local file made absolute, against -C when it is given, and any
-// other argument as it came.
+// localPath is an argument naming a local file or folder made absolute, against -C when it is
+// given, and any other argument as it came.
 func (a *app) localPath(arg string) string {
 	path := arg
 	if !filepath.IsAbs(path) && a.dir != "" {
 		path = filepath.Join(a.dir, path)
 	}
-	if !resolve.IsLocalPath(path) {
+	if !resolve.IsLocalPath(path) && !resolve.IsLocalFolder(path) {
 		return arg
 	}
 	if abs, err := filepath.Abs(path); err == nil {

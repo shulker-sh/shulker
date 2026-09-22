@@ -66,7 +66,7 @@ func Folder(root string) ([]byte, error) {
 		if err != nil {
 			return err
 		}
-		if path != root && isJunk(d.Name()) {
+		if path != root && Excluded(d.Name()) {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
@@ -92,7 +92,8 @@ func Folder(root string) ([]byte, error) {
 	return Build(entries, "")
 }
 
-func isJunk(name string) bool {
+// Excluded reports whether Folder leaves a file or folder of this name out.
+func Excluded(name string) bool {
 	switch {
 	case strings.HasPrefix(name, "."), name == "Thumbs.db", name == "desktop.ini":
 		return true

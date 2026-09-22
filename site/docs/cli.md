@@ -217,9 +217,12 @@ shulker add
 
 An argument that names an existing file, or ends in `.jar`, `.zip` or `.mrpack`, is a local file rather than a slug, and is locked in the same run. A file inside the project is referenced where it lies. One outside it is copied into `files/`, and so is one in `downloads/`, an overrides folder or a folder a side builds into, since those files aren't the project's to keep. Adding the same file again refreshes its copy and relocks it, which is how a rebuilt jar gets in; a different file already in `files/` under the same name is never replaced. The key is a jar's mod id or, for a pack, its file name without the extension, lowercased with anything a key can't hold turned into dashes, and `--as` overrides either. A jar is a mod, and a bare `add` reads a zip's type from what it holds: a resource pack holds `pack.mcmeta`, a shader `shaders/`. `--pin`, `--channel` and `--provider` don't apply to a local file.
 
+A folder is taken the same way, as a resource pack or shader built from its sources, which `lock` zips. One inside the project is referenced where it lies; one outside it, or in one of those folders, is copied whole into `files/<name>/`, leaving out what the zip leaves out, and `add` says so. Adding it again replaces the copy. Its key is the folder's name, made a key the same way, and a bare `add` reads its type from its root: `pack.mcmeta` for a resource pack, a `shaders/` folder for a shader. A folder can't be a mod.
+
 ```sh
 shulker add ./build/libs/my-mod-1.0.jar
 shulker resourcepack add ~/Downloads/Faithful.zip
+shulker resourcepack add "./Resource Packs/Mod Menu Helper"
 ```
 
 ### `shulker search`
@@ -1691,7 +1694,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
 | `file-not-found` | A file named to `pull` isn't in the build directory, a path given to `add` isn't a file, or a mod or modpack's `file` in `shulker.json` names a folder. `candidates`: the closest file there, for `pull` |
-| `file-taken` | `add` would copy a local file into `files/`, which already holds a different file of that name that no entry of the same key names; rename one or remove the one in `files/`. Also an `import` whose pack names two different local files of one name |
+| `file-taken` | `add` would copy a local file or folder into `files/`, which already holds a different one of that name that no entry of the same key names; rename one or remove the one in `files/`. Also an `import` whose pack names two different local files of one name |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |
 | `group-not-found` | `--group` names a save group that isn't under the saves root |
@@ -1807,7 +1810,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a native jar that won't unpack, or a version JSON that doesn't hold together |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
-| `type-ambiguous` | A CurseForge slug matches projects of several types, or a zip given to `add` holds neither a resource pack nor a shader; pass `--type` to choose. `candidates`: the types it could be |
+| `type-ambiguous` | A CurseForge slug matches projects of several types, or a zip or folder given to `add` holds neither a resource pack nor a shader; pass `--type` to choose. `candidates`: the types it could be |
 | `type-mismatch` | `--type`, or a hosted modpack entry, disagrees with what the provider says the project is. `candidates`: the provider's own type |
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | An override uses a variable that isn't set |
