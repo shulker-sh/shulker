@@ -160,8 +160,9 @@ func hasIndex(path string) bool {
 }
 
 // archiveEntries is the lock and manifest a consumed archive had, rebuilt from what the project's
-// lock took from it: the entries tagged with the modpack, and the mods it requires by name. A mod
-// the project lists itself is the project's, so the rebuilt lock leaves it out.
+// lock took from it: the entries tagged with the modpack, and the mods it requires by name, each
+// naming the provider project it locked from so an unlocked archive's mods resolve as they did. A
+// mod the project lists itself is the project's, so the rebuilt lock leaves it out.
 func archiveEntries(name string, a *mrpack.Archive, project *lock.Lock) (*manifest.Manifest, *lock.Lock) {
 	typ, version, _ := a.Loader()
 	m := &manifest.Manifest{Name: name, Minecraft: a.Index.Dependencies["minecraft"], Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}}
@@ -175,7 +176,7 @@ func archiveEntries(name string, a *mrpack.Archive, project *lock.Lock) (*manife
 			l.Mods[id] = mod
 		}
 		if slices.Contains(mod.RequiredBy, name) {
-			m.Requires[id] = manifest.Require{}
+			m.Requires[id] = requireFor(mod)
 		}
 	}
 	for key, p := range project.ResourcePacks {
@@ -189,6 +190,19 @@ func archiveEntries(name string, a *mrpack.Archive, project *lock.Lock) (*manife
 		}
 	}
 	return m, l
+}
+
+// requireFor is the requires entry that resolves to the provider project mod was locked from, or
+// to the file it was locked from.
+func requireFor(mod lock.Mod) manifest.Require {
+	if mod.File != "" {
+		return manifest.Require{File: mod.File}
+	}
+	r := manifest.Require{Provider: mod.Provider, Project: mod.Project}
+	if mod.Channel != "" && mod.Channel != "release" {
+		r.Channel = mod.Channel
+	}
+	return r
 }
 
 // layArchive settles the files an archive lays as its own overrides: every file in its override

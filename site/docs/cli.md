@@ -1724,6 +1724,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `mrpack-download` | A file in the modpack couldn't be downloaded |
 | `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files; pass `--bundle`. `items`: the files |
 | `mrpack-invalid` | The modpack is malformed |
+| `mrpack-lookup` | A file in a Modrinth modpack couldn't be looked up on Modrinth, by `import mrpack` or when a modpack archive is read. The `modrinth` row says why; offline, it is the network the lookup needs |
 | `mrpack-marker` | The modpack's own `shulker.json` or `shulker.lock` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-accounts` | shulker can see no account at all, so there is nothing to play with |

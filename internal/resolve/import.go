@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 
+	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
@@ -102,14 +103,14 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	}
 	v, found, err := im.modrinth.VersionByHash(ctx, sha1Sum)
 	if err != nil {
-		return err
+		return lookupFailed(f.Path, err)
 	}
 	if !found {
 		return im.unmanagedDownload(ctx, f)
 	}
 	proj, err := im.modrinth.Project(ctx, v.ProjectID, "")
 	if err != nil {
-		return err
+		return lookupFailed(f.Path, err)
 	}
 	id, prior, err := im.r.place(ctx, im.modrinth, proj, v, "", "", "", "", false)
 	if err != nil {
@@ -136,6 +137,17 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	im.r.Manifest.Requires[id] = entry
 	im.rep.Locked = append(im.rep.Locked, id)
 	return nil
+}
+
+// lookupFailed is a file in the pack that couldn't be looked up on Modrinth, with the provider's
+// error in a row. A network failure stays one for fetch.IsNetwork.
+func lookupFailed(file string, err error) error {
+	e := out.Errorf("mrpack-lookup", "couldn't look up %s on Modrinth", file).WithCause("modrinth", err)
+	if !fetch.IsNetwork(err) {
+		return e
+	}
+	e.Help = "looking a pack's files up needs the network"
+	return fetch.Unreachable(e)
 }
 
 func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error {

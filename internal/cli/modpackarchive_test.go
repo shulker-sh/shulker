@@ -280,3 +280,44 @@ func TestArchiveModpackSyncsOfflineWhenUnchanged(t *testing.T) {
 	h.mustRun(t, "install")
 	h.mustRun(t, "sync", "--offline")
 }
+
+func TestUnlockedArchiveModpackSyncsOffline(t *testing.T) {
+	h := newInPlace(t)
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"] = map[string]any{"someone": map[string]any{"type": "modpack", "file": "packs/someone.mrpack", "locked": false}}
+	})
+	archivePack(t, h, "packs/someone.mrpack", "v1")
+	h.mustRun(t, "lock")
+	l := h.readLock(t)
+	if l.Modpacks["someone"].UsesLock || l.Mods["sodium"].Modpack != "" || !slices.Contains(l.Mods["sodium"].RequiredBy, "someone") {
+		t.Fatalf("an unlocked archive's mods are resolved here: %+v %+v", l.Modpacks["someone"], l.Mods["sodium"])
+	}
+	h.mustRun(t, "install")
+	h.mustRun(t, "sync", "--offline")
+	if after := h.readLock(t); after.Mods["sodium"].Sha512 != l.Mods["sodium"].Sha512 || !slices.Contains(after.Mods["sodium"].RequiredBy, "someone") {
+		t.Fatalf("an offline relock keeps the archive's mods as they were: %+v", after.Mods["sodium"])
+	}
+
+	h.editManifest(t, func(m map[string]any) {
+		delete(m["requires"].(map[string]any)["someone"].(map[string]any), "locked")
+	})
+	h.mustRun(t, "lock")
+	if l := h.readLock(t); !l.Modpacks["someone"].UsesLock || l.Mods["sodium"].Modpack != "someone" {
+		t.Fatalf("locking it reads the archive again: %+v %+v", l.Modpacks["someone"], l.Mods["sodium"])
+	}
+}
+
+func TestChangedArchiveModpackOfflineIsACodedError(t *testing.T) {
+	h := newInPlace(t)
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"] = map[string]any{"someone": map[string]any{"type": "modpack", "file": "packs/someone.mrpack"}}
+	})
+	archivePack(t, h, "packs/someone.mrpack", "v1")
+	h.mustRun(t, "lock")
+	h.mustRun(t, "install")
+	archivePack(t, h, "packs/someone.mrpack", "v2")
+	code, stdout, _ := h.run(t, "--json", "sync", "--offline")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "mrpack-lookup" || !strings.Contains(e.Message, "modpack someone") {
+		t.Fatalf("code=%d %+v", code, e)
+	}
+}

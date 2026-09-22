@@ -212,21 +212,24 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 }
 
 // rereads reports whether a relock reads a modpack afresh rather than at its pin: a local directory
-// always, and an archive that follows its bytes when archiveMoved says so.
+// always, and an archive when archiveMoved says so, taking changed bytes only when it follows them.
 func (a *app) rereads(p *project.Project, mp manifest.Require, pinned lock.Modpack) bool {
 	switch pack.KindOf(mp) {
 	case pack.Local:
 		return true
 	case pack.File:
-		return mp.AutoUpdates() && archiveMoved(p, mp, pinned)
+		return archiveMoved(p, mp, pinned, mp.AutoUpdates())
 	}
 	return false
 }
 
-// archiveMoved reports whether an archive modpack has anything new to read: its bytes changed, or
-// it is unlocked, so its mods are resolved here.
-func archiveMoved(p *project.Project, mp manifest.Require, pinned lock.Modpack) bool {
-	return !pinned.UsesLock || len(project.FileDifferences(p.Dir, "", mp.File, pinned.File, pinned.Size, pinned.Sha512)) > 0
+// archiveMoved reports whether an archive modpack has to be read again: it was locked or unlocked
+// since, which the lock alone can't rebuild, or its bytes changed and followsBytes says to take them.
+func archiveMoved(p *project.Project, mp manifest.Require, pinned lock.Modpack, followsBytes bool) bool {
+	if isLocked := mp.Locked == nil || *mp.Locked; isLocked != pinned.UsesLock {
+		return true
+	}
+	return followsBytes && len(project.FileDifferences(p.Dir, "", mp.File, pinned.File, pinned.Size, pinned.Sha512)) > 0
 }
 
 // refreshModpacks re-resolves the modpacks refresh picks from their sources, keeps the rest at
@@ -241,8 +244,7 @@ func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolv
 	loaded := make([]*pack.Loaded, 0, len(r.Packs))
 	for _, l := range r.Packs {
 		mp := modpacks[l.Name]
-		pinned, locked := p.Lock.Modpacks[l.Name]
-		if !refresh(mp) || (l.Kind == pack.File && (!locked || !archiveMoved(p, mp, pinned))) {
+		if !refresh(mp) || (l.Kind == pack.File && !archiveMoved(p, mp, l.Pin, true)) {
 			loaded = append(loaded, l)
 			continue
 		}
