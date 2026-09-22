@@ -192,4 +192,19 @@ func TestAddWarnsWhenAModShipsOnNoDeclaredSide(t *testing.T) {
 	if _, stderr := h.mustRunStderr(t, "add", "fabric-api"); strings.Contains(stderr, "no side of this project ships it") {
 		t.Fatalf("warned for a mod on every side: %s", stderr)
 	}
+	if _, stderr := h.mustRunStderr(t, "add", "fresh-animations"); strings.Contains(stderr, "no side of this project ships it") {
+		t.Fatalf("warned for a resource pack: %s", stderr)
+	}
+}
+
+func TestUpdateSkipsTheNoSideWarningForAConditionedMod(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.editManifest(t, func(m map[string]any) {
+		m["features"] = map[string]any{"shiny": map[string]any{}}
+		m["requires"] = map[string]any{"sodium": map[string]any{"feature": "shiny"}}
+	})
+	if _, stderr := h.mustRunStderr(t, "update"); strings.Contains(stderr, "no side of this project ships it") {
+		t.Fatalf("warned for a mod behind a feature: %s", stderr)
+	}
 }

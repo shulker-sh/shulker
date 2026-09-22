@@ -25,6 +25,10 @@ func (a *app) updateCmd() *cobra.Command {
 		Short:       "Re-resolve mods to the newest compatible versions",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
+				local, args := splitLocalFiles(p.Manifest, args)
+				if len(local) > 0 && len(args) == 0 {
+					return "", nil
+				}
 				packNames := map[string]bool{}
 				for _, l := range r.Packs {
 					packNames[l.Name] = true
@@ -128,6 +132,10 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		rl.Synced = &synced
 	}
 	res := rl.lockChanges
+	var local []string
+	if cmd.Name() == "update" {
+		local, _ = splitLocalFiles(p.Manifest, cmd.Flags().Args())
+	}
 	optional := 0
 	for _, s := range rl.validation.Suggestions {
 		if s.Kind == "optional" && slices.ContainsFunc(res.Added, func(m resolve.AddedMod) bool { return m.ID == s.Mod }) {
@@ -144,12 +152,13 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		if len(res.Reresolved) > 0 {
 			l.Info("re-resolved every mod: " + strings.Join(res.Reresolved, "; "))
 		}
+		printLocalFiles(l, local)
 		res.printItems(l)
 		if optional > 0 {
 			optionalNudge(l, optional)
 		}
 		if res.IsEmpty() {
-			l.OK("already up to date", "")
+			printUpToDate(l, "already up to date", local, cmd.Flags().Args())
 		}
 		if res.Synced != nil {
 			res.Synced.print(l)
@@ -211,7 +220,9 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	rl.printItems = func(l *out.Lines) {
 		printChanges(l, rl.Changes, v.Suggestions, p.Manifest.Sides(), placements)
 	}
-	a.warn(append(append(r.Warnings, v.Warnings...), unshippedWarnings(rl.Changes, p.Manifest.Sides())...))
+	a.warn(r.Warnings)
+	a.warn(v.Warnings)
+	a.warn(unshippedWarnings(rl.Changes, p.Manifest.Sides(), r.Lock.Mods, placements))
 	if keepUnchanged && !stale {
 		now, err := json.Marshal(p.Lock)
 		if err != nil {
@@ -285,13 +296,17 @@ func (a *app) outdatedCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := r.Outdated(cmd.Context(), args)
-			if err != nil {
-				return err
+			local, rest := splitLocalFiles(p.Manifest, args)
+			res := []resolve.Outdated{}
+			if len(local) == 0 || len(rest) > 0 {
+				if res, err = r.Outdated(cmd.Context(), rest); err != nil {
+					return err
+				}
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
+				printLocalFiles(l, local)
 				if len(res) == 0 {
-					l.OK("all mods are up to date", "")
+					printUpToDate(l, "all mods are up to date", local, args)
 					return
 				}
 				var items []out.Item
@@ -306,6 +321,36 @@ func (a *app) outdatedCmd() *cobra.Command {
 				l.Nudge("Move the lock to these versions", "shulker update")
 			})
 		},
+	}
+}
+
+// splitLocalFiles takes the local files out of the named entries, since no provider has a newer
+// version of one.
+func splitLocalFiles(m *manifest.Manifest, args []string) (local, rest []string) {
+	for _, arg := range args {
+		if m.IsLocalFile(arg) {
+			local = append(local, arg)
+			continue
+		}
+		rest = append(rest, arg)
+	}
+	return local, rest
+}
+
+func printLocalFiles(l *out.Lines, local []string) {
+	for _, key := range local {
+		l.Info(key + " is a local file; nothing to check")
+	}
+}
+
+// printUpToDate says the named entries are up to date, leaving out the local files, which have no
+// newer version to be behind.
+func printUpToDate(l *out.Lines, text string, local, named []string) {
+	switch {
+	case len(local) == 0:
+		l.OK(text, "")
+	case len(local) < len(named):
+		l.OK("the rest are up to date", "")
 	}
 }
 
@@ -385,10 +430,13 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 	l.Items(items...)
 }
 
-func unshippedWarnings(c *resolve.Changes, sides []string) []string {
+func unshippedWarnings(c *resolve.Changes, sides []string, mods map[string]lock.Mod, placements map[string]build.Placement) []string {
 	var warnings []string
 	for _, m := range c.Added {
-		if len(m.RequiredBy) > 0 || len(sides) == 0 || isSideDeclared(sides, m.Side) {
+		if _, isMod := mods[m.ID]; !isMod || len(m.RequiredBy) > 0 || len(sides) == 0 || isSideDeclared(sides, m.Side) {
+			continue
+		}
+		if place := placements[m.ID]; len(place.OS) > 0 || len(place.Feature) > 0 {
 			continue
 		}
 		warnings = append(warnings, fmt.Sprintf("%s is %s only, so no side of this project ships it; shulker set requires.%s.side both ships it anyway", m.ID, m.Side, m.ID))

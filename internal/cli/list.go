@@ -18,6 +18,7 @@ type listEntry struct {
 	Type       string              `json:"type"`
 	Listed     bool                `json:"listed"`
 	Version    string              `json:"version,omitempty"`
+	File       string              `json:"file,omitempty"`
 	Source     string              `json:"source,omitempty"`
 	Kind       pack.Kind           `json:"kind,omitempty"`
 	Ref        string              `json:"ref,omitempty"`
@@ -125,13 +126,16 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 		for _, key := range slices.Sorted(maps.Keys(keys)) {
 			entry, listed := mods[key]
 			e := listEntry{
-				Key: key, Type: manifest.TypeMod, Listed: listed, Side: entry.Side,
+				Key: key, Type: manifest.TypeMod, Listed: listed, File: entry.File, Side: entry.Side,
 				Channel: entry.Channel, Provider: entry.Provider, Pinned: entry.Pin != nil,
 				OS: entry.OS, Feature: entry.Feature,
 			}
 			if p.Lock != nil {
 				if m, ok := p.Lock.Mods[key]; ok {
 					e.Version = m.VersionNumber
+					if e.File == "" {
+						e.File = m.File
+					}
 					if e.Side == "" {
 						e.Side = m.Side
 					}
@@ -182,11 +186,14 @@ func packEntries(p *project.Project, kind string) []listEntry {
 	for _, key := range slices.Sorted(maps.Keys(keys)) {
 		entry, isListed := listed[key]
 		e := listEntry{
-			Key: key, Type: kind, Listed: isListed, Channel: entry.Channel,
+			Key: key, Type: kind, Listed: isListed, File: entry.File, Channel: entry.Channel,
 			Provider: entry.Provider, Pinned: entry.Pin != nil, OS: entry.OS, Feature: entry.Feature,
 		}
 		if lp, ok := locked[key]; ok {
 			e.Version = lp.VersionNumber
+			if e.File == "" {
+				e.File = lp.File
+			}
 			if e.Provider == "" {
 				e.Provider = lp.Provider
 			}
@@ -251,7 +258,11 @@ func listItem(l *out.Lines, e listEntry) out.Item {
 		return out.Item{Kind: out.Note, Name: e.Key, Text: l.T.Grey(e.Source), Aside: aside}
 	}
 	it := out.Item{Kind: out.Note, Name: e.Key, Version: e.Version}
-	if e.Version == "" {
+	switch {
+	case e.File != "":
+		it.Text = l.T.Grey(e.File)
+		it.Aside = append(it.Aside, "local file")
+	case e.Version == "":
 		it.Aside = append(it.Aside, "not locked")
 	}
 	if e.Side != "" && e.Side != "both" {

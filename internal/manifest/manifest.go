@@ -341,6 +341,13 @@ func (m *Manifest) ResourcePacks() map[string]Require { return m.byKind(TypeReso
 
 func (m *Manifest) Shaders() map[string]Require { return m.byKind(TypeShader) }
 
+// IsLocalFile reports whether key is a mod, resource pack or shader taken from a local file, which
+// has no provider to ask for a newer version.
+func (m *Manifest) IsLocalFile(key string) bool {
+	r, ok := m.Requires[key]
+	return ok && r.File != "" && r.Kind() != TypeModpack
+}
+
 // checkFileExtension holds a local file to the extension its kind is placed with, since the lock
 // records a mod as a .jar and a pack as a .zip.
 func checkFileExtension(key string, r Require) error {

@@ -247,7 +247,7 @@ shulker remove base --type modpack
 
 ### `shulker list`
 
-List every `requires` entry under a heading per type, with its locked version and where it comes from. Mods a modpack or another mod pulled in are listed too, with `from <modpack>` or `required by <mods>`. Alias: `ls`.
+List every `requires` entry under a heading per type, with its locked version and where it comes from. Mods a modpack or another mod pulled in are listed too, with `from <modpack>` or `required by <mods>`. A local `file` entry shows its path in place of a version, labelled `local file`, and its JSON entry carries `file` with no `version` or `provider`. Alias: `ls`.
 
 ```sh
 shulker list
@@ -270,7 +270,7 @@ shulker lock
 
 ### `shulker update`
 
-Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. In an instance (a project whose side builds into its own directory), `update` then builds that side in place, backing up its worlds first when the mods change; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
+Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. Local `file` entries have no newer version to move to: a bare `update` leaves them as they are, and naming one says it is a local file. In an instance (a project whose side builds into its own directory), `update` then builds that side in place, backing up its worlds first when the mods change; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
 
 ```sh
 shulker update
@@ -279,7 +279,7 @@ shulker update sodium iris
 
 ### `shulker outdated`
 
-Show mods with a newer compatible version without changing anything, like a dry run of `update`.
+Show mods with a newer compatible version without changing anything, like a dry run of `update`. Local `file` entries are skipped, and naming one says it is a local file rather than that it is up to date.
 
 ```sh
 shulker outdated
@@ -302,7 +302,7 @@ With `--json`, `data.suggestions` lists each one as `{ "mod", "kind", "on", "dec
 
 ### `shulker pin`
 
-Pin a mod to a provider version id. Without a version, pins it to the version already in the lock.
+Pin a mod to a provider version id. Without a version, pins it to the version already in the lock. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`.
 
 ```sh
 shulker pin iris k9RhZq2X
@@ -1690,6 +1690,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `loader-profile-invalid` | The loader profile shulker fetched isn't a version JSON with an id, so it can't be installed into the launcher. A row says what was wrong with it |
 | `loader-required` | `add` of a mod in a project without a loader, or `import curseforge` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
+| `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. While the cache still has them, a gone file only warns and builds from the cache |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
 | `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |

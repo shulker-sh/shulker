@@ -134,6 +134,9 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 
 // Pin holds a mod at version, the locked one when version is empty, and returns the version pinned.
 func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, error) {
+	if err := r.refuseLocalPin(id); err != nil {
+		return "", err
+	}
 	if _, err := r.directTargets([]string{id}); err != nil {
 		return "", err
 	}
@@ -148,6 +151,9 @@ func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, 
 
 // Unpin lets a pinned mod update again, and updates it.
 func (r *Resolver) Unpin(ctx context.Context, id string) error {
+	if err := r.refuseLocalPin(id); err != nil {
+		return err
+	}
 	if _, err := r.directTargets([]string{id}); err != nil {
 		return err
 	}
@@ -158,6 +164,13 @@ func (r *Resolver) Unpin(ctx context.Context, id string) error {
 	entry.Pin = nil
 	r.Manifest.Requires[id] = entry
 	return r.Update(ctx, []string{id})
+}
+
+func (r *Resolver) refuseLocalPin(id string) error {
+	if r.Manifest.IsLocalFile(id) {
+		return out.Errorf("local-file", "%s is a local file; there is no provider version to pin", id)
+	}
+	return nil
 }
 
 // relock resolves one direct mod again. prev is its entry before the relock, which a local file whose
