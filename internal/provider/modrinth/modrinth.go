@@ -168,7 +168,7 @@ func convert(v version) (provider.Version, error) {
 	found := false
 	for _, f := range v.Files {
 		if f.Primary || !found {
-			pv.File = provider.File{URL: f.URL, Filename: f.Filename, Sha512: f.Hashes["sha512"], Size: f.Size}
+			pv.File = provider.File{URL: f.URL, Filename: f.Filename, Sha512: f.Hashes["sha512"], Sha1: f.Hashes["sha1"], Size: f.Size}
 			found = true
 			if f.Primary {
 				break

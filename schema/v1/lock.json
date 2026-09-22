@@ -94,6 +94,7 @@
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "sha512": { "type": "string", "pattern": "^[0-9a-f]{128}$" },
+    "sha1": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "download": {
       "type": "object",
       "required": ["url", "sha512"],
@@ -295,6 +296,7 @@
           "description": "Provider file page for manual download. Present only when url is null."
         },
         "sha512": { "$ref": "#/$defs/sha512", "description": "Cache key and install verification hash." },
+        "sha1": { "$ref": "#/$defs/sha1", "description": "The provider's sha1 of the file, or one computed over its bytes when the provider gives none. A server pushes it to clients as resource-pack-sha1. Provider packs only." },
         "size": { "type": "integer", "minimum": 1, "description": "File size in bytes as the provider reports it, for the download bar; for a local file, its length, compared before rehashing it." },
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked. A listed entry whose manifest channel differs makes the lock out of date." },
         "modpack": { "$ref": "#/$defs/requireKey", "description": "Key in modpacks of the locked modpack this entry was copied from. Absent for the project's own entries." },
@@ -327,10 +329,10 @@
           "if": { "required": ["file"] },
           "then": {
             "required": ["size"],
-            "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["channel"] }] }
+            "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["project"] }, { "required": ["version"] }, { "required": ["versionNumber"] }, { "required": ["url"] }, { "required": ["page"] }, { "required": ["channel"] }, { "required": ["sha1"] }] }
           },
           "else": {
-            "required": ["provider", "project", "version", "versionNumber", "url", "channel"],
+            "required": ["provider", "project", "version", "versionNumber", "url", "sha1", "channel"],
             "if": { "properties": { "url": { "type": "null" } } },
             "then": { "required": ["page"] },
             "else": { "not": { "required": ["page"] } }

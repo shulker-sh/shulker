@@ -142,6 +142,7 @@ type Pack struct {
 	URL              *string `json:"url"`
 	Page             string  `json:"page,omitempty"`
 	Sha512           string  `json:"sha512"`
+	Sha1             string  `json:"sha1,omitempty"`
 	Size             int64   `json:"size,omitempty"`
 	Channel          string  `json:"channel,omitempty"`
 	Modpack          string  `json:"modpack,omitempty"`

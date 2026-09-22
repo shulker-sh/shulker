@@ -104,6 +104,7 @@
       "filename": "FreshAnimations_v1.9.4.zip",
       "url": "https://cdn.modrinth.com/data/50dA9Sha/versions/Vb7Kq2Xn/FreshAnimations_v1.9.4.zip",
       "sha512": "7d1ce446eb23c4baa67cd22fa44d8bb4645fefd12a38b6edbba16fcd00bb0a831315668e1826beacfab1b50ad9a77824a39b189b93e5b51f13c68fc31dc3dfbe",
+      "sha1": "5f0cbd1b8e6a3f2c4d7e9a1b3c5d7e9f0a2b4c6d",
       "size": 3874112
     }
   },
@@ -118,6 +119,7 @@
       "filename": "ComplementaryReimagined_r5.5.1.zip",
       "url": "https://cdn.modrinth.com/data/HVnmMxH1/versions/pcrMhvuU/ComplementaryReimagined_r5.5.1.zip",
       "sha512": "3e90731bbfb53275aadd8306b94e5a3dcfd97e95ce687bb6c54a744a2987885cb9b2863513391ef6ccabeea957b1084e07714d17979cd6ac89978dedde05e604",
+      "sha1": "b2d4f6a8c0e1d3f5a7b9c1d3e5f7a9b1c3d5e7f9",
       "size": 1858231,
       "loader": "iris"
     }

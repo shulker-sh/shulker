@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -281,6 +282,12 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 	if err != nil {
 		return err
 	}
+	sha1 := v.File.Sha1
+	if sha1 == "" {
+		if sha1, err = fsutil.SHA1(got.path); err != nil {
+			return err
+		}
+	}
 	locked := lock.Pack{
 		Provider:         p.Name(),
 		Project:          lockID(p.Name(), proj.ID),
@@ -291,6 +298,7 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 		URL:              got.url,
 		Page:             got.page,
 		Sha512:           got.sha512,
+		Sha1:             sha1,
 		Size:             v.File.Size,
 		Channel:          channelLabel(channel),
 	}

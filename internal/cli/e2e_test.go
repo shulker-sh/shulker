@@ -119,8 +119,10 @@ type harness struct {
 	cfHits         int
 	// modrinthPacks are the modpack projects the Modrinth fake knows, by project id.
 	modrinthPacks map[string]*modrinthPack
-	ctx           context.Context
-	msa           *fakeMSA
+	// modrinthNoSha1 has the Modrinth fake publish only a file's sha512.
+	modrinthNoSha1 bool
+	ctx            context.Context
+	msa            *fakeMSA
 	// exe stands in for the running binary, for the commands that move or remove it.
 	exe string
 	// watching counts the watchers a launch left running, so a test's directories outlive the runs
@@ -358,10 +360,14 @@ func newHarness(t *testing.T) *harness {
 		"HVnmMxH1":                 {"id": "HVnmMxH1", "slug": "complementary-reimagined", "title": "Complementary Reimagined", "client_side": "required", "server_side": "unsupported", "project_type": "shader"},
 	}
 	versionTagged := func(id, projectID, number, published string, jar fakeJar, deps []map[string]any, loaders []string) map[string]any {
+		hashes := map[string]string{"sha512": jar.sha512, "sha1": jar.sha1}
+		if h.modrinthNoSha1 {
+			delete(hashes, "sha1")
+		}
 		return map[string]any{
 			"id": id, "project_id": projectID, "version_number": number, "version_type": "release",
 			"date_published": published, "game_versions": []string{"26.2"}, "loaders": loaders,
-			"files":        []map[string]any{{"url": base + "/cdn/" + jar.filename, "filename": jar.filename, "primary": true, "hashes": map[string]string{"sha512": jar.sha512}, "size": len(jar.data)}},
+			"files":        []map[string]any{{"url": base + "/cdn/" + jar.filename, "filename": jar.filename, "primary": true, "hashes": hashes, "size": len(jar.data)}},
 			"dependencies": deps,
 		}
 	}
