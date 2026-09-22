@@ -28,17 +28,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install shulker
-        run: |
-          curl -fsSL https://shulker.sh/install.sh | SHULKER_VERSION=v0.0.1 sh -s -- --no-modify-path
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          echo "SHULKER_CACHE=$RUNNER_TEMP/shulker-cache" >> "$GITHUB_ENV"
-
-      - uses: actions/cache@v6
+      - id: shulker
+        uses: shulker-sh/setup-shulker@v1
         with:
-          path: ${{ runner.temp }}/shulker-cache
-          key: shulker-${{ runner.os }}-${{ hashFiles('shulker.lock') }}
-          restore-keys: shulker-${{ runner.os }}-
+          version: v0.0.1
 
       - name: Export
         run: |
@@ -65,13 +58,25 @@ git push origin v1.2.0
 
 ## Install
 
-`SHULKER_VERSION` pins the release the workflow installs, so a new Shulker release never changes your builds until you bump it. The installer puts `shulker` in `~/.local/bin`, but its shell profile edit doesn't reach later steps, so the workflow adds the directory to `$GITHUB_PATH` itself and passes `--no-modify-path`.
+[`shulker-sh/setup-shulker`](https://github.com/shulker-sh/setup-shulker) installs Shulker on Linux, macOS and Windows runners and puts it on the `PATH` for later steps. `version` pins the release it installs, so a new Shulker release never changes your builds until you bump it. Leave it out to install the latest release. The action checks each download against the release's checksums and its build provenance, and fails the step if either doesn't match.
 
 ## Cache
 
-Export reads every locked file from Shulker's cache, and downloads the ones a fresh checkout is missing. `actions/cache` keeps that cache between runs, keyed on `shulker.lock`: while the lock is unchanged the export downloads nothing, and after a change it starts from the previous cache and downloads only what's new.
+Export reads every locked file from Shulker's cache, and downloads the ones a fresh checkout is missing. The action keeps that cache between runs, keyed on `shulker.lock`: while the lock is unchanged the export downloads nothing, and after a change it starts from the previous cache and downloads only what's new. It then prunes the files the new lock no longer needs, so the cache doesn't grow with every change.
 
-`SHULKER_CACHE` moves the cache to a path that is the same on every runner OS. The cache is optional: without it, every run downloads the pack's files again.
+A pack that isn't at the root of its repository names its lock with `lock-files`, one path per line. A repository holding several packs lists each one's lock. The cache is then keyed on all of them, and not pruned:
+
+```yaml
+      - id: shulker
+        uses: shulker-sh/setup-shulker@v1
+        with:
+          version: v0.0.1
+          lock-files: |
+            packs/survival/shulker.lock
+            packs/creative/shulker.lock
+```
+
+Set `prune: false` to keep every file a restored cache holds.
 
 ## Export
 
@@ -83,7 +88,7 @@ Export never relocks. When `shulker.lock` doesn't match `shulker.json`, it fails
 
 `export curseforge` refers to each file by its CurseForge file ID. A file locked from Modrinth or anywhere else is looked up on CurseForge by its fingerprint, and one that isn't there fails the export. Pass `--bundle` to put those files inside the archive instead; the CurseForge app warns about them on import. `export mrpack --bundle` does the same for files Modrinth launchers won't download.
 
-The lookup needs a CurseForge API key. Release binaries, which `install.sh` installs, carry one. A build from `go install` has none, so set `SHULKER_CURSEFORGE_KEY` from a repository secret:
+The lookup needs a CurseForge API key. Release binaries, which the action installs, carry one. A build from `go install` has none, so set `SHULKER_CURSEFORGE_KEY` from a repository secret:
 
 ```yaml
       - name: Export
@@ -102,15 +107,12 @@ Shulker doesn't write a changelog for a pack. The workflow lists the commit subj
 
 ## Publish to Modrinth and CurseForge
 
-[mc-publish](https://github.com/Kir-Antipov/mc-publish) uploads the archives to Modrinth and CurseForge. It can't read a modpack's Minecraft version or loader, so read them from the lock with [`shulker get --locked`](/docs/cli#shulker-get). `shulker.json` may hold a range such as `*`, and the lock holds the exact version. Add these steps after the release notes:
+[mc-publish](https://github.com/Kir-Antipov/mc-publish) uploads the archives to Modrinth and CurseForge. It can't read a modpack's Minecraft version or loader, so pass it the action's `minecraft-version` and `loader` outputs. The action reads them from the lock, like [`shulker get --locked`](/docs/cli#shulker-get): `shulker.json` may hold a range such as `*`, and the lock holds the exact version. With several lock files, the action leaves these outputs empty, so read each pack's with `shulker get --locked` instead. Add these steps after the release notes:
 
 ```yaml
-      - name: Pack versions
+      - name: Pack version
         id: pack
-        run: |
-          echo "minecraft=$(shulker get --locked minecraft)" >> "$GITHUB_OUTPUT"
-          echo "loader=$(shulker get --locked loader.type)" >> "$GITHUB_OUTPUT"
-          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - uses: Kir-Antipov/mc-publish@v3.3
         with:
@@ -122,8 +124,8 @@ Shulker doesn't write a changelog for a pack. The workflow lists the commit subj
           curseforge-files: build/*.zip
           version: ${{ steps.pack.outputs.version }}
           changelog-file: notes.md
-          loaders: ${{ steps.pack.outputs.loader }}
-          game-versions: ${{ steps.pack.outputs.minecraft }}
+          loaders: ${{ steps.shulker.outputs.loader }}
+          game-versions: ${{ steps.shulker.outputs.minecraft-version }}
 ```
 
 The IDs are your project's on each site, and the tokens are your own upload tokens, stored as repository secrets. The CurseForge upload token is not the API key `export curseforge` uses.
