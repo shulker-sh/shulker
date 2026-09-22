@@ -68,6 +68,9 @@ type State struct {
 	Files         map[string]string            `json:"files"`
 	Values        map[string]map[string]string `json:"managedValues,omitempty"`
 	Links         []string                     `json:"links,omitempty"`
+	// Packs is the file name each resource pack was placed under, so a renamed
+	// pack's entry in the enabled list can follow it.
+	Packs map[string]string `json:"packs,omitempty"`
 	// InstalledLoader is the loader its own installer set up in the dir; the installer's files aren't tracked.
 	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
 }
@@ -265,7 +268,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	if stateErr != nil {
 		report.Warnings = append(report.Warnings, stateErr.Error())
 	}
-	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader}
+	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, Packs: b.placedPackNames(desired)}
 	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
 		return nil, err

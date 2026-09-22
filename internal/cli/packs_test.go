@@ -12,12 +12,14 @@ import (
 
 type packLock struct {
 	ResourcePacks map[string]struct {
-		Filename string `json:"filename"`
-		Channel  string `json:"channel"`
+		Filename         string `json:"filename"`
+		ProviderFilename string `json:"providerFilename"`
+		Channel          string `json:"channel"`
 	} `json:"resourcepacks"`
 	Shaders map[string]struct {
-		Filename string `json:"filename"`
-		Loader   string `json:"loader"`
+		Filename         string `json:"filename"`
+		ProviderFilename string `json:"providerFilename"`
+		Loader           string `json:"loader"`
 	} `json:"shaders"`
 }
 
@@ -35,10 +37,10 @@ func TestResourcePacksAndShaders(t *testing.T) {
 
 	var l packLock
 	h.readJSON(t, "shulker.lock", &l)
-	if got := l.ResourcePacks["fresh-animations"]; got.Filename != "FreshAnimations_v1.9.4.zip" || got.Channel != "release" {
+	if got := l.ResourcePacks["fresh-animations"]; got.Filename != "fresh-animations.zip" || got.ProviderFilename != "FreshAnimations_v1.9.4.zip" || got.Channel != "release" {
 		t.Fatalf("locked resource pack: %+v", l.ResourcePacks)
 	}
-	if got := l.Shaders["complementary-reimagined"]; got.Filename != "ComplementaryReimagined_r5.5.1.zip" || got.Loader != "iris" {
+	if got := l.Shaders["complementary-reimagined"]; got.Filename != "complementary-reimagined.zip" || got.ProviderFilename != "ComplementaryReimagined_r5.5.1.zip" || got.Loader != "iris" {
 		t.Fatalf("locked shader: %+v", l.Shaders)
 	}
 	var manifest struct {
@@ -96,6 +98,75 @@ func TestResourcePacksAndShaders(t *testing.T) {
 	}
 	if _, kept := after.Shaders["complementary-reimagined"]; !kept {
 		t.Fatalf("removing a resource pack dropped the shader: %+v", after.Shaders)
+	}
+}
+
+func TestPackFilename(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fresh-animations")
+	h.mustRun(t, "shader", "add", "complementary-reimagined")
+	h.mustRun(t, "install")
+	options := filepath.Join(h.dir, "build", "client", "options.txt")
+	if err := os.WriteFile(options, []byte("resourcePacks:[\"vanilla\",\"file/fresh-animations.zip\",\"file/other.zip\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	h.editManifest(t, func(m map[string]any) {
+		requires := m["requires"].(map[string]any)
+		requires["fresh-animations"].(map[string]any)["filename"] = "Fresh Animations.zip"
+		requires["complementary-reimagined"].(map[string]any)["filename"] = "Complementary.zip"
+	})
+	h.mustRun(t, "lock")
+	var l packLock
+	h.readJSON(t, "shulker.lock", &l)
+	if got := l.ResourcePacks["fresh-animations"]; got.Filename != "Fresh Animations.zip" || got.ProviderFilename != "FreshAnimations_v1.9.4.zip" {
+		t.Fatalf("locked resource pack: %+v", got)
+	}
+	h.mustRun(t, "build")
+
+	if readBuilt(t, h, "resourcepacks/Fresh Animations.zip") == "" {
+		t.Fatal("the pack was not placed under its filename")
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "resourcepacks", "fresh-animations.zip")); !os.IsNotExist(err) {
+		t.Fatalf("the pack's old placement is still there: %v", err)
+	}
+	// The renamed entry keeps its place in the player's list, which is its priority.
+	if got := readBuilt(t, h, "options.txt"); !strings.Contains(got, `resourcePacks:["vanilla","file/Fresh Animations.zip","file/other.zip"]`) {
+		t.Fatalf("options.txt: %q", got)
+	}
+	if got := readBuilt(t, h, "config/iris.properties"); !strings.Contains(got, "shaderPack=Complementary.zip") {
+		t.Fatalf("iris.properties: %q", got)
+	}
+}
+
+func TestPackFilenameRefused(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fresh-animations")
+	h.mustRun(t, "shader", "add", "complementary-reimagined", "--as", "fresh")
+
+	for _, name := range []string{"packs/Fresh.zip", "Fresh.jar"} {
+		h.editManifest(t, func(m map[string]any) {
+			m["requires"].(map[string]any)["fresh-animations"].(map[string]any)["filename"] = name
+		})
+		if code, _, stderr := h.run(t, "lock"); code == 0 || !strings.Contains(stderr, "manifest-invalid") {
+			t.Fatalf("filename %q: exit %d: %s", name, code, stderr)
+		}
+	}
+
+	// A shader in shaderpacks/ can't clash with a resource pack, but two names in one folder can, whatever their case.
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"].(map[string]any)["fresh-animations"].(map[string]any)["filename"] = "fresh.zip"
+	})
+	h.mustRun(t, "lock")
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"].(map[string]any)["fresh-animations"].(map[string]any)["filename"] = "Taken.zip"
+		m["requires"].(map[string]any)["taken"] = map[string]any{"type": "resourcepack", "file": "files/taken.zip"}
+	})
+	writeProjectFile(t, h, "files/taken.zip", []byte("taken"))
+	if code, _, stderr := h.run(t, "lock"); code == 0 || !strings.Contains(stderr, "pack-filename-taken") {
+		t.Fatalf("exit %d: %s", code, stderr)
 	}
 }
 

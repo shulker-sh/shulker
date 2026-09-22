@@ -43,7 +43,7 @@ A modpack is another shulker project whose mods and overrides merge into this on
 
 Resource packs and shaders sit in `requires` beside your mods, and the provider's own project type decides which is which, so `shulker add fresh-animations` needs no `--type`.
 
-Each is placed under its `requires` key — `resourcepacks/<key>.zip` and `shaderpacks/<key>.zip` — rather than the provider's file name, which changes with every version. Minecraft and Iris both enable packs by literal file name, so a stable name is what keeps a pack you turned on from quietly switching off the next time it updates.
+Each is placed under its `requires` key — `resourcepacks/<key>.zip` and `shaderpacks/<key>.zip` — rather than the provider's file name, which changes with every version. Minecraft and Iris both enable packs by literal file name, so a stable name is what keeps a pack you turned on from quietly switching off the next time it updates. An entry's `filename` places it under a name of your own instead, such as the `Chat Reporting Helper.zip` players of another modpack already have enabled; change it later and the build moves the pack's entry in your enabled list along with it.
 
 A shader is enabled through its shader mod's own config, `config/iris.properties`, or `config/oculus.properties` on Forge. Shulker writes only `shaderPack` and `enableShaders` there, so the rest of your shader settings survive a rebuild. A shader that ships vanilla core shaders needs no shader mod at all: it goes in `resourcepacks/` and is enabled like a resource pack.
 

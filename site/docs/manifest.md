@@ -173,6 +173,7 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `autoUpdate` | `boolean` | Whether sync refreshes this modpack from its source, or re-reads its archive when the archive's bytes change. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless. |
 | `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock, and always for an archive, which pins exact files; a source without a lock is always resolved from its manifest. |
 | `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. On a modpack, a .mrpack archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date. |
+| `filename` | `string` | Resource packs and shaders only: the file name the pack is placed under, in place of &lt;key&gt;.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case.<br>pattern `^[^/\\]+\.zip$`, min length 1 |
 | `project` | [`projectId`](#projectid) | Written by add when the provider slug differs from the mod id or the provider is CurseForge. |
 | `pin` | [`versionId`](#versionid) | Pin to one provider version. update skips pinned mods. |
 | `channel` | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted. A channel admits itself and anything more stable.<br>default `"release"` |
@@ -189,6 +190,8 @@ When `source` is set, `type` must be `"modpack"`, and `file`, `project`, `pin`, 
 When `file` is set, `project`, `pin`, `channel` and `provider` are not allowed.
 
 When `file` is set and `type` is `"modpack"`, `side`, `os` and `feature` are not allowed.
+
+When `filename` is set, `type` is required, and `type` must be `"resourcepack"` \| `"shader"`.
 
 When `autoUpdate` is set, `source` or `file` is required.
 

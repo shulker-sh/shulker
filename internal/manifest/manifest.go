@@ -204,6 +204,7 @@ type Require struct {
 	AutoUpdate *bool      `json:"autoUpdate,omitempty"`
 	Locked     *bool      `json:"locked,omitempty"`
 	File       string     `json:"file,omitempty"`
+	Filename   string     `json:"filename,omitempty"`
 	Project    any        `json:"project,omitempty"`
 	Pin        any        `json:"pin,omitempty"`
 	Channel    string     `json:"channel,omitempty"`
@@ -342,6 +343,15 @@ func (m *Manifest) Mods() map[string]Require { return m.byKind(TypeMod) }
 func (m *Manifest) ResourcePacks() map[string]Require { return m.byKind(TypeResourcePack) }
 
 func (m *Manifest) Shaders() map[string]Require { return m.byKind(TypeShader) }
+
+// PackFilename is the name a resource pack or shader is placed under: the
+// entry's own filename, or its key, which stays put when the pack updates.
+func PackFilename(key string, e Require) string {
+	if e.Filename != "" {
+		return e.Filename
+	}
+	return key + ".zip"
+}
 
 // IsLocalFile reports whether key is a mod, resource pack or shader taken from a local file, which
 // has no provider to ask for a newer version.

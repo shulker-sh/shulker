@@ -260,6 +260,12 @@
           "$ref": "#/$defs/relativePath",
           "description": "A local jar or zip that is on no provider, placed like any other entry of its kind. On a modpack, a .mrpack archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date."
         },
+        "filename": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/\\\\]+\\.zip$",
+          "description": "Resource packs and shaders only: the file name the pack is placed under, in place of <key>.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case."
+        },
         "project": {
           "$ref": "#/$defs/projectId",
           "description": "Written by add when the provider slug differs from the mod id or the provider is CurseForge."
@@ -333,6 +339,10 @@
               "anyOf": [{ "required": ["side"] }, { "required": ["os"] }, { "required": ["feature"] }]
             }
           }
+        },
+        {
+          "if": { "required": ["filename"] },
+          "then": { "required": ["type"], "properties": { "type": { "enum": ["resourcepack", "shader"] } } }
         },
         {
           "if": { "required": ["autoUpdate"] },

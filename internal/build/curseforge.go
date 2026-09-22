@@ -203,14 +203,13 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 // the names the launcher saves file-ID packs under, which are CurseForge's own
 // file names rather than the <key>.zip a build places.
 func enableByCurseForgeNames(t *mrpackSide, fileNames map[string]string) {
-	var pairs []string
+	renamed := map[string]string{}
 	for placed, name := range fileNames {
 		if base, ok := strings.CutPrefix(placed, "resourcepacks/"); ok && name != "" {
-			pairs = append(pairs, `"file/`+base+`"`, `"file/`+name+`"`)
+			renamed[base] = name
 		}
 	}
-	// One pass, so a CurseForge name that is another pack's <key>.zip isn't renamed twice.
-	rewriteProperty(t.files, OptionsFile, resourcePacksKey+":", strings.NewReplacer(pairs...).Replace)
+	rewriteProperty(t.files, OptionsFile, resourcePacksKey+":", func(list string) string { return renamePacks(list, renamed) })
 	for _, config := range shaderConfigs {
 		rewriteProperty(t.files, config, "shaderPack=", func(v string) string {
 			if name := fileNames["shaderpacks/"+v]; name != "" {
@@ -266,7 +265,7 @@ func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 		if !t.packs[ref.key] {
 			continue
 		}
-		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.Filename})
+		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.ProviderFilename})
 	}
 	return entries
 }

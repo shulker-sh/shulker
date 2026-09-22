@@ -241,7 +241,12 @@
           "type": "string",
           "minLength": 1,
           "pattern": "^[^/\\\\]+\\.zip$",
-          "description": "The provider's own file name, or a local file's. The build places the file as <key>.zip instead, so a pack enabled in game stays enabled when it updates."
+          "description": "The name the build places the file under: the manifest entry's filename, or <key>.zip. Either way it stays put across updates, so a pack enabled in game stays enabled."
+        },
+        "providerFilename": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The provider's own name for the file. The CurseForge app saves a pack under it, so a CurseForge export enables the pack by it."
         },
         "url": {
           "type": ["string", "null"],

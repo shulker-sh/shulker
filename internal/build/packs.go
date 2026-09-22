@@ -33,7 +33,7 @@ func (b *Builder) collectPacks(cond conditions, desired map[string]source, repor
 			if !b.Cache.Has(p.Sha512) {
 				return notInstalled(key)
 			}
-			desired[packPath(kind, key, p)] = source{sha512: p.Sha512}
+			desired[p.Path(kind)] = source{sha512: p.Sha512}
 		}
 	}
 	return nil
@@ -56,20 +56,10 @@ func (b *Builder) packRefs() []packRef {
 			locked = b.Lock.Shaders
 		}
 		for _, key := range sortedPacks(locked) {
-			refs = append(refs, packRef{key: key, kind: kind, path: packPath(kind, key, locked[key]), pack: locked[key]})
+			refs = append(refs, packRef{key: key, kind: kind, path: locked[key].Path(kind), pack: locked[key]})
 		}
 	}
 	return refs
-}
-
-// packPath is where a pack lands. Shaders go to shaderpacks/, except the vanilla
-// ones: those are resource packs carrying core shaders, and no shader mod loads
-// them.
-func packPath(kind, key string, p lock.Pack) string {
-	if kind == manifest.TypeShader && p.Loader != "vanilla" {
-		return "shaderpacks/" + key + ".zip"
-	}
-	return "resourcepacks/" + key + ".zip"
 }
 
 // shaderConfigs are the config files each shader loader enables its pack in.
@@ -86,10 +76,10 @@ func (b *Builder) enableShader(desired map[string]source) {
 		if !ok {
 			continue
 		}
-		if _, placed := desired[packPath(manifest.TypeShader, key, p)]; !placed {
+		if _, placed := desired[p.Path(manifest.TypeShader)]; !placed {
 			continue
 		}
-		props := properties{"shaderPack": key + ".zip", "enableShaders": "true"}
+		props := properties{"shaderPack": p.Filename, "enableShaders": "true"}
 		desired[file] = source{owned: propsFile{props: props, sep: "="}}
 		return
 	}
@@ -105,13 +95,31 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		return
 	}
 	dir := b.Target(side, opts.Dir)
-	was, recorded := LoadState(dir).Values[OptionsFile][resourcePacksKey]
+	state := LoadState(dir)
+	was, recorded := state.Values[OptionsFile][resourcePacksKey]
 	switch {
 	case opts.Force:
 	case recorded:
 		// Keep desiring what was written, so the merge neither drops the key nor
 		// overrules a list the player has since changed in game.
 		options[resourcePacksKey] = was
+		renamed := map[string]string{}
+		for key, name := range b.placedPackNames(desired) {
+			if old := state.Packs[key]; old != "" && old != name {
+				renamed[old] = name
+			}
+		}
+		if len(renamed) == 0 {
+			return
+		}
+		data, _ := os.ReadFile(filepath.Join(dir, OptionsFile))
+		live, present := parseProperties(data)[resourcePacksKey]
+		if !present {
+			live = was
+		}
+		if swapped := renamePacks(live, renamed); swapped != live {
+			options[resourcePacksKey] = swapped
+		}
 		return
 	default:
 		data, _ := os.ReadFile(filepath.Join(dir, OptionsFile))
@@ -150,6 +158,31 @@ func placedPacks(desired map[string]source) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// placedPackNames maps each resource pack this build places to its file name.
+func (b *Builder) placedPackNames(desired map[string]source) map[string]string {
+	names := map[string]string{}
+	for _, ref := range b.packRefs() {
+		if _, placed := desired[ref.path]; !placed {
+			continue
+		}
+		if name, ok := strings.CutPrefix(ref.path, "resourcepacks/"); ok {
+			names[ref.key] = name
+		}
+	}
+	return names
+}
+
+// renamePacks swaps each old file name in an enabled list for its new one, in
+// place so its priority holds. It is one pass, so a new name that is another
+// pack's old one isn't renamed twice.
+func renamePacks(list string, names map[string]string) string {
+	var pairs []string
+	for from, to := range names {
+		pairs = append(pairs, `"file/`+from+`"`, `"file/`+to+`"`)
+	}
+	return strings.NewReplacer(pairs...).Replace(list)
 }
 
 // packList is options.txt's own syntax: a json array, vanilla first, each pack

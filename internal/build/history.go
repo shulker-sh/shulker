@@ -176,15 +176,11 @@ func cachedPlacements(lk *lock.Lock) map[string]bool {
 	for _, m := range lk.Mods {
 		placed["mods/"+m.Filename] = true
 	}
-	for key := range lk.ResourcePacks {
-		placed["resourcepacks/"+key+".zip"] = true
+	for _, p := range lk.ResourcePacks {
+		placed[p.Path(manifest.TypeResourcePack)] = true
 	}
-	for key, s := range lk.Shaders {
-		if s.Loader == "vanilla" {
-			placed["resourcepacks/"+key+".zip"] = true
-			continue
-		}
-		placed["shaderpacks/"+key+".zip"] = true
+	for _, s := range lk.Shaders {
+		placed[s.Path(manifest.TypeShader)] = true
 	}
 	return placed
 }

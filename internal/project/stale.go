@@ -160,10 +160,13 @@ func ZipDifferences(dir string, m *manifest.Manifest, l *lock.Lock) []string {
 // ZipEntryDifferences compares one listed resource pack or shader with what the
 // lock records for it.
 func ZipEntryDifferences(dir, key string, e manifest.Require, lp lock.Pack) []string {
-	if e.File != "" || lp.File != "" {
-		return FileDifferences(dir, key, e.File, lp.File, lp.Size, lp.Sha512)
-	}
 	var diffs []string
+	if name := manifest.PackFilename(key, e); name != lp.Filename {
+		diffs = append(diffs, fmt.Sprintf("%s: filename %s -> %s", key, lp.Filename, name))
+	}
+	if e.File != "" || lp.File != "" {
+		return append(diffs, FileDifferences(dir, key, e.File, lp.File, lp.Size, lp.Sha512)...)
+	}
 	channel := e.Channel
 	if channel == "" {
 		channel = "release"

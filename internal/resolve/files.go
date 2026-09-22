@@ -271,7 +271,7 @@ func (r *Resolver) lockFilePack(key, kind string, entry manifest.Require) error 
 	}
 	p := lock.Pack{
 		File:     entry.File,
-		Filename: filepath.Base(filepath.FromSlash(entry.File)),
+		Filename: manifest.PackFilename(key, entry),
 		Sha512:   got.sha512,
 		Size:     got.size,
 	}

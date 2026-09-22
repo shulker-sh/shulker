@@ -40,6 +40,9 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 	if err := r.reconcilePacks(ctx); err != nil {
 		return nil, err
 	}
+	if err := r.checkPackFilenames(); err != nil {
+		return nil, err
+	}
 	if err := r.checkLocalFiles(); err != nil {
 		return nil, err
 	}

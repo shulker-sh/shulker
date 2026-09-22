@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -220,6 +221,11 @@ func (r *Resolver) reconcilePacks(ctx context.Context) error {
 		}
 		for _, key := range sortedKeys(listed) {
 			locked, ok := section[key]
+			if ok {
+				// A new name needs no new version, so it is taken without resolving again.
+				locked.Filename = manifest.PackFilename(key, listed[key])
+				section[key] = locked
+			}
 			if ok && len(project.ZipEntryDifferences(r.Dir, key, listed[key], locked)) == 0 {
 				continue
 			}
@@ -252,6 +258,23 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 	return r.lockPack(ctx, p, proj, key, kind, pin, entry.Channel)
 }
 
+// checkPackFilenames refuses two packs placed under one name, compared without
+// case since macOS and Windows see one file there.
+func (r *Resolver) checkPackFilenames() error {
+	placed := map[string]string{}
+	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
+		section := r.packSection(kind)
+		for _, key := range sortedKeys(section) {
+			path := section[key].Path(kind)
+			if other, ok := placed[strings.ToLower(path)]; ok {
+				return out.Errorf("pack-filename-taken", "%s and %s are both placed as %s", other, key, path)
+			}
+			placed[strings.ToLower(path)] = key
+		}
+	}
+	return nil
+}
+
 // lockPack picks the resource pack or shader's version, fetches it into the cache and records it in
 // the lock under key.
 func (r *Resolver) lockPack(ctx context.Context, p provider.Provider, proj *provider.Project, key, kind, pin, channel string) error {
@@ -269,16 +292,17 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 		return err
 	}
 	locked := lock.Pack{
-		Provider:      p.Name(),
-		Project:       lockID(p.Name(), proj.ID),
-		Version:       lockID(p.Name(), v.ID),
-		VersionNumber: v.Number,
-		Filename:      v.File.Filename,
-		URL:           got.url,
-		Page:          got.page,
-		Sha512:        got.sha512,
-		Size:          v.File.Size,
-		Channel:       channelLabel(channel),
+		Provider:         p.Name(),
+		Project:          lockID(p.Name(), proj.ID),
+		Version:          lockID(p.Name(), v.ID),
+		VersionNumber:    v.Number,
+		Filename:         manifest.PackFilename(key, r.Manifest.Requires[key]),
+		ProviderFilename: v.File.Filename,
+		URL:              got.url,
+		Page:             got.page,
+		Sha512:           got.sha512,
+		Size:             v.File.Size,
+		Channel:          channelLabel(channel),
 	}
 	if kind == manifest.TypeShader {
 		locked.Loader = r.shaderLoader(v)
@@ -382,7 +406,7 @@ func (r *Resolver) lockFiles() []downloadable {
 	for _, section := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
 		for _, key := range sortedKeys(section) {
 			p := section[key]
-			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.Filename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size})
+			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size})
 		}
 	}
 	return files

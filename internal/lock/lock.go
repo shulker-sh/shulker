@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/schema"
 )
 
@@ -117,21 +118,34 @@ type Aliases struct {
 // Pack is a resource pack or shader: a zip placed by its requires key, with no
 // jar metadata to read and nothing depending on it.
 type Pack struct {
-	File          string  `json:"file,omitempty"`
-	Provider      string  `json:"provider,omitempty"`
-	Project       any     `json:"project,omitempty"`
-	Version       any     `json:"version,omitempty"`
-	VersionNumber string  `json:"versionNumber,omitempty"`
-	Filename      string  `json:"filename"`
-	URL           *string `json:"url"`
-	Page          string  `json:"page,omitempty"`
-	Sha512        string  `json:"sha512"`
-	Size          int64   `json:"size,omitempty"`
-	Channel       string  `json:"channel,omitempty"`
-	Modpack       string  `json:"modpack,omitempty"`
+	File          string `json:"file,omitempty"`
+	Provider      string `json:"provider,omitempty"`
+	Project       any    `json:"project,omitempty"`
+	Version       any    `json:"version,omitempty"`
+	VersionNumber string `json:"versionNumber,omitempty"`
+	// Filename is where the build places the pack; ProviderFilename is the
+	// provider's own name for it.
+	Filename         string  `json:"filename"`
+	ProviderFilename string  `json:"providerFilename,omitempty"`
+	URL              *string `json:"url"`
+	Page             string  `json:"page,omitempty"`
+	Sha512           string  `json:"sha512"`
+	Size             int64   `json:"size,omitempty"`
+	Channel          string  `json:"channel,omitempty"`
+	Modpack          string  `json:"modpack,omitempty"`
 	// Loader is the shader loader the file targets. A vanilla shader needs no
 	// shader mod and is placed and enabled as a resource pack.
 	Loader string `json:"loader,omitempty"`
+}
+
+// Path is where the build places the pack. Shaders go to shaderpacks/, except the
+// vanilla ones: those are resource packs carrying core shaders, and no shader mod
+// loads them.
+func (p Pack) Path(kind string) string {
+	if kind == manifest.TypeShader && p.Loader != "vanilla" {
+		return "shaderpacks/" + p.Filename
+	}
+	return "resourcepacks/" + p.Filename
 }
 
 func (m Mod) MarshalJSON() ([]byte, error) {

@@ -1396,7 +1396,7 @@ shulker modpack remove base-pack
 
 ### `shulker resourcepack add|remove|list`
 
-`shulker resourcepack add fresh-animations` is `shulker add fresh-animations --type resourcepack`, and the same for `remove` and `list`. The provider's own project type decides what an entry is, so the plain `shulker add` usually needs no `--type` at all. A resource pack is placed as `resourcepacks/<key>.zip`, named by its `requires` key rather than the provider's file name, so one you enabled in game stays enabled when it updates. Flags: `--channel`, `--pin`, `--provider`, `--as`.
+`shulker resourcepack add fresh-animations` is `shulker add fresh-animations --type resourcepack`, and the same for `remove` and `list`. The provider's own project type decides what an entry is, so the plain `shulker add` usually needs no `--type` at all. A resource pack is placed as `resourcepacks/<key>.zip`, named by its `requires` key rather than the provider's file name, so one you enabled in game stays enabled when it updates. The entry's `filename` sets another name. Flags: `--channel`, `--pin`, `--provider`, `--as`.
 
 ```sh
 shulker resourcepack add fresh-animations
@@ -1405,7 +1405,7 @@ shulker resourcepack list
 
 ### `shulker shader add|remove|list`
 
-`shulker shader add complementary-reimagined` is `shulker add complementary-reimagined --type shader`, and the same for `remove` and `list`. A shader is placed as `shaderpacks/<key>.zip` and enabled through its shader mod's own config: `config/iris.properties`, or `config/oculus.properties` on Forge. One that ships vanilla core shaders needs no shader mod at all, so it is placed in `resourcepacks/` and enabled like a resource pack. Flags: `--channel`, `--pin`, `--provider`, `--as`.
+`shulker shader add complementary-reimagined` is `shulker add complementary-reimagined --type shader`, and the same for `remove` and `list`. A shader is placed as `shaderpacks/<key>.zip`, or under its entry's `filename`, and enabled through its shader mod's own config: `config/iris.properties`, or `config/oculus.properties` on Forge. One that ships vanilla core shaders needs no shader mod at all, so it is placed in `resourcepacks/` and enabled like a resource pack. Flags: `--channel`, `--pin`, `--provider`, `--as`.
 
 ```sh
 shulker shader add complementary-reimagined
@@ -1756,6 +1756,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-unlocked` | A modpack has no commit in the lock; run `shulker update` |
 | `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
+| `pack-filename-taken` | Two resource packs or shaders would be placed under one file name in the same folder, compared without case. Give one a different `filename` |
 | `path-invalid` | `shulker.json`, `config.json` or an instance's settings have no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get`, `config get` or `instance get` names a field that isn't set |
 | `pin-mismatch` | The pinned version belongs to a different project |
