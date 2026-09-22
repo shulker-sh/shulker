@@ -5,6 +5,7 @@
   "description": "Sets every property the manifest schema allows.",
   "authors": ["Someone"],
   "license": "MIT",
+  "icon": "assets/icon.png",
   "links": {
     "website": "https://example.com",
     "chat": "https://example.com/chat"

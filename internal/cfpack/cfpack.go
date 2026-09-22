@@ -50,6 +50,7 @@ type File struct {
 	ProjectID int  `json:"projectID"`
 	FileID    int  `json:"fileID"`
 	Required  bool `json:"required"`
+	IsLocked  bool `json:"isLocked"`
 }
 
 type Archive struct {

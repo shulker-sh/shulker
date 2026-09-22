@@ -148,7 +148,7 @@ func TestExportMrpack(t *testing.T) {
 	if !strings.Contains(entries["server-overrides/server.properties"], "motd=Demo") || !strings.Contains(entries["client-overrides/options.txt"], "tutorialStep:") {
 		t.Fatalf("first-class files: %v", keys(entries))
 	}
-	if _, ok := entries["client-overrides/mods/shulker-pack.jar"]; !ok || len(entries) != 10 {
+	if _, ok := entries["client-overrides/mods/shulker-pack.jar"]; !ok || len(entries) != 11 {
 		t.Fatalf("entries: %v", keys(entries))
 	}
 	if !strings.Contains(entries["shulker.json"], `"sodium"`) || !strings.Contains(entries["shulker.lock"], `"sodium"`) {
@@ -172,7 +172,7 @@ func TestExportMrpack(t *testing.T) {
 		t.Fatalf("a partial export names its side: %s", stdout)
 	}
 	index, entries = readMrpack(t, filepath.Join(h.dir, "out", "server.mrpack"))
-	if index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename || entries["overrides/config/shared.toml"] != "server\n" || entries["overrides/eula.txt"] == "" || len(entries) != 6 {
+	if index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename || entries["overrides/config/shared.toml"] != "server\n" || entries["overrides/eula.txt"] == "" || len(entries) != 7 {
 		t.Fatalf("server export: files=%+v entries=%v", index.Files, keys(entries))
 	}
 }

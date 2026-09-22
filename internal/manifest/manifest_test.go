@@ -321,6 +321,9 @@ func TestParseRejects(t *testing.T) {
 		`"requires":{"iris":{"feature":"shaders"}},"client":{}`,
 		`"features":{"shaders":{}},"requires":{"iris":{"feature":"!shadders"}},"client":{}`,
 		`"requires":{}`,
+		`"requires":{},"client":{},"icon":"../icon.png"`,
+		`"requires":{},"client":{},"icon":"/tmp/icon.png"`,
+		`"requires":{},"client":{},"icon":"icon.jpg"`,
 	} {
 		if _, err := Parse(doc(rest)); err == nil {
 			t.Errorf("%s should be invalid", rest)
@@ -334,6 +337,9 @@ func TestParseRejects(t *testing.T) {
 		t.Fatalf("no side: %v", err)
 	}
 	if _, err := Parse(doc(`"features":{"shaders":{}},"requires":{"iris":{"feature":"!shaders"}},"client":{"build":"."},"server":{"build":"build/server"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Parse(doc(`"requires":{},"client":{},"icon":"assets/Icon.PNG"`)); err != nil {
 		t.Fatal(err)
 	}
 }

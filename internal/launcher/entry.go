@@ -46,7 +46,10 @@ type Entry struct {
 	gameDirIsInstance bool
 	// Slot is how the launcher's command slots behave. Nil means shulker fills none, as for its own
 	// instances, which run the hooks themselves.
-	Slot       *Slot
+	Slot *Slot
+	// Image is the instance picture shulker keeps in step with the pack icon. Nil means the
+	// launcher shows none shulker writes.
+	Image      *Image
 	relink     func(e *Entry, l Linked) (args []string, in string)
 	forget     func(e *Entry, l config.Instance) (Forgotten, error)
 	name       func(e *Entry, launcherDir, gameDir string) string
@@ -91,12 +94,14 @@ var All = []*Entry{
 	{
 		Name: "atlauncher", Title: "ATLauncher", IsInstanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true,
 		Slot:   &Slot{Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord},
+		Image:  &Image{File: ATLauncherImageFile, Default: ATLauncherImage, fit: atlauncherCard},
 		relink: relinkLauncher, forget: forgetInstance, name: atlauncherName, gameDirs: atlauncherGameDirs,
 		readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots,
 	},
 	{
 		Name: "gdlauncher", Title: "GDLauncher", IsInstanced: true, DefaultDir: DefaultGDLauncherDir,
 		Slot:   &Slot{Deadline: "4m", Quote: gdlauncherHookArg},
+		Image:  &Image{File: GDLauncherIconFile, Default: GDLauncherIcon},
 		relink: relinkLauncher, forget: forgetInstance, name: gdlauncherName, gameDirs: gdlauncherGameDirs,
 		readSlots: readGDLauncherSlots, writeSlots: writeGDLauncherSlots,
 	},

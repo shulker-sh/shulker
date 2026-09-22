@@ -32,9 +32,10 @@ type curseForgePack struct {
 	Version         string `json:"version"`
 	Author          string `json:"author"`
 	Files           []struct {
-		ProjectID int  `json:"projectID"`
-		FileID    int  `json:"fileID"`
-		Required  bool `json:"required"`
+		ProjectID int   `json:"projectID"`
+		FileID    int   `json:"fileID"`
+		Required  bool  `json:"required"`
+		IsLocked  *bool `json:"isLocked"`
 	} `json:"files"`
 	Overrides string `json:"overrides"`
 	Image     string `json:"image"`
@@ -120,7 +121,7 @@ func TestExportCurseForge(t *testing.T) {
 		t.Fatalf("files: %+v", pack.Files)
 	}
 	for i, f := range pack.Files {
-		if f.ProjectID != want[i][0] || f.FileID != want[i][1] || !f.Required {
+		if f.ProjectID != want[i][0] || f.FileID != want[i][1] || !f.Required || f.IsLocked == nil || *f.IsLocked {
 			t.Fatalf("file %d: %+v", i, f)
 		}
 	}

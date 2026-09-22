@@ -35,6 +35,7 @@ type Manifest struct {
 	Authors     []string           `json:"authors,omitempty"`
 	License     string             `json:"license,omitempty"`
 	Links       map[string]string  `json:"links,omitempty"`
+	Icon        string             `json:"icon,omitempty"`
 	Note        string             `json:"note,omitempty"`
 	Minecraft   string             `json:"minecraft,omitempty"`
 	Loader      Loader             `json:"loader,omitzero"`
@@ -365,6 +366,11 @@ func (m *Manifest) check() error {
 	if m.Client != nil && m.Client.OptionsPath != "" && !insideBuild(m.Client.OptionsPath) {
 		e := out.Errorf("manifest-invalid", "client.optionsPath %q is not a file inside the build", m.Client.OptionsPath)
 		e.Rows = []out.Detail{{Label: "Fix", Text: `give a path relative to the build, such as "config/modpack_defaults/options.txt"`}}
+		return e
+	}
+	if m.Icon != "" && !insideBuild(m.Icon) {
+		e := out.Errorf("manifest-invalid", "icon %q is not a file inside the project", m.Icon)
+		e.Rows = []out.Detail{{Label: "Fix", Text: `give a path relative to the project, such as "assets/icon.png"`}}
 		return e
 	}
 	if m.BuildsInPlace("client") && m.BuildsInPlace("server") {

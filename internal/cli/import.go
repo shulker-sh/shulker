@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cfpack"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -97,6 +98,9 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			a.warn(mods.Warnings)
 			if arc.Marker != nil {
 				mods.Overrides = dropManifestOwned(m, mods.Overrides)
+			}
+			if err := writeImportIcon(dir, m, arc.Icon); err != nil {
+				return err
 			}
 			if err := writeImport(dir, m, l, mods.Overrides); err != nil {
 				return err
@@ -322,6 +326,23 @@ func writeImport(dir string, m *manifest.Manifest, l *lock.Lock, overrides []mrp
 		return err
 	}
 	return p.SaveLock()
+}
+
+// writeImportIcon puts the archive's icon back where the restored manifest names it, and drops
+// the key from an archive that carries none, so the project stays valid.
+func writeImportIcon(dir string, m *manifest.Manifest, icon []byte) error {
+	if m.Icon == "" {
+		return nil
+	}
+	if icon == nil {
+		m.Icon = ""
+		return nil
+	}
+	path := filepath.Join(dir, filepath.FromSlash(m.Icon))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return fsutil.Write(path, icon)
 }
 
 func overridePaths(overrides []mrpack.Override) []string {

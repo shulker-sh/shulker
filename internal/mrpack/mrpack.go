@@ -18,7 +18,9 @@ import (
 )
 
 const (
-	IndexName     = "modrinth.index.json"
+	IndexName = "modrinth.index.json"
+	// IconName is the root entry the Modrinth App takes as the instance icon; the format itself has no icon.
+	IconName      = "icon.png"
 	FormatVersion = 1
 	Game          = "minecraft"
 )
@@ -107,6 +109,7 @@ type Archive struct {
 	Index     Index
 	Overrides []Override
 	Marker    *Marker
+	Icon      []byte
 }
 
 func (a *Archive) Loader() (string, string, bool) {
@@ -144,6 +147,10 @@ func Read(file string) (*Archive, error) {
 			if err := json.Unmarshal(data, &a.Index); err != nil {
 				return nil, out.Errorf("mrpack-invalid", "shulker can't parse %s in %s", IndexName, file).WithCause("json", err)
 			}
+			continue
+		}
+		if name == IconName {
+			a.Icon = data
 			continue
 		}
 		if name == manifest.FileName || name == lock.FileName {

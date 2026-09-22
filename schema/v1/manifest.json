@@ -38,6 +38,12 @@
     "links": {
       "$ref": "#/$defs/links"
     },
+    "icon": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\.[Pp][Nn][Gg]$",
+      "description": "The pack's icon: a path to a PNG inside the project, e.g. \"assets/icon.png\". Exports carry it, as icon.png at the root of an mrpack and as the CurseForge profile image, and linked ATLauncher and GDLauncher instances show it, fitted onto ATLauncher's 300x150 card. A sync replaces the launcher's image only when the icon changes, so one the player picked stays until then. Without it, a pack that uses the marker exports the shulker icon."
+    },
     "minecraft": {
       "$ref": "#/$defs/semverRange",
       "description": "Semver range over Minecraft version ids, e.g. \"~26.2\", \"^26.1\", or an exact version. Pre-release order is snapshot < pre < rc < release. Omit it to take the version from the project's locked modpacks, which then all have to agree."
@@ -88,7 +94,7 @@
     },
     "marker": {
       "type": "boolean",
-      "description": "Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both, and exports also leave out the shulker.json and shulker.lock they carry at the archive root and the CurseForge profile image. Default true. An instance that sets its own settings.marker decides for itself instead."
+      "description": "Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both, and exports also leave out the shulker.json and shulker.lock they carry at the archive root, and the shulker icon when the pack names no icon of its own. Default true. An instance that sets its own settings.marker decides for itself instead."
     },
     "variables": { "$ref": "#/$defs/variables" },
     "server": { "$ref": "#/$defs/server" },

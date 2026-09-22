@@ -124,17 +124,19 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 		Files:           files,
 		Overrides:       "overrides",
 	}
-	if b.Manifest.UsesMarker() {
-		profile.Image = "profileImage/" + markerLogo
+	icon, iconName, err := b.exportIcon()
+	if err != nil {
+		return nil, err
+	}
+	if icon != nil {
+		profile.Image = "profileImage/" + iconName
+		entries[profile.Image] = icon
 	}
 	data, err := json.MarshalIndent(profile, "", "  ")
 	if err != nil {
 		return nil, err
 	}
 	entries[cfpack.ManifestName] = append(data, '\n')
-	if profile.Image != "" {
-		entries[profile.Image] = markerIcon
-	}
 	entries["modlist.html"] = curseForgeModlist(names, files, curseForgeRecords(files, opts, report))
 	if err := b.addIdentity(entries); err != nil {
 		return nil, err

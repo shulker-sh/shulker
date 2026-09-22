@@ -73,6 +73,8 @@ type State struct {
 	Packs map[string]string `json:"packs,omitempty"`
 	// InstalledLoader is the loader its own installer set up in the dir; the installer's files aren't tracked.
 	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
+	// LauncherImage is the hash of the instance image shulker last wrote into the launcher.
+	LauncherImage string `json:"launcherImage,omitempty"`
 }
 
 // InstalledLoader is a loader that its own installer set up, rather than shulker.
@@ -268,7 +270,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	if stateErr != nil {
 		report.Warnings = append(report.Warnings, stateErr.Error())
 	}
-	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, Packs: b.placedPackNames(desired)}
+	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, LauncherImage: prev.LauncherImage, Packs: b.placedPackNames(desired)}
 	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
 		return nil, err
@@ -675,6 +677,13 @@ func InstallerArgsFile(lk *lock.Lock) string {
 func RecordLoader(dir string, l InstalledLoader) error {
 	s := LoadState(dir)
 	s.InstalledLoader = &l
+	return writeState(dir, s)
+}
+
+// RecordLauncherImage notes in dir's state the hash of the instance image written into the launcher.
+func RecordLauncherImage(dir, hash string) error {
+	s := LoadState(dir)
+	s.LauncherImage = hash
 	return writeState(dir, s)
 }
 

@@ -101,6 +101,13 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 		return nil, err
 	}
 	entries[mrpack.IndexName] = append(indexData, '\n')
+	icon, _, err := b.exportIcon()
+	if err != nil {
+		return nil, err
+	}
+	if icon != nil {
+		entries[mrpack.IconName] = icon
+	}
 	if err := b.addIdentity(entries); err != nil {
 		return nil, err
 	}

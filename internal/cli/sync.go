@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
@@ -238,6 +239,9 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 		return syncResult{}, err
 	}
 	a.warn(rep.Warnings)
+	if side == "client" {
+		a.syncLauncherImage(into, b)
+	}
 	if err := a.installServerLoader(ctx, p, rep); err != nil {
 		return syncResult{}, err
 	}
@@ -366,4 +370,28 @@ func (a *app) checkout(ctx context.Context, source, ref string) (*pack.Checkout,
 		return nil, err
 	}
 	return a.sourceStore().Checkout(ctx, source, ref)
+}
+
+// syncLauncherImage keeps a registered instance's picture in its launcher in step with the pack
+// icon. An icon it can't use is worth a warning, never a failed sync that would keep the game shut.
+func (a *app) syncLauncherImage(dir string, b *build.Builder) {
+	in, ok := a.registeredInstance(dir)
+	if !ok {
+		return
+	}
+	e := launcher.Find(in.Launcher)
+	if e == nil || e.Image == nil {
+		return
+	}
+	icon, err := b.InstanceIcon()
+	if err == nil {
+		last := build.LoadState(dir).LauncherImage
+		var hash string
+		if hash, err = e.SyncImage(dir, icon, last); err == nil && hash != last {
+			err = build.RecordLauncherImage(dir, hash)
+		}
+	}
+	if err != nil {
+		a.printer.Warn("launcher image not updated for %q: %v", in.Label(), err)
+	}
 }
