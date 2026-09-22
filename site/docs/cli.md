@@ -1608,7 +1608,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock` is there but can't be read, so `cache prune` stops rather than remove files that instance may need; `cache info` still reports and names the instance |
-| `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON. Rows show both hashes |
+| `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
 | `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
@@ -1661,7 +1661,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `manual-download` | The provider doesn't distribute this mod; download it into `downloads/` |
 | `memory` | Server memory isn't a whole number of M or G |
 | `meta-fetch` | Version metadata couldn't be read from Mojang, a loader's meta or Maven, or GDLauncher's meta. The row names the service and what went wrong |
-| `meta-invalid` | Version metadata was read but lacks what shulker needs, like a Minecraft version Mojang doesn't list, or a loader installer whose files won't parse |
+| `meta-invalid` | Version metadata was read but lacks what shulker needs, like a Minecraft version Mojang doesn't list, a Java runtime manifest with no java in it, or a loader installer whose files won't parse |
 | `minecraft-required` | `shulker.json` sets no `minecraft` and no locked modpack supplies one; set it with `shulker set minecraft <version>` |
 | `missing-files` | Mods that need a manual download are missing. `items`: what to download |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
