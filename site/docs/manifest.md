@@ -143,7 +143,7 @@ Type: `string`. pattern `^[^/\\]`, min length 1
 
 ### variables
 
-Values substituted for ${name} in *.tmpl override files and in server.properties values.
+Values substituted for ${name} in *.tmpl override files and in server.properties values. The built-ins ${pack.name}, ${pack.version}, ${minecraft.version}, ${loader.type} and ${loader.version} are always there too: the pack's own name and version, and the locked Minecraft and loader. A built-in whose value is missing is unset.
 
 Type: map of `string` \| `number` \| `boolean`. keys match `^[A-Za-z_][A-Za-z0-9_]*$`
 

@@ -207,7 +207,7 @@
       "type": "object",
       "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
       "additionalProperties": { "type": ["string", "number", "boolean"] },
-      "description": "Values substituted for ${name} in *.tmpl override files and in server.properties values."
+      "description": "Values substituted for ${name} in *.tmpl override files and in server.properties values. The built-ins ${pack.name}, ${pack.version}, ${minecraft.version}, ${loader.type} and ${loader.version} are always there too: the pack's own name and version, and the locked Minecraft and loader. A built-in whose value is missing is unset."
     },
     "featureDecl": {
       "type": "object",
