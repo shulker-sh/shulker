@@ -181,3 +181,15 @@ func TestAssumeClientExportsAnUndeclaredClient(t *testing.T) {
 		t.Fatalf("assumed client export: sides=%v warnings=%v", env.Data["sides"], env.Warnings)
 	}
 }
+
+func TestAddWarnsWhenAModShipsOnNoDeclaredSide(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	_, stderr := h.mustRunStderr(t, "add", "sodium")
+	if !strings.Contains(stderr, "sodium is client only, so no side of this project ships it; shulker set requires.sodium.side both ships it anyway") {
+		t.Fatalf("stderr: %s", stderr)
+	}
+	if _, stderr := h.mustRunStderr(t, "add", "fabric-api"); strings.Contains(stderr, "no side of this project ships it") {
+		t.Fatalf("warned for a mod on every side: %s", stderr)
+	}
+}

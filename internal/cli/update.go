@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -210,7 +211,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	rl.printItems = func(l *out.Lines) {
 		printChanges(l, rl.Changes, v.Suggestions, p.Manifest.Sides(), placements)
 	}
-	a.warn(append(r.Warnings, v.Warnings...))
+	a.warn(append(append(r.Warnings, v.Warnings...), unshippedWarnings(rl.Changes, p.Manifest.Sides())...))
 	if keepUnchanged && !stale {
 		now, err := json.Marshal(p.Lock)
 		if err != nil {
@@ -382,6 +383,17 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 		}
 	}
 	l.Items(items...)
+}
+
+func unshippedWarnings(c *resolve.Changes, sides []string) []string {
+	var warnings []string
+	for _, m := range c.Added {
+		if len(m.RequiredBy) > 0 || len(sides) == 0 || isSideDeclared(sides, m.Side) {
+			continue
+		}
+		warnings = append(warnings, fmt.Sprintf("%s is %s only, so no side of this project ships it; shulker set requires.%s.side both ships it anyway", m.ID, m.Side, m.ID))
+	}
+	return warnings
 }
 
 func isSideDeclared(sides []string, side string) bool {
