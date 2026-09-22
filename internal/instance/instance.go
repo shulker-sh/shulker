@@ -143,6 +143,20 @@ func (f *File) Save(dir string) error {
 	return fsutil.WriteJSON(Path(dir), f)
 }
 
+// Replace saves f after renaming the file already there to instance.json.replaced, and returns where
+// the old file went, empty when there was none.
+func (f *File) Replace(dir string) (kept string, err error) {
+	f.Schema = SchemaURL
+	if err := os.MkdirAll(filepath.Join(dir, Dir), 0o755); err != nil {
+		return "", err
+	}
+	data, err := fsutil.MarshalJSON(f)
+	if err != nil {
+		return "", err
+	}
+	return fsutil.Replace(Path(dir), data)
+}
+
 // Java is the Java the game runs with: the instance's own setting, else the one shulker resolved.
 func (f *File) Java() string {
 	if f.Settings.Java != "" || f.Resolved == nil {

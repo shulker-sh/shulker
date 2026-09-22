@@ -126,7 +126,7 @@ func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
 		{"instances", "repair", "--launcher", "shulker"},
 		{"instances", "repair", "--launcher", "shulker", "--launcher-dir", root},
 	} {
-		if err := config.WriteInstances(registryPath(h), nil); err != nil {
+		if _, err := config.WriteInstances(registryPath(h), nil); err != nil {
 			t.Fatal(err)
 		}
 		if stdout := h.mustRun(t, args...); !strings.Contains(stdout, "registered smp") {

@@ -318,17 +318,22 @@ func FindID(instances []Instance, id string) (int, bool) {
 	return -1, false
 }
 
-// WriteInstances replaces the registry wholesale. It is what repair uses, since the file it is
+// WriteInstances replaces the registry wholesale, keeping the file it replaces as
+// registry.json.replaced, and returns where that went. It is what repair uses, since the file it is
 // fixing may be one UpdateInstances refuses to read.
-func WriteInstances(path string, instances []Instance) error {
+func WriteInstances(path string, instances []Instance) (kept string, err error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return "", err
 	}
 	doc := map[string]any{"$schema": RegistrySchemaURL}
 	if len(instances) > 0 {
 		doc["instances"] = instances
 	}
-	return fsutil.WriteJSON(path, doc)
+	data, err := fsutil.MarshalJSON(doc)
+	if err != nil {
+		return "", err
+	}
+	return fsutil.Replace(path, data)
 }
 
 // UpdateInstances rereads the registry right before writing and rewrites only the instances key, so

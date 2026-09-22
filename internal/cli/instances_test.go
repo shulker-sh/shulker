@@ -195,7 +195,7 @@ func TestInPlaceInstanceFileKeepsSettingsOnly(t *testing.T) {
 	// the one writer of all three.
 	instances := readInstances(t, h)
 	instances[0].Source = filepath.Join(t.TempDir(), "moved-away")
-	if err := config.WriteInstances(registryPath(h), instances); err != nil {
+	if _, err := config.WriteInstances(registryPath(h), instances); err != nil {
 		t.Fatal(err)
 	}
 	var env struct {
@@ -460,7 +460,7 @@ func TestInstancesRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout, stderr := h.mustRunStderr(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
-	if !strings.Contains(stderr, "rebuilding it") || !strings.Contains(stdout, "registered ") {
+	if !strings.Contains(stderr, "rebuilt it") || !strings.Contains(stdout, "registered ") {
 		t.Fatalf("repair:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
 	instances := readInstances(t, h)
@@ -484,6 +484,39 @@ func TestInstancesRepair(t *testing.T) {
 	if instances := readInstances(t, h); len(instances) != 1 {
 		t.Fatalf("a missing directory keeps its row: %+v", instances)
 	}
+}
+
+// Repair rewrites a registry or instance file it can't read, a newer shulker's included, so it keeps
+// the old bytes as <name>.replaced first.
+func TestInstancesRepairKeepsWhatItReplaces(t *testing.T) {
+	h := newHarness(t)
+	prismDir := t.TempDir()
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
+
+	oldRegistry := []byte(`{"$schema":"https://shulker.sh/schema/v2/registry.json","instances":[]}`)
+	oldIntent := []byte(`{"$schema":"https://shulker.sh/schema/v2/instance.json"}`)
+	if err := os.WriteFile(registryPath(h), oldRegistry, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(instance.Path(gameDir), oldIntent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr := h.mustRunStderr(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
+	for path, want := range map[string][]byte{registryPath(h) + ".replaced": oldRegistry, instance.Path(gameDir) + ".replaced": oldIntent} {
+		if got, err := os.ReadFile(path); err != nil || string(got) != string(want) {
+			t.Fatalf("%s keeps the old bytes: %q %v", path, got, err)
+		}
+		if !strings.Contains(stderr, "kept the old one as "+path) {
+			t.Fatalf("repair names where the old file went: %s", stderr)
+		}
+	}
+	if instances := readInstances(t, h); len(instances) != 1 {
+		t.Fatalf("the registry is rebuilt: %+v", instances)
+	}
+	readIntent(t, gameDir)
 }
 
 // Under ADR 0001 a project building where it stands in a launcher's game directory is an instance,
@@ -511,7 +544,7 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 		}
 	}
 	writeFile(t, cfgPath, strings.Join(kept, "\n"))
-	if err := config.WriteInstances(registryPath(h), nil); err != nil {
+	if _, err := config.WriteInstances(registryPath(h), nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -573,7 +606,7 @@ func TestInstancesRepairNamesAnInstanceTheWayItsLauncherShowsIt(t *testing.T) {
 	}
 	h.mustRun(t, "link", "shulker", h.dir, "--as", "smp")
 
-	if err := config.WriteInstances(registryPath(h), nil); err != nil {
+	if _, err := config.WriteInstances(registryPath(h), nil); err != nil {
 		t.Fatal(err)
 	}
 	for name, dir := range dirs {
@@ -672,7 +705,7 @@ func TestInstancesRepairReadsASyncedDirectory(t *testing.T) {
 	if err := os.Remove(instance.Path(gameDir)); err != nil {
 		t.Fatal(err)
 	}
-	if err := config.WriteInstances(registryPath(h), nil); err != nil {
+	if _, err := config.WriteInstances(registryPath(h), nil); err != nil {
 		t.Fatal(err)
 	}
 	h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)

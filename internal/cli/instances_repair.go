@@ -68,9 +68,8 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		return repairResult{}, err
 	}
 	var res repairResult
-	instances, err := config.LoadInstances(path)
-	if err != nil {
-		a.printer.Warn("%s: %s; rebuilding it", path, out.AsError(err).Message)
+	instances, loadErr := config.LoadInstances(path)
+	if loadErr != nil {
 		instances, res.Rebuilt = nil, true
 	}
 	registered := map[string]bool{}
@@ -95,7 +94,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		if in.Name != from {
 			res.Renamed = append(res.Renamed, repairRename{ID: in.ID, Dir: in.Dir, From: from, To: in.Name})
 		}
-		wrote, err := repairIntent(*in)
+		wrote, err := a.repairIntent(*in)
 		if err != nil {
 			return res, err
 		}
@@ -110,7 +109,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		}
 		registered[filepath.Clean(found.Dir)] = true
 		found.ID = uniqueID(instances, inPlaceID(found.Dir), found.Name, found.Dir)
-		wrote, err := repairIntent(found)
+		wrote, err := a.repairIntent(found)
 		if err != nil {
 			return res, err
 		}
@@ -122,7 +121,11 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 	}
 	res.total = len(instances)
 	if res.Rebuilt {
-		return res, config.WriteInstances(path, instances)
+		kept, err := config.WriteInstances(path, instances)
+		if err == nil {
+			a.printer.Warn("%s; rebuilt it and kept the old one as %s", out.AsError(loadErr).Message, kept)
+		}
+		return res, err
 	}
 	_, err = config.UpdateInstances(path, func([]config.Instance) []config.Instance { return instances })
 	return res, err
@@ -130,9 +133,11 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 
 // repairIntent writes the instance file for a directory shulker synced before it kept one, from
 // what the build recorded. An instance that is a project gets a defaults-only file: its manifest
-// holds what it follows, so anything written here could only go stale against it.
-func repairIntent(in config.Instance) (bool, error) {
-	if _, err := instance.Load(in.Dir); err == nil {
+// holds what it follows, so anything written here could only go stale against it. A file it can't
+// read is kept as instance.json.replaced.
+func (a *app) repairIntent(in config.Instance) (bool, error) {
+	_, loadErr := instance.Load(in.Dir)
+	if loadErr == nil {
 		return false, nil
 	}
 	f := instance.New()
@@ -147,7 +152,11 @@ func repairIntent(in config.Instance) (bool, error) {
 		}
 		f.Source, f.Ref, f.Side = source, st.Ref, st.Side
 	}
-	return true, f.Save(in.Dir)
+	kept, err := f.Replace(in.Dir)
+	if kept != "" {
+		a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(loadErr).Message, kept)
+	}
+	return true, err
 }
 
 // inPlaceID is the id an instance that is a project was linked under: link makes the manifest's name

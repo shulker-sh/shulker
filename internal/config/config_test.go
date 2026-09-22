@@ -136,7 +136,7 @@ func TestOldRegistryFails(t *testing.T) {
 		t.Fatalf("a newer registry nudges self update: %v", err)
 	}
 
-	if err := WriteInstances(path, []Instance{{ID: "a", Dir: "/a", Source: "/p"}}); err != nil {
+	if _, err := WriteInstances(path, []Instance{{ID: "a", Dir: "/a", Source: "/p"}}); err != nil {
 		t.Fatal(err)
 	}
 	if instances, err := LoadInstances(path); err != nil || len(instances) != 1 {
