@@ -360,10 +360,8 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	if held, ok := r.Manifest.Requires[id]; ok && held.Kind() != manifest.TypeMod {
 		return "", nil, manifest.KeyTaken(id, held.Kind(), manifest.TypeMod)
 	}
-	for _, other := range r.lockIDs() {
-		if other != id && r.Lock.JarID(other) == info.ID {
-			return "", nil, out.Errorf("requires-taken", "mod id %s is already locked as %s; a mod id can only be locked once", info.ID, other)
-		}
+	if err := r.modIDFree(info.ID, id); err != nil {
+		return "", nil, err
 	}
 	var prior *lock.Mod
 	if existing, ok := r.Lock.Mods[id]; ok {

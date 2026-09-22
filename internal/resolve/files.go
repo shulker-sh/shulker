@@ -227,10 +227,8 @@ func (r *Resolver) relockFile(ctx context.Context, dir, id string, entry manifes
 	if err != nil {
 		return prefixed("mod "+id, err)
 	}
-	for _, other := range r.lockIDs() {
-		if other != id && r.Lock.JarID(other) == info.ID {
-			return out.Errorf("requires-taken", "mod id %s is already locked as %s; a mod id can only be locked once", info.ID, other)
-		}
+	if err := r.modIDFree(info.ID, id); err != nil {
+		return err
 	}
 	side := info.Side
 	if entry.Side != "" {
@@ -307,6 +305,16 @@ func (r *Resolver) lockedAs(modID string) string {
 		}
 	}
 	return ""
+}
+
+// modIDFree refuses a mod id the lock holds under a key other than key.
+func (r *Resolver) modIDFree(modID, key string) error {
+	for _, other := range r.lockIDs() {
+		if other != key && r.Lock.JarID(other) == modID {
+			return out.Errorf("requires-taken", "mod id %s is already locked as %s; a mod id can only be locked once", modID, other)
+		}
+	}
+	return nil
 }
 
 // lockFilePack locks a local resource pack or shader by its bytes.

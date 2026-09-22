@@ -320,10 +320,7 @@ func (r *Resolver) fileKeyFree(key, kind string, info *jarmeta.Info) error {
 		e.Help = fmt.Sprintf("pass `--as <key>` to give %s another key", info.ID)
 		return e
 	}
-	if held := r.lockedAs(info.ID); held != "" && held != key {
-		return out.Errorf("requires-taken", "mod id %s is already locked as %s; a mod id can only be locked once", info.ID, held)
-	}
-	return nil
+	return r.modIDFree(info.ID, key)
 }
 
 // copyFile writes the bytes of the file at from to to, replacing what is there.
