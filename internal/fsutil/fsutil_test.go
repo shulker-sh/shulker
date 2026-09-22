@@ -81,3 +81,86 @@ func TestSHA1HashesTheFile(t *testing.T) {
 		t.Fatal("a missing file has no hash")
 	}
 }
+
+func TestReplaceKeepsOldBytesAsReplaced(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "shulker.lock")
+	if err := Write(path, []byte("old")); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := Replace(path, []byte("new"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kept != path+".replaced" {
+		t.Fatalf("kept = %q", kept)
+	}
+	if data, _ := os.ReadFile(path); string(data) != "new" {
+		t.Fatalf("content = %q", data)
+	}
+	if data, _ := os.ReadFile(kept); string(data) != "old" {
+		t.Fatalf("replaced = %q", data)
+	}
+}
+
+func TestReplaceOverwritesAnOlderReplaced(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	for _, s := range []string{"first", "second", "third"} {
+		if _, err := Replace(path, []byte(s)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if data, _ := os.ReadFile(path + ".replaced"); string(data) != "second" {
+		t.Fatalf("replaced = %q", data)
+	}
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 2 {
+		t.Fatalf("entries = %v", entries)
+	}
+}
+
+func TestReplaceWithNothingThereJustWrites(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "registry.json")
+	kept, err := Replace(path, []byte("new"))
+	if err != nil || kept != "" {
+		t.Fatalf("kept = %q, err = %v", kept, err)
+	}
+	if data, _ := os.ReadFile(path); string(data) != "new" {
+		t.Fatalf("content = %q", data)
+	}
+	if _, err := os.Lstat(path + ".replaced"); !os.IsNotExist(err) {
+		t.Fatalf("replaced exists: %v", err)
+	}
+}
+
+func TestReplaceFollowsASymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "real.json")
+	link := filepath.Join(dir, "link.json")
+	if err := Write(target, []byte("old")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := Replace(link, []byte("new"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want, _ := filepath.EvalSymlinks(target); kept != want+".replaced" {
+		t.Fatalf("kept = %q", kept)
+	}
+	if data, _ := os.ReadFile(target); string(data) != "new" {
+		t.Fatalf("target = %q", data)
+	}
+	if data, _ := os.ReadFile(kept); string(data) != "old" {
+		t.Fatalf("replaced = %q", data)
+	}
+	if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("link = %v, %v", info, err)
+	}
+}

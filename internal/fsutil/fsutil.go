@@ -8,6 +8,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"hash"
 	"io"
 	"io/fs"
@@ -54,6 +55,25 @@ func WriteFrom(path string, r io.Reader) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// Replace writes data to path after renaming whatever is there to
+// <name>.replaced, clobbering only an older replaced file. kept is where the
+// old file went, empty when there was none. A symlink at path is followed, so
+// kept sits beside the link's target, not the link.
+func Replace(path string, data []byte) (kept string, err error) {
+	if info, err := os.Lstat(path); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+		if path, err = filepath.EvalSymlinks(path); err != nil {
+			return "", err
+		}
+	}
+	kept = path + ".replaced"
+	if err := os.Rename(path, kept); errors.Is(err, fs.ErrNotExist) {
+		kept = ""
+	} else if err != nil {
+		return "", err
+	}
+	return kept, Write(path, data)
 }
 
 // MarshalJSON is the encoding of every JSON file shulker writes.
