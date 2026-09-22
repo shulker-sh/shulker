@@ -80,6 +80,12 @@
       "items": { "$ref": "#/$defs/relativePath" },
       "description": "Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone."
     },
+    "skipFiles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/relativePath" },
+      "description": "Globs (* and ? match within one path segment) of override files to leave out of builds and exports. A glob with no slash matches a file name at any depth; one with a slash matches the build-relative path. .DS_Store, ._* files, Thumbs.db and desktop.ini are always left out."
+    },
     "marker": {
       "type": "boolean",
       "description": "Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both, and exports also leave out the shulker.json and shulker.lock they carry at the archive root and the CurseForge profile image. Default true. An instance that sets its own settings.marker decides for itself instead."

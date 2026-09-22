@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -44,6 +45,7 @@ type Manifest struct {
 	Requires    map[string]Require `json:"requires"`
 	Ignore      []Ignore           `json:"ignore,omitempty"`
 	WholeFiles  []string           `json:"wholeFiles,omitempty"`
+	SkipFiles   []string           `json:"skipFiles,omitempty"`
 	Marker      *bool              `json:"marker,omitempty"`
 	Variables   Variables          `json:"variables,omitempty"`
 	Server      *Server            `json:"server,omitempty"`
@@ -129,6 +131,27 @@ type Feature struct {
 	Default   bool             `json:"default,omitempty"`
 	Note      string           `json:"note,omitempty"`
 	Overrides FeatureOverrides `json:"overrides,omitzero"`
+}
+
+// Skips reports whether the override file at the build-relative path rel is left out of builds and
+// exports: an operating system's folder metadata, or a match for one of SkipFiles. A pattern with no
+// slash matches the file's name at any depth.
+func (m *Manifest) Skips(rel string) bool {
+	name := path.Base(rel)
+	switch {
+	case name == ".DS_Store", strings.HasPrefix(name, "._"), strings.EqualFold(name, "Thumbs.db"), strings.EqualFold(name, "desktop.ini"):
+		return true
+	}
+	for _, pattern := range m.SkipFiles {
+		target := rel
+		if !strings.Contains(pattern, "/") {
+			target = name
+		}
+		if ok, _ := path.Match(pattern, target); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // FeatureOverrides is where a feature's override files live: one folder for

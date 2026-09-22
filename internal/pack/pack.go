@@ -489,14 +489,15 @@ func dirSha256(dir string, m *manifest.Manifest) (string, error) {
 	}
 	var files []string
 	for layer := range roots {
-		err := filepath.WalkDir(filepath.Join(dir, layer), func(p string, d fs.DirEntry, err error) error {
+		root := filepath.Join(dir, layer)
+		err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
 				if os.IsNotExist(err) {
 					return nil
 				}
 				return err
 			}
-			if !d.IsDir() {
+			if rel, _ := filepath.Rel(root, p); !d.IsDir() && !m.Skips(filepath.ToSlash(rel)) {
 				files = append(files, p)
 			}
 			return nil

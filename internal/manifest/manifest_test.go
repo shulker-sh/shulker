@@ -337,3 +337,26 @@ func TestParseRejects(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSkips(t *testing.T) {
+	m := &Manifest{SkipFiles: []string{"*.bak", "config/*.log"}}
+	for rel, want := range map[string]bool{
+		".DS_Store":               true,
+		"config/.DS_Store":        true,
+		"config/._options.txt":    true,
+		"THUMBS.DB":               true,
+		"shaderpacks/Desktop.ini": true,
+		"a.bak":                   true,
+		"config/deep/a.bak":       true,
+		"config/latest.log":       true,
+		"config/deep/latest.log":  false,
+		"latest.log":              false,
+		"config/.ds_store":        false,
+		"options.txt":             false,
+		"config/.hidden.json":     false,
+	} {
+		if got := m.Skips(rel); got != want {
+			t.Errorf("Skips(%q) = %v, want %v", rel, got, want)
+		}
+	}
+}

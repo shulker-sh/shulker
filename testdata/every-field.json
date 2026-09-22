@@ -43,6 +43,7 @@
     { "rule": "depends", "mod": "sodium", "on": "minecraft", "declared": ">=26.3", "note": "works" }
   ],
   "wholeFiles": ["config/whole.properties"],
+  "skipFiles": ["*.bak", "config/*.log"],
   "marker": true,
   "variables": { "motd": "Welcome", "port": 25565, "hardcore": false, "ratio": 1.50 },
   "server": {

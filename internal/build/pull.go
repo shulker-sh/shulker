@@ -112,7 +112,7 @@ func (b *Builder) checkNamed(side string, files []string, opts Options) error {
 			return err
 		}
 		if present == nil {
-			if present, err = listFiles(dir); err != nil {
+			if present, err = listFiles(dir, b.Manifest.Skips); err != nil {
 				return err
 			}
 		}
@@ -123,14 +123,16 @@ func (b *Builder) checkNamed(side string, files []string, opts Options) error {
 	return nil
 }
 
-func listFiles(dir string) ([]string, error) {
+func listFiles(dir string, skips func(rel string) bool) ([]string, error) {
 	files := []string{}
 	err := filepath.WalkDir(dir, func(path string, e fs.DirEntry, err error) error {
 		if err != nil || e.IsDir() || e.Name() == StateFile {
 			return err
 		}
 		rel, err := filepath.Rel(dir, path)
-		files = append(files, filepath.ToSlash(rel))
+		if rel = filepath.ToSlash(rel); !skips(rel) {
+			files = append(files, rel)
+		}
 		return err
 	})
 	return files, err
@@ -191,6 +193,10 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 		}
 	}
 	for _, rel := range fresh {
+		if b.Manifest.Skips(rel) {
+			report.Skipped = append(report.Skipped, rel+" (left out of builds)")
+			continue
+		}
 		if req.To == "" && AdoptedType(rel) != "" {
 			report.Adoptable = append(report.Adoptable, rel)
 			continue

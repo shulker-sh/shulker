@@ -433,6 +433,7 @@ type overrideLayer struct {
 	pack    string
 	feature string
 	vars    map[string]string
+	skips   func(rel string) bool
 	// archived marks a layer read from a modpack archive: files holds it, and root only names
 	// where each file came from.
 	archived bool
@@ -453,14 +454,14 @@ func (b *Builder) overrideLayers(side string, cond conditions, vars map[string]s
 			return pack + ":" + folder
 		}
 		for _, folder := range []string{"overrides", side + "-overrides"} {
-			layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, vars: vars})
+			layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, vars: vars, skips: m.Skips})
 		}
 		for _, name := range slices.Sorted(maps.Keys(m.Features)) {
 			if !cond.features[name] {
 				continue
 			}
 			for _, folder := range featureFolders(name, m.Features[name], side) {
-				layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, feature: name, vars: vars})
+				layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, feature: name, vars: vars, skips: m.Skips})
 			}
 		}
 	}
@@ -470,9 +471,9 @@ func (b *Builder) overrideLayers(side string, cond conditions, vars map[string]s
 		maps.Copy(packVars, vars)
 		if pk.Archive != nil {
 			for _, folder := range []string{"overrides", side + "-overrides"} {
-				l := overrideLayer{root: filepath.Join(b.Dir, filepath.FromSlash(pk.Source), folder), label: pk.Name + ":" + folder, pack: pk.Name, vars: packVars, archived: true}
+				l := overrideLayer{root: filepath.Join(b.Dir, filepath.FromSlash(pk.Source), folder), label: pk.Name + ":" + folder, pack: pk.Name, vars: packVars, skips: pk.Manifest.Skips, archived: true}
 				for _, o := range pk.Overrides {
-					if o.Layer == folder {
+					if o.Layer == folder && !l.skips(o.Path) {
 						l.files = append(l.files, o)
 					}
 				}
@@ -524,6 +525,9 @@ func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[st
 			return nil
 		}
 		rel, _ := filepath.Rel(root, path)
+		if l.skips(filepath.ToSlash(rel)) {
+			return nil
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
