@@ -194,3 +194,62 @@ func TestSetWarnsOnlyWhenTheLockDiffers(t *testing.T) {
 		t.Fatalf("channel change: lockStale=%v warnings=%v", env.LockStale, env.Warnings)
 	}
 }
+
+func TestGetLocked(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+
+	for _, c := range []struct{ path, want string }{
+		{"minecraft", "26.2\n"},
+		{"loader.type", "fabric\n"},
+		{"loader", "{\n  \"type\": \"fabric\",\n  \"version\": \"0.17.3\"\n}\n"},
+	} {
+		if got := h.mustRun(t, "get", "--locked", c.path); got != c.want {
+			t.Errorf("get --locked %s = %q, want %q", c.path, got, c.want)
+		}
+	}
+	var minecraft string
+	if err := json.Unmarshal(h.runSetting(t, 0, "get", "--locked", "minecraft").Data, &minecraft); err != nil || minecraft != "26.2" {
+		t.Fatalf("get --locked minecraft --json = %q (%v)", minecraft, err)
+	}
+	var loader map[string]any
+	if err := json.Unmarshal(h.runSetting(t, 0, "get", "--locked", "loader").Data, &loader); err != nil || loader["type"] != "fabric" {
+		t.Fatalf("get --locked loader --json = %v (%v)", loader, err)
+	}
+	var whole map[string]any
+	if err := json.Unmarshal(h.runSetting(t, 0, "get", "--locked").Data, &whole); err != nil || whole["minecraft"] != "26.2" || whole["lockVersion"] == nil {
+		t.Fatalf("get --locked = %v (%v)", whole, err)
+	}
+
+	failures := []struct {
+		code string
+		args []string
+	}{
+		{"path-not-set", []string{"get", "--locked", "mods.sodium"}},
+		{"path-invalid", []string{"get", "--locked", "requires"}},
+	}
+	for _, c := range failures {
+		if env := h.runSetting(t, 1, c.args...); env.Error == nil || env.Error.Code != c.code {
+			t.Errorf("%v error = %+v, want %s", c.args, env.Error, c.code)
+		}
+	}
+	if env := h.runSetting(t, 1, "get", "--locked", "requires"); !slices.Contains(env.Error.Candidates, "mods") {
+		t.Errorf("unknown path candidates = %v, want the lock's fields", env.Error.Candidates)
+	}
+	if code, _, stderr := h.run(t, "get", "--locked", "mods.sodium"); code != 1 || !strings.Contains(stderr, "mods.sodium is not set") {
+		t.Errorf("get --locked mods.sodium exited %d: %s", code, stderr)
+	}
+	if code, _, stderr := h.run(t, "get", "--locked", "requires"); code != 1 || !strings.Contains(stderr, `shulker.lock has no "requires"`) {
+		t.Errorf("get --locked requires exited %d: %s", code, stderr)
+	}
+
+	if err := os.Remove(filepath.Join(h.dir, "shulker.lock")); err != nil {
+		t.Fatal(err)
+	}
+	if env := h.runSetting(t, 1, "get", "--locked", "minecraft"); env.Error == nil || env.Error.Code != "lock-not-found" {
+		t.Errorf("get --locked without a lock error = %+v", env.Error)
+	}
+	if code, _, stderr := h.run(t, "get", "--locked"); code != 1 || !strings.Contains(stderr, "no shulker.lock") {
+		t.Errorf("get --locked without a lock exited %d: %s", code, stderr)
+	}
+}

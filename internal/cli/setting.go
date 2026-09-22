@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -87,13 +88,18 @@ func (a *app) unsetCmd() *cobra.Command {
 }
 
 func (a *app) getCmd() *cobra.Command {
-	return &cobra.Command{
+	var locked bool
+	cmd := &cobra.Command{
 		Use:         "get [path]",
 		Annotations: reads(),
 		Short:       "Print a field of shulker.json, or all of it",
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, doc, s, err := a.openSettings()
+			open := a.openSettings
+			if locked {
+				open = a.openLocked
+			}
+			_, doc, s, err := open()
 			if err != nil {
 				return err
 			}
@@ -111,6 +117,8 @@ func (a *app) getCmd() *cobra.Command {
 			return a.printer.Emit(value, func(l *out.Lines) { writeValue(l.W, value) })
 		},
 	}
+	cmd.Flags().BoolVar(&locked, "locked", false, "read shulker.lock instead")
+	return cmd
 }
 
 func writeValue(w io.Writer, value any) {
@@ -141,6 +149,31 @@ func (a *app) openSettings() (*project.Project, map[string]any, *settingsSchema,
 		return nil, nil, nil, schema.Invalid("manifest-invalid", manifest.FileName, data, err)
 	}
 	s, err := loadSettingsSchema()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return p, doc, s, nil
+}
+
+func (a *app) openLocked() (*project.Project, map[string]any, *settingsSchema, error) {
+	p, err := a.openProject()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if err := p.RequireLock(); err != nil {
+		return nil, nil, nil, err
+	}
+	data, err := p.Lock.Encode()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	var doc map[string]any
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode(&doc); err != nil {
+		return nil, nil, nil, err
+	}
+	s, err := loadSchemaAt(schema.Lock, lock.FileName)
 	if err != nil {
 		return nil, nil, nil, err
 	}

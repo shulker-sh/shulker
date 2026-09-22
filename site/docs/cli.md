@@ -390,10 +390,18 @@ shulker unset server.memory
 
 Print a field: a string as it is, anything else as JSON. With no path, print all of `shulker.json`. A field that isn't set fails with `path-not-set`.
 
+`--locked` reads `shulker.lock` instead, by the lock's own field names, so `minecraft` is the exact version rather than the range `shulker.json` may hold. With no lock it fails with `lock-not-found`.
+
 ```sh
 shulker get name
 shulker get server.properties
+shulker get --locked minecraft
+shulker get --locked loader.type
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--locked` | Read `shulker.lock` instead of `shulker.json` |
 
 ## Configuration
 
