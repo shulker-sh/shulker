@@ -107,6 +107,49 @@ func TestLogShowsTheLastDayWithItsPreamble(t *testing.T) {
 	}
 }
 
+func TestLogIndentsEveryLineOfAMessage(t *testing.T) {
+	path := isolatedLog(t)
+	at := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano)
+	var lines []string
+	for _, e := range []auditlog.Entry{
+		{At: at, Group: "launchers", Cmd: "sync", Level: auditlog.LevelError, Code: "source-offline", Msg: "couldn't reach the pack\nit has never synced here"},
+		{At: at, Group: "launchers", Cmd: "sync", Level: auditlog.LevelWarn, Msg: "kept the old copy\nit is a day old"},
+	} {
+		line, err := json.Marshal(e)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines = append(lines, string(line))
+	}
+	writeFile(t, path, strings.Join(lines, "\n")+"\n")
+	code, stdout, stderr := run(t, "log", "--no-color")
+	if code != out.ExitOK {
+		t.Fatalf("exit %d: %s", code, stderr)
+	}
+	column := func(line, text string) int {
+		i := strings.Index(line, text)
+		if i < 0 {
+			t.Fatalf("%q not on its line in:\n%s", text, stdout)
+		}
+		return out.Width(line[:i])
+	}
+	printed := strings.Split(stdout, "\n")
+	find := func(text string) string {
+		for _, line := range printed {
+			if strings.Contains(line, text) {
+				return line
+			}
+		}
+		t.Fatalf("missing %q in:\n%s", text, stdout)
+		return ""
+	}
+	for first, next := range map[string]string{"couldn't reach the pack": "it has never synced here", "kept the old copy": "it is a day old"} {
+		if a, b := column(find(first), first), column(find(next), next); a != b {
+			t.Errorf("%q starts at column %d and the line after it at %d:\n%s", first, a, b, stdout)
+		}
+	}
+}
+
 func TestLogJSONIsTheEnvelope(t *testing.T) {
 	seedLog(t)
 	code, stdout, _ := run(t, "log", "--json", "--since", "7d")
