@@ -51,7 +51,10 @@ func (a *app) logCmd() *cobra.Command {
 			now := time.Now()
 			from, err := auditlog.ParseSince(f.since, now)
 			if err != nil {
-				return out.Errorf("usage", "--since: %s", err)
+				e := out.Errorf("usage", "--since is neither a duration nor a date")
+				e.Rows = []out.Detail{{Label: "Since", Text: f.since}}
+				e.Help = "pass a duration like 24h or 7d, or a date like 2026-09-01"
+				return e
 			}
 			if f.level != "" && !slices.Contains(logLevels, f.level) {
 				return out.Errorf("usage", "--level is one of %s, not %q", strings.Join(logLevels, ", "), f.level)

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"slices"
@@ -84,5 +83,5 @@ func ParseSince(s string, now time.Time) (time.Time, error) {
 	if at, err := time.Parse(time.RFC3339, s); err == nil {
 		return at, nil
 	}
-	return time.Time{}, fmt.Errorf("%q is neither a duration like 24h or 7d nor a date like 2026-09-01", s)
+	return time.Time{}, errors.New("neither a duration nor a date")
 }
