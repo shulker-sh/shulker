@@ -240,7 +240,7 @@ func (a *app) matchFingerprints(ctx context.Context, fingerprints []uint32) (map
 	if err != nil {
 		return nil, err
 	}
-	a.progress("looking up %s on CurseForge", plural(len(fingerprints), "mod", "mods"))
+	a.progress("looking up %s on CurseForge", plural(len(fingerprints), "file", "files"))
 	return cf.MatchFingerprints(ctx, fingerprints)
 }
 
