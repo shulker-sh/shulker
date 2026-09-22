@@ -4,10 +4,11 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"crypto/sha1"
 	"crypto/sha512"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"path"
@@ -159,7 +160,7 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if !ok {
 		return im.leaveForCurseForge(ctx, f)
 	}
-	locked, err := im.lockFile(ctx, im.modrinth, f.Path, "", found.proj, found.v)
+	locked, err := im.lockFile(ctx, im.modrinth, f.Layer(), f.Path, "", found.proj, found.v)
 	if err != nil || locked {
 		return err
 	}
@@ -301,22 +302,11 @@ func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provide
 		im.unmanaged(o)
 		return nil
 	}
-	// A fingerprint ignores whitespace bytes, so only a matching sha1 proves the pack's bytes are
-	// CurseForge's file; those lock from the cache without downloading it again.
-	if sum := sha1.Sum(o.Data); hex.EncodeToString(sum[:]) == v.File.Sha1 {
-		sha512Sum, err := im.r.Cache.Put(bytes.NewReader(o.Data))
-		if err != nil {
-			return err
-		}
-		same := *v
-		same.File.Sha512 = sha512Sum
-		v = &same
-	}
 	side := layerSide(o.Layer)
 	if side == "both" {
 		side = ""
 	}
-	locked, err := im.lockFile(ctx, cf, o.Path, side, proj, v)
+	locked, err := im.lockFile(ctx, cf, o.Layer, o.Path, side, proj, v)
 	if err != nil || locked {
 		return err
 	}
@@ -324,10 +314,11 @@ func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provide
 	return nil
 }
 
-// lockFile locks the mod jar, resource pack or shader at filePath as p's version v, reporting
-// false, with nothing locked, when proj isn't the kind its folder holds: a datapack under
-// resourcepacks/, which Modrinth calls a mod, stays unmanaged.
-func (im *importer) lockFile(ctx context.Context, p provider.Provider, filePath, side string, proj *provider.Project, v *provider.Version) (bool, error) {
+// lockFile locks the mod jar, resource pack or shader at filePath in layer as p's version v,
+// reporting false, with nothing locked, when proj isn't the kind its folder holds (a datapack
+// under resourcepacks/, which Modrinth calls a mod, stays unmanaged) or p fails to serve it. The
+// lock downloads it from p even when the pack ships the same bytes, since every later install will.
+func (im *importer) lockFile(ctx context.Context, p provider.Provider, layer, filePath, side string, proj *provider.Project, v *provider.Version) (bool, error) {
 	kind := manifest.TypeMod
 	switch path.Dir(filePath) {
 	case "resourcepacks":
@@ -342,10 +333,38 @@ func (im *importer) lockFile(ctx context.Context, p provider.Provider, filePath,
 	if projKind != kind {
 		return false, nil
 	}
+	var err error
 	if kind == manifest.TypeMod {
-		return true, im.lockMod(ctx, p, side, proj, v)
+		err = im.lockMod(ctx, p, side, proj, v)
+	} else {
+		err = im.lockPack(ctx, p, path.Base(filePath), kind, proj, v)
 	}
-	return true, im.lockPack(ctx, p, path.Base(filePath), kind, proj, v)
+	if why, failed := downloadFailure(err); failed {
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s/%s: %s's download failed (%s); kept as an override, so try matching it again later", layer, filePath, provider.Title(p.Name()), why))
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// downloadFailure says why err is a provider failing to serve a file, as a CDN cutting one short
+// does, rather than a failure of shulker's own, such as the cache's disk.
+func downloadFailure(err error) (string, bool) {
+	var status *fetch.StatusError
+	switch {
+	case err == nil, errors.Is(err, fetch.ErrOffline):
+		return "", false
+	case errors.As(err, &status):
+		return fmt.Sprintf("HTTP %d", status.Status), true
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return "the file was cut short", true
+	case out.CodeOf(err) == "checksum-mismatch":
+		return "the file doesn't match its hash", true
+	case out.CodeOf(err) == "manual-download":
+		return "it refused the download", true
+	case fetch.IsNetwork(err):
+		return "the connection failed", true
+	}
+	return "", false
 }
 
 func (im *importer) lockMod(ctx context.Context, p provider.Provider, side string, proj *provider.Project, v *provider.Version) error {
@@ -384,6 +403,11 @@ func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename,
 	if ok, err := im.canListPack(key, kind); !ok {
 		return err
 	}
+	defer func() {
+		if _, locked := r.packSection(kind)[key]; !locked {
+			delete(r.Manifest.Requires, key)
+		}
+	}()
 	listed := manifest.Require{Type: kind, Pin: lockID(p.Name(), v.ID)}
 	if filename != key+manifest.FileExtension(kind) {
 		listed.Filename = filename

@@ -391,24 +391,34 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 		return env.Data, env.Warnings, dir
 	}
 
-	h.cfMods[455508].files[0].forbidden = true
+	h.cfMods[455508].files[0].truncated = true
 	h.cfHits = 0
 	res, warnings, dir := importMixed(t)
 	if h.modrinthBatches != 2 || h.cfHits != 3 {
 		t.Fatalf("requests: %d to Modrinth, %d to CurseForge", h.modrinthBatches, h.cfHits)
 	}
-	if strings.Join(res.Mods.Locked, ",") != "iris,jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/"+nodist.filename+",overrides/mods/unknown-1.0.jar" {
+	if strings.Join(res.Mods.Locked, ",") != "jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "client-overrides/mods/"+iris.filename+",overrides/mods/"+nodist.filename+",overrides/mods/unknown-1.0.jar" {
 		t.Fatalf("import: %+v", res.Mods)
 	}
-	if len(warnings) != 1 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") {
+	if len(warnings) != 2 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") ||
+		!strings.Contains(warnings[1], iris.filename) || !strings.Contains(warnings[1], "download failed") {
 		t.Fatalf("warnings: %v", warnings)
 	}
 	m, l := readProject(t, dir)
-	if l.Mods["jei"].Provider != "curseforge" || l.Mods["iris"].Provider != "curseforge" || l.Mods["iris"].Side != "client" || l.Mods["sodium"].Provider != "modrinth" {
+	if _, ok := l.Mods["iris"]; ok || l.Mods["jei"].Provider != "curseforge" || l.Mods["sodium"].Provider != "modrinth" {
 		t.Fatalf("lock: %+v", l.Mods)
 	}
 	if got := m.Requires["jei"]; got.Provider != "curseforge" || fmt.Sprint(got.Project) != "238222" {
 		t.Fatalf("jei entry: %+v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "client-overrides/mods", iris.filename)); err != nil {
+		t.Fatalf("jar whose download failed not kept as an override: %v", err)
+	}
+
+	h.cfMods[455508].files[0].truncated = false
+	res, _, dir = importMixed(t)
+	if _, l := readProject(t, dir); strings.Join(res.Mods.Locked, ",") != "iris,jei,sodium" || l.Mods["iris"].Side != "client" {
+		t.Fatalf("import once CurseForge serves iris: %+v", res.Mods)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "client-overrides/mods", iris.filename)); !os.IsNotExist(err) {
 		t.Fatalf("locked jar kept as an override: %v", err)

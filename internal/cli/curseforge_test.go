@@ -41,6 +41,7 @@ type cfFile struct {
 	deps      []int
 	hidden    bool
 	forbidden bool
+	truncated bool
 }
 
 func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func() string) {
@@ -232,6 +233,11 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		id, _ := strconv.Atoi(strings.Split(strings.TrimPrefix(r.URL.Path, "/cfcdn/"), "/")[0])
 		for _, m := range h.cfMods {
 			for _, f := range allFiles(m) {
+				if f.id == id && f.truncated {
+					w.Header().Set("Content-Length", strconv.Itoa(len(f.jar.data)))
+					w.Write(f.jar.data[:len(f.jar.data)/2])
+					return
+				}
 				if f.id == id {
 					w.Write(f.jar.data)
 					return
