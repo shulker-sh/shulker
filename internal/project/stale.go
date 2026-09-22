@@ -250,8 +250,9 @@ func ModDifferences(dir, id string, e manifest.Require, lm lock.Mod) []string {
 }
 
 // FileDifferences compares a local file entry with the file on disk: its path, then its size, and
-// its sha512 only when the size still matches. A folder is zipped to compare its zip. A file that is
-// gone is no difference, since the cache still serves the bytes the lock names.
+// its sha512 only when the size still matches. A folder is zipped to compare its zip, and one that
+// can't be is a difference, for lock to report. A file that is gone is no difference, since the
+// cache still serves the bytes the lock names.
 func FileDifferences(dir, key, listed, locked string, size int64, lockedSha512 string) []string {
 	switch {
 	case listed == "":
@@ -269,7 +270,7 @@ func FileDifferences(dir, key, listed, locked string, size int64, lockedSha512 s
 	if st.IsDir() {
 		data, err := zipfile.Folder(path)
 		if err != nil {
-			return nil
+			return []string{key + ": " + err.Error()}
 		}
 		if sum := sha512.Sum512(data); hex.EncodeToString(sum[:]) == lockedSha512 {
 			return nil

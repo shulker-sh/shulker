@@ -90,8 +90,22 @@ func TestPackFolderStaleness(t *testing.T) {
 		t.Fatalf("excluded files make the lock stale: %+v", env)
 	}
 
-	writeProjectFile(t, h, "Resource Packs/Mod Menu Helper/assets/modmenu/lang/en_us.json", []byte(`{"modmenu.title":"Mod list"}`))
+	dangling := filepath.Join(h.dir, "Resource Packs", "Mod Menu Helper", "gone.png")
+	if err := os.Symlink(filepath.Join(t.TempDir(), "gone.png"), dangling); err != nil {
+		t.Fatal(err)
+	}
 	code, stdout, _ := h.run(t, "build", "--json")
+	env = out.Envelope{}
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "gone.png is a symlink to nothing") {
+		t.Fatalf("a folder that can't be zipped: code=%d env=%+v", code, env)
+	}
+	if err := os.Remove(dangling); err != nil {
+		t.Fatal(err)
+	}
+
+	writeProjectFile(t, h, "Resource Packs/Mod Menu Helper/assets/modmenu/lang/en_us.json", []byte(`{"modmenu.title":"Mod list"}`))
+	code, stdout, _ = h.run(t, "build", "--json")
 	env = out.Envelope{}
 	_ = json.Unmarshal([]byte(stdout), &env)
 	if code != 0 || !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "mod-menu-helper: the file's bytes changed") {
