@@ -325,6 +325,7 @@ func (r *Resolver) lockFilePack(key, kind string, entry manifest.Require) error 
 			return err
 		}
 	}
+	r.checkPackFolder(key, kind, entry)
 	p := lock.Pack{
 		File:     entry.File,
 		Filename: manifest.PackFilename(key, entry),

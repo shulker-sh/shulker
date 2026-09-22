@@ -216,6 +216,7 @@ func (r *Resolver) reconcilePacks(ctx context.Context) error {
 				section[key] = locked
 			}
 			if ok && len(project.ZipEntryDifferences(r.Dir, key, listed[key], locked)) == 0 {
+				r.checkPackFolder(key, kind, listed[key])
 				continue
 			}
 			if err := r.relockPack(ctx, key, kind, listed[key]); err != nil {
