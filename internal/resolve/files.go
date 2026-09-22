@@ -134,9 +134,32 @@ func (r *Resolver) warnOnce(warning string) {
 	}
 }
 
+// nestedPack names the modpack a locked modpack took a local file entry from, or "" when the locked
+// modpack supplies the entry itself.
+func (r *Resolver) nestedPack(id, modpack, file string) string {
+	for _, p := range r.Packs {
+		if p.Name != modpack || p.Lock == nil {
+			continue
+		}
+		if m, ok := p.Lock.Mods[id]; ok && m.File == file {
+			return m.Modpack
+		}
+		for _, section := range []map[string]lock.Pack{p.Lock.ResourcePacks, p.Lock.Shaders} {
+			if e, ok := section[id]; ok && e.File == file {
+				return e.Modpack
+			}
+		}
+	}
+	return ""
+}
+
 // restoreLocal fills the cache from a local file entry's file, and says what is wrong when the file
-// can't: it is gone, or its bytes are no longer the ones locked.
+// can't: it is gone, its bytes are no longer the ones locked, or it lives in a modpack nested inside
+// a locked one, whose directory this project never sees.
 func (r *Resolver) restoreLocal(f downloadable) string {
+	if inner := r.nestedPack(f.id, f.modpack, f.file); inner != "" {
+		return fmt.Sprintf("%s: %s comes from modpack %s inside modpack %s, so only the cache can serve it, and the cache has no copy of it", f.id, f.file, inner, f.modpack)
+	}
 	dir := r.fileDir(f.id, f.modpack, f.file)
 	file, err := os.Open(filepath.Join(dir, filepath.FromSlash(f.file)))
 	if dir == "" || err != nil {

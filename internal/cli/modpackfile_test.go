@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -205,5 +206,45 @@ func TestURLModpackFileEntryFails(t *testing.T) {
 	code, stdout, _ := h.run(t, "modpack", "add", srv.URL+"/tiny.json", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "modpack-url-file" || !strings.Contains(e.Message, "faithful") {
 		t.Fatalf("a URL modpack with a file entry: code=%d %s", code, stdout)
+	}
+}
+
+func TestNestedModpackFileServedOnlyFromCache(t *testing.T) {
+	root := t.TempDir()
+	inner, outer := filepath.Join(root, "base"), filepath.Join(root, "outer")
+	h, jar := packWithLocalFiles(t, inner)
+	h.editManifest(t, func(m map[string]any) { m["name"] = "outer" })
+	h.mustRun(t, "modpack", "add", inner)
+	if err := os.MkdirAll(outer, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"shulker.json", "shulker.lock"} {
+		if err := os.Rename(filepath.Join(h.dir, name), filepath.Join(outer, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "modpack", "add", outer)
+	if l := h.readLock(t); l.Mods["private-mod"].Sha512 != jar.sha512 || l.Mods["private-mod"].Modpack != "outer" {
+		t.Fatalf("the nested modpack's local mod: %+v", l.Mods["private-mod"])
+	}
+
+	other := makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17"}`)
+	writeFile(t, filepath.Join(outer, "files", "private-mod-1.4.jar"), string(other.data))
+	if err := os.RemoveAll(filepath.Join(h.cache, "objects")); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, _ := h.run(t, "install", "--json")
+	var env out.Envelope
+	_ = json.Unmarshal([]byte(stdout), &env)
+	if code == 0 || env.Error == nil || env.Error.Code != "missing-files" {
+		t.Fatalf("install with the nested files uncached: code=%d env=%+v", code, env)
+	}
+	var want []string
+	for _, entry := range []string{"private-mod: files/private-mod-1.4.jar", "faithful: files/faithful.zip", "bsl: files/bsl.zip"} {
+		want = append(want, entry+" comes from modpack base inside modpack outer, so only the cache can serve it, and the cache has no copy of it")
+	}
+	if !reflect.DeepEqual(env.Error.Items, want) {
+		t.Fatalf("the nested files' problems:\n got %q\nwant %q", env.Error.Items, want)
 	}
 }
