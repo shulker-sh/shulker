@@ -102,6 +102,19 @@ func TestReplaceKeepsOldBytesAsReplaced(t *testing.T) {
 	}
 }
 
+func TestReplaceKeepsTheOldMode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Replace(path, []byte("new")); err != nil {
+		t.Fatal(err)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %v", info.Mode().Perm())
+	}
+}
+
 func TestReplaceOverwritesAnOlderReplaced(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")

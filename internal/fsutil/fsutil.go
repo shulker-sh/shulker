@@ -24,10 +24,14 @@ func Write(path string, data []byte) error {
 }
 
 func WriteFrom(path string, r io.Reader) error {
+	return writeFrom(path, r, 0o644)
+}
+
+// writeFrom is WriteFrom with the mode a new file gets.
+func writeFrom(path string, r io.Reader, mode fs.FileMode) error {
 	if target, err := filepath.EvalSymlinks(path); err == nil {
 		path = target
 	}
-	mode := fs.FileMode(0o644)
 	if info, err := os.Stat(path); err == nil {
 		mode = info.Mode().Perm()
 		// A rename needs only a writable directory, so check the file itself
@@ -60,12 +64,17 @@ func WriteFrom(path string, r io.Reader) error {
 // Replace writes data to path after renaming whatever is there to
 // <name>.replaced, clobbering only an older replaced file. kept is where the
 // old file went, empty when there was none. A symlink at path is followed, so
-// kept sits beside the link's target, not the link.
+// kept sits beside the link's target, not the link. The new file keeps the old
+// one's mode.
 func Replace(path string, data []byte) (kept string, err error) {
 	if info, err := os.Lstat(path); err == nil && info.Mode()&fs.ModeSymlink != 0 {
 		if path, err = filepath.EvalSymlinks(path); err != nil {
 			return "", err
 		}
+	}
+	mode := fs.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
 	}
 	kept = path + ".replaced"
 	if err := os.Rename(path, kept); errors.Is(err, fs.ErrNotExist) {
@@ -73,7 +82,7 @@ func Replace(path string, data []byte) (kept string, err error) {
 	} else if err != nil {
 		return "", err
 	}
-	return kept, Write(path, data)
+	return kept, writeFrom(path, bytes.NewReader(data), mode)
 }
 
 // MarshalJSON is the encoding of every JSON file shulker writes.
