@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/lock"
 )
 
 type modpackLockView struct {
@@ -207,5 +209,29 @@ func TestURLModpackWithoutALockStaysFloating(t *testing.T) {
 	}
 	if from := l.Mods["sodium"].Modpack; from != "" {
 		t.Fatalf("a floating modpack's mods are resolved here, so they carry no origin, got %q", from)
+	}
+}
+
+func TestRemovingALockedModpackDropsItsResourcePacks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "add", "fresh-animations")
+	dir := filepath.Join(h.dir, "base")
+	lockedPack(t, h, dir, `"sodium": {}, "fresh-animations": {"type": "resourcepack"}`)
+	h.mustRun(t, "remove", "sodium", "fresh-animations")
+	h.mustRun(t, "modpack", "add", "./base")
+
+	var l lock.Lock
+	h.readJSON(t, "shulker.lock", &l)
+	if got := l.ResourcePacks["fresh-animations"].Modpack; got != "base" {
+		t.Fatalf("fresh-animations should come from the modpack, got %q", got)
+	}
+
+	h.mustRun(t, "modpack", "remove", "base")
+	l = lock.Lock{}
+	h.readJSON(t, "shulker.lock", &l)
+	if got, still := l.ResourcePacks["fresh-animations"]; still {
+		t.Fatalf("the modpack's resource pack should leave with it: %+v", got)
 	}
 }

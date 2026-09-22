@@ -219,8 +219,20 @@ func (r *Resolver) RemovePack(name string) error {
 	}
 	r.Packs = kept
 	r.dropRequiredBy(name)
+	r.dropPackZips(name)
 	r.pruneOrphans()
 	return nil
+}
+
+// dropPackZips drops the resource packs and shaders the named modpack supplied.
+func (r *Resolver) dropPackZips(name string) {
+	for _, section := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
+		for key, p := range section {
+			if p.Modpack == name {
+				delete(section, key)
+			}
+		}
+	}
 }
 
 // RefreshPacks makes loaded the project's modpacks, pinning each in the lock and dropping the pins of
@@ -241,6 +253,7 @@ func (r *Resolver) RefreshPacks(loaded []*pack.Loaded) error {
 		}
 		delete(r.Lock.Modpacks, name)
 		r.dropRequiredBy(name)
+		r.dropPackZips(name)
 	}
 	return nil
 }
