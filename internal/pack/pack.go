@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loaderver"
@@ -48,9 +49,10 @@ type Loaded struct {
 	UsesLock bool
 	Pin      lock.Modpack
 	// Archive is a File modpack's archive, and Overrides the files it lays itself, in place of the
-	// override folders a directory has.
-	Archive   *mrpack.Archive
-	Overrides []mrpack.Override
+	// override folders a directory has. A CurseForge pack is also kept as read, in CurseForge.
+	Archive    *mrpack.Archive
+	CurseForge *cfpack.Archive
+	Overrides  []mrpack.Override
 	// Warnings are what consuming an archive found to mention.
 	Warnings   []string
 	lockSha256 string

@@ -34,7 +34,7 @@ func (s *Store) resolveArchive(ctx context.Context, l *Loaded, p manifest.Requir
 		return err
 	}
 	l.Pin = pin
-	if l.Archive, err = readArchive(l.Name, p.File, s.Cache.Object(pin.Sha512)); err != nil {
+	if l.Archive, l.CurseForge, err = readArchive(l.Name, p.File, s.Cache.Object(pin.Sha512)); err != nil {
 		return err
 	}
 	if err := s.Consume(ctx, l); err != nil {
@@ -70,7 +70,7 @@ func (s *Store) openArchive(ctx context.Context, l *Loaded, p manifest.Require) 
 		}
 	}
 	var err error
-	if l.Archive, err = readArchive(l.Name, p.File, s.Cache.Object(l.Pin.Sha512)); err != nil {
+	if l.Archive, l.CurseForge, err = readArchive(l.Name, p.File, s.Cache.Object(l.Pin.Sha512)); err != nil {
 		return err
 	}
 	l.Manifest, l.Lock = archiveEntries(l.Name, l.Archive, s.Lock)
@@ -128,26 +128,34 @@ func FileMissing(name, rel string) *out.Error {
 // CheckArchive refuses a file that isn't a modpack archive shulker consumes, before anything is
 // done with it.
 func CheckArchive(name, path string) error {
-	_, err := readArchive(name, filepath.Base(path), path)
+	_, _, err := readArchive(name, filepath.Base(path), path)
 	return err
 }
 
-// readArchive reads a modpack archive by its content: a Modrinth pack is read whole, and anything
-// else is refused, a CurseForge pack as not consumed yet.
-func readArchive(name, rel, path string) (*mrpack.Archive, error) {
+// readArchive reads a modpack archive by its content: a Modrinth pack whole, and a CurseForge pack
+// as well as the Modrinth view of it that the build lays.
+func readArchive(name, rel, path string) (*mrpack.Archive, *cfpack.Archive, error) {
 	if hasIndex(path) {
 		a, err := mrpack.Read(path)
 		if err != nil {
-			return nil, inModpack(name, err)
+			return nil, nil, inModpack(name, err)
 		}
-		return a, nil
+		return a, nil, nil
 	}
-	if _, err := cfpack.Read(path); err == nil {
-		return nil, out.Errorf("requires-unsupported", "modpack %s: %s is a CurseForge modpack, which shulker can't consume yet", name, rel)
+	cf, err := cfpack.Read(path)
+	if err == nil {
+		a, err := cf.Mrpack()
+		if err != nil {
+			return nil, nil, inModpack(name, err)
+		}
+		return a, cf, nil
+	}
+	if out.CodeOf(err) != "archive-not-modpack" {
+		return nil, nil, inModpack(name, err)
 	}
 	e := out.Errorf("archive-not-modpack", "modpack %s: %s is not a Modrinth or CurseForge modpack", name, rel)
 	e.Help = "a modpack's file is a .mrpack or a CurseForge zip; a directory holding a shulker.json is a source"
-	return nil, e
+	return nil, nil, e
 }
 
 func hasIndex(path string) bool {

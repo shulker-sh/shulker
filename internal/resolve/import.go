@@ -285,9 +285,9 @@ func layerSide(layer string) string {
 }
 
 // ConsumeArchive locks what a modpack archive holds as that modpack's own lock and manifest, the
-// way ImportMrpack locks one into a new project, and records in its pin the files the archive
-// lays itself. r's own lock is left alone; only its providers, provider order, cache and fetch
-// client are used.
+// way ImportMrpack or ImportCurseForge locks one into a new project, and records in its pin the
+// files the archive lays itself. r's own lock is left alone; only its providers, provider order,
+// cache and fetch client are used.
 func (r *Resolver) ConsumeArchive(ctx context.Context, l *pack.Loaded) error {
 	a := l.Archive
 	minecraft := a.Index.Dependencies["minecraft"]
@@ -299,7 +299,19 @@ func (r *Resolver) ConsumeArchive(ctx context.Context, l *pack.Loaded) error {
 	pl := lock.New()
 	pl.Minecraft, pl.Loader = minecraft, lock.Loader{Type: typ, Version: version}
 	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log}
-	rep, err := scratch.ImportMrpack(ctx, a)
+	var rep *Imported
+	var err error
+	if l.CurseForge != nil {
+		if r.Fetch != nil && r.Fetch.Offline {
+			return curseForgeOffline(l.Name, nil)
+		}
+		rep, err = scratch.ImportCurseForge(ctx, l.CurseForge)
+		if fetch.IsNetwork(err) {
+			return curseForgeOffline(l.Name, err)
+		}
+	} else {
+		rep, err = scratch.ImportMrpack(ctx, a)
+	}
 	if err != nil {
 		return prefixed("modpack "+l.Name, err)
 	}
@@ -319,4 +331,15 @@ func (r *Resolver) ConsumeArchive(ctx context.Context, l *pack.Loaded) error {
 	}
 	l.Manifest, l.Lock, l.Warnings = m, pl, rep.Warnings
 	return nil
+}
+
+// curseForgeOffline is a CurseForge modpack read without the network. Its files are named by id
+// alone, with no hash to find them in the cache by, so even a warm cache can't stand in.
+func curseForgeOffline(name string, cause error) error {
+	e := out.Errorf("curseforge-offline", "modpack %s: a CurseForge modpack can't be read offline, even with every file it names in the cache", name)
+	e.Help = "it names its files by CurseForge id, which only the CurseForge API resolves; run the command again online"
+	if cause != nil {
+		e = e.WithCause("curseforge", cause)
+	}
+	return fetch.Unreachable(e)
 }

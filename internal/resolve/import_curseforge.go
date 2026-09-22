@@ -42,7 +42,7 @@ func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Im
 	if len(missing) > 0 {
 		e := out.Errorf("missing-files", "%d file(s) need a manual download", len(missing))
 		e.Items = missing
-		e.Help = "download them, then run the import again"
+		e.Help = "download them, then run the command again"
 		return nil, e
 	}
 	for _, o := range a.Overrides {

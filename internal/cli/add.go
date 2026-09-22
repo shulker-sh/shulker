@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -30,7 +31,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fallback := ""
-			if kind == "" && typ == "" && len(args) > 0 && !slices.ContainsFunc(args, func(arg string) bool { return !isArchiveName(arg) }) {
+			if kind == "" && typ == "" && len(args) > 0 && !slices.ContainsFunc(args, func(arg string) bool { return !a.isArchive(arg) }) {
 				fallback = manifest.TypeModpack
 			}
 			chosen, err := chooseType(cmd, kind, typ, fallback)
@@ -127,10 +128,17 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	return cmd
 }
 
-// isArchiveName reports whether an add argument names a modpack archive, which a bare add takes as
-// a modpack.
-func isArchiveName(arg string) bool {
-	return strings.EqualFold(filepath.Ext(arg), ".mrpack")
+// isArchive reports whether an add argument is a modpack archive, which a bare add takes as a
+// modpack: an .mrpack by its name, and a zip by holding a CurseForge manifest.
+func (a *app) isArchive(arg string) bool {
+	switch strings.ToLower(filepath.Ext(arg)) {
+	case ".mrpack":
+		return true
+	case ".zip":
+		_, err := cfpack.Read(a.localPath(arg))
+		return err == nil
+	}
+	return false
 }
 
 // localPath is an argument naming a local file made absolute, against -C when it is given, and any

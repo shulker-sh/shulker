@@ -80,6 +80,21 @@ func (a *Archive) Loader() (string, string, error) {
 	return name, version, nil
 }
 
+// Mrpack is the archive in the shape a Modrinth pack is read in: its Minecraft version and loader
+// as index dependencies, its overrides, and no index files, since it names its files by id.
+func (a *Archive) Mrpack() (*mrpack.Archive, error) {
+	name, version, err := a.Loader()
+	if err != nil {
+		return nil, err
+	}
+	deps := map[string]string{mrpack.Game: a.Manifest.Minecraft.Version}
+	if l, ok := loader.Lookup(name); ok {
+		deps[l.MrpackKey] = version
+	}
+	index := mrpack.Index{FormatVersion: 1, Game: mrpack.Game, VersionID: a.Manifest.Version, Name: a.Manifest.Name, Dependencies: deps}
+	return &mrpack.Archive{Index: index, Overrides: a.Overrides}, nil
+}
+
 // Read opens a CurseForge modpack zip. Anything that isn't one is refused by what it holds, not
 // by its name, as archive-not-modpack.
 func Read(file string) (*Archive, error) {
