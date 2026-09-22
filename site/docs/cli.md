@@ -1678,7 +1678,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `account-not-found` | No account matches the selector, or the account an instance is pinned to has since been removed. `candidates`: every account, each as its qualifier and its id, `pass`: their ids |
 | `account-not-playable` | The account owns no Java profile, so it can't launch anything |
 | `account-sign-in-expired` | The Microsoft refresh token is gone or revoked, so shulker can't get a session for the account; `shulker accounts login` signs it in again |
-| `accounts-invalid` | shulker's own `accounts.json` doesn't parse or doesn't match its schema |
+| `accounts-invalid` | shulker's own `accounts.json` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema |
 | `already-ignored` | The pair already has an ignore in `shulker.json`; pass `--force` to replace it |
 | `ambiguous-account` | The selector can't tell several accounts apart, since they share the very same name or their ids share the prefix typed, and shulker can't ask, because it isn't running on a terminal. `candidates`: the matches, each as its qualifier and its id, `pass`: their ids |
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
@@ -1721,7 +1721,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `instance-not-found` | No instance matches, or the directory `shulker instance` acts on holds no `.shulker/instance.json`. `candidates`: the instances shulker knows, `pass`: their ids |
 | `instance-id-taken` | Another instance already has the `--as` id; the message names its directory |
-| `instance-invalid` | An instance's `.shulker/instance.json` doesn't parse, doesn't match its schema, or names a `$schema` this shulker doesn't know or names none; `shulker instances repair` writes it again, keeping the old file as `.shulker/instance.json.replaced` |
+| `instance-invalid` | An instance's `.shulker/instance.json` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` writes it again, keeping the old file as `.shulker/instance.json.replaced` |
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |
@@ -1741,11 +1741,11 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
-| `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
+| `lock-invalid` | `shulker.lock` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `shulker lock` replaces it, keeping the old file as `shulker.lock.replaced`. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock`. Also a lock file named with `--lock` to `cache info` or `cache prune` that isn't there |
 | `lock-stale` | `export` needs a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
-| `manifest-invalid` | `shulker.json` doesn't parse (the message names the line and column), names a `$schema` this shulker doesn't know, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. A manifest with no `$schema` is read as the current version, and shulker writes the line the next time it saves the file. `items`: the failing fields when there are several |
+| `manifest-invalid` | `shulker.json` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. A manifest with no `$schema` is read as the current version, and shulker writes the line the next time it saves the file. `items`: the failing fields when there are several |
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |
 | `manual-download` | The provider doesn't distribute this mod or modpack; download it into `downloads/` |
 | `memory` | Server memory isn't a whole number of M or G |
@@ -1810,7 +1810,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `restore-failed` | `restore --all` failed for some targets; `data` has each target's result |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |
-| `schema-newer` | A file shulker manages was written by a newer shulker, and this one can't read it; `shulker self update` catches up |
+| `schema-newer` | `shulker.json`, `shulker.lock`, `.shulker/instance.json`, `registry.json`, `config.json` or `accounts.json` was written by a newer shulker, and this one can't read it; the message names both schema versions, and `shulker self update` catches up. A newer `shulker.local.json` or `.shulker/state.json` warns instead, with the same fix |
 | `self-uninstall` | The shulker binary couldn't be removed |
 | `self-update-check` | Checking for a release failed, or none is published |
 | `self-update-checksum` | The download doesn't match its checksum |
