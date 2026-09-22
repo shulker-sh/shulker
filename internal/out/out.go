@@ -144,9 +144,24 @@ func (p *Printer) Out() *Lines { return &Lines{W: settling{p, p.Stdout}, T: p.Th
 func (p *Printer) Err() *Lines { return &Lines{W: settling{p, p.Stderr}, T: p.ErrTheme} }
 
 func (p *Printer) Warn(format string, args ...any) {
+	p.warn(format, args...)
+}
+
+// WarnNudge is Warn with the command that deals with the warning printed beneath it, the way an
+// error's nudge is.
+func (p *Printer) WarnNudge(n Nudge, format string, args ...any) {
+	if p.warn(format, args...) && !p.JSON {
+		l := p.Err()
+		l.Nudge(n.Lead, n.Command)
+		l.Blank()
+	}
+}
+
+// warn reports whether the warning was new; a repeat is dropped.
+func (p *Printer) warn(format string, args ...any) bool {
 	msg := p.WarnPrefix + fmt.Sprintf(format, args...)
 	if slices.Contains(p.warnings, msg) {
-		return
+		return false
 	}
 	p.warnings = append(p.warnings, msg)
 	if p.Recorder != nil {
@@ -159,6 +174,7 @@ func (p *Printer) Warn(format string, args ...any) {
 		}
 		p.Err().Warn(text)
 	}
+	return true
 }
 
 func (p *Printer) envelope(ok bool, data any, e *Error) Envelope {

@@ -27,20 +27,21 @@ func TestWriteStateMarksSchema(t *testing.T) {
 	if want := "https://shulker.sh/schema/v1/state.json"; head.Schema != want {
 		t.Fatalf("$schema = %q, want %q", head.Schema, want)
 	}
-	s, err := ReadState(dir)
-	if err != nil || s.Files["mods/a.jar"] != "abc" {
-		t.Fatalf("ReadState after writeState = %+v, %v", s, err)
+	s, stateErr := ReadState(dir)
+	if stateErr != nil || s.Files["mods/a.jar"] != "abc" {
+		t.Fatalf("ReadState after writeState = %+v, %v", s, stateErr)
 	}
 }
 
 func TestReadStateMarker(t *testing.T) {
 	for _, c := range []struct {
 		name, schema, reason string
+		newer                bool
 	}{
-		{"newer", "https://shulker.sh/schema/v2/state.json", "was written by a newer shulker (schema v2; this one knows v1); treating every file as not written by shulker. Run `shulker self update` to read it, or rebuild with --force to take them over"},
-		{"missing", "", "is unreadable (names no $schema, which this shulker doesn't know); treating every file as not written by shulker. Rebuild with --force to take them over"},
-		{"foreign", "https://shulker.sh/schema/v1/lock.json", "is unreadable (names the schema https://shulker.sh/schema/v1/lock.json, which this shulker doesn't know); treating every file as not written by shulker. Rebuild with --force to take them over"},
-		{"lower", "https://shulker.sh/schema/v0/state.json", "is unreadable (names the schema https://shulker.sh/schema/v0/state.json, which this shulker doesn't know); treating every file as not written by shulker. Rebuild with --force to take them over"},
+		{"newer", "https://shulker.sh/schema/v2/state.json", "was written by a newer shulker (schema v2; this one reads up to v1); treating every file as not written by shulker", true},
+		{"missing", "", "is unreadable (names no $schema, which this shulker doesn't know); treating every file as not written by shulker", false},
+		{"foreign", "https://shulker.sh/schema/v1/lock.json", "is unreadable (names the schema https://shulker.sh/schema/v1/lock.json, which this shulker doesn't know); treating every file as not written by shulker", false},
+		{"lower", "https://shulker.sh/schema/v0/state.json", "is unreadable (names the schema https://shulker.sh/schema/v0/state.json, which this shulker doesn't know); treating every file as not written by shulker", false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -60,7 +61,10 @@ func TestReadStateMarker(t *testing.T) {
 				t.Errorf("files = %v, want none", s.Files)
 			}
 			if want := StatePath(dir) + " " + c.reason; err == nil || err.Error() != want {
-				t.Errorf("err = %v\nwant %s", err, want)
+				t.Fatalf("err = %v\nwant %s", err, want)
+			}
+			if err.Newer != c.newer {
+				t.Errorf("Newer = %v, want %v", err.Newer, c.newer)
 			}
 		})
 	}

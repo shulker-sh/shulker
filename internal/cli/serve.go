@@ -139,6 +139,7 @@ func (a *app) serveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			a.warnState(rep.State, takeOver(cmd, nil, force))
 			if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 				return err
 			}

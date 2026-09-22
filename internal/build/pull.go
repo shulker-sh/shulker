@@ -27,10 +27,11 @@ type FileDiff struct {
 }
 
 type DiffReport struct {
-	Side     string     `json:"side"`
-	Dir      string     `json:"dir"`
-	Files    []FileDiff `json:"files"`
-	Warnings []string   `json:"-"`
+	Side     string      `json:"side"`
+	Dir      string      `json:"dir"`
+	Files    []FileDiff  `json:"files"`
+	Warnings []string    `json:"-"`
+	State    *StateError `json:"-"`
 }
 
 type PullReport struct {
@@ -42,10 +43,11 @@ type PullReport struct {
 	// Entries are the jars and packs adopted as file entries, filled by the caller from Adoptable.
 	Entries []string `json:"entries"`
 	// Adoptable are the named files to adopt as file entries rather than copy to an override.
-	Adoptable       []string `json:"-"`
-	Skipped         []string `json:"skipped"`
-	Warnings        []string `json:"-"`
-	ManifestChanged bool     `json:"manifestChanged"`
+	Adoptable       []string    `json:"-"`
+	Skipped         []string    `json:"skipped"`
+	Warnings        []string    `json:"-"`
+	State           *StateError `json:"-"`
+	ManifestChanged bool        `json:"manifestChanged"`
 }
 
 // Diff is how the files in side's build directory differ from what a build would write.
@@ -54,7 +56,7 @@ func (b *Builder) Diff(side string, opts Options) (*DiffReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	report := &DiffReport{Side: side, Dir: d.dir, Files: []FileDiff{}, Warnings: d.warnings}
+	report := &DiffReport{Side: side, Dir: d.dir, Files: []FileDiff{}, Warnings: d.warnings, State: d.state}
 	for _, f := range d.plans {
 		if !drifted(f) {
 			continue
@@ -165,7 +167,7 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 		return nil, err
 	}
 	dir, desired, prev, plans := d.dir, d.desired, d.prev, d.plans
-	report := &PullReport{Side: side, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Entries: []string{}, Skipped: []string{}, Warnings: d.warnings}
+	report := &PullReport{Side: side, Dir: dir, Pulled: []string{}, Keys: []string{}, Adopted: []string{}, Entries: []string{}, Skipped: []string{}, Warnings: d.warnings, State: d.state}
 	var pulled []string
 	if len(adopt) > 0 {
 		rel := filepath.ToSlash(filepath.Clean(files[0]))
@@ -366,6 +368,7 @@ type drift struct {
 	prev     State
 	plans    []planned
 	warnings []string
+	state    *StateError
 }
 
 func (b *Builder) drift(side string, opts Options) (*drift, error) {
@@ -386,14 +389,11 @@ func (b *Builder) drift(side string, opts Options) (*drift, error) {
 		return nil, e
 	}
 	prev, stateErr := ReadState(dir)
-	if stateErr != nil {
-		report.Warnings = append(report.Warnings, stateErr.Error())
-	}
 	plans, err := b.plan(dir, desired, prev, false)
 	if err != nil {
 		return nil, err
 	}
-	return &drift{dir: dir, desired: desired, prev: prev, plans: plans, warnings: report.Warnings}, nil
+	return &drift{dir: dir, desired: desired, prev: prev, plans: plans, warnings: report.Warnings, state: stateErr}, nil
 }
 
 func drifted(f planned) bool {

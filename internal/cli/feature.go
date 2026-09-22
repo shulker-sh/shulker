@@ -175,9 +175,7 @@ func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool)
 		return nil, err
 	}
 	state, stateErr := build.ReadState(dir)
-	if stateErr != nil {
-		a.printer.Warn("%v", stateErr)
-	}
+	a.warnState(stateErr, a.forceCommand(nil, "", dir))
 	sc := &featureScope{into: dir, state: state}
 	if sc.file, err = a.loadLocal(dir); err != nil {
 		return nil, err

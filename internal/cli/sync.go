@@ -40,6 +40,9 @@ type syncRequest struct {
 	force, assumeClient bool
 	features            featureFlags
 	backup              string
+	// rerun is the take-over command for a state file sync can't read; empty names the command that
+	// rebuilds the directory.
+	rerun string
 }
 
 func (a *app) syncCmd() *cobra.Command {
@@ -56,6 +59,9 @@ func (a *app) syncCmd() *cobra.Command {
 				return err
 			}
 			req.backup = "sync"
+			if !req.force {
+				req.rerun = rerunForced(cmd, args)
+			}
 			if offline {
 				d, err := a.deps()
 				if err != nil {
@@ -242,6 +248,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 		return syncResult{}, err
 	}
 	a.warn(rep.Warnings)
+	a.warnState(rep.State, a.syncTakeOver(req, p, side, into))
 	if side == "client" {
 		a.syncLauncherImage(into, b)
 	}

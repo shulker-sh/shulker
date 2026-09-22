@@ -90,3 +90,22 @@ func TestReportPrintsOnlyForHumans(t *testing.T) {
 		t.Fatalf("human %q, json %q", human.String(), machine.String())
 	}
 }
+
+func TestWarnNudgePrintsTheNudgeUnderItsWarningOnce(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	for range 2 {
+		p.WarnNudge(Nudge{Lead: "Update shulker", Command: "shulker self update"}, "%s is newer", "state.json")
+	}
+	want := gutter + "! state.json is newer\n\n" + gutter + "Update shulker:\n" + gutter + gutter + "$ shulker self update\n\n"
+	if got := stderr.String(); got != want {
+		t.Errorf("stderr = %q, want %q", got, want)
+	}
+
+	stderr.Reset()
+	p = &Printer{JSON: true, Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	p.WarnNudge(Nudge{Lead: "Update shulker", Command: "shulker self update"}, "state.json is newer")
+	if stderr.Len() != 0 || !slices.Equal(p.warnings, []string{"state.json is newer"}) {
+		t.Errorf("json: stderr %q, warnings %q", stderr.String(), p.warnings)
+	}
+}

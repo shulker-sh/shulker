@@ -130,8 +130,11 @@ type Report struct {
 	Conflicts []string `json:"conflicts"`
 	Excluded  []string `json:"excluded"`
 	Warnings  []string `json:"-"`
-	Forced    bool     `json:"forced"`
-	History   string   `json:"history,omitempty"`
+	// State is why the directory's state file was read as empty, warned apart from Warnings since
+	// its fix is a command.
+	State   *StateError `json:"-"`
+	Forced  bool        `json:"forced"`
+	History string      `json:"history,omitempty"`
 	// InstalledLoader is set when the loader's own installer ran into the dir after the build.
 	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
 }
@@ -286,9 +289,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		dirs = nil
 	}
 	prev, stateErr := ReadState(dir)
-	if stateErr != nil {
-		report.Warnings = append(report.Warnings, stateErr.Error())
-	}
+	report.State = stateErr
 	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, LauncherImage: prev.LauncherImage, Packs: b.placedPackNames(desired)}
 	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
@@ -919,27 +920,45 @@ func LoadState(dir string) State {
 	return s
 }
 
-// ReadState treats a state file it can't read as empty, like LoadState, and also returns why,
-// worded as the warning to show.
-func ReadState(dir string) (State, error) {
+// StateError is why ReadState treated a state file as empty: every file in the directory then counts
+// as not written by shulker.
+type StateError struct {
+	Path string
+	// Newer is a file written by a newer shulker, whose fix is `shulker self update` rather than
+	// --force.
+	Newer     bool
+	Got, Want int
+	Err       error
+}
+
+func (e *StateError) Error() string {
+	if e.Newer {
+		return fmt.Sprintf("%s %s; treating every file as not written by shulker", e.Path, schema.Newer(e.Got, e.Want))
+	}
+	return fmt.Sprintf("%s is unreadable (%v); treating every file as not written by shulker", e.Path, e.Err)
+}
+
+// ReadState treats a state file it can't read as empty, like LoadState, and also returns why.
+func ReadState(dir string) (State, *StateError) {
 	path := StatePath(dir)
+	empty := State{Files: map[string]string{}}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return State{Files: map[string]string{}}, nil
-	}
-	var s State
-	if err == nil {
-		var got, want int
-		got, want, err = schema.ReadMarker(schema.State, data)
-		if err == nil && got > want {
-			return State{Files: map[string]string{}}, fmt.Errorf("%s was written by a newer shulker (schema v%d; this one knows v%d); treating every file as not written by shulker. Run `shulker self update` to read it, or rebuild with --force to take them over", path, got, want)
-		}
-	}
-	if err == nil {
-		err = json.Unmarshal(data, &s)
+		return empty, nil
 	}
 	if err != nil {
-		return State{Files: map[string]string{}}, fmt.Errorf("%s is unreadable (%v); treating every file as not written by shulker. Rebuild with --force to take them over", path, err)
+		return empty, &StateError{Path: path, Err: err}
+	}
+	got, want, err := schema.ReadMarker(schema.State, data)
+	if err != nil {
+		return empty, &StateError{Path: path, Err: err}
+	}
+	if got > want {
+		return empty, &StateError{Path: path, Newer: true, Got: got, Want: want}
+	}
+	var s State
+	if err := json.Unmarshal(data, &s); err != nil {
+		return empty, &StateError{Path: path, Err: err}
 	}
 	if s.Files == nil {
 		s.Files = map[string]string{}
