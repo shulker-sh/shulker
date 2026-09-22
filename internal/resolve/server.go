@@ -1,19 +1,17 @@
 package resolve
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
-	"hash/crc32"
 	"sort"
 	"strings"
-	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/zipfile"
 )
 
 type ServerJarResult struct {
@@ -306,32 +304,10 @@ func quiltLaunchJar(launcherMainClass, mainClass string, libraries []string) ([]
 	manifestLine(&manifest, "Class-Path", strings.Join(classPath, " "))
 	manifest.WriteString("\r\n")
 
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for _, f := range []struct{ name, data string }{
-		{"META-INF/MANIFEST.MF", manifest.String()},
-		{"quilt-server-launch.properties", "launch.mainClass=" + mainClass + "\n"},
-	} {
-		// Stored with fixed times so every machine generates the jar the lock hashed.
-		w, err := zw.CreateRaw(&zip.FileHeader{
-			Name:               f.name,
-			Method:             zip.Store,
-			Modified:           time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
-			CRC32:              crc32.ChecksumIEEE([]byte(f.data)),
-			CompressedSize64:   uint64(len(f.data)),
-			UncompressedSize64: uint64(len(f.data)),
-		})
-		if err != nil {
-			return nil, err
-		}
-		if _, err := w.Write([]byte(f.data)); err != nil {
-			return nil, err
-		}
-	}
-	if err := zw.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return zipfile.Build(map[string][]byte{
+		"META-INF/MANIFEST.MF":           []byte(manifest.String()),
+		"quilt-server-launch.properties": []byte("launch.mainClass=" + mainClass + "\n"),
+	}, "")
 }
 
 // Jar manifests cap lines at 72 bytes; longer values continue on lines starting with a space.

@@ -68,5 +68,6 @@ All notable changes to shulker are documented here. The format is based on
 
 ### Changed
 - `.shulker/state.json` records `side` in place of `target`. A state file from an earlier build decodes with an empty side, so the next build treats that directory as fresh and writes everything again; there is no migration.
+- The marker jar, both exports and the Quilt server launch jar are zipped the same way on every machine and Go release: deflated by a pinned compressor with fixed timestamps and entries in path order, so the same project gives the same bytes wherever it is built. The Quilt launch jar is now compressed, so a lock that recorded the old one fails with `lock-stale` once the jar leaves the cache; remove `loader.server` from `shulker.lock` to relock it.
 
 [Unreleased]: https://github.com/shulker-sh/shulker/commits/master

@@ -1,7 +1,6 @@
 package build
 
 import (
-	"archive/zip"
 	"bytes"
 	"embed"
 	"encoding/json"
@@ -11,13 +10,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/BurntSushi/toml"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/zipfile"
 )
 
 //go:generate sh modmenu/compile.sh
@@ -33,8 +32,6 @@ const (
 	markerEntrypoint = "shulker.marker.ShulkerModMenu"
 	markerModsPath   = "shulker/mods.txt"
 )
-
-var markerTime = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func markerModID(name string) string {
 	return "shulker_" + strings.NewReplacer(".", "_", "-", "_").Replace(name)
@@ -101,21 +98,11 @@ func (b *Builder) markerJar(side string, cond conditions, sel selection) ([]byte
 		markerEntry{lock.FileName, lockData},
 		markerEntry{markerModsPath, markerModList(direct, deps)},
 	)
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
+	files := make(map[string][]byte, len(entries))
 	for _, e := range entries {
-		w, err := zw.CreateHeader(&zip.FileHeader{Name: e.name, Method: zip.Deflate, Modified: markerTime})
-		if err != nil {
-			return nil, err
-		}
-		if _, err := w.Write(e.data); err != nil {
-			return nil, err
-		}
+		files[e.name] = e.data
 	}
-	if err := zw.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return zipfile.Build(files, "")
 }
 
 func (b *Builder) fabricMarker(side, lockHash string, direct, deps []string, cond conditions) ([]markerEntry, error) {

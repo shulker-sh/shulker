@@ -1,7 +1,6 @@
 package build
 
 import (
-	"archive/zip"
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
@@ -19,6 +18,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/zipfile"
 )
 
 // MrpackHosts are the hosts a Modrinth launcher downloads a pack's files from. A file hosted
@@ -357,34 +357,16 @@ func mrpackSplit(sides []*mrpackSide) map[string][]byte {
 	return entries
 }
 
-// writeArchive zips entries with first at the front and the rest in name order.
+// writeArchive zips entries with first at the front, so a reader streaming the zip meets the index before anything else.
 func writeArchive(output, first string, entries map[string][]byte) error {
 	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
 		return err
 	}
-	names := make([]string, 0, len(entries))
-	for n := range entries {
-		if n != first {
-			names = append(names, n)
-		}
-	}
-	sort.Strings(names)
-	names = append([]string{first}, names...)
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	for _, n := range names {
-		w, err := zw.CreateHeader(&zip.FileHeader{Name: n, Method: zip.Deflate, Modified: markerTime})
-		if err != nil {
-			return err
-		}
-		if _, err := w.Write(entries[n]); err != nil {
-			return err
-		}
-	}
-	if err := zw.Close(); err != nil {
+	data, err := zipfile.Build(entries, first)
+	if err != nil {
 		return err
 	}
-	return fsutil.Write(output, buf.Bytes())
+	return fsutil.Write(output, data)
 }
 
 func MrpackFileName(m *manifest.Manifest, versionID string) string {
