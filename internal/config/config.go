@@ -274,25 +274,17 @@ func LoadInstances(path string) ([]Instance, error) {
 	return registry.Instances, nil
 }
 
-// checkRegistrySchema reports a registry with another $schema as something to repair, rather than
-// as the list of schema failures validating it would produce.
+// checkRegistrySchema reports a registry this shulker can't read as something to repair, rather
+// than as the list of schema failures validating it would produce. A newer registry isn't: repair
+// would write it back in this shulker's shape.
 func checkRegistrySchema(path string, data []byte) error {
-	var head struct {
-		Schema string `json:"$schema"`
+	err := schema.CheckMarker(schema.Registry, "registry-invalid", path, data)
+	if out.CodeOf(err) == "registry-invalid" {
+		e := out.AsError(err)
+		e.Help = "run `shulker instances repair` to rebuild it"
+		return e
 	}
-	if err := json.Unmarshal(data, &head); err != nil {
-		return schema.Invalid("registry-invalid", path, data, err)
-	}
-	if head.Schema == RegistrySchemaURL {
-		return nil
-	}
-	what := "names no $schema"
-	if head.Schema != "" {
-		what = "names the schema " + head.Schema
-	}
-	e := schema.Invalid("registry-invalid", path, data, errors.New(what+", which this shulker doesn't know"))
-	e.Help = "run `shulker instances repair` to rebuild it"
-	return e
+	return err
 }
 
 // CreateRegistry writes an empty registry at path when nothing is there yet, and reports whether it

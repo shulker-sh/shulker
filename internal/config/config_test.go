@@ -125,9 +125,15 @@ func TestOldRegistryFails(t *testing.T) {
 		t.Fatalf("an old registry points at repair: %v", err)
 	}
 
-	os.WriteFile(path, []byte(`{"$schema":"https://shulker.sh/schema/v2/registry.json","instances":[]}`), 0o644)
-	if _, err := LoadInstances(path); err == nil || !strings.Contains(err.Error(), "v2") {
+	os.WriteFile(path, []byte(`{"$schema":"https://example.com/registry.json","instances":[]}`), 0o644)
+	if _, err := LoadInstances(path); err == nil || out.AsError(err).Code != "registry-invalid" || !strings.Contains(err.Error(), "names the schema https://example.com/registry.json, which this shulker doesn't know") {
 		t.Fatalf("a schema shulker doesn't know names it: %v", err)
+	}
+
+	// Repair would write a newer registry back in this shulker's shape, so it asks for an update instead.
+	os.WriteFile(path, []byte(`{"$schema":"https://shulker.sh/schema/v2/registry.json","instances":[]}`), 0o644)
+	if _, err := LoadInstances(path); err == nil || out.AsError(err).Code != "schema-newer" || out.AsError(err).Nudge.Command != "shulker self update" {
+		t.Fatalf("a newer registry nudges self update: %v", err)
 	}
 
 	if err := WriteInstances(path, []Instance{{ID: "a", Dir: "/a", Source: "/p"}}); err != nil {

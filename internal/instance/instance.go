@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
 
@@ -122,25 +123,16 @@ func Load(dir string) (*File, error) {
 	return &f, nil
 }
 
-// checkSchema reports a file written by another shulker as something to repair rather than as a
-// list of schema failures.
+// checkSchema reports a file this shulker can't read as something to repair rather than as a list
+// of schema failures. A newer file isn't: repair would write it back in this shulker's shape.
 func checkSchema(path string, data []byte) error {
-	var head struct {
-		Schema string `json:"$schema"`
+	err := schema.CheckMarker(schema.Instance, "instance-invalid", path, data)
+	if out.CodeOf(err) == "instance-invalid" {
+		e := out.AsError(err)
+		e.Help = "run `shulker instances repair` to write it again"
+		return e
 	}
-	if err := json.Unmarshal(data, &head); err != nil {
-		return schema.Invalid("instance-invalid", path, data, err)
-	}
-	if head.Schema == SchemaURL {
-		return nil
-	}
-	what := "names no $schema"
-	if head.Schema != "" {
-		what = "names the schema " + head.Schema
-	}
-	e := schema.Invalid("instance-invalid", path, data, errors.New(what+", which this shulker doesn't know"))
-	e.Help = "run `shulker instances repair` to write it again"
-	return e
+	return err
 }
 
 func (f *File) Save(dir string) error {

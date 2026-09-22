@@ -1,7 +1,12 @@
 package instance
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 // The schema closes `settings` to extra keys, so a setting the code reads but the schema omits
@@ -72,5 +77,31 @@ func TestEnsureResolvedKeepsWhatIsRecorded(t *testing.T) {
 	f.EnsureResolved().Java = "/cache/java/bin/java"
 	if f.Resolved.LastResult != ResultOK {
 		t.Fatalf("existing resolved replaced: %+v", f.Resolved)
+	}
+}
+
+func TestLoadTellsANewerFileFromOneItCantRead(t *testing.T) {
+	for _, c := range []struct{ name, data, code, says, nudge string }{
+		{"newer", `{"$schema":"https://shulker.sh/schema/v2/instance.json"}`, "schema-newer", "written by a newer shulker", "shulker self update"},
+		{"foreign", `{"$schema":"https://example.com/instance.json"}`, "instance-invalid", "names the schema https://example.com/instance.json, which this shulker doesn't know", ""},
+		{"missing", `{}`, "instance-invalid", "names no $schema, which this shulker doesn't know", ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(dir, Dir), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(Path(dir), []byte(c.data), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err := Load(dir)
+			e := out.AsError(err)
+			if err == nil || e.Code != c.code || !strings.Contains(e.Message, c.says) || e.Nudge.Command != c.nudge {
+				t.Fatalf("Load = %v (code %s, nudge %q)", err, e.Code, e.Nudge.Command)
+			}
+			if c.code == "instance-invalid" && !strings.Contains(e.Help, "instances repair") {
+				t.Fatalf("an unreadable file points at repair: %q", e.Help)
+			}
+		})
 	}
 }
