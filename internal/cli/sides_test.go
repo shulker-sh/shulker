@@ -56,7 +56,7 @@ func TestSyncNeedsOneSideWhenBothAreDeclared(t *testing.T) {
 	twoSided(t, h)
 
 	code, stdout, _ := h.run(t, "sync", h.dir, "--into", t.TempDir(), "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-side" || e.Message != "shulker.json declares both sides; choose one" || strings.Join(e.Candidates, ",") != "client,server" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "ambiguous-side" || e.Message != "shulker.json declares both sides" || e.Help != "choose one" || strings.Join(e.Candidates, ",") != "client,server" {
 		t.Fatalf("sync across both sides: exit %d %s", code, stdout)
 	}
 	if _, _, stderr := h.run(t, "sync", h.dir, "--into", t.TempDir()); !strings.Contains(stderr, "--side client") {

@@ -115,7 +115,7 @@ type playOptions struct {
 
 // waits reports whether this command stays for the run. --stream is --wait that shows its working,
 // so either of them keeps the launch in the foreground.
-func (o playOptions) waits() bool { return o.wait || o.stream }
+func (p playOptions) waits() bool { return p.wait || p.stream }
 
 func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	ctx := cmd.Context()
@@ -246,24 +246,24 @@ func (a *app) playWaited(req watchRequest, stream bool) (int, instance.Launch, e
 // print is the launch as a player reads it. A detached launch says the game is playing, because that
 // is all it knows; a run this command waited for says how it went instead, and a crash is reported
 // rather than raised — the game ran, so shulker did its job.
-func (r playResult) print(l *out.Lines) {
+func (p playResult) print(l *out.Lines) {
 	rows := []out.Row{
-		{Label: "account", Text: r.Account.Name},
-		{Label: "log", Text: r.Log},
+		{Label: "account", Text: p.Account.Name},
+		{Label: "log", Text: p.Log},
 	}
-	switch r.Outcome {
+	switch p.Outcome {
 	case "":
-		l.OK("playing "+r.Instance, r.Version)
+		l.OK("playing "+p.Instance, p.Version)
 	case instance.OutcomeCrashed:
-		l.Warn(r.Instance + " crashed")
-		if r.ExitCode != 0 {
-			rows = append(rows, out.Row{Label: "status", Text: strconv.Itoa(r.ExitCode)})
+		l.Warn(p.Instance + " crashed")
+		if p.ExitCode != 0 {
+			rows = append(rows, out.Row{Label: "status", Text: strconv.Itoa(p.ExitCode)})
 		}
-		if r.CrashReport != "" {
-			rows = append(rows, out.Row{Label: "crash report", Text: r.CrashReport})
+		if p.CrashReport != "" {
+			rows = append(rows, out.Row{Label: "crash report", Text: p.CrashReport})
 		}
 	default:
-		l.OK("played "+r.Instance, r.Version)
+		l.OK("played "+p.Instance, p.Version)
 	}
 	l.Tree(rows...)
 }
@@ -507,10 +507,14 @@ func (a *app) playInstance(args []string) (config.Instance, error) {
 	}
 	in, ok := a.registeredInstance(dir)
 	if !ok {
-		return config.Instance{}, out.Errorf("instance-not-found", "%s is not a registered instance; `shulker link shulker` makes one shulker launches itself", dir)
+		e := out.Errorf("instance-not-found", "%s is not a registered instance", dir)
+		e.Help = "`shulker link shulker` makes one shulker launches itself"
+		return config.Instance{}, e
 	}
 	if in.Launcher != "shulker" {
-		return config.Instance{}, out.Errorf("not-shulker", "%s belongs to %s, which starts it itself; shulker only launches the instances it owns", in.ID, in.Launcher)
+		e := out.Errorf("not-shulker", "%s belongs to %s, which starts it itself", in.ID, in.Launcher)
+		e.Help = "shulker only launches the instances it owns"
+		return config.Instance{}, e
 	}
 	return in, nil
 }

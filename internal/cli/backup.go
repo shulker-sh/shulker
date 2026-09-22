@@ -28,7 +28,9 @@ func (a *app) backupCmd() *cobra.Command {
 		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if where.sel.all && len(only) > 0 {
-				return out.Errorf("usage", "--all backs up every world of each target; to pick worlds, name the target with -i, -C or --group")
+				e := out.Errorf("usage", "--all backs up every world of each target")
+				e.Help = "to pick worlds, name the target with -i, -C or --group"
+				return e
 			}
 			return onSaves(a, where, func(n, of int) *out.Error {
 				return out.Errorf("backup-failed", "%d of %d targets failed to back up", n, of)
@@ -62,8 +64,8 @@ func (a *app) backup(target savesTarget, only []string) (backupResult, error) {
 	return backupResult{savesTarget: target, Backup: taken, elapsed: time.Since(start)}, nil
 }
 
-func (res backupResult) print(l *out.Lines) {
-	l.OKInto("backed up "+plural(res.Worlds, "world", "worlds"), res.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(res.Size), res.elapsed.Seconds()))
+func (b backupResult) print(l *out.Lines) {
+	l.OKInto("backed up "+plural(b.Worlds, "world", "worlds"), b.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(b.Size), b.elapsed.Seconds()))
 }
 
 // heldWorlds is names, each checked against the worlds target holds: for a server, only the one its
@@ -121,8 +123,8 @@ func (a *app) zipping(verb string) func(world string, open bool) {
 	}
 }
 
-func (t savesTarget) home() saves.Home {
-	return saves.Home{Dir: t.backups, IsShared: t.Group != ""}
+func (s savesTarget) home() saves.Home {
+	return saves.Home{Dir: s.backups, IsShared: s.Group != ""}
 }
 
 // autoBackup is the backup a build takes of dir's worlds before it changes the mod set, then trims

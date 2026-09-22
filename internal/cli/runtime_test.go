@@ -73,12 +73,12 @@ func sha1Hex(data []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (r *fakeRuntime) manifest(base string) []byte {
+func (f *fakeRuntime) manifest(base string) []byte {
 	files := map[string]any{}
-	for _, d := range r.dirs {
+	for _, d := range f.dirs {
 		files[d] = map[string]any{"type": "directory"}
 	}
-	for name, content := range r.files {
+	for name, content := range f.files {
 		sha := sha1Hex([]byte(content))
 		files[name] = map[string]any{
 			"type":       "file",
@@ -86,36 +86,36 @@ func (r *fakeRuntime) manifest(base string) []byte {
 			"downloads":  map[string]any{"raw": map[string]any{"sha1": sha, "size": len(content), "url": base + "/jrt/objects/" + sha}},
 		}
 	}
-	for name, target := range r.links {
+	for name, target := range f.links {
 		files[name] = map[string]any{"type": "link", "target": target}
 	}
 	data, _ := json.Marshal(map[string]any{"files": files})
 	return data
 }
 
-func (r *fakeRuntime) register(mux *http.ServeMux, base func() string) {
+func (f *fakeRuntime) register(mux *http.ServeMux, base func() string) {
 	mux.HandleFunc("/jrt/all.json", func(w http.ResponseWriter, _ *http.Request) {
 		platform, _ := meta.RuntimePlatform()
-		if r.missing {
+		if f.missing {
 			writeJSON(w, map[string]any{platform: map[string]any{}})
 			return
 		}
 		writeJSON(w, map[string]any{platform: map[string]any{"java-runtime-epsilon": []map[string]any{{
-			"manifest": map[string]any{"sha1": sha1Hex(r.manifest(base())), "url": base() + "/jrt/epsilon.json"},
-			"version":  map[string]any{"name": r.version},
+			"manifest": map[string]any{"sha1": sha1Hex(f.manifest(base())), "url": base() + "/jrt/epsilon.json"},
+			"version":  map[string]any{"name": f.version},
 		}}}})
 	})
 	mux.HandleFunc("/jrt/epsilon.json", func(w http.ResponseWriter, _ *http.Request) {
-		w.Write(r.manifest(base()))
+		w.Write(f.manifest(base()))
 	})
 	mux.HandleFunc("/jrt/objects/", func(w http.ResponseWriter, req *http.Request) {
-		r.mu.Lock()
-		r.hits++
-		r.mu.Unlock()
+		f.mu.Lock()
+		f.hits++
+		f.mu.Unlock()
 		want := strings.TrimPrefix(req.URL.Path, "/jrt/objects/")
-		for name, content := range r.files {
+		for name, content := range f.files {
 			if sha1Hex([]byte(content)) == want {
-				if name == r.corrupt {
+				if name == f.corrupt {
 					content += "tampered"
 				}
 				w.Write([]byte(content))

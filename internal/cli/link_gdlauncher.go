@@ -27,7 +27,9 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			p := src.project
 			gdl := &launcher.GDLauncher{Dir: k.launcherDir}
 			if err := gdl.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no GDLauncher directory at %s; run GDLauncher once or pass --launcher-dir", k.launcherDir)
+				e := out.Errorf("launcher-not-found", "no GDLauncher directory at %s", k.launcherDir)
+				e.Help = "run GDLauncher once or pass --launcher-dir"
+				return e
 			} else if err != nil {
 				return err
 			}
@@ -39,7 +41,9 @@ func (a *app) linkGDLauncherCmd() *cobra.Command {
 			gdl.Dir = k.launcherDir
 			display := k.display(p)
 			if launcher.GDLauncherFolder(display) == "" {
-				return out.Errorf("usage", "GDLauncher needs an instance name that isn't blank; pass --name")
+				e := out.Errorf("usage", "GDLauncher needs an instance name that isn't blank")
+				e.Help = "pass --name"
+				return e
 			}
 			gameDir := gdl.GameDir(display)
 			if err := checkAdopt(gameDir, src, "instance", display, "--name", k.force); err != nil {

@@ -31,7 +31,8 @@ func noSide(side string) error {
 // manifest declares both and nothing chose between them. flag names the flag
 // that would, or is empty when the side is positional.
 func ambiguousSide(sides []string, flag string) error {
-	e := out.Errorf("ambiguous-side", "%s declares both sides; choose one", manifest.FileName)
+	e := out.Errorf("ambiguous-side", "%s declares both sides", manifest.FileName)
+	e.Help = "choose one"
 	e.Candidates, e.Flag = sides, flag
 	return e
 }

@@ -63,7 +63,7 @@ func (a *app) selfUninstallCmd() *cobra.Command {
 func (a *app) selfUninstall(purge bool) error {
 	exe, err := a.exe()
 	if err != nil {
-		return out.Errorf("self-uninstall", "find the running shulker binary: %v", err)
+		return withCause(out.Errorf("self-uninstall", "can't find the running shulker binary"), "os", err)
 	}
 	res := selfUninstallResult{Unhooked: []config.Instance{}, Purged: purge}
 	instances, err := a.loadInstances()
@@ -96,7 +96,7 @@ func (a *app) selfUninstall(purge bool) error {
 		err = os.Remove(exe)
 	}
 	if err != nil {
-		e := out.Errorf("self-uninstall", "remove %s: %v", exe, err)
+		e := withCause(out.Errorf("self-uninstall", "can't remove %s", exe), "os", err)
 		e.Data = res
 		return e
 	}
@@ -122,22 +122,22 @@ func (a *app) forgetRegistry() error {
 	return nil
 }
 
-func (r selfUninstallResult) print(l *out.Lines) {
-	if len(r.Unhooked) > 0 {
-		l.OK("unhooked "+plural(len(r.Unhooked), "instance", "instances"), "")
-		items := make([]out.Item, 0, len(r.Unhooked))
-		for _, in := range r.Unhooked {
+func (s selfUninstallResult) print(l *out.Lines) {
+	if len(s.Unhooked) > 0 {
+		l.OK("unhooked "+plural(len(s.Unhooked), "instance", "instances"), "")
+		items := make([]out.Item, 0, len(s.Unhooked))
+		for _, in := range s.Unhooked {
 			items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{launcher.Title(in.Launcher)}})
 		}
 		l.Items(items...)
 	}
-	l.OK("removed "+r.Removed, "")
-	if r.Purged {
+	l.OK("removed "+s.Removed, "")
+	if s.Purged {
 		l.OK("forgot the registry", "")
-		if len(r.Forgotten) > 0 {
-			l.Info(plural(len(r.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`")
-			items := make([]out.Item, 0, len(r.Forgotten))
-			for _, in := range r.Forgotten {
+		if len(s.Forgotten) > 0 {
+			l.Info(plural(len(s.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`")
+			items := make([]out.Item, 0, len(s.Forgotten))
+			for _, in := range s.Forgotten {
 				items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{in.Dir}})
 			}
 			l.Items(items...)
@@ -146,8 +146,8 @@ func (r selfUninstallResult) print(l *out.Lines) {
 		l.Info("the registry and every instance folder are untouched")
 		l.Nudge("Reinstall, then", "shulker instances repair")
 	}
-	if r.Renamed != "" {
-		l.Nudge("Delete the leftover binary", `del "`+r.Renamed+`"`)
+	if s.Renamed != "" {
+		l.Nudge("Delete the leftover binary", `del "`+s.Renamed+`"`)
 	}
 }
 
@@ -182,9 +182,9 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	case errors.Is(err, fetch.ErrNotFound):
 		return out.Errorf("self-update-check", "no shulker release has been published yet")
 	case fetch.IsNetwork(err):
-		return out.Errorf("self-update-check", "can't reach GitHub to check for updates: %v", err)
+		return withCause(out.Errorf("self-update-check", "can't reach GitHub to check for updates"), "github", err)
 	case err != nil:
-		return out.Errorf("self-update-check", "check for updates: %v", err)
+		return withCause(out.Errorf("self-update-check", "can't check for updates"), "github", err)
 	}
 	res := selfUpdateResult{Current: version, Latest: strings.TrimPrefix(tag, "v"), Available: selfupdate.NeedsUpdate(version, tag)}
 	if !res.Available {
@@ -199,7 +199,7 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 
 	exe, err := a.exe()
 	if err != nil {
-		return out.Errorf("self-update-install", "find the running shulker binary: %v", err)
+		return withCause(out.Errorf("self-update-install", "can't find the running shulker binary"), "os", err)
 	}
 	tmp, err := os.MkdirTemp("", "shulker-update-")
 	if err != nil {
@@ -212,16 +212,18 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	if err != nil {
 		var sum *selfupdate.ChecksumError
 		if errors.As(err, &sum) {
-			return out.Errorf("self-update-checksum", "%v", err)
+			e := out.Errorf("self-update-checksum", "%s doesn't match its checksum", sum.Asset)
+			e.Rows = []out.Detail{{Label: "want", Text: sum.Want}, {Label: "got", Text: sum.Got}}
+			return e
 		}
-		return out.Errorf("self-update-download", "download shulker %s: %v", res.Latest, err)
+		return withCause(out.Errorf("self-update-download", "can't download shulker %s", res.Latest), "download", err)
 	}
 	a.progress("checksum verified")
 	if res.Provenance, err = a.checkProvenance(ctx, r, tag, archive, without, require); err != nil {
 		return err
 	}
 	if err := selfupdate.Install(archive, exe); err != nil {
-		return out.Errorf("self-update-install", "replace %s: %v", exe, err)
+		return withCause(out.Errorf("self-update-install", "can't replace %s", exe), "os", err)
 	}
 	res.Updated, res.Path = true, exe
 	if _, err := a.repairInstances("", ""); err != nil {
@@ -247,7 +249,7 @@ func (a *app) checkProvenance(ctx context.Context, r *selfupdate.Releases, tag, 
 	a.progress("verifying build provenance with gh")
 	if err := r.VerifyProvenance(ctx, tag, archive); err != nil {
 		if require {
-			return "", out.Errorf("self-update-provenance", "build provenance could not be verified: %v", err)
+			return "", withCause(out.Errorf("self-update-provenance", "build provenance could not be verified"), "gh", err)
 		}
 		a.printer.Warn("build provenance could not be verified, continuing on the checksum")
 		return "unverified", nil

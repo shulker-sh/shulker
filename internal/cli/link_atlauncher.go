@@ -30,13 +30,17 @@ func (a *app) linkATLauncherCmd() *cobra.Command {
 			p := src.project
 			atl := &launcher.ATLauncher{Dir: k.launcherDir}
 			if err := atl.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no ATLauncher directory at %s; run ATLauncher once or pass --launcher-dir", k.launcherDir)
+				e := out.Errorf("launcher-not-found", "no ATLauncher directory at %s", k.launcherDir)
+				e.Help = "run ATLauncher once or pass --launcher-dir"
+				return e
 			} else if err != nil {
 				return err
 			}
 			display := k.display(p)
 			if launcher.ATLauncherFolder(display) == "" {
-				return out.Errorf("usage", "ATLauncher names an instance's folder after the letters and digits in its name, and %q has none; pass --name", display)
+				e := out.Errorf("usage", "ATLauncher names an instance's folder after the letters and digits in its name, and %q has none", display)
+				e.Help = "pass --name"
+				return e
 			}
 			gameDir := atl.InstanceDir(display)
 			if err := checkAdopt(gameDir, src, "instance", display, "--name", k.force); err != nil {

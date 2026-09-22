@@ -68,28 +68,28 @@ func newSelfUpdateHarness(t *testing.T, current, tag string, corrupt bool) *self
 	return h
 }
 
-func (h *selfUpdateHarness) run(args ...string) int {
-	return h.app.run(context.Background(), append([]string{"self", "update"}, args...))
+func (s *selfUpdateHarness) run(args ...string) int {
+	return s.app.run(context.Background(), append([]string{"self", "update"}, args...))
 }
 
-func (h *selfUpdateHarness) binary(t *testing.T) string {
+func (s *selfUpdateHarness) binary(t *testing.T) string {
 	t.Helper()
-	data, err := os.ReadFile(h.exe)
+	data, err := os.ReadFile(s.exe)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return string(data)
 }
 
-func (h *selfUpdateHarness) errorCode(t *testing.T) string {
+func (s *selfUpdateHarness) errorCode(t *testing.T) string {
 	t.Helper()
 	var env struct {
 		Error struct {
 			Code string `json:"code"`
 		} `json:"error"`
 	}
-	if err := json.Unmarshal(h.stdout.Bytes(), &env); err != nil {
-		t.Fatalf("%v: %s", err, &h.stdout)
+	if err := json.Unmarshal(s.stdout.Bytes(), &env); err != nil {
+		t.Fatalf("%v: %s", err, &s.stdout)
 	}
 	return env.Error.Code
 }

@@ -112,7 +112,7 @@ func shulkerNick(instances []config.Instance, root, as, display string) string {
 		if n > 1 {
 			id = want + "-" + strconv.Itoa(n)
 		}
-		if i, ok := config.FindID(instances, id); !ok || sameDir(instances[i].Dir, filepath.Join(root, id)) {
+		if i, ok := config.FindID(instances, id); !ok || isSameDir(instances[i].Dir, filepath.Join(root, id)) {
 			return id
 		}
 	}

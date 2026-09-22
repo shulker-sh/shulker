@@ -256,7 +256,8 @@ func (a *app) selectOwnAccount(args []string, verb string) (accountRow, error) {
 			return rowFor(r, cfg), checkOwn(r, verb)
 		}
 	}
-	e := out.Errorf("account-not-found", "no default account to %s; name one", verb)
+	e := out.Errorf("account-not-found", "no default account to %s", verb)
+	e.Help = "name one"
 	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)
 	if len(accounts) == 0 {
 		e = out.Errorf("no-accounts", "shulker has signed no account in, so there is nothing to %s", verb)
@@ -276,7 +277,9 @@ func checkOwn(r account.Resolved, verb string) error {
 // naming the verb that does work on them.
 func notOwnAccount(r account.Resolved, verb string) error {
 	if r.Source == account.SourceOffline {
-		return out.Errorf("usage", "%s is an offline account, so there is no sign-in to %s; `shulker accounts remove %s` deletes it", r.Name, verb, accountSelector(r))
+		e := out.Errorf("usage", "%s is an offline account, so there is no sign-in to %s", r.Name, verb)
+		e.Help = fmt.Sprintf("`shulker accounts remove %s` deletes it", accountSelector(r))
+		return e
 	}
 	return out.Errorf("usage", "%s is borrowed from %s, so only %s can %s it", r.Name, r.Source, r.Source, verb)
 }

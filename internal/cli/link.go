@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -76,7 +77,9 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			}
 			v := &launcher.Mojang{Dir: launcherDir}
 			if err := v.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no Minecraft launcher directory at %s; run the launcher once or pass --launcher-dir", launcherDir)
+				e := out.Errorf("launcher-not-found", "no Minecraft launcher directory at %s", launcherDir)
+				e.Help = "run the launcher once or pass --launcher-dir"
+				return e
 			} else if err != nil {
 				return err
 			}
@@ -240,7 +243,7 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 // on top of the pack. Its name is set to the id either way, since repair reads the id back from it.
 func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
 	p, err := a.openProjectAt(gameDir)
-	if src.author {
+	if src.isAuthor {
 		if err == nil {
 			return nil, authoredOver(gameDir)
 		}
@@ -344,7 +347,9 @@ func authorInstance(gameDir, id, display string, src *syncSource) (*project.Proj
 // repoint, so --force has nothing to do either, and the answers would only overwrite a player's
 // own instance.
 func authoredOver(gameDir string) error {
-	return out.Errorf("instance-exists", "%s already holds a project; give the new instance another name", gameDir)
+	e := out.Errorf("instance-exists", "%s already holds a project", gameDir)
+	e.Help = "give the new instance another name"
+	return e
 }
 
 // checkAdopt guards the project a link is about to adopt. A game directory holding an in-place
@@ -356,7 +361,7 @@ func checkAdopt(gameDir string, src *syncSource, noun, name, second string, forc
 	if err != nil || !inPlace {
 		return err
 	}
-	if src.author {
+	if src.isAuthor {
 		return authoredOver(gameDir)
 	}
 	if force {
@@ -367,7 +372,9 @@ func checkAdopt(gameDir string, src *syncSource, noun, name, second string, forc
 	if key == "" || m.Requires[key].Source == source {
 		return nil
 	}
-	return out.Errorf("instance-exists", "%s %q already follows %s from %s; pass %s to create a second %s, or --force to repoint the modpack it follows", noun, name, key, m.Requires[key].Source, second, noun)
+	e := out.Errorf("instance-exists", "%s %q already follows %s from %s", noun, name, key, m.Requires[key].Source)
+	e.Help = fmt.Sprintf("pass %s to create a second %s, or --force to repoint the modpack it follows", second, noun)
+	return e
 }
 
 // modpackKey is the key the instance follows the link's source under: the source manifest's name
@@ -461,9 +468,9 @@ func (ls linkSettings) check() error {
 	return nil
 }
 
-// set reports whether this link asks for any setting at all, which is what a mode with no instance
+// isSet reports whether this link asks for any setting at all, which is what a mode with no instance
 // file to record them in has to refuse.
-func (ls linkSettings) set() bool {
+func (ls linkSettings) isSet() bool {
 	return ls.noHooks || ls.noPreLaunch || ls.noPostExit || ls.noMarker || ls.withMarker || ls.java != "" || ls.wrapper != ""
 }
 

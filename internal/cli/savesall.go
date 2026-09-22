@@ -16,9 +16,9 @@ type savesWhere struct {
 	sel   instanceSelection
 }
 
-func (w *savesWhere) register(cmd *cobra.Command, group, all string) {
-	cmd.Flags().StringVar(&w.group, "group", "", group)
-	w.sel.register(cmd, all+" (narrow with --launcher or --side)")
+func (s *savesWhere) register(cmd *cobra.Command, group, all string) {
+	cmd.Flags().StringVar(&s.group, "group", "", group)
+	s.sel.register(cmd, all+" (narrow with --launcher or --side)")
 }
 
 // savesPick is one target a fanned-out saves command acts on, and the rows that reach it. err is

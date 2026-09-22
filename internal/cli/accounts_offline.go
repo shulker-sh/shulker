@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -220,7 +221,9 @@ func whereItCameFrom(r account.Resolved) string {
 // verb that does act on it.
 func notOfflineAccount(r account.Resolved) error {
 	if r.Source == account.SourceShulker {
-		return out.Errorf("usage", "%s is a Microsoft account, so it is signed out rather than deleted; `shulker accounts logout %s` does that", r.Name, accountSelector(r))
+		e := out.Errorf("usage", "%s is a Microsoft account, so it is signed out rather than deleted", r.Name)
+		e.Help = fmt.Sprintf("`shulker accounts logout %s` does that", accountSelector(r))
+		return e
 	}
 	return notOwnAccount(r, "remove")
 }

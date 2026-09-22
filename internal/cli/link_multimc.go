@@ -35,7 +35,9 @@ func (a *app) linkMultiMCCmd() *cobra.Command {
 			p := src.project
 			l := &launcher.MultiMC{Dir: k.launcherDir}
 			if err := l.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no MultiMC directory at %s; run MultiMC once or pass --launcher-dir", k.launcherDir)
+				e := out.Errorf("launcher-not-found", "no MultiMC directory at %s", k.launcherDir)
+				e.Help = "run MultiMC once or pass --launcher-dir"
+				return e
 			} else if err != nil {
 				return err
 			}
@@ -67,7 +69,8 @@ func (a *app) linkMultiMCCmd() *cobra.Command {
 // askMultiMCDir asks where MultiMC is: it is portable, so unlike every other launcher there is no
 // default to fall back on, and off a terminal the flag is required.
 func (a *app) askMultiMCDir() (string, error) {
-	required := out.Errorf("launcher-dir-required", "MultiMC is portable; pass --launcher-dir with the folder that holds multimc.cfg")
+	required := out.Errorf("launcher-dir-required", "MultiMC is portable, so shulker can't find its folder")
+	required.Help = "pass --launcher-dir with the folder that holds multimc.cfg"
 	if !a.canPick() {
 		return "", required
 	}

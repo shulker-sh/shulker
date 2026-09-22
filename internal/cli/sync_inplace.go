@@ -75,7 +75,7 @@ func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, r
 	if err != nil {
 		return syncResult{}, err
 	}
-	if rl.saved {
+	if rl.wasSaved {
 		res.Changes = &rl.lockChanges
 	}
 	return res, nil

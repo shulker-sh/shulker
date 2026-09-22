@@ -139,13 +139,13 @@ func (a *app) syncCmd() *cobra.Command {
 	return cmd
 }
 
-func (res syncResult) print(l *out.Lines) {
-	if res.Changes != nil {
-		res.Changes.printItems(l)
+func (s syncResult) print(l *out.Lines) {
+	if s.Changes != nil {
+		s.Changes.printItems(l)
 	}
-	l.OKInto("synced "+res.Side, res.Dir, reportAside(res.Build))
-	rows := reportDetailRows(l, res.Build)
-	if row, ok := savesRow(res.Saves); ok {
+	l.OKInto("synced "+s.Side, s.Dir, reportAside(s.Build))
+	rows := reportDetailRows(l, s.Build)
+	if row, ok := savesRow(s.Saves); ok {
 		rows = append(rows, row)
 	}
 	l.Tree(rows...)
@@ -155,12 +155,12 @@ type syncSource struct {
 	*pack.Checkout
 	name    string
 	project *project.Project
-	// author is a link's answers rather than a source: a project with no directory yet, which the
+	// isAuthor is a link's answers rather than a source: a project with no directory yet, which the
 	// link writes into the instance it creates.
-	author bool
+	isAuthor bool
 }
 
-func (s *syncSource) remote() bool { return s.Kind != pack.Local }
+func (s *syncSource) isRemote() bool { return s.Kind != pack.Local }
 
 func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, error) {
 	co, err := a.checkout(ctx, from, ref)
@@ -194,7 +194,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	if err != nil {
 		return syncResult{}, err
 	}
-	remote := src.remote()
+	remote := src.isRemote()
 	into := req.into
 	if into == "" && remote {
 		return syncResult{}, out.Errorf("into-required", "--into is required when syncing from %s", src.name)
@@ -210,7 +210,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 		return syncResult{}, err
 	}
 	defer func() { a.stampSync(into, err) }()
-	ownBuild := sameDir(into, buildDir)
+	ownBuild := isSameDir(into, buildDir)
 	syncedDir := req.into != "" && !ownBuild
 	lf, inst, err := sourceLocalFiles(src, into)
 	if err != nil {
@@ -325,14 +325,16 @@ func (a *app) syncRecorded(cmd *cobra.Command, req syncRequest) (syncResult, err
 	}
 	e := inspectInstance(config.Instance{Dir: into})
 	if e.Source == "" {
-		return syncResult{}, out.Errorf("source-unknown", "%s has no record of what it was synced from; name the source", into)
+		e := out.Errorf("source-unknown", "%s has no record of what it was synced from", into)
+		e.Help = "name the source"
+		return syncResult{}, e
 	}
 	return a.syncInstance(cmd, e, req)
 }
 
-// sameDir also treats a symlink to dir as dir, since a launcher's game directory may be reached
+// isSameDir also treats a symlink to dir as dir, since a launcher's game directory may be reached
 // through one.
-func sameDir(a, b string) bool {
+func isSameDir(a, b string) bool {
 	if filepath.Clean(a) == filepath.Clean(b) {
 		return true
 	}
@@ -345,7 +347,7 @@ func sourceLocalFiles(src *syncSource, into string) (proj, inst *local.File, err
 	if inst, err = local.Load(into); err != nil {
 		return nil, nil, err
 	}
-	if src.remote() {
+	if src.isRemote() {
 		return inst, inst, nil
 	}
 	if proj, err = local.Load(src.Dir); err != nil {

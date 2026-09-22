@@ -25,11 +25,11 @@ type cfMod struct {
 	files     []cfFile
 }
 
-func (m *cfMod) classID() int {
-	if m.class == 0 {
+func (c *cfMod) classID() int {
+	if c.class == 0 {
 		return 6
 	}
-	return m.class
+	return c.class
 }
 
 type cfFile struct {

@@ -40,7 +40,7 @@ func TestUnlink(t *testing.T) {
 	h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)
 
 	code, stdout, _ := h.run(t, "unlink", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || !strings.Contains(e.Message, "shulker instances") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || !strings.Contains(e.Help, "shulker instances") {
 		t.Fatalf("unlink with no name: exit %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "unlink", "nope", "--json")
@@ -192,7 +192,7 @@ func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 	}
 
 	code, stdout, _ := h.run(t, "link", "prism", other, "--launcher-dir", prismDir, "--name", "Friends", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-exists" || !strings.Contains(e.Message, h.dir) || !strings.Contains(e.Message, "repoint the modpack it follows") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "instance-exists" || !strings.Contains(e.Message, h.dir) || !strings.Contains(e.Help, "repoint the modpack it follows") {
 		t.Fatalf("a source the unlinked project doesn't follow: exit %d %s", code, stdout)
 	}
 

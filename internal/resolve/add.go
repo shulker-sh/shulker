@@ -62,23 +62,22 @@ func (r *Resolver) provider(name string) (provider.Provider, error) {
 	if name != "" {
 		p, ok := r.Providers[name]
 		if !ok {
-			return nil, unavailable(name)
+			return nil, Unavailable(name)
 		}
 		return p, nil
 	}
-	var reasons []string
+	var reasons []*out.Error
 	for _, n := range r.Manifest.ProviderOrder() {
 		if p, ok := r.Providers[n]; ok {
 			return p, nil
 		}
 		reasons = append(reasons, Unavailable(n))
 	}
-	e := out.Errorf("provider-unavailable", "no manifest provider is available")
-	e.Items = reasons
-	return nil, e
+	return nil, NoneAvailable("no manifest provider is available", reasons)
 }
 
-func unavailable(name string) *out.Error {
+// Unavailable says why a provider can't be used.
+func Unavailable(name string) *out.Error {
 	if name == "curseforge" {
 		e := out.Errorf("provider-unavailable", "curseforge needs an API key")
 		e.Help = "set " + curseforge.KeyEnv + " or run `shulker config set curseforge.key <key>`"
@@ -87,13 +86,17 @@ func unavailable(name string) *out.Error {
 	return out.Errorf("provider-unavailable", "%s is not a known provider", name)
 }
 
-// Unavailable says why a provider can't be used, for a caller that reaches the
-// providers without a resolver.
-func Unavailable(name string) string {
-	if name == "curseforge" {
-		return "curseforge needs an API key; set " + curseforge.KeyEnv + " or run `shulker config set curseforge.key <key>`"
+// NoneAvailable is the error for when every provider is unavailable: each reason is an item, and
+// the first reason with a hint gives its help.
+func NoneAvailable(message string, reasons []*out.Error) *out.Error {
+	e := out.Errorf("provider-unavailable", "%s", message)
+	for _, reason := range reasons {
+		e.Items = append(e.Items, reason.Message)
+		if e.Help == "" {
+			e.Help = reason.Help
+		}
 	}
-	return name + " is not a known provider"
+	return e
 }
 
 func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) (provider.Provider, *provider.Project, error) {
@@ -105,7 +108,8 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 		proj, err := p.Project(ctx, slug, kind)
 		return p, proj, err
 	}
-	var missed, skipped []string
+	var missed []string
+	var skipped []*out.Error
 	for _, n := range r.Manifest.ProviderOrder() {
 		p, ok := r.Providers[n]
 		if !ok {
@@ -128,7 +132,7 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 	}
 	e := out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(missed, " or "))
 	for _, reason := range skipped {
-		e.Items = append(e.Items, "skipped: "+reason)
+		e.Items = append(e.Items, "skipped: "+reason.Message)
 	}
 	return nil, nil, e
 }

@@ -68,7 +68,9 @@ func chooseType(cmd *cobra.Command, kind, typ, fallback string) (string, error) 
 	}
 	if chosen == "" {
 		if wrong := changedFlags(cmd, inferredFlags); len(wrong) > 0 {
-			return "", out.Errorf("usage", "%s only applies to a modpack; pass `--type modpack`", strings.Join(wrong, " and "))
+			e := out.Errorf("usage", "%s only applies to a modpack", strings.Join(wrong, " and "))
+			e.Help = "pass `--type modpack`"
+			return "", e
 		}
 		return "", nil
 	}

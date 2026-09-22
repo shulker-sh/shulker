@@ -22,32 +22,32 @@ type instanceSelection struct {
 	all            bool
 }
 
-func (s *instanceSelection) register(cmd *cobra.Command, all string) {
-	s.registerWith(cmd, all, "only client or server instances")
+func (i *instanceSelection) register(cmd *cobra.Command, all string) {
+	i.registerWith(cmd, all, "only client or server instances")
 }
 
-func (s *instanceSelection) registerWith(cmd *cobra.Command, all, side string) {
-	cmd.Flags().StringVar(&s.launcher, "launcher", "", "only instances linked in this launcher: "+launcher.NameList())
-	cmd.Flags().StringVar(&s.side, "side", "", side)
+func (i *instanceSelection) registerWith(cmd *cobra.Command, all, side string) {
+	cmd.Flags().StringVar(&i.launcher, "launcher", "", "only instances linked in this launcher: "+launcher.NameList())
+	cmd.Flags().StringVar(&i.side, "side", "", side)
 	if all != "" {
-		cmd.Flags().BoolVar(&s.all, "all", false, all)
+		cmd.Flags().BoolVar(&i.all, "all", false, all)
 	}
 }
 
-func (s instanceSelection) narrows() bool { return s.launcher != "" || s.side != "" }
+func (i instanceSelection) narrows() bool { return i.launcher != "" || i.side != "" }
 
-func (s instanceSelection) check() error {
-	if s.launcher != "" && launcher.Find(s.launcher) == nil {
-		return out.Errorf("usage", "--launcher must be %s, not %q", launcher.NameList(), s.launcher)
+func (i instanceSelection) check() error {
+	if i.launcher != "" && launcher.Find(i.launcher) == nil {
+		return out.Errorf("usage", "--launcher must be %s, not %q", launcher.NameList(), i.launcher)
 	}
-	if s.side != "" && s.side != "client" && s.side != "server" {
-		return out.Errorf("usage", "--side must be client or server, not %q", s.side)
+	if i.side != "" && i.side != "client" && i.side != "server" {
+		return out.Errorf("usage", "--side must be client or server, not %q", i.side)
 	}
 	return nil
 }
 
-func (s instanceSelection) admits(e instanceEntry) bool {
-	return (s.launcher == "" || e.Launcher == s.launcher) && (s.side == "" || e.Side == s.side)
+func (i instanceSelection) admits(e instanceEntry) bool {
+	return (i.launcher == "" || e.Launcher == i.launcher) && (i.side == "" || e.Side == i.side)
 }
 
 // selectInstances matches query against ids, then against names (case-insensitive), then against
@@ -61,7 +61,9 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]instanceEntr
 		return nil, err
 	}
 	if len(entries) == 0 {
-		return nil, out.Errorf("no-instances", "nothing is linked yet; `shulker link prism` adds an instance")
+		e := out.Errorf("no-instances", "nothing is linked yet")
+		e.Help = "`shulker link prism` adds an instance"
+		return nil, e
 	}
 	sortInstanceEntries(entries)
 	var pool []instanceEntry
@@ -97,7 +99,8 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]instanceEntr
 		return nil, e
 	}
 	if len(matches) > 1 && query != "" && !s.all {
-		e := out.Errorf("ambiguous-instance", "%d instances match %s; name one by its id, or pass --all", len(matches), describeSelection(query, s))
+		e := out.Errorf("ambiguous-instance", "%d instances match %s", len(matches), describeSelection(query, s))
+		e.Help = "name one by its id, or pass --all"
 		e.Candidates, e.Pass, e.Given = instanceCandidates(matches), instanceIDs(matches), query
 		return nil, e
 	}
@@ -186,7 +189,8 @@ func (a *app) unlinkTargets(query string, s instanceSelection) ([]instanceEntry,
 		}
 	}
 	if len(matches) > 1 && !s.all {
-		e := out.Errorf("ambiguous-instance", "this project has %d instances in %s; name one, or pass --all", len(matches), launcher.Title(name))
+		e := out.Errorf("ambiguous-instance", "this project has %d instances in %s", len(matches), launcher.Title(name))
+		e.Help = "name one, or pass --all"
 		e.Candidates, e.Pass, e.Given = instanceCandidates(matches), instanceIDs(matches), query
 		return nil, e
 	}
@@ -263,7 +267,9 @@ func (a *app) pickInstance(entries []instanceEntry) (instanceEntry, error) {
 func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest) (syncResult, error) {
 	if l := launcher.Find(e.Launcher); l != nil && l.IsInstanced {
 		if _, err := os.Stat(l.InstanceDir(e.Dir)); errors.Is(err, os.ErrNotExist) {
-			return syncResult{}, out.Errorf("instance-missing", "the %s instance %q is gone (%s); `shulker unlink %s` forgets it", launcher.Title(e.Launcher), e.Label(), l.InstanceDir(e.Dir), e.ID)
+			fail := out.Errorf("instance-missing", "the %s instance %q is gone (%s)", launcher.Title(e.Launcher), e.Label(), l.InstanceDir(e.Dir))
+			fail.Help = fmt.Sprintf("`shulker unlink %s` forgets it", e.ID)
+			return syncResult{}, fail
 		}
 	}
 	if p, side, ok, err := a.inPlaceProject(e.Dir); err != nil {
@@ -277,7 +283,7 @@ func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest)
 		return syncResult{}, err
 	}
 	req.ref, req.side, req.into = e.Ref, e.Side, e.Dir
-	req.assumeClient = req.assumeClient || e.AssumeClient
+	req.assumeClient = req.assumeClient || e.AssumesClient
 	return a.sync(cmd.Context(), src, req)
 }
 

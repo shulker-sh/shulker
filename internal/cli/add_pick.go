@@ -27,7 +27,7 @@ func (a *app) askAdd(cmd *cobra.Command, kind, providerName string) ([]string, m
 	s := newLiveSearch(a.printer.ErrTheme, func(query string) (searchReply, error) {
 		reply, err := a.search(ctx, query, kind, names, addPickLimit, false)
 		reply.results.Results = slices.DeleteFunc(reply.results.Results, func(hit searchHit) bool {
-			return !addable(hit.Type)
+			return !isAddable(hit.Type)
 		})
 		return reply, err
 	})
@@ -48,9 +48,9 @@ func (a *app) askAdd(cmd *cobra.Command, kind, providerName string) ([]string, m
 	return ids, from, nil
 }
 
-// addable is a type a search result can be added as: a modpack is added from its source, and a
+// isAddable is a type a search result can be added as: a modpack is added from its source, and a
 // provider lists kinds shulker has no entry for at all.
-func addable(kind string) bool {
+func isAddable(kind string) bool {
 	switch kind {
 	case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader:
 		return true

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 
 	"shulker.sh/shulker/internal/out"
 )
@@ -28,7 +29,9 @@ func (a *app) askText(title, description, placeholder string) (string, error) {
 // and a script that means it says so.
 func (a *app) confirm(question, flag string) (bool, error) {
 	if !a.canPick() {
-		return false, out.Errorf("usage", "shulker asks before this, and can't ask here; pass %s to answer it", flag)
+		e := out.Errorf("usage", "shulker asks before this, and can't ask here")
+		e.Help = fmt.Sprintf("pass %s to answer it", flag)
+		return false, e
 	}
 	return a.askYes(question)
 }

@@ -24,7 +24,7 @@ func TestIgnoreCommandWritesAndDropsEntries(t *testing.T) {
 		t.Fatalf("--declared without --rule: exit %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "ignore", "sodium", "fabric-api", "--note", "x", "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "no-problem" || !strings.Contains(e.Message, "--declared") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "no-problem" || !strings.Contains(e.Help, "--declared") {
 		t.Fatalf("short form with nothing in the lock: exit %d %s", code, stdout)
 	}
 

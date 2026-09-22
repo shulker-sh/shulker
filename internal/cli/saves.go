@@ -107,18 +107,18 @@ func pruneBackups(target savesTarget, keep int) (savesPruned, error) {
 	return savesPruned{savesTarget: target, Pruned: pruned, Kept: len(left)}, nil
 }
 
-func (res savesPruned) print(l *out.Lines) {
-	kept := plural(res.Kept, "backup", "backups") + " left"
-	if len(res.Pruned) == 0 {
+func (s savesPruned) print(l *out.Lines) {
+	kept := plural(s.Kept, "backup", "backups") + " left"
+	if len(s.Pruned) == 0 {
 		l.Info("nothing to prune; " + kept)
 		return
 	}
-	items := make([]out.Item, 0, len(res.Pruned))
-	for _, b := range res.Pruned {
+	items := make([]out.Item, 0, len(s.Pruned))
+	for _, b := range s.Pruned {
 		items = append(items, out.Item{Kind: out.Drop, Name: b.ID})
 	}
 	l.Items(items...)
-	l.OK("pruned "+plural(len(res.Pruned), "backup", "backups"), kept)
+	l.OK("pruned "+plural(len(s.Pruned), "backup", "backups"), kept)
 }
 
 func (a *app) listSaveGroups() error {

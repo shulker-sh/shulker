@@ -61,7 +61,8 @@ func (a *app) initCmd() *cobra.Command {
 			}
 			loaders := append([]string{noLoader}, loader.Names()...)
 			if _, ok := loader.Lookup(opts.loaderName); !ok && opts.loaderName != noLoader {
-				e := out.Errorf("usage", "unknown loader %q; use one of %s", opts.loaderName, strings.Join(loaders, ", "))
+				e := out.Errorf("usage", "unknown loader %q", opts.loaderName)
+				e.Help = fmt.Sprintf("use one of %s", strings.Join(loaders, ", "))
 				e.Candidates, e.Given, e.Flag = loaders, opts.loaderName, "--loader"
 				return e
 			}

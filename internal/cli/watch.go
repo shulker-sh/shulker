@@ -44,7 +44,7 @@ func (a *app) watchCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var req watchRequest
 			if err := json.NewDecoder(a.stdin).Decode(&req); err != nil {
-				return out.Errorf("usage", "the watcher reads one launch from its stdin: %v", err)
+				return withCause(out.Errorf("usage", "the watcher reads one launch from its stdin"), "json", err)
 			}
 			// The line below is the last thing this process writes anywhere but the record: whoever
 			// asked for the launch has gone by the time the game exits, and writing to a pipe with

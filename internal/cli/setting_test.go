@@ -19,6 +19,7 @@ type settingEnvelope struct {
 		Message    string   `json:"message"`
 		Candidates []string `json:"candidates"`
 		Items      []string `json:"items"`
+		Help       string   `json:"help"`
 	} `json:"error"`
 }
 
@@ -166,7 +167,7 @@ func TestSetRejectsBadPathsAndValues(t *testing.T) {
 		{1, "manifest-invalid", "name", []string{"unset", "name"}},
 	} {
 		env := h.runSetting(t, c.exit, c.args...)
-		if env.Error == nil || env.Error.Code != c.code || !strings.Contains(env.Error.Message, c.contains) {
+		if env.Error == nil || env.Error.Code != c.code || !strings.Contains(env.Error.Message+" "+env.Error.Help, c.contains) {
 			t.Errorf("%v error = %+v, want %s containing %q", c.args, env.Error, c.code, c.contains)
 		}
 	}

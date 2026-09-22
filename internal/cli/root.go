@@ -1,3 +1,4 @@
+// Package cli is shulker's command line: the cobra commands, their flags and what they print.
 package cli
 
 import (
@@ -27,26 +28,27 @@ stdout, errors included. Act on error.code rather than the message, and run
 "shulker lock" when lockStale is true.`
 
 type app struct {
-	printer    *out.Printer
-	style      out.Options
-	stdin      io.Reader
-	tty        func() bool
-	asker      asker
-	dir        string
-	instance   string
-	d          *deps
-	configPath string
-	packs      []*pack.Loaded
-	relocking  bool
-	linkedPack string
-	releases   *selfupdate.Releases
-	exe        func() (string, error)
-	installer  func(ctx context.Context, java, jar string, args []string) error
-	watcher    func(req watchRequest) (int, error)
-	running    bool
-	backedUp   map[savesTarget]bool
+	printer     *out.Printer
+	style       out.Options
+	stdin       io.Reader
+	tty         func() bool
+	asker       asker
+	dir         string
+	instance    string
+	d           *deps
+	configPath  string
+	packs       []*pack.Loaded
+	isRelocking bool
+	linkedPack  string
+	releases    *selfupdate.Releases
+	exe         func() (string, error)
+	installer   func(ctx context.Context, java, jar string, args []string) error
+	watcher     func(req watchRequest) (int, error)
+	isRunning   bool
+	backedUp    map[savesTarget]bool
 }
 
+// Execute runs shulker with args and returns the process exit code.
 func Execute(args []string, stdout, stderr io.Writer) int {
 	// A copy of shulker installed as an instance's javaw.exe is a launcher's Java, not the CLI: it
 	// hands the launch on and never parses these arguments, which are the game's.
@@ -68,10 +70,10 @@ func newApp(stdout, stderr io.Writer) *app {
 }
 
 func (a *app) run(ctx context.Context, args []string) int {
-	a.printer.JSON = flagRequested(args, "json")
-	a.printer.NoInput = flagRequested(args, "no-input")
+	a.printer.JSON = isFlagRequested(args, "json")
+	a.printer.NoInput = isFlagRequested(args, "no-input")
 	a.printer.Args = args
-	a.style = out.Options{NoColor: flagRequested(args, "no-color"), ASCII: flagRequested(args, "ascii")}
+	a.style = out.Options{NoColor: isFlagRequested(args, "no-color"), ASCII: isFlagRequested(args, "ascii")}
 	if !a.printer.JSON {
 		a.printer.Theme, a.printer.ErrTheme = out.Detect(a.printer.Stdout, a.printer.Stderr, a.style)
 	}
@@ -80,7 +82,7 @@ func (a *app) run(ctx context.Context, args []string) int {
 	root.SetOut(a.printer.Stdout)
 	root.SetErr(a.printer.Stderr)
 	if cmd, err := root.ExecuteContextC(ctx); err != nil {
-		if !a.running && out.CodeOf(err) == "" {
+		if !a.isRunning && out.CodeOf(err) == "" {
 			err = usageError(root, err)
 		}
 		if out.CodeOf(err) == "usage" && cmd != nil {
@@ -100,7 +102,7 @@ func (a *app) run(ctx context.Context, args []string) int {
 func (a *app) markRunning(c *cobra.Command) {
 	if run := c.RunE; run != nil {
 		c.RunE = func(cmd *cobra.Command, args []string) error {
-			a.running = true
+			a.isRunning = true
 			return run(cmd, args)
 		}
 	}
@@ -220,7 +222,7 @@ func usageError(root *cobra.Command, err error) error {
 
 // Cobra reports an unknown command before parsing any flags, so the
 // persistent flags cannot be trusted on that path.
-func flagRequested(args []string, name string) bool {
+func isFlagRequested(args []string, name string) bool {
 	for _, arg := range args {
 		if arg == "--"+name || arg == "--"+name+"=true" {
 			return true
@@ -234,4 +236,9 @@ func flagRequested(args []string, name string) bool {
 
 func stdinIsTerminal() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
+}
+
+func withCause(e *out.Error, label string, err error) *out.Error {
+	e.Rows = []out.Detail{{Label: label, Text: err.Error()}}
+	return e
 }

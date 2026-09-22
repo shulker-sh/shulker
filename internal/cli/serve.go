@@ -35,7 +35,7 @@ type serveResult struct {
 // serverFailureFiles returns the server's log and the newest crash report written since started,
 // each empty when there isn't one.
 func serverFailureFiles(dir string, started time.Time) (log, crashReport string) {
-	if path := filepath.Join(dir, "logs", "latest.log"); fileExists(path) {
+	if path := filepath.Join(dir, "logs", "latest.log"); isOnDisk(path) {
 		log = path
 	}
 	return log, crashReportSince(dir, started)
@@ -58,7 +58,7 @@ func crashReportSince(dir string, started time.Time) string {
 	return report
 }
 
-func fileExists(path string) bool {
+func isOnDisk(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }

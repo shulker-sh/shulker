@@ -70,12 +70,12 @@ func (a *app) reconcileRun(dir string) {
 		return
 	}
 	keep := f.Settings.LaunchKeep()
-	if keep == 0 || !slices.ContainsFunc(instance.LoadLaunches(dir), abandoned) {
+	if keep == 0 || !slices.ContainsFunc(instance.LoadLaunches(dir), isAbandoned) {
 		return
 	}
 	err = instance.UpdateLaunches(dir, keep, func(records []instance.Launch) []instance.Launch {
 		for i := range records {
-			if abandoned(records[i]) {
+			if isAbandoned(records[i]) {
 				endRecord(&records[i], dir, noExitCode)
 			}
 		}
@@ -86,9 +86,9 @@ func (a *app) reconcileRun(dir string) {
 	}
 }
 
-// abandoned is an open record for a game shulker was watching that has gone without its watcher
+// isAbandoned is an open record for a game shulker was watching that has gone without its watcher
 // closing it.
-func abandoned(rec instance.Launch) bool {
+func isAbandoned(rec instance.Launch) bool {
 	return rec.EndedAt == "" && rec.PID != 0 && !game.IsAlive(rec.PID)
 }
 
@@ -115,7 +115,7 @@ func endRecord(rec *instance.Launch, dir string, exit int) {
 	rec.Outcome = instance.OutcomeOK
 	rec.PID = 0
 	if rec.Log == "" {
-		if path := filepath.Join(dir, "logs", "latest.log"); fileExists(path) {
+		if path := filepath.Join(dir, "logs", "latest.log"); isOnDisk(path) {
 			rec.Log = path
 		}
 	}

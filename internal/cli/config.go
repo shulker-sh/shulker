@@ -108,7 +108,9 @@ func (a *app) configSetCmd() *cobra.Command {
 				return err
 			}
 			if value == "" {
-				return out.Errorf("usage", "%s needs a value; `shulker config unset %s` removes it", key, key)
+				e := out.Errorf("usage", "%s needs a value", key)
+				e.Help = fmt.Sprintf("`shulker config unset %s` removes it", key)
+				return e
 			}
 			var to any = value
 			if literal {
@@ -245,7 +247,8 @@ func (a *app) switchRegistry(configPath string, current, next config.Config, for
 			if len(left) == 1 {
 				entries = "1 instance"
 			}
-			e := out.Errorf("registry-has-instances", "changing the registry leaves %s behind in %s; run again with --force to change it anyway", entries, from)
+			e := out.Errorf("registry-has-instances", "changing the registry leaves %s behind in %s", entries, from)
+			e.Help = "run again with --force to change it anyway"
 			e.Items = left
 			return "", e
 		}
@@ -321,7 +324,9 @@ func checkConfigValue(key string, v any, literal bool) (any, error) {
 	switch key {
 	case accountsProviders:
 		if !literal {
-			return nil, out.Errorf("usage", "%s is a list; pass --literal with a JSON array, like `--literal '[\"shulker\"]'`", key)
+			e := out.Errorf("usage", "%s is a list", key)
+			e.Help = "pass --literal with a JSON array, like `--literal '[\"shulker\"]'`"
+			return nil, e
 		}
 		names, err := providerList(v)
 		if err != nil {
@@ -405,7 +410,8 @@ func providerList(v any) ([]string, error) {
 // launcher answers to is a typo rather than a launcher shulker hasn't reached yet.
 func checkProviders(names []string) error {
 	if len(names) == 0 {
-		e := out.Errorf("usage", "%s can't be empty; unset it to go back to the default", accountsProviders)
+		e := out.Errorf("usage", "%s can't be empty", accountsProviders)
+		e.Help = "unset it to go back to the default"
 		e.Candidates = account.Providers()
 		return e
 	}

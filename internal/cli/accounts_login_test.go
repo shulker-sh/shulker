@@ -328,7 +328,7 @@ func TestAccountsLogout(t *testing.T) {
 
 	// Confirming is the default, and a run that can't ask needs the flag that answers it.
 	code, stdout, _ := h.run(t, "accounts", "logout", "Notch", "--json")
-	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || !strings.Contains(e.Message, "--yes") {
+	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || !strings.Contains(e.Help, "--yes") {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
 	if len(readAccountStore(t, h).Accounts) != 1 {
@@ -373,7 +373,7 @@ func TestAccountsLogoutNamesRemoveForAnOfflineAccount(t *testing.T) {
 	writeAccountStore(t, h, offlineAccount("Steve", steveID))
 	code, stdout, _ := h.run(t, "accounts", "logout", "Steve", "--yes", "--json")
 	e := failureCode(t, stdout)
-	if code != out.ExitUsage || e.Code != "usage" || !strings.Contains(e.Message, "accounts remove Steve") {
+	if code != out.ExitUsage || e.Code != "usage" || !strings.Contains(e.Help, "accounts remove Steve") {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
 }

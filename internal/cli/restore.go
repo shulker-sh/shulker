@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -46,7 +47,9 @@ func (a *app) restoreCmd() *cobra.Command {
 				return out.Errorf("usage", "--as takes a world's folder name, not %q", req.as)
 			}
 			if where.sel.all && (req.named != "" || len(args) > 0 || len(req.only) > 0 || req.as != "") {
-				return out.Errorf("usage", "--all restores every world of each target's newest backup; to pick a backup or a world, name its target with -i, -C or --group")
+				e := out.Errorf("usage", "--all restores every world of each target's newest backup")
+				e.Help = "to pick a backup or a world, name its target with -i, -C or --group"
+				return e
 			}
 			return onSaves(a, where, func(n, of int) *out.Error {
 				return out.Errorf("restore-failed", "%d of %d targets failed to restore", n, of)
@@ -144,16 +147,22 @@ func restoreScope(archive *saves.Archive, target savesTarget, only []string, as 
 	switch {
 	case as != "":
 		if len(worlds) != 1 {
-			return nil, out.Errorf("usage", "--as renames one world, and this restore takes %d: %s; pick one with --world", len(worlds), strings.Join(worlds, ", "))
+			e := out.Errorf("usage", "--as renames one world, and this restore takes %d: %s", len(worlds), strings.Join(worlds, ", "))
+			e.Help = "pick one with --world"
+			return nil, e
 		}
 		if target.World != "" && as != target.World {
 			return nil, out.Errorf("usage", "this server loads %s, its level-name, so --as must name %s, not %s", target.World, target.World, as)
 		}
 	case target.World != "" && !slices.Contains(worlds, target.World):
 		if len(only) > 0 {
-			return nil, out.Errorf("world-not-found", "this server loads only %s, its level-name, which --world leaves out; --as %s restores another world under that name", target.World, target.World)
+			e := out.Errorf("world-not-found", "this server loads only %s, its level-name, which --world leaves out", target.World)
+			e.Help = fmt.Sprintf("--as %s restores another world under that name", target.World)
+			return nil, e
 		}
-		return nil, out.Errorf("world-not-found", "%s holds no world %s, the level-name this server loads; --as %s restores another world under that name", archive.Path, target.World, target.World)
+		e := out.Errorf("world-not-found", "%s holds no world %s, the level-name this server loads", archive.Path, target.World)
+		e.Help = fmt.Sprintf("--as %s restores another world under that name", target.World)
+		return nil, e
 	case target.World != "":
 		worlds = []string{target.World}
 	}
@@ -189,7 +198,9 @@ func (a *app) pickBackup(target savesTarget, args []string, named string) (saves
 		return saves.Backup{}, err
 	}
 	if len(backups) == 0 {
-		return saves.Backup{}, out.Errorf("backups-empty", "%s has no backups yet; `%s` takes one", target.WorldsDir, a.savesCommand(target, "backup"))
+		e := out.Errorf("backups-empty", "%s has no backups yet", target.WorldsDir)
+		e.Help = fmt.Sprintf("`%s` takes one", a.savesCommand(target, "backup"))
+		return saves.Backup{}, e
 	}
 	if n > len(backups) {
 		return saves.Backup{}, out.Errorf("backup-missing", "there is no backup %d; %s has %s", n, target.WorldsDir, plural(len(backups), "backup", "backups"))

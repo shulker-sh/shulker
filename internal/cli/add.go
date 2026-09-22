@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
@@ -54,7 +53,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 				return unsupportedType(chosen)
 			}
 			if opts.Pin != "" && len(args) > 1 {
-				return fmt.Errorf("--pin applies to a single mod")
+				return out.Errorf("usage", "--pin applies to a single mod")
 			}
 			if as != "" && len(args) > 1 {
 				return out.Errorf("usage", "--as applies to a single mod")

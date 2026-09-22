@@ -32,7 +32,7 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 	}
 	var all []instanceEntry
 	for _, in := range registry {
-		if sameDir(in.Source, dir) && !sameDir(in.Dir, dir) {
+		if isSameDir(in.Source, dir) && !isSameDir(in.Dir, dir) {
 			all = append(all, inspectInstance(in))
 		}
 	}
@@ -42,7 +42,7 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 	}
 	for _, side := range p.Manifest.Sides() {
 		for _, d := range lf.ExistingSyncDirs(side) {
-			if sameDir(d, dir) || slices.ContainsFunc(all, func(e instanceEntry) bool { return sameDir(e.Dir, d) }) {
+			if isSameDir(d, dir) || slices.ContainsFunc(all, func(e instanceEntry) bool { return isSameDir(e.Dir, d) }) {
 				continue
 			}
 			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(side), Dir: d, Source: dir})
@@ -54,7 +54,9 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 		}
 	}
 	if len(all) == 0 {
-		return nil, true, out.Errorf("no-instances", "nothing is synced from %s yet; `shulker link prism` adds an instance and `shulker sync --into <dir>` a detached build, and `shulker sync --all` syncs every instance", dir)
+		e := out.Errorf("no-instances", "nothing is synced from %s yet", dir)
+		e.Help = "`shulker link prism` adds an instance and `shulker sync --into <dir>` a detached build, and `shulker sync --all` syncs every instance"
+		return nil, true, e
 	}
 	sortInstanceEntries(all)
 	for _, e := range all {

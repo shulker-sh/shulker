@@ -41,7 +41,8 @@ func (a *app) ignoreCmd() *cobra.Command {
 			existing := slices.IndexFunc(p.Manifest.Ignore, func(ig manifest.Ignore) bool { return ig.Mod == mod && ig.On == on })
 			if existing >= 0 && !force {
 				ig := p.Manifest.Ignore[existing]
-				e := out.Errorf("already-ignored", "%s on %s is already ignored (%s %s); pass --force to replace it", mod, on, ig.Rule, ig.Declared)
+				e := out.Errorf("already-ignored", "%s on %s is already ignored (%s %s)", mod, on, ig.Rule, ig.Declared)
+				e.Help = "pass --force to replace it"
 				e.Flag = "--force"
 				return e
 			}
@@ -111,7 +112,9 @@ func matchProblem(problems []resolve.Problem, mod, on, rule string) (*resolve.Pr
 	case 1:
 		return &matches[0], nil
 	}
-	return nil, out.Errorf("usage", "%s on %s has both a depends and a breaks problem; pass --rule depends or --rule breaks", mod, on)
+	e := out.Errorf("usage", "%s on %s has both a depends and a breaks problem", mod, on)
+	e.Help = "pass --rule depends or --rule breaks"
+	return nil, e
 }
 
 func noProblem(problems []resolve.Problem, mod, on string) error {
@@ -123,9 +126,12 @@ func noProblem(problems []resolve.Problem, mod, on string) error {
 		}
 	}
 	if len(problems) == 0 {
-		return out.Errorf("no-problem", "the locked mods have no problem between %s and %s; pass --rule and --declared from the failed command", mod, on)
+		e := out.Errorf("no-problem", "the locked mods have no problem between %s and %s", mod, on)
+		e.Help = "pass --rule and --declared from the failed command"
+		return e
 	}
-	e := out.Errorf("no-problem", "the locked mods have no problem between %s and %s; pass --rule and --declared from the failed command, or pick a current problem", mod, on)
+	e := out.Errorf("no-problem", "the locked mods have no problem between %s and %s", mod, on)
+	e.Help = "pass --rule and --declared from the failed command, or pick a current problem"
 	e.Candidates = pairs
 	if len(ons) > 0 {
 		e.Candidates, e.Given = ons, on

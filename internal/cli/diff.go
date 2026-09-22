@@ -40,7 +40,7 @@ func (a *app) buildDirs(p *project.Project, lf *local.File, side string) (string
 		return "", nil, err
 	}
 	for _, e := range entries {
-		if e.Side == side && sameDir(e.Source, p.Dir) {
+		if e.Side == side && isSameDir(e.Source, p.Dir) {
 			add(e.Dir)
 		}
 	}
@@ -233,7 +233,8 @@ func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, s
 	case 1:
 		return drifted[0], nil
 	}
-	e := out.Errorf("ambiguous-into", "the %s side has edits in several directories; pass --into", side)
+	e := out.Errorf("ambiguous-into", "the %s side has edits in several directories", side)
+	e.Help = "pass --into"
 	e.Candidates, e.Flag = drifted, "--into"
 	return "", e
 }

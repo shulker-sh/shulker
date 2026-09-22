@@ -21,14 +21,14 @@ import (
 
 type instanceEntry struct {
 	config.Instance
-	Status       string `json:"status"`
-	SyncedAt     string `json:"syncedAt,omitempty"`
-	Side         string `json:"side,omitempty"`
-	AssumeClient bool   `json:"assumeClient,omitempty"`
-	Ref          string `json:"ref,omitempty"`
-	Problem      string `json:"problem,omitempty"`
-	LaunchError  string `json:"launchError,omitempty"`
-	intent       *instance.File
+	Status        string `json:"status"`
+	SyncedAt      string `json:"syncedAt,omitempty"`
+	Side          string `json:"side,omitempty"`
+	AssumesClient bool   `json:"assumeClient,omitempty"`
+	Ref           string `json:"ref,omitempty"`
+	Problem       string `json:"problem,omitempty"`
+	LaunchError   string `json:"launchError,omitempty"`
+	intent        *instance.File
 }
 
 const (
@@ -38,7 +38,7 @@ const (
 	instanceUnreadable = "unreadable"
 )
 
-func (e instanceEntry) intentPath() string { return filepath.Join(instance.Dir, instance.FileName) }
+func (i instanceEntry) intentPath() string { return filepath.Join(instance.Dir, instance.FileName) }
 
 func (a *app) instancesCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -102,7 +102,7 @@ func inspectInstance(in config.Instance) instanceEntry {
 		e.Problem = out.AsError(err).Message
 	default:
 		e.intent = f
-		e.Side, e.Ref, e.AssumeClient = f.Side, f.Ref, f.AssumesClient
+		e.Side, e.Ref, e.AssumesClient = f.Side, f.Ref, f.AssumesClient
 		if e.Source == "" {
 			e.Source = f.Source
 		}
@@ -191,35 +191,35 @@ func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
 
 // launchText is the line under a directory whose last launch never got as far as running the game.
 // It is its own line because the reason is an operating system message, too long for the aside.
-func (e instanceEntry) launchText() string {
-	if e.LaunchError == "" {
+func (i instanceEntry) launchText() string {
+	if i.LaunchError == "" {
 		return ""
 	}
-	return "last launch didn't start: " + e.LaunchError
+	return "last launch didn't start: " + i.LaunchError
 }
 
-func (e instanceEntry) statusText() string {
-	switch e.Status {
+func (i instanceEntry) statusText() string {
+	switch i.Status {
 	case instanceMissing:
 		return "directory is missing"
 	case instanceUnreadable:
 		return "can't read the directory"
 	}
-	text := e.syncedText()
-	if e.LastError != "" {
-		text += ", last sync failed: " + e.LastError
+	text := i.syncedText()
+	if i.LastError != "" {
+		text += ", last sync failed: " + i.LastError
 	}
 	return text
 }
 
-func (e instanceEntry) syncedText() string {
-	if e.Status == instanceNotSynced {
+func (i instanceEntry) syncedText() string {
+	if i.Status == instanceNotSynced {
 		return "not synced yet"
 	}
-	if e.Problem != "" {
-		return e.Problem
+	if i.Problem != "" {
+		return i.Problem
 	}
-	if t, err := time.Parse(time.RFC3339, e.SyncedAt); err == nil {
+	if t, err := time.Parse(time.RFC3339, i.SyncedAt); err == nil {
 		return "synced " + t.Local().Format("2006-01-02 15:04")
 	}
 	return "synced"
@@ -372,7 +372,7 @@ func uniqueID(instances []config.Instance, want, name, dir string) string {
 	}
 	taken := func(id string) bool {
 		i, ok := config.FindID(instances, id)
-		return ok && !sameDir(instances[i].Dir, dir)
+		return ok && !isSameDir(instances[i].Dir, dir)
 	}
 	if !taken(want) {
 		return want
@@ -397,8 +397,10 @@ func (a *app) checkID(as, dir string) error {
 	if err != nil {
 		return err
 	}
-	if i, ok := config.FindID(instances, as); ok && !sameDir(instances[i].Dir, dir) {
-		return out.Errorf("instance-id-taken", "another instance is already called %s (%s); pass a different --as", as, instances[i].Dir)
+	if i, ok := config.FindID(instances, as); ok && !isSameDir(instances[i].Dir, dir) {
+		e := out.Errorf("instance-id-taken", "another instance is already called %s (%s)", as, instances[i].Dir)
+		e.Help = "pass a different --as"
+		return e
 	}
 	return nil
 }

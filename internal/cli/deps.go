@@ -176,7 +176,7 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 		pinned, ok := p.Lock.Modpacks[name]
 		moved := ok && pinned.Source != mp.Source
 		// A relock reads local packs as they are on disk: they have no version to hold back.
-		if !ok || moved || (a.relocking && pack.Classify(mp.Source) == pack.Local) {
+		if !ok || moved || (a.isRelocking && pack.Classify(mp.Source) == pack.Local) {
 			switch {
 			case name == a.linkedPack:
 			case !ok && len(p.Lock.Modpacks) > 0:

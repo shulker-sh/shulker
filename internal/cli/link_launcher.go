@@ -35,21 +35,21 @@ type launcherReport struct {
 	Sync        *syncResult `json:"sync"`
 }
 
-func (k *launcherLink) register(cmd *cobra.Command, dirUsage, forceUsage string) {
-	cmd.Flags().StringVar(&k.launcherDir, "launcher-dir", "", dirUsage)
-	cmd.Flags().StringVar(&k.instanceName, "name", "", "instance name (default: the side's display name)")
-	cmd.Flags().StringVar(&k.as, "as", "", "id for this instance, for -i (default: from its name)")
-	cmd.Flags().StringVar(&k.ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().BoolVar(&k.force, "force", false, forceUsage)
-	k.ff.register(cmd, "for this instance")
-	k.ls.register(cmd)
+func (l *launcherLink) register(cmd *cobra.Command, dirUsage, forceUsage string) {
+	cmd.Flags().StringVar(&l.launcherDir, "launcher-dir", "", dirUsage)
+	cmd.Flags().StringVar(&l.instanceName, "name", "", "instance name (default: the side's display name)")
+	cmd.Flags().StringVar(&l.as, "as", "", "id for this instance, for -i (default: from its name)")
+	cmd.Flags().StringVar(&l.ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().BoolVar(&l.force, "force", false, forceUsage)
+	l.ff.register(cmd, "for this instance")
+	l.ls.register(cmd)
 }
 
-func (k *launcherLink) hasFeatures() bool { return len(k.ff.with)+len(k.ff.without) > 0 }
+func (l *launcherLink) hasFeatures() bool { return len(l.ff.with)+len(l.ff.without) > 0 }
 
-func (k *launcherLink) display(p *project.Project) string {
-	if k.instanceName != "" {
-		return k.instanceName
+func (l *launcherLink) display(p *project.Project) string {
+	if l.instanceName != "" {
+		return l.instanceName
 	}
 	return p.Manifest.DisplayName("client")
 }
@@ -120,7 +120,9 @@ func (a *app) refuseForeignInstance(k *launcherLink, gameDir, title, display str
 		return err
 	}
 	if found && !launcher.IsShulkerSlot(command) {
-		return out.Errorf("instance-exists", "%s already has an instance %q that shulker didn't link; pass --name to create a second instance, or --force to link this one", title, display)
+		e := out.Errorf("instance-exists", "%s already has an instance %q that shulker didn't link", title, display)
+		e.Help = "pass --name to create a second instance, or --force to link this one"
+		return e
 	}
 	return nil
 }

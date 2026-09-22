@@ -41,7 +41,8 @@ func (a *app) pickAccount(query string, matches []account.Resolved) (account.Res
 		func(r account.Resolved) string { return r.ID },
 		func(r account.Resolved) string { return accountLabel(t, r, now) },
 		func() error {
-			e := out.Errorf("ambiguous-account", "%d accounts match %q; name one by its qualifier or its id", len(matches), query)
+			e := out.Errorf("ambiguous-account", "%d accounts match %q", len(matches), query)
+			e.Help = "name one by its qualifier or its id"
 			e.Candidates, e.Pass, e.Given = accountCandidates(matches), accountPicks(matches), query
 			return e
 		})

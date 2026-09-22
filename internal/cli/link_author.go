@@ -62,7 +62,7 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 		}
 	}
 	m.Name, m.Client.Name = slugID(display), display
-	return &syncSource{Checkout: &pack.Checkout{Kind: pack.Local}, project: &project.Project{Manifest: m, Lock: l}, author: true}, nil
+	return &syncSource{Checkout: &pack.Checkout{Kind: pack.Local}, project: &project.Project{Manifest: m, Lock: l}, isAuthor: true}, nil
 }
 
 // platformName is what an authored instance is called unless the player says otherwise, the way

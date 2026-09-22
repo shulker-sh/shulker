@@ -68,7 +68,9 @@ func (a *app) instanceProject() (*project.Project, string, error) {
 	if side, ok := p.Manifest.InPlaceSide(); ok {
 		return p, side, nil
 	}
-	return nil, "", out.Errorf("not-in-place", "no side builds in place, so this project keeps no history; point a side's build directory at \".\" to make it an instance")
+	e := out.Errorf("not-in-place", "no side builds in place, so this project keeps no history")
+	e.Help = "point a side's build directory at \".\" to make it an instance"
+	return nil, "", e
 }
 
 func historyIndex(args []string) (int, error) {
@@ -189,10 +191,13 @@ func historyChanges(p *project.Project, e build.HistoryEntry) ([]historyChange, 
 	entry := filepath.Join(build.HistoryPath(p.Dir), e.ID)
 	was, err := lock.Load(filepath.Join(entry, lock.FileName))
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, out.Errorf("history-invalid", "history entry %s has no lock; delete %s to drop it", e.ID, entry)
+		fail := out.Errorf("history-invalid", "history entry %s has no lock", e.ID)
+		fail.Help = fmt.Sprintf("delete %s to drop it", entry)
+		return nil, fail
 	}
 	if err != nil {
-		invalid := out.Errorf("history-invalid", "history entry %s has an unreadable lock; delete %s to drop it", e.ID, entry)
+		invalid := out.Errorf("history-invalid", "history entry %s has an unreadable lock", e.ID)
+		invalid.Help = fmt.Sprintf("delete %s to drop it", entry)
 		invalid.Rows = []out.Detail{{Label: "lock", Text: out.AsError(err).Message}}
 		return nil, invalid
 	}

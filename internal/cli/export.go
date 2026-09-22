@@ -32,14 +32,14 @@ type exportFlags struct {
 	ff                                 featureFlags
 }
 
-func (f *exportFlags) register(cmd *cobra.Command, extension, bundle string) {
-	cmd.Flags().StringVar(&f.version, "version", "", "version written into the pack (default: \"version\" in shulker.json)")
-	cmd.Flags().StringVarP(&f.output, "output", "o", "", "archive path (default: build/<name>-<version>"+extension+", or the current directory for a git or URL source)")
-	cmd.Flags().StringVar(&f.osName, "os", "", "include mods gated on this os: macos, windows, or linux (default: leave them out)")
-	cmd.Flags().BoolVar(&f.bundle, "bundle", false, bundle)
-	cmd.Flags().BoolVar(&f.assumeClient, "assume-client", false, "export a client even when the source declares none, built from the mods and overrides both sides share")
-	cmd.Flags().StringVar(&f.ref, "ref", "", "branch, tag, or commit to export from a git source (default: the remote HEAD)")
-	f.ff.register(cmd, "for this run only")
+func (e *exportFlags) register(cmd *cobra.Command, extension, bundle string) {
+	cmd.Flags().StringVar(&e.version, "version", "", "version written into the pack (default: \"version\" in shulker.json)")
+	cmd.Flags().StringVarP(&e.output, "output", "o", "", "archive path (default: build/<name>-<version>"+extension+", or the current directory for a git or URL source)")
+	cmd.Flags().StringVar(&e.osName, "os", "", "include mods gated on this os: macos, windows, or linux (default: leave them out)")
+	cmd.Flags().BoolVar(&e.bundle, "bundle", false, bundle)
+	cmd.Flags().BoolVar(&e.assumeClient, "assume-client", false, "export a client even when the source declares none, built from the mods and overrides both sides share")
+	cmd.Flags().StringVar(&e.ref, "ref", "", "branch, tag, or commit to export from a git source (default: the remote HEAD)")
+	e.ff.register(cmd, "for this run only")
 }
 
 type exportJob struct {
@@ -59,7 +59,7 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fil
 		return nil, err
 	}
 	p := src.project
-	if diffs := p.LockDifferences(); len(diffs) > 0 && !src.remote() {
+	if diffs := p.LockDifferences(); len(diffs) > 0 && !src.isRemote() {
 		e := out.Errorf("lock-stale", "shulker.lock does not match shulker.json (%s)", strings.Join(diffs, "; "))
 		e.Help = "run `shulker lock`"
 		e.Items = diffs
@@ -74,7 +74,7 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fil
 	}
 	if job.output == "" {
 		dir := filepath.Join(p.Dir, "build")
-		if src.remote() {
+		if src.isRemote() {
 			if dir = a.dir; dir == "" {
 				if dir, err = os.Getwd(); err != nil {
 					return nil, err
@@ -86,7 +86,7 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fil
 	if job.output, err = filepath.Abs(job.output); err != nil {
 		return nil, err
 	}
-	if src.remote() {
+	if src.isRemote() {
 		if _, err := a.fetchLocked(ctx, p, false); err != nil {
 			return nil, err
 		}
@@ -126,7 +126,7 @@ type exportTally struct {
 	overrides            []string
 }
 
-func (t exportTally) rows() []out.Row {
+func (e exportTally) rows() []out.Row {
 	var rows []out.Row
 	add := func(items []string, one, many, how string) {
 		if len(items) == 0 {
@@ -138,13 +138,13 @@ func (t exportTally) rows() []out.Row {
 		}
 		rows = append(rows, out.Row{Text: text})
 	}
-	add(t.mods, "mod", "mods", t.how)
-	add(t.resourcePacks, "resource pack", "resource packs", t.how)
-	add(t.shaders, "shader", "shaders", t.how)
-	add(t.bundledMods, "mod", "mods", "bundled")
-	add(t.bundledResourcePacks, "resource pack", "resource packs", "bundled")
-	add(t.bundledShaders, "shader", "shaders", "bundled")
-	add(t.overrides, "override file", "override files", "")
+	add(e.mods, "mod", "mods", e.how)
+	add(e.resourcePacks, "resource pack", "resource packs", e.how)
+	add(e.shaders, "shader", "shaders", e.how)
+	add(e.bundledMods, "mod", "mods", "bundled")
+	add(e.bundledResourcePacks, "resource pack", "resource packs", "bundled")
+	add(e.bundledShaders, "shader", "shaders", "bundled")
+	add(e.overrides, "override file", "override files", "")
 	return rows
 }
 

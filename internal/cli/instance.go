@@ -235,7 +235,9 @@ func (a *app) instanceEditCmd() *cobra.Command {
 		Args:  noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if a.printer.NoInput || !a.tty() {
-				return out.Errorf("usage", "instance edit opens an editor, and there is no terminal to open it on; `shulker instance set` changes one setting")
+				e := out.Errorf("usage", "instance edit opens an editor, and there is no terminal to open it on")
+				e.Help = "`shulker instance set` changes one setting"
+				return e
 			}
 			// The file is opened unchecked: one that no longer matches the schema is the file most in
 			// need of an editor.
@@ -291,7 +293,9 @@ func (a *app) runEditor(path string) error {
 		if errors.As(err, &exit) {
 			return out.Errorf("editor-failed", "%s exited with status %d, so the edit may not have been saved", words[0], exit.ExitCode())
 		}
-		return out.Errorf("editor-failed", "can't run %s: %v; set $EDITOR to the editor you use", words[0], err)
+		e := withCause(out.Errorf("editor-failed", "can't run %s", words[0]), "os", err)
+		e.Help = "set $EDITOR to the editor you use"
+		return e
 	}
 	return nil
 }
@@ -347,15 +351,17 @@ func (a *app) instanceDir() (string, error) {
 		return "", err
 	}
 	if _, err := os.Stat(instance.Path(dir)); errors.Is(err, fs.ErrNotExist) {
-		return "", out.Errorf("instance-not-found", "%s is not an instance; run this in one, or name one with -i", dir)
+		e := out.Errorf("instance-not-found", "%s is not an instance", dir)
+		e.Help = "run this in one, or name one with -i"
+		return "", e
 	} else if err != nil {
 		return "", err
 	}
 	return dir, nil
 }
 
-func (f *instanceFile) settings() map[string]any {
-	s, _ := f.doc["settings"].(map[string]any)
+func (i *instanceFile) settings() map[string]any {
+	s, _ := i.doc["settings"].(map[string]any)
 	if s == nil {
 		return map[string]any{}
 	}
@@ -364,19 +370,19 @@ func (f *instanceFile) settings() map[string]any {
 
 // save checks the document against the schema and writes it back through instance.File, so the
 // file keeps the order shulker writes it in.
-func (f *instanceFile) save() error {
-	data, err := json.Marshal(f.doc)
+func (i *instanceFile) save() error {
+	data, err := json.Marshal(i.doc)
 	if err != nil {
 		return err
 	}
 	if err := schema.Validate(schema.Instance, data); err != nil {
-		return schema.Invalid("instance-invalid", f.path, data, err)
+		return schema.Invalid("instance-invalid", i.path, data, err)
 	}
 	var file instance.File
 	if err := json.Unmarshal(data, &file); err != nil {
 		return err
 	}
-	return file.Save(f.dir)
+	return file.Save(i.dir)
 }
 
 // playDefaults is config.json as a document, for the play.* defaults an instance inherits.

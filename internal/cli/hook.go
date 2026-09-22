@@ -308,11 +308,10 @@ func updatePaused(after time.Duration, id string) *out.Error {
 
 func humanMinutes(d time.Duration) string {
 	if d >= time.Minute && d%time.Minute == 0 {
-		if m := int(d / time.Minute); m == 1 {
-			return "1 minute"
-		} else {
+		if m := int(d / time.Minute); m != 1 {
 			return fmt.Sprintf("%d minutes", m)
 		}
+		return "1 minute"
 	}
 	return d.String()
 }

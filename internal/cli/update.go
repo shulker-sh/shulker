@@ -100,7 +100,7 @@ type lockChanges struct {
 type relocked struct {
 	lockChanges
 	validation *resolve.Validation
-	saved      bool
+	wasSaved   bool
 }
 
 func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
@@ -168,8 +168,8 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	if err != nil {
 		return relocked{}, err
 	}
-	a.relocking = true
-	defer func() { a.relocking = false }()
+	a.isRelocking = true
+	defer func() { a.isRelocking = false }()
 	r, err := a.resolver(cmd.Context(), p)
 	if err != nil {
 		return relocked{}, err
@@ -239,7 +239,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 		return relocked{}, err
 	}
 	a.printer.LockStale = false
-	rl.saved = true
+	rl.wasSaved = true
 	return rl, nil
 }
 
@@ -333,7 +333,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 			it.Aside = append(it.Aside, text)
 		}
 		if text := conditionText("feature", place.Feature); text != "" {
-			if len(place.Sides) == 0 && sideDeclared(sides, m.Side) {
+			if len(place.Sides) == 0 && isSideDeclared(sides, m.Side) {
 				text += ", off on every side"
 			}
 			it.Aside = append(it.Aside, text)
@@ -380,7 +380,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 	l.Items(items...)
 }
 
-func sideDeclared(sides []string, side string) bool {
+func isSideDeclared(sides []string, side string) bool {
 	if side == "" || side == "both" {
 		return len(sides) > 0
 	}

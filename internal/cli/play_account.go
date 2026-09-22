@@ -72,7 +72,8 @@ func playableAccounts(accounts []account.Resolved) []account.Resolved {
 // The matches and the flag that names one are what the player needs either way, so escaping the
 // picker lands here too.
 func noDefaultAccount(accounts []account.Resolved) error {
-	e := out.Errorf("usage", "no default account, and shulker has no terminal to ask on; name one with --account")
+	e := out.Errorf("usage", "no default account, and shulker has no terminal to ask on")
+	e.Help = "name one with --account"
 	e.Candidates, e.Pass, e.Flag = accountCandidates(accounts), accountPicks(accounts), "--account"
 	return e
 }

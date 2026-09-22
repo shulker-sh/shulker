@@ -85,7 +85,7 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 		return searchReply{}, err
 	}
 	reply := searchReply{results: searchResults{Query: query, Results: []searchHit{}}}
-	var skipped []string
+	var skipped []*out.Error
 	var failures []error
 	for _, name := range names {
 		p, ok := d.providers[name]
@@ -119,9 +119,9 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 	case len(failures) > 0:
 		return reply, failures[0]
 	case len(names) == 1:
-		return reply, out.Errorf("provider-unavailable", "%s", skipped[0])
+		return reply, skipped[0]
 	}
-	return reply, out.Errorf("provider-unavailable", "no provider is available: %s", strings.Join(skipped, "; "))
+	return reply, resolve.NoneAvailable("no provider is available", skipped)
 }
 
 func (a *app) printSearch(reply searchReply) error {

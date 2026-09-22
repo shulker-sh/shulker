@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -30,7 +32,9 @@ func (a *app) removeCmdFor(kind string) *cobra.Command {
 					switch {
 					case chosen == manifest.TypeModpack || isModpack:
 						if chosen == manifest.TypeMod {
-							return "", out.Errorf("mod-not-found", "%s is a modpack; remove it with `shulker modpack remove %s`", key, key)
+							e := out.Errorf("mod-not-found", "%s is a modpack", key)
+							e.Help = fmt.Sprintf("remove it with `shulker modpack remove %s`", key)
+							return "", e
 						}
 						if err := r.RemovePack(key); err != nil {
 							return "", err

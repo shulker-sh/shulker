@@ -135,7 +135,7 @@ func (a *app) openSettings() (*project.Project, map[string]any, *settingsSchema,
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(&doc); err != nil {
-		return nil, nil, nil, out.Errorf("manifest-invalid", "%s: %v", manifest.FileName, err)
+		return nil, nil, nil, schema.Invalid("manifest-invalid", manifest.FileName, data, err)
 	}
 	s, err := loadSettingsSchema()
 	if err != nil {
@@ -315,7 +315,9 @@ func (s *settingsSchema) lookup(path string) (*settingField, error) {
 			}
 			keys, node = append(keys, seg), child
 		case s.types(node)["array"]:
-			return nil, out.Errorf("path-invalid", "%s is a list; set the whole list with --literal", parent)
+			e := out.Errorf("path-invalid", "%s is a list", parent)
+			e.Help = "set the whole list with --literal"
+			return nil, e
 		default:
 			return nil, out.Errorf("path-invalid", "%s is a single value, so it has no %q", parent, seg)
 		}
@@ -335,9 +337,9 @@ func pathInvalid(where string, segs []string, i int, allowed []string) error {
 	return e
 }
 
-func (f *settingField) get(doc map[string]any) (any, bool) {
+func (s *settingField) get(doc map[string]any) (any, bool) {
 	var cur any = doc
-	for _, key := range f.keys {
+	for _, key := range s.keys {
 		m, ok := cur.(map[string]any)
 		if !ok {
 			return nil, false
@@ -349,9 +351,9 @@ func (f *settingField) get(doc map[string]any) (any, bool) {
 	return cur, true
 }
 
-func (f *settingField) put(doc map[string]any, value any) {
+func (s *settingField) put(doc map[string]any, value any) {
 	m := doc
-	for _, key := range f.keys[:len(f.keys)-1] {
+	for _, key := range s.keys[:len(s.keys)-1] {
 		next, ok := m[key].(map[string]any)
 		if !ok {
 			next = map[string]any{}
@@ -359,26 +361,26 @@ func (f *settingField) put(doc map[string]any, value any) {
 		}
 		m = next
 	}
-	m[f.keys[len(f.keys)-1]] = value
+	m[s.keys[len(s.keys)-1]] = value
 }
 
-func (f *settingField) remove(doc map[string]any) {
+func (s *settingField) remove(doc map[string]any) {
 	m := doc
-	for _, key := range f.keys[:len(f.keys)-1] {
+	for _, key := range s.keys[:len(s.keys)-1] {
 		next, ok := m[key].(map[string]any)
 		if !ok {
 			return
 		}
 		m = next
 	}
-	delete(m, f.keys[len(f.keys)-1])
+	delete(m, s.keys[len(s.keys)-1])
 }
 
-func (f *settingField) coerce(value string, current any) (any, error) {
-	types := f.s.types(f.schema)
-	if items, ok := f.schema["items"].(map[string]any); ok && types["array"] && isPlayerList(items) {
+func (s *settingField) coerce(value string, current any) (any, error) {
+	types := s.s.types(s.schema)
+	if items, ok := s.schema["items"].(map[string]any); ok && types["array"] && isPlayerList(items) {
 		list, _ := current.([]any)
-		return f.addPlayer(list, value)
+		return s.addPlayer(list, value)
 	}
 	if types["boolean"] && (value == "true" || value == "false") {
 		return value == "true", nil
@@ -397,7 +399,9 @@ func (f *settingField) coerce(value string, current any) (any, error) {
 		if types["array"] {
 			kind = "a list"
 		}
-		return nil, out.Errorf("usage", "%s takes %s; pass it as JSON with --literal", f.path, kind)
+		e := out.Errorf("usage", "%s takes %s", s.path, kind)
+		e.Help = "pass it as JSON with --literal"
+		return nil, e
 	}
 	var want []string
 	if types["boolean"] {
@@ -408,7 +412,7 @@ func (f *settingField) coerce(value string, current any) (any, error) {
 	} else if types["integer"] {
 		want = append(want, "a whole number")
 	}
-	return nil, out.Errorf("usage", "%s takes %s, not %q", f.path, strings.Join(want, " or "), value)
+	return nil, out.Errorf("usage", "%s takes %s, not %q", s.path, strings.Join(want, " or "), value)
 }
 
 func isPlayerList(items map[string]any) bool {
@@ -424,8 +428,8 @@ func isPlayerList(items map[string]any) bool {
 	return false
 }
 
-func (f *settingField) addPlayer(list []any, value string) ([]any, error) {
-	name, uuid := f.s.splitPlayer(value)
+func (s *settingField) addPlayer(list []any, value string) ([]any, error) {
+	name, uuid := s.s.splitPlayer(value)
 	found := -1
 	var match map[string]any
 	for i, entry := range list {
@@ -439,11 +443,11 @@ func (f *settingField) addPlayer(list []any, value string) ([]any, error) {
 		}
 		switch {
 		case found >= 0:
-			return nil, out.Errorf("usage", "%s matches two entries in %s", value, f.path)
+			return nil, out.Errorf("usage", "%s matches two entries in %s", value, s.path)
 		case sameName && uuid != "" && listedUUID != "" && !sameUUID:
-			return nil, out.Errorf("usage", "%s is listed in %s with uuid %s", listedName, f.path, listedUUID)
+			return nil, out.Errorf("usage", "%s is listed in %s with uuid %s", listedName, s.path, listedUUID)
 		case sameUUID && name != "" && listedName != "" && !sameName:
-			return nil, out.Errorf("usage", "%s is listed in %s as %s", uuid, f.path, listedName)
+			return nil, out.Errorf("usage", "%s is listed in %s as %s", uuid, s.path, listedName)
 		}
 		found, match = i, e
 	}

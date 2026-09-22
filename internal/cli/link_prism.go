@@ -27,7 +27,9 @@ func (a *app) linkPrismCmd() *cobra.Command {
 			p := src.project
 			l := &launcher.Prism{Dir: k.launcherDir}
 			if err := l.Check(); errors.Is(err, launcher.ErrNotFound) {
-				return out.Errorf("launcher-not-found", "no Prism Launcher directory at %s; run Prism Launcher once or pass --launcher-dir", k.launcherDir)
+				e := out.Errorf("launcher-not-found", "no Prism Launcher directory at %s", k.launcherDir)
+				e.Help = "run Prism Launcher once or pass --launcher-dir"
+				return e
 			} else if err != nil {
 				return err
 			}

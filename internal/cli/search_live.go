@@ -72,17 +72,17 @@ type liveSearch struct {
 }
 
 type liveReply struct {
-	query      string
-	done       chan struct{}
-	reply      searchReply
-	err        error
-	superseded bool
+	query        string
+	done         chan struct{}
+	reply        searchReply
+	err          error
+	isSuperseded bool
 }
 
-func (r *liveReply) failed() bool {
+func (l *liveReply) hasFailed() bool {
 	select {
-	case <-r.done:
-		return r.err != nil
+	case <-l.done:
+		return l.err != nil
 	default:
 		return false
 	}
@@ -96,43 +96,43 @@ func newLiveSearch(theme out.Theme, fetch func(query string) (searchReply, error
 // and status asked for one query share its failure, and a later ask for it tries again. huh
 // keeps what it was given per exact text, so that later ask only comes for the same query typed
 // differently, like with a trailing space.
-func (s *liveSearch) SetQuery(query string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (l *liveSearch) SetQuery(query string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	query = strings.TrimSpace(query)
-	if query != s.query {
-		for q, r := range s.replies {
-			if r.failed() {
-				delete(s.replies, q)
+	if query != l.query {
+		for q, r := range l.replies {
+			if r.hasFailed() {
+				delete(l.replies, q)
 			}
 		}
 	}
-	s.query = query
-	if tooShort(query) {
-		s.shown = nil
+	l.query = query
+	if isTooShort(query) {
+		l.shown = nil
 	}
 }
 
-func (s *liveSearch) current() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.query
+func (l *liveSearch) current() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.query
 }
 
-// tooShort is a query not worth a request: one letter matches a near-arbitrary slice of
+// isTooShort is a query not worth a request: one letter matches a near-arbitrary slice of
 // everything, and it is the query most likely to be typed straight through.
-func tooShort(query string) bool { return len([]rune(query)) < 2 }
+func isTooShort(query string) bool { return len([]rune(query)) < 2 }
 
-func (s *liveSearch) Rows() []out.Choice {
-	s.settle()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if tooShort(s.query) || s.shown == nil {
+func (l *liveSearch) Rows() []out.Choice {
+	l.settle()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if isTooShort(l.query) || l.shown == nil {
 		return nil
 	}
-	t := s.theme
+	t := l.theme
 	var rows []out.Choice
-	for _, hit := range s.shown.reply.results.Results {
+	for _, hit := range l.shown.reply.results.Results {
 		aside := append([]string{providerTitle(hit.Provider)}, searchAside(hit)...)
 		rows = append(rows, out.Choice{
 			Label: t.Bold(hit.Title) + " " + t.Grey(hit.ID) + t.Aside(strings.Join(aside, ", ")),
@@ -142,12 +142,12 @@ func (s *liveSearch) Rows() []out.Choice {
 	return rows
 }
 
-func (s *liveSearch) Status() string {
-	r := s.settle()
-	t := s.theme
+func (l *liveSearch) Status() string {
+	r := l.settle()
+	t := l.theme
 	switch {
 	case r == nil:
-		if tooShort(s.current()) {
+		if isTooShort(l.current()) {
 			return t.Grey("Type two or more characters to search.")
 		}
 		return ""
@@ -164,65 +164,65 @@ func (s *liveSearch) Status() string {
 }
 
 // last is the reply on screen, which leaving the form prints.
-func (s *liveSearch) last() (searchReply, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.shown == nil {
+func (l *liveSearch) last() (searchReply, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shown == nil {
 		return searchReply{}, false
 	}
-	return s.shown.reply, true
+	return l.shown.reply, true
 }
 
 // settle waits out the debounce for the query as it stands, then answers it from the session's
 // replies or a new request. It returns nil for a query too short to search and for one typed
 // past before its answer came: huh drops a reply to a query that is no longer current, and
 // shown must not take it either.
-func (s *liveSearch) settle() *liveReply {
-	query := s.current()
-	if tooShort(query) {
+func (l *liveSearch) settle() *liveReply {
+	query := l.current()
+	if isTooShort(query) {
 		return nil
 	}
-	s.sleep(searchDebounce)
-	if s.current() != query {
+	l.sleep(searchDebounce)
+	if l.current() != query {
 		return nil
 	}
-	s.mu.Lock()
-	r, found := s.replies[query]
+	l.mu.Lock()
+	r, found := l.replies[query]
 	if !found {
 		r = &liveReply{query: query, done: make(chan struct{})}
-		s.replies[query] = r
+		l.replies[query] = r
 	}
-	s.mu.Unlock()
+	l.mu.Unlock()
 	if found {
 		<-r.done
 	} else {
-		s.answer(r)
+		l.answer(r)
 	}
-	if r.superseded {
+	if r.isSuperseded {
 		return nil
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if r.err == nil && s.query == r.query {
-		s.shown = r
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if r.err == nil && l.query == r.query {
+		l.shown = r
 	}
 	return r
 }
 
 // answer sends r's request, unless its query was typed past while an earlier request held the
 // line; an unsent one is forgotten.
-func (s *liveSearch) answer(r *liveReply) {
-	s.fetching.Lock()
-	if s.current() == r.query {
-		r.reply, r.err = s.fetch(r.query)
+func (l *liveSearch) answer(r *liveReply) {
+	l.fetching.Lock()
+	if l.current() == r.query {
+		r.reply, r.err = l.fetch(r.query)
 	} else {
-		r.superseded = true
+		r.isSuperseded = true
 	}
-	s.fetching.Unlock()
-	if r.superseded {
-		s.mu.Lock()
-		delete(s.replies, r.query)
-		s.mu.Unlock()
+	l.fetching.Unlock()
+	if r.isSuperseded {
+		l.mu.Lock()
+		delete(l.replies, r.query)
+		l.mu.Unlock()
 	}
 	close(r.done)
 }

@@ -187,7 +187,9 @@ func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool)
 		return sc, nil
 	}
 	if sc.state.Source == "" {
-		return nil, out.Errorf("not-synced", "%s has no record of the source it was synced from; run `shulker sync <source> --into %s` once", dir, dir)
+		e := out.Errorf("not-synced", "%s has no record of the source it was synced from", dir)
+		e.Help = fmt.Sprintf("run `shulker sync <source> --into %s` once", dir)
+		return nil, e
 	}
 	if sc.source, err = a.openSource(cmd.Context(), sc.state.Source, sc.state.Ref); err != nil {
 		return nil, err
@@ -257,7 +259,9 @@ func (a *app) featureChangeDir(f *featureWhere) (string, error) {
 		return "", err
 	}
 	if f.sync && into == "" {
-		return "", out.Errorf("usage", "--sync needs --into or -i; in a project, run `shulker build`")
+		e := out.Errorf("usage", "--sync needs --into or -i")
+		e.Help = "in a project, run `shulker build`"
+		return "", e
 	}
 	return into, nil
 }
@@ -419,14 +423,14 @@ func (a *app) featureListCmd() *cobra.Command {
 	return cmd
 }
 
-func (st featureStatus) state() string {
-	if st.Choice != nil {
-		if *st.Choice {
+func (f featureStatus) state() string {
+	if f.Choice != nil {
+		if *f.Choice {
 			return "on (your choice)"
 		}
 		return "off (your choice)"
 	}
-	if st.Default {
+	if f.Default {
 		return "on (default)"
 	}
 	return "off"
