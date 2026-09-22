@@ -200,17 +200,18 @@ func printLogEntries(l *out.Lines, entries []auditlog.Entry) {
 		if instanceWidth > 0 {
 			lead += pad(e.Instance, instanceWidth) + "  "
 		}
-		under := "\n  " + strings.Repeat(" ", out.Width(lead))
+		indent := "  " + strings.Repeat(" ", out.Width(lead))
+		msg := strings.ReplaceAll(e.Msg, "\n", "\n"+indent)
 		switch e.Level {
 		case auditlog.LevelError:
 			l.Raw(t.Red(t.GlyphError()) + " " + t.Grey(lead) + t.Red(cmp.Or(e.Code, "error")))
 			if e.Msg != "" {
-				l.Raw(strings.TrimPrefix(under, "\n") + strings.ReplaceAll(e.Msg, "\n", under))
+				l.Raw(indent + msg)
 			}
 		case auditlog.LevelWarn:
-			l.Raw(t.Yellow("!") + " " + t.Grey(lead) + strings.ReplaceAll(e.Msg, "\n", under))
+			l.Raw(t.Yellow("!") + " " + t.Grey(lead) + msg)
 		default:
-			l.Plain(t.Grey(lead) + strings.ReplaceAll(logSummary(e), "\n", under))
+			l.Plain(t.Grey(lead) + logSummary(e))
 		}
 	}
 }

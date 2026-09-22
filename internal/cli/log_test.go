@@ -41,16 +41,22 @@ func seedLog(t *testing.T) logFixture {
 		{At: ago(90 * time.Minute), Group: "launchers", Cmd: "hook wrap", Instance: game, Level: auditlog.LevelError, Code: "launch-not-started", Msg: "can't run Java at /x/java: no such file"},
 		{At: ago(time.Hour), Group: "shulker", Cmd: "cache prune", Level: auditlog.LevelInfo, Msg: "start"},
 	}
-	var lines []string
+	writeFile(t, path, logLines(t, entries...))
+	return logFixture{path: path, game: game}
+}
+
+// logLines is entries as log.jsonl stores them.
+func logLines(t *testing.T, entries ...auditlog.Entry) string {
+	t.Helper()
+	var b strings.Builder
 	for _, e := range entries {
 		line, err := json.Marshal(e)
 		if err != nil {
 			t.Fatal(err)
 		}
-		lines = append(lines, string(line))
+		b.Write(append(line, '\n'))
 	}
-	writeFile(t, path, strings.Join(lines, "\n")+"\n")
-	return logFixture{path: path, game: game}
+	return b.String()
 }
 
 func logReportOf(t *testing.T, stdout string) logReport {
@@ -110,18 +116,10 @@ func TestLogShowsTheLastDayWithItsPreamble(t *testing.T) {
 func TestLogIndentsEveryLineOfAMessage(t *testing.T) {
 	path := isolatedLog(t)
 	at := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano)
-	var lines []string
-	for _, e := range []auditlog.Entry{
-		{At: at, Group: "launchers", Cmd: "sync", Level: auditlog.LevelError, Code: "source-offline", Msg: "couldn't reach the pack\nit has never synced here"},
-		{At: at, Group: "launchers", Cmd: "sync", Level: auditlog.LevelWarn, Msg: "kept the old copy\nit is a day old"},
-	} {
-		line, err := json.Marshal(e)
-		if err != nil {
-			t.Fatal(err)
-		}
-		lines = append(lines, string(line))
-	}
-	writeFile(t, path, strings.Join(lines, "\n")+"\n")
+	writeFile(t, path, logLines(t,
+		auditlog.Entry{At: at, Group: "launchers", Cmd: "sync", Level: auditlog.LevelError, Code: "source-offline", Msg: "couldn't reach the pack\nit has never synced here"},
+		auditlog.Entry{At: at, Group: "launchers", Cmd: "sync", Level: auditlog.LevelWarn, Msg: "kept the old copy\nit is a day old"},
+	))
 	code, stdout, stderr := run(t, "log", "--no-color")
 	if code != out.ExitOK {
 		t.Fatalf("exit %d: %s", code, stderr)
@@ -319,17 +317,12 @@ func seedSecretLog(t *testing.T) (home string) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	for _, e := range []auditlog.Entry{
-		{At: at, Group: "mods", Cmd: "search", Level: auditlog.LevelWarn, Msg: "curseforge: GET https://api.curseforge.com/v1/mods/search?key=" + logKey + " failed"},
-		{At: at, Group: "launchers", Cmd: "sync", Instance: game, Level: auditlog.LevelError, Code: "source-fetch-failed", Msg: "can't clone https://ghp_s3cr3t@github.com/org/pack.git into " + game},
-	} {
-		line, err := json.Marshal(e)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.Write(append(line, '\n')); err != nil {
-			t.Fatal(err)
-		}
+	seeded := logLines(t,
+		auditlog.Entry{At: at, Group: "mods", Cmd: "search", Level: auditlog.LevelWarn, Msg: "curseforge: GET https://api.curseforge.com/v1/mods/search?key=" + logKey + " failed"},
+		auditlog.Entry{At: at, Group: "launchers", Cmd: "sync", Instance: game, Level: auditlog.LevelError, Code: "source-fetch-failed", Msg: "can't clone https://ghp_s3cr3t@github.com/org/pack.git into " + game},
+	)
+	if _, err := f.WriteString(seeded); err != nil {
+		t.Fatal(err)
 	}
 	return home
 }
