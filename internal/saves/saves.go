@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/manifest"
 )
 
@@ -48,10 +49,10 @@ type Result struct {
 func Link(dir, root, group string) (Result, error) {
 	path := filepath.Join(dir, DirName)
 	res := Result{Group: group}
-	current, linked := readLink(path)
+	current, linked := fsutil.ReadLink(path)
 	if group == None {
 		if linked {
-			if err := unlinkDir(path); err != nil {
+			if err := fsutil.UnlinkDir(path); err != nil {
 				return res, err
 			}
 			if err := os.MkdirAll(path, 0o755); err != nil {
@@ -63,13 +64,13 @@ func Link(dir, root, group string) (Result, error) {
 	}
 
 	want := filepath.Join(root, group)
-	if linked && isSameTarget(path, current, want) {
+	if linked && fsutil.SameTarget(path, current, want) {
 		return withWorlds(res, path)
 	}
 	info, err := os.Lstat(path)
 	switch {
 	case linked:
-		if err := unlinkDir(path); err != nil {
+		if err := fsutil.UnlinkDir(path); err != nil {
 			return res, err
 		}
 	case errors.Is(err, fs.ErrNotExist):
@@ -110,7 +111,7 @@ func Link(dir, root, group string) (Result, error) {
 	if err := os.MkdirAll(want, 0o755); err != nil {
 		return res, err
 	}
-	if err := linkDir(want, path); err != nil {
+	if err := fsutil.LinkDir(want, path); err != nil {
 		return res, err
 	}
 	res.Changed = true
@@ -132,20 +133,6 @@ func withWorlds(res Result, path string) (Result, error) {
 	worlds, err := Worlds(path)
 	res.Worlds = worlds
 	return res, err
-}
-
-// readLink reports where path links to, reading a Windows junction the same as a symlink, which a
-// mode check would not: Lstat reports a junction as irregular rather than as a symlink.
-func readLink(path string) (string, bool) {
-	target, err := os.Readlink(path)
-	return target, err == nil
-}
-
-func isSameTarget(link, target, want string) bool {
-	if !filepath.IsAbs(target) {
-		target = filepath.Join(filepath.Dir(link), target)
-	}
-	return filepath.Clean(target) == filepath.Clean(want)
 }
 
 // Worlds are the folders in dir holding a level.dat, which is what the game lists. A missing dir
