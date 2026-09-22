@@ -42,7 +42,7 @@ func TestEnableShader(t *testing.T) {
 				placed[id] = true
 			}
 			report := &Report{}
-			b.enableShader(desired, placed, report)
+			b.reportUnenabledShaders(desired, placed, b.enableShader(desired, placed), report)
 			if !slices.Equal(report.Warnings, c.warns) {
 				t.Fatalf("warnings: %q, want %q", report.Warnings, c.warns)
 			}

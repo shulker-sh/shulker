@@ -69,42 +69,70 @@ func (b *Builder) packRefs() []packRef {
 var shaderConfigs = []struct{ mod, file string }{{"iris", "config/iris.properties"}, {"oculus", "config/oculus.properties"}}
 
 // enableShader points a shader mod this build placed at the first placed pack it
-// can load, and reports every other placed pack with what it takes to turn it
-// on. placed holds the placed mods' jar ids, so a renamed mod or one from
-// another provider is still found. Only the two keys shulker owns are written,
-// through the per-key merge, so the rest of the player's shader settings survive
-// a rebuild.
-func (b *Builder) enableShader(desired map[string]source, placed map[string]bool, report *Report) {
-	enabled := false
-	for _, key := range sortedPacks(b.Lock.Shaders) {
+// can load, and returns that pack's key, empty when none. placed holds the placed
+// mods' jar ids, so a renamed mod or one from another provider is still found.
+// Only the two keys shulker owns are written, through the per-key merge, so the
+// rest of the player's shader settings survive a rebuild.
+func (b *Builder) enableShader(desired map[string]source, placed map[string]bool) string {
+	for _, key := range b.placedShaders(desired) {
 		p := b.Lock.Shaders[key]
-		if _, ok := desired[p.Path(manifest.TypeShader)]; !ok || p.IsVanillaShader() {
-			continue
-		}
-		loads := func(mod string) bool { return placed[mod] && (len(p.Loaders) == 0 || slices.Contains(p.Loaders, mod)) }
-		config := ""
-		for _, c := range shaderConfigs {
-			if loads(c.mod) {
-				config = c.file
-				break
-			}
-		}
-		var hint string
-		switch {
-		case config != "" && !enabled:
+		if config := shaderConfig(p, placed); config != "" {
 			props := properties{"shaderPack": p.Filename, "enableShaders": "true"}
 			desired[config] = source{owned: propsFile{props: props, sep: "="}}
-			enabled = true
+			return key
+		}
+	}
+	return ""
+}
+
+// reportUnenabledShaders warns about every placed shader but the enabled one,
+// with what it takes to turn it on.
+func (b *Builder) reportUnenabledShaders(desired map[string]source, placed map[string]bool, enabled string, report *Report) {
+	for _, key := range b.placedShaders(desired) {
+		p := b.Lock.Shaders[key]
+		var hint string
+		switch {
+		case key == enabled:
 			continue
-		case config != "":
+		case shaderConfig(p, placed) != "":
 			hint = " is placed but not enabled; turn it on in game under Options, Video Settings, Shader Packs"
-		case loads("canvas"):
+		case loadsShader(p, "canvas", placed):
 			hint = " is placed but not enabled; turn it on in Canvas's own menu"
 		default:
 			hint = " is placed, but nothing in this build can load it; shulker add iris"
 		}
 		report.Warnings = append(report.Warnings, key+hint)
 	}
+}
+
+// placedShaders are the keys of the locked shaders this build places, in the
+// order enabling tries them. A vanilla shader is a resource pack, so it isn't one.
+func (b *Builder) placedShaders(desired map[string]source) []string {
+	var keys []string
+	for _, key := range sortedPacks(b.Lock.Shaders) {
+		p := b.Lock.Shaders[key]
+		if _, ok := desired[p.Path(manifest.TypeShader)]; ok && !p.IsVanillaShader() {
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
+// shaderConfig is the config file of the first placed mod that can enable p, empty
+// when none can.
+func shaderConfig(p lock.Pack, placed map[string]bool) string {
+	for _, c := range shaderConfigs {
+		if loadsShader(p, c.mod, placed) {
+			return c.file
+		}
+	}
+	return ""
+}
+
+// loadsShader reports whether mod is placed and can load p: p names it among its
+// loaders, or names none.
+func loadsShader(p lock.Pack, mod string, placed map[string]bool) bool {
+	return placed[mod] && (len(p.Loaders) == 0 || slices.Contains(p.Loaders, mod))
 }
 
 // seedResourcePacks fills in options.txt's enabled list once, and holds it from

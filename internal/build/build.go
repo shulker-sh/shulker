@@ -429,7 +429,8 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectPacks(cond, desired, report); err != nil {
 			return nil, nil, err
 		}
-		b.enableShader(desired, placed, report)
+		enabled := b.enableShader(desired, placed)
+		b.reportUnenabledShaders(desired, placed, enabled, report)
 		if err := b.collectClient(side, opts, desired, vars, report); err != nil {
 			return nil, nil, err
 		}
