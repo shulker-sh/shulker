@@ -146,3 +146,30 @@ func TestAddFolderRefusals(t *testing.T) {
 		t.Fatalf("nothing is added: %+v", h.readManifest(t).Requires)
 	}
 }
+
+func TestAddFolderThroughASymlinkCopiesItsTarget(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	target := filepath.Join(t.TempDir(), "Real")
+	writeFolder(t, target, helperFiles)
+	link := filepath.Join(t.TempDir(), "Helper")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "resourcepack", "add", link)
+	if readProjectFile(t, h, "files/Helper/pack.mcmeta") != helperFiles["pack.mcmeta"] {
+		t.Fatal("the folder a symlink names is copied under the symlink's name")
+	}
+}
+
+func TestAddFolderHoldingTheProjectIsRefused(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	code, stdout, _ := h.run(t, "--json", "resourcepack", "add", filepath.Dir(h.dir))
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
+		t.Fatalf("a folder the project lies in can't be copied into it: code=%d %+v", code, e)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, manifest.FilesDir)); !os.IsNotExist(err) {
+		t.Fatalf("nothing is copied: %v", err)
+	}
+}

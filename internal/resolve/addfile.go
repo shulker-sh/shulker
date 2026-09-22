@@ -90,6 +90,11 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 	if err != nil {
 		return err
 	}
+	if folder && copied {
+		if err := r.notHoldingProject(path); err != nil {
+			return err
+		}
+	}
 	entry, isReadded := r.Manifest.Requires[key]
 	if isReadded && (entry.Kind() != kind || entry.File != rel) {
 		return manifest.KeyTaken(key, entry.Kind(), kind)
@@ -148,6 +153,23 @@ func (r *Resolver) CopyIn(path, rel string, isReadded bool) error {
 	return copyFile(path, to)
 }
 
+// notHoldingProject refuses a folder the project lies in, whose copy into the project would copy
+// itself without end.
+func (r *Resolver) notHoldingProject(path string) error {
+	root, err := filepath.EvalSymlinks(r.Dir)
+	if err != nil {
+		return err
+	}
+	folder, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return err
+	}
+	if rel, err := filepath.Rel(folder, root); err == nil && filepath.IsLocal(rel) {
+		return out.Errorf("usage", "%s holds this project, so it can't be copied into it", filepath.Base(path))
+	}
+	return nil
+}
+
 // fileKind is what a local file is: the type asked for, a mod for a jar, and for a zip whatever it
 // holds.
 func fileKind(path, asked string) (string, error) {
@@ -174,10 +196,7 @@ func fileKind(path, asked string) (string, error) {
 			}
 		}
 	}
-	e := out.Errorf("type-ambiguous", "%s holds no resource pack or shader shulker recognises", filepath.Base(path))
-	e.Candidates = []string{manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader}
-	e.Flag = "--type"
-	return "", e
+	return "", typeAmbiguous(path, manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader)
 }
 
 // folderKind is what a pack folder is: the type asked for, and otherwise whatever its root holds.
@@ -198,10 +217,14 @@ func folderKind(path, asked string) (string, error) {
 	if IsLocalFolder(filepath.Join(path, "shaders")) {
 		return manifest.TypeShader, nil
 	}
+	return "", typeAmbiguous(path, manifest.TypeResourcePack, manifest.TypeShader)
+}
+
+func typeAmbiguous(path string, candidates ...string) error {
 	e := out.Errorf("type-ambiguous", "%s holds no resource pack or shader shulker recognises", filepath.Base(path))
-	e.Candidates = []string{manifest.TypeResourcePack, manifest.TypeShader}
+	e.Candidates = candidates
 	e.Flag = "--type"
-	return "", e
+	return e
 }
 
 // StemKey is a requires key made from a file's name without its extension.
@@ -305,6 +328,11 @@ func copyFile(from, to string) error {
 // copyFolder replaces the folder at to with a copy of the one at from, leaving out what a pack
 // folder's zip leaves out, so a file gone from from is gone from the copy too.
 func copyFolder(from, to string) error {
+	// WalkDir doesn't follow a symlinked root, which would copy nothing.
+	from, err := filepath.EvalSymlinks(from)
+	if err != nil {
+		return err
+	}
 	if err := os.RemoveAll(to); err != nil {
 		return err
 	}
