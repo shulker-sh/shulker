@@ -482,6 +482,8 @@ shulker config unset curseforge.key
 
 A feature is a name that mods opt into with a `feature` condition, like `shaders`. `features` in `shulker.json` declares each one, and its `default` turns it on. Your own choices are saved in `shulker.local.json` next to `shulker.json`. That file is per machine and is added to `.gitignore`. `build`, `install`, `sync`, `export mrpack`, and `export curseforge` use your choices over the declared defaults, and their `--with` and `--without` flags override both for one run.
 
+A `shulker.local.json` shulker can't read never stops a command. When it isn't valid JSON, names no `$schema` or another file's, or was written by a newer shulker, shulker renames it to `shulker.local.json.replaced`, warns naming both paths, and goes on with the declared defaults. The next `feature on` or `off` writes a fresh file. For a newer file, the warning says to run `shulker self update` and move it back.
+
 A directory you sync into, such as a launcher instance, can have its own choices in its own `shulker.local.json`. Set them with `--into <dir>`, or with `-i <id>` for anything [`shulker instances`](#shulker-instances) lists. When you sync into it, its choices beat the project's, and `--with` and `--without` still beat both.
 
 ### `shulker feature on|off`
@@ -1737,12 +1739,11 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
-| `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
 | `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock`. Also a lock file named with `--lock` to `cache info` or `cache prune` that isn't there |
 | `lock-stale` | `export` needs a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
-| `manifest-invalid` | `shulker.json` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
+| `manifest-invalid` | `shulker.json` doesn't parse (the message names the line and column), names a `$schema` this shulker doesn't know, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. A manifest with no `$schema` is read as the current version, and shulker writes the line the next time it saves the file. `items`: the failing fields when there are several |
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |
 | `manual-download` | The provider doesn't distribute this mod or modpack; download it into `downloads/` |
 | `memory` | Server memory isn't a whole number of M or G |

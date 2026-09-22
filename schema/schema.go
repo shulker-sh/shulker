@@ -9,7 +9,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-//go:embed v1/manifest.json v1/lock.json v1/instance.json v1/registry.json v1/accounts.json v1/state.json
+//go:embed v1/manifest.json v1/lock.json v1/instance.json v1/registry.json v1/accounts.json v1/state.json v1/local.json
 var files embed.FS
 
 type Kind string
@@ -21,6 +21,7 @@ const (
 	Registry Kind = "v1/registry.json"
 	Accounts Kind = "v1/accounts.json"
 	State    Kind = "v1/state.json"
+	Local    Kind = "v1/local.json"
 )
 
 type compiled struct {

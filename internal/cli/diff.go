@@ -72,7 +72,7 @@ func (a *app) diffCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			lf, err := local.Load(p.Dir)
+			lf, err := a.loadLocal(p.Dir)
 			if err != nil {
 				return err
 			}
@@ -165,7 +165,7 @@ func (a *app) pullCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			lf, err := local.Load(p.Dir)
+			lf, err := a.loadLocal(p.Dir)
 			if err != nil {
 				return err
 			}

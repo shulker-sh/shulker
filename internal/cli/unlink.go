@@ -127,7 +127,7 @@ func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
 		return r, err
 	}
 	if filepath.IsAbs(l.Source) {
-		lf, err := local.Load(l.Source)
+		lf, err := a.loadLocal(l.Source)
 		if err == nil && lf.RemoveSyncDir(l.Side, l.Dir) {
 			err = lf.Save()
 		}

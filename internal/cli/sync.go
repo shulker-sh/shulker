@@ -217,7 +217,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	defer func() { a.stampSync(into, err) }()
 	ownBuild := isSameDir(into, buildDir)
 	syncedDir := req.into != "" && !ownBuild
-	lf, inst, err := sourceLocalFiles(src, into)
+	lf, inst, err := a.sourceLocalFiles(src, into)
 	if err != nil {
 		return syncResult{}, err
 	}
@@ -351,14 +351,26 @@ func isSameDir(a, b string) bool {
 	return errA == nil && errB == nil && ra == rb
 }
 
-func sourceLocalFiles(src *syncSource, into string) (proj, inst *local.File, err error) {
-	if inst, err = local.Load(into); err != nil {
+// loadLocal reads dir's shulker.local.json, warning and going on with an empty one when it had to
+// move an unreadable file aside.
+func (a *app) loadLocal(dir string) (*local.File, error) {
+	lf, err := local.Load(dir)
+	var replaced *local.ReplacedError
+	if errors.As(err, &replaced) {
+		a.printer.Warn("%v", err)
+		return lf, nil
+	}
+	return lf, err
+}
+
+func (a *app) sourceLocalFiles(src *syncSource, into string) (proj, inst *local.File, err error) {
+	if inst, err = a.loadLocal(into); err != nil {
 		return nil, nil, err
 	}
 	if src.isRemote() {
 		return inst, inst, nil
 	}
-	if proj, err = local.Load(src.Dir); err != nil {
+	if proj, err = a.loadLocal(src.Dir); err != nil {
 		return nil, nil, err
 	}
 	return proj, inst, nil

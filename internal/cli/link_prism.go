@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 )
@@ -75,7 +74,7 @@ func (a *app) projectSource() (*syncSource, error) {
 }
 
 func (a *app) saveInstanceFeatures(gameDir string, ff featureFlags) error {
-	lf, err := local.Load(gameDir)
+	lf, err := a.loadLocal(gameDir)
 	if err != nil {
 		return err
 	}

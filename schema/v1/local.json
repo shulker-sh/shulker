@@ -1,0 +1,34 @@
+{
+  "$id": "https://shulker.sh/schema/v1/local.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shulker local settings",
+  "description": "A project's settings for this machine alone, kept in shulker.local.json and out of version control. Shulker writes this file; losing it resets features to the manifest's defaults.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The version of this file, as a published schema URL."
+    },
+    "features": {
+      "type": "object",
+      "description": "This machine's feature decisions, by feature name, overriding the manifest's defaults.",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "syncDirs": {
+      "type": "object",
+      "description": "The directories each side was synced into from this project, so unlink and sync can find them.",
+      "propertyNames": { "enum": ["client", "server"] },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "detectedOs": {
+      "type": "string",
+      "description": "The operating system shulker detected when it last set this machine's features."
+    }
+  }
+}

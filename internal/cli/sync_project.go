@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
@@ -42,7 +41,7 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 			all = append(all, inspectInstance(in))
 		}
 	}
-	lf, err := local.Load(dir)
+	lf, err := a.loadLocal(dir)
 	if err != nil {
 		return nil, err
 	}

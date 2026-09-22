@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 )
@@ -39,7 +38,7 @@ func (a *app) buildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			lf, err := local.Load(p.Dir)
+			lf, err := a.loadLocal(p.Dir)
 			if err != nil {
 				return err
 			}

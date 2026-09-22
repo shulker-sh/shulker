@@ -12,7 +12,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -338,7 +337,7 @@ func (a *app) rollbackCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			lf, err := local.Load(p.Dir)
+			lf, err := a.loadLocal(p.Dir)
 			if err != nil {
 				return err
 			}

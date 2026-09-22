@@ -14,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/fetch"
-	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -101,7 +100,7 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fil
 	if job.builder, err = a.builder(ctx, p); err != nil {
 		return nil, err
 	}
-	lf, err := local.Load(p.Dir)
+	lf, err := a.loadLocal(p.Dir)
 	if err != nil {
 		return nil, err
 	}

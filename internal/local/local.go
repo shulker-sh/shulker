@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,6 +20,7 @@ import (
 const FileName = "shulker.local.json"
 
 type File struct {
+	Schema     string              `json:"$schema"`
 	Features   map[string]bool     `json:"features,omitempty"`
 	SyncDirs   map[string][]string `json:"syncDirs,omitempty"`
 	DetectedOS string              `json:"detectedOs,omitempty"`
@@ -27,25 +29,66 @@ type File struct {
 	isOnDisk bool
 }
 
+// ReplacedError says Load moved aside a file it couldn't read, or tried to. The file Load returns
+// with it is empty and usable: the caller warns and carries on.
+type ReplacedError struct {
+	path, kept string
+	reason     string
+	newer      bool
+	moveErr    error
+}
+
+func (e *ReplacedError) Error() string {
+	msg := e.path + " " + e.reason + "; moved it to " + e.kept + " and using the manifest's feature defaults"
+	if e.moveErr != nil {
+		msg = e.path + " " + e.reason + "; couldn't move it aside, so using the manifest's feature defaults (" + e.moveErr.Error() + ")"
+	}
+	switch {
+	case e.newer && e.moveErr != nil:
+		msg += ". Run `shulker self update` to read it"
+	case e.newer:
+		msg += ". Run `shulker self update`, then move it back to keep those settings"
+	}
+	return msg
+}
+
+// Load reads dir's shulker.local.json. One that is corrupt, foreign, lacks its $schema or was written
+// by a newer shulker is renamed to shulker.local.json.replaced, and Load returns an empty file with a
+// *ReplacedError, since this per-machine file never stops a command.
 func Load(dir string) (*File, error) {
-	f := &File{dir: dir}
-	data, err := os.ReadFile(filepath.Join(dir, FileName))
+	path := filepath.Join(dir, FileName)
+	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return f, nil
+		return &File{dir: dir}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(data, f); err != nil {
-		return nil, schema.Invalid("local-invalid", FileName, data, err)
+	got, want, err := schema.ReadMarker(schema.Local, data)
+	var reason string
+	switch {
+	case err != nil:
+		reason = "is unreadable (" + err.Error() + ")"
+	case got > want:
+		reason = fmt.Sprintf("was written by a newer shulker (schema v%d; this one knows v%d)", got, want)
+	default:
+		f := &File{dir: dir}
+		if err := json.Unmarshal(data, f); err != nil {
+			reason = "is unreadable (" + err.Error() + ")"
+			break
+		}
+		f.isOnDisk = true
+		return f, nil
 	}
-	f.isOnDisk = true
-	return f, nil
+	e := &ReplacedError{path: path, kept: path + ".replaced", reason: reason, newer: got > want}
+	e.moveErr = os.Rename(e.path, e.kept)
+	return &File{dir: dir}, e
 }
 
 func (f *File) Exists() bool { return f.isOnDisk }
 
 func (f *File) Save() error {
+	f.Schema = schema.URL(schema.Local)
 	if err := fsutil.WriteJSON(filepath.Join(f.dir, FileName), f); err != nil {
 		return err
 	}

@@ -162,7 +162,7 @@ func (a *app) projectFeatures() (*featureScope, error) {
 	if err != nil {
 		return nil, err
 	}
-	lf, err := local.Load(p.Dir)
+	lf, err := a.loadLocal(p.Dir)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool)
 		a.printer.Warn("%v", stateErr)
 	}
 	sc := &featureScope{into: dir, state: state}
-	if sc.file, err = local.Load(dir); err != nil {
+	if sc.file, err = a.loadLocal(dir); err != nil {
 		return nil, err
 	}
 	sc.decisions = sc.file.Features
@@ -195,7 +195,7 @@ func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool)
 		return nil, err
 	}
 	sc.project = sc.source.project
-	proj, _, err := sourceLocalFiles(sc.source, dir)
+	proj, _, err := a.sourceLocalFiles(sc.source, dir)
 	if err != nil {
 		return nil, err
 	}

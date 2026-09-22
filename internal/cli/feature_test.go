@@ -10,9 +10,11 @@ import (
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/schema"
 )
 
 type localView struct {
+	Schema     string          `json:"$schema"`
 	Features   map[string]bool `json:"features"`
 	DetectedOS string          `json:"detectedOs"`
 }
@@ -137,7 +139,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 	}
 	var lf localView
 	h.readJSON(t, "shulker.local.json", &lf)
-	if !lf.Features["fancy"] || lf.DetectedOS != build.DetectOS() {
+	if !lf.Features["fancy"] || lf.DetectedOS != build.DetectOS() || lf.Schema != schema.URL(schema.Local) {
 		t.Fatalf("local file: %+v", lf)
 	}
 	if stdout := h.mustRun(t, "feature", "list"); stdout != "  • fancy on (your choice, gates: sodium)\n" {
@@ -192,6 +194,44 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 		if e := failureCode(t, stdout); code == 0 || e.Code != tc.code {
 			t.Fatalf("%v: exit %d %s", tc.args, code, stdout)
 		}
+	}
+}
+
+func TestUnreadableLocalFileFallsBackToDefaults(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
+	localPath := filepath.Join(h.dir, "shulker.local.json")
+	kept := localPath + ".replaced"
+
+	newer := `{"$schema":"https://shulker.sh/schema/v2/local.json","features":{"fancy":true}}`
+	if err := os.WriteFile(localPath, []byte(newer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr := h.mustRunStderr(t, "build")
+	if want := localPath + " was written by a newer shulker (schema v2; this one knows v1); moved it to " + kept + " and using the manifest's feature defaults. Run shulker self update, then move it back to keep those settings"; !strings.Contains(stderr, want) {
+		t.Fatalf("build stderr: %s\nwant %s", stderr, want)
+	}
+	if !strings.Contains(stdout, "excluded: sodium (needs feature fancy)") {
+		t.Fatalf("build should fall back to fancy's default, off: %s", stdout)
+	}
+	if data, _ := os.ReadFile(kept); string(data) != newer {
+		t.Fatalf("replaced file: %q", data)
+	}
+	if _, err := os.Stat(localPath); !os.IsNotExist(err) {
+		t.Fatalf("the unreadable local file should be gone: %v", err)
+	}
+
+	if err := os.WriteFile(localPath, []byte(`{"features":`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr = h.mustRunStderr(t, "feature", "on", "fancy")
+	if want := localPath + " is unreadable (unexpected end of JSON input); moved it to " + kept; !strings.Contains(stderr, want) || strings.Contains(stderr, "self update") {
+		t.Fatalf("feature on stderr: %s\nwant %s", stderr, want)
+	}
+	if lf := readLocal(t, h.dir); !lf.Features["fancy"] || lf.Schema != schema.URL(schema.Local) {
+		t.Fatalf("feature on should write a fresh local file: %+v", lf)
 	}
 }
 

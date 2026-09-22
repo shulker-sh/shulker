@@ -528,7 +528,7 @@ func TestSyncFromLocalProjectReadsInstanceDecisions(t *testing.T) {
 	if err := os.MkdirAll(into, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(into, "shulker.local.json"), []byte(`{"features":{"fancy":false}}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(into, "shulker.local.json"), []byte(`{"$schema":"https://shulker.sh/schema/v1/local.json","features":{"fancy":false}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); !strings.Contains(stdout, "excluded: sodium") {
