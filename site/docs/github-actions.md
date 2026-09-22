@@ -1,0 +1,129 @@
+---
+description: Export a Shulker modpack and publish a GitHub release from GitHub Actions whenever you push a version tag.
+---
+
+# GitHub Actions
+
+Release a modpack from its repository: push a tag like `v1.2.0`, and a workflow exports the Modrinth and CurseForge archives and attaches them to a GitHub release.
+
+## The workflow
+
+Save this as `.github/workflows/release.yml` in the pack's repository:
+
+```yaml
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install shulker
+        run: |
+          curl -fsSL https://shulker.sh/install.sh | SHULKER_VERSION=v0.0.1 sh -s -- --no-modify-path
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "SHULKER_CACHE=$RUNNER_TEMP/shulker-cache" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/shulker-cache
+          key: shulker-${{ runner.os }}-${{ hashFiles('shulker.lock') }}
+          restore-keys: shulker-${{ runner.os }}-
+
+      - name: Export
+        run: |
+          shulker export mrpack --version "${GITHUB_REF_NAME#v}"
+          shulker export curseforge --version "${GITHUB_REF_NAME#v}"
+
+      - name: Release notes
+        run: |
+          prev=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          git log --pretty='- %s' "${prev:+$prev..}HEAD" > notes.md
+
+      - name: Release
+        run: gh release create "$GITHUB_REF_NAME" build/*.mrpack build/*.zip --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+```
+
+Then tag and push:
+
+```sh
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+## Install
+
+`SHULKER_VERSION` pins the release the workflow installs, so a new Shulker release never changes your builds until you bump it. The installer puts `shulker` in `~/.local/bin`, but its shell profile edit doesn't reach later steps, so the workflow adds the directory to `$GITHUB_PATH` itself and passes `--no-modify-path`.
+
+## Cache
+
+Export reads every locked file from Shulker's cache, and downloads the ones a fresh checkout is missing. `actions/cache` keeps that cache between runs, keyed on `shulker.lock`: while the lock is unchanged the export downloads nothing, and after a change it starts from the previous cache and downloads only what's new.
+
+`SHULKER_CACHE` moves the cache to a path that is the same on every runner OS. The cache is optional: without it, every run downloads the pack's files again.
+
+## Export
+
+`--version "${GITHUB_REF_NAME#v}"` takes the pack version from the tag, so `v1.2.0` exports `1.2.0` and `shulker.json` needs no `version` of its own. The archives land in `build/` as `<name>-<version>.mrpack` and `<name>-<version>.zip`. Both carry `shulker.json` and `shulker.lock`, and the same project exports byte-identical archives on every run.
+
+Export never relocks. When `shulker.lock` doesn't match `shulker.json`, it fails with `lock-stale`: run `shulker lock` locally and commit the lock.
+
+### Files that aren't on CurseForge
+
+`export curseforge` refers to each file by its CurseForge file ID. A file locked from Modrinth or anywhere else is looked up on CurseForge by its fingerprint, and one that isn't there fails the export. Pass `--bundle` to put those files inside the archive instead; the CurseForge app warns about them on import. `export mrpack --bundle` does the same for files Modrinth launchers won't download.
+
+The lookup needs a CurseForge API key. Release binaries, which `install.sh` installs, carry one. A build from `go install` has none, so set `SHULKER_CURSEFORGE_KEY` from a repository secret:
+
+```yaml
+      - name: Export
+        run: |
+          shulker export mrpack --version "${GITHUB_REF_NAME#v}"
+          shulker export curseforge --version "${GITHUB_REF_NAME#v}"
+        env:
+          SHULKER_CURSEFORGE_KEY: ${{ secrets.CURSEFORGE_KEY }}
+```
+
+A pack locked entirely from CurseForge needs no key.
+
+## Release notes
+
+Shulker doesn't write a changelog for a pack. The workflow lists the commit subjects since the previous tag, which is why the checkout fetches the full history with `fetch-depth: 0`. To write the notes by hand instead, keep them in a file in the repository and pass that to `--notes-file`.
+
+## Publish to Modrinth and CurseForge
+
+[mc-publish](https://github.com/Kir-Antipov/mc-publish) uploads the archives to Modrinth and CurseForge. It can't read a modpack's Minecraft version or loader, so read them from the lock with [`shulker get --locked`](/docs/cli#shulker-get). `shulker.json` may hold a range such as `*`, and the lock holds the exact version. Add these steps after the release notes:
+
+```yaml
+      - name: Pack versions
+        id: pack
+        run: |
+          echo "minecraft=$(shulker get --locked minecraft)" >> "$GITHUB_OUTPUT"
+          echo "loader=$(shulker get --locked loader.type)" >> "$GITHUB_OUTPUT"
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: AABBCCDD
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          modrinth-files: build/*.mrpack
+          curseforge-id: 123456
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          curseforge-files: build/*.zip
+          version: ${{ steps.pack.outputs.version }}
+          changelog-file: notes.md
+          loaders: ${{ steps.pack.outputs.loader }}
+          game-versions: ${{ steps.pack.outputs.minecraft }}
+```
+
+The IDs are your project's on each site, and the tokens are your own upload tokens, stored as repository secrets. The CurseForge upload token is not the API key `export curseforge` uses.
