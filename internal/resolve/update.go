@@ -179,10 +179,7 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 	direct := r.directMods()[id]
 	entry := direct.entry
 	if entry.File != "" {
-		if _, own := r.Manifest.Requires[id]; !own {
-			return out.Errorf("requires-unsupported", "%s: local files in a modpack aren't supported yet", id)
-		}
-		if err := r.relockFile(ctx, id, entry, prev); err != nil {
+		if err := r.relockFile(ctx, r.fileDir(id, "", entry.File), id, entry, prev); err != nil {
 			return err
 		}
 		for _, name := range direct.packs {

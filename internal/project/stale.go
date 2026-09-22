@@ -231,14 +231,15 @@ func FileDifferences(dir, key, listed, locked string, size int64, sha512 string)
 }
 
 // GoneFiles warns about each local file entry whose file is gone but whose locked bytes cached
-// has, which the build places instead. One the cache lacks too is install's missing-files.
+// has, which the build places instead. One the cache lacks too is install's missing-files. An entry
+// a modpack supplies names a file in the modpack's directory, not this one, so it is left out.
 func (p *Project) GoneFiles(cached func(sha512 string) bool) []string {
 	if p.Lock == nil {
 		return nil
 	}
 	var gone []string
 	check := func(key, rel, sha512 string) {
-		if rel == "" || !cached(sha512) {
+		if rel == "" || p.Manifest.Requires[key].File != rel || !cached(sha512) {
 			return
 		}
 		if _, err := os.Stat(filepath.Join(p.Dir, filepath.FromSlash(rel))); errors.Is(err, os.ErrNotExist) {

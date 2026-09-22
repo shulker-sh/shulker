@@ -34,7 +34,9 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 			r.Lock.AddRequiredBy(id, l.Name)
 		}
 	}
-	r.applyLockedPacks()
+	if err := r.applyLockedPacks(); err != nil {
+		return nil, err
+	}
 	if err := r.reconcilePacks(ctx); err != nil {
 		return nil, err
 	}
@@ -50,7 +52,7 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 		if d.locked != "" {
 			continue
 		}
-		if m, ok := r.Lock.Mods[id]; !ok || len(project.ModDifferences(r.Dir, id, d.entry, m)) > 0 {
+		if m, ok := r.Lock.Mods[id]; !ok || len(project.ModDifferences(r.fileDir(id, "", d.entry.File), id, d.entry, m)) > 0 {
 			targets = append(targets, id)
 		}
 	}

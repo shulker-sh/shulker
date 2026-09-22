@@ -90,6 +90,26 @@ func TestValidateOptionalAndLoaderProvides(t *testing.T) {
 	}
 }
 
+func TestValidateSkipsDependenciesNotDownloaded(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	sha, err := c.Put(bytes.NewReader(zipBytes(t, "fabric.mod.json", `{"id":"private-mod","version":"1.0.0","depends":{"fabric-api":"*","sodium":"*"}}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "fabric", Version: "0.17.3"}, Mods: map[string]lock.Mod{
+		"private-mod": {Sha512: sha},
+		"fabric-api":  {Sha512: "0000"},
+	}}
+	v, err := (&Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}).Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{{Rule: "depends", Mod: "private-mod", ModVersion: "1.0.0", On: "sodium", Declared: "*"}}
+	if !reflect.DeepEqual(v.Problems, want) {
+		t.Fatalf("problems %+v, want %+v", v.Problems, want)
+	}
+}
+
 func TestValidateNeoForgeMavenRanges(t *testing.T) {
 	c := &cache.Cache{Dir: t.TempDir()}
 	jars := map[string]string{

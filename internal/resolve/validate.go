@@ -81,10 +81,12 @@ func (r *Resolver) Validate() (*Validation, error) {
 		installed[id] = version
 	}
 	infos := map[string]*jarmeta.Info{}
+	unread := map[string]bool{}
 	for _, id := range r.lockIDs() {
 		m := r.Lock.Mods[id]
 		if !r.Cache.Has(m.Sha512) {
 			v.Warnings = append(v.Warnings, fmt.Sprintf("%s is not downloaded; its metadata was not checked", id))
+			unread[r.Lock.JarID(id)] = true
 			continue
 		}
 		info, err := jarmeta.Read(r.Cache.Object(m.Sha512), r.Lock.Loader.Type)
@@ -106,6 +108,9 @@ func (r *Resolver) Validate() (*Validation, error) {
 		for _, on := range sortedKeys(info.Depends) {
 			declared := info.Depends[on]
 			found, ok := installed[on]
+			if !ok && unread[on] {
+				continue
+			}
 			if ok {
 				match, err := satisfies(info, found, declared)
 				if err != nil {

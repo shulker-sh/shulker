@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -23,10 +24,11 @@ type localCopy struct {
 	size   int64
 }
 
-// cacheLocal hashes a requires entry's file into the cache. A file that is gone is served from the
-// cache by the sha512 it was locked at, with a warning, so the lock is only wrong when neither has it.
-func (r *Resolver) cacheLocal(key, rel, lockedSha512 string) (localCopy, error) {
-	f, err := os.Open(filepath.Join(r.Dir, filepath.FromSlash(rel)))
+// cacheLocal hashes a local file entry's file, rel under dir, into the cache. A file that is gone is
+// served from the cache by the sha512 it was locked at, with a warning, so the lock is only wrong
+// when neither has it.
+func (r *Resolver) cacheLocal(dir, key, rel, lockedSha512 string) (localCopy, error) {
+	f, err := os.Open(filepath.Join(dir, filepath.FromSlash(rel)))
 	if errors.Is(err, os.ErrNotExist) {
 		if lockedSha512 == "" || !r.Cache.Has(lockedSha512) {
 			return localCopy{}, localFileMissing(key, rel)
@@ -49,6 +51,63 @@ func (r *Resolver) cacheLocal(key, rel, lockedSha512 string) (localCopy, error) 
 		return localCopy{}, err
 	}
 	return localCopy{path: r.Cache.Object(sha), sha512: sha, size: counted.n}, nil
+}
+
+// fileDir is the directory a locked local file entry's path is relative to: the project's own for
+// an entry shulker.json lists, and the modpack's for one a modpack supplies. It is "" when neither
+// is known, as for a URL modpack, which has no directory.
+func (r *Resolver) fileDir(id, modpack, file string) string {
+	if r.Manifest.Requires[id].File == file {
+		return r.Dir
+	}
+	for _, p := range r.Packs {
+		if p.Name == modpack || (modpack == "" && p.Manifest.Requires[id].File == file) {
+			return p.Dir
+		}
+	}
+	return ""
+}
+
+// cachePackFiles hashes the local files a locked modpack's own lock names into the cache, from the
+// modpack's directory. An entry the modpack took from a modpack of its own names a path in a
+// directory this project never sees, so only the cache can serve it.
+func (r *Resolver) cachePackFiles(p *pack.Loaded) error {
+	check := func(key, file, modpack, sha512 string) error {
+		if file == "" {
+			return nil
+		}
+		label := "modpack " + p.Name + ": " + key
+		if modpack != "" || p.Dir == "" {
+			if !r.Cache.Has(sha512) {
+				return localFileMissing(label, file)
+			}
+			return nil
+		}
+		got, err := r.cacheLocal(p.Dir, label, file, sha512)
+		if err != nil {
+			return err
+		}
+		if got.sha512 != sha512 && !r.Cache.Has(sha512) {
+			e := out.Errorf("modpack-changed", "%s: %s has changed since the modpack was locked", label, file)
+			e.Help = "run `shulker lock` in the modpack"
+			return e
+		}
+		return nil
+	}
+	for _, id := range sortedKeys(p.Lock.Mods) {
+		m := p.Lock.Mods[id]
+		if err := check(id, m.File, m.Modpack, m.Sha512); err != nil {
+			return err
+		}
+	}
+	for _, section := range []map[string]lock.Pack{p.Lock.ResourcePacks, p.Lock.Shaders} {
+		for _, key := range sortedKeys(section) {
+			if err := check(key, section[key].File, section[key].Modpack, section[key].Sha512); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // checkLocalFiles holds the lock's local file entries to what the cache can serve: one whose file is
@@ -78,8 +137,9 @@ func (r *Resolver) warnOnce(warning string) {
 // restoreLocal fills the cache from a local file entry's file, and says what is wrong when the file
 // can't: it is gone, or its bytes are no longer the ones locked.
 func (r *Resolver) restoreLocal(f downloadable) string {
-	file, err := os.Open(filepath.Join(r.Dir, filepath.FromSlash(f.file)))
-	if err != nil {
+	dir := r.fileDir(f.id, f.modpack, f.file)
+	file, err := os.Open(filepath.Join(dir, filepath.FromSlash(f.file)))
+	if dir == "" || err != nil {
 		return fmt.Sprintf("%s: %s is gone, and the cache has no copy of it", f.id, f.file)
 	}
 	defer file.Close()
@@ -107,14 +167,14 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// relockFile locks a local mod jar from its own metadata: the jar says its id and side, and the
-// dependencies it declares are resolved from the providers as a hosted mod's are.
-func (r *Resolver) relockFile(ctx context.Context, id string, entry manifest.Require, prev lock.Mod) error {
+// relockFile locks a local mod jar, its path relative to dir, from its own metadata: the jar says its
+// id and side, and the dependencies it declares are resolved from the providers as a hosted mod's are.
+func (r *Resolver) relockFile(ctx context.Context, dir, id string, entry manifest.Require, prev lock.Mod) error {
 	locked := ""
 	if prev.File == entry.File {
 		locked = prev.Sha512
 	}
-	got, err := r.cacheLocal(id, entry.File, locked)
+	got, err := r.cacheLocal(dir, id, entry.File, locked)
 	if err != nil {
 		return err
 	}
@@ -211,7 +271,7 @@ func (r *Resolver) lockFilePack(key, kind string, entry manifest.Require) error 
 	if prev, ok := section[key]; ok && prev.File == entry.File {
 		locked = prev.Sha512
 	}
-	got, err := r.cacheLocal(key, entry.File, locked)
+	got, err := r.cacheLocal(r.Dir, key, entry.File, locked)
 	if err != nil {
 		return err
 	}

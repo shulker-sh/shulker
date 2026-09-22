@@ -104,7 +104,7 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 		return r.lockFilePack(key, kind, entry)
 	}
 	dependents := r.Lock.Mods[key].RequiredBy
-	if err := r.relockFile(ctx, key, entry, lock.Mod{}); err != nil {
+	if err := r.relockFile(ctx, r.Dir, key, entry, lock.Mod{}); err != nil {
 		return err
 	}
 	for _, by := range dependents {

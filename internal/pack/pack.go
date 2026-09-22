@@ -9,8 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -118,6 +120,9 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		if l.Manifest, err = manifest.Parse(data); err != nil {
 			return nil, inModpack(name, err)
 		}
+		if err := refuseFiles(name, l.Manifest); err != nil {
+			return nil, err
+		}
 		if l.Pin.Sha256, err = s.storeManifest(data); err != nil {
 			return nil, err
 		}
@@ -192,6 +197,9 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 		}
 		if l.Manifest, err = manifest.Parse(data); err != nil {
 			return nil, "", inModpack(name, err)
+		}
+		if err := refuseFiles(name, l.Manifest); err != nil {
+			return nil, "", err
 		}
 		if pinned.UsesLock {
 			if err := s.openPackLock(ctx, l, pinned.LockSha256); err != nil {
@@ -292,6 +300,19 @@ func (l *Loaded) resolveLocked(p manifest.Require) error {
 		l.UsesLock = *p.Locked
 	default:
 		l.UsesLock = true
+	}
+	return nil
+}
+
+// refuseFiles fails a modpack fetched as a bare manifest that names local files: with no
+// directory beside the manifest, there is nothing for their paths to point into.
+func refuseFiles(name string, m *manifest.Manifest) error {
+	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
+		if file := m.Requires[key].File; file != "" {
+			e := out.Errorf("modpack-url-file", "modpack %s: requires.%s is the local file %s, and a manifest fetched from a URL carries no files", name, key, file)
+			e.Help = "serve the modpack from git or a directory instead"
+			return e
+		}
 	}
 	return nil
 }
@@ -457,6 +478,15 @@ func dirSha256(dir string, m *manifest.Manifest) (string, error) {
 		})
 		if err != nil {
 			return "", err
+		}
+	}
+	for _, r := range m.Requires {
+		if r.File == "" {
+			continue
+		}
+		path := filepath.Join(dir, filepath.FromSlash(r.File))
+		if _, err := os.Stat(path); err == nil {
+			files = append(files, path)
 		}
 	}
 	files = append(files, filepath.Join(dir, manifest.FileName))

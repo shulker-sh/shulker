@@ -138,7 +138,9 @@ func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
 	}
 	r.Lock.Modpacks[l.Name] = l.Pin
 	if l.UsesLock {
-		r.applyLockedPacks()
+		if err := r.applyLockedPacks(); err != nil {
+			return err
+		}
 		for _, id := range sortedKeys(l.Manifest.Mods()) {
 			r.Lock.AddRequiredBy(id, l.Name)
 		}
@@ -159,14 +161,17 @@ func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
 }
 
 // applyLockedPacks copies every locked modpack's own lock entries into this
-// project's lock, each marked with the modpack it came from. A mod listed in
-// shulker.json is skipped, because the project's own entry is resolved here and
-// wins over what a modpack pins.
-func (r *Resolver) applyLockedPacks() {
+// project's lock, each marked with the modpack it came from, and caches the
+// local files they name. A mod listed in shulker.json is skipped, because the
+// project's own entry is resolved here and wins over what a modpack pins.
+func (r *Resolver) applyLockedPacks() error {
 	own := r.Manifest.Mods()
 	for _, p := range r.Packs {
 		if !p.UsesLock || p.Lock == nil {
 			continue
+		}
+		if err := r.cachePackFiles(p); err != nil {
+			return err
 		}
 		for _, id := range sortedKeys(p.Lock.Mods) {
 			if _, project := own[id]; project {
@@ -194,6 +199,7 @@ func (r *Resolver) applyLockedPacks() {
 			r.Lock.Shaders[key] = entry
 		}
 	}
+	return nil
 }
 
 func (r *Resolver) RemovePack(name string) error {

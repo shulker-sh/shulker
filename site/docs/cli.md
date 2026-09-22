@@ -1699,7 +1699,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `loader-required` | `add` of a mod in a project without a loader, or `import curseforge` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
-| `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. While the cache still has them, a gone file only warns and builds from the cache |
+| `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way. While the cache still has them, a gone file only warns and builds from the cache |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
 | `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock` |
@@ -1734,7 +1734,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `not-pinned` | The mod has no pin |
 | `not-shulker` | The instance belongs to another launcher, which starts it itself |
 | `not-synced` | The directory has no record of the source it was synced from |
-| `modpack-changed` | A modpack no longer matches the lock; run `shulker update` |
+| `modpack-changed` | A modpack no longer matches the lock; run `shulker update`. Also a locked modpack whose local `file` has changed since the modpack was locked, when the cache has no copy of the locked bytes; run `shulker lock` in the modpack |
 | `modpack-conflict` | Two modpacks list the same mod with different settings |
 | `modpack-exists` | The modpack is already in `shulker.json` |
 | `modpack-fetch` | A modpack couldn't be fetched |
@@ -1746,6 +1746,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
 | `modpack-unlocked` | A modpack has no commit in the lock; run `shulker update` |
+| `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
 | `path-invalid` | `shulker.json`, `config.json` or an instance's settings have no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get`, `config get` or `instance get` names a field that isn't set |
