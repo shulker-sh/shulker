@@ -195,10 +195,11 @@ func TestRequiresEntryKinds(t *testing.T) {
 	if local.Mods()["extras"].File != "files/extras.jar" || len(local.ResourcePacks()) != 1 || len(local.Shaders()) != 1 {
 		t.Errorf("local files: mods %v, resource packs %v, shaders %v", local.Mods(), local.ResourcePacks(), local.Shaders())
 	}
-	for _, entries := range []string{`"extras":{"file":"files/extras.zip"}`, `"faithful":{"type":"resourcepack","file":"files/faithful.jar"}`} {
-		if _, err := Parse(doc(entries)); out.CodeOf(err) != "manifest-invalid" {
-			t.Errorf("%s: a file of the wrong extension should be invalid, got %v", entries, err)
-		}
+	if _, err := Parse(doc(`"extras":{"file":"files/extras.zip"}`)); out.CodeOf(err) != "manifest-invalid" {
+		t.Errorf("a mod file that isn't a .jar should be invalid, got %v", err)
+	}
+	if _, err := Parse(doc(`"helper":{"type":"resourcepack","file":"Resource Packs/Mod Menu Helper"}`)); err != nil {
+		t.Errorf("a resource pack may name a folder: %v", err)
 	}
 	archive, err := Parse(doc(`"cozy":{"type":"modpack","file":"files/cozy.mrpack"}`))
 	if err != nil {
