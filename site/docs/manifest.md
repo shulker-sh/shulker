@@ -348,6 +348,7 @@ No other properties are allowed.
 | `variables` | [`variables`](#variables) |  |
 | `hooks` | [`clientHooks`](#clienthooks) |  |
 | `options` | map of `string` \| `number` \| `boolean` | Keys written into options.txt as key:value. Other keys already in the file are left alone.<br>keys match `^[A-Za-z][A-Za-z0-9_.:]*$` |
+| `optionsPath` | `string` | Where options and the seeded resourcePacks list are written, relative to the build, in builds and exports alike. Defaults to options.txt. config/modpack_defaults/options.txt ships it for Config Manager, which copies it into place only where the player has none, so a pack update never resets their settings. The tool rejects absolute paths and paths that leave the build.<br>pattern `^[^/\\]`, min length 1 |
 | `servers` | object[] | Entries written into servers.dat. |
 | `servers[].name` * | `string` | min length 1 |
 | `servers[].ip` * | `string` | host or host:port, as typed into the multiplayer screen.<br>min length 1 |

@@ -680,9 +680,10 @@ func RecordLoader(dir string, l InstalledLoader) error {
 
 func (b *Builder) collectClient(side string, opts Options, desired map[string]source, vars map[string]string, report *Report) error {
 	cl := b.Manifest.Client
+	file := b.Manifest.OptionsPath()
 	options := properties{}
 	if cl != nil && len(cl.Options) > 0 {
-		rendered, err := renderProperties(OptionsFile, cl.Options, vars)
+		rendered, err := renderProperties(file, cl.Options, vars)
 		if err != nil {
 			return err
 		}
@@ -692,7 +693,7 @@ func (b *Builder) collectClient(side string, opts Options, desired map[string]so
 	if len(options) == 0 {
 		return nil
 	}
-	desired[OptionsFile] = source{owned: propsFile{props: options, sep: ":"}}
+	desired[file] = source{owned: propsFile{props: options, sep: ":"}}
 	return nil
 }
 

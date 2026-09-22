@@ -103,7 +103,7 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 	if err != nil {
 		return nil, err
 	}
-	enableByCurseForgeNames(t, fileNames)
+	enableByCurseForgeNames(t, fileNames, b.Manifest.OptionsPath())
 	entries := map[string][]byte{}
 	for path, data := range t.files {
 		entries["overrides/"+path] = data
@@ -305,14 +305,14 @@ func zipContents(data []byte) (map[string][]byte, error) {
 // enableByCurseForgeNames points the options file and the shader loader's config
 // at the names the launcher saves file-ID packs under, which are CurseForge's own
 // file names rather than the <key>.zip a build places.
-func enableByCurseForgeNames(t *mrpackSide, fileNames map[string]string) {
+func enableByCurseForgeNames(t *mrpackSide, fileNames map[string]string, optionsPath string) {
 	renamed := map[string]string{}
 	for placed, name := range fileNames {
 		if base, ok := strings.CutPrefix(placed, "resourcepacks/"); ok && name != "" {
 			renamed[base] = name
 		}
 	}
-	rewriteProperty(t.files, OptionsFile, resourcePacksKey+":", func(list string) string { return renamePacks(list, renamed) })
+	rewriteProperty(t.files, optionsPath, resourcePacksKey+":", func(list string) string { return renamePacks(list, renamed) })
 	for _, config := range shaderConfigs {
 		rewriteProperty(t.files, config, "shaderPack=", func(v string) string {
 			if name := fileNames["shaderpacks/"+v]; name != "" {

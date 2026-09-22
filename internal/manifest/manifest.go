@@ -105,13 +105,22 @@ func (p *Players) All() []Player {
 }
 
 type Client struct {
-	Name      string          `json:"name,omitempty"`
-	Build     string          `json:"build,omitempty"`
-	Variables Variables       `json:"variables,omitempty"`
-	Hooks     *Hooks          `json:"hooks,omitempty"`
-	Options   map[string]any  `json:"options,omitempty"`
-	Servers   json.RawMessage `json:"servers,omitempty"`
-	Note      string          `json:"note,omitempty"`
+	Name        string          `json:"name,omitempty"`
+	Build       string          `json:"build,omitempty"`
+	Variables   Variables       `json:"variables,omitempty"`
+	Hooks       *Hooks          `json:"hooks,omitempty"`
+	Options     map[string]any  `json:"options,omitempty"`
+	OptionsPath string          `json:"optionsPath,omitempty"`
+	Servers     json.RawMessage `json:"servers,omitempty"`
+	Note        string          `json:"note,omitempty"`
+}
+
+// OptionsPath is where client.options is written, relative to the build.
+func (m *Manifest) OptionsPath() string {
+	if m.Client == nil || m.Client.OptionsPath == "" {
+		return "options.txt"
+	}
+	return path.Clean(m.Client.OptionsPath)
 }
 
 // Hooks are the author's defaults for a launcher instance's hook switches. They seed the instance's
@@ -353,12 +362,25 @@ func (m *Manifest) check() error {
 			}
 		}
 	}
+	if m.Client != nil && m.Client.OptionsPath != "" && !insideBuild(m.Client.OptionsPath) {
+		e := out.Errorf("manifest-invalid", "client.optionsPath %q is not a file inside the build", m.Client.OptionsPath)
+		e.Rows = []out.Detail{{Label: "Fix", Text: `give a path relative to the build, such as "config/modpack_defaults/options.txt"`}}
+		return e
+	}
 	if m.BuildsInPlace("client") && m.BuildsInPlace("server") {
 		e := out.Errorf("manifest-invalid", "%s builds both sides in place", FileName)
 		e.Rows = []out.Detail{{Label: "Fix", Text: `give one side a "build" directory of its own`}}
 		return e
 	}
 	return nil
+}
+
+func insideBuild(rel string) bool {
+	if strings.Contains(rel, `\`) || path.IsAbs(rel) || (len(rel) > 1 && rel[1] == ':') {
+		return false
+	}
+	clean := path.Clean(rel)
+	return clean != "." && clean != ".." && !strings.HasPrefix(clean, "../")
 }
 
 func (m *Manifest) Mods() map[string]Require { return m.byKind(TypeMod) }

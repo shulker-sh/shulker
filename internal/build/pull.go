@@ -524,15 +524,11 @@ func (b *Builder) pullKeys(rel string, f propsFile, existing []byte) []string {
 }
 
 func (b *Builder) manifestBlock(rel string) map[string]any {
-	switch rel {
-	case PropertiesFile:
-		if b.Manifest.Server != nil {
-			return b.Manifest.Server.Properties
-		}
-	case OptionsFile:
-		if b.Manifest.Client != nil {
-			return b.Manifest.Client.Options
-		}
+	switch {
+	case rel == PropertiesFile && b.Manifest.Server != nil:
+		return b.Manifest.Server.Properties
+	case rel == b.Manifest.OptionsPath() && b.Manifest.Client != nil:
+		return b.Manifest.Client.Options
 	}
 	return nil
 }

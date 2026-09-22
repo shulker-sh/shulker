@@ -597,6 +597,12 @@
           "additionalProperties": { "type": ["string", "number", "boolean"] },
           "description": "Keys written into options.txt as key:value. Other keys already in the file are left alone."
         },
+        "optionsPath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/\\\\]",
+          "description": "Where options and the seeded resourcePacks list are written, relative to the build, in builds and exports alike. Defaults to options.txt. config/modpack_defaults/options.txt ships it for Config Manager, which copies it into place only where the player has none, so a pack update never resets their settings. The tool rejects absolute paths and paths that leave the build."
+        },
         "servers": {
           "type": "array",
           "items": {

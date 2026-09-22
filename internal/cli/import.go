@@ -284,7 +284,7 @@ func importNeedsServer(arc *mrpack.Archive) bool {
 func dropManifestOwned(m *manifest.Manifest, overrides []mrpack.Override) []mrpack.Override {
 	owned := map[string]bool{}
 	if m.Client != nil && m.Client.Options != nil {
-		owned[build.OptionsFile] = true
+		owned[m.OptionsPath()] = true
 	}
 	if m.Server != nil {
 		owned[build.PropertiesFile] = true

@@ -95,8 +95,9 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		return
 	}
 	dir := b.Target(side, opts.Dir)
+	file := filepath.Join(dir, filepath.FromSlash(b.Manifest.OptionsPath()))
 	state := LoadState(dir)
-	was, recorded := state.Values[OptionsFile][resourcePacksKey]
+	was, recorded := state.Values[b.Manifest.OptionsPath()][resourcePacksKey]
 	switch {
 	case opts.Force:
 	case recorded:
@@ -112,7 +113,7 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		if len(renamed) == 0 {
 			return
 		}
-		data, _ := os.ReadFile(filepath.Join(dir, OptionsFile))
+		data, _ := os.ReadFile(file)
 		live, present := parseProperties(data)[resourcePacksKey]
 		if !present {
 			live = was
@@ -122,7 +123,7 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		}
 		return
 	default:
-		data, _ := os.ReadFile(filepath.Join(dir, OptionsFile))
+		data, _ := os.ReadFile(file)
 		if current, present := parseProperties(data)[resourcePacksKey]; present && !untouchedPackList(current) {
 			return
 		}

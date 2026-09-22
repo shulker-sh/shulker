@@ -9,10 +9,7 @@ import (
 	"strings"
 )
 
-const (
-	PropertiesFile = "server.properties"
-	OptionsFile    = "options.txt"
-)
+const PropertiesFile = "server.properties"
 
 type properties map[string]string
 
