@@ -19,7 +19,7 @@ import (
 
 const (
 	FileName  = "shulker.json"
-	SchemaURL = "https://shulker.sh/schema/v1/manifest.json"
+	SchemaURL = schema.Base + string(schema.Manifest)
 	// FilesDir holds the local files `add` copies into the project from outside it.
 	FilesDir = "files"
 )

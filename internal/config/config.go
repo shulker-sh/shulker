@@ -21,7 +21,7 @@ const (
 	PathEnv           = "SHULKER_CONFIG"
 	DataPathEnv       = "SHULKER_DATA"
 	RegistryFileName  = "registry.json"
-	RegistrySchemaURL = "https://shulker.sh/schema/v1/registry.json"
+	RegistrySchemaURL = schema.Base + string(schema.Registry)
 )
 
 // Keys are the config.json keys `shulker config` reads and sets.

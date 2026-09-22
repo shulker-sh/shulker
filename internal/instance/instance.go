@@ -17,7 +17,7 @@ const (
 	// Dir also holds state.json and history/; build.StateDir names the same directory.
 	Dir       = ".shulker"
 	FileName  = "instance.json"
-	SchemaURL = "https://shulker.sh/schema/v1/instance.json"
+	SchemaURL = schema.Base + string(schema.Instance)
 )
 
 // ErrNotFound is returned for a directory shulker has never synced into.
