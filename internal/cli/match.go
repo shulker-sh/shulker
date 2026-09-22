@@ -66,10 +66,10 @@ func (a *app) matchCmd() *cobra.Command {
 				if dryRun {
 					title = "would match"
 				}
-				l.OK(title, fmt.Sprintf("%s locked, %s kept as overrides", plural(len(res.Moved), "file", "files"), plural(len(res.Kept), "file", "files")))
+				l.OK(title, fmt.Sprintf("%s, %s kept as overrides", lockedSummary(res.Locked), plural(len(res.Kept), "file", "files")))
 				var rows []out.Row
-				for _, key := range res.Locked {
-					rows = append(rows, out.Row{Label: "locked", Text: key})
+				for _, f := range res.Locked {
+					rows = append(rows, out.Row{Label: "locked", Text: f.ID})
 				}
 				for _, file := range res.Kept {
 					rows = append(rows, out.Row{Label: "kept", Text: file})

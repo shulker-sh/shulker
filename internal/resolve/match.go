@@ -8,20 +8,19 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"sort"
 
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/provider"
 )
 
-// Matched is what MatchOverrides made of a project's override files: the requires keys it locked,
-// the files those were, and the files it left as overrides.
+// Matched is what MatchOverrides made of a project's override files: the entries it locked, the
+// files those were, and the files it left as overrides.
 type Matched struct {
-	Locked   []string `json:"locked"`
-	Moved    []string `json:"moved"`
-	Kept     []string `json:"kept"`
-	Warnings []string `json:"-"`
+	Locked   []LockedFile `json:"locked"`
+	Moved    []string     `json:"moved"`
+	Kept     []string     `json:"kept"`
+	Warnings []string     `json:"-"`
 }
 
 // MatchOverrides looks the project's override jars and pack zips up on Modrinth by sha1, then what
@@ -67,14 +66,13 @@ func (r *Resolver) MatchOverrides(ctx context.Context, files []mrpack.Override) 
 	if err := im.matchCurseForge(ctx); err != nil {
 		return nil, err
 	}
-	res := &Matched{Locked: im.rep.LockedIDs(), Moved: []string{}, Kept: im.rep.Unmanaged, Warnings: im.rep.Warnings}
+	im.rep.sort()
+	res := &Matched{Locked: im.rep.Locked, Moved: []string{}, Kept: im.rep.Unmanaged, Warnings: im.rep.Warnings}
 	for _, o := range files {
 		if file := o.Layer + "/" + o.Path; !slices.Contains(res.Kept, file) {
 			res.Moved = append(res.Moved, file)
 		}
 	}
-	sort.Strings(res.Locked)
-	sort.Strings(res.Kept)
 	return res, nil
 }
 

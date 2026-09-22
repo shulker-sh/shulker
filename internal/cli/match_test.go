@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/resolve"
 )
 
 type matchResult struct {
-	Locked []string `json:"locked"`
-	Moved  []string `json:"moved"`
-	Kept   []string `json:"kept"`
+	Locked []resolve.LockedFile `json:"locked"`
+	Moved  []string             `json:"moved"`
+	Kept   []string             `json:"kept"`
 }
 
 func TestMatchLocksOverrideFiles(t *testing.T) {
@@ -41,12 +44,20 @@ func TestMatchLocksOverrideFiles(t *testing.T) {
 		}
 		return env.Data, env.Warnings
 	}
-	wantLocked := "fresh-animations,iris,jei,sodium"
+	wantLocked := []resolve.LockedFile{
+		{ID: "fresh-animations", Type: "resourcepack", Provider: "modrinth"},
+		{ID: "iris", Type: "mod", Provider: "curseforge"},
+		{ID: "jei", Type: "mod", Provider: "curseforge"},
+		{ID: "sodium", Type: "mod", Provider: "modrinth"},
+	}
 	wantKept := "overrides/mods/" + nodist.filename + ",overrides/mods/unknown-1.0.jar"
 
 	res, _ := match(t, "--dry-run")
-	if strings.Join(res.Locked, ",") != wantLocked || strings.Join(res.Kept, ",") != wantKept || len(res.Moved) != 4 {
+	if !slices.Equal(res.Locked, wantLocked) || strings.Join(res.Kept, ",") != wantKept || len(res.Moved) != 4 {
 		t.Fatalf("dry run: %+v", res)
+	}
+	if got := h.mustRun(t, "match", "--dry-run"); !strings.Contains(got, "3 mods (2 CurseForge, 1 Modrinth), 1 resource pack (Modrinth) locked, 2 files kept as overrides") {
+		t.Fatalf("dry run text:\n%s", got)
 	}
 	if m, _ := readProject(t, h.dir); len(m.Requires) != 0 {
 		t.Fatalf("dry run wrote requires: %+v", m.Requires)
@@ -56,7 +67,7 @@ func TestMatchLocksOverrideFiles(t *testing.T) {
 	}
 
 	res, warnings := match(t)
-	if strings.Join(res.Locked, ",") != wantLocked || strings.Join(res.Kept, ",") != wantKept {
+	if !slices.Equal(res.Locked, wantLocked) || strings.Join(res.Kept, ",") != wantKept {
 		t.Fatalf("match: %+v", res)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") {
