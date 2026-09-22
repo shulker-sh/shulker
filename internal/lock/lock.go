@@ -53,12 +53,19 @@ type Java struct {
 	Component string `json:"component"`
 }
 
+// Modpack is where a modpack resolved to: a source's commit or digest, or a local archive's bytes.
 type Modpack struct {
-	Source    string `json:"source"`
+	Source    string `json:"source,omitempty"`
 	Ref       string `json:"ref,omitempty"`
 	Commit    string `json:"commit,omitempty"`
 	DirSha256 string `json:"dirSha256,omitempty"`
 	Sha256    string `json:"sha256,omitempty"`
+	File      string `json:"file,omitempty"`
+	Sha512    string `json:"sha512,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	// Unmanaged is what an archive lays as its own override files, by layer and path, each with
+	// its sha512: the files no lock entry took.
+	Unmanaged map[string]string `json:"unmanaged,omitempty"`
 	// UsesLock marks a modpack whose mods were copied from its own lock rather than resolved from its
 	// manifest.
 	UsesLock   bool   `json:"locked,omitempty"`
@@ -74,6 +81,8 @@ func (p Modpack) Label() string {
 		return p.DirSha256[:12]
 	case p.Sha256 != "":
 		return p.Sha256[:12]
+	case p.Sha512 != "":
+		return p.Sha512[:12]
 	}
 	return ""
 }

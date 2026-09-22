@@ -209,20 +209,25 @@ func TestRequiresEntryKinds(t *testing.T) {
 			t.Errorf("%s: a file of the wrong extension should be invalid, got %v", entries, err)
 		}
 	}
-	for _, entries := range []string{
-		`"cozy":{"type":"modpack","file":"files/cozy.mrpack"}`,
-		`"cozy":{"type":"modpack","provider":"modrinth"}`,
-	} {
-		m, err := Parse(doc(entries))
-		if err != nil {
-			t.Fatalf("%s: %v", entries, err)
-		}
-		if err := m.CheckSupported(); out.CodeOf(err) != "requires-unsupported" {
-			t.Errorf("%s: CheckSupported = %v", entries, err)
-		}
-		if len(m.Mods()) != 0 || len(m.Modpacks()) != 0 {
-			t.Errorf("%s: unsupported entry counted as mod or modpack", entries)
-		}
+	archive, err := Parse(doc(`"cozy":{"type":"modpack","file":"files/cozy.mrpack"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := archive.CheckSupported(); err != nil {
+		t.Fatal(err)
+	}
+	if len(archive.Mods()) != 0 || archive.Modpacks()["cozy"].File != "files/cozy.mrpack" {
+		t.Errorf("an archive is a modpack: mods %v, modpacks %v", archive.Mods(), archive.Modpacks())
+	}
+	hosted, err := Parse(doc(`"cozy":{"type":"modpack","provider":"modrinth"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := hosted.CheckSupported(); out.CodeOf(err) != "requires-unsupported" {
+		t.Errorf("CheckSupported = %v", err)
+	}
+	if len(hosted.Mods()) != 0 || len(hosted.Modpacks()) != 0 {
+		t.Error("a hosted modpack is counted as a mod or a modpack")
 	}
 }
 

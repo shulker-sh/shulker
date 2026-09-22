@@ -27,7 +27,7 @@ func (p *Project) LockDifferences() []string {
 	}
 	m, l := p.Manifest, p.Lock
 	diffs := append(PlatformDifferences(m, l), ProviderDifferences(m, l)...)
-	diffs = append(diffs, PackDifferences(m, l)...)
+	diffs = append(diffs, PackDifferences(p.Dir, m, l)...)
 	diffs = append(diffs, ZipDifferences(p.Dir, m, l)...)
 	mods := m.Mods()
 	for _, id := range slices.Sorted(maps.Keys(mods)) {
@@ -94,7 +94,9 @@ func ProviderDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 }
 
 // PackDifferences compares the modpacks shulker.json requires with what the lock records for them.
-func PackDifferences(m *manifest.Manifest, l *lock.Lock) []string {
+// An archive's changed bytes are a difference only when it follows them; one that doesn't stays at
+// the bytes it locked until `shulker update`.
+func PackDifferences(dir string, m *manifest.Manifest, l *lock.Lock) []string {
 	var diffs []string
 	modpacks := m.Modpacks()
 	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
@@ -103,6 +105,15 @@ func PackDifferences(m *manifest.Manifest, l *lock.Lock) []string {
 		switch {
 		case !ok:
 			diffs = append(diffs, fmt.Sprintf("pack %s: in shulker.json, not in shulker.lock", name))
+		case (mp.File == "") != (lp.File == ""):
+			diffs = append(diffs, fmt.Sprintf("pack %s: %s -> %s", name, lp.Source+lp.File, mp.Source+mp.File))
+		case mp.File != "":
+			if mp.File != lp.File || mp.AutoUpdates() {
+				diffs = append(diffs, FileDifferences(dir, name, mp.File, lp.File, lp.Size, lp.Sha512)...)
+			}
+			if mp.Locked != nil && *mp.Locked != lp.UsesLock {
+				diffs = append(diffs, fmt.Sprintf("pack %s: locked %v -> %v", name, lp.UsesLock, *mp.Locked))
+			}
 		case lp.Source != mp.Source:
 			diffs = append(diffs, fmt.Sprintf("pack %s: source %s -> %s", name, lp.Source, mp.Source))
 		case lp.Ref != mp.Ref:
@@ -253,6 +264,9 @@ func (p *Project) GoneFiles(cached func(sha512 string) bool) []string {
 		for _, key := range slices.Sorted(maps.Keys(section)) {
 			check(key, section[key].File, section[key].Sha512)
 		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(p.Lock.Modpacks)) {
+		check(name, p.Lock.Modpacks[name].File, p.Lock.Modpacks[name].Sha512)
 	}
 	return gone
 }

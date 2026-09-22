@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -126,6 +127,12 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, as, ref string, 
 				no := false
 				entry.AutoUpdate = &no
 			}
+			if path := a.localPath(source); resolve.IsLocalPath(path) {
+				if err := a.addArchiveEntry(cmd.Context(), p, r, path, as, entry); err != nil {
+					return "", err
+				}
+				continue
+			}
 			if err := a.addPackEntry(cmd.Context(), p, r, source, as, entry); err != nil {
 				return "", err
 			}
@@ -158,7 +165,77 @@ func (a *app) addPackEntry(ctx context.Context, p *project.Project, r *resolve.R
 		return manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
 	}
 	loaded.Name = key
-	err = r.AddPack(ctx, loaded)
+	return a.addLoadedPack(ctx, p, r, store, source, key, loaded, entry)
+}
+
+// addArchiveEntry adds the modpack archive at path, under the key as names or the file's stem. An
+// archive outside the project, or in a folder whose files something else owns, is copied into
+// manifest.FilesDir, and adding the same file again refreshes that copy and relocks it.
+func (a *app) addArchiveEntry(ctx context.Context, p *project.Project, r *resolve.Resolver, path, as string, entry manifest.Require) error {
+	if st, err := os.Stat(path); err != nil || !st.Mode().IsRegular() {
+		return out.Errorf("file-not-found", "%s is not a file", path)
+	}
+	rel, copied, err := r.ProjectPath(path)
+	if err != nil {
+		return err
+	}
+	key := as
+	if key == "" {
+		key = resolve.StemKey(path)
+	}
+	if !manifest.IsValidKey(key) {
+		e := out.Errorf("usage", "%s can't be a requires key", key)
+		e.Help = "pass `--as <key>` to give this modpack one"
+		return e
+	}
+	held, taken := p.Manifest.Requires[key]
+	isReadded := taken && held.Kind() == manifest.TypeModpack && held.File == rel
+	if taken && !isReadded {
+		return manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
+	}
+	for name, existing := range p.Manifest.Modpacks() {
+		if existing.File == rel && name != key {
+			return out.Errorf("modpack-exists", "modpack %s is already in the manifest as %s", rel, name)
+		}
+	}
+	if err := pack.CheckArchive(key, path); err != nil {
+		return err
+	}
+	entry.Source, entry.Type, entry.File = "", manifest.TypeModpack, rel
+	if isReadded {
+		if entry.Locked == nil {
+			entry.Locked = held.Locked
+		}
+		if entry.AutoUpdate == nil {
+			entry.AutoUpdate = held.AutoUpdate
+		}
+	}
+	if copied {
+		if err := r.CopyIn(path, rel, isReadded); err != nil {
+			return err
+		}
+	}
+	store, err := a.packStore(p)
+	if err != nil {
+		return err
+	}
+	loaded, err := store.Resolve(ctx, key, entry)
+	if err != nil {
+		return err
+	}
+	if isReadded {
+		if err := r.RemovePack(key); err != nil {
+			return err
+		}
+	}
+	return a.addLoadedPack(ctx, p, r, store, key, key, loaded, entry)
+}
+
+// addLoadedPack adds a resolved modpack under key, offering to unlock one built for another
+// Minecraft, which resolves it again as name.
+func (a *app) addLoadedPack(ctx context.Context, p *project.Project, r *resolve.Resolver, store *pack.Store, name, key string, loaded *pack.Loaded, entry manifest.Require) error {
+	a.warnFor(key, true, loaded.Warnings)
+	err := r.AddPack(ctx, loaded)
 	if a.offerUnlock(err, loaded, r.Lock.Minecraft) {
 		unlock, askErr := a.askYes(fmt.Sprintf("Unlock %s and resolve its mods for Minecraft %s?", key, r.Lock.Minecraft))
 		if askErr != nil {
@@ -167,7 +244,7 @@ func (a *app) addPackEntry(ctx context.Context, p *project.Project, r *resolve.R
 		if unlock {
 			no := false
 			entry.Locked = &no
-			if loaded, err = store.Resolve(ctx, source, entry); err != nil {
+			if loaded, err = store.Resolve(ctx, name, entry); err != nil {
 				return err
 			}
 			loaded.Name = key

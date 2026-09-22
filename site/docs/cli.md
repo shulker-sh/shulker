@@ -206,7 +206,7 @@ shulker add
 | `--pin <version-id>` | Pin to a provider version id (one mod only) |
 | `--provider <provider>` | Provider to use for this mod: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
-| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a pack file's name, the name in a modpack's manifest) |
+| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a pack or modpack archive file's name, the name in a modpack's manifest) |
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack. On a terminal, an add without it prints what would have to move and asks `Move it?` (`Move them?` for several), and yes does the same |
@@ -1378,11 +1378,14 @@ shulker mod list
 
 A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`, `--unlocked`, `--no-auto-update`.
 
+A modpack can also be a Modrinth modpack archive: `shulker modpack add packs/cozy.mrpack`, or a bare `shulker add packs/cozy.mrpack`, writes a `file` entry, taking the path the way `add` takes a local file — referenced where it lies inside the project, copied into `files/` from outside it, and keyed by the file name unless `--as` says otherwise. Its mods lock as the modpack's: each is found by its hash on Modrinth, or reused from the shulker project an exported archive carries, and a file neither knows is laid by the modpack itself, as are its `overrides`, `client-overrides` and `server-overrides` folders, before your own. An archive is locked unless `--unlocked` says otherwise. The lock records its bytes, so changing the file makes the lock out of date and the next `lock` or `sync` reads it again, unless `--no-auto-update` holds it until `shulker update`. With the file deleted, the build lays the archive from the cache and warns. A file that is neither a Modrinth nor a CurseForge modpack is refused, and a CurseForge one can't be consumed yet.
+
 A modpack that ships a `shulker.lock` is **locked**: its exact versions, dependencies included, are copied into this project's lock and marked with the modpack they came from, and its Minecraft and loader must match this project's exactly. A modpack without a lock, or one added with `--unlocked`, is **floating**: its mods are resolved here like your own, and its Minecraft and loader only have to admit this project's versions. A mod you list in `shulker.json` yourself always wins over either. Change your mind later with `shulker set requires.<key>.locked true|false`. On a terminal, adding a locked modpack built for another Minecraft asks `Unlock <name> and resolve its mods for Minecraft <version>?`, and yes adds it as `--unlocked` would.
 
 ```sh
 shulker modpack add https://github.com/shulker-sh/base-pack.git --ref v3
 shulker modpack add ../base-pack --as base
+shulker modpack add ~/Downloads/cozy.mrpack
 shulker modpack list
 shulker modpack remove base-pack
 ```
@@ -1644,7 +1647,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-instance` | Several instances match the name given. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-side` | The manifest declares both sides and the command works on one; `sync` and `pull` take `--side`, `diff --into` names it. `candidates`: the sides |
-| `archive-not-modpack` | The file given as a modpack isn't one: not a zip, or a zip without the index its format needs, like a CurseForge `manifest.json` of type `minecraftModpack` |
+| `archive-not-modpack` | The file given as a modpack isn't one: not a zip, or a zip without the index its format needs, like a CurseForge `manifest.json` of type `minecraftModpack`. A modpack's `file` that is neither a Modrinth nor a CurseForge modpack is refused the same way |
 | `appdata-unset` | `APPDATA` isn't set on Windows, so shulker can't find a launcher's default folder. `link` takes `--launcher-dir` instead |
 | `backup-failed` | `backup --all` failed for some targets; `data` has each target's result |
 | `backup-invalid` | `restore` was given a zip that won't open, or that holds anything other than world folders at its root |
@@ -1699,7 +1702,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `loader-required` | `add` of a mod in a project without a loader, or `import curseforge` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
-| `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way. While the cache still has them, a gone file only warns and builds from the cache |
+| `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
 | `local-invalid` | `shulker.local.json` isn't valid JSON; the message names the line and column |
 | `lock-invalid` | `shulker.lock` doesn't parse (the message names the line and column) or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock` |
@@ -1760,7 +1763,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid, including a `shulker.json` value that can't be written as a property. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
-| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a modpack from a local `file` or from a provider rather than a `source`, a local `file` inside a modpack, or an `.mrpack` given to `add` |
+| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a modpack from a provider rather than a `source` or a `file`, or a modpack `file` that is a CurseForge zip |
 | `restore-failed` | `restore --all` failed for some targets; `data` has each target's result |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |

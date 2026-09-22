@@ -170,9 +170,9 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `type` | `"mod"` \| `"modpack"` \| `"resourcepack"` \| `"shader"` | What the entry is. Omitted means modpack for an entry with source and mod otherwise, unless the provider says otherwise; when given it must agree with the entry. Resource packs and shaders are resolved from the provider's own project type and placed in resourcepacks/ or shaderpacks/. |
 | `source` | `string` | Local path, git URL, or raw manifest URL of a modpack.<br>min length 1 |
 | `ref` | `string` | Branch, tag, or commit for a git source. The lock records the resolved commit.<br>min length 1 |
-| `autoUpdate` | `boolean` | Whether sync refreshes this modpack from its source. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless. |
-| `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock; a source without a lock is always resolved from its manifest. |
-| `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. The lock records its sha512, and changed bytes make the lock out of date. |
+| `autoUpdate` | `boolean` | Whether sync refreshes this modpack from its source, or re-reads its archive when the archive's bytes change. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless. |
+| `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock, and always for an archive, which pins exact files; a source without a lock is always resolved from its manifest. |
+| `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. On a modpack, a .mrpack archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date. |
 | `project` | [`projectId`](#projectid) | Written by add when the provider slug differs from the mod id or the provider is CurseForge. |
 | `pin` | [`versionId`](#versionid) | Pin to one provider version. update skips pinned mods. |
 | `channel` | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted. A channel admits itself and anything more stable.<br>default `"release"` |
@@ -182,11 +182,17 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `feature` | [`featureCondition`](#featurecondition) \| [`featureCondition`](#featurecondition)[] | Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Every name must be declared in features, which is where its default lives. |
 | `note` | [`note`](#note) |  |
 
-`ref`, `autoUpdate` and `locked` require `source`.
+`ref` requires `source`.
 
 When `source` is set, `type` must be `"modpack"`, and `file`, `project`, `pin`, `channel`, `side`, `provider`, `os` and `feature` are not allowed.
 
 When `file` is set, `project`, `pin`, `channel` and `provider` are not allowed.
+
+When `file` is set and `type` is `"modpack"`, `side`, `os` and `feature` are not allowed.
+
+When `autoUpdate` is set, `source` or `file` is required.
+
+When `locked` is set, `source` or `file` is required.
 
 No other properties are allowed.
 

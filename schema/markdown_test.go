@@ -60,7 +60,10 @@ func TestDescribeStatesObjectRules(t *testing.T) {
 		"allOf": [
 			{"if": {"required": ["source"]}, "then": {"properties": {"type": {"const": "modpack"}},
 				"not": {"anyOf": [{"required": ["file"]}, {"required": ["pin"]}]}}},
-			{"if": {"required": ["file"]}, "then": {"required": ["type"]}}
+			{"if": {"required": ["file"]}, "then": {"required": ["type"]}},
+			{"if": {"required": ["file", "type"], "properties": {"type": {"const": "modpack"}}},
+				"then": {"not": {"anyOf": [{"required": ["pin"]}]}}},
+			{"if": {"required": ["locked"]}, "then": {"anyOf": [{"required": ["source"]}, {"required": ["file"]}]}}
 		]
 	}`)
 	for _, want := range []string{
@@ -69,6 +72,8 @@ func TestDescribeStatesObjectRules(t *testing.T) {
 		"`pin` requires `type` and `file`.",
 		"When `source` is set, `type` must be `\"modpack\"`, and `file` and `pin` are not allowed.",
 		"When `file` is set, `type` is required.",
+		"When `file` is set and `type` is `\"modpack\"`, `pin` is not allowed.",
+		"When `locked` is set, `source` or `file` is required.",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)

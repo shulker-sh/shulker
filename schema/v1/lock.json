@@ -111,7 +111,6 @@
     "curseforgeId": { "type": "integer", "minimum": 1 },
     "modpack": {
       "type": "object",
-      "required": ["source"],
       "additionalProperties": false,
       "properties": {
         "source": { "type": "string", "minLength": 1, "description": "The manifest source at resolution time. A different source in the manifest makes the lock out of date." },
@@ -119,15 +118,37 @@
         "commit": { "$ref": "#/$defs/gitCommit", "description": "Resolved commit. Git sources only." },
         "dirSha256": { "$ref": "#/$defs/sha256", "description": "Content hash of the modpack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only." },
         "sha256": { "$ref": "#/$defs/sha256", "description": "Hash of the fetched manifest. Raw manifest URL sources only." },
+        "file": { "$ref": "#/$defs/relativePath", "description": "A local modpack archive: the path shulker.json gives it. Its sha512 is its identity and its key in the cache." },
+        "sha512": { "$ref": "#/$defs/sha512", "description": "Hash of the archive's bytes. Local archives only." },
+        "size": { "type": "integer", "minimum": 1, "description": "The archive's length, compared before rehashing it. Local archives only." },
+        "unmanaged": {
+          "type": "object",
+          "propertyNames": { "type": "string", "pattern": "^(overrides|client-overrides|server-overrides)/" },
+          "additionalProperties": { "$ref": "#/$defs/sha512" },
+          "description": "The files the archive lays as its own overrides, by layer and path, each with its sha512: files in its index no provider matched, and jars and pack zips in its override folders no lock entry took. The build lays these and the archive's other override files, and nothing else. Local archives only."
+        },
         "locked": { "type": "boolean", "const": true, "description": "Present when the modpack's mods were copied from its lock. Absent means they were resolved from its manifest." },
-        "lockSha256": { "$ref": "#/$defs/sha256", "description": "Hash of the modpack's lock at resolution time. Present exactly when locked is." }
+        "lockSha256": { "$ref": "#/$defs/sha256", "description": "Hash of the modpack's lock at resolution time. Present exactly when locked is, on a source modpack." }
       },
       "oneOf": [
-        { "required": ["commit"] },
-        { "required": ["dirSha256"], "not": { "required": ["ref"] } },
-        { "required": ["sha256"], "not": { "required": ["ref"] } }
+        { "required": ["source", "commit"] },
+        { "required": ["source", "dirSha256"], "not": { "required": ["ref"] } },
+        { "required": ["source", "sha256"], "not": { "required": ["ref"] } },
+        {
+          "required": ["file", "sha512", "size"],
+          "not": { "anyOf": [{ "required": ["source"] }, { "required": ["ref"] }, { "required": ["commit"] }, { "required": ["dirSha256"] }, { "required": ["sha256"] }, { "required": ["lockSha256"] }] }
+        }
       ],
-      "dependentRequired": { "locked": ["lockSha256"], "lockSha256": ["locked"] }
+      "allOf": [
+        {
+          "if": { "required": ["source"] },
+          "then": {
+            "not": { "anyOf": [{ "required": ["sha512"] }, { "required": ["size"] }, { "required": ["unmanaged"] }] },
+            "dependentRequired": { "locked": ["lockSha256"] }
+          }
+        }
+      ],
+      "dependentRequired": { "lockSha256": ["locked"] }
     },
     "mod": {
       "type": "object",

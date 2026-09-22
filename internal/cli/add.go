@@ -29,7 +29,11 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			return minimumArgs(1)(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			chosen, err := chooseType(cmd, kind, typ, "")
+			fallback := ""
+			if kind == "" && typ == "" && len(args) > 0 && !slices.ContainsFunc(args, func(arg string) bool { return !isArchiveName(arg) }) {
+				fallback = manifest.TypeModpack
+			}
+			chosen, err := chooseType(cmd, kind, typ, fallback)
 			if err != nil {
 				return err
 			}
@@ -118,9 +122,15 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another")
 	}
 	if applies(kind, "as") {
-		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a pack file's name, the name in a modpack's manifest)")
+		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a pack or modpack archive file's name, the name in a modpack's manifest)")
 	}
 	return cmd
+}
+
+// isArchiveName reports whether an add argument names a modpack archive, which a bare add takes as
+// a modpack.
+func isArchiveName(arg string) bool {
+	return strings.EqualFold(filepath.Ext(arg), ".mrpack")
 }
 
 // localPath is an argument naming a local file made absolute, against -C when it is given, and any

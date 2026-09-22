@@ -72,6 +72,12 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 	platform := &Platform{Minecraft: game, Java: lock.Java{Major: java.Major, Component: java.Component}}
 	if m.Loader.Type == "" {
 		platform.Loader = inherited.Loader
+		// A modpack archive names its loader's version but not what that loader provides.
+		if l := platform.Loader; l.Type != "" && l.Provides == nil {
+			if platform.Loader.Provides, err = mt.loaderProvides(ctx, l.Type, game, l.Version); err != nil {
+				return nil, err
+			}
+		}
 		return platform, nil
 	}
 	loaderVersion, err := mt.loaderVersion(ctx, m.Loader, game)

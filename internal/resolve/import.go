@@ -7,14 +7,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"path"
 	"sort"
-	"strings"
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -98,7 +97,7 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 		im.reusePack(p)
 		return nil
 	}
-	if !isModJar(f.Path) || im.modrinth == nil {
+	if !mrpack.IsModJar(f.Path) || im.modrinth == nil {
 		return im.unmanagedDownload(ctx, f)
 	}
 	v, found, err := im.modrinth.VersionByHash(ctx, sha1Sum)
@@ -155,7 +154,7 @@ func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error 
 }
 
 func (im *importer) override(o mrpack.Override) error {
-	if !isModJar(o.Path) && !isPackZip(o.Path) {
+	if !mrpack.IsModJar(o.Path) && !mrpack.IsPackZip(o.Path) {
 		im.rep.Overrides = append(im.rep.Overrides, o)
 		return nil
 	}
@@ -263,15 +262,6 @@ func (im *importer) dropUnmatched() {
 	}
 }
 
-func isModJar(p string) bool {
-	return path.Dir(p) == "mods" && strings.EqualFold(path.Ext(p), ".jar")
-}
-
-func isPackZip(p string) bool {
-	dir := path.Dir(p)
-	return (dir == "resourcepacks" || dir == "shaderpacks") && strings.EqualFold(path.Ext(p), ".zip")
-}
-
 func layerSide(layer string) string {
 	switch layer {
 	case "client-overrides":
@@ -280,4 +270,41 @@ func layerSide(layer string) string {
 		return "server"
 	}
 	return "both"
+}
+
+// ConsumeArchive locks what a modpack archive holds as that modpack's own lock and manifest, the
+// way ImportMrpack locks one into a new project, and records in its pin the files the archive
+// lays itself. r's own lock is left alone; only its providers, provider order, cache and fetch
+// client are used.
+func (r *Resolver) ConsumeArchive(ctx context.Context, l *pack.Loaded) error {
+	a := l.Archive
+	minecraft := a.Index.Dependencies["minecraft"]
+	if minecraft == "" {
+		return out.Errorf("mrpack-invalid", "modpack %s: the archive's index names no minecraft version", l.Name)
+	}
+	typ, version, _ := a.Loader()
+	m := &manifest.Manifest{Name: l.Name, Minecraft: minecraft, Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}, Providers: r.Manifest.Providers}
+	pl := lock.New()
+	pl.Minecraft, pl.Loader = minecraft, lock.Loader{Type: typ, Version: version}
+	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log}
+	rep, err := scratch.ImportMrpack(ctx, a)
+	if err != nil {
+		return prefixed("modpack "+l.Name, err)
+	}
+	unmanaged := map[string]bool{}
+	for _, key := range rep.Unmanaged {
+		unmanaged[key] = true
+	}
+	l.Pin.Unmanaged = map[string]string{}
+	for _, o := range rep.Overrides {
+		if key := o.Layer + "/" + o.Path; unmanaged[key] {
+			sum := sha512.Sum512(o.Data)
+			l.Pin.Unmanaged[key] = hex.EncodeToString(sum[:])
+		}
+	}
+	if len(l.Pin.Unmanaged) == 0 {
+		l.Pin.Unmanaged = nil
+	}
+	l.Manifest, l.Lock, l.Warnings = m, pl, rep.Warnings
+	return nil
 }

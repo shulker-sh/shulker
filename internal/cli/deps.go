@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/game"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
@@ -159,7 +160,11 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress}, nil
+	consume := func(ctx context.Context, l *pack.Loaded) error {
+		r := &resolve.Resolver{Dir: p.Dir, Manifest: p.Manifest, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+		return r.ConsumeArchive(ctx, l)
+	}
+	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Lock: p.Lock, Consume: consume}, nil
 }
 
 func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded, error) {
@@ -175,9 +180,9 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
 		mp := modpacks[name]
 		pinned, ok := p.Lock.Modpacks[name]
-		moved := ok && pinned.Source != mp.Source
+		moved := ok && (pinned.Source != mp.Source || pinned.File != mp.File)
 		// A relock reads local packs as they are on disk: they have no version to hold back.
-		if !ok || moved || (a.isRelocking && pack.Classify(mp.Source) == pack.Local) {
+		if !ok || moved || (a.isRelocking && a.rereads(p, mp, pinned)) {
 			switch {
 			case name == a.linkedPack:
 			case !ok && len(p.Lock.Modpacks) > 0:
@@ -189,6 +194,7 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 			if err != nil {
 				return nil, err
 			}
+			a.warnFor(name, true, l.Warnings)
 			loaded = append(loaded, l)
 			continue
 		}
@@ -205,8 +211,27 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 	return loaded, nil
 }
 
+// rereads reports whether a relock reads a modpack afresh rather than at its pin: a local directory
+// always, and an archive that follows its bytes when archiveMoved says so.
+func (a *app) rereads(p *project.Project, mp manifest.Require, pinned lock.Modpack) bool {
+	switch pack.KindOf(mp) {
+	case pack.Local:
+		return true
+	case pack.File:
+		return mp.AutoUpdates() && archiveMoved(p, mp, pinned)
+	}
+	return false
+}
+
+// archiveMoved reports whether an archive modpack has anything new to read: its bytes changed, or
+// it is unlocked, so its mods are resolved here.
+func archiveMoved(p *project.Project, mp manifest.Require, pinned lock.Modpack) bool {
+	return !pinned.UsesLock || len(project.FileDifferences(p.Dir, "", mp.File, pinned.File, pinned.Size, pinned.Sha512)) > 0
+}
+
 // refreshModpacks re-resolves the modpacks refresh picks from their sources, keeps the rest at
-// their locked pins, and hands the result to the resolver.
+// their locked pins, and hands the result to the resolver. An archive is read again only when
+// archiveMoved says there is something new in it, so an unchanged one needs no network.
 func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolve.Resolver, refresh func(manifest.Require) bool) ([]*pack.Loaded, error) {
 	store, err := a.packStore(p)
 	if err != nil {
@@ -216,7 +241,8 @@ func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolv
 	loaded := make([]*pack.Loaded, 0, len(r.Packs))
 	for _, l := range r.Packs {
 		mp := modpacks[l.Name]
-		if !refresh(mp) {
+		pinned, locked := p.Lock.Modpacks[l.Name]
+		if !refresh(mp) || (l.Kind == pack.File && (!locked || !archiveMoved(p, mp, pinned))) {
 			loaded = append(loaded, l)
 			continue
 		}
@@ -224,6 +250,7 @@ func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolv
 		if err != nil {
 			return nil, err
 		}
+		a.warnFor(l.Name, true, fresh.Warnings)
 		loaded = append(loaded, fresh)
 	}
 	if err := r.RefreshPacks(loaded); err != nil {

@@ -147,6 +147,12 @@ func (c *Cache) keep(roots []Root) map[string]bool {
 			if mp.LockSha256 != "" {
 				keep[c.PackLock(mp.LockSha256)] = true
 			}
+			if mp.Sha512 != "" {
+				keep[c.Object(mp.Sha512)] = true
+			}
+			for _, sha := range mp.Unmanaged {
+				keep[c.Object(sha)] = true
+			}
 		}
 	}
 	return keep

@@ -146,7 +146,7 @@ func TestAddLocalFileRefusals(t *testing.T) {
 	}{
 		{[]string{"resourcepack", "add", writeOutside(t, pack.filename, pack.data)}, "file-taken"},
 		{[]string{"add", writeOutside(t, unknown.filename, unknown.data)}, "type-ambiguous"},
-		{[]string{"add", writeOutside(t, "pack.mrpack", pack.data)}, "requires-unsupported"},
+		{[]string{"add", writeOutside(t, "pack.mrpack", pack.data)}, "archive-not-modpack"},
 		{[]string{"resourcepack", "add", writeOutside(t, "other.zip", pack.data), "--pin", "abc"}, "usage"},
 		{[]string{"add", filepath.Join(t.TempDir(), "gone.jar")}, "file-not-found"},
 	} {
@@ -157,6 +157,9 @@ func TestAddLocalFileRefusals(t *testing.T) {
 	}
 	if readProjectFile(t, h, "files/faithful.zip") != "another" {
 		t.Fatal("a different file in files/ is never replaced")
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "files", "pack.mrpack")); !os.IsNotExist(err) {
+		t.Fatalf("a refused archive is not copied in: %v", err)
 	}
 }
 

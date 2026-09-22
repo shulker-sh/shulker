@@ -31,7 +31,7 @@ func (r *Resolver) cacheLocal(dir, key, rel, lockedSha512 string) (localCopy, er
 	f, err := os.Open(filepath.Join(dir, filepath.FromSlash(rel)))
 	if errors.Is(err, os.ErrNotExist) {
 		if lockedSha512 == "" || !r.Cache.Has(lockedSha512) {
-			return localCopy{}, localFileMissing(key, rel)
+			return localCopy{}, pack.FileMissing(key, rel)
 		}
 		r.warnOnce(project.FileGone(key, rel))
 		path := r.Cache.Object(lockedSha512)
@@ -79,7 +79,7 @@ func (r *Resolver) cachePackFiles(p *pack.Loaded) error {
 		label := "modpack " + p.Name + ": " + key
 		if modpack != "" || p.Dir == "" {
 			if !r.Cache.Has(sha512) {
-				return localFileMissing(label, file)
+				return pack.FileMissing(label, file)
 			}
 			return nil
 		}
@@ -121,7 +121,7 @@ func (r *Resolver) checkLocalFiles() error {
 			continue
 		}
 		if !r.Cache.Has(f.sha512) {
-			return localFileMissing(f.id, f.file)
+			return pack.FileMissing(f.id, f.file)
 		}
 		r.warnOnce(project.FileGone(f.id, f.file))
 	}
@@ -148,12 +148,6 @@ func (r *Resolver) restoreLocal(f downloadable) string {
 		return fmt.Sprintf("%s: %s changed since it was locked; run `shulker lock`", f.id, f.file)
 	}
 	return ""
-}
-
-func localFileMissing(key, rel string) *out.Error {
-	e := out.Errorf("local-file-missing", "%s: %s is gone, and the cache has no copy of it", key, rel)
-	e.Help = fmt.Sprintf("put the file back at %s, or remove %s from shulker.json", rel, key)
-	return e
 }
 
 type countingReader struct {

@@ -59,14 +59,14 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 			key = info.ID
 		}
 	} else if key == "" {
-		key = stemKey(path)
+		key = StemKey(path)
 	}
 	if !manifest.IsValidKey(key) {
 		e := out.Errorf("usage", "%s can't be a requires key", key)
 		e.Help = fmt.Sprintf("pass `--as <key>` to give this %s one", kind)
 		return e
 	}
-	rel, copied, err := r.projectPath(path)
+	rel, copied, err := r.ProjectPath(path)
 	if err != nil {
 		return err
 	}
@@ -87,15 +87,7 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 		entry.Side = opts.Side
 	}
 	if copied {
-		r.log("copying %s into %s/", filepath.Base(path), manifest.FilesDir)
-		to := filepath.Join(r.Dir, filepath.FromSlash(rel))
-		// A re-add refreshes the copy its own entry names, which is how a rebuilt jar gets back in.
-		if !isReadded {
-			if err := sameFileIfAny(path, to); err != nil {
-				return err
-			}
-		}
-		if err := copyFile(path, to); err != nil {
+		if err := r.CopyIn(path, rel, isReadded); err != nil {
 			return err
 		}
 	}
@@ -113,12 +105,28 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 	return nil
 }
 
+// CopyIn copies the file at path to rel in the project. A re-add refreshes the copy its own entry
+// names, which is how a rebuilt jar gets back in; otherwise a different file already at rel is
+// refused rather than replaced.
+func (r *Resolver) CopyIn(path, rel string, isReadded bool) error {
+	r.log("copying %s into %s/", filepath.Base(path), manifest.FilesDir)
+	to := filepath.Join(r.Dir, filepath.FromSlash(rel))
+	if !isReadded {
+		if err := sameFileIfAny(path, to); err != nil {
+			return err
+		}
+	}
+	return copyFile(path, to)
+}
+
 // fileKind is what a local file is: the type asked for, a mod for a jar, and for a zip whatever it
 // holds.
 func fileKind(path, asked string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	if ext == ".mrpack" {
-		return "", out.Errorf("requires-unsupported", "%s is a modpack archive, which shulker can't add yet", filepath.Base(path))
+		e := out.Errorf("usage", "%s is a modpack archive", filepath.Base(path))
+		e.Help = "add it with `shulker modpack add`"
+		return "", e
 	}
 	switch {
 	case asked != "":
@@ -143,8 +151,8 @@ func fileKind(path, asked string) (string, error) {
 	return "", e
 }
 
-// stemKey is a requires key made from a file's name without its extension.
-func stemKey(path string) string {
+// StemKey is a requires key made from a file's name without its extension.
+func StemKey(path string) string {
 	stem := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	var b strings.Builder
 	for _, c := range strings.ToLower(stem) {
@@ -157,9 +165,9 @@ func stemKey(path string) string {
 	return strings.TrimSuffix(b.String(), "-")
 }
 
-// projectPath is the relative path an entry names the file at path by, and whether the file has
+// ProjectPath is the relative path an entry names the file at path by, and whether the file has
 // to be copied there first.
-func (r *Resolver) projectPath(path string) (string, bool, error) {
+func (r *Resolver) ProjectPath(path string) (string, bool, error) {
 	root, err := filepath.EvalSymlinks(r.Dir)
 	if err != nil {
 		return "", false, err

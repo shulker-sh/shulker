@@ -250,15 +250,15 @@
         },
         "autoUpdate": {
           "type": "boolean",
-          "description": "Whether sync refreshes this modpack from its source. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless."
+          "description": "Whether sync refreshes this modpack from its source, or re-reads its archive when the archive's bytes change. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless."
         },
         "locked": {
           "type": "boolean",
-          "description": "Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock; a source without a lock is always resolved from its manifest."
+          "description": "Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock, and always for an archive, which pins exact files; a source without a lock is always resolved from its manifest."
         },
         "file": {
           "$ref": "#/$defs/relativePath",
-          "description": "A local jar or zip that is on no provider, placed like any other entry of its kind. The lock records its sha512, and changed bytes make the lock out of date."
+          "description": "A local jar or zip that is on no provider, placed like any other entry of its kind. On a modpack, a .mrpack archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date."
         },
         "project": {
           "$ref": "#/$defs/projectId",
@@ -298,7 +298,7 @@
         },
         "note": { "$ref": "#/$defs/note" }
       },
-      "dependentRequired": { "ref": ["source"], "autoUpdate": ["source"], "locked": ["source"] },
+      "dependentRequired": { "ref": ["source"] },
       "allOf": [
         {
           "if": { "required": ["source"] },
@@ -325,6 +325,22 @@
               "anyOf": [{ "required": ["project"] }, { "required": ["pin"] }, { "required": ["channel"] }, { "required": ["provider"] }]
             }
           }
+        },
+        {
+          "if": { "required": ["file", "type"], "properties": { "type": { "const": "modpack" } } },
+          "then": {
+            "not": {
+              "anyOf": [{ "required": ["side"] }, { "required": ["os"] }, { "required": ["feature"] }]
+            }
+          }
+        },
+        {
+          "if": { "required": ["autoUpdate"] },
+          "then": { "anyOf": [{ "required": ["source"] }, { "required": ["file"] }] }
+        },
+        {
+          "if": { "required": ["locked"] },
+          "then": { "anyOf": [{ "required": ["source"] }, { "required": ["file"] }] }
         }
       ]
     },

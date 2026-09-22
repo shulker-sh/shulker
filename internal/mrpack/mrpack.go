@@ -67,6 +67,17 @@ func (f File) Side() string {
 	return "both"
 }
 
+// IsModJar reports whether an archive path is a jar in mods/.
+func IsModJar(p string) bool {
+	return path.Dir(p) == "mods" && strings.EqualFold(path.Ext(p), ".jar")
+}
+
+// IsPackZip reports whether an archive path is a zip in resourcepacks/ or shaderpacks/.
+func IsPackZip(p string) bool {
+	dir := path.Dir(p)
+	return (dir == "resourcepacks" || dir == "shaderpacks") && strings.EqualFold(path.Ext(p), ".zip")
+}
+
 func (f File) Layer() string {
 	switch f.Side() {
 	case "client":

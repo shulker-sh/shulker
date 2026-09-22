@@ -10,6 +10,7 @@ import (
 
 	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -46,7 +47,7 @@ func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Im
 	}
 	for _, o := range a.Overrides {
 		rep.Overrides = append(rep.Overrides, o)
-		if isModJar(o.Path) || isPackZip(o.Path) {
+		if mrpack.IsModJar(o.Path) || mrpack.IsPackZip(o.Path) {
 			rep.Unmanaged = append(rep.Unmanaged, o.Layer+"/"+o.Path)
 		}
 	}

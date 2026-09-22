@@ -337,7 +337,7 @@ func objectRules(s *object, prefix string) ([]string, error) {
 
 func conditionalRule(b *object, prefix string) (string, error) {
 	cond, _ := b.get("if")
-	names, ok := requiredOnly(cond)
+	when, ok := condition(cond, prefix)
 	if !ok {
 		return "", fmt.Errorf("the docs renderer cannot state an if other than required")
 	}
@@ -375,11 +375,65 @@ func conditionalRule(b *object, prefix string) (string, error) {
 				return "", fmt.Errorf("the docs renderer cannot state this not")
 			}
 			clauses = append(clauses, join(banned, prefix, "and")+plural(banned, " is", " are")+" not allowed")
+		case "anyOf":
+			var options []string
+			for _, branch := range list(t.values[key]) {
+				names, ok := requiredOnly(branch)
+				if !ok || len(names) != 1 {
+					return "", fmt.Errorf("the docs renderer cannot state this anyOf")
+				}
+				options = append(options, names[0])
+			}
+			clauses = append(clauses, join(options, prefix, "or")+" is required")
 		default:
 			return "", fmt.Errorf("the docs renderer cannot state then.%s", key)
 		}
 	}
-	return "When " + join(names, prefix, "and") + plural(names, " is", " are") + " set, " + strings.Join(clauses, ", and ") + ".", nil
+	return "When " + when + ", " + strings.Join(clauses, ", and ") + ".", nil
+}
+
+// condition states an if that requires keys, some of which it may also hold to a const: "`file` is
+// set and `type` is `\"modpack\"`".
+func condition(v any, prefix string) (string, bool) {
+	b, _ := v.(*object)
+	if b == nil {
+		return "", false
+	}
+	required, _ := b.get("required")
+	names := strs(required)
+	if len(names) == 0 {
+		return "", false
+	}
+	valued := map[string]string{}
+	for _, key := range b.keys {
+		switch key {
+		case "required":
+		case "properties":
+			props, _ := b.values[key].(*object)
+			for _, name := range props.keys {
+				p, _ := props.values[name].(*object)
+				c, ok := p.get("const")
+				if !ok || len(p.keys) != 1 || !contains(names, name) {
+					return "", false
+				}
+				valued[name] = code(stringify(c))
+			}
+		default:
+			return "", false
+		}
+	}
+	var set, parts []string
+	for _, name := range names {
+		if value, ok := valued[name]; ok {
+			parts = append(parts, code(prefix+name)+" is "+value)
+		} else {
+			set = append(set, name)
+		}
+	}
+	if len(set) > 0 {
+		parts = append([]string{join(set, prefix, "and") + plural(set, " is", " are") + " set"}, parts...)
+	}
+	return strings.Join(parts, " and "), true
 }
 
 func requiredOnly(v any) ([]string, bool) {

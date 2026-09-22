@@ -378,11 +378,11 @@ func (m *Manifest) byKind(kind string) map[string]Require {
 	return found
 }
 
-// Modpacks lists only the modpacks that give a source.
+// Modpacks lists the modpacks that give a source or an archive file.
 func (m *Manifest) Modpacks() map[string]Require {
 	modpacks := map[string]Require{}
 	for key, r := range m.Requires {
-		if r.Kind() == TypeModpack && r.Source != "" {
+		if r.Kind() == TypeModpack && (r.Source != "" || r.File != "") {
 			modpacks[key] = r
 		}
 	}
@@ -394,9 +394,7 @@ func (m *Manifest) CheckSupported() error {
 	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
 		r := m.Requires[key]
 		switch {
-		case r.Kind() == TypeModpack && r.File != "":
-			return out.Errorf("requires-unsupported", "requires.%s: local modpacks aren't supported yet", key)
-		case r.Kind() == TypeModpack && r.Source == "":
+		case r.Kind() == TypeModpack && r.Source == "" && r.File == "":
 			e := out.Errorf("requires-unsupported", "requires.%s: modpacks from a provider aren't supported yet", key)
 			e.Help = "give the modpack a source"
 			return e

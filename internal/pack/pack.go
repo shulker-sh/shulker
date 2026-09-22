@@ -1,5 +1,5 @@
-// Package pack loads the modpacks a project requires from a directory, a git repository or a URL,
-// and checks them against the project's platform.
+// Package pack loads the modpacks a project requires from a directory, a git repository, a URL or
+// a local archive, and checks them against the project's platform.
 package pack
 
 import (
@@ -23,6 +23,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -33,18 +34,25 @@ const (
 	Local Kind = "local"
 	Git   Kind = "git"
 	URL   Kind = "url"
+	File  Kind = "file"
 )
 
 // Loaded is a modpack read from its source.
 type Loaded struct {
-	Name       string
-	Source     string
-	Kind       Kind
-	Dir        string
-	Manifest   *manifest.Manifest
-	Lock       *lock.Lock
-	UsesLock   bool
-	Pin        lock.Modpack
+	Name     string
+	Source   string
+	Kind     Kind
+	Dir      string
+	Manifest *manifest.Manifest
+	Lock     *lock.Lock
+	UsesLock bool
+	Pin      lock.Modpack
+	// Archive is a File modpack's archive, and Overrides the files it lays itself, in place of the
+	// override folders a directory has.
+	Archive   *mrpack.Archive
+	Overrides []mrpack.Override
+	// Warnings are what consuming an archive found to mention.
+	Warnings   []string
 	lockSha256 string
 }
 
@@ -53,6 +61,11 @@ type Store struct {
 	ProjectDir string
 	Fetch      *fetch.Client
 	Log        func(format string, args ...any)
+	// Lock is the project's lock, which an archive's entries are rebuilt from.
+	Lock *lock.Lock
+	// Consume locks what a File modpack's archive holds into its Lock and Manifest, and records
+	// in its Pin the files the archive lays itself.
+	Consume func(ctx context.Context, l *Loaded) error
 }
 
 func (s *Store) isOffline() bool { return s.Fetch != nil && s.Fetch.Offline }
@@ -81,11 +94,18 @@ func Classify(source string) Kind {
 // Resolve reads a modpack at its source's current state, for locking.
 func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*Loaded, error) {
 	var err error
-	kind := Classify(p.Source)
+	kind := KindOf(p)
 	if p.Ref != "" && kind != Git {
 		return nil, out.Errorf("modpack-ref", "modpack %s: \"ref\" only applies to git sources", name)
 	}
 	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: lock.Modpack{Source: p.Source}}
+	if kind == File {
+		l.Source = p.File
+		if err := s.resolveArchive(ctx, l, p); err != nil {
+			return nil, err
+		}
+		return l, nil
+	}
 	switch kind {
 	case Local:
 		l.Dir = s.localDir(p.Source)
@@ -141,10 +161,15 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 
 // Open reads a modpack at the state the lock pinned, and warns when a local one has changed since.
 func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinned lock.Modpack) (*Loaded, string, error) {
-	kind := Classify(p.Source)
+	kind := KindOf(p)
 	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: pinned}
 	warning := ""
 	switch kind {
+	case File:
+		l.Source = p.File
+		if err := s.openArchive(ctx, l, p); err != nil {
+			return nil, "", err
+		}
 	case Local:
 		l.Dir = s.localDir(p.Source)
 		if err := s.loadDir(l); err != nil {
@@ -521,14 +546,25 @@ type Status struct {
 	State  string `json:"state"`
 }
 
-// Status is where a modpack stands against the lock. Only a local one is read, to see whether it
-// has changed; a remote one is taken as pinned.
+// Status is where a modpack stands against the lock. Only a local directory or archive is read, to
+// see whether it has changed; a remote one is taken as pinned.
 func (s *Store) Status(name string, p manifest.Require, pinned lock.Modpack, locked bool) (Status, error) {
-	st := Status{Name: name, Kind: Classify(p.Source), Source: p.Source, Ref: p.Ref, State: "unlocked"}
+	st := Status{Name: name, Kind: KindOf(p), Source: p.Source, Ref: p.Ref, State: "unlocked"}
+	if st.Kind == File {
+		st.Source = p.File
+	}
 	if !locked {
 		return st, nil
 	}
 	st.Pin, st.State = pinned.Label(), "ok"
+	if st.Kind == File {
+		state, err := s.archiveStatus(p, pinned)
+		if err != nil {
+			return Status{}, err
+		}
+		st.State = state
+		return st, nil
+	}
 	if st.Kind != Local {
 		return st, nil
 	}

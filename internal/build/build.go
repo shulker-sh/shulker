@@ -28,6 +28,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/server"
@@ -429,6 +430,10 @@ type overrideLayer struct {
 	pack    string
 	feature string
 	vars    map[string]string
+	// archived marks a layer read from a modpack archive: files holds it, and root only names
+	// where each file came from.
+	archived bool
+	files    []mrpack.Override
 }
 
 // overrideLayers is every override folder that applies to the side, in build
@@ -457,12 +462,24 @@ func (b *Builder) overrideLayers(side string, cond conditions, vars map[string]s
 		}
 	}
 	for _, pk := range b.Packs {
-		if pk.Dir == "" {
-			continue
-		}
 		packVars := map[string]string{}
 		maps.Copy(packVars, pk.Manifest.SideVariables(side).Text())
 		maps.Copy(packVars, vars)
+		if pk.Archive != nil {
+			for _, folder := range []string{"overrides", side + "-overrides"} {
+				l := overrideLayer{root: filepath.Join(b.Dir, filepath.FromSlash(pk.Source), folder), label: pk.Name + ":" + folder, pack: pk.Name, vars: packVars, archived: true}
+				for _, o := range pk.Overrides {
+					if o.Layer == folder {
+						l.files = append(l.files, o)
+					}
+				}
+				layers = append(layers, l)
+			}
+			continue
+		}
+		if pk.Dir == "" {
+			continue
+		}
 		add(pk.Manifest, pk.Dir, pk.Name, packVars)
 	}
 	add(b.Manifest, b.Dir, "", vars)
@@ -484,7 +501,15 @@ func featureFolders(name string, f manifest.Feature, side string) []string {
 }
 
 func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[string]source, report *Report) error {
-	root, label, pack, vars := l.root, l.label, l.pack, l.vars
+	root := l.root
+	if l.archived {
+		for _, o := range l.files {
+			if err := b.layFile(l, filepath.Join(root, filepath.FromSlash(o.Path)), o.Path, o.Data, whole, desired, report); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && path == root {
@@ -496,36 +521,41 @@ func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[st
 			return nil
 		}
 		rel, _ := filepath.Rel(root, path)
-		rel = filepath.ToSlash(rel)
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		src := source{origin: path, pack: pack, feature: l.feature}
-		if strings.HasSuffix(rel, TemplateSuffix) {
-			rel = strings.TrimSuffix(rel, TemplateSuffix)
-			src.isTemplate = true
-			if data, err = render(label+"/"+rel+TemplateSuffix, data, vars); err != nil {
-				return err
-			}
-		}
-		if strings.HasSuffix(rel, ".properties") && !whole(rel) {
-			desired[rel] = mergedProperties(desired[rel], data, keySource{path: path, pack: pack, feature: l.feature, isTemplate: src.isTemplate}, src, rel, report)
-			return nil
-		}
-		if prev, taken := desired[rel]; taken {
-			warnFeatureConflict(report, prev.feature, l.feature, rel)
-		}
-		if owned := desired[rel].owned; owned != nil {
-			src.managed = owned
-			if data, err = owned.render(data, nil, nil); err != nil {
-				return err
-			}
-		}
-		src.data = data
-		desired[rel] = src
-		return nil
+		return b.layFile(l, path, filepath.ToSlash(rel), data, whole, desired, report)
 	})
+}
+
+// layFile puts one override file, read from path, at rel in desired.
+func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole func(string) bool, desired map[string]source, report *Report) error {
+	var err error
+	src := source{origin: path, pack: l.pack, feature: l.feature}
+	if strings.HasSuffix(rel, TemplateSuffix) {
+		rel = strings.TrimSuffix(rel, TemplateSuffix)
+		src.isTemplate = true
+		if data, err = render(l.label+"/"+rel+TemplateSuffix, data, l.vars); err != nil {
+			return err
+		}
+	}
+	if strings.HasSuffix(rel, ".properties") && !whole(rel) {
+		desired[rel] = mergedProperties(desired[rel], data, keySource{path: path, pack: l.pack, feature: l.feature, isTemplate: src.isTemplate}, src, rel, report)
+		return nil
+	}
+	if prev, taken := desired[rel]; taken {
+		warnFeatureConflict(report, prev.feature, l.feature, rel)
+	}
+	if owned := desired[rel].owned; owned != nil {
+		src.managed = owned
+		if data, err = owned.render(data, nil, nil); err != nil {
+			return err
+		}
+	}
+	src.data = data
+	desired[rel] = src
+	return nil
 }
 
 func (b *Builder) collectServer(desired map[string]source, vars map[string]string, report *Report) (string, error) {
