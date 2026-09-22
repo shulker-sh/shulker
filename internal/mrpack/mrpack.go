@@ -167,8 +167,9 @@ func Read(file string) (*Archive, error) {
 }
 
 // readRootIdentity takes the manifest and lock a shulker export writes at the
-// archive root. They win over a marker jar: every export carries them, while the
-// jar reaches only a client-side export of a project with a loader.
+// archive root. They win over a marker jar: every export of a project that keeps
+// the marker carries them, while the jar reaches only a client-side export of a
+// project with a loader.
 func (a *Archive) readRootIdentity(file string, root map[string][]byte) error {
 	manifestData, lockData := root[manifest.FileName], root[lock.FileName]
 	if manifestData == nil || lockData == nil {

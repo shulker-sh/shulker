@@ -112,8 +112,12 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 
 // addIdentity puts the project's own manifest and lock at the archive root, so an
 // export imports back as the project it came from. The marker jar carries them
-// too, but only a client-side export of a project with a loader has one.
+// too, but only a client-side export of a project with a loader has one. A
+// manifest that turns the marker off leaves both out.
 func (b *Builder) addIdentity(entries map[string][]byte) error {
+	if !b.Manifest.UsesMarker() {
+		return nil
+	}
 	manifestData, err := os.ReadFile(filepath.Join(b.Dir, manifest.FileName))
 	if err != nil {
 		return err

@@ -413,3 +413,25 @@ func TestMarkerSwitchResolvesTheSameWayOnEveryBuild(t *testing.T) {
 	ip.mustRun(t, "rollback")
 	missing(t, "rollback", ip.dir)
 }
+
+func TestMarkerOffLeavesShulkerOutOfExports(t *testing.T) {
+	h := newCurseForgeExport(t)
+	h.editManifest(t, func(m map[string]any) { m["marker"] = false })
+
+	h.mustRun(t, "export", "mrpack", "--bundle", "--output", filepath.Join(h.dir, "out", "pack.mrpack"))
+	h.mustRun(t, "export", "curseforge", "--output", filepath.Join(h.dir, "out", "pack.zip"))
+	for _, name := range []string{"pack.mrpack", "pack.zip"} {
+		for entry := range readArchive(t, filepath.Join(h.dir, "out", name)) {
+			if entry == "shulker.json" || entry == "shulker.lock" || strings.HasPrefix(entry, "profileImage/") || strings.HasSuffix(entry, "shulker-pack.jar") {
+				t.Errorf("%s carries %s with the marker off", name, entry)
+			}
+		}
+	}
+	var pack curseForgePack
+	if err := json.Unmarshal([]byte(readArchive(t, filepath.Join(h.dir, "out", "pack.zip"))["manifest.json"]), &pack); err != nil {
+		t.Fatal(err)
+	}
+	if pack.Image != "" {
+		t.Fatalf("the profile names an image with the marker off: %q", pack.Image)
+	}
+}

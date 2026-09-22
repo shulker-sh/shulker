@@ -114,7 +114,7 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --side server
 
 ### `shulker import mrpack`
 
-Create a project from a Modrinth modpack (`.mrpack`). A pack shulker exported carries its own `shulker.json` and `shulker.lock` at the archive root, and those are read in preference to the marker jar, so the project comes back as it was, resource packs and shaders included. `--ignore-shulker` skips both and imports the archive as any other Modrinth modpack.
+Create a project from a Modrinth modpack (`.mrpack`). A pack shulker exported carries its own `shulker.json` and `shulker.lock` at the archive root unless its manifest turns `marker` off, and those are read in preference to the marker jar, so the project comes back as it was, resource packs and shaders included. `--ignore-shulker` skips both and imports the archive as any other Modrinth modpack.
 
 ```sh
 shulker import mrpack ~/Downloads/fabulously-optimized.mrpack
