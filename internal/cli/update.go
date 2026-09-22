@@ -143,11 +143,8 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 			return err
 		}
 		rl.Synced = &synced
-		children, _, err := a.projectInstances(instanceSelection{})
-		if err != nil && out.CodeOf(err) != "no-instances" {
-			return err
-		}
-		hasChildren = len(children) > 0
+		// The nudge is only a hint: a registry it can't read mustn't fail an update that is done.
+		hasChildren, _ = a.hasSyncedInstances(p)
 	}
 	res := rl.lockChanges
 	var local []string

@@ -94,8 +94,8 @@ func (a *app) awaitsALauncher(p *project.Project) bool {
 	if _, ok := p.Manifest.InPlaceSide(); ok {
 		return false
 	}
-	_, _, err := a.projectInstances(instanceSelection{})
-	return out.CodeOf(err) == "no-instances"
+	synced, err := a.hasSyncedInstances(p)
+	return err == nil && !synced
 }
 
 // fetchLocked puts the locked files the given sides use in the cache, every locked file with no

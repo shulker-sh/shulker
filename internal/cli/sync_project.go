@@ -23,6 +23,16 @@ func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, in
 	return entries, true, err
 }
 
+// hasSyncedInstances reports whether anything is synced from p: a registered instance or a
+// detached build.
+func (a *app) hasSyncedInstances(p *project.Project) (bool, error) {
+	entries, err := a.projectEntries(p, instanceSelection{})
+	if out.CodeOf(err) == "no-instances" {
+		return false, nil
+	}
+	return len(entries) > 0, err
+}
+
 func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries []instanceEntry, err error) {
 	if err := s.check(); err != nil {
 		return nil, err

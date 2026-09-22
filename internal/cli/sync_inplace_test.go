@@ -156,6 +156,16 @@ func TestUpdateInPlaceNudgesAtItsChildren(t *testing.T) {
 	}
 }
 
+func TestUpdateInPlaceSucceedsWhenItCantReadTheRegistry(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "install")
+	h.mustRun(t, "add", "sodium")
+	writeFile(t, registryPath(h), "{")
+	if code, stdout, stderr := h.run(t, "update"); code != 0 || !strings.Contains(stdout, "synced client") {
+		t.Fatalf("an unreadable registry only costs update its nudge (%d): %s%s", code, stdout, stderr)
+	}
+}
+
 func TestUpdateWithoutChildrenHasNoSyncNudge(t *testing.T) {
 	h := newInPlace(t)
 	h.mustRun(t, "add", "sodium")
