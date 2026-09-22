@@ -44,7 +44,7 @@ func (a *app) updateCmd() *cobra.Command {
 					ids = append(ids, arg)
 				}
 				if len(args) == 0 || len(requested) > 0 {
-					loaded, err := a.refreshModpacks(cmd.Context(), p, r, func(manifest.Require) bool { return true }, false)
+					loaded, err := a.refreshModpacks(cmd.Context(), p, r, func(manifest.Require) bool { return true }, failUnreachable)
 					if err != nil {
 						return "", err
 					}

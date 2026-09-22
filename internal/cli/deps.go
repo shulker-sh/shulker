@@ -265,12 +265,20 @@ func archiveMoved(p *project.Project, mp manifest.Require, pinned lock.Modpack, 
 	return followsBytes && len(project.FileDifferences(p.Dir, "", mp.File, pinned.File, pinned.Size, pinned.Sha512)) > 0
 }
 
+// unreachable is what refreshModpacks does with a modpack whose source can't be reached.
+type unreachable int
+
+const (
+	failUnreachable unreachable = iota
+	keepUnreachable
+)
+
 // refreshModpacks re-resolves the modpacks refresh picks from their sources, keeps the rest at
 // their locked pins, and hands the result to the resolver. An archive is read again only when
 // archiveMoved says there is something new in it, so an unchanged one needs no network. One whose
 // source can't be reached stays as openPacks read it, at its pin, without holding back the others,
-// when keepUnreachable says so: sync does, but update was asked for new versions.
-func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolve.Resolver, refresh func(manifest.Require) bool, keepUnreachable bool) ([]*pack.Loaded, error) {
+// when onUnreachable says so: sync does, but update was asked for new versions.
+func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolve.Resolver, refresh func(manifest.Require) bool, onUnreachable unreachable) ([]*pack.Loaded, error) {
 	store, err := a.packStore(p)
 	if err != nil {
 		return nil, err
@@ -284,7 +292,7 @@ func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolv
 			continue
 		}
 		fresh, err := store.Resolve(ctx, l.Name, mp)
-		if err != nil && keepUnreachable && ctx.Err() == nil && fetch.IsNetwork(err) {
+		if err != nil && onUnreachable == keepUnreachable && ctx.Err() == nil && fetch.IsNetwork(err) {
 			a.printer.Drop()
 			a.printer.Warn("%s, keeping modpack %s at %s from the lock", offlineReason(store), l.Name, l.Pin.Label())
 			loaded = append(loaded, l)
