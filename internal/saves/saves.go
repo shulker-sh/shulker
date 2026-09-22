@@ -28,9 +28,9 @@ const (
 	timeLayout = "20060102-150405"
 )
 
-// ValidGroup reports whether name can be a group: a registry-style key, so it is always a single
+// IsValidGroup reports whether name can be a group: a registry-style key, so it is always a single
 // safe folder name, and never None.
-func ValidGroup(name string) bool { return name != None && manifest.IsValidKey(name) }
+func IsValidGroup(name string) bool { return name != None && manifest.IsValidKey(name) }
 
 // Result is what Link found and did. Worlds are the ones the instance's saves/ shows afterwards.
 type Result struct {
@@ -63,7 +63,7 @@ func Link(dir, root, group string) (Result, error) {
 	}
 
 	want := filepath.Join(root, group)
-	if linked && sameTarget(path, current, want) {
+	if linked && isSameTarget(path, current, want) {
 		return withWorlds(res, path)
 	}
 	info, err := os.Lstat(path)
@@ -141,7 +141,7 @@ func readLink(path string) (string, bool) {
 	return target, err == nil
 }
 
-func sameTarget(link, target, want string) bool {
+func isSameTarget(link, target, want string) bool {
 	if !filepath.IsAbs(target) {
 		target = filepath.Join(filepath.Dir(link), target)
 	}
@@ -326,9 +326,9 @@ func Prune(dir string, keep int) ([]Backup, error) {
 	return pruned, nil
 }
 
-// Automatic says whether a backup of this reason was taken on the way past a change rather than
+// IsAutomatic says whether a backup of this reason was taken on the way past a change rather than
 // asked for, which is what makes it one TrimAutomatic may delete.
-func Automatic(reason string) bool { return reason == "update" || reason == "sync" }
+func IsAutomatic(reason string) bool { return reason == "update" || reason == "sync" }
 
 // TrimAutomatic deletes all but the keep newest automatic backups in dir. A backup someone asked
 // for, and a zip shulker can't tell the reason of, never counts and is never deleted.
@@ -339,7 +339,7 @@ func TrimAutomatic(dir string, keep int) error {
 	}
 	kept := 0
 	for _, b := range backups {
-		if !Automatic(b.Reason) {
+		if !IsAutomatic(b.Reason) {
 			continue
 		}
 		if kept++; kept <= keep {

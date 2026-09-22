@@ -33,7 +33,9 @@ type Restored struct {
 func OpenArchive(path string) (*Archive, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
-		return nil, out.Errorf("backup-invalid", "%s won't open as a zip: %v", path, err)
+		e := out.Errorf("backup-invalid", "%s won't open as a zip", path)
+		e.Rows = []out.Detail{{Label: "zip", Text: err.Error()}}
+		return nil, e
 	}
 	a := &Archive{Path: path, zr: zr}
 	if err := a.check(); err != nil {
@@ -52,7 +54,9 @@ func (a *Archive) check() error {
 		}
 		root, rest, ok := strings.Cut(name, "/")
 		if !ok && !f.FileInfo().IsDir() {
-			return out.Errorf("backup-invalid", "%s holds the file %s at its root; a backup holds only world folders", a.Path, f.Name)
+			e := out.Errorf("backup-invalid", "%s holds the file %s at its root", a.Path, f.Name)
+			e.Help = "a backup holds only world folders"
+			return e
 		}
 		roots[root] = true
 		if rest == "level.dat" {
@@ -158,7 +162,9 @@ func (a *Archive) unzip(f *zip.File, path string) error {
 	}
 	r, err := f.Open()
 	if err != nil {
-		return out.Errorf("backup-invalid", "%s: %s won't unzip: %v", a.Path, f.Name, err)
+		e := out.Errorf("backup-invalid", "%s: %s won't unzip", a.Path, f.Name)
+		e.Rows = []out.Detail{{Label: "zip", Text: err.Error()}}
+		return e
 	}
 	defer r.Close()
 	return fsutil.WriteFrom(path, r)

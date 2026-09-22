@@ -101,7 +101,7 @@ func TestTakeNamesAndCountsCollisions(t *testing.T) {
 
 	var paths []string
 	for range 3 {
-		got, err := Take(Source{Dir: src, Instance: "pack"}, Home{Dir: home, Shared: true}, "backup", nil)
+		got, err := Take(Source{Dir: src, Instance: "pack"}, Home{Dir: home, IsShared: true}, "backup", nil)
 		if err != nil {
 			t.Fatal(err)
 		}

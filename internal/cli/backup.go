@@ -122,7 +122,7 @@ func (a *app) zipping(verb string) func(world string, open bool) {
 }
 
 func (t savesTarget) home() saves.Home {
-	return saves.Home{Dir: t.backups, Shared: t.Group != ""}
+	return saves.Home{Dir: t.backups, IsShared: t.Group != ""}
 }
 
 // autoBackup is the backup a build takes of dir's worlds before it changes the mod set, then trims

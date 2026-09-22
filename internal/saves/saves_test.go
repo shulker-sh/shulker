@@ -299,12 +299,12 @@ func TestTrimAutomaticLeavesKeptBackups(t *testing.T) {
 
 func TestValidGroup(t *testing.T) {
 	for _, name := range []string{"default", "hardcore", "smp-2"} {
-		if !ValidGroup(name) {
+		if !IsValidGroup(name) {
 			t.Errorf("%q should be a valid group", name)
 		}
 	}
 	for _, name := range []string{"", "none", "../x", "A", ".hidden"} {
-		if ValidGroup(name) {
+		if IsValidGroup(name) {
 			t.Errorf("%q should not be a valid group", name)
 		}
 	}

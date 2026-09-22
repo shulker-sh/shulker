@@ -37,8 +37,8 @@ type Source struct {
 // Home is the folder backups go in. A shared one is a save group's, where the filename also names
 // the instance that took the backup.
 type Home struct {
-	Dir    string
-	Shared bool
+	Dir      string
+	IsShared bool
 }
 
 // comment is the zip comment, the backup's record. Worlds is left out when the names would not fit.
@@ -94,7 +94,7 @@ func Take(src Source, home Home, reason string, each func(world string, open boo
 	if seq > 1 {
 		id += "-" + strconv.Itoa(seq)
 	}
-	if home.Shared && src.Instance != "" {
+	if home.IsShared && src.Instance != "" {
 		id += "-" + src.Instance
 	}
 	id += "-" + reason

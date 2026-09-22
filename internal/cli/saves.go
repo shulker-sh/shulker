@@ -274,7 +274,7 @@ func (a *app) savesTargetOf(group string) (savesTarget, error) {
 			return savesTarget{}, out.Errorf("usage", "pass --group or -i, not both: each names whose saves to act on")
 		}
 		t := groupTarget(r, group)
-		if info, err := os.Stat(t.WorldsDir); err != nil || !info.IsDir() || !saves.ValidGroup(group) {
+		if info, err := os.Stat(t.WorldsDir); err != nil || !info.IsDir() || !saves.IsValidGroup(group) {
 			return savesTarget{}, out.Errorf("group-not-found", "no save group %q in %s", group, r.Saves)
 		}
 		return t, nil
