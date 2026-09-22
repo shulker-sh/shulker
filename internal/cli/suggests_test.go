@@ -77,21 +77,25 @@ func TestSuggestsRecognisesAModLockedUnderItsSlug(t *testing.T) {
 	}
 }
 
-func TestAddRecordsTheSlugOfAModAlreadyLocked(t *testing.T) {
-	h := newHarness(t)
-	h.jars["sodium"] = makeJar(t, "sodium_fabric", h.jars["sodium"].filename, "client")
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	h.mustRun(t, "add", "sodium", "--as", "speed")
-	l := h.readLock(t)
-	m := l.Mods["speed"]
-	m.Slug = ""
-	l.Mods["speed"] = m
-	if err := l.Save(filepath.Join(h.dir, "shulker.lock")); err != nil {
-		t.Fatal(err)
-	}
+func TestRelockingRecordsTheSlugOfAModAlreadyLocked(t *testing.T) {
+	for _, args := range [][]string{{"add", "sodium", "--as", "speed"}, {"update"}} {
+		t.Run(args[0], func(t *testing.T) {
+			h := newHarness(t)
+			h.jars["sodium"] = makeJar(t, "sodium_fabric", h.jars["sodium"].filename, "client")
+			h.mustRun(t, "init", "--yes", "--loader", "fabric")
+			h.mustRun(t, "add", "sodium", "--as", "speed")
+			l := h.readLock(t)
+			m := l.Mods["speed"]
+			m.Slug = ""
+			l.Mods["speed"] = m
+			if err := l.Save(filepath.Join(h.dir, "shulker.lock")); err != nil {
+				t.Fatal(err)
+			}
 
-	h.mustRun(t, "add", "sodium", "--as", "speed")
-	if got := h.readLock(t).Mods["speed"].Slug; got != "sodium" {
-		t.Fatalf("re-adding should record the slug, got %q", got)
+			h.mustRun(t, args...)
+			if got := h.readLock(t).Mods["speed"].Slug; got != "sodium" {
+				t.Fatalf("%s should record the slug, got %q", args[0], got)
+			}
+		})
 	}
 }
