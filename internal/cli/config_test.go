@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +13,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/out"
 )
 
 func readConfigDoc(t *testing.T, path string) map[string]any {
@@ -75,8 +78,8 @@ func TestConfigCurseForgeKey(t *testing.T) {
 	if stdout := h.mustRun(t, "config", "unset", "curseforge.key"); stdout != "  i curseforge.key was not set\n" {
 		t.Errorf("second unset output = %q", stdout)
 	}
-	if doc := readConfigDoc(t, h.config); len(doc) != 1 || doc["extra"] != true {
-		t.Errorf("config.json after unset = %v, want only the unknown key", doc)
+	if doc := readConfigDoc(t, h.config); len(doc) != 2 || doc["extra"] != true || doc["$schema"] == nil {
+		t.Errorf("config.json after unset = %v, want only the marker and the unknown key", doc)
 	}
 
 	if env := h.runSetting(t, 1, "config", "get", "curseforge.key"); env.Error == nil || env.Error.Code != "path-not-set" {
@@ -217,4 +220,81 @@ func TestConfigRoots(t *testing.T) {
 	if env := h.runSetting(t, 1, "config", "get", "instances"); env.Error == nil || env.Error.Code != "config-invalid" {
 		t.Errorf("an instances array: %+v", env.Error)
 	}
+}
+
+func TestConfigItCantRead(t *testing.T) {
+	for _, tc := range []struct{ name, config, code string }{
+		{"corrupt", `{"curseforge":`, "config-invalid"},
+		{"foreign", `{"$schema":"https://example.com/config.json"}`, "config-invalid"},
+		{"no marker", `{"curseforge":{"key":"abc"}}`, "config-invalid"},
+		{"newer", `{"$schema":"https://shulker.sh/schema/v2/config.json"}`, "schema-newer"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			if err := os.WriteFile(h.config, []byte(tc.config), 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			var stderr bytes.Buffer
+			a := h.newApp(io.Discard, &stderr)
+			a.d = nil
+			if _, err := a.deps(); err != nil {
+				t.Fatalf("deps over the config: %v", err)
+			}
+			want := "; ignoring it\n"
+			if tc.code == "schema-newer" {
+				want = "; ignoring it. Run shulker self update to read it\n"
+			}
+			if !strings.HasSuffix(stderr.String(), want) {
+				t.Fatalf("deps warned %q", stderr.String())
+			}
+
+			env := h.runEnvelope(t, 1, "config", "get", "store")
+			if env.Error == nil || env.Error.Code != tc.code {
+				t.Fatalf("config get: %+v", env.Error)
+			}
+
+			env = h.runEnvelope(t, 0, "config", "set", "store", "elsewhere")
+			if len(env.Warnings) != 1 || !strings.HasSuffix(env.Warnings[0], "; replaced it and kept the old one as "+h.config+".replaced") {
+				t.Fatalf("config set warnings: %q", env.Warnings)
+			}
+			if data, _ := os.ReadFile(h.config + ".replaced"); string(data) != tc.config {
+				t.Fatalf("replaced = %q", data)
+			}
+			doc := readConfigDoc(t, h.config)
+			if len(doc) != 2 || doc["store"] != "elsewhere" || doc["$schema"] != "https://shulker.sh/schema/v1/config.json" {
+				t.Fatalf("new config: %v", doc)
+			}
+
+			h.mustRun(t, "config", "set", "store", "again")
+			if data, _ := os.ReadFile(h.config + ".replaced"); string(data) != tc.config {
+				t.Fatalf("a readable config was replaced again: %q", data)
+			}
+		})
+	}
+}
+
+func TestConfigGetHidesTheMarker(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "config", "set", "store", "elsewhere")
+	var all map[string]any
+	if err := json.Unmarshal(h.runSetting(t, 0, "config", "get").Data, &all); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := all["$schema"]; ok {
+		t.Errorf("config get: %v", all)
+	}
+}
+
+func (h *harness) runEnvelope(t *testing.T, wantExit int, args ...string) out.Envelope {
+	t.Helper()
+	code, stdout, stderr := h.run(t, append(args, "--json")...)
+	if code != wantExit {
+		t.Fatalf("%v exited %d, want %d\nstdout: %s\nstderr: %s", args, code, wantExit, stdout, stderr)
+	}
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatalf("%v: %v\n%s", args, err, stdout)
+	}
+	return env
 }

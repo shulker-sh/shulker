@@ -65,6 +65,7 @@ func (a *app) configGetCmd() *cobra.Command {
 			switch {
 			case key == "":
 				all := maps.Clone(doc)
+				delete(all, "$schema")
 				for k, v := range resolved {
 					all[k] = v
 				}
@@ -107,7 +108,10 @@ func (a *app) configSetCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key, value := args[0], args[1]
 			path, cfg, doc, err := a.openConfig(key)
-			if err != nil {
+			unreadable := err
+			if code := out.CodeOf(err); code == "config-invalid" || code == "schema-newer" {
+				cfg, doc = config.Config{}, map[string]any{}
+			} else if err != nil {
 				return err
 			}
 			if value == "" {
@@ -136,7 +140,13 @@ func (a *app) configSetCmd() *cobra.Command {
 				}
 			}
 			configPut(doc, key, to)
-			if err := config.SaveDocument(path, doc); err != nil {
+			if unreadable != nil {
+				kept, err := config.ReplaceDocument(path, doc)
+				if err != nil {
+					return err
+				}
+				a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(unreadable).Message, kept)
+			} else if err := config.SaveDocument(path, doc); err != nil {
 				return err
 			}
 			return a.emitConfigChange(change)
@@ -201,6 +211,8 @@ func (a *app) resolvedPaths(configPath string, cfg config.Config) (map[string]st
 	}, nil
 }
 
+// openConfig reads config.json for a command about key. A config that can't be read still returns
+// its path beside the error, so `config set` can replace it.
 func (a *app) openConfig(key string) (string, config.Config, map[string]any, error) {
 	if key != "" && !slices.Contains(config.Keys, key) {
 		e := out.Errorf("path-invalid", "config.json has no %q", key)
@@ -213,11 +225,11 @@ func (a *app) openConfig(key string) (string, config.Config, map[string]any, err
 	}
 	cfg, err := config.LoadFile(path)
 	if err != nil {
-		return "", config.Config{}, nil, err
+		return path, config.Config{}, nil, err
 	}
 	doc, err := config.LoadDocument(path)
 	if err != nil {
-		return "", config.Config{}, nil, err
+		return path, config.Config{}, nil, err
 	}
 	return path, cfg, doc, nil
 }

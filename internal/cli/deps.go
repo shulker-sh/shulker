@@ -48,11 +48,19 @@ func (a *app) deps() (*deps, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := config.Load()
-	if out.CodeOf(err) == "config-invalid" {
+	path, err := a.configFile()
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := config.LoadFile(path)
+	switch code := out.CodeOf(err); {
+	case code == "config-invalid":
 		a.printer.Warn("%s; ignoring it", out.AsError(err).Message)
 		cfg = config.Config{}
-	} else if err != nil {
+	case code == "schema-newer":
+		a.printer.Warn("%s; ignoring it. Run `shulker self update` to read it", out.AsError(err).Message)
+		cfg = config.Config{}
+	case err != nil:
 		return nil, err
 	}
 	f := fetch.New(version)

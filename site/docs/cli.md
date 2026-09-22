@@ -461,6 +461,8 @@ shulker config set accounts.providers --literal '["shulker","prism"]'
 
 A key that holds a list needs `--literal`, which reads the value as JSON. `accounts.providers` is checked as it is set: it must be a non-empty array of known provider names with no repeats, so a typo fails here rather than on the next run. The `play.` keys are checked the same way, against the rules of the instance setting of the same name.
 
+`set` is the one command that tolerates a `config.json` it can't read, one that fails `config-invalid` or `schema-newer` everywhere else: it renames that file to `config.json.replaced`, warns naming why it couldn't be read, and writes a config holding only the key being set. Only the latest replaced config is kept.
+
 | Flag | Description |
 | --- | --- |
 | `--force` | Change the registry even if it leaves linked instances or synced directories behind |
@@ -1693,7 +1695,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
 | `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
-| `config-invalid` | shulker's `config.json` isn't valid JSON; the message names the line and column. Only commands that need its registry location fail; the rest warn and go on without it |
+| `config-invalid` | shulker's `config.json` isn't valid JSON (the message names the line and column), or names a `$schema` this shulker doesn't know or names none. Only commands that need its registry location fail, as they do when it fails `schema-newer`; the rest warn and go on without it. `shulker config set` replaces it, keeping the old file as `config.json.replaced` |
 | `curseforge-invalid` | The CurseForge modpack is malformed: its `manifest.json` doesn't parse, names no Minecraft version, is a manifest version other than 1, or the zip holds an unsafe path |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs or shaders; pass `--bundle`. `items`: what is missing |
