@@ -49,6 +49,7 @@ var aikarsLarge = []string{
 	"-XX:InitiatingHeapOccupancyPercent=20",
 }
 
+// JVMArgs are a server's heap flags, its preset's tuning flags and the author's own, in that order.
 func JVMArgs(memory, preset string, extra []string) ([]string, error) {
 	if memory == "" {
 		memory = DefaultMemory
@@ -68,7 +69,9 @@ func JVMArgs(memory, preset string, extra []string) ([]string, error) {
 		}
 	case FlagsNone:
 	default:
-		return nil, out.Errorf("jvm-flags", "unknown jvmFlags preset %q; use %q or %q", preset, FlagsAikars, FlagsNone)
+		e := out.Errorf("jvm-flags", "unknown jvmFlags preset %q", preset)
+		e.Help = fmt.Sprintf("use %q or %q", FlagsAikars, FlagsNone)
+		return nil, e
 	}
 	return append(args, extra...), nil
 }
@@ -77,7 +80,9 @@ func memoryMB(memory string) (int, error) {
 	unit := strings.ToUpper(memory[len(memory)-1:])
 	n, err := strconv.Atoi(memory[:len(memory)-1])
 	if err != nil || n <= 0 || (unit != "M" && unit != "G") {
-		return 0, out.Errorf("memory", "server memory %q must be a whole number of M or G, e.g. %q", memory, DefaultMemory)
+		e := out.Errorf("memory", "server memory %q must be a whole number of M or G", memory)
+		e.Help = fmt.Sprintf("for example %q", DefaultMemory)
+		return 0, e
 	}
 	if unit == "G" {
 		n *= 1024
@@ -85,6 +90,7 @@ func memoryMB(memory string) (int, error) {
 	return n, nil
 }
 
+// Command is the java arguments that start a server, run without its GUI.
 func Command(jvmArgs, launch []string) []string {
 	return append(append(append([]string{}, jvmArgs...), launch...), "--nogui")
 }

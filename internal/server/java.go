@@ -15,6 +15,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
+// Java is a java executable and the major version it reports.
 type Java struct {
 	Path  string `json:"path"`
 	Major int    `json:"major"`
@@ -31,6 +32,7 @@ func JavaBin(home string) string {
 	return bin
 }
 
+// JavaAt is the java under a Java home.
 func JavaAt(home string) (Java, error) {
 	bin := JavaBin(home)
 	if _, err := exec.LookPath(bin); err != nil {
@@ -51,7 +53,9 @@ func ClientJava(path string, required int) (Java, error) {
 		bin = JavaBin(path)
 	}
 	if _, err := exec.LookPath(bin); err != nil {
-		return Java{}, out.Errorf("java-not-found", "no java executable at %s; the java setting takes the path of a java binary or a Java home", path)
+		e := out.Errorf("java-not-found", "no java executable at %s", path)
+		e.Help = "the java setting takes the path of a java binary or a Java home"
+		return Java{}, e
 	}
 	major, err := javaMajor(bin)
 	if err != nil {
@@ -61,6 +65,8 @@ func ClientJava(path string, required int) (Java, error) {
 	return j, requireMajor(j, required)
 }
 
+// FindJava picks a server's java. An absolute override is a Java home; any other override is a
+// version range the java on PATH must fall in, and without one it must reach required.
 func FindJava(override string, required int) (Java, error) {
 	if filepath.IsAbs(override) {
 		j, err := JavaAt(override)
@@ -71,7 +77,9 @@ func FindJava(override string, required int) (Java, error) {
 	}
 	path, err := exec.LookPath("java")
 	if err != nil {
-		return Java{}, out.Errorf("java-not-found", "no java on PATH; install a JDK or set \"java\" in shulker.json to a JDK path")
+		e := out.Errorf("java-not-found", "no java on PATH")
+		e.Help = "install a JDK or set \"java\" in shulker.json to a JDK path"
+		return Java{}, e
 	}
 	major, err := javaMajor(path)
 	if err != nil {
@@ -93,7 +101,9 @@ func FindJava(override string, required int) (Java, error) {
 
 func requireMajor(j Java, required int) error {
 	if j.Major < required {
-		return out.Errorf("java-version", "java at %s is version %d; this Minecraft version needs Java %d or newer. Set \"java\" in shulker.json to a JDK path or put a newer java on PATH", j.Path, j.Major, required)
+		e := out.Errorf("java-version", "java at %s is version %d; this Minecraft version needs Java %d or newer", j.Path, j.Major, required)
+		e.Help = "set \"java\" in shulker.json to a JDK path or put a newer java on PATH"
+		return e
 	}
 	return nil
 }
@@ -103,7 +113,9 @@ func javaMajor(path string) (int, error) {
 	cmd := exec.Command(path, "-version")
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
-		return 0, out.Errorf("java-not-found", "%s -version failed: %v", path, err)
+		e := out.Errorf("java-not-found", "%s -version failed", path)
+		e.Rows = []out.Detail{{Label: "java", Text: err.Error()}}
+		return 0, e
 	}
 	return parseMajor(append(stderr.Bytes(), stdout.Bytes()...))
 }

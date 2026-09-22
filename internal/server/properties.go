@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/near"
 )
 
+// Type is the kind of value a server.properties key takes.
 type Type string
 
 const (
@@ -26,6 +27,7 @@ type Bounds struct {
 	Max int
 }
 
+// Property is a server.properties key and the Minecraft versions that read it.
 type Property struct {
 	Key         string
 	Type        Type
@@ -125,6 +127,8 @@ type PropertyCheck struct {
 	Warnings []string
 }
 
+// CheckProperties checks server.properties values against the keys and values a Minecraft version
+// reads.
 func CheckProperties(values map[string]string, minecraft mcver.Version) PropertyCheck {
 	byKey := map[string]Property{}
 	for _, p := range Properties {

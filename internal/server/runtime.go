@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -24,6 +23,7 @@ const (
 	runtimeDownloadJobs = 8
 )
 
+// Runtime is a Java runtime from Mojang, installed in the cache.
 type Runtime struct {
 	Component string `json:"component"`
 	Version   string `json:"version"`
@@ -47,6 +47,8 @@ func RuntimeDir(cacheDir, component string) string {
 	return filepath.Join(cacheDir, "java", component)
 }
 
+// EnsureRuntime installs a runtime component unless the cache already has it. With Refresh it
+// checks Mojang for a newer release first.
 func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *meta.Runtimes, cacheDir, component string, opts RuntimeOptions) (Runtime, error) {
 	dir := RuntimeDir(cacheDir, component)
 	existing, hasExisting := readRuntimeMarker(dir)
@@ -127,7 +129,7 @@ func runtimeHome(files map[string]meta.RuntimeFile) (string, error) {
 			return filepath.Dir(filepath.Dir(filepath.FromSlash(name))), nil
 		}
 	}
-	return "", fmt.Errorf("java runtime manifest lists no bin/java")
+	return "", out.Errorf("meta-invalid", "the Java runtime manifest lists no bin/java")
 }
 
 func countFiles(files map[string]meta.RuntimeFile) int {
@@ -175,7 +177,7 @@ func materializeRuntime(ctx context.Context, client *fetch.Client, root string, 
 		case "link":
 			links = append(links, name)
 		default:
-			return fmt.Errorf("java runtime manifest: unknown entry type %q for %s", files[name].Type, name)
+			return out.Errorf("meta-invalid", "the Java runtime manifest gives %s the unknown type %q", name, files[name].Type)
 		}
 	}
 	g, ctx := errgroup.WithContext(ctx)
@@ -207,7 +209,7 @@ func materializeRuntime(ctx context.Context, client *fetch.Client, root string, 
 func runtimePath(root, name string) (string, error) {
 	rel := filepath.Clean(filepath.FromSlash(name))
 	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || filepath.IsAbs(rel) {
-		return "", fmt.Errorf("java runtime manifest: refusing path %q", name)
+		return "", out.Errorf("meta-invalid", "the Java runtime manifest names %q, which is outside the runtime", name)
 	}
 	return filepath.Join(root, rel), nil
 }
@@ -230,7 +232,9 @@ func downloadRuntimeFile(ctx context.Context, client *fetch.Client, path string,
 		return err
 	}
 	if got := hex.EncodeToString(h.Sum(nil)); got != f.Downloads.Raw.Sha1 {
-		return fmt.Errorf("%s: sha1 mismatch (expected %s, got %s)", f.Downloads.Raw.URL, f.Downloads.Raw.Sha1, got)
+		e := out.Errorf("checksum-mismatch", "the download from %s doesn't match the sha1 its runtime manifest gives", f.Downloads.Raw.URL)
+		e.Rows = []out.Detail{{Label: "want", Text: f.Downloads.Raw.Sha1}, {Label: "got", Text: got}}
+		return e
 	}
 	return nil
 }

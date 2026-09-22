@@ -1,3 +1,5 @@
+// Package server installs and runs a Minecraft server: its Java, its loader installer and its
+// launch flags.
 package server
 
 import (
@@ -10,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/proc"
 )
 
+// Runner runs a server in the foreground. The first interrupt sends it stop; a second kills it.
 type Runner struct {
 	Java      string
 	Dir       string
@@ -21,6 +24,7 @@ type Runner struct {
 	Log       io.Writer
 }
 
+// Run returns the server's exit code.
 func (r *Runner) Run() (int, error) {
 	cmd := exec.Command(r.Java, r.Args...)
 	cmd.Dir = r.Dir

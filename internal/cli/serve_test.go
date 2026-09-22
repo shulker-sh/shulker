@@ -177,7 +177,7 @@ func TestManagedJava(t *testing.T) {
 	h.runtime.files[runtimeHome+"/lib/modules"] = "modules v2"
 	h.runtime.version = "25.0.2"
 	code, _, stderr := h.run(t, "install")
-	if code == 0 || !strings.Contains(stderr, "sha1 mismatch") {
+	if code == 0 || !strings.Contains(stderr, "(checksum-mismatch)") {
 		t.Fatalf("corrupt download should fail: %d %s", code, stderr)
 	}
 	if marker := h.readRuntimeMarker(t); marker["version"] != "25.0.1" {
