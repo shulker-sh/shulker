@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -171,7 +172,7 @@ func convert(v version) (provider.Version, error) {
 		}
 	}
 	if !found || pv.File.Sha512 == "" {
-		return pv, fmt.Errorf("modrinth version %s has no downloadable file", v.ID)
+		return pv, out.Errorf("version-no-file", "modrinth version %s has no file shulker can download", v.ID)
 	}
 	for _, d := range v.Dependencies {
 		pv.Dependencies = append(pv.Dependencies, provider.Dependency{ProjectID: d.ProjectID, VersionID: d.VersionID, Type: d.DependencyType})

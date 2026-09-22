@@ -1740,6 +1740,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `update-paused` | The pre-launch hook stopped a GDLauncher update at four minutes so it could explain itself; the launch is aborted, and launching again resumes it. Shown in GDLauncher's own dialog, so it prints without shulker's usual error decoration |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
+| `version-no-file` | The provider's version has no file shulker can download, or no hash to check it against |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`; its help links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
 | `world-in-use` | `restore` would replace a world a running game or server has open. `items`: the open worlds |

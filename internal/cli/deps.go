@@ -108,7 +108,7 @@ func (a *app) openProjectAt(dir string) (*project.Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.printer.LockStale = p.LockStale()
+	a.printer.LockStale = p.IsLockStale()
 	return p, nil
 }
 

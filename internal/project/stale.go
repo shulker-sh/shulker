@@ -13,7 +13,7 @@ import (
 	"shulker.sh/shulker/internal/mcver"
 )
 
-func (p *Project) LockStale() bool {
+func (p *Project) IsLockStale() bool {
 	return p.Lock == nil || len(p.LockDifferences()) > 0
 }
 

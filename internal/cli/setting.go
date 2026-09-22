@@ -172,7 +172,7 @@ func (a *app) saveSettings(p *project.Project, doc map[string]any, field *settin
 	}
 	change := settingChange{Path: field.path, From: from}
 	change.To, _ = field.get(written)
-	a.printer.LockStale = p.LockStale()
+	a.printer.LockStale = p.IsLockStale()
 	if p.Lock != nil {
 		a.warnLockDifferences(p)
 	}

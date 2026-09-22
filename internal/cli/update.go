@@ -163,7 +163,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	if err := p.RequireLock(); err != nil {
 		return relocked{}, err
 	}
-	stale := p.LockStale()
+	stale := p.IsLockStale()
 	original, err := json.Marshal(p.Lock)
 	if err != nil {
 		return relocked{}, err

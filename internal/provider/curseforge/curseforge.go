@@ -416,7 +416,7 @@ func convertFile(f file) (provider.Version, error) {
 		}
 	}
 	if v.File.Filename == "" || v.File.Sha1 == "" {
-		return v, fmt.Errorf("curseforge file %d has no downloadable file", f.ID)
+		return v, out.Errorf("version-no-file", "curseforge file %d has no file shulker can download", f.ID)
 	}
 	for _, g := range f.GameVersions {
 		if _, isLoader := loader.Lookup(strings.ToLower(g)); isLoader {
