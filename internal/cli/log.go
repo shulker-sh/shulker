@@ -149,17 +149,16 @@ func (f logFlags) described(instance string) map[string]string {
 
 func printLog(l *out.Lines, r logReport, isWidest bool) {
 	t := l.T
-	dot := " " + t.GlyphDot() + " "
 	window := "last " + r.Since
 	// A duration is never negative, so a dash is a date.
 	if strings.Contains(r.Since, "-") {
 		window = "since " + r.Since
 	}
-	redaction := t.Grey(dot + "redacted")
+	redaction := t.Grey("redacted")
 	if !r.Redacted {
-		redaction = t.Grey(dot) + t.Yellow("unredacted")
+		redaction = t.Yellow("unredacted")
 	}
-	l.Plain(t.Bold("shulker "+r.Version) + t.Grey(dot+r.Platform+dot+window+" of "+strconv.Itoa(r.KeepDays)+" days kept") + redaction)
+	l.Plain(t.Bold("shulker "+r.Version) + " " + t.Grey("("+r.Platform+", "+window+" of "+strconv.Itoa(r.KeepDays)+" days kept, ") + redaction + t.Grey(")"))
 	var filter []string
 	for _, name := range logFilterOrder {
 		if value, ok := r.Filter[name]; ok {
@@ -168,9 +167,9 @@ func printLog(l *out.Lines, r logReport, isWidest bool) {
 	}
 	described := "every entry"
 	if len(filter) > 0 {
-		described = strings.Join(filter, dot)
+		described = strings.Join(filter, ", ")
 	}
-	l.Plain(described + t.Grey(fmt.Sprintf(" — %d of %d entries", r.Matched, r.Read)))
+	l.Plain(described + " " + t.Grey(fmt.Sprintf("(%d of %d entries)", r.Matched, r.Read)))
 	if len(r.Entries) > 0 {
 		l.Blank()
 		printLogEntries(l, r.Entries)

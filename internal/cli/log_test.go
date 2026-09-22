@@ -86,8 +86,8 @@ func TestLogShowsTheLastDayWithItsPreamble(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
 	for _, want := range []string{
-		"shulker dev • " + runtime.GOOS + "/" + runtime.GOARCH + " • last 24h of 30 days kept",
-		"every entry — 3 of 4 entries",
+		"shulker dev (" + runtime.GOOS + "/" + runtime.GOARCH + ", last 24h of 30 days kept, redacted)",
+		"every entry (3 of 4 entries)",
 		"sync",
 		"✘ ",
 		"launch-not-started",
@@ -220,7 +220,7 @@ func TestLogFiltersNarrowAndCombine(t *testing.T) {
 func TestLogFilterLineNamesTheFilters(t *testing.T) {
 	seedLog(t)
 	_, stdout, _ := run(t, "log", "--no-color", "--group", "launchers", "--level", "error")
-	if !strings.Contains(stdout, "group launchers • level error — 1 of 4 entries") {
+	if !strings.Contains(stdout, "group launchers, level error (1 of 4 entries)") {
 		t.Fatalf("filter line:\n%s", stdout)
 	}
 }
@@ -231,7 +231,7 @@ func TestLogEmptyMatchStillPrintsThePreamble(t *testing.T) {
 	if code != out.ExitOK {
 		t.Fatalf("exit %d", code)
 	}
-	for _, want := range []string{"last 24h of 30 days kept", "code nothing-like-this — 0 of 4 entries", "$ shulker log --since 30d"} {
+	for _, want := range []string{"last 24h of 30 days kept", "code nothing-like-this (0 of 4 entries)", "$ shulker log --since 30d"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("missing %q in:\n%s", want, stdout)
 		}
@@ -241,7 +241,7 @@ func TestLogEmptyMatchStillPrintsThePreamble(t *testing.T) {
 func TestLogWithNoLogIsAnEmptyReport(t *testing.T) {
 	isolatedLog(t)
 	code, stdout, stderr := run(t, "log", "--no-color")
-	if code != out.ExitOK || !strings.Contains(stdout, "every entry — 0 of 0 entries") || stderr != "" {
+	if code != out.ExitOK || !strings.Contains(stdout, "every entry (0 of 0 entries)") || stderr != "" {
 		t.Fatalf("exit %d:\n%s\n%s", code, stdout, stderr)
 	}
 }
@@ -346,7 +346,7 @@ func TestLogRedactsByDefault(t *testing.T) {
 		}
 	}
 	_, stdout, _ := run(t, "log", "--no-color")
-	if !strings.Contains(stdout, "days kept • redacted") {
+	if !strings.Contains(stdout, "days kept, redacted)") {
 		t.Errorf("the preamble says the output is redacted:\n%s", stdout)
 	}
 	_, stdout, _ = run(t, "log", "--json")
@@ -361,7 +361,7 @@ func TestLogUnredactedPrintsEntriesAsStored(t *testing.T) {
 	if code != out.ExitOK {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
-	for _, want := range []string{"days kept • unredacted", logKey, "https://ghp_s3cr3t@github.com/org/pack.git", filepath.Join(home, "Games", "friends")} {
+	for _, want := range []string{"days kept, unredacted)", logKey, "https://ghp_s3cr3t@github.com/org/pack.git", filepath.Join(home, "Games", "friends")} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("missing %q in:\n%s", want, stdout)
 		}
