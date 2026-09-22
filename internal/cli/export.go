@@ -1,19 +1,24 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/provider/curseforge"
 )
 
@@ -209,6 +214,9 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 				Records: func(projectIDs []int) (map[int]curseforge.Record, error) {
 					return a.curseForgeRecords(cmd.Context(), projectIDs)
 				},
+				Lookalike: func(miss build.CurseForgeMiss) (curseforge.Match, []byte, bool, error) {
+					return a.curseForgeLookalike(cmd.Context(), miss)
+				},
 			})
 			if err != nil {
 				return a.withBundleNudge(err)
@@ -235,6 +243,66 @@ func (a *app) matchFingerprints(ctx context.Context, fingerprints []uint32) (map
 	}
 	a.progress("looking up %s on CurseForge", plural(len(fingerprints), "mod", "mods"))
 	return cf.MatchFingerprints(ctx, fingerprints)
+}
+
+// curseForgeLookalike finds the CurseForge project through the lock's alias or the
+// Modrinth slug, and downloads its file with the missed file's name and size.
+func (a *app) curseForgeLookalike(ctx context.Context, miss build.CurseForgeMiss) (curseforge.Match, []byte, bool, error) {
+	cf, err := a.curseForgeLookup()
+	if err != nil {
+		return curseforge.Match{}, nil, false, err
+	}
+	d, err := a.deps()
+	if err != nil {
+		return curseforge.Match{}, nil, false, err
+	}
+	projectID := strconv.Itoa(miss.Alias)
+	if miss.Alias == 0 {
+		if miss.Provider != "modrinth" {
+			return curseforge.Match{}, nil, false, nil
+		}
+		a.progress("looking up %s on CurseForge by slug", miss.Key)
+		mr, err := d.providers["modrinth"].Project(ctx, fmt.Sprint(miss.Project), miss.Kind)
+		if errors.Is(err, provider.ErrNotFound) {
+			return curseforge.Match{}, nil, false, nil
+		}
+		if err != nil {
+			return curseforge.Match{}, nil, false, err
+		}
+		p, err := cf.Project(ctx, mr.Slug, miss.Kind)
+		if errors.Is(err, provider.ErrNotFound) {
+			return curseforge.Match{}, nil, false, nil
+		}
+		if err != nil {
+			return curseforge.Match{}, nil, false, err
+		}
+		projectID = p.ID
+	}
+	versions, err := cf.Versions(ctx, projectID, miss.Minecraft, miss.Loaders)
+	if errors.Is(err, provider.ErrNotFound) || errors.Is(err, fetch.ErrNotFound) {
+		return curseforge.Match{}, nil, false, nil
+	}
+	if err != nil {
+		return curseforge.Match{}, nil, false, err
+	}
+	for _, v := range versions {
+		if v.File.Filename != miss.Filename || v.File.Size != miss.Size || v.File.URL == "" {
+			continue
+		}
+		modID, _ := strconv.Atoi(v.ProjectID)
+		fileID, _ := strconv.Atoi(v.ID)
+		a.progress("comparing %s with CurseForge file %d", miss.Key, fileID)
+		var buf bytes.Buffer
+		_, err := d.fetch.Download(ctx, v.File.URL, &buf)
+		if errors.Is(err, fetch.ErrNotFound) || errors.Is(err, fetch.ErrForbidden) {
+			return curseforge.Match{}, nil, false, nil
+		}
+		if err != nil {
+			return curseforge.Match{}, nil, false, err
+		}
+		return curseforge.Match{ModID: modID, FileID: fileID, FileName: v.File.Filename}, buf.Bytes(), true, nil
+	}
+	return curseforge.Match{}, nil, false, nil
 }
 
 func (a *app) curseForgeRecords(ctx context.Context, projectIDs []int) (map[int]curseforge.Record, error) {

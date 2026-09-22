@@ -2,11 +2,16 @@ package cli
 
 import (
 	"archive/zip"
+	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -155,6 +160,101 @@ func TestExportCurseForgeUnmatchedMods(t *testing.T) {
 	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
 	if entries["overrides/mods/"+h.jars["sodium"].filename] != string(h.jars["sodium"].data) {
 		t.Fatalf("bundled entries: %v", keys(entries))
+	}
+}
+
+// rezip rewrites a jar's entries under another DOS modification time, which
+// changes its bytes and fingerprint but not its size. Setting Modified instead
+// would add an extended-timestamp field and change the size.
+func rezip(t *testing.T, jar fakeJar, edit func(name, content string) string) fakeJar {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(jar.data), int64(len(jar.data)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{}
+	for _, f := range zr.File {
+		r, err := f.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(r)
+		r.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[f.Name] = edit(f.Name, string(data))
+	}
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: name, Method: zip.Deflate, ModifiedDate: 0x5d21, ModifiedTime: 0x6000})
+		if err != nil {
+			t.Fatal(err)
+		}
+		io.WriteString(w, files[name])
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	rebuilt := fakeJar{id: jar.id, filename: jar.filename, data: buf.Bytes()}
+	sum1 := sha1.Sum(rebuilt.data)
+	rebuilt.sha1 = hex.EncodeToString(sum1[:])
+	return rebuilt
+}
+
+func TestExportCurseForgeMatchesARezippedUpload(t *testing.T) {
+	h := newCurseForgeExport(t)
+	sodium := &h.cfMods[394468].files[0]
+	sodium.jar = rezip(t, h.jars["sodium"], func(_, content string) string { return content })
+	if bytes.Equal(sodium.jar.data, h.jars["sodium"].data) {
+		t.Fatal("the rezipped jar should differ from the Modrinth one")
+	}
+
+	stdout, stderr := h.mustRunStderr(t, "export", "curseforge")
+	if !strings.Contains(stdout, "3 mods by file ID") || !strings.Contains(stdout, "matched on CurseForge: fabric-api, sodium") {
+		t.Fatalf("export output: %s", stdout)
+	}
+	if !strings.Contains(stderr, "sodium matches CurseForge file 5000020 by contents, but its bytes differ from the locked file") {
+		t.Fatalf("export warnings: %s", stderr)
+	}
+	var pack curseForgePack
+	if err := json.Unmarshal([]byte(readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))["manifest.json"]), &pack); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range pack.Files {
+		if f.ProjectID == 394468 && f.FileID == 5000020 {
+			return
+		}
+	}
+	t.Fatalf("files: %+v", pack.Files)
+}
+
+func TestExportCurseForgeRejectsALookalikeWithOtherContents(t *testing.T) {
+	h := newCurseForgeExport(t)
+	sodium := &h.cfMods[394468].files[0]
+	sodium.jar = rezip(t, h.jars["sodium"], func(_, content string) string {
+		return strings.Replace(content, `"1.0.0"`, `"1.0.1"`, 1)
+	})
+	if len(sodium.jar.data) != len(h.jars["sodium"].data) {
+		t.Fatal("the lookalike should keep the locked file's size")
+	}
+
+	code, stdout, _ := h.run(t, "export", "curseforge", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "curseforge-not-found" || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "sodium (modrinth") {
+		t.Fatalf("lookalike: code=%d %+v", code, e)
+	}
+}
+
+func TestExportCurseForgeLeavesALookalikeItCannotDownload(t *testing.T) {
+	h := newCurseForgeExport(t)
+	sodium := &h.cfMods[394468].files[0]
+	sodium.jar = rezip(t, h.jars["sodium"], func(_, content string) string { return content })
+	sodium.forbidden = true
+
+	code, stdout, _ := h.run(t, "export", "curseforge", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "curseforge-not-found" || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "sodium (modrinth") {
+		t.Fatalf("undownloadable lookalike: code=%d %+v", code, e)
 	}
 }
 

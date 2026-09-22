@@ -63,7 +63,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		700000: {id: 700000, slug: "complementary-cf", class: 6552, files: []cfFile{{id: 5400001, jar: h.jars["complementary"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 	}
 	fileJSON := func(f cfFile, m *cfMod) map[string]any {
-		var url any = base() + "/cfcdn/" + f.jar.filename
+		var url any = base() + "/cfcdn/" + strconv.Itoa(f.id) + "/" + f.jar.filename
 		if f.url == "null" {
 			url = nil
 		} else if f.forbidden {
@@ -227,6 +227,15 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		w.WriteHeader(http.StatusForbidden)
 	})
 	mux.HandleFunc("/cfcdn/", func(w http.ResponseWriter, r *http.Request) {
+		id, _ := strconv.Atoi(strings.Split(strings.TrimPrefix(r.URL.Path, "/cfcdn/"), "/")[0])
+		for _, m := range h.cfMods {
+			for _, f := range allFiles(m) {
+				if f.id == id {
+					w.Write(f.jar.data)
+					return
+				}
+			}
+		}
 		for _, jar := range h.jars {
 			if strings.HasSuffix(r.URL.Path, "/"+jar.filename) {
 				w.Write(jar.data)

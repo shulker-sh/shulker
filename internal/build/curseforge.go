@@ -1,9 +1,13 @@
 package build
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html"
+	"io"
+	"maps"
 	"os"
 	"sort"
 	"strconv"
@@ -27,6 +31,22 @@ type CurseForgeOptions struct {
 	Match func(fingerprints []uint32) (map[uint32]curseforge.Match, error)
 	// Records looks the file-ID projects up for modlist.html.
 	Records func(projectIDs []int) (map[int]curseforge.Record, error)
+	// Lookalike finds the CurseForge file with the same name and size as a file
+	// whose fingerprint missed, and downloads it. ok is false when there is none.
+	Lookalike func(miss CurseForgeMiss) (match curseforge.Match, data []byte, ok bool, err error)
+}
+
+// CurseForgeMiss is a file CurseForge has no fingerprint for.
+type CurseForgeMiss struct {
+	Key       string
+	Kind      string
+	Provider  string
+	Project   any
+	Alias     int
+	Filename  string
+	Size      int64
+	Minecraft string
+	Loaders   []string
 }
 
 type CurseForgeReport struct {
@@ -57,6 +77,11 @@ type curseForgeEntry struct {
 	project  any
 	version  any
 	filename string
+	// providerFilename is the provider's own name for the file, which a
+	// lookalike on CurseForge would share.
+	providerFilename string
+	alias            int
+	loaders          []string
 }
 
 // ExportCurseForge writes the project as a CurseForge modpack.
@@ -147,12 +172,14 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		fingerprints = append(fingerprints, curseforge.Fingerprint(data))
 	}
 	matches := map[uint32]curseforge.Match{}
+	lookalikes := opts.Lookalike != nil
 	if len(lookup) > 0 {
 		found, err := opts.Match(fingerprints)
 		switch {
 		case err == nil:
 			matches = found
 		case opts.Bundle:
+			lookalikes = false
 			report.Warnings = append(report.Warnings, fmt.Sprintf("CurseForge lookup failed, so these are bundled: %s", out.AsError(err).Message))
 		default:
 			e := out.AsError(err)
@@ -163,7 +190,21 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 	missing := &kindTally{}
 	for i, key := range lookup {
 		e := byEntry[key]
-		if match, ok := matches[fingerprints[i]]; ok {
+		match, ok := matches[fingerprints[i]]
+		if !ok && lookalikes {
+			var err error
+			if match, ok, err = b.curseForgeLookalike(e, blobs[key], opts.Lookalike); err != nil {
+				if !opts.Bundle {
+					fail := out.AsError(err)
+					fail.Items = []string{key}
+					return nil, nil, nil, fail
+				}
+				report.Warnings = append(report.Warnings, fmt.Sprintf("CurseForge lookup for %s failed, so it is bundled: %s", key, out.AsError(err).Message))
+			} else if ok {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s matches CurseForge file %d by contents, but its bytes differ from the locked file", key, match.FileID))
+			}
+		}
+		if ok {
 			byKey[key] = cfpack.File{ProjectID: match.ModID, FileID: match.FileID, Required: true}
 			fileNames[e.path] = match.FileName
 			report.Matched = append(report.Matched, key)
@@ -201,8 +242,68 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 	return files, names, fileNames, nil
 }
 
-// enableByCurseForgeNames points options.txt and the shader loader's config at
-// the names the launcher saves file-ID packs under, which are CurseForge's own
+// curseForgeLookalike accepts a CurseForge file with the locked file's name and
+// size only when every zip entry unpacks to the same bytes, since the same build
+// uploaded twice differs in entry timestamps.
+func (b *Builder) curseForgeLookalike(e curseForgeEntry, locked []byte, lookalike func(CurseForgeMiss) (curseforge.Match, []byte, bool, error)) (curseforge.Match, bool, error) {
+	if e.providerFilename == "" {
+		return curseforge.Match{}, false, nil
+	}
+	match, data, ok, err := lookalike(CurseForgeMiss{
+		Key:       e.key,
+		Kind:      e.kind,
+		Provider:  e.provider,
+		Project:   e.project,
+		Alias:     e.alias,
+		Filename:  e.providerFilename,
+		Size:      int64(len(locked)),
+		Minecraft: b.Lock.Minecraft,
+		Loaders:   e.loaders,
+	})
+	if err != nil || !ok {
+		return curseforge.Match{}, false, err
+	}
+	return match, sameZipContents(locked, data), nil
+}
+
+func sameZipContents(a, b []byte) bool {
+	left, err := zipContents(a)
+	if err != nil {
+		return false
+	}
+	right, err := zipContents(b)
+	if err != nil {
+		return false
+	}
+	return maps.EqualFunc(left, right, bytes.Equal)
+}
+
+func zipContents(data []byte) (map[string][]byte, error) {
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, err
+	}
+	contents := make(map[string][]byte, len(zr.File))
+	for _, f := range zr.File {
+		if _, dup := contents[f.Name]; dup {
+			return nil, fmt.Errorf("zip entry %s appears twice", f.Name)
+		}
+		r, err := f.Open()
+		if err != nil {
+			return nil, err
+		}
+		content, err := io.ReadAll(r)
+		r.Close()
+		if err != nil {
+			return nil, err
+		}
+		contents[f.Name] = content
+	}
+	return contents, nil
+}
+
+// enableByCurseForgeNames points the options file and the shader loader's config
+// at the names the launcher saves file-ID packs under, which are CurseForge's own
 // file names rather than the <key>.zip a build places.
 func enableByCurseForgeNames(t *mrpackSide, fileNames map[string]string) {
 	renamed := map[string]string{}
@@ -261,13 +362,17 @@ func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 	entries := make([]curseForgeEntry, 0, len(ids)+len(t.packs))
 	for _, id := range ids {
 		m := b.Lock.Mods[id]
-		entries = append(entries, curseForgeEntry{key: id, kind: manifest.TypeMod, path: "mods/" + m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, project: m.Project, version: m.Version})
+		entries = append(entries, curseForgeEntry{key: id, kind: manifest.TypeMod, path: "mods/" + m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, project: m.Project, version: m.Version, providerFilename: m.Filename, alias: m.Aliases.CurseForge, loaders: []string{b.Lock.Loader.Type}})
 	}
 	for _, ref := range b.packRefs() {
 		if !t.packs[ref.key] {
 			continue
 		}
-		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.ProviderFilename})
+		var loaders []string
+		if ref.pack.Loader != "" {
+			loaders = []string{ref.pack.Loader}
+		}
+		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.ProviderFilename, providerFilename: ref.pack.ProviderFilename, loaders: loaders})
 	}
 	return entries
 }
