@@ -313,6 +313,8 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 		prev.Files[rel] = hash
 		if src.owned != nil {
 			prev.record(rel, src.owned)
+		} else {
+			delete(prev.Values, rel)
 		}
 	}
 	if err := b.saveState(dir, prev); err != nil {

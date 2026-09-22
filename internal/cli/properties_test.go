@@ -124,3 +124,42 @@ func TestPropertiesLayersAndWholeFiles(t *testing.T) {
 		t.Fatalf("whole file: %q", got)
 	}
 }
+
+func TestPropertiesMovingIntoWholeFiles(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "clean.properties"), "# clean\r\nb=2\r\na=1\r\n")
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "edited.properties"), "# edited\nx=1\n")
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "gone.properties"), "# gone\ng=1\n")
+	built := filepath.Join(h.dir, "build", "client", "config")
+	h.mustRun(t, "build")
+
+	writeFile(t, filepath.Join(built, "edited.properties"), "# edited\nx=1\ny=player\n")
+	if err := os.Remove(filepath.Join(h.dir, "overrides", "config", "gone.properties")); err != nil {
+		t.Fatal(err)
+	}
+	h.editManifest(t, func(m map[string]any) {
+		m["wholeFiles"] = []string{"config/*.properties"}
+	})
+	code, stdout, _ := h.run(t, "build", "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "build-conflict" || strings.Join(e.Items, ",") != "config/edited.properties (changed in place and in the source)" {
+		t.Fatalf("only the file with a key the player added should conflict: exit %d %s", code, stdout)
+	}
+
+	writeFile(t, filepath.Join(built, "edited.properties"), "# edited\nx=1\n")
+	stdout = h.mustRun(t, "build")
+	if got := readFile(t, filepath.Join(built, "clean.properties")); got != "# clean\r\nb=2\r\na=1\r\n" {
+		t.Fatalf("an untouched merged file should be copied whole: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(built, "gone.properties")); !os.IsNotExist(err) || strings.Contains(stdout, "gone.properties (edited") {
+		t.Fatalf("an untouched merged file no longer in the source should be removed: %v %s", err, stdout)
+	}
+
+	h.editManifest(t, func(m map[string]any) {
+		delete(m, "wholeFiles")
+	})
+	h.mustRun(t, "build")
+	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "no changes") {
+		t.Fatalf("moving back out of wholeFiles: %s", stdout)
+	}
+}

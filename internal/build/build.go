@@ -92,6 +92,21 @@ func (s State) recordedKeys(rel string) []string {
 	return keys
 }
 
+// isUntouched reports whether the file at abs, hashing to current, is still what the last build
+// left there. A file the last build merged key by key is recorded by its values rather than its
+// bytes, so it is untouched only while it holds exactly those keys and values.
+func (s State) isUntouched(rel, abs, current string) (bool, error) {
+	values, merged := s.Values[rel]
+	if !merged {
+		return current == s.Files[rel], nil
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return false, err
+	}
+	return maps.Equal(map[string]string(parseProperties(data)), values), nil
+}
+
 func (s *State) record(rel string, f ownedFile) {
 	if s.Values == nil {
 		s.Values = map[string]map[string]string{}
@@ -793,6 +808,12 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 			return nil, err
 		}
 		recorded := prev.Files[rel]
+		untouched := false
+		if exists {
+			if untouched, err = prev.isUntouched(rel, abs, current); err != nil {
+				return nil, err
+			}
+		}
 		switch {
 		case !exists:
 			f.state = stateWrite
@@ -800,7 +821,7 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 			f.state = stateUnchanged
 		case recorded == "" && !force:
 			f.state = stateUntracked
-		case current == recorded:
+		case untouched:
 			f.state = stateWrite
 		case force:
 			f.state = stateWrite
@@ -828,8 +849,12 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 		if !exists {
 			continue
 		}
+		untouched, err := prev.isUntouched(rel, abs, current)
+		if err != nil {
+			return nil, err
+		}
 		state := stateRemove
-		edited := current != prev.Files[rel]
+		edited := !untouched
 		if edited && !force {
 			state = stateOrphan
 		}
