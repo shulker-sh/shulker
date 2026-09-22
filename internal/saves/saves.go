@@ -30,7 +30,7 @@ const (
 
 // ValidGroup reports whether name can be a group: a registry-style key, so it is always a single
 // safe folder name, and never None.
-func ValidGroup(name string) bool { return name != None && manifest.ValidKey(name) }
+func ValidGroup(name string) bool { return name != None && manifest.IsValidKey(name) }
 
 // Result is what Link found and did. Worlds are the ones the instance's saves/ shows afterwards.
 type Result struct {

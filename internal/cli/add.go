@@ -42,7 +42,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 					return err
 				}
 			}
-			if as != "" && !manifest.ValidKey(as) {
+			if as != "" && !manifest.IsValidKey(as) {
 				return out.Errorf("usage", "--as takes up to 64 lowercase letters, digits, dots, dashes and underscores, starting with a letter or digit, not %q", as)
 			}
 			switch chosen {

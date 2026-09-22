@@ -103,7 +103,7 @@ func (a *app) serveCmd() *cobra.Command {
 				p.Manifest.Server = &manifest.Server{}
 			}
 			srv := p.Manifest.Server
-			if !srv.Eula {
+			if !srv.EULA {
 				accepted, err := a.acceptEula(acceptEula)
 				if err != nil {
 					return err
@@ -111,7 +111,7 @@ func (a *app) serveCmd() *cobra.Command {
 				if !accepted {
 					return out.Errorf("eula-required", "set \"server\": {\"eula\": true} in shulker.json or pass --accept-eula once you accept the Minecraft EULA (%s)", eulaURL)
 				}
-				srv.Eula = true
+				srv.EULA = true
 				if err := p.SaveManifest(); err != nil {
 					return err
 				}

@@ -345,11 +345,11 @@ func loadIntent(dir, source, ref, side string, assumeClient bool) (*instance.Fil
 
 var unsafeIDChars = regexp.MustCompile(`[^a-z0-9._-]+`)
 
-// slugID is the id derived from an instance's name, matching manifest.ValidKey so it is safe as a
+// slugID is the id derived from an instance's name, matching manifest.IsValidKey so it is safe as a
 // path segment and as the argument to -i.
 func slugID(name string) string {
 	slug := strings.Trim(unsafeIDChars.ReplaceAllString(strings.ToLower(name), "-"), "-._")
-	for slug != "" && !manifest.ValidKey(slug) {
+	for slug != "" && !manifest.IsValidKey(slug) {
 		slug = slug[1:]
 	}
 	if len(slug) > 64 {
@@ -390,7 +390,7 @@ func (a *app) checkID(as, dir string) error {
 	if as == "" {
 		return nil
 	}
-	if !manifest.ValidKey(as) {
+	if !manifest.IsValidKey(as) {
 		return out.Errorf("usage", "--as must be lowercase letters, digits, dots, dashes or underscores, up to 64 characters, not %q", as)
 	}
 	instances, err := a.loadInstances()

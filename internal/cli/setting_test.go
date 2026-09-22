@@ -80,7 +80,7 @@ func TestSetGetUnset(t *testing.T) {
 		name      string
 		got, want any
 	}{
-		{"server.eula", m.Server.Eula, true},
+		{"server.eula", m.Server.EULA, true},
 		{"rcon.port", m.Server.Properties["rcon.port"], json.Number("25575")},
 		{"properties.motd", m.Server.Properties["motd"], "20"},
 		{"variables.port", m.Variables["port"], json.Number("25565")},

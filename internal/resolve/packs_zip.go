@@ -68,7 +68,7 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 	if key == "" {
 		key = proj.Slug
 	}
-	if !manifest.ValidKey(key) {
+	if !manifest.IsValidKey(key) {
 		return out.Errorf("usage", "%s can't be a requires key; pass `--as <key>` to give this %s one", proj.Slug, kind)
 	}
 	if err := r.packKeyFree(key, kind); err != nil {

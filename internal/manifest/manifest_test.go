@@ -202,7 +202,7 @@ func TestRequiresEntryKinds(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", entries, err)
 		}
-		if err := m.CheckSupported(); err == nil || !strings.Contains(err.Error(), "aren't supported yet") {
+		if err := m.CheckSupported(); out.CodeOf(err) != "requires-unsupported" {
 			t.Errorf("%s: CheckSupported = %v", entries, err)
 		}
 		if len(m.Mods()) != 0 || len(m.Modpacks()) != 0 {
@@ -262,8 +262,8 @@ func TestSideHelpers(t *testing.T) {
 	if m.BuildDir("client") != "." || m.BuildDir("server") != "build/server" {
 		t.Errorf("build dirs %q %q", m.BuildDir("client"), m.BuildDir("server"))
 	}
-	if !m.InPlace("client") || m.InPlace("server") {
-		t.Error("InPlace")
+	if !m.BuildsInPlace("client") || m.BuildsInPlace("server") {
+		t.Error("BuildsInPlace")
 	}
 	if side, ok := m.InPlaceSide(); !ok || side != "client" {
 		t.Errorf("InPlaceSide = %q %v", side, ok)

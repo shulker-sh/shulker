@@ -264,7 +264,7 @@ func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*p
 		p.Manifest.Name, changed = id, true
 	}
 	// A project that builds elsewhere is not yet an instance; linking it here is what makes it one.
-	if !p.Manifest.InPlace("client") {
+	if !p.Manifest.BuildsInPlace("client") {
 		if p.Manifest.Client == nil {
 			p.Manifest.Client = &manifest.Client{Name: display}
 		}

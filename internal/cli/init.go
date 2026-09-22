@@ -94,7 +94,7 @@ func (a *app) initCmd() *cobra.Command {
 				Requires:  map[string]manifest.Require{},
 			}
 			if opts.side == "server" {
-				m.Server = &manifest.Server{Eula: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
+				m.Server = &manifest.Server{EULA: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
 			}
 			if opts.side == "client" {
 				m.Client = newClient()

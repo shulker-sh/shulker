@@ -1,3 +1,4 @@
+// Package manifest reads, checks and writes a project's shulker.json.
 package manifest
 
 import (
@@ -22,6 +23,7 @@ const (
 
 var DefaultProviders = []string{"modrinth", "curseforge"}
 
+// Manifest is a decoded shulker.json.
 type Manifest struct {
 	Schema      string             `json:"$schema,omitempty"`
 	Name        string             `json:"name"`
@@ -50,7 +52,7 @@ type Server struct {
 	Name       string         `json:"name,omitempty"`
 	Build      string         `json:"build,omitempty"`
 	Variables  Variables      `json:"variables,omitempty"`
-	Eula       bool           `json:"eula"`
+	EULA       bool           `json:"eula"`
 	Memory     string         `json:"memory,omitempty"`
 	JVMFlags   string         `json:"jvmFlags,omitempty"`
 	JVMArgs    []string       `json:"jvmArgs,omitempty"`
@@ -83,6 +85,7 @@ type Ban struct {
 	Expires string `json:"expires,omitempty"`
 }
 
+// All lists every player the server names, whether whitelisted, opped or banned.
 func (p *Players) All() []Player {
 	if p == nil {
 		return nil
@@ -151,6 +154,7 @@ func (o *FeatureOverrides) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// For is the folder for a side's own overrides; any side other than client gets the server's.
 func (o FeatureOverrides) For(side string) string {
 	if side == "client" {
 		return o.Client
@@ -181,12 +185,16 @@ const (
 
 var keyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
-func ValidKey(key string) bool { return keyPattern.MatchString(key) }
+func IsValidKey(key string) bool { return keyPattern.MatchString(key) }
 
+// KeyTaken is the error for adding a requires entry under a key another entry holds.
 func KeyTaken(key, held, adding string) error {
-	return out.Errorf("requires-taken", "requires already has %s as a %s; pass `--as <key>` to give this %s another key", key, held, adding)
+	e := out.Errorf("requires-taken", "requires already has %s as a %s", key, held)
+	e.Help = fmt.Sprintf("pass `--as <key>` to give this %s another key", adding)
+	return e
 }
 
+// Require is one entry under requires.
 type Require struct {
 	Type       string     `json:"type,omitempty"`
 	Source     string     `json:"source,omitempty"`
@@ -204,6 +212,7 @@ type Require struct {
 	Note       string     `json:"note,omitempty"`
 }
 
+// Kind is the entry's type, where an entry with a source and no type is a modpack.
 func (r Require) Kind() string {
 	switch {
 	case r.Type != "":
@@ -216,6 +225,7 @@ func (r Require) Kind() string {
 
 func (r Require) AutoUpdates() bool { return r.AutoUpdate == nil || *r.AutoUpdate }
 
+// StringList is a list that shulker.json may also write as a single string.
 type StringList []string
 
 func (l *StringList) UnmarshalJSON(data []byte) error {
@@ -249,6 +259,7 @@ func (v Variables) Text() map[string]string {
 	return text
 }
 
+// Ignore silences one validation finding.
 type Ignore struct {
 	Rule     string `json:"rule"`
 	Mod      string `json:"mod"`
@@ -265,6 +276,7 @@ func Load(path string) (*Manifest, error) {
 	return Parse(data)
 }
 
+// Parse decodes a shulker.json and checks it against the schema and the rules the schema can't express.
 func Parse(data []byte) (*Manifest, error) {
 	// Before the schema, whose anyOf reports the same thing as two missing
 	// properties.
@@ -312,7 +324,7 @@ func (m *Manifest) check() error {
 			}
 		}
 	}
-	if m.InPlace("client") && m.InPlace("server") {
+	if m.BuildsInPlace("client") && m.BuildsInPlace("server") {
 		e := out.Errorf("manifest-invalid", "%s builds both sides in place", FileName)
 		e.Rows = []out.Detail{{Label: "Fix", Text: `give one side a "build" directory of its own`}}
 		return e
@@ -320,6 +332,7 @@ func (m *Manifest) check() error {
 	return nil
 }
 
+// Mods, ResourcePacks and Shaders leave out entries that name a local file.
 func (m *Manifest) Mods() map[string]Require { return m.byKind(TypeMod) }
 
 func (m *Manifest) ResourcePacks() map[string]Require { return m.byKind(TypeResourcePack) }
@@ -336,6 +349,7 @@ func (m *Manifest) byKind(kind string) map[string]Require {
 	return found
 }
 
+// Modpacks lists only the modpacks that give a source.
 func (m *Manifest) Modpacks() map[string]Require {
 	modpacks := map[string]Require{}
 	for key, r := range m.Requires {
@@ -346,6 +360,7 @@ func (m *Manifest) Modpacks() map[string]Require {
 	return modpacks
 }
 
+// CheckSupported refuses the requires entries shulker can't resolve yet.
 func (m *Manifest) CheckSupported() error {
 	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
 		r := m.Requires[key]
@@ -353,7 +368,9 @@ func (m *Manifest) CheckSupported() error {
 		case r.File != "":
 			return out.Errorf("requires-unsupported", "requires.%s: local files aren't supported yet", key)
 		case r.Kind() == TypeModpack && r.Source == "":
-			return out.Errorf("requires-unsupported", "requires.%s: modpacks from a provider aren't supported yet; give a source", key)
+			e := out.Errorf("requires-unsupported", "requires.%s: modpacks from a provider aren't supported yet", key)
+			e.Help = "give the modpack a source"
+			return e
 		}
 	}
 	return nil
@@ -363,6 +380,7 @@ func (m *Manifest) Encode() ([]byte, error) {
 	return fsutil.MarshalJSON(m)
 }
 
+// Save refuses to write a manifest that fails the schema.
 func (m *Manifest) Save(path string) error {
 	data, err := m.Encode()
 	if err != nil {
@@ -417,6 +435,7 @@ func (m *Manifest) HasSide(side string) bool {
 	return ok
 }
 
+// DisplayName is the side's own name, or the project's when the side has none.
 func (m *Manifest) DisplayName(side string) string {
 	if b, ok := m.side(side); ok && b.Name != "" {
 		return b.Name
@@ -424,6 +443,7 @@ func (m *Manifest) DisplayName(side string) string {
 	return m.Name
 }
 
+// BuildDir is where a side builds, relative to the project; build/<side> by default.
 func (m *Manifest) BuildDir(side string) string {
 	if b, ok := m.side(side); ok && b.Build != "" {
 		return b.Build
@@ -431,9 +451,9 @@ func (m *Manifest) BuildDir(side string) string {
 	return "build/" + side
 }
 
-// InPlace reports whether the side builds into the project directory itself,
+// BuildsInPlace reports whether the side builds into the project directory itself,
 // which is what makes a project an instance.
-func (m *Manifest) InPlace(side string) bool {
+func (m *Manifest) BuildsInPlace(side string) bool {
 	return m.BuildDir(side) == "."
 }
 
@@ -441,13 +461,14 @@ func (m *Manifest) InPlace(side string) bool {
 // project an instance that keeps history.
 func (m *Manifest) InPlaceSide() (string, bool) {
 	for _, side := range m.Sides() {
-		if m.InPlace(side) {
+		if m.BuildsInPlace(side) {
 			return side, true
 		}
 	}
 	return "", false
 }
 
+// SideVariables are the top-level variables with the side's own laid over them.
 func (m *Manifest) SideVariables(side string) Variables {
 	vars := Variables{}
 	maps.Copy(vars, m.Variables)
@@ -466,8 +487,8 @@ func (m *Manifest) ClientHooks() Hooks {
 	return *m.Client.Hooks
 }
 
-// MarkerOn is whether a build carries the marker mod where no instance has decided for itself.
-func (m *Manifest) MarkerOn() bool { return m.Marker == nil || *m.Marker }
+// UsesMarker is whether a build carries the marker mod where no instance has decided for itself.
+func (m *Manifest) UsesMarker() bool { return m.Marker == nil || *m.Marker }
 
 const DefaultHistory = 5
 
@@ -480,6 +501,7 @@ func (m *Manifest) HistoryKeep() int {
 	return *m.History
 }
 
+// ProviderOrder is the order providers are searched in, DefaultProviders when the manifest names none.
 func (m *Manifest) ProviderOrder() []string {
 	if len(m.Providers) == 0 {
 		return DefaultProviders

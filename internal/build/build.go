@@ -536,7 +536,7 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if srv == nil {
 		srv = &manifest.Server{}
 	}
-	if srv.Eula {
+	if srv.EULA {
 		desired[EulaFile] = source{data: []byte("eula=true\n")}
 	}
 	props, err := renderProperties(PropertiesFile, srv.Properties, vars)

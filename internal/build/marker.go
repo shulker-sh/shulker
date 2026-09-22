@@ -59,7 +59,7 @@ func (b *Builder) markerOn(dir string) bool {
 	if f, err := instance.Load(dir); err == nil && f.Settings.Marker != nil {
 		return *f.Settings.Marker
 	}
-	return b.Manifest.MarkerOn()
+	return b.Manifest.UsesMarker()
 }
 
 func markerJarPath(name string) string {
