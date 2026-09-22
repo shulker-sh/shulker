@@ -80,12 +80,8 @@ func slotCommand(launcherName, dir string, kind HookKind, goos string) string {
 	return "sh " + s.quote(script, goos)
 }
 
-// IsShulkerSlot reports whether a slot command is one shulker owns rather than a player's.
-//
-// Two shapes count. The generated script is what shulker writes now. The inline `sync --into` command
-// is what shulker wrote before the scripts existed, and it is still shulker's: treating it as a
-// stranger's would refuse to link over an instance shulker made, and would leave that command in
-// place while adopting it.
+// IsShulkerSlot reports whether a slot command is one of shulker's generated hook scripts rather
+// than a player's command.
 func IsShulkerSlot(command string) bool {
 	for _, kind := range []HookKind{HookPreLaunch, HookPostExit} {
 		if strings.Contains(command, instance.Dir+"/"+string(kind)) ||
@@ -93,14 +89,7 @@ func IsShulkerSlot(command string) bool {
 			return true
 		}
 	}
-	return isLegacySyncCommand(command)
-}
-
-// isLegacySyncCommand recognises the pre-script slot command. GDLauncher ran hooks in the game
-// directory without setting variables, so its sync went into ".".
-func isLegacySyncCommand(command string) bool {
-	return strings.Contains(command, " sync ") &&
-		(strings.HasSuffix(command, `--into "$INST_MC_DIR"`) || strings.HasSuffix(command, " --into ."))
+	return false
 }
 
 // Slots are what one instance holds in the slots its launcher has: two commands, or the profile's

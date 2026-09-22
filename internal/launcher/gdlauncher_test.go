@@ -31,9 +31,6 @@ func TestGDLauncherHookArg(t *testing.T) {
 	if got := gdlauncherHookArg(`C:\Program Files\shulker\shulker.exe`, "windows"); got != `"C:\Program Files\shulker\shulker.exe"` {
 		t.Errorf("windows: %s", got)
 	}
-	if !IsShulkerSlot(`"/bin/shulker" sync "/pack" --side client --into .`) {
-		t.Error("a GDLauncher hook should read as a shulker sync")
-	}
 }
 
 func TestDefaultGDLauncherDirOverride(t *testing.T) {
