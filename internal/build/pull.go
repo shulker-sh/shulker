@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/near"
 	"shulker.sh/shulker/internal/out"
@@ -327,10 +328,12 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 
 // AdoptedType is the requires type of a build directory file the game loads as a mod or a pack,
 // which pull adopts as a file entry: a jar directly under mods/, or a zip directly under
-// resourcepacks/ or shaderpacks/. It is "" for any other file.
+// resourcepacks/, shaderpacks/ or one of lock.DatapackFolders. It is "" for any other file.
 func AdoptedType(rel string) string {
 	dir, name := path.Split(rel)
 	switch ext := strings.ToLower(path.Ext(name)); {
+	case slices.Contains(lock.DatapackFolders, strings.TrimSuffix(dir, "/")) && ext == ".zip":
+		return manifest.TypeDatapack
 	case dir == "mods/" && ext == ".jar":
 		return manifest.TypeMod
 	case dir == "resourcepacks/" && ext == ".zip":

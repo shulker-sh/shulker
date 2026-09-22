@@ -359,13 +359,18 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	for _, f := range plans {
 		merges[f.rel] = f.merge
 	}
+	removed := slices.Clone(report.Removed)
+	// Links first: a server's datapacks are written through its world's link.
+	if err := b.applyLinks(dir, side, links, report); err != nil {
+		return nil, err
+	}
 	for _, rel := range writes {
 		if err := b.write(filepath.Join(dir, filepath.FromSlash(rel)), desired[rel], merges[rel]); err != nil {
 			return nil, err
 		}
 		report.Written = append(report.Written, rel)
 	}
-	for _, rel := range report.Removed {
+	for _, rel := range removed {
 		path := filepath.Join(dir, filepath.FromSlash(rel))
 		// The bytes reach the cache before the file leaves the disk, so a history
 		// entry that left them to the cache can still be restored offline.
@@ -375,9 +380,6 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
-	}
-	if err := b.applyLinks(dir, side, links, report); err != nil {
-		return nil, err
 	}
 	next.BuiltAt = time.Now().UTC().Format(time.RFC3339)
 	next.Minecraft, next.Loader, next.LoaderVersion = b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version
@@ -418,12 +420,16 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 	if opts.PackVersion != "" {
 		vars["pack.version"] = opts.PackVersion
 	}
+	levelName := "world"
 	if side == "server" {
-		levelName, err := b.collectServer(desired, vars, cond, opts.NoLauncher, report)
-		if err != nil {
+		var err error
+		if levelName, err = b.collectServer(desired, vars, cond, opts.NoLauncher, report); err != nil {
 			return nil, nil, err
 		}
 		dirs = dataDirs(side, levelName)
+	}
+	if err := b.collectDatapacks(side, levelName, cond, desired, report); err != nil {
+		return nil, nil, err
 	}
 	if side == "client" {
 		if err := b.collectPacks(cond, desired, report); err != nil {
@@ -989,6 +995,10 @@ func sameDir(a, b string) bool {
 func checkReserved(side string, desired map[string]source, data []string) error {
 	var bad []string
 	for rel := range desired {
+		// A server's world is data, but its datapacks folder is the build's to fill.
+		if side == "server" && path.Dir(rel) == data[0]+"/datapacks" {
+			continue
+		}
 		if reservedPath(rel, data) {
 			bad = append(bad, rel)
 		}

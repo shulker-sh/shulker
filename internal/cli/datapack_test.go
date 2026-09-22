@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/manifest"
@@ -64,5 +67,75 @@ func TestAddHostedDatapack(t *testing.T) {
 	h.mustRun(t, "datapack", "remove", "terralith")
 	if _, ok := h.readLock(t).Datapacks["terralith"]; ok {
 		t.Fatal("remove drops it from the lock")
+	}
+}
+
+func TestClientBuildPlacesDatapacks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "terralith")
+
+	_, _, stderr := h.run(t, "install")
+	if !strings.Contains(stderr, "! terralith: placed in datapacks/, which only some global datapack mods read; add one, such as paxi, to load it in every world") {
+		t.Fatalf("no warning without a global datapack mod: %s", stderr)
+	}
+	if readBuilt(t, h, "datapacks/terralith.zip") != string(h.jars["terralith"].data) {
+		t.Fatal("the datapack goes to datapacks/ without a global datapack mod")
+	}
+
+	paxi := makeJar(t, "paxi", "Paxi-26.2-Fabric-5.1.jar", "*")
+	h.mustRun(t, "add", writeOutside(t, paxi.filename, paxi.data))
+	_, _, stderr = h.run(t, "build")
+	if strings.Contains(stderr, "global datapack mods") {
+		t.Fatalf("Paxi loads it, so nothing to warn about: %s", stderr)
+	}
+	if readBuilt(t, h, "config/paxi/datapacks/terralith.zip") == "" {
+		t.Fatal("with Paxi placed, the datapack goes to its folder")
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "datapacks", "terralith.zip")); !os.IsNotExist(err) {
+		t.Fatalf("the old placement is removed: %v", err)
+	}
+}
+
+func TestServerBuildPlacesDatapacksInItsWorld(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "add", "terralith")
+	loot := makeJarFiles(t, "loot", "loot.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/loot/loot_table/chest.json": "{}"})
+	h.mustRun(t, "add", writeOutside(t, loot.filename, loot.data), "--side", "client")
+	h.editManifest(t, func(m map[string]any) {
+		m["server"] = map[string]any{"properties": map[string]any{"level-name": "adventure"}}
+	})
+	h.mustRun(t, "lock")
+
+	_, _, stderr := h.run(t, "install")
+	if strings.Contains(stderr, "global datapack mods") {
+		t.Fatalf("the server's world loads its datapacks without a mod: %s", stderr)
+	}
+	placed := filepath.Join(h.dir, "data", "server", "adventure", "datapacks", "terralith.zip")
+	if data, err := os.ReadFile(placed); err != nil || string(data) != string(h.jars["terralith"].data) {
+		t.Fatalf("the datapack is written through the world's link: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "data", "server", "adventure", "datapacks", "loot.zip")); !os.IsNotExist(err) {
+		t.Fatalf("a client-side datapack stays off the server: %v", err)
+	}
+
+	h.mustRun(t, "remove", "terralith")
+	h.mustRun(t, "build")
+	if _, err := os.Stat(placed); !os.IsNotExist(err) {
+		t.Fatalf("a dropped datapack leaves the world: %v", err)
+	}
+}
+
+func TestInPlaceServerBuildWritesItsWorldsDatapacks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.editManifest(t, func(m map[string]any) {
+		m["server"] = map[string]any{"build": "."}
+	})
+	h.mustRun(t, "add", "terralith")
+	h.mustRun(t, "install")
+	if readFile(t, filepath.Join(h.dir, "world", "datapacks", "terralith.zip")) != string(h.jars["terralith"].data) {
+		t.Fatal("an in-place server writes its world's datapacks")
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -159,13 +160,27 @@ func managedFiles(dir string, lk *lock.Lock) []string {
 	cached := cachedPlacements(lk)
 	var rels []string
 	for rel := range LoadState(dir).Files {
-		if cached[rel] || rel == historyConfig || strings.HasPrefix(rel, historyConfig+"/") {
+		if cached[rel] || cachedDatapack(lk, rel) || rel == historyConfig || strings.HasPrefix(rel, historyConfig+"/") {
 			continue
 		}
 		rels = append(rels, rel)
 	}
 	sort.Strings(rels)
 	return rels
+}
+
+// cachedDatapack reports a placed datapack, whose folder hangs on the side and the server's
+// level-name, so it is matched by its folder's name and its own.
+func cachedDatapack(lk *lock.Lock, rel string) bool {
+	if lk == nil || path.Base(path.Dir(rel)) != "datapacks" {
+		return false
+	}
+	for _, p := range lk.Datapacks {
+		if p.Filename == path.Base(rel) {
+			return true
+		}
+	}
+	return false
 }
 
 func cachedPlacements(lk *lock.Lock) map[string]bool {

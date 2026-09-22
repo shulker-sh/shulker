@@ -251,6 +251,10 @@ func (l *Lock) PackSections() []map[string]Pack {
 	return sections
 }
 
+// DatapackFolders are the folders outside a world that a datapack is placed in, by
+// DatapackFolder, and that the game or a global datapack mod loads datapacks from.
+var DatapackFolders = []string{"datapacks", "config/paxi/datapacks", "config/openloader/data", "config/openloader/packs"}
+
 // PackPath is where a side's build places a pack of kind: a datapack in DatapackFolder, the
 // other kinds by Pack.Path.
 func (l *Lock) PackPath(kind string, p Pack, side, levelName string) string {

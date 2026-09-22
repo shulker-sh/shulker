@@ -305,3 +305,32 @@ func sortedPacks(m map[string]lock.Pack) []string {
 	sort.Strings(keys)
 	return keys
 }
+
+// collectDatapacks places the datapacks locked for side in the folder DatapackFolder picks, and
+// warns when that is a client's datapacks/, which only some global datapack mods read.
+func (b *Builder) collectDatapacks(side, levelName string, cond conditions, desired map[string]source, report *Report) error {
+	folder, loaded := b.Lock.DatapackFolder(side, levelName)
+	listed := b.Manifest.Datapacks()
+	var placed []string
+	for _, key := range sortedPacks(b.Lock.Datapacks) {
+		p := b.Lock.Datapacks[key]
+		if p.Side != "both" && p.Side != side {
+			continue
+		}
+		if entry, ok := listed[key]; ok {
+			if admitted, why := cond.admits(entry); !admitted {
+				report.Excluded = append(report.Excluded, key+" ("+why+")")
+				continue
+			}
+		}
+		if !b.Cache.Has(p.Sha512) {
+			return notInstalled(key)
+		}
+		desired[folder+"/"+p.Filename] = source{sha512: p.Sha512}
+		placed = append(placed, key)
+	}
+	if !loaded && len(placed) > 0 {
+		report.Warnings = append(report.Warnings, fmt.Sprintf("%s: placed in %s/, which only some global datapack mods read; add one, such as paxi, to load it in every world", strings.Join(placed, ", "), folder))
+	}
+	return nil
+}

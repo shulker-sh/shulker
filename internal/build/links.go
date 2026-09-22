@@ -86,6 +86,9 @@ func (b *Builder) applyLinks(dir, side string, plan linkPlan, report *Report) er
 		if err := os.MkdirAll(dataRoot, 0o755); err != nil {
 			return err
 		}
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
 	}
 	for _, rel := range plan.move {
 		if err := os.Rename(filepath.Join(dir, rel), filepath.Join(dataRoot, rel)); err != nil {

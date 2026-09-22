@@ -311,7 +311,7 @@ type Placement struct {
 	Feature manifest.StringList
 }
 
-// Placements is where each locked mod lands, by mod id.
+// Placements is where each locked mod and pack lands, by key.
 func (b *Builder) Placements() map[string]Placement {
 	placements := map[string]Placement{}
 	c := conditions{admitsAnyOS: true, features: map[string]bool{}}
@@ -328,6 +328,23 @@ func (b *Builder) Placements() map[string]Placement {
 			p := placements[id]
 			p.Sides = append(p.Sides, side)
 			placements[id] = p
+		}
+		for key, entry := range b.Lock.Datapacks {
+			if entry.Side != "both" && entry.Side != side {
+				continue
+			}
+			listed, isListed := b.Manifest.Datapacks()[key]
+			if isListed {
+				if admitted, _ := c.admits(listed); !admitted {
+					continue
+				}
+			}
+			p := placements[key]
+			p.Sides = append(p.Sides, side)
+			if isListed {
+				p.OS, p.Feature = listed.OS, listed.Feature
+			}
+			placements[key] = p
 		}
 		if side != "client" {
 			continue
