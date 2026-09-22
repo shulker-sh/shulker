@@ -49,9 +49,17 @@ A shader is enabled through its shader mod's own config, `config/iris.properties
 
 The enabled list in `options.txt` works differently, because it is in priority order and yours to arrange. Shulker seeds it once — on the first build, when the line is missing or still Minecraft's own `["vanilla"]` — and then leaves it alone. A pack you add later is placed but not enabled: turn it on in game, and shulker won't reorder what you chose. `shulker build --force` seeds the list again.
 
+## Datapacks
+
+A datapack sits in `requires` too, with `"type": "datapack"`. Modrinth files datapacks as mods, so a project whose only files are datapacks adds as one on its own, and a mod that also ships a datapack, like Terralith, needs `shulker datapack add` to get the datapack.
+
+Vanilla loads datapacks only per world, so a datapack for every world needs a global datapack mod. Each build places a datapack in the folder of one it finds among the mods it placed: `config/paxi/datapacks/` for Paxi, and `config/openloader/data/` before Minecraft 1.21 or `config/openloader/packs/` from it for Open Loader. A server without one places it in its world's own `datapacks/` folder, the world `level-name` names, which the game loads with no mod at all. That one folder inside the world is the build's to fill: a datapack edited or replaced there, as by restoring an old backup, is a conflict until `--force`. A client without one places it in `datapacks/`, which only some global datapack mods read, and says so.
+
+A datapack is placed on both sides unless its `side` says otherwise, since a singleplayer world runs its server inside the client. Load order isn't shulker's: ship Paxi's `datapack_load_order.json` as an override, naming each datapack by its file name, which is `<key>.zip` unless `filename` says otherwise.
+
 ## Providers
 
-Mods, resource packs and shaders are resolved from Modrinth or CurseForge. By default Modrinth is tried first, then CurseForge. Set [`providers`](/docs/manifest#properties) to change the order or use only one, or set `provider` on a single mod.
+Mods, resource packs, shaders and datapacks are resolved from Modrinth or CurseForge. By default Modrinth is tried first, then CurseForge. Set [`providers`](/docs/manifest#properties) to change the order or use only one, or set `provider` on a single mod.
 
 CurseForge needs an API key. Release builds include one, so it works without setup. To use your own, set `SHULKER_CURSEFORGE_KEY` or run [`shulker config set curseforge.key <key>`](/docs/cli#shulker-config-set); your key always takes priority and is never replaced. If CurseForge rejects the included key, shulker fetches a new one from shulker.sh, saves it in its cache, and retries once. If that fails too, it asks you to set your own key or report an issue.
 
