@@ -65,7 +65,7 @@ func (b *Builder) ExportMrpack(opts MrpackOptions) (*MrpackReport, error) {
 	report := &MrpackReport{Path: opts.Output, VersionID: opts.VersionID, Name: b.mrpackName(sides), Sides: []string{}, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}, Warnings: []string{}}
 	for _, t := range sides {
 		report.Sides = append(report.Sides, t.side)
-		warnings, err := b.mrpackCollect(t, opts.OS, opts.Features)
+		warnings, err := b.mrpackCollect(t, opts.VersionID, opts.OS, opts.Features)
 		if err != nil {
 			return nil, err
 		}
@@ -168,9 +168,9 @@ func (b *Builder) mrpackName(sides []*mrpackSide) string {
 }
 
 // mrpackCollect fills a side's override files and the mods it ships, returning the warnings.
-func (b *Builder) mrpackCollect(t *mrpackSide, osName string, features map[string]bool) ([]string, error) {
+func (b *Builder) mrpackCollect(t *mrpackSide, version, osName string, features map[string]bool) ([]string, error) {
 	rep := &Report{}
-	desired, _, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features, NoLauncher: true}, rep)
+	desired, _, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features, NoLauncher: true, PackVersion: version}, rep)
 	if err != nil {
 		return nil, err
 	}

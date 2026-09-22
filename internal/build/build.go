@@ -152,6 +152,9 @@ type Options struct {
 	Origin      Origin
 	// NoLauncher leaves the server launcher out, for an export that ships none of it.
 	NoLauncher bool
+	// PackVersion stands in for the manifest's version in the project's ${pack.version}, for an
+	// export given a version of its own.
+	PackVersion string
 	// BeforeModChange runs once, before a build that adds, replaces or removes a mod writes
 	// anything.
 	BeforeModChange func() error
@@ -411,7 +414,10 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		desired["mods/"+m.Filename] = source{sha512: m.Sha512}
 		placed[b.Lock.JarID(id)] = true
 	}
-	vars := b.Manifest.SideVariables(side).Text()
+	vars := templateVars(b.Manifest, b.Lock, side)
+	if opts.PackVersion != "" {
+		vars["pack.version"] = opts.PackVersion
+	}
 	if side == "server" {
 		levelName, err := b.collectServer(desired, vars, cond, opts.NoLauncher, report)
 		if err != nil {
@@ -490,9 +496,7 @@ func (b *Builder) overrideLayers(side string, cond conditions, vars map[string]s
 		}
 	}
 	for _, pk := range b.Packs {
-		packVars := map[string]string{}
-		maps.Copy(packVars, pk.Manifest.SideVariables(side).Text())
-		maps.Copy(packVars, vars)
+		packVars := pulledTemplateVars(pk.Manifest, b.Lock, side, vars)
 		if pk.Archive != nil {
 			for _, folder := range []string{"overrides", side + "-overrides"} {
 				l := overrideLayer{root: filepath.Join(b.Dir, filepath.FromSlash(pk.Source), folder), label: pk.Name + ":" + folder, pack: pk.Name, vars: packVars, skips: pk.Manifest.Skips, archived: true}

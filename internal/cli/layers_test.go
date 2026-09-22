@@ -220,3 +220,59 @@ func dataJSON(t *testing.T, stdout string) string {
 	}
 	return string(data)
 }
+
+func TestBuiltinVariables(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	twoSided(t, h)
+	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", "", map[string]string{
+		"config/base.txt.tmpl": "${pack.name} ${pack.version} ${minecraft.version}\n",
+	})
+	h.mustRun(t, "modpack", "add", "./base")
+	h.editManifest(t, func(m map[string]any) {
+		m["version"] = "1.2.3"
+		m["server"].(map[string]any)["properties"] = map[string]any{"motd": "${pack.name} ${pack.version}"}
+	})
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "stamp.txt.tmpl"),
+		"${pack.name} ${pack.version} ${minecraft.version} ${loader.type} ${loader.version}\n")
+
+	code, _, stderr := h.run(t, "install")
+	if code == 0 || !strings.Contains(stderr, "base:overrides/config/base.txt.tmpl:1: variable ${pack.version} is not set") {
+		t.Fatalf("a pulled pack without a version doesn't take the project's: %d %s", code, stderr)
+	}
+
+	pulled := filepath.Join(h.dir, "base", "shulker.json")
+	data, err := os.ReadFile(pulled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, pulled, strings.Replace(string(data), `"name": "base",`, `"name": "base", "version": "9.0",`, 1))
+	h.mustRun(t, "lock")
+	h.mustRun(t, "install")
+
+	if got := readBuilt(t, h, "config/stamp.txt"); got != "pack 1.2.3 26.2 fabric 0.17.3\n" {
+		t.Errorf("the project's overrides see its own pack and the locked versions: %q", got)
+	}
+	if got := readBuilt(t, h, "config/base.txt"); got != "base 9.0 26.2\n" {
+		t.Errorf("a pulled pack's overrides see that pack's own name and version: %q", got)
+	}
+	if got := readFile(t, filepath.Join(h.dir, "build", "server", "server.properties")); !strings.Contains(got, "motd=pack 1.2.3\n") {
+		t.Errorf("server.properties values see the built-in variables: %q", got)
+	}
+
+	h.allowMrpackHost(t)
+	h.mustRun(t, "export", "mrpack", "--version", "2.0")
+	archive := readArchive(t, filepath.Join(h.dir, "build", "pack-2.0.mrpack"))
+	if got := archive["overrides/config/stamp.txt"]; got != "pack 2.0 26.2 fabric 0.17.3\n" {
+		t.Errorf("an export's --version stands in for the project's version: %q", got)
+	}
+	if got := archive["overrides/config/base.txt"]; got != "base 9.0 26.2\n" {
+		t.Errorf("an export's --version leaves a pulled pack's own version: %q", got)
+	}
+
+	h.editManifest(t, func(m map[string]any) { delete(m, "version") })
+	code, _, stderr = h.run(t, "install")
+	if code == 0 || !strings.Contains(stderr, "${pack.version} is not set") {
+		t.Fatalf("a manifest without a version leaves ${pack.version} unset: %d %s", code, stderr)
+	}
+}

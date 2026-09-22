@@ -96,7 +96,7 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 	}
 	t := sides[0]
 	report := &CurseForgeReport{Path: opts.Output, Version: opts.Version, Name: b.mrpackName(sides), Side: t.side, Mods: []string{}, ResourcePacks: []string{}, Shaders: []string{}, Matched: []string{}, BundledMods: []string{}, BundledResourcePacks: []string{}, BundledShaders: []string{}, Overrides: []string{}}
-	if report.Warnings, err = b.mrpackCollect(t, opts.OS, opts.Features); err != nil {
+	if report.Warnings, err = b.mrpackCollect(t, opts.Version, opts.OS, opts.Features); err != nil {
 		return nil, err
 	}
 	files, names, fileNames, err := b.curseForgeMods(t, opts, report)

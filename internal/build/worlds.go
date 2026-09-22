@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 )
 
@@ -47,7 +48,8 @@ func serverLevelName(dir string, m *manifest.Manifest) (string, error) {
 		if m.Server != nil {
 			raw = m.Server.Properties
 		}
-		props, err := renderProperties(PropertiesFile, raw, m.SideVariables("server").Text())
+		l, _ := lock.Load(filepath.Join(dir, lock.FileName))
+		props, err := renderProperties(PropertiesFile, raw, templateVars(m, l, "server"))
 		if err != nil {
 			return "", err
 		}
