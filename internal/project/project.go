@@ -18,9 +18,36 @@ type Project struct {
 	Dir      string
 	Manifest *manifest.Manifest
 	Lock     *lock.Lock
+	// UnreadableLock is why the lock on disk couldn't be read, when OpenReplacingLock opened the
+	// project without it.
+	UnreadableLock error
+	// ReplacedLock is where SaveLock kept the unreadable lock it wrote over.
+	ReplacedLock string
 }
 
+// Open fails on a lock it can't read; OpenReplacingLock tolerates one.
 func Open(dir string) (*Project, error) {
+	p, err := open(dir)
+	if err != nil {
+		return nil, err
+	}
+	if p.UnreadableLock != nil {
+		e := out.AsError(p.UnreadableLock)
+		if e.Code == "lock-invalid" {
+			e.Help = "run `shulker lock`"
+		}
+		return nil, e
+	}
+	return p, nil
+}
+
+// OpenReplacingLock opens dir with no lock when the one there can't be read, so the next SaveLock
+// writes a fresh one over it.
+func OpenReplacingLock(dir string) (*Project, error) {
+	return open(dir)
+}
+
+func open(dir string) (*Project, error) {
 	p := &Project{Dir: dir}
 	m, err := manifest.Load(p.ManifestPath())
 	if errors.Is(err, os.ErrNotExist) {
@@ -31,7 +58,11 @@ func Open(dir string) (*Project, error) {
 	}
 	p.Manifest = m
 	l, err := lock.Load(p.LockPath())
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+	case out.CodeOf(err) == "lock-invalid", out.CodeOf(err) == "schema-newer":
+		p.UnreadableLock = err
+	case err != nil:
 		return nil, err
 	}
 	p.Lock = l
@@ -52,4 +83,11 @@ func (p *Project) RequireLock() error {
 
 func (p *Project) SaveManifest() error { return p.Manifest.Save(p.ManifestPath()) }
 
-func (p *Project) SaveLock() error { return p.Lock.Save(p.LockPath()) }
+func (p *Project) SaveLock() error {
+	if p.UnreadableLock == nil || p.ReplacedLock != "" {
+		return p.Lock.Save(p.LockPath())
+	}
+	kept, err := p.Lock.Replace(p.LockPath())
+	p.ReplacedLock = kept
+	return err
+}

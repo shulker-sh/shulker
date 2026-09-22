@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -112,7 +113,11 @@ type relocked struct {
 }
 
 func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
-	p, err := a.openProject()
+	open := a.openProject
+	if cmd.Name() == "lock" {
+		open = a.openReplacingLock
+	}
+	p, err := open()
 	if err != nil {
 		return err
 	}
@@ -122,6 +127,13 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	rl, err := a.relockProject(cmd, p, false, run)
 	if err != nil {
 		return err
+	}
+	if p.ReplacedLock != "" {
+		kept := p.ReplacedLock
+		if rel, err := filepath.Rel(p.Dir, kept); err == nil && filepath.IsLocal(rel) {
+			kept = rel
+		}
+		a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(p.UnreadableLock).Message, kept)
 	}
 	// An instance plays its own directory, so an update there is only done once it is built.
 	hasChildren := false

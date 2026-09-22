@@ -278,16 +278,34 @@ func (l *Lock) Encode() ([]byte, error) {
 }
 
 func (l *Lock) Save(path string) error {
-	data, err := l.Encode()
+	data, err := l.encodeValid()
 	if err != nil {
 		return err
+	}
+	return fsutil.Write(path, data)
+}
+
+// Replace saves the lock over one that couldn't be read, keeping the old file as
+// shulker.lock.replaced. kept is where it went, empty when there was none.
+func (l *Lock) Replace(path string) (kept string, err error) {
+	data, err := l.encodeValid()
+	if err != nil {
+		return "", err
+	}
+	return fsutil.Replace(path, data)
+}
+
+func (l *Lock) encodeValid() ([]byte, error) {
+	data, err := l.Encode()
+	if err != nil {
+		return nil, err
 	}
 	if err := schema.Validate(schema.Lock, data); err != nil {
 		e := schema.Invalid("lock-invalid", FileName, data, err)
 		e.Message = "refusing to write " + e.Message
-		return e
+		return nil, e
 	}
-	return fsutil.Write(path, data)
+	return data, nil
 }
 
 // AddRequiredBy records that by depends on the mod id, once. A mod the lock doesn't have is left

@@ -106,7 +106,21 @@ func (a *app) scopeDir() (string, error) {
 }
 
 func (a *app) openProjectAt(dir string) (*project.Project, error) {
-	p, err := project.Open(dir)
+	return a.openWith(project.Open, dir)
+}
+
+// openReplacingLock opens the project with no lock when the one there can't be read, so the
+// relock writes a fresh one over it.
+func (a *app) openReplacingLock() (*project.Project, error) {
+	dir, err := a.scopeDir()
+	if err != nil {
+		return nil, err
+	}
+	return a.openWith(project.OpenReplacingLock, dir)
+}
+
+func (a *app) openWith(open func(string) (*project.Project, error), dir string) (*project.Project, error) {
+	p, err := open(dir)
 	if err != nil {
 		return nil, err
 	}
