@@ -32,6 +32,7 @@ import (
 	"shulker.sh/shulker/internal/provider/curseforge"
 	"shulker.sh/shulker/internal/provider/modrinth"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/schema"
 )
 
 type fakeJar struct {
@@ -787,8 +788,11 @@ func TestVerticalSlice(t *testing.T) {
 	}
 	var state build.State
 	h.readJSON(t, "build/client/.shulker/state.json", &state)
-	if state.Side != "client" || len(state.Files) != 4 {
+	if state.Side != "client" || len(state.Files) != 4 || state.Schema != schema.URL(schema.State) {
 		t.Fatalf("state: %+v", state)
+	}
+	if err := schema.Validate(schema.State, []byte(readFile(t, filepath.Join(buildDir, build.StateDir, build.StateFile)))); err != nil {
+		t.Fatalf("state.json against its schema: %v", err)
 	}
 
 	stdout = h.mustRun(t, "build")

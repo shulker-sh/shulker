@@ -32,6 +32,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/server"
+	"shulker.sh/shulker/schema"
 )
 
 const (
@@ -58,7 +59,8 @@ type Origin struct {
 // State is .shulker/state.json: what the last build wrote into a directory, and the hash of each
 // file it owns.
 type State struct {
-	Side string `json:"side"`
+	Schema string `json:"$schema"`
+	Side   string `json:"side"`
 	Origin
 	BuiltAt       string                       `json:"builtAt"`
 	LockSha256    string                       `json:"lockSha256"`
@@ -927,6 +929,13 @@ func ReadState(dir string) (State, error) {
 	}
 	var s State
 	if err == nil {
+		var got, want int
+		got, want, err = schema.ReadMarker(schema.State, data)
+		if err == nil && got > want {
+			return State{Files: map[string]string{}}, fmt.Errorf("%s was written by a newer shulker (schema v%d; this one knows v%d); treating every file as not written by shulker. Run `shulker self update` to read it, or rebuild with --force to take them over", path, got, want)
+		}
+	}
+	if err == nil {
 		err = json.Unmarshal(data, &s)
 	}
 	if err != nil {
@@ -986,6 +995,7 @@ func writeState(dir string, s State) error {
 	if err := os.MkdirAll(filepath.Join(dir, StateDir), 0o755); err != nil {
 		return err
 	}
+	s.Schema = schema.URL(schema.State)
 	return fsutil.WriteJSON(StatePath(dir), s)
 }
 

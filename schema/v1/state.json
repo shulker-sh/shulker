@@ -1,0 +1,95 @@
+{
+  "$id": "https://shulker.sh/schema/v1/state.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shulker build state",
+  "description": "What the last build wrote into a directory, kept in its .shulker/state.json. Shulker writes this file; it is a record of the last build, never read as intent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "side", "files"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The version of this file, as a published schema URL."
+    },
+    "side": {
+      "type": "string",
+      "enum": ["client", "server"],
+      "description": "The side the directory was built for."
+    },
+    "source": {
+      "type": "string",
+      "description": "Where the project was synced from, when it wasn't built from a local project."
+    },
+    "ref": {
+      "type": "string",
+      "description": "The git ref the synced project was read at."
+    },
+    "commit": {
+      "type": "string",
+      "description": "The git commit the synced project was read at."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The SHA-256 of the archive the synced project was read from."
+    },
+    "builtAt": {
+      "type": "string",
+      "description": "When the build ran."
+    },
+    "lockSha256": {
+      "type": "string",
+      "description": "The SHA-256 of the shulker.lock the build used."
+    },
+    "minecraft": {
+      "type": "string",
+      "description": "The Minecraft version the directory was built with."
+    },
+    "loader": {
+      "type": "string",
+      "description": "The mod loader the directory was built with."
+    },
+    "loaderVersion": {
+      "type": "string",
+      "description": "The version of that loader."
+    },
+    "files": {
+      "type": "object",
+      "description": "Every file the build wrote, by path relative to the directory, with the SHA-256 it was written with. A file listed here that still has that hash is shulker's to replace or remove.",
+      "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "managedValues": {
+      "type": "object",
+      "description": "The keys the build set in files it shares with the player, by file, with the values it set.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "type": "string" }
+      }
+    },
+    "links": {
+      "type": "array",
+      "description": "The data folders the build linked into the directory.",
+      "items": { "type": "string" }
+    },
+    "packs": {
+      "type": "object",
+      "description": "The file name each resource pack was placed under, by key, so a renamed pack's entry in the enabled list can follow it.",
+      "additionalProperties": { "type": "string" }
+    },
+    "installedLoader": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "version"],
+      "description": "The loader its own installer set up in the directory. The installer's files aren't listed in files.",
+      "properties": {
+        "type": { "type": "string", "description": "The loader." },
+        "version": { "type": "string", "description": "Its version." }
+      }
+    },
+    "launcherImage": {
+      "type": "string",
+      "description": "The hash of the instance image shulker last wrote into the launcher."
+    }
+  }
+}

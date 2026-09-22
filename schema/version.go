@@ -44,29 +44,38 @@ func markerVersion(url, file string) (int, bool) {
 // Its own version passes; a higher one is schema-newer, which `shulker self update` fixes; a lower,
 // foreign or absent marker is a file this shulker can't read, under the file's own code.
 func CheckMarker(kind Kind, code, file string, data []byte) error {
+	got, want, err := ReadMarker(kind, data)
+	if err != nil {
+		return Invalid(code, file, data, err)
+	}
+	if got > want {
+		e := out.Errorf("schema-newer", "%s was written by a newer shulker: its schema is v%d, and this shulker knows v%d", file, got, want)
+		e.Nudge = out.Nudge{Lead: "Update shulker", Command: "shulker self update"}
+		return e
+	}
+	return nil
+}
+
+// ReadMarker returns the version data's $schema line names and the one this shulker knows for kind.
+// A newer file is got > want with no error; a lower, foreign or absent marker, or data that isn't
+// JSON, is an error saying why the file can't be read.
+func ReadMarker(kind Kind, data []byte) (got, want int, err error) {
 	want, ok := markerVersion(URL(kind), path.Base(string(kind)))
 	if !ok {
-		return errors.New("schema kind " + string(kind) + " has no version")
+		return 0, 0, errors.New("schema kind " + string(kind) + " has no version")
 	}
 	var head struct {
 		Schema string `json:"$schema"`
 	}
 	if err := json.Unmarshal(data, &head); err != nil {
-		return Invalid(code, file, data, err)
+		return 0, want, err
 	}
-	if got, ok := markerVersion(head.Schema, path.Base(string(kind))); ok {
-		switch {
-		case got == want:
-			return nil
-		case got > want:
-			e := out.Errorf("schema-newer", "%s was written by a newer shulker: its schema is v%d, and this shulker knows v%d", file, got, want)
-			e.Nudge = out.Nudge{Lead: "Update shulker", Command: "shulker self update"}
-			return e
-		}
+	if got, ok := markerVersion(head.Schema, path.Base(string(kind))); ok && got >= want {
+		return got, want, nil
 	}
 	what := "names no $schema"
 	if head.Schema != "" {
 		what = "names the schema " + head.Schema
 	}
-	return Invalid(code, file, data, errors.New(what+", which this shulker doesn't know"))
+	return 0, want, errors.New(what + ", which this shulker doesn't know")
 }
