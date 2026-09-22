@@ -29,7 +29,7 @@ func (r *Resolver) addModpack(ctx context.Context, p provider.Provider, proj *pr
 		key = proj.Slug
 	}
 	if !manifest.IsValidKey(key) {
-		e := out.Errorf("usage", "%s can't be a requires key", proj.Slug)
+		e := out.Errorf("usage", "%s can't be a requires key", key)
 		e.Help = "pass `--as <key>` to give this modpack one"
 		return e
 	}
