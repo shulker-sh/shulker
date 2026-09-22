@@ -10,11 +10,8 @@ import (
 )
 
 func TestAnUnreachableModpackReadsAsOffline(t *testing.T) {
-	for _, tc := range []struct{ kind, reason string }{
-		{"git", "git: Failed to connect"},
-		{"url", "http: dial tcp"},
-	} {
-		t.Run(tc.kind, func(t *testing.T) {
+	for _, kind := range []string{"git", "url"} {
+		t.Run(kind, func(t *testing.T) {
 			h := newHarness(t)
 			shulkerInstances(t, h)
 			h.mustRun(t, "config", "set", "store", filepath.Join(t.TempDir(), "store"))
@@ -22,7 +19,7 @@ func TestAnUnreachableModpackReadsAsOffline(t *testing.T) {
 			h.mustRun(t, "add", "sodium")
 			var srv *httptest.Server
 			var source string
-			if tc.kind == "git" {
+			if kind == "git" {
 				if _, err := exec.LookPath("git"); err != nil {
 					t.Skip("git not installed")
 				}
@@ -44,15 +41,13 @@ func TestAnUnreachableModpackReadsAsOffline(t *testing.T) {
 			h.mustRun(t, "accounts", "login", "--use")
 			srv.Close()
 
-			code, _, stderr := h.run(t, "-i", "pack", "sync")
-			for _, want := range []string{"modpack pack: couldn't reach " + source + " (modpack-fetch)", tc.reason, "help: check the address"} {
-				if code == 0 || !strings.Contains(stderr, want) {
-					t.Fatalf("sync: exit %d, %q is missing from\n%s", code, want, stderr)
-				}
+			_, stderr := h.mustRunStderr(t, "-i", "pack", "sync")
+			if want := "offline, keeping modpack pack at "; !strings.Contains(stderr, want) {
+				t.Fatalf("sync: %q is missing from\n%s", want, stderr)
 			}
 			_, stderr = h.mustRunStderr(t, "-i", "pack", "play")
-			if want := "couldn't update, building what the lock already has: modpack pack: couldn't reach " + source + "\n"; !strings.Contains(stderr, want) {
-				t.Fatalf("play: %q is missing from\n%s", want, stderr)
+			if want := "offline, keeping modpack pack at "; !strings.Contains(stderr, want) || strings.Contains(stderr, "couldn't update") {
+				t.Fatalf("play keeps the pin without giving up the relock:\n%s", stderr)
 			}
 			for _, framing := range []string{"fatal:", "unable to access", `Get "`} {
 				if strings.Contains(stderr, framing) {

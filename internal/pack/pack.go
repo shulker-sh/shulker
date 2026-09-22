@@ -370,11 +370,14 @@ func (s *Store) fetchManifest(ctx context.Context, name, url string) ([]byte, er
 }
 
 // fetchFailure is a URL modpack's manifest or lock that couldn't be fetched, in mirrorFailure's
-// shape when the network is why.
+// shape when the network is why. --offline keeps the plain shape but still counts as the network.
 func fetchFailure(name, source string, err error) error {
 	if errors.Is(err, fetch.ErrOffline) || !fetch.IsNetwork(err) {
 		e := out.Errorf("modpack-fetch", "modpack %s: couldn't fetch %s", name, source)
 		e.Rows = []out.Detail{{Label: "http", Text: httpReason(err)}}
+		if errors.Is(err, fetch.ErrOffline) {
+			return fetch.Unreachable(e)
+		}
 		return e
 	}
 	e := out.Errorf("modpack-fetch", "modpack %s: couldn't reach %s", name, source)

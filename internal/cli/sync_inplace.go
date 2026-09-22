@@ -64,7 +64,7 @@ func inPlaceIntent(dir string) (source, ref, side string, inPlace bool) {
 func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, req syncRequest) (syncResult, error) {
 	a.packs = nil
 	rl, err := a.relockProject(cmd, p, true, func(p *project.Project, r *resolve.Resolver) (string, error) {
-		_, err := a.refreshModpacks(cmd.Context(), p, r, manifest.Require.AutoUpdates)
+		_, err := a.refreshModpacks(cmd.Context(), p, r, manifest.Require.AutoUpdates, true)
 		return "", err
 	})
 	if err != nil {
