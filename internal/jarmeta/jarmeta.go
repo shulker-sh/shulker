@@ -114,33 +114,32 @@ func readFile(f *zip.File) ([]byte, error) {
 	return bytes.TrimPrefix(data, []byte("\xef\xbb\xbf")), nil
 }
 
-// escapeControlCharacters escapes raw control characters inside JSON strings.
-// Fabric and Quilt read mod metadata with Gson-derived readers that accept a
-// raw newline or tab in a string, and published jars rely on it.
-func escapeControlCharacters(data []byte) []byte {
-	var out []byte
+// gsonStrings rewrites what Fabric's and Quilt's Gson-derived readers accept inside a string, and
+// encoding/json doesn't, into standard JSON: raw control characters, an escaped apostrophe, and a
+// backslash before a raw newline. Published jars rely on all three.
+func gsonStrings(data []byte) []byte {
+	out := make([]byte, 0, len(data))
 	inString, escaped := false, false
-	for i, c := range data {
+	for _, c := range data {
 		switch {
 		case escaped:
 			escaped = false
+			if c == '\'' {
+				out[len(out)-1] = c
+				continue
+			}
+			if c == '\n' {
+				c = 'n'
+			}
 		case inString && c == '\\':
 			escaped = true
 		case c == '"':
 			inString = !inString
 		case inString && c < 0x20:
-			if out == nil {
-				out = append(make([]byte, 0, len(data)+16), data[:i]...)
-			}
 			out = fmt.Appendf(out, `\u%04x`, c)
 			continue
 		}
-		if out != nil {
-			out = append(out, c)
-		}
-	}
-	if out == nil {
-		return data
+		out = append(out, c)
 	}
 	return out
 }
@@ -150,7 +149,6 @@ func readFabric(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	if err != nil {
 		return nil, err
 	}
-	data = escapeControlCharacters(data)
 	var raw struct {
 		ID          string          `json:"id"`
 		Version     string          `json:"version"`
@@ -165,7 +163,8 @@ func readFabric(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 			File string `json:"file"`
 		} `json:"jars"`
 	}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	// Fabric stops reading at the end of the root object, so anything after it is ignored.
+	if err := json.NewDecoder(bytes.NewReader(gsonStrings(data))).Decode(&raw); err != nil {
 		return nil, err
 	}
 	if raw.ID == "" {
@@ -198,7 +197,7 @@ func readQuilt(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	if err != nil {
 		return nil, err
 	}
-	data = escapeControlCharacters(data)
+	data = gsonStrings(data)
 	var raw struct {
 		Loader struct {
 			ID       string            `json:"id"`

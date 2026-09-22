@@ -67,6 +67,34 @@ func TestReadAcceptsRawControlCharactersInStrings(t *testing.T) {
 	}
 }
 
+func TestReadFabricAcceptsWhatStrictGsonAccepts(t *testing.T) {
+	info := readBytes(t, buildZip(t, map[string]string{
+		"fabric.mod.json": "{\"id\":\"lenient\",\"version\":\"1.0\",\"description\":\"it\\'s a \\\nline\",\"environment\":\"server\"}\n}trailing",
+	}))
+	if info.ID != "lenient" || info.Side != "server" {
+		t.Fatalf("parsed %+v", info)
+	}
+}
+
+func TestReadFabricRejectsWhatStrictGsonRejects(t *testing.T) {
+	for name, body := range map[string]string{
+		"line comment":   "{\"id\":\"x\", // note\n\"version\":\"1\"}",
+		"block comment":  `{"id":"x", /* note */ "version":"1"}`,
+		"trailing comma": `{"id":"x","version":"1",}`,
+		"single quotes":  `{'id':'x'}`,
+		"bad escape":     `{"id":"x","description":"\q"}`,
+	} {
+		data := buildZip(t, map[string]string{"fabric.mod.json": body})
+		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := readZip(zr, allFiles); err == nil {
+			t.Errorf("%s: read without error", name)
+		}
+	}
+}
+
 func TestReadQuilt(t *testing.T) {
 	nested := buildZip(t, map[string]string{
 		"fabric.mod.json": `{"id":"inner","version":"2.0"}`,
