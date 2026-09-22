@@ -98,8 +98,11 @@ func TestHelpShowsTheReferenceDescriptionAndExamples(t *testing.T) {
 	if !strings.HasPrefix(stdout, "  Add mods to the manifest, resolve them") || !strings.Contains(stdout, "  Examples\n    $ shulker add sodium lithium\n") {
 		t.Fatalf("add help:\n%s", stdout)
 	}
-	if strings.Contains(stdout, "(default: true)") || strings.Contains(stdout, "More:") {
+	if strings.Contains(stdout, "(default: true)") || !strings.Contains(stdout, "More:\n    $ shulker docs add\n") {
 		t.Fatalf("add help:\n%s", stdout)
+	}
+	if _, remove, _ := run(t, "remove", "--help", "--no-color"); strings.Contains(remove, "More:") {
+		t.Fatalf("remove help ends at its examples:\n%s", remove)
 	}
 	_, lock, _ := run(t, "lock", "--help")
 	description, _, _ := strings.Cut(lock, "\n  Usage\n")

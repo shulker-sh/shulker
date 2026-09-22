@@ -185,7 +185,7 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 
 ### `shulker add`
 
-Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug. With `--type modpack` the argument is a modpack source instead: a local path, git URL, or raw manifest URL. Each type takes only the flags that mean something for it, so `--ref` on a mod or `--side` on a modpack is refused.
+Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug, or by a path to a local jar or zip, which becomes a local `file` entry. With `--type modpack` the argument is a modpack source instead: a local path, git URL, or raw manifest URL. Each type takes only the flags that mean something for it, so `--ref` on a mod or `--side` on a modpack is refused.
 
 With no arguments, `shulker add` asks `Add which mods?` over the search box [`shulker search`](#shulker-search) opens. Tab or enter moves into the results, space marks one, and shift+tab goes back to refine the query without losing the marks. Enter adds everything marked, or the row under the cursor when nothing is, in one change to the lock, each from the provider it was found on. `--type`, `--provider` and the other flags still apply, and `shulker resourcepack add` and `shulker shader add` search their own type. Off a terminal, or with `--no-input` or `--json`, the argument is required, and a modpack always takes its source.
 
@@ -206,10 +206,17 @@ shulker add
 | `--pin <version-id>` | Pin to a provider version id (one mod only) |
 | `--provider <provider>` | Provider to use for this mod: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
-| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, the name in a modpack's manifest) |
+| `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a pack file's name, the name in a modpack's manifest) |
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack. On a terminal, an add without it prints what would have to move and asks `Move it?` (`Move them?` for several), and yes does the same |
+
+An argument that names an existing file, or ends in `.jar`, `.zip` or `.mrpack`, is a local file rather than a slug, and is locked in the same run. A file inside the project is referenced where it lies. One outside it is copied into `files/`, and so is one in `downloads/`, an overrides folder or a folder a side builds into, since those files aren't the project's to keep. Adding the same file again refreshes its copy and relocks it, which is how a rebuilt jar gets in; a different file already in `files/` under the same name is never replaced. The key is a jar's mod id or, for a pack, its file name without the extension, lowercased with anything a key can't hold turned into dashes, and `--as` overrides either. A jar is a mod, and a bare `add` reads a zip's type from what it holds: a resource pack holds `pack.mcmeta`, a shader `shaders/`. `--pin`, `--channel` and `--provider` don't apply to a local file.
+
+```sh
+shulker add ./build/libs/my-mod-1.0.jar
+shulker resourcepack add ~/Downloads/Faithful.zip
+```
 
 ### `shulker search`
 
@@ -1659,7 +1666,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
-| `file-not-found` | A file named to `pull` isn't in the build directory. `candidates`: the closest file there |
+| `file-not-found` | A file named to `pull` isn't in the build directory, or a path given to `add` isn't a file. `candidates`: the closest file there, for `pull` |
+| `file-taken` | `add` would copy a local file into `files/`, which already holds a different file of that name that no entry of the same key names; rename one or remove the one in `files/` |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `git-missing` | A git source needs `git` on PATH |
 | `group-not-found` | `--group` names a save group that isn't under the saves root |
@@ -1751,7 +1759,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid, including a `shulker.json` value that can't be written as a property. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
-| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a modpack from a local `file` or from a provider rather than a `source`, or a local `file` inside a modpack |
+| `requires-unsupported` | A `requires` entry is a kind shulker can't resolve yet: a modpack from a local `file` or from a provider rather than a `source`, a local `file` inside a modpack, or an `.mrpack` given to `add` |
 | `restore-failed` | `restore --all` failed for some targets; `data` has each target's result |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |
@@ -1772,7 +1780,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a native jar that won't unpack, or a version JSON that doesn't hold together |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
-| `type-ambiguous` | A CurseForge slug matches projects of several types; pass `--type` to choose. `candidates`: the types it matched |
+| `type-ambiguous` | A CurseForge slug matches projects of several types, or a zip given to `add` holds neither a resource pack nor a shader; pass `--type` to choose. `candidates`: the types it could be |
 | `type-mismatch` | `--type` disagrees with what the provider says the project is. `candidates`: the provider's own type |
 | `unlink-failed` | Some entries couldn't be unlinked; `data` has each entry's result |
 | `unset-variable` | An override uses a variable that isn't set |

@@ -896,7 +896,7 @@ func reservedPath(rel string, data []string) bool {
 		return true
 	}
 	top, _, _ := strings.Cut(rel, "/")
-	return top == StateDir || top == DataDir || slices.Contains(data, top)
+	return top == StateDir || top == DataDir || top == manifest.FilesDir || slices.Contains(data, top)
 }
 
 func writeState(dir string, s State) error {

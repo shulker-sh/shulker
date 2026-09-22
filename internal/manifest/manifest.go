@@ -19,6 +19,8 @@ import (
 const (
 	FileName  = "shulker.json"
 	SchemaURL = "https://shulker.sh/schema/v1/manifest.json"
+	// FilesDir holds the local files `add` copies into the project from outside it.
+	FilesDir = "files"
 )
 
 var DefaultProviders = []string{"modrinth", "curseforge"}

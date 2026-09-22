@@ -139,6 +139,9 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 }
 
 func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error {
+	if IsLocalPath(slug) {
+		return r.addFile(ctx, slug, opts)
+	}
 	explicit := opts.Provider != ""
 	listed := opts.As
 	if listed == "" {
@@ -169,9 +172,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	// The lock, not the manifest: an instance following a modpack sets no loader of its own and
 	// inherits the pack's into its lock, which is what its mods are resolved against.
 	if r.Lock.Loader.Type == "" {
-		e := out.Errorf("loader-required", "mods need a loader")
-		e.Help = fmt.Sprintf("pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
-		return e
+		return loaderRequired()
 	}
 	held := holdVersions(r.Lock)
 	v, err := r.pick(ctx, p, proj, opts.Pin, opts.Channel)
@@ -219,6 +220,12 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 		r.pruneOrphans()
 	}
 	return nil
+}
+
+func loaderRequired() *out.Error {
+	e := out.Errorf("loader-required", "mods need a loader")
+	e.Help = fmt.Sprintf("pick one with `shulker set loader.type <%s>`", strings.Join(loader.Names(), "|"))
+	return e
 }
 
 func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider.Project, pin, channel string) (*provider.Version, error) {

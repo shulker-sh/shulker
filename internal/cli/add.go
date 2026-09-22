@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -60,6 +61,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 				return out.Errorf("usage", "--as applies to a single mod")
 			}
 			opts.As, opts.Type = as, chosen
+			for i, arg := range args {
+				args[i] = a.localPath(arg)
+			}
 			for _, flag := range []struct {
 				name, value string
 				allowed     []string
@@ -114,9 +118,25 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another")
 	}
 	if applies(kind, "as") {
-		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, the name in a modpack's manifest)")
+		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a pack file's name, the name in a modpack's manifest)")
 	}
 	return cmd
+}
+
+// localPath is an argument naming a local file made absolute, against -C when it is given, and any
+// other argument as it came.
+func (a *app) localPath(arg string) string {
+	path := arg
+	if !filepath.IsAbs(path) && a.dir != "" {
+		path = filepath.Join(a.dir, path)
+	}
+	if !resolve.IsLocalPath(path) {
+		return arg
+	}
+	if abs, err := filepath.Abs(path); err == nil {
+		return abs
+	}
+	return arg
 }
 
 func addArgs(kind string) string {
