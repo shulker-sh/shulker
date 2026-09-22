@@ -130,6 +130,8 @@ type Options struct {
 	NoOS        bool
 	Features    map[string]bool
 	Origin      Origin
+	// NoLauncher leaves the server launcher out, for an export that ships none of it.
+	NoLauncher bool
 	// BeforeModChange runs once, before a build that adds, replaces or removes a mod writes
 	// anything.
 	BeforeModChange func() error
@@ -391,7 +393,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 	}
 	vars := b.Manifest.SideVariables(side).Text()
 	if side == "server" {
-		levelName, err := b.collectServer(desired, vars, report)
+		levelName, err := b.collectServer(desired, vars, opts.NoLauncher, report)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -567,9 +569,11 @@ func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole 
 	return nil
 }
 
-func (b *Builder) collectServer(desired map[string]source, vars map[string]string, report *Report) (string, error) {
-	if err := b.collectLauncher(desired); err != nil {
-		return "", err
+func (b *Builder) collectServer(desired map[string]source, vars map[string]string, noLauncher bool, report *Report) (string, error) {
+	if !noLauncher {
+		if err := b.collectLauncher(desired); err != nil {
+			return "", err
+		}
 	}
 	srv := b.Manifest.Server
 	if srv == nil {

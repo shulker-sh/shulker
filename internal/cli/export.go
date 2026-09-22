@@ -52,10 +52,11 @@ type exportJob struct {
 	builder  *build.Builder
 	version  string
 	output   string
+	sides    []string
 	features map[string]bool
 }
 
-func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fileName func(*manifest.Manifest, string) string) (*exportJob, error) {
+func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fileName func(*manifest.Manifest, string) string, sides func(*manifest.Manifest) ([]string, error)) (*exportJob, error) {
 	if err := checkOS(f.osName); err != nil {
 		return nil, err
 	}
@@ -91,10 +92,11 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fil
 	if job.output, err = filepath.Abs(job.output); err != nil {
 		return nil, err
 	}
-	if src.isRemote() {
-		if _, err := a.fetchLocked(ctx, p, false); err != nil {
-			return nil, err
-		}
+	if job.sides, err = sides(p.Manifest); err != nil {
+		return nil, err
+	}
+	if _, err := a.fetchLocked(ctx, p, job.sides, false); err != nil {
+		return nil, err
 	}
 	if job.builder, err = a.builder(ctx, p); err != nil {
 		return nil, err
@@ -161,15 +163,13 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 		Short:       "Export a Modrinth modpack (.mrpack) for the Modrinth app and other launchers",
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			job, err := a.openExport(cmd.Context(), args, &f, build.MrpackFileName)
+			job, err := a.openExport(cmd.Context(), args, &f, build.MrpackFileName, func(m *manifest.Manifest) ([]string, error) {
+				return a.exportSides(m, f.side, f.assumeClient)
+			})
 			if err != nil {
 				return err
 			}
-			opts := build.MrpackOptions{VersionID: job.version, Output: job.output, Bundle: f.bundle, OS: f.osName, Features: job.features}
-			if opts.Sides, err = a.exportSides(job.project.Manifest, f.side, f.assumeClient); err != nil {
-				return err
-			}
-			rep, err := job.builder.ExportMrpack(opts)
+			rep, err := job.builder.ExportMrpack(build.MrpackOptions{VersionID: job.version, Output: job.output, Sides: job.sides, Bundle: f.bundle, OS: f.osName, Features: job.features})
 			if err != nil {
 				return a.withBundleNudge(err)
 			}
@@ -193,16 +193,15 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 		Short:       "Export a CurseForge modpack (.zip) for the CurseForge app",
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			job, err := a.openExport(cmd.Context(), args, &f, build.CurseForgeFileName)
-			if err != nil {
-				return err
-			}
-			side, err := a.clientSide(job.project.Manifest, f.assumeClient)
+			job, err := a.openExport(cmd.Context(), args, &f, build.CurseForgeFileName, func(m *manifest.Manifest) ([]string, error) {
+				side, err := a.clientSide(m, f.assumeClient)
+				return []string{side}, err
+			})
 			if err != nil {
 				return err
 			}
 			rep, err := job.builder.ExportCurseForge(build.CurseForgeOptions{
-				Side:     side,
+				Side:     job.sides[0],
 				Version:  job.version,
 				Output:   job.output,
 				Bundle:   f.bundle,

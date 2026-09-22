@@ -218,7 +218,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	if err != nil {
 		return syncResult{}, err
 	}
-	fetched, err := a.fetchLocked(ctx, p, side == "server")
+	fetched, err := a.fetchLocked(ctx, p, nil, side == "server")
 	if err != nil {
 		return syncResult{}, err
 	}

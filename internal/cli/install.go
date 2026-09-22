@@ -36,7 +36,7 @@ func (a *app) installCmd() *cobra.Command {
 			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			fetched, err := a.fetchLocked(cmd.Context(), p, p.Manifest.HasSide("server"))
+			fetched, err := a.fetchLocked(cmd.Context(), p, nil, p.Manifest.HasSide("server"))
 			if err != nil {
 				return err
 			}
@@ -82,12 +82,14 @@ func (a *app) installCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bool) ([]string, error) {
+// fetchLocked puts the locked files the given sides use in the cache, every locked file with no
+// sides, and the server jar and its Java runtime too when wantServer is set.
+func (a *app) fetchLocked(ctx context.Context, p *project.Project, sides []string, wantServer bool) ([]string, error) {
 	r, err := a.resolver(ctx, p)
 	if err != nil {
 		return nil, err
 	}
-	fetched, dropWarnings, err := r.Install(ctx)
+	fetched, dropWarnings, err := r.Install(ctx, sides...)
 	a.warn(dropWarnings)
 	if err != nil {
 		return nil, err
@@ -126,7 +128,7 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, wantServer bo
 			}
 		}
 	}
-	v, err := r.Validate()
+	v, err := r.Validate(sides...)
 	if err != nil {
 		return nil, err
 	}

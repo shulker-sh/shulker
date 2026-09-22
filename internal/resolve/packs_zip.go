@@ -393,6 +393,7 @@ type downloadable struct {
 	url      *string
 	page     string
 	size     int64
+	side     string
 }
 
 // lockFiles is everything install has to put in the cache, mods first and then
@@ -401,12 +402,12 @@ func (r *Resolver) lockFiles() []downloadable {
 	var files []downloadable
 	for _, id := range sortedKeys(r.Lock.Mods) {
 		m := r.Lock.Mods[id]
-		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size})
+		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size, side: m.Side})
 	}
 	for _, section := range []map[string]lock.Pack{r.Lock.ResourcePacks, r.Lock.Shaders} {
 		for _, key := range sortedKeys(section) {
 			p := section[key]
-			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size})
+			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size, side: "client"})
 		}
 	}
 	return files

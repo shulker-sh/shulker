@@ -65,8 +65,8 @@ func isBuiltin(id string) bool {
 }
 
 // Validate checks the locked mods' own metadata against each other: dependencies, their versions
-// and conflicts.
-func (r *Resolver) Validate() (*Validation, error) {
+// and conflicts. With sides given, a mod none of them use goes unchecked without a warning.
+func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	if r.Lock.Minecraft == "" {
 		e := out.Errorf("minecraft-required", "this project sets no minecraft and has no locked modpack to take one from")
 		e.Help = "set one with `shulker set minecraft <version>`"
@@ -85,7 +85,9 @@ func (r *Resolver) Validate() (*Validation, error) {
 	for _, id := range r.lockIDs() {
 		m := r.Lock.Mods[id]
 		if !r.Cache.Has(m.Sha512) {
-			v.Warnings = append(v.Warnings, fmt.Sprintf("%s is not downloaded; its metadata was not checked", id))
+			if usedBy(m.Side, sides) {
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s is not downloaded; its metadata was not checked", id))
+			}
 			unread[r.Lock.JarID(id)] = true
 			continue
 		}

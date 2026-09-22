@@ -170,7 +170,7 @@ func (b *Builder) mrpackName(sides []*mrpackSide) string {
 // mrpackCollect fills a side's override files and the mods it ships, returning the warnings.
 func (b *Builder) mrpackCollect(t *mrpackSide, osName string, features map[string]bool) ([]string, error) {
 	rep := &Report{}
-	desired, _, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features}, rep)
+	desired, _, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features, NoLauncher: true}, rep)
 	if err != nil {
 		return nil, err
 	}

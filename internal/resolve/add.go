@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -519,8 +520,9 @@ func contains(list []string, s string) bool {
 }
 
 // Install downloads every locked mod the cache lacks, taking manual downloads from DownloadsDir. It
-// returns the mods it fetched and warnings for files there that match no locked mod.
-func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
+// returns the mods it fetched and warnings for files there that match no locked mod. With sides
+// given, it leaves out files that none of them use.
+func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []string, error) {
 	files, err := r.sweepDownloads()
 	if err != nil {
 		return nil, nil, err
@@ -537,7 +539,7 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 	var downloads []out.Download
 	byID := map[string]downloadable{}
 	for _, f := range r.lockFiles() {
-		if r.Cache.Has(f.sha512) {
+		if r.Cache.Has(f.sha512) || !usedBy(f.side, sides) {
 			continue
 		}
 		if f.file != "" {
@@ -583,6 +585,10 @@ func (r *Resolver) Install(ctx context.Context) ([]string, []string, error) {
 		return fetched, warnings, e
 	}
 	return fetched, warnings, nil
+}
+
+func usedBy(side string, sides []string) bool {
+	return len(sides) == 0 || side == "both" || slices.Contains(sides, side)
 }
 
 func (r *Resolver) lockHas(sha512 string) bool {

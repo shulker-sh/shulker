@@ -141,7 +141,7 @@ shulker import curseforge pack.zip -C my-pack --name my-pack
 
 ### `shulker export mrpack`
 
-Export the project as a Modrinth modpack for the Modrinth app and other launchers. Resource packs and shaders go in alongside the mods, as client-only files. The archive carries the project's own `shulker.json` and `shulker.lock` at its root, so [`import mrpack`](#shulker-import-mrpack) restores the project it came from. The source is the project in the current directory, or a project directory, git URL, or manifest URL; a git or URL source is downloaded first and the archive is written to the current directory.
+Export the project as a Modrinth modpack for the Modrinth app and other launchers. Resource packs and shaders go in alongside the mods, as client-only files. The archive carries the project's own `shulker.json` and `shulker.lock` at its root, so [`import mrpack`](#shulker-import-mrpack) restores the project it came from. The source is the project in the current directory, or a project directory, git URL, or manifest URL; a git or URL source is downloaded first and the archive is written to the current directory. Locked files the exported sides use and the cache lacks are downloaded first, so a fresh checkout exports without `shulker install`. With a warm cache the export stays offline.
 
 ```sh
 shulker export mrpack
