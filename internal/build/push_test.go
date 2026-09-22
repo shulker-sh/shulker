@@ -66,6 +66,18 @@ func TestPushResourcePackFeatureOff(t *testing.T) {
 	}
 }
 
+func TestPushResourcePackFeatureOffKeepsAHandSetPack(t *testing.T) {
+	hosted := "https://example.com/p.zip"
+	b := pushBuilder(manifest.Require{Feature: manifest.StringList{"fancy"}}, distributed(), map[string]any{"resource-pack": hosted})
+	props, _, err := collectPush(t, b, conditions{features: map[string]bool{"fancy": false}})
+	if err != nil {
+		t.Fatalf("a pack that isn't pushed conflicts with nothing: %v", err)
+	}
+	if props["resource-pack"] != hosted {
+		t.Fatalf("resource-pack = %q, want the hand-set %q", props["resource-pack"], hosted)
+	}
+}
+
 func TestPushResourcePackIgnoresOS(t *testing.T) {
 	b := pushBuilder(manifest.Require{OS: manifest.StringList{"windows"}}, distributed(), nil)
 	props, _, err := collectPush(t, b, conditions{os: "linux"})

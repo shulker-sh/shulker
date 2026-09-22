@@ -21,18 +21,18 @@ func (b *Builder) pushResourcePack(key string, cond conditions, props properties
 		e.Candidates = slices.Sorted(maps.Keys(b.Lock.ResourcePacks))
 		return e
 	}
-	for _, k := range []string{"resource-pack", "resource-pack-sha1"} {
-		if _, set := props[k]; set {
-			e := out.Errorf("resourcepack-conflict", "server.properties sets %s, which server.resourcePack %s fills", k, key)
-			e.Help = "remove " + k + " from server.properties, or drop server.resourcePack"
-			return e
-		}
-	}
 	if entry, listed := b.Manifest.ResourcePacks()[key]; listed {
 		cond.admitsAnyOS = true
 		if admitted, why := cond.admits(entry); !admitted {
 			report.Excluded = append(report.Excluded, fmt.Sprintf("%s (not pushed: %s)", key, why))
 			return nil
+		}
+	}
+	for _, k := range []string{"resource-pack", "resource-pack-sha1"} {
+		if _, set := props[k]; set {
+			e := out.Errorf("resourcepack-conflict", "server.properties sets %s, which server.resourcePack %s fills", k, key)
+			e.Help = "remove " + k + " from server.properties, or drop server.resourcePack"
+			return e
 		}
 	}
 	if p.File != "" {

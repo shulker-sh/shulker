@@ -1800,7 +1800,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry or a project being added is a kind shulker can't resolve |
-| `resourcepack-conflict` | `server.resourcePack` is set and `resource-pack` or `resource-pack-sha1` is also set in `server.properties` |
+| `resourcepack-conflict` | `server.resourcePack` pushes a pack while `resource-pack` or `resource-pack-sha1` is also set in `server.properties` |
 | `resourcepack-local-file` | `server.resourcePack` names a local `file` entry, which has no URL for clients to download it from |
 | `resourcepack-not-distributed` | `server.resourcePack` names a pack its provider forbids redistributing, so the lock has no URL for it |
 | `resourcepack-not-found` | `server.resourcePack` isn't a locked resource pack. `candidates`: the locked resource packs |
