@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strconv"
 
 	"shulker.sh/shulker/internal/cfpack"
@@ -59,16 +58,13 @@ func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Im
 	}
 	im.keepUnmanaged(im.unmatched)
 	im.dropUnmatched()
-	sort.Strings(rep.Locked)
-	sort.Strings(rep.Reused)
-	sort.Strings(rep.Dropped)
-	sort.Strings(rep.Unmanaged)
+	rep.sort()
 	return rep, nil
 }
 
 // lockedFromCurseForge keeps what curseForgeFile locked under key, unless the exporting project
 // locked the same bytes, which then come back as it locked them.
-func (im *importer) lockedFromCurseForge(key, kind string, listed manifest.Require) {
+func (im *importer) lockedFromCurseForge(p provider.Provider, key, kind string, listed manifest.Require) {
 	packs := im.r.Lock.ResourcePacks
 	if kind == manifest.TypeShader {
 		packs = im.r.Lock.Shaders
@@ -84,7 +80,7 @@ func (im *importer) lockedFromCurseForge(key, kind string, listed manifest.Requi
 		return
 	}
 	im.r.Manifest.Requires[key] = listed
-	im.rep.Locked = append(im.rep.Locked, key)
+	im.rep.locked(key, kind, p.Name())
 }
 
 // cfFound is what CurseForge has of a pack's files: their projects and files, by id, and why a
@@ -160,7 +156,7 @@ func (im *importer) curseForgeFile(ctx context.Context, p provider.Provider, fou
 			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, r.Lock.Mods[id].Filename))
 			return proj, v, nil
 		}
-		im.lockedFromCurseForge(id, kind, listed)
+		im.lockedFromCurseForge(p, id, kind, listed)
 	case manifest.TypeResourcePack, manifest.TypeShader:
 		key := proj.Slug
 		if ok, err := im.canListPack(key, kind); !ok {
@@ -170,7 +166,7 @@ func (im *importer) curseForgeFile(ctx context.Context, p provider.Provider, fou
 			return proj, v, err
 		}
 		listed.Type = kind
-		im.lockedFromCurseForge(key, kind, listed)
+		im.lockedFromCurseForge(p, key, kind, listed)
 	default:
 		return nil, nil, out.Errorf("requires-unsupported", "%s is a %s, which a pack can't carry", proj.Slug, kind)
 	}

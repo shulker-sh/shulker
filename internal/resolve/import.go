@@ -48,12 +48,44 @@ type hosted struct {
 }
 
 type Imported struct {
-	Locked    []string          `json:"locked"`
+	Locked    []LockedFile      `json:"locked"`
 	Reused    []string          `json:"reused"`
 	Dropped   []string          `json:"dropped"`
 	Unmanaged []string          `json:"unmanaged"`
 	Warnings  []string          `json:"-"`
 	Overrides []mrpack.Override `json:"-"`
+}
+
+// LockedFile is a file an import locked from a provider, under its key in the lock.
+type LockedFile struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Provider string `json:"provider"`
+}
+
+// LockedIDs are the keys of the files the import locked.
+func (rep *Imported) LockedIDs() []string {
+	ids := make([]string, len(rep.Locked))
+	for i, f := range rep.Locked {
+		ids[i] = f.ID
+	}
+	return ids
+}
+
+func (rep *Imported) locked(id, kind, provider string) {
+	rep.Locked = append(rep.Locked, LockedFile{ID: id, Type: kind, Provider: provider})
+}
+
+func (rep *Imported) sort() {
+	slices.SortFunc(rep.Locked, func(a, b LockedFile) int {
+		if c := strings.Compare(a.ID, b.ID); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Type, b.Type)
+	})
+	sort.Strings(rep.Reused)
+	sort.Strings(rep.Dropped)
+	sort.Strings(rep.Unmanaged)
 }
 
 type importer struct {
@@ -83,7 +115,7 @@ type importedPack struct {
 }
 
 func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
-	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}}
+	im := &importer{r: r, a: a, rep: &Imported{Locked: []LockedFile{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}}
 	if a.Marker == nil {
 		return im
 	}
@@ -136,10 +168,7 @@ func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLoc
 		return nil, err
 	}
 	im.dropUnmatched()
-	sort.Strings(im.rep.Locked)
-	sort.Strings(im.rep.Reused)
-	sort.Strings(im.rep.Dropped)
-	sort.Strings(im.rep.Unmanaged)
+	im.rep.sort()
 	return im.rep, nil
 }
 
@@ -398,7 +427,7 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, side strin
 		entry.Provider = p.Name()
 	}
 	im.r.Manifest.Requires[id] = entry
-	im.rep.Locked = append(im.rep.Locked, id)
+	im.rep.locked(id, manifest.TypeMod, p.Name())
 	return nil
 }
 
@@ -429,7 +458,7 @@ func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename,
 	if err := r.lockPackVersion(ctx, p, proj, v, key, kind, ""); err != nil {
 		return err
 	}
-	im.rep.Locked = append(im.rep.Locked, key)
+	im.rep.locked(key, kind, p.Name())
 	return nil
 }
 

@@ -74,7 +74,7 @@ func TestImportCurseForge(t *testing.T) {
 	if res.Name != "craft-pack" || res.Version != "3.1" || res.Minecraft != "26.2" || res.Loader.Type != "fabric" || res.Loader.Version != "0.17.3" || strings.Join(res.Sides, ",") != "client" {
 		t.Fatalf("result: %+v", res)
 	}
-	if strings.Join(res.Mods.Locked, ",") != "fabric-api,fresh-animations,jei" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/bundled.jar" {
+	if strings.Join(res.Mods.LockedIDs(), ",") != "fabric-api,fresh-animations,jei" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/bundled.jar" {
 		t.Fatalf("mods: %+v", res.Mods)
 	}
 	if strings.Join(res.Overrides, ",") != "overrides/config/jei.toml,overrides/mods/bundled.jar" {
@@ -274,7 +274,7 @@ func TestImportCurseForgeIgnoreShulker(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "curseforge", archive, "--dir", dir, "--ignore-shulker", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if res := env.Data; res.Marker || len(res.Mods.Reused) != 0 || strings.Join(res.Mods.Locked, ",") != "fabric-api,jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/private-mod-1.4.jar" {
+	if res := env.Data; res.Marker || len(res.Mods.Reused) != 0 || strings.Join(res.Mods.LockedIDs(), ",") != "fabric-api,jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/private-mod-1.4.jar" {
 		t.Fatalf("result: %+v %+v", res, res.Mods)
 	}
 	if m, l := readProject(t, dir); len(m.Features) != 0 || m.Server != nil || l.Mods["sodium"].Provider != "curseforge" {

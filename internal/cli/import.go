@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -20,6 +21,7 @@ import (
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/server"
 )
@@ -112,7 +114,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
 				rows := []out.Row{
-					{Text: fmt.Sprintf("%s locked from Modrinth, %d reused from the shulker marker", plural(len(mods.Locked), "mod", "mods"), len(mods.Reused))},
+					{Text: fmt.Sprintf("%s, %d reused from the shulker marker", lockedSummary(mods.Locked), len(mods.Reused))},
 					{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
 				}
 				if len(mods.Dropped) > 0 {
@@ -199,7 +201,7 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
-				locked := plural(len(mods.Locked), "file", "files") + " locked from CurseForge"
+				locked := lockedSummary(mods.Locked)
 				if res.Marker {
 					locked += fmt.Sprintf(", %d reused from the shulker marker", len(mods.Reused))
 				}
@@ -218,6 +220,67 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "project name (default: the pack name, slugified)")
 	cmd.Flags().BoolVar(&ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
 	return cmd
+}
+
+// lockedSummary counts an import's locked files by type, naming each type's providers when the
+// files came from more than one, or the one provider after them all when they didn't.
+func lockedSummary(files []resolve.LockedFile) string {
+	if len(files) == 0 {
+		return plural(0, "file", "files") + " locked"
+	}
+	byType := map[string]map[string]int{}
+	providers := map[string]bool{}
+	for _, f := range files {
+		if byType[f.Type] == nil {
+			byType[f.Type] = map[string]int{}
+		}
+		byType[f.Type][f.Provider]++
+		providers[f.Provider] = true
+	}
+	var parts []string
+	for _, kind := range []string{manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack} {
+		counts := byType[kind]
+		if counts == nil {
+			continue
+		}
+		names := slices.Collect(maps.Keys(counts))
+		slices.SortFunc(names, func(a, b string) int {
+			return cmp.Or(cmp.Compare(counts[b], counts[a]), cmp.Compare(a, b))
+		})
+		total := 0
+		var from []string
+		for _, name := range names {
+			total += counts[name]
+			if len(names) == 1 {
+				from = append(from, provider.Title(name))
+			} else {
+				from = append(from, fmt.Sprintf("%d %s", counts[name], provider.Title(name)))
+			}
+		}
+		one, many := typeNouns(kind)
+		part := plural(total, one, many)
+		if len(providers) > 1 {
+			part += " (" + strings.Join(from, ", ") + ")"
+		}
+		parts = append(parts, part)
+	}
+	summary := strings.Join(parts, ", ") + " locked"
+	if len(providers) == 1 {
+		summary += " from " + provider.Title(files[0].Provider)
+	}
+	return summary
+}
+
+func typeNouns(kind string) (one, many string) {
+	switch kind {
+	case manifest.TypeResourcePack:
+		return "resource pack", "resource packs"
+	case manifest.TypeShader:
+		return "shader", "shaders"
+	case manifest.TypeDatapack:
+		return "datapack", "datapacks"
+	}
+	return "mod", "mods"
 }
 
 // importDir is where an import creates its project: --dir, else a folder named for the project.

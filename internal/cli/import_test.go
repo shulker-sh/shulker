@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/resolve"
 )
 
 func readProject(t *testing.T, dir string) (*manifest.Manifest, *lock.Lock) {
@@ -273,7 +275,7 @@ func TestImportMrpackForeign(t *testing.T) {
 	if res.Marker || res.Name != "someone-s-pack" || res.Version != "2.0" || strings.Join(res.Sides, ",") != "client,server" {
 		t.Fatalf("result: %+v", res)
 	}
-	if strings.Join(res.Mods.Locked, ",") != "fabric-api,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/local-1.0.jar,server-overrides/mods/extra-1.0.jar" {
+	if strings.Join(res.Mods.LockedIDs(), ",") != "fabric-api,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/local-1.0.jar,server-overrides/mods/extra-1.0.jar" {
 		t.Fatalf("mods: %+v", res.Mods)
 	}
 	m, l := readProject(t, dir)
@@ -332,7 +334,8 @@ func TestImportMrpackLocksHostedPacks(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := env.Data.Mods
-	if strings.Join(res.Locked, ",") != "complementary-reimagined,fresh-animations" || strings.Join(res.Unmanaged, ",") != "client-overrides/datapacks/sodium-datapack.zip,client-overrides/resourcepacks/sodium-datapack.zip" {
+	wantLocked := []resolve.LockedFile{{ID: "complementary-reimagined", Type: "shader", Provider: "modrinth"}, {ID: "fresh-animations", Type: "resourcepack", Provider: "modrinth"}}
+	if !slices.Equal(res.Locked, wantLocked) || strings.Join(res.Unmanaged, ",") != "client-overrides/datapacks/sodium-datapack.zip,client-overrides/resourcepacks/sodium-datapack.zip" {
 		t.Fatalf("import: %+v", res)
 	}
 	m, l := readProject(t, dir)
@@ -397,7 +400,7 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 	if h.modrinthBatches != 2 || h.cfHits != 3 {
 		t.Fatalf("requests: %d to Modrinth, %d to CurseForge", h.modrinthBatches, h.cfHits)
 	}
-	if strings.Join(res.Mods.Locked, ",") != "jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "client-overrides/mods/"+iris.filename+",overrides/mods/"+nodist.filename+",overrides/mods/unknown-1.0.jar" {
+	if strings.Join(res.Mods.LockedIDs(), ",") != "jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "client-overrides/mods/"+iris.filename+",overrides/mods/"+nodist.filename+",overrides/mods/unknown-1.0.jar" {
 		t.Fatalf("import: %+v", res.Mods)
 	}
 	if len(warnings) != 2 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") ||
@@ -417,7 +420,7 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 
 	h.cfMods[455508].files[0].truncated = false
 	res, _, dir = importMixed(t)
-	if _, l := readProject(t, dir); strings.Join(res.Mods.Locked, ",") != "iris,jei,sodium" || l.Mods["iris"].Side != "client" {
+	if _, l := readProject(t, dir); strings.Join(res.Mods.LockedIDs(), ",") != "iris,jei,sodium" || l.Mods["iris"].Side != "client" {
 		t.Fatalf("import once CurseForge serves iris: %+v", res.Mods)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "client-overrides/mods", iris.filename)); !os.IsNotExist(err) {
@@ -426,7 +429,7 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 
 	h.noCurseForge = true
 	res, warnings, _ = importMixed(t)
-	if strings.Join(res.Mods.Locked, ",") != "sodium" || len(res.Mods.Unmanaged) != 4 {
+	if strings.Join(res.Mods.LockedIDs(), ",") != "sodium" || len(res.Mods.Unmanaged) != 4 {
 		t.Fatalf("import without CurseForge: %+v", res.Mods)
 	}
 	if len(warnings) != 1 || !strings.Contains(warnings[0], "CurseForge") {
