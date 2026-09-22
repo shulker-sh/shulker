@@ -224,7 +224,7 @@ func readHistoryEntry(dir, id string) (HistoryEntry, error) {
 	}
 	if err := json.Unmarshal(data, &e); err != nil {
 		e := out.Errorf("history-invalid", "history entry %s is unreadable", id)
-		e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
+		e.WithCause("json", err)
 		e.Help = "delete " + historyEntryPath(dir, id) + " to drop it"
 		return HistoryEntry{}, e
 	}

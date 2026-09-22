@@ -72,6 +72,13 @@ type Nudge struct {
 
 func (e *Error) Error() string { return e.Message }
 
+// WithCause adds err as a row labelled by what produced it (`json`, `zip`, a service's name), so the
+// headline says only what went wrong.
+func (e *Error) WithCause(label string, err error) *Error {
+	e.Rows = append(e.Rows, Detail{Label: label, Text: err.Error()})
+	return e
+}
+
 func Errorf(code string, format string, args ...any) *Error {
 	exit := ExitError
 	if code == "usage" {

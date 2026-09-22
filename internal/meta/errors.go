@@ -1,8 +1,6 @@
 package meta
 
 import (
-	"fmt"
-
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/out"
 )
@@ -12,7 +10,7 @@ import (
 // callers can fall back to what they already have.
 func fetchFailed(err error, service, format string, args ...any) error {
 	e := out.Errorf("meta-fetch", format, args...)
-	e.Rows = []out.Detail{{Label: service, Text: err.Error()}}
+	e.WithCause(service, err)
 	if fetch.IsNetwork(err) {
 		return fetch.Unreachable(e)
 	}
@@ -27,7 +25,5 @@ func invalid(format string, args ...any) *out.Error {
 // unreadable is the meta-invalid error for metadata that won't parse, with the parser's error in a
 // row labelled by the file it came from.
 func unreadable(err error, file, format string, args ...any) *out.Error {
-	e := invalid(format, args...)
-	e.Rows = []out.Detail{{Label: file, Text: fmt.Sprint(err)}}
-	return e
+	return invalid(format, args...).WithCause(file, err)
 }

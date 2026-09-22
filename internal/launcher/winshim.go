@@ -233,9 +233,7 @@ func writeShimCopy(exe string, have []byte, b shimBuild) error {
 	}
 	patched, err := patchSubsystem(self)
 	if err != nil {
-		e := out.Errorf("shim-build-failed", "can't make the Windows shim from shulker's own binary")
-		e.Rows = []out.Detail{{Label: "pe", Text: err.Error()}}
-		return e
+		return out.Errorf("shim-build-failed", "can't make the Windows shim from shulker's own binary").WithCause("pe", err)
 	}
 	if bytes.Equal(have, patched) {
 		return nil

@@ -113,9 +113,7 @@ func javaMajor(path string) (int, error) {
 	cmd := exec.Command(path, "-version")
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
-		e := out.Errorf("java-not-found", "%s -version failed", path)
-		e.Rows = []out.Detail{{Label: "java", Text: err.Error()}}
-		return 0, e
+		return 0, out.Errorf("java-not-found", "%s -version failed", path).WithCause("java", err)
 	}
 	return parseMajor(append(stderr.Bytes(), stdout.Bytes()...))
 }

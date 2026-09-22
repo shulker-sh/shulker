@@ -110,9 +110,7 @@ func (a *Archive) Loader() (string, string, bool) {
 func Read(file string) (*Archive, error) {
 	zr, err := zip.OpenReader(file)
 	if err != nil {
-		e := out.Errorf("mrpack-invalid", "%s is not a readable mrpack", file)
-		e.Rows = []out.Detail{{Label: "zip", Text: err.Error()}}
-		return nil, e
+		return nil, out.Errorf("mrpack-invalid", "%s is not a readable mrpack", file).WithCause("zip", err)
 	}
 	defer zr.Close()
 	a := &Archive{}
@@ -133,9 +131,7 @@ func Read(file string) (*Archive, error) {
 		if name == IndexName {
 			found = true
 			if err := json.Unmarshal(data, &a.Index); err != nil {
-				e := out.Errorf("mrpack-invalid", "shulker can't parse %s in %s", IndexName, file)
-				e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
-				return nil, e
+				return nil, out.Errorf("mrpack-invalid", "shulker can't parse %s in %s", IndexName, file).WithCause("json", err)
 			}
 			continue
 		}

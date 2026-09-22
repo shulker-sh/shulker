@@ -63,7 +63,7 @@ func (a *app) selfUninstallCmd() *cobra.Command {
 func (a *app) selfUninstall(purge bool) error {
 	exe, err := a.exe()
 	if err != nil {
-		return withCause(out.Errorf("self-uninstall", "can't find the running shulker binary"), "os", err)
+		return out.Errorf("self-uninstall", "can't find the running shulker binary").WithCause("os", err)
 	}
 	res := selfUninstallResult{Unhooked: []config.Instance{}, Purged: purge}
 	instances, err := a.loadInstances()
@@ -96,7 +96,7 @@ func (a *app) selfUninstall(purge bool) error {
 		err = os.Remove(exe)
 	}
 	if err != nil {
-		e := withCause(out.Errorf("self-uninstall", "can't remove %s", exe), "os", err)
+		e := out.Errorf("self-uninstall", "can't remove %s", exe).WithCause("os", err)
 		e.Data = res
 		return e
 	}
@@ -182,9 +182,9 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	case errors.Is(err, fetch.ErrNotFound):
 		return out.Errorf("self-update-check", "no shulker release has been published yet")
 	case fetch.IsNetwork(err):
-		return withCause(out.Errorf("self-update-check", "can't reach GitHub to check for updates"), "github", err)
+		return out.Errorf("self-update-check", "can't reach GitHub to check for updates").WithCause("github", err)
 	case err != nil:
-		return withCause(out.Errorf("self-update-check", "can't check for updates"), "github", err)
+		return out.Errorf("self-update-check", "can't check for updates").WithCause("github", err)
 	}
 	res := selfUpdateResult{Current: version, Latest: strings.TrimPrefix(tag, "v"), Available: selfupdate.NeedsUpdate(version, tag)}
 	if !res.Available {
@@ -199,7 +199,7 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 
 	exe, err := a.exe()
 	if err != nil {
-		return withCause(out.Errorf("self-update-install", "can't find the running shulker binary"), "os", err)
+		return out.Errorf("self-update-install", "can't find the running shulker binary").WithCause("os", err)
 	}
 	tmp, err := os.MkdirTemp("", "shulker-update-")
 	if err != nil {
@@ -216,14 +216,14 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 			e.Rows = []out.Detail{{Label: "want", Text: sum.Want}, {Label: "got", Text: sum.Got}}
 			return e
 		}
-		return withCause(out.Errorf("self-update-download", "can't download shulker %s", res.Latest), "download", err)
+		return out.Errorf("self-update-download", "can't download shulker %s", res.Latest).WithCause("download", err)
 	}
 	a.progress("checksum verified")
 	if res.Provenance, err = a.checkProvenance(ctx, r, tag, archive, without, require); err != nil {
 		return err
 	}
 	if err := selfupdate.Install(archive, exe); err != nil {
-		return withCause(out.Errorf("self-update-install", "can't replace %s", exe), "os", err)
+		return out.Errorf("self-update-install", "can't replace %s", exe).WithCause("os", err)
 	}
 	res.Updated, res.Path = true, exe
 	if _, err := a.repairInstances("", ""); err != nil {
@@ -249,7 +249,7 @@ func (a *app) checkProvenance(ctx context.Context, r *selfupdate.Releases, tag, 
 	a.progress("verifying build provenance with gh")
 	if err := r.VerifyProvenance(ctx, tag, archive); err != nil {
 		if require {
-			return "", withCause(out.Errorf("self-update-provenance", "build provenance could not be verified"), "gh", err)
+			return "", out.Errorf("self-update-provenance", "build provenance could not be verified").WithCause("gh", err)
 		}
 		a.printer.Warn("build provenance could not be verified, continuing on the checksum")
 		return "unverified", nil

@@ -143,9 +143,7 @@ func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error 
 	im.r.log("fetching %s", f.Path)
 	p, err := im.r.Cache.Ensure(ctx, im.r.Fetch, f.Downloads[0], f.Hashes["sha512"])
 	if err != nil {
-		e := out.Errorf("mrpack-download", "couldn't download %s", f.Path)
-		e.Rows = []out.Detail{{Label: "download", Text: err.Error()}}
-		return e
+		return out.Errorf("mrpack-download", "couldn't download %s", f.Path).WithCause("download", err)
 	}
 	data, err := os.ReadFile(p)
 	if err != nil {

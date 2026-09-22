@@ -237,8 +237,3 @@ func isFlagRequested(args []string, name string) bool {
 func stdinIsTerminal() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
 }
-
-func withCause(e *out.Error, label string, err error) *out.Error {
-	e.Rows = []out.Detail{{Label: label, Text: err.Error()}}
-	return e
-}

@@ -33,9 +33,7 @@ type Restored struct {
 func OpenArchive(path string) (*Archive, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
-		e := out.Errorf("backup-invalid", "%s won't open as a zip", path)
-		e.Rows = []out.Detail{{Label: "zip", Text: err.Error()}}
-		return nil, e
+		return nil, out.Errorf("backup-invalid", "%s won't open as a zip", path).WithCause("zip", err)
 	}
 	a := &Archive{Path: path, zr: zr}
 	if err := a.check(); err != nil {
@@ -162,9 +160,7 @@ func (a *Archive) unzip(f *zip.File, path string) error {
 	}
 	r, err := f.Open()
 	if err != nil {
-		e := out.Errorf("backup-invalid", "%s: %s won't unzip", a.Path, f.Name)
-		e.Rows = []out.Detail{{Label: "zip", Text: err.Error()}}
-		return e
+		return out.Errorf("backup-invalid", "%s: %s won't unzip", a.Path, f.Name).WithCause("zip", err)
 	}
 	defer r.Close()
 	return fsutil.WriteFrom(path, r)

@@ -25,7 +25,5 @@ func providedBy(id, packs, help string) *out.Error {
 }
 
 func rangeInvalid(what, raw string, err error) *out.Error {
-	e := out.Errorf("manifest-invalid", "%s %q isn't a version range shulker can read", what, raw)
-	e.Rows = []out.Detail{{Label: what, Text: err.Error()}}
-	return e
+	return out.Errorf("manifest-invalid", "%s %q isn't a version range shulker can read", what, raw).WithCause(what, err)
 }

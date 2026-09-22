@@ -395,9 +395,7 @@ func lockedMismatch(name, built, locked string) *out.Error {
 }
 
 func rangeInvalid(name, what string, err error) *out.Error {
-	e := out.Errorf("manifest-invalid", "modpack %s has a %s range shulker can't read", name, what)
-	e.Rows = []out.Detail{{Label: what, Text: err.Error()}}
-	return e
+	return out.Errorf("manifest-invalid", "modpack %s has a %s range shulker can't read", name, what).WithCause(what, err)
 }
 
 func unlocked(name, what string) *out.Error {

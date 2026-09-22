@@ -73,9 +73,7 @@ func Read(path, loaderName string) (*Info, error) {
 }
 
 func metadataInvalid(path, source string, err error) *out.Error {
-	e := out.Errorf("jar-metadata-invalid", "shulker can't read the mod metadata in %s", path)
-	e.Rows = []out.Detail{{Label: source, Text: err.Error()}}
-	return e
+	return out.Errorf("jar-metadata-invalid", "shulker can't read the mod metadata in %s", path).WithCause(source, err)
 }
 
 func readZip(zr *zip.Reader, files []string) (*Info, error) {

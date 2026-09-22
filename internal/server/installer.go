@@ -34,7 +34,7 @@ func RunInstaller(ctx context.Context, java, jar string, args []string) error {
 		}
 		last := lastLines(output.String(), 15)
 		e := out.Errorf("installer-failed", "the loader installer failed\n%s", last)
-		e.Rows = []out.Detail{{Label: "java", Text: err.Error()}}
+		e.WithCause("java", err)
 		for _, line := range strings.Split(last, "\n") {
 			if line = strings.TrimSpace(line); line != "" {
 				e.Rows = append(e.Rows, out.Detail{Text: line})

@@ -293,7 +293,7 @@ func (a *app) runEditor(path string) error {
 		if errors.As(err, &exit) {
 			return out.Errorf("editor-failed", "%s exited with status %d, so the edit may not have been saved", words[0], exit.ExitCode())
 		}
-		e := withCause(out.Errorf("editor-failed", "can't run %s", words[0]), "os", err)
+		e := out.Errorf("editor-failed", "can't run %s", words[0]).WithCause("os", err)
 		e.Help = "set $EDITOR to the editor you use"
 		return e
 	}

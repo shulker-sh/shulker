@@ -22,9 +22,7 @@ func (a Assembly) ExtractNatives(s Store, dir string, p Platform) error {
 	}
 	for _, f := range a.Natives {
 		if err := unpack(s.Local(f), dir, a.Excludes[f.Path], p); err != nil {
-			e := out.Errorf("store-incomplete", "shulker can't unpack %s", filepath.Base(f.Path))
-			e.Rows = []out.Detail{{Label: "zip", Text: err.Error()}}
-			return e
+			return out.Errorf("store-incomplete", "shulker can't unpack %s", filepath.Base(f.Path)).WithCause("zip", err)
 		}
 	}
 	return nil

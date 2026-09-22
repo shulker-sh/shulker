@@ -27,9 +27,7 @@ func readJSONObject(path string) (map[string]json.RawMessage, bool, error) {
 }
 
 func invalidFile(path string, err error) *out.Error {
-	e := out.Errorf("launcher-file-invalid", "shulker can't parse %s", path)
-	e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
-	return e
+	return out.Errorf("launcher-file-invalid", "shulker can't parse %s", path).WithCause("json", err)
 }
 
 // jsonObjectAt decodes the object top holds under key, empty when the key is absent. path is the

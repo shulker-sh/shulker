@@ -3,6 +3,7 @@ package out
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 )
 
@@ -22,5 +23,15 @@ func TestFailCarriesHelpIntoJSON(t *testing.T) {
 	}
 	if env.Error.Help != "run `shulker lock`" {
 		t.Fatalf("help = %q in %s", env.Error.Help, stdout.String())
+	}
+}
+
+func TestWithCauseAddsTheCauseAsARow(t *testing.T) {
+	e := Errorf("store-incomplete", "can't read the version").WithCause("json", errors.New("unexpected end of JSON input"))
+	if len(e.Rows) != 1 || e.Rows[0].Label != "json" || e.Rows[0].Text != "unexpected end of JSON input" {
+		t.Fatalf("rows = %+v", e.Rows)
+	}
+	if e.Message != "can't read the version" {
+		t.Fatalf("message = %q", e.Message)
 	}
 }

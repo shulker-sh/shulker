@@ -67,9 +67,7 @@ func (s Store) AssetFiles(indexID string) ([]File, error) {
 	}
 	var index AssetIndexFile
 	if err := json.Unmarshal(data, &index); err != nil {
-		e := out.Errorf("store-incomplete", "shulker can't parse %s", s.AssetIndex(indexID))
-		e.Rows = []out.Detail{{Label: "json", Text: err.Error()}}
-		return nil, e
+		return nil, out.Errorf("store-incomplete", "shulker can't parse %s", s.AssetIndex(indexID)).WithCause("json", err)
 	}
 	base := s.Resources
 	if base == "" {

@@ -662,9 +662,7 @@ func (b *Builder) collectClient(side string, opts Options, desired map[string]so
 func (b *Builder) checkProperties(props properties, report *Report) error {
 	minecraft, err := mcver.Parse(b.Lock.Minecraft)
 	if err != nil {
-		e := out.Errorf("properties-invalid", "server.properties can't be checked against Minecraft %s", b.Lock.Minecraft)
-		e.Rows = []out.Detail{{Label: "minecraft", Text: err.Error()}}
-		return e
+		return out.Errorf("properties-invalid", "server.properties can't be checked against Minecraft %s", b.Lock.Minecraft).WithCause("minecraft", err)
 	}
 	check := server.CheckProperties(props, minecraft)
 	report.Warnings = append(report.Warnings, check.Warnings...)
@@ -681,9 +679,7 @@ func renderProperties(file string, raw map[string]any, vars map[string]string) (
 	for key, v := range raw {
 		value, err := formatProperty(v)
 		if err != nil {
-			e := out.Errorf("properties-invalid", "shulker.json %s key %s has a value shulker can't write", file, key)
-			e.Rows = []out.Detail{{Label: "value", Text: err.Error()}}
-			return nil, e
+			return nil, out.Errorf("properties-invalid", "shulker.json %s key %s has a value shulker can't write", file, key).WithCause("value", err)
 		}
 		rendered, err := render("shulker.json "+file+" "+key, []byte(value), vars)
 		if err != nil {

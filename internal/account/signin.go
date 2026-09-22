@@ -378,9 +378,7 @@ func signInFailed(err error, service, what string) error {
 	if fetch.IsNetwork(err) {
 		return err
 	}
-	e := out.Errorf("sign-in-failed", "%s", what)
-	e.Rows = []out.Detail{{Label: service, Text: err.Error()}}
-	return e
+	return out.Errorf("sign-in-failed", "%s", what).WithCause(service, err)
 }
 
 // Error is what a state that stops a launch reads as, with the line that fixes it.

@@ -137,7 +137,7 @@ func DataDir() (string, error) {
 
 func configDirUnset(err error) *out.Error {
 	e := out.Errorf("config-dir-unset", "shulker can't tell where this user's config and data folders are")
-	e.Rows = []out.Detail{{Label: "os", Text: err.Error()}}
+	e.WithCause("os", err)
 	e.Help = "set " + PathEnv + " and " + DataPathEnv
 	return e
 }
