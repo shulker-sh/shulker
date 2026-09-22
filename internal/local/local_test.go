@@ -65,7 +65,7 @@ func TestLoadReplacesAFileItCannotRead(t *testing.T) {
 	for _, c := range []struct {
 		name, data, reason string
 	}{
-		{"newer", `{"$schema": "https://shulker.sh/schema/v2/local.json", "features": {"shaders": true}}`, "was written by a newer shulker (schema v2; this one knows v1)" + tail + ". Run `shulker self update`, then move it back to keep those settings"},
+		{"newer", `{"$schema": "https://shulker.sh/schema/v2/local.json", "features": {"shaders": true}}`, "was written by a newer shulker (schema v2; this one reads up to v1)" + tail + ". Move it back after updating shulker to keep those settings"},
 		{"missing", `{"features": {"shaders": true}}`, "is unreadable (names no $schema, which this shulker doesn't know)" + tail},
 		{"foreign", `{"$schema": "https://shulker.sh/schema/v1/lock.json", "features": {"shaders": true}}`, "is unreadable (names the schema https://shulker.sh/schema/v1/lock.json, which this shulker doesn't know)" + tail},
 		{"lower", `{"$schema": "https://shulker.sh/schema/v0/local.json", "features": {"shaders": true}}`, "is unreadable (names the schema https://shulker.sh/schema/v0/local.json, which this shulker doesn't know)" + tail},

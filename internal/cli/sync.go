@@ -17,6 +17,7 @@ import (
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/saves"
+	"shulker.sh/shulker/schema"
 )
 
 type syncResult struct {
@@ -364,7 +365,11 @@ func (a *app) loadLocal(dir string) (*local.File, error) {
 	lf, err := local.Load(dir)
 	var replaced *local.ReplacedError
 	if errors.As(err, &replaced) {
-		a.printer.Warn("%v", err)
+		if replaced.Newer() {
+			a.printer.WarnNudge(schema.UpdateNudge, "%v", err)
+		} else {
+			a.printer.Warn("%v", err)
+		}
 		return lf, nil
 	}
 	return lf, err

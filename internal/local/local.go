@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -38,16 +37,16 @@ type ReplacedError struct {
 	moveErr    error
 }
 
+// Newer reports whether a newer shulker wrote the file, whose fix is `shulker self update`.
+func (e *ReplacedError) Newer() bool { return e.newer }
+
 func (e *ReplacedError) Error() string {
 	msg := e.path + " " + e.reason + "; moved it to " + e.kept + " and using the manifest's feature defaults"
 	if e.moveErr != nil {
 		msg = e.path + " " + e.reason + "; couldn't move it aside, so using the manifest's feature defaults (" + e.moveErr.Error() + ")"
 	}
-	switch {
-	case e.newer && e.moveErr != nil:
-		msg += ". Run `shulker self update` to read it"
-	case e.newer:
-		msg += ". Run `shulker self update`, then move it back to keep those settings"
+	if e.newer && e.moveErr == nil {
+		msg += ". Move it back after updating shulker to keep those settings"
 	}
 	return msg
 }
@@ -70,7 +69,7 @@ func Load(dir string) (*File, error) {
 	case err != nil:
 		reason = "is unreadable (" + err.Error() + ")"
 	case got > want:
-		reason = fmt.Sprintf("was written by a newer shulker (schema v%d; this one knows v%d)", got, want)
+		reason = schema.Newer(got, want)
 	default:
 		f := &File{dir: dir}
 		if err := json.Unmarshal(data, f); err != nil {

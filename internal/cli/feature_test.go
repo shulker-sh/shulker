@@ -210,8 +210,11 @@ func TestUnreadableLocalFileFallsBackToDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout, stderr := h.mustRunStderr(t, "build")
-	if want := localPath + " was written by a newer shulker (schema v2; this one knows v1); moved it to " + kept + " and using the manifest's feature defaults. Run shulker self update, then move it back to keep those settings"; !strings.Contains(stderr, want) {
+	if want := localPath + " was written by a newer shulker (schema v2; this one reads up to v1); moved it to " + kept + " and using the manifest's feature defaults. Move it back after updating shulker to keep those settings"; !strings.Contains(stderr, want) {
 		t.Fatalf("build stderr: %s\nwant %s", stderr, want)
+	}
+	if !strings.Contains(stderr, "Update shulker:") || !strings.Contains(stderr, "$ shulker self update") {
+		t.Fatalf("build stderr lacks the update nudge: %s", stderr)
 	}
 	if !strings.Contains(stdout, "excluded: sodium (needs feature fancy)") {
 		t.Fatalf("build should fall back to fancy's default, off: %s", stdout)
