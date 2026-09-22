@@ -25,6 +25,7 @@ import (
 	"shulker.sh/shulker/internal/provider/modrinth"
 	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/server"
+	"shulker.sh/shulker/schema"
 )
 
 type deps struct {
@@ -58,7 +59,7 @@ func (a *app) deps() (*deps, error) {
 		a.printer.Warn("%s; ignoring it", out.AsError(err).Message)
 		cfg = config.Config{}
 	case code == "schema-newer":
-		a.printer.Warn("%s; ignoring it. Run `shulker self update` to read it", out.AsError(err).Message)
+		a.printer.WarnNudge(schema.UpdateNudge, "%s; ignoring it", out.AsError(err).Message)
 		cfg = config.Config{}
 	case err != nil:
 		return nil, err

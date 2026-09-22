@@ -241,11 +241,8 @@ func TestConfigItCantRead(t *testing.T) {
 			if _, err := a.deps(); err != nil {
 				t.Fatalf("deps over the config: %v", err)
 			}
-			want := "; ignoring it\n"
-			if tc.code == "schema-newer" {
-				want = "; ignoring it. Run shulker self update to read it\n"
-			}
-			if !strings.HasSuffix(stderr.String(), want) {
+			warned, nudge, _ := strings.Cut(stderr.String(), "; ignoring it\n")
+			if warned == stderr.String() || strings.Contains(nudge, "shulker self update") != (tc.code == "schema-newer") {
 				t.Fatalf("deps warned %q", stderr.String())
 			}
 
