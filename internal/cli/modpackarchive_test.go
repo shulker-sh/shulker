@@ -321,3 +321,31 @@ func TestChangedArchiveModpackOfflineIsACodedError(t *testing.T) {
 		t.Fatalf("code=%d %+v", code, e)
 	}
 }
+
+func TestArchiveModpackLaysAnExportedLocalFileItself(t *testing.T) {
+	h := archiveProject(t)
+	private := makeJar(t, "private-mod", "private-mod-1.4.jar", "*")
+	if err := os.WriteFile(filepath.Join(h.dir, private.filename), private.data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "add", "./"+private.filename)
+	h.mustRun(t, "export", "mrpack", "--version", "1", "--bundle", "-o", filepath.Join(h.dir, "packs", "mine.mrpack"))
+	h.mustRun(t, "remove", "private-mod")
+	h.mustRun(t, "add", "packs/mine.mrpack", "--as", "mine")
+
+	l := h.readLock(t)
+	if got, ok := l.Mods["private-mod"]; ok {
+		t.Fatalf("the exporter's local file is not locked in the consumer: %+v", got)
+	}
+	if got := l.Modpacks["mine"].Unmanaged["overrides/mods/"+private.filename]; got != private.sha512 {
+		t.Fatalf("the archive lays the jar as its own: %v", l.Modpacks["mine"].Unmanaged)
+	}
+
+	if err := os.Remove((&cache.Cache{Dir: h.cache}).Object(private.sha512)); err != nil {
+		t.Fatal(err)
+	}
+	h.mustRun(t, "install")
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "mods", private.filename)); err != nil {
+		t.Fatalf("the jar comes from the cached archive: %v", err)
+	}
+}

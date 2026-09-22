@@ -52,19 +52,32 @@ type importedPack struct {
 // ImportMrpack locks the mods a Modrinth pack lists, reporting what it locked, reused, dropped and
 // left unmanaged.
 func (r *Resolver) ImportMrpack(ctx context.Context, a *mrpack.Archive) (*Imported, error) {
+	return r.importMrpack(ctx, a, true)
+}
+
+// importMrpack is ImportMrpack. Without reuseLocal, a local file the pack's own lock names is laid
+// as an override rather than reused: its path is the exporter's, and outside the archive only the
+// cache holds its bytes.
+func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLocal bool) (*Imported, error) {
 	im := &importer{r: r, a: a, rep: &Imported{Locked: []string{}, Reused: []string{}, Dropped: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}}
 	if p, ok := r.Providers["modrinth"].(hashLookup); ok {
 		im.modrinth = p
 	}
 	if a.Marker != nil {
 		for id, m := range a.Marker.Lock.Mods {
-			im.bySha[m.Sha512] = id
+			if reuseLocal || m.File == "" {
+				im.bySha[m.Sha512] = id
+			}
 		}
 		for key, p := range a.Marker.Lock.ResourcePacks {
-			im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeResourcePack}
+			if reuseLocal || p.File == "" {
+				im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeResourcePack}
+			}
 		}
 		for key, p := range a.Marker.Lock.Shaders {
-			im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeShader}
+			if reuseLocal || p.File == "" {
+				im.packBySha[p.Sha512] = importedPack{key: key, kind: manifest.TypeShader}
+			}
 		}
 	}
 	for _, f := range a.Index.Files {
@@ -310,7 +323,7 @@ func (r *Resolver) ConsumeArchive(ctx context.Context, l *pack.Loaded) error {
 			return curseForgeOffline(l.Name, err)
 		}
 	} else {
-		rep, err = scratch.ImportMrpack(ctx, a)
+		rep, err = scratch.importMrpack(ctx, a, false)
 	}
 	if err != nil {
 		return prefixed("modpack "+l.Name, err)
