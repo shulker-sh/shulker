@@ -114,7 +114,7 @@ func unsupportedType(kind string) error {
 	return out.Errorf("requires-unsupported", "%s entries aren't supported yet", kind)
 }
 
-func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.AddOptions, ref, path string, unlocked, noAutoUpdate bool) error {
+func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.AddOptions, at pack.At, unlocked, noAutoUpdate bool) error {
 	as := opts.As
 	if as != "" && len(sources) > 1 {
 		return out.Errorf("usage", "--as applies to a single modpack")
@@ -152,10 +152,10 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 				}
 				continue
 			}
-			if err := pack.CheckPath(path, pack.Classify(source)); err != nil {
+			if err := pack.CheckPath(at.Path, pack.Classify(source)); err != nil {
 				return "", err
 			}
-			entry := manifest.Require{Source: source, Ref: ref, Path: path}
+			entry := manifest.Require{Source: source, Ref: at.Ref, Path: at.Path}
 			if unlocked {
 				no := false
 				entry.Locked = &no
