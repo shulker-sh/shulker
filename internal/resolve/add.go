@@ -329,12 +329,18 @@ func (r *Resolver) pinnedChannel(id string, v *provider.Version, channel string)
 	return v.Channel
 }
 
-// listChannel writes a widened channel back to key's entry in shulker.json, when it has one there.
-func (r *Resolver) listChannel(key, channel string) {
-	if listed, ok := r.Manifest.Requires[key]; ok {
+// relistedChannel is the channel entry accepts once v is locked for it: widened when entry is pinned
+// to a less stable v, and then written back to key's entry in shulker.json, when it has one there.
+func (r *Resolver) relistedChannel(key string, entry manifest.Require, v *provider.Version) string {
+	if entry.Pin.IsZero() {
+		return entry.Channel
+	}
+	channel := r.pinnedChannel(key, v, entry.Channel)
+	if listed, ok := r.Manifest.Requires[key]; ok && channel != entry.Channel {
 		listed.Channel = channel
 		r.Manifest.Requires[key] = listed
 	}
+	return channel
 }
 
 func channelLabel(channel string) string {

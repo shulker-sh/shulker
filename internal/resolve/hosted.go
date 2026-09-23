@@ -117,21 +117,11 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 		e.Help = fmt.Sprintf("set requires.%s.type to %s", name, proj.Type)
 		return lock.Modpack{}, e
 	}
-	pin := ""
-	if !entry.Pin.IsZero() {
-		pin = entry.Pin.String()
-	}
-	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeModpack, p.Name()), pin, entry.Channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeModpack, p.Name()), entry.Pin.String(), entry.Channel)
 	if err != nil {
 		return lock.Modpack{}, err
 	}
-	channel := entry.Channel
-	if pin != "" {
-		channel = r.pinnedChannel(name, v, channel)
-	}
-	if channel != entry.Channel {
-		r.listChannel(name, channel)
-	}
+	channel := r.relistedChannel(name, entry, v)
 	r.log("fetching modpack %s %s", proj.Slug, v.Number)
 	got, err := r.obtain(ctx, proj, v)
 	if err != nil {

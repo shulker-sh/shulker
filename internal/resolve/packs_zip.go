@@ -221,18 +221,11 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 	if err != nil {
 		return err
 	}
-	pin := ""
-	if !entry.Pin.IsZero() {
-		pin = entry.Pin.String()
-	}
-	channel, err := r.lockPack(ctx, p, proj, key, kind, pin, entry.Channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(kind, p.Name()), entry.Pin.String(), entry.Channel)
 	if err != nil {
 		return err
 	}
-	if channel != entry.Channel {
-		r.listChannel(key, channel)
-	}
-	return nil
+	return r.lockPackVersion(ctx, p, proj, v, key, kind, r.relistedChannel(key, entry, v))
 }
 
 // checkPackFilenames refuses two packs placed under one name, compared without

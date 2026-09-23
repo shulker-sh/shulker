@@ -215,23 +215,14 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 	if err != nil {
 		return err
 	}
-	pin := ""
-	if !entry.Pin.IsZero() {
-		pin = entry.Pin.String()
-	}
-	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), pin, entry.Channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), entry.Pin.String(), entry.Channel)
 	if err != nil {
 		return err
 	}
 	if _, _, err := r.place(ctx, p, proj, v, id, "", entry.Side, entry.Channel, false); err != nil {
 		return err
 	}
-	if pin != "" {
-		if widened := r.pinnedChannel(id, v, entry.Channel); widened != entry.Channel {
-			entry.Channel = widened
-			r.listChannel(id, widened)
-		}
-	}
+	entry.Channel = r.relistedChannel(id, entry, v)
 	r.settle(id, entry.Side, entry.Channel)
 	for _, name := range direct.packs {
 		r.Lock.AddRequiredBy(id, name)
