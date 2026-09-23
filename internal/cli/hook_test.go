@@ -377,7 +377,7 @@ func TestPreLaunchKeepsThePlayersFileOnAConflict(t *testing.T) {
 	if code != 0 || !strings.Contains(stdout, "synced client") {
 		t.Fatalf("a launch-time sync goes on past a conflict: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
-	for _, want := range []string{"options.txt (changed in place and in the source)", "config/extra.json (not written by shulker)", "shulker sync -i friends --force"} {
+	for _, want := range []string{"options.txt (changed in place and in the source)", "config/extra.json (not written by shulker)", "shulker pull keeps yours", "shulker sync -i friends --force"} {
 		if !strings.Contains(stderr, want) {
 			t.Fatalf("the warning should name %q:\n%s", want, stderr)
 		}

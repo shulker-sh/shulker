@@ -61,7 +61,8 @@ func (a *app) forceCommand(p *project.Project, side, dir string) string {
 
 // warnKeptConflicts warns about the files a launch kept as the player had them, where the pack
 // changed them too, with the command that takes the pack's version beneath. The instance's own sync
-// comes first: a launcher runs the hook from anywhere, and it works from anywhere.
+// comes first: a launcher runs the hook from anywhere, and it works from anywhere. A directory that
+// is a project's own build can also keep the player's version for good, with pull.
 func (a *app) warnKeptConflicts(kept []string, p *project.Project, side, dir string) {
 	if len(kept) == 0 {
 		return
@@ -71,7 +72,11 @@ func (a *app) warnKeptConflicts(kept []string, p *project.Project, side, dir str
 	if id == "" {
 		force = a.forceCommand(p, side, dir)
 	}
-	a.printer.WarnNudge(out.Nudge{Lead: "Take the pack's version", Command: force}, "kept your version of %s; `shulker diff` shows the pack's", strings.Join(kept, ", "))
+	keep := ""
+	if p != nil && isSameDir(dir, filepath.Join(p.Dir, p.Manifest.BuildDir(side))) {
+		keep = ", `shulker pull` keeps yours"
+	}
+	a.printer.WarnNudge(out.Nudge{Lead: "Take the pack's version", Command: force}, "kept your version of %s; `shulker diff` shows the pack's%s", strings.Join(kept, ", "), keep)
 }
 
 // rerunForced is the command line that ran cmd, with --force added. Flags that only change how
