@@ -62,11 +62,11 @@ func TestAddHostedDatapack(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "terralith")
 
-	if got := h.readManifest(t).Requires["terralith"]; !reflect.DeepEqual(got, manifest.Require{Type: manifest.TypeDatapack}) {
+	if got := h.readManifest(t).Requires["terralith"]; !reflect.DeepEqual(got, manifest.Require{Type: manifest.TypeDatapack, Filename: "Terralith_26.2_v2.6.4.zip"}) {
 		t.Fatalf("a datapack-only Modrinth project adds as a datapack: %+v", got)
 	}
 	p := h.readLock(t).Datapacks["terralith"]
-	if p.Provider != "modrinth" || p.VersionNumber != "2.6.4" || p.Filename != "terralith.zip" || p.Side != "both" || p.Sha1 == "" {
+	if p.Provider != "modrinth" || p.VersionNumber != "2.6.4" || p.Filename != "Terralith_26.2_v2.6.4.zip" || p.Side != "both" || p.Sha1 == "" {
 		t.Fatalf("locked like a resource pack, on both sides: %+v", p)
 	}
 	h.mustRun(t, "datapack", "remove", "terralith")
@@ -84,7 +84,7 @@ func TestClientBuildPlacesDatapacks(t *testing.T) {
 	if !strings.Contains(stderr, "! terralith: placed in datapacks/, which only some global datapack mods read; add one, such as paxi, to load it in every world") {
 		t.Fatalf("no warning without a global datapack mod: %s", stderr)
 	}
-	if readBuilt(t, h, "datapacks/terralith.zip") != string(h.jars["terralith"].data) {
+	if readBuilt(t, h, "datapacks/Terralith_26.2_v2.6.4.zip") != string(h.jars["terralith"].data) {
 		t.Fatal("the datapack goes to datapacks/ without a global datapack mod")
 	}
 
@@ -94,10 +94,10 @@ func TestClientBuildPlacesDatapacks(t *testing.T) {
 	if strings.Contains(stderr, "global datapack mods") {
 		t.Fatalf("Paxi loads it, so nothing to warn about: %s", stderr)
 	}
-	if readBuilt(t, h, "config/paxi/datapacks/terralith.zip") == "" {
+	if readBuilt(t, h, "config/paxi/datapacks/Terralith_26.2_v2.6.4.zip") == "" {
 		t.Fatal("with Paxi placed, the datapack goes to its folder")
 	}
-	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "datapacks", "terralith.zip")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "datapacks", "Terralith_26.2_v2.6.4.zip")); !os.IsNotExist(err) {
 		t.Fatalf("the old placement is removed: %v", err)
 	}
 }
@@ -117,7 +117,7 @@ func TestServerBuildPlacesDatapacksInItsWorld(t *testing.T) {
 	if strings.Contains(stderr, "global datapack mods") {
 		t.Fatalf("the server's world loads its datapacks without a mod: %s", stderr)
 	}
-	placed := filepath.Join(h.dir, "data", "server", "adventure", "datapacks", "terralith.zip")
+	placed := filepath.Join(h.dir, "data", "server", "adventure", "datapacks", "Terralith_26.2_v2.6.4.zip")
 	if data, err := os.ReadFile(placed); err != nil || string(data) != string(h.jars["terralith"].data) {
 		t.Fatalf("the datapack is written through the world's link: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestInPlaceServerBuildWritesItsWorldsDatapacks(t *testing.T) {
 	})
 	h.mustRun(t, "add", "terralith")
 	h.mustRun(t, "install")
-	if readFile(t, filepath.Join(h.dir, "world", "datapacks", "terralith.zip")) != string(h.jars["terralith"].data) {
+	if readFile(t, filepath.Join(h.dir, "world", "datapacks", "Terralith_26.2_v2.6.4.zip")) != string(h.jars["terralith"].data) {
 		t.Fatal("an in-place server writes its world's datapacks")
 	}
 }
@@ -164,10 +164,10 @@ func TestExportMrpackCarriesDatapacksBySide(t *testing.T) {
 	for _, f := range index.Files {
 		paths[f.Path] = f.Env
 	}
-	if env := paths["datapacks/terralith.zip"]; env["client"] != "required" || env["server"] != "unsupported" {
+	if env := paths["datapacks/Terralith_26.2_v2.6.4.zip"]; env["client"] != "required" || env["server"] != "unsupported" {
 		t.Fatalf("the client's copy goes to datapacks/: %+v", index.Files)
 	}
-	if env := paths["world/datapacks/terralith.zip"]; env["server"] != "required" || env["client"] != "unsupported" {
+	if env := paths["world/datapacks/Terralith_26.2_v2.6.4.zip"]; env["server"] != "required" || env["client"] != "unsupported" {
 		t.Fatalf("the server's copy goes to its world: %+v", index.Files)
 	}
 
@@ -177,14 +177,14 @@ func TestExportMrpackCarriesDatapacksBySide(t *testing.T) {
 	index, _ = readMrpack(t, filepath.Join(h.dir, "build", "pack-1.1.mrpack"))
 	var datapacks []string
 	for _, f := range index.Files {
-		if strings.Contains(f.Path, "terralith") {
+		if strings.Contains(f.Path, "Terralith") {
 			datapacks = append(datapacks, f.Path)
 			if f.Env["client"] != "required" || f.Env["server"] != "required" {
 				t.Fatalf("one copy serves both sides: %+v", f)
 			}
 		}
 	}
-	if !reflect.DeepEqual(datapacks, []string{"config/paxi/datapacks/terralith.zip"}) {
+	if !reflect.DeepEqual(datapacks, []string{"config/paxi/datapacks/Terralith_26.2_v2.6.4.zip"}) {
 		t.Fatalf("with Paxi on both sides the datapack goes in once: %v", datapacks)
 	}
 }
@@ -398,10 +398,10 @@ func TestExportsShipAHybridDatapacksResourcePackCopy(t *testing.T) {
 	for _, f := range index.Files {
 		paths[f.Path] = f.Env
 	}
-	if env := paths["resourcepacks/terralith.zip"]; env["client"] != "required" || env["server"] != "unsupported" {
+	if env := paths["resourcepacks/Terralith_26.2_v2.6.4.zip"]; env["client"] != "required" || env["server"] != "unsupported" {
 		t.Fatalf("the resource pack copy is a client file of its own: %+v", index.Files)
 	}
-	if _, ok := paths["datapacks/terralith.zip"]; !ok {
+	if _, ok := paths["datapacks/Terralith_26.2_v2.6.4.zip"]; !ok {
 		t.Fatalf("the datapack copy still ships: %+v", index.Files)
 	}
 
@@ -411,7 +411,7 @@ func TestExportsShipAHybridDatapacksResourcePackCopy(t *testing.T) {
 	}
 	h.mustRun(t, "export", "curseforge", "--version", "1.0", "--bundle")
 	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
-	if entries["overrides/resourcepacks/terralith.zip"] != string(h.jars["terralith"].data) {
+	if entries["overrides/resourcepacks/Terralith_26.2_v2.6.4.zip"] != string(h.jars["terralith"].data) {
 		t.Fatal("the resource pack copy is bundled")
 	}
 }

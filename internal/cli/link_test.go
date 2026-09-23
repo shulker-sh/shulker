@@ -207,7 +207,7 @@ func TestLinkMojangForceRepointsTheModpack(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["fabric-api"].filename)); err != nil {
 		t.Fatalf("the new pack's mods arrive: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(gameDir, "resourcepacks", "fresh-animations.zip")); err != nil {
+	if _, err := os.Stat(filepath.Join(gameDir, "resourcepacks", "FreshAnimations_v1.9.4.zip")); err != nil {
 		t.Fatalf("what the player added stays: %v", err)
 	}
 }

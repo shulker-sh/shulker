@@ -29,7 +29,7 @@ func TestOptionsPathMovesTheBuiltOptions(t *testing.T) {
 	h.mustRun(t, "install")
 
 	got := readBuilt(t, h, modpackDefaults)
-	if !strings.Contains(got, "tutorialStep:none") || !strings.Contains(got, `resourcePacks:["vanilla","file/fresh-animations.zip"]`) {
+	if !strings.Contains(got, "tutorialStep:none") || !strings.Contains(got, `resourcePacks:["vanilla","file/FreshAnimations_v1.9.4.zip"]`) {
 		t.Fatalf("%s: %q", modpackDefaults, got)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "options.txt")); !os.IsNotExist(err) {
@@ -56,7 +56,7 @@ func TestOptionsPathSeedsOverAnUntouchedList(t *testing.T) {
 	writeOverride(t, h.dir, "build/client/"+modpackDefaults, "resourcePacks:[\"vanilla\"]\n")
 	h.mustRun(t, "install")
 
-	if got := readBuilt(t, h, modpackDefaults); !strings.Contains(got, `resourcePacks:["vanilla","file/fresh-animations.zip"]`) {
+	if got := readBuilt(t, h, modpackDefaults); !strings.Contains(got, `resourcePacks:["vanilla","file/FreshAnimations_v1.9.4.zip"]`) {
 		t.Fatalf("%s: %q", modpackDefaults, got)
 	}
 	if got := readBuilt(t, h, "options.txt"); got != "resourcePacks:[\"vanilla\",\"file/mine.zip\"]\n" {
@@ -74,7 +74,7 @@ func TestOptionsPathInExports(t *testing.T) {
 
 	h.mustRun(t, "export", "mrpack", "--version", "1.0")
 	_, entries := readMrpack(t, filepath.Join(h.dir, "build", "pack-1.0.mrpack"))
-	if got := entries["overrides/"+modpackDefaults]; !strings.Contains(got, `"file/fresh-animations.zip"`) {
+	if got := entries["overrides/"+modpackDefaults]; !strings.Contains(got, `"file/FreshAnimations_CF_v1.9.4.zip"`) {
 		t.Fatalf("mrpack %s: %q (entries: %v)", modpackDefaults, got, keys(entries))
 	}
 	if _, ok := entries["overrides/options.txt"]; ok {

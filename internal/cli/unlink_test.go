@@ -211,7 +211,7 @@ func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 	if len(requires) != 2 || entry["source"] != h.dir || requires["fresh-animations"] == nil {
 		t.Fatalf("adoption leaves the manifest as it found it: %v", requires)
 	}
-	if _, err := os.Stat(filepath.Join(gameDir, "resourcepacks", "fresh-animations.zip")); err != nil {
+	if _, err := os.Stat(filepath.Join(gameDir, "resourcepacks", "FreshAnimations_v1.9.4.zip")); err != nil {
 		t.Fatalf("what the player added is still there: %v", err)
 	}
 

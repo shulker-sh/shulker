@@ -26,7 +26,7 @@ func TestShaderIsEnabledByTheShaderModTheBuildPlaced(t *testing.T) {
 	if !strings.Contains(stderr, "! complementary-reimagined is placed, but nothing in this build can load it; shulker add iris") {
 		t.Fatalf("no unloadable line with iris turned off: %s", stderr)
 	}
-	if readBuilt(t, h, "shaderpacks/complementary-reimagined.zip") == "" {
+	if readBuilt(t, h, "shaderpacks/ComplementaryReimagined_r5.5.1.zip") == "" {
 		t.Fatal("the shader was not placed")
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "config", "iris.properties")); !os.IsNotExist(err) {
@@ -37,7 +37,7 @@ func TestShaderIsEnabledByTheShaderModTheBuildPlaced(t *testing.T) {
 	if _, _, stderr := h.run(t, "build"); strings.Contains(stderr, "complementary-reimagined is placed") {
 		t.Fatalf("the enabled shader was reported: %s", stderr)
 	}
-	if got := readBuilt(t, h, "config/iris.properties"); !strings.Contains(got, "shaderPack=complementary-reimagined.zip") || !strings.Contains(got, "enableShaders=true") {
+	if got := readBuilt(t, h, "config/iris.properties"); !strings.Contains(got, "shaderPack=ComplementaryReimagined_r5.5.1.zip") || !strings.Contains(got, "enableShaders=true") {
 		t.Fatalf("iris.properties: %q", got)
 	}
 }

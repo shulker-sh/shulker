@@ -97,12 +97,17 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 		listed.Pin = lockID(p.Name(), opts.Pin)
 	}
 	r.setSource(&listed, key, p, proj)
+	locked := r.packSection(kind)[key]
+	listed.Filename = r.Manifest.Requires[key].Filename
+	if name := locked.ProviderFilename; listed.Filename == "" && strings.HasSuffix(name, ".zip") && name != key+".zip" {
+		listed.Filename = name
+	}
+	locked.Filename = manifest.PackFilename(key, listed)
 	if kind == manifest.TypeDatapack {
 		listed.Side, listed.ResourcePack = opts.Side, opts.ResourcePack
-		locked := r.packSection(kind)[key]
 		locked.Side, locked.ResourcePack = packSide(kind, listed), listed.ResourcePack
-		r.packSection(kind)[key] = locked
 	}
+	r.packSection(kind)[key] = locked
 	r.Manifest.Requires[key] = listed
 	return nil
 }

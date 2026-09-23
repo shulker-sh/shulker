@@ -197,10 +197,10 @@ func TestExportMrpackCarriesPacks(t *testing.T) {
 	}
 	// Each pack goes in under its requires key, and both are client-only.
 	pack, shader := index.Files[0], index.Files[1]
-	if pack.Path != "resourcepacks/fresh-animations.zip" || pack.Env["client"] != "required" || pack.Env["server"] != "unsupported" {
+	if pack.Path != "resourcepacks/FreshAnimations_v1.9.4.zip" || pack.Env["client"] != "required" || pack.Env["server"] != "unsupported" {
 		t.Fatalf("resource pack entry: %+v", pack)
 	}
-	if shader.Path != "shaderpacks/complementary-reimagined.zip" || shader.Env["server"] != "unsupported" {
+	if shader.Path != "shaderpacks/ComplementaryReimagined_r5.5.1.zip" || shader.Env["server"] != "unsupported" {
 		t.Fatalf("shader entry: %+v", shader)
 	}
 	if !strings.Contains(entries["shulker.json"], "complementary-reimagined") || !strings.Contains(entries["shulker.lock"], "fresh-animations") {
