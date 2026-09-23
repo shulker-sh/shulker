@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
@@ -102,6 +103,13 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 		}
 		infos[id] = info
 		cands.add(r.Lock.JarID(id), info, 0)
+	}
+	overrides, err := r.dependencyOverrides(l, sides)
+	if err != nil {
+		return nil, err
+	}
+	for id, info := range infos {
+		infos[id] = overrides.apply(info, r.Lock.Mods[id].Side)
 	}
 	installed := cands.pick(infos, l.TopLevelMandatory)
 	for id, version := range builtin {
@@ -200,6 +208,73 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 		return a.On < b.On
 	})
 	return v, nil
+}
+
+// sideOverrides is the loader's dependency overrides file each validated side's build ships, nil
+// for a side that ships none.
+type sideOverrides map[string]jarmeta.DependencyOverrides
+
+func (r *Resolver) dependencyOverrides(l loader.Loader, sides []string) (sideOverrides, error) {
+	if l.DependencyOverrides == "" {
+		return nil, nil
+	}
+	if len(sides) == 0 {
+		sides = []string{"client", "server"}
+	}
+	b := &build.Builder{Dir: r.Dir, Manifest: r.Manifest, Lock: r.Lock, Cache: r.Cache, Packs: r.Packs}
+	so := sideOverrides{}
+	for _, side := range sides {
+		data, ok, err := b.OverrideFile(side, l.DependencyOverrides)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			so[side] = nil
+			continue
+		}
+		if so[side], err = jarmeta.ParseDependencyOverrides(data); err != nil {
+			return nil, out.Errorf("dependency-overrides-invalid", "%s can't read the %s the %s build places", l.Title, l.DependencyOverrides, side).WithCause(l.DependencyOverrides, err)
+		}
+	}
+	return so, nil
+}
+
+// apply gives the mod's dependencies once every side that places it has applied its overrides: a
+// dependency stays unless each of them removes it, and one any of them adds counts.
+func (so sideOverrides) apply(info *jarmeta.Info, side string) *jarmeta.Info {
+	var applied []*jarmeta.Info
+	for _, s := range sortedKeys(so) {
+		if side == s || side == "both" {
+			applied = append(applied, so[s].Apply(info))
+		}
+	}
+	if len(applied) == 0 {
+		for _, s := range sortedKeys(so) {
+			applied = append(applied, so[s].Apply(info))
+		}
+	}
+	if !slices.ContainsFunc(applied, func(a *jarmeta.Info) bool { return a != info }) {
+		return info
+	}
+	merged := *applied[0]
+	for _, field := range []func(*jarmeta.Info) *map[string]string{
+		func(i *jarmeta.Info) *map[string]string { return &i.Depends },
+		func(i *jarmeta.Info) *map[string]string { return &i.Recommends },
+		func(i *jarmeta.Info) *map[string]string { return &i.Suggests },
+		func(i *jarmeta.Info) *map[string]string { return &i.Conflicts },
+		func(i *jarmeta.Info) *map[string]string { return &i.Breaks },
+	} {
+		set := map[string]string{}
+		for _, a := range applied {
+			for id, rng := range *field(a) {
+				if _, ok := set[id]; !ok {
+					set[id] = rng
+				}
+			}
+		}
+		*field(&merged) = set
+	}
+	return &merged
 }
 
 // candidate is one copy of a mod id the loader could load: a locked jar, a jar nested in one at

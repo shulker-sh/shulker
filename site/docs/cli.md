@@ -353,6 +353,8 @@ shulker unpin iris
 
 Record that a dependency problem between a mod and what its jar declares about another is safe to ignore. A problem reported by `add`, `remove`, `update`, `lock` or `install` prints the exact command to run, with the rule and the range the jar declares. The entry lands in `ignore` in `shulker.json` and the problem stops failing validation for as long as the jar declares that range; a new version that declares a different range makes the entry stale and the problem comes back. Without `--declared`, the command reads the rule and range from a matching problem in the locked mods. An existing entry for the pair is only replaced with `--force`.
 
+On Fabric, validation first applies `config/fabric_loader_dependencies.json`, Fabric Loader's own dependency overrides, as the build lays it from the override folders. A dependency the file removes is no problem and needs no ignore: removed for a mod, it must be removed by every side's file that places the mod, and one added by any side's file is checked like any other. Quilt doesn't read the file.
+
 ```sh
 shulker ignore sodium fabric-api --rule depends --declared ">=2.0.0" --note "works on fabric-api 1.x"
 shulker ignore sodium fabric-api --note "works on fabric-api 1.x"
@@ -1726,6 +1728,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `curseforge-cant-place` | `export curseforge` can't name these datapacks by file ID, since the CurseForge app installs datapacks in `datapacks/` and the build places them elsewhere: in a global datapack mod's folder, or a hybrid's copy in `resourcepacks/`; pass `--bundle`. `items`: each datapack and its folder |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs, shaders or datapacks; pass `--bundle`. `items`: what is missing |
 | `curseforge-offline` | A modpack's CurseForge zip was read without the network. It names its files by CurseForge ID alone, so no cached copy can stand in; the `curseforge` row, when there is one, is the network error |
+| `dependency-overrides-invalid` | Fabric Loader would refuse the `config/fabric_loader_dependencies.json` a side's build places, so the game wouldn't start: its first key isn't `"version": 1`, a key or dependency kind is unknown, or a range isn't a string or array of strings. The `cause` row says which |
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
 | `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` rebuilds it, keeping the old file as `registry.json.replaced` |

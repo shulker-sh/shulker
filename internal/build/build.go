@@ -525,6 +525,22 @@ func (b *Builder) overrideLayers(side string, cond conditions, vars map[string]s
 	return layers
 }
 
+// OverrideFile is what the side's build would place at rel from its override folders, with the
+// default features on; ok is false when no folder places it. A .properties file comes back as the
+// last folder's copy, not merged key by key as the build merges it.
+func (b *Builder) OverrideFile(side, rel string) (data []byte, ok bool, err error) {
+	desired := map[string]source{}
+	for _, l := range b.overrideLayers(side, b.conditions(Options{}), templateVars(b.Manifest, b.Lock, side)) {
+		skips := l.skips
+		l.skips = func(p string) bool { return (p != rel && p != rel+TemplateSuffix) || skips(p) }
+		if err := b.layer(l, func(string) bool { return true }, desired, &Report{}); err != nil {
+			return nil, false, err
+		}
+	}
+	s, ok := desired[rel]
+	return s.data, ok, nil
+}
+
 func featureFolders(name string, f manifest.Feature, side string) []string {
 	var folders []string
 	switch {
@@ -543,6 +559,9 @@ func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[st
 	root := l.root
 	if l.archived {
 		for _, o := range l.files {
+			if l.skips(o.Path) {
+				continue
+			}
 			if err := b.layFile(l, filepath.Join(root, filepath.FromSlash(o.Path)), o.Path, o.Data, whole, desired, report); err != nil {
 				return err
 			}

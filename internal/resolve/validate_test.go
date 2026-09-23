@@ -3,12 +3,15 @@ package resolve
 import (
 	"archive/zip"
 	"bytes"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestSatisfies(t *testing.T) {
@@ -256,5 +259,51 @@ func TestValidateQuiltKeepsTopLevelJar(t *testing.T) {
 	want := []Problem{{Rule: "depends", Mod: "wantsold", ModVersion: "1.0.0", On: "lib", Declared: "<2", Found: "2.0.0"}}
 	if !reflect.DeepEqual(v.Problems, want) {
 		t.Fatalf("problems %+v, want %+v", v.Problems, want)
+	}
+}
+
+func TestValidateAppliesFabricDependencyOverrides(t *testing.T) {
+	r := lockJars(t, "fabric", map[string][]byte{
+		"bwg":     fabricJar(t, `{"id":"bwg","version":"1.6.6","depends":{"terrablender":">=3.0.1.7"}}`, nil),
+		"climate": fabricJar(t, `{"id":"climate","version":"20.1.0","depends":{"terrablender":"*"}}`, nil),
+		"slabs":   fabricJar(t, `{"id":"slabs","version":"1.0.0"}`, nil),
+	})
+	r.Dir = t.TempDir()
+	write := func(rel, data string) {
+		path := filepath.Join(r.Dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("overrides/config/fabric_loader_dependencies.json", `{"version":1,"overrides":{
+		"bwg":{"-depends":{"terrablender":"IGNORED"}},
+		"climate":{"-depends":{"terrablender":"IGNORED"}},
+		"slabs":{"+depends":{"balm":"*"}}}}`)
+	write("server-overrides/config/fabric_loader_dependencies.json", `{"version":1,"overrides":{
+		"bwg":{"-depends":{"terrablender":"IGNORED"}}}}`)
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{
+		{Rule: "depends", Mod: "climate", ModVersion: "20.1.0", On: "terrablender", Declared: "*"},
+		{Rule: "depends", Mod: "slabs", ModVersion: "1.0.0", On: "balm", Declared: "*"},
+	}
+	if !reflect.DeepEqual(v.Problems, want) {
+		t.Fatalf("problems %+v, want %+v", v.Problems, want)
+	}
+	if v, err = r.Validate("client"); err != nil {
+		t.Fatal(err)
+	}
+	want = []Problem{{Rule: "depends", Mod: "slabs", ModVersion: "1.0.0", On: "balm", Declared: "*"}}
+	if !reflect.DeepEqual(v.Problems, want) {
+		t.Fatalf("client problems %+v, want %+v", v.Problems, want)
+	}
+	write("overrides/config/fabric_loader_dependencies.json", `{"overrides":{}}`)
+	if _, err := r.Validate("client"); out.CodeOf(err) != "dependency-overrides-invalid" {
+		t.Fatalf("err %v, want dependency-overrides-invalid", err)
 	}
 }
