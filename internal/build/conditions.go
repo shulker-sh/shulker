@@ -322,7 +322,7 @@ func (b *Builder) Placements() map[string]Placement {
 	}
 	for _, side := range b.Manifest.Sides() {
 		for id := range b.selectMods(c).included {
-			if m := b.Lock.Mods[id]; m.Side != "both" && m.Side != side {
+			if !b.Lock.Mods[id].PlacedOn(side) {
 				continue
 			}
 			p := placements[id]

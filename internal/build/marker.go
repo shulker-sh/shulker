@@ -268,7 +268,7 @@ func markerClassEntries() ([]markerEntry, error) {
 
 func (b *Builder) markerMods(side string, sel selection) (direct, deps []string) {
 	for id, m := range b.Lock.Mods {
-		if !sel.included[id] || (m.Side != "both" && m.Side != side) {
+		if !sel.included[id] || !m.PlacedOn(side) {
 			continue
 		}
 		if _, ok := b.Manifest.Mods()[id]; ok {

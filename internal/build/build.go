@@ -407,7 +407,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 	report.Warnings = append(report.Warnings, sel.warnings...)
 	placed := map[string]bool{}
 	for id, m := range b.Lock.Mods {
-		if !sel.included[id] || (m.Side != "both" && m.Side != side) {
+		if !sel.included[id] || !m.PlacedOn(side) {
 			continue
 		}
 		if !b.Cache.Has(m.Sha512) {

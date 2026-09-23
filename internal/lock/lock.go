@@ -173,6 +173,11 @@ func (p Pack) IsVanillaShader() bool {
 	return slices.Equal(p.Loaders, []string{"vanilla"})
 }
 
+// PlacedOn reports whether side's build places the mod.
+func (m Mod) PlacedOn(side string) bool {
+	return m.Side == "both" || m.Side == side
+}
+
 func (m Mod) MarshalJSON() ([]byte, error) {
 	type plain Mod
 	if m.File == "" {
@@ -273,7 +278,7 @@ func (l *Lock) PackPath(kind string, p Pack, side, levelName string) string {
 func (l *Lock) DatapackFolder(side, levelName string) (folder string, loaded bool) {
 	placed := map[string]bool{}
 	for key, m := range l.Mods {
-		if m.Side == "both" || m.Side == side {
+		if m.PlacedOn(side) {
 			placed[l.JarID(key)] = true
 		}
 	}
