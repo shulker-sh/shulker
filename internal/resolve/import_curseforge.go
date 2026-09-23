@@ -59,6 +59,7 @@ func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Im
 	im.keepUnmanaged(im.unmatched)
 	im.dropUnmatched()
 	rep.sort()
+	rep.warnSides()
 	return rep, nil
 }
 

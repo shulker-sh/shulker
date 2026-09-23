@@ -56,10 +56,19 @@ type Imported struct {
 	// Duplicates are the pack's copies of a datapack a global datapack mod's folder also holds,
 	// left out for the copy that mod loads: an index file by its index path, an override by its
 	// path in the archive.
-	Duplicates []string          `json:"duplicates"`
-	Unmanaged  []string          `json:"unmanaged"`
-	Warnings   []string          `json:"-"`
-	Overrides  []mrpack.Override `json:"-"`
+	Duplicates []string `json:"duplicates"`
+	Unmanaged  []string `json:"unmanaged"`
+	// Sides are the mods whose side the index's env gives otherwise than their provider does.
+	Sides     []SideChoice      `json:"sides"`
+	Warnings  []string          `json:"-"`
+	Overrides []mrpack.Override `json:"-"`
+}
+
+// SideChoice is a mod locked with the side the index's env gives it rather than its provider's.
+type SideChoice struct {
+	ID       string `json:"id"`
+	Pack     string `json:"pack"`
+	Provider string `json:"provider"`
 }
 
 // LockedFile is a file an import locked from a provider, under its key in the lock.
@@ -93,6 +102,19 @@ func (rep *Imported) sort() {
 	sort.Strings(rep.Dropped)
 	sort.Strings(rep.Duplicates)
 	sort.Strings(rep.Unmanaged)
+	slices.SortFunc(rep.Sides, func(a, b SideChoice) int { return strings.Compare(a.ID, b.ID) })
+}
+
+// warnSides warns once for every mod that takes its side from the pack rather than its provider.
+func (rep *Imported) warnSides() {
+	if len(rep.Sides) == 0 {
+		return
+	}
+	mods := make([]string, len(rep.Sides))
+	for i, s := range rep.Sides {
+		mods[i] = fmt.Sprintf("%s (%s → %s)", s.ID, s.Provider, s.Pack)
+	}
+	rep.Warnings = append(rep.Warnings, fmt.Sprintf("%d mod(s) take their side from the pack rather than their provider: %s", len(rep.Sides), strings.Join(mods, ", ")))
 }
 
 type importer struct {
@@ -113,6 +135,8 @@ type importer struct {
 	hybrids map[string][]hybridCopy
 	// unmatched are the mod jars and pack zips Modrinth didn't find, for CurseForge to look up.
 	unmatched []mrpack.Override
+	// indexSides are the sides the index's env gives its files, by layer and path.
+	indexSides map[string]string
 	// keepSides reuses the marker's side for each entry, for an archive whose layers don't say.
 	keepSides bool
 	// inProject marks the files as a project's own overrides rather than a pack's: one whose key
@@ -134,7 +158,7 @@ type importedPack struct {
 }
 
 func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
-	im := &importer{r: r, a: a, rep: &Imported{Locked: []LockedFile{}, Reused: []string{}, Dropped: []string{}, Duplicates: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}, loadedDatapacks: map[string]bool{}, hybrids: map[string][]hybridCopy{}}
+	im := &importer{r: r, a: a, rep: &Imported{Locked: []LockedFile{}, Reused: []string{}, Dropped: []string{}, Duplicates: []string{}, Unmanaged: []string{}, Sides: []SideChoice{}, Warnings: []string{}}, bySha: map[string]string{}, indexSides: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}, loadedDatapacks: map[string]bool{}, hybrids: map[string][]hybridCopy{}}
 	if a.Marker == nil {
 		return im
 	}
@@ -189,6 +213,7 @@ func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLoc
 	}
 	im.dropUnmatched()
 	im.rep.sort()
+	im.rep.warnSides()
 	return im.rep, nil
 }
 
@@ -211,13 +236,16 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if dup, err := im.duplicateDatapack(ctx, hybridCopy{file: &f}, f.Path, f.Path, sha512Sum); err != nil || dup {
 		return err
 	}
+	if len(f.Env) > 0 {
+		im.indexSides[f.Layer()+"/"+f.Path] = f.Side()
+	}
 	found, ok := im.onModrinth[sha1Sum]
 	if !ok {
 		return im.leaveForCurseForge(ctx, f)
 	}
-	// A pack's side is its env; a mod's comes from its provider.
+	// A pack's side is its env; a mod's is too when the index gives one, else its provider's.
 	side := ""
-	if mrpack.IsPackZip(f.Path) {
+	if mrpack.IsPackZip(f.Path) || len(f.Env) > 0 {
 		side = f.Side()
 	}
 	locked, failed, err := im.lockFile(ctx, im.modrinth, f.Layer(), f.Path, side, found.proj, found.v)
@@ -481,9 +509,11 @@ func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provide
 		im.unmanaged(o)
 		return nil
 	}
-	side := layerSide(o.Layer)
-	if side == "both" {
-		side = ""
+	side, fromIndex := im.indexSides[file]
+	if !fromIndex {
+		if side = layerSide(o.Layer); side == "both" {
+			side = ""
+		}
 	}
 	locked, err := im.lockOverride(ctx, cf, o, side, proj, v)
 	if err != nil || locked {
@@ -502,7 +532,7 @@ func (im *importer) lockFile(ctx context.Context, p provider.Provider, layer, fi
 		return false, "", nil
 	}
 	if err == nil && kind == manifest.TypeMod {
-		err = im.lockMod(ctx, p, side, proj, v)
+		err = im.lockMod(ctx, p, layer+"/"+filePath, side, proj, v)
 	} else if err == nil {
 		err = im.lockPack(ctx, p, path.Base(filePath), kind, side, proj, v)
 	}
@@ -594,8 +624,11 @@ func zipHasAssets(zr *zip.Reader) bool {
 	return slices.ContainsFunc(zr.File, func(f *zip.File) bool { return strings.HasPrefix(f.Name, "assets/") })
 }
 
-func (im *importer) lockMod(ctx context.Context, p provider.Provider, side string, proj *provider.Project, v *provider.Version) error {
-	id, prior, err := im.r.place(ctx, p, proj, v, "", "", side, "", false)
+// lockMod locks the mod the pack ships at file, on packSide when the pack gives one and on its
+// provider's side when it gives none. Only a side from the index's env is reported; one from an
+// override layer is recorded without a word.
+func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, packSide string, proj *provider.Project, v *provider.Version) error {
+	id, prior, err := im.r.place(ctx, p, proj, v, "", "", "", "", false)
 	if err != nil {
 		return err
 	}
@@ -610,6 +643,21 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, side strin
 			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: the marker pinned %v but the pack ships %s; pin dropped", id, entry.Pin, v.Number))
 			entry.Pin = nil
 		}
+	}
+	if packSide != "" {
+		providerSide := im.r.Lock.Mods[id].Side
+		if _, fromEnv := im.indexSides[file]; fromEnv && packSide != providerSide {
+			im.rep.Sides = append(im.rep.Sides, SideChoice{ID: id, Pack: packSide, Provider: providerSide})
+		}
+		// A marker's own side stays explicit even where the provider agrees with it.
+		if packSide != providerSide || entry.Side != "" {
+			entry.Side = packSide
+		}
+	}
+	if entry.Side != "" {
+		locked := im.r.Lock.Mods[id]
+		locked.Side = entry.Side
+		im.r.Lock.Mods[id] = locked
 	}
 	im.r.setSource(&entry, id, p, proj)
 	im.r.Manifest.Requires[id] = entry

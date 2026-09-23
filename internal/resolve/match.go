@@ -67,6 +67,7 @@ func (r *Resolver) MatchOverrides(ctx context.Context, files []mrpack.Override) 
 		return nil, err
 	}
 	im.rep.sort()
+	im.rep.warnSides()
 	res := &Matched{Locked: im.rep.Locked, Moved: []string{}, Kept: im.rep.Unmanaged, Warnings: im.rep.Warnings}
 	for _, o := range files {
 		if file := o.Layer + "/" + o.Path; !slices.Contains(res.Kept, file) {
