@@ -20,7 +20,7 @@ import (
 // file the installer would download, so it runs offline and only generates the rest.
 func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *build.Report) error {
 	l, _ := loader.Lookup(p.Lock.Loader.Type)
-	if l.InstallServerFlag == "" || rep.Side != "server" {
+	if l.ServerSetup != loader.ServerInstaller || rep.Side != "server" {
 		return nil
 	}
 	want := build.InstalledLoader{Type: l.Name, Version: p.Lock.Loader.Version}

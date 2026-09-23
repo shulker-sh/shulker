@@ -7,6 +7,20 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
+// ServerSetup is how a server gets its loader.
+type ServerSetup int
+
+const (
+	// ServerVanilla is no loader: the server runs the vanilla jar.
+	ServerVanilla ServerSetup = iota
+	// ServerLauncher is Fabric's: a server launch jar that fetches the vanilla jar where it expects it.
+	ServerLauncher
+	// ServerProfile is Quilt's: a launch jar and the libraries its server profile lists.
+	ServerProfile
+	// ServerInstaller is NeoForge's and Forge's: the loader's own installer, run with InstallServerFlag.
+	ServerInstaller
+)
+
 type Loader struct {
 	Name string
 	// Title is the loader's name as its own project writes it, for a name a player reads.
@@ -20,11 +34,12 @@ type Loader struct {
 	// CurseForgeType is CurseForge's numeric modLoaderType.
 	CurseForgeType string
 	// AlsoRuns are the loaders whose mods this one runs as well.
-	AlsoRuns []string
+	AlsoRuns    []string
+	ServerSetup ServerSetup
 	// ServerLaunchJar is the jar a server built for this loader starts from.
 	ServerLaunchJar string
-	// InstallServerFlag, when set, means the server is set up by running the loader's own installer
-	// jar with this flag and the server dir.
+	// InstallServerFlag is the flag the loader's own installer takes, with the server dir, to set up
+	// a ServerInstaller server.
 	InstallServerFlag string
 	// InstallClientFlag, when set, means the launcher is set up by running the loader's own
 	// installer jar with this flag and the launcher dir, instead of writing a meta profile json.
@@ -85,10 +100,10 @@ func ParseCurseForgeModLoader(id string) (string, string, bool) {
 }
 
 var All = []Loader{
-	{Name: "fabric", Title: "Fabric", DependencyID: "fabricloader", ComponentUID: "net.fabricmc.fabric-loader", MrpackKey: "fabric-loader", CurseForgeType: "4", ServerLaunchJar: "fabric-server-launch.jar", MetadataFiles: []string{"fabric.mod.json"}, MarkerFile: "fabric.mod.json", DependencyOverrides: "config/fabric_loader_dependencies.json"},
-	{Name: "quilt", Title: "Quilt", DependencyID: "quilt_loader", ComponentUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}, ServerLaunchJar: "quilt-server-launch.jar", MetadataFiles: []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json", TopLevelMandatory: true},
-	{Name: "neoforge", Title: "NeoForge", DependencyID: "neoforge", ComponentUID: "net.neoforged", MrpackKey: "neoforge", CurseForgeType: "6", InstallServerFlag: "--install-server", InstallClientFlag: "--install-client", MetadataFiles: []string{"META-INF/neoforge.mods.toml", "META-INF/mods.toml"}, MarkerFile: "META-INF/neoforge.mods.toml", MavenPath: "net/neoforged/neoforge"},
-	{Name: "forge", Title: "Forge", DependencyID: "forge", ComponentUID: "net.minecraftforge", MrpackKey: "forge", CurseForgeType: "1", InstallServerFlag: "--installServer", InstallClientFlag: "--installClient", MetadataFiles: []string{"META-INF/mods.toml"}, MarkerFile: "META-INF/mods.toml", MinecraftJarClassifier: "bundled", MavenPath: "net/minecraftforge/forge", MavenVersionPrefixesGame: true},
+	{Name: "fabric", Title: "Fabric", DependencyID: "fabricloader", ComponentUID: "net.fabricmc.fabric-loader", MrpackKey: "fabric-loader", CurseForgeType: "4", ServerSetup: ServerLauncher, ServerLaunchJar: "fabric-server-launch.jar", MetadataFiles: []string{"fabric.mod.json"}, MarkerFile: "fabric.mod.json", DependencyOverrides: "config/fabric_loader_dependencies.json"},
+	{Name: "quilt", Title: "Quilt", DependencyID: "quilt_loader", ComponentUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}, ServerSetup: ServerProfile, ServerLaunchJar: "quilt-server-launch.jar", MetadataFiles: []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json", TopLevelMandatory: true},
+	{Name: "neoforge", Title: "NeoForge", DependencyID: "neoforge", ComponentUID: "net.neoforged", MrpackKey: "neoforge", CurseForgeType: "6", ServerSetup: ServerInstaller, InstallServerFlag: "--install-server", InstallClientFlag: "--install-client", MetadataFiles: []string{"META-INF/neoforge.mods.toml", "META-INF/mods.toml"}, MarkerFile: "META-INF/neoforge.mods.toml", MavenPath: "net/neoforged/neoforge"},
+	{Name: "forge", Title: "Forge", DependencyID: "forge", ComponentUID: "net.minecraftforge", MrpackKey: "forge", CurseForgeType: "1", ServerSetup: ServerInstaller, InstallServerFlag: "--installServer", InstallClientFlag: "--installClient", MetadataFiles: []string{"META-INF/mods.toml"}, MarkerFile: "META-INF/mods.toml", MinecraftJarClassifier: "bundled", MavenPath: "net/minecraftforge/forge", MavenVersionPrefixesGame: true},
 }
 
 func Lookup(name string) (Loader, bool) {

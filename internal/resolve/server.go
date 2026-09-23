@@ -39,10 +39,10 @@ func (r *Resolver) ensureLoaderServer(ctx context.Context, mt *Meta) (ServerJarR
 	if err != nil {
 		return ServerJarResult{}, err
 	}
-	switch {
-	case l.Name == "quilt":
+	switch l.ServerSetup {
+	case loader.ServerProfile:
 		return r.ensureQuiltServer(ctx, mt)
-	case l.InstallServerFlag == "":
+	case loader.ServerLauncher:
 		return r.ensureFabricServer(ctx, mt.Fabric)
 	}
 	url, err := mt.InstallerURL(r.Lock)

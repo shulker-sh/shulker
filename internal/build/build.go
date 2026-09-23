@@ -753,7 +753,7 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 	if jar == nil || !b.Cache.Has(jar.Sha512) {
 		return launcherMissing
 	}
-	if l.InstallServerFlag == "" {
+	if l.ServerSetup != loader.ServerInstaller {
 		desired[l.ServerLaunchJar] = fromCache(jar.Sha512)
 	}
 	for name, dl := range jar.Libraries {
@@ -773,14 +773,14 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 // dir, where it downloads the jar only when missing; Quilt's launcher next to itself, which is also
 // where a project without a loader runs it; NeoForge's and Forge's installers under libraries/.
 func vanillaServerPath(l loader.Loader, minecraft string) string {
-	switch {
-	case l.InstallServerFlag != "":
+	switch l.ServerSetup {
+	case loader.ServerInstaller:
 		name := "server-" + minecraft
 		if l.MinecraftJarClassifier != "" {
 			name += "-" + l.MinecraftJarClassifier
 		}
 		return "libraries/net/minecraft/server/" + minecraft + "/" + name + ".jar"
-	case l.Name == "fabric":
+	case loader.ServerLauncher:
 		return ".fabric/server/" + minecraft + "-server.jar"
 	}
 	return VanillaServerFile
@@ -803,7 +803,7 @@ func LaunchArgs(lk *lock.Lock) []string {
 // directory, or empty when the loader has no installer.
 func InstallerArgsFile(lk *lock.Lock) string {
 	l, _ := loader.Lookup(lk.Loader.Type)
-	if l.InstallServerFlag == "" {
+	if l.ServerSetup != loader.ServerInstaller {
 		return ""
 	}
 	name := "unix_args.txt"
