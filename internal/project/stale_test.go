@@ -1,6 +1,7 @@
 package project
 
 import (
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/lock"
@@ -28,5 +29,17 @@ func TestLockDifferencesIgnoresModpackEntries(t *testing.T) {
 	}
 	if diffs := p.LockDifferences(); len(diffs) > 0 {
 		t.Fatalf("LockDifferences() = %q, want none", diffs)
+	}
+}
+
+func TestAPinWithNoProviderMatchesTheCurseForgeFileLocked(t *testing.T) {
+	pin := manifest.NewID("", "5000001")
+	locked := manifest.NewID("curseforge", "5000001")
+	diffs := ModDifferences(t.TempDir(), "jei", manifest.Require{Pin: pin}, lock.Mod{Provider: "curseforge", Version: locked})
+	diffs = append(diffs, HostedDifferences("pack", manifest.Require{Pin: pin}, lock.Modpack{Provider: "curseforge", Version: locked})...)
+	for _, d := range diffs {
+		if strings.Contains(d, "pinned") {
+			t.Fatalf("differences = %q, want the pin to match", diffs)
+		}
 	}
 }

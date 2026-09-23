@@ -152,7 +152,7 @@ func HostedDifferences(name string, e manifest.Require, lp lock.Modpack) []strin
 	if channel != lp.Channel {
 		diffs = append(diffs, fmt.Sprintf("pack %s: channel %s -> %s", name, lp.Channel, channel))
 	}
-	if !e.Pin.IsZero() && e.Pin != lp.Version {
+	if !e.Pin.IsZero() && e.Pin.For(lp.Provider) != lp.Version {
 		diffs = append(diffs, fmt.Sprintf("pack %s: pinned to %v, locked %v", name, e.Pin, lp.Version))
 	}
 	return diffs
@@ -203,7 +203,7 @@ func ZipEntryDifferences(dir, key string, e manifest.Require, lp lock.Pack) []st
 	if channel != lp.Channel {
 		diffs = append(diffs, fmt.Sprintf("%s: channel %s -> %s", key, lp.Channel, channel))
 	}
-	if !e.Pin.IsZero() && e.Pin != lp.Version {
+	if !e.Pin.IsZero() && e.Pin.For(lp.Provider) != lp.Version {
 		diffs = append(diffs, fmt.Sprintf("%s: pinned to %v, locked %v", key, e.Pin, lp.Version))
 	}
 	if name := e.Provider; name != "" && name != lp.Provider {
@@ -225,7 +225,7 @@ func ModDifferences(dir, id string, e manifest.Require, lm lock.Mod) []string {
 	if channel != lm.Channel {
 		diffs = append(diffs, fmt.Sprintf("%s: channel %s -> %s", id, lm.Channel, channel))
 	}
-	if !e.Pin.IsZero() && e.Pin != lm.Version {
+	if !e.Pin.IsZero() && e.Pin.For(lm.Provider) != lm.Version {
 		diffs = append(diffs, fmt.Sprintf("%s: pinned to %v, locked %v", id, e.Pin, lm.Version))
 	}
 	if e.Side != "" && e.Side != lm.Side {
