@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -83,7 +84,7 @@ func (a *app) matchCmd() *cobra.Command {
 }
 
 // matchFolders are the folders of an override layer whose files a provider can host.
-var matchFolders = []string{"mods", "resourcepacks", "shaderpacks"}
+var matchFolders = append([]string{"mods", "resourcepacks", "shaderpacks"}, lock.DatapackFolders...)
 
 // overrideFiles reads the jars and pack zips in the project's override layers, or only the named
 // ones, each named by its layer and its path within it.
@@ -117,7 +118,7 @@ func (a *app) overrideFiles(dir string, named []string) ([]mrpack.Override, erro
 		}
 		rel, err := filepath.Rel(dir, abs)
 		if err != nil || !filepath.IsLocal(rel) || !isMatchable(filepath.ToSlash(rel)) {
-			e := out.Errorf("override-path", "%s isn't a jar in mods/ or a zip in resourcepacks/ or shaderpacks/ of an override folder", arg)
+			e := out.Errorf("override-path", "%s isn't a jar in mods/ or a zip in resourcepacks/, shaderpacks/ or a datapack folder of an override folder", arg)
 			e.Help = "match looks up files in overrides/, client-overrides/ and server-overrides/"
 			return nil, e
 		}

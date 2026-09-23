@@ -276,3 +276,51 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 		t.Fatalf("a datapack under resourcepacks/ with no loaded copy is locked as a datapack: %+v", l.Datapacks)
 	}
 }
+
+func TestPullAdoptsADroppedDatapack(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "install")
+	buildDir := filepath.Join(h.dir, "build", "client")
+	loot := makeJarFiles(t, "loot", "Loot Tweaks.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/loot/loot_table/chest.json": "{}"})
+	writeOverride(t, buildDir, "datapacks/Loot Tweaks.zip", string(loot.data))
+
+	rep := pullReport(t, h, "datapacks/Loot Tweaks.zip")
+	if want := []string{"datapacks/Loot Tweaks.zip -> files/Loot Tweaks.zip"}; !reflect.DeepEqual(rep.Entries, want) {
+		t.Fatalf("a zip in a datapack folder is adopted: %q", rep.Entries)
+	}
+	want := manifest.Require{Type: manifest.TypeDatapack, File: "files/Loot Tweaks.zip", Filename: "Loot Tweaks.zip"}
+	if got := h.readManifest(t).Requires["loot-tweaks"]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("an adopted datapack keeps its file name: %+v", got)
+	}
+	if p := h.readLock(t).Datapacks["loot-tweaks"]; p.Sha512 != loot.sha512 || p.Filename != "Loot Tweaks.zip" {
+		t.Fatalf("the adopted datapack is locked: %+v", p)
+	}
+	h.mustRun(t, "install")
+	if _, err := os.Stat(filepath.Join(buildDir, "datapacks", "Loot Tweaks.zip")); err != nil {
+		t.Fatalf("the next build places it where it was: %v", err)
+	}
+}
+
+func TestMatchLocksAnOverrideDatapack(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	terralith := h.jars["terralith"]
+	writeFile(t, filepath.Join(h.dir, "overrides/config/paxi/datapacks/Terralith.zip"), string(terralith.data))
+
+	var env struct {
+		Data matchResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "match", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if want := []resolve.LockedFile{{ID: "terralith", Type: "datapack", Provider: "modrinth"}}; !slices.Equal(env.Data.Locked, want) {
+		t.Fatalf("a zip in a loader's datapack folder is matched: %+v", env.Data)
+	}
+	if p := h.readLock(t).Datapacks["terralith"]; p.Filename != "Terralith.zip" {
+		t.Fatalf("the matched datapack keeps its file name: %+v", p)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "overrides/config/paxi/datapacks/Terralith.zip")); !os.IsNotExist(err) {
+		t.Fatalf("the matched override is removed: %v", err)
+	}
+}
