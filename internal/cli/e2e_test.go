@@ -480,6 +480,25 @@ func newHarness(t *testing.T) *harness {
 	})
 	mux.HandleFunc("/modrinth/project/", func(w http.ResponseWriter, r *http.Request) {
 		rest := strings.TrimPrefix(r.URL.Path, "/modrinth/project/")
+		if project, version, ok := strings.Cut(rest, "/version/"); ok {
+			id := project
+			if p, known := projects[project]; known {
+				id = p["id"].(string)
+			}
+			for packID, mp := range h.modrinthPacks {
+				if project == mp.slug {
+					id = packID
+				}
+			}
+			for _, v := range versions(id) {
+				if v["id"] == version || v["version_number"] == version {
+					writeJSON(w, v)
+					return
+				}
+			}
+			http.NotFound(w, r)
+			return
+		}
 		if strings.HasSuffix(rest, "/version") {
 			if list := versions(strings.TrimSuffix(rest, "/version")); list != nil {
 				writeJSON(w, list)

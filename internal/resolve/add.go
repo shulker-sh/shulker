@@ -152,7 +152,7 @@ func notFound(slug string, missed []string, skipped []*out.Error) *out.Error {
 		e.Items = append(e.Items, "skipped: "+reason.Message)
 	}
 	if _, err := strconv.Atoi(slug); err != nil && slices.Contains(missed, "curseforge") {
-		e.Help = "CurseForge's search doesn't list every project; add one it misses by its project id, shown on its CurseForge page under About Project, with `--provider curseforge`"
+		e.Help = "CurseForge's search doesn't list every project; add one it misses by a file URL (https://www.curseforge.com/minecraft/mc-mods/<slug>/files/<file id>), by https://www.curseforge.com/projects/<project id>, or by its project id, shown on its CurseForge page under About Project, with `--provider curseforge`"
 	}
 	return e
 }

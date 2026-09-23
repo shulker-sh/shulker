@@ -190,17 +190,26 @@ func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders
 }
 
 func (m *Modrinth) Version(ctx context.Context, versionID string) (*provider.Version, error) {
+	return m.version(ctx, "/version/"+url.PathEscape(versionID), versionID)
+}
+
+// ProjectVersion reads one of a project's versions by its id or its version number.
+func (m *Modrinth) ProjectVersion(ctx context.Context, project, version string) (*provider.Version, error) {
+	return m.version(ctx, "/project/"+url.PathEscape(project)+"/version/"+url.PathEscape(version), project+" "+version)
+}
+
+func (m *Modrinth) version(ctx context.Context, path, name string) (*provider.Version, error) {
 	var raw version
 	var found bool
 	err := m.call(ctx, func() (err error) {
-		found, err = m.Client.GetJSONIfFound(ctx, m.BaseURL+"/version/"+url.PathEscape(versionID), &raw)
+		found, err = m.Client.GetJSONIfFound(ctx, m.BaseURL+path, &raw)
 		return err
 	})
 	if err != nil {
-		return nil, fmt.Errorf("modrinth version %s: %w", versionID, err)
+		return nil, fmt.Errorf("modrinth version %s: %w", name, err)
 	}
 	if !found {
-		return nil, fmt.Errorf("modrinth version %s: %w", versionID, provider.ErrNotFound)
+		return nil, fmt.Errorf("modrinth version %s: %w", name, provider.ErrNotFound)
 	}
 	pv, err := convert(raw)
 	if err != nil {

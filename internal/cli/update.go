@@ -67,16 +67,23 @@ func (a *app) updateCmd() *cobra.Command {
 
 func (a *app) pinCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:         "pin <mod> [version]",
+		Use:         "pin <mod> [version|url]",
 		Annotations: acts(),
-		Short:       "Pin a mod to a provider version id, or to its locked version",
+		Short:       "Pin a mod to a provider version id or URL, or to its locked version",
 		Args:        rangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := ""
 			if len(args) == 2 {
 				version = args[1]
 			}
+			u, isURL, err := resolve.ParseURL(version)
+			if err != nil {
+				return err
+			}
 			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+				if isURL {
+					return r.PinURL(cmd.Context(), args[0], u)
+				}
 				return r.Pin(cmd.Context(), args[0], version)
 			})
 		},

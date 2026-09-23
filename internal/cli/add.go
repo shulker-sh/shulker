@@ -30,6 +30,10 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			return minimumArgs(1)(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			urls, err := providerURLs(args)
+			if err != nil {
+				return err
+			}
 			fallback := ""
 			if opts.ResourcePack {
 				fallback = manifest.TypeDatapack
@@ -71,7 +75,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			}
 			opts.As, opts.Type = as, chosen
 			for i, arg := range args {
-				args[i] = a.localPath(arg)
+				if _, ok := urls[arg]; !ok {
+					args[i] = a.localPath(arg)
+				}
 			}
 			for _, flag := range []struct {
 				name, value string
@@ -86,10 +92,16 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 				}
 			}
 			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
-				for _, slug := range args {
-					add := opts
-					if name, ok := from[slug]; ok {
+				for _, arg := range args {
+					add, slug := opts, arg
+					if name, ok := from[arg]; ok {
 						add.Provider = name
+					}
+					if u, ok := urls[arg]; ok {
+						var err error
+						if slug, add, err = r.FromURL(cmd.Context(), u, add); err != nil {
+							return "", err
+						}
 					}
 					if err := a.addAsking(cmd.Context(), r, slug, add); err != nil {
 						return "", err
@@ -135,9 +147,27 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	return cmd
 }
 
+// providerURLs reads the arguments that are Modrinth or CurseForge URLs.
+func providerURLs(args []string) (map[string]resolve.ProviderURL, error) {
+	urls := map[string]resolve.ProviderURL{}
+	for _, arg := range args {
+		u, ok, err := resolve.ParseURL(arg)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			urls[arg] = u
+		}
+	}
+	return urls, nil
+}
+
 // isArchive reports whether an add argument is a modpack archive, which a bare add takes as a
 // modpack: an .mrpack by its name, and a zip by holding a CurseForge manifest.
 func (a *app) isArchive(arg string) bool {
+	if _, ok, _ := resolve.ParseURL(arg); ok {
+		return false
+	}
 	switch strings.ToLower(filepath.Ext(arg)) {
 	case ".mrpack":
 		return true

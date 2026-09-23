@@ -122,12 +122,30 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 	if opts.Pin != "" && len(sources) > 1 {
 		return out.Errorf("usage", "--pin applies to a single modpack")
 	}
-	hosted := slices.ContainsFunc(sources, a.isSlug)
-	if err := refuseModpackFlags(cmd, hosted, !slices.ContainsFunc(sources, func(s string) bool { return !a.isSlug(s) })); err != nil {
+	urls, err := providerURLs(sources)
+	if err != nil {
+		return err
+	}
+	isHosted := func(source string) bool {
+		_, ok := urls[source]
+		return ok || a.isSlug(source)
+	}
+	hosted := slices.ContainsFunc(sources, isHosted)
+	if err := refuseModpackFlags(cmd, hosted, !slices.ContainsFunc(sources, func(s string) bool { return !isHosted(s) })); err != nil {
 		return err
 	}
 	return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
 		for _, source := range sources {
+			if u, ok := urls[source]; ok {
+				slug, add, err := r.FromURL(cmd.Context(), u, opts)
+				if err != nil {
+					return "", err
+				}
+				if err := r.Add(cmd.Context(), slug, add); err != nil {
+					return "", err
+				}
+				continue
+			}
 			if a.isSlug(source) {
 				if err := r.Add(cmd.Context(), source, opts); err != nil {
 					return "", err
