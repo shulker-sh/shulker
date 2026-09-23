@@ -2,7 +2,6 @@ package resolve
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -122,7 +121,7 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 	if !entry.Pin.IsZero() {
 		pin = entry.Pin.String()
 	}
-	v, err := r.pickModpack(ctx, p, proj, pin, entry.Channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeModpack, p.Name()), pin, entry.Channel)
 	if err != nil {
 		return lock.Modpack{}, err
 	}
@@ -160,25 +159,6 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 	}, nil
 }
 
-func (r *Resolver) pickModpack(ctx context.Context, p provider.Provider, proj *provider.Project, pin, channel string) (*provider.Version, error) {
-	if pin != "" {
-		return pinnedVersion(ctx, p, proj, pin)
-	}
-	game, loaderName := r.modpackPlatform()
-	versions, err := p.Versions(ctx, proj.ID, game, modpackLoaders(loaderName))
-	if err != nil {
-		return nil, err
-	}
-	v, ok := provider.Newest(versions, channel, loaderName)
-	if !ok {
-		e := out.Errorf("no-compatible-version", "%s has no %s version%s", proj.Slug, channelLabel(channel), platformLabel(game, loaderName))
-		e.Candidates, e.Pass = otherChannels(versions)
-		e.Flag = "--channel"
-		return nil, e
-	}
-	return &v, nil
-}
-
 // modpackPlatform is what a hosted modpack's version has to fit: the Minecraft version and loader
 // the project sets, each left open when the project sets none, since the pack then supplies it.
 func (r *Resolver) modpackPlatform() (game, loaderName string) {
@@ -212,21 +192,6 @@ func platformLabel(game, loaderName string) string {
 	return strings.Join(parts, "")
 }
 
-// pinnedVersion is the provider version pin names, refused when it belongs to another project.
-func pinnedVersion(ctx context.Context, p provider.Provider, proj *provider.Project, pin string) (*provider.Version, error) {
-	v, err := p.Version(ctx, pin)
-	if errors.Is(err, provider.ErrNotFound) {
-		return nil, out.Errorf("version-not-found", "%s has no version %s for %s", p.Name(), pin, proj.Slug)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if v.ProjectID != proj.ID {
-		return nil, out.Errorf("pin-mismatch", "version %s belongs to project %s, not %s", pin, v.ProjectID, proj.Slug)
-	}
-	return v, nil
-}
-
 // outdatedModpacks reports the hosted modpacks a newer version is published for, without changing
 // the lock.
 func (r *Resolver) outdatedModpacks(ctx context.Context, ids []string) ([]Outdated, error) {
@@ -241,13 +206,11 @@ func (r *Resolver) outdatedModpacks(ctx context.Context, ids []string) ([]Outdat
 		if err != nil {
 			return nil, err
 		}
-		game, loaderName := r.modpackPlatform()
-		versions, err := p.Versions(ctx, locked.Project.String(), game, modpackLoaders(loaderName))
+		newest, newer, err := newerThan(ctx, p, locked.Project, r.queryFor(manifest.TypeModpack, p.Name()), entry.Channel, locked.Version)
 		if err != nil {
 			return nil, err
 		}
-		newest, ok := provider.Newest(versions, entry.Channel, loaderName)
-		if !ok || newest.ID == locked.Version.String() {
+		if !newer {
 			continue
 		}
 		res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: !entry.Pin.IsZero(), Modpack: true})

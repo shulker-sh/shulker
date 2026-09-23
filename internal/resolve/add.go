@@ -192,7 +192,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 		return loaderRequired()
 	}
 	held := holdVersions(r.Lock)
-	v, err := r.pick(ctx, p, proj, opts.Pin, opts.Channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), opts.Pin, opts.Channel)
 	if err != nil {
 		return err
 	}
@@ -243,38 +243,88 @@ func loaderRequired() *out.Error {
 	return e
 }
 
-func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider.Project, pin, channel string) (*provider.Version, error) {
-	if pin != "" {
-		v, err := p.Version(ctx, pin)
-		if errors.Is(err, provider.ErrNotFound) {
-			page := "https://modrinth.com/mod/" + proj.Slug + "/versions"
-			if p.Name() == "curseforge" {
-				page = "https://www.curseforge.com/minecraft/mc-mods/" + proj.Slug + "/files"
-			}
-			e := out.Errorf("version-not-found", "%s has no version %s for %s", p.Name(), pin, proj.Slug)
-			e.Help = "list versions at " + page
-			return nil, e
-		}
-		if err != nil {
-			return nil, err
-		}
-		if v.ProjectID != proj.ID {
-			return nil, out.Errorf("pin-mismatch", "version %s belongs to project %s, not %s", pin, v.ProjectID, proj.Slug)
-		}
-		return v, nil
+// versionQuery is how one kind asks a provider for its versions: the game and loader tags to
+// filter by and the loader Newest prefers.
+type versionQuery struct {
+	kind   string
+	game   string
+	tags   []string
+	loader string
+}
+
+func (r *Resolver) queryFor(kind, providerName string) versionQuery {
+	switch {
+	case kind == manifest.TypeModpack:
+		game, loaderName := r.modpackPlatform()
+		return versionQuery{kind: kind, game: game, tags: modpackLoaders(loaderName), loader: loaderName}
+	case manifest.IsPackKind(kind):
+		return versionQuery{kind: kind, game: r.Lock.Minecraft, tags: packTags(providerName, kind)}
 	}
-	versions, err := p.Versions(ctx, proj.ID, r.Lock.Minecraft, loader.ProviderLoaders(r.Lock.Loader.Type))
+	return versionQuery{kind: manifest.TypeMod, game: r.Lock.Minecraft, tags: loader.ProviderLoaders(r.Lock.Loader.Type), loader: r.Lock.Loader.Type}
+}
+
+// pickVersion is the version pin names, or the newest one q finds on channel.
+func pickVersion(ctx context.Context, p provider.Provider, proj *provider.Project, q versionQuery, pin, channel string) (*provider.Version, error) {
+	if pin != "" {
+		return pinnedVersion(ctx, p, proj, q.kind, pin)
+	}
+	versions, err := p.Versions(ctx, proj.ID, q.game, q.tags)
 	if err != nil {
 		return nil, err
 	}
-	v, ok := provider.Newest(versions, channel, r.Lock.Loader.Type)
+	v, ok := provider.Newest(versions, channel, q.loader)
 	if !ok {
-		e := out.Errorf("no-compatible-version", "%s has no %s version for Minecraft %s with %s", proj.Slug, channelLabel(channel), r.Lock.Minecraft, r.Lock.Loader.Type)
+		e := out.Errorf("no-compatible-version", "%s has no %s version%s", proj.Slug, channelLabel(channel), platformLabel(q.game, q.loader))
 		e.Candidates, e.Pass = otherChannels(versions)
 		e.Flag = "--channel"
 		return nil, e
 	}
 	return &v, nil
+}
+
+// newerThan is the newest version q finds on channel, and whether it is not the locked one.
+func newerThan(ctx context.Context, p provider.Provider, projectID manifest.ID, q versionQuery, channel string, locked manifest.ID) (*provider.Version, bool, error) {
+	versions, err := p.Versions(ctx, projectID.String(), q.game, q.tags)
+	if err != nil {
+		return nil, false, err
+	}
+	newest, ok := provider.Newest(versions, channel, q.loader)
+	if !ok || newest.ID == locked.String() {
+		return nil, false, nil
+	}
+	return &newest, true, nil
+}
+
+// pinnedVersion is the provider version pin names, refused when it belongs to another project.
+func pinnedVersion(ctx context.Context, p provider.Provider, proj *provider.Project, kind, pin string) (*provider.Version, error) {
+	v, err := p.Version(ctx, pin)
+	if errors.Is(err, provider.ErrNotFound) {
+		e := out.Errorf("version-not-found", "%s has no version %s for %s", p.Name(), pin, proj.Slug)
+		e.Help = "list versions at " + versionsPage(p.Name(), kind, proj.Slug)
+		return nil, e
+	}
+	if err != nil {
+		return nil, err
+	}
+	if v.ProjectID != proj.ID {
+		return nil, out.Errorf("pin-mismatch", "version %s belongs to project %s, not %s", pin, v.ProjectID, proj.Slug)
+	}
+	return v, nil
+}
+
+var curseforgeKindSections = map[string]string{
+	manifest.TypeMod:          "mc-mods",
+	manifest.TypeModpack:      "modpacks",
+	manifest.TypeResourcePack: "texture-packs",
+	manifest.TypeShader:       "shaders",
+	manifest.TypeDatapack:     "data-packs",
+}
+
+func versionsPage(providerName, kind, slug string) string {
+	if providerName == "curseforge" {
+		return "https://www.curseforge.com/minecraft/" + curseforgeKindSections[kind] + "/" + slug + "/files"
+	}
+	return "https://modrinth.com/" + kind + "/" + slug + "/versions"
 }
 
 // pinnedChannel is the channel a mod, pack or modpack pinned to v accepts: channel, widened to v's
@@ -541,7 +591,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 			return err
 		}
 		if dv == nil {
-			dv, err = r.pick(ctx, p, dproj, "", channel)
+			dv, err = pickVersion(ctx, p, dproj, r.queryFor(manifest.TypeMod, p.Name()), "", channel)
 			if err != nil {
 				return prefixed("dependency of "+parentID, err)
 			}

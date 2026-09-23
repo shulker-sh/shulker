@@ -1073,6 +1073,15 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	}
 }
 
+func TestPinningAnUnknownPackVersionLinksItsVersions(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	code, stdout, _ := h.run(t, "add", "fresh-animations", "--pin", "nope", "--json")
+	if code != 1 || !strings.Contains(stdout, `"version-not-found"`) || !strings.Contains(stdout, "modrinth.com/resourcepack/fresh-animations/versions") {
+		t.Fatalf("add a pack pinned to an unknown version: %d %s", code, stdout)
+	}
+}
+
 func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")

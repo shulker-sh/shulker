@@ -128,24 +128,6 @@ func (r *Resolver) packKeyFree(key, kind string) error {
 	return nil
 }
 
-func (r *Resolver) pickPack(ctx context.Context, p provider.Provider, proj *provider.Project, kind, pin, channel string) (*provider.Version, error) {
-	if pin != "" {
-		return pinnedVersion(ctx, p, proj, pin)
-	}
-	versions, err := p.Versions(ctx, proj.ID, r.Lock.Minecraft, packTags(p.Name(), kind))
-	if err != nil {
-		return nil, err
-	}
-	v, ok := provider.Newest(versions, channel, "")
-	if !ok {
-		e := out.Errorf("no-compatible-version", "%s has no %s version for Minecraft %s", proj.Slug, channelLabel(channel), r.Lock.Minecraft)
-		e.Candidates, e.Pass = otherChannels(versions)
-		e.Flag = "--channel"
-		return nil, e
-	}
-	return &v, nil
-}
-
 // lockedPacks is every pack in the lock, by key. Keys are one namespace, so the
 // sections never collide.
 func (r *Resolver) lockedPacks() map[string]lock.Pack {
@@ -278,7 +260,7 @@ func (r *Resolver) checkPackFilenames() error {
 // lockPack picks the pack's version, fetches it into the cache and records it in
 // the lock under key, returning the channel it accepted: channel, widened for a pin.
 func (r *Resolver) lockPack(ctx context.Context, p provider.Provider, proj *provider.Project, key, kind, pin, channel string) (string, error) {
-	v, err := r.pickPack(ctx, p, proj, kind, pin, channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(kind, p.Name()), pin, channel)
 	if err != nil {
 		return "", err
 	}
@@ -375,12 +357,11 @@ func (r *Resolver) outdatedPacks(ctx context.Context, ids []string) ([]Outdated,
 			if err != nil {
 				return nil, err
 			}
-			versions, err := p.Versions(ctx, locked.Project.String(), r.Lock.Minecraft, packTags(p.Name(), kind))
+			newest, newer, err := newerThan(ctx, p, locked.Project, r.queryFor(kind, p.Name()), listed[key].Channel, locked.Version)
 			if err != nil {
 				return nil, err
 			}
-			newest, ok := provider.Newest(versions, listed[key].Channel, "")
-			if !ok || newest.ID == locked.Version.String() {
+			if !newer {
 				continue
 			}
 			res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: !listed[key].Pin.IsZero()})

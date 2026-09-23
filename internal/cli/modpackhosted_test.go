@@ -60,6 +60,14 @@ func hostedProject(t *testing.T) (*harness, fakeJar) {
 	return h, archive
 }
 
+func TestPinningAnUnknownModpackVersionLinksItsVersions(t *testing.T) {
+	h, _ := hostedProject(t)
+	code, stdout, _ := h.run(t, "add", "cozy", "--pin", "nope", "--json")
+	if code != 1 || !strings.Contains(stdout, `"version-not-found"`) || !strings.Contains(stdout, "modrinth.com/modpack/cozy/versions") {
+		t.Fatalf("add a modpack pinned to an unknown version: %d %s", code, stdout)
+	}
+}
+
 func TestHostedModpackAddLocksAndBuilds(t *testing.T) {
 	h, archive := hostedProject(t)
 	h.mustRun(t, "add", "cozy")

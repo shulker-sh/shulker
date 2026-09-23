@@ -272,6 +272,14 @@ type Require struct {
 	Note         string     `json:"note,omitempty"`
 }
 
+// ChannelOrRelease is the channel the entry accepts, release when it names none.
+func (r Require) ChannelOrRelease() string {
+	if r.Channel == "" {
+		return "release"
+	}
+	return r.Channel
+}
+
 // Kind is the entry's type, where an entry with a source and no type is a modpack.
 func (r Require) Kind() string {
 	switch {

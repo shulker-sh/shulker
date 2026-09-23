@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"sort"
 
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/provider"
 )
 
 type Outdated struct {
@@ -127,12 +125,11 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 		if err != nil {
 			return nil, err
 		}
-		versions, err := p.Versions(ctx, m.Project.String(), r.Lock.Minecraft, loader.ProviderLoaders(r.Lock.Loader.Type))
+		newest, newer, err := newerThan(ctx, p, m.Project, r.queryFor(manifest.TypeMod, p.Name()), r.channelFor(id), m.Version)
 		if err != nil {
 			return nil, err
 		}
-		newest, ok := provider.Newest(versions, r.channelFor(id), r.Lock.Loader.Type)
-		if !ok || newest.ID == m.Version.String() {
+		if !newer {
 			continue
 		}
 		entry := r.Manifest.Mods()[id]
@@ -222,7 +219,7 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 	if !entry.Pin.IsZero() {
 		pin = entry.Pin.String()
 	}
-	v, err := r.pick(ctx, p, proj, pin, entry.Channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), pin, entry.Channel)
 	if err != nil {
 		return err
 	}

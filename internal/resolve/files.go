@@ -280,7 +280,7 @@ func (r *Resolver) addFileDeps(ctx context.Context, id string, info *jarmeta.Inf
 		if err != nil {
 			return err
 		}
-		v, err := r.pick(ctx, p, proj, "", "")
+		v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), "", "")
 		if err != nil {
 			return prefixed("dependency of "+id, err)
 		}

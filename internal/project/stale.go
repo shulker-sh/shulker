@@ -148,10 +148,7 @@ func HostedDifferences(name string, e manifest.Require, lp lock.Modpack) []strin
 	if e.Provider != "" && e.Provider != lp.Provider {
 		diffs = append(diffs, fmt.Sprintf("pack %s: provider %s -> %s", name, lp.Provider, e.Provider))
 	}
-	channel := e.Channel
-	if channel == "" {
-		channel = "release"
-	}
+	channel := e.ChannelOrRelease()
 	if channel != lp.Channel {
 		diffs = append(diffs, fmt.Sprintf("pack %s: channel %s -> %s", name, lp.Channel, channel))
 	}
@@ -202,10 +199,7 @@ func ZipEntryDifferences(dir, key string, e manifest.Require, lp lock.Pack) []st
 	if e.File != "" || lp.File != "" {
 		return append(diffs, FileDifferences(dir, key, e.File, lp.File, lp.Size, lp.Sha512)...)
 	}
-	channel := e.Channel
-	if channel == "" {
-		channel = "release"
-	}
+	channel := e.ChannelOrRelease()
 	if channel != lp.Channel {
 		diffs = append(diffs, fmt.Sprintf("%s: channel %s -> %s", key, lp.Channel, channel))
 	}
@@ -227,10 +221,7 @@ func ModDifferences(dir, id string, e manifest.Require, lm lock.Mod) []string {
 		return diffs
 	}
 	var diffs []string
-	channel := e.Channel
-	if channel == "" {
-		channel = "release"
-	}
+	channel := e.ChannelOrRelease()
 	if channel != lm.Channel {
 		diffs = append(diffs, fmt.Sprintf("%s: channel %s -> %s", id, lm.Channel, channel))
 	}
