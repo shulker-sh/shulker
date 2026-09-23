@@ -336,7 +336,7 @@ func (r *Resolver) fileKeyFree(key, kind string, info *jarmeta.Info) error {
 		return r.packKeyFree(key, kind)
 	}
 	for _, other := range manifest.PackKinds {
-		if _, ok := r.packSection(other)[key]; ok {
+		if _, ok := r.Lock.Packs(other)[key]; ok {
 			return manifest.KeyTaken(key, other, kind)
 		}
 	}

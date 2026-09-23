@@ -42,8 +42,6 @@ func packTags(providerName, kind string) []string {
 	return []string{"minecraft"}
 }
 
-func (r *Resolver) packSection(kind string) map[string]lock.Pack { return r.Lock.Packs(kind) }
-
 // packSide is where a datapack is placed: its entry's side, or both. The other
 // kinds are client-only and record none.
 func packSide(kind string, e manifest.Require) string {
@@ -98,7 +96,7 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 		listed.Pin = lockID(p.Name(), opts.Pin)
 	}
 	r.setSource(&listed, key, p, proj)
-	locked := r.packSection(kind)[key]
+	locked := r.Lock.Packs(kind)[key]
 	listed.Filename = r.Manifest.Requires[key].Filename
 	if name := locked.ProviderFilename; listed.Filename == "" && strings.HasSuffix(name, ".zip") && name != key+".zip" {
 		listed.Filename = name
@@ -108,7 +106,7 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 		listed.Side, listed.ResourcePack = opts.Side, opts.ResourcePack
 		locked.Side, locked.ResourcePack = packSide(kind, listed), listed.ResourcePack
 	}
-	r.packSection(kind)[key] = locked
+	r.Lock.Packs(kind)[key] = locked
 	r.Manifest.Requires[key] = listed
 	return nil
 }
@@ -123,7 +121,7 @@ func (r *Resolver) packKeyFree(key, kind string) error {
 		return manifest.KeyTaken(key, manifest.TypeMod, kind)
 	}
 	for _, other := range manifest.PackKinds {
-		if _, ok := r.packSection(other)[key]; ok && other != kind {
+		if _, ok := r.Lock.Packs(other)[key]; ok && other != kind {
 			return manifest.KeyTaken(key, other, kind)
 		}
 	}
@@ -153,7 +151,7 @@ func (r *Resolver) pickPack(ctx context.Context, p provider.Provider, proj *prov
 func (r *Resolver) lockedPacks() map[string]lock.Pack {
 	all := map[string]lock.Pack{}
 	for _, kind := range manifest.PackKinds {
-		maps.Copy(all, r.packSection(kind))
+		maps.Copy(all, r.Lock.Packs(kind))
 	}
 	return all
 }
@@ -165,7 +163,7 @@ func (r *Resolver) packKind(key string) (string, bool) {
 		return e.Kind(), manifest.IsPackKind(e.Kind())
 	}
 	for _, kind := range manifest.PackKinds {
-		if _, ok := r.packSection(kind)[key]; ok {
+		if _, ok := r.Lock.Packs(kind)[key]; ok {
 			return kind, true
 		}
 	}
@@ -183,12 +181,12 @@ func (r *Resolver) removePacks(ids []string) ([]string, error) {
 			continue
 		}
 		if _, listed := r.Manifest.Requires[id]; !listed {
-			if from := r.packSection(kind)[id].Modpack; from != "" {
+			if from := r.Lock.Packs(kind)[id].Modpack; from != "" {
 				return nil, providedBy(id, from, "remove the modpack or list it in shulker.json yourself")
 			}
 		}
 		delete(r.Manifest.Requires, id)
-		delete(r.packSection(kind), id)
+		delete(r.Lock.Packs(kind), id)
 	}
 	return mods, nil
 }
@@ -200,7 +198,7 @@ func (r *Resolver) removePacks(ids []string) ([]string, error) {
 func (r *Resolver) reconcilePacks(ctx context.Context) error {
 	for _, kind := range manifest.PackKinds {
 		listed := r.Manifest.Packs(kind)
-		section := r.packSection(kind)
+		section := r.Lock.Packs(kind)
 		for _, key := range sortedKeys(section) {
 			if _, still := listed[key]; !still && section[key].Modpack == "" {
 				delete(section, key)
@@ -260,7 +258,7 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 func (r *Resolver) checkPackFilenames() error {
 	placed := map[string]string{}
 	for _, kind := range manifest.PackKinds {
-		section := r.packSection(kind)
+		section := r.Lock.Packs(kind)
 		for _, key := range sortedKeys(section) {
 			paths := []string{r.Lock.PackPath(kind, section[key], "client", "")}
 			if section[key].ResourcePack {
@@ -321,7 +319,7 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 	if kind == manifest.TypeShader {
 		locked.Loaders = shaderLoaders(v)
 	}
-	r.packSection(kind)[key] = locked
+	r.Lock.Packs(kind)[key] = locked
 	return nil
 }
 
@@ -335,7 +333,7 @@ func (r *Resolver) splitPackTargets(ids []string) (mods, packs []string, err err
 			continue
 		}
 		if _, listed := r.Manifest.Requires[id]; !listed {
-			if from := r.packSection(kind)[id].Modpack; from != "" {
+			if from := r.Lock.Packs(kind)[id].Modpack; from != "" {
 				return nil, nil, providedBy(id, from, "update the modpack, or list it in shulker.json to resolve it here")
 			}
 		}
@@ -367,7 +365,7 @@ func (r *Resolver) outdatedPacks(ctx context.Context, ids []string) ([]Outdated,
 	var res []Outdated
 	for _, kind := range manifest.PackKinds {
 		listed := r.Manifest.Packs(kind)
-		section := r.packSection(kind)
+		section := r.Lock.Packs(kind)
 		for _, key := range sortedKeys(listed) {
 			locked, ok := section[key]
 			if !ok || locked.File != "" || (len(ids) > 0 && !slices.Contains(ids, key)) {
@@ -414,7 +412,7 @@ func (r *Resolver) lockFiles() []downloadable {
 		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size, side: m.Side})
 	}
 	for _, kind := range manifest.PackKinds {
-		section := r.packSection(kind)
+		section := r.Lock.Packs(kind)
 		for _, key := range sortedKeys(section) {
 			p := section[key]
 			side := cmp.Or(p.Side, "client")

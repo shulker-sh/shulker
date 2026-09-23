@@ -696,7 +696,7 @@ func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename,
 		return err
 	}
 	defer func() {
-		if _, locked := r.packSection(kind)[key]; !locked {
+		if _, locked := r.Lock.Packs(kind)[key]; !locked {
 			delete(r.Manifest.Requires, key)
 		}
 	}()

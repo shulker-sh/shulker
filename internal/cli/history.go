@@ -205,15 +205,14 @@ func historyChanges(p *project.Project, e build.HistoryEntry) ([]historyChange, 
 		invalid.Rows = []out.Detail{{Label: "lock", Text: out.AsError(err).Message}}
 		return nil, invalid
 	}
-	sections := []struct {
+	type section struct {
 		kind string
 		now  map[string]string
 		was  map[string]string
-	}{
-		{"", modVersions(p.Lock.Mods), modVersions(was.Mods)},
-		{manifest.TypeResourcePack, packVersions(p.Lock.ResourcePacks), packVersions(was.ResourcePacks)},
-		{manifest.TypeShader, packVersions(p.Lock.Shaders), packVersions(was.Shaders)},
-		{manifest.TypeDatapack, packVersions(p.Lock.Datapacks), packVersions(was.Datapacks)},
+	}
+	sections := []section{{"", modVersions(p.Lock.Mods), modVersions(was.Mods)}}
+	for _, kind := range manifest.PackKinds {
+		sections = append(sections, section{kind, packVersions(p.Lock.Packs(kind)), packVersions(was.Packs(kind))})
 	}
 	changes := []historyChange{}
 	for _, s := range sections {

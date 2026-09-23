@@ -325,7 +325,7 @@ func (r *Resolver) modIDFree(modID, key string) error {
 
 // lockFilePack locks a local resource pack or shader by its bytes.
 func (r *Resolver) lockFilePack(key, kind string, entry manifest.Require) error {
-	section := r.packSection(kind)
+	section := r.Lock.Packs(kind)
 	locked := ""
 	if prev, ok := section[key]; ok && prev.File == entry.File {
 		locked = prev.Sha512

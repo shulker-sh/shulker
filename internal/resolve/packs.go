@@ -190,7 +190,7 @@ func (r *Resolver) applyLockedPacks() error {
 				}
 				entry := section[key]
 				entry.Modpack = p.Name
-				r.packSection(kind)[key] = entry
+				r.Lock.Packs(kind)[key] = entry
 			}
 		}
 	}
