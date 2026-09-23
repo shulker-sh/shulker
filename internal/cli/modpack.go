@@ -28,10 +28,10 @@ var typeFlags = map[string][]string{
 	manifest.TypeModpack:      {"ref", "as", "unlocked", "no-auto-update", "channel", "pin", "provider"},
 	manifest.TypeResourcePack: {"channel", "pin", "provider", "as"},
 	manifest.TypeShader:       {"channel", "pin", "provider", "as"},
-	manifest.TypeDatapack:     {"side", "channel", "pin", "provider", "as"},
+	manifest.TypeDatapack:     {"side", "channel", "pin", "provider", "as", "resourcepack"},
 }
 
-var allTypeFlags = []string{"as", "channel", "no-auto-update", "pin", "provider", "ref", "side", "unlocked", "with-deps"}
+var allTypeFlags = []string{"as", "channel", "no-auto-update", "pin", "provider", "ref", "resourcepack", "side", "unlocked", "with-deps"}
 
 // inferredFlags are the flags an entry may take while its type is still the
 // provider's to settle. A modpack is never inferred — it takes a source, not a

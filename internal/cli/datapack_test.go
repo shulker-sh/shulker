@@ -415,3 +415,26 @@ func TestExportsShipAHybridDatapacksResourcePackCopy(t *testing.T) {
 		t.Fatal("the resource pack copy is bundled")
 	}
 }
+
+func TestAddAHybridDatapack(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	hybrid := makeJarFiles(t, "hybrid", "autoslabs.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/a/tags/x.json": "{}", "assets/a/lang/en_us.json": "{}"})
+	path := writeOutside(t, hybrid.filename, hybrid.data)
+	code, stdout, _ := h.run(t, "--json", "add", path)
+	if e := failureCode(t, stdout); code == 0 || !strings.Contains(e.Help, "--resourcepack") {
+		t.Fatalf("the ambiguity names the hybrid flag: %+v", e)
+	}
+	if code, _, stderr := h.run(t, "add", path, "--type", "resourcepack", "--resourcepack"); code == 0 || !strings.Contains(stderr, "--resourcepack doesn't apply to a resourcepack") {
+		t.Fatalf("the flag is a datapack's: %s", stderr)
+	}
+
+	h.mustRun(t, "add", path, "--resourcepack")
+	h.mustRun(t, "datapack", "add", "terralith", "--resourcepack")
+	m, l := h.readManifest(t), h.readLock(t)
+	for _, key := range []string{"autoslabs", "terralith"} {
+		if !m.Requires[key].ResourcePack || m.Requires[key].Kind() != manifest.TypeDatapack || !l.Datapacks[key].ResourcePack {
+			t.Fatalf("%s is a datapack placed as a resource pack too: %+v %+v", key, m.Requires[key], l.Datapacks[key])
+		}
+	}
+}

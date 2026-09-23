@@ -55,6 +55,8 @@ type AddOptions struct {
 	As       string
 	Type     string
 	WithDeps bool
+	// ResourcePack also places a datapack in resourcepacks/.
+	ResourcePack bool
 	// KeepFilename places a pack zip under its own file name when that isn't <key>.zip.
 	KeepFilename bool
 }

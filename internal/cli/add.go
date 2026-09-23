@@ -31,6 +31,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fallback := ""
+			if opts.ResourcePack {
+				fallback = manifest.TypeDatapack
+			}
 			if kind == "" && typ == "" && len(args) > 0 && !slices.ContainsFunc(args, func(arg string) bool { return !a.isArchive(arg) }) {
 				fallback = manifest.TypeModpack
 			}
@@ -101,6 +104,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	}
 	if applies(kind, "side") {
 		cmd.Flags().StringVar(&opts.Side, "side", "", "override side: client, server, both")
+	}
+	if applies(kind, "resourcepack") {
+		cmd.Flags().BoolVar(&opts.ResourcePack, "resourcepack", false, "also place the datapack in resourcepacks/, for one that carries assets/")
 	}
 	if applies(kind, "channel") {
 		cmd.Flags().StringVar(&opts.Channel, "channel", "", "least stable channel accepted: release, beta, alpha")

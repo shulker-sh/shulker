@@ -112,6 +112,9 @@ func (r *Resolver) addFile(ctx context.Context, path string, opts AddOptions) er
 	if opts.Side != "" {
 		entry.Side = opts.Side
 	}
+	if opts.ResourcePack {
+		entry.ResourcePack = true
+	}
 	if copied {
 		if err := r.CopyIn(path, rel, isReadded); err != nil {
 			return err
@@ -227,7 +230,9 @@ func guessFileKind(path, asked string) (string, error) {
 func mcmetaKind(path string, assets, data bool) (string, error) {
 	switch {
 	case data && assets:
-		return "", typeAmbiguous(path, manifest.TypeResourcePack, manifest.TypeDatapack)
+		e := typeAmbiguous(path, manifest.TypeResourcePack, manifest.TypeDatapack)
+		e.Help = "pass `--type`, or `--resourcepack` to place it as a datapack and a resource pack both"
+		return "", e
 	case data:
 		return manifest.TypeDatapack, nil
 	}
@@ -254,7 +259,7 @@ func folderKind(path, asked string) (string, error) {
 	return "", typeAmbiguous(path, manifest.PackKinds...)
 }
 
-func typeAmbiguous(path string, candidates ...string) error {
+func typeAmbiguous(path string, candidates ...string) *out.Error {
 	e := out.Errorf("type-ambiguous", "%s holds no pack shulker can tell the kind of", filepath.Base(path))
 	e.Candidates = candidates
 	e.Flag = "--type"

@@ -207,6 +207,7 @@ shulker add
 | --- | --- |
 | `--type <type>` | What the arguments name: `mod` (default), `modpack`, `resourcepack`, `shader`, `datapack` |
 | `--side <side>` | Override side: `client`, `server`, `both` |
+| `--resourcepack` | Datapacks only: also place the zip in `resourcepacks/`, for one that carries `assets/`. Implies `--type datapack` |
 | `--channel <channel>` | Least stable channel accepted: `release`, `beta`, `alpha` |
 | `--pin <version-id>` | Pin to a provider version id (one mod or modpack only) |
 | `--provider <provider>` | Provider to use for this mod or modpack: `modrinth` or `curseforge` |
@@ -1452,7 +1453,7 @@ shulker shader list
 
 ### `shulker datapack add|remove|list`
 
-`shulker datapack add terralith` is `shulker add terralith --type datapack`, and the same for `remove` and `list`. Modrinth files datapacks as mods, so a project whose only files are datapacks adds as one without `--type`, and one that ships both a mod and a datapack, like Terralith, adds as the mod unless `--type datapack` asks for its datapack files. A datapack is placed on both sides as `<key>.zip`, or under its entry's `filename`, in the folder of a global datapack mod the side places: `config/paxi/datapacks/` for Paxi, and `config/openloader/data/` before Minecraft 1.21 or `config/openloader/packs/` from it for Open Loader. With neither, a server places it in its world's `datapacks/` folder, named by `level-name`, which the game loads without a mod; a client places it in `datapacks/` and warns, since only some global datapack mods read that folder. `--side` narrows it to one side. Load order isn't managed: ship Paxi's `datapack_load_order.json` as an override. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`.
+`shulker datapack add terralith` is `shulker add terralith --type datapack`, and the same for `remove` and `list`. Modrinth files datapacks as mods, so a project whose only files are datapacks adds as one without `--type`, and one that ships both a mod and a datapack, like Terralith, adds as the mod unless `--type datapack` asks for its datapack files. A datapack is placed on both sides as `<key>.zip`, or under its entry's `filename`, in the folder of a global datapack mod the side places: `config/paxi/datapacks/` for Paxi, and `config/openloader/data/` before Minecraft 1.21 or `config/openloader/packs/` from it for Open Loader. With neither, a server places it in its world's `datapacks/` folder, named by `level-name`, which the game loads without a mod; a client places it in `datapacks/` and warns, since only some global datapack mods read that folder. `--side` narrows it to one side. A hybrid, a datapack that carries `assets/` as well, loads its assets only as a resource pack: `--resourcepack` records `"resourcepack": true`, which also places the same zip under the same name in the client's `resourcepacks/`, so one entry keeps both copies on one version. A local zip holding both `data/` and `assets/` needs `--type` or `--resourcepack`, which implies `--type datapack`. Load order isn't managed: ship Paxi's `datapack_load_order.json` as an override. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--resourcepack`.
 
 ```sh
 shulker datapack add terralith

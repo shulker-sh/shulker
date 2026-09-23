@@ -103,9 +103,9 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 		listed.Provider = p.Name()
 	}
 	if kind == manifest.TypeDatapack {
-		listed.Side = opts.Side
+		listed.Side, listed.ResourcePack = opts.Side, opts.ResourcePack
 		locked := r.packSection(kind)[key]
-		locked.Side = packSide(kind, listed)
+		locked.Side, locked.ResourcePack = packSide(kind, listed), listed.ResourcePack
 		r.packSection(kind)[key] = locked
 	}
 	r.Manifest.Requires[key] = listed
