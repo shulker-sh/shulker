@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -44,19 +45,18 @@ func inPlaceManifest(dir string) (*manifest.Manifest, string, bool, error) {
 }
 
 // inPlaceIntent is what an instance that is a project reads from its manifest rather than from its
-// instance file: the modpack it follows, the ref it follows it at, and the side that builds where
-// it stands. With several modpacks required, none of them is the one it was linked from, so the
-// source and the ref come back empty.
-func inPlaceIntent(dir string) (source, ref, side string, inPlace bool) {
+// instance file: the modpack entry it follows, and the side that builds where it stands. With
+// several modpacks required, none of them is the one it was linked from, so the entry comes back
+// empty.
+func inPlaceIntent(dir string) (pack manifest.Require, side string, inPlace bool) {
 	m, side, inPlace, err := inPlaceManifest(dir)
 	if err != nil || !inPlace {
-		return "", "", "", false
+		return manifest.Require{}, "", false
 	}
-	var pack manifest.Require
 	if key := modpackKey(m, ""); key != "" {
 		pack = m.Requires[key]
 	}
-	return pack.Source, pack.Ref, side, true
+	return pack, side, true
 }
 
 // syncInPlace refreshes the modpacks that follow their source, relocks without moving the
@@ -81,11 +81,11 @@ func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, r
 }
 
 func (a *app) buildInPlace(ctx context.Context, dir string, req syncRequest) (syncResult, error) {
-	src, err := a.openSource(ctx, dir, "")
+	src, err := a.openSource(ctx, dir, pack.At{})
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.ref, req.into = "", ""
+	req.at, req.into = pack.At{}, ""
 	return a.sync(ctx, src, req)
 }
 

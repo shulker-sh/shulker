@@ -17,6 +17,7 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 )
 
 type instanceEntry struct {
@@ -26,6 +27,7 @@ type instanceEntry struct {
 	Side          string `json:"side,omitempty"`
 	AssumesClient bool   `json:"assumeClient,omitempty"`
 	Ref           string `json:"ref,omitempty"`
+	Path          string `json:"path,omitempty"`
 	Problem       string `json:"problem,omitempty"`
 	LaunchError   string `json:"launchError,omitempty"`
 	intent        *instance.File
@@ -104,7 +106,7 @@ func inspectInstance(in config.Instance) instanceEntry {
 		e.Problem = out.AsError(err).Message
 	default:
 		e.intent = f
-		e.Side, e.Ref, e.AssumesClient = f.Side, f.Ref, f.AssumesClient
+		e.Side, e.Ref, e.Path, e.AssumesClient = f.Side, f.Ref, f.Path, f.AssumesClient
 		if e.Source == "" {
 			e.Source = f.Source
 		}
@@ -114,16 +116,16 @@ func inspectInstance(in config.Instance) instanceEntry {
 			e.LaunchError = last.Error
 		}
 	}
-	source, ref, side, inPlace := inPlaceIntent(in.Dir)
+	pack, side, inPlace := inPlaceIntent(in.Dir)
 	state, _ := build.ReadState(in.Dir)
 	switch {
 	case inPlace:
-		e.Ref, e.Side = ref, side
-		if source != "" {
-			e.Source = source
+		e.Ref, e.Path, e.Side = pack.Ref, pack.Path, side
+		if pack.Source != "" {
+			e.Source = pack.Source
 		}
 	case e.intent == nil:
-		e.Ref = state.Ref
+		e.Ref, e.Path = state.Ref, state.Path
 		if e.Source == "" {
 			e.Source = state.Source
 		}
@@ -182,6 +184,9 @@ func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
 		}
 		if e.Ref != "" {
 			detail += ", ref " + e.Ref
+		}
+		if e.Path != "" {
+			detail += ", path " + e.Path
 		}
 		if e.Side != "" {
 			detail += ", side " + e.Side
@@ -310,8 +315,8 @@ func (a *app) updateInstances(update func([]config.Instance) []config.Instance) 
 // saveIntent writes what a directory syncs from, keeping the settings block a person may have
 // edited: a sync never touches it. Every directory shulker syncs into gets one, launcher instance
 // or not; a link goes through linkSettings.save instead, which also seeds the settings.
-func saveIntent(dir, source, ref, side string, assumeClient bool) error {
-	f, _, err := loadIntent(dir, source, ref, side, assumeClient)
+func saveIntent(dir, source string, at pack.At, side string, assumeClient bool) error {
+	f, _, err := loadIntent(dir, source, at, side, assumeClient)
 	if err != nil {
 		return err
 	}
@@ -320,7 +325,7 @@ func saveIntent(dir, source, ref, side string, assumeClient bool) error {
 
 // loadIntent is the instance file for a directory with this sync recorded in it, and whether it had
 // to be created, which is what tells a link that the settings are still shulker's to seed.
-func loadIntent(dir, source, ref, side string, assumeClient bool) (*instance.File, bool, error) {
+func loadIntent(dir, source string, at pack.At, side string, assumeClient bool) (*instance.File, bool, error) {
 	_, _, inPlace, err := inPlaceManifest(dir)
 	if err != nil {
 		return nil, false, err
@@ -338,9 +343,9 @@ func loadIntent(dir, source, ref, side string, assumeClient bool) (*instance.Fil
 	// One writer per fact: an instance that is a project holds the modpack it follows and the side
 	// that builds in place in its manifest, so its file keeps no copy of either to go stale.
 	if inPlace {
-		f.Source, f.Ref, f.Side, f.AssumesClient = "", "", "", false
+		f.Source, f.Ref, f.Path, f.Side, f.AssumesClient = "", "", "", "", false
 	} else {
-		f.Source, f.Ref, f.Side, f.AssumesClient = source, ref, side, assumeClient
+		f.Source, f.Ref, f.Path, f.Side, f.AssumesClient = source, at.Ref, at.Path, side, assumeClient
 	}
 	return f, fresh, nil
 }

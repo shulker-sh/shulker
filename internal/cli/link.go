@@ -18,6 +18,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -30,6 +31,7 @@ type linkReport struct {
 	GameDir     string      `json:"gameDir"`
 	Source      string      `json:"source"`
 	Ref         string      `json:"ref,omitempty"`
+	Path        string      `json:"path,omitempty"`
 	Modpack     string      `json:"modpack"`
 	Sync        *syncResult `json:"sync"`
 }
@@ -55,7 +57,8 @@ func (a *app) linkCmd() *cobra.Command {
 }
 
 func (a *app) linkMojangCmd() *cobra.Command {
-	var launcherDir, instanceName, ref, as string
+	var launcherDir, instanceName, as string
+	var at pack.At
 	var force bool
 	var ls linkSettings
 	cmd := &cobra.Command{
@@ -65,7 +68,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 		Short:       "Add a profile for the client build to the official launcher, installing its loader if it has one",
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, l, err := a.openLinkSource(cmd, args, ref, ls)
+			src, l, err := a.openLinkSource(cmd, args, at, ls)
 			if err != nil {
 				return err
 			}
@@ -126,14 +129,14 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			inst, linked, err := a.linkProject(gameDir, id, display, ref, src)
+			inst, linked, err := a.linkProject(gameDir, id, display, src)
 			if err != nil {
 				return err
 			}
 			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
 				return err
 			}
-			if err := ls.save(gameDir, src.name, ref, "client", false, p.Manifest); err != nil {
+			if err := ls.save(gameDir, src.name, src.At, "client", false, p.Manifest); err != nil {
 				return err
 			}
 			row := config.Instance{ID: id, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name}
@@ -152,7 +155,8 @@ func (a *app) linkMojangCmd() *cobra.Command {
 				VersionID:   versionID,
 				GameDir:     gameDir,
 				Source:      src.name,
-				Ref:         ref,
+				Ref:         src.Ref,
+				Path:        src.Path,
 				Modpack:     modpackKey(inst.Manifest, src.name),
 				Sync:        &synced,
 			}
@@ -161,7 +165,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 					l.OKInto("installed "+versionID, filepath.Join(launcherDir, "versions"), "")
 				}
 				l.OKInto("linked launcher profile "+display, gameDir, "")
-				l.Tree(follows(rep.Modpack, rep.Source)...)
+				l.Tree(follows(rep.Modpack, rep.Source, rep.Path)...)
 				synced.print(l)
 			})
 		},
@@ -169,7 +173,8 @@ func (a *app) linkMojangCmd() *cobra.Command {
 	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher directory (default: the official launcher's .minecraft folder)")
 	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the side's display name)")
 	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
-	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&at.Ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
 	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack a profile already follows")
 	ls.register(cmd)
 	return cmd
@@ -219,7 +224,7 @@ func (a *app) linkID(as, display, dir string) (string, error) {
 // linkInstance is the half of a link every instanced launcher shares: the project its game
 // directory becomes, the settings this link seeds it with, the registry row that finds it again,
 // and the build that leaves it ready to play.
-func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref string, src *syncSource, ls linkSettings) (*project.Project, syncResult, error) {
+func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, src *syncSource, ls linkSettings) (*project.Project, syncResult, error) {
 	if err := a.checkID(as, row.Dir); err != nil {
 		return nil, syncResult{}, err
 	}
@@ -227,11 +232,11 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 	if err != nil {
 		return nil, syncResult{}, err
 	}
-	p, linked, err := a.linkProject(row.Dir, id, row.Name, ref, src)
+	p, linked, err := a.linkProject(row.Dir, id, row.Name, src)
 	if err != nil {
 		return nil, syncResult{}, err
 	}
-	if err := ls.save(row.Dir, src.name, ref, "client", false, src.project.Manifest); err != nil {
+	if err := ls.save(row.Dir, src.name, src.At, "client", false, src.project.Manifest); err != nil {
 		return nil, syncResult{}, err
 	}
 	row.ID, row.Source = id, src.name
@@ -244,7 +249,7 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 // calls an instance, following the link's source as a modpack and building where it stands. A
 // project already there is adopted, never replaced, so a relink keeps whatever the player added
 // on top of the pack. Its name is set to the id either way, since repair reads the id back from it.
-func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (p *project.Project, linked string, err error) {
+func (a *app) linkProject(gameDir, id, display string, src *syncSource) (p *project.Project, linked string, err error) {
 	p, err = a.openProjectAt(gameDir)
 	if src.isAuthor {
 		if err == nil {
@@ -257,7 +262,7 @@ func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (p 
 		return p, "", err
 	}
 	if errors.Is(err, project.ErrNoManifest) {
-		p, err := newInstance(gameDir, id, display, ref, src)
+		p, err := newInstance(gameDir, id, display, src)
 		return p, src.project.Manifest.Name, err
 	}
 	if err != nil {
@@ -287,8 +292,8 @@ func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (p 
 	if held && entry.Kind() != manifest.TypeModpack {
 		return nil, "", manifest.KeyTaken(key, entry.Kind(), manifest.TypeModpack)
 	}
-	if entry.Source != src.name || entry.Ref != ref {
-		entry.Source, entry.Ref = src.name, ref
+	if entry.Source != src.name || entry.Ref != src.Ref || entry.Path != src.Path {
+		entry.Source, entry.Ref, entry.Path = src.name, src.Ref, src.Path
 		p.Manifest.Requires[key], changed = entry, true
 		linked = key
 	}
@@ -302,12 +307,12 @@ func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (p 
 // locked, so the relock inherits all of that, and a pack that moves platform is followed rather
 // than fought. What it does copy is the two preferences only the pack's author can weigh, its
 // history retention and whether builds carry the marker mod; from then on both are the player's.
-func newInstance(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
+func newInstance(gameDir, id, display string, src *syncSource) (*project.Project, error) {
 	pack := src.project.Manifest
 	m := &manifest.Manifest{
 		Schema:   manifest.SchemaURL,
 		Name:     id,
-		Requires: map[string]manifest.Require{pack.Name: {Source: src.name, Ref: ref}},
+		Requires: map[string]manifest.Require{pack.Name: {Source: src.name, Ref: src.Ref, Path: src.Path}},
 		Client:   &manifest.Client{Name: display, Build: "."},
 	}
 	if pack.History != nil {
@@ -373,7 +378,7 @@ func checkAdopt(gameDir string, src *syncSource, noun, name, second string, forc
 	}
 	source := src.name
 	key := modpackKey(m, source)
-	if key == "" || m.Requires[key].Source == source {
+	if key == "" || (m.Requires[key].Source == source && m.Requires[key].Path == src.Path) {
 		return nil
 	}
 	e := out.Errorf("instance-exists", "%s %q already follows %s from %s", noun, name, key, m.Requires[key].Source)
@@ -399,20 +404,23 @@ func modpackKey(m *manifest.Manifest, source string) string {
 
 // linkSource is the project a link command works from: the argument when there
 // is one, else the project in the current directory.
-func (a *app) linkSource(ctx context.Context, args []string, ref string) (*syncSource, error) {
+func (a *app) linkSource(ctx context.Context, args []string, at pack.At) (*syncSource, error) {
 	if len(args) == 1 {
-		return a.openSource(ctx, args[0], ref)
+		return a.openSource(ctx, args[0], at)
 	}
-	if ref != "" {
+	if at.Ref != "" {
 		return nil, out.Errorf("usage", "--ref needs a git source argument")
+	}
+	if at.Path != "" {
+		return nil, out.Errorf("usage", "--path needs a git source argument")
 	}
 	return a.projectSource()
 }
 
 // linkFrom is linkSource for a link command: at a terminal, with nothing to follow, the link
 // authors the instance itself.
-func (a *app) linkFrom(cmd *cobra.Command, args []string, ref string) (*syncSource, error) {
-	src, err := a.linkSource(cmd.Context(), args, ref)
+func (a *app) linkFrom(cmd *cobra.Command, args []string, at pack.At) (*syncSource, error) {
+	src, err := a.linkSource(cmd.Context(), args, at)
 	if len(args) > 0 || !errors.Is(err, project.ErrNoManifest) || !a.canPick() {
 		return src, err
 	}
@@ -420,9 +428,12 @@ func (a *app) linkFrom(cmd *cobra.Command, args []string, ref string) (*syncSour
 }
 
 // follows is the row naming what an instance follows, which an authored instance has none of.
-func follows(modpack, source string) []out.Row {
+func follows(modpack, source, path string) []out.Row {
 	if modpack == "" {
 		return nil
+	}
+	if path != "" {
+		source += ", path " + path
 	}
 	return []out.Row{{Text: "follows " + modpack + " from " + source}}
 }
@@ -479,8 +490,8 @@ func (ls linkSettings) isSet() bool {
 }
 
 // save writes what a directory syncs from, and the settings this link decided.
-func (ls linkSettings) save(dir, source, ref, side string, assumeClient bool, m *manifest.Manifest) error {
-	f, fresh, err := loadIntent(dir, source, ref, side, assumeClient)
+func (ls linkSettings) save(dir, source string, at pack.At, side string, assumeClient bool, m *manifest.Manifest) error {
+	f, fresh, err := loadIntent(dir, source, at, side, assumeClient)
 	if err != nil {
 		return err
 	}

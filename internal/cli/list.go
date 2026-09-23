@@ -22,6 +22,7 @@ type listEntry struct {
 	Source     string              `json:"source,omitempty"`
 	Kind       pack.Kind           `json:"kind,omitempty"`
 	Ref        string              `json:"ref,omitempty"`
+	Path       string              `json:"path,omitempty"`
 	State      string              `json:"state,omitempty"`
 	Side       string              `json:"side,omitempty"`
 	Channel    string              `json:"channel,omitempty"`
@@ -108,7 +109,7 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 			}
 			e := listEntry{
 				Key: key, Type: manifest.TypeModpack, Listed: true, Version: st.Pin,
-				Source: st.Source, Kind: st.Kind, Ref: st.Ref, State: st.State,
+				Source: st.Source, Kind: st.Kind, Ref: st.Ref, Path: st.Path, State: st.State,
 			}
 			if st.Kind == pack.Hosted {
 				e.Source, e.Provider = "", st.Source
@@ -266,6 +267,9 @@ func listItem(l *out.Lines, e listEntry) out.Item {
 		}
 		if e.Ref != "" {
 			aside = append(aside, "ref "+e.Ref)
+		}
+		if e.Path != "" {
+			aside = append(aside, "path "+e.Path)
 		}
 		return out.Item{Kind: out.Note, Name: e.Key, Text: l.T.Grey(e.Source), Aside: aside}
 	}

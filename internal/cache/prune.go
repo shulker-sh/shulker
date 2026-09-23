@@ -19,6 +19,7 @@ type Root struct {
 	Lock   *lock.Lock
 	Source string
 	Ref    string
+	Path   string
 }
 
 // Pruned counts what a prune removed, by kind.
@@ -107,7 +108,7 @@ func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
 func (c *Cache) keep(roots []Root) map[string]bool {
 	keep := map[string]bool{}
 	for _, r := range roots {
-		c.keepSource(keep, r.Source, r.Ref)
+		c.keepSource(keep, r)
 		l := r.Lock
 		if l == nil {
 			continue
@@ -136,7 +137,7 @@ func (c *Cache) keep(roots []Root) map[string]bool {
 			keep[c.ATLauncherInstall(l.Loader.Type, l.Loader.Version)] = true
 		}
 		for _, mp := range l.Modpacks {
-			c.keepSource(keep, mp.Source, mp.Ref)
+			c.keepSource(keep, Root{Source: mp.Source, Ref: mp.Ref, Path: mp.Path})
 			if mp.Commit != "" {
 				keep[c.PackSource(mp.Commit)] = true
 			}
@@ -158,21 +159,21 @@ func (c *Cache) keep(roots []Root) map[string]bool {
 	return keep
 }
 
-// SourceLocks names the locks a remote source's checkouts hold: the one at the commit or digest a
-// directory was built from, and the ones its offline fallback records point at.
-func (c *Cache) SourceLocks(source, ref, commit, sha256 string) []string {
+// SourceLocks names the locks the checkouts of r's remote source hold: the one at the commit or
+// digest a directory was built from, and the ones its offline fallback records point at.
+func (c *Cache) SourceLocks(r Root, commit, sha256 string) []string {
 	var paths []string
 	add := func(commit, sha256 string) {
 		if commit != "" {
-			paths = append(paths, filepath.Join(c.PackSource(commit), lock.FileName))
+			paths = append(paths, filepath.Join(c.PackSource(commit), filepath.FromSlash(r.Path), lock.FileName))
 		}
 		if sha256 != "" {
 			paths = append(paths, filepath.Join(c.ProjectCheckout(sha256), lock.FileName))
 		}
 	}
 	add(commit, sha256)
-	for _, path := range []string{c.LastGood(source, ref), c.LastGood(source, "")} {
-		rec, ok := readLastGood(path)
+	for _, record := range []string{c.LastGood(r.Source, r.Ref, r.Path), c.LastGood(r.Source, "", r.Path)} {
+		rec, ok := readLastGood(record)
 		if ok {
 			add(rec.Commit, rec.Sha256)
 		}
@@ -198,12 +199,12 @@ func readLastGood(path string) (lastGoodRecord, bool) {
 // keepSource keeps a remote source's mirror, its offline fallback record, and
 // whatever that record points at, so a sync from an unreachable source still
 // finds the copy it falls back to.
-func (c *Cache) keepSource(keep map[string]bool, source, ref string) {
-	if source == "" {
+func (c *Cache) keepSource(keep map[string]bool, r Root) {
+	if r.Source == "" {
 		return
 	}
-	keep[c.PackMirror(source)] = true
-	for _, path := range []string{c.LastGood(source, ref), c.LastGood(source, "")} {
+	keep[c.PackMirror(r.Source)] = true
+	for _, path := range []string{c.LastGood(r.Source, r.Ref, r.Path), c.LastGood(r.Source, "", r.Path)} {
 		keep[path] = true
 		rec, ok := readLastGood(path)
 		if !ok {

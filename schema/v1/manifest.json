@@ -260,6 +260,12 @@
           "minLength": 1,
           "description": "Branch, tag, or commit for a git source. The lock records the resolved commit."
         },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/\\\\]",
+          "description": "Folder inside a git source's repository that holds the modpack's shulker.json, forward slashes, relative to the repository root. Omitted means the root. The tool rejects .. segments."
+        },
         "autoUpdate": {
           "type": "boolean",
           "description": "Whether sync refreshes this modpack from its source, or re-reads its archive when the archive's bytes change. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless."
@@ -320,7 +326,7 @@
         },
         "note": { "$ref": "#/$defs/note" }
       },
-      "dependentRequired": { "ref": ["source"] },
+      "dependentRequired": { "ref": ["source"], "path": ["source"] },
       "allOf": [
         {
           "if": { "required": ["source"] },
@@ -366,6 +372,7 @@
             "not": {
               "anyOf": [
                 { "required": ["ref"] },
+                { "required": ["path"] },
                 { "required": ["autoUpdate"] },
                 { "required": ["locked"] },
                 { "required": ["side"] },

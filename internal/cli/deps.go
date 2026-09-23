@@ -230,7 +230,7 @@ func (a *app) openPacks(ctx context.Context, p *project.Project, mode packMode) 
 	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
 		mp := modpacks[name]
 		pinned, ok := p.Lock.Modpacks[name]
-		moved := ok && (pinned.Source != mp.Source || pinned.File != mp.File || (mp.IsHosted() && len(project.HostedDifferences(name, mp, pinned)) > 0))
+		moved := ok && (pinned.Source != mp.Source || pinned.Path != mp.Path || pinned.File != mp.File || (mp.IsHosted() && len(project.HostedDifferences(name, mp, pinned)) > 0))
 		isFresh := !ok || moved
 		// An earlier read already resolved a new or moved modpack, and holds the rest at the pins a
 		// relock reads them at too, so a relock reads again only what it would take from disk.

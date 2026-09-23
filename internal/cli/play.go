@@ -23,6 +23,7 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/server"
 )
@@ -588,7 +589,7 @@ func (a *app) createProjectInstance(cmd *cobra.Command, p *project.Project, dir 
 	if !yes {
 		return config.Instance{}, nil, notRegistered(dir)
 	}
-	rep, err := a.linkShulker(cmd, nil, "", "", false, linkSettings{})
+	rep, err := a.linkShulker(cmd, nil, pack.At{}, "", false, linkSettings{})
 	if err != nil {
 		return config.Instance{}, nil, err
 	}

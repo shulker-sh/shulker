@@ -23,6 +23,7 @@ import (
 type syncResult struct {
 	Source     string               `json:"source"`
 	Kind       pack.Kind            `json:"kind"`
+	Path       string               `json:"path,omitempty"`
 	Commit     string               `json:"commit,omitempty"`
 	Sha256     string               `json:"sha256,omitempty"`
 	Offline    bool                 `json:"offline,omitempty"`
@@ -37,7 +38,9 @@ type syncResult struct {
 }
 
 type syncRequest struct {
-	ref, side, into, os string
+	// at is the ref and path a sync names with its source, and what a sync without one refuses.
+	at                  pack.At
+	side, into, os      string
 	force, assumeClient bool
 	features            featureFlags
 	backup              string
@@ -76,15 +79,15 @@ func (a *app) syncCmd() *cobra.Command {
 				d.fetch.Offline = true
 			}
 			if len(args) == 0 {
-				if req.into != "" && req.side == "" && req.ref == "" && a.instance == "" && !sel.all && !sel.narrows() {
+				if req.into != "" && req.side == "" && req.at == (pack.At{}) && a.instance == "" && !sel.all && !sel.narrows() {
 					res, err := a.syncRecorded(cmd, req)
 					if err != nil {
 						return err
 					}
 					return a.printer.Emit(res, res.print)
 				}
-				if req.into != "" || req.ref != "" {
-					return out.Errorf("usage", "--into and --ref need a source; a registered instance already has them")
+				if req.into != "" || req.at != (pack.At{}) {
+					return out.Errorf("usage", "--into, --ref and --path need a source; a registered instance already has them")
 				}
 				if a.instance == "" && !sel.all {
 					dir, err := a.scopeDir()
@@ -134,7 +137,7 @@ func (a *app) syncCmd() *cobra.Command {
 				return out.Errorf("usage", "--launcher narrows -i, --all, or the picker; it doesn't apply to a source")
 			}
 			req.side = sel.side
-			src, err := a.openSource(cmd.Context(), args[0], req.ref)
+			src, err := a.openSource(cmd.Context(), args[0], req.at)
 			if err != nil {
 				return err
 			}
@@ -148,7 +151,8 @@ func (a *app) syncCmd() *cobra.Command {
 	cmd.Flags().StringVar(&req.into, "into", "", "output directory (default: the side's build directory)")
 	cmd.Flags().BoolVar(&req.force, "force", false, "overwrite files edited in the output directory")
 	cmd.Flags().BoolVar(&req.assumeClient, "assume-client", false, "build a client even when the source declares none, from the mods and overrides both sides share")
-	cmd.Flags().StringVar(&req.ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&req.at.Ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&req.at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
 	cmd.Flags().StringVar(&req.os, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	sel.registerWith(cmd, "sync every instance (narrow with --launcher or --side)", "side to build from a source (default: the only declared side); with -i, --all, or the picker, only client or server instances")
 	a.registerFailFast(cmd)
@@ -180,8 +184,8 @@ type syncSource struct {
 
 func (s *syncSource) isRemote() bool { return s.Kind != pack.Local }
 
-func (a *app) openSource(ctx context.Context, from, ref string) (*syncSource, error) {
-	co, err := a.checkout(ctx, from, ref)
+func (a *app) openSource(ctx context.Context, from string, at pack.At) (*syncSource, error) {
+	co, err := a.checkout(ctx, from, at)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +253,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	if err != nil {
 		return syncResult{}, err
 	}
-	origin := build.Origin{Source: src.name, Ref: req.ref, Commit: src.Commit, Sha256: src.Sha256}
+	origin := build.Origin{Source: src.name, Ref: src.Ref, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256}
 	rep, err := b.Build(side, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin, BeforeModChange: a.autoBackup(req.backup, into), KeepConflicts: req.keepConflicts})
 	if err != nil {
 		return syncResult{}, err
@@ -282,12 +286,12 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 			a.printer.Warn("couldn't record %s as the offline fallback: %v", src.name, err)
 		}
 	}
-	res = syncResult{Source: src.name, Kind: src.Kind, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep, Saves: linked}
+	res = syncResult{Source: src.name, Kind: src.Kind, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep, Saves: linked}
 	if !src.LastGood.IsZero() {
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
 	if syncedDir {
-		if err := saveIntent(into, src.name, req.ref, side, req.assumeClient); err != nil {
+		if err := saveIntent(into, src.name, src.At, side, req.assumeClient); err != nil {
 			return syncResult{}, err
 		}
 		a.refreshRegistered(config.Instance{Dir: into, Source: src.name})
@@ -399,11 +403,11 @@ func (a *app) sourceStore() *pack.Store {
 	return &pack.Store{Cache: a.d.cache, Fetch: a.d.fetch, Log: a.progress}
 }
 
-func (a *app) checkout(ctx context.Context, source, ref string) (*pack.Checkout, error) {
+func (a *app) checkout(ctx context.Context, source string, at pack.At) (*pack.Checkout, error) {
 	if _, err := a.deps(); err != nil {
 		return nil, err
 	}
-	return a.sourceStore().Checkout(ctx, source, ref)
+	return a.sourceStore().Checkout(ctx, source, at)
 }
 
 // syncLauncherImage keeps a registered instance's picture in its launcher in step with the pack

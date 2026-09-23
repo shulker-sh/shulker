@@ -172,6 +172,7 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `type` | `"mod"` \| `"modpack"` \| `"resourcepack"` \| `"shader"` \| `"datapack"` | What the entry is. Omitted means modpack for an entry with source and mod otherwise, unless the provider says otherwise; when given it must agree with the entry. Resource packs and shaders are resolved from the provider's own project type and placed in resourcepacks/ or shaderpacks/. A datapack is resolved from the provider's datapack files and placed on both sides unless side says otherwise, in the folder of a global datapack mod such as Paxi or Open Loader, or with none, in a server's world. |
 | `source` | `string` | Local path, git URL, or raw manifest URL of a modpack.<br>min length 1 |
 | `ref` | `string` | Branch, tag, or commit for a git source. The lock records the resolved commit.<br>min length 1 |
+| `path` | `string` | Folder inside a git source's repository that holds the modpack's shulker.json, forward slashes, relative to the repository root. Omitted means the root. The tool rejects .. segments.<br>pattern `^[^/\\]`, min length 1 |
 | `autoUpdate` | `boolean` | Whether sync refreshes this modpack from its source, or re-reads its archive when the archive's bytes change. Omitted means true; false pins the modpack at its locked state. update refreshes every modpack regardless. |
 | `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock, and always for an archive, which pins exact files; a source without a lock is always resolved from its manifest. |
 | `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. On a resource pack, shader or datapack it may name a folder, which shulker zips and places as a zip, leaving out any name starting with a dot, Thumbs.db, desktop.ini, *~ and *.swp at any depth and zipping what a symlink in it points at. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date. |
@@ -186,7 +187,7 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `feature` | [`featureCondition`](#featurecondition) \| [`featureCondition`](#featurecondition)[] | Ship only when a feature is on. Names are any-of, !names are none-of; both must hold, together with os. Every name must be declared in features, which is where its default lives. |
 | `note` | [`note`](#note) |  |
 
-`ref` requires `source`.
+`ref` and `path` require `source`.
 
 When `source` is set, `type` must be `"modpack"`, and `file`, `project`, `pin`, `channel`, `side`, `provider`, `os` and `feature` are not allowed.
 
@@ -194,7 +195,7 @@ When `file` is set, `project`, `pin`, `channel` and `provider` are not allowed.
 
 When `file` is set and `type` is `"modpack"`, `side`, `os` and `feature` are not allowed.
 
-When `type` is `"modpack"` and neither `source` nor `file` is set, `ref`, `autoUpdate`, `locked`, `side`, `os` and `feature` are not allowed.
+When `type` is `"modpack"` and neither `source` nor `file` is set, `ref`, `path`, `autoUpdate`, `locked`, `side`, `os` and `feature` are not allowed.
 
 When `resourcepack` is set, `type` is required, and `type` must be `"datapack"`.
 

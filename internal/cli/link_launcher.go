@@ -8,16 +8,18 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
 // launcherLink is what the links into a launcher's own instances share: their flags, the checks
 // before the launcher is touched, and the registration and report once the instance is written.
 type launcherLink struct {
-	launcherDir, instanceName, ref, as string
-	force                              bool
-	ff                                 featureFlags
-	ls                                 linkSettings
+	launcherDir, instanceName, as string
+	at                            pack.At
+	force                         bool
+	ff                            featureFlags
+	ls                            linkSettings
 }
 
 type launcherReport struct {
@@ -31,6 +33,7 @@ type launcherReport struct {
 	Created     bool        `json:"created"`
 	Source      string      `json:"source"`
 	Ref         string      `json:"ref,omitempty"`
+	Path        string      `json:"path,omitempty"`
 	Modpack     string      `json:"modpack"`
 	Sync        *syncResult `json:"sync"`
 }
@@ -39,7 +42,8 @@ func (l *launcherLink) register(cmd *cobra.Command, dirUsage, forceUsage string)
 	cmd.Flags().StringVar(&l.launcherDir, "launcher-dir", "", dirUsage)
 	cmd.Flags().StringVar(&l.instanceName, "name", "", "instance name (default: the side's display name)")
 	cmd.Flags().StringVar(&l.as, "as", "", "id for this instance, for -i (default: from its name)")
-	cmd.Flags().StringVar(&l.ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&l.at.Ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&l.at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
 	cmd.Flags().BoolVar(&l.force, "force", false, forceUsage)
 	l.ff.register(cmd, "for this instance")
 	l.ls.register(cmd)
@@ -56,11 +60,11 @@ func (l *launcherLink) display(p *project.Project) string {
 
 // openLinkSource is what every link does first: check the settings, fetch the source, refuse a loader
 // this build doesn't know, and warn when the pack declares no client.
-func (a *app) openLinkSource(cmd *cobra.Command, args []string, ref string, ls linkSettings) (*syncSource, loader.Loader, error) {
+func (a *app) openLinkSource(cmd *cobra.Command, args []string, at pack.At, ls linkSettings) (*syncSource, loader.Loader, error) {
 	if err := ls.check(); err != nil {
 		return nil, loader.Loader{}, err
 	}
-	src, err := a.linkFrom(cmd, args, ref)
+	src, err := a.linkFrom(cmd, args, at)
 	if err != nil {
 		return nil, loader.Loader{}, err
 	}
@@ -80,7 +84,7 @@ func (a *app) openLinkSource(cmd *cobra.Command, args []string, ref string, ls l
 // startLauncherLink is openLinkSource plus the feature choices checked against the build, and
 // --launcher-dir made absolute, filled from defaultDir when it is empty.
 func (a *app) startLauncherLink(cmd *cobra.Command, args []string, k *launcherLink, defaultDir func() (string, error)) (*syncSource, loader.Loader, error) {
-	src, l, err := a.openLinkSource(cmd, args, k.ref, k.ls)
+	src, l, err := a.openLinkSource(cmd, args, k.at, k.ls)
 	if err != nil {
 		return nil, l, err
 	}
@@ -136,7 +140,7 @@ func (a *app) finishLauncherLink(cmd *cobra.Command, k *launcherLink, launcherNa
 		}
 	}
 	row := config.Instance{Launcher: launcherName, LauncherDir: k.launcherDir, Name: display, Dir: res.GameDir, Source: src.name}
-	inst, synced, err := a.linkInstance(cmd, row, k.as, k.ref, src, k.ls)
+	inst, synced, err := a.linkInstance(cmd, row, k.as, src, k.ls)
 	if err != nil {
 		return err
 	}
@@ -150,7 +154,8 @@ func (a *app) finishLauncherLink(cmd *cobra.Command, k *launcherLink, launcherNa
 		Command:     launcher.SlotCommand(launcherName, res.GameDir, launcher.HookPreLaunch),
 		Created:     res.Created,
 		Source:      src.name,
-		Ref:         k.ref,
+		Ref:         src.Ref,
+		Path:        src.Path,
 		Modpack:     modpackKey(inst.Manifest, src.name),
 		Sync:        &synced,
 	}
@@ -160,7 +165,7 @@ func (a *app) finishLauncherLink(cmd *cobra.Command, k *launcherLink, launcherNa
 			verb = "updated"
 		}
 		l.OKInto(verb+" instance "+display, res.Dir, "")
-		rows := append(follows(rep.Modpack, rep.Source), out.Row{Text: "the launcher syncs this instance before each launch"})
+		rows := append(follows(rep.Modpack, rep.Source, rep.Path), out.Row{Text: "the launcher syncs this instance before each launch"})
 		if k.hasFeatures() {
 			rows = append(rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
 		}

@@ -126,6 +126,8 @@ func PackDifferences(dir string, m *manifest.Manifest, l *lock.Lock) []string {
 			diffs = append(diffs, fmt.Sprintf("pack %s: source %s -> %s", name, lp.Source, mp.Source))
 		case lp.Ref != mp.Ref:
 			diffs = append(diffs, fmt.Sprintf("pack %s: ref %q -> %q", name, lp.Ref, mp.Ref))
+		case lp.Path != mp.Path:
+			diffs = append(diffs, fmt.Sprintf("pack %s: path %q -> %q", name, lp.Path, mp.Path))
 		case mp.Locked != nil && *mp.Locked != lp.UsesLock:
 			diffs = append(diffs, fmt.Sprintf("pack %s: locked %v -> %v", name, lp.UsesLock, *mp.Locked))
 		}

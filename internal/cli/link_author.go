@@ -25,7 +25,7 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 			return nil, err
 		}
 		if source != "" {
-			return a.openSource(ctx, source, "")
+			return a.openSource(ctx, source, pack.At{})
 		}
 	}
 	opts := initOptions{loaderName: noLoader, loaderVersion: "*"}

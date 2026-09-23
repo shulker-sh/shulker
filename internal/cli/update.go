@@ -307,7 +307,7 @@ func (a *app) resolveMovedRefs(ctx context.Context, p *project.Project, r *resol
 	for i, l := range r.Packs {
 		mp := modpacks[l.Name]
 		pinned, locked := p.Lock.Modpacks[l.Name]
-		if !locked || pinned.Source != mp.Source || pinned.Ref == mp.Ref {
+		if !locked || pinned.Source != mp.Source || (pinned.Ref == mp.Ref && pinned.Path == mp.Path) {
 			continue
 		}
 		store, err := a.packStore(p)

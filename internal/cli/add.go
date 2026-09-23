@@ -17,7 +17,7 @@ func (a *app) addCmd() *cobra.Command { return a.addCmdFor("") }
 
 func (a *app) addCmdFor(kind string) *cobra.Command {
 	var opts resolve.AddOptions
-	var typ, as, ref string
+	var typ, as, ref, path string
 	var unlocked, noAutoUpdate bool
 	cmd := &cobra.Command{
 		Use:         "add " + addArgs(kind),
@@ -61,7 +61,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			switch chosen {
 			case manifest.TypeModpack:
 				opts.As = as
-				return a.addModpacks(cmd, args, opts, ref, unlocked, noAutoUpdate)
+				return a.addModpacks(cmd, args, opts, ref, path, unlocked, noAutoUpdate)
 			case "", manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack:
 				// An empty type is settled by the provider during resolution.
 			default:
@@ -131,6 +131,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	}
 	if applies(kind, "ref") {
 		cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit for git sources")
+	}
+	if applies(kind, "path") {
+		cmd.Flags().StringVar(&path, "path", "", "folder of a git source's repository that holds the modpack's shulker.json (default: the root)")
 	}
 	if applies(kind, "unlocked") {
 		cmd.Flags().BoolVar(&unlocked, "unlocked", false, "resolve the modpack's mods here instead of copying the versions its lock pins")

@@ -47,11 +47,12 @@ func StatePath(dir string) string {
 	return filepath.Join(dir, StateDir, StateFile)
 }
 
-// Origin is where the project a build came from was synced from: a source, a ref and commit, or
-// an archive's sha256. It is empty for a build of the local project.
+// Origin is where the project a build came from was synced from: a source, a ref, path and commit,
+// or an archive's sha256. It is empty for a build of the local project.
 type Origin struct {
 	Source string `json:"source,omitempty"`
 	Ref    string `json:"ref,omitempty"`
+	Path   string `json:"path,omitempty"`
 	Commit string `json:"commit,omitempty"`
 	Sha256 string `json:"sha256,omitempty"`
 }

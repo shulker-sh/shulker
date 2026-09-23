@@ -143,6 +143,7 @@
         "filename": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\]+$", "description": "The provider's name for the archive. Hosted modpacks only." },
         "source": { "type": "string", "minLength": 1, "description": "The manifest source at resolution time. A different source in the manifest makes the lock out of date." },
         "ref": { "type": "string", "minLength": 1, "description": "The manifest ref at resolution time. Git sources only." },
+        "path": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\]", "description": "The manifest path at resolution time: the folder of the repository the modpack's shulker.json is in. Git sources only." },
         "commit": { "$ref": "#/$defs/gitCommit", "description": "Resolved commit. Git sources only." },
         "dirSha256": { "$ref": "#/$defs/sha256", "description": "Content hash of the modpack's shulker.json and override directories in sorted path order, excluding its lock, build output, and data. Local-path sources only." },
         "sha256": { "$ref": "#/$defs/sha256", "description": "Hash of the fetched manifest. Raw manifest URL sources only." },
@@ -160,15 +161,15 @@
       },
       "oneOf": [
         { "required": ["source", "commit"] },
-        { "required": ["source", "dirSha256"], "not": { "required": ["ref"] } },
-        { "required": ["source", "sha256"], "not": { "required": ["ref"] } },
+        { "required": ["source", "dirSha256"], "not": { "anyOf": [{ "required": ["ref"] }, { "required": ["path"] }] } },
+        { "required": ["source", "sha256"], "not": { "anyOf": [{ "required": ["ref"] }, { "required": ["path"] }] } },
         {
           "required": ["file", "sha512", "size"],
-          "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["source"] }, { "required": ["ref"] }, { "required": ["commit"] }, { "required": ["dirSha256"] }, { "required": ["sha256"] }, { "required": ["lockSha256"] }] }
+          "not": { "anyOf": [{ "required": ["provider"] }, { "required": ["source"] }, { "required": ["ref"] }, { "required": ["path"] }, { "required": ["commit"] }, { "required": ["dirSha256"] }, { "required": ["sha256"] }, { "required": ["lockSha256"] }] }
         },
         {
           "required": ["provider", "project", "version", "versionNumber", "channel", "url", "filename", "sha512", "size"],
-          "not": { "anyOf": [{ "required": ["source"] }, { "required": ["ref"] }, { "required": ["commit"] }, { "required": ["dirSha256"] }, { "required": ["sha256"] }, { "required": ["lockSha256"] }, { "required": ["file"] }] }
+          "not": { "anyOf": [{ "required": ["source"] }, { "required": ["ref"] }, { "required": ["path"] }, { "required": ["commit"] }, { "required": ["dirSha256"] }, { "required": ["sha256"] }, { "required": ["lockSha256"] }, { "required": ["file"] }] }
         }
       ],
       "allOf": [

@@ -22,6 +22,12 @@
       "minLength": 1,
       "description": "Branch, tag, or commit to follow from a git source. Omitted follows the remote HEAD, or, in an instance that is a project of its own, whatever its modpack entry follows."
     },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\]",
+      "description": "Folder inside a git source's repository that holds the shulker.json to follow. Omitted means the repository root, or, in an instance that is a project of its own, whatever its modpack entry names."
+    },
     "side": {
       "type": "string",
       "enum": ["client", "server"],

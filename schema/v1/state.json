@@ -25,6 +25,10 @@
       "type": "string",
       "description": "The git ref the synced project was read at."
     },
+    "path": {
+      "type": "string",
+      "description": "The folder of the git repository the synced project was read from."
+    },
     "commit": {
       "type": "string",
       "description": "The git commit the synced project was read at."

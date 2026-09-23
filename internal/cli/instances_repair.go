@@ -147,7 +147,7 @@ func (a *app) repairIntent(in config.Instance) (bool, error) {
 		return false, nil
 	}
 	f := instance.New()
-	if _, _, _, inPlace := inPlaceIntent(in.Dir); !inPlace {
+	if _, _, inPlace := inPlaceIntent(in.Dir); !inPlace {
 		st, _ := build.ReadState(in.Dir)
 		source := st.Source
 		if source == "" {
@@ -156,7 +156,7 @@ func (a *app) repairIntent(in config.Instance) (bool, error) {
 		if source == "" {
 			return false, nil
 		}
-		f.Source, f.Ref, f.Side = source, st.Ref, st.Side
+		f.Source, f.Ref, f.Path, f.Side = source, st.Ref, st.Path, st.Side
 	}
 	kept, err := f.Replace(in.Dir)
 	if kept != "" {
@@ -232,7 +232,8 @@ func instanceAt(dir string) (config.Instance, bool) {
 	// With several modpacks required none of them is the one the instance was linked from, so the
 	// manifest says nothing and the sources below answer instead. A directory with no source
 	// anywhere is no row shulker can write: the registry needs one.
-	source, _, _, _ := inPlaceIntent(dir)
+	pack, _, _ := inPlaceIntent(dir)
+	source := pack.Source
 	if source == "" && err == nil {
 		source = f.Source
 	}

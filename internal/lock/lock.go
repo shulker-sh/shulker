@@ -71,6 +71,7 @@ type Modpack struct {
 	Filename      string      `json:"filename,omitempty"`
 	Source        string      `json:"source,omitempty"`
 	Ref           string      `json:"ref,omitempty"`
+	Path          string      `json:"path,omitempty"`
 	Commit        string      `json:"commit,omitempty"`
 	DirSha256     string      `json:"dirSha256,omitempty"`
 	Sha256        string      `json:"sha256,omitempty"`

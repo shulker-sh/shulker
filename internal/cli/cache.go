@@ -178,7 +178,7 @@ func (a *app) cacheRoots(named []string) (roots, error) {
 			continue
 		}
 		seen[dir] = true
-		locks, present, unreadable, err := dirRoots(d.cache, dir, in.Source, in.Ref)
+		locks, present, unreadable, err := dirRoots(d.cache, dir, cache.Root{Source: in.Source, Ref: in.Ref, Path: in.Path})
 		if err != nil {
 			return roots{}, err
 		}
@@ -202,7 +202,7 @@ func (a *app) cacheRoots(named []string) (roots, error) {
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err != nil {
 		return r, nil
 	}
-	locks, _, unreadable, err := dirRoots(d.cache, dir, "", "")
+	locks, _, unreadable, err := dirRoots(d.cache, dir, cache.Root{})
 	if err != nil {
 		return roots{}, err
 	}
@@ -217,7 +217,7 @@ func (a *app) cacheRoots(named []string) (roots, error) {
 // instance it held was deleted; one whose lock is there but can't be read is
 // returned as a problem, which stops a prune because it may be an instance that
 // still needs its files, but leaves an inspection free to report.
-func dirRoots(c *cache.Cache, dir, source, ref string) ([]cache.Root, bool, []string, error) {
+func dirRoots(c *cache.Cache, dir string, from cache.Root) ([]cache.Root, bool, []string, error) {
 	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil, nil
 	} else if err != nil {
@@ -226,7 +226,7 @@ func dirRoots(c *cache.Cache, dir, source, ref string) ([]cache.Root, bool, []st
 	dirs := []string{dir}
 	// A separate-dir instance keeps its lock in the project it was built from,
 	// not in the game directory the registry records.
-	if src := filepath.Clean(source); src != "." && src != dir {
+	if src := filepath.Clean(from.Source); src != "." && src != dir {
 		if _, err := os.Stat(filepath.Join(src, manifest.FileName)); err == nil {
 			dirs = append(dirs, src)
 		}
@@ -234,9 +234,9 @@ func dirRoots(c *cache.Cache, dir, source, ref string) ([]cache.Root, bool, []st
 	var paths []string
 	// A directory synced from a git or manifest URL runs on the lock of the checkout it was
 	// built from, and falls back offline to the one its last good sync recorded.
-	if kind := pack.Classify(source); source != "" && kind != pack.Local {
+	if kind := pack.Classify(from.Source); from.Source != "" && kind != pack.Local {
 		state, _ := build.ReadState(dir)
-		paths = append(paths, c.SourceLocks(source, ref, state.Commit, state.Sha256)...)
+		paths = append(paths, c.SourceLocks(from, state.Commit, state.Sha256)...)
 	}
 	for _, d := range dirs {
 		paths = append(paths, filepath.Join(d, lock.FileName))
@@ -261,7 +261,9 @@ func dirRoots(c *cache.Cache, dir, source, ref string) ([]cache.Root, bool, []st
 			unreadable = append(unreadable, path+" can't be read, so pruning could remove files it needs ("+out.AsError(err).Message+"); fix it, or run `shulker unlink` for that instance")
 			continue
 		}
-		found = append(found, cache.Root{Lock: lk, Source: source, Ref: ref})
+		root := from
+		root.Lock = lk
+		found = append(found, root)
 	}
 	return found, true, unreadable, nil
 }

@@ -173,6 +173,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 | `--bundle` | Put files that Modrinth launchers can't download inside the archive |
 | `--assume-client` | Export a client even when the source declares none, from the mods and overrides both sides share |
 | `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 
 ### `shulker export curseforge`
 
@@ -194,6 +195,7 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 | `--bundle` | Put mods that aren't on CurseForge inside the archive, and bundle every mod not from CurseForge when the lookup can't run |
 | `--assume-client` | Export a client even when the source declares none, from the mods and overrides both sides share |
 | `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 
 ## Mods
 
@@ -232,6 +234,7 @@ A CurseForge file URL is resolved by its file id, so it reaches a project the sl
 | `--pin <version-id>` | Pin to a provider version id (one mod or modpack only; a URL argument carries its own pin). A beta or alpha file widens the entry's `channel` to match, as [`shulker pin`](#shulker-pin) does |
 | `--provider <provider>` | Provider to use for this mod or modpack: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
+| `--path <path>` | Folder of a modpack's git repository that holds its shulker.json (default: the root) |
 | `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a pack or hosted modpack's provider slug, a modpack archive file's name, the name in a modpack's manifest) |
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
@@ -984,6 +987,7 @@ shulker link shulker https://example.com/pack/shulker.json --as smp
 | --- | --- |
 | `--as <nickname>` | Nickname for this instance, which names its folder and finds it with `-i` (default: from the pack's name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 | `--force` | Repoint the modpack an instance already follows |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
@@ -1021,6 +1025,7 @@ shulker link atlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 | `--force` | Repoint the modpack an instance already follows, or link over one shulker didn't link |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
@@ -1062,6 +1067,7 @@ shulker link gdlauncher https://example.com/pack/shulker.json --name "Friends SM
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 | `--force` | Repoint the modpack an instance already follows, link over one shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
@@ -1097,6 +1103,7 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | `--name <name>` | Profile name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 | `--force` | Repoint the modpack a profile already follows |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
@@ -1132,6 +1139,7 @@ shulker link prism https://example.com/pack/shulker.json --name "Friends SMP" --
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 | `--force` | Repoint the modpack an instance already follows |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
@@ -1162,6 +1170,7 @@ shulker link multimc https://github.com/shulker-sh/base-pack.git --launcher-dir 
 | `--name <name>` | Instance name (default: the side's display name) |
 | `--as <id>` | Id for this instance, which `-i` takes (default: derived from its name) |
 | `--ref <ref>` | Branch, tag, or commit to follow from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 | `--force` | Repoint the modpack an instance already follows |
 | `--no-hooks` | Install neither hook: don't sync before a launch, don't record how a run ended |
 | `--no-pre-launch` | Don't sync this instance before each launch |
@@ -1208,6 +1217,7 @@ A file changed both in the directory and in the source fails the sync with `buil
 | `--force` | Overwrite files edited in the output directory |
 | `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the directory so later syncs keep building it |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
+| `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
@@ -1518,9 +1528,9 @@ shulker mod list
 
 ### `shulker modpack add|remove|list`
 
-A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--as`, `--unlocked`, `--no-auto-update`, and for a modpack from a provider `--pin`, `--channel`, `--provider`.
+A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--path`, `--as`, `--unlocked`, `--no-auto-update`, and for a modpack from a provider `--pin`, `--channel`, `--provider`.
 
-A modpack can be a Modrinth or CurseForge modpack, named by its slug: `shulker modpack add cozy` looks it up on each provider in the manifest's order, or on the one `--provider` names, and writes `{"type": "modpack", "provider", "project"}` under the slug unless `--as` says otherwise. It picks its version like a mod: the newest in its channel that fits the project's Minecraft and loader, or the newest overall when the project sets neither, in which case the project takes the pack's platform. None fitting fails with `no-compatible-version`. That version's archive is fetched into the cache and read as an archive is below, so its mods lock as the modpack's and its overrides are laid before your own; the lock records its provider, version and `sha512`. `pin`, `unpin`, `update` and `outdated` treat it as they treat a mod, and `sync` never moves it. A locked one builds offline from the cache; one not yet locked can't be fetched offline. `--ref`, `--unlocked` and `--no-auto-update` are refused: the archive is a provider version, always locked, and moves only with `update`. An archive whose author turned off third-party downloads stops with `missing-files` until you put it in `downloads/`.
+A modpack can be a Modrinth or CurseForge modpack, named by its slug: `shulker modpack add cozy` looks it up on each provider in the manifest's order, or on the one `--provider` names, and writes `{"type": "modpack", "provider", "project"}` under the slug unless `--as` says otherwise. It picks its version like a mod: the newest in its channel that fits the project's Minecraft and loader, or the newest overall when the project sets neither, in which case the project takes the pack's platform. None fitting fails with `no-compatible-version`. That version's archive is fetched into the cache and read as an archive is below, so its mods lock as the modpack's and its overrides are laid before your own; the lock records its provider, version and `sha512`. `pin`, `unpin`, `update` and `outdated` treat it as they treat a mod, and `sync` never moves it. A locked one builds offline from the cache; one not yet locked can't be fetched offline. `--ref`, `--path`, `--unlocked` and `--no-auto-update` are refused: the archive is a provider version, always locked, and moves only with `update`. An archive whose author turned off third-party downloads stops with `missing-files` until you put it in `downloads/`.
 
 A modpack can also be a Modrinth modpack archive: `shulker modpack add packs/cozy.mrpack`, or a bare `shulker add packs/cozy.mrpack`, writes a `file` entry, taking the path the way `add` takes a local file — referenced where it lies inside the project, copied into `files/` from outside it, and keyed by the file name unless `--as` says otherwise. Its mods lock as the modpack's: each is found by its hash on Modrinth, or reused from the shulker project an exported archive carries, and a file neither knows, or one that project had as a local file, is laid by the modpack itself, as are its `overrides`, `client-overrides` and `server-overrides` folders, before your own. An archive is locked unless `--unlocked` says otherwise. The lock records its bytes, so changing the file makes the lock out of date and the next `lock` or `sync` reads it again, unless `--no-auto-update` holds it until `shulker update`. With the file deleted, the build lays the archive from the cache and warns. A CurseForge modpack zip is taken the same way, by `shulker modpack add packs/craft.zip` or by a bare `add` of a zip that holds a CurseForge `manifest.json`: each file it names locks as the modpack's by its CurseForge project and file ID, a file whose author doesn't allow third-party downloads stops the lock with `missing-files` until you put it in `downloads/`, where it locks as a manual download, and the pack's overrides folder is laid by the modpack. Those IDs carry no hash, so the cache can't stand in for CurseForge: reading the zip needs the network even when every file it names is cached, and offline it fails with `curseforge-offline`. A locked zip whose bytes haven't changed builds from the lock and needs no network. A file that is neither a Modrinth nor a CurseForge modpack is refused.
 
@@ -1920,6 +1930,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `modpack-platform` | Locked modpacks disagree about Minecraft or the loader, and `shulker.json` sets neither; set `minecraft`/`loader`, or unlock one |
 | `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
+| `modpack-path` | A modpack's `path` is set on a source that isn't git |
 | `modpack-unlocked` | A modpack has no commit, archive hash or version in the lock; run `shulker update`, or `shulker lock` before pinning a hosted one |
 | `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
 | `override-path` | A path named to `match` isn't a jar in `mods/` or a zip in `resourcepacks/`, `shaderpacks/` or a datapack folder of `overrides/`, `client-overrides/` or `server-overrides/` |
@@ -1961,6 +1972,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `source-lock` | The sync source has no `shulker.lock` |
 | `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
 | `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
+| `source-path` | `--path` doesn't apply to the source, isn't a folder inside the repository, or holds no shulker.json at the commit |
 | `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a native jar that won't unpack, or a version JSON that doesn't hold together |
 | `strict-warnings` | `check --strict` saw warnings. `items`: the warnings |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |

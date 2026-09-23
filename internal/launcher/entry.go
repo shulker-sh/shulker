@@ -59,12 +59,13 @@ type Entry struct {
 }
 
 // Linked is a registry row plus the intent its instance.json records, which is where the side and
-// ref the relink command needs now live.
+// ref and path the relink command needs now live.
 type Linked struct {
 	config.Instance
 	Side          string
 	AssumesClient bool
 	Ref           string
+	Path          string
 }
 
 // All is every launcher shulker knows, in the order Rank displays them.
@@ -205,6 +206,9 @@ func relinkSync(l Linked) (args []string, in string) {
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
 	}
+	if l.Path != "" {
+		args = append(args, "--path", shellArg(l.Path))
+	}
 	args = append(args, "--side", shellArg(l.Side))
 	if l.AssumesClient {
 		args = append(args, "--assume-client")
@@ -219,6 +223,9 @@ func relinkShulker(e *Entry, l Linked) (args []string, in string) {
 	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
+	}
+	if l.Path != "" {
+		args = append(args, "--path", shellArg(l.Path))
 	}
 	return append(args, "--as", shellArg(l.ID)), ""
 }
@@ -235,6 +242,9 @@ func relinkLauncher(e *Entry, l Linked) (args []string, in string) {
 	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
 	if l.Ref != "" {
 		args = append(args, "--ref", shellArg(l.Ref))
+	}
+	if l.Path != "" {
+		args = append(args, "--path", shellArg(l.Path))
 	}
 	return append(args, "--name", shellArg(l.Label())), ""
 }

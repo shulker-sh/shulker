@@ -15,6 +15,7 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/provider/curseforge"
@@ -30,9 +31,10 @@ func (a *app) exportCmd() *cobra.Command {
 }
 
 type exportFlags struct {
-	version, output, side, osName, ref string
-	bundle, assumeClient               bool
-	ff                                 featureFlags
+	version, output, side, osName string
+	at                            pack.At
+	bundle, assumeClient          bool
+	ff                            featureFlags
 }
 
 func (e *exportFlags) register(cmd *cobra.Command, extension, bundle string) {
@@ -41,7 +43,8 @@ func (e *exportFlags) register(cmd *cobra.Command, extension, bundle string) {
 	cmd.Flags().StringVar(&e.osName, "os", "", "include mods gated on this os: macos, windows, or linux (default: leave them out)")
 	cmd.Flags().BoolVar(&e.bundle, "bundle", false, bundle)
 	cmd.Flags().BoolVar(&e.assumeClient, "assume-client", false, "export a client even when the source declares none, built from the mods and overrides both sides share")
-	cmd.Flags().StringVar(&e.ref, "ref", "", "branch, tag, or commit to export from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&e.at.Ref, "ref", "", "branch, tag, or commit to export from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&e.at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
 	e.ff.register(cmd, "for this run only")
 }
 
@@ -58,7 +61,7 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fil
 	if err := checkOS(f.osName); err != nil {
 		return nil, err
 	}
-	src, err := a.linkSource(ctx, args, f.ref)
+	src, err := a.linkSource(ctx, args, f.at)
 	if err != nil {
 		return nil, err
 	}

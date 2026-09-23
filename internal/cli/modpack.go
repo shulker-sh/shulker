@@ -25,13 +25,13 @@ var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.Typ
 // and its `--type` spelling take the same flags.
 var typeFlags = map[string][]string{
 	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as", "with-deps"},
-	manifest.TypeModpack:      {"ref", "as", "unlocked", "no-auto-update", "channel", "pin", "provider"},
+	manifest.TypeModpack:      {"ref", "path", "as", "unlocked", "no-auto-update", "channel", "pin", "provider"},
 	manifest.TypeResourcePack: {"channel", "pin", "provider", "as"},
 	manifest.TypeShader:       {"channel", "pin", "provider", "as"},
 	manifest.TypeDatapack:     {"side", "channel", "pin", "provider", "as", "resourcepack"},
 }
 
-var allTypeFlags = []string{"as", "channel", "no-auto-update", "pin", "provider", "ref", "resourcepack", "side", "unlocked", "with-deps"}
+var allTypeFlags = []string{"as", "channel", "no-auto-update", "path", "pin", "provider", "ref", "resourcepack", "side", "unlocked", "with-deps"}
 
 // inferredFlags are the flags an entry may take while its type is still the
 // provider's to settle. A modpack is never inferred — it takes a source, not a
@@ -114,7 +114,7 @@ func unsupportedType(kind string) error {
 	return out.Errorf("requires-unsupported", "%s entries aren't supported yet", kind)
 }
 
-func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.AddOptions, ref string, unlocked, noAutoUpdate bool) error {
+func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.AddOptions, ref, path string, unlocked, noAutoUpdate bool) error {
 	as := opts.As
 	if as != "" && len(sources) > 1 {
 		return out.Errorf("usage", "--as applies to a single modpack")
@@ -152,7 +152,10 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 				}
 				continue
 			}
-			entry := manifest.Require{Source: source, Ref: ref}
+			if err := pack.CheckPath(path, pack.Classify(source)); err != nil {
+				return "", err
+			}
+			entry := manifest.Require{Source: source, Ref: ref, Path: path}
 			if unlocked {
 				no := false
 				entry.Locked = &no
@@ -196,6 +199,7 @@ func refuseModpackFlags(cmd *cobra.Command, hosted, onlyHosted bool) error {
 	if hosted {
 		for _, flag := range []struct{ name, reason string }{
 			{"ref", "a ref names a git commit, and a modpack from a provider is a provider version"},
+			{"path", "a path names a folder of a git repository, and a modpack from a provider is an archive"},
 			{"unlocked", "a modpack from a provider is always locked: its archive pins every file"},
 			{"no-auto-update", "a modpack from a provider never auto-updates: `shulker update` moves it and `shulker pin` holds it"},
 		} {
@@ -246,7 +250,7 @@ func (a *app) lockHostedEntry(ctx context.Context, p *project.Project, r *resolv
 // or the name the pack's own manifest carries.
 func (a *app) addPackEntry(ctx context.Context, p *project.Project, r *resolve.Resolver, source, as string, entry manifest.Require) error {
 	for _, existing := range p.Manifest.Modpacks() {
-		if existing.Source == source {
+		if existing.Source == source && existing.Path == entry.Path {
 			return out.Errorf("modpack-exists", "modpack %s is already in the manifest", source)
 		}
 	}

@@ -15,6 +15,7 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 )
 
 type instanceSelection struct {
@@ -295,11 +296,11 @@ func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest)
 	} else if ok {
 		return a.syncInPlace(cmd, p, side, req)
 	}
-	src, err := a.openSource(cmd.Context(), e.Source, e.Ref)
+	src, err := a.openSource(cmd.Context(), e.Source, pack.At{Ref: e.Ref, Path: e.Path})
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.ref, req.side, req.into = e.Ref, e.Side, e.Dir
+	req.side, req.into = e.Side, e.Dir
 	req.assumeClient = req.assumeClient || e.AssumesClient
 	return a.sync(cmd.Context(), src, req)
 }

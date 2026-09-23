@@ -256,6 +256,7 @@ type Require struct {
 	Type       string `json:"type,omitempty"`
 	Source     string `json:"source,omitempty"`
 	Ref        string `json:"ref,omitempty"`
+	Path       string `json:"path,omitempty"`
 	AutoUpdate *bool  `json:"autoUpdate,omitempty"`
 	Locked     *bool  `json:"locked,omitempty"`
 	File       string `json:"file,omitempty"`
@@ -416,6 +417,11 @@ func (m *Manifest) check() error {
 				return err
 			}
 		}
+		if p := m.Requires[key].Path; p != "" && !IsSubfolder(p) {
+			e := out.Errorf("manifest-invalid", "requires.%s.path %q is not a folder inside the repository", key, p)
+			e.Rows = []out.Detail{{Label: "Fix", Text: `give a slash-separated path relative to the repository root, such as "packs/survival"`}}
+			return e
+		}
 		for _, name := range m.Requires[key].Feature {
 			if _, ok := m.Features[strings.TrimPrefix(name, "!")]; !ok {
 				e := out.Errorf("manifest-invalid", "requires.%s gates on the feature %q, which %s doesn't declare", key, strings.TrimPrefix(name, "!"), FileName)
@@ -441,6 +447,10 @@ func (m *Manifest) check() error {
 	}
 	return nil
 }
+
+// IsSubfolder reports whether rel names a folder below a repository's root, in the slash-separated
+// form a git source's path takes.
+func IsSubfolder(rel string) bool { return insideBuild(rel) }
 
 func insideBuild(rel string) bool {
 	if strings.Contains(rel, `\`) || path.IsAbs(rel) || (len(rel) > 1 && rel[1] == ':') {

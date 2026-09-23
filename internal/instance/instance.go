@@ -34,11 +34,12 @@ const (
 // last build actually did.
 type File struct {
 	Schema string `json:"$schema"`
-	// Source, Ref and Side are what a directory with no manifest of its own syncs from. An instance
-	// that is a project keeps all three in its manifest instead — the one modpack it requires, and
-	// the side carrying `build: "."` — so nothing here can go stale against it.
+	// Source, Ref, Path and Side are what a directory with no manifest of its own syncs from. An
+	// instance that is a project keeps them in its manifest instead — the one modpack it requires,
+	// and the side carrying `build: "."` — so nothing here can go stale against it.
 	Source string `json:"source,omitempty"`
 	Ref    string `json:"ref,omitempty"`
+	Path   string `json:"path,omitempty"`
 	Side   string `json:"side,omitempty"`
 	// AssumesClient builds a directory from the mods both sides share while its source declares no
 	// client.

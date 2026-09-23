@@ -105,6 +105,9 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 	if p.Ref != "" && kind != Git {
 		return nil, out.Errorf("modpack-ref", "modpack %s: \"ref\" only applies to git sources", name)
 	}
+	if p.Path != "" && kind != Git {
+		return nil, out.Errorf("modpack-path", "modpack %s: \"path\" only applies to git sources", name)
+	}
 	l := &Loaded{Name: name, Source: p.Source, Kind: kind, Pin: lock.Modpack{Source: p.Source}}
 	switch kind {
 	case File:
@@ -137,11 +140,13 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		if err != nil {
 			return nil, inModpack(name, refNotFound("modpack-ref", p.Ref, p.Source, err))
 		}
-		l.Pin.Ref = p.Ref
+		l.Pin.Ref, l.Pin.Path = p.Ref, p.Path
 		l.Pin.Commit = commit
-		if l.Dir, err = s.export(ctx, packOrigin(name), mirror, commit); err != nil {
+		export, err := s.export(ctx, packOrigin(name), mirror, commit)
+		if err != nil {
 			return nil, err
 		}
+		l.Dir = subfolder(export, p.Path)
 		if err := s.loadDir(l); err != nil {
 			return nil, err
 		}
@@ -214,7 +219,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 				return nil, "", err
 			}
 		}
-		l.Dir = dir
+		l.Dir = subfolder(dir, pinned.Path)
 		if err := s.loadDir(l); err != nil {
 			return nil, "", err
 		}
@@ -265,6 +270,9 @@ func (s *Store) loadDir(l *Loaded) error {
 	m, err := manifest.Load(filepath.Join(l.Dir, manifest.FileName))
 	if err != nil {
 		if os.IsNotExist(err) {
+			if l.Pin.Path != "" {
+				return out.Errorf("modpack-manifest", "modpack %s: no %s in %s of %s at %s", l.Name, manifest.FileName, l.Pin.Path, l.Source, l.Pin.Commit[:12])
+			}
 			return out.Errorf("modpack-manifest", "modpack %s: no %s in %s", l.Name, manifest.FileName, l.Source)
 		}
 		return inModpack(l.Name, err)
@@ -564,6 +572,7 @@ type Status struct {
 	Kind   Kind   `json:"kind"`
 	Source string `json:"source"`
 	Ref    string `json:"ref,omitempty"`
+	Path   string `json:"path,omitempty"`
 	Pin    string `json:"pin,omitempty"`
 	State  string `json:"state"`
 }
@@ -571,7 +580,7 @@ type Status struct {
 // Status is where a modpack stands against the lock. Only a local directory or archive is read, to
 // see whether it has changed; a remote one is taken as pinned.
 func (s *Store) Status(name string, p manifest.Require, pinned lock.Modpack, locked bool) (Status, error) {
-	st := Status{Name: name, Kind: KindOf(p), Source: p.Source, Ref: p.Ref, State: "unlocked"}
+	st := Status{Name: name, Kind: KindOf(p), Source: p.Source, Ref: p.Ref, Path: p.Path, State: "unlocked"}
 	switch st.Kind {
 	case File:
 		st.Source = p.File

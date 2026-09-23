@@ -100,7 +100,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 
 func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
 	r := unlinkResult{Instance: l.Instance, OK: true}
-	r.Relink, r.RelinkIn = launcher.Relink(launcher.Linked{Instance: l.Instance, Side: l.Side, AssumesClient: l.AssumesClient, Ref: l.Ref})
+	r.Relink, r.RelinkIn = launcher.Relink(launcher.Linked{Instance: l.Instance, Side: l.Side, AssumesClient: l.AssumesClient, Ref: l.Ref, Path: l.Path})
 	if l.Launcher == "gdlauncher" {
 		if running, _ := launcher.GDLauncherRunning(); running {
 			a.printer.Warn("GDLauncher is open; it may put back the pre-launch sync this removes from %q. Quit it, then check the instance's settings", l.Label())

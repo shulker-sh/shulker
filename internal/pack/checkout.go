@@ -20,29 +20,39 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
+// At is where in a git source a project is read: the ref to resolve, the remote HEAD when empty,
+// and the folder of the repository holding its shulker.json, the root when empty.
+type At struct {
+	Ref  string `json:"ref,omitempty"`
+	Path string `json:"path,omitempty"`
+}
+
 // Checkout is a project source fetched for a sync, or the copy kept from its last good sync when
 // the source can't be reached.
 type Checkout struct {
-	Source   string    `json:"source"`
-	Kind     Kind      `json:"kind"`
+	Source string `json:"source"`
+	Kind   Kind   `json:"kind"`
+	At
 	Dir      string    `json:"dir"`
 	Commit   string    `json:"commit,omitempty"`
 	Sha256   string    `json:"sha256,omitempty"`
 	Offline  bool      `json:"offline,omitempty"`
 	LastGood time.Time `json:"-"`
 	Warning  string    `json:"-"`
-	ref      string
 }
 
 var projectOrigin = origin{label: "project", code: "source-fetch"}
 
 // Checkout fetches a project from a directory, git repository or manifest URL.
-func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, error) {
+func (s *Store) Checkout(ctx context.Context, source string, at At) (*Checkout, error) {
 	kind := Classify(source)
-	if ref != "" && kind != Git {
+	if at.Ref != "" && kind != Git {
 		return nil, out.Errorf("source-ref", "--ref only applies to git sources")
 	}
-	c := &Checkout{Source: source, Kind: kind, ref: ref}
+	if err := CheckPath(at.Path, kind); err != nil {
+		return nil, err
+	}
+	c := &Checkout{Source: source, Kind: kind, At: at}
 	var err error
 	switch kind {
 	case Local:
@@ -56,11 +66,18 @@ func (s *Store) Checkout(ctx context.Context, source, ref string) (*Checkout, er
 			}
 			return nil, err
 		}
-		if c.Commit, err = s.revParse(ctx, mirror, ref); err != nil {
-			return nil, refNotFound("source-ref", ref, source, err)
+		if c.Commit, err = s.revParse(ctx, mirror, at.Ref); err != nil {
+			return nil, refNotFound("source-ref", at.Ref, source, err)
 		}
-		c.Dir, err = s.export(ctx, projectOrigin, mirror, c.Commit)
-		return c, err
+		export, err := s.export(ctx, projectOrigin, mirror, c.Commit)
+		if err != nil {
+			return nil, err
+		}
+		c.Dir = subfolder(export, at.Path)
+		if at.Path != "" && !isOnDisk(filepath.Join(c.Dir, manifest.FileName)) {
+			return nil, out.Errorf("source-path", "no %s in %s of %s at %s", manifest.FileName, at.Path, source, c.Commit[:12])
+		}
+		return c, nil
 	default:
 		return s.checkoutURL(ctx, c)
 	}
@@ -94,6 +111,30 @@ func (s *Store) urlFailure(ctx context.Context, c *Checkout, err error) (*Checko
 	e := out.Errorf("source-fetch", "couldn't fetch %s", c.Source)
 	e.Rows = []out.Detail{{Label: "http", Text: httpReason(err)}}
 	return nil, e
+}
+
+// CheckPath fails a path that isn't a folder inside a repository, or that is given for a source
+// that isn't one.
+func CheckPath(path string, kind Kind) error {
+	if path == "" {
+		return nil
+	}
+	if kind != Git {
+		return out.Errorf("source-path", "--path only applies to git sources")
+	}
+	if !manifest.IsSubfolder(path) {
+		e := out.Errorf("source-path", "--path %s is not a folder inside the repository", path)
+		e.Help = "give a slash-separated path relative to the repository root, such as packs/survival"
+		return e
+	}
+	return nil
+}
+
+func subfolder(root, path string) string {
+	if path == "" {
+		return root
+	}
+	return filepath.Join(root, filepath.FromSlash(path))
 }
 
 func refNotFound(code, ref, source string, err error) error {
@@ -134,14 +175,15 @@ func (s *Store) storeURL(c *Checkout, manifestData, lockData []byte) error {
 type lastGood struct {
 	Source string    `json:"source"`
 	Ref    string    `json:"ref,omitempty"`
+	Path   string    `json:"path,omitempty"`
 	Commit string    `json:"commit,omitempty"`
 	Sha256 string    `json:"sha256,omitempty"`
 	At     time.Time `json:"at"`
 }
 
-func (s *Store) readLastGood(source, ref string) (lastGood, bool) {
+func (s *Store) readLastGood(source string, at At) (lastGood, bool) {
 	var rec lastGood
-	data, err := os.ReadFile(s.Cache.LastGood(source, ref))
+	data, err := os.ReadFile(s.Cache.LastGood(source, at.Ref, at.Path))
 	if err != nil || json.Unmarshal(data, &rec) != nil || rec.Source != source {
 		return lastGood{}, false
 	}
@@ -154,8 +196,8 @@ func (s *Store) RecordGood(c *Checkout) error {
 	if c.Offline || (c.Kind != Git && c.Kind != URL) {
 		return nil
 	}
-	rec := lastGood{Source: c.Source, Ref: c.ref, Commit: c.Commit, Sha256: c.Sha256, At: time.Now().UTC()}
-	path := s.Cache.LastGood(c.Source, c.ref)
+	rec := lastGood{Source: c.Source, Ref: c.Ref, Path: c.Path, Commit: c.Commit, Sha256: c.Sha256, At: time.Now().UTC()}
+	path := s.Cache.LastGood(c.Source, c.Ref, c.Path)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -166,26 +208,26 @@ var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 	c.Offline = true
-	if fullCommit.MatchString(c.ref) {
-		if dir := s.Cache.PackSource(c.ref); isOnDisk(dir) {
-			c.Commit, c.Dir = c.ref, dir
-			c.Warning = fmt.Sprintf("%s, using %s at %s, already downloaded", offlineReason(cause), c.Source, c.ref[:12])
+	if fullCommit.MatchString(c.Ref) {
+		if dir := s.Cache.PackSource(c.Ref); isOnDisk(dir) {
+			c.Commit, c.Dir = c.Ref, subfolder(dir, c.Path)
+			c.Warning = fmt.Sprintf("%s, using %s at %s, already downloaded", offlineReason(cause), c.Source, c.Ref[:12])
 			return c, nil
 		}
 		return nil, neverSynced(c, cause)
 	}
-	rec, ok := s.readLastGood(c.Source, c.ref)
+	rec, ok := s.readLastGood(c.Source, c.At)
 	if !ok || rec.Commit == "" || !isOnDisk(s.Cache.PackSource(rec.Commit)) {
 		return nil, neverSynced(c, cause)
 	}
-	c.Commit, c.Dir, c.LastGood = rec.Commit, s.Cache.PackSource(rec.Commit), rec.At
+	c.Commit, c.Dir, c.LastGood = rec.Commit, subfolder(s.Cache.PackSource(rec.Commit), c.Path), rec.At
 	c.Warning = fmt.Sprintf("%s, using %s at %s from the last successful sync %s", offlineReason(cause), c.Source, rec.Commit[:12], out.Ago(rec.At))
 	return c, nil
 }
 
 func (s *Store) urlFallback(c *Checkout, cause error) (*Checkout, error) {
 	c.Offline = true
-	rec, ok := s.readLastGood(c.Source, "")
+	rec, ok := s.readLastGood(c.Source, At{})
 	if !ok || rec.Sha256 == "" || !isOnDisk(filepath.Join(s.Cache.ProjectCheckout(rec.Sha256), lock.FileName)) {
 		return nil, neverSynced(c, cause)
 	}
@@ -203,8 +245,15 @@ func offlineReason(cause error) string {
 
 func neverSynced(c *Checkout, cause error) error {
 	what := c.Source
-	if c.ref != "" {
-		what = fmt.Sprintf("%s (ref %s)", c.Source, c.ref)
+	var at []string
+	if c.Ref != "" {
+		at = append(at, "ref "+c.Ref)
+	}
+	if c.Path != "" {
+		at = append(at, "path "+c.Path)
+	}
+	if len(at) > 0 {
+		what = fmt.Sprintf("%s (%s)", c.Source, strings.Join(at, ", "))
 	}
 	if errors.Is(cause, fetch.ErrOffline) {
 		e := out.Errorf("source-offline", "--offline, and %s has never synced here", what)

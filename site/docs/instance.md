@@ -20,6 +20,7 @@ Required properties are marked with *.
 | `$schema` * | `string` | Always https://shulker.sh/schema/v1/instance.json. Shulker refuses a file that names a schema it doesn't know, rather than guessing at its shape.<br>format `uri` |
 | `source` | `string` | Where this instance syncs from: a project directory, a git URL, or a manifest URL. Absent in an instance that is a project of its own: the one modpack its shulker.json requires is what it follows.<br>min length 1 |
 | `ref` | `string` | Branch, tag, or commit to follow from a git source. Omitted follows the remote HEAD, or, in an instance that is a project of its own, whatever its modpack entry follows.<br>min length 1 |
+| `path` | `string` | Folder inside a git source's repository that holds the shulker.json to follow. Omitted means the repository root, or, in an instance that is a project of its own, whatever its modpack entry names.<br>pattern `^[^/\\]`, min length 1 |
 | `side` | `"client"` \| `"server"` | Which side of the source this directory is built for. A launcher instance is always the client. Absent in an instance that is a project of its own: the side its shulker.json builds in place is the one. |
 | `assumeClient` | `boolean` | Set by `--assume-client`: the source declares no client, so this directory is built from the mods and overrides both sides share. Ignored once the source declares one. |
 | `unlinked` | `boolean` | Set by `shulker unlink`: shulker no longer syncs this directory, and `shulker instances repair` leaves it alone. Linking or syncing into it again clears it. |

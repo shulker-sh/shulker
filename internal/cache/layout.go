@@ -66,9 +66,14 @@ func (c *Cache) ProjectCheckout(sha string) string {
 }
 
 // LastGood is the record of what a remote source looked like the last time a sync from it built,
-// which an offline sync falls back to. An empty ref is the record for a source followed with no ref.
-func (c *Cache) LastGood(source, ref string) string {
-	sum := sha256.Sum256([]byte(source + "\x00" + ref))
+// which an offline sync falls back to. An empty ref is the record for a source followed with no ref,
+// and an empty path the one for the repository's root.
+func (c *Cache) LastGood(source, ref, path string) string {
+	key := source + "\x00" + ref
+	if path != "" {
+		key += "\x00" + path
+	}
+	sum := sha256.Sum256([]byte(key))
 	return filepath.Join(c.Dir, "projects", "last-good", hex.EncodeToString(sum[:])+".json")
 }
 

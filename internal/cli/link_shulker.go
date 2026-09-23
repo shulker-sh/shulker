@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 )
 
 type shulkerReport struct {
@@ -17,13 +18,15 @@ type shulkerReport struct {
 	GameDir  string      `json:"gameDir"`
 	Source   string      `json:"source"`
 	Ref      string      `json:"ref,omitempty"`
+	Path     string      `json:"path,omitempty"`
 	Modpack  string      `json:"modpack"`
 	Created  bool        `json:"created"`
 	Sync     *syncResult `json:"sync"`
 }
 
 func (a *app) linkShulkerCmd() *cobra.Command {
-	var ref, as string
+	var as string
+	var at pack.At
 	var force bool
 	var ls linkSettings
 	cmd := &cobra.Command{
@@ -32,7 +35,7 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 		Short:       "Create an instance shulker owns and launches itself",
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rep, err := a.linkShulker(cmd, args, ref, as, force, ls)
+			rep, err := a.linkShulker(cmd, args, at, as, force, ls)
 			if err != nil {
 				return err
 			}
@@ -40,15 +43,16 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&as, "as", "", "nickname for this instance, which names its folder and finds it with -i (default: from the pack's name)")
-	cmd.Flags().StringVar(&ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&at.Ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
 	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows")
 	ls.register(cmd)
 	return cmd
 }
 
 // linkShulker creates or updates the instance shulker owns for a project, registers it and syncs it.
-func (a *app) linkShulker(cmd *cobra.Command, args []string, ref, as string, force bool, ls linkSettings) (shulkerReport, error) {
-	src, _, err := a.openLinkSource(cmd, args, ref, ls)
+func (a *app) linkShulker(cmd *cobra.Command, args []string, at pack.At, as string, force bool, ls linkSettings) (shulkerReport, error) {
+	src, _, err := a.openLinkSource(cmd, args, at, ls)
 	if err != nil {
 		return shulkerReport{}, err
 	}
@@ -74,11 +78,11 @@ func (a *app) linkShulker(cmd *cobra.Command, args []string, ref, as string, for
 	if _, err := os.Stat(gameDir); os.IsNotExist(err) {
 		created = true
 	}
-	inst, linked, err := a.linkProject(gameDir, nick, display, ref, src)
+	inst, linked, err := a.linkProject(gameDir, nick, display, src)
 	if err != nil {
 		return shulkerReport{}, err
 	}
-	if err := ls.save(gameDir, src.name, ref, "client", false, p.Manifest); err != nil {
+	if err := ls.save(gameDir, src.name, src.At, "client", false, p.Manifest); err != nil {
 		return shulkerReport{}, err
 	}
 	a.registerInstance(config.Instance{ID: nick, Launcher: "shulker", Name: display, Dir: gameDir, Source: src.name})
@@ -92,7 +96,8 @@ func (a *app) linkShulker(cmd *cobra.Command, args []string, ref, as string, for
 		Name:     display,
 		GameDir:  gameDir,
 		Source:   src.name,
-		Ref:      ref,
+		Ref:      src.Ref,
+		Path:     src.Path,
 		Modpack:  modpackKey(inst.Manifest, src.name),
 		Created:  created,
 		Sync:     &synced,
@@ -105,7 +110,7 @@ func (r shulkerReport) print(l *out.Lines) {
 		verb = "updated"
 	}
 	l.OKInto(verb+" instance "+r.ID, r.GameDir, "")
-	l.Tree(follows(r.Modpack, r.Source)...)
+	l.Tree(follows(r.Modpack, r.Source, r.Path)...)
 	r.Sync.print(l)
 }
 
