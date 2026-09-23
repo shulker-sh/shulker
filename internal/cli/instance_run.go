@@ -62,7 +62,7 @@ func (a *app) instanceDumpCmd() *cobra.Command {
 			} else if rec.Wrapped {
 				return gameWrapped(rec.PID)
 			}
-			text, err := game.Dump(rec.PID, rec.Java, rec.Log)
+			text, err := game.Dump(rec)
 			if err != nil {
 				return dumpFailed(err)
 			}
@@ -110,11 +110,20 @@ func runningGame(dir string) (instance.Launch, error) {
 
 func dumpFailed(err error) error {
 	var jcmd *game.JcmdNotFoundError
+	var failed *game.JcmdFailedError
 	switch {
 	case errors.As(err, &jcmd):
 		e := out.Errorf("jcmd-not-found", "the game's Java has no jcmd to take a thread dump with")
 		e.Rows = append(e.Rows, out.Detail{Label: "looked for", Text: jcmd.Path})
 		return e
+	case errors.As(err, &failed):
+		e := out.Errorf("dump-failed", "jcmd took no thread dump of the game")
+		if failed.Stderr != "" {
+			e.Rows = append(e.Rows, out.Detail{Label: "jcmd", Text: failed.Stderr})
+		}
+		return e
+	case errors.Is(err, os.ErrProcessDone):
+		return out.Errorf("game-not-running", "the game ended before it could be asked for a thread dump")
 	case errors.Is(err, game.ErrDumpTimeout):
 		e := out.Errorf("dump-timeout", "the game printed no thread dump")
 		e.Help = "a JVM started with -Xrs ignores the request"

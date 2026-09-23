@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"shulker.sh/shulker/internal/instance"
 )
 
 // dumpTimeout is how long a game gets to finish printing its threads. HotSpot prints a dump in well
@@ -30,15 +32,21 @@ type JcmdNotFoundError struct{ Path string }
 
 func (e *JcmdNotFoundError) Error() string { return "no jcmd at " + e.Path }
 
+// JcmdFailedError is a jcmd that ran and printed no dump, with what it said instead: the pid is no
+// JVM, or one it may not attach to.
+type JcmdFailedError struct{ Stderr string }
+
+func (e *JcmdFailedError) Error() string { return "jcmd printed no thread dump: " + e.Stderr }
+
 // Thread is one thread of a dump: its name and its stack as the JVM printed it, header line first.
 type Thread struct {
 	Name  string `json:"name"`
 	Stack string `json:"stack"`
 }
 
-// Dump asks the running game with this pid for a thread dump and hands back its text, which ends up
-// in the run's log as well. java is the runtime the game runs on, which is where Windows finds jcmd.
-func Dump(pid int, java, log string) (string, error) { return dump(pid, java, log, dumpTimeout) }
+// Dump asks the game of an open run for a thread dump and hands back its text, which ends up in the
+// run's log as well. The run's Java is where Windows finds jcmd.
+func Dump(run instance.Launch) (string, error) { return dump(run, dumpTimeout) }
 
 // Threads splits a dump into its threads, in the order the JVM printed them.
 func Threads(dump string) []Thread {

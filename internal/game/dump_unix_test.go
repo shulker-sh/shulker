@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"shulker.sh/shulker/internal/instance"
 )
 
 func TestDumpSignalsTheGameAndReadsTheDumpItPrints(t *testing.T) {
@@ -39,7 +41,7 @@ func TestDumpSignalsTheGameAndReadsTheDumpItPrints(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	got, err := Dump(cmd.Process.Pid, "", log)
+	got, err := Dump(instance.Launch{PID: cmd.Process.Pid, Log: log})
 	if err != nil {
 		t.Fatal(err)
 	}
