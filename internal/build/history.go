@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -139,10 +140,11 @@ func TakeHistory(dir string, keep int, e HistoryEntry) (HistoryEntry, error) {
 	if err := copyFile(StatePath(dir), filepath.Join(into, StateFile)); err != nil {
 		return HistoryEntry{}, err
 	}
-	if err := copyTree(filepath.Join(dir, historyConfig), filepath.Join(into, historyConfig)); err != nil {
+	cached := leftToCache(dir, lk)
+	if err := copyTree(dir, historyConfig, into, cached); err != nil {
 		return HistoryEntry{}, err
 	}
-	for _, rel := range managedFiles(dir, lk) {
+	for _, rel := range managedFiles(dir, cached) {
 		from := filepath.Join(dir, filepath.FromSlash(rel))
 		if err := copyFile(from, filepath.Join(into, filepath.FromSlash(rel))); err != nil {
 			return HistoryEntry{}, err
@@ -157,11 +159,10 @@ func TakeHistory(dir string, keep int, e HistoryEntry) (HistoryEntry, error) {
 // managedFiles are the files the last build wrote that an entry has to copy:
 // everything except the config folder, copied whole separately, and except what
 // the cache can place again from the lock.
-func managedFiles(dir string, lk *lock.Lock) []string {
-	cached := cachedPlacements(lk)
+func managedFiles(dir string, cached func(rel string) bool) []string {
 	var rels []string
 	for rel := range LoadState(dir).Files {
-		if cached[rel] || cachedDatapack(lk, rel) || rel == historyConfig || strings.HasPrefix(rel, historyConfig+"/") {
+		if cached(rel) || rel == historyConfig || strings.HasPrefix(rel, historyConfig+"/") {
 			continue
 		}
 		rels = append(rels, rel)
@@ -170,18 +171,25 @@ func managedFiles(dir string, lk *lock.Lock) []string {
 	return rels
 }
 
-// cachedDatapack reports a placed datapack, whose folder hangs on the side and the server's
-// level-name, so it is matched by its folder's name and its own.
-func cachedDatapack(lk *lock.Lock, rel string) bool {
-	if lk == nil || path.Base(path.Dir(rel)) != "datapacks" {
-		return false
-	}
-	for _, p := range lk.Datapacks {
-		if p.Filename == path.Base(rel) {
-			return true
+// leftToCache reports a placed file the cache can place again from the lock, which an entry
+// leaves out. A datapack's folder hangs on the side, its global datapack mods and the server's
+// level-name, so it is matched by its file name in any folder a build may place one in.
+func leftToCache(dir string, lk *lock.Lock) func(rel string) bool {
+	placed := cachedPlacements(lk)
+	datapacks := map[string]bool{}
+	if lk != nil {
+		for _, p := range lk.Datapacks {
+			datapacks[p.Filename] = true
 		}
 	}
-	return false
+	level := "world"
+	if data, err := os.ReadFile(filepath.Join(dir, PropertiesFile)); err == nil {
+		level = levelName(parseProperties(data))
+	}
+	folders := append(slices.Clone(lock.DatapackFolders), level+"/datapacks")
+	return func(rel string) bool {
+		return placed[rel] || datapacks[path.Base(rel)] && slices.Contains(folders, path.Dir(rel))
+	}
 }
 
 func cachedPlacements(lk *lock.Lock) map[string]bool {
@@ -264,8 +272,8 @@ func PickHistory(dir string, n int) (HistoryEntry, error) {
 }
 
 // RestoreHistory puts everything an entry holds back where it came from. The
-// config folder is replaced whole; the mods themselves come back from the cache
-// when the restored lock is built.
+// config folder is replaced whole; the mods and datapacks themselves come back from
+// the cache when the restored lock is built.
 func RestoreHistory(dir string, e HistoryEntry) error {
 	from := historyEntryPath(dir, e.ID)
 	if err := os.RemoveAll(filepath.Join(dir, historyConfig)); err != nil {
@@ -322,7 +330,10 @@ func copyFile(src, dst string) error {
 	return fsutil.Write(dst, data)
 }
 
-func copyTree(src, dst string) error {
+// copyTree copies the folder rel in dir into the same place under into, leaving out what skip
+// reports, by its path relative to dir.
+func copyTree(dir, rel, into string, skip func(rel string) bool) error {
+	src := filepath.Join(dir, rel)
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) && path == src {
@@ -330,16 +341,16 @@ func copyTree(src, dst string) error {
 			}
 			return err
 		}
-		rel, relErr := filepath.Rel(src, path)
+		rel, relErr := filepath.Rel(dir, path)
 		if relErr != nil {
 			return relErr
 		}
 		if d.IsDir() {
-			return os.MkdirAll(filepath.Join(dst, rel), 0o755)
+			return os.MkdirAll(filepath.Join(into, rel), 0o755)
 		}
-		if !d.Type().IsRegular() {
+		if !d.Type().IsRegular() || skip(filepath.ToSlash(rel)) {
 			return nil
 		}
-		return copyFile(path, filepath.Join(dst, rel))
+		return copyFile(path, filepath.Join(into, rel))
 	})
 }
