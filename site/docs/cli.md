@@ -631,6 +631,8 @@ shulker install
 
 Assemble a side's build directory from the lock and its overrides. With no side, builds every side the manifest declares.
 
+A file you edited in the build directory is kept until the source changes it too. Then it is a conflict, and so is a file in the way that shulker never wrote: the build fails `build-conflict` before writing anything, listing each one. `shulker diff` shows them, `--force` takes the source's version, and `shulker pull` copies yours into the project instead. `build`, `sync` and `install` all stop this way; only a sync for a launch, from [`play`](#shulker-play) or a launcher's [pre-launch hook](#shulker-hook-pre-launch), keeps your file and applies the rest.
+
 ```sh
 shulker build
 shulker build client
@@ -882,7 +884,7 @@ Start a shulker instance. With no nickname it plays the instance the current dir
 
 In a project folder, `play` plays the instance shulker owns for that project, the one [`shulker link shulker`](#shulker-link-shulker) made from it. Instances other launchers own are synced from the project too but never count, since shulker doesn't start them. With several, it asks which on a terminal, and off one it fails with `ambiguous-instance`, listing them to pass with `-i`. With none, it asks on a terminal to create one, which is what `link shulker` does, and then plays it; declining, or running under `--no-input` or `--json`, fails with `instance-not-found`. `--dry-run` never creates one.
 
-It updates the instance first, resolves the account, fetches whatever the store is missing, and then starts the game **detached**: `play` returns as soon as the game is running, and the game outlives the shell it was started from. `--no-sync` starts what is already on disk without updating it, and so does every `play` of an instance whose `hooks.preLaunch` is `false`. Once a launch has filled the store, `play` needs no network: a sync that can't reach the source warns and builds from the lock the instance already has, and the game, its loader and its libraries come from the store.
+It updates the instance first, resolves the account, fetches whatever the store is missing, and then starts the game **detached**: `play` returns as soon as the game is running, and the game outlives the shell it was started from. `--no-sync` starts what is already on disk without updating it, and so does every `play` of an instance whose `hooks.preLaunch` is `false`. A file you edited that the update also changes never holds the game back: the update keeps your file, applies the rest, and warns with the sync result how to take the pack's version, as [`sync`](#shulker-sync) describes. Once a launch has filled the store, `play` needs no network: a sync that can't reach the source warns and builds from the lock the instance already has, and the game, its loader and its libraries come from the store.
 
 A detached game is still recorded. `play` hands it to a watcher — shulker itself, started again in the background with no window — which starts the game, waits for it, writes how the run ended to the instance's launch history, and exits. The record is the same one a launcher's [post-exit hook](#shulker-hook-post-exit) writes, so `instances` and the history read it the same way, except that shulker started the game itself and so also knows the status it exited with: a non-zero status is `crashed` whether or not the game managed to write a crash report. If the watcher is killed while the game is running, the record stays open with the game's process id in it, and the next command that touches the instance — `play`, `sync`, `instances repair` — closes it from the crash reports once that process has gone.
 
@@ -1192,6 +1194,8 @@ To update an instance, name it instead of a source. `-i` takes an instance's id,
 
 A project whose side builds into its own directory is an instance, and `sync` run inside it (or naming it with `-i`) updates the instance itself first: modpacks that follow their source are fetched again (every modpack except one set to `"autoUpdate": false`), the lock is resolved against them without moving your own mods, and the side is built in place. Nothing is written, and no history entry is taken, when the lock comes out unchanged. Every instance synced from it is synced after, since those build from its lock. A modpack update your own mods can't satisfy stops the sync with the reason, leaving the lock and the directory as they were; a launcher's pre-launch hook instead builds what the lock already has and starts the game.
 
+A file changed both in the directory and in the source fails the sync with `build-conflict`, as [`build`](#shulker-build) does, and `--force` takes the source's version. A sync for a launch is the exception: it keeps your file, applies everything else, and warns `kept your version of <file> (<why>); shulker diff shows the pack's`, with the forcing command beneath. From then on the file counts as edited in place, so the next launch says nothing more until the pack changes it again.
+
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | Output directory (default: the side's build directory) |
@@ -1437,7 +1441,7 @@ The output names the backup taken first, then `✔ restored 2 worlds from <id> �
 
 ### `shulker hook pre-launch`
 
-What a launcher's own pre-launch slot runs. shulker writes the script that calls it into the instance's `.shulker/` folder and points the launcher at that, so there is no reason to run this yourself: outside a launcher slot it would sync whatever directory it was run in. It syncs the instance from its source before the game starts, and a failure never stops the game — the launcher plays what is already on disk.
+What a launcher's own pre-launch slot runs. shulker writes the script that calls it into the instance's `.shulker/` folder and points the launcher at that, so there is no reason to run this yourself: outside a launcher slot it would sync whatever directory it was run in. It syncs the instance from its source before the game starts, and a failure never stops the game — the launcher plays what is already on disk. A file the player edited that the update also changes is kept rather than failing the sync, so the rest of the update still lands; the warning naming it, and the command that takes the pack's version, print where the launcher shows the hook's output.
 
 A launcher that gives shulker no way to show a message gets a deadline instead, so a long update can explain itself rather than looking like a hang. That is GDLauncher only, which discards a hook's output when its own five-minute limit runs out.
 
@@ -1774,7 +1778,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `backup-invalid` | `restore` was given a zip that won't open, or that holds anything other than world folders at its root |
 | `backup-missing` | `restore` found no backup with that number, or none by the name or at the path `--backup` gives |
 | `backups-empty` | `restore` found no backups for the target |
-| `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
+| `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. A sync for a launch keeps them instead. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
 | `check-failed` | `check` found a problem; each one printed above it. `items`: every problem's items as `<code>: <item>`; `data.problems`: each problem as an error |
