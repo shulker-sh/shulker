@@ -140,7 +140,7 @@ func TestLaunchArgvSizesTheWindowThroughTheVersionsOwnArguments(t *testing.T) {
 		},
 	}}
 
-	got := strings.Join(launchArgv(v, map[string]string{}, instance.Settings{Memory: "2G"}, "640x480", quickPlay{}), " ")
+	got := strings.Join(launchArgv(v, map[string]string{}, instance.Settings{LaunchSettings: instance.LaunchSettings{Memory: "2G"}}, "640x480", quickPlay{}), " ")
 	if got != "-cp x -Xms2G -Xmx2G Main --username Steve --width 640 --height 480" {
 		t.Fatalf("argv %q", got)
 	}

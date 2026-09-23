@@ -19,10 +19,6 @@ import (
 	"shulker.sh/shulker/schema"
 )
 
-// playKeys are the settings config.json holds a default for, under play.: a launch takes the
-// instance's own key when it has one and the default when it doesn't.
-var playKeys = []string{"memory", "jvmArgs", "java", "window", "wrapper"}
-
 // Where a setting's value came from, as `instance get` reports it.
 const (
 	fromInstance = "instance"
@@ -70,7 +66,7 @@ func (a *app) instanceGetCmd() *cobra.Command {
 			}
 			if len(args) == 0 {
 				all := f.settings()
-				for _, key := range playKeys {
+				for _, key := range instance.LaunchKeys {
 					if v, ok := configLookup(defaults, "play."+key); ok {
 						if _, set := all[key]; !set {
 							all[key] = v
@@ -134,7 +130,7 @@ func valueText(v any) string {
 
 // globalKey is the config.json key behind a setting, or empty for a setting only an instance has.
 func globalKey(field *settingField) string {
-	if len(field.keys) == 2 && slices.Contains(playKeys, field.keys[1]) {
+	if len(field.keys) == 2 && slices.Contains(instance.LaunchKeys, field.keys[1]) {
 		return "play." + field.keys[1]
 	}
 	return ""

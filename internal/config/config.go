@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
@@ -42,11 +43,7 @@ type Config struct {
 // Play is how shulker launches its own instances unless an instance says otherwise: each key here
 // is a default the same key in an instance's settings overrides, and an absent one inherits.
 type Play struct {
-	Memory  string   `json:"memory,omitempty"`
-	JVMArgs []string `json:"jvmArgs,omitempty"`
-	Java    string   `json:"java,omitempty"`
-	Window  string   `json:"window,omitempty"`
-	Wrapper []string `json:"wrapper,omitempty"`
+	instance.LaunchSettings
 	// SaveBackups is how many automatic pre-change backups a save group or instance keeps. It is
 	// global only: no instance setting overrides it.
 	SaveBackups *int `json:"saveBackups,omitempty"`

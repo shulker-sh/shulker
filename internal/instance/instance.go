@@ -53,18 +53,47 @@ type File struct {
 // default of the same name in config.json when shulker launches the instance itself; an absent one
 // inherits it.
 type Settings struct {
-	Hooks         Hooks     `json:"hooks"`
-	Commands      *Commands `json:"commands,omitempty"`
-	Marker        *bool     `json:"marker,omitempty"`
-	Memory        string    `json:"memory,omitempty"`
-	JVMArgs       []string  `json:"jvmArgs,omitempty"`
-	Java          string    `json:"java,omitempty"`
-	Window        string    `json:"window,omitempty"`
-	Wrapper       []string  `json:"wrapper,omitempty"`
-	Account       string    `json:"account,omitempty"`
-	Shulker       string    `json:"shulker,omitempty"`
-	LaunchHistory *int      `json:"launchHistory,omitempty"`
-	SavesGroup    string    `json:"savesGroup,omitempty"`
+	Hooks    Hooks     `json:"hooks"`
+	Commands *Commands `json:"commands,omitempty"`
+	Marker   *bool     `json:"marker,omitempty"`
+	LaunchSettings
+	Account       string `json:"account,omitempty"`
+	Shulker       string `json:"shulker,omitempty"`
+	LaunchHistory *int   `json:"launchHistory,omitempty"`
+	SavesGroup    string `json:"savesGroup,omitempty"`
+}
+
+// LaunchSettings are the settings a launch takes from the instance, falling back to config.json's
+// play defaults for each one the instance leaves unset.
+type LaunchSettings struct {
+	Memory  string   `json:"memory,omitempty"`
+	JVMArgs []string `json:"jvmArgs,omitempty"`
+	Java    string   `json:"java,omitempty"`
+	Window  string   `json:"window,omitempty"`
+	Wrapper []string `json:"wrapper,omitempty"`
+}
+
+// LaunchKeys are the JSON keys of LaunchSettings.
+var LaunchKeys = []string{"memory", "jvmArgs", "java", "window", "wrapper"}
+
+// Over is s with each setting it leaves unset taken from base.
+func (s LaunchSettings) Over(base LaunchSettings) LaunchSettings {
+	if s.Memory == "" {
+		s.Memory = base.Memory
+	}
+	if s.JVMArgs == nil {
+		s.JVMArgs = base.JVMArgs
+	}
+	if s.Java == "" {
+		s.Java = base.Java
+	}
+	if s.Window == "" {
+		s.Window = base.Window
+	}
+	if s.Wrapper == nil {
+		s.Wrapper = base.Wrapper
+	}
+	return s
 }
 
 // Hooks switch shulker's pre-launch and post-exit work on and off. An absent switch is on.

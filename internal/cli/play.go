@@ -290,21 +290,7 @@ func (a *app) launchSettings(dir string) (instance.Settings, error) {
 		return instance.Settings{}, err
 	}
 	s := f.Settings
-	if s.Memory == "" {
-		s.Memory = cfg.Play.Memory
-	}
-	if s.JVMArgs == nil {
-		s.JVMArgs = cfg.Play.JVMArgs
-	}
-	if s.Java == "" {
-		s.Java = cfg.Play.Java
-	}
-	if s.Window == "" {
-		s.Window = cfg.Play.Window
-	}
-	if s.Wrapper == nil {
-		s.Wrapper = cfg.Play.Wrapper
-	}
+	s.LaunchSettings = s.LaunchSettings.Over(cfg.Play.LaunchSettings)
 	return s, nil
 }
 
