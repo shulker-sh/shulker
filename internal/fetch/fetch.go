@@ -124,10 +124,17 @@ func New(version string) *Client {
 }
 
 func (c *Client) get(ctx context.Context, url string, accept string) (*http.Response, error) {
-	return c.do(ctx, http.MethodGet, url, accept, "", nil)
+	return c.do(ctx, http.MethodGet, url, accepting(accept), nil)
 }
 
-func (c *Client) do(ctx context.Context, method, url, accept, contentType string, body io.Reader) (*http.Response, error) {
+func accepting(accept string) http.Header {
+	if accept == "" {
+		return nil
+	}
+	return http.Header{"Accept": {accept}}
+}
+
+func (c *Client) do(ctx context.Context, method, url string, header http.Header, body io.Reader) (*http.Response, error) {
 	if c.Offline {
 		return nil, fmt.Errorf("%s: %w", url, ErrOffline)
 	}
@@ -139,11 +146,8 @@ func (c *Client) do(ctx context.Context, method, url, accept, contentType string
 	for k, vs := range c.Header {
 		req.Header[k] = vs
 	}
-	if accept != "" {
-		req.Header.Set("Accept", accept)
-	}
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
+	for k, vs := range header {
+		req.Header[k] = vs
 	}
 	done := func() {}
 	if c.Waiting != nil {
@@ -192,7 +196,7 @@ func (c *Client) PostJSON(ctx context.Context, url string, body any, v any) erro
 	if err != nil {
 		return err
 	}
-	resp, err := c.do(ctx, http.MethodPost, url, "application/json", "application/json", bytes.NewReader(payload))
+	resp, err := c.do(ctx, http.MethodPost, url, http.Header{"Accept": {"application/json"}, "Content-Type": {"application/json"}}, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
@@ -206,7 +210,7 @@ func (c *Client) PostJSON(ctx context.Context, url string, body any, v any) erro
 // PostForm posts a form-encoded body and decodes the JSON answer, which is what the Microsoft
 // token endpoints take and give.
 func (c *Client) PostForm(ctx context.Context, url string, form url.Values, v any) error {
-	resp, err := c.do(ctx, http.MethodPost, url, "application/json", "application/x-www-form-urlencoded", strings.NewReader(form.Encode()))
+	resp, err := c.do(ctx, http.MethodPost, url, http.Header{"Accept": {"application/json"}, "Content-Type": {"application/x-www-form-urlencoded"}}, strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
 	}
