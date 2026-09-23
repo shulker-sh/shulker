@@ -118,3 +118,48 @@ func TestAModpackMemberPinnedToABetaFileLeavesTheLockCurrent(t *testing.T) {
 		t.Fatalf("the lock should match the manifest: %+v", env)
 	}
 }
+
+func TestPinningABetaPackFileAcceptsBeta(t *testing.T) {
+	h := newHarness(t)
+	fresh := h.cfMods[600000]
+	fresh.files = append(fresh.files, cfFile{id: 5300002, jar: h.jars["cf-fresh-animations"], date: "2026-09-10T00:00:00Z", channel: 2})
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+
+	_, _, stderr := h.run(t, "add", "600000", "--provider", "curseforge", "--pin", "5300002")
+
+	if !strings.Contains(stderr, "is a beta; accepting beta for it") {
+		t.Fatalf("add should say the pin widens the channel: %s", stderr)
+	}
+	if got := h.readLock(t).Packs("resourcepack")["fresh-animations"].Channel; got != "beta" {
+		t.Fatalf("lock channel = %q, want beta", got)
+	}
+	if got := h.readManifest(t).Requires["fresh-animations"].Channel; got != "beta" {
+		t.Fatalf("manifest channel = %q, want beta", got)
+	}
+	if env := installJSON(t, h); env.LockStale {
+		t.Fatalf("the lock should match the manifest: %+v", env)
+	}
+}
+
+func TestPinningABetaModpackFileAcceptsBeta(t *testing.T) {
+	h := archiveProject(t)
+	path := filepath.Join(t.TempDir(), "craft-1.1.zip")
+	writeCurseForgeZip(t, path, importedCurseForgePack(craftFiles...), map[string][]byte{})
+	archive := archiveJar(t, h, "craft-1.1.zip", path)
+	h.cfMods[800000] = &cfMod{id: 800000, slug: "craftpack", class: 4471, files: []cfFile{{id: 7000002, jar: archive, date: "2026-09-10T00:00:00Z", channel: 2}}}
+
+	_, _, stderr := h.run(t, "add", "craftpack", "--pin", "7000002")
+
+	if !strings.Contains(stderr, "is a beta; accepting beta for it") {
+		t.Fatalf("add should say the pin widens the channel: %s", stderr)
+	}
+	if got := h.readLock(t).Modpacks["craftpack"].Channel; got != "beta" {
+		t.Fatalf("lock channel = %q, want beta", got)
+	}
+	if got := h.readManifest(t).Requires["craftpack"].Channel; got != "beta" {
+		t.Fatalf("manifest channel = %q, want beta", got)
+	}
+	if env := installJSON(t, h); env.LockStale {
+		t.Fatalf("the lock should match the manifest: %+v", env)
+	}
+}

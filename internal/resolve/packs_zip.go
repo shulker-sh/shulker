@@ -86,12 +86,13 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 	if err := r.packKeyFree(key, kind); err != nil {
 		return err
 	}
-	if err := r.lockPack(ctx, p, proj, key, kind, opts.Pin, opts.Channel); err != nil {
+	channel, err := r.lockPack(ctx, p, proj, key, kind, opts.Pin, opts.Channel)
+	if err != nil {
 		return err
 	}
 	listed := manifest.Require{Type: kind}
-	if opts.Channel != "" && opts.Channel != "release" {
-		listed.Channel = opts.Channel
+	if channel != "" && channel != "release" {
+		listed.Channel = channel
 	}
 	if opts.Pin != "" {
 		listed.Pin = lockID(p.Name(), opts.Pin)
@@ -244,7 +245,14 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 	if entry.Pin != nil {
 		pin = fmt.Sprint(entry.Pin)
 	}
-	return r.lockPack(ctx, p, proj, key, kind, pin, entry.Channel)
+	channel, err := r.lockPack(ctx, p, proj, key, kind, pin, entry.Channel)
+	if err != nil {
+		return err
+	}
+	if channel != entry.Channel {
+		r.listChannel(key, channel)
+	}
+	return nil
 }
 
 // checkPackFilenames refuses two packs placed under one name, compared without
@@ -270,13 +278,16 @@ func (r *Resolver) checkPackFilenames() error {
 }
 
 // lockPack picks the pack's version, fetches it into the cache and records it in
-// the lock under key.
-func (r *Resolver) lockPack(ctx context.Context, p provider.Provider, proj *provider.Project, key, kind, pin, channel string) error {
+// the lock under key, returning the channel it accepted: channel, widened for a pin.
+func (r *Resolver) lockPack(ctx context.Context, p provider.Provider, proj *provider.Project, key, kind, pin, channel string) (string, error) {
 	v, err := r.pickPack(ctx, p, proj, kind, pin, channel)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return r.lockPackVersion(ctx, p, proj, v, key, kind, channel)
+	if pin != "" {
+		channel = r.pinnedChannel(key, v, channel)
+	}
+	return channel, r.lockPackVersion(ctx, p, proj, v, key, kind, channel)
 }
 
 func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, key, kind, channel string) error {

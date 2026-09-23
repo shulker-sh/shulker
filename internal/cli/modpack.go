@@ -225,6 +225,9 @@ func (a *app) lockHostedEntry(ctx context.Context, p *project.Project, r *resolv
 	if err != nil {
 		return err
 	}
+	if channel := loaded.Pin.Channel; channel != "release" {
+		entry.Channel = channel
+	}
 	i := slices.IndexFunc(r.Packs, func(l *pack.Loaded) bool { return l.Name == key })
 	if i < 0 {
 		return a.addLoadedPack(ctx, p, r, store, key, key, loaded, entry)

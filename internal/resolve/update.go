@@ -231,10 +231,7 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 	if pin != "" {
 		if widened := r.pinnedChannel(id, v, entry.Channel); widened != entry.Channel {
 			entry.Channel = widened
-			if listed, ok := r.Manifest.Requires[id]; ok {
-				listed.Channel = widened
-				r.Manifest.Requires[id] = listed
-			}
+			r.listChannel(id, widened)
 		}
 	}
 	r.settle(id, entry.Side, entry.Channel)

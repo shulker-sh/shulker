@@ -196,7 +196,9 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 	}
 	obtain := func(ctx context.Context, name string, entry manifest.Require) (lock.Modpack, error) {
 		r := &resolve.Resolver{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
-		return r.ObtainModpack(ctx, name, entry)
+		pin, err := r.ObtainModpack(ctx, name, entry)
+		a.warn(r.Warnings)
+		return pin, err
 	}
 	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
 }

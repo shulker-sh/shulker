@@ -126,6 +126,13 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 	if err != nil {
 		return lock.Modpack{}, err
 	}
+	channel := entry.Channel
+	if pin != "" {
+		channel = r.pinnedChannel(name, v, channel)
+	}
+	if channel != entry.Channel {
+		r.listChannel(name, channel)
+	}
 	r.log("fetching modpack %s %s", proj.Slug, v.Number)
 	got, err := r.obtain(ctx, proj, v)
 	if err != nil {
@@ -144,7 +151,7 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 		Project:       lockID(p.Name(), proj.ID),
 		Version:       lockID(p.Name(), v.ID),
 		VersionNumber: v.Number,
-		Channel:       channelLabel(entry.Channel),
+		Channel:       channelLabel(channel),
 		URL:           got.url,
 		Page:          got.page,
 		Filename:      v.File.Filename,

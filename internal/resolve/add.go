@@ -277,14 +277,22 @@ func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider
 	return &v, nil
 }
 
-// pinnedChannel is the channel a mod pinned to v accepts: channel, widened to v's own when v is less
-// stable, since pinning it accepts it.
+// pinnedChannel is the channel a mod, pack or modpack pinned to v accepts: channel, widened to v's
+// own when v is less stable, since pinning it accepts it.
 func (r *Resolver) pinnedChannel(id string, v *provider.Version, channel string) string {
 	if provider.ChannelAllows(channel, v.Channel) {
 		return channel
 	}
 	r.Warnings = append(r.Warnings, fmt.Sprintf("%s %s is a %s; accepting %s for it", id, v.Number, v.Channel, v.Channel))
 	return v.Channel
+}
+
+// listChannel writes a widened channel back to key's entry in shulker.json, when it has one there.
+func (r *Resolver) listChannel(key, channel string) {
+	if listed, ok := r.Manifest.Requires[key]; ok {
+		listed.Channel = channel
+		r.Manifest.Requires[key] = listed
+	}
 }
 
 func channelLabel(channel string) string {
