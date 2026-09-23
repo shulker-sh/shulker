@@ -58,13 +58,14 @@ type Imported struct {
 	// path in the archive.
 	Duplicates []string `json:"duplicates"`
 	Unmanaged  []string `json:"unmanaged"`
-	// Sides are the mods whose side the index's env gives otherwise than their provider does.
+	// Sides are the mods the index's env widens beyond their provider's side.
 	Sides     []SideChoice      `json:"sides"`
 	Warnings  []string          `json:"-"`
 	Overrides []mrpack.Override `json:"-"`
 }
 
-// SideChoice is a mod locked with the side the index's env gives it rather than its provider's.
+// SideChoice is a mod locked on a wider side than its provider's, since the index's env places it
+// on a side the project builds.
 type SideChoice struct {
 	ID       string `json:"id"`
 	Pack     string `json:"pack"`
@@ -624,9 +625,10 @@ func zipHasAssets(zr *zip.Reader) bool {
 	return slices.ContainsFunc(zr.File, func(f *zip.File) bool { return strings.HasPrefix(f.Name, "assets/") })
 }
 
-// lockMod locks the mod the pack ships at file, on packSide when the pack gives one and on its
-// provider's side when it gives none. Only a side from the index's env is reported; one from an
-// override layer is recorded without a word.
+// lockMod locks the mod the pack ships at file on its provider's side. An override layer's side
+// replaces it without a word. The index's env widens it to both, with a report, only where the
+// env places the mod on a side the project builds and the provider's side doesn't: packwiz
+// marks every mod as needed on both sides, so the env alone says little.
 func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, packSide string, proj *provider.Project, v *provider.Version) error {
 	id, prior, err := im.r.place(ctx, p, proj, v, "", "", "", "", false)
 	if err != nil {
@@ -644,15 +646,15 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, pack
 			entry.Pin = nil
 		}
 	}
-	if packSide != "" {
-		providerSide := im.r.Lock.Mods[id].Side
-		if _, fromEnv := im.indexSides[file]; fromEnv && packSide != providerSide {
-			im.rep.Sides = append(im.rep.Sides, SideChoice{ID: id, Pack: packSide, Provider: providerSide})
+	providerSide := im.r.Lock.Mods[id].Side
+	if _, fromEnv := im.indexSides[file]; fromEnv {
+		if im.addsBuiltSide(packSide, providerSide) {
+			entry.Side = "both"
+			im.rep.Sides = append(im.rep.Sides, SideChoice{ID: id, Pack: entry.Side, Provider: providerSide})
 		}
+	} else if packSide != "" && (packSide != providerSide || entry.Side != "") {
 		// A marker's own side stays explicit even where the provider agrees with it.
-		if packSide != providerSide || entry.Side != "" {
-			entry.Side = packSide
-		}
+		entry.Side = packSide
 	}
 	if entry.Side != "" {
 		locked := im.r.Lock.Mods[id]
@@ -663,6 +665,13 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, pack
 	im.r.Manifest.Requires[id] = entry
 	im.rep.locked(id, manifest.TypeMod, p.Name())
 	return nil
+}
+
+func (im *importer) addsBuiltSide(packSide, providerSide string) bool {
+	covers := func(side, built string) bool { return side == "both" || side == built }
+	return slices.ContainsFunc(im.r.Manifest.Sides(), func(built string) bool {
+		return covers(packSide, built) && !covers(providerSide, built)
+	})
 }
 
 // lockPack locks a resource pack or shader the pack carries under the file name it ships, which

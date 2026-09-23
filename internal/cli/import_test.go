@@ -403,8 +403,8 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 	if strings.Join(res.Mods.LockedIDs(), ",") != "jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "client-overrides/mods/"+iris.filename+",overrides/mods/"+nodist.filename+",overrides/mods/unknown-1.0.jar" {
 		t.Fatalf("import: %+v", res.Mods)
 	}
-	if len(warnings) != 3 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") ||
-		!strings.Contains(warnings[1], iris.filename) || !strings.Contains(warnings[1], "download failed") || !strings.Contains(warnings[2], "sodium (client → both)") {
+	if len(warnings) != 2 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") ||
+		!strings.Contains(warnings[1], iris.filename) || !strings.Contains(warnings[1], "download failed") {
 		t.Fatalf("warnings: %v", warnings)
 	}
 	m, l := readProject(t, dir)
@@ -432,7 +432,7 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 	if strings.Join(res.Mods.LockedIDs(), ",") != "sodium" || len(res.Mods.Unmanaged) != 4 {
 		t.Fatalf("import without CurseForge: %+v", res.Mods)
 	}
-	if len(warnings) != 2 || !strings.Contains(warnings[0], "CurseForge") {
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "CurseForge") {
 		t.Fatalf("warnings without CurseForge: %v", warnings)
 	}
 }
@@ -480,15 +480,24 @@ func TestImportMrpackKeepsAnIndexFileModrinthFailsToServe(t *testing.T) {
 	}
 }
 
-func TestImportMrpackTakesAModsSideFromThePack(t *testing.T) {
+func TestImportMrpackTakesAModsSideFromThePackOnlyWhereItAddsABuiltSide(t *testing.T) {
 	h := newHarness(t)
-	sodium, api := h.jars["sodium"], h.jars["fabric-api"]
+	h.jars["config-manager"] = makeJar(t, "config_manager", "config_manager-1.0.0.jar", "server")
+	h.cfMods[800000] = &cfMod{id: 800000, slug: "config-manager", files: []cfFile{{id: 5600001, jar: h.jars["config-manager"], date: "2026-09-01T00:00:00Z", channel: 1}}}
+	h.jars["server-tweaks"] = makeJar(t, "server_tweaks", "server_tweaks-1.0.0.jar", "server")
+	h.cfMods[800001] = &cfMod{id: 800001, slug: "server-tweaks", files: []cfFile{{id: 5600002, jar: h.jars["server-tweaks"], date: "2026-09-01T00:00:00Z", channel: 1}}}
 	file := func(jar fakeJar, env map[string]string) mrpack.File {
 		return mrpack.File{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: env, Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
 	}
 	index := mrpack.Index{
 		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Singleplayer",
-		Files:        []mrpack.File{file(sodium, mrpack.Env("both")), file(api, nil)},
+		Files: []mrpack.File{
+			file(h.jars["config-manager"], mrpack.Env("both")),
+			file(h.jars["server-tweaks"], mrpack.Env("client")),
+			file(h.jars["sodium"], mrpack.Env("both")),
+			file(h.jars["jei"], mrpack.Env("client")),
+			file(h.jars["fabric-api"], nil),
+		},
 		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
 	}
 	archive := filepath.Join(t.TempDir(), "singleplayer.mrpack")
@@ -502,18 +511,23 @@ func TestImportMrpackTakesAModsSideFromThePack(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if want := []resolve.SideChoice{{ID: "sodium", Pack: "both", Provider: "client"}}; !slices.Equal(env.Data.Mods.Sides, want) {
+	if want := []resolve.SideChoice{{ID: "config_manager", Pack: "both", Provider: "server"}, {ID: "server_tweaks", Pack: "both", Provider: "server"}}; !slices.Equal(env.Data.Mods.Sides, want) {
 		t.Fatalf("sides: %+v", env.Data.Mods.Sides)
 	}
-	if len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "sodium (client → both)") {
+	sideWarnings := slices.DeleteFunc(slices.Clone(env.Warnings), func(w string) bool { return !strings.Contains(w, "take their side") })
+	if len(sideWarnings) != 1 || !strings.Contains(sideWarnings[0], "2 mod(s)") || !strings.Contains(sideWarnings[0], "config_manager (server → both), server_tweaks (server → both)") {
 		t.Fatalf("warnings: %v", env.Warnings)
 	}
 	m, l := readProject(t, dir)
-	if l.Mods["sodium"].Side != "both" || m.Requires["sodium"].Side != "both" {
-		t.Fatalf("sodium: lock %+v, manifest %+v", l.Mods["sodium"], m.Requires["sodium"])
+	for _, id := range []string{"config_manager", "server_tweaks"} {
+		if l.Mods[id].Side != "both" || m.Requires[id].Side != "both" {
+			t.Errorf("%s: lock %+v, manifest %+v", id, l.Mods[id], m.Requires[id])
+		}
 	}
-	if l.Mods["fabric-api"].Side != "both" || m.Requires["fabric-api"].Side != "" {
-		t.Fatalf("fabric-api: lock %+v, manifest %+v", l.Mods["fabric-api"], m.Requires["fabric-api"])
+	for id, side := range map[string]string{"sodium": "client", "jei": "both", "fabric-api": "both"} {
+		if l.Mods[id].Side != side || m.Requires[id].Side != "" {
+			t.Errorf("%s: lock %+v, manifest %+v", id, l.Mods[id], m.Requires[id])
+		}
 	}
 }
 
@@ -537,25 +551,6 @@ func TestImportMrpackRecordsAnOverrideLayersSideQuietly(t *testing.T) {
 	}
 	m, l := readProject(t, dir)
 	if l.Mods["iris"].Side != "server" || m.Requires["iris"].Side != "server" {
-		t.Fatalf("iris: lock %+v, manifest %+v", l.Mods["iris"], m.Requires["iris"])
-	}
-}
-
-func TestImportMrpackTakesACurseForgeModsSideFromThePack(t *testing.T) {
-	h := newHarness(t)
-	iris := h.jars["irisshaders"]
-	index := mrpack.Index{
-		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Singleplayer",
-		Files:        []mrpack.File{{Path: "mods/" + iris.filename, Hashes: map[string]string{"sha1": iris.sha1, "sha512": iris.sha512}, Env: mrpack.Env("both"), Downloads: []string{h.server.URL + "/cdn/" + iris.filename}, FileSize: int64(len(iris.data))}},
-		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
-	}
-	archive := filepath.Join(t.TempDir(), "singleplayer.mrpack")
-	writeMrpack(t, archive, index, nil)
-	dir := filepath.Join(t.TempDir(), "singleplayer")
-	h.dir = filepath.Dir(dir)
-	h.mustRun(t, "import", "mrpack", archive, "--dir", dir)
-	m, l := readProject(t, dir)
-	if l.Mods["iris"].Provider != "curseforge" || l.Mods["iris"].Side != "both" || m.Requires["iris"].Side != "both" {
 		t.Fatalf("iris: lock %+v, manifest %+v", l.Mods["iris"], m.Requires["iris"])
 	}
 }
