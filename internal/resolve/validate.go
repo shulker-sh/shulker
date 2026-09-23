@@ -12,7 +12,6 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mavenver"
-	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -443,7 +442,7 @@ func satisfies(info *jarmeta.Info, on, version, declared string) (bool, error) {
 		return rng.Contains(mavenver.Parse(version)), nil
 	}
 	if on == "minecraft" {
-		version = mcver.FabricForm(version)
+		version = fabricver.Game(version)
 	}
 	return fabricSatisfies(version, declared)
 }

@@ -1,8 +1,8 @@
-package mcver
+package fabricver
 
 import "testing"
 
-func TestFabricForm(t *testing.T) {
+func TestGame(t *testing.T) {
 	for id, want := range map[string]string{
 		"1.20.1":          "1.20.1",
 		"26.2":            "26.2",
@@ -19,8 +19,8 @@ func TestFabricForm(t *testing.T) {
 		"26.1.1-rc-3":     "26.1.1-rc.3",
 		"99w99z":          "99w99z",
 	} {
-		if got := FabricForm(id); got != want {
-			t.Errorf("FabricForm(%q) = %q, want %q", id, got, want)
+		if got := Game(id); got != want {
+			t.Errorf("Game(%q) = %q, want %q", id, got, want)
 		}
 	}
 }

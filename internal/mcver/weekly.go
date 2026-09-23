@@ -1,5 +1,7 @@
 package mcver
 
+import "strconv"
+
 type weeklyCycle struct {
 	first   int
 	last    int
@@ -40,4 +42,15 @@ func weeklyRelease(week int) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// WeeklyRelease is the release a weekly snapshot such as 24w33a led to.
+func WeeklyRelease(id string) (string, bool) {
+	m := weeklyRe.FindStringSubmatch(id)
+	if m == nil {
+		return "", false
+	}
+	year, _ := strconv.Atoi(m[1])
+	week, _ := strconv.Atoi(m[2])
+	return weeklyRelease(year*100 + week)
 }
