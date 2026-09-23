@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"archive/zip"
 	"bytes"
 	"reflect"
 	"testing"
@@ -136,5 +137,124 @@ func TestValidateNeoForgeMavenRanges(t *testing.T) {
 	want := []Problem{{Rule: "depends", Mod: "iris", ModVersion: "1.9.0", On: "sodium", Declared: "[mc26.2-0.9,)", Found: "mc26.2-0.8.1"}}
 	if !reflect.DeepEqual(v.Problems, want) || len(v.Warnings) > 0 {
 		t.Fatalf("problems %+v, warnings %v, want %+v", v.Problems, v.Warnings, want)
+	}
+}
+
+func zipFiles(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for name, content := range files {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func fabricJar(t *testing.T, meta string, nested map[string][]byte) []byte {
+	files := map[string]string{"fabric.mod.json": meta}
+	for name, jar := range nested {
+		files[name] = string(jar)
+	}
+	return zipFiles(t, files)
+}
+
+func lockJars(t *testing.T, loader string, jars map[string][]byte) *Resolver {
+	t.Helper()
+	c := &cache.Cache{Dir: t.TempDir()}
+	l := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: loader, Version: "0.17.3"}, Mods: map[string]lock.Mod{}}
+	for id, jar := range jars {
+		sha, err := c.Put(bytes.NewReader(jar))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Mods[id] = lock.Mod{Sha512: sha}
+	}
+	return &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
+}
+
+func TestValidatePicksAmongNestedCopies(t *testing.T) {
+	renderer := func(v string) []byte {
+		return fabricJar(t, `{"id":"fabric-renderer-api-v1","version":"`+v+`"}`, nil)
+	}
+	oldAPI := fabricJar(t, `{"id":"fabric-api","version":"0.83.0+1.20.1","provides":["fabric"],"jars":[{"file":"META-INF/jars/r.jar"}]}`,
+		map[string][]byte{"META-INF/jars/r.jar": renderer("3.0.1+b3afc78b82")})
+	cloth := func(v string) []byte { return fabricJar(t, `{"id":"cloth-config2","version":"`+v+`"}`, nil) }
+	bundling := func(id string, jar []byte) []byte {
+		return fabricJar(t, `{"id":"`+id+`","version":"1.0.0","jars":[{"file":"META-INF/jars/n.jar"}]}`, map[string][]byte{"META-INF/jars/n.jar": jar})
+	}
+	lib := func(v string) []byte { return fabricJar(t, `{"id":"lib","version":"`+v+`"}`, nil) }
+	r := lockJars(t, "fabric", map[string][]byte{
+		"coroutil": bundling("coroutil", oldAPI),
+		"fabric-api": fabricJar(t, `{"id":"fabric-api","version":"0.92.7+1.20.1","provides":["fabric"],"jars":[{"file":"META-INF/jars/r.jar"}]}`,
+			map[string][]byte{"META-INF/jars/r.jar": renderer("3.2.1+aaaaaaaa")}),
+		"accessories":     fabricJar(t, `{"id":"accessories","version":"1.0.0","depends":{"fabric":">=0.92.0"}}`, nil),
+		"indium":          fabricJar(t, `{"id":"indium","version":"1.0.36","depends":{"fabric-renderer-api-v1":">=3.2.0"}}`, nil),
+		"boatiview":       bundling("boatiview", cloth("11.0.99")),
+		"quartzelv":       bundling("quartzelv", cloth("13.0.121")),
+		"cloth-config2":   cloth("11.1.136"),
+		"yungsmenutweaks": fabricJar(t, `{"id":"yungsmenutweaks","version":"1.0.2","depends":{"cloth-config2":">=11.1.106 <12"}}`, nil),
+		"wantsnew":        fabricJar(t, `{"id":"wantsnew","version":"1.0.0","depends":{"cloth-config2":">=14"}}`, nil),
+		"newlib":          bundling("newlib", lib("2.0.0")),
+		"oldlib":          bundling("oldlib", lib("1.5.0")),
+		"wantsold":        fabricJar(t, `{"id":"wantsold","version":"1.0.0","depends":{"lib":"<2"}}`, nil),
+	})
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{{Rule: "depends", Mod: "wantsnew", ModVersion: "1.0.0", On: "cloth-config2", Declared: ">=14", Found: "11.1.136"}}
+	if !reflect.DeepEqual(v.Problems, want) {
+		t.Fatalf("problems %+v, want %+v", v.Problems, want)
+	}
+}
+
+func TestValidatePrefersNewestNonSemverCopy(t *testing.T) {
+	lib := func(v string) []byte { return fabricJar(t, `{"id":"lib","version":"`+v+`"}`, nil) }
+	bundling := func(id string, jar []byte) []byte {
+		return fabricJar(t, `{"id":"`+id+`","version":"1.0.0","jars":[{"file":"META-INF/jars/n.jar"}]}`, map[string][]byte{"META-INF/jars/n.jar": jar})
+	}
+	r := lockJars(t, "fabric", map[string][]byte{
+		"a":     bundling("a", lib("9.0.0.1")),
+		"b":     bundling("b", lib("10.0.0.1")),
+		"wants": fabricJar(t, `{"id":"wants","version":"1.0.0","depends":{"lib":">=1"}}`, nil),
+	})
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{`wants depends on lib >=1 but installed version "10.0.0.1" is not semver: not checked`}
+	if !reflect.DeepEqual(v.Warnings, want) {
+		t.Fatalf("warnings %v, want %v", v.Warnings, want)
+	}
+}
+
+func TestValidateQuiltKeepsTopLevelJar(t *testing.T) {
+	quilt := func(id, v, extra string) string {
+		return `{"schema_version":1,"quilt_loader":{"id":"` + id + `","version":"` + v + `"` + extra + `}}`
+	}
+	r := lockJars(t, "quilt", map[string][]byte{
+		"lib": zipBytes(t, "quilt.mod.json", quilt("lib", "2.0.0", "")),
+		"bundler": zipFiles(t, map[string]string{
+			"quilt.mod.json":        quilt("bundler", "1.0.0", `,"jars":["META-INF/jars/lib.jar"]`),
+			"META-INF/jars/lib.jar": string(zipBytes(t, "quilt.mod.json", quilt("lib", "1.5.0", ""))),
+		}),
+		"wantsold": zipBytes(t, "quilt.mod.json", quilt("wantsold", "1.0.0", `,"depends":[{"id":"lib","versions":"<2"}]`)),
+	})
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{{Rule: "depends", Mod: "wantsold", ModVersion: "1.0.0", On: "lib", Declared: "<2", Found: "2.0.0"}}
+	if !reflect.DeepEqual(v.Problems, want) {
+		t.Fatalf("problems %+v, want %+v", v.Problems, want)
 	}
 }

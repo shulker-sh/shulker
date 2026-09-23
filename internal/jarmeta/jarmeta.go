@@ -37,7 +37,9 @@ type Info struct {
 	Suggests   map[string]string
 	// Optional dependencies aren't required, but a present mod must match the range.
 	Optional map[string]string
+	// Provides are the ids the jar itself declares; a nested jar's are on its own Info in Nested.
 	Provides map[string]string
+	Nested   []*Info
 	// UsesMavenRanges marks ranges written in Maven syntax (NeoForge and Forge) rather than Fabric's.
 	UsesMavenRanges bool
 }
@@ -353,10 +355,23 @@ func addNested(zr *zip.Reader, info *Info, name string, files []string) {
 	if err != nil {
 		return
 	}
-	info.Provides[child.ID] = child.Version
-	for id, v := range child.Provides {
-		info.Provides[id] = v
+	info.Nested = append(info.Nested, child)
+}
+
+// AllProvides is every id the jar makes available besides its own: what it provides, and each
+// nested jar's id and provides, at any depth.
+func (i *Info) AllProvides() map[string]string {
+	all := map[string]string{}
+	for id, v := range i.Provides {
+		all[id] = v
 	}
+	for _, n := range i.Nested {
+		all[n.ID] = n.Version
+		for id, v := range n.AllProvides() {
+			all[id] = v
+		}
+	}
+	return all
 }
 
 func lookup(zr *zip.Reader, name string) *zip.File {

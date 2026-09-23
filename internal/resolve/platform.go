@@ -220,7 +220,7 @@ func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) 
 	if err != nil {
 		return nil, prefixed("quilt loader "+version, err)
 	}
-	return info.Provides, nil
+	return info.AllProvides(), nil
 }
 
 // GameVersion is the Minecraft version a range resolves to, for a caller that needs it before

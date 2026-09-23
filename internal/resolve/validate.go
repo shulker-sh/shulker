@@ -76,15 +76,17 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 		return nil, e
 	}
 	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []Suggestion{}}
-	installed := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
-	if l, ok := loader.Lookup(r.Lock.Loader.Type); ok {
-		installed[l.DependencyID] = r.Lock.Loader.Version
+	builtin := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
+	l, _ := loader.Lookup(r.Lock.Loader.Type)
+	if l.DependencyID != "" {
+		builtin[l.DependencyID] = r.Lock.Loader.Version
 	}
 	for id, version := range r.Lock.Loader.Provides {
-		installed[id] = version
+		builtin[id] = version
 	}
 	infos := map[string]*jarmeta.Info{}
 	unread := map[string]bool{}
+	cands := candidates{}
 	for _, id := range r.lockIDs() {
 		m := r.Lock.Mods[id]
 		if !r.Cache.Has(m.Sha512) {
@@ -99,12 +101,11 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 			return nil, prefixed("mod "+id, err)
 		}
 		infos[id] = info
-		installed[r.Lock.JarID(id)] = info.Version
-		for pid, pv := range info.Provides {
-			if _, taken := installed[pid]; !taken {
-				installed[pid] = pv
-			}
-		}
+		cands.add(r.Lock.JarID(id), info, 0)
+	}
+	installed := cands.pick(infos, l.TopLevelMandatory)
+	for id, version := range builtin {
+		installed[id] = version
 	}
 	byName := map[string]string{}
 	for _, id := range r.lockIDs() {
@@ -199,6 +200,90 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 		return a.On < b.On
 	})
 	return v, nil
+}
+
+// candidate is one copy of a mod id the loader could load: a locked jar, a jar nested in one at
+// any depth, or an id either provides.
+type candidate struct {
+	version string
+	depth   int
+	maven   bool
+}
+
+type candidates map[string][]candidate
+
+func (c candidates) add(id string, info *jarmeta.Info, depth int) {
+	c[id] = append(c[id], candidate{info.Version, depth, info.UsesMavenRanges})
+	for pid, pv := range info.Provides {
+		c[pid] = append(c[pid], candidate{pv, depth, info.UsesMavenRanges})
+	}
+	for _, n := range info.Nested {
+		c.add(n.ID, n, depth+1)
+	}
+}
+
+// pick chooses the copy of each id the loader would load, as Fabric Loader's resolver prefers them:
+// a locked jar over a nested one, then the newest version, then the least nested. The first copy
+// every locked mod's ranges on the id accept wins, so an older copy stands in when the newest fails
+// them; with none accepted the most preferred is kept, for the problems to name. With topLevelOnly
+// a locked jar is never replaced, as Quilt loads every jar in mods/.
+func (c candidates) pick(infos map[string]*jarmeta.Info, topLevelOnly bool) map[string]string {
+	picked := map[string]string{}
+	for id, list := range c {
+		slices.SortStableFunc(list, func(a, b candidate) int {
+			if (a.depth == 0) != (b.depth == 0) {
+				if a.depth == 0 {
+					return -1
+				}
+				return 1
+			}
+			if n := compareVersions(b, a); n != 0 {
+				return n
+			}
+			return a.depth - b.depth
+		})
+		if topLevelOnly && list[0].depth == 0 {
+			list = slices.DeleteFunc(slices.Clone(list), func(c candidate) bool { return c.depth > 0 })
+		}
+		picked[id] = list[0].version
+		for _, cand := range list {
+			if accepts(infos, id, cand.version) {
+				picked[id] = cand.version
+				break
+			}
+		}
+	}
+	return picked
+}
+
+func accepts(infos map[string]*jarmeta.Info, id, version string) bool {
+	for _, info := range infos {
+		for _, set := range []map[string]string{info.Depends, info.Optional} {
+			if declared, ok := set[id]; ok {
+				if match, err := satisfies(info, version, declared); err == nil && !match {
+					return false
+				}
+			}
+		}
+		if declared, ok := info.Breaks[id]; ok {
+			if match, err := satisfies(info, version, declared); err == nil && match {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func compareVersions(a, b candidate) int {
+	if a.maven && b.maven {
+		return mavenver.Compare(mavenver.Parse(a.version), mavenver.Parse(b.version))
+	}
+	va, errA := mcver.Parse(normalizeVersion(a.version))
+	vb, errB := mcver.Parse(normalizeVersion(b.version))
+	if errA == nil && errB == nil {
+		return va.Compare(vb)
+	}
+	return mavenver.Compare(mavenver.Parse(normalizeVersion(a.version)), mavenver.Parse(normalizeVersion(b.version)))
 }
 
 type ignoreEntry struct {

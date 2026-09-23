@@ -137,7 +137,7 @@ func TestReadQuilt(t *testing.T) {
 	if want := map[string]string{"optifabric": "*"}; !maps.Equal(info.Breaks, want) {
 		t.Errorf("breaks %v, want %v", info.Breaks, want)
 	}
-	if want := map[string]string{"shiny_api": "1.4.0", "old_shiny": "1.0", "inner": "2.0"}; !maps.Equal(info.Provides, want) {
+	if want := map[string]string{"shiny_api": "1.4.0", "old_shiny": "1.0", "inner": "2.0"}; !maps.Equal(info.AllProvides(), want) {
 		t.Errorf("provides %v, want %v", info.Provides, want)
 	}
 }
@@ -226,7 +226,7 @@ type="required"
 	if want := map[string]string{"rubidium": "*"}; !maps.Equal(info.Conflicts, want) {
 		t.Errorf("conflicts %v, want %v", info.Conflicts, want)
 	}
-	if want := map[string]string{"sodium_extra_api": "2.0", "inner": "3.1"}; !maps.Equal(info.Provides, want) {
+	if want := map[string]string{"sodium_extra_api": "2.0", "inner": "3.1"}; !maps.Equal(info.AllProvides(), want) {
 		t.Errorf("provides %v, want %v", info.Provides, want)
 	}
 }

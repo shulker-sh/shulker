@@ -299,7 +299,7 @@ func (r *Resolver) isProvided(on string, info *jarmeta.Info) bool {
 	if _, ok := r.Lock.Loader.Provides[on]; ok {
 		return true
 	}
-	_, ok := info.Provides[on]
+	_, ok := info.AllProvides()[on]
 	return ok
 }
 
