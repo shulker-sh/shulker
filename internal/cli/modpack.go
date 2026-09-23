@@ -134,7 +134,7 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 	if err := refuseModpackFlags(cmd, hosted, !slices.ContainsFunc(sources, func(s string) bool { return !isHosted(s) })); err != nil {
 		return err
 	}
-	return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
+	return a.relock(cmd, relockPlan{}, func(p *project.Project, r *resolve.Resolver) (string, error) {
 		for _, source := range sources {
 			if u, ok := urls[source]; ok {
 				slug, add, err := r.FromURL(cmd.Context(), u, opts)

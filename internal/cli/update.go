@@ -25,7 +25,14 @@ func (a *app) updateCmd() *cobra.Command {
 		Aliases:     []string{"upgrade"},
 		Short:       "Re-resolve mods to the newest compatible versions",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
+			plan := relockPlan{
+				buildsInPlace: true,
+				local: func(m *manifest.Manifest) []string {
+					local, _ := splitLocalFiles(m, args)
+					return local
+				},
+			}
+			return a.relock(cmd, plan, func(p *project.Project, r *resolve.Resolver) (string, error) {
 				local, args := splitLocalFiles(p.Manifest, args)
 				if len(local) > 0 && len(args) == 0 {
 					return "", nil
@@ -80,7 +87,8 @@ func (a *app) pinCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+			pinned := func(l *out.Lines, res lockChanges) { l.OK("pinned "+args[0], res.Pin) }
+			return a.relock(cmd, relockPlan{ok: pinned}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				if isURL {
 					return r.PinURL(cmd.Context(), args[0], u)
 				}
@@ -97,7 +105,8 @@ func (a *app) unpinCmd() *cobra.Command {
 		Short:       "Remove a mod's pin and re-resolve it",
 		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+			unpinned := func(l *out.Lines, _ lockChanges) { l.OK("unpinned "+args[0], "") }
+			return a.relock(cmd, relockPlan{ok: unpinned}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				return "", r.Unpin(cmd.Context(), args[0])
 			})
 		},
@@ -119,10 +128,22 @@ type relocked struct {
 	wasSaved   bool
 }
 
-func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
-	open := a.openProject
-	if cmd.Name() == "lock" {
-		open = a.openForLock
+// relockPlan is what a lock-changing command asks of relock beyond its run.
+type relockPlan struct {
+	// open opens the project; nil opens it as every command but lock does.
+	open func() (*project.Project, error)
+	// buildsInPlace builds an instance once its lock is saved, since it plays its own directory.
+	buildsInPlace bool
+	// local is the local file entries among the command's arguments, reported as left alone.
+	local func(*manifest.Manifest) []string
+	// ok is the line that confirms the command, printed first.
+	ok func(l *out.Lines, res lockChanges)
+}
+
+func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
+	open := plan.open
+	if open == nil {
+		open = a.openProject
 	}
 	p, err := open()
 	if err != nil {
@@ -139,9 +160,8 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		}
 		a.warnReplaced(p.UnreadableLock, kept)
 	}
-	// An instance plays its own directory, so an update there is only done once it is built.
 	hasChildren := false
-	if side, ok := p.Manifest.InPlaceSide(); ok && cmd.Name() == "update" {
+	if side, ok := p.Manifest.InPlaceSide(); ok && plan.buildsInPlace {
 		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{side: side, backup: "update"})
 		if err != nil {
 			return err
@@ -152,8 +172,8 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	}
 	res := rl.lockChanges
 	var local []string
-	if cmd.Name() == "update" {
-		local, _ = splitLocalFiles(p.Manifest, cmd.Flags().Args())
+	if plan.local != nil {
+		local = plan.local(p.Manifest)
 	}
 	optional := 0
 	for _, s := range rl.validation.Suggestions {
@@ -162,11 +182,8 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 		}
 	}
 	return a.printer.Emit(res, func(l *out.Lines) {
-		if cmd.Name() == "pin" {
-			l.OK("pinned "+cmd.Flags().Arg(0), res.Pin)
-		}
-		if cmd.Name() == "unpin" {
-			l.OK("unpinned "+cmd.Flags().Arg(0), "")
+		if plan.ok != nil {
+			plan.ok(l, res)
 		}
 		if len(res.Reresolved) > 0 {
 			l.Info("re-resolved every mod: " + strings.Join(res.Reresolved, "; "))

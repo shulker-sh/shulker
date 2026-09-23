@@ -25,7 +25,7 @@ func (a *app) removeCmdFor(kind string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return a.relock(cmd, func(p *project.Project, r *resolve.Resolver) (string, error) {
+			return a.relock(cmd, relockPlan{}, func(p *project.Project, r *resolve.Resolver) (string, error) {
 				modpacks := p.Manifest.Modpacks()
 				var mods []string
 				for _, key := range args {

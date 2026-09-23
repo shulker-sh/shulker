@@ -91,7 +91,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 					return out.Errorf("usage", "--%s takes one of %s, not %q", flag.name, strings.Join(flag.allowed, ", "), flag.value)
 				}
 			}
-			return a.relock(cmd, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+			return a.relock(cmd, relockPlan{}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				for _, arg := range args {
 					add, slug := opts, arg
 					if name, ok := from[arg]; ok {
