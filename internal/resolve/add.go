@@ -115,6 +115,9 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 			return nil, nil, err
 		}
 		proj, err := p.Project(ctx, slug, kind)
+		if errors.Is(err, provider.ErrNotFound) {
+			return nil, nil, notFound(slug, []string{providerName}, nil)
+		}
 		return p, proj, err
 	}
 	var missed []string
@@ -139,11 +142,18 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 		_, err := r.provider("")
 		return nil, nil, err
 	}
+	return nil, nil, notFound(slug, missed, skipped)
+}
+
+func notFound(slug string, missed []string, skipped []*out.Error) *out.Error {
 	e := out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(missed, " or "))
 	for _, reason := range skipped {
 		e.Items = append(e.Items, "skipped: "+reason.Message)
 	}
-	return nil, nil, e
+	if _, err := strconv.Atoi(slug); err != nil && slices.Contains(missed, "curseforge") {
+		e.Help = "CurseForge's search doesn't list every project; add one it misses by its project id, shown on its CurseForge page under About Project, with `--provider curseforge`"
+	}
+	return e
 }
 
 func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error {

@@ -83,3 +83,21 @@ func TestADependencyAlreadyLockedKeepsItsVersion(t *testing.T) {
 		t.Fatalf("the dependency was locked a second time: %+v", l.Mods)
 	}
 }
+
+func TestACurseForgeSlugItsSearchMissesPointsAtTheProjectID(t *testing.T) {
+	h := newHarness(t)
+	h.cfMods[500525] = &cfMod{id: 500525, slug: "balm-fabric", unlisted: true, files: []cfFile{
+		{id: 5700001, jar: makeJar(t, "balm", "balm-fabric-7.3.9.jar", "*"), date: "2026-09-01T00:00:00Z", channel: 1},
+	}}
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+
+	for _, args := range [][]string{{"add", "balm-fabric", "--provider", "curseforge", "--json"}, {"add", "balm-fabric", "--json"}} {
+		code, stdout, _ := h.run(t, args...)
+		var env out.Envelope
+		_ = json.Unmarshal([]byte(stdout), &env)
+		if code == 0 || env.Error == nil || env.Error.Code != "mod-not-found" || !strings.Contains(env.Error.Help, "by its project id") {
+			t.Fatalf("%v: code=%d error=%+v", args, code, env.Error)
+		}
+	}
+	h.mustRun(t, "add", "500525", "--provider", "curseforge")
+}

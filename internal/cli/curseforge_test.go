@@ -23,6 +23,8 @@ type cfMod struct {
 	class     int
 	downloads int64
 	files     []cfFile
+	// unlisted leaves the project out of every search, as CurseForge does with some projects.
+	unlisted bool
 }
 
 func (c *cfMod) classID() int {
@@ -142,7 +144,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		class := q.Get("classId")
 		var matched []*cfMod
 		for _, m := range h.cfMods {
-			if class != "" && class != strconv.Itoa(m.classID()) {
+			if m.unlisted || class != "" && class != strconv.Itoa(m.classID()) {
 				continue
 			}
 			if words := q.Get("searchFilter"); words != "" {
