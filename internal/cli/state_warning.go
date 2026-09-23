@@ -59,6 +59,21 @@ func (a *app) forceCommand(p *project.Project, side, dir string) string {
 	return "shulker sync --into " + quoteName(dir) + " --force"
 }
 
+// warnKeptConflicts warns about the files a launch kept as the player had them, where the pack
+// changed them too, with the command that takes the pack's version beneath. The instance's own sync
+// comes first: a launcher runs the hook from anywhere, and it works from anywhere.
+func (a *app) warnKeptConflicts(kept []string, p *project.Project, side, dir string) {
+	if len(kept) == 0 {
+		return
+	}
+	id := a.instanceID(dir)
+	force := "shulker sync -i " + id + " --force"
+	if id == "" {
+		force = a.forceCommand(p, side, dir)
+	}
+	a.printer.WarnNudge(out.Nudge{Lead: "Take the pack's version", Command: force}, "kept your version of %s; `shulker diff` shows the pack's", strings.Join(kept, ", "))
+}
+
 // rerunForced is the command line that ran cmd, with --force added. Flags that only change how
 // output looks are left off.
 func rerunForced(cmd *cobra.Command, args []string) string {

@@ -351,3 +351,73 @@ func TestWrapWithoutGameDirStillFallsBackPastTheWrapper(t *testing.T) {
 		t.Fatalf("the version check is not a launch, got %d records", len(records))
 	}
 }
+
+func TestPreLaunchKeepsThePlayersFileOnAConflict(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	overrides := filepath.Join(h.dir, "overrides")
+	writeFile(t, filepath.Join(overrides, "options.txt"), "renderDistance:8\n")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Friends")
+	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
+
+	writeFile(t, filepath.Join(gameDir, "options.txt"), "renderDistance:16\n")
+	writeFile(t, filepath.Join(gameDir, "config", "extra.json"), "mine\n")
+	writeFile(t, filepath.Join(overrides, "options.txt"), "renderDistance:32\n")
+	writeFile(t, filepath.Join(overrides, "config", "extra.json"), "pack\n")
+	writeFile(t, filepath.Join(overrides, "config", "new.json"), "new\n")
+	h.mustRun(t, "add", "sodium")
+
+	code, stdout, _ := h.run(t, "sync", "-i", "friends", "--json")
+	if code == 0 || failureCode(t, stdout).Code != "build-conflict" {
+		t.Fatalf("an explicit sync still fails on a conflict: code=%d\n%s", code, stdout)
+	}
+
+	code, stdout, stderr := h.run(t, "hook", "pre-launch", "-C", gameDir)
+	if code != 0 || !strings.Contains(stdout, "synced client") {
+		t.Fatalf("a launch-time sync goes on past a conflict: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	for _, want := range []string{"options.txt (changed in place and in the source)", "config/extra.json (not written by shulker)", "shulker sync -i friends --force"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("the warning should name %q:\n%s", want, stderr)
+		}
+	}
+	for rel, want := range map[string]string{"options.txt": "renderDistance:16\n", "config/extra.json": "mine\n", "config/new.json": "new\n"} {
+		if got := readFile(t, filepath.Join(gameDir, filepath.FromSlash(rel))); got != want {
+			t.Fatalf("%s = %q, want %q", rel, got, want)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("the rest of the update applies: %v", err)
+	}
+
+	code, stdout, stderr = h.run(t, "hook", "pre-launch", "-C", gameDir)
+	if code != 0 || strings.Contains(stderr, "options.txt") || strings.Contains(stderr, "extra.json") {
+		t.Fatalf("a kept file is edited in place from then on, not warned again: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	h.mustRun(t, "sync", "-i", "friends")
+}
+
+func TestPreLaunchKeepsAConflictInASyncedDirectory(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	overrides := filepath.Join(h.dir, "overrides")
+	writeFile(t, filepath.Join(overrides, "options.txt"), "renderDistance:8\n")
+	into := t.TempDir()
+	h.mustRun(t, "sync", h.dir, "--into", into)
+
+	writeFile(t, filepath.Join(into, "options.txt"), "renderDistance:16\n")
+	writeFile(t, filepath.Join(overrides, "options.txt"), "renderDistance:32\n")
+	h.mustRun(t, "add", "sodium")
+
+	code, stdout, stderr := h.run(t, "hook", "pre-launch", "-C", into)
+	if code != 0 || !strings.Contains(stderr, "kept your version of options.txt (changed in place and in the source)") {
+		t.Fatalf("a launch-time sync keeps the player's file: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	if got := readFile(t, filepath.Join(into, "options.txt")); got != "renderDistance:16\n" {
+		t.Fatalf("options.txt = %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(into, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("the rest of the update applies: %v", err)
+	}
+}

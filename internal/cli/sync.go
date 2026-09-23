@@ -46,6 +46,9 @@ type syncRequest struct {
 	rerun string
 	// linked is the modpack a link just pointed the instance at.
 	linked string
+	// keepConflicts is a launch's sync, which keeps the player's side of a conflict rather than
+	// failing.
+	keepConflicts bool
 }
 
 func (a *app) syncCmd() *cobra.Command {
@@ -247,11 +250,12 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 		return syncResult{}, err
 	}
 	origin := build.Origin{Source: src.name, Ref: req.ref, Commit: src.Commit, Sha256: src.Sha256}
-	rep, err := b.Build(side, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin, BeforeModChange: a.autoBackup(req.backup, into)})
+	rep, err := b.Build(side, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin, BeforeModChange: a.autoBackup(req.backup, into), KeepConflicts: req.keepConflicts})
 	if err != nil {
 		return syncResult{}, err
 	}
 	a.warn(rep.Warnings)
+	a.warnKeptConflicts(rep.KeptConflicts, p, side, into)
 	a.warnState(rep.State, a.syncTakeOver(req, p, side, into))
 	if side == "client" {
 		a.syncLauncherImage(into, b)

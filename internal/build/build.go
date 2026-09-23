@@ -128,8 +128,10 @@ type Report struct {
 	Moved     []string `json:"moved"`
 	MovedBack []string `json:"movedBack"`
 	Conflicts []string `json:"conflicts"`
-	Excluded  []string `json:"excluded"`
-	Warnings  []string `json:"-"`
+	// KeptConflicts are the conflicts Options.KeepConflicts left as the player had them.
+	KeptConflicts []string `json:"keptConflicts,omitempty"`
+	Excluded      []string `json:"excluded"`
+	Warnings      []string `json:"-"`
 	// State is why the directory's state file was read as empty, warned apart from Warnings since
 	// its fix is a command.
 	State   *StateError `json:"-"`
@@ -158,6 +160,9 @@ type Options struct {
 	// BeforeModChange runs once, before a build that adds, replaces or removes a mod writes
 	// anything.
 	BeforeModChange func() error
+	// KeepConflicts leaves a conflicting file as it is on disk and builds everything else, recording
+	// the file at its new source version so it counts as edited in place from then on.
+	KeepConflicts bool
 }
 
 // Builder builds, diffs and exports one project from its manifest, lock and cached files.
@@ -386,12 +391,16 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 			if f.src.owned() == nil {
 				report.Kept = append(report.Kept, f.rel)
 			}
-		case stateConflict:
-			report.Conflicts = append(report.Conflicts, f.rel+" (changed in place and in the source)")
-			continue
-		case stateUntracked:
-			report.Conflicts = append(report.Conflicts, f.rel+" (not written by shulker)")
-			continue
+		case stateConflict, stateUntracked:
+			conflict := f.rel + " (changed in place and in the source)"
+			if f.state == stateUntracked {
+				conflict = f.rel + " (not written by shulker)"
+			}
+			if !opts.KeepConflicts {
+				report.Conflicts = append(report.Conflicts, conflict)
+				continue
+			}
+			report.KeptConflicts = append(report.KeptConflicts, conflict)
 		case stateOrphan:
 			report.Kept = append(report.Kept, f.rel+" (edited; no longer in source)")
 			continue
