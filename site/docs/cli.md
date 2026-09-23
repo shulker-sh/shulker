@@ -15,7 +15,7 @@ outline: [2, 3]
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
 | [`shulker outdated [mod...]`](#shulker-outdated) | Show mods with a newer compatible version |
 | [`shulker suggests`](#shulker-suggests) | List mods that locked mods recommend and that aren't installed |
-| [`shulker pin <mod> [version]`](#shulker-pin) | Pin a mod to a provider version id |
+| [`shulker pin <mod> [version\|url]`](#shulker-pin) | Pin a mod to a provider version id or URL |
 | [`shulker unpin <mod>`](#shulker-unpin) | Remove a mod's pin and re-resolve it |
 | [`shulker ignore <mod> <on>`](#shulker-ignore) | Record that a dependency problem is safe to ignore |
 | [`shulker unignore <mod> <on>`](#shulker-unignore) | Drop an ignored dependency problem |
@@ -195,7 +195,7 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 
 ### `shulker add`
 
-Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug or project id, or by a path to a local jar or zip, which becomes a local `file` entry. CurseForge's search leaves some projects out, so a slug it misses fails `mod-not-found` with help pointing at the project id, which its page shows under About Project. With `--type modpack` the argument is a modpack instead: a local path, git URL, raw manifest URL, archive, or the slug of a Modrinth or CurseForge modpack. A bare `add` of a slug the provider files as a modpack adds it as one too. Each type takes only the flags that mean something for it, so `--ref` on a mod or `--side` on a modpack is refused.
+Add mods to the manifest, resolve them and their dependencies, and write the lock. Mods are named by their provider slug or project id, by a Modrinth or CurseForge URL, or by a path to a local jar or zip, which becomes a local `file` entry. CurseForge's search leaves some projects out, so a slug it misses fails `mod-not-found` with help pointing at a file URL or the project id, which its page shows under About Project. With `--type modpack` the argument is a modpack instead: a local path, git URL, raw manifest URL, archive, or the slug of a Modrinth or CurseForge modpack. A bare `add` of a slug the provider files as a modpack adds it as one too. Each type takes only the flags that mean something for it, so `--ref` on a mod or `--side` on a modpack is refused.
 
 With no arguments, `shulker add` asks `Add which mods?` over the search box [`shulker search`](#shulker-search) opens. Tab or enter moves into the results, space marks one, and shift+tab goes back to refine the query without losing the marks. Enter adds everything marked, or the row under the cursor when nothing is, in one change to the lock, each from the provider it was found on. `--type`, `--provider` and the other flags still apply, and `shulker resourcepack add` and `shulker shader add` search their own type. Off a terminal, or with `--no-input` or `--json`, the argument is required, and so is a modpack's.
 
@@ -206,8 +206,18 @@ shulker add betterthirdperson --provider curseforge --side client
 shulker add sodium --as speed
 shulker add ../base-pack --type modpack --as base
 shulker add cobblemon-official --type modpack
+shulker add https://modrinth.com/mod/sodium https://www.curseforge.com/minecraft/mc-mods/jei/files/5000001
 shulker add
 ```
+
+A URL names the provider and the project, and a URL that names a file or version pins it, as `--pin` would; several URLs in one `add` each keep their own pin, in one change to the lock. `--provider` or `--pin` that disagrees with the URL is a `usage` error. The type comes from the project, not the URL's section. Accepted shapes, with query strings and fragments ignored:
+
+- `https://modrinth.com/<mod|project|plugin|resourcepack|shader|datapack|modpack>/<slug or id>`, optionally followed by `/version/<id or number>`
+- `https://cdn.modrinth.com/data/<project>/versions/<version>/<file>`
+- `https://www.curseforge.com/minecraft/<mc-mods|texture-packs|shaders|data-packs|modpacks>/<slug>`, optionally followed by `/files/<file id>` or `/download/<file id>`; also on `curseforge.com` and `legacy.curseforge.com`
+- `https://www.curseforge.com/projects/<project id>`
+
+A CurseForge file URL is resolved by its file id, so it reaches a project the slug search misses. Any other URL on these hosts is a `usage` error listing the shapes, and a URL on another host keeps its meaning as a modpack source.
 
 | Flag | Description |
 | --- | --- |
@@ -215,7 +225,7 @@ shulker add
 | `--side <side>` | Override side: `client`, `server`, `both` |
 | `--resourcepack` | Datapacks only: also place the zip in `resourcepacks/`, for one that carries `assets/`. Implies `--type datapack` |
 | `--channel <channel>` | Least stable channel accepted: `release`, `beta`, `alpha` |
-| `--pin <version-id>` | Pin to a provider version id (one mod or modpack only). A beta or alpha file widens the mod's `channel` to match, as [`shulker pin`](#shulker-pin) does |
+| `--pin <version-id>` | Pin to a provider version id (one mod or modpack only; a URL argument carries its own pin). A beta or alpha file widens the mod's `channel` to match, as [`shulker pin`](#shulker-pin) does |
 | `--provider <provider>` | Provider to use for this mod or modpack: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
 | `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a pack or hosted modpack's provider slug, a modpack archive file's name, the name in a modpack's manifest) |
@@ -340,10 +350,11 @@ With `--json`, `data.suggestions` lists each one as `{ "mod", "kind", "on", "dec
 
 ### `shulker pin`
 
-Pin a mod, or a modpack from a provider, to a provider version id. Without a version, pins it to the version already in the lock. Pinning a mod to a beta or alpha file accepts that channel for it: its `channel` in `shulker.json` widens to match, with a warning, so its dependencies may be that channel too and it keeps following it after `unpin`. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`.
+Pin a mod, or a modpack from a provider, to a provider version id, or to the version a Modrinth or CurseForge URL names. The URL must be of the provider and project the mod is locked from, else `usage`; to switch projects, `remove` it and `add` the URL. Without a version, pins it to the version already in the lock. Pinning a mod to a beta or alpha file accepts that channel for it: its `channel` in `shulker.json` widens to match, with a warning, so its dependencies may be that channel too and it keeps following it after `unpin`. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`.
 
 ```sh
 shulker pin iris k9RhZq2X
+shulker pin jei https://www.curseforge.com/minecraft/mc-mods/jei/files/5000001
 shulker pin sodium
 ```
 
@@ -1740,7 +1751,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `curseforge-offline` | A modpack's CurseForge zip was read without the network. It names its files by CurseForge ID alone, so no cached copy can stand in; the `curseforge` row, when there is one, is the network error |
 | `dependency-overrides-invalid` | Fabric Loader would refuse the `config/fabric_loader_dependencies.json` a side's build places, so the game wouldn't start: its first key isn't `"version": 1`, a key or dependency kind is unknown, or a range isn't a string or array of strings. The `cause` row says which |
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
-| `download-failed` | A locked file's provider failed to serve it at `install`, `sync`, `serve` or `export`: its CDN cut the file short, answered with an HTTP error, or the connection dropped. The message names the file and provider; rows show the URL and cause. Try again later |
+| `download-failed` | A locked file's provider failed to serve it at `install`, `sync`, `serve` or `export`: its CDN cut the file short, answered with an HTTP error, or the connection dropped. The message names the file and provider; rows show the URL and cause. Help says to try again later, or to run `shulker update` when the provider no longer has the file |
 | `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` rebuilds it, keeping the old file as `registry.json.replaced` |
 | `editor-failed` | The editor `instance edit` ran couldn't be started or exited with an error; set `$EDITOR` to the one you use |
@@ -1879,7 +1890,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems, checked for each side against the mods its build places; each prints the `shulker ignore` command that would accept it, and a problem only some sides have names them. `items`: the problems |
 | `version-no-file` | The provider's version has no file shulker can download, or no hash to check it against |
-| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or no file with an id a CurseForge modpack names; for a pin its help links the mod's versions page |
+| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or the one a Modrinth or CurseForge URL names, or no file with an id a CurseForge modpack names; for a pin its help links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
 | `world-in-use` | `restore` would replace a world a running game or server has open. `items`: the open worlds |
 | `world-not-found` | `backup --world` named a world the target doesn't hold, `restore --world` one the zip doesn't hold, or `restore` into a server was given a zip without the world its `level-name` names and no `--as`; the message names the `level-name` |
