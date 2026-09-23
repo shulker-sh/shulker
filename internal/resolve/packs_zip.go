@@ -96,12 +96,7 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 	if opts.Pin != "" {
 		listed.Pin = lockID(p.Name(), opts.Pin)
 	}
-	if proj.Slug != key || p.Name() != "modrinth" {
-		listed.Project = lockID(p.Name(), proj.ID)
-	}
-	if p.Name() != r.Manifest.ProviderOrder()[0] {
-		listed.Provider = p.Name()
-	}
+	r.setSource(&listed, key, p, proj)
 	if kind == manifest.TypeDatapack {
 		listed.Side, listed.ResourcePack = opts.Side, opts.ResourcePack
 		locked := r.packSection(kind)[key]

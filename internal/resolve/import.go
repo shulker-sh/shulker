@@ -576,12 +576,7 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, side strin
 			entry.Pin = nil
 		}
 	}
-	if proj.Slug != id || p.Name() != "modrinth" {
-		entry.Project = lockID(p.Name(), proj.ID)
-	}
-	if p.Name() != im.r.Manifest.ProviderOrder()[0] {
-		entry.Provider = p.Name()
-	}
+	im.r.setSource(&entry, id, p, proj)
 	im.r.Manifest.Requires[id] = entry
 	im.rep.locked(id, manifest.TypeMod, p.Name())
 	return nil
@@ -608,12 +603,7 @@ func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename,
 	if filename != key+manifest.FileExtension(kind) {
 		listed.Filename = filename
 	}
-	if p.Name() != "modrinth" || key != proj.Slug {
-		listed.Project = lockID(p.Name(), proj.ID)
-	}
-	if p.Name() != r.Manifest.ProviderOrder()[0] {
-		listed.Provider = p.Name()
-	}
+	r.setSource(&listed, key, p, proj)
 	if kind == manifest.TypeDatapack && (side == "client" || side == "server") {
 		listed.Side = side
 	}

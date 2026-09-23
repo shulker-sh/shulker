@@ -215,12 +215,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if opts.Pin != "" {
 		entry.Pin = lockID(p.Name(), opts.Pin)
 	}
-	if proj.Slug != id || p.Name() != "modrinth" {
-		entry.Project = lockID(p.Name(), proj.ID)
-	}
-	if p.Name() != r.Manifest.ProviderOrder()[0] {
-		entry.Provider = p.Name()
-	}
+	r.setSource(&entry, id, p, proj)
 	r.Manifest.Requires[id] = entry
 	if switched {
 		r.pruneOrphans()
@@ -345,6 +340,17 @@ func (r *Resolver) settle(id, side, channel string) {
 		m.Side = side
 	}
 	r.Lock.Mods[id] = m
+}
+
+// setSource names where entry under key comes from: proj's id, unless key is its Modrinth slug,
+// and p, unless it is the manifest's first provider.
+func (r *Resolver) setSource(entry *manifest.Require, key string, p provider.Provider, proj *provider.Project) {
+	if proj.Slug != key || p.Name() != "modrinth" {
+		entry.Project = lockID(p.Name(), proj.ID)
+	}
+	if p.Name() != r.Manifest.ProviderOrder()[0] {
+		entry.Provider = p.Name()
+	}
 }
 
 func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, key, requiredBy, sideOverride, channel string, replace bool) (string, *lock.Mod, error) {
