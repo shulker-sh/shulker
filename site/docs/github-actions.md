@@ -1,10 +1,36 @@
 ---
-description: Export a Shulker modpack and publish a GitHub release from GitHub Actions whenever you push a version tag.
+description: Check a Shulker modpack on every push, and export it and publish a GitHub release whenever you push a version tag, from GitHub Actions.
 ---
 
 # GitHub Actions
 
-Release a modpack from its repository: push a tag like `v1.2.0`, and a workflow exports the Modrinth and CurseForge archives and attaches them to a GitHub release.
+Check a modpack on every push, and release it from its repository: push a tag like `v1.2.0`, and a workflow exports the Modrinth and CurseForge archives and attaches them to a GitHub release.
+
+## Check on push
+
+Catch a broken pack before anyone plays it: run [`shulker check`](/docs/cli#shulker-check) on every push and pull request. It fails when `shulker.lock` doesn't match `shulker.json`, when a locked file can't be downloaded, or when a mod's dependencies aren't met on any side, and it builds and writes nothing. Save this as `.github/workflows/check.yml`:
+
+```yaml
+name: Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shulker-sh/setup-shulker@v1
+        with:
+          version: v0.0.1
+
+      - run: shulker check
+```
+
+The action keeps the download cache between runs, as it does for a release (see [Cache](#cache)), so a check with an unchanged lock downloads nothing. Pass `--strict` to fail on warnings too, such as an `ignore` entry that no longer matches anything.
 
 ## The workflow
 
