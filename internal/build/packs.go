@@ -266,13 +266,6 @@ func untouchedPackList(value string) bool {
 	return value == `["vanilla"]` || value == "[]"
 }
 
-var kindLabels = map[string][2]string{
-	manifest.TypeMod:          {"mod", "mods"},
-	manifest.TypeResourcePack: {"resource pack", "resource packs"},
-	manifest.TypeShader:       {"shader", "shaders"},
-	manifest.TypeDatapack:     {"datapack", "datapacks"},
-}
-
 // kindTally collects what an export can't point at, keeping each kind's own
 // count so the error names them separately.
 type kindTally struct {
@@ -299,9 +292,9 @@ func kindCount(counts map[string]int) string {
 		if n == 0 {
 			continue
 		}
-		word := kindLabels[kind][1]
+		one, word := manifest.TypeNouns(kind)
 		if n == 1 {
-			word = kindLabels[kind][0]
+			word = one
 		}
 		parts = append(parts, fmt.Sprintf("%d %s", n, word))
 	}

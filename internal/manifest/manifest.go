@@ -227,6 +227,19 @@ var PackKinds = []string{TypeResourcePack, TypeShader, TypeDatapack}
 
 func IsPackKind(kind string) bool { return slices.Contains(PackKinds, kind) }
 
+// TypeNouns names one and many entries of kind, for a player to read. An unknown kind is a mod.
+func TypeNouns(kind string) (one, many string) {
+	switch kind {
+	case TypeResourcePack:
+		return "resource pack", "resource packs"
+	case TypeShader:
+		return "shader", "shaders"
+	case TypeDatapack:
+		return "datapack", "datapacks"
+	}
+	return "mod", "mods"
+}
+
 var keyPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 
 func IsValidKey(key string) bool { return keyPattern.MatchString(key) }

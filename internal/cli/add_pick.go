@@ -31,7 +31,8 @@ func (a *app) askAdd(cmd *cobra.Command, kind, providerName string) ([]string, m
 		})
 		return reply, err
 	})
-	marked, err := a.questions().BrowseMarks("Add which "+addNoun(kind)+"?", "type to filter, space to mark, enter to add", s, a.stdin)
+	_, nouns := manifest.TypeNouns(kind)
+	marked, err := a.questions().BrowseMarks("Add which "+nouns+"?", "type to filter, space to mark, enter to add", s, a.stdin)
 	if err != nil {
 		return nil, nil, escaped(err)
 	}
@@ -56,16 +57,4 @@ func isAddable(kind string) bool {
 		return true
 	}
 	return false
-}
-
-func addNoun(kind string) string {
-	switch kind {
-	case manifest.TypeResourcePack:
-		return "resource packs"
-	case manifest.TypeShader:
-		return "shaders"
-	case manifest.TypeDatapack:
-		return "datapacks"
-	}
-	return "mods"
 }

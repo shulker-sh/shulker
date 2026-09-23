@@ -260,7 +260,7 @@ func lockedSummary(files []resolve.LockedFile) string {
 				from = append(from, fmt.Sprintf("%d %s", counts[name], provider.Title(name)))
 			}
 		}
-		one, many := typeNouns(kind)
+		one, many := manifest.TypeNouns(kind)
 		part := plural(total, one, many)
 		if len(providers) > 1 {
 			part += " (" + strings.Join(from, ", ") + ")"
@@ -272,18 +272,6 @@ func lockedSummary(files []resolve.LockedFile) string {
 		summary += " from " + provider.Title(files[0].Provider)
 	}
 	return summary
-}
-
-func typeNouns(kind string) (one, many string) {
-	switch kind {
-	case manifest.TypeResourcePack:
-		return "resource pack", "resource packs"
-	case manifest.TypeShader:
-		return "shader", "shaders"
-	case manifest.TypeDatapack:
-		return "datapack", "datapacks"
-	}
-	return "mod", "mods"
 }
 
 // importDir is where an import creates its project: --dir, else a folder named for the project.
