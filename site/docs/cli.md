@@ -210,7 +210,7 @@ shulker add https://modrinth.com/mod/sodium https://www.curseforge.com/minecraft
 shulker add
 ```
 
-A URL names the provider and the project, and a URL that names a file or version pins it, as `--pin` would; several URLs in one `add` each keep their own pin, in one change to the lock. `--provider` or `--pin` that disagrees with the URL is a `usage` error. The type comes from the project, not the URL's section. Accepted shapes, with query strings and fragments ignored:
+A URL names the provider and the project, and a URL that names a file or version pins it, as `--pin` would; several URLs in one `add` each keep their own pin, in one change to the lock. `--provider`, `--pin` or `--type` that disagrees with the URL is a `usage` error. The type comes from the project, not the URL's section. Accepted shapes, with query strings and fragments ignored:
 
 - `https://modrinth.com/<mod|project|plugin|resourcepack|shader|datapack|modpack>/<slug or id>`, optionally followed by `/version/<id or number>`
 - `https://cdn.modrinth.com/data/<project>/versions/<version>/<file>`

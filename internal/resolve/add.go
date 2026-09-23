@@ -60,6 +60,9 @@ type AddOptions struct {
 	ResourcePack bool
 	// KeepFilename places a pack zip under its own file name when that isn't <key>.zip.
 	KeepFilename bool
+	// IsFromURL is set when the project was named by a Modrinth or CurseForge URL, which a --type
+	// can then disagree with.
+	IsFromURL bool
 }
 
 func (r *Resolver) log(format string, args ...any) {
@@ -174,6 +177,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 		return err
 	}
 	kind, err := addKind(opts.Type, proj, slug)
+	if err != nil && opts.IsFromURL {
+		return out.Errorf("usage", "--type %s disagrees with the URL's %s", opts.Type, proj.Type)
+	}
 	if err != nil {
 		return err
 	}

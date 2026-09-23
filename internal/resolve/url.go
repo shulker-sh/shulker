@@ -161,7 +161,7 @@ func (r *Resolver) FromURL(ctx context.Context, u ProviderURL, opts AddOptions) 
 	if version != "" && opts.Pin != "" && opts.Pin != version && opts.Pin != u.Version {
 		return "", opts, out.Errorf("usage", "--pin %s disagrees with the URL's version %s", opts.Pin, u.Version)
 	}
-	opts.Provider = u.Provider
+	opts.Provider, opts.IsFromURL = u.Provider, true
 	if version != "" {
 		opts.Pin = version
 	}

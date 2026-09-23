@@ -79,6 +79,7 @@ func TestAddRefusesFlagsThatDisagreeWithTheURL(t *testing.T) {
 		{"add", "https://www.curseforge.com/minecraft/mc-mods/jei/files/5000001", "--pin", "5000000"},
 		{"add", "https://modrinth.com/mod/sodium/version/QANobbMI", "https://modrinth.com/mod/fabric-api", "--pin", "QANobbMI"},
 		{"add", "https://modrinth.com/mod/sodium/versions"},
+		{"add", "https://modrinth.com/resourcepack/fresh-animations", "--type", "shader"},
 	} {
 		if e := runError(t, h, args...); e.Code != "usage" {
 			t.Fatalf("%v: %+v, want a usage error", args, e)
