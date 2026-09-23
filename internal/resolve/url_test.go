@@ -1,6 +1,8 @@
 package resolve
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/out"
@@ -54,6 +56,20 @@ func TestParseURLRefusesUnknownShapesOnProviderHosts(t *testing.T) {
 		_, _, err := ParseURL(arg)
 		if out.CodeOf(err) != "usage" {
 			t.Fatalf("%s: err=%v, want a usage error", arg, err)
+		}
+	}
+}
+
+func TestParseURLRefusalListsEveryShapeItReads(t *testing.T) {
+	_, _, err := ParseURL("https://modrinth.com/mods")
+	var e *out.Error
+	if !errors.As(err, &e) {
+		t.Fatalf("err=%v, want an *out.Error", err)
+	}
+	listed := strings.Join(e.Items, "\n")
+	for _, want := range []string{"project|plugin", "/download/<file id>", "legacy.", "data-packs"} {
+		if !strings.Contains(listed, want) {
+			t.Errorf("shapes don't mention %q:\n%s", want, listed)
 		}
 	}
 }

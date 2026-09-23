@@ -39,10 +39,10 @@ var (
 )
 
 var urlShapes = []string{
-	"https://modrinth.com/<mod|resourcepack|shader|datapack|modpack>/<slug or id>[/version/<id or number>]",
+	"https://modrinth.com/<" + strings.Join(modrinthSections, "|") + ">/<slug or id>[/version/<id or number>]",
 	"https://cdn.modrinth.com/data/<project>/versions/<version>/<file>",
-	"https://www.curseforge.com/minecraft/<mc-mods|texture-packs|shaders|data-packs|modpacks>/<slug>[/files/<file id>]",
-	"https://www.curseforge.com/projects/<project id>",
+	"https://[www.|legacy.]curseforge.com/minecraft/<" + strings.Join(slices.Sorted(maps.Values(curseforgeSections)), "|") + ">/<slug>[/files/<file id> or /download/<file id>]",
+	"https://[www.|legacy.]curseforge.com/projects/<project id>",
 }
 
 // ParseURL reads a Modrinth or CurseForge URL. ok is false for anything else, which keeps its other
