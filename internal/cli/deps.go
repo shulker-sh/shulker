@@ -205,7 +205,7 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 		a.warn(r.Warnings)
 		return pin, err
 	}
-	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
+	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
 }
 
 // packMode is how openPacks reads a project's modpacks. A relock reads local packs as they are on
@@ -264,6 +264,9 @@ func (a *app) openPacks(ctx context.Context, p *project.Project, mode packMode) 
 		}
 		if warning != "" {
 			a.printer.Warn("%s", warning)
+		}
+		if mode.isRelocking {
+			store.WarnRawURL(l)
 		}
 		loaded = append(loaded, l)
 	}

@@ -400,7 +400,7 @@ func (a *app) sourceLocalFiles(src *syncSource, into string) (proj, inst *local.
 }
 
 func (a *app) sourceStore() *pack.Store {
-	return &pack.Store{Cache: a.d.cache, Fetch: a.d.fetch, Log: a.progress}
+	return &pack.Store{Cache: a.d.cache, Fetch: a.d.fetch, Log: a.progress, Warn: a.printer.Warn}
 }
 
 func (a *app) checkout(ctx context.Context, source string, at pack.At) (*pack.Checkout, error) {

@@ -253,7 +253,7 @@
         "source": {
           "type": "string",
           "minLength": 1,
-          "description": "Local path, git URL, or raw manifest URL of a modpack."
+          "description": "Local path, git URL, or raw manifest URL of a modpack. A raw manifest URL fetches only that shulker.json and the shulker.lock beside it, never the pack's override folders or local files, so it suits a pack that is only those two files; for anything more, give the repository's git URL, with path for a pack in a subfolder."
         },
         "ref": {
           "type": "string",

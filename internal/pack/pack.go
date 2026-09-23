@@ -65,6 +65,7 @@ type Store struct {
 	ProjectDir string
 	Fetch      *fetch.Client
 	Log        func(format string, args ...any)
+	Warn       func(format string, args ...any)
 	// Lock is the project's lock, which an archive's entries are rebuilt from.
 	Lock *lock.Lock
 	// Consume locks what a File modpack's archive holds into its Lock and Manifest, and records
@@ -161,6 +162,7 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		if err := refuseFiles(name, l.Manifest); err != nil {
 			return nil, err
 		}
+		s.warnRawURL(p.Source, l.Manifest)
 		if l.Pin.Sha256, err = s.storeManifest(data); err != nil {
 			return nil, err
 		}
@@ -358,14 +360,69 @@ func (l *Loaded) resolveLocked(p manifest.Require) error {
 // refuseFiles fails a modpack fetched as a bare manifest that names local files: with no
 // directory beside the manifest, there is nothing for their paths to point into.
 func refuseFiles(name string, m *manifest.Manifest) error {
-	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
-		if file := m.Requires[key].File; file != "" {
-			e := out.Errorf("modpack-url-file", "modpack %s: requires.%s is the local file %s, and a manifest fetched from a URL carries no files", name, key, file)
-			e.Help = "serve the modpack from git or a directory instead"
-			return e
-		}
+	if key, file, ok := localFile(m); ok {
+		e := out.Errorf("modpack-url-file", "modpack %s: requires.%s is the local file %s, and a manifest fetched from a URL carries no files", name, key, file)
+		e.Help = "serve the modpack from git or a directory instead"
+		return e
 	}
 	return nil
+}
+
+func localFile(m *manifest.Manifest) (key, file string, ok bool) {
+	for _, key := range slices.Sorted(maps.Keys(m.Requires)) {
+		if file := m.Requires[key].File; file != "" {
+			return key, file, true
+		}
+	}
+	return "", "", false
+}
+
+// WarnRawURL gives a relock that holds a raw-URL modpack at its pin the warning resolving it gives,
+// since the lock it writes still takes the modpack from there.
+func (s *Store) WarnRawURL(l *Loaded) {
+	if l.Kind == URL {
+		s.warnRawURL(l.Source, l.Manifest)
+	}
+}
+
+// warnRawURL is the one warning every command reading a raw manifest URL gives: only the manifest
+// and its lock come from there, so the pack's override folders and files never arrive. It names
+// the ones the manifest itself points at. The printer drops a repeat, so a command that reads the
+// same source twice still says it once.
+func (s *Store) warnRawURL(source string, m *manifest.Manifest) {
+	if s.Warn == nil {
+		return
+	}
+	including := ""
+	if missing := pointedAt(m); len(missing) > 0 {
+		including = ", including " + strings.Join(missing, " and ")
+	}
+	s.Warn("%s is a raw manifest URL: its overrides and local files aren't fetched%s; use the repository's git URL, with path for a pack in a subfolder, to get them", source, including)
+}
+
+// pointedAt is what a manifest names in its own directory, beyond the default override folders
+// every pack may have: its features' override folders and its icon.
+func pointedAt(m *manifest.Manifest) []string {
+	if m == nil {
+		return nil
+	}
+	var folders []string
+	for _, name := range slices.Sorted(maps.Keys(m.Features)) {
+		o := m.Features[name].Overrides
+		for _, folder := range []string{o.Both, o.Client, o.Server} {
+			if folder != "" && !slices.Contains(folders, folder) {
+				folders = append(folders, folder)
+			}
+		}
+	}
+	var named []string
+	if len(folders) > 0 {
+		named = append(named, "the feature overrides "+strings.Join(folders, ", "))
+	}
+	if m.Icon != "" {
+		named = append(named, "the icon "+m.Icon)
+	}
+	return named
 }
 
 func (s *Store) fetchManifest(ctx context.Context, name, url string) ([]byte, error) {

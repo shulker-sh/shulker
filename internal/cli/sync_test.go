@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -305,7 +306,7 @@ func TestSyncFromManifestURL(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--offline", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if res := env.Data; !res.Offline || res.Sha256 != good || len(env.Warnings) == 0 || env.Warnings[0] != "--offline, using "+source+" from the last successful sync just now" || hits != 0 {
+	if res := env.Data; !res.Offline || res.Sha256 != good || !slices.Contains(env.Warnings, "--offline, using "+source+" from the last successful sync just now") || hits != 0 {
 		t.Fatalf("--offline must not touch the network (%d requests): %+v", hits, res)
 	}
 
@@ -334,7 +335,7 @@ func TestSyncFromManifestURL(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if res := env.Data; !res.Offline || res.Sha256 != good || len(env.Warnings) == 0 || env.Warnings[0] != "offline, using "+source+" from the last successful sync just now" {
+	if res := env.Data; !res.Offline || res.Sha256 != good || !slices.Contains(env.Warnings, "offline, using "+source+" from the last successful sync just now") {
 		t.Fatalf("unreachable url falls back to the last good copy: %+v", res)
 	}
 	code, stdout, _ = h.run(t, "sync", srv.URL+"/other/shulker.json", "--into", into, "--json")
