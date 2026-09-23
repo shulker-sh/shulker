@@ -18,35 +18,43 @@ const resourcePacksKey = "resourcePacks"
 // both are placed under their requires key rather than the provider's file name,
 // so a pack enabled in game stays enabled when it updates.
 func (b *Builder) collectPacks(cond conditions, desired map[string]source, report *Report) error {
-	for _, kind := range []string{manifest.TypeResourcePack, manifest.TypeShader} {
-		listed, locked := b.Manifest.ResourcePacks(), b.Lock.ResourcePacks
-		if kind == manifest.TypeShader {
-			listed, locked = b.Manifest.Shaders(), b.Lock.Shaders
-		}
-		for _, key := range sortedPacks(locked) {
-			p := locked[key]
-			if entry, ok := listed[key]; ok {
-				if admitted, why := cond.admits(entry); !admitted {
-					report.Excluded = append(report.Excluded, key+" ("+why+")")
-					continue
-				}
+	for _, ref := range b.packRefs() {
+		if entry, ok := ref.listed(b.Manifest); ok {
+			if admitted, why := cond.admits(entry); !admitted {
+				report.Excluded = append(report.Excluded, ref.key+" ("+why+")")
+				continue
 			}
-			if !b.Cache.Has(p.Sha512) {
-				return notInstalled(key)
-			}
-			desired[p.Path(kind)] = source{sha512: p.Sha512}
 		}
+		if !b.Cache.Has(ref.pack.Sha512) {
+			return notInstalled(ref.key)
+		}
+		desired[ref.path] = source{sha512: ref.pack.Sha512}
 	}
 	return nil
 }
 
 // packRef is a locked pack with the kind it was locked as and where it lands, so
-// builds and exports agree on both.
+// builds and exports agree on both. A hybrid datapack's resource pack copy is a
+// resource pack ref of its own.
 type packRef struct {
-	key  string
-	kind string
-	path string
-	pack lock.Pack
+	key    string
+	kind   string
+	path   string
+	pack   lock.Pack
+	hybrid bool
+}
+
+// listed is the manifest entry the pack was locked from, if any.
+func (ref packRef) listed(m *manifest.Manifest) (manifest.Require, bool) {
+	listed := m.ResourcePacks()
+	switch {
+	case ref.hybrid:
+		listed = m.Datapacks()
+	case ref.kind == manifest.TypeShader:
+		listed = m.Shaders()
+	}
+	entry, ok := listed[ref.key]
+	return entry, ok
 }
 
 func (b *Builder) packRefs() []packRef {
@@ -58,6 +66,11 @@ func (b *Builder) packRefs() []packRef {
 		}
 		for _, key := range sortedPacks(locked) {
 			refs = append(refs, packRef{key: key, kind: kind, path: locked[key].Path(kind), pack: locked[key]})
+		}
+	}
+	for _, key := range sortedPacks(b.Lock.Datapacks) {
+		if p := b.Lock.Datapacks[key]; p.ResourcePack {
+			refs = append(refs, packRef{key: key, kind: manifest.TypeResourcePack, path: p.Path(manifest.TypeResourcePack), pack: p, hybrid: true})
 		}
 	}
 	return refs

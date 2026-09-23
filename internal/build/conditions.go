@@ -350,11 +350,10 @@ func (b *Builder) Placements() map[string]Placement {
 			continue
 		}
 		for _, ref := range b.packRefs() {
-			listed := b.Manifest.ResourcePacks()
-			if ref.kind == manifest.TypeShader {
-				listed = b.Manifest.Shaders()
+			if ref.hybrid {
+				continue
 			}
-			entry, isListed := listed[ref.key]
+			entry, isListed := ref.listed(b.Manifest)
 			if isListed {
 				if admitted, _ := c.admits(entry); !admitted {
 					continue

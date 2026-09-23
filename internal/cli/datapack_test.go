@@ -355,3 +355,30 @@ func TestHybridDatapackFlagLocks(t *testing.T) {
 		t.Fatalf("resourcepack is refused on anything but a datapack: %s", stdout)
 	}
 }
+
+func TestBuildPlacesAHybridDatapackAsAResourcePack(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	hybrid := makeJarFiles(t, "hybrid", "autoslabs.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/a/tags/x.json": "{}", "assets/a/lang/en_us.json": "{}"})
+	h.mustRun(t, "add", writeOutside(t, hybrid.filename, hybrid.data), "--type", "datapack")
+	h.mustRun(t, "set", "requires.autoslabs.resourcepack", "true")
+	h.mustRun(t, "lock")
+
+	h.mustRun(t, "install")
+	if readBuilt(t, h, "datapacks/autoslabs.zip") != string(hybrid.data) || readBuilt(t, h, "resourcepacks/autoslabs.zip") != string(hybrid.data) {
+		t.Fatal("a hybrid is placed as a datapack and as a resource pack")
+	}
+	if !strings.Contains(readBuilt(t, h, "options.txt"), `"file/autoslabs.zip"`) {
+		t.Fatal("its resource pack copy is enabled like any other")
+	}
+
+	h.mustRun(t, "set", "requires.autoslabs.side", "server")
+	h.mustRun(t, "lock")
+	h.mustRun(t, "build")
+	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "datapacks", "autoslabs.zip")); !os.IsNotExist(err) {
+		t.Fatalf("side governs the datapack copy: %v", err)
+	}
+	if readBuilt(t, h, "resourcepacks/autoslabs.zip") == "" {
+		t.Fatal("the resource pack copy stays on the client whatever the side")
+	}
+}
