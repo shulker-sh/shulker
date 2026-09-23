@@ -1890,7 +1890,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems, checked for each side against the mods its build places; each prints the `shulker ignore` command that would accept it, and a problem only some sides have names them. `items`: the problems |
 | `version-no-file` | The provider's version has no file shulker can download, or no hash to check it against |
-| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or the one a Modrinth or CurseForge URL names, or no file with an id a CurseForge modpack names; for a pin its help links the mod's versions page |
+| `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or the one a Modrinth or CurseForge URL names, or no file with an id a CurseForge modpack names; for a pin its help links the project's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |
 | `world-in-use` | `restore` would replace a world a running game or server has open. `items`: the open worlds |
 | `world-not-found` | `backup --world` named a world the target doesn't hold, `restore --world` one the zip doesn't hold, or `restore` into a server was given a zip without the world its `level-name` names and no `--as`; the message names the `level-name` |
