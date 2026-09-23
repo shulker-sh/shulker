@@ -55,7 +55,7 @@ func (r *Resolver) MatchOverrides(ctx context.Context, files []mrpack.Override) 
 		if side == "both" {
 			side = ""
 		}
-		locked, err := im.lockFile(ctx, im.modrinth, o.Layer, o.Path, side, found.proj, found.v)
+		locked, err := im.lockOverride(ctx, im.modrinth, o, side, found.proj, found.v)
 		if err != nil {
 			return nil, err
 		}

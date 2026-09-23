@@ -80,6 +80,7 @@ func makeJarFiles(t *testing.T, id, filename string, files map[string]string) fa
 
 type harness struct {
 	server         *httptest.Server
+	cdnDown        map[string]bool
 	jars           map[string]fakeJar
 	dir            string
 	cache          string
@@ -523,6 +524,10 @@ func newHarness(t *testing.T) *harness {
 		writeJSON(w, map[string]any{"hits": hits, "total_hits": len(hits)})
 	})
 	mux.HandleFunc("/cdn/", func(w http.ResponseWriter, r *http.Request) {
+		if h.cdnDown[r.URL.Path] {
+			http.NotFound(w, r)
+			return
+		}
 		for _, jar := range h.jars {
 			if strings.HasSuffix(r.URL.Path, jar.filename) {
 				w.Write(jar.data)

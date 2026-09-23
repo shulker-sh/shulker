@@ -220,11 +220,37 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if mrpack.IsPackZip(f.Path) {
 		side = f.Side()
 	}
-	locked, err := im.lockFile(ctx, im.modrinth, f.Layer(), f.Path, side, found.proj, found.v)
+	locked, failed, err := im.lockFile(ctx, im.modrinth, f.Layer(), f.Path, side, found.proj, found.v)
 	if err != nil || locked {
 		return err
 	}
-	return im.unmanagedDownload(ctx, f)
+	if failed == "" {
+		return im.unmanagedDownload(ctx, f)
+	}
+	return im.keepIndexFile(ctx, f, found.v.File.URL, failed)
+}
+
+// keepIndexFile keeps an index file its provider failed to serve as an override, fetched from the
+// pack's own download URLs other than the one that failed. The pack holds no bytes of its own for
+// it, so with no such URL, or none that works, the import fails.
+func (im *importer) keepIndexFile(ctx context.Context, f mrpack.File, failedURL, why string) error {
+	f.Downloads = slices.DeleteFunc(slices.Clone(f.Downloads), func(u string) bool { return u == failedURL })
+	failed := out.Detail{Label: "modrinth", Text: why}
+	if len(f.Downloads) == 0 {
+		e := out.Errorf("mrpack-download", "couldn't download %s", f.Path)
+		e.Rows = []out.Detail{failed}
+		e.Help = "the pack lists no other URL for it"
+		return e
+	}
+	o, err := im.download(ctx, f)
+	if err != nil {
+		e := out.AsError(err)
+		e.Rows = append([]out.Detail{failed}, e.Rows...)
+		return e
+	}
+	im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s/%s: Modrinth's download failed (%s); kept as an override from the pack's other URL, so try matching it again later", o.Layer, o.Path, why))
+	im.unmanaged(o)
+	return nil
 }
 
 // findOnModrinth looks every mod jar and pack zip the index lists, and every datapack zip in the
@@ -459,7 +485,7 @@ func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provide
 	if side == "both" {
 		side = ""
 	}
-	locked, err := im.lockFile(ctx, cf, o.Layer, o.Path, side, proj, v)
+	locked, err := im.lockOverride(ctx, cf, o, side, proj, v)
 	if err != nil || locked {
 		return err
 	}
@@ -470,21 +496,30 @@ func (im *importer) lockCurseForgeMatch(ctx context.Context, cf provider.Provide
 // lockFile locks the mod jar or pack zip at filePath in layer as p's version v, reporting false,
 // with nothing locked, when v isn't the kind its folder holds or p fails to serve it. The lock
 // downloads it from p even when the pack ships the same bytes, since every later install will.
-func (im *importer) lockFile(ctx context.Context, p provider.Provider, layer, filePath, side string, proj *provider.Project, v *provider.Version) (bool, error) {
+func (im *importer) lockFile(ctx context.Context, p provider.Provider, layer, filePath, side string, proj *provider.Project, v *provider.Version) (locked bool, failed string, err error) {
 	kind, err := im.fileKind(ctx, filePath, proj, v)
 	if err == nil && kind == "" {
-		return false, nil
+		return false, "", nil
 	}
 	if err == nil && kind == manifest.TypeMod {
 		err = im.lockMod(ctx, p, side, proj, v)
 	} else if err == nil {
 		err = im.lockPack(ctx, p, path.Base(filePath), kind, side, proj, v)
 	}
-	if why, failed := downloadFailure(err); failed {
-		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s/%s: %s's download failed (%s); kept as an override, so try matching it again later", layer, filePath, provider.Title(p.Name()), why))
-		return false, nil
+	if why, ok := downloadFailure(err); ok {
+		return false, why, nil
 	}
-	return err == nil, err
+	return err == nil, "", err
+}
+
+// lockOverride locks an override the pack ships as lockFile does, keeping it as an override, with a
+// warning, when p fails to serve it.
+func (im *importer) lockOverride(ctx context.Context, p provider.Provider, o mrpack.Override, side string, proj *provider.Project, v *provider.Version) (bool, error) {
+	locked, failed, err := im.lockFile(ctx, p, o.Layer, o.Path, side, proj, v)
+	if failed != "" {
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s/%s: %s's download failed (%s); kept as an override, so try matching it again later", o.Layer, o.Path, provider.Title(p.Name()), failed))
+	}
+	return locked, err
 }
 
 // downloadFailure says why err is a provider failing to serve a file, as a CDN cutting one short
@@ -650,7 +685,13 @@ func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error 
 
 func (im *importer) download(ctx context.Context, f mrpack.File) (mrpack.Override, error) {
 	im.r.log("fetching %s", f.Path)
-	p, err := im.r.Cache.Ensure(ctx, im.r.Fetch, f.Downloads[0], f.Hashes["sha512"])
+	var p string
+	var err error
+	for _, url := range f.Downloads {
+		if p, err = im.r.Cache.Ensure(ctx, im.r.Fetch, url, f.Hashes["sha512"]); err == nil {
+			break
+		}
+	}
 	if err != nil {
 		return mrpack.Override{}, out.Errorf("mrpack-download", "couldn't download %s", f.Path).WithCause("download", err)
 	}
@@ -703,7 +744,7 @@ func (im *importer) override(ctx context.Context, o mrpack.Override) error {
 	if mrpack.IsDatapackZip(o.Path) {
 		sum := sha1.Sum(o.Data)
 		if found, ok := im.onModrinth[hex.EncodeToString(sum[:])]; ok {
-			locked, err := im.lockFile(ctx, im.modrinth, o.Layer, o.Path, layerSide(o.Layer), found.proj, found.v)
+			locked, err := im.lockOverride(ctx, im.modrinth, o, layerSide(o.Layer), found.proj, found.v)
 			if !locked && err == nil {
 				im.unmanaged(o)
 			}

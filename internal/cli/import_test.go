@@ -436,3 +436,46 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 		t.Fatalf("warnings without CurseForge: %v", warnings)
 	}
 }
+
+func TestImportMrpackKeepsAnIndexFileModrinthFailsToServe(t *testing.T) {
+	h := newHarness(t)
+	sodium := h.jars["sodium"]
+	h.cdnDown = map[string]bool{"/cdn/" + sodium.filename: true}
+	importWith := func(t *testing.T, downloads ...string) (int, string, string) {
+		t.Helper()
+		index := mrpack.Index{
+			FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Mirrored",
+			Files:        []mrpack.File{{Path: "mods/" + sodium.filename, Hashes: map[string]string{"sha1": sodium.sha1, "sha512": sodium.sha512}, Env: mrpack.Env("client"), Downloads: downloads, FileSize: int64(len(sodium.data))}},
+			Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
+		}
+		archive := filepath.Join(t.TempDir(), "mirrored.mrpack")
+		writeMrpack(t, archive, index, nil)
+		h.dir = t.TempDir()
+		return h.run(t, "import", "mrpack", archive, "--dir", filepath.Join(h.dir, "mirrored"), "--json")
+	}
+
+	if code, stdout, _ := importWith(t, h.server.URL+"/cdn/"+sodium.filename); code == 0 || !strings.Contains(stdout, "mrpack-download") || !strings.Contains(stdout, "no other URL") {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+
+	code, stdout, stderr := importWith(t, h.server.URL+"/cdn/"+sodium.filename, h.server.URL+"/cdn/mirror/"+sodium.filename)
+	if code != 0 {
+		t.Fatalf("exit %d: %s%s", code, stdout, stderr)
+	}
+	var env struct {
+		Warnings []string     `json:"warnings"`
+		Data     importResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatal(err)
+	}
+	if len(env.Data.Mods.LockedIDs()) != 0 || strings.Join(env.Data.Mods.Unmanaged, ",") != "client-overrides/mods/"+sodium.filename {
+		t.Fatalf("import: %+v", env.Data.Mods)
+	}
+	if len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "Modrinth's download failed") {
+		t.Fatalf("warnings: %v", env.Warnings)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "mirrored/client-overrides/mods", sodium.filename)); err != nil {
+		t.Fatalf("not kept as an override: %v", err)
+	}
+}
