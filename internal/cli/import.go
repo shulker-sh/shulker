@@ -328,11 +328,9 @@ func (a *app) platformLock(ctx context.Context, d *deps, platform *resolve.Platf
 	l.Minecraft = platform.Minecraft
 	l.Loader = platform.Loader
 	l.Java = platform.Java
-	dataVersion, warning := d.meta.DataVersion(ctx, platform.Minecraft)
-	if warning != "" {
+	if warning := d.meta.FillDataVersion(ctx, l); warning != "" {
 		a.printer.Warn("%s", warning)
 	}
-	l.DataVersion = dataVersion
 	return l
 }
 

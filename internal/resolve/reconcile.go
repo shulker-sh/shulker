@@ -26,7 +26,9 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 			r.Lock.Minecraft, r.Lock.DataVersion, r.Lock.Loader, r.Lock.Java = pf.Minecraft, 0, pf.Loader, pf.Java
 		}
 	}
-	r.fillDataVersion(ctx)
+	if warning := r.Meta.FillDataVersion(ctx, r.Lock); warning != "" && !slices.Contains(r.Warnings, warning) {
+		r.Warnings = append(r.Warnings, warning)
+	}
 	if err := r.RefreshPacks(r.Packs); err != nil {
 		return nil, err
 	}
@@ -66,16 +68,4 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 	}
 	sort.Strings(targets)
 	return nil, r.Update(ctx, targets)
-}
-
-// fillDataVersion gives a lock that has a Minecraft version but no data version one.
-func (r *Resolver) fillDataVersion(ctx context.Context) {
-	if r.Lock.Minecraft == "" || r.Lock.DataVersion != 0 {
-		return
-	}
-	dataVersion, warning := r.Meta.DataVersion(ctx, r.Lock.Minecraft)
-	r.Lock.DataVersion = dataVersion
-	if warning != "" && !slices.Contains(r.Warnings, warning) {
-		r.Warnings = append(r.Warnings, warning)
-	}
 }

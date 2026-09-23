@@ -15,6 +15,7 @@ import (
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/meta"
 )
@@ -159,8 +160,9 @@ func TestQuiltLoaderProvides(t *testing.T) {
 func TestDataVersionIsNotLookedForBefore114(t *testing.T) {
 	mt := &Meta{}
 	for _, game := range []string{"1.7.10", "1.13.2", "1.13-pre1"} {
-		if got, warning := mt.DataVersion(context.Background(), game); got != 0 || warning != "" {
-			t.Errorf("%s: got %d, %q", game, got, warning)
+		l := &lock.Lock{Minecraft: game}
+		if warning := mt.FillDataVersion(context.Background(), l); l.DataVersion != 0 || warning != "" {
+			t.Errorf("%s: got %d, %q", game, l.DataVersion, warning)
 		}
 	}
 }

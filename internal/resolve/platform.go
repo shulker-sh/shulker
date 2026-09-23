@@ -96,17 +96,22 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 // firstWithDataVersion is the first 1.14 snapshot, where the server jar's version.json starts.
 var firstWithDataVersion = mcver.MustParse("1.13").TildeUpper()
 
-// DataVersion is game's data version, 0 for a version older than 1.14 without asking. Reading it
-// never blocks a lock: a failure comes back as a warning, and the next relock tries again.
-func (mt *Meta) DataVersion(ctx context.Context, game string) (dataVersion int, warning string) {
-	if v, err := mcver.Parse(game); err == nil && v.Compare(firstWithDataVersion) < 0 {
-		return 0, ""
+// FillDataVersion gives l the data version of its Minecraft version when it has none yet, and none
+// is looked for before 1.14. Reading it never blocks a lock: a failure comes back as a warning, l
+// stays without one, and the next relock tries again.
+func (mt *Meta) FillDataVersion(ctx context.Context, l *lock.Lock) (warning string) {
+	if l.Minecraft == "" || l.DataVersion != 0 {
+		return ""
 	}
-	dataVersion, err := mt.Piston.DataVersion(ctx, game)
+	if v, err := mcver.Parse(l.Minecraft); err == nil && v.Compare(firstWithDataVersion) < 0 {
+		return ""
+	}
+	dataVersion, err := mt.Piston.DataVersion(ctx, l.Minecraft)
 	if err != nil {
-		return 0, fmt.Sprintf("couldn't read the Minecraft %s data version, so ${minecraft.dataVersion} stays unset until the next relock: %v", game, err)
+		return fmt.Sprintf("couldn't read the Minecraft %s data version, so ${minecraft.dataVersion} stays unset until the next relock: %v", l.Minecraft, err)
 	}
-	return dataVersion, ""
+	l.DataVersion = dataVersion
+	return ""
 }
 
 // inheritedDifferences reports a platform the locked modpacks supply that the lock
