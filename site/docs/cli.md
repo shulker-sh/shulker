@@ -300,6 +300,26 @@ Bring `shulker.lock` in line with `shulker.json` after you edit it by hand, with
 shulker lock
 ```
 
+### `shulker check`
+
+Check the project the way CI should, on every push: fail when anything would break it, and change nothing. It writes nothing to the project: no `build/`, no lock, no history entry. Every problem is reported, not just the first, and the exit code is non-zero when there is any.
+
+- `shulker.lock` must match `shulker.json`: each difference is listed under `lock-stale`, and `check` never relocks.
+- Every locked file must be obtainable. Each is put in the download cache the way `install` does, so a run with the cache kept from the last one downloads nothing. A manual download missing from `downloads/`, a local file that is gone with no copy in the cache, or a download that fails is its own problem, under the code `install` would fail with.
+- Every side the manifest declares is validated as `install` validates it, with every jar read: a mod whose dependency is missing or the wrong version fails with the same line and `shulker ignore` hint, and a problem only the server has fails a project that declares both sides. `ignore` entries and loader dependency overrides apply as usual.
+
+Warnings, such as an `ignore` entry that matches nothing or a local file served from the cache because the project's copy is gone, print without failing the run, unless `--strict` is passed.
+
+```sh
+shulker check
+```
+
+| Flag | Description |
+| --- | --- |
+| `--strict` | Fail on warnings too |
+
+With `--json`, a clean run's `data.problems` is empty. A failing run ends with `check-failed`: its `items` are every problem's own items, each as `<code>: <item>`, one per thing to annotate, and `data.problems` lists each problem as an error, `{ "code", "message", "items", "help" }`.
+
 ### `shulker match`
 
 Look the jars and pack zips in `mods/`, `resourcepacks/`, `shaderpacks/` and the datapack folders (`datapacks/`, `config/paxi/datapacks/`, `config/openloader/data/`, `config/openloader/packs/`) of `overrides/`, `client-overrides/` and `server-overrides/` up on Modrinth by sha1, then the ones Modrinth lacks on CurseForge by fingerprint, the way `import mrpack` does, and lock each match: it joins `requires` with the side of the folder it was in, and its file leaves the override folder. Naming paths looks up only those files. A file stays an override when no provider has it, when its author doesn't allow third-party downloads, when the provider's download fails, or when `requires` already has its key, with a warning for each but the first. A zip in a datapack folder locks as a `datapack`. Feature override folders are left alone. `locked` lists the keys, `moved` the files they came from, and `kept` the files left as overrides. Every match is locked without asking; a lookup needs the network, and without a CurseForge API key only Modrinth is asked.
@@ -1741,6 +1761,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
+| `check-failed` | `check` found a problem; each one printed above it. `items`: every problem's items as `<code>: <item>`; `data.problems`: each problem as an error |
 | `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes, and the file at `install` |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
 | `config-invalid` | shulker's `config.json` isn't valid JSON (the message names the line and column), or names a `$schema` this shulker doesn't know or names none. Only commands that need its registry location fail, as they do when it fails `schema-newer`; the rest warn and go on without it. `shulker config set` replaces it, keeping the old file as `config.json.replaced` |
@@ -1794,7 +1815,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
 | `lock-invalid` | `shulker.lock` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `shulker lock` replaces it, keeping the old file as `shulker.lock.replaced`. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock`. Also a lock file named with `--lock` to `cache info` or `cache prune` that isn't there |
-| `lock-stale` | `export` needs a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
+| `lock-stale` | `export` and `check` need a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
 | `manifest-exists` | A `shulker.json` is already where `init` or `import` would write one |
 | `manifest-invalid` | `shulker.json` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. A manifest with no `$schema` is read as the current version, and shulker writes the line the next time it saves the file. `items`: the failing fields when there are several |
 | `manifest-not-found` | No `shulker.json` in the project directory or the sync source |
@@ -1878,6 +1899,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
 | `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
 | `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a native jar that won't unpack, or a version JSON that doesn't hold together |
+| `strict-warnings` | `check --strict` saw warnings. `items`: the warnings |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
 | `topic-not-found` | `docs` found no page, heading or line matching the words. `candidates`: the pages |
 | `type-ambiguous` | A CurseForge slug matches projects of several types, or a zip or folder given to `add` holds no pack whose kind it can tell, including one with both `data/` and `assets/`; pass `--type` to choose. `candidates`: the types it could be |

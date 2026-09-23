@@ -31,9 +31,12 @@ type Problem struct {
 }
 
 type Validation struct {
-	Problems    []Problem
-	Warnings    []string
-	Suggestions []Suggestion
+	Problems []Problem
+	Warnings []string
+	// Undownloaded are the warnings, also in Warnings, for jars whose metadata went unchecked
+	// because the cache doesn't have them.
+	Undownloaded []string
+	Suggestions  []Suggestion
 }
 
 type Suggestion struct {
@@ -97,7 +100,8 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 		m := r.Lock.Mods[id]
 		if !r.Cache.Has(m.Sha512) {
 			if usedBy(m.Side, sides) {
-				v.Warnings = append(v.Warnings, fmt.Sprintf("%s is not downloaded; its metadata was not checked", id))
+				w := fmt.Sprintf("%s is not downloaded; its metadata was not checked", id)
+				v.Warnings, v.Undownloaded = append(v.Warnings, w), append(v.Undownloaded, w)
 			}
 			unread[id] = true
 			continue
