@@ -1,11 +1,13 @@
 package out
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 )
 
 const (
@@ -54,6 +56,9 @@ type Error struct {
 	Rows []Detail `json:"-"`
 	// Usage prints under a human error that suggests nothing else to run.
 	Usage func(l *Lines) `json:"-"`
+	// IsSummary marks an error whose items repeat errors the run already reported, so it adds no
+	// annotations of its own.
+	IsSummary bool `json:"-"`
 }
 
 // Detail is one row under an error line; Children nest one level beneath it.
@@ -71,6 +76,12 @@ type Nudge struct {
 }
 
 func (e *Error) Error() string { return e.Message }
+
+// Headline is the message's first line, without the colon that introduces the lines under it.
+func (e *Error) Headline() string {
+	headline, _, _ := strings.Cut(e.Message, "\n")
+	return strings.TrimSuffix(headline, ":")
+}
 
 // WithCause adds err as a row labelled by what produced it (`json`, `zip`, a service's name), so the
 // headline says only what went wrong.
@@ -132,6 +143,9 @@ type Printer struct {
 	// Recorder, when set, hears each warning once, the way the run shows it, and each result as the
 	// data --json prints.
 	Recorder Recorder
+	// Annotate prints each warning and error as a GitHub Actions workflow command as well, which
+	// the runner reads from either stream and shows as an annotation on the run.
+	Annotate bool
 	warnings []string
 	steps    stepState
 	waits    waits
@@ -167,6 +181,7 @@ func (p *Printer) warn(format string, args ...any) bool {
 	if p.Recorder != nil {
 		p.Recorder.Warn(msg)
 	}
+	p.annotate("warning", "", msg)
 	if !p.JSON {
 		text := fmt.Sprintf(format, args...)
 		if p.WarnPrefix != "" {
@@ -211,6 +226,37 @@ func (p *Printer) record(e *Error) {
 	if p.Recorder != nil {
 		p.Recorder.Error(e.Code, e.Message)
 	}
+	if e.IsSummary {
+		return
+	}
+	headline := e.Headline()
+	code := cmp.Or(e.Code, "error")
+	if len(e.Items) == 0 {
+		p.annotate("error", code, headline)
+	}
+	for _, item := range e.Items {
+		p.annotate("error", headline+" ("+code+")", item)
+	}
+}
+
+// annotate prints one GitHub Actions workflow command, escaped as the runner unescapes it.
+func (p *Printer) annotate(level, title, message string) {
+	if !p.Annotate {
+		return
+	}
+	command := "::" + level
+	if title != "" {
+		command += " title=" + annotationEscaper(true).Replace(title)
+	}
+	fmt.Fprintf(settling{p, p.Stderr}, "%s::%s\n", command, annotationEscaper(false).Replace(message))
+}
+
+func annotationEscaper(isProperty bool) *strings.Replacer {
+	pairs := []string{"%", "%25", "\r", "%0D", "\n", "%0A"}
+	if isProperty {
+		pairs = append(pairs, ":", "%3A", ",", "%2C")
+	}
+	return strings.NewReplacer(pairs...)
 }
 
 // Fail prints err as the run's error and returns the exit code the run ends with.

@@ -18,6 +18,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	os.Unsetenv("GITHUB_ACTIONS")
 	os.Setenv("SHULKER_CONFIG", filepath.Join(dir, "config.json"))
 	os.Setenv("SHULKER_CACHE", filepath.Join(dir, "cache"))
 	os.Setenv("SHULKER_DATA", filepath.Join(dir, "data"))

@@ -190,12 +190,12 @@ func (a *app) checkServer(ctx context.Context, p *project.Project, r *resolve.Re
 // it, with every problem's own items listed together for CI to annotate.
 func checkFailed(res checkResult) error {
 	e := out.Errorf("check-failed", "%d problem(s) found", len(res.Problems))
-	e.Data = res
+	e.Data, e.IsSummary = res, true
 	for _, p := range res.Problems {
-		message, _, _ := strings.Cut(p.Message, "\n")
-		e.Rows = append(e.Rows, out.Detail{Label: p.Code, Text: strings.TrimSuffix(message, ":")})
+		headline := p.Headline()
+		e.Rows = append(e.Rows, out.Detail{Label: p.Code, Text: headline})
 		if len(p.Items) == 0 {
-			e.Items = append(e.Items, fmt.Sprintf("%s: %s", p.Code, message))
+			e.Items = append(e.Items, fmt.Sprintf("%s: %s", p.Code, headline))
 		}
 		for _, item := range p.Items {
 			e.Items = append(e.Items, fmt.Sprintf("%s: %s", p.Code, item))

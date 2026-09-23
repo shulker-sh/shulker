@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"testing"
 )
@@ -107,5 +108,21 @@ func TestWarnNudgePrintsTheNudgeUnderItsWarningOnce(t *testing.T) {
 	p.WarnNudge(Nudge{Lead: "Update shulker", Command: "shulker self update"}, "state.json is newer")
 	if stderr.Len() != 0 || !slices.Equal(p.warnings, []string{"state.json is newer"}) {
 		t.Errorf("json: stderr %q, warnings %q", stderr.String(), p.warnings)
+	}
+}
+
+func TestAnnotationsEscapeWhatTheRunnerUnescapes(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: io.Discard, Stderr: &stderr, Annotate: true, JSON: true}
+	p.Warn("100%% done\nnext")
+	e := Errorf("some-code", "a: b, c:\nmore detail")
+	e.Items = []string{"one: 1"}
+	p.Fail(e)
+	summary := Errorf("summary", "2 problems")
+	summary.IsSummary = true
+	p.Report(summary)
+	want := "::warning::100%25 done%0Anext\n::error title=a%3A b%2C c (some-code)::one: 1\n"
+	if stderr.String() != want {
+		t.Fatalf("annotations:\n%q\nwant\n%q", stderr.String(), want)
 	}
 }

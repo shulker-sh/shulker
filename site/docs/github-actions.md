@@ -32,6 +32,8 @@ jobs:
 
 The action keeps the download cache between runs, as it does for a release (see [Cache](#cache)), so a check with an unchanged lock downloads nothing. With no arguments it checks what an export needs; for a pack with a server, `shulker check --all` also downloads the server jar and Java runtime `install` would. Pass `--strict` to fail on warnings too, such as an `ignore` entry that no longer matches anything.
 
+Every problem shows as an annotation on the run, so a failed check lists what to fix on the workflow's summary page without opening the log. Shulker does this for every command's errors and warnings when `GITHUB_ACTIONS=true`, which every runner sets; pass `--no-annotations` to turn it off.
+
 ## The workflow
 
 Save this as `.github/workflows/release.yml` in the pack's repository:

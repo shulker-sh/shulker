@@ -259,3 +259,32 @@ func TestCheckServerOnlyWhenNamedOrAll(t *testing.T) {
 		t.Fatal("check server locked the server jar")
 	}
 }
+
+func TestCheckAnnotatesEachProblemInGitHubActions(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "add", "sodium")
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"].(map[string]any)["sodium"] = map[string]any{"side": "server"}
+		m["ignore"] = []any{map[string]any{"rule": "depends", "mod": "sodium", "on": "nothing", "declared": "*", "note": "stale"}}
+	})
+	stale := "::error title=shulker.lock does not match shulker.json (lock-stale)::sodium: side client -> server\n"
+	warning := "::warning::ignore entry 1 (depends: sodium on nothing) matched nothing\n"
+
+	_, _, stderr := h.run(t, "check")
+	if strings.Contains(stderr, "::error") {
+		t.Fatalf("annotations outside GitHub Actions: %s", stderr)
+	}
+	t.Setenv("GITHUB_ACTIONS", "true")
+	code, stdout, stderr := h.run(t, "check", "--json")
+	if code == 0 || !json.Valid([]byte(stdout)) || !strings.Contains(stderr, stale) || !strings.Contains(stderr, warning) || strings.Count(stderr, "::error") != 1 {
+		t.Fatalf("annotations in GitHub Actions: exit %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	if _, _, stderr = h.run(t, "check", "--no-annotations"); strings.Contains(stderr, "::") {
+		t.Fatalf("--no-annotations: %s", stderr)
+	}
+	t.Setenv("GITHUB_ACTIONS", "")
+	if _, _, stderr = h.run(t, "check", "--annotations"); !strings.Contains(stderr, stale) {
+		t.Fatalf("--annotations outside GitHub Actions: %s", stderr)
+	}
+}

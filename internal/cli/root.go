@@ -73,6 +73,7 @@ func newApp(stdout, stderr io.Writer) *app {
 func (a *app) run(ctx context.Context, args []string) int {
 	a.printer.JSON = isFlagRequested(args, "json")
 	a.printer.NoInput = isFlagRequested(args, "no-input")
+	a.printer.Annotate = annotates(args)
 	a.printer.Args = args
 	a.style = out.Options{NoColor: isFlagRequested(args, "no-color"), ASCII: isFlagRequested(args, "ascii")}
 	if !a.printer.JSON {
@@ -148,6 +149,8 @@ func (a *app) root() *cobra.Command {
 	})
 	root.PersistentFlags().BoolVar(&a.style.NoColor, "no-color", false, "print without colour (NO_COLOR does the same)")
 	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ »")
+	root.PersistentFlags().Bool("annotations", false, "also print errors and warnings as GitHub Actions annotations (the default when GITHUB_ACTIONS=true)")
+	root.PersistentFlags().Bool("no-annotations", false, "print no GitHub Actions annotations, even when GITHUB_ACTIONS=true")
 	a.printer.JSON, a.printer.NoInput, a.dir, a.style.NoColor, a.style.ASCII = jsonOut, noInput, dir, noColor, ascii
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.addCmd(), a.searchCmd(), a.removeCmd(), a.listCmd(), a.lockCmd(), a.checkCmd(), a.matchCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.ignoreCmd(), a.unignoreCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.instancesCmd(), a.instanceCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.historyCmd(), a.rollbackCmd(), a.backupCmd(), a.restoreCmd(), a.savesCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.accountsCmd(), a.playCmd(), a.watchCmd(), a.selfCmd(), a.docsCmd(), a.cacheCmd(), a.logCmd(), a.completionCmd())
 	root.AddCommand(a.typeGroupCmds()...)
@@ -227,6 +230,15 @@ func usageError(root *cobra.Command, err error) error {
 	}
 	e.Given = m[1]
 	return e
+}
+
+// annotates reports whether errors and warnings also print as GitHub Actions annotations: in a
+// workflow run unless --no-annotations says otherwise, and anywhere with --annotations.
+func annotates(args []string) bool {
+	if isFlagRequested(args, "no-annotations") {
+		return false
+	}
+	return isFlagRequested(args, "annotations") || os.Getenv("GITHUB_ACTIONS") == "true"
 }
 
 // Cobra reports an unknown command before parsing any flags, so the
