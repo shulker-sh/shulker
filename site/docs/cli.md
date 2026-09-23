@@ -62,8 +62,8 @@ outline: [2, 3]
 | [`shulker accounts providers`](#shulker-accounts-providers) | List the launchers shulker reads accounts from |
 | [`shulker accounts providers add\|remove <launcher>`](#shulker-accounts-providers-add-remove) | Read accounts from another launcher, or stop |
 | [`shulker accounts providers set <launcher...>`](#shulker-accounts-providers-set) | Replace the list, in the order given |
-| [`shulker import mrpack <file>`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
-| [`shulker import curseforge <file>`](#shulker-import-curseforge) | Create a project from a CurseForge modpack |
+| [`shulker import mrpack <file> [dir]`](#shulker-import-mrpack) | Create a project from a Modrinth modpack |
+| [`shulker import curseforge <file> [dir]`](#shulker-import-curseforge) | Create a project from a CurseForge modpack |
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
 | [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
@@ -117,8 +117,11 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --side server
 
 Create a project from a Modrinth modpack (`.mrpack`). Each mod jar the pack lists, and each resource pack, shader or datapack zip, is looked up on Modrinth by its hash and locked as that project's version. What Modrinth doesn't host, along with the mod jars and pack zips the pack bundles in its overrides, is then looked up on CurseForge by fingerprint, all in one request, and each exact match is locked from there. Every match is downloaded from its provider before it locks, even one the pack bundles, since every later install fetches it from there. A match whose author doesn't allow third-party downloads, or whose download fails, as when a CDN cuts the file short, stays an override, with a warning, and without a CurseForge key the lookup is skipped with a warning. A mod keeps its provider's side unless its index entry's `env` places it on a side the project builds and that side lacks, as when a pack ships a server mod on the client for singleplayer's integrated server; then it is locked on `both`, its manifest entry records `side`, and one warning and the result's `sides` list name each such mod with both sides. An `env` that matches the provider's side, or is narrower, changes nothing, since packwiz marks every mod as needed on both sides, and so does a mod with no `env`. One matched from `client-overrides/` or `server-overrides/` takes that folder's side, and its manifest entry records it too, without a warning. A matched index file whose provider download fails is fetched from the index's other URLs and kept as an override, with a warning; with none that works the import fails with `mrpack-download`. A resource pack, shader or datapack is pinned to the version the pack ships and keeps the file name it ships as its `filename`, since the game enables packs by name and Paxi orders datapacks by it. A datapack is locked as one wherever the pack keeps it: in `datapacks/`, or in a global datapack mod's folder, `config/paxi/datapacks/` or `config/openloader/data/` or `packs/`, where a zip in the overrides is looked up on Modrinth too. A datapack under `resourcepacks/` is locked as a datapack, unless its zip carries `assets/`, which make it load as a resource pack there, and then it is locked as one. A copy under `resourcepacks/` or `datapacks/` with the same bytes as a zip in a global datapack mod's folder is left out as a leftover, since that mod loads the other. One under `resourcepacks/` that carries `assets/` is a hybrid's, whose assets load only from there: it locks with the loaded copy as one datapack entry with `"resourcepack": true`, or stays an override when the loaded copy does. `duplicates` lists each by its path in the archive: an index file by its index path, an override under `overrides/`, `client-overrides/` or `server-overrides/`. Anything else, a file neither provider has, goes into the project's overrides as it is. A pack shulker exported carries its own `shulker.json` and `shulker.lock` at the archive root unless its manifest turns `marker` off, and those are read in preference to the marker jar, so the project comes back as it was, resource packs and shaders included, and its `icon` is put back from the archive's `icon.png`. A local file that project had, bundled into the archive with `export mrpack --bundle`, becomes the new project's own local file in `files/`, so it builds on a machine that never read the archive; two of one name fail with `file-taken`. `--ignore-shulker` skips both and imports the archive as any other Modrinth modpack.
 
+The project goes in `dir` when one is given, `.` being the current folder, else in `-C`'s folder, else in a new folder named for the project. A folder and `-C` together fail with `usage`, and one that already holds a `shulker.json` fails with `manifest-exists`. When the new folder lands inside an empty current folder, dotfiles such as `.git` aside, the result adds a line saying `.` would have imported there.
+
 ```sh
 shulker import mrpack ~/Downloads/fabulously-optimized.mrpack
+shulker import mrpack ~/Downloads/fabulously-optimized.mrpack .
 shulker import mrpack pack.mrpack -C my-pack --name my-pack
 ```
 
@@ -133,8 +136,11 @@ Create a project from a CurseForge modpack `.zip`, the kind the CurseForge app e
 
 A zip shulker exported carries its own `shulker.json` and `shulker.lock` at its root unless its manifest turns `marker` off, and those are read the way `import mrpack` reads them, so the project comes back as it was: features, side blocks, conditions and keys chosen with `--as` included. Each file the zip names is matched to that project's lock by its bytes once it is downloaded, and comes back as the project locked it, so a mod it locked from Modrinth is locked from Modrinth again. A local file the export bundled becomes the new project's own local file in `files/`. `--ignore-shulker` skips both and imports the zip as any other CurseForge modpack.
 
+The project goes where `import mrpack` puts it: in `dir`, else `-C`'s folder, else a new folder named for the project.
+
 ```sh
 shulker import curseforge ~/Downloads/all-the-mods.zip
+shulker import curseforge ~/Downloads/all-the-mods.zip .
 shulker import curseforge pack.zip -C my-pack --name my-pack
 ```
 

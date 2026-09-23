@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/resolve"
 )
 
@@ -552,5 +553,72 @@ func TestImportMrpackRecordsAnOverrideLayersSideQuietly(t *testing.T) {
 	m, l := readProject(t, dir)
 	if l.Mods["iris"].Side != "server" || m.Requires["iris"].Side != "server" {
 		t.Fatalf("iris: lock %+v, manifest %+v", l.Mods["iris"], m.Requires["iris"])
+	}
+}
+
+func writeEmptyMrpack(t *testing.T) string {
+	t.Helper()
+	archive := filepath.Join(t.TempDir(), "empty.mrpack")
+	writeMrpack(t, archive, mrpack.Index{FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Empty Pack", Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"}}, nil)
+	return archive
+}
+
+func TestImportTakesItsFolderAsAnArgument(t *testing.T) {
+	h := newHarness(t)
+	h.dir = ""
+	archive := writeEmptyMrpack(t)
+	here := t.TempDir()
+	t.Chdir(here)
+	stdout := h.mustRun(t, "import", "mrpack", archive, ".")
+	if _, err := os.Stat(filepath.Join(here, manifest.FileName)); err != nil {
+		t.Fatalf("not imported here: %v", err)
+	}
+	if strings.Contains(stdout, "import here") {
+		t.Fatalf("hint with a folder given: %s", stdout)
+	}
+	h.mustRun(t, "import", "mrpack", archive, "packs/mine")
+	if _, err := os.Stat(filepath.Join(here, "packs", "mine", manifest.FileName)); err != nil {
+		t.Fatalf("not imported into packs/mine: %v", err)
+	}
+	if code, stdout, _ := h.run(t, "import", "mrpack", archive, ".", "--json"); code == 0 || failureCode(t, stdout).Code != "manifest-exists" {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+	h.dir = t.TempDir()
+	if code, stdout, _ := h.run(t, "import", "mrpack", archive, "elsewhere", "--json"); code != out.ExitUsage || failureCode(t, stdout).Code != "usage" {
+		t.Fatalf("folder and -C: exit %d: %s", code, stdout)
+	}
+}
+
+func TestImportCurseForgeTakesItsFolderAsAnArgument(t *testing.T) {
+	h := newHarness(t)
+	h.dir = ""
+	archive := filepath.Join(t.TempDir(), "craft.zip")
+	writeCurseForgeZip(t, archive, importedCurseForgePack(), map[string][]byte{})
+	here := t.TempDir()
+	t.Chdir(here)
+	h.mustRun(t, "import", "curseforge", archive, ".")
+	if _, err := os.Stat(filepath.Join(here, manifest.FileName)); err != nil {
+		t.Fatalf("not imported here: %v", err)
+	}
+}
+
+func TestImportHintsAtImportingHereInAnEmptyFolder(t *testing.T) {
+	h := newHarness(t)
+	h.dir = ""
+	archive := writeEmptyMrpack(t)
+	here := t.TempDir()
+	if err := os.Mkdir(filepath.Join(here, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(here)
+	stdout := h.mustRun(t, "import", "mrpack", archive)
+	if _, err := os.Stat(filepath.Join(here, "empty-pack", manifest.FileName)); err != nil {
+		t.Fatalf("not imported into its own folder: %v", err)
+	}
+	if !strings.Contains(stdout, "pass . to import here") {
+		t.Fatalf("no hint: %s", stdout)
+	}
+	if stdout := h.mustRun(t, "import", "mrpack", archive, "--name", "second"); strings.Contains(stdout, "import here") {
+		t.Fatalf("hint in a folder that isn't empty: %s", stdout)
 	}
 }

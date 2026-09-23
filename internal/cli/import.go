@@ -51,10 +51,10 @@ func (a *app) importMrpackCmd() *cobra.Command {
 	var name string
 	var ignoreShulker bool
 	cmd := &cobra.Command{
-		Use:         "mrpack <file>",
+		Use:         "mrpack <file> [dir]",
 		Annotations: acts(),
 		Short:       "Create a project from a Modrinth modpack (.mrpack)",
-		Args:        exactArgs(1),
+		Args:        rangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arc, err := mrpack.Read(args[0])
 			if err != nil {
@@ -66,7 +66,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 			if name == "" {
 				name = slugify(arc.Index.Name)
 			}
-			dir, err := a.importDir(name)
+			dir, hintHere, err := a.importDir(name, args)
 			if err != nil {
 				return err
 			}
@@ -124,6 +124,9 @@ func (a *app) importMrpackCmd() *cobra.Command {
 					rows = append(rows, out.Row{Label: "left out as copies of a datapack a global datapack mod loads", Children: mods.Duplicates})
 				}
 				l.Tree(rows...)
+				if hintHere {
+					l.Info("imported into ./" + filepath.Base(dir) + "; pass `.` to import here")
+				}
 				l.Nudge("Download and build it", "cd "+dir+" && shulker install")
 			})
 		},
@@ -137,10 +140,10 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 	var name string
 	var ignoreShulker bool
 	cmd := &cobra.Command{
-		Use:         "curseforge <file>",
+		Use:         "curseforge <file> [dir]",
 		Annotations: acts(),
 		Short:       "Create a project from a CurseForge modpack (.zip)",
-		Args:        exactArgs(1),
+		Args:        rangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arc, err := cfpack.Read(args[0])
 			if err != nil {
@@ -152,7 +155,7 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 			if name == "" {
 				name = slugify(arc.Manifest.Name)
 			}
-			dir, err := a.importDir(name)
+			dir, hintHere, err := a.importDir(name, args)
 			if err != nil {
 				return err
 			}
@@ -216,6 +219,9 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 					rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
 				}
 				l.Tree(rows...)
+				if hintHere {
+					l.Info("imported into ./" + filepath.Base(dir) + "; pass `.` to import here")
+				}
 				l.Nudge("Download and build it", "cd "+dir+" && shulker install")
 			})
 		},
@@ -274,21 +280,33 @@ func lockedSummary(files []resolve.LockedFile) string {
 	return summary
 }
 
-// importDir is where an import creates its project: --dir, else a folder named for the project.
-// It refuses one that already holds a manifest.
-func (a *app) importDir(name string) (string, error) {
-	dir := a.dir
-	if dir == "" {
-		dir = name
+// importDir is where an import creates its project: the folder argument, else --dir, else a
+// folder named for the project. It refuses one that already holds a manifest. hintHere is set
+// when that last default lands in an empty folder, which the user more likely meant to import into.
+func (a *app) importDir(name string, args []string) (dir string, hintHere bool, err error) {
+	dir = a.dir
+	if len(args) > 1 {
+		if a.dir != "" {
+			return "", false, out.Errorf("usage", "pass a folder or -C, not both: each of them says where the project goes")
+		}
+		dir = args[1]
 	}
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		return "", err
+	if dir == "" {
+		dir, hintHere = name, cwdEmpty()
+	}
+	if dir, err = filepath.Abs(dir); err != nil {
+		return "", false, err
 	}
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
-		return "", out.Errorf("manifest-exists", "%s already exists in %s", manifest.FileName, dir)
+		return "", false, out.Errorf("manifest-exists", "%s already exists in %s", manifest.FileName, dir)
 	}
-	return dir, nil
+	return dir, hintHere, nil
+}
+
+// cwdEmpty reports whether the current folder holds nothing but dotfiles, such as .git.
+func cwdEmpty() bool {
+	entries, err := os.ReadDir(".")
+	return err == nil && !slices.ContainsFunc(entries, func(e os.DirEntry) bool { return !strings.HasPrefix(e.Name(), ".") })
 }
 
 // importLock starts the new project's lock from the exact platform the pack names.
