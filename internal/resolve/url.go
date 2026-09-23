@@ -190,7 +190,7 @@ func (r *Resolver) PinURL(ctx context.Context, key string, u ProviderURL) (strin
 	if err != nil {
 		return "", err
 	}
-	if project != lockedProject {
+	if manifest.NewID(u.Provider, project) != lockedProject {
 		return "", switchProject(out.Errorf("usage", "the URL's version belongs to project %s, not %s's project %s", project, key, lockedProject), key)
 	}
 	return r.Pin(ctx, key, version)
@@ -201,12 +201,12 @@ func switchProject(e *out.Error, key string) *out.Error {
 	return e
 }
 
-func (r *Resolver) lockedSource(key string) (providerName, project string, ok bool) {
+func (r *Resolver) lockedSource(key string) (providerName string, project manifest.ID, ok bool) {
 	if m, found := r.Lock.Mods[key]; found && m.Provider != "" {
-		return m.Provider, m.Project.String(), true
+		return m.Provider, m.Project, true
 	}
 	if m, found := r.Lock.Modpacks[key]; found && m.Provider != "" {
-		return m.Provider, m.Project.String(), true
+		return m.Provider, m.Project, true
 	}
-	return "", "", false
+	return "", manifest.ID{}, false
 }
