@@ -54,7 +54,8 @@ type Imported struct {
 	Reused  []string     `json:"reused"`
 	Dropped []string     `json:"dropped"`
 	// Duplicates are the pack's copies of a datapack a global datapack mod's folder also holds,
-	// left out for the copy that mod loads.
+	// left out for the copy that mod loads: an index file by its index path, an override by its
+	// path in the archive.
 	Duplicates []string          `json:"duplicates"`
 	Unmanaged  []string          `json:"unmanaged"`
 	Warnings   []string          `json:"-"`
@@ -195,7 +196,7 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if !mrpack.IsModJar(f.Path) && !mrpack.IsPackZip(f.Path) {
 		return im.unmanagedDownload(ctx, f)
 	}
-	if im.duplicateDatapack(f.Layer(), f.Path, sha512Sum) {
+	if im.duplicateDatapack(f.Path, f.Path, sha512Sum) {
 		return nil
 	}
 	found, ok := im.onModrinth[sha1Sum]
@@ -257,11 +258,11 @@ func (im *importer) findLoadedDatapacks(a *mrpack.Archive) {
 
 // duplicateDatapack reports, and records, a pack zip outside a global datapack mod's folder with
 // the bytes of one inside it: a leftover copy the game never loads.
-func (im *importer) duplicateDatapack(layer, filePath, sha512Sum string) bool {
+func (im *importer) duplicateDatapack(archivePath, filePath, sha512Sum string) bool {
 	if mrpack.IsLoadedDatapackZip(filePath) || !im.loadedDatapacks[sha512Sum] {
 		return false
 	}
-	im.rep.Duplicates = append(im.rep.Duplicates, layer+"/"+filePath)
+	im.rep.Duplicates = append(im.rep.Duplicates, archivePath)
 	return true
 }
 
@@ -633,7 +634,7 @@ func (im *importer) override(ctx context.Context, o mrpack.Override) error {
 		im.reuse(id, side)
 		return nil
 	}
-	if im.duplicateDatapack(o.Layer, o.Path, digest) {
+	if im.duplicateDatapack(o.Layer+"/"+o.Path, o.Path, digest) {
 		return nil
 	}
 	if mrpack.IsDatapackZip(o.Path) {

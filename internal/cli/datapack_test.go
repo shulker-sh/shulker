@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -231,6 +232,7 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 	writeMrpack(t, archive, index, map[string][]byte{
 		"overrides/config/paxi/datapacks/Terralith.zip":        terralith.data,
 		"overrides/config/paxi/datapacks/inmis_recipe_fix.zip": unknown.data,
+		"overrides/resourcepacks/Terralith Copy.zip":           terralith.data,
 	})
 
 	dir := filepath.Join(t.TempDir(), "better")
@@ -247,8 +249,14 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 	if !slices.Equal(res.Locked, wantLocked) {
 		t.Fatalf("locked: %+v", res.Locked)
 	}
-	if strings.Join(res.Duplicates, ",") != "overrides/datapacks/Terralith.zip,overrides/resourcepacks/Terralith.zip" {
-		t.Fatalf("index copies of a loaded datapack are dropped: %+v", res.Duplicates)
+	if strings.Join(res.Duplicates, ",") != "datapacks/Terralith.zip,overrides/resourcepacks/Terralith Copy.zip,resourcepacks/Terralith.zip" {
+		t.Fatalf("copies of a loaded datapack are dropped, named by their path in the archive: %+v", res.Duplicates)
+	}
+	text := h.mustRun(t, "import", "mrpack", archive, "--dir", filepath.Join(t.TempDir(), "text"))
+	for _, rel := range res.Duplicates {
+		if !regexp.MustCompile(`(?m)^\s*│?\s+` + regexp.QuoteMeta(rel) + `$`).MatchString(text) {
+			t.Fatalf("each left-out copy gets a line of its own:\n%s", text)
+		}
 	}
 	if strings.Join(res.Unmanaged, ",") != "overrides/config/paxi/datapacks/inmis_recipe_fix.zip" {
 		t.Fatalf("a datapack no provider has stays an override: %+v", res.Unmanaged)

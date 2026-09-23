@@ -121,7 +121,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 					rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
 				}
 				if len(mods.Duplicates) > 0 {
-					rows = append(rows, out.Row{Label: "left out as copies of a datapack a global datapack mod loads", Text: strings.Join(mods.Duplicates, ", ")})
+					rows = append(rows, out.Row{Label: "left out as copies of a datapack a global datapack mod loads", Children: mods.Duplicates})
 				}
 				l.Tree(rows...)
 				l.Nudge("Download and build it", "cd "+dir+" && shulker install")
