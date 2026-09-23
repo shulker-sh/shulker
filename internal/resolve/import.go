@@ -108,6 +108,9 @@ type importer struct {
 	onModrinth map[string]hosted
 	// loadedDatapacks are the sha512s of the zips in a global datapack mod's folder.
 	loadedDatapacks map[string]bool
+	// hybrids are the resourcepacks/ copies of loaded datapacks that carry assets/, by sha512,
+	// held back until the loaded copy is locked.
+	hybrids map[string][]hybridCopy
 	// unmatched are the mod jars and pack zips Modrinth didn't find, for CurseForge to look up.
 	unmatched []mrpack.Override
 	// keepSides reuses the marker's side for each entry, for an archive whose layers don't say.
@@ -115,6 +118,12 @@ type importer struct {
 	// inProject marks the files as a project's own overrides rather than a pack's: one whose key
 	// requires already holds stays an override instead of being dropped as a duplicate.
 	inProject bool
+}
+
+// hybridCopy is a hybrid datapack's copy under resourcepacks/, an index file or an override.
+type hybridCopy struct {
+	file     *mrpack.File
+	override *mrpack.Override
 }
 
 // importedPack is a pack the pack's own lock names, found by
@@ -125,7 +134,7 @@ type importedPack struct {
 }
 
 func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
-	im := &importer{r: r, a: a, rep: &Imported{Locked: []LockedFile{}, Reused: []string{}, Dropped: []string{}, Duplicates: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}, loadedDatapacks: map[string]bool{}}
+	im := &importer{r: r, a: a, rep: &Imported{Locked: []LockedFile{}, Reused: []string{}, Dropped: []string{}, Duplicates: []string{}, Unmanaged: []string{}, Warnings: []string{}}, bySha: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, onModrinth: map[string]hosted{}, loadedDatapacks: map[string]bool{}, hybrids: map[string][]hybridCopy{}}
 	if a.Marker == nil {
 		return im
 	}
@@ -175,6 +184,9 @@ func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLoc
 	if err := im.matchCurseForge(ctx); err != nil {
 		return nil, err
 	}
+	if err := im.settleHybrids(ctx); err != nil {
+		return nil, err
+	}
 	im.dropUnmatched()
 	im.rep.sort()
 	return im.rep, nil
@@ -196,8 +208,8 @@ func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
 	if !mrpack.IsModJar(f.Path) && !mrpack.IsPackZip(f.Path) {
 		return im.unmanagedDownload(ctx, f)
 	}
-	if im.duplicateDatapack(f.Path, f.Path, sha512Sum) {
-		return nil
+	if dup, err := im.duplicateDatapack(ctx, hybridCopy{file: &f}, f.Path, f.Path, sha512Sum); err != nil || dup {
+		return err
 	}
 	found, ok := im.onModrinth[sha1Sum]
 	if !ok {
@@ -257,13 +269,79 @@ func (im *importer) findLoadedDatapacks(a *mrpack.Archive) {
 }
 
 // duplicateDatapack reports, and records, a pack zip outside a global datapack mod's folder with
-// the bytes of one inside it: a leftover copy the game never loads.
-func (im *importer) duplicateDatapack(archivePath, filePath, sha512Sum string) bool {
+// the bytes of one inside it: a leftover copy the game never loads. A copy under resourcepacks/
+// that carries assets/ is a hybrid's, which loads its assets, and is held for settleHybrids.
+func (im *importer) duplicateDatapack(ctx context.Context, c hybridCopy, archivePath, filePath, sha512Sum string) (bool, error) {
 	if mrpack.IsLoadedDatapackZip(filePath) || !im.loadedDatapacks[sha512Sum] {
-		return false
+		return false, nil
+	}
+	if path.Dir(filePath) == "resourcepacks" {
+		hybrid, err := im.carriesAssets(ctx, c)
+		if err != nil {
+			return false, err
+		}
+		if hybrid {
+			im.hybrids[sha512Sum] = append(im.hybrids[sha512Sum], c)
+			return true, nil
+		}
 	}
 	im.rep.Duplicates = append(im.rep.Duplicates, archivePath)
-	return true
+	return true, nil
+}
+
+func (im *importer) carriesAssets(ctx context.Context, c hybridCopy) (bool, error) {
+	if c.override != nil {
+		zr, err := zip.NewReader(bytes.NewReader(c.override.Data), int64(len(c.override.Data)))
+		return err == nil && zipHasAssets(zr), nil
+	}
+	o, err := im.download(ctx, *c.file)
+	if err != nil {
+		return false, err
+	}
+	return im.carriesAssets(ctx, hybridCopy{override: &o})
+}
+
+// name is the copy's file name under resourcepacks/.
+func (c hybridCopy) name() string {
+	if c.file != nil {
+		return path.Base(c.file.Path)
+	}
+	return path.Base(c.override.Path)
+}
+
+// settleHybrids places each held hybrid copy through the datapack its loaded copy locked as, so one
+// entry keeps both on one version. A hybrid whose loaded copy stayed an override keeps this copy
+// as one too.
+func (im *importer) settleHybrids(ctx context.Context) error {
+	for _, sum := range slices.Sorted(maps.Keys(im.hybrids)) {
+		key, locked := "", false
+		for k, p := range im.r.Lock.Datapacks {
+			if p.Sha512 == sum {
+				key, locked = k, true
+				break
+			}
+		}
+		for _, c := range im.hybrids[sum] {
+			if !locked {
+				if c.override != nil {
+					im.unmanaged(*c.override)
+				} else if err := im.unmanagedDownload(ctx, *c.file); err != nil {
+					return err
+				}
+				continue
+			}
+			p := im.r.Lock.Datapacks[key]
+			p.ResourcePack = true
+			im.r.Lock.Datapacks[key] = p
+			entry := im.r.Manifest.Requires[key]
+			entry.ResourcePack = true
+			im.r.Manifest.Requires[key] = entry
+			if name := c.name(); name != p.Filename {
+				im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: its resource pack copy was resourcepacks/%s and is now placed as resourcepacks/%s; enable it again in game", key, name, p.Filename))
+			}
+		}
+	}
+	return nil
 }
 
 func (im *importer) lookUpOnModrinth(ctx context.Context, sha1s []string) error {
@@ -483,6 +561,10 @@ func hasAssets(path string) bool {
 		return false
 	}
 	defer zr.Close()
+	return zipHasAssets(&zr.Reader)
+}
+
+func zipHasAssets(zr *zip.Reader) bool {
 	return slices.ContainsFunc(zr.File, func(f *zip.File) bool { return strings.HasPrefix(f.Name, "assets/") })
 }
 
@@ -634,7 +716,7 @@ func (im *importer) override(ctx context.Context, o mrpack.Override) error {
 		im.reuse(id, side)
 		return nil
 	}
-	if im.duplicateDatapack(o.Layer+"/"+o.Path, o.Path, digest) {
+	if dup, err := im.duplicateDatapack(ctx, hybridCopy{override: &o}, o.Layer+"/"+o.Path, o.Path, digest); err != nil || dup {
 		return nil
 	}
 	if mrpack.IsDatapackZip(o.Path) {

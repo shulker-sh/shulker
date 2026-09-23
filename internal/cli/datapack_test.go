@@ -438,3 +438,51 @@ func TestAddAHybridDatapack(t *testing.T) {
 		}
 	}
 }
+
+func TestImportMrpackKeepsAHybridDatapackAsBoth(t *testing.T) {
+	h := newHarness(t)
+	autoslabs := h.jars["autoslabs"]
+	unknown := makeJarFiles(t, "tweaks", "Tweaks.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/tweaks/tags/x.json": "{}", "assets/tweaks/lang/en_us.json": "{}"})
+	index := mrpack.Index{
+		FormatVersion: 1, Game: "minecraft", VersionID: "40", Name: "Better",
+		Files: []mrpack.File{{
+			Path: "resourcepacks/AutoslabsCompat.zip", Hashes: map[string]string{"sha1": autoslabs.sha1, "sha512": autoslabs.sha512}, Env: mrpack.Env("both"),
+			Downloads: []string{h.server.URL + "/cdn/" + autoslabs.filename}, FileSize: int64(len(autoslabs.data)),
+		}},
+		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
+	}
+	archive := filepath.Join(t.TempDir(), "better.mrpack")
+	writeMrpack(t, archive, index, map[string][]byte{
+		"overrides/config/paxi/datapacks/AutoslabsCompat.zip": autoslabs.data,
+		"overrides/config/paxi/datapacks/Tweaks.zip":          unknown.data,
+		"overrides/resourcepacks/Tweaks.zip":                  unknown.data,
+	})
+
+	dir := filepath.Join(t.TempDir(), "better")
+	var env struct {
+		Data importResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	res := env.Data.Mods
+	if want := []resolve.LockedFile{{ID: "autoslabs-compat-bmc", Type: "datapack", Provider: "modrinth"}}; !slices.Equal(res.Locked, want) {
+		t.Fatalf("a hybrid in both places locks once, as a datapack: %+v", res.Locked)
+	}
+	if len(res.Duplicates) != 0 {
+		t.Fatalf("a hybrid's resource pack copy isn't a leftover: %+v", res.Duplicates)
+	}
+	if strings.Join(res.Unmanaged, ",") != "overrides/config/paxi/datapacks/Tweaks.zip,overrides/resourcepacks/Tweaks.zip" {
+		t.Fatalf("a hybrid no provider has keeps both copies as overrides: %+v", res.Unmanaged)
+	}
+	m, l := readProject(t, dir)
+	if got := m.Requires["autoslabs-compat-bmc"]; got.Type != manifest.TypeDatapack || !got.ResourcePack || got.Filename != "AutoslabsCompat.zip" {
+		t.Fatalf("the entry places it as both: %+v", got)
+	}
+	if p := l.Datapacks["autoslabs-compat-bmc"]; !p.ResourcePack {
+		t.Fatalf("the lock places it as both: %+v", p)
+	}
+	if len(l.ResourcePacks) != 0 {
+		t.Fatalf("no second entry: %+v", l.ResourcePacks)
+	}
+}
