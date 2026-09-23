@@ -90,24 +90,53 @@ var matchFolders = append([]string{"mods", "resourcepacks", "shaderpacks"}, lock
 // ones, each named by its layer and its path within it.
 func (a *app) overrideFiles(dir string, named []string) ([]mrpack.Override, error) {
 	var rels []string
+	var err error
 	if len(named) == 0 {
-		for _, layer := range mrpack.Layers {
-			for _, folder := range matchFolders {
-				entries, err := os.ReadDir(filepath.Join(dir, layer, folder))
-				if os.IsNotExist(err) {
-					continue
-				}
-				if err != nil {
-					return nil, err
-				}
-				for _, e := range entries {
-					if rel := layer + "/" + folder + "/" + e.Name(); e.Type().IsRegular() && isMatchable(rel) {
-						rels = append(rels, rel)
-					}
+		rels, err = scanOverrides(dir)
+	} else {
+		rels, err = a.namedOverrides(dir, named)
+	}
+	if err != nil {
+		return nil, err
+	}
+	files := make([]mrpack.Override, len(rels))
+	for i, rel := range rels {
+		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
+		if err != nil {
+			return nil, err
+		}
+		layer, within, _ := strings.Cut(rel, "/")
+		files[i] = mrpack.Override{Layer: layer, Path: within, Data: data}
+	}
+	return files, nil
+}
+
+// scanOverrides lists every matchable file in the project's override layers, relative to dir.
+func scanOverrides(dir string) ([]string, error) {
+	var rels []string
+	for _, layer := range mrpack.Layers {
+		for _, folder := range matchFolders {
+			entries, err := os.ReadDir(filepath.Join(dir, layer, folder))
+			if os.IsNotExist(err) {
+				continue
+			}
+			if err != nil {
+				return nil, err
+			}
+			for _, e := range entries {
+				if rel := layer + "/" + folder + "/" + e.Name(); e.Type().IsRegular() && isMatchable(rel) {
+					rels = append(rels, rel)
 				}
 			}
 		}
 	}
+	return rels, nil
+}
+
+// namedOverrides checks that each named path is a matchable file in an override layer, giving it
+// relative to dir.
+func (a *app) namedOverrides(dir string, named []string) ([]string, error) {
+	var rels []string
 	for _, arg := range named {
 		if !filepath.IsAbs(arg) && a.dir != "" {
 			arg = filepath.Join(a.dir, arg)
@@ -129,16 +158,7 @@ func (a *app) overrideFiles(dir string, named []string) ([]mrpack.Override, erro
 			rels = append(rels, rel)
 		}
 	}
-	files := make([]mrpack.Override, len(rels))
-	for i, rel := range rels {
-		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
-		if err != nil {
-			return nil, err
-		}
-		layer, within, _ := strings.Cut(rel, "/")
-		files[i] = mrpack.Override{Layer: layer, Path: within, Data: data}
-	}
-	return files, nil
+	return rels, nil
 }
 
 func isMatchable(rel string) bool {
