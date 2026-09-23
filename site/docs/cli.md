@@ -215,7 +215,7 @@ shulker add
 | `--side <side>` | Override side: `client`, `server`, `both` |
 | `--resourcepack` | Datapacks only: also place the zip in `resourcepacks/`, for one that carries `assets/`. Implies `--type datapack` |
 | `--channel <channel>` | Least stable channel accepted: `release`, `beta`, `alpha` |
-| `--pin <version-id>` | Pin to a provider version id (one mod or modpack only) |
+| `--pin <version-id>` | Pin to a provider version id (one mod or modpack only). A beta or alpha file widens the mod's `channel` to match, as [`shulker pin`](#shulker-pin) does |
 | `--provider <provider>` | Provider to use for this mod or modpack: `modrinth` or `curseforge` |
 | `--ref <ref>` | Branch, tag, or commit for a modpack's git source |
 | `--as <key>` | Key used in `requires`, messages, and `requiredBy` (default: a mod's jar id, a pack or hosted modpack's provider slug, a modpack archive file's name, the name in a modpack's manifest) |
@@ -340,7 +340,7 @@ With `--json`, `data.suggestions` lists each one as `{ "mod", "kind", "on", "dec
 
 ### `shulker pin`
 
-Pin a mod, or a modpack from a provider, to a provider version id. Without a version, pins it to the version already in the lock. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`.
+Pin a mod, or a modpack from a provider, to a provider version id. Without a version, pins it to the version already in the lock. Pinning a mod to a beta or alpha file accepts that channel for it: its `channel` in `shulker.json` widens to match, with a warning, so its dependencies may be that channel too and it keeps following it after `unpin`. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`.
 
 ```sh
 shulker pin iris k9RhZq2X

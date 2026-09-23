@@ -228,6 +228,15 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 	if _, _, err := r.place(ctx, p, proj, v, id, "", entry.Side, entry.Channel, false); err != nil {
 		return err
 	}
+	if pin != "" {
+		if widened := r.pinnedChannel(id, v, entry.Channel); widened != entry.Channel {
+			entry.Channel = widened
+			if listed, ok := r.Manifest.Requires[id]; ok {
+				listed.Channel = widened
+				r.Manifest.Requires[id] = listed
+			}
+		}
+	}
 	r.settle(id, entry.Side, entry.Channel)
 	for _, name := range direct.packs {
 		r.Lock.AddRequiredBy(id, name)

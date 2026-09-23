@@ -200,6 +200,9 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 			opts.Channel = previous.Channel
 		}
 	}
+	if opts.Pin != "" {
+		opts.Channel = r.pinnedChannel(id, v, opts.Channel)
+	}
 	r.settle(id, opts.Side, opts.Channel)
 	visited := map[string]bool{proj.ID: true}
 	if err := r.addDeps(ctx, p, v, id, opts.Channel, visited); err != nil {
@@ -261,6 +264,16 @@ func (r *Resolver) pick(ctx context.Context, p provider.Provider, proj *provider
 		return nil, e
 	}
 	return &v, nil
+}
+
+// pinnedChannel is the channel a mod pinned to v accepts: channel, widened to v's own when v is less
+// stable, since pinning it accepts it.
+func (r *Resolver) pinnedChannel(id string, v *provider.Version, channel string) string {
+	if provider.ChannelAllows(channel, v.Channel) {
+		return channel
+	}
+	r.Warnings = append(r.Warnings, fmt.Sprintf("%s %s is a %s; accepting %s for it", id, v.Number, v.Channel, v.Channel))
+	return v.Channel
 }
 
 func channelLabel(channel string) string {
@@ -460,13 +473,8 @@ func isSameMod(existing lock.Mod, jarID, providerName, projectID, resolvedJarID 
 	if existing.Provider == providerName {
 		return fmt.Sprint(existing.Project) == projectID
 	}
-	switch providerName {
-	case "modrinth":
-		return existing.Aliases.Modrinth != "" && existing.Aliases.Modrinth == projectID
-	case "curseforge":
-		return existing.Aliases.CurseForge != 0 && strconv.Itoa(existing.Aliases.CurseForge) == projectID
-	}
-	return false
+	alias := aliasFor(existing, providerName)
+	return alias != "" && alias == projectID
 }
 
 func clearAlias(m *lock.Mod, providerName string) {
@@ -505,6 +513,10 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 			continue
 		}
 		visited[d.ProjectID] = true
+		if locked, ok := r.lockedProject(p.Name(), d.ProjectID); ok && dv == nil {
+			r.Lock.AddRequiredBy(locked, parentID)
+			continue
+		}
 		dproj, err := p.Project(ctx, d.ProjectID, "")
 		if err != nil {
 			return err
@@ -524,6 +536,30 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 		}
 	}
 	return nil
+}
+
+// lockedProject finds the lock's mod that providerName's project projectID resolved to, by its
+// project or its alias for that provider.
+func (r *Resolver) lockedProject(providerName, projectID string) (string, bool) {
+	for _, id := range sortedKeys(r.Lock.Mods) {
+		m := r.Lock.Mods[id]
+		if m.Provider == providerName && fmt.Sprint(m.Project) == projectID || aliasFor(m, providerName) == projectID {
+			return id, true
+		}
+	}
+	return "", false
+}
+
+func aliasFor(m lock.Mod, providerName string) string {
+	switch providerName {
+	case "modrinth":
+		return m.Aliases.Modrinth
+	case "curseforge":
+		if m.Aliases.CurseForge != 0 {
+			return strconv.Itoa(m.Aliases.CurseForge)
+		}
+	}
+	return ""
 }
 
 func contains(list []string, s string) bool {
