@@ -124,10 +124,7 @@ func (a *app) importMrpackCmd() *cobra.Command {
 					rows = append(rows, out.Row{Label: "left out as copies of a datapack a global datapack mod loads", Children: mods.Duplicates})
 				}
 				l.Tree(rows...)
-				if hintHere {
-					l.Info("imported into ./" + filepath.Base(dir) + "; pass `.` to import here")
-				}
-				l.Nudge("Download and build it", "cd "+dir+" && shulker install")
+				nudgeImported(l, dir, hintHere)
 			})
 		},
 	}
@@ -219,10 +216,7 @@ func (a *app) importCurseForgeCmd() *cobra.Command {
 					rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
 				}
 				l.Tree(rows...)
-				if hintHere {
-					l.Info("imported into ./" + filepath.Base(dir) + "; pass `.` to import here")
-				}
-				l.Nudge("Download and build it", "cd "+dir+" && shulker install")
+				nudgeImported(l, dir, hintHere)
 			})
 		},
 	}
@@ -301,6 +295,15 @@ func (a *app) importDir(name string, args []string) (dir string, hintHere bool, 
 		return "", false, out.Errorf("manifest-exists", "%s already exists in %s", manifest.FileName, dir)
 	}
 	return dir, hintHere, nil
+}
+
+// nudgeImported ends an import's report with how to build the project, first saying where it went
+// when hintHere says the user more likely meant the current folder.
+func nudgeImported(l *out.Lines, dir string, hintHere bool) {
+	if hintHere {
+		l.Info("imported into ./" + filepath.Base(dir) + "; pass `.` to import here")
+	}
+	l.Nudge("Download and build it", "cd "+dir+" && shulker install")
 }
 
 // cwdEmpty reports whether the current folder holds nothing but dotfiles, such as .git.
