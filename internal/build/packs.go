@@ -1,6 +1,7 @@
 package build
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -151,10 +152,13 @@ func loadsShader(p lock.Pack, mod string, placed map[string]bool) bool {
 // seedResourcePacks fills in options.txt's enabled list once, and holds it from
 // then on. Minecraft reads the list in priority order, so once it is a player's
 // own shulker stops touching it: a later add or remove leaves the line alone and
-// the pack is enabled in game by hand. --force seeds it again.
-func (b *Builder) seedResourcePacks(side string, opts Options, desired map[string]source, options properties, report *Report) {
-	defer func() { reportUnenabled(desired, options[resourcePacksKey], report) }()
+// the pack is enabled in game by hand. --force seeds it again. A list the
+// override folders ship is the pack's own, so it is never seeded over.
+func (b *Builder) seedResourcePacks(side string, opts Options, desired map[string]source, options properties, shipped string) {
 	if _, own := options[resourcePacksKey]; own {
+		return
+	}
+	if shipped != "" && !untouchedPackList(shipped) {
 		return
 	}
 	dir := b.Target(side, opts.Dir)
@@ -196,19 +200,121 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 	}
 }
 
-// reportUnenabled names the packs this build placed that the enabled list
-// doesn't carry, because shulker seeds that list once and then leaves it to the
-// player.
-func reportUnenabled(desired map[string]source, enabled string, report *Report) {
-	if report == nil {
-		return
+// shippedPackList is the enabled list the override folders put in options.txt,
+// the last folder's winning as it does when the build lays them, or empty when
+// none sets one.
+func (b *Builder) shippedPackList(side string, cond conditions, vars map[string]string) (string, error) {
+	rel := b.Manifest.OptionsPath()
+	var list string
+	for _, l := range b.overrideLayers(side, cond, vars) {
+		for _, name := range []string{rel, rel + TemplateSuffix} {
+			if l.skips(name) {
+				continue
+			}
+			data, ok := overrideData(l, name)
+			if !ok {
+				continue
+			}
+			if name != rel {
+				var err error
+				if data, err = render(l.label+"/"+name, l.pack, data, l.vars); err != nil {
+					return "", err
+				}
+			}
+			if value, set := parseProperties(data)[resourcePacksKey]; set {
+				list = value
+			}
+		}
 	}
-	for _, name := range placedPacks(desired) {
-		if strings.Contains(enabled, `"file/`+name+`"`) {
+	return list, nil
+}
+
+func overrideData(l overrideLayer, rel string) ([]byte, bool) {
+	if l.archived {
+		for _, o := range l.files {
+			if o.Path == rel {
+				return o.Data, true
+			}
+		}
+		return nil, false
+	}
+	data, err := os.ReadFile(filepath.Join(l.root, filepath.FromSlash(rel)))
+	return data, err == nil
+}
+
+// enabledPackList is the enabled list the game reads once this build is
+// written: the one the build writes, unless the build keeps the file already
+// there, or the merge keeps a list the player changed in game.
+func (b *Builder) enabledPackList(side string, opts Options, desired map[string]source) (string, error) {
+	rel := b.Manifest.OptionsPath()
+	dir := b.Target(side, opts.Dir)
+	abs := filepath.Join(dir, filepath.FromSlash(rel))
+	data, _ := os.ReadFile(abs)
+	live, present := parseProperties(data)[resourcePacksKey]
+	src, written := desired[rel]
+	if !written {
+		return live, nil
+	}
+	state := LoadState(dir)
+	if src.owned == nil {
+		// A whole file the player changed, or one no build recorded, is kept
+		// rather than written; one that also changed in the source fails the build.
+		current, exists, err := fileSha256(abs)
+		if err != nil {
+			return "", err
+		}
+		untouched := false
+		if exists && state.Files[rel] != "" {
+			if untouched, err = state.isUntouched(rel, abs, current); err != nil {
+				return "", err
+			}
+		}
+		if exists && !opts.Force && !untouched {
+			return live, nil
+		}
+		return parseProperties(src.data)[resourcePacksKey], nil
+	}
+	want, set := src.owned.values()[resourcePacksKey]
+	if !set {
+		return live, nil
+	}
+	last, known := state.Values[rel][resourcePacksKey]
+	if present && known && !opts.Force && live != last && want == last {
+		return live, nil
+	}
+	return want, nil
+}
+
+// reportPackList names the packs this build placed that the enabled list
+// doesn't carry, because shulker seeds that list once and then leaves it to the
+// player. A list the override folders shipped is the project's own, so a pack
+// it enables that nothing places is named too.
+func (b *Builder) reportPackList(side string, opts Options, desired map[string]source, shipped string, report *Report) error {
+	if report == nil {
+		return nil
+	}
+	list, err := b.enabledPackList(side, opts, desired)
+	if err != nil {
+		return err
+	}
+	var entries []string
+	_ = json.Unmarshal([]byte(list), &entries)
+	placed := placedPacks(desired)
+	for _, name := range placed {
+		if slices.Contains(entries, "file/"+name) {
 			continue
 		}
 		report.Warnings = append(report.Warnings, fmt.Sprintf("%s is placed but not enabled; turn it on in game under Options, Resource Packs", strings.TrimSuffix(name, ".zip")))
 	}
+	if shipped == "" || list != shipped {
+		return nil
+	}
+	for _, entry := range entries {
+		if name, ok := strings.CutPrefix(entry, "file/"); ok && !slices.Contains(placed, name) {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s enables %s, but no pack is placed under that name", b.Manifest.OptionsPath(), name))
+		}
+	}
+	return nil
 }
 
 // placedPacks are the file names this build puts in resourcepacks/, which are

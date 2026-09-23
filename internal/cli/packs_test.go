@@ -185,3 +185,68 @@ func TestPackTypeDisagreesWithProvider(t *testing.T) {
 		t.Fatalf("a type that disagrees with the provider should fail: code=%d env=%+v", code, env)
 	}
 }
+
+func TestShippedPackListIsTheEnabledList(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fresh-animations")
+	h.mustRun(t, "set", "requires.fresh-animations.filename", "Fresh's Pack.zip")
+	h.mustRun(t, "lock")
+	shipped := `resourcePacks:["vanilla","fabric","file/Fresh's Pack.zip","file/Missing Pack.zip"]`
+	writeFile(t, filepath.Join(h.dir, "overrides", "options.txt"), "fov:0.5\n"+shipped+"\n")
+	h.mustRun(t, "install")
+
+	// The pack's own list is already set, so it isn't seeded over, and a name
+	// Minecraft writes escaped still counts as enabled.
+	for range 2 {
+		_, _, stderr := h.run(t, "build")
+		if got := readBuilt(t, h, "options.txt"); !strings.Contains(got, shipped+"\n") {
+			t.Fatalf("the shipped list was replaced: %q", got)
+		}
+		if strings.Contains(stderr, "placed but not enabled") {
+			t.Fatalf("a pack the shipped list enables was reported: %s", stderr)
+		}
+		if !strings.Contains(stderr, "! options.txt enables Missing Pack.zip, but no pack is placed under that name") {
+			t.Fatalf("no warning for a shipped entry nothing places: %s", stderr)
+		}
+	}
+}
+
+func TestPlayersPackListReportsOnlyWhatItLeavesOff(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fresh-animations")
+	h.mustRun(t, "install")
+	options := filepath.Join(h.dir, "build", "client", "options.txt")
+	writeFile(t, options, "resourcePacks:[\"vanilla\",\"file/Gone.zip\"]\n")
+
+	_, _, stderr := h.run(t, "build")
+	if !strings.Contains(stderr, "! FreshAnimations_v1.9.4 is placed but not enabled") {
+		t.Fatalf("a pack the player's list leaves off wasn't reported: %s", stderr)
+	}
+	if strings.Contains(stderr, "Gone.zip") {
+		t.Fatalf("an entry in the player's own list was reported: %s", stderr)
+	}
+}
+
+func TestPlayersEditToAShippedListIsWhatIsReported(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fresh-animations")
+	writeFile(t, filepath.Join(h.dir, "overrides", "options.txt"), "resourcePacks:[\"vanilla\",\"file/FreshAnimations_v1.9.4.zip\",\"file/Missing.zip\"]\n")
+	h.mustRun(t, "install")
+
+	// The build keeps a file the player edited while its override is unchanged,
+	// so the player's list is the one the game reads.
+	writeFile(t, filepath.Join(h.dir, "build", "client", "options.txt"), "resourcePacks:[\"vanilla\"]\n")
+	_, _, stderr := h.run(t, "build")
+	if got := readBuilt(t, h, "options.txt"); got != "resourcePacks:[\"vanilla\"]\n" {
+		t.Fatalf("the player's edit was overwritten: %q", got)
+	}
+	if !strings.Contains(stderr, "! FreshAnimations_v1.9.4 is placed but not enabled") {
+		t.Fatalf("a pack the player's list leaves off wasn't reported: %s", stderr)
+	}
+	if strings.Contains(stderr, "Missing.zip") {
+		t.Fatalf("the shipped list was reported in place of the player's: %s", stderr)
+	}
+}

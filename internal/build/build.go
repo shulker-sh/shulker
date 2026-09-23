@@ -421,6 +421,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		vars["pack.version"] = opts.PackVersion
 	}
 	levelName := "world"
+	var shipped string
 	if side == "server" {
 		var err error
 		if levelName, err = b.collectServer(desired, vars, cond, opts.NoLauncher, report); err != nil {
@@ -437,7 +438,11 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		}
 		enabled := b.enableShader(desired, placed)
 		b.reportUnenabledShaders(desired, placed, enabled, report)
-		if err := b.collectClient(side, opts, desired, vars, report); err != nil {
+		var err error
+		if shipped, err = b.shippedPackList(side, cond, vars); err != nil {
+			return nil, nil, err
+		}
+		if err := b.collectClient(side, opts, desired, vars, shipped); err != nil {
 			return nil, nil, err
 		}
 		if b.Lock.Loader.Type != "" && b.markerOn(dir) {
@@ -458,6 +463,11 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 	}
 	for _, l := range b.overrideLayers(side, cond, vars) {
 		if err := b.layer(l, whole, desired, report); err != nil {
+			return nil, nil, err
+		}
+	}
+	if side == "client" {
+		if err := b.reportPackList(side, opts, desired, shipped, report); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -746,7 +756,7 @@ func RecordLauncherImage(dir, hash string) error {
 	return writeState(dir, s)
 }
 
-func (b *Builder) collectClient(side string, opts Options, desired map[string]source, vars map[string]string, report *Report) error {
+func (b *Builder) collectClient(side string, opts Options, desired map[string]source, vars map[string]string, shipped string) error {
 	cl := b.Manifest.Client
 	file := b.Manifest.OptionsPath()
 	options := properties{}
@@ -757,7 +767,7 @@ func (b *Builder) collectClient(side string, opts Options, desired map[string]so
 		}
 		options = rendered
 	}
-	b.seedResourcePacks(side, opts, desired, options, report)
+	b.seedResourcePacks(side, opts, desired, options, shipped)
 	if len(options) == 0 {
 		return nil
 	}
