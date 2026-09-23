@@ -14,6 +14,7 @@ import (
 
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/schema"
 )
 
 func readConfigDoc(t *testing.T, path string) map[string]any {
@@ -294,4 +295,72 @@ func (h *harness) runEnvelope(t *testing.T, wantExit int, args ...string) out.En
 		t.Fatalf("%v: %v\n%s", args, err, stdout)
 	}
 	return env
+}
+
+func TestConfigSetRefusesAValueOfTheWrongType(t *testing.T) {
+	h := newHarness(t)
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"registry", "--literal", "5"}, "registry takes a string, not 5"},
+		{[]string{"accounts.default", "--literal", "5"}, "accounts.default takes a string, not 5"},
+		{[]string{"accounts.providers", "shulker"}, "accounts.providers takes a list"},
+		{[]string{"play.saveBackups", "many"}, `play.saveBackups takes a whole number, not "many"`},
+	} {
+		code, stdout, _ := h.run(t, append(append([]string{"config", "set"}, c.args...), "--json")...)
+		if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || e.Message != c.want {
+			t.Errorf("%v: exit %d: %s", c.args, code, stdout)
+		}
+	}
+	if _, err := os.Stat(h.config); !errors.Is(err, os.ErrNotExist) {
+		t.Error("a refused set wrote config.json")
+	}
+}
+
+func TestConfigDefaultsComeFromTheSchema(t *testing.T) {
+	h := newHarness(t)
+	for key, want := range map[string]string{"play.saveBackups": fmt.Sprint(config.DefaultSaveBackups), "log.keepDays": fmt.Sprint(config.DefaultLogKeepDays)} {
+		if stdout := h.mustRun(t, "config", "get", key); strings.TrimSpace(stdout) != want {
+			t.Errorf("%s = %q, want %s", key, stdout, want)
+		}
+	}
+}
+
+func TestConfigUnsetNestedKeyDropsItsEmptyParent(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "config", "set", "curseforge.key", "abcd1234")
+	h.mustRun(t, "config", "unset", "curseforge.key")
+	if doc := readConfigDoc(t, h.config); doc["curseforge"] != nil {
+		t.Errorf("curseforge is left behind: %v", doc)
+	}
+}
+
+func TestConfigSetDefaultAccountMustExist(t *testing.T) {
+	h := newHarness(t)
+	writeAccountStore(t, h, ownAccount("Notch", notchID))
+	code, stdout, _ := h.run(t, "config", "set", "accounts.default", steveID, "--json")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "account-not-found" {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+	h.mustRun(t, "config", "set", "accounts.default", notchID)
+}
+
+func TestConfigKeysAreTheSchemaLeaves(t *testing.T) {
+	var leaves []string
+	for _, key := range []string{"accounts", "curseforge", "log", "play"} {
+		s, err := loadSchemaAt(schema.Config, config.FileName, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		props, _ := s.deref(s.root)["properties"].(map[string]any)
+		for name := range props {
+			leaves = append(leaves, key+"."+name)
+		}
+	}
+	leaves = append(leaves, "instances", "registry", "saves", "store")
+	slices.Sort(leaves)
+	if !slices.Equal(leaves, config.Keys) {
+		t.Fatalf("config.Keys %v, schema %v", config.Keys, leaves)
+	}
 }

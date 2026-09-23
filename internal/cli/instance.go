@@ -67,7 +67,11 @@ func (a *app) instanceGetCmd() *cobra.Command {
 			if len(args) == 0 {
 				all := f.settings()
 				for _, key := range instance.LaunchKeys {
-					if v, ok := configLookup(defaults, "play."+key); ok {
+					field, err := configField("play." + key)
+					if err != nil {
+						return err
+					}
+					if v, ok := field.get(defaults); ok {
 						if _, set := all[key]; !set {
 							all[key] = v
 						}
@@ -82,7 +86,11 @@ func (a *app) instanceGetCmd() *cobra.Command {
 			got := instanceSetting{Path: field.path}
 			global := globalKey(field)
 			if global != "" {
-				got.Default, _ = configLookup(defaults, global)
+				field, err := configField(global)
+				if err != nil {
+					return err
+				}
+				got.Default, _ = field.get(defaults)
 			} else {
 				got.Default = field.schema["default"]
 			}

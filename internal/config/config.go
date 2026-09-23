@@ -21,6 +21,7 @@ import (
 const (
 	PathEnv           = "SHULKER_CONFIG"
 	DataPathEnv       = "SHULKER_DATA"
+	FileName          = "config.json"
 	RegistryFileName  = "registry.json"
 	RegistrySchemaURL = schema.Base + string(schema.Registry)
 )
@@ -122,7 +123,7 @@ func Path() (string, error) {
 	if err != nil {
 		return "", configDirUnset(err)
 	}
-	return filepath.Join(base, "shulker", "config.json"), nil
+	return filepath.Join(base, "shulker", FileName), nil
 }
 
 // DataDir is where shulker keeps what a player would miss if it went: instances and save groups,

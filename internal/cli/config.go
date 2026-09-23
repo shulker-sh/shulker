@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
@@ -57,6 +58,10 @@ func (a *app) configGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			field, err := configField(key)
+			if err != nil {
+				return err
+			}
 			resolved, err := a.resolvedPaths(path, cfg)
 			if err != nil {
 				return err
@@ -69,18 +74,20 @@ func (a *app) configGetCmd() *cobra.Command {
 				for k, v := range resolved {
 					all[k] = v
 				}
-				if secret, ok := configSecret(doc, curseForgeKey); ok && !reveal {
-					cf := maps.Clone(doc["curseforge"].(map[string]any))
-					cf["key"] = maskKey(secret)
-					all["curseforge"] = cf
+				if cf, ok := doc["curseforge"].(map[string]any); ok && !reveal {
+					if secret, ok := cf["key"].(string); ok {
+						cf = maps.Clone(cf)
+						cf["key"] = maskKey(secret)
+						all["curseforge"] = cf
+					}
 				}
 				value = all
 			case resolved[key] != "":
 				value = resolved[key]
 			default:
-				v, ok := configLookup(doc, key)
+				v, ok := field.get(doc)
 				if !ok {
-					if v, ok = configDefault(key); !ok {
+					if v, ok = field.schema["default"]; !ok {
 						return out.Errorf("path-not-set", "%s is not set", key)
 					}
 				}
@@ -119,19 +126,33 @@ func (a *app) configSetCmd() *cobra.Command {
 				e.Help = fmt.Sprintf("`shulker config unset %s` removes it", key)
 				return e
 			}
-			var to any = value
+			field, err := configField(key)
+			if err != nil {
+				return err
+			}
+			from, _ := field.get(doc)
+			var to any
 			if literal {
-				if to, err = decodeLiteral(key, value); err != nil {
+				to, err = decodeLiteral(key, value)
+			} else {
+				to, err = field.coerce(value, from)
+			}
+			if err != nil {
+				return err
+			}
+			if to, err = checkConfigValue(key, to); err != nil {
+				return err
+			}
+			field.put(doc, to)
+			if err := checkConfigDocument(field, doc, to); err != nil {
+				return err
+			}
+			if key == accountsDefault && unreadable == nil {
+				if err := a.checkAccountID(to.(string)); err != nil {
 					return err
 				}
 			}
-			if to, err = checkConfigValue(key, to, literal); err != nil {
-				return err
-			}
-			change := configChange{Path: key, To: to}
-			if from, ok := configLookup(doc, key); ok {
-				change.From = from
-			}
+			change := configChange{Path: key, From: from, To: to}
 			if key == "registry" {
 				next := cfg
 				next.Registry = value
@@ -139,7 +160,6 @@ func (a *app) configSetCmd() *cobra.Command {
 					return err
 				}
 			}
-			configPut(doc, key, to)
 			if unreadable != nil {
 				kept, err := config.ReplaceDocument(path, doc)
 				if err != nil {
@@ -170,7 +190,11 @@ func (a *app) configUnsetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			from, ok := configLookup(doc, key)
+			field, err := configField(key)
+			if err != nil {
+				return err
+			}
+			from, ok := field.get(doc)
 			if !ok {
 				return a.printer.Emit(configChange{Path: key}, func(l *out.Lines) {
 					l.Info(key + " was not set")
@@ -184,7 +208,7 @@ func (a *app) configUnsetCmd() *cobra.Command {
 					return err
 				}
 			}
-			configRemove(doc, key)
+			field.removeEmptied(doc)
 			if err := config.SaveDocument(path, doc); err != nil {
 				return err
 			}
@@ -301,61 +325,61 @@ func maskKey(key string) string {
 	return dots + key[len(key)-4:]
 }
 
-func configLookup(doc map[string]any, key string) (any, bool) {
-	m := doc
-	if parent, name, nested := strings.Cut(key, "."); nested {
-		m, _ = doc[parent].(map[string]any)
-		key = name
+var configSchema = sync.OnceValues(func() (*settingsSchema, error) {
+	return loadSchemaAt(schema.Config, config.FileName)
+})
+
+// configField is key's field in config.json's schema, or nil for no key.
+func configField(key string) (*settingField, error) {
+	if key == "" {
+		return nil, nil
 	}
-	v, ok := m[key]
-	return v, ok && v != nil && v != ""
+	s, err := configSchema()
+	if err != nil {
+		return nil, err
+	}
+	return s.lookup(key)
 }
 
-// configSecret is configLookup for a key whose value is masked, which only a string can be.
-func configSecret(doc map[string]any, key string) (string, bool) {
-	v, ok := configLookup(doc, key)
-	if !ok {
-		return "", false
+// checkAccountID refuses a default account shulker can't see, which every launch would then fail on.
+func (a *app) checkAccountID(id string) error {
+	accounts, _, err := a.accounts()
+	if err != nil {
+		return err
 	}
-	s, ok := v.(string)
-	return s, ok
+	if slices.ContainsFunc(accounts, func(r account.Resolved) bool { return r.ID == id }) {
+		return nil
+	}
+	e := out.Errorf("account-not-found", "no account has the id %s", id)
+	e.Help = "`shulker accounts` lists them"
+	return e
 }
 
-// configDefault is what an unset key means. The roots are resolved separately, because an unset
-// root names a real directory on this machine; this covers the keys whose default is a value
-// rather than a path.
-func configDefault(key string) (any, bool) {
-	if key == accountsProviders {
-		return account.DefaultProviders(), true
+// checkConfigDocument refuses a value, typed with --literal, that config.json's schema doesn't allow
+// at field, so the next run doesn't find the file broken.
+func checkConfigDocument(field *settingField, doc map[string]any, v any) error {
+	written := maps.Clone(doc)
+	written["$schema"] = schema.URL(schema.Config)
+	data, err := json.Marshal(written)
+	if err != nil {
+		return err
 	}
-	if key == playSaveBackups {
-		return config.DefaultSaveBackups, true
+	if schema.Validate(schema.Config, data) != nil {
+		return out.Errorf("usage", "%s takes %s, not %s", field.path, field.kind(), settingText(v))
 	}
-	if key == logKeepDays {
-		return config.DefaultLogKeepDays, true
-	}
-	return nil, false
+	return nil
 }
 
 // checkConfigValue rejects a value config.json can hold but shulker can't use, at the point it is
 // typed rather than on the next run that reads it.
-func checkConfigValue(key string, v any, literal bool) (any, error) {
+func checkConfigValue(key string, v any) (any, error) {
 	switch key {
 	case accountsProviders:
-		if !literal {
-			e := out.Errorf("usage", "%s is a list", key)
-			e.Help = "pass --literal with a JSON array, like `--literal '[\"shulker\"]'`"
-			return nil, e
-		}
 		names, err := providerList(v)
 		if err != nil {
 			return nil, err
 		}
 		return names, nil
-	case accountsDefault:
-		if _, ok := v.(string); !ok {
-			return nil, out.Errorf("usage", "%s is an account id, so it takes a string", key)
-		}
 	case playSaveBackups:
 		return backupCount(key, v)
 	case logKeepDays:
@@ -457,32 +481,4 @@ func checkProviders(names []string) error {
 		}
 	}
 	return nil
-}
-
-func configPut(doc map[string]any, key string, value any) {
-	parent, name, nested := strings.Cut(key, ".")
-	if !nested {
-		doc[key] = value
-		return
-	}
-	m, ok := doc[parent].(map[string]any)
-	if !ok {
-		m = map[string]any{}
-		doc[parent] = m
-	}
-	m[name] = value
-}
-
-func configRemove(doc map[string]any, key string) {
-	parent, name, nested := strings.Cut(key, ".")
-	if !nested {
-		delete(doc, key)
-		return
-	}
-	if m, ok := doc[parent].(map[string]any); ok {
-		delete(m, name)
-		if len(m) == 0 {
-			delete(doc, parent)
-		}
-	}
 }

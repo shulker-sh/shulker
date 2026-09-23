@@ -21,6 +21,7 @@
           "minItems": 1,
           "uniqueItems": true,
           "items": { "enum": ["shulker", "prism", "mojang"] },
+          "default": ["shulker"],
           "description": "Where accounts are read from, in order. The earliest provider wins an account several hold."
         },
         "default": {
@@ -50,6 +51,7 @@
         "keepDays": {
           "type": "integer",
           "minimum": 1,
+          "default": 30,
           "description": "How many days of runs log.jsonl keeps."
         }
       }
@@ -83,6 +85,7 @@
         "saveBackups": {
           "type": "integer",
           "minimum": 0,
+          "default": 5,
           "description": "How many automatic backups of a save group or instance's worlds to keep."
         }
       }

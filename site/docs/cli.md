@@ -496,7 +496,7 @@ shulker config set registry ~/Dropbox/shulker/registry.json
 shulker config set accounts.providers --literal '["shulker","prism"]'
 ```
 
-A key that holds a list needs `--literal`, which reads the value as JSON. `accounts.providers` is checked as it is set: it must be a non-empty array of known provider names with no repeats, so a typo fails here rather than on the next run. The `play.` keys are checked the same way, against the rules of the instance setting of the same name.
+A key that holds a list needs `--literal`, which reads the value as JSON. `accounts.providers` is checked as it is set: it must be a non-empty array of known provider names with no repeats, so a typo fails here rather than on the next run. The `play.` keys are checked the same way, against the rules of the instance setting of the same name. Every value is checked against `config.json`'s schema before anything is written, so a `--literal` of the wrong type fails with `usage`, and `accounts.default` must be the id of an account shulker can see, or it fails with `account-not-found`.
 
 `set` is the one command that tolerates a `config.json` it can't read, one that fails `config-invalid` or `schema-newer` everywhere else: it renames that file to `config.json.replaced`, warns naming why it couldn't be read, and writes a config holding only the key being set. Only the latest replaced config is kept.
 
@@ -1723,7 +1723,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | --- | --- |
 | `account-exists` | An account already answers to that name, or already plays under that UUID. A name is shared with `--force`; a UUID never is |
 | `account-name-invalid` | An offline name outside the pattern a Minecraft username matches; `--allow-invalid-name` takes it |
-| `account-not-found` | No account matches the selector, or the account an instance is pinned to has since been removed. `candidates`: every account, each as its qualifier and its id, `pass`: their ids |
+| `account-not-found` | No account matches the selector, the account an instance is pinned to has since been removed, or `config set accounts.default` names an id no account has. `candidates`: every account, each as its qualifier and its id, `pass`: their ids |
 | `account-not-playable` | The account owns no Java profile, so it can't launch anything |
 | `account-sign-in-expired` | The Microsoft refresh token is gone or revoked, so shulker can't get a session for the account; `shulker accounts login` signs it in again |
 | `accounts-invalid` | shulker's own `accounts.json` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema |

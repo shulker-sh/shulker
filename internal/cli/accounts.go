@@ -141,14 +141,16 @@ func (a *app) changeDefault(id string) (configChange, error) {
 	if err != nil {
 		return configChange{}, err
 	}
-	change := configChange{Path: accountsDefault, To: id}
-	if from, ok := configLookup(doc, accountsDefault); ok {
-		change.From = from
+	field, err := configField(accountsDefault)
+	if err != nil {
+		return configChange{}, err
 	}
+	change := configChange{Path: accountsDefault, To: id}
+	change.From, _ = field.get(doc)
 	if id == "" {
-		configRemove(doc, accountsDefault)
+		field.removeEmptied(doc)
 	} else {
-		configPut(doc, accountsDefault, id)
+		field.put(doc, id)
 	}
 	return change, config.SaveDocument(path, doc)
 }

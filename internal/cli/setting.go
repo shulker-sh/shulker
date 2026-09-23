@@ -412,6 +412,20 @@ func (s *settingField) remove(doc map[string]any) {
 	delete(m, s.keys[len(s.keys)-1])
 }
 
+// removeEmptied is remove, then drops each object the removal left empty. config.json holds only
+// optional objects; a manifest's may be required, so its unset keeps them.
+func (s *settingField) removeEmptied(doc map[string]any) {
+	s.remove(doc)
+	for depth := len(s.keys) - 1; depth > 0; depth-- {
+		parent := &settingField{keys: s.keys[:depth]}
+		v, _ := parent.get(doc)
+		if m, ok := v.(map[string]any); !ok || len(m) > 0 {
+			return
+		}
+		parent.remove(doc)
+	}
+}
+
 func (s *settingField) coerce(value string, current any) (any, error) {
 	types := s.s.types(s.schema)
 	if items, ok := s.schema["items"].(map[string]any); ok && types["array"] && isPlayerList(items) {
@@ -431,15 +445,26 @@ func (s *settingField) coerce(value string, current any) (any, error) {
 		return value, nil
 	}
 	if types["array"] || types["object"] {
-		kind := "an object"
-		if types["array"] {
-			kind = "a list"
-		}
-		e := out.Errorf("usage", "%s takes %s", s.path, kind)
+		e := out.Errorf("usage", "%s takes %s", s.path, s.kind())
 		e.Help = "pass it as JSON with --literal"
 		return nil, e
 	}
+	return nil, out.Errorf("usage", "%s takes %s, not %q", s.path, s.kind(), value)
+}
+
+// kind says what the field holds, for an error refusing a value it can't.
+func (s *settingField) kind() string {
+	types := s.s.types(s.schema)
+	switch {
+	case types["array"]:
+		return "a list"
+	case types["object"]:
+		return "an object"
+	}
 	var want []string
+	if types["string"] {
+		want = append(want, "a string")
+	}
 	if types["boolean"] {
 		want = append(want, "true or false")
 	}
@@ -448,7 +473,7 @@ func (s *settingField) coerce(value string, current any) (any, error) {
 	} else if types["integer"] {
 		want = append(want, "a whole number")
 	}
-	return nil, out.Errorf("usage", "%s takes %s, not %q", s.path, strings.Join(want, " or "), value)
+	return strings.Join(want, " or ")
 }
 
 func isPlayerList(items map[string]any) bool {

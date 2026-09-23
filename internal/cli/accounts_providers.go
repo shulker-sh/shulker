@@ -113,7 +113,11 @@ func (a *app) changeProviders(from, to []string) error {
 	if err != nil {
 		return err
 	}
-	configPut(doc, accountsProviders, to)
+	field, err := configField(accountsProviders)
+	if err != nil {
+		return err
+	}
+	field.put(doc, to)
 	if err := config.SaveDocument(path, doc); err != nil {
 		return err
 	}
