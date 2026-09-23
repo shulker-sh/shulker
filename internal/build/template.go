@@ -25,8 +25,8 @@ func templateVars(m *manifest.Manifest, l *lock.Lock, side string) map[string]st
 	builtins := map[string]string{"project.name": m.Name, "project.displayName": m.DisplayName(side), "project.version": m.Version}
 	if l != nil {
 		builtins["minecraft.version"] = l.Minecraft
-		builtins["minecraft.dataVersion"] = nonZero(l.DataVersion)
-		builtins["java.major"] = nonZero(l.Java.Major)
+		builtins["minecraft.dataVersion"] = intOrUnset(l.DataVersion)
+		builtins["java.major"] = intOrUnset(l.Java.Major)
 		builtins["loader.type"] = l.Loader.Type
 		builtins["loader.version"] = l.Loader.Version
 	}
@@ -35,7 +35,8 @@ func templateVars(m *manifest.Manifest, l *lock.Lock, side string) map[string]st
 	return vars
 }
 
-func nonZero(n int) string {
+// intOrUnset is n as text, or empty for a zero, which is how a lock says it doesn't know the value.
+func intOrUnset(n int) string {
 	if n == 0 {
 		return ""
 	}
