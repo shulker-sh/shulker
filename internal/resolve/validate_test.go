@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
@@ -105,7 +106,7 @@ func TestValidateOptionalAndLoaderProvides(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		l.Mods[id] = lock.Mod{Sha512: sha}
+		l.Mods[id] = lock.Mod{Sha512: sha, Side: "both"}
 	}
 	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
 	v, err := r.Validate()
@@ -125,8 +126,8 @@ func TestValidateSkipsDependenciesNotDownloaded(t *testing.T) {
 		t.Fatal(err)
 	}
 	l := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "fabric", Version: "0.17.3"}, Mods: map[string]lock.Mod{
-		"private-mod": {Sha512: sha},
-		"fabric-api":  {Sha512: "0000"},
+		"private-mod": {Sha512: sha, Side: "both"},
+		"fabric-api":  {Sha512: "0000", Side: "both"},
 	}}
 	v, err := (&Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}).Validate()
 	if err != nil {
@@ -154,7 +155,7 @@ func TestValidateNeoForgeMavenRanges(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		l.Mods[id] = lock.Mod{Sha512: sha}
+		l.Mods[id] = lock.Mod{Sha512: sha, Side: "both"}
 	}
 	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
 	v, err := r.Validate()
@@ -203,7 +204,7 @@ func lockJars(t *testing.T, loader string, jars map[string][]byte) *Resolver {
 		if err != nil {
 			t.Fatal(err)
 		}
-		l.Mods[id] = lock.Mod{Sha512: sha}
+		l.Mods[id] = lock.Mod{Sha512: sha, Side: "both"}
 	}
 	return &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
 }
@@ -313,8 +314,8 @@ func TestValidateAppliesFabricDependencyOverrides(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Problem{
-		{Rule: "depends", Mod: "climate", ModVersion: "20.1.0", On: "terrablender", Declared: "*"},
-		{Rule: "depends", Mod: "slabs", ModVersion: "1.0.0", On: "balm", Declared: "*"},
+		{Rule: "depends", Mod: "climate", ModVersion: "20.1.0", On: "terrablender", Declared: "*", Side: "server"},
+		{Rule: "depends", Mod: "slabs", ModVersion: "1.0.0", On: "balm", Declared: "*", Side: "client"},
 	}
 	if !reflect.DeepEqual(v.Problems, want) {
 		t.Fatalf("problems %+v, want %+v", v.Problems, want)
@@ -329,5 +330,61 @@ func TestValidateAppliesFabricDependencyOverrides(t *testing.T) {
 	write("overrides/config/fabric_loader_dependencies.json", `{"overrides":{}}`)
 	if _, err := r.Validate("client"); out.CodeOf(err) != "dependency-overrides-invalid" {
 		t.Fatalf("err %v, want dependency-overrides-invalid", err)
+	}
+}
+
+func TestValidateEachSideAgainstWhatItPlaces(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	mods := map[string]struct{ side, deps string }{
+		"bwg":        {"both", `{"trees":">=1.3.8"}`},
+		"trees":      {"server", `{}`},
+		"hybrid":     {"client", `{"lith":"*"}`},
+		"lith":       {"server", `{}`},
+		"serveronly": {"server", `{"clientlib":"*"}`},
+		"clientlib":  {"client", `{}`},
+		"common":     {"both", `{"nothere":"*"}`},
+	}
+	l := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "fabric", Version: "0.17.3"}, Mods: map[string]lock.Mod{}}
+	for id, m := range mods {
+		sha, err := c.Put(bytes.NewReader(zipBytes(t, "fabric.mod.json", `{"id":"`+id+`","version":"1.4.0","depends":`+m.deps+`}`)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Mods[id] = lock.Mod{Sha512: sha, Side: m.side}
+	}
+	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{
+		{Rule: "depends", Mod: "bwg", ModVersion: "1.4.0", On: "trees", Declared: ">=1.3.8", Side: "client", LockedAs: "trees"},
+		{Rule: "depends", Mod: "common", ModVersion: "1.4.0", On: "nothere", Declared: "*"},
+		{Rule: "depends", Mod: "hybrid", ModVersion: "1.4.0", On: "lith", Declared: "*", Side: "client", LockedAs: "lith"},
+		{Rule: "depends", Mod: "serveronly", ModVersion: "1.4.0", On: "clientlib", Declared: "*", Side: "server", LockedAs: "clientlib"},
+	}
+	if !reflect.DeepEqual(v.Problems, want) {
+		t.Fatalf("problems %+v, want %+v", v.Problems, want)
+	}
+	e := out.AsError(v.Err())
+	if !strings.Contains(e.Message, "bwg 1.4.0 requires trees >=1.3.8, which the client doesn't place") || !strings.Contains(e.Message, "Fix: shulker set requires.trees.side both") {
+		t.Fatalf("error: %s", e.Message)
+	}
+
+	v, err = r.Validate("server")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverWant := []Problem{want[1], want[3]}
+	if !reflect.DeepEqual(v.Problems, serverWant) {
+		t.Fatalf("server only: problems %+v, want %+v", v.Problems, serverWant)
+	}
+
+	r.Manifest.Server = &manifest.Server{}
+	if v, err = r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(v.Problems, serverWant) {
+		t.Fatalf("server project: problems %+v, want %+v", v.Problems, serverWant)
 	}
 }

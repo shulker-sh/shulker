@@ -353,7 +353,9 @@ shulker unpin iris
 
 Record that a dependency problem between a mod and what its jar declares about another is safe to ignore. A problem reported by `add`, `remove`, `update`, `lock` or `install` prints the exact command to run, with the rule and the range the jar declares. The entry lands in `ignore` in `shulker.json` and the problem stops failing validation for as long as the jar declares that range; a new version that declares a different range makes the entry stale and the problem comes back. Without `--declared`, the command reads the rule and range from a matching problem in the locked mods. An existing entry for the pair is only replaced with `--force`.
 
-On Fabric, validation first applies `config/fabric_loader_dependencies.json`, Fabric Loader's own dependency overrides, as the build lays it from the override folders. A dependency the file removes is no problem and needs no ignore: removed for a mod, it must be removed by every side's file that places the mod, and one added by any side's file is checked like any other. Quilt doesn't read the file.
+On Fabric, validation first applies `config/fabric_loader_dependencies.json`, Fabric Loader's own dependency overrides, as the build lays it from the override folders. A dependency the file removes is no problem and needs no ignore, and one it adds is checked like any other, each side by its own build's file. Quilt doesn't read the file.
+
+Validation checks each side the project declares, or the client and the server when it declares none, against the mods that side's build places, so a client mod that needs a `server` mod fails, since the client build leaves that mod out. A problem only some sides have names them, and one whose dependency is locked but placed only on the other side suggests `shulker set requires.<key>.side both`.
 
 ```sh
 shulker ignore sodium fabric-api --rule depends --declared ">=2.0.0" --note "works on fabric-api 1.x"
@@ -1866,7 +1868,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `unsupported-quickplay` | `play --world` on a Minecraft before 1.20, which has no quick play to boot into a save with; nothing is launched |
 | `update-paused` | The pre-launch hook stopped a GDLauncher update at four minutes so it could explain itself; the launch is aborted, and launching again resumes it. Shown in GDLauncher's own dialog, so it prints without shulker's usual error decoration |
 | `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
-| `validation-failed` | The locked mods have dependency problems; each prints the `shulker ignore` command that would accept it. `items`: the problems |
+| `validation-failed` | The locked mods have dependency problems, checked for each side against the mods its build places; each prints the `shulker ignore` command that would accept it, and a problem only some sides have names them. `items`: the problems |
 | `version-no-file` | The provider's version has no file shulker can download, or no hash to check it against |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or no file with an id a CurseForge modpack names; for a pin its help links the mod's versions page |
 | `version-required` | `export mrpack` and `export curseforge` need a version |

@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"sort"
@@ -22,7 +23,11 @@ type Problem struct {
 	On         string `json:"on"`
 	Declared   string `json:"declared"`
 	Found      string `json:"found,omitempty"`
-	StaleNote  string `json:"staleNote,omitempty"`
+	// Side is the sides whose builds have the problem, when not every checked side does.
+	Side string `json:"side,omitempty"`
+	// LockedAs is the lock key of a mod that provides On but that this side doesn't place.
+	LockedAs  string `json:"lockedAs,omitempty"`
+	StaleNote string `json:"staleNote,omitempty"`
 }
 
 type Validation struct {
@@ -67,7 +72,10 @@ func isBuiltin(id string) bool {
 }
 
 // Validate checks the locked mods' own metadata against each other: dependencies, their versions
-// and conflicts. With sides given, a mod none of them use goes unchecked without a warning.
+// and conflicts. Each side is checked against the mods its build places, so a client mod that
+// needs a server-only one fails. With sides given, only those are checked, and a mod none of them
+// use goes unchecked without a warning; otherwise the sides the project declares are, or both
+// when it declares none.
 func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	if r.Lock.Minecraft == "" {
 		e := out.Errorf("minecraft-required", "this project sets no minecraft and has no locked modpack to take one from")
@@ -85,14 +93,13 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	}
 	infos := map[string]*jarmeta.Info{}
 	unread := map[string]bool{}
-	cands := candidates{}
 	for _, id := range r.lockIDs() {
 		m := r.Lock.Mods[id]
 		if !r.Cache.Has(m.Sha512) {
 			if usedBy(m.Side, sides) {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s is not downloaded; its metadata was not checked", id))
 			}
-			unread[r.Lock.JarID(id)] = true
+			unread[id] = true
 			continue
 		}
 		info, err := jarmeta.Read(r.Cache.Object(m.Sha512), m.Filename, r.Lock.Loader.Type)
@@ -100,96 +107,57 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 			return nil, prefixed("mod "+id, err)
 		}
 		infos[id] = info
-		cands.add(r.Lock.JarID(id), info, 0)
 	}
-	overrides, err := r.dependencyOverrides(l, sides)
+	checked := sides
+	if len(checked) == 0 {
+		checked = r.Manifest.Sides()
+	}
+	if len(checked) == 0 {
+		checked = []string{"client", "server"}
+	}
+	overrides, err := r.dependencyOverrides(l, checked)
 	if err != nil {
 		return nil, err
 	}
-	for id, info := range infos {
-		infos[id] = overrides.apply(info, r.Lock.Mods[id].Side)
-	}
-	installed := cands.pick(infos, l.TopLevelMandatory)
-	for id, version := range builtin {
-		installed[id] = version
-	}
-	byName := map[string]string{}
+	sc := sideCheck{infos: infos, unread: unread, builtin: builtin, topLevelOnly: l.TopLevelMandatory, byName: map[string]string{}}
 	for _, id := range r.lockIDs() {
-		byName[id] = id
+		sc.byName[id] = id
 		if slug := r.Lock.Mods[id].Slug; slug != "" {
-			byName[slug] = id
+			sc.byName[slug] = id
+		}
+	}
+	onSides := map[Problem][]string{}
+	var problems []Problem
+	for _, side := range checked {
+		sv := r.validateSide(side, overrides[side], sc)
+		for _, p := range sv.Problems {
+			if onSides[p] == nil {
+				problems = append(problems, p)
+			}
+			onSides[p] = append(onSides[p], side)
+		}
+		for _, w := range sv.Warnings {
+			if !slices.Contains(v.Warnings, w) {
+				v.Warnings = append(v.Warnings, w)
+			}
+		}
+		for _, sg := range sv.Suggestions {
+			if !slices.Contains(v.Suggestions, sg) {
+				v.Suggestions = append(v.Suggestions, sg)
+			}
 		}
 	}
 	ignores := r.ignores()
 	used := map[int]bool{}
-	for _, id := range sortedKeys(infos) {
-		info := infos[id]
-		for _, on := range sortedKeys(info.Depends) {
-			declared := info.Depends[on]
-			found, ok := installed[on]
-			if !ok && unread[on] {
-				continue
-			}
-			if ok {
-				match, err := satisfies(info, on, found, declared)
-				if err != nil {
-					v.Warnings = append(v.Warnings, fmt.Sprintf("%s depends on %s %s but %s: not checked", id, on, declared, err))
-					continue
-				}
-				if match {
-					continue
-				}
-			}
-			v.record(ignores, used, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+	for _, p := range problems {
+		if p.LockedAs != "" || len(onSides[p]) < len(checked) {
+			p.Side = strings.Join(onSides[p], ", ")
 		}
-		for _, on := range sortedKeys(info.Optional) {
-			declared := info.Optional[on]
-			found, ok := installed[on]
-			if !ok {
-				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared, InstalledAs: byName[on]})
-				continue
-			}
-			match, err := satisfies(info, on, found, declared)
-			if err != nil {
-				v.Warnings = append(v.Warnings, fmt.Sprintf("%s optionally depends on %s %s but %s: not checked", id, on, declared, err))
-				continue
-			}
-			if !match {
-				v.record(ignores, used, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
-			}
-		}
-		for _, on := range sortedKeys(info.Breaks) {
-			declared := info.Breaks[on]
-			found, ok := installed[on]
-			if !ok {
-				continue
-			}
-			match, err := satisfies(info, on, found, declared)
-			if err != nil {
-				v.Warnings = append(v.Warnings, fmt.Sprintf("%s breaks %s %s but %s: not checked", id, on, declared, err))
-				continue
-			}
-			if match {
-				v.record(ignores, used, Problem{Rule: "breaks", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
-			}
-		}
-		for _, on := range sortedKeys(info.Conflicts) {
-			found, ok := installed[on]
-			if !ok {
-				continue
-			}
-			if match, err := satisfies(info, on, found, info.Conflicts[on]); err == nil && match {
-				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s)", id, info.Version, on, info.Conflicts[on], found))
-			}
-		}
-		for kind, set := range map[string]map[string]string{"recommends": info.Recommends, "suggests": info.Suggests} {
-			for _, on := range sortedKeys(set) {
-				if _, ok := installed[on]; !ok {
-					v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: kind, On: on, Declared: set[on], InstalledAs: byName[on]})
-				}
-			}
-		}
+		v.record(ignores, used, p)
 	}
+	slices.SortStableFunc(v.Problems, func(a, b Problem) int {
+		return cmp.Or(strings.Compare(a.Mod, b.Mod), strings.Compare(a.On, b.On), strings.Compare(a.Side, b.Side))
+	})
 	for i, ig := range r.Manifest.Ignore {
 		if !used[i] {
 			v.Warnings = append(v.Warnings, fmt.Sprintf("ignore entry %d (%s: %s on %s) matched nothing", i+1, ig.Rule, ig.Mod, ig.On))
@@ -208,6 +176,124 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	return v, nil
 }
 
+// sideCheck is what Validate reads once for every side it checks.
+type sideCheck struct {
+	infos map[string]*jarmeta.Info
+	// unread are the locked mods whose jars aren't downloaded, by lock key.
+	unread       map[string]bool
+	builtin      map[string]string
+	topLevelOnly bool
+	// byName is each locked mod's key by its key and its provider slug.
+	byName map[string]string
+}
+
+// validateSide checks the mods side's build places against each other, with that side's
+// dependency overrides applied. Its problems carry no Side yet, so Validate can merge the sides'.
+func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrides, sc sideCheck) *Validation {
+	v := &Validation{}
+	placed := map[string]*jarmeta.Info{}
+	unreadIDs := map[string]bool{}
+	elsewhere := map[string]string{}
+	cands := candidates{}
+	for _, id := range r.lockIDs() {
+		jarID := r.Lock.JarID(id)
+		if !r.Lock.Mods[id].PlacedOn(side) {
+			elsewhere[jarID] = id
+			if info, ok := sc.infos[id]; ok {
+				for provided := range info.Provides {
+					elsewhere[provided] = id
+				}
+			}
+			continue
+		}
+		if sc.unread[id] {
+			unreadIDs[jarID] = true
+			continue
+		}
+		if info, ok := sc.infos[id]; ok {
+			placed[id] = overrides.Apply(info)
+			cands.add(jarID, info, 0)
+		}
+	}
+	installed := cands.pick(placed, sc.topLevelOnly)
+	for id, version := range sc.builtin {
+		installed[id] = version
+	}
+	for _, id := range sortedKeys(placed) {
+		info := placed[id]
+		for _, on := range sortedKeys(info.Depends) {
+			declared := info.Depends[on]
+			found, ok := installed[on]
+			if !ok && unreadIDs[on] {
+				continue
+			}
+			if ok {
+				match, err := satisfies(info, on, found, declared)
+				if err != nil {
+					v.Warnings = append(v.Warnings, fmt.Sprintf("%s depends on %s %s but %s: not checked", id, on, declared, err))
+					continue
+				}
+				if match {
+					continue
+				}
+			}
+			p := Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found}
+			if !ok {
+				p.LockedAs = elsewhere[on]
+			}
+			v.Problems = append(v.Problems, p)
+		}
+		for _, on := range sortedKeys(info.Optional) {
+			declared := info.Optional[on]
+			found, ok := installed[on]
+			if !ok {
+				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared, InstalledAs: sc.byName[on]})
+				continue
+			}
+			match, err := satisfies(info, on, found, declared)
+			if err != nil {
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s optionally depends on %s %s but %s: not checked", id, on, declared, err))
+				continue
+			}
+			if !match {
+				v.Problems = append(v.Problems, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+			}
+		}
+		for _, on := range sortedKeys(info.Breaks) {
+			declared := info.Breaks[on]
+			found, ok := installed[on]
+			if !ok {
+				continue
+			}
+			match, err := satisfies(info, on, found, declared)
+			if err != nil {
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s breaks %s %s but %s: not checked", id, on, declared, err))
+				continue
+			}
+			if match {
+				v.Problems = append(v.Problems, Problem{Rule: "breaks", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+			}
+		}
+		for _, on := range sortedKeys(info.Conflicts) {
+			found, ok := installed[on]
+			if !ok {
+				continue
+			}
+			if match, err := satisfies(info, on, found, info.Conflicts[on]); err == nil && match {
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s)", id, info.Version, on, info.Conflicts[on], found))
+			}
+		}
+		for kind, set := range map[string]map[string]string{"recommends": info.Recommends, "suggests": info.Suggests} {
+			for _, on := range sortedKeys(set) {
+				if _, ok := installed[on]; !ok {
+					v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: kind, On: on, Declared: set[on], InstalledAs: sc.byName[on]})
+				}
+			}
+		}
+	}
+	return v
+}
+
 // sideOverrides is the loader's dependency overrides file each validated side's build ships, nil
 // for a side that ships none.
 type sideOverrides map[string]jarmeta.DependencyOverrides
@@ -215,9 +301,6 @@ type sideOverrides map[string]jarmeta.DependencyOverrides
 func (r *Resolver) dependencyOverrides(l loader.Loader, sides []string) (sideOverrides, error) {
 	if l.DependencyOverrides == "" {
 		return nil, nil
-	}
-	if len(sides) == 0 {
-		sides = []string{"client", "server"}
 	}
 	b := &build.Builder{Dir: r.Dir, Manifest: r.Manifest, Lock: r.Lock, Cache: r.Cache, Packs: r.Packs}
 	so := sideOverrides{}
@@ -235,44 +318,6 @@ func (r *Resolver) dependencyOverrides(l loader.Loader, sides []string) (sideOve
 		}
 	}
 	return so, nil
-}
-
-// apply gives the mod's dependencies once every side that places it has applied its overrides: a
-// dependency stays unless each of them removes it, and one any of them adds counts.
-func (so sideOverrides) apply(info *jarmeta.Info, side string) *jarmeta.Info {
-	var applied []*jarmeta.Info
-	for _, s := range sortedKeys(so) {
-		if side == s || side == "both" {
-			applied = append(applied, so[s].Apply(info))
-		}
-	}
-	if len(applied) == 0 {
-		for _, s := range sortedKeys(so) {
-			applied = append(applied, so[s].Apply(info))
-		}
-	}
-	if !slices.ContainsFunc(applied, func(a *jarmeta.Info) bool { return a != info }) {
-		return info
-	}
-	merged := *applied[0]
-	for _, field := range []func(*jarmeta.Info) *map[string]string{
-		func(i *jarmeta.Info) *map[string]string { return &i.Depends },
-		func(i *jarmeta.Info) *map[string]string { return &i.Recommends },
-		func(i *jarmeta.Info) *map[string]string { return &i.Suggests },
-		func(i *jarmeta.Info) *map[string]string { return &i.Conflicts },
-		func(i *jarmeta.Info) *map[string]string { return &i.Breaks },
-	} {
-		set := map[string]string{}
-		for _, a := range applied {
-			for id, rng := range *field(a) {
-				if _, ok := set[id]; !ok {
-					set[id] = rng
-				}
-			}
-		}
-		*field(&merged) = set
-	}
-	return &merged
 }
 
 // candidate is one copy of a mod id the loader could load: a locked jar, a jar nested in one at
@@ -404,9 +449,9 @@ func (v *Validation) Err() error {
 			fmt.Fprintf(&b, "\n      %s", p.StaleNote)
 			row.Children = append(row.Children, out.Detail{Text: p.StaleNote})
 		}
-		if p.Rule == "depends" && p.Found == "" && !isBuiltin(p.On) {
-			fmt.Fprintf(&b, "\n      Fix: shulker add %s", p.On)
-			row.Children = append(row.Children, out.Detail{Label: "Fix", Text: "shulker add " + p.On, IsCommand: true})
+		if fix := p.fix(); fix != "" {
+			fmt.Fprintf(&b, "\n      Fix: %s", fix)
+			row.Children = append(row.Children, out.Detail{Label: "Fix", Text: fix, IsCommand: true})
 		}
 		ignore := p.ignoreCommand()
 		fmt.Fprintf(&b, "\n      Ignore: %s", ignore)
@@ -420,13 +465,32 @@ func (v *Validation) Err() error {
 }
 
 func (p Problem) line() string {
-	if p.Rule == "breaks" {
-		return fmt.Sprintf("%s %s breaks %s %s, found %s %s", p.Mod, p.ModVersion, p.On, p.Declared, p.On, p.Found)
+	var line string
+	switch {
+	case p.Rule == "breaks":
+		line = fmt.Sprintf("%s %s breaks %s %s, found %s %s", p.Mod, p.ModVersion, p.On, p.Declared, p.On, p.Found)
+	case p.LockedAs != "":
+		return fmt.Sprintf("%s %s requires %s %s, which the %s doesn't place", p.Mod, p.ModVersion, p.On, p.Declared, p.Side)
+	case p.Found == "":
+		line = fmt.Sprintf("%s %s requires %s %s, not installed", p.Mod, p.ModVersion, p.On, p.Declared)
+	default:
+		line = fmt.Sprintf("%s %s requires %s %s, found %s %s", p.Mod, p.ModVersion, p.On, p.Declared, p.On, p.Found)
 	}
-	if p.Found == "" {
-		return fmt.Sprintf("%s %s requires %s %s, not installed", p.Mod, p.ModVersion, p.On, p.Declared)
+	if p.Side != "" {
+		line += " on the " + p.Side
 	}
-	return fmt.Sprintf("%s %s requires %s %s, found %s %s", p.Mod, p.ModVersion, p.On, p.Declared, p.On, p.Found)
+	return line
+}
+
+// fix is the command that clears the problem, empty when there isn't one to suggest.
+func (p Problem) fix() string {
+	switch {
+	case p.Rule != "depends" || p.Found != "" || isBuiltin(p.On):
+		return ""
+	case p.LockedAs != "":
+		return fmt.Sprintf("shulker set requires.%s.side both", p.LockedAs)
+	}
+	return "shulker add " + p.On
 }
 
 func (p Problem) ignoreCommand() string {
