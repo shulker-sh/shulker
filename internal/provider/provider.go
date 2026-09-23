@@ -25,6 +25,10 @@ func Title(name string) string {
 	return name
 }
 
+// DatapackLoader is the loader a datapack version lists. Modrinth files datapacks as mods, so a
+// project whose only loader is this one is a datapack.
+const DatapackLoader = "datapack"
+
 type Project struct {
 	ID    string
 	Slug  string

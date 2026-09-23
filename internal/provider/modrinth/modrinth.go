@@ -150,22 +150,18 @@ func (m *Modrinth) Search(ctx context.Context, query, kind string, limit int) ([
 	for _, h := range res.Hits {
 		found := convertProject(h.project)
 		found.ID = h.ProjectID
-		found.Datapack = slices.Contains(h.Categories, loaderDatapack)
+		found.Datapack = slices.Contains(h.Categories, provider.DatapackLoader)
 		projects = append(projects, found)
 	}
 	return projects, nil
 }
 
-// loaderDatapack is the loader Modrinth tags a datapack version with. It files datapacks as mods,
-// so a project whose only loader is this one is a datapack.
-const loaderDatapack = "datapack"
-
 func convertProject(p project) provider.Project {
 	kind := p.ProjectType
-	if kind == "mod" && len(p.Loaders) > 0 && !slices.ContainsFunc(p.Loaders, func(l string) bool { return l != loaderDatapack }) {
-		kind = loaderDatapack
+	if kind == "mod" && len(p.Loaders) > 0 && !slices.ContainsFunc(p.Loaders, func(l string) bool { return l != provider.DatapackLoader }) {
+		kind = provider.DatapackLoader
 	}
-	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: kind, Datapack: slices.Contains(p.Loaders, loaderDatapack), Downloads: p.Downloads}
+	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: kind, Datapack: slices.Contains(p.Loaders, provider.DatapackLoader), Downloads: p.Downloads}
 }
 
 func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {

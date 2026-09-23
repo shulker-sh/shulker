@@ -522,7 +522,7 @@ func (im *importer) fileKind(ctx context.Context, filePath string, proj *provide
 	case mrpack.IsDatapackZip(filePath):
 		kind = manifest.TypeDatapack
 	}
-	datapack := proj.Type == manifest.TypeDatapack || slices.Contains(v.Loaders, "datapack")
+	datapack := proj.Type == manifest.TypeDatapack || slices.Contains(v.Loaders, provider.DatapackLoader)
 	switch {
 	case kind == manifest.TypeDatapack && datapack:
 		return kind, nil

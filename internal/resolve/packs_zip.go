@@ -37,7 +37,7 @@ func packTags(providerName, kind string) []string {
 		return nil
 	}
 	if kind == manifest.TypeDatapack {
-		return []string{"datapack"}
+		return []string{provider.DatapackLoader}
 	}
 	return []string{"minecraft"}
 }
