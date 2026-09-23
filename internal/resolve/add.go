@@ -312,17 +312,9 @@ func pinnedVersion(ctx context.Context, p provider.Provider, proj *provider.Proj
 	return v, nil
 }
 
-var curseforgeKindSections = map[string]string{
-	manifest.TypeMod:          "mc-mods",
-	manifest.TypeModpack:      "modpacks",
-	manifest.TypeResourcePack: "texture-packs",
-	manifest.TypeShader:       "shaders",
-	manifest.TypeDatapack:     "data-packs",
-}
-
 func versionsPage(providerName, kind, slug string) string {
 	if providerName == "curseforge" {
-		return "https://www.curseforge.com/minecraft/" + curseforgeKindSections[kind] + "/" + slug + "/files"
+		return "https://www.curseforge.com/minecraft/" + curseforgeSections[kind] + "/" + slug + "/files"
 	}
 	return "https://modrinth.com/" + kind + "/" + slug + "/versions"
 }

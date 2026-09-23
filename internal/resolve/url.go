@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -26,8 +28,14 @@ var (
 	modrinthHosts    = []string{"modrinth.com", "www.modrinth.com"}
 	curseforgeHosts  = []string{"curseforge.com", "www.curseforge.com", "legacy.curseforge.com"}
 	modrinthSections = []string{"mod", "project", "plugin", "resourcepack", "shader", "datapack", "modpack"}
-	// curseforgeSections are the curseforge.com/minecraft/<section> kinds shulker can add.
-	curseforgeSections = []string{"mc-mods", "texture-packs", "shaders", "data-packs", "modpacks"}
+	// curseforgeSections are the curseforge.com/minecraft/<section> of each kind shulker can add.
+	curseforgeSections = map[string]string{
+		manifest.TypeMod:          "mc-mods",
+		manifest.TypeModpack:      "modpacks",
+		manifest.TypeResourcePack: "texture-packs",
+		manifest.TypeShader:       "shaders",
+		manifest.TypeDatapack:     "data-packs",
+	}
 )
 
 var urlShapes = []string{
@@ -97,7 +105,7 @@ func curseforgeURL(parts []string) (ProviderURL, bool) {
 	if len(parts) == 2 && parts[0] == "projects" && numeric(parts[1]) {
 		return ProviderURL{Provider: "curseforge", Project: parts[1]}, true
 	}
-	if len(parts) < 3 || parts[0] != "minecraft" || !slices.Contains(curseforgeSections, parts[1]) {
+	if len(parts) < 3 || parts[0] != "minecraft" || !slices.Contains(slices.Collect(maps.Values(curseforgeSections)), parts[1]) {
 		return ProviderURL{}, false
 	}
 	switch {
