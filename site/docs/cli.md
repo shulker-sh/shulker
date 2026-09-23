@@ -306,22 +306,28 @@ shulker lock
 
 Check the project the way CI should, on every push: fail when anything would break it, and change nothing. It writes nothing to the project: no `build/`, no lock, no history entry. Every problem is reported, not just the first, and the exit code is non-zero when there is any.
 
-- `shulker.lock` must match `shulker.json`: each difference is listed under `lock-stale`, and `check` never relocks.
-- Every locked file must be obtainable. Each is put in the download cache the way `install` does, so a run with the cache kept from the last one downloads nothing. Every file is tried, so one failed download doesn't hide the next, unless `--fail-fast`. The failed downloads are one problem, `download-failed`, and the manual downloads missing from `downloads/` and local files gone with no copy in the cache another, `missing-files`, as `install` reports them.
-- Every side the manifest declares is validated as `install` validates it, with every jar read: a mod whose dependency is missing or the wrong version fails with the same line and `shulker ignore` hint, and a problem only the server has fails a project that declares both sides. `ignore` entries and loader dependency overrides apply as usual.
+Name the checks to run; with none, `check` runs `lock`, `files` and `deps`, which is everything an export needs. `--all` runs every check, `server` included when the project declares a server.
+
+- `lock`: `shulker.lock` must match `shulker.json`. Each difference is listed under `lock-stale`, and `check` never relocks. It downloads nothing.
+- `files`: every locked file must be obtainable. Each is put in the download cache the way `install` does, so a run with the cache kept from the last one downloads nothing. Every file is tried, so one failed download doesn't hide the next, unless `--fail-fast`. The failed downloads are one problem, `download-failed`, and the manual downloads missing from `downloads/` and local files gone with no copy in the cache another, `missing-files`, as `install` reports them.
+- `deps`: every side the manifest declares is validated as `install` validates it, with every mod jar read: a mod whose dependency is missing or the wrong version fails with the same line and `shulker ignore` hint, and a problem only the server has fails a project that declares both sides. `ignore` entries and loader dependency overrides apply as usual. Without `files`, it fetches the mod jars alone.
+- `server`: the server jar and, unless `shulker.json` sets `java`, the Java runtime the server runs on must download, as `install` fetches them. A server jar the lock doesn't record yet is fetched but not locked. Naming it on a project that declares no server fails `no-side`.
 
 Warnings, such as an `ignore` entry that matches nothing or a local file served from the cache because the project's copy is gone, print without failing the run, unless `--strict` is passed.
 
 ```sh
 shulker check
+shulker check lock
+shulker check --all
 ```
 
 | Flag | Description |
 | --- | --- |
+| `--all` | Run every check, `server` included when the project declares a server; not with named checks |
 | `--strict` | Fail on warnings too |
 | `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 
-With `--json`, a clean run's `data.problems` is empty. A failing run ends with `check-failed`: its `items` are every problem's own items, each as `<code>: <item>`, one per thing to annotate, and `data.problems` lists each problem as an error, `{ "code", "message", "items", "help" }`.
+With `--json`, `data.scopes` lists the checks that ran and a clean run's `data.problems` is empty. A failing run ends with `check-failed`: its `items` are every problem's own items, each as `<code>: <item>`, one per thing to annotate, and `data.problems` lists each problem as an error, `{ "code", "message", "items", "help" }`.
 
 ### `shulker match`
 

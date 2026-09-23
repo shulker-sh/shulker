@@ -9,20 +9,31 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/resolve"
+)
+
+var (
+	checkScopes        = []string{"lock", "files", "deps", "server"}
+	defaultCheckScopes = []string{"lock", "files", "deps"}
 )
 
 type checkResult struct {
+	Scopes   []string     `json:"scopes"`
 	Problems []*out.Error `json:"problems"`
 }
 
 func (a *app) checkCmd() *cobra.Command {
-	var strict bool
+	var strict, all bool
 	cmd := &cobra.Command{
-		Use:         "check",
+		Use:         "check [lock|files|deps|server]...",
 		Annotations: reads(),
 		Short:       "Fail when the lock is stale, a locked file can't be fetched, or a mod's dependencies aren't met",
-		Args:        noArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		ValidArgs:   checkScopes,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			scopes, err := checkScopesFor(args, all)
+			if err != nil {
+				return err
+			}
 			p, err := a.openProject()
 			if err != nil {
 				return err
@@ -30,24 +41,27 @@ func (a *app) checkCmd() *cobra.Command {
 			if err := p.RequireLock(); err != nil {
 				return err
 			}
-			d, err := a.deps()
-			if err != nil {
-				return err
+			if slices.Contains(scopes, "server") && !p.Manifest.HasSide("server") {
+				if !all {
+					return noSide("server")
+				}
+				scopes = slices.DeleteFunc(scopes, func(s string) bool { return s == "server" })
 			}
-			res := checkResult{Problems: []*out.Error{}}
+			res := checkResult{Scopes: scopes, Problems: []*out.Error{}}
 			problem := func(err error) {
 				e := out.AsError(err)
 				a.printer.Report(e)
 				res.Problems = append(res.Problems, e)
 			}
-			if diffs := p.LockDifferences(); len(diffs) > 0 {
-				e := out.Errorf("lock-stale", "shulker.lock does not match shulker.json")
-				e.Help = "run `shulker lock`"
-				e.Items = diffs
-				problem(e)
+			if slices.Contains(scopes, "lock") {
+				if diffs := p.LockDifferences(); len(diffs) > 0 {
+					e := out.Errorf("lock-stale", "shulker.lock does not match shulker.json")
+					e.Help = "run `shulker lock`"
+					e.Items = diffs
+					problem(e)
+				}
 			}
-			errs, warnings := a.checkLockedFiles(cmd.Context(), p)
-			warnings = append(p.GoneFiles(d.cache.Has), warnings...)
+			errs, warnings := a.checkLocked(cmd.Context(), p, scopes)
 			for _, err := range errs {
 				problem(err)
 			}
@@ -61,28 +75,74 @@ func (a *app) checkCmd() *cobra.Command {
 				return checkFailed(res)
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OK("no problems found", "")
+				l.OK("no problems found", "checked "+strings.Join(scopes, ", "))
 			})
 		},
 	}
+	cmd.Flags().BoolVar(&all, "all", false, "run every check, server included when the project declares one")
 	cmd.Flags().BoolVar(&strict, "strict", false, "fail on warnings too")
 	a.registerFailFast(cmd)
 	return cmd
 }
 
-// checkLockedFiles fetches every locked file into the cache and validates every declared side
-// with all their jars read.
-func (a *app) checkLockedFiles(ctx context.Context, p *project.Project) ([]error, []string) {
-	r, err := a.resolver(ctx, p)
+// checkScopesFor is the checks to run, in checkScopes' order: the ones named, every one with all,
+// and the default set with neither.
+func checkScopesFor(args []string, all bool) ([]string, error) {
+	if all && len(args) > 0 {
+		return nil, out.Errorf("usage", "--all runs every check; name checks or pass --all, not both")
+	}
+	for _, arg := range args {
+		if !slices.Contains(checkScopes, arg) {
+			e := out.Errorf("usage", "%q is not a check", arg)
+			e.Candidates, e.Given = checkScopes, arg
+			return nil, e
+		}
+	}
+	switch {
+	case all:
+		return slices.Clone(checkScopes), nil
+	case len(args) == 0:
+		return slices.Clone(defaultCheckScopes), nil
+	}
+	return slices.DeleteFunc(slices.Clone(checkScopes), func(s string) bool { return !slices.Contains(args, s) }), nil
+}
+
+// checkLocked runs the scopes that need the locked files: files fetches every one into the cache,
+// deps fetches the mod jars and validates every declared side with them all read, and server fetches
+// the server jar and its Java runtime.
+func (a *app) checkLocked(ctx context.Context, p *project.Project, scopes []string) ([]error, []string) {
+	files, deps, srv := slices.Contains(scopes, "files"), slices.Contains(scopes, "deps"), slices.Contains(scopes, "server")
+	if !files && !deps && !srv {
+		return nil, nil
+	}
+	d, err := a.deps()
 	if err != nil {
 		return []error{err}, nil
 	}
-	var errs []error
-	_, warnings, fetchErr := r.Install(ctx)
-	if joined, ok := fetchErr.(interface{ Unwrap() []error }); ok {
-		errs = append(errs, joined.Unwrap()...)
-	} else if fetchErr != nil {
-		errs = append(errs, fetchErr)
+	var warnings []string
+	if files {
+		warnings = p.GoneFiles(d.cache.Has)
+	}
+	r, err := a.resolver(ctx, p)
+	if err != nil {
+		return []error{err}, warnings
+	}
+	var fetchErr error
+	switch {
+	case files:
+		var dropWarnings []string
+		_, dropWarnings, fetchErr = r.Install(ctx)
+		warnings = append(warnings, dropWarnings...)
+	case deps:
+		_, _, fetchErr = r.InstallMods(ctx)
+	}
+	errs := splitJoined(fetchErr)
+	if srv {
+		srvErrs, srvWarnings := a.checkServer(ctx, p, r)
+		errs, warnings = append(errs, srvErrs...), append(warnings, srvWarnings...)
+	}
+	if !deps {
+		return errs, warnings
 	}
 	v, err := r.Validate()
 	if err != nil {
@@ -96,6 +156,32 @@ func (a *app) checkLockedFiles(ctx context.Context, p *project.Project) ([]error
 		if fetchErr == nil || !slices.Contains(v.Undownloaded, w) {
 			warnings = append(warnings, w)
 		}
+	}
+	return errs, warnings
+}
+
+// checkServer fetches the server jar and, unless shulker.json names a Java of its own, the managed
+// runtime the server runs on. A server jar the lock doesn't record yet is fetched but not locked:
+// check writes no lock.
+func (a *app) checkServer(ctx context.Context, p *project.Project, r *resolve.Resolver) ([]error, []string) {
+	d, err := a.deps()
+	if err != nil {
+		return []error{err}, nil
+	}
+	var errs []error
+	var warnings []string
+	if _, err := r.EnsureServerJar(ctx, d.meta); err != nil {
+		errs = append(errs, err)
+	}
+	if p.Manifest.Java != "" {
+		return errs, nil
+	}
+	_, err = a.freshestJava(ctx, p, serverJavaFix)
+	switch {
+	case out.CodeOf(err) == "runtime-unavailable":
+		warnings = append(warnings, runtimeWarning(err))
+	case err != nil:
+		errs = append(errs, err)
 	}
 	return errs, warnings
 }

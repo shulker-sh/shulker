@@ -652,6 +652,15 @@ func contains(list []string, s string) bool {
 // given, it leaves out files that none of them use. A download the host fails goes on to the next
 // file unless FailFast, and the error joins the failed downloads' and the missing files'.
 func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []string, error) {
+	return r.install(ctx, r.lockFiles(), sides)
+}
+
+// InstallMods is Install for the locked mods alone, the jars Validate reads.
+func (r *Resolver) InstallMods(ctx context.Context) ([]string, []string, error) {
+	return r.install(ctx, r.modFiles(), nil)
+}
+
+func (r *Resolver) install(ctx context.Context, locked []downloadable, sides []string) ([]string, []string, error) {
 	files, err := r.sweepDownloads()
 	if err != nil {
 		return nil, nil, err
@@ -667,7 +676,7 @@ func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []st
 	var wanted []string
 	var downloads []out.Download
 	byID := map[string]downloadable{}
-	for _, f := range r.lockFiles() {
+	for _, f := range locked {
 		if r.Cache.Has(f.sha512) || !usedBy(f.side, sides) {
 			continue
 		}

@@ -17,6 +17,7 @@ import (
 type checkEnvelope struct {
 	out.Envelope
 	Data struct {
+		Scopes   []string    `json:"scopes"`
 		Problems []out.Error `json:"problems"`
 	} `json:"data"`
 }
@@ -200,5 +201,61 @@ func TestCheckStrictFailsOnWarnings(t *testing.T) {
 	code, env = runCheck(t, h, "--strict")
 	if code == 0 || env.problem("strict-warnings") == nil {
 		t.Fatalf("--strict fails on a warning: exit %d %+v", code, env)
+	}
+}
+
+func (h *harness) isCached(sha512 string) bool {
+	_, err := os.Stat(filepath.Join(h.cache, "objects", sha512[:2], sha512))
+	return err == nil
+}
+
+func TestCheckRunsOnlyTheScopesNamed(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "resourcepack", "add", "fresh-animations")
+	os.RemoveAll(h.cache)
+
+	code, env := runCheck(t, h, "lock")
+	if code != 0 || strings.Join(env.Data.Scopes, ",") != "lock" || h.isCached(h.jars["sodium"].sha512) {
+		t.Fatalf("lock alone downloads nothing: exit %d %+v", code, env)
+	}
+	code, env = runCheck(t, h, "deps", "lock")
+	if code != 0 || strings.Join(env.Data.Scopes, ",") != "lock,deps" || !h.isCached(h.jars["sodium"].sha512) || h.isCached(h.jars["fresh-animations"].sha512) {
+		t.Fatalf("deps fetches the mod jars alone: exit %d %+v", code, env)
+	}
+	code, env = runCheck(t, h)
+	if code != 0 || strings.Join(env.Data.Scopes, ",") != "lock,files,deps" || !h.isCached(h.jars["fresh-animations"].sha512) {
+		t.Fatalf("the default fetches every file: exit %d %+v", code, env)
+	}
+
+	for _, args := range [][]string{{"nope"}, {"lock", "--all"}} {
+		if e := runError(t, h, append([]string{"check"}, args...)...); e.Code != "usage" {
+			t.Fatalf("check %v: %+v", args, e)
+		}
+	}
+}
+
+func TestCheckServerOnlyWhenNamedOrAll(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "add", "sodium")
+
+	if e := runError(t, h, "check", "server"); e.Code != "no-side" {
+		t.Fatalf("server on a client-only project: %+v", e)
+	}
+	if code, env := runCheck(t, h, "--all"); code != 0 || strings.Join(env.Data.Scopes, ",") != "lock,files,deps" {
+		t.Fatalf("--all leaves out a server the project doesn't declare: exit %d %+v", code, env)
+	}
+
+	h.editManifest(t, func(m map[string]any) { m["server"] = map[string]any{} })
+	h.mustRun(t, "lock")
+	lockBefore, _ := os.ReadFile(filepath.Join(h.dir, lock.FileName))
+	code, env := runCheck(t, h, "--all")
+	if code != 0 || strings.Join(env.Data.Scopes, ",") != "lock,files,deps,server" {
+		t.Fatalf("--all checks the server: exit %d %+v", code, env)
+	}
+	if lockAfter, _ := os.ReadFile(filepath.Join(h.dir, lock.FileName)); string(lockAfter) != string(lockBefore) {
+		t.Fatal("check server locked the server jar")
 	}
 }

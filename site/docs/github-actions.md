@@ -30,7 +30,7 @@ jobs:
       - run: shulker check
 ```
 
-The action keeps the download cache between runs, as it does for a release (see [Cache](#cache)), so a check with an unchanged lock downloads nothing. Pass `--strict` to fail on warnings too, such as an `ignore` entry that no longer matches anything.
+The action keeps the download cache between runs, as it does for a release (see [Cache](#cache)), so a check with an unchanged lock downloads nothing. With no arguments it checks what an export needs; for a pack with a server, `shulker check --all` also downloads the server jar and Java runtime `install` would. Pass `--strict` to fail on warnings too, such as an `ignore` entry that no longer matches anything.
 
 ## The workflow
 

@@ -380,11 +380,7 @@ type downloadable struct {
 // lockFiles is everything install has to put in the cache, mods first and then
 // the zips, each section in key order.
 func (r *Resolver) lockFiles() []downloadable {
-	var files []downloadable
-	for _, id := range sortedKeys(r.Lock.Mods) {
-		m := r.Lock.Mods[id]
-		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size, side: m.Side})
-	}
+	files := r.modFiles()
 	for _, kind := range manifest.PackKinds {
 		section := r.Lock.Packs(kind)
 		for _, key := range sortedKeys(section) {
@@ -392,6 +388,15 @@ func (r *Resolver) lockFiles() []downloadable {
 			side := cmp.Or(p.Side, "client")
 			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, provider: p.Provider, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size, side: side})
 		}
+	}
+	return files
+}
+
+func (r *Resolver) modFiles() []downloadable {
+	var files []downloadable
+	for _, id := range sortedKeys(r.Lock.Mods) {
+		m := r.Lock.Mods[id]
+		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size, side: m.Side})
 	}
 	return files
 }
