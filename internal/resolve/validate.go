@@ -2,13 +2,12 @@ package resolve
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/fabricver"
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
@@ -133,7 +132,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 				continue
 			}
 			if ok {
-				match, err := satisfies(info, found, declared)
+				match, err := satisfies(info, on, found, declared)
 				if err != nil {
 					v.Warnings = append(v.Warnings, fmt.Sprintf("%s depends on %s %s but %s: not checked", id, on, declared, err))
 					continue
@@ -151,7 +150,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared, InstalledAs: byName[on]})
 				continue
 			}
-			match, err := satisfies(info, found, declared)
+			match, err := satisfies(info, on, found, declared)
 			if err != nil {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s optionally depends on %s %s but %s: not checked", id, on, declared, err))
 				continue
@@ -166,7 +165,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 			if !ok {
 				continue
 			}
-			match, err := satisfies(info, found, declared)
+			match, err := satisfies(info, on, found, declared)
 			if err != nil {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s breaks %s %s but %s: not checked", id, on, declared, err))
 				continue
@@ -180,7 +179,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 			if !ok {
 				continue
 			}
-			if match, err := satisfies(info, found, info.Conflicts[on]); err == nil && match {
+			if match, err := satisfies(info, on, found, info.Conflicts[on]); err == nil && match {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s)", id, info.Version, on, info.Conflicts[on], found))
 			}
 		}
@@ -335,13 +334,13 @@ func accepts(infos map[string]*jarmeta.Info, id, version string) bool {
 	for _, info := range infos {
 		for _, set := range []map[string]string{info.Depends, info.Optional} {
 			if declared, ok := set[id]; ok {
-				if match, err := satisfies(info, version, declared); err == nil && !match {
+				if match, err := satisfies(info, id, version, declared); err == nil && !match {
 					return false
 				}
 			}
 		}
 		if declared, ok := info.Breaks[id]; ok {
-			if match, err := satisfies(info, version, declared); err == nil && match {
+			if match, err := satisfies(info, id, version, declared); err == nil && match {
 				return false
 			}
 		}
@@ -353,12 +352,7 @@ func compareVersions(a, b candidate) int {
 	if a.maven && b.maven {
 		return mavenver.Compare(mavenver.Parse(a.version), mavenver.Parse(b.version))
 	}
-	va, errA := mcver.Parse(normalizeVersion(a.version))
-	vb, errB := mcver.Parse(normalizeVersion(b.version))
-	if errA == nil && errB == nil {
-		return va.Compare(vb)
-	}
-	return mavenver.Compare(mavenver.Parse(normalizeVersion(a.version)), mavenver.Parse(normalizeVersion(b.version)))
+	return fabricver.Compare(fabricver.Parse(a.version), fabricver.Parse(b.version))
 }
 
 type ignoreEntry struct {
@@ -440,14 +434,7 @@ func (p Problem) ignoreCommand() string {
 	return fmt.Sprintf(`shulker ignore %s %s --rule %s --declared "%s" --note "why this is safe"`, p.Mod, p.On, p.Rule, p.Declared)
 }
 
-var (
-	bareInt  = regexp.MustCompile(`^\d+$`)
-	minorX   = regexp.MustCompile(`^(\d+)\.[xX*]$`)
-	patchX   = regexp.MustCompile(`^(\d+)\.(\d+)\.[xX*]$`)
-	rangeOps = []string{">=", "<=", ">", "<", "=", "~", "^"}
-)
-
-func satisfies(info *jarmeta.Info, version, declared string) (bool, error) {
+func satisfies(info *jarmeta.Info, on, version, declared string) (bool, error) {
 	if info.UsesMavenRanges {
 		rng, err := mavenver.ParseRange(declared)
 		if err != nil {
@@ -455,90 +442,25 @@ func satisfies(info *jarmeta.Info, version, declared string) (bool, error) {
 		}
 		return rng.Contains(mavenver.Parse(version)), nil
 	}
+	if on == "minecraft" {
+		version = mcver.FabricForm(version)
+	}
 	return fabricSatisfies(version, declared)
 }
 
+// fabricSatisfies matches as Fabric Loader does. Alternatives are joined by "||", the way an array
+// of ranges in fabric.mod.json and a Quilt any-of are held.
 func fabricSatisfies(version, declared string) (bool, error) {
-	v, err := mcver.Parse(normalizeVersion(version))
-	if err != nil {
-		return false, fmt.Errorf("installed version %q is not semver", version)
-	}
-	rng, err := fabricRange(declared)
-	if err != nil {
-		return false, err
-	}
-	return rng.Contains(v), nil
-}
-
-func normalizeVersion(s string) string {
-	s = strings.TrimSpace(s)
-	if i := strings.IndexByte(s, '+'); i >= 0 {
-		s = s[:i]
-	}
-	if bareInt.MatchString(s) {
-		s += ".0"
-	}
-	return s
-}
-
-func fabricRange(declared string) (mcver.Range, error) {
-	var alts []string
+	var alts []fabricver.Predicate
 	for _, alt := range strings.Split(declared, "||") {
-		var toks []string
-		for _, tok := range strings.Fields(alt) {
-			norm, err := normalizeToken(tok)
-			if err != nil {
-				return mcver.Range{}, fmt.Errorf("range %q is not understood", declared)
-			}
-			toks = append(toks, norm)
+		p, err := fabricver.ParsePredicate(strings.TrimSpace(alt))
+		if err != nil {
+			return false, fmt.Errorf("range %q is not understood", declared)
 		}
-		if len(toks) == 0 {
-			toks = []string{"*"}
-		}
-		alts = append(alts, strings.Join(toks, " "))
+		alts = append(alts, p)
 	}
-	rng, err := mcver.ParseRange(strings.Join(alts, " || "))
-	if err != nil {
-		return mcver.Range{}, fmt.Errorf("range %q is not understood", declared)
-	}
-	return rng, nil
-}
-
-func normalizeToken(tok string) (string, error) {
-	if tok == "*" {
-		return tok, nil
-	}
-	op := ""
-	for _, candidate := range rangeOps {
-		if strings.HasPrefix(tok, candidate) {
-			op = candidate
-			break
-		}
-	}
-	ver := normalizeVersion(tok[len(op):])
-	switch {
-	case minorX.MatchString(ver):
-		if op != "" {
-			return "", fmt.Errorf("wildcard with operator")
-		}
-		major := atoi(minorX.FindStringSubmatch(ver)[1])
-		return fmt.Sprintf(">=%d.0.0 <%d.0.0", major, major+1), nil
-	case patchX.MatchString(ver):
-		if op != "" {
-			return "", fmt.Errorf("wildcard with operator")
-		}
-		m := patchX.FindStringSubmatch(ver)
-		return fmt.Sprintf(">=%d.%d.0 <%d.%d.0", atoi(m[1]), atoi(m[2]), atoi(m[1]), atoi(m[2])+1), nil
-	}
-	if _, err := mcver.Parse(ver); err != nil {
-		return "", err
-	}
-	return op + ver, nil
-}
-
-func atoi(s string) int {
-	n, _ := strconv.Atoi(s)
-	return n
+	v := fabricver.Parse(version)
+	return slices.ContainsFunc(alts, func(p fabricver.Predicate) bool { return p.Test(v) }), nil
 }
 
 func sortedKeys[V any](m map[string]V) []string {

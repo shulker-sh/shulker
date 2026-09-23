@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -29,9 +30,6 @@ func TestSatisfies(t *testing.T) {
 		{"26.2", "~26.2-", true},
 		{"26.3-pre-1", ">=26.2-", true},
 		{"26.3-pre-1", ">=26.3", false},
-		{"24w33a", ">=1.21.2-", true},
-		{"24w33a", ">=1.21.2", false},
-		{"24w33a", ">1.21.1", true},
 		{"27.1", "26.x", false},
 		{"0.5.2", "0.x", true},
 		{"1.0.0", "0.x", false},
@@ -48,6 +46,11 @@ func TestSatisfies(t *testing.T) {
 		{"1.0.0", "<0.9 || >=1.0", true},
 		{"0.9.5", "<0.9 || >=1.0", false},
 		{"1.0.0", ">=0.5 <2.0", true},
+		{"4.0.3.4", ">=4.0.3.2", true},
+		{"4.0.3.4", ">=4.0.3.5", false},
+		{"3.12.3.3+fabric-1.20.1", ">=3.12.2", true},
+		{"custom", "custom", true},
+		{"custom", ">=1.0", false},
 	}
 	for _, c := range cases {
 		got, err := fabricSatisfies(c.version, c.declared)
@@ -61,8 +64,29 @@ func TestSatisfies(t *testing.T) {
 	}
 }
 
+func TestSatisfiesMinecraftAsFabricSeesIt(t *testing.T) {
+	for _, c := range []struct {
+		version, declared string
+		want              bool
+	}{
+		{"24w33a", ">=1.21.2-", true},
+		{"24w33a", ">=1.21.2", false},
+		{"24w33a", ">1.21.1", true},
+		{"1.21-pre1", ">=1.21-beta.1", true},
+		{"1.20.1", "~1.20", true},
+	} {
+		got, err := satisfies(&jarmeta.Info{}, "minecraft", c.version, c.declared)
+		if err != nil || got != c.want {
+			t.Errorf("satisfies(minecraft %q, %q) = %v, %v, want %v", c.version, c.declared, got, err, c.want)
+		}
+	}
+	if got, _ := satisfies(&jarmeta.Info{}, "some-mod", "24w33a", ">=1.21.2-"); got {
+		t.Error("a mod versioned like a weekly snapshot is matched as the game")
+	}
+}
+
 func TestSatisfiesUnparsable(t *testing.T) {
-	for _, c := range [][2]string{{"1.2.3.4", "*"}, {"1.0.0", ">=1.x"}, {"1.0.0", "1.2.3.4"}, {"26w10a", ">=26.2"}} {
+	for _, c := range [][2]string{{"1.0.0", ">=1.x"}, {"1.0.0", "<custom"}, {"1.0.0", "<1.0 || >x"}} {
 		if _, err := fabricSatisfies(c[0], c[1]); err == nil {
 			t.Errorf("fabricSatisfies(%q, %q) should not parse", c[0], c[1])
 		}
@@ -220,7 +244,7 @@ func TestValidatePicksAmongNestedCopies(t *testing.T) {
 	}
 }
 
-func TestValidatePrefersNewestNonSemverCopy(t *testing.T) {
+func TestValidatePrefersNewestFourPartCopy(t *testing.T) {
 	lib := func(v string) []byte { return fabricJar(t, `{"id":"lib","version":"`+v+`"}`, nil) }
 	bundling := func(id string, jar []byte) []byte {
 		return fabricJar(t, `{"id":"`+id+`","version":"1.0.0","jars":[{"file":"META-INF/jars/n.jar"}]}`, map[string][]byte{"META-INF/jars/n.jar": jar})
@@ -228,15 +252,15 @@ func TestValidatePrefersNewestNonSemverCopy(t *testing.T) {
 	r := lockJars(t, "fabric", map[string][]byte{
 		"a":     bundling("a", lib("9.0.0.1")),
 		"b":     bundling("b", lib("10.0.0.1")),
-		"wants": fabricJar(t, `{"id":"wants","version":"1.0.0","depends":{"lib":">=1"}}`, nil),
+		"wants": fabricJar(t, `{"id":"wants","version":"1.0.0","depends":{"lib":">=11"}}`, nil),
 	})
 	v, err := r.Validate()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{`wants depends on lib >=1 but installed version "10.0.0.1" is not semver: not checked`}
-	if !reflect.DeepEqual(v.Warnings, want) {
-		t.Fatalf("warnings %v, want %v", v.Warnings, want)
+	want := []Problem{{Rule: "depends", Mod: "wants", ModVersion: "1.0.0", On: "lib", Declared: ">=11", Found: "10.0.0.1"}}
+	if !reflect.DeepEqual(v.Problems, want) || len(v.Warnings) > 0 {
+		t.Fatalf("problems %+v, warnings %v, want %+v", v.Problems, v.Warnings, want)
 	}
 }
 
