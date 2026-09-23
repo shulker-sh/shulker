@@ -112,7 +112,7 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 			}
 			if st.Kind == pack.Hosted {
 				e.Source, e.Provider = "", st.Source
-				e.Channel, e.Pinned = modpacks[key].Channel, modpacks[key].Pin != nil
+				e.Channel, e.Pinned = modpacks[key].Channel, !modpacks[key].Pin.IsZero()
 			}
 			res = append(res, e)
 		}
@@ -132,7 +132,7 @@ func (a *app) listEntries(p *project.Project, kind string) ([]listEntry, error) 
 			entry, listed := mods[key]
 			e := listEntry{
 				Key: key, Type: manifest.TypeMod, Listed: listed, File: entry.File, Side: entry.Side,
-				Channel: entry.Channel, Provider: entry.Provider, Pinned: entry.Pin != nil,
+				Channel: entry.Channel, Provider: entry.Provider, Pinned: !entry.Pin.IsZero(),
 				OS: entry.OS, Feature: entry.Feature,
 			}
 			if p.Lock != nil {
@@ -186,7 +186,7 @@ func packEntries(p *project.Project, kind string) []listEntry {
 		entry, isListed := listed[key]
 		e := listEntry{
 			Key: key, Type: kind, Listed: isListed, File: entry.File, Channel: entry.Channel,
-			Provider: entry.Provider, Pinned: entry.Pin != nil, OS: entry.OS, Feature: entry.Feature,
+			Provider: entry.Provider, Pinned: !entry.Pin.IsZero(), OS: entry.OS, Feature: entry.Feature,
 		}
 		if lp, ok := locked[key]; ok {
 			e.Version = lp.VersionNumber

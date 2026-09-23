@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 
 	"shulker.sh/shulker/internal/pack"
 )
@@ -49,13 +48,4 @@ func (r *Resolver) sweepDownloads() ([]dropped, error) {
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Name < files[j].Name })
 	return files, nil
-}
-
-func lockID(providerName, id string) any {
-	if providerName == "curseforge" {
-		if n, err := strconv.Atoi(id); err == nil {
-			return n
-		}
-	}
-	return id
 }

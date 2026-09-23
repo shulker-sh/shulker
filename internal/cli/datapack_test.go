@@ -262,13 +262,13 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 		t.Fatalf("a datapack no provider has stays an override: %+v", res.Unmanaged)
 	}
 	m, l := readProject(t, dir)
-	if got := m.Requires["terralith"]; got.Type != manifest.TypeDatapack || got.Filename != "Terralith.zip" || got.Pin != "urbokcOc" {
+	if got := m.Requires["terralith"]; got.Type != manifest.TypeDatapack || got.Filename != "Terralith.zip" || got.Pin.String() != "urbokcOc" {
 		t.Fatalf("terralith entry: %+v", got)
 	}
 	if p := l.Datapacks["terralith"]; p.Side != "both" || p.Filename != "Terralith.zip" {
 		t.Fatalf("terralith lock: %+v", p)
 	}
-	if got := m.Requires["autoslabs-compat-bmc"]; got.Type != manifest.TypeResourcePack || got.Filename != "AutoslabsCompat.zip" || got.Project != "AutoSlb1" {
+	if got := m.Requires["autoslabs-compat-bmc"]; got.Type != manifest.TypeResourcePack || got.Filename != "AutoslabsCompat.zip" || got.Project.String() != "AutoSlb1" {
 		t.Fatalf("a datapack carrying assets/ is a resource pack, keyed by its slug made a key: %+v", got)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "overrides", "config", "paxi", "datapacks", "Terralith.zip")); !os.IsNotExist(err) {

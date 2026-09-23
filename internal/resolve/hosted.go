@@ -36,10 +36,10 @@ func (r *Resolver) addModpack(ctx context.Context, p provider.Provider, proj *pr
 	if held, taken := r.Manifest.Requires[key]; taken {
 		return manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
 	}
-	project := lockID(p.Name(), proj.ID)
+	project := manifest.NewID(p.Name(), proj.ID)
 	for _, name := range sortedKeys(r.Manifest.Modpacks()) {
 		existing := r.Manifest.Requires[name]
-		if pinned, ok := r.Lock.Modpacks[name]; ok && existing.IsHosted() && pinned.Provider == p.Name() && fmt.Sprint(pinned.Project) == fmt.Sprint(project) {
+		if pinned, ok := r.Lock.Modpacks[name]; ok && existing.IsHosted() && pinned.Provider == p.Name() && pinned.Project == project {
 			return out.Errorf("modpack-exists", "modpack %s is already in the manifest as %s", proj.Slug, name)
 		}
 	}
@@ -48,7 +48,7 @@ func (r *Resolver) addModpack(ctx context.Context, p provider.Provider, proj *pr
 		entry.Channel = opts.Channel
 	}
 	if opts.Pin != "" {
-		entry.Pin = lockID(p.Name(), opts.Pin)
+		entry.Pin = manifest.NewID(p.Name(), opts.Pin)
 	}
 	return r.lockModpack(ctx, key, entry)
 }
@@ -66,22 +66,22 @@ func (r *Resolver) pinModpack(ctx context.Context, key, version string) (string,
 	entry := r.Manifest.Requires[key]
 	locked := r.Lock.Modpacks[key]
 	if version == "" {
-		if locked.Version == nil {
+		if locked.Version.IsZero() {
 			return "", unlockedModpack(key)
 		}
-		version = fmt.Sprint(locked.Version)
+		version = locked.Version.String()
 	}
-	entry.Pin = lockID(r.modpackProvider(entry, locked), version)
+	entry.Pin = manifest.NewID(r.modpackProvider(entry, locked), version)
 	return version, r.lockModpack(ctx, key, entry)
 }
 
 // unpinModpack lets a pinned hosted modpack move again, and locks it at its newest version.
 func (r *Resolver) unpinModpack(ctx context.Context, key string) error {
 	entry := r.Manifest.Requires[key]
-	if entry.Pin == nil {
+	if entry.Pin.IsZero() {
 		return out.Errorf("not-pinned", "%s is not pinned", key)
 	}
-	entry.Pin = nil
+	entry.Pin = manifest.ID{}
 	return r.lockModpack(ctx, key, entry)
 }
 
@@ -106,8 +106,8 @@ func unlockedModpack(key string) *out.Error {
 // downloaded, as a CurseForge mod's is.
 func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifest.Require) (lock.Modpack, error) {
 	slug := name
-	if entry.Project != nil {
-		slug = fmt.Sprint(entry.Project)
+	if !entry.Project.IsZero() {
+		slug = entry.Project.String()
 	}
 	p, proj, err := r.lookup(ctx, slug, entry.Provider, manifest.TypeModpack)
 	if err != nil {
@@ -119,8 +119,8 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 		return lock.Modpack{}, e
 	}
 	pin := ""
-	if entry.Pin != nil {
-		pin = fmt.Sprint(entry.Pin)
+	if !entry.Pin.IsZero() {
+		pin = entry.Pin.String()
 	}
 	v, err := r.pickModpack(ctx, p, proj, pin, entry.Channel)
 	if err != nil {
@@ -148,8 +148,8 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 	}
 	return lock.Modpack{
 		Provider:      p.Name(),
-		Project:       lockID(p.Name(), proj.ID),
-		Version:       lockID(p.Name(), v.ID),
+		Project:       manifest.NewID(p.Name(), proj.ID),
+		Version:       manifest.NewID(p.Name(), v.ID),
 		VersionNumber: v.Number,
 		Channel:       channelLabel(channel),
 		URL:           got.url,
@@ -242,15 +242,15 @@ func (r *Resolver) outdatedModpacks(ctx context.Context, ids []string) ([]Outdat
 			return nil, err
 		}
 		game, loaderName := r.modpackPlatform()
-		versions, err := p.Versions(ctx, fmt.Sprint(locked.Project), game, modpackLoaders(loaderName))
+		versions, err := p.Versions(ctx, locked.Project.String(), game, modpackLoaders(loaderName))
 		if err != nil {
 			return nil, err
 		}
 		newest, ok := provider.Newest(versions, entry.Channel, loaderName)
-		if !ok || newest.ID == fmt.Sprint(locked.Version) {
+		if !ok || newest.ID == locked.Version.String() {
 			continue
 		}
-		res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: entry.Pin != nil, Modpack: true})
+		res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: !entry.Pin.IsZero(), Modpack: true})
 	}
 	return res, nil
 }

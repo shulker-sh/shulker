@@ -650,9 +650,9 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, pack
 	entry := manifest.Require{}
 	if prior, ok := im.markerManifestMod(id); ok {
 		entry = prior
-		if entry.Pin != nil {
+		if !entry.Pin.IsZero() {
 			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: the marker pinned %v but the pack ships %s; pin dropped", id, entry.Pin, v.Number))
-			entry.Pin = nil
+			entry.Pin = manifest.ID{}
 		}
 	}
 	providerSide := im.r.Lock.Mods[id].Side
@@ -700,7 +700,7 @@ func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename,
 			delete(r.Manifest.Requires, key)
 		}
 	}()
-	listed := manifest.Require{Type: kind, Pin: lockID(p.Name(), v.ID)}
+	listed := manifest.Require{Type: kind, Pin: manifest.NewID(p.Name(), v.ID)}
 	if filename != key+manifest.FileExtension(kind) {
 		listed.Filename = filename
 	}

@@ -227,7 +227,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 		entry.Channel = opts.Channel
 	}
 	if opts.Pin != "" {
-		entry.Pin = lockID(p.Name(), opts.Pin)
+		entry.Pin = manifest.NewID(p.Name(), opts.Pin)
 	}
 	r.setSource(&entry, id, p, proj)
 	r.Manifest.Requires[id] = entry
@@ -378,7 +378,7 @@ func (r *Resolver) settle(id, side, channel string) {
 // and p, unless it is the manifest's first provider.
 func (r *Resolver) setSource(entry *manifest.Require, key string, p provider.Provider, proj *provider.Project) {
 	if proj.Slug != key || p.Name() != "modrinth" {
-		entry.Project = lockID(p.Name(), proj.ID)
+		entry.Project = manifest.NewID(p.Name(), proj.ID)
 	}
 	if p.Name() != r.Manifest.ProviderOrder()[0] {
 		entry.Provider = p.Name()
@@ -429,7 +429,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			r.Lock.Mods[id] = aliased
 			r.log("keeping %s %s from %s (%s project %s recorded as an alias)", id, existing.VersionNumber, existing.Provider, p.Name(), proj.ID)
 			return id, prior, nil
-		case fmt.Sprint(existing.Version) != v.ID:
+		case existing.Version.String() != v.ID:
 			r.log("keeping %s %s already in lock", id, existing.VersionNumber)
 			return id, prior, nil
 		default:
@@ -445,8 +445,8 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	entry := lock.Mod{
 		Provider:      p.Name(),
-		Project:       lockID(p.Name(), proj.ID),
-		Version:       lockID(p.Name(), v.ID),
+		Project:       manifest.NewID(p.Name(), proj.ID),
+		Version:       manifest.NewID(p.Name(), v.ID),
 		VersionNumber: v.Number,
 		Filename:      v.File.Filename,
 		URL:           got.url,
@@ -466,7 +466,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		if sideOverride == "" {
 			entry.Side = prior.Side
 		}
-		setAlias(&entry, prior.Provider, fmt.Sprint(prior.Project))
+		setAlias(&entry, prior.Provider, prior.Project.String())
 		clearAlias(&entry, p.Name())
 	}
 	if info.ID != id {
@@ -490,7 +490,7 @@ func isSameMod(existing lock.Mod, jarID, providerName, projectID, resolvedJarID 
 		return true
 	}
 	if existing.Provider == providerName {
-		return fmt.Sprint(existing.Project) == projectID
+		return existing.Project.String() == projectID
 	}
 	alias := aliasFor(existing, providerName)
 	return alias != "" && alias == projectID
@@ -562,7 +562,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 func (r *Resolver) lockedProject(providerName, projectID string) (string, bool) {
 	for _, id := range sortedKeys(r.Lock.Mods) {
 		m := r.Lock.Mods[id]
-		if m.Provider == providerName && fmt.Sprint(m.Project) == projectID || aliasFor(m, providerName) == projectID {
+		if m.Provider == providerName && m.Project.String() == projectID || aliasFor(m, providerName) == projectID {
 			return id, true
 		}
 	}
@@ -714,7 +714,7 @@ func pageFor(m lock.Mod) string {
 	case m.Page != "":
 		return m.Page
 	case m.Provider == "curseforge":
-		return curseforge.ProjectPage(fmt.Sprint(m.Project))
+		return curseforge.ProjectPage(m.Project.String())
 	case m.URL == nil:
 		return ""
 	}

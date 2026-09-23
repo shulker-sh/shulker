@@ -93,7 +93,7 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 		listed.Channel = channel
 	}
 	if opts.Pin != "" {
-		listed.Pin = lockID(p.Name(), opts.Pin)
+		listed.Pin = manifest.NewID(p.Name(), opts.Pin)
 	}
 	r.setSource(&listed, key, p, proj)
 	locked := r.Lock.Packs(kind)[key]
@@ -232,16 +232,16 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 		return r.lockFilePack(key, kind, entry)
 	}
 	slug := key
-	if entry.Project != nil {
-		slug = fmt.Sprint(entry.Project)
+	if !entry.Project.IsZero() {
+		slug = entry.Project.String()
 	}
 	p, proj, err := r.lookup(ctx, slug, entry.Provider, kind)
 	if err != nil {
 		return err
 	}
 	pin := ""
-	if entry.Pin != nil {
-		pin = fmt.Sprint(entry.Pin)
+	if !entry.Pin.IsZero() {
+		pin = entry.Pin.String()
 	}
 	channel, err := r.lockPack(ctx, p, proj, key, kind, pin, entry.Channel)
 	if err != nil {
@@ -302,8 +302,8 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 	}
 	locked := lock.Pack{
 		Provider:         p.Name(),
-		Project:          lockID(p.Name(), proj.ID),
-		Version:          lockID(p.Name(), v.ID),
+		Project:          manifest.NewID(p.Name(), proj.ID),
+		Version:          manifest.NewID(p.Name(), v.ID),
 		VersionNumber:    v.Number,
 		Filename:         manifest.PackFilename(key, r.Manifest.Requires[key]),
 		ProviderFilename: v.File.Filename,
@@ -375,15 +375,15 @@ func (r *Resolver) outdatedPacks(ctx context.Context, ids []string) ([]Outdated,
 			if err != nil {
 				return nil, err
 			}
-			versions, err := p.Versions(ctx, fmt.Sprint(locked.Project), r.Lock.Minecraft, packTags(p.Name(), kind))
+			versions, err := p.Versions(ctx, locked.Project.String(), r.Lock.Minecraft, packTags(p.Name(), kind))
 			if err != nil {
 				return nil, err
 			}
 			newest, ok := provider.Newest(versions, listed[key].Channel, "")
-			if !ok || newest.ID == fmt.Sprint(locked.Version) {
+			if !ok || newest.ID == locked.Version.String() {
 				continue
 			}
-			res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: listed[key].Pin != nil})
+			res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: !listed[key].Pin.IsZero()})
 		}
 	}
 	return res, nil

@@ -60,22 +60,22 @@ type Java struct {
 // Modpack is where a modpack resolved to: a source's commit or digest, a local archive's bytes, or
 // a provider version and its archive's bytes.
 type Modpack struct {
-	Provider      string  `json:"provider,omitempty"`
-	Project       any     `json:"project,omitempty"`
-	Version       any     `json:"version,omitempty"`
-	VersionNumber string  `json:"versionNumber,omitempty"`
-	Channel       string  `json:"channel,omitempty"`
-	URL           *string `json:"url,omitempty"`
-	Page          string  `json:"page,omitempty"`
-	Filename      string  `json:"filename,omitempty"`
-	Source        string  `json:"source,omitempty"`
-	Ref           string  `json:"ref,omitempty"`
-	Commit        string  `json:"commit,omitempty"`
-	DirSha256     string  `json:"dirSha256,omitempty"`
-	Sha256        string  `json:"sha256,omitempty"`
-	File          string  `json:"file,omitempty"`
-	Sha512        string  `json:"sha512,omitempty"`
-	Size          int64   `json:"size,omitempty"`
+	Provider      string      `json:"provider,omitempty"`
+	Project       manifest.ID `json:"project,omitzero"`
+	Version       manifest.ID `json:"version,omitzero"`
+	VersionNumber string      `json:"versionNumber,omitempty"`
+	Channel       string      `json:"channel,omitempty"`
+	URL           *string     `json:"url,omitempty"`
+	Page          string      `json:"page,omitempty"`
+	Filename      string      `json:"filename,omitempty"`
+	Source        string      `json:"source,omitempty"`
+	Ref           string      `json:"ref,omitempty"`
+	Commit        string      `json:"commit,omitempty"`
+	DirSha256     string      `json:"dirSha256,omitempty"`
+	Sha256        string      `json:"sha256,omitempty"`
+	File          string      `json:"file,omitempty"`
+	Sha512        string      `json:"sha512,omitempty"`
+	Size          int64       `json:"size,omitempty"`
 	// Unmanaged is what an archive lays as its own override files, by layer and path, each with
 	// its sha512: the files no lock entry took.
 	Unmanaged map[string]string `json:"unmanaged,omitempty"`
@@ -105,23 +105,23 @@ func (p Modpack) Label() string {
 // Mod is a locked mod jar. One with File is a local file: it names no provider, so every
 // provider-shaped field stays empty and url is left out rather than written null.
 type Mod struct {
-	File          string   `json:"file,omitempty"`
-	Provider      string   `json:"provider,omitempty"`
-	Project       any      `json:"project,omitempty"`
-	Version       any      `json:"version,omitempty"`
-	VersionNumber string   `json:"versionNumber,omitempty"`
-	Filename      string   `json:"filename"`
-	URL           *string  `json:"url"`
-	Page          string   `json:"page,omitempty"`
-	Sha512        string   `json:"sha512"`
-	Size          int64    `json:"size,omitempty"`
-	Side          string   `json:"side"`
-	Channel       string   `json:"channel,omitempty"`
-	Modpack       string   `json:"modpack,omitempty"`
-	ModID         string   `json:"modId,omitempty"`
-	Slug          string   `json:"slug,omitempty"`
-	RequiredBy    []string `json:"requiredBy"`
-	Aliases       Aliases  `json:"aliases"`
+	File          string      `json:"file,omitempty"`
+	Provider      string      `json:"provider,omitempty"`
+	Project       manifest.ID `json:"project,omitzero"`
+	Version       manifest.ID `json:"version,omitzero"`
+	VersionNumber string      `json:"versionNumber,omitempty"`
+	Filename      string      `json:"filename"`
+	URL           *string     `json:"url"`
+	Page          string      `json:"page,omitempty"`
+	Sha512        string      `json:"sha512"`
+	Size          int64       `json:"size,omitempty"`
+	Side          string      `json:"side"`
+	Channel       string      `json:"channel,omitempty"`
+	Modpack       string      `json:"modpack,omitempty"`
+	ModID         string      `json:"modId,omitempty"`
+	Slug          string      `json:"slug,omitempty"`
+	RequiredBy    []string    `json:"requiredBy"`
+	Aliases       Aliases     `json:"aliases"`
 }
 
 // Aliases are the same mod's project ids on the other providers.
@@ -133,11 +133,11 @@ type Aliases struct {
 // Pack is a resource pack, shader or datapack: a zip placed by its requires key,
 // with no jar metadata to read and nothing depending on it.
 type Pack struct {
-	File          string `json:"file,omitempty"`
-	Provider      string `json:"provider,omitempty"`
-	Project       any    `json:"project,omitempty"`
-	Version       any    `json:"version,omitempty"`
-	VersionNumber string `json:"versionNumber,omitempty"`
+	File          string      `json:"file,omitempty"`
+	Provider      string      `json:"provider,omitempty"`
+	Project       manifest.ID `json:"project,omitzero"`
+	Version       manifest.ID `json:"version,omitzero"`
+	VersionNumber string      `json:"versionNumber,omitempty"`
 	// Filename is where the build places the pack; ProviderFilename is the
 	// provider's own name for it.
 	Filename         string  `json:"filename"`
@@ -325,6 +325,20 @@ func Parse(data []byte) (*Lock, error) {
 	dec.UseNumber()
 	if err := dec.Decode(l); err != nil {
 		return nil, schema.Invalid("lock-invalid", FileName, data, err)
+	}
+	for key, m := range l.Modpacks {
+		m.Project, m.Version = m.Project.For(m.Provider), m.Version.For(m.Provider)
+		l.Modpacks[key] = m
+	}
+	for key, m := range l.Mods {
+		m.Project, m.Version = m.Project.For(m.Provider), m.Version.For(m.Provider)
+		l.Mods[key] = m
+	}
+	for _, section := range l.PackSections() {
+		for key, p := range section {
+			p.Project, p.Version = p.Project.For(p.Provider), p.Version.For(p.Provider)
+			section[key] = p
+		}
 	}
 	return l, nil
 }

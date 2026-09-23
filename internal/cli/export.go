@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -264,7 +263,7 @@ func (a *app) curseForgeLookalike(ctx context.Context, miss build.CurseForgeMiss
 			return curseforge.Match{}, nil, false, nil
 		}
 		a.progress("looking up %s on CurseForge by slug", miss.Key)
-		mr, err := d.providers["modrinth"].Project(ctx, fmt.Sprint(miss.Project), miss.Kind)
+		mr, err := d.providers["modrinth"].Project(ctx, miss.Project.String(), miss.Kind)
 		if errors.Is(err, provider.ErrNotFound) {
 			return curseforge.Match{}, nil, false, nil
 		}

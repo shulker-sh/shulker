@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/cfpack"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 )
 
@@ -87,17 +88,17 @@ func TestImportCurseForge(t *testing.T) {
 	if m.Minecraft != "26.2" || m.Loader.Type != "fabric" || m.Server != nil || m.Client == nil || strings.Join(m.Authors, ",") != "someone" {
 		t.Fatalf("manifest: %+v", m)
 	}
-	if jei := m.Mods()["jei"]; jei.Provider != "curseforge" || jei.Project.(json.Number) != "238222" || jei.Pin != nil {
+	if jei := m.Mods()["jei"]; jei.Provider != "curseforge" || jei.Project != manifest.NewID("curseforge", "238222") || !jei.Pin.IsZero() {
 		t.Fatalf("jei manifest entry: %+v", jei)
 	}
-	if pack := m.ResourcePacks()["fresh-animations"]; pack.Provider != "curseforge" || pack.Project.(json.Number) != "600000" {
+	if pack := m.ResourcePacks()["fresh-animations"]; pack.Provider != "curseforge" || pack.Project != manifest.NewID("curseforge", "600000") {
 		t.Fatalf("fresh-animations manifest entry: %+v", pack)
 	}
 	jei := l.Mods["jei"]
-	if jei.Provider != "curseforge" || jei.Version.(json.Number) != "5000001" || jei.Sha512 != h.jars["jei"].sha512 || jei.URL == nil {
+	if jei.Provider != "curseforge" || jei.Version != manifest.NewID("curseforge", "5000001") || jei.Sha512 != h.jars["jei"].sha512 || jei.URL == nil {
 		t.Fatalf("jei lock entry: %+v", jei)
 	}
-	if pack := l.ResourcePacks["fresh-animations"]; pack.Version.(json.Number) != "5300001" || pack.Sha512 != h.jars["cf-fresh-animations"].sha512 {
+	if pack := l.ResourcePacks["fresh-animations"]; pack.Version != manifest.NewID("curseforge", "5300001") || pack.Sha512 != h.jars["cf-fresh-animations"].sha512 {
 		t.Fatalf("fresh-animations lock entry: %+v", pack)
 	}
 	if _, ok := l.Mods["sodium"]; ok {

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -77,7 +78,7 @@ func TestADependencyAlreadyLockedKeepsItsVersion(t *testing.T) {
 
 	l := h.readLock(t)
 	framework := l.Mods["framework"]
-	if framework.Version.(json.Number) != "5600001" || !strings.Contains(strings.Join(framework.RequiredBy, ","), "goblintraders") {
+	if framework.Version != manifest.NewID("curseforge", "5600001") || !strings.Contains(strings.Join(framework.RequiredBy, ","), "goblintraders") {
 		t.Fatalf("framework should stay at its pinned file and gain goblintraders: %+v", framework)
 	}
 	if _, ok := l.Mods["framework-fabric"]; ok {

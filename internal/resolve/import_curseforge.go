@@ -138,7 +138,7 @@ func (im *importer) curseForgeFile(ctx context.Context, p provider.Provider, fou
 	if v.ProjectID != proj.ID {
 		return nil, nil, out.Errorf("pin-mismatch", "file %s belongs to project %s, not %s", fileID, v.ProjectID, proj.Slug)
 	}
-	listed := manifest.Require{Project: lockID(p.Name(), proj.ID)}
+	listed := manifest.Require{Project: manifest.NewID(p.Name(), proj.ID)}
 	if p.Name() != r.Manifest.ProviderOrder()[0] {
 		listed.Provider = p.Name()
 	}

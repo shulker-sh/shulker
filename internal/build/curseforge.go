@@ -42,7 +42,7 @@ type CurseForgeMiss struct {
 	Key       string
 	Kind      string
 	Provider  string
-	Project   any
+	Project   manifest.ID
 	Alias     int
 	Filename  string
 	Size      int64
@@ -77,8 +77,8 @@ type curseForgeEntry struct {
 	provider string
 	sha512   string
 	url      *string
-	project  any
-	version  any
+	project  manifest.ID
+	version  manifest.ID
 	filename string
 	// providerFilename is the provider's own name for the file, which a
 	// lookalike on CurseForge would share.
@@ -417,22 +417,9 @@ func curseForgeLocked(e curseForgeEntry) (project, file int, ok bool) {
 	if e.provider != "curseforge" {
 		return 0, 0, false
 	}
-	project, okProject := lockInt(e.project)
-	file, okFile := lockInt(e.version)
+	project, okProject := e.project.Int()
+	file, okFile := e.version.Int()
 	return project, file, okProject && okFile
-}
-
-func lockInt(v any) (int, bool) {
-	switch n := v.(type) {
-	case int:
-		return n, true
-	case json.Number:
-		i, err := strconv.Atoi(n.String())
-		return i, err == nil
-	case float64:
-		return int(n), n == float64(int(n))
-	}
-	return 0, false
 }
 
 func curseForgeRecords(files []cfpack.File, opts CurseForgeOptions, report *CurseForgeReport) map[int]curseforge.Record {

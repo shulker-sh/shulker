@@ -7,6 +7,7 @@ import (
 
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -126,16 +127,16 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 		if err != nil {
 			return nil, err
 		}
-		versions, err := p.Versions(ctx, fmt.Sprint(m.Project), r.Lock.Minecraft, loader.ProviderLoaders(r.Lock.Loader.Type))
+		versions, err := p.Versions(ctx, m.Project.String(), r.Lock.Minecraft, loader.ProviderLoaders(r.Lock.Loader.Type))
 		if err != nil {
 			return nil, err
 		}
 		newest, ok := provider.Newest(versions, r.channelFor(id), r.Lock.Loader.Type)
-		if !ok || newest.ID == fmt.Sprint(m.Version) {
+		if !ok || newest.ID == m.Version.String() {
 			continue
 		}
 		entry := r.Manifest.Mods()[id]
-		res = append(res, Outdated{ID: id, Current: m.VersionNumber, Latest: newest.Number, Pinned: entry.Pin != nil})
+		res = append(res, Outdated{ID: id, Current: m.VersionNumber, Latest: newest.Number, Pinned: !entry.Pin.IsZero()})
 	}
 	if res == nil {
 		res = []Outdated{}
@@ -156,10 +157,10 @@ func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, 
 		return "", err
 	}
 	if version == "" {
-		version = fmt.Sprint(r.Lock.Mods[id].Version)
+		version = r.Lock.Mods[id].Version.String()
 	}
 	entry := r.Manifest.Mods()[id]
-	entry.Pin = lockID(r.Lock.Mods[id].Provider, version)
+	entry.Pin = manifest.NewID(r.Lock.Mods[id].Provider, version)
 	r.Manifest.Requires[id] = entry
 	return version, r.Update(ctx, []string{id})
 }
@@ -176,10 +177,10 @@ func (r *Resolver) Unpin(ctx context.Context, id string) error {
 		return err
 	}
 	entry := r.Manifest.Mods()[id]
-	if entry.Pin == nil {
+	if entry.Pin.IsZero() {
 		return out.Errorf("not-pinned", "%s is not pinned", id)
 	}
-	entry.Pin = nil
+	entry.Pin = manifest.ID{}
 	r.Manifest.Requires[id] = entry
 	return r.Update(ctx, []string{id})
 }
@@ -210,16 +211,16 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 		return err
 	}
 	key := id
-	if entry.Project != nil {
-		key = fmt.Sprint(entry.Project)
+	if !entry.Project.IsZero() {
+		key = entry.Project.String()
 	}
 	proj, err := p.Project(ctx, key, "")
 	if err != nil {
 		return err
 	}
 	pin := ""
-	if entry.Pin != nil {
-		pin = fmt.Sprint(entry.Pin)
+	if !entry.Pin.IsZero() {
+		pin = entry.Pin.String()
 	}
 	v, err := r.pick(ctx, p, proj, pin, entry.Channel)
 	if err != nil {

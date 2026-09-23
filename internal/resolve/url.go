@@ -195,10 +195,10 @@ func switchProject(e *out.Error, key string) *out.Error {
 
 func (r *Resolver) lockedSource(key string) (providerName, project string, ok bool) {
 	if m, found := r.Lock.Mods[key]; found && m.Provider != "" {
-		return m.Provider, fmt.Sprint(m.Project), true
+		return m.Provider, m.Project.String(), true
 	}
 	if m, found := r.Lock.Modpacks[key]; found && m.Provider != "" {
-		return m.Provider, fmt.Sprint(m.Project), true
+		return m.Provider, m.Project.String(), true
 	}
 	return "", "", false
 }

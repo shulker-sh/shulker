@@ -27,10 +27,10 @@ func TestAddPinsAModrinthVersionURLByItsNumber(t *testing.T) {
 
 	h.mustRun(t, "add", "https://modrinth.com/mod/sodium/version/1.0.0+mc26.2")
 
-	if got := h.readLock(t).Mods["sodium"].Version; got != "QANobbMI" {
+	if got := h.readLock(t).Mods["sodium"].Version; got.String() != "QANobbMI" {
 		t.Fatalf("sodium locked at %v, want the 1.0.0 version QANobbMI", got)
 	}
-	if got := h.readManifest(t).Mods()["sodium"].Pin; got != "QANobbMI" {
+	if got := h.readManifest(t).Mods()["sodium"].Pin; got.String() != "QANobbMI" {
 		t.Fatalf("manifest pin = %v, want QANobbMI", got)
 	}
 }
@@ -52,7 +52,7 @@ func TestAddTakesSeveralURLsEachWithItsOwnPin(t *testing.T) {
 
 	l := h.readLock(t)
 	for key, want := range map[string]string{"balm": "5700001", "jei": "5000001", "sodium": "QANobbMI"} {
-		if got := fmt.Sprint(l.Mods[key].Version); got != want {
+		if got := l.Mods[key].Version.String(); got != want {
 			t.Fatalf("%s locked at %s, want %s", key, got, want)
 		}
 		if got := fmt.Sprint(h.readManifest(t).Mods()[key].Pin); got != want {
@@ -65,7 +65,7 @@ func TestAddTakesSeveralURLsEachWithItsOwnPin(t *testing.T) {
 	if _, ok := l.ResourcePacks["fresh-animations"]; !ok {
 		t.Fatalf("the resource pack URL should add a resource pack: %+v", l.ResourcePacks)
 	}
-	if pin := h.readManifest(t).Requires["fresh-animations"].Pin; pin != nil {
+	if pin := h.readManifest(t).Requires["fresh-animations"].Pin; !pin.IsZero() {
 		t.Fatalf("a project URL is no pin: %v", pin)
 	}
 }
@@ -94,7 +94,7 @@ func TestAHostedModpackURL(t *testing.T) {
 
 	h.mustRun(t, "add", "--type", "modpack", "https://modrinth.com/modpack/cozy/version/1.0.0")
 
-	if got := h.readLock(t).Modpacks["cozy"].Version; got != "cozyV100" {
+	if got := h.readLock(t).Modpacks["cozy"].Version; got.String() != "cozyV100" {
 		t.Fatalf("cozy locked at %v, want cozyV100", got)
 	}
 }

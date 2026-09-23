@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -340,10 +339,10 @@ func TestImportMrpackLocksHostedPacks(t *testing.T) {
 		t.Fatalf("import: %+v", res)
 	}
 	m, l := readProject(t, dir)
-	if got := m.Requires["fresh-animations"]; got.Type != manifest.TypeResourcePack || got.Filename != "Fresh Animations.zip" || got.Project != nil || got.Pin != "Vb7Kq2Xn" {
+	if got := m.Requires["fresh-animations"]; got.Type != manifest.TypeResourcePack || got.Filename != "Fresh Animations.zip" || !got.Project.IsZero() || got.Pin.String() != "Vb7Kq2Xn" {
 		t.Fatalf("fresh-animations entry: %+v", got)
 	}
-	if got := m.Requires["complementary-reimagined"]; got.Type != manifest.TypeShader || got.Filename != complementary.filename || got.Pin != "pcrMhvuU" {
+	if got := m.Requires["complementary-reimagined"]; got.Type != manifest.TypeShader || got.Filename != complementary.filename || got.Pin.String() != "pcrMhvuU" {
 		t.Fatalf("complementary entry: %+v", got)
 	}
 	if l.ResourcePacks["fresh-animations"].VersionNumber != "1.9.4" || l.ResourcePacks["fresh-animations"].Filename != "Fresh Animations.zip" || l.Shaders["complementary-reimagined"].VersionNumber != "r5.5.1" {
@@ -412,7 +411,7 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 	if _, ok := l.Mods["iris"]; ok || l.Mods["jei"].Provider != "curseforge" || l.Mods["sodium"].Provider != "modrinth" {
 		t.Fatalf("lock: %+v", l.Mods)
 	}
-	if got := m.Requires["jei"]; got.Provider != "curseforge" || fmt.Sprint(got.Project) != "238222" {
+	if got := m.Requires["jei"]; got.Provider != "curseforge" || got.Project.String() != "238222" {
 		t.Fatalf("jei entry: %+v", got)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "client-overrides/mods", iris.filename)); err != nil {
