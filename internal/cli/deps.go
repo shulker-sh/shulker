@@ -170,6 +170,7 @@ func (a *app) resolverFor(ctx context.Context, p *project.Project, mode packMode
 		Meta:      d.meta,
 		Log:       a.progress,
 		Progress:  a.printer.Progress,
+		FailFast:  a.failFast,
 	}
 	r.LockModpack = func(ctx context.Context, key string, entry manifest.Require) error {
 		return a.lockHostedEntry(ctx, p, r, key, entry)

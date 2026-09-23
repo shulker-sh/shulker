@@ -82,6 +82,7 @@ func (a *app) installCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory")
 	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
 	ff.register(cmd, "for this run only")
+	a.registerFailFast(cmd)
 	return cmd
 }
 
@@ -108,7 +109,7 @@ func (a *app) fetchLocked(ctx context.Context, p *project.Project, sides []strin
 	fetched, dropWarnings, err := r.Install(ctx, sides...)
 	a.warn(dropWarnings)
 	if err != nil {
-		return nil, err
+		return nil, a.lastOf(err)
 	}
 	if fetched == nil {
 		fetched = []string{}

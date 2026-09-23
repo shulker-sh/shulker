@@ -46,6 +46,7 @@ type app struct {
 	backedUp   map[savesTarget]bool
 	log        *auditlog.Log
 	logState   logState
+	failFast   bool
 }
 
 // Execute runs shulker with args and returns the process exit code.

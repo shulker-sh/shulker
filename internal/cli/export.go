@@ -183,6 +183,7 @@ func (a *app) exportMrpackCmd() *cobra.Command {
 		},
 	}
 	f.register(cmd, ".mrpack", "put files that Modrinth launchers cannot download inside the archive")
+	a.registerFailFast(cmd)
 	cmd.Flags().StringVar(&f.side, "side", "", "export one side only (default: every declared side)")
 	return cmd
 }
@@ -234,6 +235,7 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 		},
 	}
 	f.register(cmd, ".zip", "put files that aren't on CurseForge inside the archive")
+	a.registerFailFast(cmd)
 	return cmd
 }
 

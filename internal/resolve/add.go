@@ -38,6 +38,9 @@ type Resolver struct {
 	Log       func(format string, args ...any)
 	// Warnings are raised while resolving, for the command to print when it finishes.
 	Warnings []string
+	// FailFast stops Install at the first download that fails, rather than trying every file and
+	// failing with them all.
+	FailFast bool
 	// Progress starts a download bar for the named files.
 	Progress func(verb string, files []out.Download) *out.Progress
 	// AskMove is shown the deps-held refusal before an add without --with-deps gives up;
@@ -646,7 +649,8 @@ func contains(list []string, s string) bool {
 
 // Install downloads every locked mod the cache lacks, taking manual downloads from DownloadsDir. It
 // returns the mods it fetched and warnings for files there that match no locked mod. With sides
-// given, it leaves out files that none of them use.
+// given, it leaves out files that none of them use. A download the host fails goes on to the next
+// file unless FailFast, and the error joins the failed downloads' and the missing files'.
 func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []string, error) {
 	files, err := r.sweepDownloads()
 	if err != nil {
@@ -688,6 +692,7 @@ func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []st
 			defer func() { r.Fetch.Progress = nil }()
 		}
 	}
+	var failed []*out.Error
 	for i, id := range wanted {
 		f := byID[id]
 		progress.File(downloads[i].Name)
@@ -697,19 +702,55 @@ func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []st
 			continue
 		}
 		if err != nil {
-			progress.Abort()
-			return fetched, warnings, f.downloadError(err)
+			err = f.downloadError(err)
+			code := out.CodeOf(err)
+			if r.FailFast || (code != "download-failed" && code != "checksum-mismatch") {
+				progress.Abort()
+				return fetched, warnings, err
+			}
+			failed = append(failed, out.AsError(err))
+			continue
 		}
 		progress.Advance()
 		fetched = append(fetched, id)
 	}
-	progress.Finish()
+	if len(failed) > 0 && len(fetched) == 0 {
+		progress.Abort()
+	} else {
+		progress.Finish()
+	}
+	var errs []error
+	if len(failed) > 0 {
+		errs = append(errs, downloadsFailed(failed))
+	}
 	if len(missing) > 0 {
 		e := out.Errorf("missing-files", "%d file(s) need a manual download", len(missing))
 		e.Items = missing
-		return fetched, warnings, e
+		errs = append(errs, e)
 	}
-	return fetched, warnings, nil
+	return fetched, warnings, errors.Join(errs...)
+}
+
+// downloadsFailed is the error for the locked files whose downloads failed: the one file's own
+// error, or one download-failed listing each file's.
+func downloadsFailed(failed []*out.Error) *out.Error {
+	if len(failed) == 1 {
+		return failed[0]
+	}
+	e := out.Errorf("download-failed", "couldn't download %d files", len(failed))
+	e.Help = failed[0].Help
+	for _, f := range failed {
+		if f.Help != e.Help {
+			e.Help = ""
+		}
+		e.Items = append(e.Items, f.Message)
+		row := out.Detail{Text: f.Message, Children: f.Rows}
+		if f.Code != e.Code {
+			row.Text += " (" + f.Code + ")"
+		}
+		e.Rows = append(e.Rows, row)
+	}
+	return e
 }
 
 // downloadError names the locked file whose download failed when the failure is its host's, as a CDN

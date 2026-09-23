@@ -66,6 +66,7 @@ func (a *app) checkCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&strict, "strict", false, "fail on warnings too")
+	a.registerFailFast(cmd)
 	return cmd
 }
 
@@ -78,7 +79,9 @@ func (a *app) checkLockedFiles(ctx context.Context, p *project.Project) ([]error
 	}
 	var errs []error
 	_, warnings, fetchErr := r.Install(ctx)
-	if fetchErr != nil {
+	if joined, ok := fetchErr.(interface{ Unwrap() []error }); ok {
+		errs = append(errs, joined.Unwrap()...)
+	} else if fetchErr != nil {
 		errs = append(errs, fetchErr)
 	}
 	v, err := r.Validate()

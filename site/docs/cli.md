@@ -167,6 +167,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
+| `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 | `--bundle` | Put files that Modrinth launchers can't download inside the archive |
 | `--assume-client` | Export a client even when the source declares none, from the mods and overrides both sides share |
 | `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
@@ -187,6 +188,7 @@ shulker export curseforge --bundle -o dist/my-pack.zip
 | `--os <os>` | Include mods gated on this OS: `macos`, `windows`, or `linux` (default: leave them out) |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
+| `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 | `--bundle` | Put mods that aren't on CurseForge inside the archive, and bundle every mod not from CurseForge when the lookup can't run |
 | `--assume-client` | Export a client even when the source declares none, from the mods and overrides both sides share |
 | `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
@@ -305,7 +307,7 @@ shulker lock
 Check the project the way CI should, on every push: fail when anything would break it, and change nothing. It writes nothing to the project: no `build/`, no lock, no history entry. Every problem is reported, not just the first, and the exit code is non-zero when there is any.
 
 - `shulker.lock` must match `shulker.json`: each difference is listed under `lock-stale`, and `check` never relocks.
-- Every locked file must be obtainable. Each is put in the download cache the way `install` does, so a run with the cache kept from the last one downloads nothing. A manual download missing from `downloads/`, a local file that is gone with no copy in the cache, or a download that fails is its own problem, under the code `install` would fail with.
+- Every locked file must be obtainable. Each is put in the download cache the way `install` does, so a run with the cache kept from the last one downloads nothing. Every file is tried, so one failed download doesn't hide the next, unless `--fail-fast`. The failed downloads are one problem, `download-failed`, and the manual downloads missing from `downloads/` and local files gone with no copy in the cache another, `missing-files`, as `install` reports them.
 - Every side the manifest declares is validated as `install` validates it, with every jar read: a mod whose dependency is missing or the wrong version fails with the same line and `shulker ignore` hint, and a problem only the server has fails a project that declares both sides. `ignore` entries and loader dependency overrides apply as usual.
 
 Warnings, such as an `ignore` entry that matches nothing or a local file served from the cache because the project's copy is gone, print without failing the run, unless `--strict` is passed.
@@ -317,6 +319,7 @@ shulker check
 | Flag | Description |
 | --- | --- |
 | `--strict` | Fail on warnings too |
+| `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 
 With `--json`, a clean run's `data.problems` is empty. A failing run ends with `check-failed`: its `items` are every problem's own items, each as `<code>: <item>`, one per thing to annotate, and `data.problems` lists each problem as an error, `{ "code", "message", "items", "help" }`.
 
@@ -612,6 +615,7 @@ shulker install
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
+| `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 
 ### `shulker build`
 
@@ -932,6 +936,7 @@ shulker serve server --accept-eula
 | --- | --- |
 | `--force` | Overwrite files edited in the build directory |
 | `--accept-eula` | Record acceptance of the Minecraft EULA in shulker.json without prompting |
+| `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 
 ### `shulker link`
 
@@ -1190,6 +1195,7 @@ A project whose side builds into its own directory is an instance, and `sync` ru
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
+| `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 
 ### `shulker instances`
 
@@ -1772,7 +1778,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `curseforge-offline` | A modpack's CurseForge zip was read without the network. It names its files by CurseForge ID alone, so no cached copy can stand in; the `curseforge` row, when there is one, is the network error |
 | `dependency-overrides-invalid` | Fabric Loader would refuse the `config/fabric_loader_dependencies.json` a side's build places, so the game wouldn't start: its first key isn't `"version": 1`, a key or dependency kind is unknown, or a range isn't a string or array of strings. The `cause` row says which |
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
-| `download-failed` | A locked file's provider failed to serve it at `install`, `sync`, `serve` or `export`: its CDN cut the file short, answered with an HTTP error, or the connection dropped. The message names the file and provider; rows show the URL and cause. Help says to try again later, or to run `shulker update` when the provider no longer has the file |
+| `download-failed` | A locked file's provider failed to serve it at `install`, `sync`, `serve`, `export` or `check`: its CDN cut the file short, answered with an HTTP error, or the connection dropped. The message names the file and provider; rows show the URL and cause. Help says to try again later, or to run `shulker update` when the provider no longer has the file. Every file is tried before the run fails, unless `--fail-fast`: with several failures the message counts them, a row names each file with its URL and cause, and `items` holds each file's message. When files also need a manual download, `missing-files` is the run's error and this one is in `data.errors` |
 | `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` rebuilds it, keeping the old file as `registry.json.replaced` |
 | `editor-failed` | The editor `instance edit` ran couldn't be started or exited with an error; set `$EDITOR` to the one you use |
