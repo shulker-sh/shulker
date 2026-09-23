@@ -38,6 +38,7 @@ type HistoryEntry struct {
 	Mods          int    `json:"mods"`
 	ResourcePacks int    `json:"resourcepacks,omitempty"`
 	Shaders       int    `json:"shaders,omitempty"`
+	Datapacks     int    `json:"datapacks,omitempty"`
 	Written       int    `json:"written,omitempty"`
 	Removed       int    `json:"removed,omitempty"`
 }
@@ -128,7 +129,7 @@ func TakeHistory(dir string, keep int, e HistoryEntry) (HistoryEntry, error) {
 	lk, lockErr := lock.Load(filepath.Join(dir, lock.FileName))
 	if lockErr == nil {
 		e.Minecraft, e.Loader, e.Mods = lk.Minecraft, lk.Loader.Type, len(lk.Mods)
-		e.ResourcePacks, e.Shaders = len(lk.ResourcePacks), len(lk.Shaders)
+		e.ResourcePacks, e.Shaders, e.Datapacks = len(lk.ResourcePacks), len(lk.Shaders), len(lk.Datapacks)
 	}
 	for _, name := range []string{manifest.FileName, lock.FileName} {
 		if err := copyFile(filepath.Join(dir, name), filepath.Join(into, name)); err != nil {

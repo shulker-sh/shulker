@@ -70,6 +70,20 @@ func TestHistoryCountsPacks(t *testing.T) {
 	}
 }
 
+func TestHistoryCountsDatapacks(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "terralith")
+	h.mustRun(t, "install")
+	h.mustRun(t, "remove", "terralith")
+
+	if stdout := h.mustRun(t, "history", "list"); !strings.Contains(stdout, "1 datapack") {
+		t.Fatalf("history list should count datapacks: %s", stdout)
+	}
+	if stdout := h.mustRun(t, "history", "show", "1"); !strings.Contains(stdout, "datapacks: 1") {
+		t.Fatalf("history show should count datapacks: %s", stdout)
+	}
+}
+
 func TestHistoryPruneAndWarning(t *testing.T) {
 	h := newInPlace(t)
 	h.editManifest(t, func(m map[string]any) { m["history"] = 1 })

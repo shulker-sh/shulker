@@ -157,6 +157,9 @@ func (a *app) historyShowCmd() *cobra.Command {
 				if e.Shaders > 0 {
 					rows = append(rows, out.Row{Label: "shaders", Text: strconv.Itoa(e.Shaders)})
 				}
+				if e.Datapacks > 0 {
+					rows = append(rows, out.Row{Label: "datapacks", Text: strconv.Itoa(e.Datapacks)})
+				}
 				l.Tree(rows...)
 				l.Blank()
 				if len(changes) == 0 {
@@ -383,6 +386,9 @@ func historyAside(e build.HistoryEntry) string {
 	}
 	if e.Shaders > 0 {
 		parts = append(parts, plural(e.Shaders, "shader", "shaders"))
+	}
+	if e.Datapacks > 0 {
+		parts = append(parts, plural(e.Datapacks, "datapack", "datapacks"))
 	}
 	return "(" + strings.Join(parts, ", ") + ")"
 }
