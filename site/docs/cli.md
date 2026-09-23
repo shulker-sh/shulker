@@ -888,6 +888,8 @@ It updates the instance first, resolves the account, fetches whatever the store 
 
 A detached game is still recorded. `play` hands it to a watcher — shulker itself, started again in the background with no window — which starts the game, waits for it, writes how the run ended to the instance's launch history, and exits. The record is the same one a launcher's [post-exit hook](#shulker-hook-post-exit) writes, so `instances` and the history read it the same way, except that shulker started the game itself and so also knows the status it exited with: a non-zero status is `crashed` whether or not the game managed to write a crash report. If the watcher is killed while the game is running, the record stays open with the game's process id in it, and the next command that touches the instance — `play`, `sync`, `instances repair` — closes it from the crash reports once that process has gone.
 
+A detached launch prints the account, the log and the game's `pid`, then a hint: if the game hangs, [`shulker instance dump`](#shulker-instance-dump) shows where it is stuck, and [`shulker instance log`](#shulker-instance-log) prints its output.
+
 `--wait` keeps the launch in the foreground instead: `play` starts the game itself, waits for it, records the run and says how it went. `--stream` does the same and shows the game's output as it runs, on stdout, or on stderr under `--json`. The log is written either way. A game that crashes is reported, not raised: `play` exits 0, because it got the game running, which is its job.
 
 Only the instances shulker owns can be played here: every other launcher starts its own, so an instance linked into one fails with `not-shulker`.
@@ -1256,7 +1258,7 @@ shulker instances repair --launcher prism --launcher-dir ~/other-prism
 
 ### `shulker instance`
 
-`instance get`, `instance set`, `instance unset` and `instance edit` read and change the settings of one instance: the one the current directory is, or the one `-i` names from anywhere. That is its `.shulker/instance.json`, and every directory shulker syncs into has one, so an instance in another launcher has settings here too. The plural [`shulker instances`](#shulker-instances) is the list of them.
+`instance get`, `instance set`, `instance unset` and `instance edit` read and change the settings of one instance: the one the current directory is, or the one `-i` names from anywhere. `instance dump` and `instance log` look into its game: where a running game is stuck, and what the latest run printed. That is its `.shulker/instance.json`, and every directory shulker syncs into has one, so an instance in another launcher has settings here too. The plural [`shulker instances`](#shulker-instances) is the list of them.
 
 A path is relative to the file's `settings` block and dotted the way `shulker set` dots the manifest: `memory`, `hooks.preLaunch`. Five settings are launch settings with a default in `config.json` under `play.`, which [`shulker config set`](#shulker-config-set) sets for every instance at once: an instance that sets one wins, and one that doesn't inherits the default. They apply when shulker launches the instance itself, with [`shulker play`](#shulker-play). `play.java` and `play.wrapper` don't reach another launcher, but an instance's own `java` and `wrapper` still point that launcher at a Java and a wrapper, as before.
 
@@ -1316,6 +1318,42 @@ shulker instance unset memory
 Open the instance's `instance.json` in `$VISUAL` or `$EDITOR`, or in `vi` (`notepad` on Windows) when neither is set, and check the file once the editor exits. It opens a file that no longer matches its schema too, since that is the file most in need of an editor; a save that still doesn't fails with `instance-invalid` and leaves what you saved in place for the next edit. It needs a terminal, so under `--no-input` or off one it is a usage error, and an editor that exits with an error fails with `editor-failed`.
 
 With `--json`, the data is `{ "file", "changed" }`.
+
+### `shulker instance dump`
+
+Take a thread dump of the instance's running game and print the stacks of its `main` and `Render thread` threads, then the log that holds the rest. A game that froze with nothing on screen is usually sitting in one of those two, in the frame of the mod that holds it up. Only a game [`shulker play`](#shulker-play) started can be dumped, since shulker knows its process; with none running, it fails with `game-not-running`.
+
+On macOS and Linux it sends the game `SIGQUIT`, on which Java prints every thread's stack into the run's log and carries on, and waits up to 10 seconds for the dump to finish (`dump-timeout`). On Windows it runs `jcmd <pid> Thread.print` from the folder the game's `java` is in and appends the dump to the run's log; a runtime with no `jcmd` there fails with `jcmd-not-found`, naming the path it looked for. The Windows path hasn't been checked on a real Windows machine yet.
+
+A game started through `settings.wrapper` is refused with `game-wrapped`, naming the wrapper's pid: that is the only process shulker knows, and a wrapper that runs Java as its child rather than becoming it would be killed by the signal. Find the java process under it yourself and pass its pid with `--pid`.
+
+| Flag | Description |
+| --- | --- |
+| `--pid <pid>` | Dump this Java process instead of the one the run recorded, for a game started through a wrapper |
+
+```sh
+shulker instance dump
+shulker instance dump -i smp
+shulker instance dump --pid 48213
+```
+
+With `--json`, the data is `{ "pid", "log", "threads" }`, where `threads` is every thread in the dump as `{ "name", "stack" }`, in the order Java printed them.
+
+### `shulker instance log`
+
+Print the game's output from the instance's latest run: the log [`shulker play`](#shulker-play) wrote under `.shulker/logs/`, or while another launcher's run is going, the game's own `logs/latest.log`. With no run yet it fails with `run-not-found`.
+
+| Flag | Description |
+| --- | --- |
+| `-f`, `--follow` | Keep printing new output until the game exits or you press Ctrl-C; not with `--json` |
+| `--limit <n>` | Print only the last `n` lines; with `--follow`, the last `n` and then everything new, like `tail -n <n> -f` |
+
+```sh
+shulker instance log
+shulker instance log -f --limit 50
+```
+
+With `--json`, the data is `{ "log", "lines" }`.
 
 ### `shulker unlink`
 
@@ -1453,7 +1491,7 @@ A launcher that gives shulker no way to show a message gets a deadline instead, 
 
 What a launcher's own post-exit slot runs, recording how the run ended in the instance's `.shulker/launches.json`: when it started and finished, whether the game left a crash report, and where that report and the log are. `settings.launchHistory` in `.shulker/instance.json` is how many runs are kept — 5 by default, `-1` every one, and `0` none at all, which records nothing.
 
-A run's `outcome` is `ok`, `crashed`, or `not-started` for one the game never began, which also carries the reason in `error` and has the same `startedAt` and `endedAt`. A run [`play`](#shulker-play) started also has `exitCode`, the status the game left, which no launcher passes to its post-exit slot; and while it is still going, `pid`, the game's own process, which the record drops once it is closed.
+A run's `outcome` is `ok`, `crashed`, or `not-started` for one the game never began, which also carries the reason in `error` and has the same `startedAt` and `endedAt`. A run [`play`](#shulker-play) started also has `exitCode`, the status the game left, which no launcher passes to its post-exit slot; and while it is still going, `pid`, the game's own process, `java`, the runtime it runs on, and `wrapped`, true when `settings.wrapper` started it so `pid` is the wrapper's, all of which the record drops once it is closed.
 
 ### `shulker hook wrap -- <java arguments>`
 
@@ -1793,6 +1831,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `dependency-overrides-invalid` | Fabric Loader would refuse the `config/fabric_loader_dependencies.json` a side's build places, so the game wouldn't start: its first key isn't `"version": 1`, a key or dependency kind is unknown, or a range isn't a string or array of strings. The `cause` row says which |
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
 | `download-failed` | A locked file's provider failed to serve it at `install`, `sync`, `serve`, `export` or `check`: its CDN cut the file short, answered with an HTTP error, or the connection dropped. The message names the file and provider; rows show the URL and cause. Help says to try again later, or to run `shulker update` when the provider no longer has the file. Every file is tried before the run fails, unless `--fail-fast`: with several failures the message counts them, a row names each file with its URL and cause, and `items` holds each file's message. When files also need a manual download, `missing-files` is the run's error and this one is in `data.errors` |
+| `dump-timeout` | The game `instance dump` asked for a thread dump printed none within 10 seconds, which a JVM started with `-Xrs` never does |
 | `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` rebuilds it, keeping the old file as `registry.json.replaced` |
 | `editor-failed` | The editor `instance edit` ran couldn't be started or exited with an error; set `$EDITOR` to the one you use |
@@ -1802,6 +1841,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `file-not-found` | A file named to `pull` isn't in the build directory, a path given to `add` or `match` isn't a file, or a mod or modpack's `file` in `shulker.json` names a folder. `candidates`: the closest file there, for `pull` |
 | `file-taken` | `add` would copy a local file or folder into `files/`, which already holds a different one of that name that no entry of the same key names; rename one or remove the one in `files/`. Also an `import` whose pack names two different local files of one name |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
+| `game-not-running` | `instance dump` found no game running in the instance: no run is open, its game has gone, or another launcher started it, so shulker has no process to ask; or no process has the pid `--pid` names |
+| `game-wrapped` | `instance dump` won't signal a game started through `settings.wrapper`, since the pid it knows is the wrapper's. The row names that pid; pass Java's own with `--pid` |
 | `git-missing` | A git source needs `git` on PATH |
 | `group-not-found` | `--group` names a save group that isn't under the saves root |
 | `history-empty` | The instance has no history entries yet; one is taken before an in-place build changes anything |
@@ -1822,6 +1863,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `java-not-found` | No working Java at the configured path or on PATH |
 | `java-range` | `java` in `shulker.json` is neither a path nor a version range |
 | `java-version` | The Java found is outside the range in `shulker.json` |
+| `jcmd-not-found` | On Windows, the game's runtime has no `jcmd` beside its `java` for `instance dump` to take a thread dump with. The row names the path it looked for |
 | `jvm-flags` | Unknown `jvmFlags` preset |
 | `key-not-found` | A `--key` isn't in the file. `candidates`: its keys |
 | `launch-not-started` | Shulker never got as far as running the game: for `hook wrap`, the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start; for `play`, the Java it assembled wouldn't start, or the watcher it hands a detached launch to couldn't be started or stopped before it answered. Under a launcher the exit is what makes it show an error, since no window appears |
@@ -1902,6 +1944,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `resourcepack-not-distributed` | `server.resourcePack` names a pack its provider forbids redistributing, so the lock has no URL for it |
 | `resourcepack-not-found` | `server.resourcePack` isn't a locked resource pack. `candidates`: the locked resource packs |
 | `restore-failed` | `restore --all` failed for some targets; `data` has each target's result |
+| `run-not-found` | `instance log` found no run to print: the instance has never been played, or the latest run's log has been deleted |
 | `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |
 | `schema-newer` | `shulker.json`, `shulker.lock`, `.shulker/instance.json`, `registry.json`, `config.json` or `accounts.json` was written by a newer shulker, and this one can't read it; the message names both schema versions, and `shulker self update` catches up. A newer `shulker.local.json` or `.shulker/state.json` warns instead, with the same fix |
