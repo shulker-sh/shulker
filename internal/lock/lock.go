@@ -21,6 +21,7 @@ const FileName = "shulker.lock"
 type Lock struct {
 	Schema        string             `json:"$schema"`
 	Minecraft     string             `json:"minecraft"`
+	DataVersion   int                `json:"dataVersion,omitempty"`
 	Loader        Loader             `json:"loader,omitzero"`
 	Java          Java               `json:"java"`
 	Server        *Download          `json:"server,omitempty"`

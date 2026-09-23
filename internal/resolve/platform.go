@@ -93,6 +93,22 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 	return platform, nil
 }
 
+// firstWithDataVersion is the first 1.14 snapshot, where the server jar's version.json starts.
+var firstWithDataVersion = mcver.MustParse("1.13").TildeUpper()
+
+// DataVersion is game's data version, 0 for a version older than 1.14 without asking. Reading it
+// never blocks a lock: a failure comes back as a warning, and the next relock tries again.
+func (mt *Meta) DataVersion(ctx context.Context, game string) (dataVersion int, warning string) {
+	if v, err := mcver.Parse(game); err == nil && v.Compare(firstWithDataVersion) < 0 {
+		return 0, ""
+	}
+	dataVersion, err := mt.Piston.DataVersion(ctx, game)
+	if err != nil {
+		return 0, fmt.Sprintf("couldn't read the Minecraft %s data version, so ${minecraft.dataVersion} stays unset until the next relock: %v", game, err)
+	}
+	return dataVersion, ""
+}
+
 // inheritedDifferences reports a platform the locked modpacks supply that the lock
 // doesn't hold yet, so a modpack moving to another Minecraft or loader re-resolves
 // the projects that inherit from it instead of leaving them on a stale lock.

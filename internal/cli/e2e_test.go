@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
@@ -100,6 +101,7 @@ type harness struct {
 	assetIndex     []byte
 	assets         map[string]string
 	noQuickPlay    bool
+	noRanges       bool
 	hitsMu         sync.Mutex
 	storeHits      int
 	quiltHits      int
@@ -191,7 +193,7 @@ func newHarness(t *testing.T) *harness {
 			},
 		})
 	})
-	h.vanilla = makeJarFile(t, "minecraft", "server.jar", "version.json", `{"id":"26.2"}`)
+	h.vanilla = makeJarFile(t, "minecraft", "server.jar", "version.json", `{"id":"26.2","world_version":4903}`)
 	h.clientJar = makeJarFile(t, "minecraft", "client.jar", "version.json", `{"id":"26.2"}`)
 	h.brigadier = makeJarFile(t, "brigadier", "brigadier-1.3.10.jar", "brigadier.txt", "brigadier")
 	h.fabricLoader = makeJarFile(t, "fabric_loader", "fabric-loader-0.17.3.jar", "fabric.mod.json", `{"id":"fabricloader"}`)
@@ -259,6 +261,10 @@ func newHarness(t *testing.T) *harness {
 	}
 	for path, data := range mavenFiles {
 		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			if !h.noRanges && (r.Method == http.MethodHead || r.Header.Get("Range") != "") {
+				http.ServeContent(w, r, filepath.Base(path), time.Time{}, bytes.NewReader(data))
+				return
+			}
 			h.hit(&h.quiltHits)
 			w.Write(data)
 		})

@@ -17,6 +17,11 @@
       "minLength": 1,
       "description": "Resolved Minecraft version id, exactly as Mojang's manifest names it."
     },
+    "dataVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The Minecraft version's data version, the world_version in the version.json its server jar carries. Absent when the version doesn't say, as before 1.14, or when it couldn't be read; the next relock tries again."
+    },
     "loader": {
       "type": "object",
       "required": ["type", "version"],

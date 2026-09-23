@@ -11,7 +11,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -113,10 +112,7 @@ func (a *app) initCmd() *cobra.Command {
 			if platform.Minecraft != m.Minecraft && m.Minecraft == "*" {
 				m.Minecraft = platform.Minecraft
 			}
-			l := lock.New()
-			l.Minecraft = platform.Minecraft
-			l.Loader = platform.Loader
-			l.Java = platform.Java
+			l := a.platformLock(cmd.Context(), d, platform)
 			p := &project.Project{Dir: dir, Manifest: m, Lock: l}
 			if err := p.SaveManifest(); err != nil {
 				return err

@@ -155,3 +155,12 @@ func TestQuiltLoaderProvides(t *testing.T) {
 		t.Fatalf("fabric provides %v, %v", provides, err)
 	}
 }
+
+func TestDataVersionIsNotLookedForBefore114(t *testing.T) {
+	mt := &Meta{}
+	for _, game := range []string{"1.7.10", "1.13.2", "1.13-pre1"} {
+		if got, warning := mt.DataVersion(context.Background(), game); got != 0 || warning != "" {
+			t.Errorf("%s: got %d, %q", game, got, warning)
+		}
+	}
+}

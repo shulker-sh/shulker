@@ -319,11 +319,21 @@ func (a *app) importLock(ctx context.Context, d *deps, exact *manifest.Manifest)
 	if err != nil {
 		return nil, err
 	}
+	return a.platformLock(ctx, d, platform), nil
+}
+
+// platformLock is a new project's lock, holding just the platform it resolved to.
+func (a *app) platformLock(ctx context.Context, d *deps, platform *resolve.Platform) *lock.Lock {
 	l := lock.New()
 	l.Minecraft = platform.Minecraft
 	l.Loader = platform.Loader
 	l.Java = platform.Java
-	return l, nil
+	dataVersion, warning := d.meta.DataVersion(ctx, platform.Minecraft)
+	if warning != "" {
+		a.printer.Warn("%s", warning)
+	}
+	l.DataVersion = dataVersion
+	return l
 }
 
 func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []string, error) {
