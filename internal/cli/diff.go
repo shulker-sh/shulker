@@ -237,7 +237,7 @@ func (a *app) adoptFiles(cmd *cobra.Command, p *project.Project, rep *build.Pull
 	if len(rep.Adoptable) == 0 {
 		return nil
 	}
-	_, err := a.relockProject(cmd, p, true, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+	_, err := a.relockProject(cmd, p, relockOptions{keepUnchanged: true}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 		for _, rel := range rep.Adoptable {
 			abs := filepath.Join(rep.Dir, filepath.FromSlash(rel))
 			dest, _, err := r.ProjectPath(abs)

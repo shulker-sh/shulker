@@ -290,7 +290,7 @@ func (a *app) initPack(cmd *cobra.Command, p *project.Project, source string) (f
 	if source == "" {
 		return func(*out.Lines) {}, nil
 	}
-	rl, err := a.relockProject(cmd, p, false, func(p *project.Project, r *resolve.Resolver) (string, error) {
+	rl, err := a.relockProject(cmd, p, relockOptions{}, func(p *project.Project, r *resolve.Resolver) (string, error) {
 		return "", a.addPackEntry(cmd.Context(), p, r, source, "", manifest.Require{Source: source})
 	})
 	if err != nil {

@@ -126,7 +126,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			inst, err := a.linkProject(gameDir, id, display, ref, src)
+			inst, linked, err := a.linkProject(gameDir, id, display, ref, src)
 			if err != nil {
 				return err
 			}
@@ -138,7 +138,7 @@ func (a *app) linkMojangCmd() *cobra.Command {
 			}
 			row := config.Instance{ID: id, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name}
 			a.registerInstance(row)
-			synced, err := a.syncInPlace(cmd, inst, "client", syncRequest{})
+			synced, err := a.syncInPlace(cmd, inst, "client", syncRequest{linked: linked})
 			if err != nil {
 				return err
 			}
@@ -227,7 +227,7 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 	if err != nil {
 		return nil, syncResult{}, err
 	}
-	p, err := a.linkProject(row.Dir, id, row.Name, ref, src)
+	p, linked, err := a.linkProject(row.Dir, id, row.Name, ref, src)
 	if err != nil {
 		return nil, syncResult{}, err
 	}
@@ -236,7 +236,7 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 	}
 	row.ID, row.Source = id, src.name
 	a.registerInstance(row)
-	synced, err := a.syncInPlace(cmd, p, "client", syncRequest{})
+	synced, err := a.syncInPlace(cmd, p, "client", syncRequest{linked: linked})
 	return p, synced, err
 }
 
@@ -244,23 +244,24 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as, ref stri
 // calls an instance, following the link's source as a modpack and building where it stands. A
 // project already there is adopted, never replaced, so a relink keeps whatever the player added
 // on top of the pack. Its name is set to the id either way, since repair reads the id back from it.
-func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*project.Project, error) {
-	p, err := a.openProjectAt(gameDir)
+func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (p *project.Project, linked string, err error) {
+	p, err = a.openProjectAt(gameDir)
 	if src.isAuthor {
 		if err == nil {
-			return nil, authoredOver(gameDir)
+			return nil, "", authoredOver(gameDir)
 		}
 		if !errors.Is(err, project.ErrNoManifest) {
-			return nil, err
+			return nil, "", err
 		}
-		return authorInstance(gameDir, id, display, src)
+		p, err := authorInstance(gameDir, id, display, src)
+		return p, "", err
 	}
 	if errors.Is(err, project.ErrNoManifest) {
-		a.linkedPack = src.project.Manifest.Name
-		return newInstance(gameDir, id, display, ref, src)
+		p, err := newInstance(gameDir, id, display, ref, src)
+		return p, src.project.Manifest.Name, err
 	}
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if p.Lock == nil {
 		p.Lock = lock.New()
@@ -284,17 +285,17 @@ func (a *app) linkProject(gameDir, id, display, ref string, src *syncSource) (*p
 	}
 	entry, held := p.Manifest.Requires[key]
 	if held && entry.Kind() != manifest.TypeModpack {
-		return nil, manifest.KeyTaken(key, entry.Kind(), manifest.TypeModpack)
+		return nil, "", manifest.KeyTaken(key, entry.Kind(), manifest.TypeModpack)
 	}
 	if entry.Source != src.name || entry.Ref != ref {
 		entry.Source, entry.Ref = src.name, ref
 		p.Manifest.Requires[key], changed = entry, true
-		a.linkedPack = key
+		linked = key
 	}
 	if !changed {
-		return p, nil
+		return p, linked, nil
 	}
-	return p, p.SaveManifest()
+	return p, linked, p.SaveManifest()
 }
 
 // newInstance writes the instance manifest. It pins no platform and lists no feature: the pack is

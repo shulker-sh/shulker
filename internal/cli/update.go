@@ -128,7 +128,7 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	if err != nil {
 		return err
 	}
-	rl, err := a.relockProject(cmd, p, false, run)
+	rl, err := a.relockProject(cmd, p, relockOptions{}, run)
 	if err != nil {
 		return err
 	}
@@ -192,9 +192,16 @@ func (a *app) relock(cmd *cobra.Command, run func(*project.Project, *resolve.Res
 	})
 }
 
-// relockProject re-resolves p's lock with run and saves it. With keepUnchanged, a relock that
-// changes nothing writes nothing, so a sync on every launch doesn't fill the history with copies.
-func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchanged bool, run func(*project.Project, *resolve.Resolver) (pin string, err error)) (relocked, error) {
+// relockOptions shape a relock. With keepUnchanged, a relock that changes nothing writes nothing,
+// so a sync on every launch doesn't fill the history with copies. linked is the modpack a link just
+// pointed the project at.
+type relockOptions struct {
+	keepUnchanged bool
+	linked        string
+}
+
+// relockProject re-resolves p's lock with run and saves it.
+func (a *app) relockProject(cmd *cobra.Command, p *project.Project, opts relockOptions, run func(*project.Project, *resolve.Resolver) (pin string, err error)) (relocked, error) {
 	if err := p.RequireLock(); err != nil {
 		return relocked{}, err
 	}
@@ -203,9 +210,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	if err != nil {
 		return relocked{}, err
 	}
-	a.isRelocking = true
-	defer func() { a.isRelocking = false }()
-	r, err := a.resolver(cmd.Context(), p)
+	r, err := a.resolverFor(cmd.Context(), p, packMode{isRelocking: true, linked: opts.linked})
 	if err != nil {
 		return relocked{}, err
 	}
@@ -245,7 +250,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, keepUnchange
 	a.warn(r.Warnings)
 	a.warn(v.Warnings)
 	a.warn(unshippedWarnings(rl.Changes, p.Manifest.Sides(), r.Lock.Mods, placements))
-	if keepUnchanged && !stale {
+	if opts.keepUnchanged && !stale {
 		now, err := json.Marshal(p.Lock)
 		if err != nil {
 			return relocked{}, err

@@ -295,7 +295,6 @@ func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest)
 	} else if ok {
 		return a.syncInPlace(cmd, p, side, req)
 	}
-	a.packs = nil
 	src, err := a.openSource(cmd.Context(), e.Source, e.Ref)
 	if err != nil {
 		return syncResult{}, err

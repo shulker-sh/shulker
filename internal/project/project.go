@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 )
 
 var ErrNoManifest = &out.Error{Code: "manifest-not-found", Message: "no shulker.json here", Help: "run `shulker init`", Exit: out.ExitError}
@@ -23,6 +24,14 @@ type Project struct {
 	UnreadableLock error
 	// ReplacedLock is where SaveLock kept the unreadable lock it wrote over.
 	ReplacedLock string
+	// Packs are the modpacks the command has read for the project, for its later steps to reuse.
+	Packs *OpenedPacks
+}
+
+// OpenedPacks are the modpacks a command read for a project, and whether a relock read them.
+type OpenedPacks struct {
+	Loaded      []*pack.Loaded
+	IsRelocking bool
 }
 
 // Open fails on a lock it can't read; OpenReplacingLock tolerates one.

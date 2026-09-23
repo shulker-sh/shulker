@@ -44,6 +44,8 @@ type syncRequest struct {
 	// rerun is the take-over command for a state file sync can't read; empty names the command that
 	// rebuilds the directory.
 	rerun string
+	// linked is the modpack a link just pointed the instance at.
+	linked string
 }
 
 func (a *app) syncCmd() *cobra.Command {

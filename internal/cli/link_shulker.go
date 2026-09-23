@@ -74,7 +74,7 @@ func (a *app) linkShulker(cmd *cobra.Command, args []string, ref, as string, for
 	if _, err := os.Stat(gameDir); os.IsNotExist(err) {
 		created = true
 	}
-	inst, err := a.linkProject(gameDir, nick, display, ref, src)
+	inst, linked, err := a.linkProject(gameDir, nick, display, ref, src)
 	if err != nil {
 		return shulkerReport{}, err
 	}
@@ -82,7 +82,7 @@ func (a *app) linkShulker(cmd *cobra.Command, args []string, ref, as string, for
 		return shulkerReport{}, err
 	}
 	a.registerInstance(config.Instance{ID: nick, Launcher: "shulker", Name: display, Dir: gameDir, Source: src.name})
-	synced, err := a.syncInPlace(cmd, inst, "client", syncRequest{})
+	synced, err := a.syncInPlace(cmd, inst, "client", syncRequest{linked: linked})
 	if err != nil {
 		return shulkerReport{}, err
 	}

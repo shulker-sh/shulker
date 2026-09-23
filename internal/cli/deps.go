@@ -147,11 +147,15 @@ func (a *app) openWith(open func(string) (*project.Project, error), dir string) 
 }
 
 func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolver, error) {
+	return a.resolverFor(ctx, p, packMode{})
+}
+
+func (a *app) resolverFor(ctx context.Context, p *project.Project, mode packMode) (*resolve.Resolver, error) {
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
 	}
-	packs, err := a.openPacks(ctx, p)
+	packs, err := a.openPacks(ctx, p, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +182,7 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 	if err != nil {
 		return nil, err
 	}
-	packs, err := a.openPacks(ctx, p)
+	packs, err := a.openPacks(ctx, p, packMode{})
 	if err != nil {
 		return nil, err
 	}
@@ -203,9 +207,18 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
 }
 
-func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded, error) {
-	if a.packs != nil {
-		return a.packs, nil
+// packMode is how openPacks reads a project's modpacks. A relock reads local packs as they are on
+// disk, since they have no version to hold back. linked is the modpack a link just pointed the
+// project at, resolved without the warning a moved modpack gets.
+type packMode struct {
+	isRelocking bool
+	linked      string
+}
+
+func (a *app) openPacks(ctx context.Context, p *project.Project, mode packMode) ([]*pack.Loaded, error) {
+	prior := p.Packs
+	if prior != nil && (prior.IsRelocking || !mode.isRelocking) {
+		return prior.Loaded, nil
 	}
 	store, err := a.packStore(p)
 	if err != nil {
@@ -217,10 +230,18 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 		mp := modpacks[name]
 		pinned, ok := p.Lock.Modpacks[name]
 		moved := ok && (pinned.Source != mp.Source || pinned.File != mp.File || (mp.IsHosted() && len(project.HostedDifferences(name, mp, pinned)) > 0))
-		// A relock reads local packs as they are on disk: they have no version to hold back.
-		if !ok || moved || (a.isRelocking && a.rereads(p, mp, pinned)) {
+		isFresh := !ok || moved
+		// An earlier read already resolved a new or moved modpack, and holds the rest at the pins a
+		// relock reads them at too, so a relock reads again only what it would take from disk.
+		if prior != nil && (isFresh || !a.rereads(p, mp, pinned)) {
+			if i := slices.IndexFunc(prior.Loaded, func(l *pack.Loaded) bool { return l.Name == name }); i >= 0 {
+				loaded = append(loaded, prior.Loaded[i])
+				continue
+			}
+		}
+		if isFresh || (mode.isRelocking && a.rereads(p, mp, pinned)) {
 			switch {
-			case name == a.linkedPack:
+			case name == mode.linked:
 			case !ok && len(p.Lock.Modpacks) > 0:
 				a.printer.Warn("modpack %s is not in the lock yet; resolving it", name)
 			case moved && mp.IsHosted():
@@ -245,8 +266,16 @@ func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*pack.Loaded
 		}
 		loaded = append(loaded, l)
 	}
-	a.packs = loaded
+	p.Packs = &project.OpenedPacks{Loaded: loaded, IsRelocking: mode.isRelocking}
 	return loaded, nil
+}
+
+// replacePacks records packs a command resolved again in place of what openPacks read for p.
+func replacePacks(p *project.Project, loaded []*pack.Loaded) {
+	if p.Packs == nil {
+		p.Packs = &project.OpenedPacks{}
+	}
+	p.Packs.Loaded = loaded
 }
 
 // rereads reports whether a relock reads a modpack afresh rather than at its pin: a local directory
@@ -312,7 +341,7 @@ func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolv
 	if err := r.RefreshPacks(loaded); err != nil {
 		return nil, err
 	}
-	a.packs = loaded
+	replacePacks(p, loaded)
 	return loaded, nil
 }
 

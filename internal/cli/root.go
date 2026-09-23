@@ -18,7 +18,6 @@ import (
 	"shulker.sh/shulker/internal/auditlog"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/selfupdate"
 	"shulker.sh/shulker/internal/server"
 )
@@ -30,26 +29,23 @@ stdout, errors included. Act on error.code rather than the message, and run
 "shulker lock" when lockStale is true.`
 
 type app struct {
-	printer     *out.Printer
-	style       out.Options
-	stdin       io.Reader
-	tty         func() bool
-	asker       asker
-	dir         string
-	instance    string
-	d           *deps
-	configPath  string
-	packs       []*pack.Loaded
-	isRelocking bool
-	linkedPack  string
-	releases    *selfupdate.Releases
-	exe         func() (string, error)
-	installer   func(ctx context.Context, java, jar string, args []string) error
-	watcher     func(req watchRequest) (int, error)
-	isRunning   bool
-	backedUp    map[savesTarget]bool
-	log         *auditlog.Log
-	logState    logState
+	printer    *out.Printer
+	style      out.Options
+	stdin      io.Reader
+	tty        func() bool
+	asker      asker
+	dir        string
+	instance   string
+	d          *deps
+	configPath string
+	releases   *selfupdate.Releases
+	exe        func() (string, error)
+	installer  func(ctx context.Context, java, jar string, args []string) error
+	watcher    func(req watchRequest) (int, error)
+	isRunning  bool
+	backedUp   map[savesTarget]bool
+	log        *auditlog.Log
+	logState   logState
 }
 
 // Execute runs shulker with args and returns the process exit code.
