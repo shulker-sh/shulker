@@ -349,7 +349,7 @@ func (im *importer) lookUpOnModrinth(ctx context.Context, sha1s []string) error 
 		return nil
 	}
 	im.r.log("looking up %d file(s) on Modrinth", len(sha1s))
-	failed := func(err error) error { return lookupFailed("Modrinth", fmt.Sprintf("%d file(s)", len(sha1s)), err) }
+	failed := func(err error) error { return lookupFailed("modrinth", fmt.Sprintf("%d file(s)", len(sha1s)), err) }
 	versions, err := im.modrinth.VersionsByHash(ctx, sha1s)
 	if err != nil {
 		return failed(err)
@@ -405,11 +405,11 @@ func (im *importer) matchCurseForge(ctx context.Context) error {
 	im.r.log("looking up %d file(s) on CurseForge", len(left))
 	matches, err := cf.MatchFingerprints(ctx, fingerprints)
 	if err != nil {
-		return lookupFailed("CurseForge", fmt.Sprintf("%d file(s)", len(left)), err)
+		return lookupFailed("curseforge", fmt.Sprintf("%d file(s)", len(left)), err)
 	}
 	found, err := findOnCurseForge(ctx, cf, matches)
 	if err != nil {
-		return lookupFailed("CurseForge", fmt.Sprintf("%d file(s)", len(left)), err)
+		return lookupFailed("curseforge", fmt.Sprintf("%d file(s)", len(left)), err)
 	}
 	for i, o := range left {
 		m, ok := found[fingerprints[i]]
@@ -628,10 +628,10 @@ func (im *importer) canListPack(key, kind string) (bool, error) {
 	return true, im.r.packKeyFree(key, kind)
 }
 
-// lookupFailed is a file in the pack that couldn't be looked up on a provider, with the provider's
+// lookupFailed is a file in the pack that couldn't be looked up on the named provider, with its
 // error in a row. A network failure stays one for fetch.IsNetwork.
-func lookupFailed(on, file string, err error) error {
-	e := out.Errorf("mrpack-lookup", "couldn't look up %s on %s", file, on).WithCause(strings.ToLower(on), err)
+func lookupFailed(providerName, file string, err error) error {
+	e := out.Errorf("mrpack-lookup", "couldn't look up %s on %s", file, provider.Title(providerName)).WithCause(providerName, err)
 	if !fetch.IsNetwork(err) {
 		return e
 	}
