@@ -382,3 +382,36 @@ func TestBuildPlacesAHybridDatapackAsAResourcePack(t *testing.T) {
 		t.Fatal("the resource pack copy stays on the client whatever the side")
 	}
 }
+
+func TestExportsShipAHybridDatapacksResourcePackCopy(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "terralith")
+	h.mustRun(t, "set", "requires.terralith.resourcepack", "true")
+	h.mustRun(t, "lock")
+	h.mustRun(t, "install")
+	h.allowMrpackHost(t)
+
+	h.mustRun(t, "export", "mrpack", "--version", "1.0")
+	index, _ := readMrpack(t, filepath.Join(h.dir, "build", "pack-1.0.mrpack"))
+	paths := map[string]map[string]string{}
+	for _, f := range index.Files {
+		paths[f.Path] = f.Env
+	}
+	if env := paths["resourcepacks/terralith.zip"]; env["client"] != "required" || env["server"] != "unsupported" {
+		t.Fatalf("the resource pack copy is a client file of its own: %+v", index.Files)
+	}
+	if _, ok := paths["datapacks/terralith.zip"]; !ok {
+		t.Fatalf("the datapack copy still ships: %+v", index.Files)
+	}
+
+	code, stdout, _ := h.run(t, "--json", "export", "curseforge", "--version", "1.0")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "curseforge-cant-place" || !strings.Contains(stdout, "terralith (resourcepacks/)") {
+		t.Fatalf("the resource pack copy can't go by file ID: code=%d %s", code, stdout)
+	}
+	h.mustRun(t, "export", "curseforge", "--version", "1.0", "--bundle")
+	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
+	if entries["overrides/resourcepacks/terralith.zip"] != string(h.jars["terralith"].data) {
+		t.Fatal("the resource pack copy is bundled")
+	}
+}

@@ -86,7 +86,8 @@ type curseForgeEntry struct {
 	alias            int
 	loaders          []string
 	// bundleOnly marks a file the CurseForge app can't place where the build does: a datapack
-	// outside datapacks/, the one folder the app installs datapacks in.
+	// outside datapacks/, the one folder the app installs datapacks in, including a hybrid's
+	// resource pack copy.
 	bundleOnly bool
 }
 
@@ -195,7 +196,7 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		fingerprints = append(fingerprints, curseforge.Fingerprint(data))
 	}
 	if len(unplaceable) > 0 {
-		e := out.Errorf("curseforge-cant-place", "%s can't go in by file ID: the CurseForge app installs datapacks in datapacks/, and this build places them in a global datapack mod's folder", kindCount(map[string]int{manifest.TypeDatapack: len(unplaceable)}))
+		e := out.Errorf("curseforge-cant-place", "%s can't go in by file ID: the CurseForge app installs datapacks in datapacks/, and this build places them elsewhere", kindCount(map[string]int{manifest.TypeDatapack: len(unplaceable)}))
 		return nil, nil, nil, bundleNudge(e, unplaceable, "shulker export curseforge --bundle")
 	}
 	matches := map[uint32]curseforge.Match{}
@@ -399,7 +400,7 @@ func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 		if !t.packs[ref.key] {
 			continue
 		}
-		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.ProviderFilename, providerFilename: ref.pack.ProviderFilename, loaders: ref.pack.Loaders})
+		entries = append(entries, curseForgeEntry{key: ref.key, kind: ref.kind, path: ref.path, provider: ref.pack.Provider, sha512: ref.pack.Sha512, url: ref.pack.URL, project: ref.pack.Project, version: ref.pack.Version, filename: ref.pack.ProviderFilename, providerFilename: ref.pack.ProviderFilename, loaders: ref.pack.Loaders, bundleOnly: ref.hybrid})
 	}
 	for _, key := range sortedPacks(b.Lock.Datapacks) {
 		rel, ok := t.datapacks[key]
