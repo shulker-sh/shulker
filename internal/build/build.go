@@ -154,9 +154,9 @@ type Options struct {
 	Origin      Origin
 	// NoLauncher leaves the server launcher out, for an export that ships none of it.
 	NoLauncher bool
-	// PackVersion stands in for the manifest's version in the project's ${pack.version}, for an
+	// ProjectVersion stands in for the manifest's version in the project's ${project.version}, for an
 	// export given a version of its own.
-	PackVersion string
+	ProjectVersion string
 	// BeforeModChange runs once, before a build that adds, replaces or removes a mod writes
 	// anything.
 	BeforeModChange func() error
@@ -497,8 +497,8 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		placed[b.Lock.JarID(id)] = true
 	}
 	vars := templateVars(b.Manifest, b.Lock, side)
-	if opts.PackVersion != "" {
-		vars["pack.version"] = opts.PackVersion
+	if opts.ProjectVersion != "" {
+		vars["project.version"] = opts.ProjectVersion
 	}
 	levelName := "world"
 	var shipped string

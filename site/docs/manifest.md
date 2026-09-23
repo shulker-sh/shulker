@@ -143,7 +143,7 @@ Type: `string`. pattern `^[^/\\]`, min length 1
 
 ### variables
 
-Values substituted for ${name} in *.tmpl override files and in server.properties values. The built-ins ${pack.name}, ${pack.version}, ${minecraft.version}, ${loader.type} and ${loader.version} are always there too: the pack's own name and version, and the locked Minecraft and loader. A built-in whose value is missing is unset.
+Values substituted for ${name} in *.tmpl override files and in server.properties and client.options values. The built-ins are always there too: ${project.name}, ${project.displayName} and ${project.version}, the project's own name, the side's display name and the version; ${minecraft.version} and ${minecraft.dataVersion}, the locked Minecraft and its data version; ${java.major}, the locked Java major version; and ${loader.type} and ${loader.version}, the locked loader. A built-in whose value is missing is unset.
 
 Type: map of `string` \| `number` \| `boolean`. keys match `^[A-Za-z_][A-Za-z0-9_]*$`
 
@@ -354,7 +354,7 @@ No other properties are allowed.
 | `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;side&gt;; "." builds into the project directory itself, which is what makes the project an instance. |
 | `variables` | [`variables`](#variables) |  |
 | `hooks` | [`clientHooks`](#clienthooks) |  |
-| `options` | map of `string` \| `number` \| `boolean` | Keys written into options.txt as key:value. Other keys already in the file are left alone.<br>keys match `^[A-Za-z][A-Za-z0-9_.:]*$` |
+| `options` | map of `string` \| `number` \| `boolean` | Keys written into options.txt as key:value. Other keys already in the file are left alone. Values expand ${name} variables, the built-ins included, so "version": "${minecraft.dataVersion}" keeps the file's data version in step with the lock.<br>keys match `^[A-Za-z][A-Za-z0-9_.:]*$` |
 | `optionsPath` | `string` | Where options and the seeded resourcePacks list are written, relative to the build, in builds and exports alike. Defaults to options.txt. config/modpack_defaults/options.txt ships it for Config Manager, which copies it into place only where the player has none, so a pack update never resets their settings. The tool rejects absolute paths and paths that leave the build.<br>pattern `^[^/\\]`, min length 1 |
 | `servers` | object[] | Entries written into servers.dat. |
 | `servers[].name` * | `string` | min length 1 |

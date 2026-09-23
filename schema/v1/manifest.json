@@ -207,7 +207,7 @@
       "type": "object",
       "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
       "additionalProperties": { "type": ["string", "number", "boolean"] },
-      "description": "Values substituted for ${name} in *.tmpl override files and in server.properties values. The built-ins ${pack.name}, ${pack.version}, ${minecraft.version}, ${loader.type} and ${loader.version} are always there too: the pack's own name and version, and the locked Minecraft and loader. A built-in whose value is missing is unset."
+      "description": "Values substituted for ${name} in *.tmpl override files and in server.properties and client.options values. The built-ins are always there too: ${project.name}, ${project.displayName} and ${project.version}, the project's own name, the side's display name and the version; ${minecraft.version} and ${minecraft.dataVersion}, the locked Minecraft and its data version; ${java.major}, the locked Java major version; and ${loader.type} and ${loader.version}, the locked loader. A built-in whose value is missing is unset."
     },
     "featureDecl": {
       "type": "object",
@@ -633,7 +633,7 @@
           "type": "object",
           "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_.:]*$" },
           "additionalProperties": { "type": ["string", "number", "boolean"] },
-          "description": "Keys written into options.txt as key:value. Other keys already in the file are left alone."
+          "description": "Keys written into options.txt as key:value. Other keys already in the file are left alone. Values expand ${name} variables, the built-ins included, so \"version\": \"${minecraft.dataVersion}\" keeps the file's data version in step with the lock."
         },
         "optionsPath": {
           "type": "string",

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/lock"
@@ -21,9 +22,11 @@ var varRe = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z
 // built-in whose value is missing stays unset.
 func templateVars(m *manifest.Manifest, l *lock.Lock, side string) map[string]string {
 	vars := m.SideVariables(side).Text()
-	builtins := map[string]string{"pack.name": m.Name, "pack.version": m.Version}
+	builtins := map[string]string{"project.name": m.Name, "project.displayName": m.DisplayName(side), "project.version": m.Version}
 	if l != nil {
 		builtins["minecraft.version"] = l.Minecraft
+		builtins["minecraft.dataVersion"] = nonZero(l.DataVersion)
+		builtins["java.major"] = nonZero(l.Java.Major)
 		builtins["loader.type"] = l.Loader.Type
 		builtins["loader.version"] = l.Loader.Version
 	}
@@ -32,12 +35,19 @@ func templateVars(m *manifest.Manifest, l *lock.Lock, side string) map[string]st
 	return vars
 }
 
+func nonZero(n int) string {
+	if n == 0 {
+		return ""
+	}
+	return strconv.Itoa(n)
+}
+
 // pulledTemplateVars are a pulled pack's variables with the project's laid over them, all but
-// the pack built-ins, which name the pulled pack itself.
+// the project built-ins, which name the pulled pack itself.
 func pulledTemplateVars(m *manifest.Manifest, l *lock.Lock, side string, project map[string]string) map[string]string {
 	vars := templateVars(m, l, side)
 	for k, v := range project {
-		if !strings.HasPrefix(k, "pack.") {
+		if !strings.HasPrefix(k, "project.") {
 			vars[k] = v
 		}
 	}
@@ -70,13 +80,13 @@ func unsetVariable(at, pack, key string, vars map[string]string) *out.Error {
 		e.Given, e.Candidates = key, names
 	}
 	switch {
-	case key == "pack.version" && pack != "":
+	case key == "project.version" && pack != "":
 		e.Help = fmt.Sprintf(`set "version" in %s's shulker.json`, pack)
-	case key == "pack.version":
+	case key == "project.version":
 		e.Help = "run `shulker set version <version>`"
 	case key == "loader.type" || key == "loader.version":
 		e.Help = "the lock has no loader: set \"loader\" in shulker.json, then run `shulker lock`"
-	case key == "minecraft.version":
+	case key == "minecraft.version" || key == "minecraft.dataVersion" || key == "java.major":
 		e.Help = "run `shulker lock`"
 	case !strings.Contains(key, "."):
 		e.Help = fmt.Sprintf("run `shulker set variables.%s <value>`", key)
