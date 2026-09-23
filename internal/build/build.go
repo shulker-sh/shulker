@@ -171,14 +171,85 @@ type Builder struct {
 }
 
 type source struct {
-	sha512     string
-	data       []byte
-	owned      ownedFile
+	content    content
 	origin     string
 	pack       string
 	feature    string
 	isTemplate bool
-	managed    ownedFile
+	// managed is the owned file an override replaced, remembered so pull can
+	// still adopt the keys the manifest sets in it.
+	managed ownedFile
+}
+
+// content is what a desired file holds: bytes from the cache, bytes in hand, or
+// an owned file shulker merges key by key with what is on disk.
+type content interface {
+	hash(b *Builder) (string, error)
+	bytes(b *Builder, abs string, m keyMerge) ([]byte, error)
+}
+
+type cached struct{ sha512 string }
+
+func (c cached) hash(b *Builder) (string, error) {
+	data, err := os.ReadFile(b.Cache.Object(c.sha512))
+	if err != nil {
+		return "", err
+	}
+	return sha256Hex(data), nil
+}
+
+func (c cached) bytes(b *Builder, _ string, _ keyMerge) ([]byte, error) {
+	return os.ReadFile(b.Cache.Object(c.sha512))
+}
+
+type literal struct{ data []byte }
+
+func (l literal) hash(*Builder) (string, error) { return sha256Hex(l.data), nil }
+
+func (l literal) bytes(*Builder, string, keyMerge) ([]byte, error) { return l.data, nil }
+
+type ownedContent struct{ ownedFile }
+
+func (o ownedContent) hash(*Builder) (string, error) {
+	return sha256Hex(canonicalValues(o.values())), nil
+}
+
+func (o ownedContent) bytes(_ *Builder, abs string, m keyMerge) ([]byte, error) {
+	existing, err := os.ReadFile(abs)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	return o.render(existing, m.kept, m.dropped)
+}
+
+func fromCache(sha512 string) source { return source{content: cached{sha512}} }
+
+func ownedSource(f ownedFile) source { return source{content: ownedContent{f}} }
+
+// owned is the file shulker merges key by key, or nil for a whole file.
+func (s source) owned() ownedFile {
+	if o, ok := s.content.(ownedContent); ok {
+		return o.ownedFile
+	}
+	return nil
+}
+
+func (s source) props() (propsFile, bool) {
+	pf, ok := s.owned().(propsFile)
+	return pf, ok
+}
+
+func (s source) isCached() bool {
+	_, ok := s.content.(cached)
+	return ok
+}
+
+// data is a whole file's bytes in hand, or nil for a cached or owned one.
+func (s source) data() []byte {
+	if l, ok := s.content.(literal); ok {
+		return l.data
+	}
+	return nil
 }
 
 type fileState string
@@ -312,7 +383,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		case stateUnchanged:
 			report.Unchanged++
 		case stateKept:
-			if f.src.owned == nil {
+			if f.src.owned() == nil {
 				report.Kept = append(report.Kept, f.rel)
 			}
 		case stateConflict:
@@ -329,8 +400,8 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 			continue
 		}
 		next.Files[f.rel] = f.hash
-		if f.src.owned != nil {
-			next.record(f.rel, f.src.owned)
+		if f.src.owned() != nil {
+			next.record(f.rel, f.src.owned())
 			for _, k := range sortedKeys(f.merge.kept) {
 				report.Kept = append(report.Kept, f.rel+" "+k+" (edited in place)")
 			}
@@ -413,7 +484,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if !b.Cache.Has(m.Sha512) {
 			return nil, nil, notInstalled(id)
 		}
-		desired["mods/"+m.Filename] = source{sha512: m.Sha512}
+		desired["mods/"+m.Filename] = fromCache(m.Sha512)
 		placed[b.Lock.JarID(id)] = true
 	}
 	vars := templateVars(b.Manifest, b.Lock, side)
@@ -450,7 +521,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 			if err != nil {
 				return nil, nil, err
 			}
-			desired[markerJarPath(b.Manifest.Name)] = source{data: jar}
+			desired[markerJarPath(b.Manifest.Name)] = source{content: literal{jar}}
 		}
 	}
 	whole := func(rel string) bool {
@@ -548,7 +619,7 @@ func (b *Builder) OverrideFile(side, rel string) (data []byte, ok bool, err erro
 		}
 	}
 	s, ok := desired[rel]
-	return s.data, ok, nil
+	return s.data(), ok, nil
 }
 
 func featureFolders(name string, f manifest.Feature, side string) []string {
@@ -618,13 +689,13 @@ func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole 
 	if prev, taken := desired[rel]; taken {
 		warnFeatureConflict(report, prev.feature, l.feature, rel)
 	}
-	if owned := desired[rel].owned; owned != nil {
-		src.managed = owned
-		if data, err = owned.render(data, nil, nil); err != nil {
+	if under := desired[rel].owned(); under != nil {
+		src.managed = under
+		if data, err = under.render(data, nil, nil); err != nil {
 			return err
 		}
 	}
-	src.data = data
+	src.content = literal{data}
 	desired[rel] = src
 	return nil
 }
@@ -640,7 +711,7 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 		srv = &manifest.Server{}
 	}
 	if srv.EULA {
-		desired[EulaFile] = source{data: []byte("eula=true\n")}
+		desired[EulaFile] = source{content: literal{[]byte("eula=true\n")}}
 	}
 	props, err := renderProperties(PropertiesFile, srv.Properties, vars)
 	if err != nil {
@@ -654,7 +725,7 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if err := b.checkProperties(props, report); err != nil {
 		return "", err
 	}
-	desired[PropertiesFile] = source{owned: propsFile{props: props, sep: "="}}
+	desired[PropertiesFile] = ownedSource(propsFile{props: props, sep: "="})
 	if err := b.collectPlayers(srv.Players, desired); err != nil {
 		return "", err
 	}
@@ -675,7 +746,7 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 	if vanilla == nil || !b.Cache.Has(vanilla.Sha512) {
 		return launcherMissing
 	}
-	desired[vanillaServerPath(l, b.Lock.Minecraft)] = source{sha512: vanilla.Sha512}
+	desired[vanillaServerPath(l, b.Lock.Minecraft)] = fromCache(vanilla.Sha512)
 	if b.Lock.Loader.Type == "" {
 		return nil
 	}
@@ -683,7 +754,7 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 		return launcherMissing
 	}
 	if l.InstallServerFlag == "" {
-		desired[l.ServerLaunchJar] = source{sha512: jar.Sha512}
+		desired[l.ServerLaunchJar] = fromCache(jar.Sha512)
 	}
 	for name, dl := range jar.Libraries {
 		path, err := meta.MavenPath(name)
@@ -693,7 +764,7 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 		if !b.Cache.Has(dl.Sha512) {
 			return launcherMissing
 		}
-		desired["libraries/"+path] = source{sha512: dl.Sha512}
+		desired["libraries/"+path] = fromCache(dl.Sha512)
 	}
 	return nil
 }
@@ -771,7 +842,7 @@ func (b *Builder) collectClient(side string, opts Options, desired map[string]so
 	if len(options) == 0 {
 		return nil
 	}
-	desired[file] = source{owned: propsFile{props: options, sep: ":"}}
+	desired[file] = ownedSource(propsFile{props: options, sep: ":"})
 	return nil
 }
 
@@ -806,19 +877,7 @@ func renderProperties(file string, raw map[string]any, vars map[string]string) (
 	return props, nil
 }
 
-func (b *Builder) hashSource(s source) (string, error) {
-	if s.owned != nil {
-		return sha256Hex(canonicalValues(s.owned.values())), nil
-	}
-	if s.sha512 != "" {
-		data, err := os.ReadFile(b.Cache.Object(s.sha512))
-		if err != nil {
-			return "", err
-		}
-		return sha256Hex(data), nil
-	}
-	return sha256Hex(s.data), nil
-}
+func (b *Builder) hashSource(s source) (string, error) { return s.content.hash(b) }
 
 func (b *Builder) plan(dir string, desired map[string]source, prev State, force bool) ([]planned, error) {
 	paths := make([]string, 0, len(desired))
@@ -835,12 +894,12 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 		}
 		abs := filepath.Join(dir, filepath.FromSlash(rel))
 		f := planned{rel: rel, src: src, hash: newHash}
-		if src.owned != nil {
+		if src.owned() != nil {
 			existing, err := os.ReadFile(abs)
 			if err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return nil, err
 			}
-			f.merge = mergeKeys(src.owned, existing, prev.Values[rel], prev.recordedKeys(rel), force)
+			f.merge = mergeKeys(src.owned(), existing, prev.Values[rel], prev.recordedKeys(rel), force)
 			f.isForced = f.merge.isForced
 			switch {
 			case f.merge.hasChanged:
@@ -914,8 +973,8 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 }
 
 func (b *Builder) write(abs string, s source, m keyMerge) error {
-	if s.sha512 != "" {
-		return b.Cache.CopyTo(s.sha512, abs)
+	if c, ok := s.content.(cached); ok {
+		return b.Cache.CopyTo(c.sha512, abs)
 	}
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return err
@@ -928,17 +987,7 @@ func (b *Builder) write(abs string, s source, m keyMerge) error {
 }
 
 func (b *Builder) output(abs string, s source, m keyMerge) ([]byte, error) {
-	if s.sha512 != "" {
-		return os.ReadFile(b.Cache.Object(s.sha512))
-	}
-	if s.owned == nil {
-		return s.data, nil
-	}
-	existing, err := os.ReadFile(abs)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, err
-	}
-	return s.owned.render(existing, m.kept, m.dropped)
+	return s.content.bytes(b, abs, m)
 }
 
 func canonicalValues(values map[string]string) []byte {

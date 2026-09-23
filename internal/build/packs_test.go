@@ -57,7 +57,7 @@ func TestEnableShader(t *testing.T) {
 				if !written {
 					t.Fatalf("%s not written", file)
 				}
-				if props := got.owned.(propsFile).props; props["shaderPack"] != c.pack || props["enableShaders"] != "true" {
+				if props := got.owned().(propsFile).props; props["shaderPack"] != c.pack || props["enableShaders"] != "true" {
 					t.Fatalf("%s: %v", file, props)
 				}
 			}

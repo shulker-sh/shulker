@@ -209,8 +209,8 @@ func (b *Builder) collectPlayers(players *manifest.Players, desired map[string]s
 		}
 		bans.add(u, e)
 	}
-	desired[WhitelistFile] = source{owned: whitelist}
-	desired[OpsFile] = source{owned: ops}
-	desired[BansFile] = source{owned: bans}
+	desired[WhitelistFile] = ownedSource(whitelist)
+	desired[OpsFile] = ownedSource(ops)
+	desired[BansFile] = ownedSource(bans)
 	return nil
 }

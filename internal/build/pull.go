@@ -74,7 +74,7 @@ func (b *Builder) Diff(side string, opts Options) (*DiffReport, error) {
 				return nil, err
 			}
 		}
-		if f.src.owned != nil {
+		if f.src.owned() != nil {
 			state = stateKept
 		}
 		report.Files = append(report.Files, FileDiff{Path: f.rel, State: string(state), Diff: unifiedDiff(f.rel, project, existing)})
@@ -85,11 +85,11 @@ func (b *Builder) Diff(side string, opts Options) (*DiffReport, error) {
 // projectSide renders what the project says for the keys edited on disk and leaves every other
 // key as it is, so the diff of an owned file shows only the in-game edits.
 func projectSide(f planned) keyMerge {
-	if f.src.owned == nil {
+	if f.src.owned() == nil {
 		return keyMerge{}
 	}
 	m := keyMerge{kept: map[string]bool{}}
-	for _, k := range f.src.owned.keys() {
+	for _, k := range f.src.owned().keys() {
 		if !f.merge.kept[k] {
 			m.kept[k] = true
 		}
@@ -247,12 +247,13 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 				continue
 			}
 			dest = filepath.Join(b.Dir, "overrides", filepath.FromSlash(f.rel))
-		case src.owned != nil:
-			if _, ok := src.owned.(propsFile); !ok {
+		case src.owned() != nil:
+			pf, ok := src.props()
+			if !ok {
 				report.Skipped = append(report.Skipped, f.rel+" (player files are managed by `shulker player`)")
 				continue
 			}
-			if pf := src.owned.(propsFile); pf.origins != nil {
+			if pf.origins != nil {
 				wrote, err := b.pullOverrideKeys(f.rel, pf, f.merge.kept, existing, report)
 				if err != nil {
 					return nil, err
@@ -262,7 +263,7 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 				}
 				continue
 			}
-			keys := b.pullKeys(f.rel, src.owned.(propsFile), existing, report)
+			keys := b.pullKeys(f.rel, pf, existing, report)
 			report.Keys = append(report.Keys, keys...)
 			if len(keys) > 0 {
 				report.ManifestChanged = true
@@ -284,8 +285,8 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 		if toDir != "" {
 			dest = filepath.Join(toDir, filepath.FromSlash(f.rel))
 		}
-		if src.managed != nil {
-			keys := b.pullKeys(f.rel, src.managed.(propsFile), existing, report)
+		if pf, ok := src.managed.(propsFile); ok {
+			keys := b.pullKeys(f.rel, pf, existing, report)
 			report.Keys = append(report.Keys, keys...)
 			if len(keys) > 0 {
 				report.ManifestChanged = true
@@ -314,8 +315,8 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 			return nil, err
 		}
 		prev.Files[rel] = hash
-		if src.owned != nil {
-			prev.record(rel, src.owned)
+		if src.owned() != nil {
+			prev.record(rel, src.owned())
 		} else {
 			delete(prev.Values, rel)
 		}
@@ -400,7 +401,7 @@ func (b *Builder) drift(side string, opts Options) (*drift, error) {
 }
 
 func drifted(f planned) bool {
-	if f.src.owned != nil {
+	if f.src.owned() != nil {
 		return len(f.merge.kept) > 0
 	}
 	return f.state == stateKept || f.state == stateConflict || f.state == stateUntracked || f.state == stateOrphan
@@ -471,7 +472,7 @@ func (b *Builder) adoptKeys(rel string, keys []string, d *drift, report *PullRep
 		return out.Errorf("usage", "--key works on .properties files, not %s", rel)
 	}
 	src := d.desired[rel]
-	if _, merged := src.owned.(propsFile); !merged && src.origin != "" {
+	if _, merged := src.props(); !merged && src.origin != "" {
 		e := out.Errorf("usage", "%s is copied whole (wholeFiles)", rel)
 		e.Help = "edit the override instead"
 		return e

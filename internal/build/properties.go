@@ -143,7 +143,7 @@ func mergedProperties(prev source, data []byte, from keySource, src source, rel 
 	merged := properties{}
 	origins := map[string]keySource{}
 	sep := "="
-	if pf, ok := prev.owned.(propsFile); ok {
+	if pf, ok := prev.props(); ok {
 		for k, v := range pf.props {
 			merged[k] = v
 		}
@@ -169,7 +169,6 @@ func mergedProperties(prev source, data []byte, from keySource, src source, rel 
 		sort.Strings(conflicts)
 		report.Warnings = append(report.Warnings, conflicts...)
 	}
-	src.owned = propsFile{props: merged, sep: sep, base: data, origins: origins}
-	src.data = nil
+	src.content = ownedContent{propsFile{props: merged, sep: sep, base: data, origins: origins}}
 	return src
 }

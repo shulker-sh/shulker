@@ -29,7 +29,7 @@ func (b *Builder) collectPacks(cond conditions, desired map[string]source, repor
 		if !b.Cache.Has(ref.pack.Sha512) {
 			return notInstalled(ref.key)
 		}
-		desired[ref.path] = source{sha512: ref.pack.Sha512}
+		desired[ref.path] = fromCache(ref.pack.Sha512)
 	}
 	return nil
 }
@@ -92,7 +92,7 @@ func (b *Builder) enableShader(desired map[string]source, placed map[string]bool
 		p := b.Lock.Shaders[key]
 		if config := shaderConfig(p, placed); config != "" {
 			props := properties{"shaderPack": p.Filename, "enableShaders": "true"}
-			desired[config] = source{owned: propsFile{props: props, sep: "="}}
+			desired[config] = ownedSource(propsFile{props: props, sep: "="})
 			return key
 		}
 	}
@@ -256,7 +256,7 @@ func (b *Builder) enabledPackList(side string, opts Options, desired map[string]
 		return live, nil
 	}
 	state := LoadState(dir)
-	if src.owned == nil {
+	if src.owned() == nil {
 		// A whole file the player changed, or one no build recorded, is kept
 		// rather than written; one that also changed in the source fails the build.
 		current, exists, err := fileSha256(abs)
@@ -272,9 +272,9 @@ func (b *Builder) enabledPackList(side string, opts Options, desired map[string]
 		if exists && !opts.Force && !untouched {
 			return live, nil
 		}
-		return parseProperties(src.data)[resourcePacksKey], nil
+		return parseProperties(src.data())[resourcePacksKey], nil
 	}
-	want, set := src.owned.values()[resourcePacksKey]
+	want, set := src.owned().values()[resourcePacksKey]
 	if !set {
 		return live, nil
 	}
@@ -439,7 +439,7 @@ func (b *Builder) collectDatapacks(side, levelName string, cond conditions, desi
 		if !b.Cache.Has(p.Sha512) {
 			return notInstalled(key)
 		}
-		desired[folder+"/"+p.Filename] = source{sha512: p.Sha512}
+		desired[folder+"/"+p.Filename] = fromCache(p.Sha512)
 		placed = append(placed, key)
 	}
 	if !loaded && len(placed) > 0 {

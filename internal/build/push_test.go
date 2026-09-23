@@ -35,7 +35,7 @@ func collectPush(t *testing.T, b *Builder, cond conditions) (properties, *Report
 	if _, err := b.collectServer(desired, nil, cond, true, report); err != nil {
 		return nil, report, err
 	}
-	return desired[PropertiesFile].owned.(propsFile).props, report, nil
+	return desired[PropertiesFile].owned().(propsFile).props, report, nil
 }
 
 func TestPushResourcePackWritesBothKeys(t *testing.T) {

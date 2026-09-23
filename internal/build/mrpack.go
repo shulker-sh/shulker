@@ -195,7 +195,7 @@ func (b *Builder) mrpackCollect(t *mrpackSide, version, osName string, features 
 	}
 	t.datapacks = map[string]string{}
 	for key, p := range b.Lock.Datapacks {
-		if rel := b.Lock.PackPath(manifest.TypeDatapack, p, t.side, dirs[0]); desired[rel].sha512 != "" {
+		if rel := b.Lock.PackPath(manifest.TypeDatapack, p, t.side, dirs[0]); desired[rel].isCached() {
 			t.datapacks[key] = rel
 		}
 	}
@@ -205,18 +205,18 @@ func (b *Builder) mrpackCollect(t *mrpackSide, version, osName string, features 
 		}
 	}
 	for path, s := range desired {
-		if s.sha512 != "" {
+		if s.isCached() {
 			continue
 		}
-		if s.owned != nil {
-			data, err := s.owned.render(nil, nil, nil)
+		if f := s.owned(); f != nil {
+			data, err := f.render(nil, nil, nil)
 			if err != nil {
 				return nil, err
 			}
 			t.files[path] = data
 			continue
 		}
-		t.files[path] = s.data
+		t.files[path] = s.data()
 	}
 	return warnings, nil
 }
