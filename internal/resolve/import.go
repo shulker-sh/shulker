@@ -717,7 +717,7 @@ func (im *importer) override(ctx context.Context, o mrpack.Override) error {
 		return nil
 	}
 	if dup, err := im.duplicateDatapack(ctx, hybridCopy{override: &o}, o.Layer+"/"+o.Path, o.Path, digest); err != nil || dup {
-		return nil
+		return err
 	}
 	if mrpack.IsDatapackZip(o.Path) {
 		sum := sha1.Sum(o.Data)
