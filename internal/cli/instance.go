@@ -43,9 +43,9 @@ type instanceEdit struct {
 func (a *app) instanceCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "instance",
-		Short: "Read and change the settings of the instance you are in, or the one -i names",
+		Short: "Read and change the settings of the instance you are in, or the one -i names, and dump or read its game",
 	}
-	cmd.AddCommand(a.instanceGetCmd(), a.instanceSetCmd(), a.instanceUnsetCmd(), a.instanceEditCmd())
+	cmd.AddCommand(a.instanceGetCmd(), a.instanceSetCmd(), a.instanceUnsetCmd(), a.instanceEditCmd(), a.instanceDumpCmd(), a.instanceLogCmd())
 	return cmd
 }
 

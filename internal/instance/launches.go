@@ -37,6 +37,12 @@ type Launch struct {
 	// it so that a later command can tell a run still going from one whose watcher was killed; a
 	// launcher-driven run has none, and is nobody's to close but its own post-exit hook.
 	PID int `json:"pid,omitempty"`
+	// Java is the runtime a watched game runs on, kept beside PID and dropped with it: on Windows
+	// its jcmd is what takes a thread dump of the game.
+	Java string `json:"java,omitempty"`
+	// Wrapped is a watched game started through settings.wrapper, whose PID is the wrapper's rather
+	// than Java's. It is dropped with PID.
+	Wrapped bool `json:"wrapped,omitempty"`
 	// ExitCode is the status the game left. Only a run shulker waited on itself has one: no
 	// launcher passes the game's exit code to a post-exit slot.
 	ExitCode int `json:"exitCode,omitempty"`

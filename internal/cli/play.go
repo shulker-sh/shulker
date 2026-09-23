@@ -259,6 +259,7 @@ func (p playResult) print(l *out.Lines) {
 	switch p.Outcome {
 	case "":
 		l.OK("playing "+p.Instance, p.Version)
+		rows = append(rows, out.Row{Label: "pid", Text: strconv.Itoa(p.PID)})
 	case instance.OutcomeCrashed:
 		l.Warn(p.Instance + " crashed")
 		if p.ExitCode != 0 {
@@ -271,6 +272,9 @@ func (p playResult) print(l *out.Lines) {
 		l.OK("played "+p.Instance, p.Version)
 	}
 	l.Tree(rows...)
+	if p.Outcome == "" {
+		l.Muted("if it hangs, shulker instance dump -i " + p.Instance + " shows where; shulker instance log -i " + p.Instance + " prints its output")
+	}
 }
 
 // launchSettings are the settings a launch runs with: the instance's own where it sets one, and the

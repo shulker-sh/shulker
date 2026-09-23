@@ -113,7 +113,7 @@ func endRecord(rec *instance.Launch, dir string, exit int) {
 	}
 	rec.EndedAt = nowStamp()
 	rec.Outcome = instance.OutcomeOK
-	rec.PID = 0
+	rec.PID, rec.Java, rec.Wrapped = 0, "", false
 	if rec.Log == "" {
 		if path := filepath.Join(dir, "logs", "latest.log"); isOnDisk(path) {
 			rec.Log = path

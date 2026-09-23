@@ -82,6 +82,8 @@ func (a *app) watchRun(req watchRequest, stream io.Writer, running func(watchRep
 		StartedAt: started.UTC().Format(time.RFC3339),
 		Log:       req.Log,
 		PID:       g.PID,
+		Java:      req.Java,
+		Wrapped:   len(req.Wrapper) > 0,
 	})
 	running(watchReply{PID: g.PID})
 	code, err := g.Wait()
