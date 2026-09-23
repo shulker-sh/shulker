@@ -81,6 +81,8 @@ func makeJarFiles(t *testing.T, id, filename string, files map[string]string) fa
 type harness struct {
 	server         *httptest.Server
 	cdnDown        map[string]bool
+	cdnCut         map[string]bool
+	cdnDrop        map[string]bool
 	jars           map[string]fakeJar
 	dir            string
 	cache          string
@@ -528,8 +530,18 @@ func newHarness(t *testing.T) *harness {
 			http.NotFound(w, r)
 			return
 		}
+		if h.cdnDrop[r.URL.Path] {
+			conn, _, _ := w.(http.Hijacker).Hijack()
+			conn.Close()
+			return
+		}
 		for _, jar := range h.jars {
 			if strings.HasSuffix(r.URL.Path, jar.filename) {
+				if h.cdnCut[r.URL.Path] {
+					w.Header().Set("Content-Length", strconv.Itoa(len(jar.data)))
+					w.Write(jar.data[:len(jar.data)/2])
+					return
+				}
 				w.Write(jar.data)
 				return
 			}

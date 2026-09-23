@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -635,7 +636,7 @@ func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []st
 		}
 		if err != nil {
 			progress.Abort()
-			return fetched, warnings, err
+			return fetched, warnings, f.downloadError(err)
 		}
 		progress.Advance()
 		fetched = append(fetched, id)
@@ -647,6 +648,44 @@ func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []st
 		return fetched, warnings, e
 	}
 	return fetched, warnings, nil
+}
+
+// downloadError names the locked file whose download failed when the failure is its host's, as a CDN
+// cutting the file short, leaving one of shulker's own, such as the cache's disk, as it is.
+func (f downloadable) downloadError(err error) error {
+	host := provider.Title(f.provider)
+	if host == "" {
+		host = urlHost(*f.url)
+	}
+	var e *out.Error
+	if errors.As(err, &e) && e.Code == "checksum-mismatch" {
+		e.Rows = append([]out.Detail{{Label: "file", Text: f.id + " (" + f.filename + ")"}}, e.Rows...)
+		return err
+	}
+	fault, ok := downloadFailure(err, host)
+	if !ok {
+		return err
+	}
+	e = out.Errorf("download-failed", "couldn't download %s (%s) from %s", f.id, f.filename, host)
+	e.Help = fault.help
+	e.Rows = []out.Detail{{Label: "url", Text: *f.url}, {Label: "cause", Text: downloadCause(err, *f.url)}}
+	return e
+}
+
+// downloadCause is what went wrong with err, without the URL the error rows already show.
+func downloadCause(err error, rawURL string) string {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		return ue.Err.Error()
+	}
+	return strings.TrimPrefix(err.Error(), rawURL+": ")
+}
+
+func urlHost(raw string) string {
+	if u, err := url.Parse(raw); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return raw
 }
 
 func usedBy(side string, sides []string) bool {

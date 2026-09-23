@@ -35,8 +35,8 @@ func TestDownloadFailure(t *testing.T) {
 		{out.Errorf("requires-taken", "requires already has x"), "", false},
 		{nil, "", false},
 	} {
-		if why, failed := downloadFailure(c.err); why != c.why || failed != c.failed {
-			t.Errorf("downloadFailure(%v) = %q, %v; want %q, %v", c.err, why, failed, c.why, c.failed)
+		if fault, failed := downloadFailure(c.err, "Modrinth"); fault.why != c.why || failed != c.failed {
+			t.Errorf("downloadFailure(%v) = %q, %v; want %q, %v", c.err, fault.why, failed, c.why, c.failed)
 		}
 	}
 }

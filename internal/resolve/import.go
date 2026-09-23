@@ -537,8 +537,8 @@ func (im *importer) lockFile(ctx context.Context, p provider.Provider, layer, fi
 	} else if err == nil {
 		err = im.lockPack(ctx, p, path.Base(filePath), kind, side, proj, v)
 	}
-	if why, ok := downloadFailure(err); ok {
-		return false, why, nil
+	if fault, ok := downloadFailure(err, provider.Title(p.Name())); ok {
+		return false, fault.why, nil
 	}
 	return err == nil, "", err
 }
@@ -553,25 +553,34 @@ func (im *importer) lockOverride(ctx context.Context, p provider.Provider, o mrp
 	return locked, err
 }
 
-// downloadFailure says why err is a provider failing to serve a file, as a CDN cutting one short
-// does, rather than a failure of shulker's own, such as the cache's disk.
-func downloadFailure(err error) (string, bool) {
+// downloadFault is how a provider failed to serve a file: why, as a warning puts it, and help
+// saying what to do about it.
+type downloadFault struct {
+	why  string
+	help string
+}
+
+// downloadFailure says how err is host failing to serve a file, as a CDN cutting one short does,
+// rather than a failure of shulker's own, such as the cache's disk.
+func downloadFailure(err error, host string) (downloadFault, bool) {
 	var status *fetch.StatusError
 	switch {
 	case err == nil, errors.Is(err, fetch.ErrOffline):
-		return "", false
+		return downloadFault{}, false
+	case errors.Is(err, fetch.ErrNotFound):
+		return downloadFault{"HTTP 404", fmt.Sprintf("%s no longer serves this file; `shulker update` locks another version", host)}, true
 	case errors.As(err, &status):
-		return fmt.Sprintf("HTTP %d", status.Status), true
+		return downloadFault{fmt.Sprintf("HTTP %d", status.Status), fmt.Sprintf("%s answered HTTP %d; try again later", host, status.Status)}, true
 	case errors.Is(err, io.ErrUnexpectedEOF):
-		return "the file was cut short", true
+		return downloadFault{"the file was cut short", fmt.Sprintf("%s's CDN served a partial file; try again later", host)}, true
 	case out.CodeOf(err) == "checksum-mismatch":
-		return "the file doesn't match its hash", true
+		return downloadFault{"the file doesn't match its hash", fmt.Sprintf("%s served a different file than it lists; try again later", host)}, true
 	case out.CodeOf(err) == "manual-download":
-		return "it refused the download", true
+		return downloadFault{"it refused the download", fmt.Sprintf("%s won't serve this file; download it by hand", host)}, true
 	case fetch.IsNetwork(err):
-		return "the connection failed", true
+		return downloadFault{"the connection failed", fmt.Sprintf("the connection to %s failed; check your network and try again", host)}, true
 	}
-	return "", false
+	return downloadFault{}, false
 }
 
 // fileKind is what the file at filePath locks as, empty when v isn't the kind its folder holds.

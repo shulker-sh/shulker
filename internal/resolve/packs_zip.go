@@ -386,6 +386,7 @@ type downloadable struct {
 	file     string
 	modpack  string
 	filename string
+	provider string
 	sha512   string
 	url      *string
 	page     string
@@ -399,14 +400,14 @@ func (r *Resolver) lockFiles() []downloadable {
 	var files []downloadable
 	for _, id := range sortedKeys(r.Lock.Mods) {
 		m := r.Lock.Mods[id]
-		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size, side: m.Side})
+		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size, side: m.Side})
 	}
 	for _, kind := range manifest.PackKinds {
 		section := r.packSection(kind)
 		for _, key := range sortedKeys(section) {
 			p := section[key]
 			side := cmp.Or(p.Side, "client")
-			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size, side: side})
+			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, provider: p.Provider, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size, side: side})
 		}
 	}
 	return files
