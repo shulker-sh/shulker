@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -100,4 +101,20 @@ func TestACurseForgeSlugItsSearchMissesPointsAtTheProjectID(t *testing.T) {
 		}
 	}
 	h.mustRun(t, "add", "500525", "--provider", "curseforge")
+}
+
+func TestAModpackMemberPinnedToABetaFileLeavesTheLockCurrent(t *testing.T) {
+	h := newHarness(t)
+	betaDependency(t, h)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"framework": {"provider": "curseforge", "project": 667391, "pin": 5600001}`, nil)
+
+	h.mustRun(t, "modpack", "add", "./base", "--unlocked")
+
+	if got := h.readLock(t).Mods["framework"].Channel; got != "beta" {
+		t.Fatalf("lock channel = %q, want beta", got)
+	}
+	if env := installJSON(t, h); env.LockStale {
+		t.Fatalf("the lock should match the manifest: %+v", env)
+	}
 }
