@@ -1,8 +1,11 @@
 package meta
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 
 	"shulker.sh/shulker/internal/fetch"
 )
@@ -62,6 +65,18 @@ type Download struct {
 }
 
 func (p *Piston) ServerDownload(ctx context.Context, game string) (Download, error) {
+	dl, err := p.serverDownload(ctx, game)
+	if err != nil {
+		return Download{}, err
+	}
+	if dl.URL == "" || dl.Sha1 == "" {
+		return Download{}, invalid("minecraft %s has no server download", game)
+	}
+	return dl, nil
+}
+
+// serverDownload is the server jar Mojang's version JSON names for game, empty when it names none.
+func (p *Piston) serverDownload(ctx context.Context, game string) (Download, error) {
 	m, err := p.Manifest(ctx)
 	if err != nil {
 		return Download{}, err
@@ -77,9 +92,6 @@ func (p *Piston) ServerDownload(ctx context.Context, game string) (Download, err
 	}
 	if err := p.Client.GetJSON(ctx, v.URL, &detail); err != nil {
 		return Download{}, versionFetchFailed(err, v.ID)
-	}
-	if detail.Downloads.Server.URL == "" || detail.Downloads.Server.Sha1 == "" {
-		return Download{}, invalid("minecraft %s has no server download", v.ID)
 	}
 	return detail.Downloads.Server, nil
 }
@@ -99,6 +111,43 @@ func (p *Piston) Version(ctx context.Context, game string) (json.RawMessage, err
 		return nil, versionFetchFailed(err, v.ID)
 	}
 	return detail, nil
+}
+
+// DataVersion is a game version's data version, the world_version in the version.json its server jar
+// carries; Mojang's version JSON doesn't name it. Only the jar's zip directory and that one entry
+// are read, by byte ranges. It is 0 when the version has no server jar or the jar doesn't say.
+func (p *Piston) DataVersion(ctx context.Context, game string) (int, error) {
+	server, err := p.serverDownload(ctx, game)
+	if err != nil || server.URL == "" {
+		return 0, err
+	}
+	jar, err := p.Client.Remote(ctx, server.URL)
+	if err != nil {
+		return 0, dataVersionFailed(err, game)
+	}
+	zr, err := zip.NewReader(jar, jar.Size())
+	if err != nil {
+		return 0, dataVersionFailed(err, game)
+	}
+	f, err := zr.Open("version.json")
+	if errors.Is(err, fs.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, dataVersionFailed(err, game)
+	}
+	defer f.Close()
+	var version struct {
+		WorldVersion int `json:"world_version"`
+	}
+	if err := json.NewDecoder(f).Decode(&version); err != nil {
+		return 0, dataVersionFailed(err, game)
+	}
+	return version.WorldVersion, nil
+}
+
+func dataVersionFailed(err error, game string) error {
+	return fetchFailed(err, "mojang", "couldn't read the minecraft %s data version from its server jar", game)
 }
 
 // Java is the runtime component and major version Mojang names for a game version.
