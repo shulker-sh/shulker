@@ -64,8 +64,11 @@ type CurseForge struct {
 	key          string
 	hasRefreshed bool
 	refreshErr   error
-	slugs        map[string]string
-	classes      map[string]int
+	// keyWorked is set once a request has succeeded with the key, after which a 403 is CurseForge
+	// locking shulker out rather than the key being wrong.
+	keyWorked bool
+	slugs     map[string]string
+	classes   map[string]int
 }
 
 // Key is the user's own API key: SHULKER_CURSEFORGE_KEY when it is set, else the configured one.
@@ -430,7 +433,7 @@ func (c *CurseForge) remember(m mod) *provider.Project {
 // once per run and retries.
 func (c *CurseForge) call(ctx context.Context, what string, request func() error) error {
 	err := request()
-	if errors.Is(err, fetch.ErrForbidden) && c.KeyFile != "" {
+	if errors.Is(err, fetch.ErrForbidden) && !c.keyWorked && c.KeyFile != "" {
 		if !c.hasRefreshed {
 			c.hasRefreshed = true
 			if c.refreshErr = c.refreshKey(ctx); c.refreshErr == nil {
@@ -442,9 +445,10 @@ func (c *CurseForge) call(ctx context.Context, what string, request func() error
 		}
 	}
 	if err == nil {
+		c.keyWorked = true
 		return nil
 	}
-	if errors.Is(err, fetch.ErrRateLimited) {
+	if errors.Is(err, fetch.ErrRateLimited) || c.keyWorked && errors.Is(err, fetch.ErrForbidden) {
 		e := out.Errorf("rate-limited", "curseforge is rate-limiting shulker's requests")
 		e.Help = "CurseForge doesn't say for how long, and reports put it at an hour or more; run the command again later"
 		return e

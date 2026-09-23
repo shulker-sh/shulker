@@ -1831,7 +1831,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `players-invalid` | A player entry in `shulker.json` is invalid |
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid, including a `shulker.json` value that can't be written as a property. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
-| `rate-limited` | Modrinth or CurseForge is refusing shulker's requests for making too many. A Modrinth limit that resets within a minute is waited out once first; the help says when to run the command again |
+| `rate-limited` | Modrinth or CurseForge is refusing shulker's requests for making too many; CurseForge refusing a key it has already accepted in the same run counts too. A Modrinth limit that resets within a minute is waited out once first; the help says when to run the command again |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry or a project being added is a kind shulker can't resolve |
 | `resourcepack-conflict` | `server.resourcePack` pushes a pack while `resource-pack` or `resource-pack-sha1` is also set in `server.properties` |

@@ -221,6 +221,30 @@ func TestRateLimitIsNamed(t *testing.T) {
 	}
 }
 
+func TestForbiddenAfterTheKeyWorkedIsALockout(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls > 1 {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"id": 10, "name": "Shiny", "slug": "shiny"}})
+	}))
+	defer srv.Close()
+	c := NewShared(fetch.New("test"), "key", t.TempDir())
+	c.BaseURL, c.KeyURL = srv.URL, srv.URL+"/key"
+	if _, err := c.Project(context.Background(), "10", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Mods(context.Background(), []int{10}); out.CodeOf(err) != "rate-limited" {
+		t.Fatalf("got %v", err)
+	}
+	if calls != 2 {
+		t.Errorf("%d calls, want 2: a lockout fetches no new key", calls)
+	}
+}
+
 func TestFilesNamesAFileWithNothingToDownload(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"data":[{"id":100,"modId":10,"displayName":"1.0","fileName":"jei.jar","downloadUrl":"https://x/jei.jar","hashes":[]}]}`))
