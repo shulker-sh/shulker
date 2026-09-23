@@ -317,7 +317,8 @@
           "minItems": 1,
           "description": "Shaders only: the shader mods that can load this file, from the provider's tags. Absent for a local shader, which any shader mod can load. A shader tagged only vanilla is a core-shader resource pack, placed in resourcepacks/ and enabled like one; the rest are placed in shaderpacks/, and the build enables the first one a placed shader mod can load through that mod's .properties file."
         },
-        "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Datapacks only: the sides the datapack is placed on, the manifest's side or both. Resource packs and shaders are client-only." }
+        "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Datapacks only: the sides the datapack is placed on, the manifest's side or both. Resource packs and shaders are client-only." },
+        "resourcepack": { "type": "boolean", "description": "Datapacks only: the manifest's resourcepack, placing the zip in resourcepacks/ on the client as well." }
       },
       "allOf": [
         {

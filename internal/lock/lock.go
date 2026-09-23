@@ -153,6 +153,8 @@ type Pack struct {
 	Loaders []string `json:"loaders,omitempty"`
 	// Side is where a datapack is placed; the other kinds are client-only.
 	Side string `json:"side,omitempty"`
+	// ResourcePack also places a datapack in resourcepacks/, on the client.
+	ResourcePack bool `json:"resourcepack,omitempty"`
 }
 
 // Path is where the build places a resource pack or shader. Shaders go to shaderpacks/, except the

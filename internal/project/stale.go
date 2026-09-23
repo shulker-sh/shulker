@@ -195,6 +195,9 @@ func ZipEntryDifferences(dir, key string, e manifest.Require, lp lock.Pack) []st
 		if side := cmp.Or(e.Side, "both"); side != lp.Side {
 			diffs = append(diffs, fmt.Sprintf("%s: side %s -> %s", key, lp.Side, side))
 		}
+		if e.ResourcePack != lp.ResourcePack {
+			diffs = append(diffs, fmt.Sprintf("%s: resourcepack %t -> %t", key, lp.ResourcePack, e.ResourcePack))
+		}
 	}
 	if e.File != "" || lp.File != "" {
 		return append(diffs, FileDifferences(dir, key, e.File, lp.File, lp.Size, lp.Sha512)...)

@@ -332,3 +332,26 @@ func TestMatchLocksAnOverrideDatapack(t *testing.T) {
 		t.Fatalf("the matched override is removed: %v", err)
 	}
 }
+
+func TestHybridDatapackFlagLocks(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	hybrid := makeJarFiles(t, "hybrid", "autoslabs.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/a/tags/x.json": "{}", "assets/a/lang/en_us.json": "{}"})
+	h.mustRun(t, "add", writeOutside(t, hybrid.filename, hybrid.data), "--type", "datapack")
+	h.mustRun(t, "set", "requires.autoslabs.resourcepack", "true")
+
+	_, stderr := h.mustRunStderr(t, "build")
+	if !strings.Contains(stderr, "autoslabs: resourcepack false -> true") {
+		t.Fatalf("the flag is part of what the lock records: %s", stderr)
+	}
+	h.mustRun(t, "lock")
+	if p := h.readLock(t).Datapacks["autoslabs"]; !p.ResourcePack {
+		t.Fatalf("the lock mirrors the flag: %+v", p)
+	}
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"].(map[string]any)["pack"] = map[string]any{"type": "resourcepack", "resourcepack": true}
+	})
+	if code, stdout, _ := h.run(t, "--json", "list"); code == 0 || failureCode(t, stdout).Code != "manifest-invalid" {
+		t.Fatalf("resourcepack is refused on anything but a datapack: %s", stdout)
+	}
+}

@@ -341,11 +341,12 @@ func (r *Resolver) lockFilePack(key, kind string, entry manifest.Require) error 
 	}
 	r.checkPackFolder(key, kind, entry)
 	p := lock.Pack{
-		File:     entry.File,
-		Filename: manifest.PackFilename(key, entry),
-		Sha512:   got.sha512,
-		Size:     got.size,
-		Side:     packSide(kind, entry),
+		File:         entry.File,
+		Filename:     manifest.PackFilename(key, entry),
+		Sha512:       got.sha512,
+		Size:         got.size,
+		Side:         packSide(kind, entry),
+		ResourcePack: entry.ResourcePack,
 	}
 	section[key] = p
 	return nil

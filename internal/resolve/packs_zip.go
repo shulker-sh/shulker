@@ -211,6 +211,7 @@ func (r *Resolver) reconcilePacks(ctx context.Context) error {
 				// A new name or side needs no new version, so it is taken without resolving again.
 				locked.Filename = manifest.PackFilename(key, listed[key])
 				locked.Side = packSide(kind, listed[key])
+				locked.ResourcePack = listed[key].ResourcePack
 				section[key] = locked
 			}
 			if ok && len(project.ZipEntryDifferences(r.Dir, key, listed[key], locked)) == 0 {
@@ -253,11 +254,16 @@ func (r *Resolver) checkPackFilenames() error {
 	for _, kind := range manifest.PackKinds {
 		section := r.packSection(kind)
 		for _, key := range sortedKeys(section) {
-			path := r.Lock.PackPath(kind, section[key], "client", "")
-			if other, ok := placed[strings.ToLower(path)]; ok {
-				return out.Errorf("pack-filename-taken", "%s and %s are both placed as %s", other, key, path)
+			paths := []string{r.Lock.PackPath(kind, section[key], "client", "")}
+			if section[key].ResourcePack {
+				paths = append(paths, section[key].Path(manifest.TypeResourcePack))
 			}
-			placed[strings.ToLower(path)] = key
+			for _, path := range paths {
+				if other, ok := placed[strings.ToLower(path)]; ok {
+					return out.Errorf("pack-filename-taken", "%s and %s are both placed as %s", other, key, path)
+				}
+				placed[strings.ToLower(path)] = key
+			}
 		}
 	}
 	return nil
@@ -299,6 +305,7 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 		Size:             v.File.Size,
 		Channel:          channelLabel(channel),
 		Side:             packSide(kind, r.Manifest.Requires[key]),
+		ResourcePack:     r.Manifest.Requires[key].ResourcePack,
 	}
 	if kind == manifest.TypeShader {
 		locked.Loaders = shaderLoaders(v)

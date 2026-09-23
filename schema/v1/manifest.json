@@ -278,6 +278,10 @@
           "pattern": "^[^/\\\\]+\\.zip$",
           "description": "Resource packs, shaders and datapacks only: the file name the pack is placed under, in place of <key>.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case."
         },
+        "resourcepack": {
+          "type": "boolean",
+          "description": "Datapacks only: also place the zip in resourcepacks/ on the client, under the same file name, for a hybrid that carries assets/ as well as data/. One entry keeps both copies on one version."
+        },
         "project": {
           "$ref": "#/$defs/projectId",
           "description": "The provider project, by slug or id. Omitted means the key. Written by add when the provider slug differs from the key or the provider is CurseForge, and always for a modpack."
@@ -370,6 +374,10 @@
               ]
             }
           }
+        },
+        {
+          "if": { "required": ["resourcepack"] },
+          "then": { "required": ["type"], "properties": { "type": { "const": "datapack" } } }
         },
         {
           "if": { "required": ["filename"] },

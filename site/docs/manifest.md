@@ -176,6 +176,7 @@ Type: `string`. pattern `^[a-z0-9][a-z0-9._-]{0,63}$`
 | `locked` | `boolean` | Whether the modpack's mods are copied verbatim from its lock, dependencies included, instead of resolved against this project. Omitted means true when the source has a lock, and always for an archive, which pins exact files; a source without a lock is always resolved from its manifest. |
 | `file` | [`relativePath`](#relativepath) | A local jar or zip that is on no provider, placed like any other entry of its kind. On a resource pack, shader or datapack it may name a folder, which shulker zips and places as a zip, leaving out any name starting with a dot, Thumbs.db, desktop.ini, *~ and *.swp at any depth and zipping what a symlink in it points at. On a modpack, a .mrpack or CurseForge zip archive: its mods lock as the modpack's and its override folders become the modpack's layers. The lock records its sha512, and changed bytes make the lock out of date. |
 | `filename` | `string` | Resource packs, shaders and datapacks only: the file name the pack is placed under, in place of &lt;key&gt;.zip. The game enables packs by file name, so this keeps a pack enabled under a name players already use. Unique within its folder whatever the case.<br>pattern `^[^/\\]+\.zip$`, min length 1 |
+| `resourcepack` | `boolean` | Datapacks only: also place the zip in resourcepacks/ on the client, under the same file name, for a hybrid that carries assets/ as well as data/. One entry keeps both copies on one version. |
 | `project` | [`projectId`](#projectid) | The provider project, by slug or id. Omitted means the key. Written by add when the provider slug differs from the key or the provider is CurseForge, and always for a modpack. |
 | `pin` | [`versionId`](#versionid) | Pin to one provider version. update skips pinned mods and modpacks. |
 | `channel` | `"release"` \| `"beta"` \| `"alpha"` | Least stable channel accepted. A channel admits itself and anything more stable.<br>default `"release"` |
@@ -194,6 +195,8 @@ When `file` is set, `project`, `pin`, `channel` and `provider` are not allowed.
 When `file` is set and `type` is `"modpack"`, `side`, `os` and `feature` are not allowed.
 
 When `type` is `"modpack"` and neither `source` nor `file` is set, `ref`, `autoUpdate`, `locked`, `side`, `os` and `feature` are not allowed.
+
+When `resourcepack` is set, `type` is required, and `type` must be `"datapack"`.
 
 When `filename` is set, `type` is required, and `type` must be `"resourcepack"` \| `"shader"` \| `"datapack"`.
 

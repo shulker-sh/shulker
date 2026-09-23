@@ -240,21 +240,23 @@ func KeyTaken(key, held, adding string) error {
 
 // Require is one entry under requires.
 type Require struct {
-	Type       string     `json:"type,omitempty"`
-	Source     string     `json:"source,omitempty"`
-	Ref        string     `json:"ref,omitempty"`
-	AutoUpdate *bool      `json:"autoUpdate,omitempty"`
-	Locked     *bool      `json:"locked,omitempty"`
-	File       string     `json:"file,omitempty"`
-	Filename   string     `json:"filename,omitempty"`
-	Project    any        `json:"project,omitempty"`
-	Pin        any        `json:"pin,omitempty"`
-	Channel    string     `json:"channel,omitempty"`
-	Side       string     `json:"side,omitempty"`
-	Provider   string     `json:"provider,omitempty"`
-	OS         StringList `json:"os,omitempty"`
-	Feature    StringList `json:"feature,omitempty"`
-	Note       string     `json:"note,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Source     string `json:"source,omitempty"`
+	Ref        string `json:"ref,omitempty"`
+	AutoUpdate *bool  `json:"autoUpdate,omitempty"`
+	Locked     *bool  `json:"locked,omitempty"`
+	File       string `json:"file,omitempty"`
+	Filename   string `json:"filename,omitempty"`
+	// ResourcePack also places a datapack's zip in resourcepacks/, for a hybrid carrying assets/.
+	ResourcePack bool       `json:"resourcepack,omitempty"`
+	Project      any        `json:"project,omitempty"`
+	Pin          any        `json:"pin,omitempty"`
+	Channel      string     `json:"channel,omitempty"`
+	Side         string     `json:"side,omitempty"`
+	Provider     string     `json:"provider,omitempty"`
+	OS           StringList `json:"os,omitempty"`
+	Feature      StringList `json:"feature,omitempty"`
+	Note         string     `json:"note,omitempty"`
 }
 
 // Kind is the entry's type, where an entry with a source and no type is a modpack.
