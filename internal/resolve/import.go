@@ -427,28 +427,19 @@ func (im *importer) matchCurseForge(ctx context.Context) error {
 // findOnCurseForge fetches the projects and files of every match in two requests, leaving out a
 // match whose project or file CurseForge no longer has.
 func findOnCurseForge(ctx context.Context, cf curseForgeLookup, matches map[uint32]curseforge.Match) (map[uint32]hosted, error) {
-	if len(matches) == 0 {
-		return nil, nil
-	}
 	var modIDs, fileIDs []int
 	for _, m := range matches {
 		modIDs = append(modIDs, m.ModID)
 		fileIDs = append(fileIDs, m.FileID)
 	}
-	slices.Sort(modIDs)
-	slices.Sort(fileIDs)
-	projects, err := cf.Mods(ctx, slices.Compact(modIDs))
-	if err != nil {
-		return nil, err
-	}
-	files, _, err := cf.Files(ctx, slices.Compact(fileIDs))
+	cfFiles, err := lookUpCurseForge(ctx, cf, modIDs, fileIDs)
 	if err != nil {
 		return nil, err
 	}
 	found := map[uint32]hosted{}
 	for fp, m := range matches {
-		proj, hasProject := projects[m.ModID]
-		v, hasFile := files[m.FileID]
+		proj, hasProject := cfFiles.projects[m.ModID]
+		v, hasFile := cfFiles.files[m.FileID]
 		if hasProject && hasFile {
 			found[fp] = hosted{proj: proj, v: &v}
 		}

@@ -98,6 +98,11 @@ func findManifestFiles(ctx context.Context, cf curseForgeLookup, files []cfpack.
 			fileIDs = append(fileIDs, f.FileID)
 		}
 	}
+	return lookUpCurseForge(ctx, cf, modIDs, fileIDs)
+}
+
+// lookUpCurseForge fetches CurseForge's projects and files by id, in one request each.
+func lookUpCurseForge(ctx context.Context, cf curseForgeLookup, modIDs, fileIDs []int) (cfFound, error) {
 	if len(fileIDs) == 0 {
 		return cfFound{}, nil
 	}
