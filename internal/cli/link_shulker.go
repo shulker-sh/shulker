@@ -32,64 +32,11 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 		Short:       "Create an instance shulker owns and launches itself",
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, _, err := a.openLinkSource(cmd, args, ref, ls)
+			rep, err := a.linkShulker(cmd, args, ref, as, force, ls)
 			if err != nil {
 				return err
 			}
-			p := src.project
-			r, err := a.roots()
-			if err != nil {
-				return err
-			}
-			instances, err := a.loadInstances()
-			if err != nil {
-				return err
-			}
-			display := p.Manifest.DisplayName("client")
-			nick := shulkerNick(instances, r.Instances, as, display)
-			gameDir := filepath.Join(r.Instances, nick)
-			if err := a.checkID(as, gameDir); err != nil {
-				return err
-			}
-			if err := checkAdopt(gameDir, src, "instance", nick, "--as", force); err != nil {
-				return err
-			}
-			created := false
-			if _, err := os.Stat(gameDir); os.IsNotExist(err) {
-				created = true
-			}
-			inst, err := a.linkProject(gameDir, nick, display, ref, src)
-			if err != nil {
-				return err
-			}
-			if err := ls.save(gameDir, src.name, ref, "client", false, p.Manifest); err != nil {
-				return err
-			}
-			a.registerInstance(config.Instance{ID: nick, Launcher: "shulker", Name: display, Dir: gameDir, Source: src.name})
-			synced, err := a.syncInPlace(cmd, inst, "client", syncRequest{})
-			if err != nil {
-				return err
-			}
-			rep := shulkerReport{
-				Launcher: "shulker",
-				ID:       nick,
-				Name:     display,
-				GameDir:  gameDir,
-				Source:   src.name,
-				Ref:      ref,
-				Modpack:  modpackKey(inst.Manifest, src.name),
-				Created:  created,
-				Sync:     &synced,
-			}
-			return a.printer.Emit(rep, func(l *out.Lines) {
-				verb := "created"
-				if !created {
-					verb = "updated"
-				}
-				l.OKInto(verb+" instance "+nick, gameDir, "")
-				l.Tree(follows(rep.Modpack, rep.Source)...)
-				synced.print(l)
-			})
+			return a.printer.Emit(rep, rep.print)
 		},
 	}
 	cmd.Flags().StringVar(&as, "as", "", "nickname for this instance, which names its folder and finds it with -i (default: from the pack's name)")
@@ -97,6 +44,69 @@ func (a *app) linkShulkerCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack an instance already follows")
 	ls.register(cmd)
 	return cmd
+}
+
+// linkShulker creates or updates the instance shulker owns for a project, registers it and syncs it.
+func (a *app) linkShulker(cmd *cobra.Command, args []string, ref, as string, force bool, ls linkSettings) (shulkerReport, error) {
+	src, _, err := a.openLinkSource(cmd, args, ref, ls)
+	if err != nil {
+		return shulkerReport{}, err
+	}
+	p := src.project
+	r, err := a.roots()
+	if err != nil {
+		return shulkerReport{}, err
+	}
+	instances, err := a.loadInstances()
+	if err != nil {
+		return shulkerReport{}, err
+	}
+	display := p.Manifest.DisplayName("client")
+	nick := shulkerNick(instances, r.Instances, as, display)
+	gameDir := filepath.Join(r.Instances, nick)
+	if err := a.checkID(as, gameDir); err != nil {
+		return shulkerReport{}, err
+	}
+	if err := checkAdopt(gameDir, src, "instance", nick, "--as", force); err != nil {
+		return shulkerReport{}, err
+	}
+	created := false
+	if _, err := os.Stat(gameDir); os.IsNotExist(err) {
+		created = true
+	}
+	inst, err := a.linkProject(gameDir, nick, display, ref, src)
+	if err != nil {
+		return shulkerReport{}, err
+	}
+	if err := ls.save(gameDir, src.name, ref, "client", false, p.Manifest); err != nil {
+		return shulkerReport{}, err
+	}
+	a.registerInstance(config.Instance{ID: nick, Launcher: "shulker", Name: display, Dir: gameDir, Source: src.name})
+	synced, err := a.syncInPlace(cmd, inst, "client", syncRequest{})
+	if err != nil {
+		return shulkerReport{}, err
+	}
+	return shulkerReport{
+		Launcher: "shulker",
+		ID:       nick,
+		Name:     display,
+		GameDir:  gameDir,
+		Source:   src.name,
+		Ref:      ref,
+		Modpack:  modpackKey(inst.Manifest, src.name),
+		Created:  created,
+		Sync:     &synced,
+	}, nil
+}
+
+func (r shulkerReport) print(l *out.Lines) {
+	verb := "created"
+	if !r.Created {
+		verb = "updated"
+	}
+	l.OKInto(verb+" instance "+r.ID, r.GameDir, "")
+	l.Tree(follows(r.Modpack, r.Source)...)
+	r.Sync.print(l)
 }
 
 // shulkerNick is the nickname a shulker instance goes by. It names the folder under the instances

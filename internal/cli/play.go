@@ -71,6 +71,7 @@ func (a *app) playCmd() *cobra.Command {
 		Use:         "play [nickname]",
 		Annotations: acts(),
 		Short:       "Start a shulker instance",
+		Long:        "Start a shulker instance: the nickname given, the one -i names, or the one the current directory is. In a project folder it plays the instance shulker owns for that project; with several it asks which, and with none it offers to create one on a terminal.",
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.window != "" {
@@ -84,7 +85,7 @@ func (a *app) playCmd() *cobra.Command {
 			}
 			opts.target = target
 			if opts.dryRun {
-				return a.dryRun(cmd.Context(), args, target)
+				return a.dryRun(cmd, args, target)
 			}
 			return a.play(cmd, args, opts)
 		},
@@ -120,7 +121,7 @@ func (p playOptions) waits() bool { return p.wait || p.stream }
 
 func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	ctx := cmd.Context()
-	in, err := a.playInstance(args)
+	in, linked, err := a.playInstance(cmd, args, true)
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		return err
 	}
 	var synced *syncResult
-	if !opts.noSync && f.Settings.PreLaunch() {
+	if linked == nil && !opts.noSync && f.Settings.PreLaunch() {
 		res, err := a.syncForLaunch(cmd, in.Dir)
 		if err != nil {
 			return err
@@ -214,6 +215,9 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		return err
 	}
 	return a.printer.Emit(res, func(l *out.Lines) {
+		if linked != nil {
+			linked.print(l)
+		}
 		if synced != nil {
 			synced.print(l)
 		}
@@ -385,8 +389,9 @@ func launchLog(dir string, at time.Time) (string, error) {
 	}
 }
 
-func (a *app) dryRun(ctx context.Context, args []string, target quickPlay) error {
-	in, err := a.playInstance(args)
+func (a *app) dryRun(cmd *cobra.Command, args []string, target quickPlay) error {
+	ctx := cmd.Context()
+	in, _, err := a.playInstance(cmd, args, false)
 	if err != nil {
 		return err
 	}
@@ -493,31 +498,115 @@ func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Proje
 }
 
 // playInstance is the instance a launch acts on: the nickname given, else the one the current
-// directory is. Only the instances shulker owns can be launched from here; every other launcher
-// starts its own.
-func (a *app) playInstance(args []string) (config.Instance, error) {
+// directory is, else the one shulker owns for the project the current directory holds. Only the
+// instances shulker owns can be launched from here; every other launcher starts its own. With
+// create, a project nothing plays yet asks to make its instance, which is linked and synced here,
+// and returned with that link's report.
+func (a *app) playInstance(cmd *cobra.Command, args []string, create bool) (config.Instance, *shulkerReport, error) {
 	if len(args) == 1 {
 		if a.instance != "" || a.dir != "" {
-			return config.Instance{}, out.Errorf("usage", "pass a nickname, -i or -C, not more than one: each of them says which instance to launch")
+			return config.Instance{}, nil, out.Errorf("usage", "pass a nickname, -i or -C, not more than one: each of them says which instance to launch")
 		}
 		a.instance = args[0]
 	}
 	dir, err := a.scopeDir()
 	if err != nil {
-		return config.Instance{}, err
+		return config.Instance{}, nil, err
 	}
 	in, ok := a.registeredInstance(dir)
+	if !ok && a.instance == "" {
+		return a.projectInstance(cmd, dir, create)
+	}
 	if !ok {
-		e := out.Errorf("instance-not-found", "%s is not a registered instance", dir)
-		e.Help = "`shulker link shulker` makes one shulker launches itself"
-		return config.Instance{}, e
+		return config.Instance{}, nil, notRegistered(dir)
 	}
 	if in.Launcher != "shulker" {
 		e := out.Errorf("not-shulker", "%s belongs to %s, which starts it itself", in.ID, in.Launcher)
 		e.Help = "shulker only launches the instances it owns"
-		return config.Instance{}, e
+		return config.Instance{}, nil, e
 	}
-	return in, nil
+	return in, nil, nil
+}
+
+func notRegistered(dir string) error {
+	e := out.Errorf("instance-not-found", "%s is not a registered instance", dir)
+	e.Help = "`shulker link shulker` makes one shulker launches itself"
+	return e
+}
+
+// projectInstance is the instance shulker owns for the project in dir. Instances other launchers
+// own are synced from it too, but never count, since shulker doesn't start them.
+func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (config.Instance, *shulkerReport, error) {
+	p, err := a.openProjectAt(dir)
+	if errors.Is(err, project.ErrNoManifest) {
+		return config.Instance{}, nil, notRegistered(dir)
+	}
+	if err != nil {
+		return config.Instance{}, nil, err
+	}
+	registry, err := a.loadInstances()
+	if err != nil {
+		return config.Instance{}, nil, err
+	}
+	source, err := filepath.Abs(p.Dir)
+	if err != nil {
+		return config.Instance{}, nil, err
+	}
+	var own []config.Instance
+	for _, in := range registry {
+		if in.Launcher == "shulker" && isSameDir(in.Source, source) && !isSameDir(in.Dir, source) {
+			own = append(own, in)
+		}
+	}
+	switch len(own) {
+	case 0:
+		return a.createProjectInstance(cmd, p, dir, create)
+	case 1:
+		a.logInstance(own[0].ID)
+		return own[0], nil, nil
+	}
+	entries := make([]instanceEntry, len(own))
+	for i, in := range own {
+		entries[i] = inspectInstance(in)
+	}
+	sortInstanceEntries(entries)
+	t := a.printer.ErrTheme
+	e, err := pickOne(a, "Play which one?", entries,
+		func(e instanceEntry) string { return e.ID },
+		func(e instanceEntry) string { return instancePickLabel(t, e) },
+		func() error {
+			e := out.Errorf("ambiguous-instance", "several shulker instances play %s", p.Manifest.DisplayName("client"))
+			e.Help = "pass -i <id> to choose one"
+			e.Candidates, e.Pass, e.Flag = instanceCandidates(entries), instanceIDs(entries), "--instance"
+			return e
+		})
+	if err != nil {
+		return config.Instance{}, nil, err
+	}
+	a.logInstance(e.ID)
+	return e.Instance, nil, nil
+}
+
+func (a *app) createProjectInstance(cmd *cobra.Command, p *project.Project, dir string, create bool) (config.Instance, *shulkerReport, error) {
+	if !create || !a.canPick() {
+		return config.Instance{}, nil, notRegistered(dir)
+	}
+	yes, err := a.askYes("Create a shulker instance for " + p.Manifest.DisplayName("client") + " and play it?")
+	if err != nil {
+		return config.Instance{}, nil, err
+	}
+	if !yes {
+		return config.Instance{}, nil, notRegistered(dir)
+	}
+	rep, err := a.linkShulker(cmd, nil, "", "", false, linkSettings{})
+	if err != nil {
+		return config.Instance{}, nil, err
+	}
+	in, ok := a.registeredInstance(rep.GameDir)
+	if !ok {
+		return config.Instance{}, nil, notRegistered(rep.GameDir)
+	}
+	return in, &rep, nil
 }
 
 // playProject is the pack a launch runs, read after the sync that may have changed it.
