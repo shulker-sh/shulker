@@ -186,3 +186,38 @@ func TestProjectTellsDatapacksApart(t *testing.T) {
 		t.Errorf("a datapack-only project: %+v", only)
 	}
 }
+
+func TestURLsRoundTrip(t *testing.T) {
+	m := New(fetch.New("test"))
+	for arg, want := range map[string]provider.Ref{
+		"https://modrinth.com/mod/sodium":                                            {Project: "sodium"},
+		"https://www.modrinth.com/shader/complementary-reimagined/":                  {Project: "complementary-reimagined"},
+		"https://modrinth.com/project/AANobbMI?tab=versions#top":                     {Project: "AANobbMI"},
+		"https://modrinth.com/mod/sodium/version/mc1.21.1-0.6.0-fabric":              {Project: "sodium", Version: "mc1.21.1-0.6.0-fabric"},
+		"https://cdn.modrinth.com/data/AANobbMI/versions/b70slbHV/sodium-fabric.jar": {Project: "AANobbMI", Version: "b70slbHV"},
+	} {
+		u, _ := url.Parse(arg)
+		if got, err := m.ParseURL(u); err != nil || got != want {
+			t.Errorf("%s: got %+v err=%v", arg, got, err)
+		}
+	}
+	for _, arg := range []string{"https://modrinth.com/user/jellysquid3", "https://modrinth.com/mod/sodium/versions", "https://cdn.modrinth.com/data/AANobbMI/icon.png"} {
+		u, _ := url.Parse(arg)
+		if _, err := m.ParseURL(u); out.CodeOf(err) != "usage" {
+			t.Errorf("%s: err=%v, want usage", arg, err)
+		}
+	}
+	u, _ := url.Parse("https://www.curseforge.com/minecraft/mc-mods/jei")
+	if _, err := m.ParseURL(u); err != provider.ErrNotHosted {
+		t.Errorf("another host: %v", err)
+	}
+	if got := m.ProjectPage("shader", "complementary-reimagined"); got != "https://modrinth.com/shader/complementary-reimagined" {
+		t.Errorf("project page %s", got)
+	}
+	if got := m.ProjectPage("", "AANobbMI"); got != "https://modrinth.com/project/AANobbMI" {
+		t.Errorf("project page by id %s", got)
+	}
+	if got := m.VersionsPage("mod", "sodium"); got != "https://modrinth.com/mod/sodium/versions" {
+		t.Errorf("versions page %s", got)
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/resolve"
 )
 
@@ -32,7 +33,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			return minimumArgs(1)(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			urls, err := providerURLs(args)
+			urls, err := a.providerURLs(args)
 			if err != nil {
 				return err
 			}
@@ -84,7 +85,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			if err := checkFlagValues(
 				flagValue{"side", opts.Side, []string{"client", "server", "both"}},
 				flagValue{"channel", opts.Channel, []string{"release", "beta", "alpha"}},
-				flagValue{"provider", opts.Provider, []string{"modrinth", "curseforge"}},
+				flagValue{"provider", opts.Provider, manifest.DefaultProviders},
 			); err != nil {
 				return err
 			}
@@ -163,11 +164,15 @@ func checkFlagValues(flags ...flagValue) error {
 	return nil
 }
 
-// providerURLs reads the arguments that are Modrinth or CurseForge URLs.
-func providerURLs(args []string) (map[string]resolve.ProviderURL, error) {
-	urls := map[string]resolve.ProviderURL{}
+// providerURLs reads the arguments that are provider URLs.
+func (a *app) providerURLs(args []string) (map[string]provider.Ref, error) {
+	d, err := a.deps()
+	if err != nil {
+		return nil, err
+	}
+	urls := map[string]provider.Ref{}
 	for _, arg := range args {
-		u, ok, err := resolve.ParseURL(arg)
+		u, ok, err := d.providers.ParseURL(arg)
 		if err != nil {
 			return nil, err
 		}
@@ -181,8 +186,10 @@ func providerURLs(args []string) (map[string]resolve.ProviderURL, error) {
 // isArchive reports whether an add argument is a modpack archive, which a bare add takes as a
 // modpack: an .mrpack by its name, and a zip by holding a CurseForge manifest.
 func (a *app) isArchive(arg string) bool {
-	if _, ok, _ := resolve.ParseURL(arg); ok {
-		return false
+	if d, err := a.deps(); err == nil {
+		if _, ok, _ := d.providers.ParseURL(arg); ok {
+			return false
+		}
 	}
 	switch strings.ToLower(filepath.Ext(arg)) {
 	case ".mrpack":

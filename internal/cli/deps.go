@@ -31,7 +31,7 @@ import (
 type deps struct {
 	fetch      *fetch.Client
 	cache      *cache.Cache
-	providers  map[string]provider.Provider
+	providers  provider.Providers
 	meta       *resolve.Meta
 	runtimes   *meta.Runtimes
 	players    *player.Client
@@ -39,6 +39,15 @@ type deps struct {
 	signin     *account.SignIn
 	// resources is where the game store fetches asset objects from.
 	resources string
+}
+
+// titles names providers as the user reads them, by whatever deps are open; a name stays a name
+// when none are.
+func (a *app) titles() provider.Providers {
+	if d, err := a.deps(); err == nil {
+		return d.providers
+	}
+	return nil
 }
 
 func (a *app) deps() (*deps, error) {
@@ -68,12 +77,8 @@ func (a *app) deps() (*deps, error) {
 	f.Waiting = a.printer.Waiting
 	mr := modrinth.New(f)
 	mr.Log = a.progress
-	providers := map[string]provider.Provider{"modrinth": mr}
-	if key := curseforge.Key(cfg.CurseForge.Key); key != "" {
-		providers["curseforge"] = curseforge.New(f, key)
-	} else if key := curseforge.SharedKey(c.Dir); key != "" {
-		providers["curseforge"] = curseforge.NewShared(f, key, c.Dir)
-	}
+	cf := curseforge.Open(f, cfg.CurseForge.Key, c.Dir)
+	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	a.d = &deps{
 		fetch:      f,
 		cache:      c,
@@ -187,7 +192,7 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 	if err != nil {
 		return nil, err
 	}
-	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs}, nil
+	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers}, nil
 }
 
 func (a *app) packStore(p *project.Project) (*pack.Store, error) {

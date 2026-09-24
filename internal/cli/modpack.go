@@ -122,7 +122,7 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 	if opts.Pin != "" && len(sources) > 1 {
 		return out.Errorf("usage", "--pin applies to a single modpack")
 	}
-	urls, err := providerURLs(sources)
+	urls, err := a.providerURLs(sources)
 	if err != nil {
 		return err
 	}

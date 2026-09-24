@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strconv"
 
 	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/manifest"
@@ -19,9 +18,9 @@ import (
 // missing-files error, so a single pass says everything to download. A file the exporting shulker
 // project locked, matched by sha512, comes back as that project locked it.
 func (r *Resolver) ImportCurseForge(ctx context.Context, a *cfpack.Archive) (*Imported, error) {
-	p, ok := r.Providers["curseforge"].(curseForgeLookup)
-	if !ok {
-		return nil, Unavailable("curseforge")
+	p, err := r.Providers.Get(cfpack.Provider)
+	if err != nil {
+		return nil, err
 	}
 	found, err := findManifestFiles(ctx, p, a.Manifest.Files)
 	if err != nil {
@@ -84,36 +83,32 @@ func (im *importer) lockedFromCurseForge(p provider.Provider, key, kind string, 
 // cfFound is what CurseForge has of a pack's files: their projects and files, by id, and why a
 // file it has can't be used.
 type cfFound struct {
-	projects map[int]*provider.Project
-	files    map[int]provider.Version
-	unusable map[int]error
+	projects map[string]provider.Project
+	files    map[string]provider.Version
+	unusable map[string]error
 }
 
-// findManifestFiles fetches the projects and files of every file the pack requires in two
-// requests, whatever the pack's size.
-func findManifestFiles(ctx context.Context, cf curseForgeLookup, files []cfpack.File) (cfFound, error) {
-	var modIDs, fileIDs []int
+// findManifestFiles fetches the projects and files of every file the pack requires in one
+// request each, whatever the pack's size.
+func findManifestFiles(ctx context.Context, p provider.Provider, files []cfpack.File) (cfFound, error) {
+	var projectIDs, versionIDs []string
 	for _, f := range files {
 		if f.Required {
-			modIDs = append(modIDs, f.ProjectID)
-			fileIDs = append(fileIDs, f.FileID)
+			projectID, versionID := f.IDs()
+			projectIDs = append(projectIDs, projectID)
+			versionIDs = append(versionIDs, versionID)
 		}
 	}
-	return lookUpCurseForge(ctx, cf, modIDs, fileIDs)
-}
-
-// lookUpCurseForge fetches CurseForge's projects and files by id, in one request each.
-func lookUpCurseForge(ctx context.Context, cf curseForgeLookup, modIDs, fileIDs []int) (cfFound, error) {
-	if len(fileIDs) == 0 {
+	if len(versionIDs) == 0 {
 		return cfFound{}, nil
 	}
-	slices.Sort(modIDs)
-	slices.Sort(fileIDs)
-	projects, err := cf.Mods(ctx, slices.Compact(modIDs))
+	slices.Sort(projectIDs)
+	slices.Sort(versionIDs)
+	projects, err := p.Projects(ctx, slices.Compact(projectIDs))
 	if err != nil {
 		return cfFound{}, err
 	}
-	versions, unusable, err := cf.Files(ctx, slices.Compact(fileIDs))
+	versions, unusable, err := p.VersionsByID(ctx, slices.Compact(versionIDs))
 	if err != nil {
 		return cfFound{}, err
 	}
@@ -122,23 +117,24 @@ func lookUpCurseForge(ctx context.Context, cf curseForgeLookup, modIDs, fileIDs 
 
 func (im *importer) curseForgeFile(ctx context.Context, p provider.Provider, found cfFound, f cfpack.File) (*provider.Project, *provider.Version, error) {
 	r, rep := im.r, im.rep
-	projectID, fileID := strconv.Itoa(f.ProjectID), strconv.Itoa(f.FileID)
-	proj, ok := found.projects[f.ProjectID]
+	projectID, fileID := f.IDs()
+	project, ok := found.projects[projectID]
 	if !ok {
-		return nil, nil, out.Errorf("mod-not-found", "curseforge has no project %s", projectID)
+		return nil, nil, out.Errorf("mod-not-found", "%s has no project %s", p.Name(), projectID)
 	}
-	if err := found.unusable[f.FileID]; err != nil {
+	proj := &project
+	if err := found.unusable[fileID]; err != nil {
 		return nil, nil, err
 	}
-	file, ok := found.files[f.FileID]
+	file, ok := found.files[fileID]
 	if !ok {
-		return nil, nil, out.Errorf("version-not-found", "curseforge has no file %s for %s", fileID, proj.Slug)
+		return nil, nil, out.Errorf("version-not-found", "%s has no file %s for %s", p.Name(), fileID, proj.Slug)
 	}
 	v := &file
 	if v.ProjectID != proj.ID {
 		return nil, nil, out.Errorf("pin-mismatch", "file %s belongs to project %s, not %s", fileID, v.ProjectID, proj.Slug)
 	}
-	listed := manifest.Require{Project: manifest.NewID(p.Name(), proj.ID)}
+	listed := manifest.Require{Project: proj.ID}
 	if p.Name() != r.Manifest.ProviderOrder()[0] {
 		listed.Provider = p.Name()
 	}

@@ -3,6 +3,10 @@ package cli
 import (
 	"testing"
 
+	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/provider/curseforge"
+	"shulker.sh/shulker/internal/provider/modrinth"
 	"shulker.sh/shulker/internal/resolve"
 )
 
@@ -33,7 +37,8 @@ func TestLockedSummary(t *testing.T) {
 		{"larger provider first", files("mod", "modrinth", 1, "mod", "curseforge", 2), "3 mods (2 CurseForge, 1 Modrinth) locked"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := lockedSummary(tc.files); got != tc.want {
+			providers := provider.Providers{"modrinth": modrinth.New(fetch.New("test")), "curseforge": curseforge.New(fetch.New("test"), "")}
+			if got := lockedSummary(providers, tc.files); got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})

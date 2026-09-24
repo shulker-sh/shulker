@@ -22,7 +22,7 @@ type fakeSearches struct {
 
 func newFakeSearches() *fakeSearches {
 	f := &fakeSearches{fail: map[string]bool{}, duringFetch: map[string]func(){}, duringSleep: map[string]func(){}}
-	f.s = newLiveSearch(out.Theme{}, func(query string) (searchReply, error) {
+	f.s = newLiveSearch(out.Theme{}, nil, func(query string) (searchReply, error) {
 		f.fetched = append(f.fetched, query)
 		if during := f.duringFetch[query]; during != nil {
 			during()

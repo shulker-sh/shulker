@@ -8,13 +8,18 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/provider/fake"
 )
 
 const freshSha1 = "0123456789abcdef0123456789abcdef01234567"
 
 func pushBuilder(entry manifest.Require, pack lock.Pack, props map[string]any) *Builder {
 	entry.Type = manifest.TypeResourcePack
+	cf := fake.New("curseforge")
+	cf.Label = "CurseForge"
 	return &Builder{
+		Providers: provider.Providers{cf.Name(): cf},
 		Manifest: &manifest.Manifest{
 			Requires: map[string]manifest.Require{"fresh": entry},
 			Server:   &manifest.Server{ResourcePack: "fresh", Properties: props},

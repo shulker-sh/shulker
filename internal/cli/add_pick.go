@@ -24,7 +24,7 @@ func (a *app) askAdd(cmd *cobra.Command, kind, providerName string) ([]string, m
 	}
 	a.printer.Settle()
 	ctx := cmd.Context()
-	s := newLiveSearch(a.printer.ErrTheme, func(query string) (searchReply, error) {
+	s := newLiveSearch(a.printer.ErrTheme, a.titles(), func(query string) (searchReply, error) {
 		reply, err := a.search(ctx, query, kind, names, addPickLimit, false)
 		reply.results.Results = slices.DeleteFunc(reply.results.Results, func(hit searchHit) bool {
 			return !isAddable(hit.Type)

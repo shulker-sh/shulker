@@ -2,8 +2,6 @@ package resolve
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -29,40 +27,17 @@ type Matched struct {
 func (r *Resolver) MatchOverrides(ctx context.Context, files []mrpack.Override) (*Matched, error) {
 	im := newImporter(r, &mrpack.Archive{}, false)
 	im.inProject = true
-	if p, ok := r.Providers["modrinth"].(hashLookup); ok {
-		im.modrinth = p
-	}
-	sha1s := make([]string, len(files))
-	for i, o := range files {
-		sum := sha1.Sum(o.Data)
-		sha1s[i] = hex.EncodeToString(sum[:])
-	}
-	if err := im.lookUpOnModrinth(ctx, sha1s); err != nil {
-		return nil, err
-	}
-	for i, o := range files {
-		found, ok := im.onModrinth[sha1s[i]]
-		if !ok {
-			im.unmatched = append(im.unmatched, o)
-			continue
-		}
-		if im.alreadyRequired(o, found.proj) {
-			im.unmanaged(o)
-			continue
-		}
+	for _, o := range files {
 		side := layerSide(o.Layer)
 		if side == "both" {
 			side = ""
 		}
-		locked, err := im.lockOverride(ctx, im.modrinth, o, side, found.proj, found.v)
-		if err != nil {
-			return nil, err
-		}
-		if !locked {
-			im.unmanaged(o)
-		}
+		im.toIdentify(o, side)
 	}
-	if err := im.matchCurseForge(ctx); err != nil {
+	if err := im.identify(ctx); err != nil {
+		return nil, err
+	}
+	if err := im.lockIdentified(ctx); err != nil {
 		return nil, err
 	}
 	im.rep.sort()

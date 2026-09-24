@@ -11,14 +11,12 @@ import (
 	"os"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/cfpack"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/provider/curseforge"
+	"shulker.sh/shulker/internal/provider"
 )
 
 type CurseForgeOptions struct {
@@ -28,13 +26,16 @@ type CurseForgeOptions struct {
 	Bundle   bool
 	OS       string
 	Features map[string]bool
-	// Match looks fingerprints up on CurseForge. It only runs when a mod isn't locked from CurseForge.
-	Match func(fingerprints []uint32) (map[uint32]curseforge.Match, error)
-	// Records looks the file-ID projects up for modlist.html.
-	Records func(projectIDs []int) (map[int]curseforge.Record, error)
+	// Identify finds the files CurseForge hosts, keyed as given. It only runs for files not
+	// locked from CurseForge.
+	Identify func(files map[string][]byte) (map[string]provider.Hosted, error)
+	// Projects looks the file-ID projects up for modlist.html.
+	Projects func(ids []string) (map[string]provider.Project, error)
+	// ProjectPage is a project's page by id, for a modlist entry Projects didn't cover.
+	ProjectPage func(projectID string) string
 	// Lookalike finds the CurseForge file with the same name and size as a file
 	// whose fingerprint missed, and downloads it. ok is false when there is none.
-	Lookalike func(miss CurseForgeMiss) (match curseforge.Match, data []byte, ok bool, err error)
+	Lookalike func(miss CurseForgeMiss) (match provider.Version, data []byte, ok bool, err error)
 }
 
 // CurseForgeMiss is a file CurseForge has no fingerprint for.
@@ -42,8 +43,8 @@ type CurseForgeMiss struct {
 	Key       string
 	Kind      string
 	Provider  string
-	Project   manifest.ID
-	Alias     int
+	Project   string
+	Alias     string
 	Filename  string
 	Size      int64
 	Minecraft string
@@ -77,13 +78,13 @@ type curseForgeEntry struct {
 	provider string
 	sha512   string
 	url      *string
-	project  manifest.ID
-	version  manifest.ID
+	project  string
+	version  string
 	filename string
 	// providerFilename is the provider's own name for the file, which a
 	// lookalike on CurseForge would share.
 	providerFilename string
-	alias            int
+	alias            string
 	loaders          []string
 	// bundleOnly marks a file the CurseForge app can't place where the build does: a datapack
 	// outside datapacks/, the one folder the app installs datapacks in, including a hybrid's
@@ -118,8 +119,8 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 	}
 	sort.Strings(report.Overrides)
 	modLoaders := []cfpack.ModLoader{}
-	if l, ok := loader.Lookup(b.Lock.Loader.Type); ok {
-		modLoaders = append(modLoaders, cfpack.ModLoader{ID: l.CurseForgeModLoader(b.Lock.Minecraft, b.Lock.Loader.Version), Primary: true})
+	if b.Lock.Loader.Type != "" {
+		modLoaders = append(modLoaders, cfpack.ModLoader{ID: cfpack.ModLoaderID(b.Lock.Loader.Type, b.Lock.Minecraft, b.Lock.Loader.Version), Primary: true})
 	}
 	profile := cfpack.Manifest{
 		Minecraft:       cfpack.Minecraft{Version: b.Lock.Minecraft, ModLoaders: modLoaders},
@@ -144,7 +145,7 @@ func (b *Builder) ExportCurseForge(opts CurseForgeOptions) (*CurseForgeReport, e
 		return nil, err
 	}
 	entries[cfpack.ManifestName] = append(data, '\n')
-	entries["modlist.html"] = curseForgeModlist(names, files, curseForgeRecords(files, opts, report))
+	entries["modlist.html"] = curseForgeModlist(names, files, curseForgeProjects(files, opts, report), opts.ProjectPage)
 	if err := b.addIdentity(entries); err != nil {
 		return nil, err
 	}
@@ -164,7 +165,6 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 	byEntry := map[string]curseForgeEntry{}
 	blobs := map[string][]byte{}
 	var lookup, unplaceable []string
-	var fingerprints []uint32
 	for _, e := range entries {
 		byEntry[e.key] = e
 		if e.bundleOnly {
@@ -182,8 +182,8 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 			report.Warnings = append(report.Warnings, fmt.Sprintf("bundled %s into the archive at %s, since the CurseForge app would install it in datapacks/", e.key, e.path))
 			continue
 		}
-		if project, file, ok := curseForgeLocked(e); ok {
-			byKey[e.key] = cfpack.File{ProjectID: project, FileID: file, Required: true}
+		if f, ok := curseForgeLocked(e); ok {
+			byKey[e.key] = f
 			fileNames[e.path] = e.filename
 			continue
 		}
@@ -193,16 +193,15 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		}
 		blobs[e.key] = data
 		lookup = append(lookup, e.key)
-		fingerprints = append(fingerprints, curseforge.Fingerprint(data))
 	}
 	if len(unplaceable) > 0 {
 		e := out.Errorf("curseforge-cant-place", "%s can't go in by file ID: the CurseForge app installs datapacks in datapacks/, and this build places them elsewhere", kindCount(map[string]int{manifest.TypeDatapack: len(unplaceable)}))
 		return nil, nil, nil, bundleNudge(e, unplaceable, "shulker export curseforge --bundle")
 	}
-	matches := map[uint32]curseforge.Match{}
+	matches := map[string]provider.Hosted{}
 	lookalikes := opts.Lookalike != nil
 	if len(lookup) > 0 {
-		found, err := opts.Match(fingerprints)
+		found, err := opts.Identify(blobs)
 		switch {
 		case err == nil:
 			matches = found
@@ -216,12 +215,12 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 		}
 	}
 	missing := &kindTally{}
-	for i, key := range lookup {
+	for _, key := range lookup {
 		e := byEntry[key]
-		match, ok := matches[fingerprints[i]]
+		match, ok := matches[key]
 		if !ok && lookalikes {
 			var err error
-			if match, ok, err = b.curseForgeLookalike(e, blobs[key], opts.Lookalike); err != nil {
+			if match.Version, ok, err = b.curseForgeLookalike(e, blobs[key], opts.Lookalike); err != nil {
 				if !opts.Bundle {
 					fail := out.AsError(err)
 					fail.Items = []string{key}
@@ -229,12 +228,12 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 				}
 				report.Warnings = append(report.Warnings, fmt.Sprintf("CurseForge lookup for %s failed, so it is bundled: %s", key, out.AsError(err).Message))
 			} else if ok {
-				report.Warnings = append(report.Warnings, fmt.Sprintf("%s matches CurseForge file %d by contents, but its bytes differ from the locked file", key, match.FileID))
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s matches CurseForge file %s by contents, but its bytes differ from the locked file", key, match.Version.ID))
 			}
 		}
-		if ok {
-			byKey[key] = cfpack.File{ProjectID: match.ModID, FileID: match.FileID, Required: true}
-			fileNames[e.path] = match.FileName
+		if f, listed := cfpack.FileFor(match.Version.ProjectID, match.Version.ID); ok && listed {
+			byKey[key] = f
+			fileNames[e.path] = match.Version.File.Filename
 			report.Matched = append(report.Matched, key)
 			continue
 		}
@@ -273,9 +272,9 @@ func (b *Builder) curseForgeMods(t *mrpackSide, opts CurseForgeOptions, report *
 // curseForgeLookalike accepts a CurseForge file with the locked file's name and
 // size only when every zip entry unpacks to the same bytes, since the same build
 // uploaded twice differs in entry timestamps.
-func (b *Builder) curseForgeLookalike(e curseForgeEntry, locked []byte, lookalike func(CurseForgeMiss) (curseforge.Match, []byte, bool, error)) (curseforge.Match, bool, error) {
+func (b *Builder) curseForgeLookalike(e curseForgeEntry, locked []byte, lookalike func(CurseForgeMiss) (provider.Version, []byte, bool, error)) (provider.Version, bool, error) {
 	if e.providerFilename == "" {
-		return curseforge.Match{}, false, nil
+		return provider.Version{}, false, nil
 	}
 	match, data, ok, err := lookalike(CurseForgeMiss{
 		Key:       e.key,
@@ -289,7 +288,7 @@ func (b *Builder) curseForgeLookalike(e curseForgeEntry, locked []byte, lookalik
 		Loaders:   e.loaders,
 	})
 	if err != nil || !ok {
-		return curseforge.Match{}, false, err
+		return provider.Version{}, false, err
 	}
 	return match, sameZipContents(locked, data), nil
 }
@@ -394,7 +393,7 @@ func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 	entries := make([]curseForgeEntry, 0, len(ids)+len(t.packs))
 	for _, id := range ids {
 		m := b.Lock.Mods[id]
-		entries = append(entries, curseForgeEntry{key: id, kind: manifest.TypeMod, path: "mods/" + m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, project: m.Project, version: m.Version, providerFilename: m.Filename, alias: m.Aliases.CurseForge, loaders: []string{b.Lock.Loader.Type}})
+		entries = append(entries, curseForgeEntry{key: id, kind: manifest.TypeMod, path: "mods/" + m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, project: m.Project, version: m.Version, providerFilename: m.Filename, alias: m.Aliases[cfpack.Provider], loaders: []string{b.Lock.Loader.Type}})
 	}
 	for _, ref := range b.packRefs() {
 		if !t.packs[ref.key] {
@@ -413,42 +412,41 @@ func (b *Builder) curseForgeEntries(t *mrpackSide) []curseForgeEntry {
 	return entries
 }
 
-func curseForgeLocked(e curseForgeEntry) (project, file int, ok bool) {
-	if e.provider != "curseforge" {
-		return 0, 0, false
+func curseForgeLocked(e curseForgeEntry) (cfpack.File, bool) {
+	if e.provider != cfpack.Provider {
+		return cfpack.File{}, false
 	}
-	project, okProject := e.project.Int()
-	file, okFile := e.version.Int()
-	return project, file, okProject && okFile
+	return cfpack.FileFor(e.project, e.version)
 }
 
-func curseForgeRecords(files []cfpack.File, opts CurseForgeOptions, report *CurseForgeReport) map[int]curseforge.Record {
-	if len(files) == 0 || opts.Records == nil {
+func curseForgeProjects(files []cfpack.File, opts CurseForgeOptions, report *CurseForgeReport) map[string]provider.Project {
+	if len(files) == 0 || opts.Projects == nil {
 		return nil
 	}
-	ids := make([]int, len(files))
+	ids := make([]string, len(files))
 	for i, f := range files {
-		ids[i] = f.ProjectID
+		ids[i], _ = f.IDs()
 	}
-	records, err := opts.Records(ids)
+	projects, err := opts.Projects(ids)
 	if err != nil {
 		report.Warnings = append(report.Warnings, fmt.Sprintf("CurseForge project lookup failed, so modlist.html links project IDs: %s", out.AsError(err).Message))
 		return nil
 	}
-	return records
+	return projects
 }
 
 // curseForgeModlist writes each line as the CurseForge app does, less its byte-order mark, and
 // falls back to the project ID and shulker key for a project it has no record of.
-func curseForgeModlist(names []string, files []cfpack.File, records map[int]curseforge.Record) []byte {
+func curseForgeModlist(names []string, files []cfpack.File, projects map[string]provider.Project, projectPage func(string) string) []byte {
 	var sb strings.Builder
 	sb.WriteString("<ul>\n")
 	for i, f := range files {
-		page, text := curseforge.ProjectPage(strconv.Itoa(f.ProjectID)), names[i]
-		if r, ok := records[f.ProjectID]; ok && r.WebsiteURL != "" && r.Name != "" {
-			page, text = r.WebsiteURL, r.Name
-			if r.Author != "" {
-				text += " (by " + r.Author + ")"
+		id, _ := f.IDs()
+		page, text := projectPage(id), names[i]
+		if p, ok := projects[id]; ok && p.Page != "" && p.Title != "" {
+			page, text = p.Page, p.Title
+			if p.Author != "" {
+				text += " (by " + p.Author + ")"
 			}
 		}
 		fmt.Fprintf(&sb, "<li><a href=\"%s\">%s</a></li>\n", html.EscapeString(page), html.EscapeString(text))

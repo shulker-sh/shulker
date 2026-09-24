@@ -31,6 +31,7 @@ import (
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/server"
 	"shulker.sh/shulker/schema"
 )
@@ -174,6 +175,8 @@ type Builder struct {
 	LockPath string
 	Cache    *cache.Cache
 	Packs    []*pack.Loaded
+	// Providers names the hosts the lock's entries come from, for messages that say who.
+	Providers provider.Providers
 }
 
 type source struct {

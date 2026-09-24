@@ -770,12 +770,13 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	players := player.New(f)
 	players.APIURL = h.server.URL + "/mojang"
 	players.SessionURL = h.server.URL + "/session"
-	providers := map[string]provider.Provider{"modrinth": mr}
-	if !h.noCurseForge {
-		cf := curseforge.New(f, curseForgeTestKey)
-		cf.BaseURL = h.server.URL + "/curseforge"
-		providers["curseforge"] = cf
+	key := curseForgeTestKey
+	if h.noCurseForge {
+		key = ""
 	}
+	cf := curseforge.New(f, key)
+	cf.BaseURL = h.server.URL + "/curseforge"
+	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	c := &cache.Cache{Dir: h.cache}
 	a.d = &deps{
 		fetch:      f,

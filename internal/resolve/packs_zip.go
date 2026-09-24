@@ -21,27 +21,6 @@ import (
 // them. Each is keyed by its requires key, which is also the name the build
 // places it under, so a pack enabled in game survives its own updates.
 
-// packTags is how each provider files the pack kinds. Modrinth tags resource pack
-// versions with the minecraft loader, datapacks with the datapack loader and
-// shaders with the shader loader they target; CurseForge has no loader tag for
-// resource packs or datapacks, and keeps shader loaders in gameVersions, where
-// only Iris and OptiFine appear.
-func packTags(providerName, kind string) []string {
-	if kind == manifest.TypeShader {
-		if providerName == "curseforge" {
-			return []string{"iris", "optifine"}
-		}
-		return []string{"iris", "oculus", "canvas", "vanilla"}
-	}
-	if providerName == "curseforge" {
-		return nil
-	}
-	if kind == manifest.TypeDatapack {
-		return []string{provider.DatapackLoader}
-	}
-	return []string{"minecraft"}
-}
-
 // packSide is where a datapack is placed: its entry's side, or both. The other
 // kinds are client-only and record none.
 func packSide(kind string, e manifest.Require) string {
@@ -93,7 +72,7 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 		listed.Channel = channel
 	}
 	if opts.Pin != "" {
-		listed.Pin = manifest.NewID(p.Name(), opts.Pin)
+		listed.Pin = opts.Pin
 	}
 	r.setSource(&listed, key, p, proj)
 	locked := r.Lock.Packs(kind)[key]
@@ -214,14 +193,14 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 		return r.lockFilePack(key, kind, entry)
 	}
 	slug := key
-	if !entry.Project.IsZero() {
-		slug = entry.Project.String()
+	if entry.Project != "" {
+		slug = entry.Project
 	}
 	p, proj, err := r.lookup(ctx, slug, entry.Provider, kind)
 	if err != nil {
 		return err
 	}
-	v, err := pickVersion(ctx, p, proj, r.queryFor(kind, p.Name()), entry.Pin.String(), entry.Channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(kind, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
 		return err
 	}
@@ -277,8 +256,8 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 	}
 	locked := lock.Pack{
 		Provider:         p.Name(),
-		Project:          manifest.NewID(p.Name(), proj.ID),
-		Version:          manifest.NewID(p.Name(), v.ID),
+		Project:          proj.ID,
+		Version:          v.ID,
 		VersionNumber:    v.Number,
 		Filename:         manifest.PackFilename(key, r.Manifest.Requires[key]),
 		ProviderFilename: v.File.Filename,
@@ -357,7 +336,7 @@ func (r *Resolver) outdatedPacks(ctx context.Context, ids []string) ([]Outdated,
 			if !newer {
 				continue
 			}
-			res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: !listed[key].Pin.IsZero()})
+			res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: listed[key].Pin != ""})
 		}
 	}
 	return res, nil
@@ -370,11 +349,13 @@ type downloadable struct {
 	modpack  string
 	filename string
 	provider string
-	sha512   string
-	url      *string
-	page     string
-	size     int64
-	side     string
+	// host is the provider's title, for messages about its downloads.
+	host   string
+	sha512 string
+	url    *string
+	page   string
+	size   int64
+	side   string
 }
 
 // lockFiles is everything install has to put in the cache, mods first and then
@@ -386,7 +367,7 @@ func (r *Resolver) lockFiles() []downloadable {
 		for _, key := range sortedKeys(section) {
 			p := section[key]
 			side := cmp.Or(p.Side, "client")
-			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, provider: p.Provider, sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size, side: side})
+			files = append(files, downloadable{id: key, file: p.File, modpack: p.Modpack, filename: p.ProviderFilename, provider: p.Provider, host: r.Providers.Title(p.Provider), sha512: p.Sha512, url: p.URL, page: packPage(p), size: p.Size, side: side})
 		}
 	}
 	return files
@@ -396,7 +377,7 @@ func (r *Resolver) modFiles() []downloadable {
 	var files []downloadable
 	for _, id := range sortedKeys(r.Lock.Mods) {
 		m := r.Lock.Mods[id]
-		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, page: pageFor(m), size: m.Size, side: m.Side})
+		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, page: r.pageFor(m), host: r.Providers.Title(m.Provider), size: m.Size, side: m.Side})
 	}
 	return files
 }

@@ -102,7 +102,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	err := checkFlagValues(
 		flagValue{"type", f.typ, []string{"mrpack", "curseforge", "source", "modpack"}},
 		flagValue{"side", f.side, []string{"client", "server"}},
-		flagValue{"provider", f.provider, []string{"modrinth", "curseforge"}},
+		flagValue{"provider", f.provider, manifest.DefaultProviders},
 	)
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	}
 	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: in.arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides), KeptYours: []string{}, LeftOut: leftOut}
 	return a.emitImport(res,
-		out.Row{Text: importedSummary(mods, res.Marker)},
+		out.Row{Text: importedSummary(a.titles(), mods, res.Marker)},
 		out.Row{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
 	)
 }
@@ -176,8 +176,8 @@ func (a *app) emitImport(res importResult, rows ...out.Row) error {
 }
 
 // importedSummary counts what an import locked, and what it reused from a shulker marker.
-func importedSummary(mods *resolve.Imported, marker bool) string {
-	locked := lockedSummary(mods.Locked)
+func importedSummary(providers provider.Providers, mods *resolve.Imported, marker bool) string {
+	locked := lockedSummary(providers, mods.Locked)
 	if marker {
 		locked += fmt.Sprintf(", %d reused from the shulker marker", len(mods.Reused))
 	}
@@ -636,18 +636,18 @@ func keepSide(m *manifest.Manifest, l *lock.Lock, overrides []mrpack.Override, s
 
 // lockedSummary counts an import's locked files by type, naming each type's providers when the
 // files came from more than one, or the one provider after them all when they didn't.
-func lockedSummary(files []resolve.LockedFile) string {
+func lockedSummary(providers provider.Providers, files []resolve.LockedFile) string {
 	if len(files) == 0 {
 		return plural(0, "file", "files") + " locked"
 	}
 	byType := map[string]map[string]int{}
-	providers := map[string]bool{}
+	hosts := map[string]bool{}
 	for _, f := range files {
 		if byType[f.Type] == nil {
 			byType[f.Type] = map[string]int{}
 		}
 		byType[f.Type][f.Provider]++
-		providers[f.Provider] = true
+		hosts[f.Provider] = true
 	}
 	var parts []string
 	for _, kind := range []string{manifest.TypeMod, manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack} {
@@ -664,21 +664,21 @@ func lockedSummary(files []resolve.LockedFile) string {
 		for _, name := range names {
 			total += counts[name]
 			if len(names) == 1 {
-				from = append(from, provider.Title(name))
+				from = append(from, providers.Title(name))
 			} else {
-				from = append(from, fmt.Sprintf("%d %s", counts[name], provider.Title(name)))
+				from = append(from, fmt.Sprintf("%d %s", counts[name], providers.Title(name)))
 			}
 		}
 		one, many := manifest.TypeNouns(kind)
 		part := plural(total, one, many)
-		if len(providers) > 1 {
+		if len(hosts) > 1 {
 			part += " (" + strings.Join(from, ", ") + ")"
 		}
 		parts = append(parts, part)
 	}
 	summary := strings.Join(parts, ", ") + " locked"
-	if len(providers) == 1 {
-		summary += " from " + provider.Title(files[0].Provider)
+	if len(hosts) == 1 {
+		summary += " from " + providers.Title(files[0].Provider)
 	}
 	return summary
 }

@@ -89,9 +89,9 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 	var skipped []*out.Error
 	var failures []error
 	for _, name := range names {
-		p, ok := d.providers[name]
-		if !ok {
-			skipped = append(skipped, resolve.Unavailable(name))
+		p, err := d.providers.Get(name)
+		if err != nil {
+			skipped = append(skipped, out.AsError(err))
 			continue
 		}
 		if steps {
@@ -140,7 +140,7 @@ func (a *app) printSearch(reply searchReply) error {
 			if i > 0 {
 				l.Blank()
 			}
-			l.Heading(provider.Title(name))
+			l.Heading(a.titles().Title(name))
 			l.Items(items...)
 		}
 		l.Nudge("Add one", "shulker add <id>")

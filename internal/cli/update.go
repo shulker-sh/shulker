@@ -83,7 +83,11 @@ func (a *app) pinCmd() *cobra.Command {
 			if len(args) == 2 {
 				version = args[1]
 			}
-			u, isURL, err := resolve.ParseURL(version)
+			d, err := a.deps()
+			if err != nil {
+				return err
+			}
+			u, isURL, err := d.providers.ParseURL(version)
 			if err != nil {
 				return err
 			}

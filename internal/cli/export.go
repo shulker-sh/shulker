@@ -7,18 +7,17 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
-	"shulker.sh/shulker/internal/provider/curseforge"
 )
 
 func (a *app) exportCmd() *cobra.Command {
@@ -213,13 +212,14 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 				Bundle:   f.bundle,
 				OS:       f.osName,
 				Features: job.features,
-				Match: func(fingerprints []uint32) (map[uint32]curseforge.Match, error) {
-					return a.matchFingerprints(cmd.Context(), fingerprints)
+				Identify: func(files map[string][]byte) (map[string]provider.Hosted, error) {
+					return a.identifyOnCurseForge(cmd.Context(), files)
 				},
-				Records: func(projectIDs []int) (map[int]curseforge.Record, error) {
-					return a.curseForgeRecords(cmd.Context(), projectIDs)
+				Projects: func(ids []string) (map[string]provider.Project, error) {
+					return a.curseForgeProjects(cmd.Context(), ids)
 				},
-				Lookalike: func(miss build.CurseForgeMiss) (curseforge.Match, []byte, bool, error) {
+				ProjectPage: a.curseForgePage,
+				Lookalike: func(miss build.CurseForgeMiss) (provider.Version, []byte, bool, error) {
 					return a.curseForgeLookalike(cmd.Context(), miss)
 				},
 			})
@@ -242,94 +242,99 @@ func (a *app) exportCurseForgeCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) matchFingerprints(ctx context.Context, fingerprints []uint32) (map[uint32]curseforge.Match, error) {
-	cf, err := a.curseForgeLookup()
+func (a *app) curseForge() (provider.Provider, error) {
+	d, err := a.deps()
 	if err != nil {
 		return nil, err
 	}
-	a.progress("looking up %s on CurseForge", plural(len(fingerprints), "file", "files"))
-	return cf.MatchFingerprints(ctx, fingerprints)
+	return d.providers.Get(cfpack.Provider)
 }
 
-// curseForgeLookalike finds the CurseForge project through the lock's alias or the
-// Modrinth slug, and downloads its file with the missed file's name and size.
-func (a *app) curseForgeLookalike(ctx context.Context, miss build.CurseForgeMiss) (curseforge.Match, []byte, bool, error) {
-	cf, err := a.curseForgeLookup()
+func (a *app) identifyOnCurseForge(ctx context.Context, files map[string][]byte) (map[string]provider.Hosted, error) {
+	cf, err := a.curseForge()
 	if err != nil {
-		return curseforge.Match{}, nil, false, err
+		return nil, err
+	}
+	a.progress("looking up %s on CurseForge", plural(len(files), "file", "files"))
+	return cf.Identify(ctx, files)
+}
+
+func (a *app) curseForgeProjects(ctx context.Context, ids []string) (map[string]provider.Project, error) {
+	cf, err := a.curseForge()
+	if err != nil {
+		return nil, err
+	}
+	a.progress("looking up %s for modlist.html", plural(len(ids), "CurseForge project", "CurseForge projects"))
+	return cf.Projects(ctx, ids)
+}
+
+func (a *app) curseForgePage(projectID string) string {
+	d, err := a.deps()
+	if err != nil {
+		return ""
+	}
+	if p, ok := d.providers[cfpack.Provider]; ok {
+		return p.ProjectPage("", projectID)
+	}
+	return ""
+}
+
+// curseForgeLookalike finds the CurseForge project through the lock's alias or the slug of the
+// locked provider's project, and downloads its file with the missed file's name and size.
+func (a *app) curseForgeLookalike(ctx context.Context, miss build.CurseForgeMiss) (provider.Version, []byte, bool, error) {
+	none := provider.Version{}
+	cf, err := a.curseForge()
+	if err != nil {
+		return none, nil, false, err
 	}
 	d, err := a.deps()
 	if err != nil {
-		return curseforge.Match{}, nil, false, err
+		return none, nil, false, err
 	}
-	projectID := strconv.Itoa(miss.Alias)
-	if miss.Alias == 0 {
-		if miss.Provider != "modrinth" {
-			return curseforge.Match{}, nil, false, nil
+	projectID := miss.Alias
+	if projectID == "" {
+		locked, err := d.providers.Get(miss.Provider)
+		if err != nil {
+			return none, nil, false, nil
 		}
 		a.progress("looking up %s on CurseForge by slug", miss.Key)
-		mr, err := d.providers["modrinth"].Project(ctx, miss.Project.String(), miss.Kind)
+		proj, err := locked.Project(ctx, miss.Project, miss.Kind)
 		if errors.Is(err, provider.ErrNotFound) {
-			return curseforge.Match{}, nil, false, nil
+			return none, nil, false, nil
 		}
 		if err != nil {
-			return curseforge.Match{}, nil, false, err
+			return none, nil, false, err
 		}
-		p, err := cf.Project(ctx, mr.Slug, miss.Kind)
+		p, err := cf.Project(ctx, proj.Slug, miss.Kind)
 		if errors.Is(err, provider.ErrNotFound) {
-			return curseforge.Match{}, nil, false, nil
+			return none, nil, false, nil
 		}
 		if err != nil {
-			return curseforge.Match{}, nil, false, err
+			return none, nil, false, err
 		}
 		projectID = p.ID
 	}
 	versions, err := cf.Versions(ctx, projectID, miss.Minecraft, miss.Loaders)
 	if errors.Is(err, provider.ErrNotFound) || errors.Is(err, fetch.ErrNotFound) {
-		return curseforge.Match{}, nil, false, nil
+		return none, nil, false, nil
 	}
 	if err != nil {
-		return curseforge.Match{}, nil, false, err
+		return none, nil, false, err
 	}
 	for _, v := range versions {
 		if v.File.Filename != miss.Filename || v.File.Size != miss.Size || v.File.URL == "" {
 			continue
 		}
-		modID, _ := strconv.Atoi(v.ProjectID)
-		fileID, _ := strconv.Atoi(v.ID)
-		a.progress("comparing %s with CurseForge file %d", miss.Key, fileID)
+		a.progress("comparing %s with CurseForge file %s", miss.Key, v.ID)
 		var buf bytes.Buffer
 		_, err := d.fetch.Download(ctx, v.File.URL, &buf)
 		if errors.Is(err, fetch.ErrNotFound) || errors.Is(err, fetch.ErrForbidden) {
-			return curseforge.Match{}, nil, false, nil
+			return none, nil, false, nil
 		}
 		if err != nil {
-			return curseforge.Match{}, nil, false, err
+			return none, nil, false, err
 		}
-		return curseforge.Match{ModID: modID, FileID: fileID, FileName: v.File.Filename}, buf.Bytes(), true, nil
+		return v, buf.Bytes(), true, nil
 	}
-	return curseforge.Match{}, nil, false, nil
-}
-
-func (a *app) curseForgeRecords(ctx context.Context, projectIDs []int) (map[int]curseforge.Record, error) {
-	cf, err := a.curseForgeLookup()
-	if err != nil {
-		return nil, err
-	}
-	a.progress("looking up %s for modlist.html", plural(len(projectIDs), "CurseForge project", "CurseForge projects"))
-	return cf.Records(ctx, projectIDs)
-}
-
-func (a *app) curseForgeLookup() (*curseforge.CurseForge, error) {
-	d, err := a.deps()
-	if err != nil {
-		return nil, err
-	}
-	cf, ok := d.providers["curseforge"].(*curseforge.CurseForge)
-	if !ok {
-		e := out.Errorf("provider-unavailable", "curseforge needs an API key to look mods up")
-		e.Help = "set " + curseforge.KeyEnv + " or run `shulker config set curseforge.key <key>`"
-		return nil, e
-	}
-	return cf, nil
+	return none, nil, false, nil
 }

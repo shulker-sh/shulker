@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/provider"
 )
 
 // maxPushSize is the largest resource pack the wiki says a server may push.
@@ -41,7 +40,7 @@ func (b *Builder) pushResourcePack(key string, cond conditions, props properties
 		return e
 	}
 	if p.URL == nil {
-		return out.Errorf("resourcepack-not-distributed", "%s is not distributed by %s, so there's no URL for clients to download it from", key, provider.Title(p.Provider))
+		return out.Errorf("resourcepack-not-distributed", "%s is not distributed by %s, so there's no URL for clients to download it from", key, b.Providers.Title(p.Provider))
 	}
 	if p.Size > maxPushSize {
 		report.Warnings = append(report.Warnings, fmt.Sprintf("resource pack %s is %.1f MiB, over the 250 MiB a server may push; it is pushed anyway", key, float64(p.Size)/(1<<20)))

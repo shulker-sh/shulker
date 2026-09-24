@@ -26,7 +26,7 @@ func (a *app) browseSearch(cmd *cobra.Command, kind string, names []string, limi
 	}
 	a.printer.Settle()
 	ctx := cmd.Context()
-	s := newLiveSearch(a.printer.ErrTheme, func(query string) (searchReply, error) {
+	s := newLiveSearch(a.printer.ErrTheme, a.titles(), func(query string) (searchReply, error) {
 		return a.search(ctx, query, kind, names, limit, false)
 	})
 	if err := a.printer.Browse(a.searchTitle(names), s, a.stdin); err != nil {
@@ -43,8 +43,8 @@ func (a *app) browseSearch(cmd *cobra.Command, kind string, names []string, limi
 func (a *app) searchTitle(names []string) string {
 	var titles []string
 	for _, name := range names {
-		if _, ok := a.d.providers[name]; ok {
-			titles = append(titles, provider.Title(name))
+		if p, err := a.d.providers.Get(name); err == nil {
+			titles = append(titles, p.Title())
 		}
 	}
 	if len(titles) == 0 {
@@ -60,6 +60,8 @@ type liveSearch struct {
 	theme out.Theme
 	fetch func(query string) (searchReply, error)
 	sleep func(time.Duration)
+	// titles names each hit's provider as the user reads it.
+	titles provider.Providers
 
 	// fetching holds one request at a time: a slow one makes the next wait rather than race it,
 	// and a query typed past while waiting is never sent.
@@ -89,8 +91,8 @@ func (l *liveReply) hasFailed() bool {
 	}
 }
 
-func newLiveSearch(theme out.Theme, fetch func(query string) (searchReply, error)) *liveSearch {
-	return &liveSearch{theme: theme, fetch: fetch, sleep: time.Sleep, replies: map[string]*liveReply{}}
+func newLiveSearch(theme out.Theme, titles provider.Providers, fetch func(query string) (searchReply, error)) *liveSearch {
+	return &liveSearch{theme: theme, titles: titles, fetch: fetch, sleep: time.Sleep, replies: map[string]*liveReply{}}
 }
 
 // SetQuery takes the query as typed. Moving off a query forgets every failed reply: the rows
@@ -134,7 +136,7 @@ func (l *liveSearch) Rows() []out.Choice {
 	t := l.theme
 	var rows []out.Choice
 	for _, hit := range l.shown.reply.results.Results {
-		aside := append([]string{provider.Title(hit.Provider)}, searchAside(hit)...)
+		aside := append([]string{l.titles.Title(hit.Provider)}, searchAside(hit)...)
 		rows = append(rows, out.Choice{
 			Label: t.Bold(hit.Title) + " " + t.Grey(hit.ID) + t.Aside(strings.Join(aside, ", ")),
 			Value: hit.Provider + ":" + hit.ID,

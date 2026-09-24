@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strconv"
@@ -21,7 +22,6 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/provider"
-	"shulker.sh/shulker/internal/provider/curseforge"
 )
 
 // Resolver changes a project's manifest and lock together: it picks versions from the providers,
@@ -30,7 +30,7 @@ type Resolver struct {
 	Dir       string
 	Manifest  *manifest.Manifest
 	Lock      *lock.Lock
-	Providers map[string]provider.Provider
+	Providers provider.Providers
 	Cache     *cache.Cache
 	Fetch     *fetch.Client
 	Packs     []*pack.Loaded
@@ -90,30 +90,17 @@ func (r *Resolver) log(format string, args ...any) {
 
 func (r *Resolver) provider(name string) (provider.Provider, error) {
 	if name != "" {
-		p, ok := r.Providers[name]
-		if !ok {
-			return nil, Unavailable(name)
-		}
-		return p, nil
+		return r.Providers.Get(name)
 	}
 	var reasons []*out.Error
 	for _, n := range r.Manifest.ProviderOrder() {
-		if p, ok := r.Providers[n]; ok {
+		p, err := r.Providers.Get(n)
+		if err == nil {
 			return p, nil
 		}
-		reasons = append(reasons, Unavailable(n))
+		reasons = append(reasons, out.AsError(err))
 	}
 	return nil, NoneAvailable("no manifest provider is available", reasons)
-}
-
-// Unavailable says why a provider can't be used.
-func Unavailable(name string) *out.Error {
-	if name == "curseforge" {
-		e := out.Errorf("provider-unavailable", "curseforge needs an API key")
-		e.Help = "set " + curseforge.KeyEnv + " or run `shulker config set curseforge.key <key>`"
-		return e
-	}
-	return out.Errorf("provider-unavailable", "%s is not a known provider", name)
 }
 
 // NoneAvailable is the error for when every provider is unavailable: each reason is an item, and
@@ -137,21 +124,21 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 		}
 		proj, err := p.Project(ctx, slug, kind)
 		if errors.Is(err, provider.ErrNotFound) {
-			return nil, nil, notFound(slug, []string{providerName}, nil)
+			return nil, nil, notFound(slug, []provider.Provider{p}, nil)
 		}
 		return p, proj, err
 	}
-	var missed []string
+	var missed []provider.Provider
 	var skipped []*out.Error
 	for _, n := range r.Manifest.ProviderOrder() {
-		p, ok := r.Providers[n]
-		if !ok {
-			skipped = append(skipped, Unavailable(n))
+		p, err := r.Providers.Get(n)
+		if err != nil {
+			skipped = append(skipped, out.AsError(err))
 			continue
 		}
 		proj, err := p.Project(ctx, slug, kind)
 		if errors.Is(err, provider.ErrNotFound) {
-			missed = append(missed, n)
+			missed = append(missed, p)
 			continue
 		}
 		if err != nil {
@@ -166,13 +153,23 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 	return nil, nil, notFound(slug, missed, skipped)
 }
 
-func notFound(slug string, missed []string, skipped []*out.Error) *out.Error {
-	e := out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(missed, " or "))
+// notFound names the providers that missed slug, with the first help a provider offers for a
+// slug its lookup can miss.
+func notFound(slug string, missed []provider.Provider, skipped []*out.Error) *out.Error {
+	var names []string
+	for _, p := range missed {
+		names = append(names, p.Name())
+	}
+	e := out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(names, " or "))
 	for _, reason := range skipped {
 		e.Items = append(e.Items, "skipped: "+reason.Message)
 	}
-	if _, err := strconv.Atoi(slug); err != nil && slices.Contains(missed, "curseforge") {
-		e.Help = "CurseForge's search doesn't list every project; add one it misses by a file URL (https://www.curseforge.com/minecraft/mc-mods/<slug>/files/<file id>), by https://www.curseforge.com/projects/<project id>, or by its project id, shown on its CurseForge page under About Project, with `--provider curseforge`"
+	if _, err := strconv.Atoi(slug); err != nil {
+		for _, p := range missed {
+			if e.Help = p.NotFoundHelp(); e.Help != "" {
+				break
+			}
+		}
 	}
 	return e
 }
@@ -250,7 +247,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 		entry.Channel = opts.Channel
 	}
 	if opts.Pin != "" {
-		entry.Pin = manifest.NewID(p.Name(), opts.Pin)
+		entry.Pin = opts.Pin
 	}
 	r.setSource(&entry, id, p, proj)
 	r.Manifest.Requires[id] = entry
@@ -281,7 +278,11 @@ func (r *Resolver) queryFor(kind, providerName string) versionQuery {
 		game, loaderName := r.modpackPlatform()
 		return versionQuery{kind: kind, game: game, tags: modpackLoaders(loaderName), loader: loaderName}
 	case manifest.IsPackKind(kind):
-		return versionQuery{kind: kind, game: r.Lock.Minecraft, tags: packTags(providerName, kind)}
+		q := versionQuery{kind: kind, game: r.Lock.Minecraft}
+		if p, ok := r.Providers[providerName]; ok {
+			q.tags = p.PackTags(kind)
+		}
+		return q
 	}
 	return versionQuery{kind: manifest.TypeMod, game: r.Lock.Minecraft, tags: loader.ProviderLoaders(r.Lock.Loader.Type), loader: r.Lock.Loader.Type}
 }
@@ -306,13 +307,13 @@ func pickVersion(ctx context.Context, p provider.Provider, proj *provider.Projec
 }
 
 // newerThan is the newest version q finds on channel, and whether it is not the locked one.
-func newerThan(ctx context.Context, p provider.Provider, projectID manifest.ID, q versionQuery, channel string, locked manifest.ID) (*provider.Version, bool, error) {
-	versions, err := p.Versions(ctx, projectID.String(), q.game, q.tags)
+func newerThan(ctx context.Context, p provider.Provider, projectID string, q versionQuery, channel string, locked string) (*provider.Version, bool, error) {
+	versions, err := p.Versions(ctx, projectID, q.game, q.tags)
 	if err != nil {
 		return nil, false, err
 	}
 	newest, ok := provider.Newest(versions, channel, q.loader)
-	if !ok || newest.ID == locked.String() {
+	if !ok || newest.ID == locked {
 		return nil, false, nil
 	}
 	return &newest, true, nil
@@ -323,7 +324,7 @@ func pinnedVersion(ctx context.Context, p provider.Provider, proj *provider.Proj
 	v, err := p.Version(ctx, pin)
 	if errors.Is(err, provider.ErrNotFound) {
 		e := out.Errorf("version-not-found", "%s has no version %s for %s", p.Name(), pin, proj.Slug)
-		e.Help = "list versions at " + versionsPage(p.Name(), kind, proj.Slug)
+		e.Help = "list versions at " + p.VersionsPage(kind, proj.Slug)
 		return nil, e
 	}
 	if err != nil {
@@ -333,13 +334,6 @@ func pinnedVersion(ctx context.Context, p provider.Provider, proj *provider.Proj
 		return nil, out.Errorf("pin-mismatch", "version %s belongs to project %s, not %s", pin, v.ProjectID, proj.Slug)
 	}
 	return v, nil
-}
-
-func versionsPage(providerName, kind, slug string) string {
-	if providerName == "curseforge" {
-		return "https://www.curseforge.com/minecraft/" + curseforgeSections[kind] + "/" + slug + "/files"
-	}
-	return "https://modrinth.com/" + kind + "/" + slug + "/versions"
 }
 
 // pinnedChannel is the channel a mod, pack or modpack pinned to v accepts: channel, widened to v's
@@ -355,7 +349,7 @@ func (r *Resolver) pinnedChannel(id string, v *provider.Version, channel string)
 // relistedChannel is the channel entry accepts once v is locked for it: widened when entry is pinned
 // to a less stable v, and then written back to key's entry in shulker.json, when it has one there.
 func (r *Resolver) relistedChannel(key string, entry manifest.Require, v *provider.Version) string {
-	if entry.Pin.IsZero() {
+	if entry.Pin == "" {
 		return entry.Channel
 	}
 	channel := r.pinnedChannel(key, v, entry.Channel)
@@ -445,11 +439,11 @@ func (r *Resolver) settle(id, side, channel string) {
 	r.Lock.Mods[id] = m
 }
 
-// setSource names where entry under key comes from: proj's id, unless key is its Modrinth slug,
-// and p, unless it is the manifest's first provider.
+// setSource names where entry under key comes from: proj's id, unless key is its slug and p finds
+// a slug as surely as an id, and p, unless it is the manifest's first provider.
 func (r *Resolver) setSource(entry *manifest.Require, key string, p provider.Provider, proj *provider.Project) {
-	if proj.Slug != key || p.Name() != "modrinth" {
-		entry.Project = manifest.NewID(p.Name(), proj.ID)
+	if proj.Slug != key || !p.KeysBySlug() {
+		entry.Project = proj.ID
 	}
 	if p.Name() != r.Manifest.ProviderOrder()[0] {
 		entry.Provider = p.Name()
@@ -503,7 +497,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			r.Lock.Mods[id] = aliased
 			r.log("keeping %s %s from %s (%s project %s recorded as an alias)", id, existing.VersionNumber, existing.Provider, p.Name(), proj.ID)
 			return id, prior, nil
-		case existing.Version.String() != v.ID:
+		case existing.Version != v.ID:
 			r.log("keeping %s %s already in lock", id, existing.VersionNumber)
 			return id, prior, nil
 		default:
@@ -519,8 +513,8 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	entry := lock.Mod{
 		Provider:      p.Name(),
-		Project:       manifest.NewID(p.Name(), proj.ID),
-		Version:       manifest.NewID(p.Name(), v.ID),
+		Project:       proj.ID,
+		Version:       v.ID,
 		VersionNumber: v.Number,
 		Filename:      v.File.Filename,
 		URL:           got.url,
@@ -536,11 +530,11 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	if prior != nil {
 		entry.RequiredBy = prior.RequiredBy
-		entry.Aliases = prior.Aliases
+		entry.Aliases = maps.Clone(prior.Aliases)
 		if sideOverride == "" {
 			entry.Side = prior.Side
 		}
-		setAlias(&entry, prior.Provider, prior.Project.String())
+		setAlias(&entry, prior.Provider, prior.Project)
 		clearAlias(&entry, p.Name())
 	}
 	if info.ID != id {
@@ -564,28 +558,21 @@ func isSameMod(existing lock.Mod, jarID, providerName, projectID, resolvedJarID 
 		return true
 	}
 	if existing.Provider == providerName {
-		return existing.Project.String() == projectID
+		return existing.Project == projectID
 	}
 	alias := aliasFor(existing, providerName)
 	return alias != "" && alias == projectID
 }
 
 func clearAlias(m *lock.Mod, providerName string) {
-	switch providerName {
-	case "modrinth":
-		m.Aliases.Modrinth = ""
-	case "curseforge":
-		m.Aliases.CurseForge = 0
-	}
+	delete(m.Aliases, providerName)
 }
 
 func setAlias(m *lock.Mod, providerName, projectID string) {
-	switch providerName {
-	case "modrinth":
-		m.Aliases.Modrinth = projectID
-	case "curseforge":
-		m.Aliases.CurseForge, _ = strconv.Atoi(projectID)
+	if m.Aliases == nil {
+		m.Aliases = lock.Aliases{}
 	}
+	m.Aliases[providerName] = projectID
 }
 
 func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider.Version, parentID, channel string, visited map[string]bool) error {
@@ -636,7 +623,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 func (r *Resolver) lockedProject(providerName, projectID string) (string, bool) {
 	for _, id := range sortedKeys(r.Lock.Mods) {
 		m := r.Lock.Mods[id]
-		if m.Provider == providerName && m.Project.String() == projectID || aliasFor(m, providerName) == projectID {
+		if m.Provider == providerName && m.Project == projectID || aliasFor(m, providerName) == projectID {
 			return id, true
 		}
 	}
@@ -644,15 +631,7 @@ func (r *Resolver) lockedProject(providerName, projectID string) (string, bool) 
 }
 
 func aliasFor(m lock.Mod, providerName string) string {
-	switch providerName {
-	case "modrinth":
-		return m.Aliases.Modrinth
-	case "curseforge":
-		if m.Aliases.CurseForge != 0 {
-			return strconv.Itoa(m.Aliases.CurseForge)
-		}
-	}
-	return ""
+	return m.Aliases[providerName]
 }
 
 func contains(list []string, s string) bool {
@@ -782,7 +761,7 @@ func downloadsFailed(failed []*out.Error) *out.Error {
 // downloadError names the locked file whose download failed when the failure is its host's, as a CDN
 // cutting the file short, leaving one of shulker's own, such as the cache's disk, as it is.
 func (f downloadable) downloadError(err error) error {
-	host := provider.Title(f.provider)
+	host := f.host
 	if host == "" {
 		host = urlHost(*f.url)
 	}
@@ -830,12 +809,17 @@ func (r *Resolver) lockHas(sha512 string) bool {
 	return false
 }
 
-func pageFor(m lock.Mod) string {
+// pageFor is where a mod's file can be fetched by hand: its own page, else its project's, else
+// its download URL.
+func (r *Resolver) pageFor(m lock.Mod) string {
 	switch {
 	case m.Page != "":
 		return m.Page
-	case m.Provider == "curseforge":
-		return curseforge.ProjectPage(m.Project.String())
+	case m.URL == nil && m.Provider != "":
+		if p, ok := r.Providers[m.Provider]; ok {
+			return p.ProjectPage("", m.Project)
+		}
+		return ""
 	case m.URL == nil:
 		return ""
 	}
