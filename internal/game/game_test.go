@@ -449,3 +449,20 @@ func TestEnsureProfilesWritesTheStubTheInstallersNeed(t *testing.T) {
 		t.Fatalf("stub %s", data)
 	}
 }
+
+func TestGameDirOf(t *testing.T) {
+	for _, tc := range []struct {
+		argv []string
+		dir  string
+		ok   bool
+	}{
+		{[]string{"-jar", "."}, "", false},
+		{[]string{"--gameDir"}, "", false},
+		{[]string{"-Xmx2G", "--gameDir", "/g", "--accessToken", "x"}, "/g", true},
+		{[]string{"--gameDir=/g"}, "/g", true},
+	} {
+		if dir, ok := GameDirOf(tc.argv); dir != tc.dir || ok != tc.ok {
+			t.Errorf("GameDirOf(%q) = %q, %v; want %q, %v", tc.argv, dir, ok, tc.dir, tc.ok)
+		}
+	}
+}

@@ -91,3 +91,16 @@ func (v Version) Declares(feature string) bool {
 	}
 	return false
 }
+
+// GameDirOf is the --gameDir a launcher's argv names, in either of the forms Java takes it.
+func GameDirOf(argv []string) (string, bool) {
+	for i, arg := range argv {
+		if arg == "--gameDir" && i+1 < len(argv) {
+			return argv[i+1], true
+		}
+		if v, ok := strings.CutPrefix(arg, "--gameDir="); ok {
+			return v, true
+		}
+	}
+	return "", false
+}

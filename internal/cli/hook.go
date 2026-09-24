@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io/fs"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/proc"
@@ -108,7 +108,7 @@ func (a *app) hookWrapCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, argv []string) error {
 			// The launcher's version check runs the shim without --gameDir, and that call just
 			// wants Java.
-			gameDir, launching := gameDirOf(argv)
+			gameDir, launching := game.GameDirOf(argv)
 			if a.dir == "" && a.instance == "" {
 				a.dir = gameDir
 			}
@@ -203,18 +203,6 @@ func runReason(exe string, err error) string {
 		err = look.Err
 	}
 	return fmt.Sprintf("run %s: %v", exe, err)
-}
-
-func gameDirOf(argv []string) (string, bool) {
-	for i, arg := range argv {
-		if arg == "--gameDir" && i+1 < len(argv) {
-			return argv[i+1], true
-		}
-		if v, ok := strings.CutPrefix(arg, "--gameDir="); ok {
-			return v, true
-		}
-	}
-	return "", false
 }
 
 func (a *app) syncForLaunch(cmd *cobra.Command, dir string) (syncResult, error) {

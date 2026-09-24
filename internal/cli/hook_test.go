@@ -201,23 +201,6 @@ func TestWrapHonoursTheHookSwitches(t *testing.T) {
 	}
 }
 
-func TestGameDirOf(t *testing.T) {
-	for _, tc := range []struct {
-		argv []string
-		dir  string
-		ok   bool
-	}{
-		{[]string{"-jar", "."}, "", false},
-		{[]string{"--gameDir"}, "", false},
-		{[]string{"-Xmx2G", "--gameDir", "/g", "--accessToken", "x"}, "/g", true},
-		{[]string{"--gameDir=/g"}, "/g", true},
-	} {
-		if dir, ok := gameDirOf(tc.argv); dir != tc.dir || ok != tc.ok {
-			t.Errorf("gameDirOf(%q) = %q, %v; want %q, %v", tc.argv, dir, ok, tc.dir, tc.ok)
-		}
-	}
-}
-
 func TestWrapFallsBackToJavaWhenTheWrapperCantRun(t *testing.T) {
 	h, gameDir, argsFile := wrappedInstance(t, "0", func(f *instance.File) {
 		f.Settings.Wrapper = []string{"shulker-no-such-wrapper", "--tag"}
