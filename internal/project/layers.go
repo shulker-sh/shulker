@@ -22,3 +22,17 @@ func OverrideLayers(m *manifest.Manifest) []string {
 	}
 	return layers
 }
+
+// IsSideLayer reports whether layer is one of side's own override folders, a feature's included.
+func IsSideLayer(m *manifest.Manifest, side, layer string) bool {
+	layers := []string{side + "-overrides"}
+	for _, f := range m.Features {
+		if side == "client" && f.Overrides.Client != "" {
+			layers = append(layers, f.Overrides.Client)
+		}
+		if side == "server" && f.Overrides.Server != "" {
+			layers = append(layers, f.Overrides.Server)
+		}
+	}
+	return slices.Contains(layers, layer)
+}

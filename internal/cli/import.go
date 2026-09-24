@@ -366,7 +366,7 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 	if f.side != "" {
 		other := otherSide(f.side)
 		paths = slices.DeleteFunc(paths, func(p string) bool {
-			if !isSideLayer(m, other, p) {
+			if !project.IsSideLayer(m, other, p) {
 				return false
 			}
 			if _, err := os.Stat(filepath.Join(c.Dir, filepath.FromSlash(p))); err == nil {
@@ -426,20 +426,6 @@ func projectPaths(m *manifest.Manifest) []string {
 	}
 	slices.Sort(paths)
 	return slices.Compact(paths)
-}
-
-// isSideLayer reports whether layer is one of side's own override folders.
-func isSideLayer(m *manifest.Manifest, side, layer string) bool {
-	layers := []string{side + "-overrides"}
-	for _, f := range m.Features {
-		if side == "client" && f.Overrides.Client != "" {
-			layers = append(layers, f.Overrides.Client)
-		}
-		if side == "server" && f.Overrides.Server != "" {
-			layers = append(layers, f.Overrides.Server)
-		}
-	}
-	return slices.Contains(layers, layer)
 }
 
 func otherSide(side string) string {
@@ -525,7 +511,7 @@ func keepSide(m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Overri
 	}
 	kept := overrides[:0]
 	for _, o := range overrides {
-		if isSideLayer(m, other, o.Layer) {
+		if project.IsSideLayer(m, other, o.Layer) {
 			leftOut = append(leftOut, o.Layer+"/"+o.Path)
 			continue
 		}

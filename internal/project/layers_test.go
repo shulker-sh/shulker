@@ -21,3 +21,18 @@ func TestOverrideLayersListsTheFixedThenEachFeatures(t *testing.T) {
 		t.Fatalf("layers = %v, want %v", got, want)
 	}
 }
+
+func TestIsSideLayerKnowsAFeaturesSideFolders(t *testing.T) {
+	m := featureManifest()
+	cases := map[string]map[string]bool{
+		"client": {"client-overrides": true, "shaders-client-overrides": true, "server-overrides": false, "shaders-overrides": false, "overrides": false},
+		"server": {"server-overrides": true, "admin-server-overrides": true, "client-overrides": false, "shaders-client-overrides": false},
+	}
+	for side, layers := range cases {
+		for layer, want := range layers {
+			if got := IsSideLayer(m, side, layer); got != want {
+				t.Errorf("IsSideLayer(%s, %s) = %v, want %v", side, layer, got, want)
+			}
+		}
+	}
+}
