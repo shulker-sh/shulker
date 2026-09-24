@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -43,7 +44,7 @@ func (a *app) buildDirs(p *project.Project, lf *local.File, side string) (string
 		return "", nil, err
 	}
 	for _, e := range entries {
-		if e.Side == side && isSameDir(e.Source, p.Dir) {
+		if e.Side == side && config.SameDir(e.Source, p.Dir) {
 			add(e.Dir)
 		}
 	}

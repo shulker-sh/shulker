@@ -27,7 +27,7 @@ func (a *app) accountsCmd() *cobra.Command {
 		Args:        exactArgs(0),
 		RunE:        func(cmd *cobra.Command, args []string) error { return a.listAccounts() },
 	}
-	cmd.AddCommand(a.accountsLoginCmd(), a.accountsLogoutCmd(), a.accountsAddCmd(), a.accountsRemoveCmd(), a.accountsRefreshCmd(), a.accountsUseCmd(), a.accountsProvidersCmd())
+	cmd.AddCommand(a.accountsLoginCmd(), a.accountsLogoutCmd(), a.accountsAddCmd(), a.accountsRemoveCmd(), a.accountsRefreshCmd(), a.accountsUseCmd(), a.accountsStoresCmd())
 	return cmd
 }
 
@@ -166,7 +166,7 @@ func (a *app) accountStore() (string, account.Store, error) {
 	return account.Path(path), store, err
 }
 
-// accounts is every account the configured providers yield, with the config that named them.
+// accounts is every account the configured stores yield, with the config that named them.
 func (a *app) accounts() ([]account.Resolved, config.Config, error) {
 	path, err := a.configFile()
 	if err != nil {
@@ -180,16 +180,13 @@ func (a *app) accounts() ([]account.Resolved, config.Config, error) {
 	if err != nil {
 		return nil, config.Config{}, err
 	}
-	providers := cfg.Accounts.Providers
-	if providers == nil {
-		providers = account.DefaultProviders()
+	stores := cfg.Accounts.Stores
+	if stores == nil {
+		stores = account.DefaultStores()
 	}
-	for _, p := range account.WithoutReader(providers) {
-		a.printer.Warn("shulker can't read %s's accounts yet, so accounts.providers lists it for nothing", p)
-	}
-	borrowed, err := a.borrowedAccounts(providers)
+	borrowed, err := a.borrowedAccounts(stores)
 	if err != nil {
 		return nil, config.Config{}, err
 	}
-	return account.Resolve(providers, store, borrowed), cfg, nil
+	return account.Resolve(stores, store, borrowed), cfg, nil
 }

@@ -23,7 +23,7 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
+
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/server"
 )
@@ -494,7 +494,7 @@ func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Proje
 // instances shulker owns can be launched from here; every other launcher starts its own. With
 // create, a project nothing plays yet asks to make its instance, which is linked and synced here,
 // and returned with that link's report.
-func (a *app) playInstance(cmd *cobra.Command, args []string, create bool) (config.Instance, *shulkerReport, error) {
+func (a *app) playInstance(cmd *cobra.Command, args []string, create bool) (config.Instance, *linkReport, error) {
 	if len(args) == 1 {
 		if a.instance != "" || a.dir != "" {
 			return config.Instance{}, nil, out.Errorf("usage", "pass a nickname, -i or -C, not more than one: each of them says which instance to launch")
@@ -512,7 +512,7 @@ func (a *app) playInstance(cmd *cobra.Command, args []string, create bool) (conf
 	if !ok {
 		return config.Instance{}, nil, notRegistered(dir)
 	}
-	if in.Launcher != "shulker" {
+	if in.Launcher != launcher.Shulker.Name {
 		e := out.Errorf("not-shulker", "%s belongs to %s, which starts it itself", in.ID, in.Launcher)
 		e.Help = "shulker only launches the instances it owns"
 		return config.Instance{}, nil, e
@@ -528,7 +528,7 @@ func notRegistered(dir string) error {
 
 // projectInstance is the instance shulker owns for the project in dir. Instances other launchers
 // own are synced from it too, but never count, since shulker doesn't start them.
-func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (config.Instance, *shulkerReport, error) {
+func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (config.Instance, *linkReport, error) {
 	p, err := a.openProjectAt(dir)
 	if errors.Is(err, project.ErrNoManifest) {
 		return config.Instance{}, nil, notRegistered(dir)
@@ -546,7 +546,7 @@ func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (conf
 	}
 	var own []config.Instance
 	for _, in := range registry {
-		if in.Launcher == "shulker" && isSameDir(in.Source, source) && !isSameDir(in.Dir, source) {
+		if in.Launcher == launcher.Shulker.Name && config.SameDir(in.Source, source) && !config.SameDir(in.Dir, source) {
 			own = append(own, in)
 		}
 	}
@@ -579,7 +579,7 @@ func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (conf
 	return e.Instance, nil, nil
 }
 
-func (a *app) createProjectInstance(cmd *cobra.Command, p *project.Project, dir string, create bool) (config.Instance, *shulkerReport, error) {
+func (a *app) createProjectInstance(cmd *cobra.Command, p *project.Project, dir string, create bool) (config.Instance, *linkReport, error) {
 	if !create || !a.canPick() {
 		return config.Instance{}, nil, notRegistered(dir)
 	}
@@ -590,7 +590,7 @@ func (a *app) createProjectInstance(cmd *cobra.Command, p *project.Project, dir 
 	if !yes {
 		return config.Instance{}, nil, notRegistered(dir)
 	}
-	rep, err := a.linkShulker(cmd, nil, pack.At{}, "", false, linkSettings{})
+	rep, err := a.linkInto(cmd, nil, launcher.Shulker, &launcherLink{})
 	if err != nil {
 		return config.Instance{}, nil, err
 	}
@@ -598,7 +598,7 @@ func (a *app) createProjectInstance(cmd *cobra.Command, p *project.Project, dir 
 	if !ok {
 		return config.Instance{}, nil, notRegistered(rep.GameDir)
 	}
-	return in, &rep, nil
+	return in, rep, nil
 }
 
 // playProject is the pack a launch runs, read after the sync that may have changed it.
@@ -655,7 +655,7 @@ func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store
 		if err := a.fetchVanillaClient(ctx, s, p.Lock.Minecraft); err != nil {
 			return "", err
 		}
-		id, err = a.installClientLoader(ctx, p, &launcher.Mojang{Dir: s.Root}, l)
+		id, err = a.installClientLoader(ctx, p, s.Root, l)
 	} else {
 		a.progress("fetching %s loader %s for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
 		var profile []byte

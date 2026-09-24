@@ -1,4 +1,4 @@
-package account
+package launcher
 
 import (
 	"os"
@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"shulker.sh/shulker/internal/account"
 )
 
 var mojangNow = time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
@@ -26,7 +28,7 @@ func writeMojang(t *testing.T, files map[string]string) string {
 	return dir
 }
 
-func mojangEntry(local, id, name, token, expires string) string {
+func mojangAccountEntry(local, id, name, token, expires string) string {
 	return `"` + local + `": {
 	  "accessToken": "` + token + `",
 	  "accessTokenExpiresAt": "` + expires + `",
@@ -49,11 +51,11 @@ func mojangBody(entries ...string) string {
 
 func TestReadMojangTakesAccountsFromBothFiles(t *testing.T) {
 	dir := writeMojang(t, map[string]string{
-		MojangFileName:      mojangBody(mojangEntry("one", notchUUID, "Notch", "session", "2026-09-21T12:00:00Z")),
-		MojangStoreFileName: mojangBody(mojangEntry("two", jebUUID, "Jeb_", "store", "2026-09-21T12:00:00Z")),
+		MojangAccountsFile:      mojangBody(mojangAccountEntry("one", notchUUID, "Notch", "session", "2026-09-21T12:00:00Z")),
+		MojangStoreAccountsFile: mojangBody(mojangAccountEntry("two", jebUUID, "Jeb_", "store", "2026-09-21T12:00:00Z")),
 	})
 
-	got, errs := ReadMojang(dir, mojangNow)
+	got, errs := mojangAccounts(mojangEntry, dir, mojangNow)
 	if len(errs) != 0 {
 		t.Fatalf("errs = %v", errs)
 	}
@@ -64,13 +66,13 @@ func TestReadMojangTakesAccountsFromBothFiles(t *testing.T) {
 	if jeb.Name != "Jeb_" || notch.Name != "Notch" {
 		t.Fatalf("accounts = %+v", got)
 	}
-	if notch.Source != SourceMojang || notch.Group != GroupBorrowed || notch.State != Playable {
+	if notch.Source != mojangEntry.Name || notch.Group != account.GroupBorrowed || notch.State != account.Playable {
 		t.Errorf("row = %+v", notch)
 	}
 	if notch.ID != notchUUID || notch.Account.Profile == nil || notch.Account.Profile.Name != "Notch" {
 		t.Errorf("username and UUID come from minecraftProfile: %+v", notch)
 	}
-	if notch.Account.Type != Microsoft || notch.Account.Minecraft == nil || notch.Account.Minecraft.Token != "session" {
+	if notch.Account.Type != account.Microsoft || notch.Account.Minecraft == nil || notch.Account.Minecraft.Token != "session" {
 		t.Errorf("the session token is what a launch needs: %+v", notch.Account)
 	}
 	if notch.Account.RefreshToken != "" {
@@ -88,10 +90,10 @@ func TestReadMojangMergesAUUIDInBothFiles(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			dir := writeMojang(t, map[string]string{
-				MojangFileName:      mojangBody(mojangEntry("one", notchUUID, "Notch", "session", c.plain)),
-				MojangStoreFileName: mojangBody(mojangEntry("two", notchUUID, "Notch", "store", c.store)),
+				MojangAccountsFile:      mojangBody(mojangAccountEntry("one", notchUUID, "Notch", "session", c.plain)),
+				MojangStoreAccountsFile: mojangBody(mojangAccountEntry("two", notchUUID, "Notch", "store", c.store)),
 			})
-			got, errs := ReadMojang(dir, mojangNow)
+			got, errs := mojangAccounts(mojangEntry, dir, mojangNow)
 			if len(errs) != 0 || len(got) != 1 {
 				t.Fatalf("one UUID is one account: %+v %v", got, errs)
 			}
@@ -104,10 +106,10 @@ func TestReadMojangMergesAUUIDInBothFiles(t *testing.T) {
 
 func TestReadMojangMergesAUUIDWrittenTwoWays(t *testing.T) {
 	dir := writeMojang(t, map[string]string{
-		MojangFileName:      mojangBody(mojangEntry("one", notchUUID, "Notch", "session", "2026-09-21T12:00:00Z")),
-		MojangStoreFileName: mojangBody(mojangEntry("two", strings.ReplaceAll(notchUUID, "-", ""), "Notch", "store", "2026-09-22T12:00:00Z")),
+		MojangAccountsFile:      mojangBody(mojangAccountEntry("one", notchUUID, "Notch", "session", "2026-09-21T12:00:00Z")),
+		MojangStoreAccountsFile: mojangBody(mojangAccountEntry("two", strings.ReplaceAll(notchUUID, "-", ""), "Notch", "store", "2026-09-22T12:00:00Z")),
 	})
-	got, errs := ReadMojang(dir, mojangNow)
+	got, errs := mojangAccounts(mojangEntry, dir, mojangNow)
 	if len(errs) != 0 || len(got) != 1 {
 		t.Fatalf("a UUID dashed in one file and not the other is one account: %+v %v", got, errs)
 	}
@@ -116,21 +118,21 @@ func TestReadMojangMergesAUUIDWrittenTwoWays(t *testing.T) {
 func TestReadMojangTokenExpiry(t *testing.T) {
 	for _, c := range []struct {
 		name, token, expires string
-		want                 State
+		want                 account.State
 		expired              time.Time
 	}{
-		{"holds", "session", "2026-09-21T12:00:00Z", Playable, time.Time{}},
-		{"fractional seconds", "session", "2026-09-21T12:00:00.0000000Z", Playable, time.Time{}},
-		{"ran out", "session", "2026-09-18T12:00:00Z", TokenExpired, time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC)},
-		{"no expiry", "session", "", TokenExpired, time.Time{}},
-		{"unparseable expiry", "session", "yesterday", TokenExpired, time.Time{}},
-		{"no token", "", "2026-09-21T12:00:00Z", TokenExpired, time.Time{}},
+		{"holds", "session", "2026-09-21T12:00:00Z", account.Playable, time.Time{}},
+		{"fractional seconds", "session", "2026-09-21T12:00:00.0000000Z", account.Playable, time.Time{}},
+		{"ran out", "session", "2026-09-18T12:00:00Z", account.TokenExpired, time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC)},
+		{"no expiry", "session", "", account.TokenExpired, time.Time{}},
+		{"unparseable expiry", "session", "yesterday", account.TokenExpired, time.Time{}},
+		{"no token", "", "2026-09-21T12:00:00Z", account.TokenExpired, time.Time{}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			dir := writeMojang(t, map[string]string{
-				MojangFileName: mojangBody(mojangEntry("one", notchUUID, "Notch", c.token, c.expires)),
+				MojangAccountsFile: mojangBody(mojangAccountEntry("one", notchUUID, "Notch", c.token, c.expires)),
 			})
-			got, errs := ReadMojang(dir, mojangNow)
+			got, errs := mojangAccounts(mojangEntry, dir, mojangNow)
 			if len(errs) != 0 || len(got) != 1 {
 				t.Fatalf("an account with a profile is never skipped: %+v %v", got, errs)
 			}
@@ -146,9 +148,9 @@ func TestReadMojangTokenExpiry(t *testing.T) {
 
 func TestReadMojangExpiredTokenStaysUsable(t *testing.T) {
 	dir := writeMojang(t, map[string]string{
-		MojangFileName: mojangBody(mojangEntry("one", notchUUID, "Notch", "stale", "2026-09-18T12:00:00Z")),
+		MojangAccountsFile: mojangBody(mojangAccountEntry("one", notchUUID, "Notch", "stale", "2026-09-18T12:00:00Z")),
 	})
-	got, errs := ReadMojang(dir, mojangNow)
+	got, errs := mojangAccounts(mojangEntry, dir, mojangNow)
 	if len(errs) != 0 || len(got) != 1 {
 		t.Fatalf("read = %+v %v", got, errs)
 	}
@@ -171,8 +173,8 @@ func TestReadMojangSilentCases(t *testing.T) {
 		{"profile without a name", `{"accounts":{"one":{"minecraftProfile":{"id":"` + notchUUID + `"}}}}`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			dir := writeMojang(t, map[string]string{MojangFileName: c.body})
-			got, errs := ReadMojang(dir, mojangNow)
+			dir := writeMojang(t, map[string]string{MojangAccountsFile: c.body})
+			got, errs := mojangAccounts(mojangEntry, dir, mojangNow)
 			if len(errs) != 0 || len(got) != 0 {
 				t.Fatalf("read = %+v %v", got, errs)
 			}
@@ -181,7 +183,7 @@ func TestReadMojangSilentCases(t *testing.T) {
 }
 
 func TestReadMojangMissingDirectoryIsSilent(t *testing.T) {
-	got, errs := ReadMojang(filepath.Join(t.TempDir(), "nowhere"), mojangNow)
+	got, errs := mojangAccounts(mojangEntry, filepath.Join(t.TempDir(), "nowhere"), mojangNow)
 	if len(errs) != 0 || got != nil {
 		t.Fatalf("read = %+v %v", got, errs)
 	}
@@ -189,14 +191,14 @@ func TestReadMojangMissingDirectoryIsSilent(t *testing.T) {
 
 func TestReadMojangSkipsOnlyTheFileItCannotRead(t *testing.T) {
 	dir := writeMojang(t, map[string]string{
-		MojangFileName:      `{"accounts":{`,
-		MojangStoreFileName: mojangBody(mojangEntry("two", jebUUID, "Jeb_", "store", "2026-09-21T12:00:00Z")),
+		MojangAccountsFile:      `{"accounts":{`,
+		MojangStoreAccountsFile: mojangBody(mojangAccountEntry("two", jebUUID, "Jeb_", "store", "2026-09-21T12:00:00Z")),
 	})
-	got, errs := ReadMojang(dir, mojangNow)
+	got, errs := mojangAccounts(mojangEntry, dir, mojangNow)
 	if len(errs) != 1 {
 		t.Fatalf("errs = %v, want the one file that didn't parse", errs)
 	}
-	if !strings.Contains(errs[0].Error(), filepath.Join(dir, MojangFileName)) {
+	if !strings.Contains(errs[0].Error(), filepath.Join(dir, MojangAccountsFile)) {
 		t.Errorf("the warning names the file: %v", errs[0])
 	}
 	if !strings.Contains(errs[0].Error(), "unexpected end of JSON input") {
@@ -211,14 +213,14 @@ func TestReadMojangOpensNeitherEntitlementsNorCredentials(t *testing.T) {
 	// Garbage in every file beside the two account lists: opening any of them would fail, and
 	// the ownership proof is the Java profile rather than an entitlement.
 	dir := writeMojang(t, map[string]string{
-		MojangFileName:                                 mojangBody(mojangEntry("one", notchUUID, "Notch", "session", "2026-09-21T12:00:00Z")),
+		MojangAccountsFile:                             mojangBody(mojangAccountEntry("one", notchUUID, "Notch", "session", "2026-09-21T12:00:00Z")),
 		"launcher_entitlements.json":                   "not json",
 		"launcher_entitlements_microsoft_store.json":   "not json",
 		"launcher_msa_credentials.bin":                 "not json",
 		"launcher_msa_credentials_microsoft_store.bin": "not json",
 	})
-	got, errs := ReadMojang(dir, mojangNow)
-	if len(errs) != 0 || len(got) != 1 || got[0].State != Playable {
+	got, errs := mojangAccounts(mojangEntry, dir, mojangNow)
+	if len(errs) != 0 || len(got) != 1 || got[0].State != account.Playable {
 		t.Fatalf("read = %+v %v", got, errs)
 	}
 }

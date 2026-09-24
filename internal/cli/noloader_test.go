@@ -124,7 +124,7 @@ func TestLinkWithoutALoader(t *testing.T) {
 
 	mojangDir := t.TempDir()
 	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)
-	if strings.Contains(stdout, "installed") || !strings.Contains(stdout, "linked launcher profile pack") {
+	if strings.Contains(stdout, "installed") || !strings.Contains(stdout, "created profile pack") {
 		t.Fatalf("link mojang output: %s", stdout)
 	}
 	if _, err := os.Stat(filepath.Join(mojangDir, "versions")); err == nil {

@@ -186,7 +186,7 @@ func scanLaunchers(only, dir, instancesRoot string) []config.Instance {
 		launcherDir := dir
 		switch {
 		case launcherDir != "":
-		case e.Name == "shulker":
+		case !e.HasDir():
 			launcherDir = instancesRoot
 		case e.DefaultDir == nil:
 			continue
@@ -203,7 +203,7 @@ func scanLaunchers(only, dir, instancesRoot string) []config.Instance {
 				continue
 			}
 			in.Launcher = e.Name
-			if e.Name != "shulker" {
+			if e.HasDir() {
 				in.LauncherDir = launcherDir
 			}
 			if name := e.InstanceName(launcherDir, gameDir); name != "" {

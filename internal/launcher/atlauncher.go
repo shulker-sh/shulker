@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"context"
 	"crypto/rand"
 	_ "embed"
 	"encoding/json"
@@ -26,6 +27,27 @@ const (
 //
 //go:embed assets/atlauncher-instance.png
 var ATLauncherImage []byte
+
+// atlauncherEntry is ATLauncher: an instance folder named after the letters and digits in the
+// instance name, which is the game directory too, started from a complete version JSON.
+var atlauncherEntry = &Entry{
+	Name: "atlauncher", Title: "ATLauncher", IsInstanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true, NamesFolder: true,
+	Slot:  &Slot{Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord},
+	Image: &Image{File: ATLauncherImageFile, Default: ATLauncherImage, fit: atlauncherCard},
+	Usage: Usage{
+		Short: "Create an ATLauncher instance that syncs the client build before each launch",
+		Noun:  "instance",
+		Dir:   "launcher data directory (default: ATLauncher's)",
+		Names: true,
+		Force: "repoint the modpack an instance already follows, or link over one shulker didn't link",
+	},
+	relink: relinkLauncher, forget: forgetInstance, name: atlauncherName, gameDirs: atlauncherGameDirs,
+	readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots,
+	place: placeATLauncher, link: linkATLauncher,
+	after: func(e *Entry, _ InstanceResult) string {
+		return "restart " + e.Title + " if it is open so the instance shows up"
+	},
+}
 
 type ATLauncher struct {
 	Dir string
@@ -76,12 +98,86 @@ func DefaultATLauncherDir() (string, error) {
 	}
 }
 
-func (a *ATLauncher) Check() error {
-	info, err := os.Stat(a.Dir)
-	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, a.Dir)
+func atlauncherName(e *Entry, _, gameDir string) string {
+	var inst struct {
+		Launcher struct {
+			Name string `json:"name"`
+		} `json:"launcher"`
 	}
-	return nil
+	readJSON(filepath.Join(e.InstanceDir(gameDir), ATLauncherInstanceFile), &inst)
+	return inst.Launcher.Name
+}
+
+func atlauncherGameDirs(_ *Entry, launcherDir string) []string {
+	return gameDirsUnder(filepath.Join(launcherDir, "instances"), func(dir string) []string {
+		return []string{dir}
+	})
+}
+
+func placeATLauncher(_ *Entry, req *Link) (Placement, error) {
+	if ATLauncherFolder(req.Name) == "" {
+		return Placement{}, blankName(fmt.Sprintf("ATLauncher names an instance's folder after the letters and digits in its name, and %q has none", req.Name))
+	}
+	dir := (&ATLauncher{Dir: req.LauncherDir}).InstanceDir(req.Name)
+	return Placement{ID: req.ID, Dir: dir, GameDir: dir}, nil
+}
+
+func linkATLauncher(ctx context.Context, _ *Entry, req *Link, _ Placement) (InstanceResult, error) {
+	atl := &ATLauncher{Dir: req.LauncherDir}
+	version, err := atlauncherVersion(ctx, req, atl)
+	if err != nil {
+		return InstanceResult{}, err
+	}
+	return atl.WriteInstance(ATLauncherInstance{
+		Name:          req.Name,
+		Minecraft:     req.Minecraft,
+		LoaderType:    req.LoaderType,
+		LoaderVersion: req.LoaderVersion,
+		Version:       version,
+	})
+}
+
+// atlauncherVersion is the version JSON an ATLauncher instance starts the game from. NeoForge and
+// Forge build part of the client with their installer, so it runs once per loader version into a
+// scratch launcher directory in the cache, and what it put in libraries/ is copied into ATLauncher's.
+func atlauncherVersion(ctx context.Context, req *Link, atl *ATLauncher) (json.RawMessage, error) {
+	req.Log("fetching Minecraft %s", req.Minecraft)
+	vanilla, err := req.Versions.Vanilla(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.LoaderType == "" {
+		return vanilla, nil
+	}
+	if !req.Versions.HasInstaller() {
+		req.Log("fetching %s loader %s for %s", req.LoaderType, req.LoaderVersion, req.Minecraft)
+		loaderVersion, err := req.Versions.LoaderProfile(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return MergeVersion(vanilla, loaderVersion)
+	}
+	scratch := req.Cache.ATLauncherInstall(req.LoaderType, req.LoaderVersion)
+	installed := filepath.Join(scratch, ".installed")
+	if _, err := os.Stat(installed); err != nil {
+		if err := os.MkdirAll(scratch, 0o755); err != nil {
+			return nil, err
+		}
+		if _, err := req.Versions.InstallClient(ctx, scratch); err != nil {
+			return nil, err
+		}
+		if err := fsutil.Write(installed, nil); err != nil {
+			return nil, err
+		}
+	}
+	loaderVersion, err := req.Versions.InstallerVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := CopyLibraries(filepath.Join(scratch, "libraries"), atl.LibrariesDir()); err != nil {
+		return nil, err
+	}
+	return MergeVersion(vanilla, loaderVersion)
 }
 
 var atlauncherUnsafeChars = regexp.MustCompile(`[^A-Za-z0-9]`)
@@ -106,7 +202,7 @@ func (a *ATLauncher) LibrariesDir() string {
 // launcher setting the player chose, such as memory or Java arguments.
 func (a *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, error) {
 	dir := a.InstanceDir(inst.Name)
-	res := InstanceResult{Dir: dir, GameDir: dir}
+	res := InstanceResult{Dir: dir, GameDir: dir, Key: ATLauncherFolder(inst.Name)}
 	path := filepath.Join(dir, ATLauncherInstanceFile)
 	previous, found, err := readJSONObject(path)
 	if err != nil {

@@ -152,7 +152,7 @@ func TestResolveDedupesByIDKeepingTheEarliestProvider(t *testing.T) {
 		own("NOTCH", "069A79F444E94726A5BEFCA90E38AAF5"),
 		offline("Steve", "8667ba71-b85a-3d5b-af5f-cb2f6e9c7d21"),
 	}}
-	got := Resolve(DefaultProviders(), store, nil)
+	got := Resolve(DefaultStores(), store, nil)
 	if len(got) != 2 {
 		t.Fatalf("got %d accounts, want 2: %+v", len(got), got)
 	}
@@ -164,52 +164,33 @@ func TestResolveDedupesByIDKeepingTheEarliestProvider(t *testing.T) {
 	}
 }
 
-func TestResolveIgnoresAProviderThatFoundNothing(t *testing.T) {
+func TestResolveIgnoresAStoreThatFoundNothing(t *testing.T) {
 	store := Store{Accounts: []Account{own("Notch", "u1")}}
-	if got := Resolve([]string{SourceMojang}, store, nil); len(got) != 0 {
+	if got := Resolve([]string{"mojang"}, store, nil); len(got) != 0 {
 		t.Fatalf("got %+v, want nothing", got)
 	}
 	if got := Resolve(nil, store, nil); len(got) != 0 {
-		t.Fatalf("an empty provider list should yield nothing, got %+v", got)
+		t.Fatalf("an empty store list should yield nothing, got %+v", got)
 	}
 }
 
-func TestReadersForEveryProviderTheListTakes(t *testing.T) {
-	// A launcher may be offered before its reader exists, so a list can drop shulker for one of
-	// them; today every name accounts.providers accepts has one.
-	for _, p := range Providers() {
-		if !HasReader(p) {
-			t.Errorf("%s is offered without a reader", p)
-		}
-	}
-	if len(WithoutReader(Providers())) != 0 {
-		t.Errorf("without a reader = %v", WithoutReader(Providers()))
-	}
-	if HasReader("multimc") {
-		t.Error("a launcher the list doesn't take has no reader either")
-	}
-	if got := WithoutReader([]string{SourceShulker, "multimc"}); len(got) != 1 || got[0] != "multimc" {
-		t.Errorf("without a reader = %v, want the one that has none", got)
-	}
-}
-
-func TestResolveTakesTheEarliestProvidersCopyOfAnAccount(t *testing.T) {
+func TestResolveTakesTheEarliestStoresCopyOfAnAccount(t *testing.T) {
 	id := "069a79f4-44e9-4726-a5be-fca90e38aaf5"
-	borrowed := map[string][]Resolved{SourcePrism: {{
+	borrowed := map[string][]Resolved{"prism": {{
 		ID: "069A79F444E94726A5BEFCA90E38AAF5", Name: "Notch",
-		Source: SourcePrism, Group: GroupBorrowed, State: TokenExpired,
+		Source: "prism", Group: GroupBorrowed, State: TokenExpired,
 	}}}
 	store := Store{Accounts: []Account{own("Notch", id)}}
 
-	got := Resolve([]string{SourceShulker, SourcePrism}, store, borrowed)
+	got := Resolve([]string{SourceShulker, "prism"}, store, borrowed)
 	if len(got) != 1 || got[0].Source != SourceShulker {
 		t.Fatalf("shulker comes first, so its copy wins: %+v", got)
 	}
-	got = Resolve([]string{SourcePrism, SourceShulker}, store, borrowed)
-	if len(got) != 1 || got[0].Source != SourcePrism {
+	got = Resolve([]string{"prism", SourceShulker}, store, borrowed)
+	if len(got) != 1 || got[0].Source != "prism" {
 		t.Fatalf("prism comes first, so its copy wins: %+v", got)
 	}
-	if got = Resolve([]string{SourcePrism}, store, borrowed); len(got) != 1 || got[0].State != TokenExpired {
+	if got = Resolve([]string{"prism"}, store, borrowed); len(got) != 1 || got[0].State != TokenExpired {
 		t.Fatalf("without shulker only the borrowed copy is left: %+v", got)
 	}
 }
@@ -223,7 +204,7 @@ func TestFind(t *testing.T) {
 		loSteve = "5a1f0000-0000-3000-8000-000000000002"
 		stella  = "b1a00000-0000-3000-8000-000000000003"
 	)
-	accounts := Resolve(DefaultProviders(), Store{Accounts: []Account{
+	accounts := Resolve(DefaultStores(), Store{Accounts: []Account{
 		own("Notch", notch),
 		offline("Notch", offNotc),
 		offline("Big Dog 42", bigDog),

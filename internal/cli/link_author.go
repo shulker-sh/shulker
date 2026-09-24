@@ -2,6 +2,7 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -61,7 +62,7 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 			return nil, err
 		}
 	}
-	m.Name, m.Client.Name = slugID(display), display
+	m.Name, m.Client.Name = config.SlugID(display), display
 	return &syncSource{Checkout: &pack.Checkout{Kind: pack.Local}, project: &project.Project{Manifest: m, Lock: l}, isAuthor: true}, nil
 }
 

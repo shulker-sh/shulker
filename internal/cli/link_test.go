@@ -43,7 +43,7 @@ func onlyModpack(t *testing.T, m map[string]any) (string, map[string]any) {
 
 // mojangGameDir is where `link mojang` puts an instance: the launcher's own folder for it.
 func mojangGameDir(launcherDir, name string) string {
-	return filepath.Join(launcherDir, "shulker", strings.TrimPrefix(instanceKey(name), "shulker-"))
+	return filepath.Join(launcherDir, "shulker", strings.TrimPrefix(launcher.InstanceKey(name), "shulker-"))
 }
 
 func mojangLauncherDir(t *testing.T) string {
@@ -143,7 +143,7 @@ func TestLinkMojang(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Command != "link mojang" || env.Data.Profile != "shulker-pack" || env.Data.GameDir != gameDir {
+	if env.Command != "link mojang" || env.Data.Instance != "shulker-pack" || env.Data.GameDir != gameDir {
 		t.Fatalf("relink envelope: %s", stdout)
 	}
 	if env.Data.Modpack != "pack" || env.Data.Sync == nil || env.Data.Sync.Dir != gameDir {
@@ -259,7 +259,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	gameDir := filepath.Join(launcherDir, "shulker", "friends")
-	if rep := env.Data; rep.Source != source || rep.Ref != "main" || rep.Name != "Friends" || rep.Profile != "shulker-friends" || rep.GameDir != gameDir || rep.Sync == nil {
+	if rep := env.Data; rep.Source != source || rep.Ref != "main" || rep.Name != "Friends" || rep.Instance != "shulker-friends" || rep.GameDir != gameDir || rep.Sync == nil {
 		t.Fatalf("link report: %+v", rep)
 	}
 	if env.Data.Modpack != "my-pack" {

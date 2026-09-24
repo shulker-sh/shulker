@@ -229,18 +229,14 @@ func detachedBuild(query string) (instanceEntry, bool) {
 		return instanceEntry{}, false
 	}
 	e := inspectInstance(config.Instance{Name: filepath.Base(dir), Dir: dir})
-	e.ID = slugID(e.Name)
+	e.ID = config.SlugID(e.Name)
 	e.detached = true
 	return e, true
 }
 
 func launcherArg(arg string) string {
-	arg = strings.ToLower(arg)
-	if arg == "vanilla" {
-		return "mojang"
-	}
-	if launcher.Find(arg) != nil {
-		return arg
+	if e := launcher.Resolve(strings.ToLower(arg)); e != nil {
+		return e.Name
 	}
 	return ""
 }

@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -9,7 +10,9 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 )
 
@@ -19,17 +22,24 @@ const (
 	RemovedProfile   = "launcher profile"
 )
 
-// Forgotten is what unlinking an entry did: what it took away, if anything, and
-// the sentence describing it.
+// Forgotten is what unlinking an entry did: what it took away, if anything, the sentence describing
+// it, and a warning worth printing first.
 type Forgotten struct {
 	Removed string
 	Summary string
+	Warning string
 }
 
+// InstanceResult is what a link step left in the launcher: the instance folder, its game directory,
+// the launcher's own key for it, whether it is new, and the version the launcher was made to
+// install, for a launcher that keeps versions of its own.
 type InstanceResult struct {
-	Dir     string
-	GameDir string
-	Created bool
+	Dir        string
+	GameDir    string
+	Key        string
+	Created    bool
+	Version    string
+	VersionDir string
 }
 
 // Entry is one launcher shulker links into. Everything that differs between launchers is described
@@ -49,13 +59,35 @@ type Entry struct {
 	Slot *Slot
 	// Image is the instance picture shulker keeps in step with the pack icon. Nil means the
 	// launcher shows none shulker writes.
-	Image      *Image
+	Image *Image
+	// Usage is how the launcher's link command reads.
+	Usage Usage
+	// NamesFolder marks launchers that keep an instance in a folder named after the instance, so
+	// a folder a link would take may hold an instance the player made.
+	NamesFolder bool
+	// MetaURL is the launcher's own metadata service, for a launcher that installs loaders only
+	// from one.
+	MetaURL string
+	// NeedsRuntime marks a launcher whose instances start the game with the Java shulker manages
+	// rather than the launcher's own, so a sync records that Java in the instance.
+	NeedsRuntime bool
+	// Accounts reads the accounts the launcher keeps in its data directory. Nil means it keeps
+	// none shulker can read.
+	Accounts   func(e *Entry, dir string, now time.Time) ([]account.Resolved, []error)
 	relink     func(e *Entry, l Linked) (args []string, in string)
 	forget     func(e *Entry, l config.Instance) (Forgotten, error)
 	name       func(e *Entry, launcherDir, gameDir string) string
 	gameDirs   func(e *Entry, launcherDir string) []string
 	readSlots  func(e *Entry, in config.Instance) (Slots, bool, error)
 	writeSlots func(e *Entry, in config.Instance, s Slots) error
+	// locate settles the launcher directory a link works in, for a launcher that reaches its own
+	// files through a resolved path; nil means the directory as given.
+	locate func(dir string) (string, error)
+	// running says whether the launcher is open, for a launcher that can tell.
+	running func() (running, detectable bool)
+	place   func(e *Entry, req *Link) (Placement, error)
+	link    func(ctx context.Context, e *Entry, req *Link, p Placement) (InstanceResult, error)
+	after   func(e *Entry, res InstanceResult) string
 }
 
 // Linked is a registry row plus the intent its instance.json records, which is where the side and
@@ -69,44 +101,7 @@ type Linked struct {
 }
 
 // All is every launcher shulker knows, in the order Rank displays them.
-var All = []*Entry{
-	{
-		Name: "shulker", Title: "Shulker", IsInstanced: true, gameDirIsInstance: true,
-		relink: relinkShulker, forget: forgetShulker, name: shulkerName, gameDirs: instanceGameDirs,
-	},
-	{
-		Name: "prism", Title: "Prism Launcher", IsInstanced: true, DefaultDir: DefaultPrismDir,
-		Slot:   &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
-		relink: relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
-		readSlots: readPrismSlots, writeSlots: writePrismSlots,
-	},
-	{
-		Name: "multimc", Title: "MultiMC", IsInstanced: true,
-		Slot:   &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
-		relink: relinkLauncher, forget: forgetInstance, name: multimcName, gameDirs: multimcGameDirs,
-		readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots,
-	},
-	{
-		Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir,
-		Slot:   &Slot{UsesShim: true},
-		relink: relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,
-		readSlots: readMojangSlots, writeSlots: writeMojangSlots,
-	},
-	{
-		Name: "atlauncher", Title: "ATLauncher", IsInstanced: true, DefaultDir: DefaultATLauncherDir, gameDirIsInstance: true,
-		Slot:   &Slot{Token: "$INST_DIR", Tokens: instTokens, Unreproducible: []string{"INST_JAVA", "INST_JAVA_ARGS"}, Quote: bareWord},
-		Image:  &Image{File: ATLauncherImageFile, Default: ATLauncherImage, fit: atlauncherCard},
-		relink: relinkLauncher, forget: forgetInstance, name: atlauncherName, gameDirs: atlauncherGameDirs,
-		readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots,
-	},
-	{
-		Name: "gdlauncher", Title: "GDLauncher", IsInstanced: true, DefaultDir: DefaultGDLauncherDir,
-		Slot:   &Slot{Deadline: "4m", Quote: gdlauncherHookArg},
-		Image:  &Image{File: GDLauncherIconFile, Default: GDLauncherIcon},
-		relink: relinkLauncher, forget: forgetInstance, name: gdlauncherName, gameDirs: gdlauncherGameDirs,
-		readSlots: readGDLauncherSlots, writeSlots: writeGDLauncherSlots,
-	},
-}
+var All = []*Entry{Shulker, prismEntry, multimcEntry, mojangEntry, atlauncherEntry, gdlauncherEntry}
 
 // InstanceDir is the instance folder that holds an instanced launcher's game directory.
 func (e *Entry) InstanceDir(gameDir string) string {
@@ -119,6 +114,20 @@ func (e *Entry) InstanceDir(gameDir string) string {
 func Find(name string) *Entry {
 	for _, e := range All {
 		if e.Name == name {
+			return e
+		}
+	}
+	return nil
+}
+
+// Resolve is Find for an argument a user typed: it takes a launcher's command aliases as well as
+// its name.
+func Resolve(arg string) *Entry {
+	if e := Find(arg); e != nil {
+		return e
+	}
+	for _, e := range All {
+		if slices.Contains(e.Usage.Aliases, arg) {
 			return e
 		}
 	}
@@ -177,6 +186,18 @@ func (e *Entry) defaultDir() string {
 	return dir
 }
 
+// HasDir says whether the launcher has a directory of its own, which a link records and
+// --launcher-dir names. Shulker's own instances root stands in for one otherwise.
+func (e *Entry) HasDir() bool { return e.Usage.Dir != "" }
+
+// IsRunning says whether the launcher is open, and whether this machine can tell at all.
+func (e *Entry) IsRunning() (running, detectable bool) {
+	if e.running == nil {
+		return false, false
+	}
+	return e.running()
+}
+
 // Relink is the command that recreates an entry, and the directory to run it in
 // when the command needs one.
 func Relink(l Linked) (command, in string) {
@@ -216,26 +237,6 @@ func relinkSync(l Linked) (args []string, in string) {
 	return append(args, "--into", shellArg(l.Dir)), ""
 }
 
-// relinkShulker rebuilds an instance shulker owns. It names the instance with --as rather than
-// --name, because the id is also the folder under the instances root, and it carries no side: a
-// shulker instance is a client.
-func relinkShulker(e *Entry, l Linked) (args []string, in string) {
-	args = []string{"shulker", "link", e.Name, shellArg(l.Source)}
-	if l.Ref != "" {
-		args = append(args, "--ref", shellArg(l.Ref))
-	}
-	if l.Path != "" {
-		args = append(args, "--path", shellArg(l.Path))
-	}
-	return append(args, "--as", shellArg(l.ID)), ""
-}
-
-// forgetShulker has nothing to take away. Shulker runs its own hooks in process, so no slot holds a
-// command and no script was generated; unlinking is the registry row going and nothing else.
-func forgetShulker(e *Entry, l config.Instance) (Forgotten, error) {
-	return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance directory and its worlds stay.", l.Label(), e.Title)}, nil
-}
-
 // relinkLauncher rebuilds an instance a launcher owns. Every one of them names the source and
 // follows it as a modpack, so the command is the same shape whichever launcher wrote the instance.
 func relinkLauncher(e *Entry, l Linked) (args []string, in string) {
@@ -250,15 +251,22 @@ func relinkLauncher(e *Entry, l Linked) (args []string, in string) {
 }
 
 func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
+	f := Forgotten{}
+	running, detectable := e.IsRunning()
+	if running {
+		f.Warning = fmt.Sprintf("%s is open; it may put back the pre-launch sync this removes from %q. Quit it, then check the instance's settings", e.Title, l.Label())
+	}
 	if _, err := os.Stat(e.InstanceDir(l.Dir)); errors.Is(err, os.ErrNotExist) {
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its instance was already gone.", l.Label(), e.Title)}, nil
+		f.Summary = fmt.Sprintf("Unlinked %q (%s); its instance was already gone.", l.Label(), e.Title)
+		return f, nil
 	}
 	tookPreLaunch, tookPostExit, err := ReleaseSlots(e, l)
 	if err != nil {
 		return Forgotten{}, err
 	}
 	if !tookPreLaunch && !tookPostExit {
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept.", l.Label(), e.Title)}, nil
+		f.Summary = fmt.Sprintf("Unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept.", l.Label(), e.Title)
+		return f, nil
 	}
 	// Report the slot that actually went: a pre-launch command shulker never wrote is kept, and then
 	// the post-exit slot is all there was to remove.
@@ -266,31 +274,13 @@ func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 	if !tookPreLaunch {
 		removed, what = RemovedPostExit, "post-exit command"
 	}
-	summary := fmt.Sprintf("Unlinked %q (%s): removed its %s; the instance and its worlds stay.", l.Label(), e.Title, what)
-	// Unlink warns when GDLauncher is open, so the restart reminder is only for where it can't tell.
-	if _, detectable := GDLauncherRunning(); e.Name != "gdlauncher" || !detectable {
-		summary += "\nRestart the launcher if it is open so the change is picked up."
+	f.Removed = removed
+	f.Summary = fmt.Sprintf("Unlinked %q (%s): removed its %s; the instance and its worlds stay.", l.Label(), e.Title, what)
+	// Unlink warns when the launcher is open, so the restart reminder is only for where it can't tell.
+	if !detectable {
+		f.Summary += "\nRestart the launcher if it is open so the change is picked up."
 	}
-	return Forgotten{Removed: removed, Summary: summary}, nil
-}
-
-func forgetMojang(e *Entry, l config.Instance) (Forgotten, error) {
-	// Unlink takes the generated scripts and the shim with the profile, and puts the profile's own
-	// Java back on the way.
-	if _, _, err := ReleaseSlots(e, l); err != nil {
-		return Forgotten{}, err
-	}
-	n, err := (&Mojang{Dir: l.LauncherDir}).RemoveProfiles(l.Dir)
-	if err != nil {
-		return Forgotten{}, err
-	}
-	if n == 0 {
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); it had no launcher profile left.", l.Label(), e.Title)}, nil
-	}
-	return Forgotten{
-		Removed: RemovedProfile,
-		Summary: fmt.Sprintf("Unlinked %q (%s): removed its launcher profile; the instance directory and the loader stay.", l.Label(), e.Title),
-	}, nil
+	return f, nil
 }
 
 var plainShellArg = regexp.MustCompile(`^[A-Za-z0-9_./:@%+=,-]+$`)

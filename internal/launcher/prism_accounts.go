@@ -1,4 +1,4 @@
-package account
+package launcher
 
 import (
 	"encoding/json"
@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"shulker.sh/shulker/internal/account"
 )
 
-// PrismFileName is what Prism calls its account list inside its own data directory
+// PrismAccountsFile is what Prism calls its account list inside its own data directory
 // (Application.cpp: setListFilePath("accounts.json", true)).
-const PrismFileName = "accounts.json"
+const PrismAccountsFile = "accounts.json"
 
 // prismVersion is the only list version Prism reads (AccountList.cpp, AccountListVersion::MojangMSA);
 // it renames a file carrying any other and starts a fresh list, so shulker can't read one either.
@@ -52,13 +54,21 @@ type prismToken struct {
 	Expires  int64  `json:"exp"`
 }
 
-// ReadPrism is the accounts Prism holds in dir. A directory or file that isn't there yields
+// prismAccounts is the accounts Prism holds in dir. A directory or file that isn't there yields
 // nothing and says nothing: opting in to a launcher that isn't installed is worth one line where
 // the opting in happens, not on every run afterwards. A file that doesn't read is an error to
 // warn with and skip, since shulker neither wrote it nor can repair it and a corrupt one must not
 // take `shulker accounts` down.
-func ReadPrism(dir string, now time.Time) ([]Resolved, error) {
-	path := filepath.Join(dir, PrismFileName)
+func prismAccounts(e *Entry, dir string, now time.Time) ([]account.Resolved, []error) {
+	found, err := readPrismAccounts(e, dir, now)
+	if err != nil {
+		return found, []error{err}
+	}
+	return found, nil
+}
+
+func readPrismAccounts(e *Entry, dir string, now time.Time) ([]account.Resolved, error) {
+	path := filepath.Join(dir, PrismAccountsFile)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -73,9 +83,9 @@ func ReadPrism(dir string, now time.Time) ([]Resolved, error) {
 	if file.FormatVersion != prismVersion {
 		return nil, fmt.Errorf("%s: format version %d, not the %d shulker reads", path, file.FormatVersion, prismVersion)
 	}
-	var out []Resolved
+	var out []account.Resolved
 	for _, entry := range file.Accounts {
-		if r, ok := entry.resolve(now); ok {
+		if r, ok := entry.resolve(e, now); ok {
 			out = append(out, r)
 		}
 	}
@@ -86,31 +96,31 @@ func ReadPrism(dir string, now time.Time) ([]Resolved, error) {
 // with no profile is skipped silently, because the username and the UUID both live there and the
 // file's own username field is most likely the Microsoft email shulker took care never to handle.
 // A type Prism itself refuses to load goes the same way.
-func (p prismAccount) resolve(now time.Time) (Resolved, bool) {
+func (p prismAccount) resolve(e *Entry, now time.Time) (account.Resolved, bool) {
 	if p.Profile == nil || p.Profile.ID == "" || p.Profile.Name == "" {
-		return Resolved{}, false
+		return account.Resolved{}, false
 	}
-	r := Resolved{
+	r := account.Resolved{
 		ID:      p.Profile.ID,
 		Name:    p.Profile.Name,
-		Source:  SourcePrism,
-		Group:   GroupBorrowed,
-		State:   OfflineOnly,
-		Account: Account{Type: Offline, Profile: &Profile{ID: p.Profile.ID, Name: p.Profile.Name}},
+		Source:  e.Name,
+		Group:   account.GroupBorrowed,
+		State:   account.OfflineOnly,
+		Account: account.Account{Type: account.Offline, Profile: &account.Profile{ID: p.Profile.ID, Name: p.Profile.Name}},
 	}
 	switch p.Type {
 	case prismOffline:
 		return r, true
 	case prismMSA:
 	default:
-		return Resolved{}, false
+		return account.Resolved{}, false
 	}
-	r.Account.Type = Microsoft
-	r.State = TokenExpired
+	r.Account.Type = account.Microsoft
+	r.State = account.TokenExpired
 	if p.Ygg == nil || p.Ygg.Token == "" {
 		return r, true
 	}
-	r.Account.Minecraft = &Minecraft{Token: p.Ygg.Token}
+	r.Account.Minecraft = &account.Minecraft{Token: p.Ygg.Token}
 	expires := p.Ygg.expiry()
 	if expires.IsZero() {
 		return r, true
@@ -119,7 +129,7 @@ func (p prismAccount) resolve(now time.Time) (Resolved, bool) {
 	// No margin, unlike an own account's IsFresh: nothing renews this one, so the token is spent
 	// only once it actually runs out and is worth using until then.
 	if expires.After(now) {
-		r.State = Playable
+		r.State = account.Playable
 		return r, true
 	}
 	r.Expired = expires

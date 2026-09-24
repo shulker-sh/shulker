@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,25 @@ const (
 	MultiMCPackFile     = "mmc-pack.json"
 )
 
+// multimcEntry is MultiMC: Prism's layout in its older instance.cfg dialect, portable, so it has no
+// default directory and a link asks for one.
+var multimcEntry = &Entry{
+	Name: "multimc", Title: "MultiMC", IsInstanced: true,
+	Slot: &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
+	Usage: Usage{
+		Short:     "Create a MultiMC instance that syncs the client build before each launch",
+		Noun:      "instance",
+		Dir:       "the MultiMC folder, the one that holds multimc.cfg (required)",
+		DirHint:   "the folder that holds multimc.cfg",
+		NoDefault: "MultiMC is portable, so shulker can't find its folder",
+		Names:     true,
+		Force:     "repoint the modpack an instance already follows",
+	},
+	relink: relinkLauncher, forget: forgetInstance, name: multimcName, gameDirs: multimcGameDirs,
+	readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots,
+	place: placeMultiMC, link: linkMultiMC, after: restartIfUpdated,
+}
+
 type MultiMC struct {
 	Dir string
 }
@@ -30,12 +50,36 @@ type MultiMCInstance struct {
 	LoaderVersion string
 }
 
-func (m *MultiMC) Check() error {
-	info, err := os.Stat(m.Dir)
-	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, m.Dir)
+func multimcName(e *Entry, _, gameDir string) string {
+	cfg, err := readINI(filepath.Join(e.InstanceDir(gameDir), MultiMCInstanceFile), multimcUnescape)
+	if err != nil {
+		return ""
 	}
-	return nil
+	return cfg["name"]
+}
+
+func multimcGameDirs(_ *Entry, launcherDir string) []string {
+	l := &MultiMC{Dir: launcherDir}
+	return gameDirsUnder(l.InstancesDir(), func(dir string) []string {
+		return []string{filepath.Join(dir, "minecraft"), filepath.Join(dir, ".minecraft")}
+	})
+}
+
+func placeMultiMC(_ *Entry, req *Link) (Placement, error) {
+	l := &MultiMC{Dir: req.LauncherDir}
+	dir := filepath.Join(l.InstancesDir(), InstanceKey(req.Name))
+	return Placement{ID: req.ID, Dir: dir, GameDir: multimcGameDirIn(dir)}, nil
+}
+
+func linkMultiMC(_ context.Context, _ *Entry, req *Link, _ Placement) (InstanceResult, error) {
+	l := &MultiMC{Dir: req.LauncherDir}
+	return l.WriteInstance(MultiMCInstance{
+		ID:            InstanceKey(req.Name),
+		Name:          req.Name,
+		Minecraft:     req.Minecraft,
+		LoaderType:    req.LoaderType,
+		LoaderVersion: req.LoaderVersion,
+	})
 }
 
 func (m *MultiMC) InstancesDir() string {
@@ -51,7 +95,7 @@ func (m *MultiMC) InstancesDir() string {
 
 func (m *MultiMC) WriteInstance(inst MultiMCInstance) (InstanceResult, error) {
 	dir := filepath.Join(m.InstancesDir(), inst.ID)
-	res := InstanceResult{Dir: dir}
+	res := InstanceResult{Dir: dir, Key: inst.ID}
 	cfgPath := filepath.Join(dir, MultiMCInstanceFile)
 	if _, err := os.Stat(cfgPath); errors.Is(err, os.ErrNotExist) {
 		res.Created = true

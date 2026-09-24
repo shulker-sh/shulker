@@ -165,7 +165,7 @@ func TestAccountsAddGateTakesAnyAccountWithAJavaProfile(t *testing.T) {
 	borrowed := newHarness(t)
 	prismAccounts(t, borrowed, `{"formatVersion": 3, "accounts": [{"type": "MSA", "ygg": {"token": "stale", "exp": 1600000000},
 	  "profile": {"id": "853c80ef-3c37-49fd-aa49-938b674adae6", "name": "Jeb_"}}]}`)
-	borrowed.mustRun(t, "accounts", "providers", "add", "prism")
+	borrowed.mustRun(t, "accounts", "stores", "add", "prism")
 	borrowed.mustRun(t, "accounts", "add", "Steve")
 }
 

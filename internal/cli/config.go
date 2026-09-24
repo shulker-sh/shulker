@@ -14,16 +14,17 @@ import (
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
 
 const (
-	curseForgeKey     = "curseforge.key"
-	accountsProviders = "accounts.providers"
-	accountsDefault   = "accounts.default"
-	playSaveBackups   = "play.saveBackups"
-	logKeepDays       = "log.keepDays"
+	curseForgeKey   = "curseforge.key"
+	accountsStores  = "accounts.stores"
+	accountsDefault = "accounts.default"
+	playSaveBackups = "play.saveBackups"
+	logKeepDays     = "log.keepDays"
 )
 
 type configChange struct {
@@ -374,8 +375,8 @@ func checkConfigDocument(field *settingField, doc map[string]any, v any) error {
 // typed rather than on the next run that reads it.
 func checkConfigValue(key string, v any) (any, error) {
 	switch key {
-	case accountsProviders:
-		names, err := providerList(v)
+	case accountsStores:
+		names, err := storeList(v)
 		if err != nil {
 			return nil, err
 		}
@@ -440,43 +441,44 @@ func checkPlaySetting(path, name string, v any) error {
 	return nil
 }
 
-// providerList reads accounts.providers out of a JSON value.
-func providerList(v any) ([]string, error) {
+// storeList reads accounts.stores out of a JSON value.
+func storeList(v any) ([]string, error) {
 	items, ok := v.([]any)
 	if !ok {
-		return nil, out.Errorf("usage", "%s takes a JSON array of provider names", accountsProviders)
+		return nil, out.Errorf("usage", "%s takes a JSON array of store names", accountsStores)
 	}
 	names := make([]string, 0, len(items))
 	for _, item := range items {
 		name, ok := item.(string)
 		if !ok {
-			return nil, out.Errorf("usage", "%s takes provider names, not %s", accountsProviders, settingText(item))
+			return nil, out.Errorf("usage", "%s takes store names, not %s", accountsStores, settingText(item))
 		}
 		names = append(names, name)
 	}
-	if err := checkProviders(names); err != nil {
+	if err := checkStores(names); err != nil {
 		return nil, err
 	}
 	return names, nil
 }
 
-// checkProviders refuses a provider list shulker can't act on, wherever it was typed: an empty one
+// checkStores refuses a store list shulker can't act on, wherever it was typed: an empty one
 // leaves no account anywhere, a repeat says nothing the first mention didn't, and a name no
-// launcher answers to is a typo rather than a launcher shulker hasn't reached yet.
-func checkProviders(names []string) error {
+// launcher with a reader answers to is a typo rather than a launcher shulker hasn't reached yet.
+func checkStores(names []string) error {
+	stores := launcher.AccountStores()
 	if len(names) == 0 {
-		e := out.Errorf("usage", "%s can't be empty", accountsProviders)
+		e := out.Errorf("usage", "%s can't be empty", accountsStores)
 		e.Help = "unset it to go back to the default"
-		e.Candidates = account.Providers()
+		e.Candidates = stores
 		return e
 	}
 	for i, name := range names {
 		if slices.Contains(names[:i], name) {
-			return out.Errorf("usage", "%s names %s twice", accountsProviders, name)
+			return out.Errorf("usage", "%s names %s twice", accountsStores, name)
 		}
-		if !slices.Contains(account.Providers(), name) {
+		if !slices.Contains(stores, name) {
 			e := out.Errorf("usage", "shulker can't read accounts from %s", name)
-			e.Candidates, e.Given = account.Providers(), name
+			e.Candidates, e.Given = stores, name
 			return e
 		}
 	}

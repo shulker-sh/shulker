@@ -13,96 +13,93 @@ import (
 	"shulker.sh/shulker/internal/out"
 )
 
-func (a *app) accountsProvidersCmd() *cobra.Command {
+func (a *app) accountsStoresCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:         "providers",
+		Use:         "stores",
 		Annotations: reads(),
 		Short:       "List the launchers shulker reads accounts from",
 		Args:        exactArgs(0),
-		RunE:        func(cmd *cobra.Command, args []string) error { return a.listProviders() },
+		RunE:        func(cmd *cobra.Command, args []string) error { return a.listStores() },
 	}
-	cmd.AddCommand(a.providersAddCmd(), a.providersRemoveCmd(), a.providersSetCmd())
+	cmd.AddCommand(a.storesAddCmd(), a.storesRemoveCmd(), a.storesSetCmd())
 	return cmd
 }
 
-func (a *app) listProviders() error {
-	providers, err := a.providers()
+func (a *app) listStores() error {
+	stores, err := a.stores()
 	if err != nil {
 		return err
 	}
-	return a.printer.Emit(providers, func(l *out.Lines) {
-		items := make([]out.Item, len(providers))
-		for i, p := range providers {
-			items[i] = out.Item{Kind: out.Note, Name: p, Version: launcher.Title(p)}
-			if !account.HasReader(p) {
-				items[i].Text = "no reader yet"
-			}
+	return a.printer.Emit(stores, func(l *out.Lines) {
+		items := make([]out.Item, len(stores))
+		for i, name := range stores {
+			items[i] = out.Item{Kind: out.Note, Name: name, Version: launcher.Title(name)}
 		}
 		l.Items(items...)
 	})
 }
 
-func (a *app) providersAddCmd() *cobra.Command {
+func (a *app) storesAddCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:         "add <launcher>",
 		Annotations: acts(),
 		Short:       "Read accounts from another launcher as well",
 		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, err := a.providers()
+			from, err := a.stores()
 			if err != nil {
 				return err
 			}
 			if slices.Contains(from, args[0]) {
-				return out.Errorf("usage", "%s already reads accounts from %s", accountsProviders, args[0])
+				return out.Errorf("usage", "%s already reads accounts from %s", accountsStores, args[0])
 			}
-			return a.changeProviders(from, append(slices.Clone(from), args[0]))
+			return a.changeStores(from, append(slices.Clone(from), args[0]))
 		},
 	}
 }
 
-func (a *app) providersRemoveCmd() *cobra.Command {
+func (a *app) storesRemoveCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:         "remove <launcher>",
 		Annotations: acts(),
 		Short:       "Stop reading accounts from a launcher",
 		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, err := a.providers()
+			from, err := a.stores()
 			if err != nil {
 				return err
 			}
 			to := slices.DeleteFunc(slices.Clone(from), func(p string) bool { return p == args[0] })
 			if len(to) == len(from) {
-				e := out.Errorf("usage", "%s does not read accounts from %s", accountsProviders, args[0])
+				e := out.Errorf("usage", "%s does not read accounts from %s", accountsStores, args[0])
 				e.Candidates, e.Given = from, args[0]
 				return e
 			}
-			return a.changeProviders(from, to)
+			return a.changeStores(from, to)
 		},
 	}
 }
 
-func (a *app) providersSetCmd() *cobra.Command {
+func (a *app) storesSetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:         "set <launcher...>",
 		Annotations: acts(),
 		Short:       "Replace the list, in the order given",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, err := a.providers()
+			from, err := a.stores()
 			if err != nil {
 				return err
 			}
-			return a.changeProviders(from, args)
+			return a.changeStores(from, args)
 		},
 	}
 }
 
-// changeProviders writes the list and prints it before and after, in the shape `config set` gives
+// changeStores writes the list and prints it before and after, in the shape `config set` gives
 // the same key. A launcher newly in the list is checked for where it keeps its accounts, which is
 // the one moment a player asked about it; the readers themselves stay quiet on every run after.
-func (a *app) changeProviders(from, to []string) error {
-	if err := checkProviders(to); err != nil {
+func (a *app) changeStores(from, to []string) error {
+	if err := checkStores(to); err != nil {
 		return err
 	}
 	path, err := a.configFile()
@@ -113,7 +110,7 @@ func (a *app) changeProviders(from, to []string) error {
 	if err != nil {
 		return err
 	}
-	field, err := configField(accountsProviders)
+	field, err := configField(accountsStores)
 	if err != nil {
 		return err
 	}
@@ -122,26 +119,27 @@ func (a *app) changeProviders(from, to []string) error {
 		return err
 	}
 	a.warnMissingLaunchers(from, to)
-	return a.emitConfigChange(configChange{Path: accountsProviders, From: from, To: to})
+	return a.emitConfigChange(configChange{Path: accountsStores, From: from, To: to})
 }
 
 func (a *app) warnMissingLaunchers(from, to []string) {
-	for _, p := range to {
-		if p == account.SourceShulker || slices.Contains(from, p) {
+	for _, name := range to {
+		e := launcher.Find(name)
+		if e == nil || e.Accounts == nil || slices.Contains(from, name) {
 			continue
 		}
-		dir, err := a.launcherDir(p)
+		dir, err := a.launcherDir(e)
 		if err != nil || dir == "" {
 			continue
 		}
 		if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
-			a.printer.Warn("%s isn't at %s, so there are no accounts to read there yet", launcher.Title(p), dir)
+			a.printer.Warn("%s isn't at %s, so there are no accounts to read there yet", e.Title, dir)
 		}
 	}
 }
 
-// providers is the configured provider list, or the default when config.json doesn't name one.
-func (a *app) providers() ([]string, error) {
+// stores is the configured store list, or the default when config.json doesn't name one.
+func (a *app) stores() ([]string, error) {
 	path, err := a.configFile()
 	if err != nil {
 		return nil, err
@@ -150,27 +148,28 @@ func (a *app) providers() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cfg.Accounts.Providers == nil {
-		return account.DefaultProviders(), nil
+	if cfg.Accounts.Stores == nil {
+		return account.DefaultStores(), nil
 	}
-	return cfg.Accounts.Providers, nil
+	return cfg.Accounts.Stores, nil
 }
 
 // borrowedAccounts is what each configured launcher's reader takes from its own accounts file. A
 // file that doesn't read warns and is skipped: shulker neither wrote it nor can repair it, so a
 // corrupt one must not take the whole account list down with it.
-func (a *app) borrowedAccounts(providers []string) (map[string][]account.Resolved, error) {
+func (a *app) borrowedAccounts(stores []string) (map[string][]account.Resolved, error) {
 	var borrowed map[string][]account.Resolved
 	now := time.Now()
-	for _, p := range providers {
-		if p == account.SourceShulker || !account.HasReader(p) {
+	for _, name := range stores {
+		e := launcher.Find(name)
+		if e == nil || e.Accounts == nil {
 			continue
 		}
-		dir, err := a.launcherDir(p)
+		dir, err := a.launcherDir(e)
 		if err != nil {
 			return nil, err
 		}
-		found, errs := account.Read(p, dir, now)
+		found, errs := e.ReadAccounts(dir, now)
 		for _, err := range errs {
 			a.printer.Warn("%s", err)
 		}
@@ -180,7 +179,7 @@ func (a *app) borrowedAccounts(providers []string) (map[string][]account.Resolve
 		if borrowed == nil {
 			borrowed = map[string][]account.Resolved{}
 		}
-		borrowed[p] = found
+		borrowed[name] = found
 	}
 	return borrowed, nil
 }
@@ -188,18 +187,17 @@ func (a *app) borrowedAccounts(providers []string) (map[string][]account.Resolve
 // launcherDir is where a launcher keeps its own files: the directory a registered instance was
 // linked against, since the player named it with `link --launcher-dir` and re-deriving would read
 // a folder they don't use, and the launcher's default on this machine otherwise.
-func (a *app) launcherDir(name string) (string, error) {
+func (a *app) launcherDir(e *launcher.Entry) (string, error) {
 	instances, err := a.loadInstances()
 	if err != nil {
 		return "", err
 	}
 	for _, in := range instances {
-		if in.Launcher == name && in.LauncherDir != "" {
+		if in.Launcher == e.Name && in.LauncherDir != "" {
 			return in.LauncherDir, nil
 		}
 	}
-	e := launcher.Find(name)
-	if e == nil || e.DefaultDir == nil {
+	if e.DefaultDir == nil {
 		return "", nil
 	}
 	// A default that can't be worked out on this machine is no directory at all, the way

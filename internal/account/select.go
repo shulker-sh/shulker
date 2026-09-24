@@ -67,7 +67,7 @@ func rank(a Resolved, name string) int {
 	if name == "" {
 		return noMatch
 	}
-	id := normalizeID(name)
+	id := NormalizeID(name)
 	switch {
 	case SameID(a.ID, name):
 		return byID
@@ -79,7 +79,7 @@ func rank(a Resolved, name string) int {
 		return byPrefix
 	case strings.HasPrefix(strings.ToLower(a.Name), strings.ToLower(name)):
 		return byPrefixFolded
-	case id != "" && strings.HasPrefix(normalizeID(a.ID), id):
+	case id != "" && strings.HasPrefix(NormalizeID(a.ID), id):
 		return byIDPrefix
 	}
 	return noMatch
@@ -95,11 +95,12 @@ func split(query string) (name, source string) {
 }
 
 // normalizeID reads an id the way it is typed: a UUID dashed or not, in either case.
-func normalizeID(s string) string {
+// NormalizeID reads an id the way it was typed, dashed or not, in either case.
+func NormalizeID(s string) string {
 	return strings.ToLower(strings.ReplaceAll(s, "-", ""))
 }
 
 // SameID reports whether two ids name one account, reading each the way it was typed.
 func SameID(a, b string) bool {
-	return a != "" && normalizeID(a) == normalizeID(b)
+	return a != "" && NormalizeID(a) == NormalizeID(b)
 }

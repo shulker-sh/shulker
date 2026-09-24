@@ -59,9 +59,9 @@ outline: [2, 3]
 | [`shulker accounts remove <name>`](#shulker-accounts-remove) | Delete an offline account |
 | [`shulker accounts refresh [name...]`](#shulker-accounts-refresh) | Renew the accounts shulker signed in |
 | [`shulker accounts use <name>`](#shulker-accounts-use) | Switch the default account |
-| [`shulker accounts providers`](#shulker-accounts-providers) | List the launchers shulker reads accounts from |
-| [`shulker accounts providers add\|remove <launcher>`](#shulker-accounts-providers-add-remove) | Read accounts from another launcher, or stop |
-| [`shulker accounts providers set <launcher...>`](#shulker-accounts-providers-set) | Replace the list, in the order given |
+| [`shulker accounts stores`](#shulker-accounts-stores) | List the launchers shulker reads accounts from |
+| [`shulker accounts stores add\|remove <launcher>`](#shulker-accounts-stores-add-remove) | Read accounts from another launcher, or stop |
+| [`shulker accounts stores set <launcher...>`](#shulker-accounts-stores-set) | Replace the list, in the order given |
 | [`shulker import <modpack>`](#shulker-import) | Create a project from a modpack file, URL, slug or shulker source |
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
@@ -496,7 +496,7 @@ shulker get --locked loader.type
 
 | Key | Description |
 | --- | --- |
-| `accounts.providers` | Where accounts are read from, in order, as a JSON array of `shulker`, `prism` or `mojang`. Without it, `["shulker"]`. An account in several providers is counted once, and the earliest one wins |
+| `accounts.stores` | Where accounts are read from, in order, as a JSON array of `shulker`, `prism` or `mojang`. Without it, `["shulker"]`. An account in several stores is counted once, and the earliest one wins |
 | `accounts.default` | The id of the account a launch uses when nothing else names one. [`shulker accounts use`](#shulker-accounts-use) sets it |
 | `play.memory` | The heap size [`shulker play`](#shulker-play) gives the game, like `6G`. An instance's own `memory` wins over it, as each `play.` key's instance setting does; see [`shulker instance`](#shulker-instance). Without either, the JVM picks its own |
 | `play.jvmArgs` | Extra JVM arguments for those launches, as a JSON array |
@@ -515,7 +515,7 @@ The CurseForge key is always shown as its last four characters, like `•••�
 
 ### `shulker config get`
 
-Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set, and `accounts.providers`, `play.saveBackups` and `log.keepDays` show their defaults the same way. A `curseforge.key` that isn't set fails with `path-not-set`.
+Print a key: a string as it is, anything else as JSON. With no key, print all of `config.json`. `registry`, `instances`, `saves` and `store` show the path shulker actually uses, even when the key isn't set, and `accounts.stores`, `play.saveBackups` and `log.keepDays` show their defaults the same way. A `curseforge.key` that isn't set fails with `path-not-set`.
 
 ```sh
 shulker config get
@@ -534,10 +534,10 @@ Set a key. When `registry` points at a file that doesn't exist, `set` creates it
 ```sh
 shulker config set curseforge.key "$CURSEFORGE_KEY"
 shulker config set registry ~/Dropbox/shulker/registry.json
-shulker config set accounts.providers --literal '["shulker","prism"]'
+shulker config set accounts.stores --literal '["shulker","prism"]'
 ```
 
-A key that holds a list needs `--literal`, which reads the value as JSON. `accounts.providers` is checked as it is set: it must be a non-empty array of known provider names with no repeats, so a typo fails here rather than on the next run. The `play.` keys are checked the same way, against the rules of the instance setting of the same name. Every value is checked against `config.json`'s schema before anything is written, so a `--literal` of the wrong type fails with `usage`, and `accounts.default` must be the id of an account shulker can see, or it fails with `account-not-found`.
+A key that holds a list needs `--literal`, which reads the value as JSON. `accounts.stores` is checked as it is set: it must be a non-empty array of launchers shulker reads accounts from, with no repeats, so a typo fails here rather than on the next run. The `play.` keys are checked the same way, against the rules of the instance setting of the same name. Every value is checked against `config.json`'s schema before anything is written, so a `--literal` of the wrong type fails with `usage`, and `accounts.default` must be the id of an account shulker can see, or it fails with `account-not-found`.
 
 `set` is the one command that tolerates a `config.json` it can't read, one that fails `config-invalid` or `schema-newer` everywhere else: it renames that file to `config.json.replaced`, warns naming why it couldn't be read, and writes a config holding only the key being set. Only the latest replaced config is kept.
 
@@ -742,7 +742,7 @@ shulker accounts
 
 The states are `playable`, `not playable (no Java profile)`, `sign-in expired`, `token expired <ago>` for a borrowed account whose launcher has not renewed it, and `offline`.
 
-Which accounts are read comes from `accounts.providers`. A provider shulker has no reader for yet warns and contributes nothing. With `--json`, each row is `{ "id", "name", "source", "group", "state", "default" }`.
+Which accounts are read comes from `accounts.stores`. With `--json`, each row is `{ "id", "name", "source", "group", "state", "default" }`.
 
 ### `shulker accounts login`
 
@@ -850,39 +850,39 @@ shulker accounts use 069a79f4-44e9-4726-a5be-fca90e38aaf5
 
 An account is named by its username or its id, dashed or not, or by the start of either, and `name@source` narrows it to one source: `shulker`, `offline`, `prism` or `mojang`. A name may hold spaces, because an account with no Java profile is named by its Xbox gamertag, so quote it. When several accounts match, shulker takes the closest and warns which one it chose: the full id, then the full name with its case, then without it, then the start of a name with its case, then without it, then a shorter name before a longer one. So with offline accounts `Steve` and `steve`, `ste` picks `steve` and `Ste` picks `Steve`. The start of an id counts only when no name starts that way, and only when it starts one id. When the input can't tell accounts apart, because they share the very same name or their ids share the prefix typed, shulker asks which one on a terminal, and fails with `ambiguous-account` anywhere else, listing each with its qualifier and its id. An account that owns no Java profile can't launch anything, so it is refused with `account-not-playable`.
 
-### `shulker accounts providers`
+### `shulker accounts stores`
 
-List the launchers shulker reads accounts from, in the order it reads them. The list is `accounts.providers` in `config.json`; without it, shulker reads only its own accounts.
+List the launchers shulker reads accounts from, in the order it reads them. The list is `accounts.stores` in `config.json`; without it, shulker reads only its own accounts. Each store is shulker itself or a launcher shulker has a reader for.
 
 ```sh
-shulker accounts providers
+shulker accounts stores
 ```
 
-The order is what settles a Microsoft account signed in to more than one launcher: it is listed once, from the earliest provider that has it. A provider shulker has no reader for yet is shown as such, and contributes nothing. With `--json`, the list comes back as an array of names.
+The order is what settles a Microsoft account signed in to more than one launcher: it is listed once, from the earliest store that has it. With `--json`, the list comes back as an array of names.
 
 Where a launcher's accounts are read is the directory a registered instance of it was linked against — the one named with [`shulker link prism --launcher-dir`](#shulker-link-prism) — and the launcher's usual directory on this machine otherwise. Prism's accounts come from `accounts.json` there, Microsoft and offline accounts alike. The Minecraft Launcher's come from both `launcher_accounts.json` and `launcher_accounts_microsoft_store.json` in [its own directory](#shulker-link-mojang), because that suffix is per file rather than per install; an account in both is listed once, with the session that lasts longer. Shulker opens neither the entitlements file beside them nor the launcher's stored credentials: an account's Java profile is its own proof that it owns the game, and an account with no profile isn't listed at all, since its username and UUID both live there. Shulker never renews a borrowed account and never writes to another launcher's files: a borrowed session token that has run out is shown as `token expired <ago>`, still plays, and warns at launch that online servers and Realms will reject it until that launcher renews it. A file shulker can't read warns, naming itself, and is skipped, so a corrupt one can't take the account list down — the other accounts file in the same directory still loads.
 
-### `shulker accounts providers add|remove`
+### `shulker accounts stores add|remove`
 
 Add a launcher to the list, or take one out.
 
 ```sh
-shulker accounts providers add prism
-shulker accounts providers remove shulker
+shulker accounts stores add prism
+shulker accounts stores remove shulker
 ```
 
-Both print the list before and after. A launcher shulker has no name for, one already in the list, one that isn't in it, and a change that would leave the list empty are all usage errors — unset `accounts.providers` to go back to the default instead of emptying it. Adding a launcher that isn't installed warns once, naming the directory that was checked; it is not an error, and nothing says it again afterwards.
+Both print the list before and after. A launcher shulker can't read accounts from, one already in the list, one that isn't in it, and a change that would leave the list empty are all usage errors — unset `accounts.stores` to go back to the default instead of emptying it. Adding a launcher that isn't installed warns once, naming the directory that was checked; it is not an error, and nothing says it again afterwards.
 
-### `shulker accounts providers set`
+### `shulker accounts stores set`
 
 Replace the whole list, in the order given.
 
 ```sh
-shulker accounts providers set shulker prism
-shulker accounts providers set prism
+shulker accounts stores set shulker prism
+shulker accounts stores set prism
 ```
 
-The same checks apply, and a launcher new to the list warns about a missing directory the way `add` does. The generic path is `shulker config set accounts.providers --literal '["shulker","prism"]'`, which checks the value the same way.
+The same checks apply, and a launcher new to the list warns about a missing directory the way `add` does. The generic path is `shulker config set accounts.stores --literal '["shulker","prism"]'`, which checks the value the same way.
 
 ## Running
 
@@ -962,7 +962,7 @@ shulker serve server --accept-eula
 
 ### `shulker link`
 
-Point a launcher at a pack. Name the launcher as a subcommand below. At a terminal, a bare `shulker link` asks `Which launcher?` over the Minecraft Launcher, Prism Launcher, MultiMC, ATLauncher and GDLauncher, then carries on exactly as naming that launcher would. Under [`--no-input`](#global-flags), and so off a terminal or with `--json`, it prints this group's help instead.
+Point a launcher at a pack. Name the launcher as a subcommand below. At a terminal, a bare `shulker link` asks `Which launcher?` over every launcher below, Shulker included, then carries on exactly as naming that launcher would. Under [`--no-input`](#global-flags), and so off a terminal or with `--json`, it prints this group's help instead.
 
 ```sh
 shulker link
@@ -979,6 +979,8 @@ With no source, it links the project in the current directory. Pass a project di
 The instance's nickname names both the folder under the instances root and the id `-i` takes, so the two can never drift. Without `--as` it comes from the pack's name. `link` never writes over a `shulker.json` that is already in the instance directory: it adopts that project, clears the unlinked mark, re-registers it and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If an instance of that name already follows a different modpack, `link` fails rather than repointing it: pass `--as` to name a second instance, or `--force` to repoint the modpack it follows.
 
 Move the instances root with `shulker config set instances <path>`; `shulker config get instances` prints where it is now.
+
+`--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <instance folder>`, or run `link` again with new flags.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`, the same way the other `link` commands do.
 
@@ -1001,6 +1003,8 @@ shulker link shulker https://example.com/pack/shulker.json --as smp
 | `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
 | `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
 | `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--with <feature>` | Turn a feature on for this instance; repeat for more |
+| `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
 ### `shulker link atlauncher`
 
@@ -1090,6 +1094,8 @@ Install the project's loader, if it has one, into the official launcher and add 
 
 With no source, it links the project in the current directory. Pass a project directory, git URL, or manifest URL to link that instead. Either way the game directory is `shulker/<slug>` inside the launcher directory, and what lands there is a project of its own: a `shulker.json` that follows the source as a modpack and builds where it stands. It takes its platform, its features and its override layers from the pack at every sync, so `shulker add` in the game directory puts a mod on top of the pack and keeps it. shulker builds it before `link` returns, so it's ready to play. The official launcher runs no commands of its own, so shulker points the profile's Java at a small shim of its own that syncs the instance before each launch and then starts the game. That shim lives in the instance's own `.shulker` folder: a shell script on macOS and Linux, and on Windows a small executable shulker generates there, beside a file holding the two paths it needs.
 
+`--with` and `--without` are saved in the instance's own `shulker.local.json`. Change them later with `shulker feature on|off --into <game dir>`, or run `link` again with new flags.
+
 `link` never writes over a `shulker.json` that is already in the game directory: it adopts that project, clears the unlinked mark, rewrites the launcher's own files and builds it where it stands, so relinking an instance you unlinked picks it back up with everything you added on top of the pack. If the profile already follows a different modpack, `link` fails rather than repointing it. Use `--name` to create a second profile, or `--force` to repoint this one: `--force` repoints the modpack the instance follows and leaves everything you added on top of it where it is.
 
 `--no-hooks`, `--no-pre-launch`, `--no-post-exit`, `--no-marker`, `--with-marker`, `--java` and `--wrapper` seed the instance's own `settings` block in `.shulker/instance.json`. The manifest's `client.hooks` are the defaults, a flag overrides one for this link, and from then on the file decides: no sync writes over it. The marker is not seeded: `settings.marker` is written only by `--no-marker` or `--with-marker`, and while it is absent every build reads the manifest's `marker`. Change your mind later by editing the file and running `shulker instances repair`.
@@ -1117,6 +1123,8 @@ shulker link mojang https://example.com/pack/shulker.json --name "Friends SMP"
 | `--with-marker` | Include the marker mod in this instance's builds, over a manifest that leaves it out |
 | `--java <path>` | Absolute path to the Java this machine launches the instance with (default: shulker's managed runtime) |
 | `--wrapper <cmd>` | Command prefix for the launch command, such as `gamemoderun`; split on whitespace |
+| `--with <feature>` | Turn a feature on for this instance; repeat for more |
+| `--without <feature>` | Turn a feature off for this instance; repeat for more |
 
 ### `shulker link prism`
 

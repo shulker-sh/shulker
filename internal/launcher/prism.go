@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,24 @@ const (
 	PrismInstanceFile = "instance.cfg"
 	PrismPackFile     = "mmc-pack.json"
 )
+
+// prismEntry is Prism Launcher: an instance folder shulker-<slug> under its instances directory,
+// whose minecraft/ is the game directory, with the loader installed from mmc-pack.json.
+var prismEntry = &Entry{
+	Name: "prism", Title: "Prism Launcher", IsInstanced: true, DefaultDir: DefaultPrismDir,
+	Slot: &Slot{Token: "$INST_MC_DIR", Tokens: instTokens},
+	Usage: Usage{
+		Short: "Create a Prism Launcher instance that syncs the client build before each launch",
+		Noun:  "instance",
+		Dir:   "launcher data directory (default: Prism Launcher's)",
+		Names: true,
+		Force: "repoint the modpack an instance already follows",
+	},
+	Accounts: prismAccounts,
+	relink:   relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
+	readSlots: readPrismSlots, writeSlots: writePrismSlots,
+	place: placePrism, link: linkPrism, after: restartIfUpdated,
+}
 
 type Prism struct {
 	Dir string
@@ -57,12 +76,45 @@ func DefaultPrismDir() (string, error) {
 	}
 }
 
-func (p *Prism) Check() error {
-	info, err := os.Stat(p.Dir)
-	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, p.Dir)
+func prismName(e *Entry, _, gameDir string) string {
+	cfg, err := readINI(filepath.Join(e.InstanceDir(gameDir), PrismInstanceFile), prismUnescape)
+	if err != nil {
+		return ""
 	}
-	return nil
+	return cfg["name"]
+}
+
+func prismGameDirs(_ *Entry, launcherDir string) []string {
+	l := &Prism{Dir: launcherDir}
+	return gameDirsUnder(l.InstancesDir(), func(dir string) []string {
+		return []string{filepath.Join(dir, "minecraft"), filepath.Join(dir, ".minecraft")}
+	})
+}
+
+func placePrism(_ *Entry, req *Link) (Placement, error) {
+	l := &Prism{Dir: req.LauncherDir}
+	dir := filepath.Join(l.InstancesDir(), InstanceKey(req.Name))
+	return Placement{ID: req.ID, Dir: dir, GameDir: prismGameDirIn(dir)}, nil
+}
+
+func linkPrism(_ context.Context, _ *Entry, req *Link, _ Placement) (InstanceResult, error) {
+	l := &Prism{Dir: req.LauncherDir}
+	return l.WriteInstance(PrismInstance{
+		ID:            InstanceKey(req.Name),
+		Name:          req.Name,
+		Minecraft:     req.Minecraft,
+		LoaderType:    req.LoaderType,
+		LoaderVersion: req.LoaderVersion,
+	})
+}
+
+// restartIfUpdated reminds the player that a launcher reads an instance it already showed only when
+// it starts.
+func restartIfUpdated(e *Entry, res InstanceResult) string {
+	if res.Created {
+		return ""
+	}
+	return "restart " + e.Title + " if it is open so the change is picked up"
 }
 
 func (p *Prism) InstancesDir() string {
@@ -78,7 +130,7 @@ func (p *Prism) InstancesDir() string {
 
 func (p *Prism) WriteInstance(inst PrismInstance) (InstanceResult, error) {
 	dir := filepath.Join(p.InstancesDir(), inst.ID)
-	res := InstanceResult{Dir: dir}
+	res := InstanceResult{Dir: dir, Key: inst.ID}
 	cfgPath := filepath.Join(dir, PrismInstanceFile)
 	if _, err := os.Stat(cfgPath); errors.Is(err, os.ErrNotExist) {
 		res.Created = true

@@ -2,12 +2,13 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -15,25 +16,50 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
+// linkReport is what every link reports: the launcher and where it keeps the instance, the
+// instance's id and name, what it follows, and the build that left it ready to play.
 type linkReport struct {
 	Launcher    string      `json:"launcher"`
-	LauncherDir string      `json:"launcherDir"`
-	Profile     string      `json:"profile"`
+	LauncherDir string      `json:"launcherDir,omitempty"`
+	ID          string      `json:"id"`
+	Instance    string      `json:"instance"`
+	InstanceDir string      `json:"instanceDir"`
 	Name        string      `json:"name"`
-	VersionID   string      `json:"versionId"`
+	VersionID   string      `json:"versionId,omitempty"`
 	GameDir     string      `json:"gameDir"`
+	Command     string      `json:"command,omitempty"`
+	Created     bool        `json:"created"`
 	Source      string      `json:"source"`
 	Ref         string      `json:"ref,omitempty"`
 	Path        string      `json:"path,omitempty"`
 	Modpack     string      `json:"modpack"`
 	Sync        *syncResult `json:"sync"`
+	noun        string
+	shown       string
+	versionDir  string
+	rows        []out.Row
+}
+
+func (r *linkReport) print(l *out.Lines) {
+	if r.VersionID != "" {
+		l.OKInto("installed "+r.VersionID, r.versionDir, "")
+	}
+	verb := "created"
+	if !r.Created {
+		verb = "updated"
+	}
+	l.OKInto(verb+" "+r.noun+" "+r.shown, r.InstanceDir, "")
+	l.Tree(r.rows...)
+	r.Sync.print(l)
 }
 
 func (a *app) linkCmd() *cobra.Command {
@@ -52,140 +78,358 @@ func (a *app) linkCmd() *cobra.Command {
 			return a.linkAsked(cmd)
 		},
 	}
-	cmd.AddCommand(a.linkShulkerCmd(), a.linkMojangCmd(), a.linkPrismCmd(), a.linkMultiMCCmd(), a.linkATLauncherCmd(), a.linkGDLauncherCmd())
+	for _, e := range launcher.All {
+		cmd.AddCommand(a.launcherLinkCmd(e))
+	}
 	return cmd
 }
 
-func (a *app) linkMojangCmd() *cobra.Command {
-	var launcherDir, instanceName, as string
-	var at pack.At
-	var force bool
-	var ls linkSettings
+// launcherLink is the flags a link takes, the same for every launcher but for the ones its usage
+// block leaves out.
+type launcherLink struct {
+	launcherDir, instanceName, as string
+	at                            pack.At
+	force                         bool
+	ff                            featureFlags
+	ls                            linkSettings
+}
+
+func (k *launcherLink) register(cmd *cobra.Command, e *launcher.Entry) {
+	if e.HasDir() {
+		cmd.Flags().StringVar(&k.launcherDir, "launcher-dir", "", e.Usage.Dir)
+	}
+	if e.Usage.Names {
+		cmd.Flags().StringVar(&k.instanceName, "name", "", e.Usage.Noun+" name (default: the side's display name)")
+	}
+	as := e.Usage.As
+	if as == "" {
+		as = "id for this instance, for -i (default: from its name)"
+	}
+	cmd.Flags().StringVar(&k.as, "as", "", as)
+	cmd.Flags().StringVar(&k.at.Ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&k.at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
+	cmd.Flags().BoolVar(&k.force, "force", false, e.Usage.Force)
+	k.ff.register(cmd, "for this instance")
+	k.ls.register(cmd)
+}
+
+func (k *launcherLink) hasFeatures() bool { return len(k.ff.with)+len(k.ff.without) > 0 }
+
+func (k *launcherLink) display(p *project.Project) string {
+	if k.instanceName != "" {
+		return k.instanceName
+	}
+	return p.Manifest.DisplayName("client")
+}
+
+// launcherLinkCmd is `link <launcher>` for one entry: the shared flags and flow around the
+// launcher's own placement and link step.
+func (a *app) launcherLinkCmd(e *launcher.Entry) *cobra.Command {
+	var k launcherLink
 	cmd := &cobra.Command{
-		Use:         "mojang [project-dir | git-url | manifest-url]",
+		Use:         e.Name + " [project-dir | git-url | manifest-url]",
 		Annotations: acts(),
-		Aliases:     []string{"vanilla"},
-		Short:       "Add a profile for the client build to the official launcher, installing its loader if it has one",
+		Aliases:     e.Usage.Aliases,
+		Short:       e.Usage.Short,
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, l, err := a.openLinkSource(cmd, args, at, ls)
+			rep, err := a.linkInto(cmd, args, e, &k)
 			if err != nil {
 				return err
 			}
-			p := src.project
-			if launcherDir == "" {
-				if launcherDir, err = launcher.DefaultMojangDir(); err != nil {
-					return err
-				}
-			}
-			if launcherDir, err = filepath.Abs(launcherDir); err != nil {
-				return err
-			}
-			v := &launcher.Mojang{Dir: launcherDir}
-			if err := v.Check(); errors.Is(err, launcher.ErrNotFound) {
-				e := out.Errorf("launcher-not-found", "no Minecraft launcher directory at %s", launcherDir)
-				e.Help = "run the launcher once or pass --launcher-dir"
-				return e
-			} else if err != nil {
-				return err
-			}
-			display := p.Manifest.DisplayName("client")
-			if instanceName != "" {
-				display = instanceName
-			}
-			key := instanceKey(display)
-			gameDir, err := filepath.Abs(filepath.Join(launcherDir, "shulker", strings.TrimPrefix(key, "shulker-")))
-			if err != nil {
-				return err
-			}
-			if err := checkAdopt(gameDir, src, "profile", display, "--name", force); err != nil {
-				return err
-			}
-			if err := a.checkID(as, gameDir); err != nil {
-				return err
-			}
-			versionID := p.Lock.Minecraft
-			switch {
-			case p.Lock.Loader.Type == "":
-			case l.InstallClientFlag != "":
-				if versionID, err = a.installClientLoader(cmd.Context(), p, v, l); err != nil {
-					return err
-				}
-			default:
-				d, err := a.deps()
-				if err != nil {
-					return err
-				}
-				a.progress("fetching %s loader %s for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
-				profile, err := d.meta.LoaderProfile(cmd.Context(), p.Lock.Loader, p.Lock.Minecraft)
-				if err != nil {
-					return err
-				}
-				if versionID, err = v.InstallVersion(profile); err != nil {
-					return err
-				}
-			}
-			id, err := a.linkID(as, display, gameDir)
-			if err != nil {
-				return err
-			}
-			inst, linked, err := a.linkProject(gameDir, id, display, src)
-			if err != nil {
-				return err
-			}
-			if err := v.WriteProfile(launcher.Profile{Key: key, Name: display, VersionID: versionID, GameDir: gameDir}); err != nil {
-				return err
-			}
-			if err := ls.save(gameDir, src.name, src.At, "client", false, p.Manifest); err != nil {
-				return err
-			}
-			row := config.Instance{ID: id, Launcher: "mojang", LauncherDir: launcherDir, Name: display, Dir: gameDir, Source: src.name}
-			a.registerInstance(row)
-			synced, err := a.syncInPlace(cmd, inst, "client", syncRequest{linked: linked})
-			if err != nil {
-				return err
-			}
-			// The shim records the Java it falls back to, which the build just resolved.
-			a.reconcileOrWarn(row)
-			rep := linkReport{
-				Launcher:    "mojang",
-				LauncherDir: launcherDir,
-				Profile:     key,
-				Name:        display,
-				VersionID:   versionID,
-				GameDir:     gameDir,
-				Source:      src.name,
-				Ref:         src.Ref,
-				Path:        src.Path,
-				Modpack:     modpackKey(inst.Manifest, src.name),
-				Sync:        &synced,
-			}
-			return a.printer.Emit(rep, func(l *out.Lines) {
-				if p.Lock.Loader.Type != "" {
-					l.OKInto("installed "+versionID, filepath.Join(launcherDir, "versions"), "")
-				}
-				l.OKInto("linked launcher profile "+display, gameDir, "")
-				l.Tree(follows(rep.Modpack, rep.Source, rep.Path)...)
-				synced.print(l)
-			})
+			return a.printer.Emit(rep, rep.print)
 		},
 	}
-	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "launcher directory (default: the official launcher's .minecraft folder)")
-	cmd.Flags().StringVar(&instanceName, "name", "", "profile name (default: the side's display name)")
-	cmd.Flags().StringVar(&as, "as", "", "id for this instance, for -i (default: from its name)")
-	cmd.Flags().StringVar(&at.Ref, "ref", "", "branch, tag, or commit to follow from a git source (default: the remote HEAD)")
-	cmd.Flags().StringVar(&at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
-	cmd.Flags().BoolVar(&force, "force", false, "repoint the modpack a profile already follows")
-	ls.register(cmd)
+	k.register(cmd, e)
 	return cmd
+}
+
+// linkInto links the source into one launcher: the launcher's own placement, checks and link step
+// around the project, registry row and build every link shares.
+func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *launcherLink) (*linkReport, error) {
+	if e.HasDir() && e.DefaultDir == nil && k.launcherDir == "" {
+		if err := k.ls.check(); err != nil {
+			return nil, err
+		}
+		dir, err := a.askLauncherDir(e)
+		if err != nil {
+			return nil, err
+		}
+		k.launcherDir = dir
+	}
+	src, l, err := a.startLauncherLink(cmd, args, k, e)
+	if err != nil {
+		return nil, err
+	}
+	p := src.project
+	dir := k.launcherDir
+	if e.HasDir() {
+		if dir, err = e.Locate(dir); err != nil {
+			return nil, err
+		}
+	}
+	d, err := a.deps()
+	if err != nil {
+		return nil, err
+	}
+	instances, err := a.loadInstances()
+	if err != nil {
+		return nil, err
+	}
+	display := k.display(p)
+	req := &launcher.Link{
+		LauncherDir:   dir,
+		Name:          display,
+		ID:            k.as,
+		Minecraft:     p.Lock.Minecraft,
+		LoaderType:    p.Lock.Loader.Type,
+		LoaderVersion: p.Lock.Loader.Version,
+		Force:         k.force,
+		Registry:      instances,
+		Cache:         d.cache,
+		Fetch:         d.fetch,
+		MetaURL:       a.metaURL(d, e),
+		Versions:      clientVersions{a: a, p: p, l: l},
+		Log:           a.progress,
+		Warn:          a.printer.Warn,
+	}
+	place, err := e.Place(req)
+	if err != nil {
+		return nil, err
+	}
+	second := "--name"
+	if !e.Usage.Names {
+		second = "--as"
+	}
+	if err := checkAdopt(place.GameDir, src, e.Usage.Noun, display, second, k.force); err != nil {
+		return nil, err
+	}
+	if err := a.checkID(k.as, place.GameDir); err != nil {
+		return nil, err
+	}
+	if err := a.refuseForeignInstance(k, e, dir, place.GameDir, display); err != nil {
+		return nil, err
+	}
+	res, err := e.Link(cmd.Context(), req, place)
+	if err != nil {
+		return nil, err
+	}
+	if k.hasFeatures() {
+		if err := a.saveInstanceFeatures(res.GameDir, k.ff); err != nil {
+			return nil, err
+		}
+	}
+	row := config.Instance{Launcher: e.Name, Name: display, Dir: res.GameDir, Source: src.name}
+	if e.HasDir() {
+		row.LauncherDir = dir
+	}
+	inst, synced, err := a.linkInstance(cmd, row, place.ID, src, k.ls)
+	if err != nil {
+		return nil, err
+	}
+	if e.Slot != nil && e.Slot.UsesShim {
+		// The shim records the Java it falls back to, which the build just resolved.
+		row.ID = inst.Manifest.Name
+		a.reconcileOrWarn(row)
+	}
+	rep := &linkReport{
+		Launcher:    e.Name,
+		LauncherDir: row.LauncherDir,
+		ID:          inst.Manifest.Name,
+		Instance:    res.Key,
+		InstanceDir: res.Dir,
+		Name:        display,
+		VersionID:   res.Version,
+		GameDir:     res.GameDir,
+		Created:     res.Created,
+		Source:      src.name,
+		Ref:         src.Ref,
+		Path:        src.Path,
+		Modpack:     modpackKey(inst.Manifest, src.name),
+		Sync:        &synced,
+		noun:        e.Usage.Noun,
+		shown:       display,
+		versionDir:  res.VersionDir,
+	}
+	// A launcher that shows no name of its own is addressed by the id, so that is what the line
+	// names.
+	if !e.Usage.Names {
+		rep.shown = rep.ID
+	}
+	rep.rows = follows(rep.Modpack, rep.Source, rep.Path)
+	if e.Slot != nil {
+		rep.Command = launcher.SlotCommand(e.Name, res.GameDir, launcher.HookPreLaunch)
+		rep.rows = append(rep.rows, out.Row{Text: "the launcher syncs this instance before each launch"})
+	}
+	if k.hasFeatures() {
+		rep.rows = append(rep.rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
+	}
+	if note := e.AfterNote(res); note != "" {
+		rep.rows = append(rep.rows, out.Row{Text: note})
+	}
+	return rep, nil
+}
+
+// metaURL is where a link reads a launcher's own metadata: the entry's service, unless the run
+// points that launcher at a fake.
+func (a *app) metaURL(d *deps, e *launcher.Entry) string {
+	if url, ok := d.launcherMeta[e.Name]; ok {
+		return url
+	}
+	return e.MetaURL
+}
+
+// openLinkSource is what every link does first: check the settings, fetch the source, refuse a loader
+// this build doesn't know, and warn when the pack declares no client.
+func (a *app) openLinkSource(cmd *cobra.Command, args []string, at pack.At, ls linkSettings) (*syncSource, loader.Loader, error) {
+	if err := ls.check(); err != nil {
+		return nil, loader.Loader{}, err
+	}
+	src, err := a.linkFrom(cmd, args, at)
+	if err != nil {
+		return nil, loader.Loader{}, err
+	}
+	p := src.project
+	var l loader.Loader
+	if p.Lock.Loader.Type != "" {
+		if l, err = loader.Require(p.Lock.Loader.Type); err != nil {
+			return nil, loader.Loader{}, err
+		}
+	}
+	if !p.Manifest.HasSide("client") {
+		a.printer.Warn("%s", noClientPack)
+	}
+	return src, l, nil
+}
+
+// startLauncherLink is openLinkSource plus the feature choices checked against the build, and
+// --launcher-dir made absolute, filled from the launcher's default when it is empty. A launcher with
+// no directory of its own works in shulker's instances root.
+func (a *app) startLauncherLink(cmd *cobra.Command, args []string, k *launcherLink, e *launcher.Entry) (*syncSource, loader.Loader, error) {
+	src, l, err := a.openLinkSource(cmd, args, k.at, k.ls)
+	if err != nil {
+		return nil, l, err
+	}
+	if k.hasFeatures() {
+		b, err := a.builder(cmd.Context(), src.project)
+		if err != nil {
+			return nil, l, err
+		}
+		if err := k.ff.check(b); err != nil {
+			return nil, l, err
+		}
+	}
+	switch {
+	case !e.HasDir():
+		r, err := a.roots()
+		if err != nil {
+			return nil, l, err
+		}
+		k.launcherDir = r.Instances
+	case k.launcherDir == "":
+		if k.launcherDir, err = e.DefaultDir(); err != nil {
+			return nil, l, err
+		}
+	}
+	if k.launcherDir, err = filepath.Abs(k.launcherDir); err != nil {
+		return nil, l, err
+	}
+	return src, l, nil
+}
+
+// askLauncherDir asks where a launcher with no default directory is, and off a terminal requires
+// the flag.
+func (a *app) askLauncherDir(e *launcher.Entry) (string, error) {
+	required := out.Errorf("launcher-dir-required", "%s", e.Usage.NoDefault)
+	required.Help = "pass --launcher-dir with " + e.Usage.DirHint
+	if !a.canPick() {
+		return "", required
+	}
+	dir, err := a.askText("Where is "+e.Title+" installed?", e.Usage.DirHint, "")
+	if err != nil {
+		return "", err
+	}
+	if dir == "" {
+		return "", required
+	}
+	// A shell expands ~ in --launcher-dir, so the answer to the same question does too.
+	if rest, ok := strings.CutPrefix(dir, "~/"); ok {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		dir = filepath.Join(home, rest)
+	}
+	return dir, nil
+}
+
+// refuseForeignInstance refuses to link over an instance shulker didn't link, unless --force. An
+// instance shulker linked is a project in its own game directory, and stays one after an unlink;
+// anything else in a folder the launcher names after the instance is the player's own.
+func (a *app) refuseForeignInstance(k *launcherLink, e *launcher.Entry, launcherDir, gameDir, display string) error {
+	if k.force || !e.NamesFolder {
+		return nil
+	}
+	_, _, inPlace, err := a.inPlaceProject(gameDir)
+	if err != nil || inPlace {
+		return err
+	}
+	slots, found, err := launcher.ReadSlots(e, config.Instance{Dir: gameDir, LauncherDir: launcherDir})
+	if err != nil {
+		return err
+	}
+	if found && !launcher.IsShulkerSlot(slots.PreLaunch) {
+		err := out.Errorf("instance-exists", "%s already has an %s %q that shulker didn't link", e.Title, e.Usage.Noun, display)
+		err.Help = "pass --name to create a second " + e.Usage.Noun + ", or --force to link this one"
+		return err
+	}
+	return nil
+}
+
+// clientVersions is what a link hands a launcher to install the locked platform: the versions the
+// project's resolver and loader row can fetch or build.
+type clientVersions struct {
+	a *app
+	p *project.Project
+	l loader.Loader
+}
+
+func (v clientVersions) Vanilla(ctx context.Context) (json.RawMessage, error) {
+	d, err := v.a.deps()
+	if err != nil {
+		return nil, err
+	}
+	return d.meta.Piston.Version(ctx, v.p.Lock.Minecraft)
+}
+
+func (v clientVersions) HasInstaller() bool { return v.l.InstallClientFlag != "" }
+
+func (v clientVersions) LoaderProfile(ctx context.Context) (json.RawMessage, error) {
+	d, err := v.a.deps()
+	if err != nil {
+		return nil, err
+	}
+	return d.meta.LoaderProfile(ctx, v.p.Lock.Loader, v.p.Lock.Minecraft)
+}
+
+func (v clientVersions) InstallClient(ctx context.Context, launcherDir string) (string, error) {
+	return v.a.installClientLoader(ctx, v.p, launcherDir, v.l)
+}
+
+func (v clientVersions) InstallerVersion(ctx context.Context) (json.RawMessage, error) {
+	jar, err := v.a.clientInstaller(ctx, v.p)
+	if err != nil {
+		return nil, err
+	}
+	return meta.InstallerVersion(jar)
 }
 
 // linkAsked is a bare link at a terminal: it asks which launcher, then runs that launcher's own
 // link as if it had been named, so everything after the question is the named command's.
 func (a *app) linkAsked(cmd *cobra.Command) error {
 	var choices []out.Choice
-	for _, name := range []string{"mojang", "prism", "multimc", "atlauncher", "gdlauncher"} {
-		choices = append(choices, out.Choice{Label: launcher.Title(name), Value: name})
+	for _, e := range launcher.All {
+		choices = append(choices, out.Choice{Label: e.Title, Value: e.Name})
 	}
 	name, err := a.ask("Which launcher?", choices)
 	if err != nil {
@@ -438,16 +682,6 @@ func follows(modpack, source, path string) []out.Row {
 	return []out.Row{{Text: "follows " + modpack + " from " + source}}
 }
 
-var unsafeKeyChars = regexp.MustCompile(`[^a-z0-9]+`)
-
-func instanceKey(name string) string {
-	slug := strings.Trim(unsafeKeyChars.ReplaceAllString(strings.ToLower(name), "-"), "-")
-	if slug == "" {
-		slug = "project"
-	}
-	return "shulker-" + slug
-}
-
 // linkSettings are the settings a `link` seeds an instance with: the manifest's hook defaults on a
 // new instance, then a flag's value over them. On a relink only the flags land, because the
 // settings block belongs to whoever edited it once it exists, and no sync rewrites it. The marker
@@ -523,4 +757,60 @@ func (ls linkSettings) save(dir, source string, at pack.At, side string, assumeC
 		f.Settings.Wrapper = w
 	}
 	return f.Save(dir)
+}
+
+func (a *app) projectSource() (*syncSource, error) {
+	p, err := a.openProject()
+	if err != nil {
+		return nil, err
+	}
+	if err := p.RequireLock(); err != nil {
+		return nil, err
+	}
+	dir, err := filepath.Abs(p.Dir)
+	if err != nil {
+		return nil, err
+	}
+	return &syncSource{Checkout: &pack.Checkout{Source: dir, Kind: pack.Local, Dir: dir}, name: dir, project: p}, nil
+}
+
+func (a *app) saveInstanceFeatures(gameDir string, ff featureFlags) error {
+	lf, err := a.loadLocal(gameDir)
+	if err != nil {
+		return err
+	}
+	for _, name := range ff.with {
+		lf.SetFeature(name, true)
+	}
+	for _, name := range ff.without {
+		lf.SetFeature(name, false)
+	}
+	return a.saveLocal(lf, false)
+}
+
+// shulkerPath is the path reconcile records in settings.shulker for the generated scripts to call:
+// the one shulker is installed under on PATH when that is this binary, else this binary's own
+// path. A bare "shulker" would not do, because launchers opened from the Dock never read the shell
+// rc files installers add PATH through.
+func shulkerPath() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	onPath, err := exec.LookPath("shulker")
+	if err != nil {
+		return exe, nil
+	}
+	if onPath, err = filepath.Abs(onPath); err != nil {
+		return exe, nil
+	}
+	a, err := os.Stat(onPath)
+	if err != nil {
+		return exe, nil
+	}
+	b, err := os.Stat(exe)
+	if err != nil || !os.SameFile(a, b) {
+		return exe, nil
+	}
+	return onPath, nil
 }

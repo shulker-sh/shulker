@@ -1,4 +1,4 @@
-package account
+package launcher
 
 import (
 	"encoding/json"
@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"time"
+
+	"shulker.sh/shulker/internal/account"
 )
 
 // The two account lists the official launcher writes, in the one directory it keeps them. The
@@ -16,11 +18,11 @@ import (
 // both and the reader takes the accounts from each; the packaged launcher's `Packages` tree holds
 // no `launcher_*` file at all and is never looked at (docs/research/microsoft-sign-in.md).
 const (
-	MojangFileName      = "launcher_accounts.json"
-	MojangStoreFileName = "launcher_accounts_microsoft_store.json"
+	MojangAccountsFile      = "launcher_accounts.json"
+	MojangStoreAccountsFile = "launcher_accounts_microsoft_store.json"
 )
 
-var mojangFileNames = []string{MojangFileName, MojangStoreFileName}
+var mojangAccountsFiles = []string{MojangAccountsFile, MojangStoreAccountsFile}
 
 // mojangFile is one of those lists, keyed by the launcher's own local id. One struct decodes both
 // files on both platforms, the Store file being a superset of the macOS shape. Neither
@@ -45,16 +47,16 @@ type mojangProfile struct {
 	Name string `json:"name"`
 }
 
-// ReadMojang is the accounts the official launcher holds in dir. A directory or file that isn't
+// mojangAccounts is the accounts the official launcher holds in dir. A directory or file that isn't
 // there yields nothing and says nothing: opting in to a launcher that isn't installed is worth one
 // line where the opting in happens, not on every run afterwards. Each file that doesn't read is an
 // error to warn with and skip, the other file and every other provider still loading, since
 // shulker neither wrote it nor can repair it and a corrupt one must not take `shulker accounts`
 // down.
-func ReadMojang(dir string, now time.Time) ([]Resolved, []error) {
+func mojangAccounts(e *Entry, dir string, now time.Time) ([]account.Resolved, []error) {
 	var errs []error
 	byID := map[string]mojangAccount{}
-	for _, name := range mojangFileNames {
+	for _, name := range mojangAccountsFiles {
 		path := filepath.Join(dir, name)
 		data, err := os.ReadFile(path)
 		if errors.Is(err, os.ErrNotExist) {
@@ -75,11 +77,11 @@ func ReadMojang(dir string, now time.Time) ([]Resolved, []error) {
 			file.Accounts[local].merge(byID)
 		}
 	}
-	var out []Resolved
+	var out []account.Resolved
 	for _, entry := range byID {
-		out = append(out, entry.resolve(now))
+		out = append(out, entry.resolve(e, now))
 	}
-	Sort(out)
+	account.Sort(out)
 	return out, errs
 }
 
@@ -92,7 +94,7 @@ func (m mojangAccount) merge(byID map[string]mojangAccount) {
 	if m.Profile == nil || m.Profile.ID == "" || m.Profile.Name == "" {
 		return
 	}
-	id := normalizeID(m.Profile.ID)
+	id := account.NormalizeID(m.Profile.ID)
 	if was, dup := byID[id]; dup && !m.expiry().After(was.expiry()) {
 		return
 	}
@@ -102,19 +104,19 @@ func (m mojangAccount) merge(byID map[string]mojangAccount) {
 // resolve is the borrowed account as every command sees it. An entry with a profile but no usable
 // token is expired rather than skipped: the account is real, it proves the player owns Java, and a
 // launch already says what an expired session can't do.
-func (m mojangAccount) resolve(now time.Time) Resolved {
-	r := Resolved{
+func (m mojangAccount) resolve(e *Entry, now time.Time) account.Resolved {
+	r := account.Resolved{
 		ID:      m.Profile.ID,
 		Name:    m.Profile.Name,
-		Source:  SourceMojang,
-		Group:   GroupBorrowed,
-		State:   TokenExpired,
-		Account: Account{Type: Microsoft, Profile: &Profile{ID: m.Profile.ID, Name: m.Profile.Name}},
+		Source:  e.Name,
+		Group:   account.GroupBorrowed,
+		State:   account.TokenExpired,
+		Account: account.Account{Type: account.Microsoft, Profile: &account.Profile{ID: m.Profile.ID, Name: m.Profile.Name}},
 	}
 	if m.AccessToken == "" {
 		return r
 	}
-	r.Account.Minecraft = &Minecraft{Token: m.AccessToken}
+	r.Account.Minecraft = &account.Minecraft{Token: m.AccessToken}
 	expires := m.expiry()
 	if expires.IsZero() {
 		return r
@@ -123,7 +125,7 @@ func (m mojangAccount) resolve(now time.Time) Resolved {
 	// No margin, unlike an own account's IsFresh: nothing renews this one, so the token is spent
 	// only once it actually runs out and is worth using until then.
 	if expires.After(now) {
-		r.State = Playable
+		r.State = account.Playable
 		return r
 	}
 	r.Expired = expires

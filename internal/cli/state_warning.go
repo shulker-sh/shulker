@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/schema"
@@ -42,7 +43,7 @@ func (a *app) warnBuild(side string, several bool, warnings []string, state *bui
 // directory, sync for a registered instance by id, and otherwise sync into dir from the source its
 // instance file records.
 func (a *app) forceCommand(p *project.Project, side, dir string) string {
-	if p != nil && isSameDir(dir, filepath.Join(p.Dir, p.Manifest.BuildDir(side))) {
+	if p != nil && config.SameDir(dir, filepath.Join(p.Dir, p.Manifest.BuildDir(side))) {
 		command := "shulker build"
 		if len(p.Manifest.Sides()) > 1 {
 			command += " " + side
@@ -51,7 +52,7 @@ func (a *app) forceCommand(p *project.Project, side, dir string) string {
 	}
 	if entries, err := a.loadInstanceEntries(); err == nil {
 		for _, e := range entries {
-			if isSameDir(e.Dir, dir) {
+			if config.SameDir(e.Dir, dir) {
 				return "shulker sync -i " + e.ID + " --force"
 			}
 		}
@@ -73,7 +74,7 @@ func (a *app) warnKeptConflicts(kept []string, p *project.Project, side, dir str
 		force = a.forceCommand(p, side, dir)
 	}
 	keep := ""
-	if p != nil && isSameDir(dir, filepath.Join(p.Dir, p.Manifest.BuildDir(side))) {
+	if p != nil && config.SameDir(dir, filepath.Join(p.Dir, p.Manifest.BuildDir(side))) {
 		keep = ", `shulker pull` keeps yours"
 	}
 	a.printer.WarnNudge(out.Nudge{Lead: "Take the pack's version", Command: force}, "kept your version of %s; `shulker diff` shows the pack's%s", strings.Join(kept, ", "), keep)

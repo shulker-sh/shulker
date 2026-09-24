@@ -779,15 +779,15 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	c := &cache.Cache{Dir: h.cache}
 	a.d = &deps{
-		fetch:      f,
-		cache:      c,
-		providers:  providers,
-		meta:       &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt, NeoForge: neoforge, Forge: forge, Cache: c},
-		runtimes:   runtimes,
-		players:    players,
-		gdlauncher: &meta.GDLauncher{Client: f, BaseURL: h.server.URL + "/gdl"},
-		signin:     h.msa.signIn(f, h.server.URL),
-		resources:  h.server.URL + "/resources",
+		fetch:        f,
+		cache:        c,
+		providers:    providers,
+		meta:         &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt, NeoForge: neoforge, Forge: forge, Cache: c},
+		runtimes:     runtimes,
+		players:      players,
+		launcherMeta: map[string]string{"gdlauncher": h.server.URL + "/gdl"},
+		signin:       h.msa.signIn(f, h.server.URL),
+		resources:    h.server.URL + "/resources",
 	}
 	return a
 }

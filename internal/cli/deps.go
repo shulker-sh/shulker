@@ -29,14 +29,15 @@ import (
 )
 
 type deps struct {
-	fetch      *fetch.Client
-	cache      *cache.Cache
-	providers  provider.Providers
-	meta       *resolve.Meta
-	runtimes   *meta.Runtimes
-	players    *player.Client
-	gdlauncher *meta.GDLauncher
-	signin     *account.SignIn
+	fetch     *fetch.Client
+	cache     *cache.Cache
+	providers provider.Providers
+	meta      *resolve.Meta
+	runtimes  *meta.Runtimes
+	players   *player.Client
+	// launcherMeta points a launcher at a fake metadata service, by launcher name.
+	launcherMeta map[string]string
+	signin       *account.SignIn
 	// resources is where the game store fetches asset objects from.
 	resources string
 }
@@ -80,15 +81,14 @@ func (a *app) deps() (*deps, error) {
 	cf := curseforge.Open(f, cfg.CurseForge.Key, c.Dir)
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	a.d = &deps{
-		fetch:      f,
-		cache:      c,
-		providers:  providers,
-		meta:       &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f), Quilt: meta.NewQuilt(f), NeoForge: meta.NewNeoForge(f), Forge: meta.NewForge(f), Cache: c},
-		runtimes:   meta.NewRuntimes(f),
-		players:    player.New(f),
-		gdlauncher: meta.NewGDLauncher(f),
-		signin:     account.NewSignIn(f),
-		resources:  game.MojangResources,
+		fetch:     f,
+		cache:     c,
+		providers: providers,
+		meta:      &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f), Quilt: meta.NewQuilt(f), NeoForge: meta.NewNeoForge(f), Forge: meta.NewForge(f), Cache: c},
+		runtimes:  meta.NewRuntimes(f),
+		players:   player.New(f),
+		signin:    account.NewSignIn(f),
+		resources: game.MojangResources,
 	}
 	return a.d, nil
 }

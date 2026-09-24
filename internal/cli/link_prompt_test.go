@@ -105,12 +105,9 @@ func TestLinkLaunchersOffered(t *testing.T) {
 	a.tty = func() bool { return true }
 	a.asker = offering(func(choices []out.Choice) { offered = choices })
 	a.run(context.Background(), []string{"link"})
-	want := []out.Choice{
-		{Label: "Minecraft Launcher", Value: "mojang"},
-		{Label: "Prism Launcher", Value: "prism"},
-		{Label: "MultiMC", Value: "multimc"},
-		{Label: "ATLauncher", Value: "atlauncher"},
-		{Label: "GDLauncher", Value: "gdlauncher"},
+	var want []out.Choice
+	for _, e := range launcher.All {
+		want = append(want, out.Choice{Label: e.Title, Value: e.Name})
 	}
 	if !slices.Equal(offered, want) {
 		t.Fatalf("offered %v, want %v", offered, want)

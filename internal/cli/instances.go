@@ -4,7 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
+
 	"slices"
 	"strconv"
 	"strings"
@@ -350,36 +350,18 @@ func loadIntent(dir, source string, at pack.At, side string, assumeClient bool) 
 	return f, fresh, nil
 }
 
-var unsafeIDChars = regexp.MustCompile(`[^a-z0-9._-]+`)
-
-// slugID is the id derived from an instance's name, matching manifest.IsValidKey so it is safe as a
-// path segment and as the argument to -i.
-func slugID(name string) string {
-	slug := strings.Trim(unsafeIDChars.ReplaceAllString(strings.ToLower(name), "-"), "-._")
-	for slug != "" && !manifest.IsValidKey(slug) {
-		slug = slug[1:]
-	}
-	if len(slug) > 64 {
-		slug = strings.TrimRight(slug[:64], "-._")
-	}
-	if slug == "" {
-		slug = "instance"
-	}
-	return slug
-}
-
 // uniqueID keeps want when it is free, and otherwise suffixes the slug the way history entries
 // taken in the same second are suffixed.
 func uniqueID(instances []config.Instance, want, name, dir string) string {
 	if want == "" {
-		want = slugID(name)
+		want = config.SlugID(name)
 	}
 	if want == "" {
-		want = slugID(filepath.Base(dir))
+		want = config.SlugID(filepath.Base(dir))
 	}
 	taken := func(id string) bool {
 		i, ok := config.FindID(instances, id)
-		return ok && !isSameDir(instances[i].Dir, dir)
+		return ok && !config.SameDir(instances[i].Dir, dir)
 	}
 	if !taken(want) {
 		return want
@@ -404,7 +386,7 @@ func (a *app) checkID(as, dir string) error {
 	if err != nil {
 		return err
 	}
-	if i, ok := config.FindID(instances, as); ok && !isSameDir(instances[i].Dir, dir) {
+	if i, ok := config.FindID(instances, as); ok && !config.SameDir(instances[i].Dir, dir) {
 		e := out.Errorf("instance-id-taken", "another instance is already called %s (%s)", as, instances[i].Dir)
 		e.Help = "pass a different --as"
 		return e

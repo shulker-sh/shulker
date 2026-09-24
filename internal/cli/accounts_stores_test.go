@@ -9,6 +9,7 @@ import (
 
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/launcher"
 )
 
 // registerPrism puts a prism instance in the registry so the reader looks in dir, the way
@@ -29,7 +30,7 @@ func registerPrism(t *testing.T, h *harness, dir string) {
 func prismAccounts(t *testing.T, h *harness, body string) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, account.PrismFileName), []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, launcher.PrismAccountsFile), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	registerPrism(t, h, dir)
@@ -50,12 +51,12 @@ const prismNotch = `{
 
 func TestProvidersList(t *testing.T) {
 	h := newHarness(t)
-	if stdout := h.mustRun(t, "accounts", "providers"); !strings.Contains(stdout, "• shulker Shulker\n") {
+	if stdout := h.mustRun(t, "accounts", "stores"); !strings.Contains(stdout, "• shulker Shulker\n") {
 		t.Errorf("the default list = %q", stdout)
 	}
-	h.mustRun(t, "accounts", "providers", "set", "prism", "mojang", "shulker")
+	h.mustRun(t, "accounts", "stores", "set", "prism", "mojang", "shulker")
 
-	stdout := h.mustRun(t, "accounts", "providers")
+	stdout := h.mustRun(t, "accounts", "stores")
 	for _, want := range []string{
 		"• prism   Prism Launcher\n",
 		"• mojang  Minecraft Launcher\n",
@@ -66,7 +67,7 @@ func TestProvidersList(t *testing.T) {
 		}
 	}
 	var names []string
-	if err := json.Unmarshal(h.runSetting(t, 0, "accounts", "providers", "--json").Data, &names); err != nil {
+	if err := json.Unmarshal(h.runSetting(t, 0, "accounts", "stores", "--json").Data, &names); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Join(names, ",") != "prism,mojang,shulker" {
@@ -79,19 +80,19 @@ func TestProvidersAddAndRemovePrintTheListBeforeAndAfter(t *testing.T) {
 	// A directory the launcher really is in, so opting in says nothing about it.
 	prismAccounts(t, h, prismNotch)
 
-	stdout := h.mustRun(t, "accounts", "providers", "add", "prism")
-	if !strings.Contains(stdout, `accounts.providers ["shulker"] ⟶ ["shulker","prism"]`) {
+	stdout := h.mustRun(t, "accounts", "stores", "add", "prism")
+	if !strings.Contains(stdout, `accounts.stores ["shulker"] ⟶ ["shulker","prism"]`) {
 		t.Errorf("add should print the list before and after:\n%s", stdout)
 	}
-	if got := readConfigDoc(t, h.config)["accounts"].(map[string]any)["providers"]; len(got.([]any)) != 2 {
-		t.Errorf("accounts.providers = %v", got)
+	if got := readConfigDoc(t, h.config)["accounts"].(map[string]any)["stores"]; len(got.([]any)) != 2 {
+		t.Errorf("accounts.stores = %v", got)
 	}
-	stdout = h.mustRun(t, "accounts", "providers", "remove", "shulker")
-	if !strings.Contains(stdout, `accounts.providers ["shulker","prism"] ⟶ ["prism"]`) {
+	stdout = h.mustRun(t, "accounts", "stores", "remove", "shulker")
+	if !strings.Contains(stdout, `accounts.stores ["shulker","prism"] ⟶ ["prism"]`) {
 		t.Errorf("remove should print the list before and after:\n%s", stdout)
 	}
-	stdout = h.mustRun(t, "accounts", "providers", "set", "shulker", "mojang")
-	if !strings.Contains(stdout, `accounts.providers ["prism"] ⟶ ["shulker","mojang"]`) {
+	stdout = h.mustRun(t, "accounts", "stores", "set", "shulker", "mojang")
+	if !strings.Contains(stdout, `accounts.stores ["prism"] ⟶ ["shulker","mojang"]`) {
 		t.Errorf("set should print the list before and after:\n%s", stdout)
 	}
 }
@@ -111,7 +112,7 @@ func TestProvidersRejectWhatTheListCannotHold(t *testing.T) {
 		{"set to nothing", "can't be empty", []string{"set"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			code, stdout, _ := h.run(t, append([]string{"accounts", "providers"}, append(c.args, "--json")...)...)
+			code, stdout, _ := h.run(t, append([]string{"accounts", "stores"}, append(c.args, "--json")...)...)
 			e := failureCode(t, stdout)
 			if code == 0 || e.Code != "usage" {
 				t.Fatalf("exit %d: %s", code, stdout)
@@ -131,19 +132,19 @@ func TestProvidersWarnOnceAboutALauncherThatIsNotThere(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "gone")
 	registerPrism(t, h, missing)
 
-	_, stderr := h.mustRunStderr(t, "accounts", "providers", "add", "prism")
+	_, stderr := h.mustRunStderr(t, "accounts", "stores", "add", "prism")
 	if !strings.Contains(stderr, "Prism Launcher isn't at "+missing) {
 		t.Fatalf("add should name the directory it checked:\n%s", stderr)
 	}
 	// Every later run stays quiet: the launcher may yet be installed, and this is not an error.
-	for _, args := range [][]string{{"accounts"}, {"accounts", "providers"}, {"accounts", "providers", "set", "prism"}} {
+	for _, args := range [][]string{{"accounts"}, {"accounts", "stores"}, {"accounts", "stores", "set", "prism"}} {
 		if _, stderr := h.mustRunStderr(t, args...); strings.Contains(stderr, missing) {
 			t.Errorf("%v should not warn about the directory:\n%s", args, stderr)
 		}
 	}
 	// `set` opts in the same way `add` does, so a launcher it brings in warns once too.
-	h.mustRun(t, "accounts", "providers", "set", "shulker")
-	_, stderr = h.mustRunStderr(t, "accounts", "providers", "set", "shulker", "prism")
+	h.mustRun(t, "accounts", "stores", "set", "shulker")
+	_, stderr = h.mustRunStderr(t, "accounts", "stores", "set", "shulker", "prism")
 	if !strings.Contains(stderr, "Prism Launcher isn't at "+missing) {
 		t.Fatalf("set should name the directory it checked:\n%s", stderr)
 	}
@@ -153,7 +154,7 @@ func TestAccountsBorrowsFromPrism(t *testing.T) {
 	h := newHarness(t)
 	prismAccounts(t, h, prismNotch)
 	writeAccountStore(t, h, ownAccount("Dinnerbone", dinnerbone))
-	h.mustRun(t, "accounts", "providers", "add", "prism")
+	h.mustRun(t, "accounts", "stores", "add", "prism")
 
 	stdout := h.mustRun(t, "accounts")
 	for _, want := range []string{
@@ -190,12 +191,12 @@ func TestAccountsDedupeKeepsTheEarliestProvider(t *testing.T) {
 	prismAccounts(t, h, prismNotch)
 	writeAccountStore(t, h, ownAccount("Notch", notchID))
 
-	h.mustRun(t, "accounts", "providers", "set", "shulker", "prism")
+	h.mustRun(t, "accounts", "stores", "set", "shulker", "prism")
 	stdout := h.mustRun(t, "accounts")
 	if !strings.Contains(stdout, "Own") || strings.Count(stdout, notchID) != 1 {
 		t.Errorf("shulker comes first, so its own Notch is the only one:\n%s", stdout)
 	}
-	h.mustRun(t, "accounts", "providers", "set", "prism", "shulker")
+	h.mustRun(t, "accounts", "stores", "set", "prism", "shulker")
 	stdout = h.mustRun(t, "accounts")
 	if strings.Contains(stdout, "  Own\n") || strings.Count(stdout, notchID) != 1 {
 		t.Errorf("prism comes first, so its Notch is the only one:\n%s", stdout)
@@ -206,10 +207,10 @@ func TestAccountsSkipsAPrismFileItCannotRead(t *testing.T) {
 	h := newHarness(t)
 	dir := prismAccounts(t, h, `{"formatVersion":3,`)
 	writeAccountStore(t, h, ownAccount("Dinnerbone", dinnerbone))
-	h.mustRun(t, "accounts", "providers", "add", "prism")
+	h.mustRun(t, "accounts", "stores", "add", "prism")
 
 	stdout, stderr := h.mustRunStderr(t, "accounts")
-	if !strings.Contains(stderr, filepath.Join(dir, account.PrismFileName)) {
+	if !strings.Contains(stderr, filepath.Join(dir, launcher.PrismAccountsFile)) {
 		t.Errorf("the warning should name the file:\n%s", stderr)
 	}
 	if !strings.Contains(stdout, "Dinnerbone") {
@@ -225,7 +226,7 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentPrismFile(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			h := newHarness(t)
 			prismAccounts(t, h, c.body)
-			h.mustRun(t, "accounts", "providers", "set", "prism")
+			h.mustRun(t, "accounts", "stores", "set", "prism")
 			stdout, stderr := h.mustRunStderr(t, "accounts")
 			if !strings.Contains(stdout, "no accounts yet") {
 				t.Errorf("stdout = %q", stdout)
@@ -238,7 +239,7 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentPrismFile(t *testing.T) {
 
 	h := newHarness(t)
 	registerPrism(t, h, filepath.Join(t.TempDir(), "gone"))
-	h.mustRun(t, "accounts", "providers", "set", "prism")
+	h.mustRun(t, "accounts", "stores", "set", "prism")
 	if _, stderr := h.mustRunStderr(t, "accounts"); strings.TrimSpace(stderr) != "" {
 		t.Errorf("a launcher that isn't installed says nothing on a later run: %q", stderr)
 	}
@@ -247,7 +248,7 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentPrismFile(t *testing.T) {
 func TestLaunchWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
 	h := newHarness(t)
 	prismAccounts(t, h, prismNotch)
-	h.mustRun(t, "accounts", "providers", "set", "prism")
+	h.mustRun(t, "accounts", "stores", "set", "prism")
 
 	signed, stderr, err := accountSession(t, h, "Jeb_")
 	if err != nil {
@@ -311,19 +312,19 @@ func mojangAccountEntry(local, id, name, token, expires string) string {
 func TestAccountsBorrowsFromMojang(t *testing.T) {
 	h := newHarness(t)
 	mojangAccounts(t, h, map[string]string{
-		account.MojangFileName: mojangFile(
+		launcher.MojangAccountsFile: mojangFile(
 			mojangAccountEntry("one", notchID, "Notch", "session", "2099-01-01T00:00:00Z"),
 			mojangAccountEntry("two", steveID, "Steve", "stale", "2020-01-01T00:00:00.0000000Z"),
 		),
 		// The Store file's suffix is per file, so its accounts come in too.
-		account.MojangStoreFileName: mojangFile(
+		launcher.MojangStoreAccountsFile: mojangFile(
 			mojangAccountEntry("three", dinnerbone, "Dinnerbone", "store", "2099-01-01T00:00:00Z"),
 		),
 		// Neither of these is ever opened: the Java profile is the ownership proof.
 		"launcher_entitlements.json":   "not json",
 		"launcher_msa_credentials.bin": "not json",
 	})
-	h.mustRun(t, "accounts", "providers", "set", "mojang")
+	h.mustRun(t, "accounts", "stores", "set", "mojang")
 
 	stdout, stderr := h.mustRunStderr(t, "accounts")
 	if strings.TrimSpace(stderr) != "" {
@@ -344,7 +345,7 @@ func TestAccountsBorrowsFromMojang(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, row := range rows {
-		if row.Source != account.SourceMojang || row.Group != account.GroupBorrowed {
+		if row.Source != "mojang" || row.Group != account.GroupBorrowed {
 			t.Errorf("borrowed row = %+v", row)
 		}
 	}
@@ -358,12 +359,12 @@ func TestAccountsBorrowsFromMojang(t *testing.T) {
 func TestAccountsMergesAnAccountInBothMojangFiles(t *testing.T) {
 	h := newHarness(t)
 	mojangAccounts(t, h, map[string]string{
-		account.MojangFileName: mojangFile(
+		launcher.MojangAccountsFile: mojangFile(
 			mojangAccountEntry("one", notchID, "Notch", "stale", "2020-01-01T00:00:00Z")),
-		account.MojangStoreFileName: mojangFile(
+		launcher.MojangStoreAccountsFile: mojangFile(
 			mojangAccountEntry("two", notchID, "Notch", "session", "2099-01-01T00:00:00Z")),
 	})
-	h.mustRun(t, "accounts", "providers", "set", "mojang")
+	h.mustRun(t, "accounts", "stores", "set", "mojang")
 
 	stdout := h.mustRun(t, "accounts")
 	if strings.Count(stdout, notchID) != 1 {
@@ -381,14 +382,14 @@ func TestAccountsMergesAnAccountInBothMojangFiles(t *testing.T) {
 func TestAccountsSkipsAMojangFileItCannotRead(t *testing.T) {
 	h := newHarness(t)
 	dir := mojangAccounts(t, h, map[string]string{
-		account.MojangFileName: `{"accounts":{`,
-		account.MojangStoreFileName: mojangFile(
+		launcher.MojangAccountsFile: `{"accounts":{`,
+		launcher.MojangStoreAccountsFile: mojangFile(
 			mojangAccountEntry("two", notchID, "Notch", "session", "2099-01-01T00:00:00Z")),
 	})
-	h.mustRun(t, "accounts", "providers", "set", "mojang")
+	h.mustRun(t, "accounts", "stores", "set", "mojang")
 
 	stdout, stderr := h.mustRunStderr(t, "accounts")
-	if !strings.Contains(stderr, filepath.Join(dir, account.MojangFileName)) {
+	if !strings.Contains(stderr, filepath.Join(dir, launcher.MojangAccountsFile)) {
 		t.Errorf("the warning should name the file:\n%s", stderr)
 	}
 	if !strings.Contains(stdout, "Notch") {
@@ -398,8 +399,8 @@ func TestAccountsSkipsAMojangFileItCannotRead(t *testing.T) {
 
 func TestAccountsSaysNothingAboutAnEmptyOrAbsentMojangFile(t *testing.T) {
 	h := newHarness(t)
-	mojangAccounts(t, h, map[string]string{account.MojangFileName: `{"accounts":{}}`})
-	h.mustRun(t, "accounts", "providers", "set", "mojang")
+	mojangAccounts(t, h, map[string]string{launcher.MojangAccountsFile: `{"accounts":{}}`})
+	h.mustRun(t, "accounts", "stores", "set", "mojang")
 	stdout, stderr := h.mustRunStderr(t, "accounts")
 	if !strings.Contains(stdout, "no accounts yet") {
 		t.Errorf("stdout = %q", stdout)
@@ -412,7 +413,7 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentMojangFile(t *testing.T) {
 	h = newHarness(t)
 	missing := filepath.Join(t.TempDir(), "gone")
 	registerMojang(t, h, missing)
-	if _, stderr := h.mustRunStderr(t, "accounts", "providers", "set", "mojang"); !strings.Contains(stderr, "Minecraft Launcher isn't at "+missing) {
+	if _, stderr := h.mustRunStderr(t, "accounts", "stores", "set", "mojang"); !strings.Contains(stderr, "Minecraft Launcher isn't at "+missing) {
 		t.Fatalf("opting in should name the directory it checked:\n%s", stderr)
 	}
 	if _, stderr := h.mustRunStderr(t, "accounts"); strings.TrimSpace(stderr) != "" {

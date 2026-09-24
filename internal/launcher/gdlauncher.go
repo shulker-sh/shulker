@@ -1,10 +1,10 @@
 package launcher
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,7 +12,10 @@ import (
 	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/mavenver"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/proc"
 )
 
@@ -30,6 +33,33 @@ const (
 //
 //go:embed assets/gdlauncher-icon.png
 var GDLauncherIcon []byte
+
+// GDLauncherMetaURL is GDLauncher's own meta, the only place it installs loaders from.
+const GDLauncherMetaURL = "https://meta.gdl.gg"
+
+// gdlauncherAnyGame is the game id GDLauncher's meta lists Fabric and Quilt loaders under, since one
+// loader build runs on every game version.
+const gdlauncherAnyGame = "${gdlauncher.gameVersion}"
+
+// gdlauncherEntry is GDLauncher: an instance folder named the way it names one, holding the game
+// directory as instance/, which installs the game, the loader and Java on first Play.
+var gdlauncherEntry = &Entry{
+	Name: "gdlauncher", Title: "GDLauncher", IsInstanced: true, DefaultDir: DefaultGDLauncherDir, NamesFolder: true,
+	Slot:    &Slot{Deadline: "4m", Quote: gdlauncherHookArg},
+	Image:   &Image{File: GDLauncherIconFile, Default: GDLauncherIcon},
+	MetaURL: GDLauncherMetaURL,
+	Usage: Usage{
+		Short: "Create a GDLauncher instance that syncs the client build before each launch",
+		Noun:  "instance",
+		Dir:   "launcher runtime directory (default: GDLauncher's)",
+		Names: true,
+		Force: "repoint the modpack an instance already follows, link over one shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet",
+	},
+	relink: relinkLauncher, forget: forgetInstance, name: gdlauncherName, gameDirs: gdlauncherGameDirs,
+	readSlots: readGDLauncherSlots, writeSlots: writeGDLauncherSlots,
+	locate: filepath.EvalSymlinks, running: GDLauncherRunning,
+	place: placeGDLauncher, link: linkGDLauncher, after: gdlauncherAfter,
+}
 
 type GDLauncher struct {
 	Dir string
@@ -118,12 +148,123 @@ func gdlauncherAppData() (string, error) {
 	}
 }
 
-func (g *GDLauncher) Check() error {
-	info, err := os.Stat(g.Dir)
-	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, g.Dir)
+func gdlauncherName(e *Entry, _, gameDir string) string {
+	var inst struct {
+		Name string `json:"name"`
 	}
-	return nil
+	readJSON(filepath.Join(e.InstanceDir(gameDir), GDLauncherInstanceFile), &inst)
+	return inst.Name
+}
+
+func gdlauncherGameDirs(_ *Entry, launcherDir string) []string {
+	return gameDirsUnder(filepath.Join(launcherDir, "instances"), func(dir string) []string {
+		return []string{filepath.Join(dir, GDLauncherGameDir)}
+	})
+}
+
+func placeGDLauncher(_ *Entry, req *Link) (Placement, error) {
+	if GDLauncherFolder(req.Name) == "" {
+		return Placement{}, blankName("GDLauncher needs an instance name that isn't blank")
+	}
+	g := &GDLauncher{Dir: req.LauncherDir}
+	return Placement{ID: req.ID, Dir: g.InstanceDir(req.Name), GameDir: g.GameDir(req.Name)}, nil
+}
+
+// linkGDLauncher writes the instance GDLauncher installs from, asking for a loader version it can
+// install. GDLauncher is warned about rather than waited for: it reads its instances when it starts
+// and writes its own copy back over them while open.
+func linkGDLauncher(ctx context.Context, _ *Entry, req *Link, _ Placement) (InstanceResult, error) {
+	loaderVersion, err := gdlauncherLoaderVersion(ctx, req)
+	if err != nil {
+		return InstanceResult{}, err
+	}
+	if running, _ := GDLauncherRunning(); running {
+		req.Warn("GDLauncher is open; it may overwrite this instance's changes. Quit it and run this link again")
+	}
+	g := &GDLauncher{Dir: req.LauncherDir}
+	return g.WriteInstance(GDLauncherInstance{
+		Name:          req.Name,
+		Minecraft:     req.Minecraft,
+		LoaderType:    req.LoaderType,
+		LoaderVersion: loaderVersion,
+	})
+}
+
+// gdlauncherAfter keeps the restart reminder for where an open GDLauncher can't be detected.
+func gdlauncherAfter(e *Entry, _ InstanceResult) string {
+	if _, detectable := GDLauncherRunning(); detectable {
+		return ""
+	}
+	return "restart " + e.Title + " if it is open so the instance shows up"
+}
+
+// gdlauncherLoaderVersion is the loader version the instance asks GDLauncher for. GDLauncher installs
+// loaders only from its own meta, which lags behind new releases, so a locked version it doesn't list
+// yet gives way to the newest one it has, unless force.
+func gdlauncherLoaderVersion(ctx context.Context, req *Link) (string, error) {
+	if req.LoaderType == "" {
+		return "", nil
+	}
+	want := GDLauncherLoaderVersion(req.Minecraft, req.LoaderType, req.LoaderVersion)
+	req.Log("checking which %s versions GDLauncher can install", req.LoaderType)
+	meta := &GDLauncherMeta{Client: req.Fetch, BaseURL: req.MetaURL}
+	listed, err := meta.LoaderVersions(ctx, req.LoaderType, req.Minecraft)
+	switch {
+	case err != nil:
+		req.Warn("couldn't check whether GDLauncher can install %s %s (%v); the instance asks for it anyway", req.LoaderType, want, err)
+		return want, nil
+	case slices.Contains(listed, want):
+		return want, nil
+	case len(listed) == 0:
+		req.Warn("GDLauncher can't install %s for Minecraft %s yet, so the instance won't start until it can", req.LoaderType, req.Minecraft)
+		return want, nil
+	}
+	newest := slices.MaxFunc(listed, func(x, y string) int {
+		return mavenver.Compare(mavenver.Parse(x), mavenver.Parse(y))
+	})
+	if req.Force {
+		req.Warn("GDLauncher can't install %s %s yet, so the instance won't start until it can; without --force it would use %s", req.LoaderType, want, newest)
+		return want, nil
+	}
+	req.Warn("GDLauncher can't install %s %s yet, so the instance uses %s, the newest it has; run this link again once GDLauncher adds %s, or pass --force to use it anyway", req.LoaderType, want, newest, want)
+	return newest, nil
+}
+
+// GDLauncherMeta reads GDLauncher's own meta.
+type GDLauncherMeta struct {
+	Client  *fetch.Client
+	BaseURL string
+}
+
+// LoaderVersions lists the versions of a loader GDLauncher can install for a game, named the way its
+// meta names them.
+func (g *GDLauncherMeta) LoaderVersions(ctx context.Context, loader, game string) ([]string, error) {
+	var manifest struct {
+		GameVersions []struct {
+			ID      string `json:"id"`
+			Loaders []struct {
+				ID string `json:"id"`
+			} `json:"loaders"`
+		} `json:"gameVersions"`
+	}
+	if err := g.Client.GetJSON(ctx, g.BaseURL+"/"+loader+"/v2/manifest.json", &manifest); err != nil {
+		e := out.Errorf("meta-fetch", "couldn't read GDLauncher's %s versions", loader)
+		e.WithCause("gdlauncher", err)
+		if fetch.IsNetwork(err) {
+			return nil, fetch.Unreachable(e)
+		}
+		return nil, e
+	}
+	var versions []string
+	for _, gv := range manifest.GameVersions {
+		if gv.ID != game && gv.ID != gdlauncherAnyGame {
+			continue
+		}
+		for _, l := range gv.Loaders {
+			versions = append(versions, l.ID)
+		}
+	}
+	return versions, nil
 }
 
 // GDLauncherFolder is the folder GDLauncher gives an instance with this name. Like GDLauncher, it checks
@@ -169,7 +310,7 @@ func (g *GDLauncher) GameDir(name string) string {
 // memory, Java arguments and playtime.
 func (g *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, error) {
 	dir := g.InstanceDir(inst.Name)
-	res := InstanceResult{Dir: dir, GameDir: filepath.Join(dir, GDLauncherGameDir)}
+	res := InstanceResult{Dir: dir, GameDir: filepath.Join(dir, GDLauncherGameDir), Key: GDLauncherFolder(inst.Name)}
 	path := filepath.Join(dir, GDLauncherInstanceFile)
 	top, found, err := readJSONObject(path)
 	if err != nil {

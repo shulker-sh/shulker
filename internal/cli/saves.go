@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/saves"
 )
@@ -329,7 +330,7 @@ func groupTarget(r rootDirs, group string) savesTarget {
 // since only instances shulker launches itself share worlds. owned says whether dir is one.
 func (a *app) saveGroupOf(dir string) (group string, owned bool, err error) {
 	in, ok := a.registeredInstance(dir)
-	if !ok || in.Launcher != "shulker" {
+	if !ok || in.Launcher != launcher.Shulker.Name {
 		return saves.None, false, nil
 	}
 	f, err := instance.Load(dir)

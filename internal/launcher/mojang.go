@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,13 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
 )
 
 const ProfilesFile = "launcher_profiles.json"
-
-var ErrNotFound = errors.New("launcher not found")
 
 func appDataUnset() *out.Error {
 	return out.Errorf("appdata-unset", "APPDATA is not set")
@@ -29,6 +29,25 @@ func invalidLoaderProfile(problem string) *out.Error {
 	e := out.Errorf("loader-profile-invalid", "the loader profile isn't a version JSON shulker can install")
 	e.Rows = []out.Detail{{Label: "profile", Text: problem}}
 	return e
+}
+
+// mojangEntry is the official launcher: a profile shulker-<slug> whose game directory is
+// shulker/<slug> under the launcher directory, started through the shim in the profile's javaDir.
+var mojangEntry = &Entry{
+	Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir,
+	Slot: &Slot{UsesShim: true}, NeedsRuntime: true,
+	Usage: Usage{
+		Short:   "Add a profile for the client build to the official launcher, installing its loader if it has one",
+		Aliases: []string{"vanilla"},
+		Noun:    "profile",
+		Dir:     "launcher directory (default: the official launcher's .minecraft folder)",
+		Names:   true,
+		Force:   "repoint the modpack a profile already follows",
+	},
+	Accounts: mojangAccounts,
+	relink:   relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,
+	readSlots: readMojangSlots, writeSlots: writeMojangSlots,
+	place: placeMojang, link: linkMojang,
 }
 
 type Mojang struct {
@@ -66,12 +85,113 @@ func DefaultMojangDir() (string, error) {
 	}
 }
 
-func (m *Mojang) Check() error {
-	info, err := os.Stat(m.Dir)
-	if err != nil || !info.IsDir() {
-		return fmt.Errorf("%w at %s", ErrNotFound, m.Dir)
+func forgetMojang(e *Entry, l config.Instance) (Forgotten, error) {
+	// Unlink takes the generated scripts and the shim with the profile, and puts the profile's own
+	// Java back on the way.
+	if _, _, err := ReleaseSlots(e, l); err != nil {
+		return Forgotten{}, err
 	}
-	return nil
+	n, err := (&Mojang{Dir: l.LauncherDir}).RemoveProfiles(l.Dir)
+	if err != nil {
+		return Forgotten{}, err
+	}
+	if n == 0 {
+		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); it had no launcher profile left.", l.Label(), e.Title)}, nil
+	}
+	return Forgotten{
+		Removed: RemovedProfile,
+		Summary: fmt.Sprintf("Unlinked %q (%s): removed its launcher profile; the instance directory and the loader stay.", l.Label(), e.Title),
+	}, nil
+}
+
+// mojangName reads the profile rather than the instance: the official launcher keeps no instance of
+// its own, so the name lives beside the gameDir that points here.
+func mojangName(_ *Entry, launcherDir, gameDir string) string {
+	if launcherDir == "" {
+		return ""
+	}
+	_, profiles, err := (&Mojang{Dir: launcherDir}).readProfiles()
+	if err != nil {
+		return ""
+	}
+	for _, key := range shulkerProfiles(profiles, gameDir) {
+		var p struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(profiles[key], &p) == nil && p.Name != "" {
+			return p.Name
+		}
+	}
+	return ""
+}
+
+// mojangGameDirs reads the game directories of the profiles shulker wrote, since the official
+// launcher keeps no instances of its own and a profile can point anywhere.
+func mojangGameDirs(_ *Entry, launcherDir string) []string {
+	profiles, err := (&Mojang{Dir: launcherDir}).Profiles()
+	if err != nil {
+		return nil
+	}
+	var dirs []string
+	for key, raw := range profiles {
+		dir, ok := shulkerProfileGameDir(key, raw)
+		if !ok {
+			continue
+		}
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			dirs = append(dirs, dir)
+		}
+	}
+	return dirs
+}
+
+// placeMojang puts the game directory under shulker/ in the launcher directory, named after the
+// profile key without its prefix, whatever the source.
+func placeMojang(_ *Entry, req *Link) (Placement, error) {
+	dir := filepath.Join(req.LauncherDir, "shulker", strings.TrimPrefix(InstanceKey(req.Name), "shulker-"))
+	return Placement{ID: req.ID, Dir: dir, GameDir: dir}, nil
+}
+
+// linkMojang installs the version the profile starts, then writes the profile pointing at the game
+// directory.
+func linkMojang(ctx context.Context, _ *Entry, req *Link, p Placement) (InstanceResult, error) {
+	m := &Mojang{Dir: req.LauncherDir}
+	key := InstanceKey(req.Name)
+	res := InstanceResult{Dir: p.Dir, GameDir: p.Dir, Key: key}
+	profiles, err := m.Profiles()
+	if err != nil {
+		return res, err
+	}
+	_, exists := profiles[key]
+	res.Created = !exists
+	versionID, err := mojangVersion(ctx, m, req)
+	if err != nil {
+		return res, err
+	}
+	if err := m.WriteProfile(Profile{Key: key, Name: req.Name, VersionID: versionID, GameDir: p.Dir}); err != nil {
+		return res, err
+	}
+	if req.LoaderType != "" {
+		res.Version, res.VersionDir = versionID, filepath.Join(m.Dir, "versions")
+	}
+	return res, nil
+}
+
+// mojangVersion is the version id the profile starts: vanilla's for a project with no loader, and
+// the loader's otherwise, installed from its profile or by its own installer.
+func mojangVersion(ctx context.Context, m *Mojang, req *Link) (string, error) {
+	switch {
+	case req.LoaderType == "":
+		return req.Minecraft, nil
+	case req.Versions.HasInstaller():
+		return req.Versions.InstallClient(ctx, m.Dir)
+	}
+	req.Log("fetching %s loader %s for %s", req.LoaderType, req.LoaderVersion, req.Minecraft)
+	profile, err := req.Versions.LoaderProfile(ctx)
+	if err != nil {
+		return "", err
+	}
+	return m.InstallVersion(profile)
 }
 
 func (m *Mojang) InstallVersion(profile json.RawMessage) (string, error) {

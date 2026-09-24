@@ -305,7 +305,7 @@ func TestConfigSetRefusesAValueOfTheWrongType(t *testing.T) {
 	}{
 		{[]string{"registry", "--literal", "5"}, "registry takes a string, not 5"},
 		{[]string{"accounts.default", "--literal", "5"}, "accounts.default takes a string, not 5"},
-		{[]string{"accounts.providers", "shulker"}, "accounts.providers takes a list"},
+		{[]string{"accounts.stores", "shulker"}, "accounts.stores takes a list"},
 		{[]string{"play.saveBackups", "many"}, `play.saveBackups takes a whole number, not "many"`},
 	} {
 		code, stdout, _ := h.run(t, append(append([]string{"config", "set"}, c.args...), "--json")...)

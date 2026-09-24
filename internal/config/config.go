@@ -9,11 +9,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
+	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
@@ -27,7 +30,7 @@ const (
 )
 
 // Keys are the config.json keys `shulker config` reads and sets.
-var Keys = []string{"accounts.default", "accounts.providers", "curseforge.key", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
+var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
 
 // Config is config.json.
 type Config struct {
@@ -84,8 +87,8 @@ type CurseForge struct {
 // here rather than in accounts.json because a borrowed account may be it, and shulker never writes
 // another launcher's accounts into its own file.
 type Accounts struct {
-	// Providers is where accounts are read from, in the order the earliest one wins ties by UUID.
-	Providers []string `json:"providers,omitempty"`
+	// Stores is where accounts are read from, in the order the earliest one wins ties by UUID.
+	Stores []string `json:"stores,omitempty"`
 	// Default is the id of the account a launch falls back to.
 	Default string `json:"default,omitempty"`
 }
@@ -347,6 +350,35 @@ func FindID(instances []Instance, id string) (int, bool) {
 		}
 	}
 	return -1, false
+}
+
+// SlugID is the id derived from an instance's name, matching manifest.IsValidKey so it is safe as a
+// path segment and as the argument to -i.
+func SlugID(name string) string {
+	slug := strings.Trim(unsafeIDChars.ReplaceAllString(strings.ToLower(name), "-"), "-._")
+	for slug != "" && !manifest.IsValidKey(slug) {
+		slug = slug[1:]
+	}
+	if len(slug) > 64 {
+		slug = strings.TrimRight(slug[:64], "-._")
+	}
+	if slug == "" {
+		slug = "instance"
+	}
+	return slug
+}
+
+var unsafeIDChars = regexp.MustCompile(`[^a-z0-9._-]+`)
+
+// SameDir also treats a symlink to dir as dir, since a launcher's game directory may be reached
+// through one.
+func SameDir(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
+	}
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	return errA == nil && errB == nil && ra == rb
 }
 
 // WriteInstances replaces the registry wholesale, keeping the file it replaces as

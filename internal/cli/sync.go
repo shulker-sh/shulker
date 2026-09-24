@@ -232,7 +232,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 		return syncResult{}, err
 	}
 	defer func() { a.stampSync(into, err) }()
-	ownBuild := isSameDir(into, buildDir)
+	ownBuild := config.SameDir(into, buildDir)
 	syncedDir := req.into != "" && !ownBuild
 	lf, inst, err := a.sourceLocalFiles(src, into)
 	if err != nil {
@@ -357,17 +357,6 @@ func (a *app) syncRecorded(cmd *cobra.Command, req syncRequest) (syncResult, err
 		return syncResult{}, e
 	}
 	return a.syncInstance(cmd, e, req)
-}
-
-// isSameDir also treats a symlink to dir as dir, since a launcher's game directory may be reached
-// through one.
-func isSameDir(a, b string) bool {
-	if filepath.Clean(a) == filepath.Clean(b) {
-		return true
-	}
-	ra, errA := filepath.EvalSymlinks(a)
-	rb, errB := filepath.EvalSymlinks(b)
-	return errA == nil && errB == nil && ra == rb
 }
 
 // loadLocal reads dir's shulker.local.json, warning and going on with an empty one when it had to

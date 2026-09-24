@@ -5,6 +5,7 @@ import (
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/server"
@@ -33,7 +34,10 @@ func (a *app) recordClientRuntime(ctx context.Context, p *project.Project, side,
 		return server.Runtime{}, nil
 	}
 	in, ok := a.registeredInstance(dir)
-	if !ok || in.Launcher != "mojang" {
+	if !ok {
+		return server.Runtime{}, nil
+	}
+	if e := launcher.Find(in.Launcher); e == nil || !e.NeedsRuntime {
 		return server.Runtime{}, nil
 	}
 	f, err := instance.Load(dir)

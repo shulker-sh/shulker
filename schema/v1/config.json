@@ -16,13 +16,13 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "providers": {
+        "stores": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": { "enum": ["shulker", "prism", "mojang"] },
           "default": ["shulker"],
-          "description": "Where accounts are read from, in order. The earliest provider wins an account several hold."
+          "description": "Where accounts are read from, in order. The earliest store wins an account several hold."
         },
         "default": {
           "type": "string",

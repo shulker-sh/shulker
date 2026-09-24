@@ -13,7 +13,8 @@ import (
 // NeoForge and Forge install a client. The installer writes a launcher profile of its own; shulker
 // puts launcher_profiles.json back the way it was afterwards, so only shulker's profile shows, and
 // reads the version id it installed off the entry it wrote.
-func (a *app) installClientLoader(ctx context.Context, p *project.Project, v *launcher.Mojang, l loader.Loader) (string, error) {
+func (a *app) installClientLoader(ctx context.Context, p *project.Project, launcherDir string, l loader.Loader) (string, error) {
+	v := &launcher.Mojang{Dir: launcherDir}
 	jar, err := a.clientInstaller(ctx, p)
 	if err != nil {
 		return "", err

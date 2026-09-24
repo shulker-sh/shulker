@@ -231,7 +231,7 @@ func TestAccountsProviders(t *testing.T) {
 	h := newHarness(t)
 	writeAccountStore(t, h, ownAccount("Notch", notchID))
 
-	if stdout := h.mustRun(t, "config", "get", "accounts.providers"); stdout != "[\n  \"shulker\"\n]\n" {
+	if stdout := h.mustRun(t, "config", "get", "accounts.stores"); stdout != "[\n  \"shulker\"\n]\n" {
 		t.Errorf("the default should read back: %q", stdout)
 	}
 	if stdout := h.mustRun(t, "accounts"); !strings.Contains(stdout, "Notch") {
@@ -240,7 +240,7 @@ func TestAccountsProviders(t *testing.T) {
 
 	// shulker can be taken out of the list, and then its own accounts stop being visible.
 	registerMojang(t, h, t.TempDir())
-	h.mustRun(t, "config", "set", "accounts.providers", "--literal", `["mojang"]`)
+	h.mustRun(t, "config", "set", "accounts.stores", "--literal", `["mojang"]`)
 	stdout, stderr := h.mustRunStderr(t, "accounts")
 	if !strings.Contains(stdout, "no accounts yet") {
 		t.Errorf("without shulker its own accounts are not read:\n%s", stdout)
@@ -250,7 +250,7 @@ func TestAccountsProviders(t *testing.T) {
 	}
 
 	// Unsetting the key goes back to the default, and the accounts come back.
-	h.mustRun(t, "config", "unset", "accounts.providers")
+	h.mustRun(t, "config", "unset", "accounts.stores")
 	if stdout := h.mustRun(t, "accounts"); !strings.Contains(stdout, "Notch") {
 		t.Errorf("unset should restore the default:\n%s", stdout)
 	}
@@ -267,7 +267,7 @@ func TestConfigSetLiteral(t *testing.T) {
 		{"not a name", `[1]`, "usage"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			code, stdout, _ := h.run(t, "config", "set", "accounts.providers", "--literal", c.value, "--json")
+			code, stdout, _ := h.run(t, "config", "set", "accounts.stores", "--literal", c.value, "--json")
 			if e := failureCode(t, stdout); code == 0 || e.Code != c.code {
 				t.Fatalf("exit %d: %s", code, stdout)
 			}
@@ -275,18 +275,18 @@ func TestConfigSetLiteral(t *testing.T) {
 	}
 
 	// Without --literal the value would be the string "[]", which the key can't hold.
-	code, stdout, _ := h.run(t, "config", "set", "accounts.providers", `["shulker"]`, "--json")
+	code, stdout, _ := h.run(t, "config", "set", "accounts.stores", `["shulker"]`, "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
 		t.Fatalf("a list needs --literal: %s", stdout)
 	}
 
-	h.mustRun(t, "config", "set", "accounts.providers", "--literal", `["shulker"]`)
+	h.mustRun(t, "config", "set", "accounts.stores", "--literal", `["shulker"]`)
 	doc := readConfigDoc(t, h.config)
-	got, _ := doc["accounts"].(map[string]any)["providers"].([]any)
+	got, _ := doc["accounts"].(map[string]any)["stores"].([]any)
 	if len(got) != 1 || got[0] != "shulker" {
-		t.Fatalf("accounts.providers = %v", doc["accounts"])
+		t.Fatalf("accounts.stores = %v", doc["accounts"])
 	}
-	if data, err := os.ReadFile(filepath.Join(h.config)); err != nil || !strings.Contains(string(data), `"providers"`) {
+	if data, err := os.ReadFile(filepath.Join(h.config)); err != nil || !strings.Contains(string(data), `"stores"`) {
 		t.Fatalf("config.json: %v %s", err, data)
 	}
 }

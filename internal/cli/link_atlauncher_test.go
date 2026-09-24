@@ -18,7 +18,7 @@ func TestLinkATLauncher(t *testing.T) {
 
 	launcherDir := t.TempDir()
 	var env struct {
-		Data launcherReport `json:"data"`
+		Data linkReport `json:"data"`
 	}
 	stdout := h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Friends SMP", "--json")
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {

@@ -1,4 +1,4 @@
-package account
+package launcher
 
 import (
 	"os"
@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"shulker.sh/shulker/internal/account"
 )
 
 var prismNow = time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
@@ -13,7 +15,7 @@ var prismNow = time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
 func writePrism(t *testing.T, body string) string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, PrismFileName), []byte(body), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, PrismAccountsFile), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	return dir
@@ -39,7 +41,7 @@ func TestReadPrismTakesMSAAndOfflineAccounts(t *testing.T) {
 	  ]
 	}`)
 
-	got, err := ReadPrism(dir, prismNow)
+	got, err := readPrismAccounts(prismEntry, dir, prismNow)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,10 +49,10 @@ func TestReadPrismTakesMSAAndOfflineAccounts(t *testing.T) {
 		t.Fatalf("accounts = %+v", got)
 	}
 	notch := got[0]
-	if notch.Name != "Notch" || notch.Source != SourcePrism || notch.Group != GroupBorrowed {
+	if notch.Name != "Notch" || notch.Source != prismEntry.Name || notch.Group != account.GroupBorrowed {
 		t.Errorf("msa row = %+v", notch)
 	}
-	if notch.State != Playable {
+	if notch.State != account.Playable {
 		t.Errorf("a token that still holds is playable: %+v", notch)
 	}
 	if notch.Account.Minecraft == nil || notch.Account.Minecraft.Token != "session" {
@@ -60,7 +62,7 @@ func TestReadPrismTakesMSAAndOfflineAccounts(t *testing.T) {
 		t.Error("a borrowed account is never renewed, so no refresh token is kept")
 	}
 	steve := got[1]
-	if steve.State != OfflineOnly || steve.Source != SourcePrism || steve.Group != GroupBorrowed {
+	if steve.State != account.OfflineOnly || steve.Source != prismEntry.Name || steve.Group != account.GroupBorrowed {
 		t.Errorf("offline row = %+v", steve)
 	}
 }
@@ -70,21 +72,21 @@ func TestReadPrismTokenExpiry(t *testing.T) {
 	for _, c := range []struct {
 		name    string
 		ygg     string
-		want    State
+		want    account.State
 		expired time.Time
 	}{
-		{"holds", `{"token": "s", "exp": 1789948800}`, Playable, time.Time{}},
-		{"ran out", `{"token": "s", "exp": 1789732800}`, TokenExpired, time.Unix(1789732800, 0)},
-		{"a day after it was issued", `{"token": "s", "iat": 1789862400}`, Playable, time.Time{}},
-		{"issued two days ago", `{"token": "s", "iat": 1789732800}`, TokenExpired, time.Unix(1789819200, 0)},
-		{"no token", `{"exp": 1789948800}`, TokenExpired, time.Time{}},
-		{"empty token", `{"token": "", "exp": 1789948800}`, TokenExpired, time.Time{}},
-		{"undated", `{"token": "s"}`, TokenExpired, time.Time{}},
+		{"holds", `{"token": "s", "exp": 1789948800}`, account.Playable, time.Time{}},
+		{"ran out", `{"token": "s", "exp": 1789732800}`, account.TokenExpired, time.Unix(1789732800, 0)},
+		{"a day after it was issued", `{"token": "s", "iat": 1789862400}`, account.Playable, time.Time{}},
+		{"issued two days ago", `{"token": "s", "iat": 1789732800}`, account.TokenExpired, time.Unix(1789819200, 0)},
+		{"no token", `{"exp": 1789948800}`, account.TokenExpired, time.Time{}},
+		{"empty token", `{"token": "", "exp": 1789948800}`, account.TokenExpired, time.Time{}},
+		{"undated", `{"token": "s"}`, account.TokenExpired, time.Time{}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			dir := writePrism(t, `{"formatVersion":3,"accounts":[{"type":"MSA","ygg":`+c.ygg+
 				`,"profile":{"id":"069a79f4-44e9-4726-a5be-fca90e38aaf5","name":"Notch"}}]}`)
-			got, err := ReadPrism(dir, prismNow)
+			got, err := readPrismAccounts(prismEntry, dir, prismNow)
 			if err != nil || len(got) != 1 {
 				t.Fatalf("read = %+v %v", got, err)
 			}
@@ -101,7 +103,7 @@ func TestReadPrismTokenExpiry(t *testing.T) {
 func TestReadPrismExpiredTokenStaysUsable(t *testing.T) {
 	dir := writePrism(t, `{"formatVersion":3,"accounts":[{"type":"MSA","ygg":{"token":"stale","exp":1789732800},
 	  "profile":{"id":"069a79f4-44e9-4726-a5be-fca90e38aaf5","name":"Notch"}}]}`)
-	got, err := ReadPrism(dir, prismNow)
+	got, err := readPrismAccounts(prismEntry, dir, prismNow)
 	if err != nil || len(got) != 1 {
 		t.Fatalf("read = %+v %v", got, err)
 	}
@@ -124,7 +126,7 @@ func TestReadPrismSilentCases(t *testing.T) {
 		{"unknown type", `{"formatVersion":3,"accounts":[{"type":"Yggdrasil","profile":{"id":"u1","name":"Notch"}}]}`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := ReadPrism(writePrism(t, c.body), prismNow)
+			got, err := readPrismAccounts(prismEntry, writePrism(t, c.body), prismNow)
 			if err != nil || len(got) != 0 {
 				t.Fatalf("read = %+v %v", got, err)
 			}
@@ -133,7 +135,7 @@ func TestReadPrismSilentCases(t *testing.T) {
 }
 
 func TestReadPrismMissingDirectoryIsSilent(t *testing.T) {
-	got, err := ReadPrism(filepath.Join(t.TempDir(), "nowhere"), prismNow)
+	got, err := readPrismAccounts(prismEntry, filepath.Join(t.TempDir(), "nowhere"), prismNow)
 	if err != nil || got != nil {
 		t.Fatalf("read = %+v %v", got, err)
 	}
@@ -147,11 +149,11 @@ func TestReadPrismUnreadableFileNamesItself(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			dir := writePrism(t, c.body)
-			got, err := ReadPrism(dir, prismNow)
+			got, err := readPrismAccounts(prismEntry, dir, prismNow)
 			if err == nil {
 				t.Fatalf("read = %+v, want an error to warn with", got)
 			}
-			if !strings.Contains(err.Error(), filepath.Join(dir, PrismFileName)) {
+			if !strings.Contains(err.Error(), filepath.Join(dir, PrismAccountsFile)) {
 				t.Errorf("the warning names the file: %v", err)
 			}
 			if !strings.Contains(err.Error(), c.want) {
