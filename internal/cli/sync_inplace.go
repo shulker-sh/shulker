@@ -53,7 +53,7 @@ func inPlaceIntent(dir string) (pack manifest.Require, side string, inPlace bool
 	if err != nil || !inPlace {
 		return manifest.Require{}, "", false
 	}
-	if key := modpackKey(m, ""); key != "" {
+	if key := project.ModpackKey(m, ""); key != "" {
 		pack = m.Requires[key]
 	}
 	return pack, side, true

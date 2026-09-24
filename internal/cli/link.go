@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -244,7 +242,7 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 		Source:      src.name,
 		Ref:         src.Ref,
 		Path:        src.Path,
-		Modpack:     modpackKey(inst.Manifest, src.name),
+		Modpack:     project.ModpackKey(inst.Manifest, src.name),
 		Sync:        &synced,
 		noun:        e.Usage.Noun,
 		shown:       display,
@@ -548,7 +546,7 @@ func (a *app) linkProject(gameDir, id, display string, src *syncSource) (p *proj
 	}
 	// Only --force reaches here with a source the instance doesn't follow yet. Repointing that one
 	// modpack entry leaves the player's own requires, and the lock holding them, where they are.
-	key := modpackKey(p.Manifest, src.name)
+	key := project.ModpackKey(p.Manifest, src.name)
 	if key == "" {
 		key = src.project.Manifest.Name
 	}
@@ -641,29 +639,13 @@ func checkAdopt(gameDir string, src *syncSource, noun, name, second string, forc
 		return nil
 	}
 	source := src.name
-	key := modpackKey(m, source)
+	key := project.ModpackKey(m, source)
 	if key == "" || (m.Requires[key].Source == source && m.Requires[key].Path == src.Path) {
 		return nil
 	}
 	e := out.Errorf("instance-exists", "%s %q already follows %s from %s", noun, name, key, m.Requires[key].Source)
 	e.Help = fmt.Sprintf("pass %s to create a second %s, or --force to repoint the modpack it follows", second, noun)
 	return e
-}
-
-// modpackKey is the key the instance follows the link's source under: the source manifest's name
-// when this link wrote the entry, and whatever an earlier link or a hand edit chose when it didn't.
-// Empty where no single entry is the link's: with several packs required, none of them is the one.
-func modpackKey(m *manifest.Manifest, source string) string {
-	keys := slices.Sorted(maps.Keys(m.Modpacks()))
-	for _, key := range keys {
-		if m.Requires[key].Source == source {
-			return key
-		}
-	}
-	if len(keys) == 1 {
-		return keys[0]
-	}
-	return ""
 }
 
 // linkSource is the project a link command works from: the argument when there
