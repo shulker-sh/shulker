@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -128,7 +127,7 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 	}
 	isHosted := func(source string) bool {
 		_, ok := urls[source]
-		return ok || a.isSlug(source)
+		return ok || resolve.IsSlug(source, a.dir)
 	}
 	hosted := slices.ContainsFunc(sources, isHosted)
 	if err := refuseModpackFlags(cmd, hosted, !slices.ContainsFunc(sources, func(s string) bool { return !isHosted(s) })); err != nil {
@@ -146,7 +145,7 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 				}
 				continue
 			}
-			if a.isSlug(source) {
+			if resolve.IsSlug(source, a.dir) {
 				if err := r.Add(cmd.Context(), source, opts); err != nil {
 					return "", err
 				}
@@ -176,20 +175,6 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 		}
 		return "", nil
 	})
-}
-
-// isSlug reports whether a modpack argument names a project on a provider rather than a source: it
-// is no URL, no path and no directory that exists.
-func (a *app) isSlug(arg string) bool {
-	if pack.Classify(arg) != pack.Local || strings.ContainsAny(arg, `/\`) || arg == "." || arg == ".." || resolve.IsLocalPath(a.localPath(arg)) {
-		return false
-	}
-	dir := arg
-	if a.dir != "" {
-		dir = filepath.Join(a.dir, arg)
-	}
-	_, err := os.Stat(dir)
-	return err != nil
 }
 
 // refuseModpackFlags refuses the flags that don't apply to the modpacks being added, each with its

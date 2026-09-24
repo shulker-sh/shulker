@@ -30,3 +30,29 @@ func TestAddFileCoremodTakesItsLockedKey(t *testing.T) {
 		t.Errorf("jar id %q", got)
 	}
 }
+
+func TestIsSlugIsNoURLPathOrDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, "base"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "pack.mrpack"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		arg  string
+		want bool
+	}{
+		{"sodium", true},
+		{"base", false},
+		{"pack.mrpack", false},
+		{"other.mrpack", false},
+		{"packs/sodium", false},
+		{".", false},
+		{"https://example.com/pack.git", false},
+	} {
+		if got := IsSlug(tc.arg, dir); got != tc.want {
+			t.Errorf("IsSlug(%q) = %v, want %v", tc.arg, got, tc.want)
+		}
+	}
+}
