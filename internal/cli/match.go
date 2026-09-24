@@ -51,7 +51,7 @@ func (a *app) matchCmd() *cobra.Command {
 				}
 				a.warn(res.Warnings)
 			} else {
-				_, err := a.relockProject(cmd, p, relockOptions{keepUnchanged: true}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+				_, err := a.relockOpened(cmd, p, relockOptions{keepUnchanged: true}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 					var err error
 					if res, err = r.MatchOverrides(cmd.Context(), files); err != nil {
 						return "", err

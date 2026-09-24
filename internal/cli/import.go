@@ -303,7 +303,7 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 		undo()
 		return err
 	}
-	if _, err := a.relockProject(cmd, p, relockOptions{}, func(*project.Project, *resolve.Resolver) (string, error) { return "", nil }); err != nil {
+	if _, err := a.relockOpened(cmd, p, relockOptions{}, func(*project.Project, *resolve.Resolver) (string, error) { return "", nil }); err != nil {
 		undo()
 		return err
 	}

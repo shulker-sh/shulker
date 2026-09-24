@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -155,7 +152,7 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 	if err != nil {
 		return err
 	}
-	rl, err := a.relockProject(cmd, p, relockOptions{}, run)
+	rl, err := a.relockOpened(cmd, p, relockOptions{}, run)
 	if err != nil {
 		return err
 	}
@@ -223,110 +220,37 @@ type relockOptions struct {
 	linked        string
 }
 
-// relockProject re-resolves p's lock with run and saves it.
-func (a *app) relockProject(cmd *cobra.Command, p *project.Project, opts relockOptions, run func(*project.Project, *resolve.Resolver) (pin string, err error)) (relocked, error) {
+// relockOpened relocks the project a command has already opened, prints what the relock warned
+// of, and shapes its changes for the command's result.
+func (a *app) relockOpened(cmd *cobra.Command, p *project.Project, opts relockOptions, run func(*project.Project, *resolve.Resolver) (pin string, err error)) (relocked, error) {
 	if err := p.RequireLock(); err != nil {
-		return relocked{}, err
-	}
-	stale := p.IsLockStale()
-	original, err := json.Marshal(p.Lock)
-	if err != nil {
 		return relocked{}, err
 	}
 	r, err := a.resolverFor(cmd.Context(), p, resolve.PackMode{IsRelocking: true, Linked: opts.linked})
 	if err != nil {
 		return relocked{}, err
 	}
-	before := r.Snapshot()
-	if err := a.resolveMovedRefs(cmd.Context(), p, r); err != nil {
-		return relocked{}, err
-	}
-	reresolved, err := r.Reconcile(cmd.Context())
+	store, err := a.packStore(p)
 	if err != nil {
 		return relocked{}, err
 	}
-	if reresolved == nil {
-		reresolved = []string{}
-	}
-	pin, err := run(p, r)
+	res, err := r.Relock(cmd.Context(), store, p, run, resolve.RelockOptions{KeepUnchanged: opts.keepUnchanged, Reason: cmd.Name()})
 	if err != nil {
 		return relocked{}, err
 	}
-	if _, err := r.Reconcile(cmd.Context()); err != nil {
-		return relocked{}, err
-	}
-	v, err := r.Validate()
-	if err != nil {
-		return relocked{}, err
-	}
-	if err := v.Err(); err != nil {
-		return relocked{}, err
-	}
+	a.warn(res.Warnings)
 	rl := relocked{
-		lockChanges: lockChanges{Changes: r.Changes(before), Reresolved: reresolved, Pin: pin, Suggestions: v.Recommended()},
-		validation:  v,
+		lockChanges: lockChanges{Changes: res.Changes, Reresolved: res.Reresolved, Pin: res.Pin, Suggestions: res.Validation.Recommended()},
+		validation:  res.Validation,
+		wasSaved:    res.WasSaved,
 	}
-	placements := (&build.Builder{Manifest: r.Manifest, Lock: r.Lock, Packs: r.Packs}).Placements()
 	rl.printItems = func(l *out.Lines) {
-		printChanges(l, rl.Changes, v.Suggestions, p.Manifest.Sides(), placements)
+		printChanges(l, rl.Changes, res.Validation.Suggestions, p.Manifest.Sides(), res.Placements)
 	}
-	a.warn(r.Warnings)
-	a.warn(v.Warnings)
-	a.warn(rl.Changes.Unshipped(p.Manifest.Sides(), r.Lock.Mods, placements))
-	if opts.keepUnchanged && !stale {
-		now, err := json.Marshal(p.Lock)
-		if err != nil {
-			return relocked{}, err
-		}
-		if bytes.Equal(original, now) {
-			return rl, nil
-		}
+	if res.WasSaved {
+		a.printer.LockStale = false
 	}
-	// An instance keeps what it had before the manifest and lock are rewritten,
-	// which is the state a rollback puts back.
-	if side, ok := p.Manifest.InPlaceSide(); ok {
-		keep := p.Manifest.HistoryKeep()
-		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Side: side, Reason: cmd.Name()}); err != nil {
-			return relocked{}, err
-		}
-		warning, err := build.HistoryWarning(p.Dir, keep)
-		if err != nil {
-			return relocked{}, err
-		}
-		if warning != "" {
-			a.printer.Warn("%s", warning)
-		}
-	}
-	if err := p.SaveManifest(); err != nil {
-		return relocked{}, err
-	}
-	if err := p.SaveLock(); err != nil {
-		return relocked{}, err
-	}
-	a.printer.LockStale = false
-	rl.wasSaved = true
 	return rl, nil
-}
-
-func (a *app) resolveMovedRefs(ctx context.Context, p *project.Project, r *resolve.Resolver) error {
-	modpacks := p.Manifest.Modpacks()
-	for i, l := range r.Packs {
-		mp := modpacks[l.Name]
-		pinned, locked := p.Lock.Modpacks[l.Name]
-		if !locked || pinned.Source != mp.Source || (pinned.Ref == mp.Ref && pinned.Path == mp.Path) {
-			continue
-		}
-		store, err := a.packStore(p)
-		if err != nil {
-			return err
-		}
-		loaded, err := store.Resolve(ctx, l.Name, mp)
-		if err != nil {
-			return err
-		}
-		r.Packs[i] = loaded
-	}
-	return nil
 }
 
 func (a *app) outdatedCmd() *cobra.Command {

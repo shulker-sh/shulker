@@ -53,7 +53,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 		rep, err = resolve.Merge(p, inc, sides)
 		return "", err
 	}
-	if _, err := a.relockProject(cmd, p, relockOptions{}, run); err != nil {
+	if _, err := a.relockOpened(cmd, p, relockOptions{}, run); err != nil {
 		if rep != nil {
 			rep.Undo()
 		}

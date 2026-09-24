@@ -33,7 +33,7 @@ func (a *app) inPlaceProject(dir string) (*project.Project, string, bool, error)
 // syncInPlace refreshes the modpacks that follow their source, relocks without moving the
 // project's own mods, and builds the instance where it stands.
 func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, req syncRequest) (syncResult, error) {
-	rl, err := a.relockProject(cmd, p, relockOptions{keepUnchanged: true, linked: req.linked}, func(p *project.Project, r *resolve.Resolver) (string, error) {
+	rl, err := a.relockOpened(cmd, p, relockOptions{keepUnchanged: true, linked: req.linked}, func(p *project.Project, r *resolve.Resolver) (string, error) {
 		store, err := a.packStore(p)
 		if err != nil {
 			return "", err
