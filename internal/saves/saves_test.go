@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 func world(t *testing.T, dir, name string) {
@@ -307,5 +309,43 @@ func TestValidGroup(t *testing.T) {
 		if IsValidGroup(name) {
 			t.Errorf("%q should not be a valid group", name)
 		}
+	}
+}
+
+func TestPickBackupByNumberNameOrPath(t *testing.T) {
+	src := t.TempDir()
+	world(t, src, "mine")
+	target := Target{WorldsDir: src, Backups: filepath.Join(t.TempDir(), "backups")}
+	frozen(t, time.Date(2026, 9, 18, 20, 30, 15, 0, time.Local))
+	older, err := Take(Source{Dir: src}, target.Home(), "backup", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frozen(t, time.Date(2026, 9, 19, 20, 30, 15, 0, time.Local))
+	newer, err := Take(Source{Dir: src}, target.Home(), "sync", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := PickBackup(target, 1, ""); err != nil || got.Path != newer.Path {
+		t.Fatalf("1 is the newest: %+v %v", got, err)
+	}
+	if got, err := PickBackup(target, 2, ""); err != nil || got.Path != older.Path {
+		t.Fatalf("2 is the one before: %+v %v", got, err)
+	}
+	if _, err := PickBackup(target, 3, ""); out.CodeOf(err) != "backup-missing" {
+		t.Fatalf("past the end is backup-missing, got %v", err)
+	}
+	if got, err := PickBackup(target, 1, older.ID); err != nil || got.Path != older.Path {
+		t.Fatalf("a name is looked up in the target's backups: %+v %v", got, err)
+	}
+	if got, err := PickBackup(target, 1, older.Path); err != nil || got.Path != older.Path {
+		t.Fatalf("a path is taken as is: %+v %v", got, err)
+	}
+	if _, err := PickBackup(target, 1, "nope"); out.CodeOf(err) != "backup-missing" {
+		t.Fatalf("an unknown name is backup-missing, got %v", err)
+	}
+	if _, err := PickBackup(Target{WorldsDir: src, Backups: filepath.Join(t.TempDir(), "none")}, 1, ""); out.CodeOf(err) != "backups-empty" {
+		t.Fatalf("no backups is backups-empty, got %v", err)
 	}
 }

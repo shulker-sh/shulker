@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -64,7 +61,16 @@ func (a *app) restoreCmd() *cobra.Command {
 }
 
 func (a *app) restore(target savesTarget, req restoreRequest) (restoreResult, error) {
-	from, err := a.pickBackup(target, req.args, req.named)
+	n, err := backupIndex(req.args)
+	if err != nil {
+		return restoreResult{}, err
+	}
+	from, err := saves.PickBackup(target.Target, n, req.named)
+	if out.CodeOf(err) == "backups-empty" {
+		e := out.AsError(err)
+		e.Help = fmt.Sprintf("`%s` takes one", a.savesCommand(target, "backup"))
+		return restoreResult{}, e
+	}
 	if err != nil {
 		return restoreResult{}, err
 	}
@@ -132,41 +138,14 @@ func (res restoreResult) print(l *out.Lines) {
 	l.Items(items...)
 }
 
-// pickBackup is the backup restore puts back: the one --backup names, else the nth of target's,
-// newest first. A --backup value with a path separator, or naming something on disk, is a path, as
-// -i's is; any other is a name in target's backups.
-func (a *app) pickBackup(target savesTarget, args []string, named string) (saves.Backup, error) {
-	if named != "" {
-		path := filepath.Join(target.Backups, strings.TrimSuffix(named, ".zip")+".zip")
-		if _, err := os.Stat(named); err == nil || strings.ContainsRune(named, '/') || strings.ContainsRune(named, filepath.Separator) {
-			if path, err = filepath.Abs(named); err != nil {
-				return saves.Backup{}, err
-			}
-		}
-		b, err := saves.ReadBackup(path)
-		if errors.Is(err, fs.ErrNotExist) {
-			return saves.Backup{}, out.Errorf("backup-missing", "there is no backup %s", path)
-		}
-		return b, err
+// backupIndex is the backup a restore's argument numbers, newest first and 1 by default.
+func backupIndex(args []string) (int, error) {
+	if len(args) == 0 {
+		return 1, nil
 	}
-	n := 1
-	if len(args) > 0 {
-		var err error
-		if n, err = strconv.Atoi(args[0]); err != nil || n < 1 {
-			return saves.Backup{}, out.Errorf("usage", "backups are numbered from 1, newest first, not %q", args[0])
-		}
+	n, err := strconv.Atoi(args[0])
+	if err != nil || n < 1 {
+		return 0, out.Errorf("usage", "backups are numbered from 1, newest first, not %q", args[0])
 	}
-	backups, err := saves.Backups(target.Backups)
-	if err != nil {
-		return saves.Backup{}, err
-	}
-	if len(backups) == 0 {
-		e := out.Errorf("backups-empty", "%s has no backups yet", target.WorldsDir)
-		e.Help = fmt.Sprintf("`%s` takes one", a.savesCommand(target, "backup"))
-		return saves.Backup{}, e
-	}
-	if n > len(backups) {
-		return saves.Backup{}, out.Errorf("backup-missing", "there is no backup %d; %s has %s", n, target.WorldsDir, plural(len(backups), "backup", "backups"))
-	}
-	return backups[n-1], nil
+	return n, nil
 }

@@ -16,6 +16,7 @@ import (
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 const (
@@ -337,4 +338,41 @@ func TrimAutomatic(dir string, keep int) error {
 		}
 	}
 	return nil
+}
+
+// PickBackup is the backup a restore puts back into t: the one named, else the nth of t's, newest
+// first. A name with a path separator, or naming something on disk, is a path; any other is a
+// name in t's backups.
+func PickBackup(t Target, n int, named string) (Backup, error) {
+	if named != "" {
+		path := filepath.Join(t.Backups, strings.TrimSuffix(named, ".zip")+".zip")
+		if _, err := os.Stat(named); err == nil || strings.ContainsRune(named, '/') || strings.ContainsRune(named, filepath.Separator) {
+			if path, err = filepath.Abs(named); err != nil {
+				return Backup{}, err
+			}
+		}
+		b, err := ReadBackup(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			return Backup{}, out.Errorf("backup-missing", "there is no backup %s", path)
+		}
+		return b, err
+	}
+	backups, err := Backups(t.Backups)
+	if err != nil {
+		return Backup{}, err
+	}
+	if len(backups) == 0 {
+		return Backup{}, out.Errorf("backups-empty", "%s has no backups yet", t.WorldsDir)
+	}
+	if n > len(backups) {
+		return Backup{}, out.Errorf("backup-missing", "there is no backup %d; %s has %s", n, t.WorldsDir, plural(len(backups), "backup", "backups"))
+	}
+	return backups[n-1], nil
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, one)
+	}
+	return fmt.Sprintf("%d %s", n, many)
 }
