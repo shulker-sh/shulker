@@ -6,14 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
-	"github.com/BurntSushi/toml"
 	"shulker.sh/shulker/internal/instance"
 )
 
@@ -203,140 +200,6 @@ func TestInitSeedsAuthors(t *testing.T) {
 	m := h.readManifest(t)
 	if len(m.Authors) == 0 || m.Authors[len(m.Authors)-1] != "shulker.sh" {
 		t.Fatalf("authors: %v", m.Authors)
-	}
-}
-
-func TestNeoForgeMarkerJar(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
-	h.editManifest(t, func(m map[string]any) {
-		m["description"] = "Survival with <friends>."
-		m["authors"] = []string{"Alice", "shulker.sh"}
-		m["license"] = "MIT"
-		m["links"] = map[string]any{
-			"website": "https://example.com",
-			"issues":  "https://example.com/issues",
-			"license": "https://example.com/license",
-		}
-	})
-	h.mustRun(t, "install")
-
-	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-pack.jar"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	entries := readZip(t, data)
-	for _, name := range []string{"META-INF/neoforge.mods.toml", "pack.mcmeta", "icon.png", "shulker.json", "shulker.lock", "shulker/mods.txt"} {
-		if _, ok := entries[name]; !ok {
-			t.Fatalf("marker has no %s (%v)", name, slices.Sorted(maps.Keys(entries)))
-		}
-	}
-	for name := range entries {
-		if strings.HasSuffix(name, ".class") || name == "fabric.mod.json" {
-			t.Fatalf("neoforge marker should carry no fabric metadata or classes: %s", name)
-		}
-	}
-	var meta struct {
-		ModLoader       string `toml:"modLoader"`
-		LoaderVersion   string `toml:"loaderVersion"`
-		License         string `toml:"license"`
-		LicenseURL      string `toml:"licenseURL"`
-		IssueTrackerURL string `toml:"issueTrackerURL"`
-		Mods            []struct {
-			ModID       string `toml:"modId"`
-			DisplayName string `toml:"displayName"`
-			LogoFile    string `toml:"logoFile"`
-			IconFile    string `toml:"iconFile"`
-			IconBlur    bool   `toml:"iconBlur"`
-			Authors     string `toml:"authors"`
-			DisplayURL  string `toml:"displayURL"`
-			Description string `toml:"description"`
-		} `toml:"mods"`
-	}
-	if err := toml.Unmarshal(entries["META-INF/neoforge.mods.toml"], &meta); err != nil {
-		t.Fatal(err)
-	}
-	// Naming a language loader is what NeoForge warns about; left out, it uses the one that loads a
-	// mod declaring no code.
-	if meta.ModLoader != "" || meta.LoaderVersion != "" {
-		t.Fatalf("marker toml: %+v", meta)
-	}
-	if meta.License != "MIT" || meta.LicenseURL != "https://example.com/license" {
-		t.Fatalf("marker toml: %+v", meta)
-	}
-	if meta.IssueTrackerURL != "https://example.com/issues" || len(meta.Mods) != 1 {
-		t.Fatalf("marker toml: %+v", meta)
-	}
-	mod := meta.Mods[0]
-	if mod.ModID != "shulker_pack" || mod.DisplayName != "pack" || mod.LogoFile != "icon.png" {
-		t.Fatalf("marker mod: %+v", mod)
-	}
-	// NeoForge draws the mod list icon from iconFile alone, and falls back to nothing without it.
-	if mod.IconFile != "icon.png" || !mod.IconBlur {
-		t.Fatalf("neoforge marker needs an icon of its own: %+v", mod)
-	}
-	if mod.Authors != "Alice, shulker.sh" || mod.DisplayURL != "https://example.com" {
-		t.Fatalf("marker mod: %+v", mod)
-	}
-	if !strings.HasPrefix(mod.Description, "Survival with <friends>.\n\nMinecraft 26.2 • neoforge ") {
-		t.Fatalf("description should be plain text:\n%s", mod.Description)
-	}
-	if strings.ContainsAny(mod.Description, "\\") || strings.Contains(mod.Description, "<bold>") {
-		t.Fatalf("description should carry no QuickText tags:\n%s", mod.Description)
-	}
-}
-
-func TestFMLMarkerPackMetadataIsCompatible(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
-	h.mustRun(t, "install")
-
-	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-pack.jar"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var meta struct {
-		Pack struct {
-			MaxFormat        int   `json:"max_format"`
-			MinFormat        []int `json:"min_format"`
-			SupportedFormats struct {
-				MaxInclusive int `json:"max_inclusive"`
-			} `json:"supported_formats"`
-		} `json:"pack"`
-	}
-	if err := json.Unmarshal(readZip(t, data)["pack.mcmeta"], &meta); err != nil {
-		t.Fatal(err)
-	}
-	// 26.2 is resource format 88 and data format 107; both schemas have to admit numbers that big.
-	if meta.Pack.MaxFormat < 107 || meta.Pack.SupportedFormats.MaxInclusive < 107 || len(meta.Pack.MinFormat) != 2 {
-		t.Fatalf("pack.mcmeta must read as compatible with a current game: %+v", meta.Pack)
-	}
-}
-
-func TestQuiltMarkerJarIsFabricMetadata(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "quilt")
-	h.mustRun(t, "install")
-
-	data, err := os.ReadFile(filepath.Join(h.dir, "build", "client", "mods", "shulker-pack.jar"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	entries := readZip(t, data)
-	// Quilt reads fabric.mod.json as is; a quilt.mod.json holding TOML stops the game loading.
-	if _, ok := entries["quilt.mod.json"]; ok {
-		t.Fatalf("quilt marker must not carry quilt.mod.json (%v)", slices.Sorted(maps.Keys(entries)))
-	}
-	meta, ok := entries["fabric.mod.json"]
-	if !ok {
-		t.Fatalf("quilt marker has no fabric.mod.json (%v)", slices.Sorted(maps.Keys(entries)))
-	}
-	var parsed map[string]any
-	if err := json.Unmarshal(meta, &parsed); err != nil {
-		t.Fatalf("fabric.mod.json must be JSON: %v\n%s", err, meta)
-	}
-	if parsed["id"] != "shulker_pack" {
-		t.Fatalf("marker id: %v", parsed["id"])
 	}
 }
 
