@@ -109,6 +109,20 @@ func (e *Entry) AfterNote(res InstanceResult) string {
 	return e.after(e, res)
 }
 
+// LinkedByShulker is whether the folder the launcher names after an instance is shulker's to link:
+// the launcher names no folder, nothing is there yet, or what is there has shulker's command in its
+// slot. Anything else is an instance the player made.
+func (e *Entry) LinkedByShulker(launcherDir, gameDir string) (bool, error) {
+	if !e.NamesFolder {
+		return true, nil
+	}
+	slots, found, err := ReadSlots(e, config.Instance{Dir: gameDir, LauncherDir: launcherDir})
+	if err != nil {
+		return false, err
+	}
+	return !found || IsShulkerSlot(slots.PreLaunch), nil
+}
+
 // AccountStores is every name accounts.stores accepts: shulker's own file first, then each launcher
 // whose accounts shulker reads, in table order.
 func AccountStores() []string {

@@ -364,23 +364,20 @@ func (a *app) askLauncherDir(e *launcher.Entry) (string, error) {
 // instance shulker linked is a project in its own game directory, and stays one after an unlink;
 // anything else in a folder the launcher names after the instance is the player's own.
 func (a *app) refuseForeignInstance(k *launcherLink, e *launcher.Entry, launcherDir, gameDir, display string) error {
-	if k.force || !e.NamesFolder {
+	if k.force {
 		return nil
 	}
 	_, _, inPlace, err := a.inPlaceProject(gameDir)
 	if err != nil || inPlace {
 		return err
 	}
-	slots, found, err := launcher.ReadSlots(e, config.Instance{Dir: gameDir, LauncherDir: launcherDir})
-	if err != nil {
+	ok, err := e.LinkedByShulker(launcherDir, gameDir)
+	if err != nil || ok {
 		return err
 	}
-	if found && !launcher.IsShulkerSlot(slots.PreLaunch) {
-		err := out.Errorf("instance-exists", "%s already has an %s %q that shulker didn't link", e.Title, e.Usage.Noun, display)
-		err.Help = "pass --name to create a second " + e.Usage.Noun + ", or --force to link this one"
-		return err
-	}
-	return nil
+	foreign := out.Errorf("instance-exists", "%s already has an %s %q that shulker didn't link", e.Title, e.Usage.Noun, display)
+	foreign.Help = "pass --name to create a second " + e.Usage.Noun + ", or --force to link this one"
+	return foreign
 }
 
 // clientVersions is what a link hands a launcher to install the locked platform: the versions the
