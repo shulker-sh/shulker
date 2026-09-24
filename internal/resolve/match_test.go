@@ -7,7 +7,7 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -26,7 +26,7 @@ func TestAlreadyRequiredKeysLegacyIDBySlug(t *testing.T) {
 		Lock:     &lock.Lock{Minecraft: "1.12.2", Loader: lock.Loader{Type: "forge", Version: "14.23.5.2860"}, Mods: map[string]lock.Mod{}},
 	}
 	im := &importer{r: r, rep: &Imported{}, inProject: true}
-	o := mrpack.Override{Layer: "overrides", Path: "mods/SpawnerControl.jar"}
+	o := packarchive.Override{Layer: "overrides", Path: "mods/SpawnerControl.jar"}
 	if !im.alreadyRequired(o, &provider.Project{Slug: "mob-spawner-control"}) {
 		t.Fatalf("a legacy mod required under its slug isn't found: %v", im.rep.Warnings)
 	}

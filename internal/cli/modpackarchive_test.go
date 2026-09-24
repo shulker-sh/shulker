@@ -317,7 +317,7 @@ func TestChangedArchiveModpackOfflineIsACodedError(t *testing.T) {
 	h.mustRun(t, "install")
 	archivePack(t, h, "packs/someone.mrpack", "v2")
 	code, stdout, _ := h.run(t, "--json", "sync", "--offline")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "mrpack-lookup" || !strings.Contains(e.Message, "modpack someone") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "modpack-lookup" || !strings.Contains(e.Message, "modpack someone") {
 		t.Fatalf("code=%d %+v", code, e)
 	}
 }

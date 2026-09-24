@@ -7,8 +7,8 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/provider/fake"
 )
@@ -82,9 +82,9 @@ func TestIdentifyAsksEachProviderInManifestOrder(t *testing.T) {
 	beta.Known = []provider.Project{{ID: "p1", Slug: "shiny", Type: manifest.TypeMod}}
 	beta.Files = []provider.Version{{ID: "v1", ProjectID: "p1", File: provider.File{Sha1: "86f7e437faa5a7fce15d1ddcb9eaeaea377667b8", Filename: "shiny.jar", URL: "https://beta.test/shiny.jar"}}}
 	r := fakeResolver(alpha, beta)
-	im := newImporter(r, &mrpack.Archive{}, false)
-	im.toIdentify(mrpack.Override{Layer: "overrides", Path: "mods/shiny.jar", Data: []byte("a")}, "")
-	im.toIdentify(mrpack.Override{Layer: "overrides", Path: "mods/other.jar", Data: []byte("b")}, "")
+	im := newImporter(r, &packarchive.Archive{}, false)
+	im.toIdentify(packarchive.Override{Layer: "overrides", Path: "mods/shiny.jar", Data: []byte("a")}, "")
+	im.toIdentify(packarchive.Override{Layer: "overrides", Path: "mods/other.jar", Data: []byte("b")}, "")
 	if err := im.identify(context.Background()); err != nil {
 		t.Fatal(err)
 	}

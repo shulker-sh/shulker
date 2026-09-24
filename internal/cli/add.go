@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/resolve"
@@ -191,14 +191,10 @@ func (a *app) isArchive(arg string) bool {
 			return false
 		}
 	}
-	switch strings.ToLower(filepath.Ext(arg)) {
-	case ".mrpack":
+	if _, ok := packarchive.NamedFormat(arg); ok {
 		return true
-	case ".zip":
-		_, err := cfpack.Read(a.localPath(arg))
-		return err == nil
 	}
-	return false
+	return packarchive.HasArchiveExtension(arg) && packarchive.IsArchive(a.localPath(arg))
 }
 
 // localPath is an argument naming a local file or folder made absolute, against -C when it is

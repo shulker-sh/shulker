@@ -28,9 +28,9 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/meta"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/server"
 	"shulker.sh/shulker/schema"
@@ -568,7 +568,7 @@ type overrideLayer struct {
 	// archived marks a layer read from a modpack archive: files holds it, and root only names
 	// where each file came from.
 	archived bool
-	files    []mrpack.Override
+	files    []packarchive.Override
 }
 
 // overrideLayers is every override folder that applies to the side, in build

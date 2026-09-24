@@ -453,7 +453,7 @@ func TestImportMrpackKeepsAnIndexFileModrinthFailsToServe(t *testing.T) {
 		return h.run(t, "import", archive, "--dir", filepath.Join(h.dir, "mirrored"), "--json")
 	}
 
-	if code, stdout, _ := importWith(t, h.server.URL+"/cdn/"+sodium.filename); code == 0 || !strings.Contains(stdout, "mrpack-download") || !strings.Contains(stdout, "no other URL") {
+	if code, stdout, _ := importWith(t, h.server.URL+"/cdn/"+sodium.filename); code == 0 || !strings.Contains(stdout, "modpack-download") || !strings.Contains(stdout, "no other URL") {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
 

@@ -109,7 +109,7 @@ func TestCurseForgeArchiveModpackNeverResolvesOffline(t *testing.T) {
 	curseForgeArchive(t, h, "packs/craft.zip", "v2", craftFiles...)
 	code, stdout, _ := h.run(t, "--json", "sync", "--offline")
 	e := failureCode(t, stdout)
-	if code == 0 || e.Code != "curseforge-offline" || !strings.Contains(e.Message, "modpack craft") {
+	if code == 0 || e.Code != "modpack-offline" || !strings.Contains(e.Message, "modpack craft") {
 		t.Fatalf("code=%d %+v", code, e)
 	}
 }

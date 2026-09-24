@@ -1,7 +1,6 @@
 package pack
 
 import (
-	"archive/zip"
 	"context"
 	"errors"
 	"fmt"
@@ -9,12 +8,11 @@ import (
 	"path/filepath"
 	"slices"
 
-	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/packarchive"
 )
 
 // KindOf is where a modpack entry comes from: an archive when it names a file, a provider when it
@@ -37,7 +35,7 @@ func (s *Store) resolveArchive(ctx context.Context, l *Loaded, p manifest.Requir
 		return err
 	}
 	l.Pin = pin
-	if l.Archive, l.CurseForge, err = readArchive(l.Name, p.File, s.Cache.Object(pin.Sha512)); err != nil {
+	if l.Archive, err = readArchive(l.Name, p.File, s.Cache.Object(pin.Sha512)); err != nil {
 		return err
 	}
 	if err := s.Consume(ctx, l); err != nil {
@@ -79,7 +77,7 @@ func (s *Store) openArchive(ctx context.Context, l *Loaded, p manifest.Require) 
 // from the entries the project's lock took from it.
 func (s *Store) openCached(ctx context.Context, l *Loaded, rel string) error {
 	var err error
-	if l.Archive, l.CurseForge, err = readArchive(l.Name, rel, s.Cache.Object(l.Pin.Sha512)); err != nil {
+	if l.Archive, err = readArchive(l.Name, rel, s.Cache.Object(l.Pin.Sha512)); err != nil {
 		return err
 	}
 	l.Manifest, l.Lock = archiveEntries(l.Name, l.Archive, s.Lock)
@@ -94,7 +92,7 @@ func (s *Store) resolveHosted(ctx context.Context, l *Loaded, p manifest.Require
 		return err
 	}
 	l.Pin, l.Source = pin, pin.Provider
-	if l.Archive, l.CurseForge, err = readArchive(l.Name, pin.Filename, s.Cache.Object(pin.Sha512)); err != nil {
+	if l.Archive, err = readArchive(l.Name, pin.Filename, s.Cache.Object(pin.Sha512)); err != nil {
 		return err
 	}
 	if err := s.Consume(ctx, l); err != nil {
@@ -213,53 +211,31 @@ func NotAFile(name, rel string) *out.Error {
 // CheckArchive refuses a file that isn't a modpack archive shulker consumes, before anything is
 // done with it.
 func CheckArchive(name, path string) error {
-	_, _, err := readArchive(name, filepath.Base(path), path)
+	_, err := readArchive(name, filepath.Base(path), path)
 	return err
 }
 
-// readArchive reads a modpack archive by its content: a Modrinth pack whole, and a CurseForge pack
-// as well as the Modrinth view of it that the build lays.
-func readArchive(name, rel, path string) (*mrpack.Archive, *cfpack.Archive, error) {
-	if HasIndex(path) {
-		a, err := mrpack.Read(path)
-		if err != nil {
-			return nil, nil, inModpack(name, err)
-		}
-		return a, nil, nil
+// readArchive reads a modpack archive by its content, in whichever format it is.
+func readArchive(name, rel, path string) (*packarchive.Archive, error) {
+	a, err := packarchive.Read(path)
+	if out.CodeOf(err) == "archive-not-modpack" {
+		e := out.Errorf("archive-not-modpack", "modpack %s: %s is not a %s modpack", name, rel, packarchive.Titles())
+		e.Help = "a modpack's file is " + packarchive.Archives() + "; a directory holding a shulker.json is a source"
+		return nil, e
 	}
-	cf, err := cfpack.Read(path)
-	if err == nil {
-		a, err := cf.Mrpack()
-		if err != nil {
-			return nil, nil, inModpack(name, err)
-		}
-		return a, cf, nil
-	}
-	if out.CodeOf(err) != "archive-not-modpack" {
-		return nil, nil, inModpack(name, err)
-	}
-	e := out.Errorf("archive-not-modpack", "modpack %s: %s is not a Modrinth or CurseForge modpack", name, rel)
-	e.Help = "a modpack's file is a .mrpack or a CurseForge zip; a directory holding a shulker.json is a source"
-	return nil, nil, e
-}
-
-// HasIndex reports whether path is a zip holding a Modrinth index.
-func HasIndex(path string) bool {
-	zr, err := zip.OpenReader(path)
 	if err != nil {
-		return false
+		return nil, inModpack(name, err)
 	}
-	defer zr.Close()
-	return slices.ContainsFunc(zr.File, func(f *zip.File) bool { return f.Name == mrpack.IndexName })
+	return a, nil
 }
 
 // archiveEntries is the lock and manifest a consumed archive had, rebuilt from what the project's
 // lock took from it: the entries tagged with the modpack, and the mods it requires by name, each
 // naming the provider project it locked from so an unlocked archive's mods resolve as they did. A
 // mod the project lists itself is the project's, so the rebuilt lock leaves it out.
-func archiveEntries(name string, a *mrpack.Archive, project *lock.Lock) (*manifest.Manifest, *lock.Lock) {
-	typ, version, _ := a.Loader()
-	m := &manifest.Manifest{Name: name, Minecraft: a.Index.Dependencies["minecraft"], Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}}
+func archiveEntries(name string, a *packarchive.Archive, project *lock.Lock) (*manifest.Manifest, *lock.Lock) {
+	typ, version := a.Loader.Type, a.Loader.Version
+	m := &manifest.Manifest{Name: name, Minecraft: a.Minecraft, Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}}
 	l := lock.New()
 	l.Minecraft, l.Loader = m.Minecraft, lock.Loader{Type: typ, Version: version}
 	if project == nil {
@@ -302,27 +278,28 @@ func requireFor(mod lock.Mod) manifest.Require {
 func (s *Store) layArchive(ctx context.Context, l *Loaded) error {
 	l.Overrides = nil
 	for _, o := range l.Archive.Overrides {
-		if mrpack.IsModJar(o.Path) || mrpack.IsPackZip(o.Path) {
+		if packarchive.IsModJar(o.Path) || packarchive.IsPackZip(o.Path) {
 			if _, ok := l.Pin.Unmanaged[o.Layer+"/"+o.Path]; !ok {
 				continue
 			}
 		}
 		l.Overrides = append(l.Overrides, o)
 	}
-	for _, f := range l.Archive.Index.Files {
-		sha, ok := l.Pin.Unmanaged[f.Layer()+"/"+f.Path]
+	for _, f := range l.Archive.Files {
+		layer := packarchive.LayerFor(f.Side)
+		sha, ok := l.Pin.Unmanaged[layer+"/"+f.Path]
 		if !ok || sha != f.Hashes["sha512"] || len(f.Downloads) == 0 {
 			continue
 		}
 		path, err := s.Cache.Ensure(ctx, s.Fetch, f.Downloads[0], sha)
 		if err != nil {
-			return out.Errorf("mrpack-download", "modpack %s: couldn't download %s", l.Name, f.Path).WithCause("download", err)
+			return out.Errorf("modpack-download", "modpack %s: couldn't download %s", l.Name, f.Path).WithCause("download", err)
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		l.Overrides = append(l.Overrides, mrpack.Override{Layer: f.Layer(), Path: f.Path, Data: data})
+		l.Overrides = append(l.Overrides, packarchive.Override{Layer: layer, Path: f.Path, Data: data})
 	}
 	return nil
 }

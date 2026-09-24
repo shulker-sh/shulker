@@ -15,14 +15,14 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/zipfile"
 )
 
 // IsLocalPath reports whether an add argument names a local file rather than a provider slug: a
 // file that exists, or a name ending the way a jar or a pack archive does.
 func IsLocalPath(arg string) bool {
-	switch strings.ToLower(filepath.Ext(arg)) {
-	case ".jar", ".zip", ".mrpack":
+	if strings.EqualFold(filepath.Ext(arg), ".jar") || packarchive.HasArchiveExtension(arg) {
 		return true
 	}
 	st, err := os.Stat(arg)
@@ -195,7 +195,7 @@ func fileKind(path, asked string) (string, error) {
 // guessFileKind is the type asked for, a mod for a jar, and for a zip whatever it holds.
 func guessFileKind(path, asked string) (string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
-	if ext == ".mrpack" {
+	if _, ok := packarchive.NamedFormat(path); ok {
 		e := out.Errorf("usage", "%s is a modpack archive", filepath.Base(path))
 		e.Help = "add it with `shulker modpack add`"
 		return "", e

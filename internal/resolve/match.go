@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
-	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -24,11 +24,11 @@ type Matched struct {
 // Modrinth lacks on CurseForge by fingerprint, and locks each match into requires, its side taken
 // from the file's layer. Each file's Layer and Path name it under r.Dir. A file that doesn't match,
 // can't be locked, or whose key requires already holds stays an override.
-func (r *Resolver) MatchOverrides(ctx context.Context, files []mrpack.Override) (*Matched, error) {
-	im := newImporter(r, &mrpack.Archive{}, false)
+func (r *Resolver) MatchOverrides(ctx context.Context, files []packarchive.Override) (*Matched, error) {
+	im := newImporter(r, &packarchive.Archive{}, false)
 	im.inProject = true
 	for _, o := range files {
-		side := layerSide(o.Layer)
+		side := packarchive.LayerSide(o.Layer)
 		if side == "both" {
 			side = ""
 		}
@@ -54,12 +54,12 @@ func (r *Resolver) MatchOverrides(ctx context.Context, files []mrpack.Override) 
 // alreadyRequired reports, with a warning, whether a project's override file matched as proj is
 // one requires already holds the key of, for it to stay an override. A pack's own files are never
 // checked: a duplicate there is dropped.
-func (im *importer) alreadyRequired(o mrpack.Override, proj *provider.Project) bool {
+func (im *importer) alreadyRequired(o packarchive.Override, proj *provider.Project) bool {
 	if !im.inProject {
 		return false
 	}
 	key := proj.Slug
-	if mrpack.IsModJar(o.Path) {
+	if packarchive.IsModJar(o.Path) {
 		info, err := im.r.readJar(filepath.Join(im.r.Dir, o.Layer, filepath.FromSlash(o.Path)), path.Base(o.Path))
 		if err != nil {
 			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: %v; kept as an override", o.Layer+"/"+o.Path, err))

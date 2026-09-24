@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -15,15 +14,13 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/resolve"
@@ -53,29 +50,6 @@ type importFlags struct {
 	ignoreShulker             bool
 }
 
-// importArchive is the archive an import reads, as the Modrinth view the resolver takes, with
-// the CurseForge pack it came from when it was one.
-type importArchive struct {
-	kind archiveKind
-	arc  *mrpack.Archive
-	cf   *cfpack.Archive
-}
-
-// archiveKind is the format of a modpack archive, as --type names it.
-type archiveKind string
-
-const (
-	kindMrpack     archiveKind = "mrpack"
-	kindCurseForge archiveKind = "curseforge"
-)
-
-func (k archiveKind) title() string {
-	if k == kindCurseForge {
-		return "CurseForge"
-	}
-	return "Modrinth"
-}
-
 func (a *app) importCmd() *cobra.Command {
 	var f importFlags
 	cmd := &cobra.Command{
@@ -88,7 +62,7 @@ func (a *app) importCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&f.name, "name", "", "project name (default: the pack name, slugified)")
-	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the modpack unless it is this kind: mrpack, curseforge, source, or modpack for one the project requires (default: detected)")
+	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the modpack unless it is this kind: "+strings.Join(packarchive.Names(), ", ")+", source, or modpack for one the project requires (default: detected)")
 	cmd.Flags().StringVar(&f.provider, "provider", "", "look a slug up on this provider only: modrinth or curseforge (default: the first that has it)")
 	cmd.Flags().StringVar(&f.at.Ref, "ref", "", "git ref of a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&f.at.Path, "path", "", "folder of a git source's repository holding its shulker.json (default: the root)")
@@ -100,7 +74,7 @@ func (a *app) importCmd() *cobra.Command {
 func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	ctx := cmd.Context()
 	err := checkFlagValues(
-		flagValue{"type", f.typ, []string{"mrpack", "curseforge", "source", "modpack"}},
+		flagValue{"type", f.typ, append(packarchive.Names(), "source", "modpack")},
 		flagValue{"side", f.side, []string{"client", "server"}},
 		flagValue{"provider", f.provider, manifest.DefaultProviders},
 	)
@@ -133,17 +107,17 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if err != nil {
 		return err
 	}
-	in, source, err := a.findImport(ctx, d, dir, target, arg, f)
+	arc, source, err := a.findImport(ctx, d, dir, target, arg, f)
 	if err != nil {
 		return err
 	}
 	if target != nil {
-		return a.mergeImport(cmd, d, target, in, source, f)
+		return a.mergeImport(cmd, d, target, arc, source, f)
 	}
 	if source != nil {
 		return a.importSource(cmd, dir, source, f)
 	}
-	pk, err := a.readImportPack(ctx, d, in, dir, f)
+	pk, err := a.readImportPack(ctx, d, arc, dir, f)
 	if err != nil {
 		return err
 	}
@@ -152,13 +126,13 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if f.side != "" {
 		mods.Overrides, leftOut = keepSide(m, l, mods.Overrides, f.side)
 	}
-	if err := writeImportIcon(dir, m, in.arc.Icon); err != nil {
+	if err := writeImportIcon(dir, m, arc.Icon); err != nil {
 		return err
 	}
 	if err := writeImport(dir, m, l, mods.Overrides); err != nil {
 		return err
 	}
-	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: in.arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides), KeptYours: []string{}, LeftOut: leftOut}
+	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides), KeptYours: []string{}, LeftOut: leftOut}
 	return a.emitImport(res,
 		out.Row{Text: importedSummary(a.titles(), mods, res.Marker)},
 		out.Row{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
@@ -210,54 +184,30 @@ type packProject struct {
 	mods     *resolve.Imported
 }
 
-// platform is the Minecraft version and loader an archive names.
-func (in *importArchive) platform() (minecraft, loaderType, loaderVersion string) {
-	minecraft = in.arc.Index.Dependencies["minecraft"]
-	loaderType, loaderVersion, _ = in.arc.Loader()
-	if in.cf != nil {
-		minecraft = in.cf.Manifest.Minecraft.Version
-		loaderType, loaderVersion, _ = in.cf.Loader()
-	}
-	return minecraft, loaderType, loaderVersion
-}
-
 // readImportPack locks what an archive holds as the project it would make, with dir as that
 // project's directory: its local files are copied out there.
-func (a *app) readImportPack(ctx context.Context, d *deps, in *importArchive, dir string, f *importFlags) (*packProject, error) {
+func (a *app) readImportPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir string, f *importFlags) (*packProject, error) {
 	if f.ignoreShulker {
-		in.arc.Marker = nil
-		if in.cf != nil {
-			in.cf.Marker = nil
-		}
+		arc.Marker = nil
 	}
 	name := f.name
 	if name == "" {
-		name = slugify(in.arc.Index.Name)
+		name = slugify(arc.Name)
 	}
-	m, warnings, err := importManifest(in.arc, name)
-	if err != nil {
-		return nil, err
-	}
+	m, warnings := arc.Manifest(name)
 	a.warn(warnings)
-	if in.cf != nil && in.arc.Marker == nil && in.cf.Manifest.Author != "" {
-		m.Authors = []string{in.cf.Manifest.Author}
-	}
+	// The platform the pack names is exact, where a marker's manifest may hold a range.
 	exact := *m
-	exact.Minecraft, exact.Loader.Type, exact.Loader.Version = in.platform()
+	exact.Minecraft, exact.Loader = arc.Minecraft, manifest.Loader{Type: arc.Loader.Type, Version: arc.Loader.Version}
 	l, err := a.importLock(ctx, d, &exact)
 	if err != nil {
 		return nil, err
 	}
-	if marker := in.arc.Marker; marker != nil && marker.Manifest.Server != nil && marker.Manifest.Server.Players != nil {
+	if marker := arc.Marker; marker != nil && marker.Manifest.Server != nil && marker.Manifest.Server.Players != nil {
 		l.Players = marker.Lock.Players
 	}
 	r := &resolve.Resolver{Dir: dir, Manifest: m, Lock: l, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
-	var mods *resolve.Imported
-	if in.cf != nil {
-		mods, err = r.ImportCurseForge(ctx, in.cf)
-	} else {
-		mods, err = r.ImportMrpack(ctx, in.arc)
-	}
+	mods, err := r.Import(ctx, arc)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +215,7 @@ func (a *app) readImportPack(ctx context.Context, d *deps, in *importArchive, di
 	if err := r.AdoptLocalFiles(); err != nil {
 		return nil, err
 	}
-	if in.arc.Marker != nil {
+	if arc.Marker != nil {
 		mods.Overrides = dropManifestOwned(m, mods.Overrides)
 	}
 	return &packProject{manifest: m, lock: l, mods: mods}, nil
@@ -275,7 +225,7 @@ func (a *app) readImportPack(ctx context.Context, d *deps, in *importArchive, di
 // as a source; a URL as an archive by its content, else a git or manifest source; and anything
 // else as a modpack slug, fitting target's platform when there is a target to merge into. It
 // returns the archive, or the source's checkout.
-func (a *app) findImport(ctx context.Context, d *deps, dir string, target *project.Project, arg string, f *importFlags) (*importArchive, *pack.Checkout, error) {
+func (a *app) findImport(ctx context.Context, d *deps, dir string, target *project.Project, arg string, f *importFlags) (*packarchive.Archive, *pack.Checkout, error) {
 	if !isImportURL(arg) {
 		path := a.localPath(arg)
 		if resolve.IsLocalFolder(path) {
@@ -285,8 +235,8 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 			if err := refuseImportFlags(f, pack.File); err != nil {
 				return nil, nil, err
 			}
-			in, err := readImportArchive(path, f.typ)
-			return in, nil, err
+			arc, err := readImportArchive(path, f.typ)
+			return arc, nil, err
 		}
 		return a.importHosted(ctx, d, dir, target, arg, f)
 	}
@@ -299,8 +249,8 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 			if err := refuseImportFlags(f, pack.File); err != nil {
 				return nil, nil, err
 			}
-			in, err := readImportArchive(path, f.typ)
-			return in, nil, err
+			arc, err := readImportArchive(path, f.typ)
+			return arc, nil, err
 		}
 	}
 	return a.importCheckout(ctx, d, dir, arg, f)
@@ -319,7 +269,7 @@ func (a *app) fetchImportArchive(ctx context.Context, d *deps, url string) (stri
 	defer os.Remove(tmp.Name())
 	_, err = d.fetch.Download(ctx, url, tmp)
 	tmp.Close()
-	isNamedArchive := slices.Contains([]string{".mrpack", ".zip"}, strings.ToLower(path.Ext(strings.SplitN(url, "?", 2)[0])))
+	isNamedArchive := packarchive.HasArchiveExtension(strings.SplitN(url, "?", 2)[0])
 	if errors.Is(err, fetch.ErrNotFound) && !isNamedArchive {
 		return "", nil
 	}
@@ -327,9 +277,9 @@ func (a *app) fetchImportArchive(ctx context.Context, d *deps, url string) (stri
 		e := out.Errorf("modpack-fetch", "couldn't download %s", url)
 		return "", e.WithCause("http", err)
 	}
-	if !isModpackArchive(tmp.Name()) {
+	if !packarchive.IsArchive(tmp.Name()) {
 		if isNamedArchive {
-			return "", notModpackError(url)
+			return "", packarchive.NotArchive(url)
 		}
 		return "", nil
 	}
@@ -345,24 +295,8 @@ func (a *app) fetchImportArchive(ctx context.Context, d *deps, url string) (stri
 	return d.cache.Object(sha), nil
 }
 
-func notModpackError(file string) *out.Error {
-	e := out.Errorf("archive-not-modpack", "%s is not a Modrinth or CurseForge modpack", file)
-	e.Help = "import reads a .mrpack, or a CurseForge zip with a manifest.json of type minecraftModpack"
-	return e
-}
-
 func isImportURL(arg string) bool {
 	return pack.Classify(arg) != pack.Local || strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")
-}
-
-// isModpackArchive reports whether path is a zip holding a Modrinth index or a CurseForge modpack
-// manifest.
-func isModpackArchive(path string) bool {
-	if pack.HasIndex(path) {
-		return true
-	}
-	_, err := cfpack.Read(path)
-	return err == nil
 }
 
 // refuseImportFlags refuses the flags that don't apply to a modpack of kind, with the codes a
@@ -385,7 +319,7 @@ func refuseImportFlags(f *importFlags, kind pack.Kind) error {
 
 // importHosted picks a hosted modpack's newest release that fits target's platform, or any
 // platform without a target, and reads its archive from the cache.
-func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *project.Project, slug string, f *importFlags) (*importArchive, *pack.Checkout, error) {
+func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *project.Project, slug string, f *importFlags) (*packarchive.Archive, *pack.Checkout, error) {
 	if err := refuseImportFlags(f, pack.Hosted); err != nil {
 		return nil, nil, err
 	}
@@ -398,18 +332,18 @@ func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *pro
 	if err != nil {
 		return nil, nil, err
 	}
-	in, err := readImportArchive(d.cache.Object(pin.Sha512), f.typ)
-	return in, nil, err
+	arc, err := readImportArchive(d.cache.Object(pin.Sha512), f.typ)
+	return arc, nil, err
 }
 
 // importCheckout fetches a shulker source for an import to copy.
-func (a *app) importCheckout(ctx context.Context, d *deps, dir, source string, f *importFlags) (*importArchive, *pack.Checkout, error) {
+func (a *app) importCheckout(ctx context.Context, d *deps, dir, source string, f *importFlags) (*packarchive.Archive, *pack.Checkout, error) {
 	kind := pack.Classify(source)
 	if err := refuseImportFlags(f, kind); err != nil {
 		return nil, nil, err
 	}
-	if f.typ != "" && f.typ != "source" {
-		return nil, nil, out.Errorf("usage", "%s is a shulker source, not a %s modpack", source, archiveKind(f.typ).title())
+	if want, ok := packarchive.Lookup(f.typ); ok {
+		return nil, nil, out.Errorf("usage", "%s is a shulker source, not a %s modpack", source, want.Title())
 	}
 	store := &pack.Store{Cache: d.cache, ProjectDir: dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn}
 	c, err := store.Checkout(ctx, source, f.at)
@@ -497,7 +431,7 @@ func projectPaths(m *manifest.Manifest) []string {
 // overrideLayers are a project's override folders: the three every project has, then each
 // feature's.
 func overrideLayers(m *manifest.Manifest) []string {
-	layers := slices.Clone(mrpack.Layers)
+	layers := slices.Clone(packarchive.Layers)
 	for _, name := range slices.Sorted(maps.Keys(m.Features)) {
 		o := m.Features[name].Overrides
 		for _, layer := range []string{o.Both, o.Client, o.Server} {
@@ -550,40 +484,22 @@ func copyProjectFiles(src, dir string, paths []string) ([]string, error) {
 	return created, nil
 }
 
-// readImportArchive reads a modpack archive by its content, refusing one that isn't the kind typ
-// names when it names one.
-func readImportArchive(file, typ string) (*importArchive, error) {
-	in := &importArchive{kind: kindMrpack}
-	if pack.HasIndex(file) {
-		arc, err := mrpack.Read(file)
-		if err != nil {
-			return nil, err
-		}
-		in.arc = arc
-	} else {
-		cf, err := cfpack.Read(file)
-		if out.CodeOf(err) == "archive-not-modpack" {
-			return nil, notModpackError(file)
-		}
-		if err != nil {
-			return nil, err
-		}
-		arc, err := cf.Mrpack()
-		if err != nil {
-			return nil, err
-		}
-		arc.Marker = cf.Marker
-		in.kind, in.arc, in.cf = kindCurseForge, arc, cf
+// readImportArchive reads a modpack archive by its content, refusing one that isn't the format
+// typ names when it names one.
+func readImportArchive(file, typ string) (*packarchive.Archive, error) {
+	arc, err := packarchive.Read(file)
+	if err != nil {
+		return nil, err
 	}
-	if typ != "" && archiveKind(typ) != in.kind {
-		return nil, out.Errorf("usage", "%s is a %s modpack, not a %s one", file, in.kind.title(), archiveKind(typ).title())
+	if want, ok := packarchive.Lookup(typ); ok && want.Name() != arc.Format.Name() {
+		return nil, out.Errorf("usage", "%s is a %s modpack, not a %s one", file, arc.Format.Title(), want.Title())
 	}
-	return in, nil
+	return arc, nil
 }
 
 // keepSide narrows a project to one side: the other side's block, its entries and its override
 // folders, a feature's included, go, and what went is returned by key and by override path.
-func keepSide(m *manifest.Manifest, l *lock.Lock, overrides []mrpack.Override, side string) ([]mrpack.Override, []string) {
+func keepSide(m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Override, side string) ([]packarchive.Override, []string) {
 	other := otherSide(side)
 	leftOut := []string{}
 	switch side {
@@ -705,73 +621,7 @@ func (a *app) platformLock(ctx context.Context, d *deps, platform *resolve.Platf
 	return l
 }
 
-func importManifest(arc *mrpack.Archive, name string) (*manifest.Manifest, []string, error) {
-	minecraft := arc.Index.Dependencies["minecraft"]
-	if minecraft == "" {
-		return nil, nil, out.Errorf("mrpack-invalid", "the index has no minecraft dependency")
-	}
-	loaderType, loaderVersion, _ := arc.Loader()
-	var warnings []string
-	if arc.Marker == nil {
-		m := &manifest.Manifest{
-			Schema:    manifest.SchemaURL,
-			Name:      name,
-			Version:   arc.Index.VersionID,
-			Note:      arc.Index.Summary,
-			Minecraft: minecraft,
-			Loader:    manifest.Loader{Type: loaderType, Version: loaderVersion},
-			Requires:  map[string]manifest.Require{},
-			Client:    &manifest.Client{},
-		}
-		if importNeedsServer(arc) {
-			m.Server = &manifest.Server{Memory: server.DefaultMemory}
-		}
-		return m, warnings, nil
-	}
-	copied := *arc.Marker.Manifest
-	m := &copied
-	ml := arc.Marker.Lock
-	if ml.Minecraft != minecraft {
-		warnings = append(warnings, fmt.Sprintf("the marker was locked to Minecraft %s but the pack is for %s; using %s", ml.Minecraft, minecraft, minecraft))
-		m.Minecraft = minecraft
-	}
-	if ml.Loader.Type != loaderType || ml.Loader.Version != loaderVersion {
-		warnings = append(warnings, fmt.Sprintf("the marker was locked to %s but the pack is for %s; using the pack's", loader.Describe(ml.Loader.Type, ml.Loader.Version), loader.Describe(loaderType, loaderVersion)))
-		m.Loader = manifest.Loader{Type: loaderType, Version: loaderVersion}
-	}
-	if m.Version != arc.Index.VersionID {
-		m.Version = arc.Index.VersionID
-	}
-	if modpacks := m.Modpacks(); len(modpacks) > 0 {
-		sources := make([]string, 0, len(modpacks))
-		for _, name := range slices.Sorted(maps.Keys(modpacks)) {
-			source := modpacks[name].Source + modpacks[name].File
-			if source == "" {
-				source = name
-			}
-			sources = append(sources, source)
-		}
-		warnings = append(warnings, fmt.Sprintf("pack layers were flattened into the overrides: %s", strings.Join(sources, ", ")))
-	}
-	m.Requires = map[string]manifest.Require{}
-	return m, warnings, nil
-}
-
-func importNeedsServer(arc *mrpack.Archive) bool {
-	for _, f := range arc.Index.Files {
-		if f.Side() == "server" {
-			return true
-		}
-	}
-	for _, o := range arc.Overrides {
-		if o.Layer == "server-overrides" {
-			return true
-		}
-	}
-	return false
-}
-
-func dropManifestOwned(m *manifest.Manifest, overrides []mrpack.Override) []mrpack.Override {
+func dropManifestOwned(m *manifest.Manifest, overrides []packarchive.Override) []packarchive.Override {
 	owned := map[string]bool{}
 	if m.Client != nil && m.Client.Options != nil {
 		owned[m.OptionsPath()] = true
@@ -794,7 +644,7 @@ func dropManifestOwned(m *manifest.Manifest, overrides []mrpack.Override) []mrpa
 	return kept
 }
 
-func writeImport(dir string, m *manifest.Manifest, l *lock.Lock, overrides []mrpack.Override) error {
+func writeImport(dir string, m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Override) error {
 	if err := scaffold(dir); err != nil {
 		return err
 	}
@@ -831,7 +681,7 @@ func writeImportIcon(dir string, m *manifest.Manifest, icon []byte) error {
 	return fsutil.Write(path, icon)
 }
 
-func overridePaths(overrides []mrpack.Override) []string {
+func overridePaths(overrides []packarchive.Override) []string {
 	paths := make([]string, 0, len(overrides))
 	for _, o := range overrides {
 		paths = append(paths, o.Layer+"/"+o.Path)

@@ -18,14 +18,13 @@ import (
 	"sort"
 	"strings"
 
-	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -47,9 +46,9 @@ type Imported struct {
 	Duplicates []string `json:"duplicates"`
 	Unmanaged  []string `json:"unmanaged"`
 	// Sides are the mods the index's env widens beyond their provider's side.
-	Sides     []SideChoice      `json:"sides"`
-	Warnings  []string          `json:"-"`
-	Overrides []mrpack.Override `json:"-"`
+	Sides     []SideChoice           `json:"sides"`
+	Warnings  []string               `json:"-"`
+	Overrides []packarchive.Override `json:"-"`
 }
 
 // SideChoice is a mod locked on a wider side than its provider's, since the index's env places it
@@ -108,7 +107,7 @@ func (rep *Imported) warnSides() {
 
 type importer struct {
 	r         *Resolver
-	a         *mrpack.Archive
+	a         *packarchive.Archive
 	rep       *Imported
 	bySha     map[string]string
 	packBySha map[string]importedPack
@@ -127,7 +126,7 @@ type importer struct {
 	hybrids map[string][]hybridCopy
 	// unmatched are the mod jars and pack zips to identify, index files and overrides alike, in
 	// the order the pack lists them.
-	unmatched []mrpack.Override
+	unmatched []packarchive.Override
 	// indexSides are the sides the index's env gives its files, by layer and path.
 	indexSides map[string]string
 	// keepSides reuses the marker's side for each entry, for an archive whose layers don't say.
@@ -139,8 +138,8 @@ type importer struct {
 
 // hybridCopy is a hybrid datapack's copy under resourcepacks/, an index file or an override.
 type hybridCopy struct {
-	file     *mrpack.File
-	override *mrpack.Override
+	file     *packarchive.File
+	override *packarchive.Override
 }
 
 // importedPack is a pack the pack's own lock names, found by
@@ -150,7 +149,7 @@ type importedPack struct {
 	kind string
 }
 
-func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
+func newImporter(r *Resolver, a *packarchive.Archive, reuseLocal bool) *importer {
 	im := &importer{r: r, a: a, rep: &Imported{Locked: []LockedFile{}, Reused: []string{}, Dropped: []string{}, Duplicates: []string{}, Unmanaged: []string{}, Sides: []SideChoice{}, Warnings: []string{}}, bySha: map[string]string{}, indexSides: map[string]string{}, packBySha: map[string]importedPack{}, matched: map[string]bool{}, found: map[string]hosted{}, sides: map[string]string{}, served: map[string]string{}, loadedDatapacks: map[string]bool{}, hybrids: map[string][]hybridCopy{}}
 	if a.Marker == nil {
 		return im
@@ -170,20 +169,28 @@ func newImporter(r *Resolver, a *mrpack.Archive, reuseLocal bool) *importer {
 	return im
 }
 
-// ImportMrpack locks the mods a Modrinth pack lists, reporting what it locked, reused, dropped and
-// left unmanaged.
-func (r *Resolver) ImportMrpack(ctx context.Context, a *mrpack.Archive) (*Imported, error) {
-	return r.importMrpack(ctx, a, true)
+// Import locks the files a pack archive lists and carries, whatever its format, reporting what it
+// locked, reused, dropped and left unmanaged. A file the exporting shulker project locked, matched
+// by sha512, comes back as that project locked it.
+func (r *Resolver) Import(ctx context.Context, a *packarchive.Archive) (*Imported, error) {
+	return r.importArchive(ctx, a, true)
 }
 
-// importMrpack is ImportMrpack. Without reuseLocal, a local file the pack's own lock names is laid
-// as an override rather than reused: its path is the exporter's, and outside the archive only the
+// importArchive is Import. Without reuseLocal, a local file the pack's own lock names is laid as
+// an override rather than reused: its path is the exporter's, and outside the archive only the
 // cache holds its bytes.
-func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLocal bool) (*Imported, error) {
+func (r *Resolver) importArchive(ctx context.Context, a *packarchive.Archive, reuseLocal bool) (*Imported, error) {
 	im := newImporter(r, a, reuseLocal)
+	im.keepSides = !a.Format.Sided()
 	im.findLoadedDatapacks(a)
-	for _, f := range a.Index.Files {
-		if err := im.indexFile(ctx, f); err != nil {
+	if err := im.listedByID(ctx); err != nil {
+		return nil, err
+	}
+	for _, f := range a.Files {
+		if f.Provider != "" {
+			continue
+		}
+		if err := im.listedByDownload(ctx, f); err != nil {
 			return nil, err
 		}
 	}
@@ -207,58 +214,51 @@ func (r *Resolver) importMrpack(ctx context.Context, a *mrpack.Archive, reuseLoc
 	return im.rep, nil
 }
 
-func (im *importer) indexFile(ctx context.Context, f mrpack.File) error {
-	sha512Sum, sha1Sum := f.Hashes["sha512"], f.Hashes["sha1"]
-	if sha512Sum == "" || sha1Sum == "" || len(f.Downloads) == 0 {
-		return out.Errorf("mrpack-invalid", "index file %s lacks sha1, sha512, or a download url", f.Path)
-	}
+// listedByDownload takes a file the archive lists by hash and download URL.
+func (im *importer) listedByDownload(ctx context.Context, f packarchive.File) error {
+	sha512Sum := f.Hashes["sha512"]
 	if id, ok := im.bySha[sha512Sum]; ok {
-		im.reuse(id, f.Side())
+		im.reuse(id, f.Side)
 		return nil
 	}
 	if p, ok := im.packBySha[sha512Sum]; ok {
 		im.reusePack(p)
 		return nil
 	}
-	if !mrpack.IsModJar(f.Path) && !mrpack.IsPackZip(f.Path) {
+	if !packarchive.IsModJar(f.Path) && !packarchive.IsPackZip(f.Path) {
 		return im.unmanagedDownload(ctx, f)
 	}
 	if dup, err := im.duplicateDatapack(ctx, hybridCopy{file: &f}, f.Path, f.Path, sha512Sum); err != nil || dup {
 		return err
 	}
-	if len(f.Env) > 0 {
-		im.indexSides[f.Layer()+"/"+f.Path] = f.Side()
+	if f.Side != "" {
+		im.indexSides[packarchive.LayerFor(f.Side)+"/"+f.Path] = f.Side
 	}
 	o, err := im.download(ctx, f)
 	if err != nil {
 		return err
 	}
-	// A pack's side is its env; a mod's is too when the index gives one, else its provider's.
-	side := ""
-	if mrpack.IsPackZip(f.Path) || len(f.Env) > 0 {
-		side = f.Side()
-	}
-	im.toIdentify(o, side)
+	im.toIdentify(o, f.Side)
 	return nil
 }
 
 // toIdentify queues a mod jar or pack zip for the providers to identify, to be locked on side
 // when one hosts it.
-func (im *importer) toIdentify(o mrpack.Override, side string) {
+func (im *importer) toIdentify(o packarchive.Override, side string) {
 	im.sides[o.Layer+"/"+o.Path] = side
 	im.unmatched = append(im.unmatched, o)
 }
 
 // findLoadedDatapacks notes the zips the pack keeps in a global datapack mod's folder, which are
 // the copies that load.
-func (im *importer) findLoadedDatapacks(a *mrpack.Archive) {
-	for _, f := range a.Index.Files {
-		if mrpack.IsLoadedDatapackZip(f.Path) {
+func (im *importer) findLoadedDatapacks(a *packarchive.Archive) {
+	for _, f := range a.Files {
+		if packarchive.IsLoadedDatapackZip(f.Path) {
 			im.loadedDatapacks[f.Hashes["sha512"]] = true
 		}
 	}
 	for _, o := range a.Overrides {
-		if mrpack.IsLoadedDatapackZip(o.Path) {
+		if packarchive.IsLoadedDatapackZip(o.Path) {
 			sum := sha512.Sum512(o.Data)
 			im.loadedDatapacks[hex.EncodeToString(sum[:])] = true
 		}
@@ -269,7 +269,7 @@ func (im *importer) findLoadedDatapacks(a *mrpack.Archive) {
 // the bytes of one inside it: a leftover copy the game never loads. A copy under resourcepacks/
 // that carries assets/ is a hybrid's, which loads its assets, and is held for settleHybrids.
 func (im *importer) duplicateDatapack(ctx context.Context, c hybridCopy, archivePath, filePath, sha512Sum string) (bool, error) {
-	if mrpack.IsLoadedDatapackZip(filePath) || !im.loadedDatapacks[sha512Sum] {
+	if packarchive.IsLoadedDatapackZip(filePath) || !im.loadedDatapacks[sha512Sum] {
 		return false, nil
 	}
 	if path.Dir(filePath) == "resourcepacks" {
@@ -427,7 +427,7 @@ func (im *importer) lockFile(ctx context.Context, p provider.Provider, layer, fi
 
 // lockOverride locks an override the pack ships as lockFile does, keeping it as an override, with a
 // warning, when p fails to serve it.
-func (im *importer) lockOverride(ctx context.Context, p provider.Provider, o mrpack.Override, side string, proj *provider.Project, v *provider.Version) (bool, error) {
+func (im *importer) lockOverride(ctx context.Context, p provider.Provider, o packarchive.Override, side string, proj *provider.Project, v *provider.Version) (bool, error) {
 	locked, failed, err := im.lockFile(ctx, p, o.Layer, o.Path, side, proj, v)
 	if failed != "" {
 		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s/%s: %s's download failed (%s); kept as an override, so try matching it again later", o.Layer, o.Path, p.Title(), failed))
@@ -476,7 +476,7 @@ func (im *importer) fileKind(ctx context.Context, filePath string, proj *provide
 		kind = manifest.TypeResourcePack
 	case path.Dir(filePath) == "shaderpacks":
 		kind = manifest.TypeShader
-	case mrpack.IsDatapackZip(filePath):
+	case packarchive.IsDatapackZip(filePath):
 		kind = manifest.TypeDatapack
 	}
 	datapack := proj.Type == manifest.TypeDatapack || slices.Contains(v.Loaders, provider.DatapackLoader)
@@ -614,7 +614,7 @@ func (im *importer) canListPack(key, kind string) (bool, error) {
 // lookupFailed is a file in the pack that couldn't be looked up on p, with its error in a row. A
 // network failure stays one for fetch.IsNetwork.
 func lookupFailed(p provider.Provider, file string, err error) error {
-	e := out.Errorf("mrpack-lookup", "couldn't look up %s on %s", file, p.Title()).WithCause(p.Name(), err)
+	e := out.Errorf("modpack-lookup", "couldn't look up %s on %s", file, p.Title()).WithCause(p.Name(), err)
 	if !fetch.IsNetwork(err) {
 		return e
 	}
@@ -622,7 +622,7 @@ func lookupFailed(p provider.Provider, file string, err error) error {
 	return fetch.Unreachable(e)
 }
 
-func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error {
+func (im *importer) unmanagedDownload(ctx context.Context, f packarchive.File) error {
 	o, err := im.download(ctx, f)
 	if err != nil {
 		return err
@@ -634,9 +634,9 @@ func (im *importer) unmanagedDownload(ctx context.Context, f mrpack.File) error 
 // download fetches an index file from the first of its URLs that serves it, into memory rather
 // than the cache: a file identified on a provider is fetched from the provider when it is locked,
 // which proves the provider serves it, unless the URL that served it was the provider's own.
-func (im *importer) download(ctx context.Context, f mrpack.File) (mrpack.Override, error) {
+func (im *importer) download(ctx context.Context, f packarchive.File) (packarchive.Override, error) {
 	im.r.log("fetching %s", f.Path)
-	o := mrpack.Override{Layer: f.Layer(), Path: f.Path}
+	o := packarchive.Override{Layer: packarchive.LayerFor(f.Side), Path: f.Path}
 	want := f.Hashes["sha512"]
 	if im.r.Cache.Has(want) {
 		data, err := os.ReadFile(im.r.Cache.Object(want))
@@ -658,27 +658,27 @@ func (im *importer) download(ctx context.Context, f mrpack.File) (mrpack.Overrid
 		im.served[o.Layer+"/"+o.Path] = url
 		return o, nil
 	}
-	e := out.Errorf("mrpack-download", "couldn't download %s", f.Path).WithCause("download", err)
+	e := out.Errorf("modpack-download", "couldn't download %s", f.Path).WithCause("download", err)
 	e.Help = "every URL the pack lists for it failed"
 	if len(f.Downloads) == 1 {
 		e.Help = "the pack lists no other URL for it"
 	}
-	return mrpack.Override{}, e
+	return packarchive.Override{}, e
 }
 
-func (im *importer) unmanaged(o mrpack.Override) {
+func (im *importer) unmanaged(o packarchive.Override) {
 	im.rep.Overrides = append(im.rep.Overrides, o)
 	im.rep.Unmanaged = append(im.rep.Unmanaged, o.Layer+"/"+o.Path)
 }
 
-func (im *importer) keepUnmanaged(files []mrpack.Override) {
+func (im *importer) keepUnmanaged(files []packarchive.Override) {
 	for _, o := range files {
 		im.unmanaged(o)
 	}
 }
 
-func (im *importer) override(ctx context.Context, o mrpack.Override) error {
-	if !mrpack.IsModJar(o.Path) && !mrpack.IsPackZip(o.Path) {
+func (im *importer) override(ctx context.Context, o packarchive.Override) error {
+	if !packarchive.IsModJar(o.Path) && !packarchive.IsPackZip(o.Path) {
 		im.rep.Overrides = append(im.rep.Overrides, o)
 		return nil
 	}
@@ -695,7 +695,7 @@ func (im *importer) override(ctx context.Context, o mrpack.Override) error {
 		if _, err := im.r.Cache.Put(bytes.NewReader(o.Data)); err != nil {
 			return err
 		}
-		side := layerSide(o.Layer)
+		side := packarchive.LayerSide(o.Layer)
 		if im.keepSides {
 			side = ""
 		}
@@ -705,7 +705,7 @@ func (im *importer) override(ctx context.Context, o mrpack.Override) error {
 	if dup, err := im.duplicateDatapack(ctx, hybridCopy{override: &o}, o.Layer+"/"+o.Path, o.Path, digest); err != nil || dup {
 		return err
 	}
-	side := layerSide(o.Layer)
+	side := packarchive.LayerSide(o.Layer)
 	if side == "both" {
 		side = ""
 	}
@@ -844,16 +844,6 @@ func (r *Resolver) AdoptLocalFiles() error {
 	return nil
 }
 
-func layerSide(layer string) string {
-	switch layer {
-	case "client-overrides":
-		return "client"
-	case "server-overrides":
-		return "server"
-	}
-	return "both"
-}
-
 // unpackFolder lays the pack folder zip the cache holds under sha512 out as the folder at to. It
 // zips back to the same bytes, since zipfile.Folder writes a folder's files alone, in path order.
 func (r *Resolver) unpackFolder(sha512, to string) error {
@@ -890,32 +880,23 @@ func unpackFile(f *zip.File, to string) error {
 }
 
 // ConsumeArchive locks what a modpack archive holds as that modpack's own lock and manifest, the
-// way ImportMrpack or ImportCurseForge locks one into a new project, and records in its pin the
-// files the archive lays itself. r's own lock is left alone; only its providers, provider order,
-// cache and fetch client are used.
+// way Import locks one into a new project, and records in its pin the files the archive lays
+// itself. r's own lock is left alone; only its providers, provider order, cache and fetch client
+// are used.
 func (r *Resolver) ConsumeArchive(ctx context.Context, l *pack.Loaded) error {
 	a := l.Archive
-	minecraft := a.Index.Dependencies["minecraft"]
-	if minecraft == "" {
-		return out.Errorf("mrpack-invalid", "modpack %s: the archive's index names no minecraft version", l.Name)
-	}
-	typ, version, _ := a.Loader()
-	m := &manifest.Manifest{Name: l.Name, Minecraft: minecraft, Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}, Providers: r.Manifest.Providers}
+	typ, version := a.Loader.Type, a.Loader.Version
+	m := &manifest.Manifest{Name: l.Name, Minecraft: a.Minecraft, Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}, Providers: r.Manifest.Providers}
 	pl := lock.New()
-	pl.Minecraft, pl.Loader = minecraft, lock.Loader{Type: typ, Version: version}
+	pl.Minecraft, pl.Loader = a.Minecraft, lock.Loader{Type: typ, Version: version}
 	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log}
-	var rep *Imported
-	var err error
-	if l.CurseForge != nil {
-		if r.Fetch != nil && r.Fetch.Offline {
-			return curseForgeOffline(l.Name, nil)
-		}
-		rep, err = scratch.ImportCurseForge(ctx, l.CurseForge)
-		if fetch.IsNetwork(err) {
-			return curseForgeOffline(l.Name, err)
-		}
-	} else {
-		rep, err = scratch.importMrpack(ctx, a, false)
+	byID := a.Format.Provider() != ""
+	if byID && r.Fetch != nil && r.Fetch.Offline {
+		return archiveOffline(l.Name, a.Format, nil)
+	}
+	rep, err := scratch.importArchive(ctx, a, false)
+	if byID && fetch.IsNetwork(err) {
+		return archiveOffline(l.Name, a.Format, err)
 	}
 	if err != nil {
 		return prefixed("modpack "+l.Name, err)
@@ -938,13 +919,14 @@ func (r *Resolver) ConsumeArchive(ctx context.Context, l *pack.Loaded) error {
 	return nil
 }
 
-// curseForgeOffline is a CurseForge modpack read without the network. Its files are named by id
-// alone, with no hash to find them in the cache by, so even a warm cache can't stand in.
-func curseForgeOffline(name string, cause error) error {
-	e := out.Errorf("curseforge-offline", "modpack %s: a CurseForge modpack can't be read offline, even with every file it names in the cache", name)
-	e.Help = "it names its files by CurseForge id, which only the CurseForge API resolves; run the command again online"
+// archiveOffline is a modpack archive that lists its files by provider id read without the
+// network. An id carries no hash to find the file in the cache by, so even a warm cache can't
+// stand in.
+func archiveOffline(name string, f packarchive.Format, cause error) error {
+	e := out.Errorf("modpack-offline", "modpack %s: a %s modpack can't be read offline, even with every file it names in the cache", name, f.Title())
+	e.Help = fmt.Sprintf("it names its files by %s id, which only the %s API resolves; run the command again online", f.Title(), f.Title())
 	if cause != nil {
-		e = e.WithCause(cfpack.Provider, cause)
+		e = e.WithCause(f.Provider(), cause)
 	}
 	return fetch.Unreachable(e)
 }

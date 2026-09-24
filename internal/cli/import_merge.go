@@ -14,9 +14,9 @@ import (
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -27,7 +27,7 @@ import (
 type incoming struct {
 	manifest  *manifest.Manifest
 	lock      *lock.Lock
-	overrides []mrpack.Override
+	overrides []packarchive.Override
 	dir       string
 	hasBlocks bool
 }
@@ -50,7 +50,7 @@ func (rep *mergeReport) undo() {
 }
 
 // mergeImport merges a modpack into the project p, the project winning on every clash.
-func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, in *importArchive, source *pack.Checkout, f *importFlags) error {
+func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *packarchive.Archive, source *pack.Checkout, f *importFlags) error {
 	ctx := cmd.Context()
 	dir := p.Dir
 	sides, err := mergeSides(p.Manifest, f.side)
@@ -67,8 +67,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, in *i
 			return err
 		}
 	} else {
-		minecraft, loaderType, loaderVersion := in.platform()
-		if err := checkImportPlatform(p, minecraft, loaderType, loaderVersion); err != nil {
+		if err := checkImportPlatform(p, arc.Minecraft, arc.Loader.Type, arc.Loader.Version); err != nil {
 			return err
 		}
 		staging, err := os.MkdirTemp("", "shulker-import-")
@@ -76,12 +75,12 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, in *i
 			return err
 		}
 		defer os.RemoveAll(staging)
-		pk, err := a.readImportPack(ctx, d, in, staging, f)
+		pk, err := a.readImportPack(ctx, d, arc, staging, f)
 		if err != nil {
 			return err
 		}
 		mods = pk.mods
-		inc = &incoming{manifest: pk.manifest, lock: pk.lock, overrides: mods.Overrides, dir: staging, hasBlocks: in.arc.Marker != nil}
+		inc = &incoming{manifest: pk.manifest, lock: pk.lock, overrides: mods.Overrides, dir: staging, hasBlocks: arc.Marker != nil}
 	}
 	name, version := inc.manifest.Name, inc.manifest.Version
 	var rep *mergeReport
@@ -157,8 +156,8 @@ func readSourcePack(c *pack.Checkout) (*incoming, error) {
 }
 
 // readOverrideFolders reads the files in a project's override folders, a feature's included.
-func readOverrideFolders(dir string, m *manifest.Manifest) ([]mrpack.Override, error) {
-	var overrides []mrpack.Override
+func readOverrideFolders(dir string, m *manifest.Manifest) ([]packarchive.Override, error) {
+	var overrides []packarchive.Override
 	for _, layer := range overrideLayers(m) {
 		root := filepath.Join(dir, filepath.FromSlash(layer))
 		err := filepath.WalkDir(root, func(path string, e fs.DirEntry, err error) error {
@@ -173,7 +172,7 @@ func readOverrideFolders(dir string, m *manifest.Manifest) ([]mrpack.Override, e
 			if err != nil {
 				return err
 			}
-			overrides = append(overrides, mrpack.Override{Layer: layer, Path: filepath.ToSlash(rel), Data: data})
+			overrides = append(overrides, packarchive.Override{Layer: layer, Path: filepath.ToSlash(rel), Data: data})
 			return nil
 		})
 		if err != nil && !os.IsNotExist(err) {

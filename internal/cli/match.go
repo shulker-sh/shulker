@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"shulker.sh/shulker/internal/lock"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -88,7 +88,7 @@ var matchFolders = append([]string{"mods", "resourcepacks", "shaderpacks"}, lock
 
 // overrideFiles reads the jars and pack zips in the project's override layers, or only the named
 // ones, each named by its layer and its path within it.
-func (a *app) overrideFiles(dir string, named []string) ([]mrpack.Override, error) {
+func (a *app) overrideFiles(dir string, named []string) ([]packarchive.Override, error) {
 	var rels []string
 	var err error
 	if len(named) == 0 {
@@ -99,14 +99,14 @@ func (a *app) overrideFiles(dir string, named []string) ([]mrpack.Override, erro
 	if err != nil {
 		return nil, err
 	}
-	files := make([]mrpack.Override, len(rels))
+	files := make([]packarchive.Override, len(rels))
 	for i, rel := range rels {
 		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
 		if err != nil {
 			return nil, err
 		}
 		layer, within, _ := strings.Cut(rel, "/")
-		files[i] = mrpack.Override{Layer: layer, Path: within, Data: data}
+		files[i] = packarchive.Override{Layer: layer, Path: within, Data: data}
 	}
 	return files, nil
 }
@@ -114,7 +114,7 @@ func (a *app) overrideFiles(dir string, named []string) ([]mrpack.Override, erro
 // scanOverrides lists every matchable file in the project's override layers, relative to dir.
 func scanOverrides(dir string) ([]string, error) {
 	var rels []string
-	for _, layer := range mrpack.Layers {
+	for _, layer := range packarchive.Layers {
 		for _, folder := range matchFolders {
 			entries, err := os.ReadDir(filepath.Join(dir, layer, folder))
 			if os.IsNotExist(err) {
@@ -163,5 +163,5 @@ func (a *app) namedOverrides(dir string, named []string) ([]string, error) {
 
 func isMatchable(rel string) bool {
 	layer, within, _ := strings.Cut(rel, "/")
-	return slices.Contains(mrpack.Layers, layer) && (mrpack.IsModJar(within) || mrpack.IsPackZip(within))
+	return slices.Contains(packarchive.Layers, layer) && (packarchive.IsModJar(within) || packarchive.IsPackZip(within))
 }
