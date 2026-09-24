@@ -1,6 +1,9 @@
 package server
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -60,4 +63,24 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func TestFindJavaTakesABinaryOrAHome(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake java is a shell script")
+	}
+	home := t.TempDir()
+	bin := filepath.Join(home, "bin", "java")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\necho 'openjdk version \"1.8.0_74\"' >&2\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, override := range []string{home, bin} {
+		j, err := FindJava(override, 8)
+		if err != nil || j.Path != bin || j.Major != 8 {
+			t.Errorf("%s: got %+v, %v", override, j, err)
+		}
+	}
 }

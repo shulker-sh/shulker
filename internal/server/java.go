@@ -65,15 +65,11 @@ func ClientJava(path string, required int) (Java, error) {
 	return j, requireMajor(j, required)
 }
 
-// FindJava picks a server's java. An absolute override is a Java home; any other override is a
-// version range the java on PATH must fall in, and without one it must reach required.
+// FindJava picks a server's java. An absolute override is a java binary or a Java home; any other
+// override is a version range the java on PATH must fall in, and without one it must reach required.
 func FindJava(override string, required int) (Java, error) {
 	if filepath.IsAbs(override) {
-		j, err := JavaAt(override)
-		if err != nil {
-			return Java{}, err
-		}
-		return j, requireMajor(j, required)
+		return ClientJava(override, required)
 	}
 	path, err := exec.LookPath("java")
 	if err != nil {

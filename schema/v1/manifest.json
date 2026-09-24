@@ -52,7 +52,7 @@
     "java": {
       "type": "string",
       "minLength": 1,
-      "description": "Optional override. Either an absolute path to a JDK/JRE home or a semver range over the Java major version, e.g. \">=25\". Omit to derive from the Minecraft version json and use the managed runtime."
+      "description": "Optional override. Either an absolute path to a java binary or a JDK/JRE home, or a semver range over the Java major version, e.g. \">=25\". Omit to derive from the Minecraft version json and use the managed runtime."
     },
     "providers": {
       "type": "array",
