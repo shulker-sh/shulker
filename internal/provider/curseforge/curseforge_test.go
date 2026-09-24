@@ -3,6 +3,7 @@ package curseforge
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -333,5 +334,37 @@ func TestURLsRoundTrip(t *testing.T) {
 	}
 	if c.Available() != nil || New(fetch.New("test"), "").Available() == nil {
 		t.Error("availability follows the key")
+	}
+}
+
+func TestAFileIDReachesAProjectTheSearchMisses(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/mods/search":
+			w.Write([]byte(`{"data":[]}`))
+		case "/mods/files":
+			w.Write([]byte(`{"data":[{"id":5700001,"modId":500525,"displayName":"7.3.9","fileName":"balm-fabric-7.3.9.jar","downloadUrl":"https://x/balm.jar","hashes":[{"algo":1,"value":"abc"}]}]}`))
+		case "/mods/500525":
+			w.Write([]byte(`{"data":{"id":500525,"slug":"balm-fabric","name":"Balm","classId":6}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+	ctx := context.Background()
+	if _, err := c.Project(ctx, "balm-fabric", "mod"); !errors.Is(err, provider.ErrNotFound) {
+		t.Fatalf("an unlisted slug is not found: %v", err)
+	}
+	if !strings.Contains(c.NotFoundHelp(), "file URL") {
+		t.Fatalf("the miss points at a file URL: %s", c.NotFoundHelp())
+	}
+	v, err := c.ProjectVersion(ctx, "balm-fabric", "5700001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.ProjectID != "500525" || v.ID != "5700001" || v.Page != "https://www.curseforge.com/minecraft/mc-mods/balm-fabric/files/5700001" {
+		t.Fatalf("the file names its project: %+v", v)
 	}
 }

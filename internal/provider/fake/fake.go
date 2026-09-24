@@ -124,6 +124,9 @@ func (p *Provider) Version(_ context.Context, versionID string) (*provider.Versi
 
 func (p *Provider) ProjectVersion(_ context.Context, project, version string) (*provider.Version, error) {
 	p.Requests["ProjectVersion"]++
+	if i := slices.IndexFunc(p.Known, func(proj provider.Project) bool { return proj.Slug == project }); i >= 0 {
+		project = p.Known[i].ID
+	}
 	for _, v := range p.Files {
 		if v.ProjectID == project && (v.ID == version || v.Number == version) {
 			found := v
