@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"context"
+	"os"
 
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -30,6 +31,66 @@ func (r *Resolver) AddPackSource(ctx context.Context, store *pack.Store, source,
 	}
 	loaded.Name = key
 	return r.addLoadedPack(ctx, store, source, key, loaded, entry)
+}
+
+// AddArchive adds the modpack archive at path, under the key as names or the file's stem. An
+// archive outside the project, or in a folder whose files something else owns, is copied into
+// manifest.FilesDir, and adding the same file again refreshes that copy and relocks it, keeping
+// its locked and auto-update flags. A second key for the same file is refused.
+func (r *Resolver) AddArchive(ctx context.Context, store *pack.Store, path, as string, entry manifest.Require) error {
+	if st, err := os.Stat(path); err != nil || !st.Mode().IsRegular() {
+		return out.Errorf("file-not-found", "%s is not a file", path)
+	}
+	rel, copied, err := r.ProjectPath(path)
+	if err != nil {
+		return err
+	}
+	key := as
+	if key == "" {
+		key = StemKey(path)
+	}
+	if !manifest.IsValidKey(key) {
+		e := out.Errorf("usage", "%s can't be a requires key", key)
+		e.Help = "pass `--as <key>` to give this modpack one"
+		return e
+	}
+	held, taken := r.Manifest.Requires[key]
+	isReadded := taken && held.Kind() == manifest.TypeModpack && held.File == rel
+	if taken && !isReadded {
+		return manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
+	}
+	for name, existing := range r.Manifest.Modpacks() {
+		if existing.File == rel && name != key {
+			return out.Errorf("modpack-exists", "modpack %s is already in the manifest as %s", rel, name)
+		}
+	}
+	if err := pack.CheckArchive(key, path); err != nil {
+		return err
+	}
+	entry.Source, entry.Type, entry.File = "", manifest.TypeModpack, rel
+	if isReadded {
+		if entry.Locked == nil {
+			entry.Locked = held.Locked
+		}
+		if entry.AutoUpdate == nil {
+			entry.AutoUpdate = held.AutoUpdate
+		}
+	}
+	if copied {
+		if err := r.CopyIn(path, rel, isReadded); err != nil {
+			return err
+		}
+	}
+	loaded, err := store.Resolve(ctx, key, entry)
+	if err != nil {
+		return err
+	}
+	if isReadded {
+		if err := r.RemovePack(key); err != nil {
+			return err
+		}
+	}
+	return r.addLoadedPack(ctx, store, key, key, loaded, entry)
 }
 
 // addLoadedPack adds a resolved modpack under key. One built for another Minecraft than the

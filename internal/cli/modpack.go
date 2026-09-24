@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -134,6 +133,10 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 		return err
 	}
 	return a.relock(cmd, relockPlan{}, func(p *project.Project, r *resolve.Resolver) (string, error) {
+		store, err := a.packStore(p)
+		if err != nil {
+			return "", err
+		}
 		for _, source := range sources {
 			if u, ok := urls[source]; ok {
 				slug, add, err := r.FromURL(cmd.Context(), u, opts)
@@ -164,14 +167,10 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 				entry.AutoUpdate = &no
 			}
 			if path := a.localPath(source); resolve.IsLocalPath(path) {
-				if err := a.addArchiveEntry(cmd.Context(), p, r, path, as, entry); err != nil {
+				if err := r.AddArchive(cmd.Context(), store, path, as, entry); err != nil {
 					return "", err
 				}
 				continue
-			}
-			store, err := a.packStore(p)
-			if err != nil {
-				return "", err
 			}
 			if err := r.AddPackSource(cmd.Context(), store, source, as, entry); err != nil {
 				return "", err
@@ -233,69 +232,6 @@ func (a *app) lockHostedEntry(ctx context.Context, p *project.Project, r *resolv
 	p.ReplacePacks(packs)
 	p.Manifest.Requires[key] = entry
 	return nil
-}
-
-// addArchiveEntry adds the modpack archive at path, under the key as names or the file's stem. An
-// archive outside the project, or in a folder whose files something else owns, is copied into
-// manifest.FilesDir, and adding the same file again refreshes that copy and relocks it.
-func (a *app) addArchiveEntry(ctx context.Context, p *project.Project, r *resolve.Resolver, path, as string, entry manifest.Require) error {
-	if st, err := os.Stat(path); err != nil || !st.Mode().IsRegular() {
-		return out.Errorf("file-not-found", "%s is not a file", path)
-	}
-	rel, copied, err := r.ProjectPath(path)
-	if err != nil {
-		return err
-	}
-	key := as
-	if key == "" {
-		key = resolve.StemKey(path)
-	}
-	if !manifest.IsValidKey(key) {
-		e := out.Errorf("usage", "%s can't be a requires key", key)
-		e.Help = "pass `--as <key>` to give this modpack one"
-		return e
-	}
-	held, taken := p.Manifest.Requires[key]
-	isReadded := taken && held.Kind() == manifest.TypeModpack && held.File == rel
-	if taken && !isReadded {
-		return manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
-	}
-	for name, existing := range p.Manifest.Modpacks() {
-		if existing.File == rel && name != key {
-			return out.Errorf("modpack-exists", "modpack %s is already in the manifest as %s", rel, name)
-		}
-	}
-	if err := pack.CheckArchive(key, path); err != nil {
-		return err
-	}
-	entry.Source, entry.Type, entry.File = "", manifest.TypeModpack, rel
-	if isReadded {
-		if entry.Locked == nil {
-			entry.Locked = held.Locked
-		}
-		if entry.AutoUpdate == nil {
-			entry.AutoUpdate = held.AutoUpdate
-		}
-	}
-	if copied {
-		if err := r.CopyIn(path, rel, isReadded); err != nil {
-			return err
-		}
-	}
-	store, err := a.packStore(p)
-	if err != nil {
-		return err
-	}
-	loaded, err := store.Resolve(ctx, key, entry)
-	if err != nil {
-		return err
-	}
-	if isReadded {
-		if err := r.RemovePack(key); err != nil {
-			return err
-		}
-	}
-	return a.addLoadedPack(ctx, p, r, store, key, key, loaded, entry)
 }
 
 // addLoadedPack adds a resolved modpack under key, offering to unlock one built for another
