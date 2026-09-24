@@ -3,7 +3,6 @@ package cli
 import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/pack"
@@ -57,7 +56,7 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 	}
 	l := lock.New()
 	l.Minecraft, l.Loader, l.Java = platform.Minecraft, platform.Loader, platform.Java
-	display := platformName(platform.Minecraft, platform.Loader.Type)
+	display := project.PlatformName(platform.Minecraft, platform.Loader.Type)
 	if !cmd.Flags().Changed("name") && !cmd.Flags().Changed("as") {
 		if display, err = a.askText("What should it be called?", "the name the launcher shows", display); err != nil {
 			return nil, err
@@ -65,13 +64,4 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 	}
 	m.Name, m.Client.Name = config.SlugID(display), display
 	return &syncSource{Checkout: &pack.Checkout{Kind: pack.Local}, project: &project.Project{Manifest: m, Lock: l}, isAuthor: true}, nil
-}
-
-// platformName is what an authored instance is called unless the player says otherwise, the way
-// launchers name a new instance after what it runs.
-func platformName(minecraft, loaderType string) string {
-	if l, ok := loader.Lookup(loaderType); ok {
-		return l.Title + " " + minecraft
-	}
-	return "Minecraft " + minecraft
 }
