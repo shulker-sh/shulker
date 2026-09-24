@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
@@ -172,6 +173,44 @@ func newImporter(r *Resolver, a *packarchive.Archive, reuseLocal bool) *importer
 // Import locks the files a pack archive lists and carries, whatever its format, reporting what it
 // locked, reused, dropped and left unmanaged. A file the exporting shulker project locked, matched
 // by sha512, comes back as that project locked it.
+// ImportProject reads arc as the project it makes at r.Dir, into r.Manifest and r.Lock: the
+// manifest arc gives under name, a lock from the exact platform the pack names, where a marker's
+// manifest may hold a range, the marker's players when it keeps some, the files Import locks, its
+// local files adopted, and, after a marker, the overrides the manifest renders itself dropped.
+// The manifest's and the lock's warnings go to r.Warnings; the import's own come back in Imported.
+func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, name string, ignoreMarker bool) (*Imported, error) {
+	if ignoreMarker {
+		arc.Marker = nil
+	}
+	m, warnings := arc.Manifest(name)
+	r.Warnings = append(r.Warnings, warnings...)
+	exact := *m
+	exact.Minecraft, exact.Loader = arc.Minecraft, manifest.Loader{Type: arc.Loader.Type, Version: arc.Loader.Version}
+	r.log("%s", ResolvingLine(exact.Minecraft, exact.Loader))
+	l, warning, err := r.Meta.NewLock(ctx, &exact)
+	if err != nil {
+		return nil, err
+	}
+	if warning != "" {
+		r.Warnings = append(r.Warnings, warning)
+	}
+	if marker := arc.Marker; marker != nil && marker.Manifest.Server != nil && marker.Manifest.Server.Players != nil {
+		l.Players = marker.Lock.Players
+	}
+	r.Manifest, r.Lock = m, l
+	mods, err := r.Import(ctx, arc)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.AdoptLocalFiles(); err != nil {
+		return nil, err
+	}
+	if arc.Marker != nil {
+		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
+	}
+	return mods, nil
+}
+
 func (r *Resolver) Import(ctx context.Context, a *packarchive.Archive) (*Imported, error) {
 	return r.importArchive(ctx, a, true)
 }

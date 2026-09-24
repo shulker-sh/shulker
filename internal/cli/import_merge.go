@@ -75,12 +75,12 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 			return err
 		}
 		defer os.RemoveAll(staging)
-		pk, err := a.readImportPack(ctx, d, arc, staging, f)
+		r, imported, err := a.importPack(ctx, d, arc, staging, f)
 		if err != nil {
 			return err
 		}
-		mods = pk.mods
-		inc = &incoming{manifest: pk.manifest, lock: pk.lock, overrides: mods.Overrides, dir: staging, hasBlocks: arc.Marker != nil}
+		mods = imported
+		inc = &incoming{manifest: r.Manifest, lock: r.Lock, overrides: mods.Overrides, dir: staging, hasBlocks: arc.Marker != nil}
 	}
 	name, version := inc.manifest.Name, inc.manifest.Version
 	var rep *mergeReport

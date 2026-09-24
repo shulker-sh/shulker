@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -115,11 +114,11 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if source != nil {
 		return a.importSource(cmd, dir, source, f)
 	}
-	pk, err := a.readImportPack(ctx, d, arc, dir, f)
+	r, mods, err := a.importPack(ctx, d, arc, dir, f)
 	if err != nil {
 		return err
 	}
-	m, l, mods := pk.manifest, pk.lock, pk.mods
+	m, l := r.Manifest, r.Lock
 	leftOut := []string{}
 	if f.side != "" {
 		mods.Overrides, leftOut = resolve.KeepSide(m, l, mods.Overrides, f.side)
@@ -174,53 +173,17 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 	return rows
 }
 
-// packProject is a modpack archive read as a project of its own: the manifest and lock a new
-// project would get, with the files the resolver found and the overrides it left.
-type packProject struct {
-	manifest *manifest.Manifest
-	lock     *lock.Lock
-	mods     *resolve.Imported
-}
-
-// readImportPack locks what an archive holds as the project it would make, with dir as that
-// project's directory: its local files are copied out there.
-func (a *app) readImportPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir string, f *importFlags) (*packProject, error) {
-	if f.ignoreShulker {
-		arc.Marker = nil
-	}
-	name := f.name
-	if name == "" {
-		name = project.Slugify(arc.Name)
-	}
-	m, warnings := arc.Manifest(name)
-	a.warn(warnings)
-	// The platform the pack names is exact, where a marker's manifest may hold a range.
-	exact := *m
-	exact.Minecraft, exact.Loader = arc.Minecraft, manifest.Loader{Type: arc.Loader.Type, Version: arc.Loader.Version}
-	a.progress("%s", resolvingLine(exact.Minecraft, exact.Loader))
-	l, warning, err := d.meta.NewLock(ctx, &exact)
+// importPack reads arc as the project it would make at dir, its local files copied out there,
+// and returns the resolver holding that project's manifest and lock.
+func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir string, f *importFlags) (*resolve.Resolver, *resolve.Imported, error) {
+	r := &resolve.Resolver{Dir: dir, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Meta: d.meta, Log: a.progress}
+	mods, err := r.ImportProject(ctx, arc, cmp.Or(f.name, project.Slugify(arc.Name)), f.ignoreShulker)
+	a.warn(r.Warnings)
 	if err != nil {
-		return nil, err
-	}
-	if warning != "" {
-		a.printer.Warn("%s", warning)
-	}
-	if marker := arc.Marker; marker != nil && marker.Manifest.Server != nil && marker.Manifest.Server.Players != nil {
-		l.Players = marker.Lock.Players
-	}
-	r := &resolve.Resolver{Dir: dir, Manifest: m, Lock: l, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
-	mods, err := r.Import(ctx, arc)
-	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	a.warn(mods.Warnings)
-	if err := r.AdoptLocalFiles(); err != nil {
-		return nil, err
-	}
-	if arc.Marker != nil {
-		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
-	}
-	return &packProject{manifest: m, lock: l, mods: mods}, nil
+	return r, mods, nil
 }
 
 // findImport reads what an import argument names: an existing file as an archive and a folder
