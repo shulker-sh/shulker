@@ -192,7 +192,7 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 	if err != nil {
 		return nil, err
 	}
-	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers}, nil
+	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers, Fetch: d.fetch, Log: a.progress}, nil
 }
 
 func (a *app) packStore(p *project.Project) (*pack.Store, error) {

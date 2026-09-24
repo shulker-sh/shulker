@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -11,13 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/cfpack"
-	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
-	"shulker.sh/shulker/internal/provider"
 )
 
 func (a *app) exportCmd() *cobra.Command {
@@ -25,7 +22,9 @@ func (a *app) exportCmd() *cobra.Command {
 		Use:   "export",
 		Short: "Write this project in another modpack format",
 	}
-	cmd.AddCommand(a.exportMrpackCmd(), a.exportCurseForgeCmd())
+	for _, f := range packarchive.Formats {
+		cmd.AddCommand(a.exportFormatCmd(f))
+	}
 	return cmd
 }
 
@@ -56,7 +55,7 @@ type exportJob struct {
 	features map[string]bool
 }
 
-func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fileName func(*manifest.Manifest, string) string, sides func(*manifest.Manifest) ([]string, error)) (*exportJob, error) {
+func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, format packarchive.Format, sides func(*manifest.Manifest) ([]string, error)) (*exportJob, error) {
 	if err := checkOS(f.osName); err != nil {
 		return nil, err
 	}
@@ -87,7 +86,7 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fil
 				}
 			}
 		}
-		job.output = filepath.Join(dir, fileName(p.Manifest, job.version))
+		job.output = filepath.Join(dir, build.ExportFileName(p.Manifest, job.version, format))
 	}
 	if job.output, err = filepath.Abs(job.output); err != nil {
 		return nil, err
@@ -114,7 +113,7 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, fil
 // withBundleNudge points the nudge under a bundle error at the command as typed, source included.
 func (a *app) withBundleNudge(err error) error {
 	var e *out.Error
-	if errors.As(err, &e) && e.Nudge.Command != "" && (e.Code == "curseforge-not-found" || e.Code == "mrpack-host-not-allowed") {
+	if errors.As(err, &e) && strings.HasSuffix(e.Nudge.Command, " --bundle") {
 		e.Nudge.Command = out.CommandLine(append(slices.Clone(a.printer.Args), "--bundle"))
 	}
 	return err
@@ -159,182 +158,46 @@ func (e exportTally) rows() []out.Row {
 	return rows
 }
 
-func (a *app) exportMrpackCmd() *cobra.Command {
-	var f exportFlags
+// exportFormatCmd is the export subcommand for one format: the shared flags, plus --side for a
+// format that keeps sides apart.
+func (a *app) exportFormatCmd(f packarchive.Format) *cobra.Command {
+	var flags exportFlags
+	usage := f.Usage()
 	cmd := &cobra.Command{
-		Use:         "mrpack [source]",
+		Use:         f.Name() + " [source]",
 		Annotations: acts(),
-		Short:       "Export a Modrinth modpack (.mrpack) for the Modrinth app and other launchers",
+		Short:       usage.Short,
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			job, err := a.openExport(cmd.Context(), args, &f, build.MrpackFileName, func(m *manifest.Manifest) ([]string, error) {
-				return a.exportSides(m, f.side, f.assumeClient)
-			})
-			if err != nil {
-				return err
-			}
-			rep, err := job.builder.ExportMrpack(build.MrpackOptions{VersionID: job.version, Output: job.output, Sides: job.sides, Bundle: f.bundle, OS: f.osName, Features: job.features})
-			if err != nil {
-				return a.withBundleNudge(err)
-			}
-			a.warn(rep.Warnings)
-			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OKInto("wrote "+rep.Name+" "+rep.VersionID, rep.Path, strings.Join(rep.Sides, " and "))
-				l.Tree(exportTally{how: "by download", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, datapacks: rep.Datapacks, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, bundledDatapacks: rep.BundledDatapacks, overrides: rep.Overrides}.rows()...)
-			})
-		},
-	}
-	f.register(cmd, ".mrpack", "put files that Modrinth launchers cannot download inside the archive")
-	a.registerFailFast(cmd)
-	cmd.Flags().StringVar(&f.side, "side", "", "export one side only (default: every declared side)")
-	return cmd
-}
-
-func (a *app) exportCurseForgeCmd() *cobra.Command {
-	var f exportFlags
-	cmd := &cobra.Command{
-		Use:         "curseforge [source]",
-		Annotations: acts(),
-		Short:       "Export a CurseForge modpack (.zip) for the CurseForge app",
-		Args:        maximumArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			job, err := a.openExport(cmd.Context(), args, &f, build.CurseForgeFileName, func(m *manifest.Manifest) ([]string, error) {
-				side, err := a.clientSide(m, f.assumeClient)
+			job, err := a.openExport(cmd.Context(), args, &flags, f, func(m *manifest.Manifest) ([]string, error) {
+				if f.Sided() {
+					return a.exportSides(m, flags.side, flags.assumeClient)
+				}
+				side, err := a.clientSide(m, flags.assumeClient)
 				return []string{side}, err
 			})
 			if err != nil {
 				return err
 			}
-			rep, err := job.builder.ExportCurseForge(build.CurseForgeOptions{
-				Side:     job.sides[0],
-				Version:  job.version,
-				Output:   job.output,
-				Bundle:   f.bundle,
-				OS:       f.osName,
-				Features: job.features,
-				Identify: func(files map[string][]byte) (map[string]provider.Hosted, error) {
-					return a.identifyOnCurseForge(cmd.Context(), files)
-				},
-				Projects: func(ids []string) (map[string]provider.Project, error) {
-					return a.curseForgeProjects(cmd.Context(), ids)
-				},
-				ProjectPage: a.curseForgePage,
-				Lookalike: func(miss build.CurseForgeMiss) (provider.Version, []byte, bool, error) {
-					return a.curseForgeLookalike(cmd.Context(), miss)
-				},
-			})
+			rep, err := job.builder.Export(cmd.Context(), build.ExportOptions{Format: f, Sides: job.sides, Version: job.version, Output: job.output, Bundle: flags.bundle, OS: flags.osName, Features: job.features})
 			if err != nil {
 				return a.withBundleNudge(err)
 			}
 			a.warn(rep.Warnings)
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OKInto("wrote "+rep.Name+" "+rep.Version, rep.Path, "")
-				rows := exportTally{how: "by file ID", mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, datapacks: rep.Datapacks, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, bundledDatapacks: rep.BundledDatapacks, overrides: rep.Overrides}.rows()
+				l.OKInto("wrote "+rep.Name+" "+rep.Version, rep.Path, strings.Join(rep.Sides, " and "))
+				rows := exportTally{how: usage.Listed, mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, datapacks: rep.Datapacks, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, bundledDatapacks: rep.BundledDatapacks, overrides: rep.Overrides}.rows()
 				if len(rep.Matched) > 0 {
-					rows = append(rows, out.Row{Label: "matched on CurseForge", Text: strings.Join(rep.Matched, ", ")})
+					rows = append(rows, out.Row{Label: "matched on " + f.Title(), Text: strings.Join(rep.Matched, ", ")})
 				}
 				l.Tree(rows...)
 			})
 		},
 	}
-	f.register(cmd, ".zip", "put files that aren't on CurseForge inside the archive")
+	flags.register(cmd, f.Extension(), usage.Bundle)
 	a.registerFailFast(cmd)
+	if f.Sided() {
+		cmd.Flags().StringVar(&flags.side, "side", "", "export one side only (default: every declared side)")
+	}
 	return cmd
-}
-
-func (a *app) curseForge() (provider.Provider, error) {
-	d, err := a.deps()
-	if err != nil {
-		return nil, err
-	}
-	return d.providers.Get(cfpack.Provider)
-}
-
-func (a *app) identifyOnCurseForge(ctx context.Context, files map[string][]byte) (map[string]provider.Hosted, error) {
-	cf, err := a.curseForge()
-	if err != nil {
-		return nil, err
-	}
-	a.progress("looking up %s on CurseForge", plural(len(files), "file", "files"))
-	return cf.Identify(ctx, files)
-}
-
-func (a *app) curseForgeProjects(ctx context.Context, ids []string) (map[string]provider.Project, error) {
-	cf, err := a.curseForge()
-	if err != nil {
-		return nil, err
-	}
-	a.progress("looking up %s for modlist.html", plural(len(ids), "CurseForge project", "CurseForge projects"))
-	return cf.Projects(ctx, ids)
-}
-
-func (a *app) curseForgePage(projectID string) string {
-	d, err := a.deps()
-	if err != nil {
-		return ""
-	}
-	if p, ok := d.providers[cfpack.Provider]; ok {
-		return p.ProjectPage("", projectID)
-	}
-	return ""
-}
-
-// curseForgeLookalike finds the CurseForge project through the lock's alias or the slug of the
-// locked provider's project, and downloads its file with the missed file's name and size.
-func (a *app) curseForgeLookalike(ctx context.Context, miss build.CurseForgeMiss) (provider.Version, []byte, bool, error) {
-	none := provider.Version{}
-	cf, err := a.curseForge()
-	if err != nil {
-		return none, nil, false, err
-	}
-	d, err := a.deps()
-	if err != nil {
-		return none, nil, false, err
-	}
-	projectID := miss.Alias
-	if projectID == "" {
-		locked, err := d.providers.Get(miss.Provider)
-		if err != nil {
-			return none, nil, false, nil
-		}
-		a.progress("looking up %s on CurseForge by slug", miss.Key)
-		proj, err := locked.Project(ctx, miss.Project, miss.Kind)
-		if errors.Is(err, provider.ErrNotFound) {
-			return none, nil, false, nil
-		}
-		if err != nil {
-			return none, nil, false, err
-		}
-		p, err := cf.Project(ctx, proj.Slug, miss.Kind)
-		if errors.Is(err, provider.ErrNotFound) {
-			return none, nil, false, nil
-		}
-		if err != nil {
-			return none, nil, false, err
-		}
-		projectID = p.ID
-	}
-	versions, err := cf.Versions(ctx, projectID, miss.Minecraft, miss.Loaders)
-	if errors.Is(err, provider.ErrNotFound) || errors.Is(err, fetch.ErrNotFound) {
-		return none, nil, false, nil
-	}
-	if err != nil {
-		return none, nil, false, err
-	}
-	for _, v := range versions {
-		if v.File.Filename != miss.Filename || v.File.Size != miss.Size || v.File.URL == "" {
-			continue
-		}
-		a.progress("comparing %s with CurseForge file %s", miss.Key, v.ID)
-		var buf bytes.Buffer
-		_, err := d.fetch.Download(ctx, v.File.URL, &buf)
-		if errors.Is(err, fetch.ErrNotFound) || errors.Is(err, fetch.ErrForbidden) {
-			return none, nil, false, nil
-		}
-		if err != nil {
-			return none, nil, false, err
-		}
-		return v, buf.Bytes(), true, nil
-	}
-	return none, nil, false, nil
 }

@@ -11,9 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/packarchive"
 )
 
 type mrpackIndex struct {
@@ -53,7 +52,7 @@ func readMrpack(t *testing.T, path string) (mrpackIndex, map[string]string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f.Name == mrpack.IndexName {
+		if f.Name == "modrinth.index.json" {
 			if err := json.Unmarshal(data, &index); err != nil {
 				t.Fatal(err)
 			}
@@ -70,9 +69,9 @@ func (h *harness) allowMrpackHost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	saved := build.MrpackHosts
-	build.MrpackHosts = append([]string{u.Hostname()}, saved...)
-	t.Cleanup(func() { build.MrpackHosts = saved })
+	saved := packarchive.MrpackHosts
+	packarchive.MrpackHosts = append([]string{u.Hostname()}, saved...)
+	t.Cleanup(func() { packarchive.MrpackHosts = saved })
 }
 
 func writeOverride(t *testing.T, dir, rel, content string) {
@@ -165,7 +164,7 @@ func TestExportMrpack(t *testing.T) {
 		t.Fatal(err)
 	}
 	rep := env.Data.(map[string]any)
-	if rep["name"] != "pack" || rep["versionId"] != "2.0" || len(rep["mods"].([]any)) != 1 || fmt.Sprint(rep["sides"]) != "[server]" {
+	if rep["name"] != "pack" || rep["version"] != "2.0" || len(rep["mods"].([]any)) != 1 || fmt.Sprint(rep["sides"]) != "[server]" {
 		t.Fatalf("server export report: %v", rep)
 	}
 	if stdout := h.mustRun(t, "export", "mrpack", "--side", "server", "--version", "2.0", "--output", filepath.Join(h.dir, "out", "server.mrpack")); !strings.Contains(stdout, "(server)") {

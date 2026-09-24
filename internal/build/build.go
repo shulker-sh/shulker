@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/local"
@@ -175,8 +176,11 @@ type Builder struct {
 	LockPath string
 	Cache    *cache.Cache
 	Packs    []*pack.Loaded
-	// Providers names the hosts the lock's entries come from, for messages that say who.
+	// Providers names the hosts the lock's entries come from, for messages that say who, and an
+	// export asks them which files the archive's format can list.
 	Providers provider.Providers
+	Fetch     *fetch.Client
+	Log       func(format string, args ...any)
 }
 
 type source struct {

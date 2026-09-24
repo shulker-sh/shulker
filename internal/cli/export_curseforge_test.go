@@ -287,7 +287,7 @@ func TestExportCurseForgeLockedModsNeedNoLookup(t *testing.T) {
 	if !strings.Contains(stdout, "2 mods by file ID") || strings.Contains(stdout, "matched on CurseForge") || strings.Contains(stderr, "looked up") {
 		t.Fatalf("export of CurseForge-locked mods: stdout=%s stderr=%s", stdout, stderr)
 	}
-	if !strings.Contains(stderr, "modlist.html links project IDs") {
+	if !strings.Contains(stderr, "the pack's listing names project IDs") {
 		t.Fatalf("offline modlist warning: %s", stderr)
 	}
 	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
