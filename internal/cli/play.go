@@ -111,7 +111,7 @@ type playOptions struct {
 	window  string
 	world   string
 	server  string
-	target  quickPlay
+	target  game.QuickPlay
 }
 
 // waits reports whether this command stays for the run. --stream is --wait that shows its working,
@@ -149,7 +149,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
-	if err := checkQuickPlay(plan.launch.Version, p.Lock.Minecraft, opts.target); err != nil {
+	if err := opts.target.Check(plan.launch.Version, p.Lock.Minecraft); err != nil {
 		return err
 	}
 	settings, err := a.launchSettings(in.Dir)
@@ -320,7 +320,7 @@ func (a *app) pinnedAccount(id string) (string, error) {
 // the version's own, and the window through the arguments the version declares for a custom
 // resolution, as is the quick play target. A version from before those were declared takes the
 // pairs appended, as Prism does.
-func launchArgv(v game.Version, platform game.Platform, vars map[string]string, s instance.Settings, window string, target quickPlay) []string {
+func launchArgv(v game.Version, platform game.Platform, vars map[string]string, s instance.Settings, window string, target game.QuickPlay) []string {
 	var extra []string
 	if s.Memory != "" {
 		extra = append(extra, "-Xms"+s.Memory, "-Xmx"+s.Memory)
@@ -328,7 +328,7 @@ func launchArgv(v game.Version, platform game.Platform, vars map[string]string, 
 	extra = append(extra, s.JVMArgs...)
 	features := map[string]bool{}
 	vars = maps.Clone(vars)
-	legacy := target.apply(v, features, vars)
+	legacy := target.Apply(v, features, vars)
 	width, height, sized := strings.Cut(window, "x")
 	if sized {
 		features["has_custom_resolution"] = true
@@ -378,7 +378,7 @@ func launchLog(dir string, at time.Time) (string, error) {
 	}
 }
 
-func (a *app) dryRun(cmd *cobra.Command, args []string, target quickPlay) error {
+func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) error {
 	ctx := cmd.Context()
 	in, _, err := a.playInstance(cmd, args, false)
 	if err != nil {
@@ -392,7 +392,7 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target quickPlay) error 
 	if err != nil {
 		return err
 	}
-	if err := checkQuickPlay(plan.launch.Version, p.Lock.Minecraft, target); err != nil {
+	if err := target.Check(plan.launch.Version, p.Lock.Minecraft); err != nil {
 		return err
 	}
 	l := plan.launch
