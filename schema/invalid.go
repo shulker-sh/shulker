@@ -19,6 +19,12 @@ import (
 // coded error: syntax errors carry file:line:column and plain words, schema
 // errors one item per failing path.
 func Invalid(code, file string, data []byte, err error) *out.Error {
+	e := invalid(code, file, data, err)
+	e.Cause = err
+	return e
+}
+
+func invalid(code, file string, data []byte, err error) *out.Error {
 	var syntax *json.SyntaxError
 	var typed *json.UnmarshalTypeError
 	var schemaErr *jsonschema.ValidationError
@@ -47,18 +53,26 @@ func Invalid(code, file string, data []byte, err error) *out.Error {
 // Decode parses data into a generic value the way the schema library does,
 // keeping numbers exact, and reports content left after the value.
 func Decode(data []byte) (any, error) {
+	var doc any
+	if err := DecodeInto(data, &doc); err != nil {
+		return nil, err
+	}
+	return doc, nil
+}
+
+// DecodeInto parses data into v the same way, numbers kept exact and trailing content reported.
+func DecodeInto(data []byte, v any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
-	var doc any
-	if err := dec.Decode(&doc); err != nil {
-		return nil, err
+	if err := dec.Decode(v); err != nil {
+		return err
 	}
 	end := dec.InputOffset()
 	if rest := bytes.TrimLeft(data[end:], " \t\r\n"); len(rest) > 0 {
 		offset := int64(len(data)-len(rest)) + 1
-		return nil, &trailingError{offset: offset, after: closing(data[:end])}
+		return &trailingError{offset: offset, after: closing(data[:end])}
 	}
-	return doc, nil
+	return nil
 }
 
 type trailingError struct {

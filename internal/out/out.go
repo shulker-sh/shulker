@@ -39,6 +39,9 @@ type Error struct {
 	Data any `json:"-"`
 	// Help is what to do about the error: the "help:" row under a human error line, and help in JSON.
 	Help string `json:"help,omitempty"`
+	// Cause is the reason in the parser's or checker's own words, without the file's name, for a
+	// reader that warns with it and goes on rather than failing.
+	Cause error `json:"-"`
 	// Nudge is the human-only command to run next, with its lead-in.
 	Nudge Nudge `json:"-"`
 	// IsPlain marks an error rendered as dialog body text: no glyph, no code aside, no gutter, and the

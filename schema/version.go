@@ -52,6 +52,7 @@ func CheckMarker(kind Kind, code, file string, data []byte) error {
 	if got > want {
 		e := out.Errorf("schema-newer", "%s %s", file, Newer(got, want))
 		e.Nudge = UpdateNudge
+		e.Cause = errors.New(Newer(got, want))
 		return e
 	}
 	return nil

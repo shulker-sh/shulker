@@ -1899,6 +1899,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `loader-required` | `add` of a mod in a project without a loader, or `import` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
+| `local-invalid` | `shulker.local.json` isn't valid JSON, or names a `$schema` this shulker doesn't know or names none. It never fails a command: the file is moved aside to `shulker.local.json.replaced` with a warning, and the manifest's feature defaults apply |
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
 | `lock-invalid` | `shulker.lock` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `shulker lock` replaces it, keeping the old file as `shulker.lock.replaced`. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock`. Also a lock file named with `--lock` to `cache info` or `cache prune` that isn't there |
@@ -1991,6 +1992,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
 | `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
 | `source-path` | `--path` doesn't apply to the source, isn't a folder inside the repository, or holds no shulker.json at the commit |
+| `state-invalid` | An instance's `.shulker/state.json` isn't valid JSON, or names a `$schema` this shulker doesn't know or names none. It never fails a command: the build warns and treats every file in the directory as not written by shulker |
 | `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a native jar that won't unpack, or a version JSON that doesn't hold together |
 | `strict-warnings` | `check --strict` saw warnings. `items`: the warnings |
 | `sync-failed` | Some entries failed to sync; `data` has each entry's result |
