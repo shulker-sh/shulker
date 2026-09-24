@@ -700,7 +700,11 @@ func (ls linkSettings) isSet() bool {
 
 // save writes what a directory syncs from, and the settings this link decided.
 func (ls linkSettings) save(dir, source string, at pack.At, side string, assumeClient bool, m *manifest.Manifest) error {
-	f, fresh, err := loadIntent(dir, source, at, side, assumeClient)
+	_, _, inPlace, err := inPlaceManifest(dir)
+	if err != nil {
+		return err
+	}
+	f, fresh, err := instance.Intent(dir, inPlace, source, at, side, assumeClient)
 	if err != nil {
 		return err
 	}

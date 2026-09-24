@@ -291,7 +291,11 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
 	if syncedDir {
-		if err := saveIntent(into, src.name, src.At, side, req.assumeClient); err != nil {
+		_, _, inPlace, err := inPlaceManifest(into)
+		if err != nil {
+			return syncResult{}, err
+		}
+		if err := instance.SaveIntent(into, inPlace, src.name, src.At, side, req.assumeClient); err != nil {
 			return syncResult{}, err
 		}
 		a.refreshRegistered(config.Instance{Dir: into, Source: src.name})

@@ -226,7 +226,7 @@ func TestPreLaunchInPlaceFallsBackToTheLock(t *testing.T) {
 	repo, source, _ := gitPack(t, "follow", "", "follow.txt")
 	h.mustRun(t, "modpack", "add", source)
 	h.mustRun(t, "install")
-	if err := saveIntent(h.dir, h.dir, pack.At{}, "client", false); err != nil {
+	if err := instance.SaveIntent(h.dir, true, h.dir, pack.At{}, "client", false); err != nil {
 		t.Fatal(err)
 	}
 	h.mustRun(t, "add", "sodium")

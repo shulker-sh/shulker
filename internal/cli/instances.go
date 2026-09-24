@@ -16,7 +16,6 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 )
 
 type instanceEntry struct {
@@ -309,44 +308,6 @@ func (a *app) updateInstances(update func([]config.Instance) []config.Instance) 
 	}
 	a.printer.Warn("registry not updated: %v", err)
 	return false
-}
-
-// saveIntent writes what a directory syncs from, keeping the settings block a person may have
-// edited: a sync never touches it. Every directory shulker syncs into gets one, launcher instance
-// or not; a link goes through linkSettings.save instead, which also seeds the settings.
-func saveIntent(dir, source string, at pack.At, side string, assumeClient bool) error {
-	f, _, err := loadIntent(dir, source, at, side, assumeClient)
-	if err != nil {
-		return err
-	}
-	return f.Save(dir)
-}
-
-// loadIntent is the instance file for a directory with this sync recorded in it, and whether it had
-// to be created, which is what tells a link that the settings are still shulker's to seed.
-func loadIntent(dir, source string, at pack.At, side string, assumeClient bool) (*instance.File, bool, error) {
-	_, _, inPlace, err := inPlaceManifest(dir)
-	if err != nil {
-		return nil, false, err
-	}
-	f, err := instance.Load(dir)
-	fresh := false
-	switch {
-	case errors.Is(err, instance.ErrNotFound):
-		f, fresh = instance.New(), true
-	case err != nil:
-		return nil, false, err
-	default:
-		f.IsUnlinked = false
-	}
-	// One writer per fact: an instance that is a project holds the modpack it follows and the side
-	// that builds in place in its manifest, so its file keeps no copy of either to go stale.
-	if inPlace {
-		f.Source, f.Ref, f.Path, f.Side, f.AssumesClient = "", "", "", "", false
-	} else {
-		f.Source, f.Ref, f.Path, f.Side, f.AssumesClient = source, at.Ref, at.Path, side, assumeClient
-	}
-	return f, fresh, nil
 }
 
 // checkID refuses an --as value that isn't a valid key, or that another instance already holds.
