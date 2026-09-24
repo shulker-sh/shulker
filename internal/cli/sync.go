@@ -218,23 +218,15 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	}
 	a.warnAssumedClient(assumed)
 	remote := src.isRemote()
-	into := req.into
-	if into == "" && remote {
-		return syncResult{}, out.Errorf("into-required", "--into is required when syncing from %s", src.name)
+	var remoteSource string
+	if remote {
+		remoteSource = src.name
 	}
-	buildDir, err := filepath.Abs(filepath.Join(src.Dir, p.Manifest.BuildDir(side)))
+	into, ownBuild, syncedDir, err := project.SyncTarget(p.Manifest, src.Dir, side, req.into, remoteSource)
 	if err != nil {
 		return syncResult{}, err
 	}
-	if into == "" {
-		into = buildDir
-	}
-	if into, err = filepath.Abs(into); err != nil {
-		return syncResult{}, err
-	}
 	defer func() { a.stampSync(into, err) }()
-	ownBuild := config.SameDir(into, buildDir)
-	syncedDir := req.into != "" && !ownBuild
 	lf, inst, err := a.sourceLocalFiles(src, into)
 	if err != nil {
 		return syncResult{}, err

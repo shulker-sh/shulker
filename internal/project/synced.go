@@ -8,6 +8,8 @@ import (
 
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/local"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 // SyncedFrom lists what is synced from p: the registry rows that name it as their source, then
@@ -76,4 +78,26 @@ func BuildDirs(p *Project, registry []config.Instance, lf *local.File, side stri
 		add(d)
 	}
 	return buildDir, dirs, nil
+}
+
+// SyncTarget is where a sync of the project at srcDir builds its side. A remote source, named by
+// remoteSource, needs --into; the build dir is the manifest's for the side, and into equal to it
+// is the project's own build; anything else is a synced directory.
+func SyncTarget(m *manifest.Manifest, srcDir, side, into, remoteSource string) (dir string, ownBuild, syncedDir bool, err error) {
+	if into == "" && remoteSource != "" {
+		return "", false, false, out.Errorf("into-required", "--into is required when syncing from %s", remoteSource)
+	}
+	buildDir, err := filepath.Abs(filepath.Join(srcDir, m.BuildDir(side)))
+	if err != nil {
+		return "", false, false, err
+	}
+	dir = into
+	if dir == "" {
+		dir = buildDir
+	}
+	if dir, err = filepath.Abs(dir); err != nil {
+		return "", false, false, err
+	}
+	ownBuild = config.SameDir(dir, buildDir)
+	return dir, ownBuild, into != "" && !ownBuild, nil
 }

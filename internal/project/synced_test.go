@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 func syncedFixture(t *testing.T) (p *Project, linked, detached string) {
@@ -85,5 +86,26 @@ func TestBuildDirsStartsWithTheBuildDirAndSkipsWhatIsGone(t *testing.T) {
 	}
 	if want := []string{buildDir, linked, detached}; got != buildDir || !slices.Equal(dirs, want) {
 		t.Fatalf("build dir %q, dirs %v, want %v", got, dirs, want)
+	}
+}
+
+func TestSyncTargetTellsTheOwnBuildFromASyncedDirectory(t *testing.T) {
+	root := t.TempDir()
+	m := &manifest.Manifest{Client: &manifest.Client{}}
+	own := filepath.Join(root, m.BuildDir("client"))
+
+	dir, ownBuild, syncedDir, err := SyncTarget(m, root, "client", "", "")
+	if err != nil || dir != own || !ownBuild || syncedDir {
+		t.Fatalf("no --into is the project's own build: %q own=%v synced=%v err=%v", dir, ownBuild, syncedDir, err)
+	}
+	if dir, ownBuild, syncedDir, err := SyncTarget(m, root, "client", own, ""); err != nil || dir != own || !ownBuild || syncedDir {
+		t.Fatalf("--into the build dir is still the own build: %q own=%v synced=%v err=%v", dir, ownBuild, syncedDir, err)
+	}
+	elsewhere := filepath.Join(root, "game")
+	if dir, ownBuild, syncedDir, err := SyncTarget(m, root, "client", elsewhere, "pack.git"); err != nil || dir != elsewhere || ownBuild || !syncedDir {
+		t.Fatalf("--into elsewhere is a synced directory: %q own=%v synced=%v err=%v", dir, ownBuild, syncedDir, err)
+	}
+	if _, _, _, err := SyncTarget(m, root, "client", "", "pack.git"); out.CodeOf(err) != "into-required" {
+		t.Fatalf("a remote source needs --into, got %v", err)
 	}
 }
