@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -107,5 +109,37 @@ func TestVanillaHasNoVersions(t *testing.T) {
 	}
 	if _, err := neoforge.Profile(context.Background(), &Remote{}, "26.2", "26.2.0.87"); out.CodeOf(err) != "unsupported-loader" {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestFabricServerLauncherIsLockedOnce(t *testing.T) {
+	launcher := &fakeFile{data: []byte("fabric server launcher")}
+	r := fakeRemote(t, FabricMetaURL, map[string]any{
+		"/versions/installer":                           []map[string]any{{"version": "1.2.0-beta.1", "stable": false}, {"version": "1.1.2", "stable": true}},
+		"/versions/loader/26.2/0.17.3/1.1.2/server/jar": launcher,
+	})
+	ctx := context.Background()
+	lk := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "fabric", Version: "0.17.3"}}
+
+	res, err := fabric.EnsureServer(ctx, r, lk)
+	if err != nil || !res.ChangedLock || !res.WasFetched {
+		t.Fatalf("first ensure: %+v, %v", res, err)
+	}
+	want := &lock.ServerJar{Installer: "1.1.2", URL: r.URLs[FabricMetaURL] + "/versions/loader/26.2/0.17.3/1.1.2/server/jar", Sha512: launcher.sha512()}
+	if !reflect.DeepEqual(lk.Loader.Server, want) || !r.Cache.Has(want.Sha512) {
+		t.Fatalf("lock loader server: %+v", lk.Loader.Server)
+	}
+	if res, err := fabric.EnsureServer(ctx, r, lk); err != nil || res != (ServerResult{}) || launcher.hits != 1 {
+		t.Fatalf("a locked, cached launcher ensures nothing: %+v, %v, %d downloads", res, err, launcher.hits)
+	}
+
+	lk.Loader.Server.URL = ""
+	if res, err := fabric.EnsureServer(ctx, r, lk); err != nil || !res.ChangedLock || res.WasFetched || !reflect.DeepEqual(lk.Loader.Server, want) {
+		t.Fatalf("a blank url is written back from the locked installer: %+v, %v, %+v", res, err, lk.Loader.Server)
+	}
+
+	r.Cache = &cache.Cache{Dir: t.TempDir()}
+	if res, err := fabric.EnsureServer(ctx, r, lk); err != nil || res.ChangedLock || !res.WasFetched || launcher.hits != 2 || !reflect.DeepEqual(lk.Loader.Server, want) {
+		t.Fatalf("a fresh cache downloads the locked launcher: %+v, %v, %d downloads", res, err, launcher.hits)
 	}
 }
