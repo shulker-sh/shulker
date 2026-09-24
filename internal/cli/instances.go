@@ -171,9 +171,8 @@ func (a *app) reconcileOrWarn(in config.Instance) {
 	}
 }
 
-// refreshRegistered keeps a row that a link or a repair wrote in step with the directory it points
-// at: its source, and the launcher of a row written before shulker recorded one. A sync adds no
-// row of its own, so a directory without one is a detached build and gets no hooks either.
+// refreshRegistered refreshes the row for a directory a sync just built. A sync adds no row of its
+// own, so a directory without one is a detached build and gets no hooks either.
 func (a *app) refreshRegistered(in config.Instance) {
 	found := false
 	a.updateInstances(func(instances []config.Instance) []config.Instance {
@@ -182,13 +181,7 @@ func (a *app) refreshRegistered(in config.Instance) {
 			return instances
 		}
 		found = true
-		old := instances[i]
-		in.ID, in.Name = old.ID, old.Name
-		in.Launcher, in.LauncherDir = old.Launcher, old.LauncherDir
-		in.LastSync, in.LastError = old.LastSync, old.LastError
-		if in.Launcher == "" {
-			in.Launcher, in.LauncherDir = launcher.Detect(in.Dir)
-		}
+		in = launcher.RefreshRow(instances[i], in)
 		instances[i] = in
 		return instances
 	})

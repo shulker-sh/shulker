@@ -1,6 +1,8 @@
 package launcher
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"shulker.sh/shulker/internal/config"
@@ -56,5 +58,30 @@ func TestShulkerOwnsItsInstances(t *testing.T) {
 	f, err := Forget(in)
 	if err != nil || f.Removed != "" || f.Summary != `Unlinked "SMP" (Shulker); the instance directory and its worlds stay.` {
 		t.Fatalf("Forget = %+v %v", f, err)
+	}
+}
+
+func TestRefreshRowKeepsTheOldRowsIdentityAndDetectsAMissingLauncher(t *testing.T) {
+	root := t.TempDir()
+	gameDir := filepath.Join(root, "instances", "smp", ".minecraft")
+	if err := os.MkdirAll(gameDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, data := range map[string]string{PrismPackFile: "{}", PrismInstanceFile: "[General]\nConfigVersion=1.2\n"} {
+		if err := os.WriteFile(filepath.Join(root, "instances", "smp", name), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := config.Instance{ID: "smp", Name: "SMP", Dir: gameDir, Source: "old", LastSync: "then", LastError: "boom"}
+	got := RefreshRow(old, config.Instance{Dir: gameDir, Source: "new"})
+	if got.ID != "smp" || got.Name != "SMP" || got.Source != "new" || got.LastSync != "then" || got.LastError != "boom" {
+		t.Fatalf("row = %+v", got)
+	}
+	if got.Launcher != "prism" || got.LauncherDir != root {
+		t.Fatalf("a row without a launcher gets the detected one: %+v", got)
+	}
+	kept := RefreshRow(config.Instance{ID: "smp", Launcher: "atlauncher", LauncherDir: "/atl"}, config.Instance{Dir: gameDir})
+	if kept.Launcher != "atlauncher" || kept.LauncherDir != "/atl" {
+		t.Fatalf("a recorded launcher is kept: %+v", kept)
 	}
 }

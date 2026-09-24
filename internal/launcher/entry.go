@@ -292,6 +292,19 @@ func shellArg(s string) string {
 	return CommandArg(s)
 }
 
+// RefreshRow keeps a row that a link or a repair wrote in step with the directory it points at:
+// in brings the source, and old keeps its id, name, launcher and last sync. A row written before
+// shulker recorded a launcher gets the one its layout gives away.
+func RefreshRow(old, in config.Instance) config.Instance {
+	in.ID, in.Name = old.ID, old.Name
+	in.Launcher, in.LauncherDir = old.Launcher, old.LauncherDir
+	in.LastSync, in.LastError = old.LastSync, old.LastError
+	if in.Launcher == "" {
+		in.Launcher, in.LauncherDir = Detect(in.Dir)
+	}
+	return in
+}
+
 // Detect names the launcher that owns a game directory, and the launcher's data
 // directory when the layout gives it away. It reads an instance registered
 // before shulker recorded a launcher, or one a plain `sync --into` found.
