@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -121,6 +122,21 @@ func (e *Entry) LinkedByShulker(launcherDir, gameDir string) (bool, error) {
 		return false, err
 	}
 	return !found || IsShulkerSlot(slots.PreLaunch), nil
+}
+
+// LinkDir is the launcher directory a link works in: shulker's instances root for a launcher with
+// no directory of its own, else the one given or the launcher's default, made absolute.
+func (e *Entry) LinkDir(given, instancesRoot string) (string, error) {
+	switch {
+	case !e.HasDir():
+		given = instancesRoot
+	case given == "":
+		var err error
+		if given, err = e.DefaultDir(); err != nil {
+			return "", err
+		}
+	}
+	return filepath.Abs(given)
 }
 
 // AccountStores is every name accounts.stores accepts: shulker's own file first, then each launcher

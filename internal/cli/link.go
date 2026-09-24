@@ -300,8 +300,7 @@ func (a *app) openLinkSource(cmd *cobra.Command, args []string, at pack.At, ls l
 }
 
 // startLauncherLink is openLinkSource plus the feature choices checked against the build, and
-// --launcher-dir made absolute, filled from the launcher's default when it is empty. A launcher with
-// no directory of its own works in shulker's instances root.
+// the launcher directory the link works in settled.
 func (a *app) startLauncherLink(cmd *cobra.Command, args []string, k *launcherLink, e *launcher.Entry) (*syncSource, loader.Loader, error) {
 	src, l, err := a.openLinkSource(cmd, args, k.at, k.ls)
 	if err != nil {
@@ -316,19 +315,11 @@ func (a *app) startLauncherLink(cmd *cobra.Command, args []string, k *launcherLi
 			return nil, l, err
 		}
 	}
-	switch {
-	case !e.HasDir():
-		r, err := a.roots()
-		if err != nil {
-			return nil, l, err
-		}
-		k.launcherDir = r.Instances
-	case k.launcherDir == "":
-		if k.launcherDir, err = e.DefaultDir(); err != nil {
-			return nil, l, err
-		}
+	r, err := a.roots()
+	if err != nil {
+		return nil, l, err
 	}
-	if k.launcherDir, err = filepath.Abs(k.launcherDir); err != nil {
+	if k.launcherDir, err = e.LinkDir(k.launcherDir, r.Instances); err != nil {
 		return nil, l, err
 	}
 	return src, l, nil
