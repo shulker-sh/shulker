@@ -38,7 +38,7 @@ func (a *app) inlineImport(cmd *cobra.Command, p *project.Project, key string, f
 	if err != nil {
 		return err
 	}
-	var rep *mergeReport
+	var rep *resolve.Merged
 	var name, version string
 	run := func(p *project.Project, r *resolve.Resolver) (string, error) {
 		i := slices.IndexFunc(r.Packs, func(l *pack.Loaded) bool { return l.Name == key })
@@ -57,23 +57,23 @@ func (a *app) inlineImport(cmd *cobra.Command, p *project.Project, key string, f
 			return "", err
 		}
 		replacePacks(p, packs)
-		rep, err = mergePack(p, inc, sides)
+		rep, err = resolve.Merge(p, inc, sides)
 		return "", err
 	}
 	if _, err := a.relockProject(cmd, p, relockOptions{}, run); err != nil {
 		if rep != nil {
-			rep.undo()
+			rep.Undo()
 		}
 		return err
 	}
-	res := importResult{Dir: p.Dir, Name: name, Version: version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: key, Sides: p.Manifest.Sides(), Overrides: []string{}, Merged: true, KeptYours: rep.keptYours, LeftOut: rep.leftOut}
-	return a.emitImport(res, out.Row{Text: plural(len(rep.merged), "entry", "entries") + " now the project's own"}, rep.overrideRow())
+	res := importResult{Dir: p.Dir, Name: name, Version: version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: key, Sides: p.Manifest.Sides(), Overrides: []string{}, Merged: true, KeptYours: rep.KeptYours, LeftOut: rep.LeftOut}
+	return a.emitImport(res, out.Row{Text: plural(len(rep.Entries), "entry", "entries") + " now the project's own"}, overrideRow(rep))
 }
 
 // inlined is a required modpack as a pack to merge: the project's lock entries it provides, taken
 // out of the project's lock and listed under the pack's own requires entry where it has one, its
 // manifest's blocks, and its override files.
-func inlined(p *project.Project, loaded *pack.Loaded) (*incoming, error) {
+func inlined(p *project.Project, loaded *pack.Loaded) (*resolve.Incoming, error) {
 	key := loaded.Name
 	pm := *loaded.Manifest
 	pm.Requires = map[string]manifest.Require{}
@@ -129,13 +129,13 @@ func inlined(p *project.Project, loaded *pack.Loaded) (*incoming, error) {
 			pm.Requires[id] = entry(id, kind, lp.Project, lp.Provider)
 		}
 	}
-	inc := &incoming{manifest: &pm, lock: pl, dir: loaded.Dir, hasBlocks: true, overrides: loaded.Overrides}
+	inc := &resolve.Incoming{Manifest: &pm, Lock: pl, Dir: loaded.Dir, HasBlocks: true, Overrides: loaded.Overrides}
 	if loaded.Dir != "" && loaded.Archive == nil {
 		overrides, err := project.ReadOverrideFolders(loaded.Dir, loaded.Manifest)
 		if err != nil {
 			return nil, err
 		}
-		inc.overrides = overrides
+		inc.Overrides = overrides
 	}
 	return inc, nil
 }

@@ -11,8 +11,6 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/project"
 )
 
 // writeMergePack writes a Modrinth pack for 26.2 on loaderKey listing jars in its index, on both sides,
@@ -198,16 +196,5 @@ func TestImportMergeTakesTheSlugsVersionForTheProjectsLoader(t *testing.T) {
 	importMerge(t, h, "cozy")
 	if data, err := os.ReadFile(filepath.Join(h.dir, "overrides", "config", "cozy.txt")); err != nil || string(data) != "cozy 1.0.0\n" {
 		t.Fatalf("override: %q %v", data, err)
-	}
-}
-
-func TestMergeFailsOnALocalFileThePackLacks(t *testing.T) {
-	dir := t.TempDir()
-	p := &project.Project{Dir: dir, Manifest: &manifest.Manifest{Name: "p", Requires: map[string]manifest.Require{}}, Lock: lock.New()}
-	pl := lock.New()
-	pl.Mods["gone"] = lock.Mod{File: "files/gone.jar"}
-	inc := &incoming{manifest: &manifest.Manifest{Name: "pack", Requires: map[string]manifest.Require{"gone": {File: "files/gone.jar"}}}, lock: pl, dir: t.TempDir()}
-	if _, err := mergePack(p, inc, []string{"client"}); out.CodeOf(err) != "local-file-missing" {
-		t.Fatalf("got %v", err)
 	}
 }
