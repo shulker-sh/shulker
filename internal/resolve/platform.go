@@ -122,6 +122,20 @@ func (mt *Meta) FillDataVersion(ctx context.Context, l *lock.Lock) (warning stri
 	return ""
 }
 
+// NewLock starts a new project's lock from the exact platform m names: Minecraft, loader, Java
+// and the data version, whose failure to read comes back as the warning FillDataVersion gives.
+func (mt *Meta) NewLock(ctx context.Context, m *manifest.Manifest) (*lock.Lock, string, error) {
+	platform, err := mt.Platform(ctx, m, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	l := lock.New()
+	l.Minecraft = platform.Minecraft
+	l.Loader = platform.Loader
+	l.Java = platform.Java
+	return l, mt.FillDataVersion(ctx, l), nil
+}
+
 // inheritedDifferences reports a platform the locked modpacks supply that the lock
 // doesn't hold yet, so a modpack moving to another Minecraft or loader re-resolves
 // the projects that inherit from it instead of leaving them on a stale lock.

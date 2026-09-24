@@ -197,9 +197,13 @@ func (a *app) readImportPack(ctx context.Context, d *deps, arc *packarchive.Arch
 	// The platform the pack names is exact, where a marker's manifest may hold a range.
 	exact := *m
 	exact.Minecraft, exact.Loader = arc.Minecraft, manifest.Loader{Type: arc.Loader.Type, Version: arc.Loader.Version}
-	l, err := a.importLock(ctx, d, &exact)
+	a.progress("%s", resolvingLine(exact.Minecraft, exact.Loader))
+	l, warning, err := d.meta.NewLock(ctx, &exact)
 	if err != nil {
 		return nil, err
+	}
+	if warning != "" {
+		a.printer.Warn("%s", warning)
 	}
 	if marker := arc.Marker; marker != nil && marker.Manifest.Server != nil && marker.Manifest.Server.Players != nil {
 		l.Players = marker.Lock.Players
@@ -445,28 +449,6 @@ func lockedSummary(providers provider.Providers, files []resolve.LockedFile) str
 		summary += " from " + providers.Title(files[0].Provider)
 	}
 	return summary
-}
-
-// importLock starts the new project's lock from the exact platform the pack names.
-func (a *app) importLock(ctx context.Context, d *deps, exact *manifest.Manifest) (*lock.Lock, error) {
-	a.progress("%s", resolvingLine(exact.Minecraft, exact.Loader))
-	platform, err := d.meta.Platform(ctx, exact, nil)
-	if err != nil {
-		return nil, err
-	}
-	return a.platformLock(ctx, d, platform), nil
-}
-
-// platformLock is a new project's lock, holding just the platform it resolved to.
-func (a *app) platformLock(ctx context.Context, d *deps, platform *resolve.Platform) *lock.Lock {
-	l := lock.New()
-	l.Minecraft = platform.Minecraft
-	l.Loader = platform.Loader
-	l.Java = platform.Java
-	if warning := d.meta.FillDataVersion(ctx, l); warning != "" {
-		a.printer.Warn("%s", warning)
-	}
-	return l
 }
 
 func overridePaths(overrides []packarchive.Override) []string {

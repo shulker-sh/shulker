@@ -104,14 +104,16 @@ func (a *app) initCmd() *cobra.Command {
 				return err
 			}
 			a.progress("%s", resolvingLine(minecraft, projectLoader))
-			platform, err := d.meta.Platform(cmd.Context(), m, nil)
+			l, warning, err := d.meta.NewLock(cmd.Context(), m)
 			if err != nil {
 				return err
 			}
-			if platform.Minecraft != m.Minecraft && m.Minecraft == "*" {
-				m.Minecraft = platform.Minecraft
+			if warning != "" {
+				a.printer.Warn("%s", warning)
 			}
-			l := a.platformLock(cmd.Context(), d, platform)
+			if m.Minecraft == "*" {
+				m.Minecraft = l.Minecraft
+			}
 			p := &project.Project{Dir: dir, Manifest: m, Lock: l}
 			if err := p.SaveManifest(); err != nil {
 				return err
