@@ -229,7 +229,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, opts relockO
 	if err != nil {
 		return relocked{}, err
 	}
-	r, err := a.resolverFor(cmd.Context(), p, packMode{isRelocking: true, linked: opts.linked})
+	r, err := a.resolverFor(cmd.Context(), p, resolve.PackMode{IsRelocking: true, Linked: opts.linked})
 	if err != nil {
 		return relocked{}, err
 	}

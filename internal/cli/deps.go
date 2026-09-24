@@ -2,9 +2,7 @@ package cli
 
 import (
 	"context"
-	"maps"
 	"os"
-	"slices"
 	"strings"
 
 	"shulker.sh/shulker/internal/account"
@@ -158,18 +156,23 @@ func (a *app) openWith(open func(string) (*project.Project, error), dir string) 
 }
 
 func (a *app) resolver(ctx context.Context, p *project.Project) (*resolve.Resolver, error) {
-	return a.resolverFor(ctx, p, packMode{})
+	return a.resolverFor(ctx, p, resolve.PackMode{})
 }
 
-func (a *app) resolverFor(ctx context.Context, p *project.Project, mode packMode) (*resolve.Resolver, error) {
+func (a *app) resolverFor(ctx context.Context, p *project.Project, mode resolve.PackMode) (*resolve.Resolver, error) {
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
 	}
-	packs, err := a.openPacks(ctx, p, mode)
+	store, err := a.packStore(p)
 	if err != nil {
 		return nil, err
 	}
+	packs, warnings, err := resolve.OpenPacks(ctx, store, p, mode)
+	if err != nil {
+		return nil, err
+	}
+	a.warn(warnings)
 	r := &resolve.Resolver{
 		Dir:       p.Dir,
 		Manifest:  p.Manifest,
@@ -194,10 +197,15 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 	if err != nil {
 		return nil, err
 	}
-	packs, err := a.openPacks(ctx, p, packMode{})
+	store, err := a.packStore(p)
 	if err != nil {
 		return nil, err
 	}
+	packs, warnings, err := resolve.OpenPacks(ctx, store, p, resolve.PackMode{})
+	if err != nil {
+		return nil, err
+	}
+	a.warn(warnings)
 	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers, Fetch: d.fetch, Log: a.progress}, nil
 }
 
@@ -217,93 +225,6 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 		return pin, err
 	}
 	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
-}
-
-// packMode is how openPacks reads a project's modpacks. A relock reads local packs as they are on
-// disk, since they have no version to hold back. linked is the modpack a link just pointed the
-// project at, resolved without the warning a moved modpack gets.
-type packMode struct {
-	isRelocking bool
-	linked      string
-}
-
-func (a *app) openPacks(ctx context.Context, p *project.Project, mode packMode) ([]*pack.Loaded, error) {
-	prior := p.Packs
-	if prior != nil && (prior.IsRelocking || !mode.isRelocking) {
-		return prior.Loaded, nil
-	}
-	store, err := a.packStore(p)
-	if err != nil {
-		return nil, err
-	}
-	modpacks := p.Manifest.Modpacks()
-	loaded := []*pack.Loaded{}
-	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
-		mp := modpacks[name]
-		pinned, ok := p.Lock.Modpacks[name]
-		moved := ok && (pinned.Source != mp.Source || pinned.Path != mp.Path || pinned.File != mp.File || (mp.IsHosted() && len(project.HostedDifferences(name, mp, pinned)) > 0))
-		isFresh := !ok || moved
-		// An earlier read already resolved a new or moved modpack, and holds the rest at the pins a
-		// relock reads them at too, so a relock reads again only what it would take from disk.
-		if prior != nil && (isFresh || !a.rereads(p, mp, pinned)) {
-			if i := slices.IndexFunc(prior.Loaded, func(l *pack.Loaded) bool { return l.Name == name }); i >= 0 {
-				loaded = append(loaded, prior.Loaded[i])
-				continue
-			}
-		}
-		if isFresh || (mode.isRelocking && a.rereads(p, mp, pinned)) {
-			switch {
-			case name == mode.linked:
-			case !ok && len(p.Lock.Modpacks) > 0:
-				a.printer.Warn("modpack %s is not in the lock yet; resolving it", name)
-			case moved && mp.IsHosted():
-				a.printer.Warn("modpack %s has changed since the lock; resolving it", name)
-			case moved:
-				a.printer.Warn("modpack %s has a new source since the lock; resolving it", name)
-			}
-			l, err := store.Resolve(ctx, name, mp)
-			if err != nil {
-				return nil, err
-			}
-			a.warnFor(name, true, l.Warnings)
-			loaded = append(loaded, l)
-			continue
-		}
-		l, warning, err := store.Open(ctx, name, mp, pinned)
-		if err != nil {
-			return nil, err
-		}
-		if warning != "" {
-			a.printer.Warn("%s", warning)
-		}
-		if mode.isRelocking {
-			store.WarnRawURL(l)
-		}
-		loaded = append(loaded, l)
-	}
-	p.Packs = &project.OpenedPacks{Loaded: loaded, IsRelocking: mode.isRelocking}
-	return loaded, nil
-}
-
-// rereads reports whether a relock reads a modpack afresh rather than at its pin: a local directory
-// always, and an archive when archiveMoved says so, taking changed bytes only when it follows them.
-func (a *app) rereads(p *project.Project, mp manifest.Require, pinned lock.Modpack) bool {
-	switch pack.KindOf(mp) {
-	case pack.Local:
-		return true
-	case pack.File:
-		return archiveMoved(p, mp, pinned, mp.AutoUpdates())
-	}
-	return false
-}
-
-// archiveMoved reports whether an archive modpack has to be read again: it was locked or unlocked
-// since, which the lock alone can't rebuild, or its bytes changed and followsBytes says to take them.
-func archiveMoved(p *project.Project, mp manifest.Require, pinned lock.Modpack, followsBytes bool) bool {
-	if isLocked := mp.Locked == nil || *mp.Locked; isLocked != pinned.UsesLock {
-		return true
-	}
-	return followsBytes && len(project.FileDifferences(p.Dir, "", mp.File, pinned.File, pinned.Size, pinned.Sha512)) > 0
 }
 
 // unreachable is what refreshModpacks does with a modpack whose source can't be reached.
@@ -328,7 +249,7 @@ func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolv
 	loaded := make([]*pack.Loaded, 0, len(r.Packs))
 	for _, l := range r.Packs {
 		mp := modpacks[l.Name]
-		if !refresh(mp) || (l.Kind == pack.File && !archiveMoved(p, mp, l.Pin, true)) {
+		if !refresh(mp) || (l.Kind == pack.File && !resolve.ArchiveMoved(p.Dir, mp, l.Pin, true)) {
 			loaded = append(loaded, l)
 			continue
 		}
