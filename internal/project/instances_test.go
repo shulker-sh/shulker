@@ -3,6 +3,7 @@ package project
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"shulker.sh/shulker/internal/config"
@@ -23,11 +24,8 @@ func TestSortInstancesOrdersByLauncherThenLabelThenDir(t *testing.T) {
 	for _, e := range entries {
 		got = append(got, e.Dir)
 	}
-	want := []string{"/s", "/p1", "/p2", "/u", "/x"}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("order = %v, want %v", got, want)
-		}
+	if want := []string{"/s", "/p1", "/p2", "/u", "/x"}; !slices.Equal(got, want) {
+		t.Fatalf("order = %v, want %v", got, want)
 	}
 }
 
@@ -107,5 +105,29 @@ func TestDetachedBuildNeedsASourcedInstanceFileAndNoManifest(t *testing.T) {
 	}
 	if _, ok := DetachedBuild(dir); ok {
 		t.Fatal("a directory with a manifest is a project, not a detached build")
+	}
+}
+
+func TestMatchInstancesPrefersTheIDThenNamesThenTheDirectory(t *testing.T) {
+	dir := t.TempDir()
+	pool := []InstanceEntry{
+		{Instance: config.Instance{ID: "smp", Name: "Pack", Dir: "/a"}},
+		{Instance: config.Instance{ID: "pack", Name: "Other", Dir: "/b"}},
+		{Instance: config.Instance{ID: "two", Name: "pack", Dir: dir}},
+	}
+	if got := MatchInstances(pool, ""); len(got) != 3 {
+		t.Fatalf("no query keeps the pool: %+v", got)
+	}
+	if got := MatchInstances(pool, "pack"); len(got) != 1 || got[0].ID != "pack" {
+		t.Fatalf("an exact id wins: %+v", got)
+	}
+	if got := MatchInstances(pool, "PACK"); len(got) != 2 || got[0].ID != "smp" || got[1].ID != "two" {
+		t.Fatalf("names match case-insensitively: %+v", got)
+	}
+	if got := MatchInstances(pool, dir); len(got) != 1 || got[0].ID != "two" {
+		t.Fatalf("a directory matches last: %+v", got)
+	}
+	if got := MatchInstances(pool, "nothing"); len(got) != 0 {
+		t.Fatalf("nothing matches: %+v", got)
 	}
 }

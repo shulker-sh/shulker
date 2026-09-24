@@ -205,3 +205,27 @@ func DetachedBuild(dir string) (InstanceEntry, bool) {
 	e.Detached = true
 	return e, true
 }
+
+// MatchInstances picks the entries a query names, in order: the id exactly, then names
+// case-insensitively, then the directory. An empty query keeps the whole pool.
+func MatchInstances(pool []InstanceEntry, query string) []InstanceEntry {
+	if query == "" {
+		return pool
+	}
+	var matches []InstanceEntry
+	for _, e := range pool {
+		if e.ID == query {
+			return []InstanceEntry{e}
+		}
+		if strings.EqualFold(e.Name, query) {
+			matches = append(matches, e)
+		}
+	}
+	if dir, err := filepath.Abs(query); len(matches) == 0 && err == nil {
+		dir = filepath.Clean(dir)
+		if i := slices.IndexFunc(pool, func(e InstanceEntry) bool { return filepath.Clean(e.Dir) == dir }); i >= 0 {
+			matches = pool[i : i+1]
+		}
+	}
+	return matches
+}

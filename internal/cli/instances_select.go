@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -72,24 +71,7 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]project.Inst
 			pool = append(pool, e)
 		}
 	}
-	matches := pool
-	if query != "" {
-		matches = nil
-		for _, e := range pool {
-			if e.ID == query {
-				matches = []project.InstanceEntry{e}
-				break
-			}
-			if strings.EqualFold(e.Name, query) {
-				matches = append(matches, e)
-			}
-		}
-		if dir, err := filepath.Abs(query); len(matches) == 0 && err == nil {
-			if i := findEntry(pool, dir); i >= 0 {
-				matches = pool[i : i+1]
-			}
-		}
-	}
+	matches := project.MatchInstances(pool, query)
 	if len(matches) == 0 {
 		e := out.Errorf("instance-not-found", "no instance matches %s", describeSelection(query, s))
 		e.Candidates, e.Pass, e.Given = instanceCandidates(pool), instanceIDs(pool), query
@@ -105,11 +87,6 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]project.Inst
 		return nil, e
 	}
 	return matches, nil
-}
-
-func findEntry(entries []project.InstanceEntry, dir string) int {
-	dir = filepath.Clean(dir)
-	return slices.IndexFunc(entries, func(e project.InstanceEntry) bool { return filepath.Clean(e.Dir) == dir })
 }
 
 func describeSelection(query string, s instanceSelection) string {
