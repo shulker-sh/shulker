@@ -25,6 +25,8 @@ type Provider struct {
 	Label string
 	// Unavailable, when set, is what Available answers.
 	Unavailable error
+	// Help, when set, is what a project the provider lacks points the user at.
+	Help string
 	// KeyedByID says a slug is no sure key on this provider, as on CurseForge, so an entry
 	// records the project id.
 	KeyedByID bool
@@ -51,7 +53,7 @@ func (p *Provider) Available() error { return p.Unavailable }
 
 func (p *Provider) KeysBySlug() bool { return !p.KeyedByID }
 
-func (p *Provider) NotFoundHelp() string { return "" }
+func (p *Provider) NotFoundHelp() string { return p.Help }
 
 func (p *Provider) PackTags(string) []string { return nil }
 

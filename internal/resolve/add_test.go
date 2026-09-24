@@ -321,3 +321,40 @@ func TestAddRefusesAVersionOffTheChannel(t *testing.T) {
 		t.Fatalf("beta add: %+v", got)
 	}
 }
+
+func TestPinningABetaPackFileAcceptsBeta(t *testing.T) {
+	cf := curseForgeHost(t)
+	fresh := cf.Known[3]
+	cf.publish(fresh, provider.Version{ID: "5300002", Number: "1.9.5", Channel: "beta", Published: day(10), Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.5.zip"}}, cf.cdn.bytes(cf.Files[3]))
+	h := newHarness(t, cf)
+
+	h.mustAdd("600000", AddOptions{Pin: "5300002"})
+
+	if !slices.ContainsFunc(h.r.Warnings, func(w string) bool { return strings.Contains(w, "is a beta; accepting beta for it") }) {
+		t.Fatalf("the pin should widen the channel: %v", h.r.Warnings)
+	}
+	if got := h.r.Lock.ResourcePacks["fresh-animations"]; got.Channel != "beta" || got.Version != "5300002" {
+		t.Fatalf("lock entry: %+v", got)
+	}
+	if got := h.r.Manifest.Requires["fresh-animations"]; got.Channel != "beta" || got.Type != manifest.TypeResourcePack {
+		t.Fatalf("manifest entry: %+v", got)
+	}
+}
+
+func TestASlugTheProviderLacksCarriesItsHelp(t *testing.T) {
+	cf := newHost(newCDN(t), "curseforge").likeCurseForge()
+	cf.Help = "add one its search misses by its project id"
+	cf.publish(mod("500525", "balm-fabric"), provider.Version{ID: "5700001", Number: "7.3.9", File: provider.File{Filename: "balm-fabric-7.3.9.jar"}}, modJar(t, "balm", "7.3.9", "*"))
+	h := newHarness(t, cf)
+
+	for _, opts := range []AddOptions{{Provider: "curseforge"}, {}} {
+		err := h.add("balm-forge", opts)
+		if e := out.AsError(err); e == nil || e.Code != "mod-not-found" || !strings.Contains(e.Help, "by its project id") {
+			t.Fatalf("%+v: %v", opts, err)
+		}
+	}
+	h.mustAdd("500525", AddOptions{Provider: "curseforge"})
+	if got := h.mod("balm"); got.Project != "500525" {
+		t.Fatalf("an add by project id: %+v", got)
+	}
+}
