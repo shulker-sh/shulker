@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"path/filepath"
 	"slices"
 	"sync"
 
@@ -151,7 +150,7 @@ func (a *app) configSetCmd() *cobra.Command {
 			if key == "registry" {
 				next := cfg
 				next.Registry = value
-				if change.Created, err = a.switchRegistry(path, cfg, next, force); err != nil {
+				if change.Created, err = config.SwitchRegistry(path, cfg, next, force); err != nil {
 					return err
 				}
 			}
@@ -199,7 +198,7 @@ func (a *app) configUnsetCmd() *cobra.Command {
 			if key == "registry" {
 				next := cfg
 				next.Registry = ""
-				if change.Created, err = a.switchRegistry(path, cfg, next, force); err != nil {
+				if change.Created, err = config.SwitchRegistry(path, cfg, next, force); err != nil {
 					return err
 				}
 			}
@@ -252,49 +251,6 @@ func (a *app) openConfig(key string) (string, config.Config, map[string]any, err
 	}
 	return path, cfg, doc, nil
 }
-
-// switchRegistry checks the registry next resolves to, creating it when missing, and returns its
-// path when it did. Without force it refuses when the current registry holds entries the new one
-// lacks, because shulker would stop syncing them.
-func (a *app) switchRegistry(configPath string, current, next config.Config, force bool) (string, error) {
-	from := config.RegistryPath(configPath, current)
-	to := config.RegistryPath(configPath, next)
-	if filepath.Clean(from) == filepath.Clean(to) {
-		return "", nil
-	}
-	dest, err := config.LoadInstances(to)
-	if err != nil {
-		return "", err
-	}
-	if !force {
-		instances, err := config.LoadInstances(from)
-		if err != nil {
-			return "", err
-		}
-		var left []string
-		for _, in := range instances {
-			if _, ok := config.FindInstance(dest, in.Dir); !ok {
-				left = append(left, in.Dir)
-			}
-		}
-		if len(left) > 0 {
-			entries := fmt.Sprintf("%d instances", len(left))
-			if len(left) == 1 {
-				entries = "1 instance"
-			}
-			e := out.Errorf("registry-has-instances", "changing the registry leaves %s behind in %s", entries, from)
-			e.Help = "run again with --force to change it anyway"
-			e.Items = left
-			return "", e
-		}
-	}
-	created, err := config.CreateRegistry(to)
-	if err != nil || !created {
-		return "", err
-	}
-	return to, nil
-}
-
 func (a *app) emitConfigChange(change configChange) error {
 	if change.Path == curseForgeKey {
 		if s, ok := change.From.(string); ok {
