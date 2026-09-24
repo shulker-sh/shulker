@@ -84,7 +84,7 @@ func (a *app) initCmd() *cobra.Command {
 			if name == "" {
 				name = project.Slugify(filepath.Base(dir))
 			}
-			minecraft := orLatest(opts.minecraft)
+			minecraft := project.OrLatest(opts.minecraft)
 			m := &manifest.Manifest{
 				Schema:    manifest.SchemaURL,
 				Name:      name,
@@ -97,7 +97,7 @@ func (a *app) initCmd() *cobra.Command {
 				m.Server = &manifest.Server{EULA: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
 			}
 			if opts.side == "client" {
-				m.Client = newClient()
+				m.Client = project.NewClient()
 			}
 			d, err := a.deps()
 			if err != nil {
@@ -235,7 +235,7 @@ func (a *app) askPlatform(ctx context.Context, opts *initOptions, given func(fla
 	if opts.loaderName != noLoader && !given("loader-version") {
 		a.progress("fetching %s versions", opts.loaderName)
 		if game == "" {
-			if game, err = d.meta.GameVersion(ctx, orLatest(opts.minecraft)); err != nil {
+			if game, err = d.meta.GameVersion(ctx, project.OrLatest(opts.minecraft)); err != nil {
 				return err
 			}
 		}
@@ -260,25 +260,6 @@ func loaderChoices() []out.Choice {
 		choices = append(choices, out.Choice{Label: name, Value: name})
 	}
 	return choices
-}
-
-// newClient is the client block a new project starts with, its options skipping the game's
-// first-run screens.
-func newClient() *manifest.Client {
-	return &manifest.Client{Options: map[string]any{
-		"onboardAccessibility":   false,
-		"skipMultiplayerWarning": true,
-		"tutorialStep":           "none",
-		"joinedFirstServer":      true,
-	}}
-}
-
-// orLatest is the range an unset version means, which is the newest release.
-func orLatest(minecraft string) string {
-	if minecraft == "" {
-		return "*"
-	}
-	return minecraft
 }
 
 // initPack adds the pack the wizard asked for to the project init has just written, and returns

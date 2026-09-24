@@ -36,9 +36,9 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 	}
 	m := &manifest.Manifest{
 		Schema:    manifest.SchemaURL,
-		Minecraft: orLatest(opts.minecraft),
+		Minecraft: project.OrLatest(opts.minecraft),
 		Requires:  map[string]manifest.Require{},
-		Client:    newClient(),
+		Client:    project.NewClient(),
 	}
 	if opts.loaderName != noLoader {
 		m.Loader = manifest.Loader{Type: opts.loaderName, Version: opts.loaderVersion}
