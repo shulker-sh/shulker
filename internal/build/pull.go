@@ -575,3 +575,57 @@ func (b *Builder) relPath(abs string) string {
 	}
 	return abs
 }
+
+// DriftedDir is the build directory a pull takes from, among the side's dirs: the only one, the
+// one with edits to the named files, or every file when none is named; several with edits is
+// ambiguous. A diff that fails in buildDir, the project's own, fails the pull; in any other it is
+// a warning and that directory is skipped.
+func (b *Builder) DriftedDir(side, buildDir string, dirs, files []string, features map[string]bool) (dir string, warnings []string, err error) {
+	if len(dirs) == 0 {
+		return "", nil, nil
+	}
+	if len(dirs) == 1 {
+		return dirs[0], nil, nil
+	}
+	var drifted []string
+	for _, dir := range dirs {
+		rep, err := b.Diff(side, Options{Dir: dir, Features: features})
+		if err != nil {
+			if dir == buildDir {
+				return "", nil, err
+			}
+			warnings = append(warnings, fmt.Sprintf("skipped %s: %v", dir, err))
+			continue
+		}
+		if driftsNamed(rep, files) {
+			drifted = append(drifted, dir)
+		}
+	}
+	switch len(drifted) {
+	case 0:
+		return dirs[0], warnings, nil
+	case 1:
+		return drifted[0], warnings, nil
+	}
+	e := out.Errorf("ambiguous-into", "the %s side has edits in several directories", side)
+	e.Help = "pass --into"
+	e.Candidates, e.Flag = drifted, "--into"
+	return "", warnings, e
+}
+
+// driftsNamed reports whether the report shows edits to any of the named files, or to any file
+// when none is named.
+func driftsNamed(rep *DiffReport, files []string) bool {
+	if len(files) == 0 {
+		return len(rep.Files) > 0
+	}
+	for _, f := range files {
+		rel := filepath.ToSlash(filepath.Clean(f))
+		for _, d := range rep.Files {
+			if d.Path == rel {
+				return true
+			}
+		}
+	}
+	return false
+}

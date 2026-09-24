@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -140,8 +139,20 @@ func (a *app) pullCmd() *cobra.Command {
 				if into, err = filepath.Abs(into); err != nil {
 					return err
 				}
-			} else if into, err = a.pullSource(b, p, lf, side, args); err != nil {
-				return err
+			} else {
+				registry, err := a.loadInstances()
+				if err != nil {
+					return err
+				}
+				buildDir, dirs, err := project.BuildDirs(p, registry, lf, side)
+				if err != nil {
+					return err
+				}
+				var warnings []string
+				if into, warnings, err = b.DriftedDir(side, buildDir, dirs, args, lf.Features); err != nil {
+					return err
+				}
+				a.warn(warnings)
 			}
 			rep, err := b.Pull(side, build.PullRequest{Files: args, Keys: keys, To: to}, build.Options{Dir: into, Features: lf.Features})
 			if err != nil {
@@ -229,59 +240,6 @@ func (a *app) adoptFiles(cmd *cobra.Command, p *project.Project, rep *build.Pull
 		return "", nil
 	})
 	return err
-}
-
-func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, side string, files []string) (string, error) {
-	registry, err := a.loadInstances()
-	if err != nil {
-		return "", err
-	}
-	buildDir, dirs, err := project.BuildDirs(p, registry, lf, side)
-	if err != nil || len(dirs) == 0 {
-		return "", err
-	}
-	if len(dirs) == 1 {
-		return dirs[0], nil
-	}
-	var drifted []string
-	for _, dir := range dirs {
-		rep, err := b.Diff(side, build.Options{Dir: dir, Features: lf.Features})
-		if err != nil {
-			if dir == buildDir {
-				return "", err
-			}
-			a.printer.Warn("skipped %s: %v", dir, err)
-			continue
-		}
-		if driftsNamed(rep, files) {
-			drifted = append(drifted, dir)
-		}
-	}
-	switch len(drifted) {
-	case 0:
-		return dirs[0], nil
-	case 1:
-		return drifted[0], nil
-	}
-	e := out.Errorf("ambiguous-into", "the %s side has edits in several directories", side)
-	e.Help = "pass --into"
-	e.Candidates, e.Flag = drifted, "--into"
-	return "", e
-}
-
-func driftsNamed(rep *build.DiffReport, files []string) bool {
-	if len(files) == 0 {
-		return len(rep.Files) > 0
-	}
-	for _, f := range files {
-		rel := filepath.ToSlash(filepath.Clean(f))
-		for _, d := range rep.Files {
-			if d.Path == rel {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // diffAside says what happened to a file in words; JSON keeps the state name.

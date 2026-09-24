@@ -2,6 +2,7 @@ package build
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -53,5 +54,33 @@ func TestPullToChoosesTheOverrideFolder(t *testing.T) {
 	var e *out.Error
 	if !errors.As(err, &e) || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,shaders,voice" {
 		t.Fatalf("unknown --to: %v", err)
+	}
+}
+
+func TestDriftedDirPicksTheDirectoryWithEdits(t *testing.T) {
+	p := newProject(t)
+	p.override("config/plain.txt", "a=1\n")
+	own := p.builtPath("client", "")
+	other := filepath.Join(t.TempDir(), "game")
+	p.mustBuild("client", Options{})
+	p.mustBuild("client", Options{Dir: other})
+
+	if dir, _, err := p.b.DriftedDir("client", own, []string{own, other}, nil, nil); err != nil || dir != own {
+		t.Fatalf("no edits anywhere takes the first: %q %v", dir, err)
+	}
+	writeFile(t, filepath.Join(other, "config", "plain.txt"), "a=2\n")
+	if dir, _, err := p.b.DriftedDir("client", own, []string{own, other}, nil, nil); err != nil || dir != other {
+		t.Fatalf("the directory with edits wins: %q %v", dir, err)
+	}
+	if dir, _, err := p.b.DriftedDir("client", own, []string{own, other}, []string{"config/other.txt"}, nil); err != nil || dir != own {
+		t.Fatalf("edits to a file not named don't count: %q %v", dir, err)
+	}
+	p.writeBuilt("client", "config/plain.txt", "a=3\n")
+	_, _, err := p.b.DriftedDir("client", own, []string{own, other}, nil, nil)
+	if out.CodeOf(err) != "ambiguous-into" {
+		t.Fatalf("edits in both is ambiguous, got %v", err)
+	}
+	if dir, _, err := p.b.DriftedDir("client", own, []string{own}, nil, nil); err != nil || dir != own {
+		t.Fatalf("one directory is taken as is: %q %v", dir, err)
 	}
 }
