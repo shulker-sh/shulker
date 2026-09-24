@@ -4,6 +4,10 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/packarchive"
 )
 
 // Scaffold gives an empty project folder what every project has: an overrides folder and a
@@ -17,4 +21,26 @@ func Scaffold(dir string) error {
 		return fsutil.Write(gi, []byte("/build/\n/data/\n/downloads/\n/shulker.local.json\n/.shulker/\n"))
 	}
 	return nil
+}
+
+// Create lays a new project out at dir: the scaffold, each override file under its layer, then
+// the manifest and lock.
+func Create(dir string, m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Override) error {
+	if err := Scaffold(dir); err != nil {
+		return err
+	}
+	for _, o := range overrides {
+		abs := filepath.Join(dir, o.Layer, filepath.FromSlash(o.Path))
+		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+			return err
+		}
+		if err := fsutil.Write(abs, o.Data); err != nil {
+			return err
+		}
+	}
+	p := &Project{Dir: dir, Manifest: m, Lock: l}
+	if err := p.SaveManifest(); err != nil {
+		return err
+	}
+	return p.SaveLock()
 }

@@ -128,7 +128,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if err := writeImportIcon(dir, m, arc.Icon); err != nil {
 		return err
 	}
-	if err := writeImport(dir, m, l, mods.Overrides); err != nil {
+	if err := project.Create(dir, m, l, mods.Overrides); err != nil {
 		return err
 	}
 	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides), KeptYours: []string{}, LeftOut: leftOut}
@@ -468,26 +468,6 @@ func (a *app) platformLock(ctx context.Context, d *deps, platform *resolve.Platf
 		a.printer.Warn("%s", warning)
 	}
 	return l
-}
-
-func writeImport(dir string, m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Override) error {
-	if err := project.Scaffold(dir); err != nil {
-		return err
-	}
-	for _, o := range overrides {
-		abs := filepath.Join(dir, o.Layer, filepath.FromSlash(o.Path))
-		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(abs, o.Data, 0o644); err != nil {
-			return err
-		}
-	}
-	p := &project.Project{Dir: dir, Manifest: m, Lock: l}
-	if err := p.SaveManifest(); err != nil {
-		return err
-	}
-	return p.SaveLock()
 }
 
 // writeImportIcon puts the archive's icon back where the restored manifest names it, and drops
