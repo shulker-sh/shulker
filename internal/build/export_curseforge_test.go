@@ -15,13 +15,13 @@ import (
 // curseForgeExport is a project with sodium and fabric-api locked from Modrinth and jei from
 // CurseForge, where CurseForge also has sodium and fabric-api as the same bytes.
 type curseForgeExport struct {
-	*exportProject
+	*project
 	sodium, fabricAPI, jei provider.Version
 }
 
 func newCurseForgeExport(t *testing.T) *curseForgeExport {
 	t.Helper()
-	x := &curseForgeExport{exportProject: newExportProject(t)}
+	x := &curseForgeExport{project: newProject(t)}
 	sodium, api, jei := modJar(t, "sodium", "1.0.0"), modJar(t, "fabric-api", "1.0.0"), modJar(t, "jei", "1.0.0")
 	x.lockMod("sodium", x.modrinth, x.modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "m-sodium-1", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodium))
 	x.lockMod("fabric-api", x.modrinth, x.modrinth.publish(mod("P7dR8mSH", "fabric-api"), provider.Version{ID: "m-api-1", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, api))
@@ -196,7 +196,7 @@ func TestExportOfModsLockedFromCurseForgeNeedsNoLookup(t *testing.T) {
 }
 
 func TestExportListsPacksLockedFromCurseForgeByID(t *testing.T) {
-	x := newExportProject(t)
+	x := newProject(t)
 	x.lockMod("jei", x.cf, x.cf.publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}}, modJar(t, "jei", "1.0.0")))
 	fresh := provider.Project{ID: "600000", Slug: "fresh-animations", Title: "Fresh Animations", Type: "resourcepack"}
 	x.lockPack("resourcepack", "fresh-animations", x.cf, x.cf.publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, packZip(t, "fresh")))
@@ -219,7 +219,7 @@ func TestExportListsPacksLockedFromCurseForgeByID(t *testing.T) {
 }
 
 func TestExportEnablesPacksByTheirCurseForgeNames(t *testing.T) {
-	x := newExportProject(t)
+	x := newProject(t)
 	fresh := provider.Project{ID: "600000", Slug: "fresh-animations", Title: "Fresh Animations", Type: "resourcepack"}
 	x.lockPack("resourcepack", "fresh-animations", x.cf, x.cf.publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, packZip(t, "fresh")))
 	shader := packZip(t, "complementary")
@@ -254,7 +254,7 @@ func datapackZip(t *testing.T, hybrid bool) []byte {
 }
 
 func TestExportBundlesADatapackOutsideDatapacksOrRefuses(t *testing.T) {
-	p := newExportProject(t)
+	p := newProject(t)
 	p.b.Manifest.Server = nil
 	loot := datapackZip(t, false)
 	p.lockLocalDatapack("loot", "loot.zip", loot)
@@ -276,7 +276,7 @@ func TestExportBundlesADatapackOutsideDatapacksOrRefuses(t *testing.T) {
 }
 
 func TestExportBundlesAHybridDatapacksResourcePackCopyOrRefuses(t *testing.T) {
-	p := newExportProject(t)
+	p := newProject(t)
 	p.b.Manifest.Server = nil
 	hybrid := datapackZip(t, true)
 	terralith := p.modrinth.publish(provider.Project{ID: "8oi3bsk5", Slug: "terralith", Type: manifest.TypeDatapack}, provider.Version{ID: "TerraV264", Number: "2.6.4", Loaders: []string{"datapack"}, File: provider.File{Filename: "Terralith_26.2_v2.6.4.zip"}}, hybrid)
