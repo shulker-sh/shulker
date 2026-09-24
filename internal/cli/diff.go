@@ -3,56 +3,18 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
-
-// buildDirs is the build directory plus every directory this side was synced
-// into: the links registry first, then any left in shulker.local.json by a
-// shulker that recorded them there. Directories that are gone are skipped.
-func (a *app) buildDirs(p *project.Project, lf *local.File, side string) (string, []string, error) {
-	buildDir, err := filepath.Abs(filepath.Join(p.Dir, p.Manifest.BuildDir(side)))
-	if err != nil {
-		return "", nil, err
-	}
-	var dirs []string
-	seen := map[string]bool{}
-	add := func(dir string) {
-		if dir == "" || seen[dir] {
-			return
-		}
-		if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
-			return
-		}
-		seen[dir] = true
-		dirs = append(dirs, dir)
-	}
-	add(buildDir)
-	entries, err := a.loadInstanceEntries()
-	if err != nil {
-		return "", nil, err
-	}
-	for _, e := range entries {
-		if e.Side == side && config.SameDir(e.Source, p.Dir) {
-			add(e.Dir)
-		}
-	}
-	for _, d := range lf.ExistingSyncDirs(side) {
-		add(d)
-	}
-	return buildDir, dirs, nil
-}
 
 func (a *app) diffCmd() *cobra.Command {
 	var into string
@@ -77,6 +39,10 @@ func (a *app) diffCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			registry, err := a.loadInstances()
+			if err != nil {
+				return err
+			}
 			sides, err := projectSides(p, args)
 			if err != nil {
 				return err
@@ -94,7 +60,7 @@ func (a *app) diffCmd() *cobra.Command {
 			for _, side := range sides {
 				buildDir, dirs := "", []string{into}
 				if into == "" {
-					if buildDir, dirs, err = a.buildDirs(p, lf, side); err != nil {
+					if buildDir, dirs, err = project.BuildDirs(p, registry, lf, side); err != nil {
 						return err
 					}
 					if len(dirs) == 0 {
@@ -266,7 +232,11 @@ func (a *app) adoptFiles(cmd *cobra.Command, p *project.Project, rep *build.Pull
 }
 
 func (a *app) pullSource(b *build.Builder, p *project.Project, lf *local.File, side string, files []string) (string, error) {
-	buildDir, dirs, err := a.buildDirs(p, lf, side)
+	registry, err := a.loadInstances()
+	if err != nil {
+		return "", err
+	}
+	buildDir, dirs, err := project.BuildDirs(p, registry, lf, side)
 	if err != nil || len(dirs) == 0 {
 		return "", err
 	}

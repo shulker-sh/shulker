@@ -3,6 +3,7 @@ package project
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"shulker.sh/shulker/internal/config"
@@ -52,5 +53,37 @@ func TestSyncedFromListsRowsThenTheLocalFilesDetachedBuilds(t *testing.T) {
 	d := got[1]
 	if !d.Detached || d.ID != "pack-client-2" || d.Dir != detached || d.Source != p.Dir || d.Side != "client" || d.Name != "pack" {
 		t.Fatalf("the detached build takes a free id: %+v", d)
+	}
+}
+
+func TestBuildDirsStartsWithTheBuildDirAndSkipsWhatIsGone(t *testing.T) {
+	p, linked, detached := syncedFixture(t)
+	buildDir := filepath.Join(p.Dir, "build", "client")
+	if err := os.MkdirAll(buildDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	server := filepath.Join(filepath.Dir(p.Dir), "server")
+	if err := os.MkdirAll(server, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for dir, side := range map[string]string{server: "server", linked: "client"} {
+		f := instance.New()
+		f.Source, f.Side = p.Dir, side
+		if err := f.Save(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	registry := []config.Instance{
+		{ID: "gone", Launcher: "prism", Dir: filepath.Join(p.Dir, "..", "gone"), Source: p.Dir},
+		{ID: "pack-client", Launcher: "prism", Dir: linked, Source: p.Dir},
+		{ID: "pack-server", Launcher: "prism", Dir: server, Source: p.Dir},
+	}
+	lf := &local.File{SyncDirs: map[string][]string{"client": {detached, linked}}}
+	got, dirs, err := BuildDirs(p, registry, lf, "client")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{buildDir, linked, detached}; got != buildDir || !slices.Equal(dirs, want) {
+		t.Fatalf("build dir %q, dirs %v, want %v", got, dirs, want)
 	}
 }

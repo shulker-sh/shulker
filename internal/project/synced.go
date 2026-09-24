@@ -1,6 +1,8 @@
 package project
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 
@@ -39,4 +41,39 @@ func SyncedFrom(p *Project, registry []config.Instance, lf *local.File) ([]Insta
 		}
 	}
 	return all, nil
+}
+
+// BuildDirs is the build directory for side plus every directory that side was synced into and
+// that still exists: registered instances first, then any the local file recorded. It is what a
+// diff or a pull compares against.
+func BuildDirs(p *Project, registry []config.Instance, lf *local.File, side string) (buildDir string, dirs []string, err error) {
+	buildDir, err = filepath.Abs(filepath.Join(p.Dir, p.Manifest.BuildDir(side)))
+	if err != nil {
+		return "", nil, err
+	}
+	synced, err := SyncedFrom(p, registry, lf)
+	if err != nil {
+		return "", nil, err
+	}
+	seen := map[string]bool{}
+	add := func(dir string) {
+		if dir == "" || seen[dir] {
+			return
+		}
+		if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
+			return
+		}
+		seen[dir] = true
+		dirs = append(dirs, dir)
+	}
+	add(buildDir)
+	for _, e := range synced {
+		if e.Side == side {
+			add(e.Dir)
+		}
+	}
+	for _, d := range lf.ExistingSyncDirs(side) {
+		add(d)
+	}
+	return buildDir, dirs, nil
 }
