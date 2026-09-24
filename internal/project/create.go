@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/packarchive"
@@ -43,4 +44,21 @@ func Create(dir string, m *manifest.Manifest, l *lock.Lock, overrides []packarch
 		return err
 	}
 	return p.SaveLock()
+}
+
+// WriteIcon puts an archive's icon where m names it, and drops the key from a manifest whose
+// archive carried none, so the project stays valid.
+func WriteIcon(dir string, m *manifest.Manifest, icon []byte) error {
+	if m.Icon == "" {
+		return nil
+	}
+	if icon == nil {
+		m.Icon = ""
+		return nil
+	}
+	path := filepath.Join(dir, filepath.FromSlash(m.Icon))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return fsutil.Write(path, icon)
 }

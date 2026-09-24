@@ -15,7 +15,6 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/fetch"
-	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -125,7 +124,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if f.side != "" {
 		mods.Overrides, leftOut = resolve.KeepSide(m, l, mods.Overrides, f.side)
 	}
-	if err := writeImportIcon(dir, m, arc.Icon); err != nil {
+	if err := project.WriteIcon(dir, m, arc.Icon); err != nil {
 		return err
 	}
 	if err := project.Create(dir, m, l, mods.Overrides); err != nil {
@@ -468,23 +467,6 @@ func (a *app) platformLock(ctx context.Context, d *deps, platform *resolve.Platf
 		a.printer.Warn("%s", warning)
 	}
 	return l
-}
-
-// writeImportIcon puts the archive's icon back where the restored manifest names it, and drops
-// the key from an archive that carries none, so the project stays valid.
-func writeImportIcon(dir string, m *manifest.Manifest, icon []byte) error {
-	if m.Icon == "" {
-		return nil
-	}
-	if icon == nil {
-		m.Icon = ""
-		return nil
-	}
-	path := filepath.Join(dir, filepath.FromSlash(m.Icon))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return fsutil.Write(path, icon)
 }
 
 func overridePaths(overrides []packarchive.Override) []string {

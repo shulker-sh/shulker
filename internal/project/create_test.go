@@ -30,3 +30,18 @@ func TestCreateLaysOutScaffoldOverridesManifestAndLock(t *testing.T) {
 		t.Fatalf("reopen: %v", err)
 	}
 }
+
+func TestWriteIconDropsTheKeyWhenTheArchiveHadNone(t *testing.T) {
+	dir := t.TempDir()
+	m := &manifest.Manifest{Icon: "assets/icon.png"}
+	if err := WriteIcon(dir, m, nil); err != nil || m.Icon != "" {
+		t.Fatalf("icon %q, %v", m.Icon, err)
+	}
+	m.Icon = "assets/icon.png"
+	if err := WriteIcon(dir, m, []byte("png")); err != nil || m.Icon != "assets/icon.png" {
+		t.Fatalf("icon %q, %v", m.Icon, err)
+	}
+	if data, err := os.ReadFile(filepath.Join(dir, "assets", "icon.png")); err != nil || string(data) != "png" {
+		t.Fatalf("written %q, %v", data, err)
+	}
+}
