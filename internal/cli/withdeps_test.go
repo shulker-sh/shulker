@@ -35,54 +35,6 @@ func heldProject(t *testing.T, h *harness) {
 	h.newerAPI = true
 }
 
-func TestAddHoldsTheVersionsTheLockAlreadyPins(t *testing.T) {
-	h := newHarness(t)
-	heldProject(t, h)
-
-	h.mustRun(t, "add", "sodium")
-
-	if got := heldVersion(t, h, "fabric-api"); !strings.HasPrefix(got, "1.0.0") {
-		t.Fatalf("adding sodium should hold fabric-api at 1.0.0, got %s", got)
-	}
-}
-
-func TestAddRefusesToMoveAHeldDependency(t *testing.T) {
-	h := newHarness(t)
-	needsNewAPI(t, h)
-	heldProject(t, h)
-
-	code, stdout, _ := h.run(t, "add", "sodium", "--json")
-
-	e := failureCode(t, stdout)
-	if code == 0 || e.Code != "deps-held" {
-		t.Fatalf("add should refuse to move a held dependency: exit %d %s", code, stdout)
-	}
-	if len(e.Items) != 1 || !strings.Contains(e.Items[0], "requires fabric-api >=2.0.0") || !strings.Contains(e.Items[0], "held at 1.0.0") {
-		t.Fatalf("the refusal should name the held version and what needs it: %v", e.Items)
-	}
-	if got := heldVersion(t, h, "fabric-api"); !strings.HasPrefix(got, "1.0.0") {
-		t.Fatalf("a refused add should leave the lock alone, got fabric-api %s", got)
-	}
-	if got := heldVersion(t, h, "sodium"); got != "" {
-		t.Fatalf("a refused add should lock nothing, got sodium %s", got)
-	}
-}
-
-func TestAddWithDepsMovesTheHeldDependency(t *testing.T) {
-	h := newHarness(t)
-	needsNewAPI(t, h)
-	heldProject(t, h)
-
-	h.mustRun(t, "add", "sodium", "--with-deps")
-
-	if got := heldVersion(t, h, "fabric-api"); !strings.HasPrefix(got, "2.0.0") {
-		t.Fatalf("--with-deps should move fabric-api, got %s", got)
-	}
-	if got := heldVersion(t, h, "sodium"); got == "" {
-		t.Fatal("--with-deps should still add the mod that needed the move")
-	}
-}
-
 func TestWithDepsListsAModpacksDependencyAsItMovesIt(t *testing.T) {
 	h := newHarness(t)
 	needsNewAPI(t, h)

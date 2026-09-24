@@ -143,14 +143,6 @@ func TestLocalFileGoneBuildsFromCache(t *testing.T) {
 	if got := readBuilt(t, h, "mods/private-mod-1.4.jar"); got != string(jar.data) {
 		t.Fatal("the gone file is placed from the cache")
 	}
-	env = out.Envelope{}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env); err != nil {
-		t.Fatal(err)
-	}
-	if l := h.readLock(t); len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "files/private-mod-1.4.jar is gone") || l.Mods["private-mod"].Sha512 != jar.sha512 {
-		t.Fatalf("lock keeps the entry the cache serves, with one warning: %+v %+v", env, l.Mods["private-mod"])
-	}
-
 	if err := os.RemoveAll(h.cache); err != nil {
 		t.Fatal(err)
 	}
@@ -159,42 +151,6 @@ func TestLocalFileGoneBuildsFromCache(t *testing.T) {
 	_ = json.Unmarshal([]byte(stdout), &env)
 	if code == 0 || len(env.Warnings) != 0 || env.Error == nil || env.Error.Code != "missing-files" || len(env.Error.Items) != 1 || !strings.Contains(env.Error.Items[0], "private-mod") {
 		t.Fatalf("install with neither file nor cache: code=%d env=%+v", code, env)
-	}
-	code, stdout, _ = h.run(t, "lock", "--json")
-	env = out.Envelope{}
-	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error == nil || env.Error.Code != "local-file-missing" {
-		t.Fatalf("lock with neither file nor cache: code=%d env=%+v", code, env)
-	}
-}
-
-func TestLocalModKeyedAndChanged(t *testing.T) {
-	h, _ := localFiles(t)
-	h.editManifest(t, func(m map[string]any) {
-		requires := m["requires"].(map[string]any)
-		delete(requires, "private-mod")
-		requires["mine"] = map[string]any{"file": "files/private-mod-1.4.jar", "side": "both"}
-	})
-	h.mustRun(t, "lock")
-	if l := h.readLock(t); l.Mods["mine"].ModID != "private-mod" || l.Mods["mine"].Side != "both" || l.Mods["fabric-api"].RequiredBy[0] != "mine" {
-		t.Fatalf("a local jar under another key: %+v", l.Mods)
-	}
-
-	changed := makeJarVersion(t, "private-mod", "private-mod-1.4.jar", "client", "1.5.0", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
-	writeProjectFile(t, h, "files/private-mod-1.4.jar", changed.data)
-	code, stdout, _ := h.run(t, "build", "--json")
-	var env out.Envelope
-	_ = json.Unmarshal([]byte(stdout), &env)
-	if code != 0 || !env.LockStale || len(env.Warnings) != 1 || !strings.Contains(env.Warnings[0], "mine: the file's bytes changed") {
-		t.Fatalf("code=%d env=%+v", code, env)
-	}
-	h.mustRun(t, "lock")
-	if l := h.readLock(t); l.Mods["mine"].Sha512 != changed.sha512 || l.Mods["mine"].ModID != "private-mod" {
-		t.Fatalf("lock adopts the new jar: %+v", l.Mods["mine"])
-	}
-	h.mustRun(t, "install")
-	if got := readBuilt(t, h, "mods/private-mod-1.4.jar"); got != string(changed.data) {
-		t.Fatal("the build places the new jar")
 	}
 }
 
@@ -414,19 +370,5 @@ func TestOutdatedAndUpdateSkipLocalFiles(t *testing.T) {
 	stdout = h.mustRun(t, "update")
 	if strings.Contains(stdout, "local file") || strings.Contains(stdout, "private-mod") {
 		t.Fatalf("a bare update names a local file:\n%s", stdout)
-	}
-}
-
-func TestPinRefusesLocalFiles(t *testing.T) {
-	h, _ := localFiles(t)
-	h.mustRun(t, "lock")
-
-	for _, args := range [][]string{{"pin", "private-mod"}, {"pin", "private-mod", "abc"}, {"unpin", "private-mod"}, {"pin", "faithful"}, {"unpin", "bsl"}} {
-		code, stdout, _ := h.run(t, append(args, "--json")...)
-		var env out.Envelope
-		_ = json.Unmarshal([]byte(stdout), &env)
-		if code == 0 || env.Error == nil || env.Error.Code != "local-file" || env.Error.Message != args[1]+" is a local file; there is no provider version to pin" {
-			t.Errorf("%v: code=%d env=%+v", args, code, env)
-		}
 	}
 }

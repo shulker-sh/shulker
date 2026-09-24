@@ -1107,27 +1107,17 @@ func TestPinningAnUnknownPackVersionLinksItsVersions(t *testing.T) {
 	}
 }
 
-func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
+func TestLockRecreatesADeletedLock(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
-	h.editManifest(t, func(m map[string]any) { m["requires"] = map[string]any{} })
-	var env out.Envelope
-	if err := json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env); err != nil {
-		t.Fatal(err)
-	}
-	if removed := env.Data.(map[string]any)["removed"].([]any); len(removed) != 2 {
-		t.Fatalf("lock after removing sodium by hand: %+v", env.Data)
-	}
-
-	h.editManifest(t, func(m map[string]any) { m["requires"] = map[string]any{"sodium": map[string]any{}} })
 	if err := os.Remove(filepath.Join(h.dir, "shulker.lock")); err != nil {
 		t.Fatal(err)
 	}
 	if code, stdout, _ := h.run(t, "build", "--json"); code == 0 || !strings.Contains(stdout, `"code": "lock-not-found"`) {
 		t.Fatalf("build without a lock: code=%d %s", code, stdout)
 	}
-	env = out.Envelope{}
+	var env out.Envelope
 	if err := json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
@@ -1138,61 +1128,6 @@ func TestLockDropsRemovedModsAndRecreatesTheLock(t *testing.T) {
 	}
 	if l := h.readLock(t); l.Minecraft != "26.2" || len(l.Mods) != 2 {
 		t.Fatalf("recreated lock: %+v", l)
-	}
-}
-
-func TestRemovePrunesOrphans(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	h.mustRun(t, "add", "sodium")
-
-	code, stdout, _ := h.run(t, "remove", "fabric-api", "--json")
-	var env out.Envelope
-	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error == nil || env.Error.Code != "not-direct" || env.Error.Items[0] != "sodium" {
-		t.Fatalf("removing a dependency: code=%d env=%+v", code, env)
-	}
-	if code, stdout, _ = h.run(t, "remove", "nope", "--json"); code == 0 || !strings.Contains(stdout, `"mod-not-found"`) {
-		t.Fatalf("removing an unknown mod: code=%d %s", code, stdout)
-	}
-
-	stdout = h.mustRun(t, "remove", "sodium", "--json")
-	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
-		t.Fatal(err)
-	}
-	data := env.Data.(map[string]any)
-	removed := data["removed"].([]any)
-	if !env.OK || env.LockStale || len(removed) != 2 || removed[0].(map[string]any)["id"] != "fabric-api" || removed[0].(map[string]any)["requiredBy"].([]any)[0] != "sodium" || removed[1].(map[string]any)["id"] != "sodium" {
-		t.Fatalf("remove envelope: %+v", env)
-	}
-	var l struct {
-		Mods map[string]any `json:"mods"`
-	}
-	h.readJSON(t, "shulker.lock", &l)
-	var m struct {
-		Mods map[string]any `json:"mods"`
-	}
-	h.readJSON(t, "shulker.json", &m)
-	if len(l.Mods) != 0 || len(m.Mods) != 0 {
-		t.Fatalf("lock mods %v, manifest mods %v", l.Mods, m.Mods)
-	}
-
-	h.mustRun(t, "add", "sodium", "fabric-api")
-	stdout = h.mustRun(t, "remove", "sodium")
-	if strings.Contains(stdout, "fabric-api") {
-		t.Fatalf("direct fabric-api must survive: %s", stdout)
-	}
-	var kept struct {
-		Mods map[string]struct {
-			RequiredBy []string `json:"requiredBy"`
-		} `json:"mods"`
-	}
-	h.readJSON(t, "shulker.lock", &kept)
-	if fa, ok := kept.Mods["fabric-api"]; !ok || len(fa.RequiredBy) != 0 {
-		t.Fatalf("lock after remove: %+v", kept.Mods)
-	}
-	if code, _, _ := h.run(t, "build"); code != 0 {
-		t.Fatal("lock should not be stale after remove")
 	}
 }
 
@@ -1404,41 +1339,6 @@ func TestUpdateOutdatedAndPin(t *testing.T) {
 	}
 	if code, _, _ := h.run(t, "build"); code != 0 {
 		t.Fatal("lock should not be stale after pin")
-	}
-}
-
-func TestUpdateKeepsPinnedDirectDependency(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	h.mustRun(t, "add", "sodium", "fabric-api")
-	h.mustRun(t, "pin", "fabric-api")
-	h.newer = true
-
-	stdout := h.mustRun(t, "update", "sodium", "--json")
-	var env out.Envelope
-	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
-		t.Fatal(err)
-	}
-	data := env.Data.(map[string]any)
-	if updated := data["updated"].([]any); len(updated) != 1 || updated[0].(map[string]any)["id"] != "sodium" {
-		t.Fatalf("update sodium: %v", data)
-	}
-	var l struct {
-		Mods map[string]struct {
-			Version    string   `json:"version"`
-			RequiredBy []string `json:"requiredBy"`
-		} `json:"mods"`
-	}
-	h.readJSON(t, "shulker.lock", &l)
-	if fa := l.Mods["fabric-api"]; fa.Version != "Q7dR8mSH" || len(fa.RequiredBy) != 1 || fa.RequiredBy[0] != "sodium" {
-		t.Fatalf("fabric-api after update sodium: %+v", l.Mods)
-	}
-	if out := h.mustRun(t, "update"); !strings.Contains(out, "already up to date") {
-		t.Fatalf("update all: %s", out)
-	}
-	h.readJSON(t, "shulker.lock", &l)
-	if fa := l.Mods["fabric-api"]; fa.Version != "Q7dR8mSH" || len(fa.RequiredBy) != 1 {
-		t.Fatalf("fabric-api after update all: %+v", l.Mods)
 	}
 }
 

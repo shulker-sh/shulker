@@ -278,3 +278,30 @@ func TestLinkPrismKeepsFeatureFlags(t *testing.T) {
 		t.Fatalf("re-linking without flags keeps the choices: %+v", lf)
 	}
 }
+
+func TestFeatureListNamesWhereAFeatureComesFrom(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	writeFile(t, filepath.Join(h.dir, "base", "shulker.json"), `{"name": "base", "minecraft": "~26.2", "loader": {"type": "fabric", "version": "*"},
+  "features": {"shaders": {"default": true, "note": "the pack's note"}, "voice": {}},
+  "requires": {}, "client": {}}`)
+	h.editManifest(t, func(m map[string]any) {
+		m["features"] = map[string]any{"shaders": map[string]any{"default": false, "note": "the project's note"}}
+	})
+	h.mustRun(t, "modpack", "add", "./base")
+
+	var listed []struct {
+		Name   string `json:"name"`
+		Origin string `json:"origin"`
+		On     bool   `json:"default"`
+	}
+	if err := json.Unmarshal([]byte(dataJSON(t, h.mustRun(t, "feature", "list", "--json"))), &listed); err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 2 || listed[0].Name != "shaders" || listed[0].On || listed[0].Origin != "" || listed[1].Name != "voice" || listed[1].Origin != "base" {
+		t.Fatalf("the project owns a name both declare, and a pack-only feature keeps its origin: %+v", listed)
+	}
+	if stdout := h.mustRun(t, "feature", "list"); !strings.Contains(stdout, "off (from base)") {
+		t.Fatalf("feature list names where a feature comes from: %s", stdout)
+	}
+}
