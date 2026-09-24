@@ -398,7 +398,7 @@ func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Proje
 	if err != nil {
 		return launchPlan{}, a.keepInstallerOutput(err)
 	}
-	natives := nativesDir(in.Dir)
+	natives := instance.NativesDir(in.Dir)
 	if err := l.Assembly.ExtractNatives(s, natives, platform); err != nil {
 		return launchPlan{}, err
 	}
@@ -561,10 +561,6 @@ func (a *app) gameStore() (game.Store, error) {
 	s := game.Store{Root: r.Store, Resources: d.resources}
 	return s, s.EnsureProfiles()
 }
-
-// nativesDir is where a launch unpacks its native libraries. It sits under .shulker/ rather than
-// in the game directory, which belongs to the pack.
-func nativesDir(dir string) string { return filepath.Join(dir, instance.Dir, "natives") }
 
 // clientJava is what the launch runs: the `java` setting when the instance or play.java has one,
 // and otherwise shulker's managed runtime for the component the lock names.

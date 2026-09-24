@@ -121,6 +121,10 @@ type Resolved struct {
 
 func Path(dir string) string { return filepath.Join(dir, Dir, FileName) }
 
+// NativesDir is where a launch unpacks its native libraries. It sits under .shulker/ rather than
+// in the game directory, which belongs to the pack.
+func NativesDir(dir string) string { return filepath.Join(dir, Dir, "natives") }
+
 // New is the file shulker writes for a directory it starts syncing into. The hooks are written at
 // their default so opening it shows what shulker will do; marker is left absent, because an absent
 // marker defers to the manifest and a written one would freeze the manifest's value at this moment.
