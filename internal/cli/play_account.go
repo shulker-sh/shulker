@@ -29,7 +29,7 @@ func (a *app) launchAccount(selector string) (account.Resolved, bool, error) {
 			return r, false, nil
 		}
 	}
-	usable := playableAccounts(accounts)
+	usable := account.Launchable(accounts)
 	switch {
 	case len(usable) == 0 && len(accounts) == 1:
 		// One account and it can't play: its own state says what to do about that.
@@ -54,18 +54,6 @@ func (a *app) launchAccount(selector string) (account.Resolved, bool, error) {
 func (a *app) adoptDefault(r account.Resolved) error {
 	_, err := a.changeDefault(r.ID)
 	return err
-}
-
-// playableAccounts is the accounts a launch could use: every state that doesn't stop one, which is
-// the same test `accounts logout` uses to hand the default on.
-func playableAccounts(accounts []account.Resolved) []account.Resolved {
-	var usable []account.Resolved
-	for _, r := range accounts {
-		if r.State.Error(r.Name) == nil {
-			usable = append(usable, r)
-		}
-	}
-	return usable
 }
 
 // noDefaultAccount is what a launch says when there is no default account and nothing to ask on.

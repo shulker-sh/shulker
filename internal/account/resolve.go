@@ -41,6 +41,18 @@ type Resolved struct {
 // Qualifier is how a selector names this account when its name alone is ambiguous.
 func (r Resolved) Qualifier() string { return r.Name + "@" + r.Source }
 
+// Launchable is the accounts a launch could use: every state that doesn't stop one, which is the
+// same test `accounts logout` uses to hand the default on.
+func Launchable(accounts []Resolved) []Resolved {
+	var usable []Resolved
+	for _, r := range accounts {
+		if r.State.Error(r.Name) == nil {
+			usable = append(usable, r)
+		}
+	}
+	return usable
+}
+
 // Resolve is every account the stores yield, in store order: shulker's own file, and what each
 // launcher's reader already took from it. One Microsoft account can sit in several launchers, so
 // the list is deduped by id and the earliest store wins.

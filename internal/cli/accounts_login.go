@@ -299,12 +299,7 @@ func (a *app) reseatDefault(gone accountRow) (*account.Resolved, error) {
 	if err != nil {
 		return nil, err
 	}
-	var usable []account.Resolved
-	for _, r := range accounts {
-		if r.State.Error(r.Name) == nil {
-			usable = append(usable, r)
-		}
-	}
+	usable := account.Launchable(accounts)
 	if len(usable) != 1 {
 		_, err := a.changeDefault("")
 		return nil, err
