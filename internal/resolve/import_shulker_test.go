@@ -245,3 +245,58 @@ func TestImportIdentifiesTheFilesItCannotLockByHashOnCurseForge(t *testing.T) {
 		t.Fatalf("warnings without CurseForge: %v", res.Warnings)
 	}
 }
+
+func TestImportTakesAModsSideFromThePackOnlyWhereItAddsABuiltSide(t *testing.T) {
+	cf := curseForgeHost(t)
+	modrinth := newHost(cf.cdn, "modrinth")
+	sodium := modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "0.9.2", "client"))
+	configManager := cf.publish(mod("800000", "config-manager"), provider.Version{ID: "5600001", Number: "1.0.0", File: provider.File{Filename: "config_manager-1.0.0.jar"}}, modJar(t, "config_manager", "1.0.0", "server"))
+	serverTweaks := cf.publish(mod("800001", "server-tweaks"), provider.Version{ID: "5600002", Number: "1.0.0", File: provider.File{Filename: "server_tweaks-1.0.0.jar"}}, modJar(t, "server_tweaks", "1.0.0", "server"))
+	jei, api := cf.Files[1], cf.Files[0]
+	listed := func(v provider.Version, env map[string]string) mrpackFile {
+		f := listedByDownload(cf.cdn, v)
+		f.Env = env
+		return f
+	}
+	sided := func(side string) map[string]string {
+		env := map[string]string{"client": "required", "server": "required"}
+		switch side {
+		case "client":
+			env["server"] = "unsupported"
+		case "server":
+			env["client"] = "unsupported"
+		}
+		return env
+	}
+	archive := filepath.Join(t.TempDir(), "singleplayer.mrpack")
+	writeMrpack(t, archive, []mrpackFile{
+		listed(configManager, sided("both")),
+		listed(serverTweaks, sided("client")),
+		listed(sodium, sided("both")),
+		listed(jei, sided("client")),
+		listed(api, nil),
+	}, map[string]string{})
+
+	h, res, err := importArchive(t, t.TempDir(), archive, false, modrinth, cf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []SideChoice{{ID: "config_manager", Pack: "both", Provider: "server"}, {ID: "server_tweaks", Pack: "both", Provider: "server"}}; !slices.Equal(res.Sides, want) {
+		t.Fatalf("sides: %+v", res.Sides)
+	}
+	sideWarnings := slices.DeleteFunc(slices.Clone(res.Warnings), func(w string) bool { return !strings.Contains(w, "take their side") })
+	if len(sideWarnings) != 1 || !strings.Contains(sideWarnings[0], "2 mod(s)") || !strings.Contains(sideWarnings[0], "config_manager (server → both), server_tweaks (server → both)") {
+		t.Fatalf("warnings: %v", res.Warnings)
+	}
+	m, l := h.r.Manifest, h.r.Lock
+	for _, id := range []string{"config_manager", "server_tweaks"} {
+		if l.Mods[id].Side != "both" || m.Requires[id].Side != "both" {
+			t.Errorf("%s: lock %+v, manifest %+v", id, l.Mods[id], m.Requires[id])
+		}
+	}
+	for id, side := range map[string]string{"sodium": "client", "jei": "both", "fabric-api": "both"} {
+		if l.Mods[id].Side != side || m.Requires[id].Side != "" {
+			t.Errorf("%s: lock %+v, manifest %+v", id, l.Mods[id], m.Requires[id])
+		}
+	}
+}
