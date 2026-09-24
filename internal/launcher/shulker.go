@@ -27,6 +27,19 @@ var Shulker = &Entry{
 	place: placeShulker, link: linkShulker,
 }
 
+// Owned lists the instances shulker owns for the project at source. Instances other launchers
+// own are synced from it too, but never count, since shulker doesn't start them; nor does the
+// project directory itself.
+func Owned(registry []config.Instance, source string) []config.Instance {
+	var own []config.Instance
+	for _, in := range registry {
+		if in.Launcher == Shulker.Name && config.SameDir(in.Source, source) && !config.SameDir(in.Dir, source) {
+			own = append(own, in)
+		}
+	}
+	return own
+}
+
 // relinkShulker rebuilds an instance shulker owns. It names the instance with --as rather than
 // --name, because the id is also the folder under the instances root, and it carries no side: a
 // shulker instance is a client.

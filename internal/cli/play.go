@@ -556,12 +556,7 @@ func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (conf
 	if err != nil {
 		return config.Instance{}, nil, err
 	}
-	var own []config.Instance
-	for _, in := range registry {
-		if in.Launcher == launcher.Shulker.Name && config.SameDir(in.Source, source) && !config.SameDir(in.Dir, source) {
-			own = append(own, in)
-		}
-	}
+	own := launcher.Owned(registry, source)
 	switch len(own) {
 	case 0:
 		return a.createProjectInstance(cmd, p, dir, create)

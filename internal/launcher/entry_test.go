@@ -85,3 +85,16 @@ func TestRefreshRowKeepsTheOldRowsIdentityAndDetectsAMissingLauncher(t *testing.
 		t.Fatalf("a recorded launcher is kept: %+v", kept)
 	}
 }
+
+func TestOwnedIsShulkersInstancesOfAProjectButNotTheProjectItself(t *testing.T) {
+	registry := []config.Instance{
+		{ID: "smp", Launcher: "shulker", Dir: "/data/instances/smp", Source: "/packs/smp"},
+		{ID: "prism", Launcher: "prism", Dir: "/prism/smp/.minecraft", Source: "/packs/smp"},
+		{ID: "self", Launcher: "shulker", Dir: "/packs/smp", Source: "/packs/smp"},
+		{ID: "other", Launcher: "shulker", Dir: "/data/instances/other", Source: "/packs/other"},
+	}
+	own := Owned(registry, "/packs/smp/")
+	if len(own) != 1 || own[0].ID != "smp" {
+		t.Fatalf("owned = %+v", own)
+	}
+}
