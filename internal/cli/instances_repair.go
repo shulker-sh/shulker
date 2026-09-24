@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
@@ -95,11 +94,14 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		if in.Name != from {
 			res.Renamed = append(res.Renamed, repairRename{ID: in.ID, Dir: in.Dir, From: from, To: in.Name})
 		}
-		wrote, err := a.repairIntent(*in)
+		rep, err := project.RepairIntent(*in)
+		if rep.Kept != "" {
+			a.warnReplaced(rep.Unreadable, rep.Kept)
+		}
 		if err != nil {
 			return res, err
 		}
-		if wrote {
+		if rep.Wrote {
 			res.Wrote = append(res.Wrote, instance.Path(in.Dir))
 		}
 		a.reconcileOrWarn(*in)
@@ -110,11 +112,14 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		}
 		registered[filepath.Clean(found.Dir)] = true
 		found.ID = config.InstanceID(instances, project.InPlaceID(found.Dir), found.Name, found.Dir)
-		wrote, err := a.repairIntent(found)
+		rep, err := project.RepairIntent(found)
+		if rep.Kept != "" {
+			a.warnReplaced(rep.Unreadable, rep.Kept)
+		}
 		if err != nil {
 			return res, err
 		}
-		if wrote {
+		if rep.Wrote {
 			res.Wrote = append(res.Wrote, instance.Path(found.Dir))
 		}
 		instances = append(instances, found)
@@ -136,34 +141,6 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 // old one was kept.
 func (a *app) warnReplaced(unreadable error, kept string) {
 	a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(unreadable).Message, kept)
-}
-
-// repairIntent writes the instance file for a directory shulker synced before it kept one, from
-// what the build recorded. An instance that is a project gets a defaults-only file: its manifest
-// holds what it follows, so anything written here could only go stale against it. A file it can't
-// read is kept as instance.json.replaced.
-func (a *app) repairIntent(in config.Instance) (bool, error) {
-	_, loadErr := instance.Load(in.Dir)
-	if loadErr == nil {
-		return false, nil
-	}
-	f := instance.New()
-	if _, _, inPlace := project.InPlaceIntent(in.Dir); !inPlace {
-		st, _ := build.ReadState(in.Dir)
-		source := st.Source
-		if source == "" {
-			source = in.Source
-		}
-		if source == "" {
-			return false, nil
-		}
-		f.Source, f.Ref, f.Path, f.Side = source, st.Ref, st.Path, st.Side
-	}
-	kept, err := f.Replace(in.Dir)
-	if kept != "" {
-		a.warnReplaced(loadErr, kept)
-	}
-	return true, err
 }
 
 func (r repairResult) print(l *out.Lines) {

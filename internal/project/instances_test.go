@@ -1,11 +1,13 @@
 package project
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/manifest"
 )
 
 func TestSortInstancesOrdersByLauncherThenLabelThenDir(t *testing.T) {
@@ -50,5 +52,34 @@ func TestInstanceAtReadsTheInstanceFileUnlessItSaysUnlinked(t *testing.T) {
 	}
 	if _, ok := InstanceAt(dir); ok {
 		t.Fatal("an unlinked instance file wins over its source")
+	}
+}
+
+func TestRepairIntentWritesADefaultsOnlyFileForAnInPlaceProjectAndKeepsAnUnreadableOne(t *testing.T) {
+	dir := t.TempDir()
+	rep, err := RepairIntent(config.Instance{Dir: dir})
+	if err != nil || rep.Wrote {
+		t.Fatalf("a directory with no source gets no file: %+v, %v", rep, err)
+	}
+	m := &manifest.Manifest{Schema: manifest.SchemaURL, Name: "pack", Version: "1.0", Authors: []string{"me"}, Minecraft: "26.2", Loader: manifest.Loader{Type: "fabric", Version: "0.17.3"}, Client: &manifest.Client{Build: "."}, Requires: map[string]manifest.Require{"src": {Source: "https://example.com/pack.git"}}}
+	if err := m.Save(filepath.Join(dir, manifest.FileName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, instance.Dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(instance.Path(dir), []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rep, err = RepairIntent(config.Instance{Dir: dir})
+	if err != nil || !rep.Wrote || rep.Kept != instance.Path(dir)+".replaced" || rep.Unreadable == nil {
+		t.Fatalf("repaired %+v, %v", rep, err)
+	}
+	f, err := instance.Load(dir)
+	if err != nil || f.Source != "" || f.Side != "" {
+		t.Fatalf("an in-place project's file holds no source: %+v, %v", f, err)
+	}
+	if rep, err := RepairIntent(config.Instance{Dir: dir}); err != nil || rep.Wrote {
+		t.Fatalf("a readable file is left alone: %+v, %v", rep, err)
 	}
 }

@@ -150,3 +150,40 @@ func InstanceAt(dir string) (config.Instance, bool) {
 	}
 	return in, true
 }
+
+// Repaired is what RepairIntent did to an instance file: whether it wrote one, and when it wrote
+// over a file it couldn't read, where the old one was kept and why.
+type Repaired struct {
+	Wrote      bool
+	Kept       string
+	Unreadable error
+}
+
+// RepairIntent writes the instance file for a directory shulker synced before it kept one, from
+// what the build recorded. An instance that is a project gets a defaults-only file: its manifest
+// holds what it follows, so anything written here could only go stale against it. A file it can't
+// read is kept as instance.json.replaced.
+func RepairIntent(in config.Instance) (Repaired, error) {
+	_, loadErr := instance.Load(in.Dir)
+	if loadErr == nil {
+		return Repaired{}, nil
+	}
+	f := instance.New()
+	if _, _, inPlace := InPlaceIntent(in.Dir); !inPlace {
+		st, _ := build.ReadState(in.Dir)
+		source := st.Source
+		if source == "" {
+			source = in.Source
+		}
+		if source == "" {
+			return Repaired{}, nil
+		}
+		f.Source, f.Ref, f.Path, f.Side = source, st.Ref, st.Path, st.Side
+	}
+	kept, err := f.Replace(in.Dir)
+	rep := Repaired{Wrote: true, Kept: kept}
+	if kept != "" {
+		rep.Unreadable = loadErr
+	}
+	return rep, err
+}
