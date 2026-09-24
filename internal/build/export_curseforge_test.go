@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -239,5 +240,61 @@ func TestExportEnablesPacksByTheirCurseForgeNames(t *testing.T) {
 	}
 	if props := entries["overrides/config/iris.properties"]; !strings.Contains(props, "shaderPack=ComplementaryReimagined_r5.5.1.zip") {
 		t.Fatalf("iris.properties: %s", props)
+	}
+}
+
+// datapackZip is a datapack carrying a loot table, with assets/ too when hybrid.
+func datapackZip(t *testing.T, hybrid bool) []byte {
+	t.Helper()
+	entries := map[string]string{"pack.mcmeta": `{"pack":{"pack_format":48,"description":"loot"}}`, "data/loot/loot_table/chest.json": "{}"}
+	if hybrid {
+		entries["assets/loot/lang/en_us.json"] = "{}"
+	}
+	return zipOf(t, entries)
+}
+
+func TestExportBundlesADatapackOutsideDatapacksOrRefuses(t *testing.T) {
+	p := newExportProject(t)
+	p.b.Manifest.Server = nil
+	loot := datapackZip(t, false)
+	p.lockLocalDatapack("loot", "loot.zip", loot)
+	p.lockLocalMod("paxi", "Paxi-26.2-Fabric-5.1.jar", modJar(t, "paxi", "5.1"))
+
+	if e := failure(t, mustFail(p.exportCurseForge(false))); e.Code != "curseforge-cant-place" || !strings.Contains(strings.Join(e.Items, "\n"), "loot (config/paxi/datapacks/)") {
+		t.Fatalf("a datapack in Paxi's folder can't go by file ID: %+v", e)
+	}
+	report, err := p.exportCurseForge(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(report.BundledDatapacks, ",") != "loot" || len(report.Datapacks) != 0 {
+		t.Fatalf("report: %+v", report)
+	}
+	if p.archive()["overrides/config/paxi/datapacks/loot.zip"] != string(loot) {
+		t.Fatal("the datapack is bundled where Paxi reads it")
+	}
+}
+
+func TestExportBundlesAHybridDatapacksResourcePackCopyOrRefuses(t *testing.T) {
+	p := newExportProject(t)
+	p.b.Manifest.Server = nil
+	hybrid := datapackZip(t, true)
+	terralith := p.modrinth.publish(provider.Project{ID: "8oi3bsk5", Slug: "terralith", Type: manifest.TypeDatapack}, provider.Version{ID: "TerraV264", Number: "2.6.4", Loaders: []string{"datapack"}, File: provider.File{Filename: "Terralith_26.2_v2.6.4.zip"}}, hybrid)
+	p.lockPack(manifest.TypeDatapack, "terralith", p.modrinth, terralith)
+	entry := p.b.Manifest.Requires["terralith"]
+	entry.ResourcePack = true
+	p.b.Manifest.Requires["terralith"] = entry
+	locked := p.b.Lock.Datapacks["terralith"]
+	locked.ResourcePack, locked.Filename = true, terralith.File.Filename
+	p.b.Lock.Datapacks["terralith"] = locked
+
+	if e := failure(t, mustFail(p.exportCurseForge(false))); e.Code != "curseforge-cant-place" || !strings.Contains(strings.Join(e.Items, "\n"), "terralith (resourcepacks/)") {
+		t.Fatalf("the resource pack copy can't go by file ID: %+v", e)
+	}
+	if _, err := p.exportCurseForge(true); err != nil {
+		t.Fatal(err)
+	}
+	if p.archive()["overrides/resourcepacks/Terralith_26.2_v2.6.4.zip"] != string(hybrid) {
+		t.Fatal("the resource pack copy is bundled")
 	}
 }

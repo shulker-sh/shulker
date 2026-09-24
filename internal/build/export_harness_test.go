@@ -355,3 +355,31 @@ func listedIDs(files []packarchive.File) []string {
 	}
 	return ids
 }
+
+// cacheBytes puts data in the cache under its sha512 and returns the digest.
+func (p *exportProject) cacheBytes(data []byte) string {
+	p.t.Helper()
+	sum := sha512Hex(data)
+	path := p.b.Cache.Object(sum)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		p.t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		p.t.Fatal(err)
+	}
+	return sum
+}
+
+// lockLocalMod locks data as the project's own jar files/filename under key.
+func (p *exportProject) lockLocalMod(key, filename string, data []byte) {
+	p.t.Helper()
+	p.b.Manifest.Requires[key] = manifest.Require{File: "files/" + filename}
+	p.b.Lock.Mods[key] = lock.Mod{File: "files/" + filename, Filename: filename, Sha512: p.cacheBytes(data), Size: int64(len(data)), Side: "both", RequiredBy: []string{}, Aliases: lock.Aliases{}}
+}
+
+// lockLocalDatapack locks data as the project's own datapack files/filename under key.
+func (p *exportProject) lockLocalDatapack(key, filename string, data []byte) {
+	p.t.Helper()
+	p.b.Manifest.Requires[key] = manifest.Require{Type: manifest.TypeDatapack, File: "files/" + filename}
+	p.b.Lock.Datapacks[key] = lock.Pack{File: "files/" + filename, Filename: filename, Sha512: p.cacheBytes(data), Size: int64(len(data)), Side: "both"}
+}
