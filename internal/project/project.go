@@ -3,6 +3,7 @@
 package project
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/schema"
 )
 
 var ErrNoManifest = &out.Error{Code: "manifest-not-found", Message: "no shulker.json here", Help: "run `shulker init`", Exit: out.ExitError}
@@ -119,4 +121,21 @@ func (p *Project) SaveIfChanged(changed bool, err error) error {
 		return saveErr
 	}
 	return err
+}
+
+// ReplaceManifest validates doc as the manifest, parses it and saves it as the project's.
+func (p *Project) ReplaceManifest(doc map[string]any) error {
+	data, err := json.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	if err := schema.Validate(schema.Manifest, data); err != nil {
+		return schema.Invalid("manifest-invalid", manifest.FileName, data, err)
+	}
+	m, err := manifest.Parse(data)
+	if err != nil {
+		return err
+	}
+	p.Manifest = m
+	return p.SaveManifest()
 }

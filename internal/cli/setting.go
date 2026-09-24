@@ -191,19 +191,7 @@ func (a *app) openLocked() (*project.Project, map[string]any, *schema.FieldSet, 
 }
 
 func (a *app) saveSettings(p *project.Project, doc map[string]any, field *schema.Field, from any) error {
-	data, err := json.Marshal(doc)
-	if err != nil {
-		return err
-	}
-	if err := schema.Validate(schema.Manifest, data); err != nil {
-		return schema.Invalid("manifest-invalid", manifest.FileName, data, err)
-	}
-	m, err := manifest.Parse(data)
-	if err != nil {
-		return err
-	}
-	p.Manifest = m
-	if err := p.SaveManifest(); err != nil {
+	if err := p.ReplaceManifest(doc); err != nil {
 		return err
 	}
 	saved, err := p.Manifest.Encode()
