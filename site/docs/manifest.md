@@ -103,9 +103,9 @@ Type: `string`. pattern `^[A-Za-z0-9][A-Za-z0-9_.-]*$`
 
 ### modId
 
-In-jar mod id as declared in fabric.mod.json, quilt.mod.json or neoforge.mods.toml.
+In-jar mod id as declared in fabric.mod.json, quilt.mod.json, neoforge.mods.toml, mods.toml, or for Forge before 1.13 the @Mod annotation, a coremod container, an @API package or mcmod.info, which allow capitals, spaces and punctuation.
 
-Type: `string`. pattern `^[a-z][a-z0-9_-]{1,63}$`
+Type: `string`. pattern `^\S(.{0,62}\S)?$`
 
 ### projectId
 
@@ -213,7 +213,7 @@ No other properties are allowed.
 | --- | --- | --- |
 | `rule` * | `"depends"` \| `"breaks"` |  |
 | `mod` * | [`modId`](#modid) | The mod whose jar metadata declares the constraint. |
-| `on` * | `string` | Subject of the constraint: a mod id or one of the built-ins minecraft, java, fabricloader, quilt_loader, neoforge, forge.<br>pattern `^[a-z][a-z0-9_-]{1,63}$` |
+| `on` * | `string` | Subject of the constraint: a mod id or one of the built-ins minecraft, java, fabricloader, quilt_loader, neoforge, forge.<br>pattern `^\S(.{0,62}\S)?$` |
 | `declared` * | `string` | The range exactly as the jar declared it when this ignore was written. A jar that declares a different range makes the ignore stale and the original failure re-surfaces.<br>min length 1 |
 | `note` * | `string` | Why this constraint is safe to ignore. Required.<br>min length 1 |
 

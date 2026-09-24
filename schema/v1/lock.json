@@ -121,7 +121,7 @@
     },
     "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
-    "modId": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+    "modId": { "type": "string", "pattern": "^\\S(.{0,62}\\S)?$" },
     "requireKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
     "modrinthId": { "type": "string", "pattern": "^[A-Za-z0-9]{8}$" },
     "curseforgeId": { "type": "integer", "minimum": 1 },
