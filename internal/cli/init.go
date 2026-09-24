@@ -131,7 +131,7 @@ func (a *app) initCmd() *cobra.Command {
 			}
 			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Side: opts.side}
 			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OK("created "+manifest.FileName, fmt.Sprintf("%s, Java %d", platformLabel(res.Minecraft, res.Loader, res.Version), res.Java))
+				l.OK("created "+manifest.FileName, fmt.Sprintf("%s, Java %d", resolve.PlatformLabel(res.Minecraft, res.Loader, res.Version), res.Java))
 				packItems(l)
 				switch {
 				case res.Loader != "":
@@ -301,13 +301,6 @@ func (a *app) initPack(cmd *cobra.Command, p *project.Project, source string) (f
 }
 
 const noLoader = "none"
-
-func platformLabel(minecraft, loaderType, loaderVersion string) string {
-	if loaderType == "" {
-		return "Minecraft " + minecraft
-	}
-	return fmt.Sprintf("Minecraft %s, %s %s", minecraft, loaderType, loaderVersion)
-}
 
 func defaultAuthors() []string {
 	authors := []string{"shulker.sh"}

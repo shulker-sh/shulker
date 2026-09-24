@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/project"
 )
 
 // Platform is the Minecraft version, loader and Java a project resolves to.
@@ -142,6 +144,31 @@ func (mt *Meta) NewLock(ctx context.Context, m *manifest.Manifest) (*lock.Lock, 
 	l.Loader = platform.Loader
 	l.Java = platform.Java
 	return l, mt.FillDataVersion(ctx, l), nil
+}
+
+// CheckImportPlatform refuses a pack whose Minecraft version, loader or loader version differs
+// from the one the project sets or inherits. A project that has neither takes the pack's, which
+// the merge writes.
+func CheckImportPlatform(p *project.Project, minecraft, loaderType, loaderVersion string) error {
+	have := cmp.Or(p.Lock.Minecraft, p.Manifest.Minecraft)
+	haveLoader := cmp.Or(p.Lock.Loader.Type, p.Manifest.Loader.Type)
+	haveVersion := cmp.Or(p.Lock.Loader.Version, p.Manifest.Loader.Version)
+	sameLoader := haveLoader == "" || (haveLoader == loaderType && (haveVersion == "" || haveVersion == loaderVersion))
+	if (have == "" || have == minecraft) && sameLoader {
+		return nil
+	}
+	e := out.Errorf("import-mismatch", "the pack is for %s, and the project for %s", PlatformLabel(minecraft, loaderType, loaderVersion), PlatformLabel(have, haveLoader, haveVersion))
+	e.Help = "import it into a new project with -C <dir>"
+	return e
+}
+
+// PlatformLabel names a platform as a message shows it: its Minecraft version, then its loader
+// and loader version when it has one.
+func PlatformLabel(minecraft, loaderType, loaderVersion string) string {
+	if loaderType == "" {
+		return "Minecraft " + minecraft
+	}
+	return fmt.Sprintf("Minecraft %s, %s %s", minecraft, loaderType, loaderVersion)
 }
 
 // inheritedDifferences reports a platform the locked modpacks supply that the lock

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"fmt"
 	"os"
 	"slices"
@@ -29,11 +28,11 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 		if inc, err = readSourcePack(source); err != nil {
 			return err
 		}
-		if err := checkImportPlatform(p, inc.Lock.Minecraft, inc.Lock.Loader.Type, inc.Lock.Loader.Version); err != nil {
+		if err := resolve.CheckImportPlatform(p, inc.Lock.Minecraft, inc.Lock.Loader.Type, inc.Lock.Loader.Version); err != nil {
 			return err
 		}
 	} else {
-		if err := checkImportPlatform(p, arc.Minecraft, arc.Loader.Type, arc.Loader.Version); err != nil {
+		if err := resolve.CheckImportPlatform(p, arc.Minecraft, arc.Loader.Type, arc.Loader.Version); err != nil {
 			return err
 		}
 		staging, err := os.MkdirTemp("", "shulker-import-")
@@ -86,22 +85,6 @@ func mergeSides(m *manifest.Manifest, side string) ([]string, error) {
 		return nil, out.Errorf("usage", "--side %s names a side the project doesn't declare", side)
 	}
 	return []string{side}, nil
-}
-
-// checkImportPlatform refuses a pack whose Minecraft version, loader or loader version differs
-// from the one the project sets or inherits. A project that has neither takes the pack's, which
-// the merge writes.
-func checkImportPlatform(p *project.Project, minecraft, loaderType, loaderVersion string) error {
-	have := cmp.Or(p.Lock.Minecraft, p.Manifest.Minecraft)
-	haveLoader := cmp.Or(p.Lock.Loader.Type, p.Manifest.Loader.Type)
-	haveVersion := cmp.Or(p.Lock.Loader.Version, p.Manifest.Loader.Version)
-	sameLoader := haveLoader == "" || (haveLoader == loaderType && (haveVersion == "" || haveVersion == loaderVersion))
-	if (have == "" || have == minecraft) && sameLoader {
-		return nil
-	}
-	e := out.Errorf("import-mismatch", "the pack is for %s, and the project for %s", platformLabel(minecraft, loaderType, loaderVersion), platformLabel(have, haveLoader, haveVersion))
-	e.Help = "import it into a new project with -C <dir>"
-	return e
 }
 
 // readSourcePack reads a shulker source for a merge: its manifest, its lock, and the files in its

@@ -298,7 +298,7 @@ func pickVersion(ctx context.Context, p provider.Provider, proj *provider.Projec
 	}
 	v, ok := provider.Newest(versions, channel, q.loader)
 	if !ok {
-		e := out.Errorf("no-compatible-version", "%s has no %s version%s", proj.Slug, channelLabel(channel), platformLabel(q.game, q.loader))
+		e := out.Errorf("no-compatible-version", "%s has no %s version%s", proj.Slug, channelLabel(channel), platformSuffix(q.game, q.loader))
 		e.Candidates, e.Pass = otherChannels(versions)
 		e.Flag = "--channel"
 		return nil, e

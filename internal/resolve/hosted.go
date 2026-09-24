@@ -171,7 +171,7 @@ func modpackLoaders(name string) []string {
 	return loader.ProviderLoaders(name)
 }
 
-func platformLabel(game, loaderName string) string {
+func platformSuffix(game, loaderName string) string {
 	var parts []string
 	if game != "" {
 		parts = append(parts, " for Minecraft "+game)
