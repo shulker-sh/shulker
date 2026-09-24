@@ -49,7 +49,11 @@ func (a *app) updateCmd() *cobra.Command {
 					ids = append(ids, arg)
 				}
 				if len(args) == 0 || len(requested) > 0 {
-					loaded, err := a.refreshModpacks(cmd.Context(), p, r, func(manifest.Require) bool { return true }, failUnreachable)
+					store, err := a.packStore(p)
+					if err != nil {
+						return "", err
+					}
+					loaded, err := r.RefreshModpacks(cmd.Context(), store, p, func(manifest.Require) bool { return true }, resolve.FailUnreachable)
 					if err != nil {
 						return "", err
 					}

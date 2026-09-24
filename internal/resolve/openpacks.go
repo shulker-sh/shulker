@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 
+	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/pack"
@@ -78,6 +79,55 @@ func OpenPacks(ctx context.Context, store *pack.Store, p *project.Project, mode 
 	return loaded, warnings, nil
 }
 
+// Unreachable is what RefreshModpacks does with a modpack whose source can't be reached.
+type Unreachable int
+
+const (
+	FailUnreachable Unreachable = iota
+	KeepUnreachable
+)
+
+// RefreshModpacks re-resolves the modpacks refresh picks from their sources, keeps the rest at
+// their locked pins, and takes the result in place of what OpenPacks read for p. An archive is read
+// again only when archiveMoved says there is something new in it, so an unchanged one needs no
+// network. One whose source can't be reached stays as OpenPacks read it, at its pin, without
+// holding back the others, when onUnreachable says so: sync does, but update was asked for new
+// versions.
+func (r *Resolver) RefreshModpacks(ctx context.Context, store *pack.Store, p *project.Project, refresh func(manifest.Require) bool, onUnreachable Unreachable) ([]*pack.Loaded, error) {
+	modpacks := r.Manifest.Modpacks()
+	loaded := make([]*pack.Loaded, 0, len(r.Packs))
+	for _, l := range r.Packs {
+		mp := modpacks[l.Name]
+		if !refresh(mp) || (l.Kind == pack.File && !archiveMoved(r.Dir, mp, l.Pin, true)) {
+			loaded = append(loaded, l)
+			continue
+		}
+		fresh, err := store.Resolve(ctx, l.Name, mp)
+		if err != nil && onUnreachable == KeepUnreachable && ctx.Err() == nil && fetch.IsNetwork(err) {
+			r.Warnings = append(r.Warnings, fmt.Sprintf("%s, keeping modpack %s at %s from the lock", offlineReason(store), l.Name, l.Pin.Label()))
+			loaded = append(loaded, l)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		r.Warnings = append(r.Warnings, scoped(l.Name, fresh.Warnings)...)
+		loaded = append(loaded, fresh)
+	}
+	if err := r.RefreshPacks(loaded); err != nil {
+		return nil, err
+	}
+	p.ReplacePacks(loaded)
+	return loaded, nil
+}
+
+func offlineReason(store *pack.Store) string {
+	if store.Fetch != nil && store.Fetch.Offline {
+		return "--offline"
+	}
+	return "offline"
+}
+
 // scoped prefixes each warning with the modpack it is about.
 func scoped(name string, warnings []string) []string {
 	named := make([]string, 0, len(warnings))
@@ -94,14 +144,14 @@ func rereads(dir string, mp manifest.Require, pinned lock.Modpack) bool {
 	case pack.Local:
 		return true
 	case pack.File:
-		return ArchiveMoved(dir, mp, pinned, mp.AutoUpdates())
+		return archiveMoved(dir, mp, pinned, mp.AutoUpdates())
 	}
 	return false
 }
 
-// ArchiveMoved reports whether an archive modpack has to be read again: it was locked or unlocked
+// archiveMoved reports whether an archive modpack has to be read again: it was locked or unlocked
 // since, which the lock alone can't rebuild, or its bytes changed and followsBytes says to take them.
-func ArchiveMoved(dir string, mp manifest.Require, pinned lock.Modpack, followsBytes bool) bool {
+func archiveMoved(dir string, mp manifest.Require, pinned lock.Modpack, followsBytes bool) bool {
 	if isLocked := mp.Locked == nil || *mp.Locked; isLocked != pinned.UsesLock {
 		return true
 	}

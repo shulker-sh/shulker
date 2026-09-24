@@ -34,7 +34,11 @@ func (a *app) inPlaceProject(dir string) (*project.Project, string, bool, error)
 // project's own mods, and builds the instance where it stands.
 func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, req syncRequest) (syncResult, error) {
 	rl, err := a.relockProject(cmd, p, relockOptions{keepUnchanged: true, linked: req.linked}, func(p *project.Project, r *resolve.Resolver) (string, error) {
-		_, err := a.refreshModpacks(cmd.Context(), p, r, manifest.Require.AutoUpdates, keepUnreachable)
+		store, err := a.packStore(p)
+		if err != nil {
+			return "", err
+		}
+		_, err = r.RefreshModpacks(cmd.Context(), store, p, manifest.Require.AutoUpdates, resolve.KeepUnreachable)
 		return "", err
 	})
 	if err != nil {

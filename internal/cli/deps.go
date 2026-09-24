@@ -227,59 +227,6 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
 }
 
-// unreachable is what refreshModpacks does with a modpack whose source can't be reached.
-type unreachable int
-
-const (
-	failUnreachable unreachable = iota
-	keepUnreachable
-)
-
-// refreshModpacks re-resolves the modpacks refresh picks from their sources, keeps the rest at
-// their locked pins, and hands the result to the resolver. An archive is read again only when
-// archiveMoved says there is something new in it, so an unchanged one needs no network. One whose
-// source can't be reached stays as openPacks read it, at its pin, without holding back the others,
-// when onUnreachable says so: sync does, but update was asked for new versions.
-func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolve.Resolver, refresh func(manifest.Require) bool, onUnreachable unreachable) ([]*pack.Loaded, error) {
-	store, err := a.packStore(p)
-	if err != nil {
-		return nil, err
-	}
-	modpacks := p.Manifest.Modpacks()
-	loaded := make([]*pack.Loaded, 0, len(r.Packs))
-	for _, l := range r.Packs {
-		mp := modpacks[l.Name]
-		if !refresh(mp) || (l.Kind == pack.File && !resolve.ArchiveMoved(p.Dir, mp, l.Pin, true)) {
-			loaded = append(loaded, l)
-			continue
-		}
-		fresh, err := store.Resolve(ctx, l.Name, mp)
-		if err != nil && onUnreachable == keepUnreachable && ctx.Err() == nil && fetch.IsNetwork(err) {
-			a.printer.Drop()
-			a.printer.Warn("%s, keeping modpack %s at %s from the lock", offlineReason(store), l.Name, l.Pin.Label())
-			loaded = append(loaded, l)
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		a.warnFor(l.Name, true, fresh.Warnings)
-		loaded = append(loaded, fresh)
-	}
-	if err := r.RefreshPacks(loaded); err != nil {
-		return nil, err
-	}
-	p.ReplacePacks(loaded)
-	return loaded, nil
-}
-
-func offlineReason(store *pack.Store) string {
-	if store.Fetch != nil && store.Fetch.Offline {
-		return "--offline"
-	}
-	return "offline"
-}
-
 // managedJava ensures the lock's runtime component. fix is the Fix row a runtime-unavailable error
 // carries, which depends on which side needs the Java.
 func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool, fix out.Detail) (server.Runtime, error) {
