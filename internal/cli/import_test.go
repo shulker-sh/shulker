@@ -138,9 +138,8 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 		t.Fatalf("the marker jar must not be imported as an override: %v", err)
 	}
 
-	code, stdout, _ := h.run(t, "import", archive, "--dir", dir, "--json")
-	if code == 0 || failureCode(t, stdout).Code != "manifest-exists" {
-		t.Fatalf("import over an existing project: exit %d %s", code, stdout)
+	if stdout := h.mustRun(t, "import", archive, "--dir", dir, "--json"); !strings.Contains(stdout, `"merged": true`) {
+		t.Fatalf("import over an existing project merges: %s", stdout)
 	}
 }
 
@@ -574,9 +573,6 @@ func TestImportCreatesTheProjectInTheCurrentFolder(t *testing.T) {
 	}
 	if strings.Contains(stdout, "cd ") || !strings.Contains(stdout, "shulker install") {
 		t.Fatalf("nudge: %s", stdout)
-	}
-	if code, stdout, _ := h.run(t, "import", archive, "--json"); code == 0 || failureCode(t, stdout).Code != "manifest-exists" {
-		t.Fatalf("exit %d: %s", code, stdout)
 	}
 	h.mustRun(t, "-C", "new", "import", archive)
 	if _, err := os.Stat(filepath.Join(here, "new", manifest.FileName)); err != nil {
