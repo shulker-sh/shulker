@@ -49,22 +49,13 @@ func (rep *mergeReport) undo() {
 	}
 }
 
-// mergeImport merges a modpack into the project in dir, the project winning on every clash.
-func (a *app) mergeImport(cmd *cobra.Command, d *deps, dir string, in *importArchive, source *pack.Checkout, f *importFlags) error {
+// mergeImport merges a modpack into the project p, the project winning on every clash.
+func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, in *importArchive, source *pack.Checkout, f *importFlags) error {
 	ctx := cmd.Context()
-	p, err := a.openProjectAt(dir)
+	dir := p.Dir
+	sides, err := mergeSides(p.Manifest, f.side)
 	if err != nil {
 		return err
-	}
-	if err := p.RequireLock(); err != nil {
-		return err
-	}
-	sides := p.Manifest.Sides()
-	if f.side != "" {
-		if !slices.Contains(sides, f.side) {
-			return out.Errorf("usage", "--side %s names a side the project doesn't declare", f.side)
-		}
-		sides = []string{f.side}
 	}
 	var inc *incoming
 	var mods *resolve.Imported
@@ -108,31 +99,42 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, dir string, in *importArc
 	if source != nil {
 		res.Source = source.Source
 	}
-	return a.printer.Emit(res, func(l *out.Lines) {
-		l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
-		summary := plural(len(rep.merged), "entry", "entries") + " merged"
-		if mods != nil {
-			locked := slices.DeleteFunc(slices.Clone(mods.Locked), func(f resolve.LockedFile) bool { return !slices.Contains(rep.merged, f.ID) })
-			summary = lockedSummary(locked)
-		}
-		rows := []out.Row{
-			{Text: summary},
-			{Text: fmt.Sprintf("%s copied, %d kept", plural(rep.copied, "override file", "override files"), rep.kept)},
-		}
-		l.Tree(append(rows, importRows(mods, rep.keptYours, rep.leftOut)...)...)
-		l.Nudge("Download and build it", "shulker install")
-	})
+	summary := plural(len(rep.merged), "entry", "entries") + " merged"
+	if mods != nil {
+		locked := slices.DeleteFunc(slices.Clone(mods.Locked), func(f resolve.LockedFile) bool { return !slices.Contains(rep.merged, f.ID) })
+		summary = lockedSummary(locked)
+	}
+	return a.emitImport(res, out.Row{Text: summary}, rep.overrideRow())
 }
 
-// checkImportPlatform refuses a pack whose Minecraft version or loader differs from the one the
-// project sets or inherits. A project that has neither takes the pack's, which the merge writes.
+func (rep *mergeReport) overrideRow() out.Row {
+	return out.Row{Text: fmt.Sprintf("%s copied, %d kept", plural(rep.copied, "override file", "override files"), rep.kept)}
+}
+
+// mergeSides are the sides a merge into m takes: the ones it declares, or the one --side names.
+func mergeSides(m *manifest.Manifest, side string) ([]string, error) {
+	sides := m.Sides()
+	if side == "" {
+		return sides, nil
+	}
+	if !slices.Contains(sides, side) {
+		return nil, out.Errorf("usage", "--side %s names a side the project doesn't declare", side)
+	}
+	return []string{side}, nil
+}
+
+// checkImportPlatform refuses a pack whose Minecraft version, loader or loader version differs
+// from the one the project sets or inherits. A project that has neither takes the pack's, which
+// the merge writes.
 func checkImportPlatform(p *project.Project, minecraft, loaderType, loaderVersion string) error {
 	have := cmp.Or(p.Lock.Minecraft, p.Manifest.Minecraft)
 	haveLoader := cmp.Or(p.Lock.Loader.Type, p.Manifest.Loader.Type)
-	if (have == "" || have == minecraft) && (haveLoader == "" || loaderType == "" || haveLoader == loaderType) {
+	haveVersion := cmp.Or(p.Lock.Loader.Version, p.Manifest.Loader.Version)
+	sameLoader := haveLoader == "" || (haveLoader == loaderType && (haveVersion == "" || haveVersion == loaderVersion))
+	if (have == "" || have == minecraft) && sameLoader {
 		return nil
 	}
-	e := out.Errorf("import-mismatch", "the pack is for %s, and the project for %s", platformLabel(minecraft, loaderType, loaderVersion), platformLabel(have, haveLoader, p.Lock.Loader.Version))
+	e := out.Errorf("import-mismatch", "the pack is for %s, and the project for %s", platformLabel(minecraft, loaderType, loaderVersion), platformLabel(have, haveLoader, haveVersion))
 	e.Help = "import it into a new project with -C <dir>"
 	return e
 }
@@ -156,17 +158,8 @@ func readSourcePack(c *pack.Checkout) (*incoming, error) {
 
 // readOverrideFolders reads the files in a project's override folders, a feature's included.
 func readOverrideFolders(dir string, m *manifest.Manifest) ([]mrpack.Override, error) {
-	layers := slices.Clone(mrpack.Layers)
-	for _, name := range slices.Sorted(maps.Keys(m.Features)) {
-		o := m.Features[name].Overrides
-		for _, layer := range []string{o.Both, o.Client, o.Server} {
-			if layer != "" && !slices.Contains(layers, layer) {
-				layers = append(layers, layer)
-			}
-		}
-	}
 	var overrides []mrpack.Override
-	for _, layer := range layers {
+	for _, layer := range overrideLayers(m) {
 		root := filepath.Join(dir, filepath.FromSlash(layer))
 		err := filepath.WalkDir(root, func(path string, e fs.DirEntry, err error) error {
 			if err != nil || !e.Type().IsRegular() {
@@ -247,11 +240,11 @@ func mergePack(p *project.Project, inc *incoming, sides []string) (*mergeReport,
 			continue
 		}
 		from, to := filepath.Join(inc.dir, filepath.FromSlash(rel)), filepath.Join(p.Dir, filepath.FromSlash(rel))
-		if _, err := os.Lstat(to); err == nil || inc.dir == "" {
+		if _, err := os.Lstat(to); err == nil {
 			continue
 		}
-		if _, err := os.Stat(from); err != nil {
-			continue
+		if _, err := os.Stat(from); inc.dir == "" || err != nil {
+			return rep, pack.FileMissing(inc.manifest.Name, rel)
 		}
 		rep.created = append(rep.created, to)
 		if err := copyPath(from, to); err != nil {

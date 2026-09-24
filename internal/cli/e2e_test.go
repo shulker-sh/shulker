@@ -420,7 +420,11 @@ func newHarness(t *testing.T) *harness {
 		if mp, ok := h.modrinthPacks[projectID]; ok {
 			list := []map[string]any{}
 			for _, v := range mp.versions {
-				list = append(list, versionTagged(v.id, projectID, v.number, v.published, v.archive, nil, []string{"fabric"}))
+				loaders := v.loaders
+				if loaders == nil {
+					loaders = []string{"fabric"}
+				}
+				list = append(list, versionTagged(v.id, projectID, v.number, v.published, v.archive, nil, loaders))
 			}
 			return list
 		}
@@ -506,7 +510,14 @@ func newHarness(t *testing.T) *harness {
 			return
 		}
 		if strings.HasSuffix(rest, "/version") {
-			if list := versions(strings.TrimSuffix(rest, "/version")); list != nil {
+			projectID := strings.TrimSuffix(rest, "/version")
+			if list := versions(projectID); list != nil {
+				var loaders []string
+				if _, isPack := h.modrinthPacks[projectID]; isPack && json.Unmarshal([]byte(r.URL.Query().Get("loaders")), &loaders) == nil {
+					list = slices.DeleteFunc(list, func(v map[string]any) bool {
+						return !slices.ContainsFunc(v["loaders"].([]string), func(l string) bool { return slices.Contains(loaders, l) })
+					})
+				}
 				writeJSON(w, list)
 			} else {
 				http.NotFound(w, r)

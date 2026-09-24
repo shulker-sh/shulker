@@ -2,8 +2,6 @@ package cli
 
 import (
 	"cmp"
-	"fmt"
-	"path/filepath"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -15,17 +13,13 @@ import (
 	"shulker.sh/shulker/internal/resolve"
 )
 
-// isModpackKey reports whether an import argument is a modpack the project in dir requires, which
-// comes before every other reading of it. --type modpack insists on it, and any other --type rules
-// it out.
-func isModpackKey(dir string, merging bool, arg, typ string) (bool, error) {
+// isModpackKey reports whether an import argument is a modpack the target project requires,
+// which comes before every other reading of it. --type modpack insists on it, and any other --type
+// rules it out.
+func isModpackKey(target *project.Project, arg, typ string) (bool, error) {
 	isKey := false
-	if merging && (typ == "" || typ == "modpack") {
-		m, err := manifest.Load(filepath.Join(dir, manifest.FileName))
-		if err != nil {
-			return false, err
-		}
-		req, listed := m.Requires[arg]
+	if target != nil && (typ == "" || typ == "modpack") {
+		req, listed := target.Manifest.Requires[arg]
 		isKey = listed && req.Kind() == manifest.TypeModpack
 	}
 	if typ == "modpack" && !isKey {
@@ -36,23 +30,13 @@ func isModpackKey(dir string, merging bool, arg, typ string) (bool, error) {
 
 // inlineImport makes a modpack the project requires part of the project: its entries become the
 // project's own, merged as an import merges a pack, and the requires entry and its lock section go.
-func (a *app) inlineImport(cmd *cobra.Command, dir, key string, f *importFlags) error {
+func (a *app) inlineImport(cmd *cobra.Command, p *project.Project, key string, f *importFlags) error {
 	if f.at != (pack.At{}) || f.provider != "" || f.ignoreShulker {
 		return out.Errorf("usage", "--ref, --path, --provider and --ignore-shulker don't apply to a modpack the project requires")
 	}
-	p, err := a.openProjectAt(dir)
+	sides, err := mergeSides(p.Manifest, f.side)
 	if err != nil {
 		return err
-	}
-	if err := p.RequireLock(); err != nil {
-		return err
-	}
-	sides := p.Manifest.Sides()
-	if f.side != "" {
-		if !slices.Contains(sides, f.side) {
-			return out.Errorf("usage", "--side %s names a side the project doesn't declare", f.side)
-		}
-		sides = []string{f.side}
 	}
 	var rep *mergeReport
 	var name, version string
@@ -82,16 +66,8 @@ func (a *app) inlineImport(cmd *cobra.Command, dir, key string, f *importFlags) 
 		}
 		return err
 	}
-	res := importResult{Dir: dir, Name: name, Version: version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: key, Sides: p.Manifest.Sides(), Overrides: []string{}, Merged: true, KeptYours: rep.keptYours, LeftOut: rep.leftOut}
-	return a.printer.Emit(res, func(l *out.Lines) {
-		l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
-		rows := []out.Row{
-			{Text: plural(len(rep.merged), "entry", "entries") + " now the project's own"},
-			{Text: fmt.Sprintf("%s copied, %d kept", plural(rep.copied, "override file", "override files"), rep.kept)},
-		}
-		l.Tree(append(rows, importRows(nil, rep.keptYours, rep.leftOut)...)...)
-		l.Nudge("Download and build it", "shulker install")
-	})
+	res := importResult{Dir: p.Dir, Name: name, Version: version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: key, Sides: p.Manifest.Sides(), Overrides: []string{}, Merged: true, KeptYours: rep.keptYours, LeftOut: rep.leftOut}
+	return a.emitImport(res, out.Row{Text: plural(len(rep.merged), "entry", "entries") + " now the project's own"}, rep.overrideRow())
 }
 
 // inlined is a required modpack as a pack to merge: the project's lock entries it provides, taken

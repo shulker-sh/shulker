@@ -21,6 +21,8 @@ type modrinthPack struct {
 type modrinthPackVersion struct {
 	id, number, published string
 	archive               fakeJar
+	// loaders are the loaders the version is tagged with, fabric when empty.
+	loaders []string
 }
 
 // hostedMrpack builds a Modrinth pack archive served from the fake CDN: sodium and fabric-api, which

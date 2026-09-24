@@ -12,6 +12,8 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 // writeMergePack writes a Modrinth pack for 26.2 on loaderKey listing jars in its index, on both sides,
@@ -173,5 +175,40 @@ func TestImportMergeIntoAnInstanceTakesAHistoryEntry(t *testing.T) {
 	entries, err := build.History(h.dir)
 	if err != nil || len(entries) != 1 || entries[0].Reason != "import" {
 		t.Fatalf("history: %+v %v", entries, err)
+	}
+}
+
+func TestImportMergeRefusesAnotherLoaderVersion(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	archive := writeMergePack(t, h, "fabric-loader", "0.16.0", nil, nil)
+	if code, stdout, _ := h.run(t, "--json", "import", archive); code == 0 || failureCode(t, stdout).Code != "import-mismatch" {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+}
+
+func TestImportMergeTakesTheSlugsVersionForTheProjectsLoader(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	older := hostedMrpack(t, h, "cozy-1.0.0.mrpack", "1.0.0")
+	newer := hostedMrpack(t, h, "cozy-2.0.0.mrpack", "2.0.0")
+	h.modrinthPacks = map[string]*modrinthPack{"COZYpack": {slug: "cozy", versions: []modrinthPackVersion{
+		{id: "cozyV100", number: "1.0.0", published: "2026-09-01T00:00:00Z", archive: older},
+		{id: "cozyV200", number: "2.0.0", published: "2026-09-05T00:00:00Z", archive: newer, loaders: []string{"neoforge"}},
+	}}}
+	importMerge(t, h, "cozy")
+	if data, err := os.ReadFile(filepath.Join(h.dir, "overrides", "config", "cozy.txt")); err != nil || string(data) != "cozy 1.0.0\n" {
+		t.Fatalf("override: %q %v", data, err)
+	}
+}
+
+func TestMergeFailsOnALocalFileThePackLacks(t *testing.T) {
+	dir := t.TempDir()
+	p := &project.Project{Dir: dir, Manifest: &manifest.Manifest{Name: "p", Requires: map[string]manifest.Require{}}, Lock: lock.New()}
+	pl := lock.New()
+	pl.Mods["gone"] = lock.Mod{File: "files/gone.jar"}
+	inc := &incoming{manifest: &manifest.Manifest{Name: "pack", Requires: map[string]manifest.Require{"gone": {File: "files/gone.jar"}}}, lock: pl, dir: t.TempDir()}
+	if _, err := mergePack(p, inc, []string{"client"}); out.CodeOf(err) != "local-file-missing" {
+		t.Fatalf("got %v", err)
 	}
 }

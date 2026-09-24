@@ -81,17 +81,12 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 					args[i] = a.localPath(arg)
 				}
 			}
-			for _, flag := range []struct {
-				name, value string
-				allowed     []string
-			}{
-				{"side", opts.Side, []string{"client", "server", "both"}},
-				{"channel", opts.Channel, []string{"release", "beta", "alpha"}},
-				{"provider", opts.Provider, []string{"modrinth", "curseforge"}},
-			} {
-				if flag.value != "" && !slices.Contains(flag.allowed, flag.value) {
-					return out.Errorf("usage", "--%s takes one of %s, not %q", flag.name, strings.Join(flag.allowed, ", "), flag.value)
-				}
+			if err := checkFlagValues(
+				flagValue{"side", opts.Side, []string{"client", "server", "both"}},
+				flagValue{"channel", opts.Channel, []string{"release", "beta", "alpha"}},
+				flagValue{"provider", opts.Provider, []string{"modrinth", "curseforge"}},
+			); err != nil {
+				return err
 			}
 			return a.relock(cmd, relockPlan{}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				for _, arg := range args {
@@ -150,6 +145,22 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a pack or hosted modpack's provider slug, a modpack archive file's name, the name in a modpack's manifest)")
 	}
 	return cmd
+}
+
+// flagValue is a flag's value and the values it takes.
+type flagValue struct {
+	name, value string
+	allowed     []string
+}
+
+// checkFlagValues refuses a flag given a value it doesn't take.
+func checkFlagValues(flags ...flagValue) error {
+	for _, flag := range flags {
+		if flag.value != "" && !slices.Contains(flag.allowed, flag.value) {
+			return out.Errorf("usage", "--%s takes one of %s, not %q", flag.name, strings.Join(flag.allowed, ", "), flag.value)
+		}
+	}
+	return nil
 }
 
 // providerURLs reads the arguments that are Modrinth or CurseForge URLs.

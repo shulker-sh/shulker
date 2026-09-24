@@ -135,3 +135,31 @@ func TestImportCopiesAGitSourceAtARefAndPath(t *testing.T) {
 		t.Fatalf("lock: %+v", l.Mods)
 	}
 }
+
+func TestImportReportsAMissingArchiveURL(t *testing.T) {
+	h := newHarness(t)
+	code, stdout, _ := h.run(t, "--json", "-C", filepath.Join(t.TempDir(), "x"), "import", h.server.URL+"/cdn/missing.mrpack")
+	if code == 0 || failureCode(t, stdout).Code != "modpack-fetch" {
+		t.Fatalf("exit %d: %s", code, stdout)
+	}
+}
+
+func TestImportCopiesOnlyASourcesOwnFiles(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "install")
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "a.txt"), "a")
+	writeFile(t, filepath.Join(h.dir, "notes.txt"), "not the project's")
+	source := h.dir
+	dir := filepath.Join(t.TempDir(), "copy")
+	h.dir = ""
+	h.mustRun(t, "-C", dir, "import", source)
+	for _, rel := range []string{"mods", "options.txt", "notes.txt"} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); !os.IsNotExist(err) {
+			t.Fatalf("%s was copied: %v", rel, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "overrides", "config", "a.txt")); err != nil {
+		t.Fatal(err)
+	}
+}
