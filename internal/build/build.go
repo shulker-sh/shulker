@@ -526,7 +526,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectClient(side, opts, desired, vars, shipped); err != nil {
 			return nil, nil, err
 		}
-		if b.Lock.Loader.Type != "" && b.markerOn(dir) {
+		if b.Lock.RunningLoader().MarkerFile != "" && b.markerOn(dir) {
 			jar, err := b.markerJar(side, cond, sel)
 			if err != nil {
 				return nil, nil, err

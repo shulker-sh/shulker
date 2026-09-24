@@ -82,7 +82,7 @@ func (b *Builder) markerJar(side string, cond conditions, sel selection) ([]byte
 		return nil, err
 	}
 	direct, deps := b.markerMods(side, sel)
-	l, _ := loader.Lookup(b.Lock.Loader.Type)
+	l := b.Lock.RunningLoader()
 	var entries []markerEntry
 	// The marker declares itself in the file its loader reads, and that file decides the format.
 	if strings.HasSuffix(l.MarkerFile, ".json") {
