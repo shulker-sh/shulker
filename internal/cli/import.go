@@ -215,7 +215,7 @@ func (a *app) readImportPack(ctx context.Context, d *deps, arc *packarchive.Arch
 		return nil, err
 	}
 	if arc.Marker != nil {
-		mods.Overrides = dropManifestOwned(m, mods.Overrides)
+		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
 	}
 	return &packProject{manifest: m, lock: l, mods: mods}, nil
 }
@@ -468,29 +468,6 @@ func (a *app) platformLock(ctx context.Context, d *deps, platform *resolve.Platf
 		a.printer.Warn("%s", warning)
 	}
 	return l
-}
-
-func dropManifestOwned(m *manifest.Manifest, overrides []packarchive.Override) []packarchive.Override {
-	owned := map[string]bool{}
-	if m.Client != nil && m.Client.Options != nil {
-		owned[m.OptionsPath()] = true
-	}
-	if m.Server != nil {
-		owned[build.PropertiesFile] = true
-		owned[build.EulaFile] = true
-		if m.Server.Players != nil {
-			owned[build.WhitelistFile] = true
-			owned[build.OpsFile] = true
-			owned[build.BansFile] = true
-		}
-	}
-	kept := overrides[:0]
-	for _, o := range overrides {
-		if !owned[o.Path] {
-			kept = append(kept, o)
-		}
-	}
-	return kept
 }
 
 func writeImport(dir string, m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Override) error {
