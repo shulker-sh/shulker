@@ -158,7 +158,7 @@ func readSourcePack(c *pack.Checkout) (*incoming, error) {
 // readOverrideFolders reads the files in a project's override folders, a feature's included.
 func readOverrideFolders(dir string, m *manifest.Manifest) ([]packarchive.Override, error) {
 	var overrides []packarchive.Override
-	for _, layer := range overrideLayers(m) {
+	for _, layer := range project.OverrideLayers(m) {
 		root := filepath.Join(dir, filepath.FromSlash(layer))
 		err := filepath.WalkDir(root, func(path string, e fs.DirEntry, err error) error {
 			if err != nil || !e.Type().IsRegular() {

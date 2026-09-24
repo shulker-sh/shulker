@@ -412,7 +412,7 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 // as a build the project makes in place, is not the project's to copy.
 func projectPaths(m *manifest.Manifest) []string {
 	paths := []string{lock.FileName, ".gitignore", manifest.FilesDir}
-	paths = append(paths, overrideLayers(m)...)
+	paths = append(paths, project.OverrideLayers(m)...)
 	if m.Icon != "" {
 		paths = append(paths, m.Icon)
 	}
@@ -426,21 +426,6 @@ func projectPaths(m *manifest.Manifest) []string {
 	}
 	slices.Sort(paths)
 	return slices.Compact(paths)
-}
-
-// overrideLayers are a project's override folders: the three every project has, then each
-// feature's.
-func overrideLayers(m *manifest.Manifest) []string {
-	layers := slices.Clone(packarchive.Layers)
-	for _, name := range slices.Sorted(maps.Keys(m.Features)) {
-		o := m.Features[name].Overrides
-		for _, layer := range []string{o.Both, o.Client, o.Server} {
-			if layer != "" && !slices.Contains(layers, layer) {
-				layers = append(layers, layer)
-			}
-		}
-	}
-	return layers
 }
 
 // isSideLayer reports whether layer is one of side's own override folders.
