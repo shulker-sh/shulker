@@ -4,10 +4,12 @@ package game
 
 import (
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"shulker.sh/shulker/internal/proc"
 )
@@ -49,6 +51,31 @@ func Argv(v Version, p Platform, features map[string]bool, vars map[string]strin
 	argv = append(argv, extra...)
 	argv = append(argv, v.MainClass)
 	return append(argv, game...)
+}
+
+// LaunchArgv is the argv with one launch's own settings in it: the memory and JVM arguments after
+// the version's own, and the window through the arguments the version declares for a custom
+// resolution, as is the quick play target. A version from before those were declared takes the
+// pairs appended, as Prism does.
+func LaunchArgv(v Version, p Platform, vars map[string]string, memory string, jvmArgs []string, window string, target QuickPlay) []string {
+	var extra []string
+	if memory != "" {
+		extra = append(extra, "-Xms"+memory, "-Xmx"+memory)
+	}
+	extra = append(extra, jvmArgs...)
+	features := map[string]bool{}
+	vars = maps.Clone(vars)
+	legacy := target.Apply(v, features, vars)
+	width, height, sized := strings.Cut(window, "x")
+	if sized {
+		features["has_custom_resolution"] = true
+		vars["resolution_width"], vars["resolution_height"] = width, height
+	}
+	argv := Argv(v, p, features, vars, extra...)
+	if sized && !slices.Contains(argv, "--width") {
+		argv = append(argv, "--width", width, "--height", height)
+	}
+	return append(argv, legacy...)
 }
 
 // Launch is one start of the game: the java that runs it, the argv it runs with, the directory it

@@ -5,9 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"shulker.sh/shulker/internal/game"
-	"shulker.sh/shulker/internal/instance"
 )
 
 // playedArgv launches the instance and returns the argv the fake java was handed, clearing the one
@@ -127,24 +124,5 @@ func TestPlayUsesTheInstancesPinnedAccount(t *testing.T) {
 	}
 	if _, _, stderr := h.run(t, "-i", "pack", "play", "--no-sync"); !strings.Contains(stderr, "shulker instance unset account") {
 		t.Fatalf("the error names the way back to the default account:\n%s", stderr)
-	}
-}
-
-func TestLaunchArgvSizesTheWindowThroughTheVersionsOwnArguments(t *testing.T) {
-	sized := []game.Rule{{Action: "allow", Features: map[string]bool{"has_custom_resolution": true}}}
-	v := game.Version{MainClass: "Main", Arguments: &game.Arguments{
-		JVM: []game.Argument{{Values: []string{"-cp", "x"}}},
-		Game: []game.Argument{
-			{Values: []string{"--username", "Steve"}},
-			{Values: []string{"--width", "${resolution_width}", "--height", "${resolution_height}"}, Rules: sized},
-		},
-	}}
-
-	got := strings.Join(launchArgv(v, game.Host(), map[string]string{}, instance.Settings{LaunchSettings: instance.LaunchSettings{Memory: "2G"}}, "640x480", game.QuickPlay{}), " ")
-	if got != "-cp x -Xms2G -Xmx2G Main --username Steve --width 640 --height 480" {
-		t.Fatalf("argv %q", got)
-	}
-	if got := strings.Join(launchArgv(v, game.Host(), map[string]string{}, instance.Settings{}, "", game.QuickPlay{}), " "); got != "-cp x Main --username Steve" {
-		t.Fatalf("no window asks for none: %q", got)
 	}
 }

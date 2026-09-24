@@ -5,12 +5,9 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -199,7 +196,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	req := watchRequest{
 		Dir:     in.Dir,
 		Java:    plan.java,
-		Argv:    launchArgv(plan.launch.Version, plan.platform, vars, settings, window, opts.target),
+		Argv:    game.LaunchArgv(plan.launch.Version, plan.platform, vars, settings.Memory, settings.JVMArgs, window, opts.target),
 		Log:     res.Log,
 		Wrapper: settings.Wrapper,
 	}
@@ -314,31 +311,6 @@ func (a *app) pinnedAccount(id string) (string, error) {
 	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)
 	e.Nudge = out.Nudge{Lead: "Play it as the default account instead with", Command: "shulker instance unset account"}
 	return "", e
-}
-
-// launchArgv is the argv with this launch's own settings in it: the memory and JVM arguments after
-// the version's own, and the window through the arguments the version declares for a custom
-// resolution, as is the quick play target. A version from before those were declared takes the
-// pairs appended, as Prism does.
-func launchArgv(v game.Version, platform game.Platform, vars map[string]string, s instance.Settings, window string, target game.QuickPlay) []string {
-	var extra []string
-	if s.Memory != "" {
-		extra = append(extra, "-Xms"+s.Memory, "-Xmx"+s.Memory)
-	}
-	extra = append(extra, s.JVMArgs...)
-	features := map[string]bool{}
-	vars = maps.Clone(vars)
-	legacy := target.Apply(v, features, vars)
-	width, height, sized := strings.Cut(window, "x")
-	if sized {
-		features["has_custom_resolution"] = true
-		vars["resolution_width"], vars["resolution_height"] = width, height
-	}
-	argv := game.Argv(v, platform, features, vars, extra...)
-	if sized && !slices.Contains(argv, "--width") {
-		argv = append(argv, "--width", width, "--height", height)
-	}
-	return append(argv, legacy...)
 }
 
 // gameSession is the account as the game's own arguments name it. An offline account presents the

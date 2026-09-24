@@ -39,3 +39,22 @@ func TestSessionFillsEveryPlaceholderTheGameHasForAnAccount(t *testing.T) {
 		t.Fatalf("game arguments %q", game)
 	}
 }
+
+func TestLaunchArgvSizesTheWindowThroughTheVersionsOwnArguments(t *testing.T) {
+	sized := []Rule{{Action: "allow", Features: map[string]bool{"has_custom_resolution": true}}}
+	v := Version{MainClass: "Main", Arguments: &Arguments{
+		JVM: []Argument{{Values: []string{"-cp", "x"}}},
+		Game: []Argument{
+			{Values: []string{"--username", "Steve"}},
+			{Values: []string{"--width", "${resolution_width}", "--height", "${resolution_height}"}, Rules: sized},
+		},
+	}}
+
+	got := strings.Join(LaunchArgv(v, Host(), map[string]string{}, "2G", nil, "640x480", QuickPlay{}), " ")
+	if got != "-cp x -Xms2G -Xmx2G Main --username Steve --width 640 --height 480" {
+		t.Fatalf("argv %q", got)
+	}
+	if got := strings.Join(LaunchArgv(v, Host(), map[string]string{}, "", nil, "", QuickPlay{}), " "); got != "-cp x Main --username Steve" {
+		t.Fatalf("no window asks for none: %q", got)
+	}
+}
