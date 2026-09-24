@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/out"
 )
 
 const commentFormat = 1
@@ -122,6 +123,31 @@ func Take(src Source, home Home, reason string, each func(world string, open boo
 		return Backup{}, err
 	}
 	return Backup{ID: id, Path: path, Taken: at, Reason: reason, Instance: src.Instance, Size: info.Size(), Worlds: len(worlds), Names: worlds, Minecraft: src.Minecraft, Loader: src.Loader, LoaderVersion: src.LoaderVersion, seq: seq}, nil
+}
+
+// HeldWorlds is names, each checked against the worlds in worldsDir: for a server, whose level
+// names the one world it loads, only that one.
+func HeldWorlds(worldsDir, level string, names []string) ([]string, error) {
+	held, err := Worlds(worldsDir)
+	if err != nil {
+		return nil, err
+	}
+	names = distinct(names)
+	for _, name := range names {
+		switch {
+		case level != "" && name != level:
+			return nil, out.Errorf("world-not-found", "this server loads only %s, its level-name, not %s", level, name)
+		case !slices.Contains(held, name):
+			return nil, out.Errorf("world-not-found", "no world %s in %s", name, worldsDir)
+		}
+	}
+	return names, nil
+}
+
+func distinct(names []string) []string {
+	names = slices.Clone(names)
+	slices.Sort(names)
+	return slices.Compact(names)
 }
 
 // Auto is the backup a build takes of src's worlds before it changes the mod set, then trims

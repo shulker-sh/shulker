@@ -47,7 +47,7 @@ func (a *app) backup(target savesTarget, only []string) (backupResult, error) {
 	src := a.backupSource(target)
 	if len(only) > 0 {
 		var err error
-		if src.Only, err = heldWorlds(target, only); err != nil {
+		if src.Only, err = saves.HeldWorlds(target.WorldsDir, target.World, only); err != nil {
 			return backupResult{}, err
 		}
 	}
@@ -67,25 +67,6 @@ func (a *app) backup(target savesTarget, only []string) (backupResult, error) {
 
 func (b backupResult) print(l *out.Lines) {
 	l.OKInto("backed up "+plural(b.Worlds, "world", "worlds"), b.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(b.Size), b.elapsed.Seconds()))
-}
-
-// heldWorlds is names, each checked against the worlds target holds: for a server, only the one its
-// level-name loads.
-func heldWorlds(target savesTarget, names []string) ([]string, error) {
-	held, err := saves.Worlds(target.WorldsDir)
-	if err != nil {
-		return nil, err
-	}
-	names = distinct(names)
-	for _, name := range names {
-		switch {
-		case target.World != "" && name != target.World:
-			return nil, out.Errorf("world-not-found", "this server loads only %s, its level-name, not %s", target.World, name)
-		case !slices.Contains(held, name):
-			return nil, out.Errorf("world-not-found", "no world %s in %s", name, target.WorldsDir)
-		}
-	}
-	return names, nil
 }
 
 func distinct(names []string) []string {

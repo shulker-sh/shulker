@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/saves/savestest"
 )
 
@@ -442,5 +443,24 @@ func TestAutoTrimsTheAutomaticBackupsItKeeps(t *testing.T) {
 	}
 	if want := []string{"sync", "update", "backup"}; !slices.Equal(reasons, want) {
 		t.Fatalf("the oldest automatic backup goes and the asked-for one stays: %v", reasons)
+	}
+}
+
+func TestHeldWorldsChecksTheNamesAndAServersLevel(t *testing.T) {
+	src := t.TempDir()
+	world(t, src, "mine")
+	world(t, src, "creative")
+	got, err := HeldWorlds(src, "", []string{"mine", "creative", "mine"})
+	if err != nil || !slices.Equal(got, []string{"creative", "mine"}) {
+		t.Fatalf("names are checked and made distinct: %q %v", got, err)
+	}
+	if _, err := HeldWorlds(src, "", []string{"other"}); out.CodeOf(err) != "world-not-found" {
+		t.Fatalf("a world not held is world-not-found, got %v", err)
+	}
+	if _, err := HeldWorlds(src, "mine", []string{"creative"}); out.CodeOf(err) != "world-not-found" {
+		t.Fatalf("a server holds only its level, got %v", err)
+	}
+	if got, err := HeldWorlds(src, "mine", []string{"mine"}); err != nil || !slices.Equal(got, []string{"mine"}) {
+		t.Fatalf("the level itself is held: %q %v", got, err)
 	}
 }
