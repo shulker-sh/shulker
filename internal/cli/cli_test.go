@@ -316,15 +316,6 @@ func TestUnknownCommandHuman(t *testing.T) {
 	}
 }
 
-func TestSlugify(t *testing.T) {
-	cases := map[string]string{"My Pack": "my-pack", "tmp.KEnt9tWC1o": "tmp.kent9twc1o", "---": "shulker-project", "west_coast SMP!": "west_coast-smp"}
-	for in, want := range cases {
-		if got := slugify(in); got != want {
-			t.Errorf("slugify(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
 func TestProjectFileCodes(t *testing.T) {
 	dir := t.TempDir()
 	if code, stdout, _ := run(t, "build", "-C", dir, "--json"); code != out.ExitError || failureCode(t, stdout).Code != "manifest-not-found" {

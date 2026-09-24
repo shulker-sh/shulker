@@ -192,7 +192,7 @@ func (a *app) readImportPack(ctx context.Context, d *deps, arc *packarchive.Arch
 	}
 	name := f.name
 	if name == "" {
-		name = slugify(arc.Name)
+		name = project.Slugify(arc.Name)
 	}
 	m, warnings := arc.Manifest(name)
 	a.warn(warnings)

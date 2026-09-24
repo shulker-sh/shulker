@@ -82,7 +82,7 @@ func (a *app) initCmd() *cobra.Command {
 			}
 			name := opts.name
 			if name == "" {
-				name = slugify(filepath.Base(dir))
+				name = project.Slugify(filepath.Base(dir))
 			}
 			minecraft := orLatest(opts.minecraft)
 			m := &manifest.Manifest{
@@ -312,23 +312,6 @@ func platformLabel(minecraft, loaderType, loaderVersion string) string {
 		return "Minecraft " + minecraft
 	}
 	return fmt.Sprintf("Minecraft %s, %s %s", minecraft, loaderType, loaderVersion)
-}
-
-func slugify(s string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(s) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '.', r == '_', r == '-':
-			b.WriteRune(r)
-		default:
-			b.WriteRune('-')
-		}
-	}
-	out := strings.Trim(b.String(), "._-")
-	if out == "" {
-		return "shulker-project"
-	}
-	return out
 }
 
 func defaultAuthors() []string {
