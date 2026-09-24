@@ -3,22 +3,40 @@ package modrinth
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
 
 const (
 	APIURL      = "https://api.modrinth.com/v2"
+	siteURL     = "https://modrinth.com"
 	searchLimit = 100
+)
+
+var (
+	hosts = []string{"modrinth.com", "www.modrinth.com"}
+	// sections are the modrinth.com/<section>/<slug> pages a project has.
+	sections = []string{"mod", "project", "plugin", "resourcepack", "shader", "datapack", "modpack"}
+	// packTags are the loader tags Modrinth files each pack kind's versions under: resource packs
+	// under minecraft, datapacks under datapack and shaders under the shader loader they target.
+	packTags = map[string][]string{
+		manifest.TypeShader:   {"iris", "oculus", "canvas", "vanilla"},
+		manifest.TypeDatapack: {provider.DatapackLoader},
+	}
 )
 
 // longestWait is the longest rate-limit reset worth waiting out. Modrinth's window is a minute.
@@ -31,6 +49,8 @@ type Modrinth struct {
 	Log   func(format string, args ...any)
 	sleep func(ctx context.Context, d time.Duration) error
 }
+
+var _ provider.Provider = (*Modrinth)(nil)
 
 func New(c *fetch.Client) *Modrinth {
 	return &Modrinth{Client: c, BaseURL: APIURL, sleep: sleep}
@@ -81,6 +101,24 @@ func sleep(ctx context.Context, d time.Duration) error {
 
 func (m *Modrinth) Name() string { return "modrinth" }
 
+func (m *Modrinth) Title() string { return "Modrinth" }
+
+func (m *Modrinth) Hosts() []string { return []string{"modrinth.com"} }
+
+func (m *Modrinth) Available() error { return nil }
+
+// Modrinth reads a slug straight, so a slug finds its project as surely as its id.
+func (m *Modrinth) KeysBySlug() bool { return true }
+
+func (m *Modrinth) NotFoundHelp() string { return "" }
+
+func (m *Modrinth) PackTags(kind string) []string {
+	if tags, ok := packTags[kind]; ok {
+		return tags
+	}
+	return []string{"minecraft"}
+}
+
 type project struct {
 	ID          string   `json:"id"`
 	Slug        string   `json:"slug"`
@@ -96,6 +134,7 @@ type project struct {
 // project itself.
 type hit struct {
 	ProjectID  string   `json:"project_id"`
+	Author     string   `json:"author"`
 	Categories []string `json:"categories"`
 	project
 }
@@ -150,6 +189,7 @@ func (m *Modrinth) Search(ctx context.Context, query, kind string, limit int) ([
 	for _, h := range res.Hits {
 		found := convertProject(h.project)
 		found.ID = h.ProjectID
+		found.Author = h.Author
 		found.Datapack = slices.Contains(h.Categories, provider.DatapackLoader)
 		projects = append(projects, found)
 	}
@@ -161,7 +201,7 @@ func convertProject(p project) provider.Project {
 	if kind == "mod" && len(p.Loaders) > 0 && !slices.ContainsFunc(p.Loaders, func(l string) bool { return l != provider.DatapackLoader }) {
 		kind = provider.DatapackLoader
 	}
-	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: kind, Datapack: slices.Contains(p.Loaders, provider.DatapackLoader), Downloads: p.Downloads}
+	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: kind, Datapack: slices.Contains(p.Loaders, provider.DatapackLoader), Downloads: p.Downloads, Page: projectPage(p.ProjectType, p.Slug)}
 }
 
 func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {
@@ -218,9 +258,69 @@ func (m *Modrinth) version(ctx context.Context, path, name string) (*provider.Ve
 	return &pv, nil
 }
 
-// VersionsByHash finds the versions whose files have these sha1s, in one request, by sha1. A hash
-// Modrinth doesn't know is left out.
-func (m *Modrinth) VersionsByHash(ctx context.Context, sha1s []string) (map[string]provider.Version, error) {
+func (m *Modrinth) VersionsByID(ctx context.Context, ids []string) (map[string]provider.Version, map[string]error, error) {
+	var raw []version
+	if err := m.call(ctx, func() error {
+		return m.Client.GetJSON(ctx, m.BaseURL+"/versions?"+url.Values{"ids": {jsonList(ids...)}}.Encode(), &raw)
+	}); err != nil {
+		return nil, nil, fmt.Errorf("modrinth versions: %w", err)
+	}
+	found := make(map[string]provider.Version, len(raw))
+	unusable := map[string]error{}
+	for _, v := range raw {
+		pv, err := convert(v)
+		if err != nil {
+			unusable[v.ID] = err
+			continue
+		}
+		found[v.ID] = pv
+	}
+	return found, unusable, nil
+}
+
+// Identify looks the files up by sha1, then their projects, in one request each, whatever the
+// count, since Modrinth rate-limits by the request.
+func (m *Modrinth) Identify(ctx context.Context, files map[string][]byte) (map[string]provider.Hosted, error) {
+	sha1s := make(map[string]string, len(files))
+	var hashes []string
+	for _, key := range slices.Sorted(maps.Keys(files)) {
+		sum := sha1.Sum(files[key])
+		sha1s[key] = hex.EncodeToString(sum[:])
+		hashes = append(hashes, sha1s[key])
+	}
+	if len(hashes) == 0 {
+		return map[string]provider.Hosted{}, nil
+	}
+	versions, err := m.versionsByHash(ctx, slices.Compact(hashes))
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, v := range versions {
+		ids = append(ids, v.ProjectID)
+	}
+	found := map[string]provider.Hosted{}
+	if len(ids) == 0 {
+		return found, nil
+	}
+	slices.Sort(ids)
+	projects, err := m.Projects(ctx, slices.Compact(ids))
+	if err != nil {
+		return nil, err
+	}
+	for key, sha1Sum := range sha1s {
+		v, hosted := versions[sha1Sum]
+		proj, hasProject := projects[v.ProjectID]
+		if hosted && hasProject {
+			found[key] = provider.Hosted{Project: proj, Version: v}
+		}
+	}
+	return found, nil
+}
+
+// versionsByHash finds the versions whose files have these sha1s, in one request. A hash Modrinth
+// doesn't know is left out.
+func (m *Modrinth) versionsByHash(ctx context.Context, sha1s []string) (map[string]provider.Version, error) {
 	raw := map[string]version{}
 	if err := m.call(ctx, func() error {
 		return m.Client.PostJSON(ctx, m.BaseURL+"/version_files", map[string]any{"hashes": sha1s, "algorithm": "sha1"}, &raw)
@@ -272,6 +372,54 @@ func convert(v version) (provider.Version, error) {
 		pv.Dependencies = append(pv.Dependencies, provider.Dependency{ProjectID: d.ProjectID, VersionID: d.VersionID, Type: d.DependencyType})
 	}
 	return pv, nil
+}
+
+func (m *Modrinth) ParseURL(u *url.URL) (provider.Ref, error) {
+	host := strings.ToLower(u.Hostname())
+	var parts []string
+	for part := range strings.SplitSeq(u.Path, "/") {
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	switch {
+	case slices.Contains(hosts, host):
+		if len(parts) >= 2 && slices.Contains(sections, parts[0]) {
+			if len(parts) == 2 {
+				return provider.Ref{Project: parts[1]}, nil
+			}
+			if len(parts) == 4 && parts[2] == "version" {
+				return provider.Ref{Project: parts[1], Version: parts[3]}, nil
+			}
+		}
+	case host == "cdn.modrinth.com":
+		if len(parts) == 5 && parts[0] == "data" && parts[2] == "versions" {
+			return provider.Ref{Project: parts[1], Version: parts[3]}, nil
+		}
+	default:
+		return provider.Ref{}, provider.ErrNotHosted
+	}
+	return provider.Ref{}, out.Errorf("usage", "modrinth can't read %s", u)
+}
+
+func (m *Modrinth) URLShapes() []string {
+	return []string{
+		siteURL + "/<" + strings.Join(sections, "|") + ">/<slug or id>[/version/<id or number>]",
+		"https://cdn.modrinth.com/data/<project>/versions/<version>/<file>",
+	}
+}
+
+func (m *Modrinth) ProjectPage(kind, slugOrID string) string { return projectPage(kind, slugOrID) }
+
+func (m *Modrinth) VersionsPage(kind, slug string) string {
+	return projectPage(kind, slug) + "/versions"
+}
+
+func projectPage(kind, slugOrID string) string {
+	if kind == "" {
+		kind = "project"
+	}
+	return siteURL + "/" + kind + "/" + slugOrID
 }
 
 func side(client, server string) string {

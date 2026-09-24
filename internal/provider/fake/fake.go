@@ -21,6 +21,8 @@ type Provider struct {
 	// Known are the projects the provider has, and Files their versions.
 	Known []provider.Project
 	Files []provider.Version
+	// Label, when set, is the title; the name with its first letter raised otherwise.
+	Label string
 	// Unavailable, when set, is what Available answers.
 	Unavailable error
 	// Requests counts the lookups made, by method name.
@@ -35,7 +37,12 @@ var _ provider.Provider = (*Provider)(nil)
 
 func (p *Provider) Name() string { return p.name }
 
-func (p *Provider) Title() string { return strings.ToUpper(p.name[:1]) + p.name[1:] }
+func (p *Provider) Title() string {
+	if p.Label != "" {
+		return p.Label
+	}
+	return strings.ToUpper(p.name[:1]) + p.name[1:]
+}
 
 func (p *Provider) Available() error { return p.Unavailable }
 

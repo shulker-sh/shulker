@@ -187,11 +187,11 @@ func TestModsThenFilesAskTwice(t *testing.T) {
 	c := New(fetch.New("test"), "key")
 	c.BaseURL = srv.URL
 	ctx := context.Background()
-	projects, err := c.Mods(ctx, []int{10, 11, 12})
+	projects, err := c.Projects(ctx, []string{"10", "11", "12"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	files, unusable, err := c.Files(ctx, []int{100, 101})
+	files, unusable, err := c.VersionsByID(ctx, []string{"100", "101"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,10 +201,10 @@ func TestModsThenFilesAskTwice(t *testing.T) {
 	if len(paths) != 2 || paths[0] != "POST /mods" || paths[1] != "POST /mods/files" {
 		t.Fatalf("requests: %v", paths)
 	}
-	if projects[11].Type != "resourcepack" || len(projects) != 2 {
+	if projects["11"].Type != "resourcepack" || len(projects) != 2 {
 		t.Fatalf("projects: %+v", projects)
 	}
-	if files[100].File.URL != "https://x/jei.jar" || files[101].File.URL != "" || files[101].Page != "https://www.curseforge.com/minecraft/texture-packs/pack/files/101" {
+	if files["100"].File.URL != "https://x/jei.jar" || files["101"].File.URL != "" || files["101"].Page != "https://www.curseforge.com/minecraft/texture-packs/pack/files/101" {
 		t.Fatalf("files: %+v", files)
 	}
 }
@@ -216,7 +216,7 @@ func TestRateLimitIsNamed(t *testing.T) {
 	defer srv.Close()
 	c := New(fetch.New("test"), "key")
 	c.BaseURL = srv.URL
-	if _, err := c.Mods(context.Background(), []int{10}); out.CodeOf(err) != "rate-limited" {
+	if _, err := c.Projects(context.Background(), []string{"10"}); out.CodeOf(err) != "rate-limited" {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -237,7 +237,7 @@ func TestForbiddenAfterTheKeyWorkedIsALockout(t *testing.T) {
 	if _, err := c.Project(context.Background(), "10", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Mods(context.Background(), []int{10}); out.CodeOf(err) != "rate-limited" {
+	if _, err := c.Projects(context.Background(), []string{"10"}); out.CodeOf(err) != "rate-limited" {
 		t.Fatalf("got %v", err)
 	}
 	if calls != 2 {
@@ -252,11 +252,86 @@ func TestFilesNamesAFileWithNothingToDownload(t *testing.T) {
 	defer srv.Close()
 	c := New(fetch.New("test"), "key")
 	c.BaseURL = srv.URL
-	files, unusable, err := c.Files(context.Background(), []int{100})
+	files, unusable, err := c.VersionsByID(context.Background(), []string{"100"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 0 || out.CodeOf(unusable[100]) != "version-no-file" {
+	if len(files) != 0 || out.CodeOf(unusable["100"]) != "version-no-file" {
 		t.Fatalf("files %v, unusable %v", files, unusable)
+	}
+}
+
+func TestIdentifyFingerprintsThenAsksForProjectsAndFiles(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		switch r.URL.Path {
+		case "/fingerprints":
+			var body struct {
+				Fingerprints []uint32 `json:"fingerprints"`
+			}
+			json.NewDecoder(r.Body).Decode(&body)
+			if len(body.Fingerprints) != 2 || body.Fingerprints[0] != 3817166195 {
+				t.Errorf("fingerprints asked: %v", body.Fingerprints)
+			}
+			w.Write([]byte(`{"data":{"exactMatches":[{"file":{"id":100,"modId":10,"fileFingerprint":3817166195}}]}}`))
+		case "/mods":
+			w.Write([]byte(`{"data":[{"id":10,"slug":"jei","name":"JEI","classId":6,"links":{"websiteUrl":"https://www.curseforge.com/minecraft/mc-mods/jei"},"authors":[{"name":"mezz"}]}]}`))
+		case "/mods/files":
+			w.Write([]byte(`{"data":[{"id":100,"modId":10,"displayName":"1.0","fileName":"jei.jar","downloadUrl":"https://x/jei.jar","hashes":[{"algo":1,"value":"abc"}]}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+	found, err := c.Identify(context.Background(), map[string][]byte{"mods/jei.jar": []byte("shulker"), "mods/other.jar": []byte("other")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(paths, []string{"POST /fingerprints", "POST /mods", "POST /mods/files"}) {
+		t.Fatalf("requests: %v", paths)
+	}
+	h, ok := found["mods/jei.jar"]
+	if len(found) != 1 || !ok || h.Project.Author != "mezz" || h.Project.Page != "https://www.curseforge.com/minecraft/mc-mods/jei" || h.Version.ID != "100" {
+		t.Fatalf("found %+v", found)
+	}
+}
+
+func TestURLsRoundTrip(t *testing.T) {
+	c := New(fetch.New("test"), "key")
+	for arg, want := range map[string]provider.Ref{
+		"https://www.curseforge.com/minecraft/mc-mods/jei":                              {Project: "jei"},
+		"https://curseforge.com/minecraft/texture-packs/fresh-animations/files/5000001": {Project: "fresh-animations", Version: "5000001"},
+		"https://legacy.curseforge.com/minecraft/mc-mods/balm-fabric/download/5700001":  {Project: "balm-fabric", Version: "5700001"},
+		"https://www.curseforge.com/projects/500525":                                    {Project: "500525"},
+	} {
+		u, _ := url.Parse(arg)
+		if got, err := c.ParseURL(u); err != nil || got != want {
+			t.Errorf("%s: got %+v err=%v", arg, got, err)
+		}
+	}
+	for _, arg := range []string{"https://www.curseforge.com/minecraft/worlds/skyblock", "https://www.curseforge.com/minecraft/mc-mods/jei/files", "https://www.curseforge.com/projects/jei"} {
+		u, _ := url.Parse(arg)
+		if _, err := c.ParseURL(u); out.CodeOf(err) != "usage" {
+			t.Errorf("%s: err=%v, want usage", arg, err)
+		}
+	}
+	u, _ := url.Parse("https://modrinth.com/mod/sodium")
+	if _, err := c.ParseURL(u); err != provider.ErrNotHosted {
+		t.Errorf("another host: %v", err)
+	}
+	if got := c.ProjectPage("resourcepack", "fresh-animations"); got != "https://www.curseforge.com/minecraft/texture-packs/fresh-animations" {
+		t.Errorf("project page %s", got)
+	}
+	if got := c.ProjectPage("", "500525"); got != "https://www.curseforge.com/projects/500525" {
+		t.Errorf("project page by id %s", got)
+	}
+	if got := c.VersionsPage("mod", "jei"); got != "https://www.curseforge.com/minecraft/mc-mods/jei/files" {
+		t.Errorf("versions page %s", got)
+	}
+	if c.Available() != nil || New(fetch.New("test"), "").Available() == nil {
+		t.Error("availability follows the key")
 	}
 }

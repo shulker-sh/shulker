@@ -48,7 +48,7 @@ func TestSearchAsksForTheTypeAsAFacet(t *testing.T) {
 	if got.Get("query") != "sodium" || got.Get("limit") != "5" || got.Get("facets") != `[["project_type:mod"]]` {
 		t.Errorf("search asked for %v", got)
 	}
-	want := provider.Project{ID: "AANobbMI", Slug: "sodium", Title: "Sodium", Side: "client", Type: "mod", Downloads: 228124617}
+	want := provider.Project{ID: "AANobbMI", Slug: "sodium", Title: "Sodium", Side: "client", Type: "mod", Downloads: 228124617, Page: "https://modrinth.com/mod/sodium"}
 	if len(projects) != 1 || projects[0] != want {
 		t.Errorf("projects %+v, want %+v", projects, want)
 	}
@@ -103,30 +103,39 @@ func TestWaitsOutARateLimitOnce(t *testing.T) {
 	}
 }
 
-func TestVersionsByHashAsksOnce(t *testing.T) {
-	calls := 0
+func TestIdentifyAsksOnceForVersionsAndOnceForProjects(t *testing.T) {
+	var paths []string
 	var body struct {
 		Hashes    []string `json:"hashes"`
 		Algorithm string   `json:"algorithm"`
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		if r.Method != http.MethodPost || r.URL.Path != "/version_files" {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		switch r.URL.Path {
+		case "/version_files":
+			json.NewDecoder(r.Body).Decode(&body)
+			w.Write([]byte(`{"86f7e437faa5a7fce15d1ddcb9eaeaea377667b8":{"id":"v1","project_id":"p1","version_number":"1.0","files":[{"url":"u","filename":"a.jar","primary":true,"hashes":{"sha1":"86f7e437faa5a7fce15d1ddcb9eaeaea377667b8","sha512":"ccc"}}]}}`))
+		case "/projects":
+			w.Write([]byte(`[{"id":"p1","slug":"one","project_type":"mod"}]`))
+		default:
 			http.NotFound(w, r)
-			return
 		}
-		json.NewDecoder(r.Body).Decode(&body)
-		w.Write([]byte(`{"aaa":{"id":"v1","project_id":"p1","version_number":"1.0","files":[{"url":"u","filename":"a.jar","primary":true,"hashes":{"sha1":"aaa","sha512":"ccc"}}]}}`))
 	}))
 	defer srv.Close()
 	m := New(fetch.New("test"))
 	m.BaseURL = srv.URL
-	found, err := m.VersionsByHash(context.Background(), []string{"aaa", "bbb"})
+	found, err := m.Identify(context.Background(), map[string][]byte{"mods/a.jar": []byte("a"), "mods/b.jar": []byte("b")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if calls != 1 || body.Algorithm != "sha1" || len(body.Hashes) != 2 || len(found) != 1 || found["aaa"].ProjectID != "p1" {
-		t.Fatalf("calls %d, body %+v, found %+v", calls, body, found)
+	if len(paths) != 2 || paths[0] != "POST /version_files" || paths[1] != "GET /projects" {
+		t.Fatalf("requests: %v", paths)
+	}
+	if body.Algorithm != "sha1" || len(body.Hashes) != 2 {
+		t.Errorf("body %+v", body)
+	}
+	if len(found) != 1 || found["mods/a.jar"].Project.Slug != "one" || found["mods/a.jar"].Version.ID != "v1" {
+		t.Errorf("found %+v", found)
 	}
 }
 

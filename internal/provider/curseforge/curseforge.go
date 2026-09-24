@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,12 +21,14 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
 
 const (
 	APIURL   = "https://api.curseforge.com/v1"
+	siteURL  = "https://www.curseforge.com"
 	KeyURL   = "https://shulker.sh/api/curseforge-key"
 	KeyEnv   = "SHULKER_CURSEFORGE_KEY"
 	gameID   = "432"
@@ -47,6 +50,21 @@ const (
 var classTypes = map[int]string{6: "mod", 4471: "modpack", 12: "resourcepack", 6552: "shader", 6945: "datapack"}
 
 var typeClasses = map[string]string{"mod": classMod, "modpack": classModpack, "resourcepack": classResourcePack, "shader": classShader, "datapack": classDatapack}
+
+// sections are the curseforge.com/minecraft/<section> of each kind shulker can add.
+var sections = map[string]string{
+	manifest.TypeMod:          "mc-mods",
+	manifest.TypeModpack:      "modpacks",
+	manifest.TypeResourcePack: "texture-packs",
+	manifest.TypeShader:       "shaders",
+	manifest.TypeDatapack:     "data-packs",
+}
+
+var hosts = []string{"curseforge.com", "www.curseforge.com", "legacy.curseforge.com"}
+
+// shaderTags are the shader loaders CurseForge tags files with, in gameVersions beside the game
+// versions; resource packs and datapacks carry no loader tag at all.
+var shaderTags = []string{"iris", "optifine"}
 
 var embeddedKey string
 
@@ -112,6 +130,18 @@ func keyFile(cacheDir string) string {
 	return filepath.Join(cacheDir, "curseforge-key.json")
 }
 
+var _ provider.Provider = (*CurseForge)(nil)
+
+// Open is the CurseForge provider for this machine: the user's own key when there is one, else
+// the shared one, replaced from shulker.sh when CurseForge rejects it. With no key at all it is
+// unavailable.
+func Open(c *fetch.Client, configured, cacheDir string) *CurseForge {
+	if key := Key(configured); key != "" {
+		return New(c, key)
+	}
+	return NewShared(c, SharedKey(cacheDir), cacheDir)
+}
+
 func New(c *fetch.Client, key string) *CurseForge {
 	return &CurseForge{Client: withKey(c, key), BaseURL: APIURL, key: key, slugs: map[string]string{}, classes: map[string]int{}}
 }
@@ -133,6 +163,34 @@ func withKey(c *fetch.Client, key string) *fetch.Client {
 
 func (c *CurseForge) Name() string { return "curseforge" }
 
+func (c *CurseForge) Title() string { return "CurseForge" }
+
+func (c *CurseForge) Hosts() []string { return []string{"forgecdn.net", "curseforge.com"} }
+
+func (c *CurseForge) Available() error {
+	if c.key != "" {
+		return nil
+	}
+	e := out.Errorf("provider-unavailable", "curseforge needs an API key")
+	e.Help = "set " + KeyEnv + " or run `shulker config set curseforge.key <key>`"
+	return e
+}
+
+// CurseForge finds a slug through its search, which leaves some projects out, so a manifest
+// names a project by its id.
+func (c *CurseForge) KeysBySlug() bool { return false }
+
+func (c *CurseForge) NotFoundHelp() string {
+	return "CurseForge's search doesn't list every project; add one it misses by a file URL (" + siteURL + "/minecraft/mc-mods/<slug>/files/<file id>), by " + siteURL + "/projects/<project id>, or by its project id, shown on its CurseForge page under About Project, with `--provider curseforge`"
+}
+
+func (c *CurseForge) PackTags(kind string) []string {
+	if kind == manifest.TypeShader {
+		return shaderTags
+	}
+	return nil
+}
+
 type mod struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -145,34 +203,6 @@ type mod struct {
 	Authors []struct {
 		Name string `json:"name"`
 	} `json:"authors"`
-}
-
-// Record is what a modpack's modlist.html shows for a project.
-type Record struct {
-	Name       string
-	Author     string
-	WebsiteURL string
-}
-
-// Records looks the projects up in one request. A project CurseForge doesn't return is absent from the map.
-func (c *CurseForge) Records(ctx context.Context, projectIDs []int) (map[int]Record, error) {
-	var res struct {
-		Data []mod `json:"data"`
-	}
-	if err := c.call(ctx, "mods", func() error {
-		return c.Client.PostJSON(ctx, c.BaseURL+"/mods", map[string]any{"modIds": projectIDs}, &res)
-	}); err != nil {
-		return nil, err
-	}
-	records := map[int]Record{}
-	for _, m := range res.Data {
-		r := Record{Name: m.Name, WebsiteURL: m.Links.WebsiteURL}
-		if len(m.Authors) > 0 {
-			r.Author = m.Authors[0].Name
-		}
-		records[m.ID] = r
-	}
-	return records, nil
 }
 
 type file struct {
@@ -360,8 +390,101 @@ func (c *CurseForge) Version(ctx context.Context, versionID string) (*provider.V
 	return &list[0], nil
 }
 
-// Mods finds these projects in one request, by id. A project CurseForge doesn't have is left out.
-func (c *CurseForge) Mods(ctx context.Context, ids []int) (map[int]*provider.Project, error) {
+// CurseForge names a file by its id alone, so the project adds nothing to the lookup.
+func (c *CurseForge) ProjectVersion(ctx context.Context, _, version string) (*provider.Version, error) {
+	return c.Version(ctx, version)
+}
+
+func (c *CurseForge) Projects(ctx context.Context, ids []string) (map[string]provider.Project, error) {
+	mods, err := c.mods(ctx, numbers(ids))
+	if err != nil {
+		return nil, err
+	}
+	found := make(map[string]provider.Project, len(mods))
+	for id, p := range mods {
+		found[strconv.Itoa(id)] = *p
+	}
+	return found, nil
+}
+
+func (c *CurseForge) VersionsByID(ctx context.Context, ids []string) (map[string]provider.Version, map[string]error, error) {
+	files, unusableFiles, err := c.files(ctx, numbers(ids))
+	if err != nil {
+		return nil, nil, err
+	}
+	found := make(map[string]provider.Version, len(files))
+	for id, v := range files {
+		found[strconv.Itoa(id)] = v
+	}
+	unusable := make(map[string]error, len(unusableFiles))
+	for id, err := range unusableFiles {
+		unusable[strconv.Itoa(id)] = err
+	}
+	return found, unusable, nil
+}
+
+// Identify fingerprints the files and looks the exact matches up, then their projects and files
+// by id, in one request each.
+func (c *CurseForge) Identify(ctx context.Context, files map[string][]byte) (map[string]provider.Hosted, error) {
+	prints := make(map[string]uint32, len(files))
+	var all []uint32
+	for _, key := range slices.Sorted(maps.Keys(files)) {
+		prints[key] = Fingerprint(files[key])
+		all = append(all, prints[key])
+	}
+	found := map[string]provider.Hosted{}
+	if len(all) == 0 {
+		return found, nil
+	}
+	matches, err := c.matchFingerprints(ctx, all)
+	if err != nil {
+		return nil, err
+	}
+	if len(matches) == 0 {
+		return found, nil
+	}
+	var modIDs, fileIDs []int
+	for _, m := range matches {
+		modIDs = append(modIDs, m.ModID)
+		fileIDs = append(fileIDs, m.FileID)
+	}
+	slices.Sort(modIDs)
+	slices.Sort(fileIDs)
+	projects, err := c.mods(ctx, slices.Compact(modIDs))
+	if err != nil {
+		return nil, err
+	}
+	versions, _, err := c.files(ctx, slices.Compact(fileIDs))
+	if err != nil {
+		return nil, err
+	}
+	for key, print := range prints {
+		m, matched := matches[print]
+		if !matched {
+			continue
+		}
+		proj, hasProject := projects[m.ModID]
+		v, hasFile := versions[m.FileID]
+		if hasProject && hasFile {
+			found[key] = provider.Hosted{Project: *proj, Version: v}
+		}
+	}
+	return found, nil
+}
+
+// numbers are the ids CurseForge has, which are integers; any other id is left out.
+func numbers(ids []string) []int {
+	var ns []int
+	for _, id := range ids {
+		if n, err := strconv.Atoi(id); err == nil {
+			ns = append(ns, n)
+		}
+	}
+	return ns
+}
+
+// mods finds these projects in one request, by id. A project CurseForge doesn't have is left out.
+func (c *CurseForge) mods(ctx context.Context, ids []int) (map[int]*provider.Project, error) {
 	var res struct {
 		Data []mod `json:"data"`
 	}
@@ -377,10 +500,10 @@ func (c *CurseForge) Mods(ctx context.Context, ids []int) (map[int]*provider.Pro
 	return found, nil
 }
 
-// Files finds these files in one request, by id. A file CurseForge doesn't have is left out, and
-// one it has nothing to download for is in unusable with the reason. Call Mods for their projects
+// files finds these files in one request, by id. A file CurseForge doesn't have is left out, and
+// one it has nothing to download for is in unusable with the reason. Call mods for their projects
 // first, or each file's page costs a request of its own.
-func (c *CurseForge) Files(ctx context.Context, ids []int) (found map[int]provider.Version, unusable map[int]error, err error) {
+func (c *CurseForge) files(ctx context.Context, ids []int) (found map[int]provider.Version, unusable map[int]error, err error) {
 	var res struct {
 		Data []file `json:"data"`
 	}
@@ -417,7 +540,7 @@ func (c *CurseForge) withPages(ctx context.Context, versions []provider.Version)
 				return nil, err
 			}
 		}
-		versions[i].Page = FilePage(c.slugs[v.ProjectID], v.ID, c.classes[v.ProjectID])
+		versions[i].Page = filePage(c.slugs[v.ProjectID], v.ID, c.classes[v.ProjectID])
 	}
 	return versions, nil
 }
@@ -493,23 +616,69 @@ func sharedKeyRejected(detail string) error {
 	return e
 }
 
-// classPaths are the url segments curseforge.com uses per class.
-var classPaths = map[int]string{6: "mc-mods", 4471: "modpacks", 12: "texture-packs", 6552: "shaders", 6945: "data-packs"}
-
-func FilePage(slug, fileID string, class int) string {
-	path, ok := classPaths[class]
-	if !ok {
-		path = "mc-mods"
+func (c *CurseForge) ParseURL(u *url.URL) (provider.Ref, error) {
+	if !slices.Contains(hosts, strings.ToLower(u.Hostname())) {
+		return provider.Ref{}, provider.ErrNotHosted
 	}
-	return "https://www.curseforge.com/minecraft/" + path + "/" + slug + "/files/" + fileID
+	var parts []string
+	for part := range strings.SplitSeq(u.Path, "/") {
+		if part != "" {
+			parts = append(parts, part)
+		}
+	}
+	numeric := func(s string) bool {
+		_, err := strconv.Atoi(s)
+		return err == nil
+	}
+	switch {
+	case len(parts) == 2 && parts[0] == "projects" && numeric(parts[1]):
+		return provider.Ref{Project: parts[1]}, nil
+	case len(parts) < 3 || parts[0] != "minecraft" || !slices.Contains(slices.Collect(maps.Values(sections)), parts[1]):
+	case len(parts) == 3:
+		return provider.Ref{Project: parts[2]}, nil
+	case len(parts) == 5 && (parts[3] == "files" || parts[3] == "download") && numeric(parts[4]):
+		return provider.Ref{Project: parts[2], Version: parts[4]}, nil
+	}
+	return provider.Ref{}, out.Errorf("usage", "curseforge can't read %s", u)
 }
 
-func ProjectPage(projectID string) string {
-	return "https://www.curseforge.com/projects/" + projectID
+func (c *CurseForge) URLShapes() []string {
+	return []string{
+		"https://[www.|legacy.]curseforge.com/minecraft/<" + strings.Join(slices.Sorted(maps.Values(sections)), "|") + ">/<slug>[/files/<file id> or /download/<file id>]",
+		"https://[www.|legacy.]curseforge.com/projects/<project id>",
+	}
+}
+
+// ProjectPage is the project's page: by id, the redirect that needs no section, since a project
+// id may name a project whose slug the search can't find.
+func (c *CurseForge) ProjectPage(kind, slugOrID string) string {
+	if _, err := strconv.Atoi(slugOrID); err == nil {
+		return siteURL + "/projects/" + slugOrID
+	}
+	return siteURL + "/minecraft/" + section(kind) + "/" + slugOrID
+}
+
+func (c *CurseForge) VersionsPage(kind, slug string) string {
+	return siteURL + "/minecraft/" + section(kind) + "/" + slug + "/files"
+}
+
+func section(kind string) string {
+	if path, ok := sections[kind]; ok {
+		return path
+	}
+	return sections[manifest.TypeMod]
+}
+
+func filePage(slug, fileID string, class int) string {
+	return siteURL + "/minecraft/" + section(classTypes[class]) + "/" + slug + "/files/" + fileID
 }
 
 func convertMod(m mod) *provider.Project {
-	return &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Type: classTypes[m.ClassID], Datapack: m.ClassID == 6945, Downloads: m.Downloads}
+	p := &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Type: classTypes[m.ClassID], Datapack: m.ClassID == 6945, Downloads: m.Downloads, Page: m.Links.WebsiteURL}
+	if len(m.Authors) > 0 {
+		p.Author = m.Authors[0].Name
+	}
+	return p
 }
 
 func convertFile(f file) (provider.Version, error) {
