@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
@@ -412,7 +413,15 @@ func (v clientVersions) LoaderProfile(ctx context.Context) (json.RawMessage, err
 }
 
 func (v clientVersions) InstallClient(ctx context.Context, launcherDir string) (string, error) {
-	return v.a.installClientLoader(ctx, v.p, launcherDir, v.l)
+	src, err := v.a.storeSources(v.p)
+	if err != nil {
+		return "", err
+	}
+	id, err := game.InstallLoader(ctx, launcherDir, v.p.Lock, src)
+	if err != nil {
+		return "", v.a.keepInstallerOutput(err)
+	}
+	return id, nil
 }
 
 func (v clientVersions) InstallerVersion(ctx context.Context) (json.RawMessage, error) {
@@ -422,6 +431,18 @@ func (v clientVersions) InstallerVersion(ctx context.Context) (json.RawMessage, 
 	}
 	raw, changed, err := v.l.InstallerVersion(ctx, d.loaders, v.p.Lock)
 	return raw, saveChangedLock(v.p, changed, err)
+}
+
+// saveChangedLock saves the lock when a row call changed it, whether or not the call succeeded,
+// since what it locked stays valid; the call's own error wins over a save failure.
+func saveChangedLock(p *project.Project, changed bool, err error) error {
+	if !changed {
+		return err
+	}
+	if saveErr := p.Lock.Save(p.LockPath()); saveErr != nil && err == nil {
+		return saveErr
+	}
+	return err
 }
 
 // linkAsked is a bare link at a terminal: it asks which launcher, then runs that launcher's own

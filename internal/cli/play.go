@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"maps"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/game"
@@ -147,7 +145,11 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
-	if err := a.checkQuickPlay(ctx, p, opts.target); err != nil {
+	plan, err := a.assemble(ctx, in, p)
+	if err != nil {
+		return err
+	}
+	if err := checkQuickPlay(plan.launch.Version, p.Lock.Minecraft, opts.target); err != nil {
 		return err
 	}
 	settings, err := a.launchSettings(in.Dir)
@@ -174,11 +176,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
-	plan, err := a.assemble(ctx, in, p)
-	if err != nil {
-		return err
-	}
-	vars := plan.assembly.Vars(plan.store, "shulker", version, in.Dir, plan.natives)
+	vars := plan.launch.Assembly.Vars(plan.store, "shulker", version, in.Dir, plan.natives)
 	for name, value := range gameSession(signed).Vars() {
 		vars[name] = value
 	}
@@ -188,7 +186,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	}
 	res := playResult{
 		Instance: in.ID,
-		Version:  plan.versionID,
+		Version:  plan.launch.ID,
 		Account:  rowFor(who, cfg),
 		GameDir:  in.Dir,
 		Log:      log,
@@ -201,7 +199,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	req := watchRequest{
 		Dir:     in.Dir,
 		Java:    plan.java,
-		Argv:    launchArgv(plan.version, plan.platform, vars, settings, window, opts.target),
+		Argv:    launchArgv(plan.launch.Version, plan.platform, vars, settings, window, opts.target),
 		Log:     res.Log,
 		Wrapper: settings.Wrapper,
 	}
@@ -390,29 +388,30 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target quickPlay) error 
 	if err != nil {
 		return err
 	}
-	if err := a.checkQuickPlay(ctx, p, target); err != nil {
-		return err
-	}
 	plan, err := a.assemble(ctx, in, p)
 	if err != nil {
 		return err
 	}
+	if err := checkQuickPlay(plan.launch.Version, p.Lock.Minecraft, target); err != nil {
+		return err
+	}
+	l := plan.launch
 	rep := playReport{
 		Instance:       in.ID,
-		Version:        plan.versionID,
-		Inherits:       plan.inherits,
-		MainClass:      plan.version.MainClass,
+		Version:        l.ID,
+		Inherits:       l.Top.InheritsFrom,
+		MainClass:      l.Version.MainClass,
 		Java:           plan.java,
 		GameDir:        in.Dir,
 		NativesDir:     plan.natives,
-		Classpath:      len(plan.assembly.Libraries) + 1,
-		ClasspathBytes: plan.assembly.ClasspathSize(plan.store),
+		Classpath:      len(l.Assembly.Libraries) + 1,
+		ClasspathBytes: l.Assembly.ClasspathSize(plan.store),
 	}
-	if plan.version.AssetIndex != nil {
-		rep.AssetIndex = plan.version.AssetIndex.ID
+	if l.Version.AssetIndex != nil {
+		rep.AssetIndex = l.Version.AssetIndex.ID
 	}
-	if plan.inherits != "" {
-		own := plan.assembly.LibrariesFrom(plan.top, plan.platform)
+	if rep.Inherits != "" {
+		own := l.Assembly.LibrariesFrom(l.Top, plan.platform)
 		rep.LoaderLibraries, rep.LoaderLibrariesBytes = len(own), plan.store.Size(own)
 	}
 	return a.printer.Emit(rep, func(l *out.Lines) {
@@ -442,31 +441,15 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target quickPlay) error 
 // runs, the store filled with what that version names, the natives unpacked, and the java to run
 // it with. A dry run prints it; a launch templates the account into it and starts the game.
 type launchPlan struct {
-	store     game.Store
-	versionID string
-	inherits  string
-	top       game.Version
-	version   game.Version
-	assembly  game.Assembly
-	natives   string
-	java      string
-	platform  game.Platform
+	store    game.Store
+	launch   game.Launchable
+	natives  string
+	java     string
+	platform game.Platform
 }
 
 func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Project) (launchPlan, error) {
 	s, err := a.gameStore()
-	if err != nil {
-		return launchPlan{}, err
-	}
-	versionID, err := a.storeVersion(ctx, p, s)
-	if err != nil {
-		return launchPlan{}, err
-	}
-	top, err := s.Version(versionID)
-	if err != nil {
-		return launchPlan{}, err
-	}
-	v, err := s.Resolve(versionID)
 	if err != nil {
 		return launchPlan{}, err
 	}
@@ -475,18 +458,47 @@ func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Proje
 		return launchPlan{}, err
 	}
 	platform := game.ForJava(java)
-	assembly, err := game.Assemble(v, platform, nil)
+	src, err := a.storeSources(p)
 	if err != nil {
 		return launchPlan{}, err
 	}
-	if err := a.fillStore(ctx, s, assembly); err != nil {
-		return launchPlan{}, err
+	l, err := s.Fill(ctx, p.Lock, platform, src)
+	if err != nil {
+		return launchPlan{}, a.keepInstallerOutput(err)
 	}
 	natives := nativesDir(in.Dir)
-	if err := assembly.ExtractNatives(s, natives, platform); err != nil {
+	if err := l.Assembly.ExtractNatives(s, natives, platform); err != nil {
 		return launchPlan{}, err
 	}
-	return launchPlan{store: s, versionID: versionID, inherits: top.InheritsFrom, top: top, version: v, assembly: assembly, natives: natives, java: java, platform: platform}, nil
+	return launchPlan{store: s, launch: l, natives: natives, java: java, platform: platform}, nil
+}
+
+// storeSources is what the store fills a launch of p from: every client the app holds, the row
+// the lock names, and the Java its installer would run with.
+func (a *app) storeSources(p *project.Project) (game.Sources, error) {
+	d, err := a.deps()
+	if err != nil {
+		return game.Sources{}, err
+	}
+	var row loader.Loader
+	if p.Lock.Loader.Type != "" {
+		if row, err = loader.Require(p.Lock.Loader.Type); err != nil {
+			return game.Sources{}, err
+		}
+	}
+	return game.Sources{
+		Fetch:   d.fetch,
+		Piston:  d.meta.Piston,
+		Loader:  row,
+		Loaders: d.loaders,
+		InstallerJava: func(ctx context.Context) (string, error) {
+			java, err := a.projectJava(ctx, p)
+			return java.Path, err
+		},
+		SaveLock: func() error { return p.Lock.Save(p.LockPath()) },
+		Log:      a.progress,
+		Progress: a.printer.Progress,
+	}, nil
 }
 
 // playInstance is the instance a launch acts on: the nickname given, else the one the current
@@ -626,156 +638,6 @@ func (a *app) gameStore() (game.Store, error) {
 // nativesDir is where a launch unpacks its native libraries. It sits under .shulker/ rather than
 // in the game directory, which belongs to the pack.
 func nativesDir(dir string) string { return filepath.Join(dir, instance.Dir, "natives") }
-
-// storeVersion puts the version JSON a launch runs, and the vanilla one it inherits from, into the
-// store, and returns its id. A loader with an installer of its own is run against the store, which
-// is laid out as the Mojang launcher directory the installer expects. The store remembers the id
-// each loader wrote, so a later launch needs neither the installer nor the network.
-func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store) (string, error) {
-	d, err := a.deps()
-	if err != nil {
-		return "", err
-	}
-	if err := a.storeVanillaVersion(ctx, s, p.Lock.Minecraft); err != nil {
-		return "", err
-	}
-	if p.Lock.Loader.Type == "" {
-		return p.Lock.Minecraft, nil
-	}
-	l, err := loader.Require(p.Lock.Loader.Type)
-	if err != nil {
-		return "", err
-	}
-	key := p.Lock.Loader.Type + "-" + p.Lock.Loader.Version + "-" + p.Lock.Minecraft
-	if id, ok := s.InstalledLoader(key); ok && s.HasVersion(id) {
-		return id, nil
-	}
-	var id string
-	if l.HasInstaller() {
-		if err := a.fetchVanillaClient(ctx, s, p.Lock.Minecraft); err != nil {
-			return "", err
-		}
-		id, err = a.installClientLoader(ctx, p, s.Root, l)
-	} else {
-		a.progress("fetching %s loader %s for %s", p.Lock.Loader.Type, p.Lock.Loader.Version, p.Lock.Minecraft)
-		var profile []byte
-		if profile, err = d.meta.LoaderProfile(ctx, p.Lock.Loader, p.Lock.Minecraft); err == nil {
-			id, err = s.SaveVersion(profile)
-		}
-	}
-	if err != nil {
-		return "", err
-	}
-	return id, s.RecordLoader(key, id)
-}
-
-// storeVanillaVersion puts the vanilla version JSON for the Minecraft version in the store, unless
-// it is there already.
-func (a *app) storeVanillaVersion(ctx context.Context, s game.Store, minecraft string) error {
-	if s.HasVersion(minecraft) {
-		return nil
-	}
-	d, err := a.deps()
-	if err != nil {
-		return err
-	}
-	a.progress("fetching the minecraft %s version json", minecraft)
-	raw, err := d.meta.Piston.Version(ctx, minecraft)
-	if err != nil {
-		return err
-	}
-	_, err = s.SaveVersion(raw)
-	return err
-}
-
-// fetchVanillaClient puts the vanilla client jar in the store before a loader's installer runs.
-// The installer patches that jar and would download it itself when it is missing, but silently,
-// with no progress line of its own.
-func (a *app) fetchVanillaClient(ctx context.Context, s game.Store, minecraft string) error {
-	v, err := s.Version(minecraft)
-	if err != nil {
-		return err
-	}
-	client, err := game.ClientJar(v)
-	if err != nil {
-		return err
-	}
-	return a.fetchInto(ctx, s, []game.File{client}, "client jar", "client jars")
-}
-
-// fillStore fetches everything the assembly is missing, a bar per kind so each stage of the
-// assembly says what it did. Assets come last, because their index has to be in the store before
-// the objects it names can be listed.
-func (a *app) fillStore(ctx context.Context, s game.Store, assembly game.Assembly) error {
-	if err := a.fetchInto(ctx, s, []game.File{assembly.Client}, "client jar", "client jars"); err != nil {
-		return err
-	}
-	libraries := append(append([]game.File{}, assembly.Libraries...), assembly.Natives...)
-	if err := a.fetchInto(ctx, s, libraries, "library", "libraries"); err != nil {
-		return err
-	}
-	if assembly.AssetIndex.Path == "" {
-		return nil
-	}
-	if err := a.fetchInto(ctx, s, []game.File{assembly.AssetIndex}, "asset index", "asset indexes"); err != nil {
-		return err
-	}
-	objects, err := s.AssetFiles(assembly.Version.AssetIndex.ID)
-	if err != nil {
-		return err
-	}
-	return a.fetchInto(ctx, s, objects, "asset", "assets")
-}
-
-// storeDownloadJobs is how many files the store fetches at once. An asset index names thousands of
-// small objects, and fetching them one at a time is what makes a first launch take hours.
-const storeDownloadJobs = 8
-
-func (a *app) fetchInto(ctx context.Context, s game.Store, files []game.File, one, many string) error {
-	d, err := a.deps()
-	if err != nil {
-		return err
-	}
-	var missing []game.File
-	for _, f := range files {
-		if !s.Has(f) {
-			missing = append(missing, f)
-		}
-	}
-	if len(missing) == 0 {
-		return nil
-	}
-	downloads := make([]out.Download, len(missing))
-	for i, f := range missing {
-		downloads[i] = out.Download{Name: path.Base(f.Path), Size: f.Size}
-	}
-	progress := a.printer.Progress("fetching", downloads).Counts(one, many)
-	if progress != nil {
-		d.fetch.Progress = progress.Bytes
-		defer func() { d.fetch.Progress = nil }()
-	}
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(storeDownloadJobs)
-	for i, f := range missing {
-		if ctx.Err() != nil {
-			break
-		}
-		g.Go(func() error {
-			progress.File(downloads[i].Name)
-			if err := s.Fetch(ctx, d.fetch, f); err != nil {
-				return err
-			}
-			progress.Advance()
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		progress.Abort()
-		return err
-	}
-	progress.Finish()
-	return nil
-}
 
 // clientJava is what the launch runs: the `java` setting when the instance or play.java has one,
 // and otherwise shulker's managed runtime for the component the lock names.

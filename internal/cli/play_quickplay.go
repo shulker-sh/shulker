@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"net"
 	"strconv"
 	"strings"
@@ -9,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/project"
 )
 
 // quickPlayFloor is the first release whose version JSON declares quick play.
@@ -52,25 +50,11 @@ func parseQuickPlay(cmd *cobra.Command, world, server string) (quickPlay, error)
 // checkQuickPlay fails a --world launch on a Minecraft from before quick play, before anything is
 // started. Launching to the title screen instead would look the same as a save that failed to load.
 // --server needs no check: the pair it falls back to is older than quick play.
-func (a *app) checkQuickPlay(ctx context.Context, p *project.Project, q quickPlay) error {
-	if q.world == "" {
+func checkQuickPlay(v game.Version, minecraft string, q quickPlay) error {
+	if q.world == "" || v.Declares("is_quick_play_singleplayer") {
 		return nil
 	}
-	s, err := a.gameStore()
-	if err != nil {
-		return err
-	}
-	if err := a.storeVanillaVersion(ctx, s, p.Lock.Minecraft); err != nil {
-		return err
-	}
-	v, err := s.Version(p.Lock.Minecraft)
-	if err != nil {
-		return err
-	}
-	if v.Declares("is_quick_play_singleplayer") {
-		return nil
-	}
-	return out.Errorf("unsupported-quickplay", "minecraft %s has no quick play, so --world needs %s or later", p.Lock.Minecraft, quickPlayFloor)
+	return out.Errorf("unsupported-quickplay", "minecraft %s has no quick play, so --world needs %s or later", minecraft, quickPlayFloor)
 }
 
 // apply turns the target on through the arguments the version declares for it. A server on a
