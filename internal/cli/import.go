@@ -645,7 +645,7 @@ func dropManifestOwned(m *manifest.Manifest, overrides []packarchive.Override) [
 }
 
 func writeImport(dir string, m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Override) error {
-	if err := scaffold(dir); err != nil {
+	if err := project.Scaffold(dir); err != nil {
 		return err
 	}
 	for _, o := range overrides {

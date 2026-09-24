@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -121,7 +120,7 @@ func (a *app) initCmd() *cobra.Command {
 				os.Remove(filepath.Join(dir, manifest.FileName))
 				return err
 			}
-			if err := scaffold(dir); err != nil {
+			if err := project.Scaffold(dir); err != nil {
 				return err
 			}
 			packItems, err := a.initPack(cmd, p, opts.pack)
@@ -330,17 +329,6 @@ func slugify(s string) string {
 		return "shulker-project"
 	}
 	return out
-}
-
-func scaffold(dir string) error {
-	if err := os.MkdirAll(filepath.Join(dir, "overrides"), 0o755); err != nil {
-		return err
-	}
-	gi := filepath.Join(dir, ".gitignore")
-	if _, err := os.Stat(gi); errors.Is(err, os.ErrNotExist) {
-		return os.WriteFile(gi, []byte("/build/\n/data/\n/downloads/\n/shulker.local.json\n/.shulker/\n"), 0o644)
-	}
-	return nil
 }
 
 func defaultAuthors() []string {
