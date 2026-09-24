@@ -3,8 +3,11 @@ package instance
 import (
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
 )
@@ -52,6 +55,24 @@ type Launch struct {
 }
 
 func LaunchesPath(dir string) string { return filepath.Join(dir, Dir, LaunchesFileName) }
+
+// LaunchLog is where a run's output goes. Every launch gets a file of its own, named for when it
+// started, because a detached game has no terminal to write to and the last run's output is what
+// says why it stopped. Two launches in the same second are still two runs, so the second takes a
+// suffix, the way a history entry does.
+func LaunchLog(dir string, at time.Time) (string, error) {
+	logs := filepath.Join(dir, Dir, "logs")
+	stamp := at.Format("20060102-150405")
+	for n := 2; ; n++ {
+		path := filepath.Join(logs, stamp+".log")
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+			return path, nil
+		} else if err != nil {
+			return "", err
+		}
+		stamp = at.Format("20060102-150405") + "-" + strconv.Itoa(n)
+	}
+}
 
 // LaunchKeep is how many launch records are kept, mirroring the manifest's history count: -1 keeps
 // every record, 0 keeps none and records nothing at all.

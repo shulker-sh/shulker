@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -176,7 +174,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	for name, value := range game.SessionOf(signed).Vars() {
 		vars[name] = value
 	}
-	log, err := launchLog(in.Dir, time.Now())
+	log, err := instance.LaunchLog(in.Dir, time.Now())
 	if err != nil {
 		return err
 	}
@@ -310,24 +308,6 @@ func (a *app) pinnedAccount(id string) (string, error) {
 	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)
 	e.Nudge = out.Nudge{Lead: "Play it as the default account instead with", Command: "shulker instance unset account"}
 	return "", e
-}
-
-// launchLog is where a run's output goes. Every launch gets a file of its own, named for when it
-// started, because a detached game has no terminal to write to and the last run's output is what
-// says why it stopped. Two launches in the same second are still two runs, so the second takes a
-// suffix, the way a history entry does.
-func launchLog(dir string, at time.Time) (string, error) {
-	logs := filepath.Join(dir, instance.Dir, "logs")
-	stamp := at.Format("20060102-150405")
-	for n := 2; ; n++ {
-		path := filepath.Join(logs, stamp+".log")
-		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-			return path, nil
-		} else if err != nil {
-			return "", err
-		}
-		stamp = at.Format("20060102-150405") + "-" + strconv.Itoa(n)
-	}
 }
 
 func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) error {
