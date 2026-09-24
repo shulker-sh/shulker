@@ -13,6 +13,9 @@ type Fake struct {
 	Profile  json.RawMessage
 	// ProvidesJar is the URL of a jar whose metadata says what the loader provides.
 	ProvidesJar string
+	// Installer is the URL of the loader's own installer jar; set, a client is set up by running it
+	// rather than from a profile.
+	Installer string
 }
 
 // Row is the in-memory row the Fake answers as.
@@ -30,5 +33,9 @@ func (f Fake) Row() Loader {
 	}
 	l.installerURL, l.ensureServer, l.vanillaServer, l.launchArgs = nil, nil, nil, nil
 	l.InstallServerFlag, l.InstallClientFlag = "", ""
+	if f.Installer != "" {
+		l.installerURL = func(*Remote, string, string) string { return f.Installer }
+		l.InstallClientFlag = "--install-client"
+	}
 	return l
 }
