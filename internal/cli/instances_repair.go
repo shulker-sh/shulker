@@ -104,7 +104,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		}
 		a.reconcileOrWarn(*in)
 	}
-	for _, found := range scanLaunchers(launcherName, launcherDir, r.Instances) {
+	for _, found := range launcher.Scan(launcherName, launcherDir, r.Instances, project.InstanceAt) {
 		if registered[filepath.Clean(found.Dir)] {
 			continue
 		}
@@ -164,48 +164,6 @@ func (a *app) repairIntent(in config.Instance) (bool, error) {
 		a.warnReplaced(loadErr, kept)
 	}
 	return true, err
-}
-
-// scanLaunchers looks where each launcher keeps its instances, and for shulker's own that is the
-// instances root. A shulker row records no launcher directory, the same as the row link writes.
-func scanLaunchers(only, dir, instancesRoot string) []config.Instance {
-	var found []config.Instance
-	for _, e := range launcher.All {
-		if only != "" && e.Name != only {
-			continue
-		}
-		launcherDir := dir
-		switch {
-		case launcherDir != "":
-		case !e.HasDir():
-			launcherDir = instancesRoot
-		case e.DefaultDir == nil:
-			continue
-		default:
-			d, err := e.DefaultDir()
-			if err != nil {
-				continue
-			}
-			launcherDir = d
-		}
-		for _, gameDir := range e.GameDirs(launcherDir) {
-			in, ok := project.InstanceAt(gameDir)
-			if !ok {
-				continue
-			}
-			in.Launcher = e.Name
-			if e.HasDir() {
-				in.LauncherDir = launcherDir
-			}
-			if name := e.InstanceName(launcherDir, gameDir); name != "" {
-				in.Name = name
-			} else if e.IsInstanced {
-				in.Name = filepath.Base(e.InstanceDir(gameDir))
-			}
-			found = append(found, in)
-		}
-	}
-	return found
 }
 
 func (r repairResult) print(l *out.Lines) {
