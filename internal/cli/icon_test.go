@@ -171,7 +171,7 @@ func TestImportMrpackRestoresTheIcon(t *testing.T) {
 	h.mustRun(t, "export", "mrpack", "--version", "1.0.0")
 
 	dir := filepath.Join(t.TempDir(), "imported")
-	h.mustRun(t, "import", "mrpack", filepath.Join(h.dir, "build", "pack-1.0.0.mrpack"), "--dir", dir)
+	h.mustRun(t, "import", filepath.Join(h.dir, "build", "pack-1.0.0.mrpack"), "--dir", dir)
 	if m, _ := readProject(t, dir); m.Icon != "assets/pack.png" {
 		t.Fatalf("icon key: %q", m.Icon)
 	}

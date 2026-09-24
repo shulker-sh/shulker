@@ -105,7 +105,7 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	res := env.Data
@@ -138,7 +138,7 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 		t.Fatalf("the marker jar must not be imported as an override: %v", err)
 	}
 
-	code, stdout, _ := h.run(t, "import", "mrpack", archive, "--dir", dir, "--json")
+	code, stdout, _ := h.run(t, "import", archive, "--dir", dir, "--json")
 	if code == 0 || failureCode(t, stdout).Code != "manifest-exists" {
 		t.Fatalf("import over an existing project: exit %d %s", code, stdout)
 	}
@@ -156,7 +156,7 @@ func TestImportMrpackIgnoreShulker(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--ignore-shulker", "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--ignore-shulker", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	// The pack's own manifest and lock are ignored, so every mod is looked up
@@ -179,7 +179,7 @@ func TestImportMrpackVanillaRoundTrip(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	// A project with no loader ships no marker jar, so only the manifest and lock
@@ -223,7 +223,7 @@ func TestImportMrpackTamperedMarker(t *testing.T) {
 		Warnings []string     `json:"warnings"`
 		Data     importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", tampered, "--dir", dir, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", tampered, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	res := env.Data
@@ -267,7 +267,7 @@ func TestImportMrpackForeign(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", filepath.Join(parent, "someone-s-pack"), "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", filepath.Join(parent, "someone-s-pack"), "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	res := env.Data
@@ -330,7 +330,7 @@ func TestImportMrpackLocksHostedPacks(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	res := env.Data.Mods
@@ -388,7 +388,7 @@ func TestImportMrpackMatchesCurseForge(t *testing.T) {
 			Warnings []string     `json:"warnings"`
 			Data     importResult `json:"data"`
 		}
-		if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+		if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 			t.Fatal(err)
 		}
 		return env.Data, env.Warnings, dir
@@ -451,7 +451,7 @@ func TestImportMrpackKeepsAnIndexFileModrinthFailsToServe(t *testing.T) {
 		archive := filepath.Join(t.TempDir(), "mirrored.mrpack")
 		writeMrpack(t, archive, index, nil)
 		h.dir = t.TempDir()
-		return h.run(t, "import", "mrpack", archive, "--dir", filepath.Join(h.dir, "mirrored"), "--json")
+		return h.run(t, "import", archive, "--dir", filepath.Join(h.dir, "mirrored"), "--json")
 	}
 
 	if code, stdout, _ := importWith(t, h.server.URL+"/cdn/"+sodium.filename); code == 0 || !strings.Contains(stdout, "mrpack-download") || !strings.Contains(stdout, "no other URL") {
@@ -508,7 +508,7 @@ func TestImportMrpackTakesAModsSideFromThePackOnlyWhereItAddsABuiltSide(t *testi
 		Warnings []string     `json:"warnings"`
 		Data     importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	if want := []resolve.SideChoice{{ID: "config_manager", Pack: "both", Provider: "server"}, {ID: "server_tweaks", Pack: "both", Provider: "server"}}; !slices.Equal(env.Data.Mods.Sides, want) {
@@ -543,7 +543,7 @@ func TestImportMrpackRecordsAnOverrideLayersSideQuietly(t *testing.T) {
 		Warnings []string     `json:"warnings"`
 		Data     importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	if len(env.Data.Mods.Sides) != 0 || slices.ContainsFunc(env.Warnings, func(w string) bool { return strings.Contains(w, "take their side") }) {
@@ -562,62 +562,89 @@ func writeEmptyMrpack(t *testing.T) string {
 	return archive
 }
 
-func TestImportTakesItsFolderAsAnArgument(t *testing.T) {
+func TestImportCreatesTheProjectInTheCurrentFolder(t *testing.T) {
 	h := newHarness(t)
 	h.dir = ""
 	archive := writeEmptyMrpack(t)
 	here := t.TempDir()
 	t.Chdir(here)
-	stdout := h.mustRun(t, "import", "mrpack", archive, ".")
+	stdout := h.mustRun(t, "import", archive)
 	if _, err := os.Stat(filepath.Join(here, manifest.FileName)); err != nil {
 		t.Fatalf("not imported here: %v", err)
 	}
-	if strings.Contains(stdout, "import here") {
-		t.Fatalf("hint with a folder given: %s", stdout)
+	if strings.Contains(stdout, "cd ") || !strings.Contains(stdout, "shulker install") {
+		t.Fatalf("nudge: %s", stdout)
 	}
-	h.mustRun(t, "import", "mrpack", archive, "packs/mine")
-	if _, err := os.Stat(filepath.Join(here, "packs", "mine", manifest.FileName)); err != nil {
-		t.Fatalf("not imported into packs/mine: %v", err)
-	}
-	if code, stdout, _ := h.run(t, "import", "mrpack", archive, ".", "--json"); code == 0 || failureCode(t, stdout).Code != "manifest-exists" {
+	if code, stdout, _ := h.run(t, "import", archive, "--json"); code == 0 || failureCode(t, stdout).Code != "manifest-exists" {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
-	h.dir = t.TempDir()
-	if code, stdout, _ := h.run(t, "import", "mrpack", archive, "elsewhere", "--json"); code != out.ExitUsage || failureCode(t, stdout).Code != "usage" {
-		t.Fatalf("folder and -C: exit %d: %s", code, stdout)
+	h.mustRun(t, "-C", "new", "import", archive)
+	if _, err := os.Stat(filepath.Join(here, "new", manifest.FileName)); err != nil {
+		t.Fatalf("not imported into new: %v", err)
+	}
+	if code, stdout, _ := h.run(t, "-C", "other", "import", archive, "extra", "--json"); code != out.ExitUsage || failureCode(t, stdout).Code != "usage" {
+		t.Fatalf("a second argument: exit %d: %s", code, stdout)
 	}
 }
 
-func TestImportCurseForgeTakesItsFolderAsAnArgument(t *testing.T) {
+func TestImportDetectsACurseForgePack(t *testing.T) {
 	h := newHarness(t)
 	h.dir = ""
 	archive := filepath.Join(t.TempDir(), "craft.zip")
 	writeCurseForgeZip(t, archive, importedCurseForgePack(), map[string][]byte{})
 	here := t.TempDir()
 	t.Chdir(here)
-	h.mustRun(t, "import", "curseforge", archive, ".")
+	h.mustRun(t, "import", archive, "--type", "curseforge")
 	if _, err := os.Stat(filepath.Join(here, manifest.FileName)); err != nil {
 		t.Fatalf("not imported here: %v", err)
 	}
 }
 
-func TestImportHintsAtImportingHereInAnEmptyFolder(t *testing.T) {
+func TestImportTypeRefusesAMismatch(t *testing.T) {
 	h := newHarness(t)
-	h.dir = ""
 	archive := writeEmptyMrpack(t)
-	here := t.TempDir()
-	if err := os.Mkdir(filepath.Join(here, ".git"), 0o755); err != nil {
+	cf := filepath.Join(t.TempDir(), "craft.zip")
+	writeCurseForgeZip(t, cf, importedCurseForgePack(), map[string][]byte{})
+	for _, args := range [][]string{{archive, "--type", "curseforge"}, {cf, "--type", "mrpack"}, {archive, "--type", "shader"}} {
+		code, stdout, _ := h.run(t, append([]string{"--json", "-C", filepath.Join(t.TempDir(), "p"), "import"}, args...)...)
+		if code != out.ExitUsage || failureCode(t, stdout).Code != "usage" {
+			t.Fatalf("%v: exit %d: %s", args, code, stdout)
+		}
+	}
+}
+
+func TestImportSideNarrowsANewProject(t *testing.T) {
+	h := newHarness(t)
+	archive := filepath.Join(t.TempDir(), "sided.mrpack")
+	writeMrpack(t, archive, mrpack.Index{FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Sided", Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"}}, map[string][]byte{
+		"overrides/config/both.txt":          []byte("both"),
+		"server-overrides/config/server.txt": []byte("server"),
+		"client-overrides/config/client.txt": []byte("client"),
+	})
+	dir := filepath.Join(t.TempDir(), "client-only")
+	var env struct {
+		Data importResult `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "-C", dir, "import", archive, "--side", "client", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	t.Chdir(here)
-	stdout := h.mustRun(t, "import", "mrpack", archive)
-	if _, err := os.Stat(filepath.Join(here, "empty-pack", manifest.FileName)); err != nil {
-		t.Fatalf("not imported into its own folder: %v", err)
+	if !slices.Equal(env.Data.Sides, []string{"client"}) {
+		t.Fatalf("sides: %v", env.Data.Sides)
 	}
-	if !strings.Contains(stdout, "pass . to import here") {
-		t.Fatalf("no hint: %s", stdout)
+	if !slices.Equal(env.Data.LeftOut, []string{"server-overrides/config/server.txt"}) {
+		t.Fatalf("left out: %v", env.Data.LeftOut)
 	}
-	if stdout := h.mustRun(t, "import", "mrpack", archive, "--name", "second"); strings.Contains(stdout, "import here") {
-		t.Fatalf("hint in a folder that isn't empty: %s", stdout)
+	if _, err := os.Stat(filepath.Join(dir, "server-overrides")); !os.IsNotExist(err) {
+		t.Fatalf("server overrides written: %v", err)
+	}
+	m, err := manifest.Load(filepath.Join(dir, manifest.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Server != nil {
+		t.Fatalf("server block kept: %+v", m.Server)
+	}
+	if code, stdout, _ := h.run(t, "--json", "-C", filepath.Join(t.TempDir(), "x"), "import", archive, "--side", "both"); code != out.ExitUsage || failureCode(t, stdout).Code != "usage" {
+		t.Fatalf("--side both: exit %d: %s", code, stdout)
 	}
 }

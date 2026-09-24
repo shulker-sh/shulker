@@ -125,7 +125,7 @@ func Read(file string) (*Archive, error) {
 	if !ok {
 		if _, isMrpack := entries[mrpack.IndexName]; isMrpack {
 			e := out.Errorf("archive-not-modpack", "%s is a Modrinth modpack, not a CurseForge one", file)
-			e.Help = "import a Modrinth modpack with `shulker import mrpack`"
+			e.Help = "`shulker import` reads a Modrinth modpack too"
 			return nil, e
 		}
 		return nil, NotModpack(file, "a CurseForge modpack")

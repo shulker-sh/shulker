@@ -181,7 +181,7 @@ func TestImportMrpackWithoutALoader(t *testing.T) {
 		Dependencies: map[string]string{"minecraft": "26.2"},
 	}, map[string][]byte{"overrides/options.txt": []byte("fov:0.5\n")})
 	dir := filepath.Join(t.TempDir(), "vanilla")
-	stdout := h.mustRun(t, "import", "mrpack", archive, "--dir", dir)
+	stdout := h.mustRun(t, "import", archive, "--dir", dir)
 	if !strings.Contains(stdout, "(Minecraft 26.2)") {
 		t.Fatalf("import output: %s", stdout)
 	}

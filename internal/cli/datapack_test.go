@@ -240,7 +240,7 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	stdout := h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")
+	stdout := h.mustRun(t, "import", archive, "--dir", dir, "--json")
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 	if strings.Join(res.Duplicates, ",") != "datapacks/Terralith.zip,overrides/resourcepacks/Terralith Copy.zip,resourcepacks/Terralith.zip" {
 		t.Fatalf("copies of a loaded datapack are dropped, named by their path in the archive: %+v", res.Duplicates)
 	}
-	text := h.mustRun(t, "import", "mrpack", archive, "--dir", filepath.Join(t.TempDir(), "text"))
+	text := h.mustRun(t, "import", archive, "--dir", filepath.Join(t.TempDir(), "text"))
 	for _, rel := range res.Duplicates {
 		if !regexp.MustCompile(`(?m)^\s*│?\s+` + regexp.QuoteMeta(rel) + `$`).MatchString(text) {
 			t.Fatalf("each left-out copy gets a line of its own:\n%s", text)
@@ -279,7 +279,7 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 	index.Files = index.Files[:1]
 	writeMrpack(t, stray, index, nil)
 	dir = filepath.Join(t.TempDir(), "stray")
-	h.mustRun(t, "import", "mrpack", stray, "--dir", dir)
+	h.mustRun(t, "import", stray, "--dir", dir)
 	if _, l := readProject(t, dir); l.Datapacks["terralith"].Filename != "Terralith.zip" {
 		t.Fatalf("a datapack under resourcepacks/ with no loaded copy is locked as a datapack: %+v", l.Datapacks)
 	}
@@ -462,7 +462,7 @@ func TestImportMrpackKeepsAHybridDatapackAsBoth(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "mrpack", archive, "--dir", dir, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	res := env.Data.Mods

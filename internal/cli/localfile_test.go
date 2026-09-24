@@ -248,7 +248,7 @@ func TestImportMrpackTakesBundledLocalFilesAsItsOwn(t *testing.T) {
 	h.mustRun(t, "export", "mrpack", "--version", "1.0.0", "--bundle")
 
 	dir := filepath.Join(t.TempDir(), "imported")
-	h.mustRun(t, "import", "mrpack", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir)
+	h.mustRun(t, "import", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir)
 	m, l := readProject(t, dir)
 	for key, want := range map[string]string{"private-mod": "files/private-mod-1.4.jar", "faithful": "files/faithful.zip", "bsl": "files/bsl.zip"} {
 		if m.Requires[key].File != want {
@@ -282,7 +282,7 @@ func TestImportMrpackRestoresAPackFolder(t *testing.T) {
 	h.mustRun(t, "export", "mrpack", "--version", "1.0.0", "--bundle")
 
 	dir := filepath.Join(t.TempDir(), "imported")
-	h.mustRun(t, "import", "mrpack", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir)
+	h.mustRun(t, "import", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir)
 	h.dir = dir
 	m, l := readProject(t, dir)
 	if m.Requires["helper"].File != "files/Helper" || l.ResourcePacks["helper"].File != "files/Helper" {
@@ -311,7 +311,7 @@ func TestImportMrpackRefusesTwoLocalFilesOfOneName(t *testing.T) {
 	h.mustRun(t, "export", "mrpack", "--version", "1.0.0", "--bundle")
 
 	dir := filepath.Join(t.TempDir(), "imported")
-	code, stdout, _ := h.run(t, "import", "mrpack", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir, "--json")
+	code, stdout, _ := h.run(t, "import", filepath.Join(h.dir, "build", filepath.Base(h.dir)+"-1.0.0.mrpack"), "--dir", dir, "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "file-taken" {
 		t.Fatalf("two local files named faithful.zip: code=%d %+v", code, e)
 	}

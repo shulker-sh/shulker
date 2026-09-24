@@ -220,7 +220,7 @@ func CheckArchive(name, path string) error {
 // readArchive reads a modpack archive by its content: a Modrinth pack whole, and a CurseForge pack
 // as well as the Modrinth view of it that the build lays.
 func readArchive(name, rel, path string) (*mrpack.Archive, *cfpack.Archive, error) {
-	if hasIndex(path) {
+	if HasIndex(path) {
 		a, err := mrpack.Read(path)
 		if err != nil {
 			return nil, nil, inModpack(name, err)
@@ -243,7 +243,8 @@ func readArchive(name, rel, path string) (*mrpack.Archive, *cfpack.Archive, erro
 	return nil, nil, e
 }
 
-func hasIndex(path string) bool {
+// HasIndex reports whether path is a zip holding a Modrinth index.
+func HasIndex(path string) bool {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
 		return false

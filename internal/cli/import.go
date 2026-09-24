@@ -20,6 +20,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/resolve"
@@ -36,193 +37,243 @@ type importResult struct {
 	Sides     []string          `json:"sides"`
 	Mods      *resolve.Imported `json:"mods"`
 	Overrides []string          `json:"overrides"`
+	LeftOut   []string          `json:"leftOut"`
+}
+
+// importFlags are import's own flags.
+type importFlags struct {
+	name, typ, side string
+	ignoreShulker   bool
+}
+
+// importArchive is the archive an import reads, as the Modrinth view the resolver takes, with
+// the CurseForge pack it came from when it was one.
+type importArchive struct {
+	kind string
+	arc  *mrpack.Archive
+	cf   *cfpack.Archive
 }
 
 func (a *app) importCmd() *cobra.Command {
+	var f importFlags
 	cmd := &cobra.Command{
-		Use:   "import",
-		Short: "Create a project from another modpack format",
+		Use:         "import <file>",
+		Annotations: acts(),
+		Short:       "Create a project from a Modrinth or CurseForge modpack",
+		Args:        exactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return a.runImport(cmd.Context(), a.localPath(args[0]), &f)
+		},
 	}
-	cmd.AddCommand(a.importMrpackCmd(), a.importCurseForgeCmd())
+	cmd.Flags().StringVar(&f.name, "name", "", "project name (default: the pack name, slugified)")
+	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the file unless it is this kind of modpack: mrpack or curseforge (default: detected)")
+	cmd.Flags().StringVar(&f.side, "side", "", "take one side only: client or server (default: every side the pack declares)")
+	cmd.Flags().BoolVar(&f.ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
 	return cmd
 }
 
-func (a *app) importMrpackCmd() *cobra.Command {
-	var name string
-	var ignoreShulker bool
-	cmd := &cobra.Command{
-		Use:         "mrpack <file> [dir]",
-		Annotations: acts(),
-		Short:       "Create a project from a Modrinth modpack (.mrpack)",
-		Args:        rangeArgs(1, 2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			arc, err := mrpack.Read(args[0])
-			if err != nil {
-				return err
-			}
-			if ignoreShulker {
-				arc.Marker = nil
-			}
-			if name == "" {
-				name = slugify(arc.Index.Name)
-			}
-			dir, hintHere, err := a.importDir(name, args)
-			if err != nil {
-				return err
-			}
-			m, warnings, err := importManifest(arc, name)
-			if err != nil {
-				return err
-			}
-			a.warn(warnings)
-			d, err := a.deps()
-			if err != nil {
-				return err
-			}
-			exact := *m
-			exact.Minecraft = arc.Index.Dependencies["minecraft"]
-			if exact.Minecraft == "" {
-				return out.Errorf("mrpack-invalid", "the modpack's index names no minecraft version")
-			}
-			_, exact.Loader.Version, _ = arc.Loader()
-			l, err := a.importLock(cmd.Context(), d, &exact)
-			if err != nil {
-				return err
-			}
-			if arc.Marker != nil && arc.Marker.Manifest.Server != nil && arc.Marker.Manifest.Server.Players != nil {
-				l.Players = arc.Marker.Lock.Players
-			}
-			r := &resolve.Resolver{Dir: dir, Manifest: m, Lock: l, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
-			mods, err := r.ImportMrpack(cmd.Context(), arc)
-			if err != nil {
-				return err
-			}
-			a.warn(mods.Warnings)
-			if err := r.AdoptLocalFiles(); err != nil {
-				return err
-			}
-			if arc.Marker != nil {
-				mods.Overrides = dropManifestOwned(m, mods.Overrides)
-			}
-			if err := writeImportIcon(dir, m, arc.Icon); err != nil {
-				return err
-			}
-			if err := writeImport(dir, m, l, mods.Overrides); err != nil {
-				return err
-			}
-			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
-			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
-				rows := []out.Row{
-					{Text: fmt.Sprintf("%s, %d reused from the shulker marker", lockedSummary(mods.Locked), len(mods.Reused))},
-					{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
-				}
-				if len(mods.Dropped) > 0 {
-					rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
-				}
-				if len(mods.Duplicates) > 0 {
-					rows = append(rows, out.Row{Label: "left out as copies of a datapack a global datapack mod loads", Children: mods.Duplicates})
-				}
-				l.Tree(rows...)
-				nudgeImported(l, dir, hintHere)
-			})
-		},
+func (a *app) runImport(ctx context.Context, file string, f *importFlags) error {
+	for _, flag := range []struct {
+		name, value string
+		allowed     []string
+	}{
+		{"type", f.typ, []string{"mrpack", "curseforge"}},
+		{"side", f.side, []string{"client", "server"}},
+	} {
+		if flag.value != "" && !slices.Contains(flag.allowed, flag.value) {
+			return out.Errorf("usage", "--%s takes one of %s, not %q", flag.name, strings.Join(flag.allowed, ", "), flag.value)
+		}
 	}
-	cmd.Flags().StringVar(&name, "name", "", "project name (default: the pack name, slugified)")
-	cmd.Flags().BoolVar(&ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
-	return cmd
+	dir, err := a.importDir()
+	if err != nil {
+		return err
+	}
+	in, err := readImportArchive(file, f.typ)
+	if err != nil {
+		return err
+	}
+	if f.ignoreShulker {
+		in.arc.Marker = nil
+		if in.cf != nil {
+			in.cf.Marker = nil
+		}
+	}
+	name := f.name
+	if name == "" {
+		name = slugify(in.arc.Index.Name)
+	}
+	m, warnings, err := importManifest(in.arc, name)
+	if err != nil {
+		return err
+	}
+	a.warn(warnings)
+	if in.cf != nil && in.arc.Marker == nil && in.cf.Manifest.Author != "" {
+		m.Authors = []string{in.cf.Manifest.Author}
+	}
+	d, err := a.deps()
+	if err != nil {
+		return err
+	}
+	exact := *m
+	exact.Minecraft = in.arc.Index.Dependencies["minecraft"]
+	_, exact.Loader.Version, _ = in.arc.Loader()
+	if in.cf != nil {
+		exact.Minecraft = in.cf.Manifest.Minecraft.Version
+		exact.Loader.Type, exact.Loader.Version, _ = in.cf.Loader()
+	}
+	l, err := a.importLock(ctx, d, &exact)
+	if err != nil {
+		return err
+	}
+	if marker := in.arc.Marker; marker != nil && marker.Manifest.Server != nil && marker.Manifest.Server.Players != nil {
+		l.Players = marker.Lock.Players
+	}
+	r := &resolve.Resolver{Dir: dir, Manifest: m, Lock: l, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+	var mods *resolve.Imported
+	if in.cf != nil {
+		mods, err = r.ImportCurseForge(ctx, in.cf)
+	} else {
+		mods, err = r.ImportMrpack(ctx, in.arc)
+	}
+	if err != nil {
+		return err
+	}
+	a.warn(mods.Warnings)
+	if err := r.AdoptLocalFiles(); err != nil {
+		return err
+	}
+	if in.arc.Marker != nil {
+		mods.Overrides = dropManifestOwned(m, mods.Overrides)
+	}
+	leftOut := []string{}
+	if f.side != "" {
+		mods.Overrides, leftOut = keepSide(m, l, mods.Overrides, f.side)
+	}
+	if err := writeImportIcon(dir, m, in.arc.Icon); err != nil {
+		return err
+	}
+	if err := writeImport(dir, m, l, mods.Overrides); err != nil {
+		return err
+	}
+	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: in.arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides), LeftOut: leftOut}
+	return a.printer.Emit(res, func(l *out.Lines) {
+		l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
+		locked := lockedSummary(mods.Locked)
+		if res.Marker {
+			locked += fmt.Sprintf(", %d reused from the shulker marker", len(mods.Reused))
+		}
+		rows := []out.Row{
+			{Text: locked},
+			{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
+		}
+		if len(leftOut) > 0 {
+			rows = append(rows, out.Row{Label: "left out for side", Children: leftOut})
+		}
+		if len(mods.Dropped) > 0 {
+			rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
+		}
+		if len(mods.Duplicates) > 0 {
+			rows = append(rows, out.Row{Label: "left out as copies of a datapack a global datapack mod loads", Children: mods.Duplicates})
+		}
+		l.Tree(rows...)
+		l.Nudge("Download and build it", "shulker install")
+	})
 }
 
-func (a *app) importCurseForgeCmd() *cobra.Command {
-	var name string
-	var ignoreShulker bool
-	cmd := &cobra.Command{
-		Use:         "curseforge <file> [dir]",
-		Annotations: acts(),
-		Short:       "Create a project from a CurseForge modpack (.zip)",
-		Args:        rangeArgs(1, 2),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			arc, err := cfpack.Read(args[0])
-			if err != nil {
-				return err
-			}
-			if ignoreShulker {
-				arc.Marker = nil
-			}
-			if name == "" {
-				name = slugify(arc.Manifest.Name)
-			}
-			dir, hintHere, err := a.importDir(name, args)
-			if err != nil {
-				return err
-			}
-			asMrpack, err := arc.Mrpack()
-			if err != nil {
-				return err
-			}
-			asMrpack.Marker = arc.Marker
-			m, warnings, err := importManifest(asMrpack, name)
-			if err != nil {
-				return err
-			}
-			a.warn(warnings)
-			if arc.Marker == nil && arc.Manifest.Author != "" {
-				m.Authors = []string{arc.Manifest.Author}
-			}
-			d, err := a.deps()
-			if err != nil {
-				return err
-			}
-			exact := *m
-			exact.Minecraft = arc.Manifest.Minecraft.Version
-			exact.Loader.Type, exact.Loader.Version, _ = arc.Loader()
-			l, err := a.importLock(cmd.Context(), d, &exact)
-			if err != nil {
-				return err
-			}
-			if arc.Marker != nil && arc.Marker.Manifest.Server != nil && arc.Marker.Manifest.Server.Players != nil {
-				l.Players = arc.Marker.Lock.Players
-			}
-			r := &resolve.Resolver{Dir: dir, Manifest: m, Lock: l, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
-			mods, err := r.ImportCurseForge(cmd.Context(), arc)
-			if err != nil {
-				return err
-			}
-			a.warn(mods.Warnings)
-			if err := r.AdoptLocalFiles(); err != nil {
-				return err
-			}
-			if arc.Marker != nil {
-				mods.Overrides = dropManifestOwned(m, mods.Overrides)
-			}
-			if err := writeImportIcon(dir, m, arc.Icon); err != nil {
-				return err
-			}
-			if err := writeImport(dir, m, l, mods.Overrides); err != nil {
-				return err
-			}
-			res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides)}
-			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
-				locked := lockedSummary(mods.Locked)
-				if res.Marker {
-					locked += fmt.Sprintf(", %d reused from the shulker marker", len(mods.Reused))
-				}
-				rows := []out.Row{
-					{Text: locked},
-					{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
-				}
-				if len(mods.Dropped) > 0 {
-					rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
-				}
-				l.Tree(rows...)
-				nudgeImported(l, dir, hintHere)
-			})
-		},
+// readImportArchive reads a modpack archive by its content, refusing one that isn't the kind typ
+// names when it names one.
+func readImportArchive(file, typ string) (*importArchive, error) {
+	in := &importArchive{kind: "mrpack"}
+	if pack.HasIndex(file) {
+		arc, err := mrpack.Read(file)
+		if err != nil {
+			return nil, err
+		}
+		in.arc = arc
+	} else {
+		cf, err := cfpack.Read(file)
+		if out.CodeOf(err) == "archive-not-modpack" {
+			e := out.Errorf("archive-not-modpack", "%s is not a Modrinth or CurseForge modpack", file)
+			e.Help = "import reads a .mrpack, or a CurseForge zip with a manifest.json of type minecraftModpack"
+			return nil, e
+		}
+		if err != nil {
+			return nil, err
+		}
+		arc, err := cf.Mrpack()
+		if err != nil {
+			return nil, err
+		}
+		arc.Marker = cf.Marker
+		in.kind, in.arc, in.cf = "curseforge", arc, cf
 	}
-	cmd.Flags().StringVar(&name, "name", "", "project name (default: the pack name, slugified)")
-	cmd.Flags().BoolVar(&ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
-	return cmd
+	if typ != "" && typ != in.kind {
+		return nil, out.Errorf("usage", "%s is a %s modpack, not a %s one", file, importKindTitle(in.kind), importKindTitle(typ))
+	}
+	return in, nil
+}
+
+func importKindTitle(kind string) string {
+	if kind == "curseforge" {
+		return "CurseForge"
+	}
+	return "Modrinth"
+}
+
+// keepSide narrows a new project to one side: the other side's block, its entries and its
+// override layer go, and what went is returned by key and by override path.
+func keepSide(m *manifest.Manifest, l *lock.Lock, overrides []mrpack.Override, side string) ([]mrpack.Override, []string) {
+	other := "server"
+	if side == "server" {
+		other = "client"
+	}
+	var leftOut []string
+	switch side {
+	case "client":
+		m.Server = nil
+		l.Players = []lock.Player{}
+		if m.Client == nil {
+			m.Client = &manifest.Client{}
+		}
+	case "server":
+		m.Client = nil
+		if m.Server == nil {
+			m.Server = &manifest.Server{Memory: server.DefaultMemory}
+		}
+	}
+	for key, req := range m.Requires {
+		if req.Side == other {
+			delete(m.Requires, key)
+			leftOut = append(leftOut, key)
+		}
+	}
+	for key, mod := range l.Mods {
+		if mod.Side == other {
+			delete(l.Mods, key)
+			delete(m.Requires, key)
+			leftOut = append(leftOut, key)
+		}
+	}
+	for _, kind := range manifest.PackKinds {
+		packs := l.Packs(kind)
+		for key, p := range packs {
+			if p.Side == other {
+				delete(packs, key)
+				delete(m.Requires, key)
+				leftOut = append(leftOut, key)
+			}
+		}
+	}
+	kept := overrides[:0]
+	for _, o := range overrides {
+		if o.Layer == other+"-overrides" {
+			leftOut = append(leftOut, o.Layer+"/"+o.Path)
+			continue
+		}
+		kept = append(kept, o)
+	}
+	slices.Sort(leftOut)
+	return kept, slices.Compact(leftOut)
 }
 
 // lockedSummary counts an import's locked files by type, naming each type's providers when the
@@ -274,42 +325,17 @@ func lockedSummary(files []resolve.LockedFile) string {
 	return summary
 }
 
-// importDir is where an import creates its project: the folder argument, else --dir, else a
-// folder named for the project. It refuses one that already holds a manifest. hintHere is set
-// when that last default lands in an empty folder, which the user more likely meant to import into.
-func (a *app) importDir(name string, args []string) (dir string, hintHere bool, err error) {
-	dir = a.dir
-	if len(args) > 1 {
-		if a.dir != "" {
-			return "", false, out.Errorf("usage", "pass a folder or -C, not both: each of them says where the project goes")
-		}
-		dir = args[1]
-	}
-	if dir == "" {
-		dir, hintHere = name, cwdEmpty()
-	}
-	if dir, err = filepath.Abs(dir); err != nil {
-		return "", false, err
+// importDir is the project directory an import creates its project in, refusing one that already
+// holds a manifest.
+func (a *app) importDir() (string, error) {
+	dir, err := filepath.Abs(cmp.Or(a.dir, "."))
+	if err != nil {
+		return "", err
 	}
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
-		return "", false, out.Errorf("manifest-exists", "%s already exists in %s", manifest.FileName, dir)
+		return "", out.Errorf("manifest-exists", "%s already exists in %s", manifest.FileName, dir)
 	}
-	return dir, hintHere, nil
-}
-
-// nudgeImported ends an import's report with how to build the project, first saying where it went
-// when hintHere says the user more likely meant the current folder.
-func nudgeImported(l *out.Lines, dir string, hintHere bool) {
-	if hintHere {
-		l.Info("imported into ./" + filepath.Base(dir) + "; pass `.` to import here")
-	}
-	l.Nudge("Download and build it", "cd "+dir+" && shulker install")
-}
-
-// cwdEmpty reports whether the current folder holds nothing but dotfiles, such as .git.
-func cwdEmpty() bool {
-	entries, err := os.ReadDir(".")
-	return err == nil && !slices.ContainsFunc(entries, func(e os.DirEntry) bool { return !strings.HasPrefix(e.Name(), ".") })
+	return dir, nil
 }
 
 // importLock starts the new project's lock from the exact platform the pack names.

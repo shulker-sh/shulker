@@ -10,7 +10,6 @@ import (
 
 	"shulker.sh/shulker/internal/cfpack"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 )
 
 func writeCurseForgeZip(t *testing.T, path string, m cfpack.Manifest, entries map[string][]byte) {
@@ -63,7 +62,7 @@ func TestImportCurseForge(t *testing.T) {
 	parent := t.TempDir()
 	h.dir = parent
 	dir := filepath.Join(parent, "craft-pack")
-	stdout := h.mustRun(t, "import", "curseforge", archive, "--dir", dir, "--json")
+	stdout := h.mustRun(t, "import", archive, "--dir", dir, "--json")
 	var env struct {
 		Data     importResult `json:"data"`
 		Warnings []string     `json:"warnings"`
@@ -134,7 +133,7 @@ func TestImportCurseForgeManualDownload(t *testing.T) {
 	h.dir = parent
 	dir := filepath.Join(parent, "craft-pack")
 
-	code, stdout, _ := h.run(t, "--json", "import", "curseforge", archive, "--dir", dir)
+	code, stdout, _ := h.run(t, "--json", "import", archive, "--dir", dir)
 	e := failureCode(t, stdout)
 	if code == 0 || e.Code != "missing-files" || len(e.Items) != 2 || !strings.Contains(e.Items[0], "nodist-1.0.0.jar from https://www.curseforge.com/minecraft/mc-mods/nodist/files/5100001") || !strings.Contains(e.Items[1], "locked-1.0.0.jar") || !strings.Contains(e.Items[1], filepath.Join(dir, "downloads")) {
 		t.Fatalf("expected missing-files, got %d %s", code, stdout)
@@ -147,7 +146,7 @@ func TestImportCurseForgeManualDownload(t *testing.T) {
 	os.MkdirAll(downloads, 0o755)
 	os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
 	os.WriteFile(filepath.Join(downloads, "locked-1.0.0.jar"), h.jars["locked"].data, 0o644)
-	h.mustRun(t, "import", "curseforge", archive, "--dir", dir)
+	h.mustRun(t, "import", archive, "--dir", dir)
 	_, l := readProject(t, dir)
 	nodist := l.Mods["nodist"]
 	if nodist.URL != nil || nodist.Page != "https://www.curseforge.com/minecraft/mc-mods/nodist/files/5100001" || nodist.Sha512 != h.jars["nodist"].sha512 {
@@ -158,11 +157,9 @@ func TestImportCurseForgeManualDownload(t *testing.T) {
 	}
 }
 
-func TestImportCurseForgeRefusesOtherArchives(t *testing.T) {
+func TestImportRefusesAnArchiveThatIsNoModpack(t *testing.T) {
 	h := newHarness(t)
 	h.dir = t.TempDir()
-	mrpackFile := filepath.Join(t.TempDir(), "pack.mrpack")
-	writeMrpack(t, mrpackFile, mrpack.Index{FormatVersion: 1, Game: "minecraft", VersionID: "1", Name: "x", Dependencies: map[string]string{"minecraft": "26.2"}}, map[string][]byte{})
 	resourcePack := filepath.Join(t.TempDir(), "pack.zip")
 	f, _ := os.Create(resourcePack)
 	zw := zip.NewWriter(f)
@@ -170,15 +167,9 @@ func TestImportCurseForgeRefusesOtherArchives(t *testing.T) {
 	w.Write([]byte("{}"))
 	zw.Close()
 	f.Close()
-	for _, file := range []string{mrpackFile, resourcePack} {
-		code, stdout, _ := h.run(t, "--json", "import", "curseforge", file)
-		if e := failureCode(t, stdout); code == 0 || e.Code != "archive-not-modpack" {
-			t.Fatalf("%s: expected archive-not-modpack, got %d %s", file, code, stdout)
-		}
-	}
-	_, stdout, _ := h.run(t, "--json", "import", "curseforge", mrpackFile)
-	if e := failureCode(t, stdout); !strings.Contains(e.Help, "shulker import mrpack") {
-		t.Fatalf("help: %+v", e)
+	code, stdout, _ := h.run(t, "--json", "import", resourcePack)
+	if e := failureCode(t, stdout); code == 0 || e.Code != "archive-not-modpack" {
+		t.Fatalf("expected archive-not-modpack, got %d %s", code, stdout)
 	}
 }
 
@@ -189,7 +180,7 @@ func TestImportCurseForgeRoundTrip(t *testing.T) {
 	exported := h.readLock(t)
 
 	dir := filepath.Join(t.TempDir(), "demo")
-	h.mustRun(t, "import", "curseforge", archive, "--dir", dir)
+	h.mustRun(t, "import", archive, "--dir", dir)
 	m, l := readProject(t, dir)
 	if m.Name != "pack" || m.Version != "1.0" || strings.Join(m.Authors, ",") != "Ann,Bo" || m.Server == nil || l.Loader.Type != "fabric" || l.Loader.Version != exported.Loader.Version {
 		t.Fatalf("project: %+v %+v", m, l.Loader)
@@ -233,7 +224,7 @@ func TestImportCurseForgeRestoresAShulkerExport(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "curseforge", archive, "--dir", dir, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	if res := env.Data; !res.Marker || strings.Join(res.Mods.Reused, ",") != "fabric-api,private-mod,recipes,sodium" || len(res.Mods.Locked) != 0 || len(res.Mods.Dropped) != 0 || len(res.Mods.Unmanaged) != 0 {
@@ -272,7 +263,7 @@ func TestImportCurseForgeIgnoreShulker(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "curseforge", archive, "--dir", dir, "--ignore-shulker", "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--ignore-shulker", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	if res := env.Data; res.Marker || len(res.Mods.Reused) != 0 || strings.Join(res.Mods.LockedIDs(), ",") != "fabric-api,jei,sodium" || strings.Join(res.Mods.Unmanaged, ",") != "overrides/mods/private-mod-1.4.jar" {
