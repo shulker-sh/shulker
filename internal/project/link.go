@@ -1,12 +1,16 @@
 package project
 
 import (
+	"errors"
+	"fmt"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 )
 
@@ -19,6 +23,65 @@ type LinkSource struct {
 	Name     string
 	Project  *Project
 	IsAuthor bool
+}
+
+// LinkInstance is the project a link leaves in the game directory: the minimal manifest ADR 0001
+// calls an instance, following the link's source as a modpack and building where it stands. A
+// project already there is adopted, never replaced, so a relink keeps whatever the player added
+// on top of the pack. Its name is set to the id either way, since repair reads the id back from it.
+// linked names the modpack entry this link wrote or repointed, and is empty when it left them alone.
+func LinkInstance(gameDir, id, display string, src *LinkSource) (p *Project, linked string, err error) {
+	p, err = Open(gameDir)
+	if src.IsAuthor {
+		if err == nil {
+			return nil, "", authoredOver(gameDir)
+		}
+		if !errors.Is(err, ErrNoManifest) {
+			return nil, "", err
+		}
+		p, err := AuthorInstance(gameDir, id, display, src)
+		return p, "", err
+	}
+	if errors.Is(err, ErrNoManifest) {
+		p, err := NewInstance(gameDir, id, display, src)
+		return p, src.Project.Manifest.Name, err
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if p.Lock == nil {
+		p.Lock = lock.New()
+	}
+	changed := false
+	if p.Manifest.Name != id {
+		p.Manifest.Name, changed = id, true
+	}
+	// A project that builds elsewhere is not yet an instance; linking it here is what makes it one.
+	if !p.Manifest.BuildsInPlace("client") {
+		if p.Manifest.Client == nil {
+			p.Manifest.Client = &manifest.Client{Name: display}
+		}
+		p.Manifest.Client.Build, changed = ".", true
+	}
+	// Only --force reaches here with a source the instance doesn't follow yet. Repointing that one
+	// modpack entry leaves the player's own requires, and the lock holding them, where they are.
+	key := ModpackKey(p.Manifest, src.Name)
+	if key == "" {
+		key = src.Project.Manifest.Name
+	}
+	entry, held := p.Manifest.Requires[key]
+	if held && entry.Kind() != manifest.TypeModpack {
+		return nil, "", manifest.KeyTaken(key, entry.Kind(), manifest.TypeModpack)
+	}
+	if entry.Source != src.Name || entry.Ref != src.Ref || entry.Path != src.Path {
+		entry.Source, entry.Ref, entry.Path = src.Name, src.Ref, src.Path
+		p.Manifest.Requires[key], changed = entry, true
+		linked = key
+	}
+	if !changed {
+		return p, linked, nil
+	}
+	return p, linked, p.SaveManifest()
 }
 
 // NewInstance writes the instance manifest. It pins no platform and lists no feature: the pack is
@@ -68,6 +131,55 @@ func AuthorInstance(gameDir, id, display string, src *LinkSource) (*Project, err
 	}
 	src.Name, src.Source, src.Dir = gameDir, gameDir, gameDir
 	return p, nil
+}
+
+// authoredOver refuses to author an instance where a project already stands: there is no pack to
+// repoint, so --force has nothing to do either, and the answers would only overwrite a player's
+// own instance.
+func authoredOver(gameDir string) error {
+	e := out.Errorf("instance-exists", "%s already holds a project", gameDir)
+	e.Help = "give the new instance another name"
+	return e
+}
+
+// CheckAdopt guards the project a link is about to adopt. A game directory holding an in-place
+// project keeps the pack it follows, so the source a link names has to agree with the manifest
+// before the link may take it over, and force is what repoints that one entry. The manifest is
+// what decides, not the registry row: an unlink deletes the row and leaves the project whole.
+// noun, name and second word the refusal: what the launcher calls the instance, what this one is
+// called, and the flag that would make a second one instead.
+func CheckAdopt(gameDir string, src *LinkSource, noun, name, second string, force bool) error {
+	m, inPlace, err := inPlaceManifest(gameDir)
+	if err != nil || !inPlace {
+		return err
+	}
+	if src.IsAuthor {
+		return authoredOver(gameDir)
+	}
+	if force {
+		return nil
+	}
+	key := ModpackKey(m, src.Name)
+	if key == "" || (m.Requires[key].Source == src.Name && m.Requires[key].Path == src.Path) {
+		return nil
+	}
+	e := out.Errorf("instance-exists", "%s %q already follows %s from %s", noun, name, key, m.Requires[key].Source)
+	e.Help = fmt.Sprintf("pass %s to create a second %s, or --force to repoint the modpack it follows", second, noun)
+	return e
+}
+
+// inPlaceManifest is the manifest at dir when a side of it builds there, which is what makes the
+// directory an instance rather than a project that builds elsewhere.
+func inPlaceManifest(dir string) (*manifest.Manifest, bool, error) {
+	m, err := manifest.Load(filepath.Join(dir, manifest.FileName))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	_, ok := m.InPlaceSide()
+	return m, ok, nil
 }
 
 // ModpackKey is the key an instance follows a link's source under: the source manifest's name

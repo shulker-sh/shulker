@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
@@ -198,7 +196,7 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 	if !e.Usage.Names {
 		second = "--as"
 	}
-	if err := checkAdopt(place.GameDir, src, e.Usage.Noun, display, second, k.force); err != nil {
+	if err := project.CheckAdopt(place.GameDir, src.forLink(), e.Usage.Noun, display, second, k.force); err != nil {
 		return nil, err
 	}
 	if err := a.checkID(k.as, place.GameDir); err != nil {
@@ -455,10 +453,12 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, s
 		return nil, syncResult{}, err
 	}
 	id := config.InstanceID(instances, as, row.Name, row.Dir)
-	p, linked, err := a.linkProject(row.Dir, id, row.Name, src)
+	from := src.forLink()
+	p, linked, err := project.LinkInstance(row.Dir, id, row.Name, from)
 	if err != nil {
 		return nil, syncResult{}, err
 	}
+	src.name = from.Name
 	if err := ls.save(row.Dir, src.name, src.At, "client", false, src.project.Manifest); err != nil {
 		return nil, syncResult{}, err
 	}
@@ -468,103 +468,9 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, s
 	return p, synced, err
 }
 
-// linkSource is the source as the project a link writes takes it.
-func (s *syncSource) linkSource() *project.LinkSource {
+// forLink is the source as the project a link writes takes it.
+func (s *syncSource) forLink() *project.LinkSource {
 	return &project.LinkSource{Checkout: s.Checkout, Name: s.name, Project: s.project, IsAuthor: s.isAuthor}
-}
-
-// linkProject is the project a link leaves in the game directory: the minimal manifest ADR 0001
-// calls an instance, following the link's source as a modpack and building where it stands. A
-// project already there is adopted, never replaced, so a relink keeps whatever the player added
-// on top of the pack. Its name is set to the id either way, since repair reads the id back from it.
-func (a *app) linkProject(gameDir, id, display string, src *syncSource) (p *project.Project, linked string, err error) {
-	p, err = a.openProjectAt(gameDir)
-	if src.isAuthor {
-		if err == nil {
-			return nil, "", authoredOver(gameDir)
-		}
-		if !errors.Is(err, project.ErrNoManifest) {
-			return nil, "", err
-		}
-		ls := src.linkSource()
-		p, err := project.AuthorInstance(gameDir, id, display, ls)
-		src.name = ls.Name
-		return p, "", err
-	}
-	if errors.Is(err, project.ErrNoManifest) {
-		p, err := project.NewInstance(gameDir, id, display, src.linkSource())
-		return p, src.project.Manifest.Name, err
-	}
-	if err != nil {
-		return nil, "", err
-	}
-	if p.Lock == nil {
-		p.Lock = lock.New()
-	}
-	changed := false
-	if p.Manifest.Name != id {
-		p.Manifest.Name, changed = id, true
-	}
-	// A project that builds elsewhere is not yet an instance; linking it here is what makes it one.
-	if !p.Manifest.BuildsInPlace("client") {
-		if p.Manifest.Client == nil {
-			p.Manifest.Client = &manifest.Client{Name: display}
-		}
-		p.Manifest.Client.Build, changed = ".", true
-	}
-	// Only --force reaches here with a source the instance doesn't follow yet. Repointing that one
-	// modpack entry leaves the player's own requires, and the lock holding them, where they are.
-	key := project.ModpackKey(p.Manifest, src.name)
-	if key == "" {
-		key = src.project.Manifest.Name
-	}
-	entry, held := p.Manifest.Requires[key]
-	if held && entry.Kind() != manifest.TypeModpack {
-		return nil, "", manifest.KeyTaken(key, entry.Kind(), manifest.TypeModpack)
-	}
-	if entry.Source != src.name || entry.Ref != src.Ref || entry.Path != src.Path {
-		entry.Source, entry.Ref, entry.Path = src.name, src.Ref, src.Path
-		p.Manifest.Requires[key], changed = entry, true
-		linked = key
-	}
-	if !changed {
-		return p, linked, nil
-	}
-	return p, linked, p.SaveManifest()
-}
-
-// authoredOver refuses to author an instance where a project already stands: there is no pack to
-// repoint, so --force has nothing to do either, and the answers would only overwrite a player's
-// own instance.
-func authoredOver(gameDir string) error {
-	e := out.Errorf("instance-exists", "%s already holds a project", gameDir)
-	e.Help = "give the new instance another name"
-	return e
-}
-
-// checkAdopt guards the project a link is about to adopt. A game directory holding an in-place
-// project keeps the pack it follows, so the source a link names has to agree with the manifest
-// before the link may take it over, and --force is what repoints that one entry. The manifest is
-// what decides, not the registry row: an unlink deletes the row and leaves the project whole.
-func checkAdopt(gameDir string, src *syncSource, noun, name, second string, force bool) error {
-	m, _, inPlace, err := inPlaceManifest(gameDir)
-	if err != nil || !inPlace {
-		return err
-	}
-	if src.isAuthor {
-		return authoredOver(gameDir)
-	}
-	if force {
-		return nil
-	}
-	source := src.name
-	key := project.ModpackKey(m, source)
-	if key == "" || (m.Requires[key].Source == source && m.Requires[key].Path == src.Path) {
-		return nil
-	}
-	e := out.Errorf("instance-exists", "%s %q already follows %s from %s", noun, name, key, m.Requires[key].Source)
-	e.Help = fmt.Sprintf("pass %s to create a second %s, or --force to repoint the modpack it follows", second, noun)
-	return e
 }
 
 // linkSource is the project a link command works from: the argument when there
