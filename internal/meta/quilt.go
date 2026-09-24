@@ -83,9 +83,14 @@ func (l Library) JarURL() (string, error) {
 	return strings.TrimSuffix(l.URL, "/") + "/" + path, nil
 }
 
-// MavenPath is where a group:artifact:version[:classifier] coordinate's jar sits under a Maven root.
+// MavenPath is where a group:artifact:version[:classifier][@extension] coordinate's file sits under a
+// Maven root; without an extension it is a jar.
 func MavenPath(name string) (string, error) {
-	parts := strings.Split(name, ":")
+	coords, ext, ok := strings.Cut(name, "@")
+	if !ok {
+		ext = "jar"
+	}
+	parts := strings.Split(coords, ":")
 	if len(parts) < 3 || len(parts) > 4 {
 		return "", invalid("the Maven coordinate %q is not group:artifact:version[:classifier]", name)
 	}
@@ -94,7 +99,7 @@ func MavenPath(name string) (string, error) {
 	if len(parts) == 4 {
 		file += "-" + parts[3]
 	}
-	return group + "/" + artifact + "/" + version + "/" + file + ".jar", nil
+	return group + "/" + artifact + "/" + version + "/" + file + "." + ext, nil
 }
 
 // LoaderVersions lists every Quilt loader for a game. Quilt meta has no stable flag and doesn't
