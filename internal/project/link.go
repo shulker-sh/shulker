@@ -48,6 +48,28 @@ func NewInstance(gameDir, id, display string, src *LinkSource) (*Project, error)
 	return p, p.SaveManifest()
 }
 
+// AuthorInstance writes the project the link's answers describe into the game directory, which
+// from then on is both the instance and the project it builds. It follows nothing, so it syncs from
+// itself, and that is the source its registry row records.
+func AuthorInstance(gameDir, id, display string, src *LinkSource) (*Project, error) {
+	m := *src.Project.Manifest
+	client := *m.Client
+	m.Name, client.Name, client.Build = id, display, "."
+	m.Client = &client
+	if err := os.MkdirAll(gameDir, 0o755); err != nil {
+		return nil, err
+	}
+	p := &Project{Dir: gameDir, Manifest: &m, Lock: src.Project.Lock}
+	if err := p.SaveManifest(); err != nil {
+		return nil, err
+	}
+	if err := p.SaveLock(); err != nil {
+		return nil, err
+	}
+	src.Name, src.Source, src.Dir = gameDir, gameDir, gameDir
+	return p, nil
+}
+
 // ModpackKey is the key an instance follows a link's source under: the source manifest's name
 // when the link wrote the entry, and whatever an earlier link or a hand edit chose when it didn't.
 // Empty where no single entry is the link's: with several packs required, none of them is the one.

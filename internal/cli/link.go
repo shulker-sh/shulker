@@ -486,7 +486,9 @@ func (a *app) linkProject(gameDir, id, display string, src *syncSource) (p *proj
 		if !errors.Is(err, project.ErrNoManifest) {
 			return nil, "", err
 		}
-		p, err := authorInstance(gameDir, id, display, src)
+		ls := src.linkSource()
+		p, err := project.AuthorInstance(gameDir, id, display, ls)
+		src.name = ls.Name
 		return p, "", err
 	}
 	if errors.Is(err, project.ErrNoManifest) {
@@ -529,28 +531,6 @@ func (a *app) linkProject(gameDir, id, display string, src *syncSource) (p *proj
 		return p, linked, nil
 	}
 	return p, linked, p.SaveManifest()
-}
-
-// authorInstance writes the project the link's answers describe into the game directory, which
-// from then on is both the instance and the project it builds. It follows nothing, so it syncs from
-// itself, and that is the source its registry row records.
-func authorInstance(gameDir, id, display string, src *syncSource) (*project.Project, error) {
-	m := *src.project.Manifest
-	client := *m.Client
-	m.Name, client.Name, client.Build = id, display, "."
-	m.Client = &client
-	if err := os.MkdirAll(gameDir, 0o755); err != nil {
-		return nil, err
-	}
-	p := &project.Project{Dir: gameDir, Manifest: &m, Lock: src.project.Lock}
-	if err := p.SaveManifest(); err != nil {
-		return nil, err
-	}
-	if err := p.SaveLock(); err != nil {
-		return nil, err
-	}
-	src.name, src.Source, src.Dir = gameDir, gameDir, gameDir
-	return p, nil
 }
 
 // authoredOver refuses to author an instance where a project already stands: there is no pack to
