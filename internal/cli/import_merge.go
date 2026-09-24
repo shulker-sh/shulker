@@ -147,18 +147,27 @@ func readSourcePack(c *pack.Checkout) (*incoming, error) {
 	if err := src.RequireLock(); err != nil {
 		return nil, err
 	}
-	inc := &incoming{manifest: src.Manifest, lock: src.Lock, dir: c.Dir, hasBlocks: true}
+	overrides, err := readOverrideFolders(c.Dir, src.Manifest)
+	if err != nil {
+		return nil, err
+	}
+	return &incoming{manifest: src.Manifest, lock: src.Lock, overrides: overrides, dir: c.Dir, hasBlocks: true}, nil
+}
+
+// readOverrideFolders reads the files in a project's override folders, a feature's included.
+func readOverrideFolders(dir string, m *manifest.Manifest) ([]mrpack.Override, error) {
 	layers := slices.Clone(mrpack.Layers)
-	for _, name := range slices.Sorted(maps.Keys(src.Manifest.Features)) {
-		o := src.Manifest.Features[name].Overrides
+	for _, name := range slices.Sorted(maps.Keys(m.Features)) {
+		o := m.Features[name].Overrides
 		for _, layer := range []string{o.Both, o.Client, o.Server} {
 			if layer != "" && !slices.Contains(layers, layer) {
 				layers = append(layers, layer)
 			}
 		}
 	}
+	var overrides []mrpack.Override
 	for _, layer := range layers {
-		root := filepath.Join(c.Dir, filepath.FromSlash(layer))
+		root := filepath.Join(dir, filepath.FromSlash(layer))
 		err := filepath.WalkDir(root, func(path string, e fs.DirEntry, err error) error {
 			if err != nil || !e.Type().IsRegular() {
 				return err
@@ -171,14 +180,14 @@ func readSourcePack(c *pack.Checkout) (*incoming, error) {
 			if err != nil {
 				return err
 			}
-			inc.overrides = append(inc.overrides, mrpack.Override{Layer: layer, Path: filepath.ToSlash(rel), Data: data})
+			overrides = append(overrides, mrpack.Override{Layer: layer, Path: filepath.ToSlash(rel), Data: data})
 			return nil
 		})
 		if err != nil && !os.IsNotExist(err) {
 			return nil, err
 		}
 	}
-	return inc, nil
+	return overrides, nil
 }
 
 // mergePack merges inc into p within sides: the pack's entries, lock entries, local files and
@@ -237,12 +246,15 @@ func mergePack(p *project.Project, inc *incoming, sides []string) (*mergeReport,
 		if rel == "" {
 			continue
 		}
-		to := filepath.Join(p.Dir, filepath.FromSlash(rel))
-		if _, err := os.Lstat(to); err == nil {
+		from, to := filepath.Join(inc.dir, filepath.FromSlash(rel)), filepath.Join(p.Dir, filepath.FromSlash(rel))
+		if _, err := os.Lstat(to); err == nil || inc.dir == "" {
+			continue
+		}
+		if _, err := os.Stat(from); err != nil {
 			continue
 		}
 		rep.created = append(rep.created, to)
-		if err := copyPath(filepath.Join(inc.dir, filepath.FromSlash(rel)), to); err != nil {
+		if err := copyPath(from, to); err != nil {
 			return rep, err
 		}
 	}

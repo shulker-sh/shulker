@@ -116,13 +116,14 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --side server
 
 ### `shulker import`
 
-Create a project from a modpack. The argument is read in this order:
+Create a project from a modpack, or merge one into the project. The argument is read in this order:
 
+- **A modpack the project requires**, by its key. Its entries become the project's own: every lock entry it provides loses its `modpack` tag and gains a `requires` entry, as `add --with-deps` lists a mod a modpack pinned, and its override files, feature folders and blocks merge as below. Then its `requires` entry and its `modpacks` lock section go, so `update` moves its mods like any other and `remove` takes them out. A locked pack is read as `build` reads it, from the cache, its pinned commit or its cached manifest, so this works offline wherever `build` does; a floating one is taken as it resolves now. Where two packs provide one key, the inlined pack's entry becomes the project's and wins. `--type modpack` insists on this reading and fails with `usage` for anything else.
 - **An existing path.** A file is a modpack archive, its kind read from what it holds, whatever its name: a `modrinth.index.json` makes it a Modrinth pack, a CurseForge `manifest.json` of type `minecraftModpack` a CurseForge one, and anything else fails with `archive-not-modpack`. A folder is a shulker source.
 - **A URL.** A Modrinth or CurseForge page is looked up as a slug is, at the version it names, if any. Any other `http(s)` URL is downloaded into the cache and read as an archive by what it holds; one that isn't an archive, and a `git@`, `ssh://`, `git://` or `file://` URL, is a git source, or a raw manifest source when it ends in `.json`, as `modpack add` reads one. A raw manifest source gets the warning that its overrides didn't come with it.
 - **Anything else** is a modpack slug, looked up as `add --type modpack` looks one up, on the first provider holding it, or the one `--provider` names. It takes the newest `release` version; a specific version is the URL of its page or file. A project that isn't a modpack fails with `type-mismatch`. The archive goes in the cache at its sha512, and one whose author turned third-party downloads off fails with `manual-download`, naming its page: download it into the new project's `downloads/` and run the import again.
 
-`--type mrpack|curseforge|source` refuses anything of another kind with `usage`. `--ref` and `--path` apply to a git source and fail with `source-ref` and `source-path` on anything else, and `--provider` applies to a slug only.
+`--type mrpack|curseforge|source|modpack` refuses anything of another kind with `usage`. `--ref` and `--path` apply to a git source and fail with `source-ref` and `source-path` on anything else, and `--provider` applies to a slug only.
 
 A shulker source is copied: its `shulker.json`, `shulker.lock` and the files beside them, leaving out `.git`, `.shulker`, `build`, `data`, `downloads` and `shulker.local.json`, and the lock is brought in line as `lock` does, reusing each entry that still matches. `--name` renames the copy.
 
@@ -141,13 +142,14 @@ shulker import ~/Downloads/fabulously-optimized.mrpack
 shulker import ~/Downloads/all-the-mods.zip -C all-the-mods
 shulker import pack.mrpack -C my-pack --name my-pack --side client
 shulker import fabulously-optimized
+shulker import base-pack --type modpack
 shulker import https://github.com/friends/pack.git --ref v2 --path packs/survival
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--name <name>` | Project name (default: the modpack name, slugified) |
-| `--type <kind>` | Refuse the modpack unless it is this kind: `mrpack`, `curseforge` or `source` (default: detected) |
+| `--type <kind>` | Refuse the modpack unless it is this kind: `mrpack`, `curseforge`, `source`, or `modpack` for one the project requires (default: detected) |
 | `--provider <name>` | Look a slug up on this provider only: `modrinth` or `curseforge` (default: the first that has it) |
 | `--ref <ref>` | Git ref of a git source (default: the remote HEAD) |
 | `--path <folder>` | Folder of a git source's repository holding its `shulker.json` (default: the root) |

@@ -70,7 +70,7 @@ func (a *app) importCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&f.name, "name", "", "project name (default: the pack name, slugified)")
-	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the modpack unless it is this kind: mrpack, curseforge or source (default: detected)")
+	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the modpack unless it is this kind: mrpack, curseforge, source, or modpack for one the project requires (default: detected)")
 	cmd.Flags().StringVar(&f.provider, "provider", "", "look a slug up on this provider only: modrinth or curseforge (default: the first that has it)")
 	cmd.Flags().StringVar(&f.at.Ref, "ref", "", "git ref of a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&f.at.Path, "path", "", "folder of a git source's repository holding its shulker.json (default: the root)")
@@ -85,7 +85,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 		name, value string
 		allowed     []string
 	}{
-		{"type", f.typ, []string{"mrpack", "curseforge", "source"}},
+		{"type", f.typ, []string{"mrpack", "curseforge", "source", "modpack"}},
 		{"side", f.side, []string{"client", "server"}},
 		{"provider", f.provider, []string{"modrinth", "curseforge"}},
 	} {
@@ -99,6 +99,12 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	}
 	if merging && f.name != "" {
 		return out.Errorf("usage", "--name names a new project, and %s already holds a %s to merge into", dir, manifest.FileName)
+	}
+	if isKey, err := isModpackKey(dir, merging, arg, f.typ); err != nil || isKey {
+		if err != nil {
+			return err
+		}
+		return a.inlineImport(cmd, dir, arg, f)
 	}
 	d, err := a.deps()
 	if err != nil {
