@@ -32,9 +32,8 @@ func TestLockDifferencesIgnoresModpackEntries(t *testing.T) {
 	}
 }
 
-func TestAPinWithNoProviderMatchesTheCurseForgeFileLocked(t *testing.T) {
-	pin := manifest.NewID("", "5000001")
-	locked := manifest.NewID("curseforge", "5000001")
+func TestAPinMatchesTheFileLocked(t *testing.T) {
+	pin, locked := "5000001", "5000001"
 	diffs := ModDifferences(t.TempDir(), "jei", manifest.Require{Pin: pin}, lock.Mod{Provider: "curseforge", Version: locked})
 	diffs = append(diffs, HostedDifferences("pack", manifest.Require{Pin: pin}, lock.Modpack{Provider: "curseforge", Version: locked})...)
 	for _, d := range diffs {

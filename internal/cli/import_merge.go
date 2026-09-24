@@ -102,7 +102,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, in *i
 	summary := plural(len(rep.merged), "entry", "entries") + " merged"
 	if mods != nil {
 		locked := slices.DeleteFunc(slices.Clone(mods.Locked), func(f resolve.LockedFile) bool { return !slices.Contains(rep.merged, f.ID) })
-		summary = lockedSummary(locked)
+		summary = lockedSummary(d.providers, locked)
 	}
 	return a.emitImport(res, out.Row{Text: summary}, rep.overrideRow())
 }
@@ -206,7 +206,7 @@ func mergePack(p *project.Project, inc *incoming, sides []string) (*mergeReport,
 			continue
 		}
 		req := pm.Requires[key]
-		req.Pin = manifest.ID{}
+		req.Pin = ""
 		p.Manifest.Requires[key] = req
 		rep.merged = append(rep.merged, key)
 	}

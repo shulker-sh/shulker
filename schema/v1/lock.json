@@ -123,15 +123,14 @@
     "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
     "modId": { "type": "string", "pattern": "^\\S(.{0,62}\\S)?$" },
     "requireKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
-    "modrinthId": { "type": "string", "pattern": "^[A-Za-z0-9]{8}$" },
-    "curseforgeId": { "type": "integer", "minimum": 1 },
+    "providerId": { "type": "string", "minLength": 1, "description": "A provider's own id for a project or version, as it writes it: base62 for Modrinth, digits for CurseForge." },
     "modpack": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "provider": { "type": "string", "enum": ["modrinth", "curseforge"], "description": "The provider a hosted modpack was locked from. Hosted modpacks only." },
-        "project": { "description": "Provider project id, typed as the provider types it. Hosted modpacks only." },
-        "version": { "description": "Provider version id (Modrinth) or file id (CurseForge). Hosted modpacks only." },
+        "project": { "$ref": "#/$defs/providerId", "description": "Provider project id. Hosted modpacks only." },
+        "version": { "$ref": "#/$defs/providerId", "description": "Provider version id (Modrinth) or file id (CurseForge). Hosted modpacks only." },
         "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed. Hosted modpacks only." },
         "channel": { "type": "string", "enum": ["release", "beta", "alpha"], "description": "Least stable channel accepted when this version was picked. Hosted modpacks only." },
         "url": {
@@ -185,14 +184,6 @@
           }
         },
         {
-          "if": { "properties": { "provider": { "const": "modrinth" } } },
-          "then": { "properties": { "project": { "$ref": "#/$defs/modrinthId" }, "version": { "$ref": "#/$defs/modrinthId" } } }
-        },
-        {
-          "if": { "properties": { "provider": { "const": "curseforge" } } },
-          "then": { "properties": { "project": { "$ref": "#/$defs/curseforgeId" }, "version": { "$ref": "#/$defs/curseforgeId" } } }
-        },
-        {
           "if": { "required": ["source"] },
           "then": {
             "not": { "anyOf": [{ "required": ["sha512"] }, { "required": ["size"] }, { "required": ["unmanaged"] }] },
@@ -209,8 +200,8 @@
       "properties": {
         "file": { "$ref": "#/$defs/relativePath", "description": "A local file: the path shulker.json gives it. Such an entry names no provider, and its sha512 is its identity." },
         "provider": { "type": "string", "enum": ["modrinth", "curseforge"] },
-        "project": { "description": "Provider project id, typed as the provider types it." },
-        "version": { "description": "Provider version id (Modrinth) or file id (CurseForge)." },
+        "project": { "$ref": "#/$defs/providerId", "description": "Provider project id." },
+        "version": { "$ref": "#/$defs/providerId", "description": "Provider version id (Modrinth) or file id (CurseForge)." },
         "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed." },
         "filename": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\]+\\.jar$" },
         "url": {
@@ -238,33 +229,12 @@
         },
         "aliases": {
           "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "modrinth": { "$ref": "#/$defs/modrinthId" },
-            "curseforge": { "$ref": "#/$defs/curseforgeId" }
-          },
-          "description": "The same mod's project id on other providers, discovered on first download."
+          "propertyNames": { "enum": ["modrinth", "curseforge"] },
+          "additionalProperties": { "$ref": "#/$defs/providerId" },
+          "description": "The same mod's project id on other providers, by provider name, discovered on first download."
         }
       },
       "allOf": [
-        {
-          "if": { "properties": { "provider": { "const": "modrinth" } } },
-          "then": {
-            "properties": {
-              "project": { "$ref": "#/$defs/modrinthId" },
-              "version": { "$ref": "#/$defs/modrinthId" }
-            }
-          }
-        },
-        {
-          "if": { "properties": { "provider": { "const": "curseforge" } } },
-          "then": {
-            "properties": {
-              "project": { "$ref": "#/$defs/curseforgeId" },
-              "version": { "$ref": "#/$defs/curseforgeId" }
-            }
-          }
-        },
         {
           "if": { "required": ["file"] },
           "then": {
@@ -287,8 +257,8 @@
       "properties": {
         "file": { "$ref": "#/$defs/relativePath", "description": "A local file: the path shulker.json gives it. Such an entry names no provider, and its sha512 is its identity." },
         "provider": { "type": "string", "enum": ["modrinth", "curseforge"] },
-        "project": { "description": "Provider project id, typed as the provider types it." },
-        "version": { "description": "Provider version id (Modrinth) or file id (CurseForge)." },
+        "project": { "$ref": "#/$defs/providerId", "description": "Provider project id." },
+        "version": { "$ref": "#/$defs/providerId", "description": "Provider version id (Modrinth) or file id (CurseForge)." },
         "versionNumber": { "type": "string", "minLength": 1, "description": "Provider display string. Never parsed." },
         "filename": {
           "type": "string",
@@ -327,24 +297,6 @@
         "resourcepack": { "type": "boolean", "description": "Datapacks only: the manifest's resourcepack, placing the zip in resourcepacks/ on the client as well." }
       },
       "allOf": [
-        {
-          "if": { "properties": { "provider": { "const": "modrinth" } } },
-          "then": {
-            "properties": {
-              "project": { "$ref": "#/$defs/modrinthId" },
-              "version": { "$ref": "#/$defs/modrinthId" }
-            }
-          }
-        },
-        {
-          "if": { "properties": { "provider": { "const": "curseforge" } } },
-          "then": {
-            "properties": {
-              "project": { "$ref": "#/$defs/curseforgeId" },
-              "version": { "$ref": "#/$defs/curseforgeId" }
-            }
-          }
-        },
         {
           "if": { "required": ["file"] },
           "then": {

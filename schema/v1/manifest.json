@@ -166,18 +166,14 @@
       "description": "In-jar mod id as declared in fabric.mod.json, quilt.mod.json, neoforge.mods.toml, mods.toml, or for Forge before 1.13 the @Mod annotation, a coremod container, an @API package or mcmod.info, which allow capitals, spaces and punctuation."
     },
     "projectId": {
-      "description": "Provider project id. Modrinth ids are base62 strings, CurseForge ids are integers.",
-      "oneOf": [
-        { "type": "string", "pattern": "^[A-Za-z0-9]{8}$" },
-        { "type": "integer", "minimum": 1 }
-      ]
+      "type": "string",
+      "minLength": 1,
+      "description": "Provider project id, as the provider writes it: base62 for Modrinth, digits for CurseForge."
     },
     "versionId": {
-      "description": "Provider version id. Modrinth version ids are base62 strings, CurseForge file ids are integers.",
-      "oneOf": [
-        { "type": "string", "pattern": "^[A-Za-z0-9]{8}$" },
-        { "type": "integer", "minimum": 1 }
-      ]
+      "type": "string",
+      "minLength": 1,
+      "description": "Provider version id, as the provider writes it: a base62 version id for Modrinth, a file id in digits for CurseForge."
     },
     "side": {
       "type": "string",

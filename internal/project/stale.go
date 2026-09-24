@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
@@ -154,7 +153,7 @@ func HostedDifferences(name string, e manifest.Require, lp lock.Modpack) []strin
 	if channel != lp.Channel {
 		diffs = append(diffs, fmt.Sprintf("pack %s: channel %s -> %s", name, lp.Channel, channel))
 	}
-	if !e.Pin.IsZero() && e.Pin.For(lp.Provider) != lp.Version {
+	if e.Pin != "" && e.Pin != lp.Version {
 		diffs = append(diffs, fmt.Sprintf("pack %s: pinned to %v, locked %v", name, e.Pin, lp.Version))
 	}
 	return diffs
@@ -205,7 +204,7 @@ func ZipEntryDifferences(dir, key string, e manifest.Require, lp lock.Pack) []st
 	if channel != lp.Channel {
 		diffs = append(diffs, fmt.Sprintf("%s: channel %s -> %s", key, lp.Channel, channel))
 	}
-	if !e.Pin.IsZero() && e.Pin.For(lp.Provider) != lp.Version {
+	if e.Pin != "" && e.Pin != lp.Version {
 		diffs = append(diffs, fmt.Sprintf("%s: pinned to %v, locked %v", key, e.Pin, lp.Version))
 	}
 	if name := e.Provider; name != "" && name != lp.Provider {
@@ -227,7 +226,7 @@ func ModDifferences(dir, id string, e manifest.Require, lm lock.Mod) []string {
 	if channel != lm.Channel {
 		diffs = append(diffs, fmt.Sprintf("%s: channel %s -> %s", id, lm.Channel, channel))
 	}
-	if !e.Pin.IsZero() && e.Pin.For(lm.Provider) != lm.Version {
+	if e.Pin != "" && e.Pin != lm.Version {
 		diffs = append(diffs, fmt.Sprintf("%s: pinned to %v, locked %v", id, e.Pin, lm.Version))
 	}
 	if e.Side != "" && e.Side != lm.Side {
@@ -241,7 +240,7 @@ func ModDifferences(dir, id string, e manifest.Require, lm lock.Mod) []string {
 	switch {
 	case !ok:
 		diffs = append(diffs, fmt.Sprintf("%s: provider %s -> %s", id, lm.Provider, provider))
-	case !e.Project.IsZero() && e.Project.String() != project:
+	case e.Project != "" && e.Project != project:
 		diffs = append(diffs, fmt.Sprintf("%s: project %s -> %v", id, project, e.Project))
 	}
 	return diffs
@@ -319,15 +318,11 @@ func FileGone(key, rel string) string {
 }
 
 func lockedProject(lm lock.Mod, provider string) (string, bool) {
-	switch {
-	case provider == lm.Provider:
-		return lm.Project.String(), true
-	case provider == "modrinth" && lm.Aliases.Modrinth != "":
-		return lm.Aliases.Modrinth, true
-	case provider == "curseforge" && lm.Aliases.CurseForge != 0:
-		return strconv.Itoa(lm.Aliases.CurseForge), true
+	if provider == lm.Provider {
+		return lm.Project, true
 	}
-	return "", false
+	alias, ok := lm.Aliases[provider]
+	return alias, ok && alias != ""
 }
 
 func minecraftMatches(raw, id string) bool {

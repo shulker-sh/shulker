@@ -75,12 +75,12 @@ func TestHostedModpackAddLocksAndBuilds(t *testing.T) {
 	h.mustRun(t, "add", "cozy")
 
 	entry := h.readManifest(t).Requires["cozy"]
-	if entry.Type != "modpack" || entry.Provider != "modrinth" || entry.Project.String() != "COZYpack" || entry.Source != "" || entry.File != "" {
+	if entry.Type != "modpack" || entry.Provider != "modrinth" || entry.Project != "COZYpack" || entry.Source != "" || entry.File != "" {
 		t.Fatalf("manifest entry: %+v", entry)
 	}
 	l := h.readLock(t)
 	mp := l.Modpacks["cozy"]
-	if mp.Provider != "modrinth" || mp.Project.String() != "COZYpack" || mp.Version.String() != "cozyV100" || mp.VersionNumber != "1.0.0" || mp.Channel != "release" ||
+	if mp.Provider != "modrinth" || mp.Project != "COZYpack" || mp.Version != "cozyV100" || mp.VersionNumber != "1.0.0" || mp.Channel != "release" ||
 		mp.URL == nil || mp.Filename != "cozy-1.0.0.mrpack" || mp.Sha512 != archive.sha512 || mp.Size != int64(len(archive.data)) || !mp.UsesLock || mp.Source != "" {
 		t.Fatalf("modpack lock entry: %+v", mp)
 	}
@@ -114,11 +114,11 @@ func TestHostedModpackSyncsOffline(t *testing.T) {
 	next := hostedMrpack(t, h, "cozy-2.0.0.mrpack", "2.0.0")
 	h.modrinthPacks["COZYpack"].versions = append(h.modrinthPacks["COZYpack"].versions, modrinthPackVersion{id: "cozyV200", number: "2.0.0", published: "2026-09-05T00:00:00Z", archive: next})
 	h.mustRun(t, "sync", "--offline")
-	if after := h.readLock(t).Modpacks["cozy"]; after.Version.String() != "cozyV100" {
+	if after := h.readLock(t).Modpacks["cozy"]; after.Version != "cozyV100" {
 		t.Fatalf("an offline sync keeps the locked version: %+v", after)
 	}
 	h.mustRun(t, "sync")
-	if after := h.readLock(t).Modpacks["cozy"]; after.Version.String() != "cozyV100" {
+	if after := h.readLock(t).Modpacks["cozy"]; after.Version != "cozyV100" {
 		t.Fatalf("sync never moves a hosted modpack: %+v", after)
 	}
 	h.editManifest(t, func(m map[string]any) {
@@ -154,11 +154,11 @@ func TestHostedModpackUpdatesLikeAMod(t *testing.T) {
 		t.Fatalf("outdated reports the modpack:\n%s", got)
 	}
 	h.mustRun(t, "pin", "cozy")
-	if pin := h.readManifest(t).Requires["cozy"].Pin; pin.String() != "cozyV100" {
+	if pin := h.readManifest(t).Requires["cozy"].Pin; pin != "cozyV100" {
 		t.Fatalf("pin holds the locked version: %v", pin)
 	}
 	h.mustRun(t, "update")
-	if v := h.readLock(t).Modpacks["cozy"].Version; v.String() != "cozyV100" {
+	if v := h.readLock(t).Modpacks["cozy"].Version; v != "cozyV100" {
 		t.Fatalf("update leaves a pinned modpack: %v", v)
 	}
 	if got := h.mustRun(t, "outdated", "cozy"); !strings.Contains(got, "(modpack, pinned)") {
@@ -166,7 +166,7 @@ func TestHostedModpackUpdatesLikeAMod(t *testing.T) {
 	}
 	h.mustRun(t, "unpin", "cozy")
 	l := h.readLock(t)
-	if mp := l.Modpacks["cozy"]; mp.Version.String() != "cozyV200" || mp.Sha512 != next.sha512 {
+	if mp := l.Modpacks["cozy"]; mp.Version != "cozyV200" || mp.Sha512 != next.sha512 {
 		t.Fatalf("unpin moves the modpack to its newest version: %+v", mp)
 	}
 	h.mustRun(t, "install")
@@ -175,24 +175,24 @@ func TestHostedModpackUpdatesLikeAMod(t *testing.T) {
 		t.Fatalf("the build lays the new version's overrides: %q %v", data, err)
 	}
 	h.mustRun(t, "pin", "cozy", "cozyV100")
-	if v := h.readLock(t).Modpacks["cozy"].Version; v.String() != "cozyV100" {
+	if v := h.readLock(t).Modpacks["cozy"].Version; v != "cozyV100" {
 		t.Fatalf("pin to a version locks it: %v", v)
 	}
 	h.mustRun(t, "unpin", "cozy")
 	h.mustRun(t, "lock")
-	if v := h.readLock(t).Modpacks["cozy"].Version; v.String() != "cozyV200" {
+	if v := h.readLock(t).Modpacks["cozy"].Version; v != "cozyV200" {
 		t.Fatalf("unpin locks the newest version: %v", v)
 	}
 	third := hostedMrpack(t, h, "cozy-3.0.0.mrpack", "3.0.0")
 	cozy.versions = append(cozy.versions, modrinthPackVersion{id: "cozyV300", number: "3.0.0", published: "2026-09-09T00:00:00Z", archive: third})
 	h.mustRun(t, "lock")
-	if v := h.readLock(t).Modpacks["cozy"].Version; v.String() != "cozyV200" {
+	if v := h.readLock(t).Modpacks["cozy"].Version; v != "cozyV200" {
 		t.Fatalf("lock keeps the locked version: %v", v)
 	}
 	if got := h.mustRun(t, "update"); !strings.Contains(got, "3.0.0") {
 		t.Fatalf("update reports the modpack moving:\n%s", got)
 	}
-	if v := h.readLock(t).Modpacks["cozy"].Version; v.String() != "cozyV300" {
+	if v := h.readLock(t).Modpacks["cozy"].Version; v != "cozyV300" {
 		t.Fatalf("update moves an unpinned modpack: %v", v)
 	}
 }
@@ -218,7 +218,7 @@ func TestHostedModpackRefusesSourceFlags(t *testing.T) {
 		t.Fatal("a refused add writes nothing")
 	}
 	h.mustRun(t, "modpack", "add", "cozy", "--channel", "beta", "--as", "snug")
-	if entry := h.readManifest(t).Requires["snug"]; entry.Channel != "beta" || entry.Project.String() != "COZYpack" {
+	if entry := h.readManifest(t).Requires["snug"]; entry.Channel != "beta" || entry.Project != "COZYpack" {
 		t.Fatalf("modpack add takes a slug with --channel and --as: %+v", entry)
 	}
 }

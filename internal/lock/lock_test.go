@@ -25,7 +25,7 @@ func TestRoundTrip(t *testing.T) {
 	if again.Mods["betterthirdperson"].URL != nil || again.Mods["betterthirdperson"].Page == "" {
 		t.Fatal("null url and page must survive a round trip")
 	}
-	if again.Mods["appleskin"].Aliases.CurseForge != 248787 {
+	if again.Mods["appleskin"].Aliases["curseforge"] != "248787" {
 		t.Fatal("aliases must survive a round trip")
 	}
 }
@@ -149,7 +149,7 @@ func TestHostedModpackEntries(t *testing.T) {
 		return []byte(`{"$schema":"https://shulker.sh/schema/v1/lock.json","minecraft":"26.2","loader":{"type":"fabric","version":"0.17.3"},"java":{"major":25,"component":"java-runtime-epsilon"},` +
 			`"modpacks":{"cozy":{` + modpack + `}},"mods":{},"resourcepacks":{},"shaders":{},"datapacks":{},"players":[]}`)
 	}
-	identity := `"provider":"curseforge","project":600001,"version":7000001,"versionNumber":"Cozy 2.0","channel":"release","filename":"cozy-2.0.zip","sha512":"` + sha + `","size":10,"locked":true`
+	identity := `"provider":"curseforge","project":"600001","version":"7000001","versionNumber":"Cozy 2.0","channel":"release","filename":"cozy-2.0.zip","sha512":"` + sha + `","size":10,"locked":true`
 	hosted := identity + `,"url":"https://edge.forgecdn.net/files/cozy-2.0.zip"`
 	l, err := Parse(doc(hosted))
 	if err != nil {

@@ -67,7 +67,7 @@ func TestImportMergeKeepsTheProjectsVersion(t *testing.T) {
 		t.Fatalf("sodium not merged: %+v", l.Mods["sodium"])
 	}
 	entry, ok := h.readManifest(t).Requires["sodium"]
-	if !ok || !entry.Pin.IsZero() {
+	if !ok || entry.Pin != "" {
 		t.Fatalf("sodium entry: %+v %v", entry, ok)
 	}
 	if code, stdout, _ := h.run(t, "--json", "import", archive, "--name", "x"); code == 0 || failureCode(t, stdout).Code != "usage" {

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -78,7 +77,7 @@ func TestADependencyAlreadyLockedKeepsItsVersion(t *testing.T) {
 
 	l := h.readLock(t)
 	framework := l.Mods["framework"]
-	if framework.Version != manifest.NewID("curseforge", "5600001") || !strings.Contains(strings.Join(framework.RequiredBy, ","), "goblintraders") {
+	if framework.Version != "5600001" || !strings.Contains(strings.Join(framework.RequiredBy, ","), "goblintraders") {
 		t.Fatalf("framework should stay at its pinned file and gain goblintraders: %+v", framework)
 	}
 	if _, ok := l.Mods["framework-fabric"]; ok {
@@ -108,7 +107,7 @@ func TestAModpackMemberPinnedToABetaFileLeavesTheLockCurrent(t *testing.T) {
 	h := newHarness(t)
 	betaDependency(t, h)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"framework": {"provider": "curseforge", "project": 667391, "pin": 5600001}`, nil)
+	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"framework": {"provider": "curseforge", "project": "667391", "pin": "5600001"}`, nil)
 
 	h.mustRun(t, "modpack", "add", "./base", "--unlocked")
 

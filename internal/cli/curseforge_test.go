@@ -284,14 +284,14 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	}
 	l := h.readLock(t)
 	jei := l.Mods["jei"]
-	if jei.Provider != "curseforge" || jei.Project != manifest.NewID("curseforge", "238222") || jei.Version != manifest.NewID("curseforge", "5000001") || jei.Sha512 != h.jars["jei"].sha512 || jei.Size != int64(len(h.jars["jei"].data)) || jei.URL == nil || jei.Page != "" || jei.Side != "both" {
+	if jei.Provider != "curseforge" || jei.Project != "238222" || jei.Version != "5000001" || jei.Sha512 != h.jars["jei"].sha512 || jei.Size != int64(len(h.jars["jei"].data)) || jei.URL == nil || jei.Page != "" || jei.Side != "both" {
 		t.Fatalf("jei lock entry: %+v", jei)
 	}
 	if dep := l.Mods["fabric-api"]; dep.Provider != "curseforge" || dep.RequiredBy[0] != "jei" {
 		t.Fatalf("fabric-api lock entry: %+v", dep)
 	}
 	m := h.readManifest(t)
-	if entry := m.Mods()["jei"]; entry.Project != manifest.NewID("curseforge", "238222") || entry.Provider != "curseforge" {
+	if entry := m.Mods()["jei"]; entry.Project != "238222" || entry.Provider != "curseforge" {
 		t.Fatalf("jei manifest entry: %+v", entry)
 	}
 	h.mustRun(t, "install")
@@ -305,14 +305,14 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 		t.Fatalf("outdated: %s", stdout)
 	}
 	h.mustRun(t, "update")
-	if v := h.readLock(t).Mods["jei"].Version; v != manifest.NewID("curseforge", "5000002") {
+	if v := h.readLock(t).Mods["jei"].Version; v != "5000002" {
 		t.Fatalf("update left version %s", v)
 	}
 	h.mustRun(t, "pin", "jei", "5000001")
-	if pin := h.readManifest(t).Mods()["jei"].Pin; pin != manifest.NewID("curseforge", "5000001") {
+	if pin := h.readManifest(t).Mods()["jei"].Pin; pin != "5000001" {
 		t.Fatalf("pin: %v", pin)
 	}
-	if v := h.readLock(t).Mods["jei"].Version; v != manifest.NewID("curseforge", "5000001") {
+	if v := h.readLock(t).Mods["jei"].Version; v != "5000001" {
 		t.Fatalf("pin left version %s", v)
 	}
 
@@ -343,7 +343,7 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 		t.Fatalf("add via curseforge: %s", stdout)
 	}
 	sodium := h.readLock(t).Mods["sodium"]
-	if sodium.Provider != "curseforge" || sodium.Aliases.Modrinth != "AANobbMI" || sodium.Aliases.CurseForge != 0 {
+	if sodium.Provider != "curseforge" || sodium.Aliases["modrinth"] != "AANobbMI" || sodium.Aliases["curseforge"] != "" {
 		t.Fatalf("switched entry: %+v", sodium)
 	}
 	if by := h.readLock(t).Mods["fabric-api"].RequiredBy; len(by) != 1 || by[0] != "sodium" {
@@ -353,7 +353,7 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 		Mods map[string]map[string]any `json:"requires"`
 	}
 	h.readJSON(t, "shulker.json", &m)
-	if m.Mods["sodium"]["provider"] != "curseforge" || m.Mods["sodium"]["project"] != float64(394468) {
+	if m.Mods["sodium"]["provider"] != "curseforge" || m.Mods["sodium"]["project"] != "394468" {
 		t.Fatalf("manifest after switch: %v", m.Mods["sodium"])
 	}
 	stdout = h.mustRun(t, "add", "sodium", "--provider", "modrinth")
@@ -361,7 +361,7 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 		t.Fatalf("switch back: %s", stdout)
 	}
 	sodium = h.readLock(t).Mods["sodium"]
-	if sodium.Provider != "modrinth" || sodium.Aliases.CurseForge != 394468 || sodium.Aliases.Modrinth != "" {
+	if sodium.Provider != "modrinth" || sodium.Aliases["curseforge"] != "394468" || sodium.Aliases["modrinth"] != "" {
 		t.Fatalf("switched back entry: %+v", sodium)
 	}
 	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth ⟶ curseforge") {

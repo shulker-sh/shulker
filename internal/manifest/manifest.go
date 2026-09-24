@@ -263,8 +263,8 @@ type Require struct {
 	Filename   string `json:"filename,omitempty"`
 	// ResourcePack also places a datapack's zip in resourcepacks/, for a hybrid carrying assets/.
 	ResourcePack bool       `json:"resourcepack,omitempty"`
-	Project      ID         `json:"project,omitzero"`
-	Pin          ID         `json:"pin,omitzero"`
+	Project      string     `json:"project,omitempty"`
+	Pin          string     `json:"pin,omitempty"`
 	Channel      string     `json:"channel,omitempty"`
 	Side         string     `json:"side,omitempty"`
 	Provider     string     `json:"provider,omitempty"`
@@ -389,12 +389,6 @@ func Parse(data []byte) (*Manifest, error) {
 	}
 	if m.Requires == nil {
 		m.Requires = map[string]Require{}
-	}
-	for key, r := range m.Requires {
-		if r.Provider != "" {
-			r.Project, r.Pin = r.Project.For(r.Provider), r.Pin.For(r.Provider)
-			m.Requires[key] = r
-		}
 	}
 	if err := m.check(); err != nil {
 		return nil, err

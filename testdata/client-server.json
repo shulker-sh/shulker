@@ -15,7 +15,7 @@
     "appleskin": { "side": "both" },
     "betterthirdperson": {
       "provider": "curseforge",
-      "project": 355424,
+      "project": "355424",
       "side": "client"
     }
   },

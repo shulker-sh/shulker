@@ -109,15 +109,15 @@ Type: `string`. pattern `^\S(.{0,62}\S)?$`
 
 ### projectId
 
-Provider project id. Modrinth ids are base62 strings, CurseForge ids are integers.
+Provider project id, as the provider writes it: base62 for Modrinth, digits for CurseForge.
 
-Type: `string` \| `integer`
+Type: `string`. min length 1
 
 ### versionId
 
-Provider version id. Modrinth version ids are base62 strings, CurseForge file ids are integers.
+Provider version id, as the provider writes it: a base62 version id for Modrinth, a file id in digits for CurseForge.
 
-Type: `string` \| `integer`
+Type: `string`. min length 1
 
 ### side
 

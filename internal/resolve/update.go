@@ -133,7 +133,7 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 			continue
 		}
 		entry := r.Manifest.Mods()[id]
-		res = append(res, Outdated{ID: id, Current: m.VersionNumber, Latest: newest.Number, Pinned: !entry.Pin.IsZero()})
+		res = append(res, Outdated{ID: id, Current: m.VersionNumber, Latest: newest.Number, Pinned: entry.Pin != ""})
 	}
 	if res == nil {
 		res = []Outdated{}
@@ -154,10 +154,10 @@ func (r *Resolver) Pin(ctx context.Context, id string, version string) (string, 
 		return "", err
 	}
 	if version == "" {
-		version = r.Lock.Mods[id].Version.String()
+		version = r.Lock.Mods[id].Version
 	}
 	entry := r.Manifest.Mods()[id]
-	entry.Pin = manifest.NewID(r.Lock.Mods[id].Provider, version)
+	entry.Pin = version
 	r.Manifest.Requires[id] = entry
 	return version, r.Update(ctx, []string{id})
 }
@@ -174,10 +174,10 @@ func (r *Resolver) Unpin(ctx context.Context, id string) error {
 		return err
 	}
 	entry := r.Manifest.Mods()[id]
-	if entry.Pin.IsZero() {
+	if entry.Pin == "" {
 		return out.Errorf("not-pinned", "%s is not pinned", id)
 	}
-	entry.Pin = manifest.ID{}
+	entry.Pin = ""
 	r.Manifest.Requires[id] = entry
 	return r.Update(ctx, []string{id})
 }
@@ -208,14 +208,14 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 		return err
 	}
 	key := id
-	if !entry.Project.IsZero() {
-		key = entry.Project.String()
+	if entry.Project != "" {
+		key = entry.Project
 	}
 	proj, err := p.Project(ctx, key, "")
 	if err != nil {
 		return err
 	}
-	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), entry.Pin.String(), entry.Channel)
+	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
 		return err
 	}

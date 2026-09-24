@@ -82,7 +82,7 @@ func inlined(p *project.Project, loaded *pack.Loaded) (*incoming, error) {
 		_, own := p.Manifest.Requires[id]
 		return modpack == key || (!own && slices.Contains(requiredBy, key))
 	}
-	entry := func(id, kind string, project manifest.ID, providerName string) manifest.Require {
+	entry := func(id, kind string, project, providerName string) manifest.Require {
 		req, ok := loaded.Manifest.Requires[id]
 		if !ok {
 			req = manifest.Require{}
@@ -90,8 +90,8 @@ func inlined(p *project.Project, loaded *pack.Loaded) (*incoming, error) {
 				req.Type = kind
 			}
 		}
-		req.Pin = manifest.ID{}
-		if !project.IsZero() {
+		req.Pin = ""
+		if project != "" {
 			req.Project = project
 			req.Provider = ""
 			if providerName != "" && providerName != p.Manifest.ProviderOrder()[0] {

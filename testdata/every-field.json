@@ -39,7 +39,7 @@
       "feature": ["fancy", "!shaders"],
       "note": "mod"
     },
-    "jei": { "project": 238222, "pin": 5101366, "provider": "curseforge", "os": ["macos", "!linux"] }
+    "jei": { "project": "238222", "pin": "5101366", "provider": "curseforge", "os": ["macos", "!linux"] }
   },
   "ignore": [
     { "rule": "depends", "mod": "sodium", "on": "minecraft", "declared": ">=26.3", "note": "works" }
