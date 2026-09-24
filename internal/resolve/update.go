@@ -323,3 +323,16 @@ func channelRank(channel string) int {
 	}
 	return 0
 }
+
+// SplitLocalFiles takes the local files out of the named entries, since no provider has a newer
+// version of one.
+func SplitLocalFiles(m *manifest.Manifest, keys []string) (local, rest []string) {
+	for _, key := range keys {
+		if m.IsLocalFile(key) {
+			local = append(local, key)
+			continue
+		}
+		rest = append(rest, key)
+	}
+	return local, rest
+}

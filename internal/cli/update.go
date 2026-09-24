@@ -28,12 +28,12 @@ func (a *app) updateCmd() *cobra.Command {
 			plan := relockPlan{
 				buildsInPlace: true,
 				local: func(m *manifest.Manifest) []string {
-					local, _ := splitLocalFiles(m, args)
+					local, _ := resolve.SplitLocalFiles(m, args)
 					return local
 				},
 			}
 			return a.relock(cmd, plan, func(p *project.Project, r *resolve.Resolver) (string, error) {
-				local, args := splitLocalFiles(p.Manifest, args)
+				local, args := resolve.SplitLocalFiles(p.Manifest, args)
 				if len(local) > 0 && len(args) == 0 {
 					return "", nil
 				}
@@ -344,7 +344,7 @@ func (a *app) outdatedCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			local, rest := splitLocalFiles(p.Manifest, args)
+			local, rest := resolve.SplitLocalFiles(p.Manifest, args)
 			res := []resolve.Outdated{}
 			if len(local) == 0 || len(rest) > 0 {
 				if res, err = r.Outdated(cmd.Context(), rest); err != nil {
@@ -373,19 +373,6 @@ func (a *app) outdatedCmd() *cobra.Command {
 			})
 		},
 	}
-}
-
-// splitLocalFiles takes the local files out of the named entries, since no provider has a newer
-// version of one.
-func splitLocalFiles(m *manifest.Manifest, args []string) (local, rest []string) {
-	for _, arg := range args {
-		if m.IsLocalFile(arg) {
-			local = append(local, arg)
-			continue
-		}
-		rest = append(rest, arg)
-	}
-	return local, rest
 }
 
 func printLocalFiles(l *out.Lines, local []string) {
