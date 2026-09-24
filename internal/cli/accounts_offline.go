@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
@@ -27,7 +26,7 @@ func (a *app) accountsAddCmd() *cobra.Command {
 			if !allowInvalid && !player.IsName(name) {
 				e := out.Errorf("account-name-invalid", "%q is not a Minecraft username", name)
 				e.Rows = []out.Detail{{Label: "Wants", Text: "3 to 16 letters, digits or underscores"}}
-				e.Nudge = out.Nudge{Lead: "Use it anyway", Command: "shulker accounts add " + quoteName(name) + " --allow-invalid-name"}
+				e.Nudge = out.Nudge{Lead: "Use it anyway", Command: "shulker accounts add " + account.QuoteName(name) + " --allow-invalid-name"}
 				return e
 			}
 			id := account.OfflineUUID(name)
@@ -48,7 +47,7 @@ func (a *app) accountsAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := freeToCreate(accounts, store, name, id, force); err != nil {
+			if err := account.FreeToCreate(accounts, store, name, id, force); err != nil {
 				return err
 			}
 			created := account.NewOffline(name, id)
@@ -148,59 +147,6 @@ func unprovenOwnership(what string, nudge out.Nudge) error {
 	e := out.Errorf("ownership-unproven", "shulker can see no account that owns Minecraft: Java Edition, so it won't %s", what)
 	e.Nudge = nudge
 	return e
-}
-
-// freeToCreate is what an offline account may not be: an id another account already has, which is
-// what shulker's own file is keyed by and so is refused however hard a run insists, or — without
-// --force — a name someone else already answers to.
-func freeToCreate(accounts []account.Resolved, store account.Store, name, id string, force bool) error {
-	if have, taken := playsUnder(accounts, store, id); taken {
-		e := out.Errorf("account-exists", "%s already plays under %s, and two accounts can't share a uuid", have, id)
-		e.Nudge = out.Nudge{Lead: "Give the new account its own uuid", Command: "shulker accounts add " + quoteName(name) + " --force --uuid <uuid>"}
-		return e
-	}
-	if force {
-		return nil
-	}
-	for _, r := range accounts {
-		if !strings.EqualFold(r.Name, name) {
-			continue
-		}
-		e := out.Errorf("account-exists", "%s is already %s", name, whereItCameFrom(r))
-		e.Rows = []out.Detail{{Label: "Have", Text: r.Qualifier() + " — " + r.ID}}
-		e.Nudge = out.Nudge{Lead: "Create a second account with that name", Command: "shulker accounts add " + quoteName(name) + " --force --uuid <uuid>"}
-		return e
-	}
-	return nil
-}
-
-// playsUnder names whoever already has an id. Shulker's own file is searched beside the accounts
-// the providers yield, because storing an account is keyed by id: one the configured providers
-// don't read back would be replaced rather than added.
-func playsUnder(accounts []account.Resolved, store account.Store, id string) (string, bool) {
-	for _, r := range accounts {
-		if account.SameID(r.ID, id) {
-			return r.Name, true
-		}
-	}
-	for _, have := range store.Accounts {
-		if account.SameID(have.ID(), id) {
-			return have.Name(), true
-		}
-	}
-	return "", false
-}
-
-// whereItCameFrom names an account the way a clash has to explain it: what is already there is
-// either a sign-in, an offline account or another launcher's.
-func whereItCameFrom(r account.Resolved) string {
-	switch r.Source {
-	case account.SourceShulker:
-		return "signed in"
-	case account.SourceOffline:
-		return "an offline account"
-	}
-	return "borrowed from " + r.Source
 }
 
 // notOfflineAccount is what `accounts remove` says about an account it doesn't delete, naming the

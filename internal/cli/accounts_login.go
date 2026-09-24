@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -344,16 +343,7 @@ func ownAccountOf(a account.Account) account.Resolved {
 }
 
 // accountSelector names an account the way it has to be typed back.
-func accountSelector(r account.Resolved) string { return quoteName(r.Name) }
-
-// quoteName quotes a name a shell would otherwise split: a gamertag may hold spaces, and so may an
-// offline name created with --allow-invalid-name.
-func quoteName(name string) string {
-	if strings.ContainsAny(name, " \t") {
-		return `"` + name + `"`
-	}
-	return name
-}
+func accountSelector(r account.Resolved) string { return account.QuoteName(r.Name) }
 
 // renewFailed is one account's failure as a warning, with the line that fixes it, since a refresh
 // of several accounts carries on past the ones it can't renew.

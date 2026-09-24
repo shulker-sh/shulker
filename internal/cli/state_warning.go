@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
@@ -57,7 +58,7 @@ func (a *app) forceCommand(p *project.Project, side, dir string) string {
 			}
 		}
 	}
-	return "shulker sync --into " + quoteName(dir) + " --force"
+	return "shulker sync --into " + account.QuoteName(dir) + " --force"
 }
 
 // warnKeptConflicts warns about the files a launch kept as the player had them, where the pack
@@ -85,7 +86,7 @@ func (a *app) warnKeptConflicts(kept []string, p *project.Project, side, dir str
 func rerunForced(cmd *cobra.Command, args []string) string {
 	parts := []string{cmd.CommandPath()}
 	for _, arg := range args {
-		parts = append(parts, quoteName(arg))
+		parts = append(parts, account.QuoteName(arg))
 	}
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 		switch f.Name {
@@ -98,7 +99,7 @@ func rerunForced(cmd *cobra.Command, args []string) string {
 		}
 		if items, ok := f.Value.(pflag.SliceValue); ok {
 			for _, item := range items.GetSlice() {
-				parts = append(parts, name, quoteName(item))
+				parts = append(parts, name, account.QuoteName(item))
 			}
 			return
 		}
@@ -109,7 +110,7 @@ func rerunForced(cmd *cobra.Command, args []string) string {
 			parts = append(parts, name)
 			return
 		}
-		parts = append(parts, name, quoteName(f.Value.String()))
+		parts = append(parts, name, account.QuoteName(f.Value.String()))
 	})
 	return strings.Join(append(parts, "--force"), " ")
 }

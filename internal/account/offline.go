@@ -3,6 +3,9 @@ package account
 import (
 	"crypto/md5"
 	"fmt"
+	"strings"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 // OfflineUUID is the UUID an offline-mode host derives for a name: Java's type 3 UUID over
@@ -36,4 +39,66 @@ func OwnsTheGame(accounts []Resolved) bool {
 		}
 	}
 	return false
+}
+
+// FreeToCreate is what an offline account may not be: an id another account already has, which is
+// what shulker's own file is keyed by and so is refused however hard a run insists, or, without
+// force, a name someone else already answers to.
+func FreeToCreate(accounts []Resolved, store Store, name, id string, force bool) error {
+	if have, taken := playsUnder(accounts, store, id); taken {
+		e := out.Errorf("account-exists", "%s already plays under %s, and two accounts can't share a uuid", have, id)
+		e.Nudge = out.Nudge{Lead: "Give the new account its own uuid", Command: "shulker accounts add " + QuoteName(name) + " --force --uuid <uuid>"}
+		return e
+	}
+	if force {
+		return nil
+	}
+	for _, r := range accounts {
+		if !strings.EqualFold(r.Name, name) {
+			continue
+		}
+		e := out.Errorf("account-exists", "%s is already %s", name, whereItCameFrom(r))
+		e.Rows = []out.Detail{{Label: "Have", Text: r.Qualifier() + " — " + r.ID}}
+		e.Nudge = out.Nudge{Lead: "Create a second account with that name", Command: "shulker accounts add " + QuoteName(name) + " --force --uuid <uuid>"}
+		return e
+	}
+	return nil
+}
+
+// playsUnder names whoever already has an id. Shulker's own file is searched beside the accounts
+// the providers yield, because storing an account is keyed by id: one the configured providers
+// don't read back would be replaced rather than added.
+func playsUnder(accounts []Resolved, store Store, id string) (string, bool) {
+	for _, r := range accounts {
+		if SameID(r.ID, id) {
+			return r.Name, true
+		}
+	}
+	for _, have := range store.Accounts {
+		if SameID(have.ID(), id) {
+			return have.Name(), true
+		}
+	}
+	return "", false
+}
+
+// whereItCameFrom names an account the way a clash has to explain it: what is already there is
+// either a sign-in, an offline account or another launcher's.
+func whereItCameFrom(r Resolved) string {
+	switch r.Source {
+	case SourceShulker:
+		return "signed in"
+	case SourceOffline:
+		return "an offline account"
+	}
+	return "borrowed from " + r.Source
+}
+
+// QuoteName quotes a name a shell would otherwise split: a gamertag may hold spaces, and so may an
+// offline name created with --allow-invalid-name.
+func QuoteName(name string) string {
+	if strings.ContainsAny(name, " \t") {
+		return `"` + name + `"`
+	}
+	return name
 }
