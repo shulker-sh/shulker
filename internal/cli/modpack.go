@@ -241,7 +241,7 @@ func (a *app) lockHostedEntry(ctx context.Context, p *project.Project, r *resolv
 	if err := r.RefreshPacks(packs); err != nil {
 		return err
 	}
-	replacePacks(p, packs)
+	p.ReplacePacks(packs)
 	p.Manifest.Requires[key] = entry
 	return nil
 }

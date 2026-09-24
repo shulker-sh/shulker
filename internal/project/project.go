@@ -34,6 +34,14 @@ type OpenedPacks struct {
 	IsRelocking bool
 }
 
+// ReplacePacks records the packs a command resolved again in place of what it first read for p.
+func (p *Project) ReplacePacks(loaded []*pack.Loaded) {
+	if p.Packs == nil {
+		p.Packs = &OpenedPacks{}
+	}
+	p.Packs.Loaded = loaded
+}
+
 // Open fails on a lock it can't read; OpenReplacingLock tolerates one.
 func Open(dir string) (*Project, error) {
 	p, err := open(dir)

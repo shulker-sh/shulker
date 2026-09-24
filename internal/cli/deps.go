@@ -285,14 +285,6 @@ func (a *app) openPacks(ctx context.Context, p *project.Project, mode packMode) 
 	return loaded, nil
 }
 
-// replacePacks records packs a command resolved again in place of what openPacks read for p.
-func replacePacks(p *project.Project, loaded []*pack.Loaded) {
-	if p.Packs == nil {
-		p.Packs = &project.OpenedPacks{}
-	}
-	p.Packs.Loaded = loaded
-}
-
 // rereads reports whether a relock reads a modpack afresh rather than at its pin: a local directory
 // always, and an archive when archiveMoved says so, taking changed bytes only when it follows them.
 func (a *app) rereads(p *project.Project, mp manifest.Require, pinned lock.Modpack) bool {
@@ -356,7 +348,7 @@ func (a *app) refreshModpacks(ctx context.Context, p *project.Project, r *resolv
 	if err := r.RefreshPacks(loaded); err != nil {
 		return nil, err
 	}
-	replacePacks(p, loaded)
+	p.ReplacePacks(loaded)
 	return loaded, nil
 }
 

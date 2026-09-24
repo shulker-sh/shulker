@@ -55,7 +55,7 @@ func (a *app) inlineImport(cmd *cobra.Command, p *project.Project, key string, f
 		if err := r.RefreshPacks(packs); err != nil {
 			return "", err
 		}
-		replacePacks(p, packs)
+		p.ReplacePacks(packs)
 		rep, err = resolve.Merge(p, inc, sides)
 		return "", err
 	}
