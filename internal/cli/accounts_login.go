@@ -286,10 +286,8 @@ func notOwnAccount(r account.Resolved, verb string) error {
 	return out.Errorf("usage", "%s is borrowed from %s, so only %s can %s it", r.Name, r.Source, r.Source, verb)
 }
 
-// reseatDefault keeps accounts.default pointing at an account that is still there. Losing the
-// default one leaves the single account a launch could use behind it as the default, and no
-// default at all when there isn't exactly one to take over. An offline account inherits as
-// readily as a signed-in one, since it launches as readily; what can't is what a launch refuses.
+// reseatDefault keeps accounts.default pointing at an account that is still there, handing it to
+// the successor when there is one and clearing it otherwise.
 func (a *app) reseatDefault(gone accountRow) (*account.Resolved, error) {
 	if !gone.Default {
 		return nil, nil
@@ -298,15 +296,15 @@ func (a *app) reseatDefault(gone accountRow) (*account.Resolved, error) {
 	if err != nil {
 		return nil, err
 	}
-	usable := account.Launchable(accounts)
-	if len(usable) != 1 {
+	heir, ok := account.Successor(accounts)
+	if !ok {
 		_, err := a.changeDefault("")
 		return nil, err
 	}
-	if _, err := a.changeDefault(usable[0].ID); err != nil {
+	if _, err := a.changeDefault(heir.ID); err != nil {
 		return nil, err
 	}
-	return &usable[0], nil
+	return &heir, nil
 }
 
 // sessionFor is the account a launch plays on, renewed and saved when its token was stale, with

@@ -112,3 +112,14 @@ func InGroup(accounts []Resolved, g Group) []Resolved {
 	Sort(out)
 	return out
 }
+
+// Successor is who inherits the default when the account holding it goes: the single account a
+// launch could still use, else nobody. An offline account inherits as readily as a signed-in one,
+// since it launches as readily; what can't is what a launch refuses.
+func Successor(accounts []Resolved) (Resolved, bool) {
+	usable := Launchable(accounts)
+	if len(usable) != 1 {
+		return Resolved{}, false
+	}
+	return usable[0], true
+}
