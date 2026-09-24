@@ -33,7 +33,7 @@ func (a *app) reconcileInstance(in config.Instance) error {
 	if err != nil || !found {
 		return err
 	}
-	exe, err := shulkerPath()
+	exe, err := launcher.ShulkerPath()
 	if err != nil {
 		return err
 	}

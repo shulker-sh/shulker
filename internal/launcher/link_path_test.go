@@ -1,4 +1,4 @@
-package cli
+package launcher
 
 import (
 	"os"
@@ -17,9 +17,9 @@ func TestShulkerPathPrefersTheNameOnPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
-	got, err := shulkerPath()
+	got, err := ShulkerPath()
 	if err != nil || got != link {
-		t.Fatalf("shulkerPath() = %q, %v; want %q", got, err, link)
+		t.Fatalf("ShulkerPath() = %q, %v; want %q", got, err, link)
 	}
 }
 
@@ -33,8 +33,8 @@ func TestShulkerPathIgnoresAnotherShulker(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
-	got, err := shulkerPath()
+	got, err := ShulkerPath()
 	if err != nil || got != exe {
-		t.Fatalf("shulkerPath() = %q, %v; want %q", got, err, exe)
+		t.Fatalf("ShulkerPath() = %q, %v; want %q", got, err, exe)
 	}
 }
