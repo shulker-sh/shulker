@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -51,7 +50,7 @@ func (a *app) instanceDumpCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rec, err := runningGame(dir)
+			rec, err := instance.RunningGame(dir)
 			if err != nil {
 				return err
 			}
@@ -92,21 +91,6 @@ func gameWrapped(pid int) error {
 	e.Rows = append(e.Rows, out.Detail{Label: "wrapper pid", Text: strconv.Itoa(pid)})
 	e.Help = "find the java process the wrapper started and pass its pid with --pid"
 	return e
-}
-
-// runningGame is the open record of a game shulker started and is still running. A launcher's run
-// has no pid to signal, so it is no more a running game here than a run that has ended.
-func runningGame(dir string) (instance.Launch, error) {
-	records := instance.LoadLaunches(dir)
-	for i := len(records) - 1; i >= 0; i-- {
-		rec := records[i]
-		if rec.EndedAt == "" && rec.PID != 0 && proc.IsAlive(rec.PID) {
-			return rec, nil
-		}
-	}
-	e := out.Errorf("game-not-running", "no game is running in %s", dir)
-	e.Help = "shulker dumps a game it started itself, with shulker play"
-	return instance.Launch{}, e
 }
 
 func dumpFailed(err error) error {
@@ -152,7 +136,7 @@ func (a *app) instanceLogCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rec, err := latestRun(dir)
+			rec, err := instance.LatestRun(dir)
 			if err != nil {
 				return err
 			}
@@ -192,24 +176,6 @@ func (a *app) instanceLogCmd() *cobra.Command {
 	return cmd
 }
 
-// latestRun is the newest record, which must have a log to read. A launcher's run gets its log only
-// once it ends, so while it is open its log is the game's own latest.log.
-func latestRun(dir string) (instance.Launch, error) {
-	records := instance.LoadLaunches(dir)
-	if len(records) > 0 {
-		rec := records[len(records)-1]
-		if rec.Log == "" && rec.EndedAt == "" {
-			rec.Log = filepath.Join(dir, "logs", "latest.log")
-		}
-		if rec.Log != "" {
-			return rec, nil
-		}
-	}
-	e := out.Errorf("run-not-found", "%s has no run with a log yet", dir)
-	e.Help = "start it with shulker play"
-	return instance.Launch{}, e
-}
-
 // followLog prints what the game writes to its log from where f stands, until the run closes or the
 // command is interrupted, starting with partial, a line the game had only begun. After the run
 // closes it reads once more, for what the game wrote last.
@@ -232,7 +198,7 @@ func (a *app) followLog(ctx context.Context, dir string, rec instance.Launch, f 
 		if err := drain(); err != nil {
 			return err
 		}
-		if rec.EndedAt != "" || runClosed(dir, rec) {
+		if rec.EndedAt != "" || instance.RunClosed(dir, rec) {
 			if err := drain(); err != nil {
 				return err
 			}
@@ -247,19 +213,6 @@ func (a *app) followLog(ctx context.Context, dir string, rec instance.Launch, f 
 		case <-time.After(followInterval):
 		}
 	}
-}
-
-// runClosed reports whether the run being followed has ended: its record was closed, or trimmed
-// away by newer runs, or its game has gone without the watcher closing it. A closed record drops its
-// pid, so the run is found by when it started.
-func runClosed(dir string, rec instance.Launch) bool {
-	records := instance.LoadLaunches(dir)
-	for i := len(records) - 1; i >= 0; i-- {
-		if records[i].StartedAt == rec.StartedAt {
-			return records[i].EndedAt != "" || (rec.PID != 0 && !proc.IsAlive(rec.PID))
-		}
-	}
-	return true
 }
 
 // tailChunk is how much of a log readTail takes at a time from its end.

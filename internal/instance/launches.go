@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/proc"
 )
 
@@ -267,4 +268,50 @@ func FailLaunch(dir string, keep int, stamped bool, reason string) error {
 		records[at].Error = reason
 		return records
 	})
+}
+
+// RunningGame is the open record of a game shulker started and is still running. A launcher's run
+// has no pid to signal, so it is no more a running game here than a run that has ended.
+func RunningGame(dir string) (Launch, error) {
+	records := LoadLaunches(dir)
+	for i := len(records) - 1; i >= 0; i-- {
+		rec := records[i]
+		if rec.EndedAt == "" && rec.PID != 0 && proc.IsAlive(rec.PID) {
+			return rec, nil
+		}
+	}
+	e := out.Errorf("game-not-running", "no game is running in %s", dir)
+	e.Help = "shulker dumps a game it started itself, with shulker play"
+	return Launch{}, e
+}
+
+// LatestRun is the newest record, which must have a log to read. A launcher's run gets its log only
+// once it ends, so while it is open its log is the game's own latest.log.
+func LatestRun(dir string) (Launch, error) {
+	records := LoadLaunches(dir)
+	if len(records) > 0 {
+		rec := records[len(records)-1]
+		if rec.Log == "" && rec.EndedAt == "" {
+			rec.Log = filepath.Join(dir, "logs", "latest.log")
+		}
+		if rec.Log != "" {
+			return rec, nil
+		}
+	}
+	e := out.Errorf("run-not-found", "%s has no run with a log yet", dir)
+	e.Help = "start it with shulker play"
+	return Launch{}, e
+}
+
+// RunClosed reports whether the run being followed has ended: its record was closed, or trimmed
+// away by newer runs, or its game has gone without the watcher closing it. A closed record drops its
+// pid, so the run is found by when it started.
+func RunClosed(dir string, rec Launch) bool {
+	records := LoadLaunches(dir)
+	for i := len(records) - 1; i >= 0; i-- {
+		if records[i].StartedAt == rec.StartedAt {
+			return records[i].EndedAt != "" || (rec.PID != 0 && !proc.IsAlive(rec.PID))
+		}
+	}
+	return true
 }
