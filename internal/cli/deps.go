@@ -365,8 +365,12 @@ func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool,
 	}
 	opts := server.RuntimeOptions{Refresh: refresh, Log: a.progress}
 	rt, err := server.EnsureRuntime(ctx, d.fetch, d.runtimes, d.cache.Dir, p.Lock.Java.Component, opts)
-	if out.CodeOf(err) == "runtime-unavailable" {
+	switch out.CodeOf(err) {
+	case "runtime-unavailable":
 		out.AsError(err).Rows = []out.Detail{fix}
+	case "rosetta-required":
+		e := out.AsError(err)
+		e.Rows = append(e.Rows, fix)
 	}
 	return rt, err
 }

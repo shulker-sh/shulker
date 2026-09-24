@@ -1963,8 +1963,9 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `resourcepack-not-distributed` | `server.resourcePack` names a pack its provider forbids redistributing, so the lock has no URL for it |
 | `resourcepack-not-found` | `server.resourcePack` isn't a locked resource pack. `candidates`: the locked resource packs |
 | `restore-failed` | `restore --all` failed for some targets; `data` has each target's result |
+| `rosetta-required` | On an Apple Silicon Mac, the locked Java runtime, like Java 8's `jre-legacy`, is published only for Intel Macs, and Rosetta isn't installed to run it. The first `Fix:` row installs it; the second is the side's own, as for `runtime-unavailable` |
 | `run-not-found` | `instance log` found no run to print: the instance has never been played, or the latest run's log has been deleted |
-| `runtime-unavailable` | Mojang publishes no Java runtime for this platform. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
+| `runtime-unavailable` | Mojang publishes no Java runtime for this platform, and on an Apple Silicon Mac no Intel one either. The `Fix:` row depends on the side: a server sets `java` in `shulker.json`, a client instance passes `--java <path>` to `shulker link` |
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |
 | `schema-newer` | `shulker.json`, `shulker.lock`, `.shulker/instance.json`, `registry.json`, `config.json` or `accounts.json` was written by a newer shulker, and this one can't read it; the message names both schema versions, and `shulker self update` catches up. A newer `shulker.local.json` or `.shulker/state.json` warns instead, with the same fix |
 | `self-uninstall` | The shulker binary couldn't be removed |

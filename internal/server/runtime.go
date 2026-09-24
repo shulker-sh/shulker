@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -59,12 +60,9 @@ func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *meta.Run
 	if !ok {
 		return Runtime{}, out.Errorf("runtime-unavailable", "Mojang publishes no Java runtime for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
-	release, ok, err := runtimes.Release(ctx, platform, component)
+	release, err := findRelease(ctx, runtimes, platform, component, rosettaInstalled)
 	if err != nil {
 		return Runtime{}, err
-	}
-	if !ok {
-		return Runtime{}, out.Errorf("runtime-unavailable", "Mojang publishes no %s runtime for %s", component, platform)
 	}
 	if hasExisting && existing.ManifestSha1 == release.ManifestSha1 {
 		return Runtime{Component: component, Version: existing.Version, Home: filepath.Join(dir, existing.Home)}, nil
@@ -106,6 +104,35 @@ func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *meta.Run
 		return Runtime{}, err
 	}
 	return Runtime{Component: component, Version: release.Version, Home: filepath.Join(dir, home), Fetched: true}, nil
+}
+
+// findRelease is the release of component Mojang publishes for platform. On Apple Silicon, where
+// Mojang publishes the oldest runtimes only for Intel Macs, it falls back to the Intel release, which
+// runs under Rosetta, as Mojang's own launcher does.
+func findRelease(ctx context.Context, runtimes *meta.Runtimes, platform, component string, rosetta func() bool) (meta.RuntimeRelease, error) {
+	release, ok, err := runtimes.Release(ctx, platform, component)
+	if err != nil || ok {
+		return release, err
+	}
+	if platform == "mac-os-arm64" {
+		release, ok, err = runtimes.Release(ctx, "mac-os", component)
+		if err != nil {
+			return release, err
+		}
+		if ok && !rosetta() {
+			e := out.Errorf("rosetta-required", "Mojang publishes %s only for Intel Macs, and running it needs Rosetta", component)
+			e.Rows = []out.Detail{{Label: "Fix", Text: "softwareupdate --install-rosetta --agree-to-license", IsCommand: true}}
+			return release, e
+		}
+		if ok {
+			return release, nil
+		}
+	}
+	return release, out.Errorf("runtime-unavailable", "Mojang publishes no %s runtime for %s", component, platform)
+}
+
+func rosettaInstalled() bool {
+	return exec.Command("/usr/bin/arch", "-x86_64", "/usr/bin/true").Run() == nil
 }
 
 func readRuntimeMarker(dir string) (runtimeMarker, bool) {
