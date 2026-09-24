@@ -201,7 +201,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	req := watchRequest{
 		Dir:     in.Dir,
 		Java:    plan.java,
-		Argv:    launchArgv(plan.version, vars, settings, window, opts.target),
+		Argv:    launchArgv(plan.version, plan.platform, vars, settings, window, opts.target),
 		Log:     res.Log,
 		Wrapper: settings.Wrapper,
 	}
@@ -322,7 +322,7 @@ func (a *app) pinnedAccount(id string) (string, error) {
 // the version's own, and the window through the arguments the version declares for a custom
 // resolution, as is the quick play target. A version from before those were declared takes the
 // pairs appended, as Prism does.
-func launchArgv(v game.Version, vars map[string]string, s instance.Settings, window string, target quickPlay) []string {
+func launchArgv(v game.Version, platform game.Platform, vars map[string]string, s instance.Settings, window string, target quickPlay) []string {
 	var extra []string
 	if s.Memory != "" {
 		extra = append(extra, "-Xms"+s.Memory, "-Xmx"+s.Memory)
@@ -336,7 +336,7 @@ func launchArgv(v game.Version, vars map[string]string, s instance.Settings, win
 		features["has_custom_resolution"] = true
 		vars["resolution_width"], vars["resolution_height"] = width, height
 	}
-	argv := game.Argv(v, game.Host(), features, vars, extra...)
+	argv := game.Argv(v, platform, features, vars, extra...)
 	if sized && !slices.Contains(argv, "--width") {
 		argv = append(argv, "--width", width, "--height", height)
 	}
@@ -412,7 +412,7 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target quickPlay) error 
 		rep.AssetIndex = plan.version.AssetIndex.ID
 	}
 	if plan.inherits != "" {
-		own := plan.assembly.LibrariesFrom(plan.top, game.Host())
+		own := plan.assembly.LibrariesFrom(plan.top, plan.platform)
 		rep.LoaderLibraries, rep.LoaderLibrariesBytes = len(own), plan.store.Size(own)
 	}
 	return a.printer.Emit(rep, func(l *out.Lines) {
@@ -450,6 +450,7 @@ type launchPlan struct {
 	assembly  game.Assembly
 	natives   string
 	java      string
+	platform  game.Platform
 }
 
 func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Project) (launchPlan, error) {
@@ -469,8 +470,12 @@ func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Proje
 	if err != nil {
 		return launchPlan{}, err
 	}
-	host := game.Host()
-	assembly, err := game.Assemble(v, host, nil)
+	java, err := a.clientJava(ctx, p, in.Dir)
+	if err != nil {
+		return launchPlan{}, err
+	}
+	platform := game.ForJava(java)
+	assembly, err := game.Assemble(v, platform, nil)
 	if err != nil {
 		return launchPlan{}, err
 	}
@@ -478,14 +483,10 @@ func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Proje
 		return launchPlan{}, err
 	}
 	natives := nativesDir(in.Dir)
-	if err := assembly.ExtractNatives(s, natives, host); err != nil {
+	if err := assembly.ExtractNatives(s, natives, platform); err != nil {
 		return launchPlan{}, err
 	}
-	java, err := a.clientJava(ctx, p, in.Dir)
-	if err != nil {
-		return launchPlan{}, err
-	}
-	return launchPlan{store: s, versionID: versionID, inherits: top.InheritsFrom, top: top, version: v, assembly: assembly, natives: natives, java: java}, nil
+	return launchPlan{store: s, versionID: versionID, inherits: top.InheritsFrom, top: top, version: v, assembly: assembly, natives: natives, java: java, platform: platform}, nil
 }
 
 // playInstance is the instance a launch acts on: the nickname given, else the one the current
