@@ -1,4 +1,4 @@
-package cli
+package instance
 
 import (
 	"os"
@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-func TestServerFailureFiles(t *testing.T) {
+func TestFailureFiles(t *testing.T) {
 	dir := t.TempDir()
 	started := time.Now().Add(-time.Minute)
-	if log, crash := serverFailureFiles(dir, started); log != "" || crash != "" {
+	if log, crash := FailureFiles(dir, started); log != "" || crash != "" {
 		t.Fatalf("empty dir: log %q, crash report %q", log, crash)
 	}
 
@@ -32,7 +32,7 @@ func TestServerFailureFiles(t *testing.T) {
 	write("crash-reports/crash-first-server.txt", started.Add(10*time.Second))
 	newest := write("crash-reports/crash-last-server.txt", started.Add(20*time.Second))
 
-	if log, crash := serverFailureFiles(dir, started); log != logPath || crash != newest {
+	if log, crash := FailureFiles(dir, started); log != logPath || crash != newest {
 		t.Fatalf("log %q, crash report %q; want %q and %q", log, crash, logPath, newest)
 	}
 }

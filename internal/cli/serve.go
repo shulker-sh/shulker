@@ -6,13 +6,13 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
@@ -30,37 +30,6 @@ type serveResult struct {
 	ExitCode    int         `json:"exitCode"`
 	Log         string      `json:"log,omitempty"`
 	CrashReport string      `json:"crashReport,omitempty"`
-}
-
-// serverFailureFiles returns the server's log and the newest crash report written since started,
-// each empty when there isn't one.
-func serverFailureFiles(dir string, started time.Time) (log, crashReport string) {
-	if path := filepath.Join(dir, "logs", "latest.log"); isOnDisk(path) {
-		log = path
-	}
-	return log, crashReportSince(dir, started)
-}
-
-// crashReportSince is the newest crash report the game wrote after started, empty when there is
-// none. It is the only evidence of how a run ended that survives the process that ran it.
-func crashReportSince(dir string, started time.Time) string {
-	entries, _ := os.ReadDir(filepath.Join(dir, "crash-reports"))
-	var newest time.Time
-	var report string
-	for _, e := range entries {
-		info, err := e.Info()
-		if err != nil || e.IsDir() || info.ModTime().Before(started) || !info.ModTime().After(newest) {
-			continue
-		}
-		newest = info.ModTime()
-		report = filepath.Join(dir, "crash-reports", e.Name())
-	}
-	return report
-}
-
-func isOnDisk(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 func (a *app) projectJava(ctx context.Context, p *project.Project) (server.Java, error) {
@@ -177,7 +146,7 @@ func (a *app) serveCmd() *cobra.Command {
 			}
 			res := serveResult{Side: "server", Dir: dir, Java: java, Args: launchArgs, ExitCode: code}
 			if code != 0 {
-				res.Log, res.CrashReport = serverFailureFiles(dir, started)
+				res.Log, res.CrashReport = instance.FailureFiles(dir, started)
 				if a.printer.JSON {
 					_ = a.printer.Emit(res, func(*out.Lines) {})
 				}

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"path/filepath"
 	"slices"
 	"time"
 
@@ -114,12 +113,11 @@ func endRecord(rec *instance.Launch, dir string, exit int) {
 	rec.EndedAt = nowStamp()
 	rec.Outcome = instance.OutcomeOK
 	rec.PID, rec.Java, rec.Wrapped = 0, "", false
+	log, crash := instance.FailureFiles(dir, started)
 	if rec.Log == "" {
-		if path := filepath.Join(dir, "logs", "latest.log"); isOnDisk(path) {
-			rec.Log = path
-		}
+		rec.Log = log
 	}
-	if crash := crashReportSince(dir, started); crash != "" {
+	if crash != "" {
 		rec.Outcome, rec.CrashReport = instance.OutcomeCrashed, crash
 	}
 	if exit != noExitCode {
