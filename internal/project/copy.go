@@ -1,9 +1,11 @@
 package project
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/pack"
@@ -28,4 +30,24 @@ func OwnPaths(m *manifest.Manifest) []string {
 	}
 	slices.Sort(paths)
 	return slices.Compact(paths)
+}
+
+// CopyOwnFiles copies each path in src that exists into dir, leaving alone one dir already has,
+// and returns the paths it created, in order, a failure's included.
+func CopyOwnFiles(src, dir string, paths []string) ([]string, error) {
+	var created []string
+	for _, rel := range paths {
+		from, to := filepath.Join(src, filepath.FromSlash(rel)), filepath.Join(dir, filepath.FromSlash(rel))
+		if _, err := os.Stat(from); err != nil {
+			continue
+		}
+		if _, err := os.Lstat(to); err == nil {
+			continue
+		}
+		created = append(created, to)
+		if err := fsutil.CopyPath(from, to); err != nil {
+			return created, err
+		}
+	}
+	return created, nil
 }

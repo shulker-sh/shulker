@@ -375,7 +375,7 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 			return true
 		})
 	}
-	created, err := copyProjectFiles(c.Dir, dir, paths)
+	created, err := project.CopyOwnFiles(c.Dir, dir, paths)
 	undo := func() {
 		for _, path := range slices.Backward(created) {
 			os.RemoveAll(path)
@@ -412,26 +412,6 @@ func otherSide(side string) string {
 		return "client"
 	}
 	return "server"
-}
-
-// copyProjectFiles copies each path in src that exists into dir, leaving alone one dir already
-// has, and returns the paths it created.
-func copyProjectFiles(src, dir string, paths []string) ([]string, error) {
-	var created []string
-	for _, rel := range paths {
-		from, to := filepath.Join(src, filepath.FromSlash(rel)), filepath.Join(dir, filepath.FromSlash(rel))
-		if _, err := os.Stat(from); err != nil {
-			continue
-		}
-		if _, err := os.Lstat(to); err == nil {
-			continue
-		}
-		created = append(created, to)
-		if err := fsutil.CopyPath(from, to); err != nil {
-			return created, err
-		}
-	}
-	return created, nil
 }
 
 // readImportArchive reads a modpack archive by its content, refusing one that isn't the format
