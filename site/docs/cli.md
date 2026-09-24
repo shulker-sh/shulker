@@ -62,7 +62,7 @@ outline: [2, 3]
 | [`shulker accounts providers`](#shulker-accounts-providers) | List the launchers shulker reads accounts from |
 | [`shulker accounts providers add\|remove <launcher>`](#shulker-accounts-providers-add-remove) | Read accounts from another launcher, or stop |
 | [`shulker accounts providers set <launcher...>`](#shulker-accounts-providers-set) | Replace the list, in the order given |
-| [`shulker import <file>`](#shulker-import) | Create a project from a Modrinth or CurseForge modpack |
+| [`shulker import <modpack>`](#shulker-import) | Create a project from a modpack file, URL, slug or shulker source |
 | [`shulker export mrpack [source]`](#shulker-export-mrpack) | Export a Modrinth modpack |
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
 | [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
@@ -116,7 +116,15 @@ shulker init --name my-server --minecraft 1.21.1 --loader neoforge --side server
 
 ### `shulker import`
 
-Create a project from a Modrinth or CurseForge modpack. The file's kind is read from what it holds, whatever its name: a `modrinth.index.json` makes it a Modrinth pack, a CurseForge `manifest.json` of type `minecraftModpack` a CurseForge one, and anything else fails with `archive-not-modpack`. `--type` refuses a file of the other kind with `usage`.
+Create a project from a modpack. The argument is read in this order:
+
+- **An existing path.** A file is a modpack archive, its kind read from what it holds, whatever its name: a `modrinth.index.json` makes it a Modrinth pack, a CurseForge `manifest.json` of type `minecraftModpack` a CurseForge one, and anything else fails with `archive-not-modpack`. A folder is a shulker source.
+- **A URL.** A Modrinth or CurseForge page is looked up as a slug is, at the version it names, if any. Any other `http(s)` URL is downloaded into the cache and read as an archive by what it holds; one that isn't an archive, and a `git@`, `ssh://`, `git://` or `file://` URL, is a git source, or a raw manifest source when it ends in `.json`, as `modpack add` reads one. A raw manifest source gets the warning that its overrides didn't come with it.
+- **Anything else** is a modpack slug, looked up as `add --type modpack` looks one up, on the first provider holding it, or the one `--provider` names. It takes the newest `release` version; a specific version is the URL of its page or file. A project that isn't a modpack fails with `type-mismatch`. The archive goes in the cache at its sha512, and one whose author turned third-party downloads off fails with `manual-download`, naming its page: download it into the new project's `downloads/` and run the import again.
+
+`--type mrpack|curseforge|source` refuses anything of another kind with `usage`. `--ref` and `--path` apply to a git source and fail with `source-ref` and `source-path` on anything else, and `--provider` applies to a slug only.
+
+A shulker source is copied: its `shulker.json`, `shulker.lock` and the files beside them, leaving out `.git`, `.shulker`, `build`, `data`, `downloads` and `shulker.local.json`, and the lock is brought in line as `lock` does, reusing each entry that still matches. `--name` renames the copy.
 
 The project is created in the project directory, `-C` or the current folder, which is created when it is missing. One that already holds a `shulker.json` fails with `manifest-exists`. The new project takes every side the pack declares; `--side` keeps one, as `export --side` does: the other side's block, its entries and its override folder are left out, and `leftOut` in the result lists each by key or override path.
 
@@ -130,12 +138,17 @@ A zip shulker exported carries its own `shulker.json` and `shulker.lock` at its 
 shulker import ~/Downloads/fabulously-optimized.mrpack
 shulker import ~/Downloads/all-the-mods.zip -C all-the-mods
 shulker import pack.mrpack -C my-pack --name my-pack --side client
+shulker import fabulously-optimized
+shulker import https://github.com/friends/pack.git --ref v2 --path packs/survival
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--name <name>` | Project name (default: the modpack name, slugified) |
-| `--type <kind>` | Refuse the file unless it is this kind of modpack: `mrpack` or `curseforge` (default: detected) |
+| `--type <kind>` | Refuse the modpack unless it is this kind: `mrpack`, `curseforge` or `source` (default: detected) |
+| `--provider <name>` | Look a slug up on this provider only: `modrinth` or `curseforge` (default: the first that has it) |
+| `--ref <ref>` | Git ref of a git source (default: the remote HEAD) |
+| `--path <folder>` | Folder of a git source's repository holding its `shulker.json` (default: the root) |
 | `--side <side>` | Take one side only: `client` or `server` (default: every side the pack declares) |
 | `--ignore-shulker` | Ignore the shulker manifest and lock inside the modpack and import it as any other one |
 

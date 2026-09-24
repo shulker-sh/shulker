@@ -34,6 +34,7 @@ type importResult struct {
 	Minecraft string            `json:"minecraft"`
 	Loader    lock.Loader       `json:"loader"`
 	Marker    bool              `json:"marker"`
+	Source    string            `json:"source,omitempty"`
 	Sides     []string          `json:"sides"`
 	Mods      *resolve.Imported `json:"mods"`
 	Overrides []string          `json:"overrides"`
@@ -42,8 +43,9 @@ type importResult struct {
 
 // importFlags are import's own flags.
 type importFlags struct {
-	name, typ, side string
-	ignoreShulker   bool
+	name, typ, side, provider string
+	at                        pack.At
+	ignoreShulker             bool
 }
 
 // importArchive is the archive an import reads, as the Modrinth view the resolver takes, with
@@ -57,28 +59,33 @@ type importArchive struct {
 func (a *app) importCmd() *cobra.Command {
 	var f importFlags
 	cmd := &cobra.Command{
-		Use:         "import <file>",
+		Use:         "import <modpack>",
 		Annotations: acts(),
-		Short:       "Create a project from a Modrinth or CurseForge modpack",
+		Short:       "Create a project from a modpack file, URL, slug or shulker source",
 		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return a.runImport(cmd.Context(), a.localPath(args[0]), &f)
+			return a.runImport(cmd, args[0], &f)
 		},
 	}
 	cmd.Flags().StringVar(&f.name, "name", "", "project name (default: the pack name, slugified)")
-	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the file unless it is this kind of modpack: mrpack or curseforge (default: detected)")
+	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the modpack unless it is this kind: mrpack, curseforge or source (default: detected)")
+	cmd.Flags().StringVar(&f.provider, "provider", "", "look a slug up on this provider only: modrinth or curseforge (default: the first that has it)")
+	cmd.Flags().StringVar(&f.at.Ref, "ref", "", "git ref of a git source (default: the remote HEAD)")
+	cmd.Flags().StringVar(&f.at.Path, "path", "", "folder of a git source's repository holding its shulker.json (default: the root)")
 	cmd.Flags().StringVar(&f.side, "side", "", "take one side only: client or server (default: every side the pack declares)")
 	cmd.Flags().BoolVar(&f.ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
 	return cmd
 }
 
-func (a *app) runImport(ctx context.Context, file string, f *importFlags) error {
+func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
+	ctx := cmd.Context()
 	for _, flag := range []struct {
 		name, value string
 		allowed     []string
 	}{
-		{"type", f.typ, []string{"mrpack", "curseforge"}},
+		{"type", f.typ, []string{"mrpack", "curseforge", "source"}},
 		{"side", f.side, []string{"client", "server"}},
+		{"provider", f.provider, []string{"modrinth", "curseforge"}},
 	} {
 		if flag.value != "" && !slices.Contains(flag.allowed, flag.value) {
 			return out.Errorf("usage", "--%s takes one of %s, not %q", flag.name, strings.Join(flag.allowed, ", "), flag.value)
@@ -88,9 +95,16 @@ func (a *app) runImport(ctx context.Context, file string, f *importFlags) error 
 	if err != nil {
 		return err
 	}
-	in, err := readImportArchive(file, f.typ)
+	d, err := a.deps()
 	if err != nil {
 		return err
+	}
+	in, source, err := a.findImport(ctx, d, dir, arg, f)
+	if err != nil {
+		return err
+	}
+	if source != nil {
+		return a.importSource(cmd, dir, source, f)
 	}
 	if f.ignoreShulker {
 		in.arc.Marker = nil
@@ -109,10 +123,6 @@ func (a *app) runImport(ctx context.Context, file string, f *importFlags) error 
 	a.warn(warnings)
 	if in.cf != nil && in.arc.Marker == nil && in.cf.Manifest.Author != "" {
 		m.Authors = []string{in.cf.Manifest.Author}
-	}
-	d, err := a.deps()
-	if err != nil {
-		return err
 	}
 	exact := *m
 	exact.Minecraft = in.arc.Index.Dependencies["minecraft"]
@@ -178,6 +188,225 @@ func (a *app) runImport(ctx context.Context, file string, f *importFlags) error 
 		l.Tree(rows...)
 		l.Nudge("Download and build it", "shulker install")
 	})
+}
+
+// findImport reads what an import argument names: an existing file as an archive and a folder
+// as a source; a URL as a provider page, else an archive by its content, else a git or manifest
+// source; and anything else as a modpack slug. It returns the archive, or the source's checkout.
+func (a *app) findImport(ctx context.Context, d *deps, dir, arg string, f *importFlags) (*importArchive, *pack.Checkout, error) {
+	if !isImportURL(arg) {
+		path := a.localPath(arg)
+		if resolve.IsLocalFolder(path) {
+			return a.importCheckout(ctx, d, dir, path, f)
+		}
+		if _, err := os.Stat(path); err == nil {
+			if err := refuseImportFlags(f, pack.File); err != nil {
+				return nil, nil, err
+			}
+			in, err := readImportArchive(path, f.typ)
+			return in, nil, err
+		}
+		return a.importHosted(ctx, d, dir, arg, manifest.Require{Type: manifest.TypeModpack, Provider: f.provider}, f)
+	}
+	u, isProvider, err := resolve.ParseURL(arg)
+	if err != nil {
+		return nil, nil, err
+	}
+	if isProvider {
+		r := &resolve.Resolver{Dir: dir, Manifest: &manifest.Manifest{}, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+		slug, opts, err := r.FromURL(ctx, u, resolve.AddOptions{Provider: f.provider})
+		if err != nil {
+			return nil, nil, err
+		}
+		entry := manifest.Require{Type: manifest.TypeModpack, Provider: opts.Provider, Project: manifest.NewID(opts.Provider, slug)}
+		if opts.Pin != "" {
+			entry.Pin = manifest.NewID(opts.Provider, opts.Pin)
+		}
+		return a.importHosted(ctx, d, dir, slug, entry, f)
+	}
+	if (strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")) && pack.Classify(arg) == pack.Git {
+		a.progress("fetching %s", arg)
+		if sha, err := d.cache.Fetch(ctx, d.fetch, arg); err == nil && isModpackArchive(d.cache.Object(sha)) {
+			if err := refuseImportFlags(f, pack.File); err != nil {
+				return nil, nil, err
+			}
+			in, err := readImportArchive(d.cache.Object(sha), f.typ)
+			return in, nil, err
+		}
+	}
+	return a.importCheckout(ctx, d, dir, arg, f)
+}
+
+func isImportURL(arg string) bool {
+	return pack.Classify(arg) != pack.Local || strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")
+}
+
+// isModpackArchive reports whether path is a zip holding a Modrinth index or a CurseForge modpack
+// manifest.
+func isModpackArchive(path string) bool {
+	if pack.HasIndex(path) {
+		return true
+	}
+	_, err := cfpack.Read(path)
+	return err == nil
+}
+
+// refuseImportFlags refuses the flags that don't apply to a modpack of kind, with the codes a
+// source uses for --ref and --path.
+func refuseImportFlags(f *importFlags, kind pack.Kind) error {
+	if f.at.Ref != "" && kind != pack.Git {
+		return out.Errorf("source-ref", "--ref only applies to git sources")
+	}
+	if err := pack.CheckPath(f.at.Path, kind); err != nil {
+		return err
+	}
+	if f.provider != "" && kind != pack.Hosted {
+		return out.Errorf("usage", "--provider only applies to a modpack slug")
+	}
+	if f.typ == "source" && (kind == pack.File || kind == pack.Hosted) {
+		return out.Errorf("usage", "--type source names a shulker project, and this is a modpack archive")
+	}
+	return nil
+}
+
+// importHosted picks a hosted modpack's newest release, or the version entry pins, and reads its
+// archive from the cache.
+func (a *app) importHosted(ctx context.Context, d *deps, dir, slug string, entry manifest.Require, f *importFlags) (*importArchive, *pack.Checkout, error) {
+	if err := refuseImportFlags(f, pack.Hosted); err != nil {
+		return nil, nil, err
+	}
+	r := &resolve.Resolver{Dir: dir, Manifest: &manifest.Manifest{}, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+	pin, err := r.ObtainModpack(ctx, slug, entry)
+	a.warn(r.Warnings)
+	if err != nil {
+		return nil, nil, err
+	}
+	in, err := readImportArchive(d.cache.Object(pin.Sha512), f.typ)
+	return in, nil, err
+}
+
+// importCheckout fetches a shulker source for an import to copy.
+func (a *app) importCheckout(ctx context.Context, d *deps, dir, source string, f *importFlags) (*importArchive, *pack.Checkout, error) {
+	kind := pack.Classify(source)
+	if err := refuseImportFlags(f, kind); err != nil {
+		return nil, nil, err
+	}
+	if f.typ != "" && f.typ != "source" {
+		return nil, nil, out.Errorf("usage", "%s is a shulker source, not a %s modpack", source, importKindTitle(f.typ))
+	}
+	store := &pack.Store{Cache: d.cache, ProjectDir: dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn}
+	c, err := store.Checkout(ctx, source, f.at)
+	return nil, c, err
+}
+
+// importSource creates the project as a copy of a shulker source: its manifest, its lock, whose
+// entries the relock reuses, and its files and override folders. A failure removes what it copied.
+func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *importFlags) error {
+	src, err := project.OpenReplacingLock(c.Dir)
+	if err != nil {
+		return err
+	}
+	m := src.Manifest
+	if f.name != "" {
+		m.Name = f.name
+	}
+	skip := []string{".git", ".shulker", "build", "data", pack.DownloadsDir, "shulker.local.json", manifest.FileName}
+	for _, side := range manifest.SideNames {
+		skip = append(skip, strings.SplitN(m.BuildDir(side), "/", 2)[0])
+	}
+	leftOut := []string{}
+	if f.side != "" {
+		other := "server"
+		if f.side == "server" {
+			other = "client"
+		}
+		skip = append(skip, other+"-overrides")
+		if _, err := os.Stat(filepath.Join(c.Dir, other+"-overrides")); err == nil {
+			leftOut = append(leftOut, other+"-overrides")
+		}
+	}
+	created, err := copyProjectFiles(c.Dir, dir, skip)
+	undo := func() {
+		for _, name := range created {
+			os.RemoveAll(filepath.Join(dir, name))
+		}
+	}
+	if err != nil {
+		undo()
+		return err
+	}
+	created = append(created, manifest.FileName)
+	p := &project.Project{Dir: dir, Manifest: m, Lock: src.Lock}
+	if p.Lock == nil {
+		p.Lock = lock.New()
+	}
+	if f.side != "" {
+		_, dropped := keepSide(m, p.Lock, nil, f.side)
+		leftOut = append(leftOut, dropped...)
+	}
+	if err := p.SaveManifest(); err != nil {
+		undo()
+		return err
+	}
+	if _, err := a.relockProject(cmd, p, relockOptions{}, func(*project.Project, *resolve.Resolver) (string, error) { return "", nil }); err != nil {
+		undo()
+		return err
+	}
+	slices.Sort(leftOut)
+	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: c.Source, Sides: m.Sides(), LeftOut: leftOut, Overrides: []string{}}
+	return a.printer.Emit(res, func(l *out.Lines) {
+		l.OKInto("imported "+res.Name+" "+res.Version, dir, platformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
+		rows := []out.Row{{Text: fmt.Sprintf("%s copied from %s", plural(len(m.Requires), "entry", "entries"), c.Source)}}
+		if len(leftOut) > 0 {
+			rows = append(rows, out.Row{Label: "left out for side", Children: leftOut})
+		}
+		l.Tree(rows...)
+		l.Nudge("Download and build it", "shulker install")
+	})
+}
+
+// copyProjectFiles copies a project's folder into dir, leaving out the top-level names in skip, and
+// returns the top-level names it created.
+func copyProjectFiles(src, dir string, skip []string) ([]string, error) {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return nil, err
+	}
+	var created []string
+	for _, e := range entries {
+		if slices.Contains(skip, e.Name()) {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(dir, e.Name())); err == nil {
+			continue
+		}
+		created = append(created, e.Name())
+		err := filepath.WalkDir(filepath.Join(src, e.Name()), func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			rel, err := filepath.Rel(src, path)
+			if err != nil {
+				return err
+			}
+			target := filepath.Join(dir, rel)
+			if entry.IsDir() {
+				return os.MkdirAll(target, 0o755)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			return fsutil.Write(target, data)
+		})
+		if err != nil {
+			return created, err
+		}
+	}
+	return created, nil
 }
 
 // readImportArchive reads a modpack archive by its content, refusing one that isn't the kind typ
