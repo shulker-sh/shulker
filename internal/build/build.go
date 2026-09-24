@@ -751,7 +751,7 @@ func levelName(props properties) string {
 
 func (b *Builder) collectLauncher(desired map[string]source) error {
 	launcherMissing := notInstalled("the server launcher")
-	l, _ := loader.Lookup(b.Lock.Loader.Type)
+	l := b.Lock.RunningLoader()
 	jar, vanilla := b.Lock.Loader.Server, b.Lock.Server
 	if vanilla == nil || !b.Cache.Has(vanilla.Sha512) {
 		return launcherMissing
@@ -781,40 +781,49 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 
 // vanillaServerPath is where a loader looks for the vanilla server jar: Fabric's launcher in its data
 // dir, where it downloads the jar only when missing; Quilt's launcher next to itself, which is also
-// where a project without a loader runs it; NeoForge's and Forge's installers under libraries/.
+// where a project without a loader runs it; NeoForge's and Forge's installers under libraries/, or
+// in the server dir for Forge's older ones.
 func vanillaServerPath(l loader.Loader, minecraft string) string {
-	switch l.ServerSetup {
-	case loader.ServerInstaller:
+	switch {
+	case l.RootServerJars:
+		return loader.VanillaServerJar(minecraft)
+	case l.ServerSetup == loader.ServerInstaller:
 		name := "server-" + minecraft
 		if l.MinecraftJarClassifier != "" {
 			name += "-" + l.MinecraftJarClassifier
 		}
 		return "libraries/net/minecraft/server/" + minecraft + "/" + name + ".jar"
-	case loader.ServerLauncher:
+	case l.ServerSetup == loader.ServerLauncher:
 		return ".fabric/server/" + minecraft + "-server.jar"
 	}
 	return VanillaServerFile
 }
 
-// LaunchArgs start the server from its dir: the launch jar, the args file a loader's installer
-// wrote, or the vanilla jar when there is no loader.
+// LaunchArgs start the server from its dir: the launch jar, the file a loader's installer left, or
+// the vanilla jar when there is no loader.
 func LaunchArgs(lk *lock.Lock) []string {
-	if file := InstallerArgsFile(lk); file != "" {
-		return []string{"@" + file}
-	}
-	info, ok := loader.Lookup(lk.Loader.Type)
-	if !ok {
+	l := lk.RunningLoader()
+	switch {
+	case l.Name == "":
 		return []string{"-jar", VanillaServerFile}
+	case l.RootServerJars:
+		return []string{"-jar", InstalledServerFile(lk)}
+	case l.ServerSetup == loader.ServerInstaller:
+		return []string{"@" + InstalledServerFile(lk)}
 	}
-	return []string{"-jar", info.ServerLaunchJar}
+	return []string{"-jar", l.ServerLaunchJar}
 }
 
-// InstallerArgsFile is the args file a loader's server installer writes, relative to the server
-// directory, or empty when the loader has no installer.
-func InstallerArgsFile(lk *lock.Lock) string {
-	l, _ := loader.Lookup(lk.Loader.Type)
+// InstalledServerFile is what a loader's server installer leaves for the server to start from,
+// relative to the server directory: an args file, or a jar for Forge's older installers. It is
+// empty when the loader has no installer.
+func InstalledServerFile(lk *lock.Lock) string {
+	l := lk.RunningLoader()
 	if l.ServerSetup != loader.ServerInstaller {
 		return ""
+	}
+	if l.RootServerJars {
+		return l.InstalledServerJar(lk.Minecraft, lk.Loader.Version)
 	}
 	name := "unix_args.txt"
 	if runtime.GOOS == "windows" {

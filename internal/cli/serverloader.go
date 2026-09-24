@@ -19,13 +19,13 @@ import (
 // loader isn't installed there yet, recording it on the report. The build already placed every
 // file the installer would download, so it runs offline and only generates the rest.
 func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *build.Report) error {
-	l, _ := loader.Lookup(p.Lock.Loader.Type)
+	l := p.Lock.RunningLoader()
 	if l.ServerSetup != loader.ServerInstaller || rep.Side != "server" {
 		return nil
 	}
 	want := build.InstalledLoader{Type: l.Name, Version: p.Lock.Loader.Version}
 	if installed := build.LoadState(rep.Dir).InstalledLoader; installed != nil && *installed == want {
-		if _, err := os.Stat(filepath.Join(rep.Dir, build.InstallerArgsFile(p.Lock))); err == nil {
+		if _, err := os.Stat(filepath.Join(rep.Dir, build.InstalledServerFile(p.Lock))); err == nil {
 			return nil
 		}
 	}
