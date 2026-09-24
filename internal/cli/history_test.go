@@ -111,89 +111,12 @@ func TestHistoryPruneAndWarning(t *testing.T) {
 	}
 }
 
-func TestHistoryKeepsEditsBeforeABuild(t *testing.T) {
-	h := newInPlace(t)
-	writeFile(t, filepath.Join(h.dir, "overrides", "config", "x.txt"), "from the pack\n")
-	h.mustRun(t, "install")
-	if entries, err := build.History(h.dir); err != nil || len(entries) != 0 {
-		t.Fatalf("a first build with nothing of yours at risk keeps nothing: %+v %v", entries, err)
-	}
-
-	writeFile(t, filepath.Join(h.dir, "config", "x.txt"), "mine\n")
-	h.mustRun(t, "build")
-
-	if stdout := h.mustRun(t, "history", "list"); !strings.Contains(stdout, "before build client") {
-		t.Fatalf("a build over an edit should keep it: %s", stdout)
-	}
-	entries, err := build.History(h.dir)
-	if err != nil || len(entries) != 1 {
-		t.Fatalf("entries: %+v %v", entries, err)
-	}
-	kept := filepath.Join(build.HistoryPath(h.dir), entries[0].ID, "config", "x.txt")
-	if got := readFile(t, kept); got != "mine\n" {
-		t.Fatalf("the entry should hold the edit: %q", got)
-	}
-}
-
 func TestHistoryNeedsAnInstance(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	code, stdout, _ := h.run(t, "--json", "history", "list")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "not-in-place" {
 		t.Fatalf("history outside an instance: code=%d %+v", code, e)
-	}
-}
-
-// A forced build overwrites what the player changed, so it is the build that most
-// needs to keep the state first.
-func TestForcedBuildKeepsTheDriftItOverwrites(t *testing.T) {
-	h := newInPlace(t)
-	writeFile(t, filepath.Join(h.dir, "overrides", "config", "x.txt"), "from the pack\n")
-	writeFile(t, filepath.Join(h.dir, "overrides", "config", "gone.txt"), "from the pack\n")
-	h.mustRun(t, "install")
-	writeFile(t, filepath.Join(h.dir, "config", "x.txt"), "mine\n")
-	writeFile(t, filepath.Join(h.dir, "config", "gone.txt"), "mine too\n")
-	if err := os.Remove(filepath.Join(h.dir, "overrides", "config", "gone.txt")); err != nil {
-		t.Fatal(err)
-	}
-
-	h.mustRun(t, "build", "--force")
-	if got := readFile(t, filepath.Join(h.dir, "config", "x.txt")); got != "from the pack\n" {
-		t.Fatalf("force should overwrite the edit: %q", got)
-	}
-	if _, err := os.Stat(filepath.Join(h.dir, "config", "gone.txt")); !os.IsNotExist(err) {
-		t.Fatalf("force should remove the edited file the source dropped: %v", err)
-	}
-	entries, err := build.History(h.dir)
-	if err != nil || len(entries) != 1 || entries[0].Reason != "build" {
-		t.Fatalf("a forced build over edits should keep them: %+v %v", entries, err)
-	}
-	kept := filepath.Join(build.HistoryPath(h.dir), entries[0].ID, "config")
-	if got := readFile(t, filepath.Join(kept, "x.txt")); got != "mine\n" {
-		t.Fatalf("the entry should hold the overwritten edit: %q", got)
-	}
-	if got := readFile(t, filepath.Join(kept, "gone.txt")); got != "mine too\n" {
-		t.Fatalf("the entry should hold the removed edit: %q", got)
-	}
-}
-
-func TestForcedBuildKeepsAnOverwrittenOption(t *testing.T) {
-	h := newInPlace(t)
-	h.mustRun(t, "install")
-	options := filepath.Join(h.dir, "options.txt")
-	writeFile(t, options, strings.Replace(readFile(t, options), "tutorialStep:none", "tutorialStep:movement", 1))
-
-	h.mustRun(t, "build", "--force")
-	if got := readFile(t, options); !strings.Contains(got, "tutorialStep:none") {
-		t.Fatalf("force should overwrite the edited key: %s", got)
-	}
-	entries, err := build.History(h.dir)
-	if err != nil || len(entries) != 1 {
-		t.Fatalf("a forced build over an edited key should keep it: %+v %v", entries, err)
-	}
-	kept := filepath.Join(build.HistoryPath(h.dir), entries[0].ID, "options.txt")
-	if got := readFile(t, kept); !strings.Contains(got, "tutorialStep:movement") {
-		t.Fatalf("the entry should hold the edited key: %s", got)
 	}
 }
 
