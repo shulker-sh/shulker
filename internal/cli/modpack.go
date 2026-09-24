@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"context"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -204,65 +202,4 @@ func refuseModpackFlags(cmd *cobra.Command, hosted, onlyHosted bool) error {
 		}
 	}
 	return nil
-}
-
-// lockHostedEntry locks the hosted modpack entry and puts it in the manifest under key, in place of
-// the modpack already loaded there.
-func (a *app) lockHostedEntry(ctx context.Context, p *project.Project, r *resolve.Resolver, key string, entry manifest.Require) error {
-	store, err := a.packStore(p)
-	if err != nil {
-		return err
-	}
-	loaded, err := store.Resolve(ctx, key, entry)
-	if err != nil {
-		return err
-	}
-	if channel := loaded.Pin.Channel; channel != "release" {
-		entry.Channel = channel
-	}
-	i := slices.IndexFunc(r.Packs, func(l *pack.Loaded) bool { return l.Name == key })
-	if i < 0 {
-		return a.addLoadedPack(ctx, p, r, store, key, key, loaded, entry)
-	}
-	packs := slices.Clone(r.Packs)
-	packs[i] = loaded
-	if err := r.RefreshPacks(packs); err != nil {
-		return err
-	}
-	p.ReplacePacks(packs)
-	p.Manifest.Requires[key] = entry
-	return nil
-}
-
-// addLoadedPack adds a resolved modpack under key, offering to unlock one built for another
-// Minecraft, which resolves it again as name.
-func (a *app) addLoadedPack(ctx context.Context, p *project.Project, r *resolve.Resolver, store *pack.Store, name, key string, loaded *pack.Loaded, entry manifest.Require) error {
-	a.warnFor(key, true, loaded.Warnings)
-	err := r.AddPack(ctx, loaded)
-	if a.offerUnlock(err, loaded, r.Lock.Minecraft) {
-		unlock, askErr := a.askYes(fmt.Sprintf("Unlock %s and resolve its mods for Minecraft %s?", key, r.Lock.Minecraft))
-		if askErr != nil {
-			return askErr
-		}
-		if unlock {
-			no := false
-			entry.Locked = &no
-			if loaded, err = store.Resolve(ctx, name, entry); err != nil {
-				return err
-			}
-			loaded.Name = key
-			err = r.AddPack(ctx, loaded)
-		}
-	}
-	if err != nil {
-		return err
-	}
-	p.Manifest.Requires[key] = entry
-	return nil
-}
-
-// offerUnlock reports whether a modpack refused for its platform is the one refusal unlocking
-// answers: locked, and built for another Minecraft than the project's.
-func (a *app) offerUnlock(err error, l *pack.Loaded, minecraft string) bool {
-	return out.CodeOf(err) == "modpack-mismatch" && a.canPick() && l.Kind != pack.Hosted && l.UsesLock && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
 }

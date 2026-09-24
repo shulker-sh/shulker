@@ -188,7 +188,7 @@ func (a *app) resolverFor(ctx context.Context, p *project.Project, mode resolve.
 		FailFast:  a.failFast,
 	}
 	r.LockModpack = func(ctx context.Context, key string, entry manifest.Require) error {
-		return a.lockHostedEntry(ctx, p, r, key, entry)
+		return r.LockHosted(ctx, store, p, key, entry)
 	}
 	if a.canPick() {
 		r.AskUnlock = func(key, minecraft string) (bool, error) {

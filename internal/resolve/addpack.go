@@ -3,10 +3,12 @@ package resolve
 import (
 	"context"
 	"os"
+	"slices"
 
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/project"
 )
 
 // AddPackSource resolves one modpack source through store and puts it in the manifest under the
@@ -91,6 +93,31 @@ func (r *Resolver) AddArchive(ctx context.Context, store *pack.Store, path, as s
 		}
 	}
 	return r.addLoadedPack(ctx, store, key, key, loaded, entry)
+}
+
+// LockHosted locks the hosted modpack entry through store and puts it in the manifest under key,
+// in place of the modpack already loaded there. The channel its version came from is recorded
+// unless it is release.
+func (r *Resolver) LockHosted(ctx context.Context, store *pack.Store, p *project.Project, key string, entry manifest.Require) error {
+	loaded, err := store.Resolve(ctx, key, entry)
+	if err != nil {
+		return err
+	}
+	if channel := loaded.Pin.Channel; channel != "release" {
+		entry.Channel = channel
+	}
+	i := slices.IndexFunc(r.Packs, func(l *pack.Loaded) bool { return l.Name == key })
+	if i < 0 {
+		return r.addLoadedPack(ctx, store, key, key, loaded, entry)
+	}
+	packs := slices.Clone(r.Packs)
+	packs[i] = loaded
+	if err := r.RefreshPacks(packs); err != nil {
+		return err
+	}
+	p.ReplacePacks(packs)
+	r.Manifest.Requires[key] = entry
+	return nil
 }
 
 // addLoadedPack adds a resolved modpack under key. One built for another Minecraft than the
