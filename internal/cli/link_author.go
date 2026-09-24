@@ -2,7 +2,6 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/pack"
@@ -33,35 +32,27 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 	if err := a.askPlatform(ctx, &opts, func(string) bool { return false }); err != nil {
 		return nil, err
 	}
-	m := &manifest.Manifest{
-		Schema:    manifest.SchemaURL,
-		Minecraft: project.OrLatest(opts.minecraft),
-		Requires:  map[string]manifest.Require{},
-		Client:    project.NewClient(),
-	}
+	var l manifest.Loader
 	if opts.loaderName != noLoader {
-		m.Loader = manifest.Loader{Type: opts.loaderName, Version: opts.loaderVersion}
+		l = manifest.Loader{Type: opts.loaderName, Version: opts.loaderVersion}
 	}
+	minecraft := project.OrLatest(opts.minecraft)
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
 	}
-	a.progress("%s", resolve.ResolvingLine(m.Minecraft, m.Loader))
-	platform, err := d.meta.Platform(ctx, m, nil)
+	a.progress("%s", resolve.ResolvingLine(minecraft, l))
+	platform, err := d.meta.Platform(ctx, &manifest.Manifest{Minecraft: minecraft, Loader: l}, nil)
 	if err != nil {
 		return nil, err
 	}
-	if m.Minecraft == "*" {
-		m.Minecraft = platform.Minecraft
-	}
-	l := lock.New()
-	l.Minecraft, l.Loader, l.Java = platform.Minecraft, platform.Loader, platform.Java
+	locked := lock.New()
+	locked.Minecraft, locked.Loader, locked.Java = platform.Minecraft, platform.Loader, platform.Java
 	display := project.PlatformName(platform.Minecraft, platform.Loader.Type)
 	if !cmd.Flags().Changed("name") && !cmd.Flags().Changed("as") {
 		if display, err = a.askText("What should it be called?", "the name the launcher shows", display); err != nil {
 			return nil, err
 		}
 	}
-	m.Name, m.Client.Name = config.SlugID(display), display
-	return &syncSource{Checkout: &pack.Checkout{Kind: pack.Local}, project: &project.Project{Manifest: m, Lock: l}, isAuthor: true}, nil
+	return &syncSource{Checkout: &pack.Checkout{Kind: pack.Local}, project: project.Authored(locked, minecraft, l, display), isAuthor: true}, nil
 }
