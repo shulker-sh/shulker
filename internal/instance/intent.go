@@ -3,6 +3,7 @@ package instance
 import (
 	"errors"
 
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/pack"
 )
 
@@ -38,4 +39,18 @@ func Intent(dir string, inPlace bool, source string, at pack.At, side string, as
 		f.Source, f.Ref, f.Path, f.Side, f.AssumesClient = source, at.Ref, at.Path, side, assumeClient
 	}
 	return f, fresh, nil
+}
+
+// SeedHooks gives a fresh instance file the manifest's hook defaults. A file that was already there
+// keeps its settings block, because it belongs to whoever edited it once it exists.
+func SeedHooks(f *File, fresh bool, hooks manifest.Hooks) {
+	if !fresh {
+		return
+	}
+	if hooks.PreLaunch != nil {
+		f.Settings.Hooks.PreLaunch = hooks.PreLaunch
+	}
+	if hooks.PostExit != nil {
+		f.Settings.Hooks.PostExit = hooks.PostExit
+	}
 }

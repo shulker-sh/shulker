@@ -708,15 +708,7 @@ func (ls linkSettings) save(dir, source string, at pack.At, side string, assumeC
 	if err != nil {
 		return err
 	}
-	if fresh {
-		h := m.ClientHooks()
-		if h.PreLaunch != nil {
-			f.Settings.Hooks.PreLaunch = h.PreLaunch
-		}
-		if h.PostExit != nil {
-			f.Settings.Hooks.PostExit = h.PostExit
-		}
-	}
+	instance.SeedHooks(f, fresh, m.ClientHooks())
 	if ls.noHooks || ls.noPreLaunch {
 		f.Settings.Hooks.PreLaunch = instance.Off()
 	}
