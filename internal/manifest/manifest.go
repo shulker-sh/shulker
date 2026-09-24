@@ -2,7 +2,6 @@
 package manifest
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -13,6 +12,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
@@ -357,35 +357,9 @@ func Load(path string) (*Manifest, error) {
 
 // Parse decodes a shulker.json and checks it against the schema and the rules the schema can't express.
 func Parse(data []byte) (*Manifest, error) {
-	// A manifest with no $schema is read as the current version: it is the one managed file
-	// people write by hand.
-	var head struct {
-		Schema json.RawMessage `json:"$schema"`
-	}
-	if json.Unmarshal(data, &head) != nil || head.Schema != nil {
-		if err := schema.CheckMarker(schema.Manifest, "manifest-invalid", FileName, data); err != nil {
-			return nil, err
-		}
-	}
-	// Before the schema, whose anyOf reports the same thing as two missing
-	// properties.
-	var declared struct {
-		Client json.RawMessage `json:"client"`
-		Server json.RawMessage `json:"server"`
-	}
-	if json.Unmarshal(data, &declared) == nil && declared.Client == nil && declared.Server == nil {
-		e := out.Errorf("manifest-invalid", "%s declares no side", FileName)
-		e.Rows = []out.Detail{{Label: "Fix", Text: `add "client": {} or "server": {}`}}
-		return nil, e
-	}
-	if err := schema.Validate(schema.Manifest, data); err != nil {
-		return nil, schema.Invalid("manifest-invalid", FileName, data, err)
-	}
 	var m Manifest
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	if err := dec.Decode(&m); err != nil {
-		return nil, schema.Invalid("manifest-invalid", FileName, data, err)
+	if err := managed.Decode(schema.Manifest, FileName, data, &m); err != nil {
+		return nil, sideless(data, err)
 	}
 	if m.Requires == nil {
 		m.Requires = map[string]Require{}
@@ -394,6 +368,21 @@ func Parse(data []byte) (*Manifest, error) {
 		return nil, err
 	}
 	return &m, nil
+}
+
+// sideless reports a manifest that declares neither side in one sentence, in place of the schema's
+// report, whose anyOf says the same thing as two missing properties.
+func sideless(data []byte, err error) error {
+	var declared struct {
+		Client json.RawMessage `json:"client"`
+		Server json.RawMessage `json:"server"`
+	}
+	if out.CodeOf(err) != "manifest-invalid" || json.Unmarshal(data, &declared) != nil || declared.Client != nil || declared.Server != nil {
+		return err
+	}
+	e := out.Errorf("manifest-invalid", "%s declares no side", FileName)
+	e.Rows = []out.Detail{{Label: "Fix", Text: `add "client": {} or "server": {}`}}
+	return e
 }
 
 func (m *Manifest) check() error {

@@ -5,7 +5,6 @@ package local
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -13,6 +12,8 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/managed"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
 
@@ -56,32 +57,26 @@ func (e *UnreadableError) Error() string {
 // *UnreadableError, since this per-machine file never stops a command.
 func Load(dir string) (*File, error) {
 	path := filepath.Join(dir, FileName)
-	data, err := os.ReadFile(path)
+	f := &File{dir: dir}
+	err := managed.Read(schema.Local, path, f)
 	if errors.Is(err, os.ErrNotExist) {
-		return &File{dir: dir}, nil
+		return f, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	got, want, err := schema.ReadMarker(schema.Local, data)
-	var reason string
-	switch {
-	case err != nil:
-		reason = "is unreadable (" + err.Error() + ")"
-	case got > want:
-		reason = schema.Newer(got, want)
-	default:
-		f := &File{dir: dir}
-		if err := json.Unmarshal(data, f); err != nil {
-			reason = "is unreadable (" + err.Error() + ")"
-			break
-		}
+	if err == nil {
 		f.isOnDisk = true
 		return f, nil
 	}
-	e := &UnreadableError{path: path, kept: path + ".replaced", reason: reason, newer: got > want}
-	e.moveErr = os.Rename(e.path, e.kept)
-	return &File{dir: dir}, e
+	e := out.AsError(err)
+	if e.Cause == nil {
+		return nil, err
+	}
+	u := &UnreadableError{path: path, newer: e.Code == "schema-newer"}
+	u.reason = "is unreadable (" + e.Cause.Error() + ")"
+	if u.newer {
+		u.reason = e.Cause.Error()
+	}
+	u.kept, u.moveErr = managed.MoveAside(path)
+	return &File{dir: dir}, u
 }
 
 func (f *File) Exists() bool { return f.isOnDisk }

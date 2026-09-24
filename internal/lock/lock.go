@@ -11,6 +11,7 @@ import (
 	"sort"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/schema"
@@ -321,22 +322,21 @@ func Load(path string) (*Lock, error) {
 }
 
 func Parse(data []byte) (*Lock, error) {
-	if err := schema.CheckMarker(schema.Lock, "lock-invalid", FileName, data); err != nil {
-		return nil, err
-	}
-	if err := schema.Validate(schema.Lock, data); err != nil {
-		return nil, schema.Invalid("lock-invalid", FileName, data, err)
-	}
 	l := New()
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	if err := dec.Decode(l); err != nil {
-		return nil, schema.Invalid("lock-invalid", FileName, data, err)
+	if err := managed.Decode(schema.Lock, FileName, data, l); err != nil {
+		return nil, err
 	}
 	return l, nil
 }
 
 func (l *Lock) Encode() ([]byte, error) {
+	l.normalize()
+	return fsutil.MarshalJSON(l)
+}
+
+// normalize writes the lock's marker and empties every absent section, so the file always holds
+// each key.
+func (l *Lock) normalize() {
 	l.Schema = schema.URL(schema.Lock)
 	for id, m := range l.Mods {
 		if m.RequiredBy == nil {
@@ -357,7 +357,6 @@ func (l *Lock) Encode() ([]byte, error) {
 	if l.Players == nil {
 		l.Players = []Player{}
 	}
-	return fsutil.MarshalJSON(l)
 }
 
 func (l *Lock) Save(path string) error {
@@ -371,11 +370,8 @@ func (l *Lock) Save(path string) error {
 // Replace saves the lock over one that couldn't be read, keeping the old file as
 // shulker.lock.replaced. kept is where it went, empty when there was none.
 func (l *Lock) Replace(path string) (kept string, err error) {
-	data, err := l.encodeValid()
-	if err != nil {
-		return "", err
-	}
-	return fsutil.Replace(path, data)
+	l.normalize()
+	return managed.Replace(schema.Lock, path, l)
 }
 
 func (l *Lock) encodeValid() ([]byte, error) {

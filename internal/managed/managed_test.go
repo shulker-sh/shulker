@@ -133,3 +133,17 @@ func TestReplaceRefusesAFileItCouldNotReadBack(t *testing.T) {
 		})
 	}
 }
+
+func TestMoveAsideKeepsTheOldFileAndWritesNothing(t *testing.T) {
+	path := write(t, `{"old": true}`)
+	kept, err := MoveAside(path)
+	if err != nil || kept != path+".replaced" {
+		t.Fatalf("MoveAside = %q, %v", kept, err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("the file is still there: %v", err)
+	}
+	if kept, err := MoveAside(path); err != nil || kept != "" {
+		t.Errorf("a missing file: %q, %v", kept, err)
+	}
+}

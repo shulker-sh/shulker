@@ -3,12 +3,12 @@
 package instance
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
 )
@@ -132,31 +132,20 @@ func New() *File {
 }
 
 func Load(dir string) (*File, error) {
-	path := Path(dir)
-	data, err := os.ReadFile(path)
+	var f File
+	err := managed.Read(schema.Instance, Path(dir), &f)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
-		return nil, err
-	}
-	if err := checkSchema(path, data); err != nil {
-		return nil, err
-	}
-	if err := schema.Validate(schema.Instance, data); err != nil {
-		return nil, schema.Invalid("instance-invalid", path, data, err)
-	}
-	var f File
-	if err := json.Unmarshal(data, &f); err != nil {
-		return nil, schema.Invalid("instance-invalid", path, data, err)
+		return nil, unreadable(err)
 	}
 	return &f, nil
 }
 
-// checkSchema reports a file this shulker can't read as something to repair rather than as a list
-// of schema failures. A newer file isn't: repair would write it back in this shulker's shape.
-func checkSchema(path string, data []byte) error {
-	err := schema.CheckMarker(schema.Instance, "instance-invalid", path, data)
+// unreadable points a file this shulker can't read at repair. A newer file isn't pointed there:
+// repair would write it back in this shulker's shape.
+func unreadable(err error) error {
 	if out.CodeOf(err) == "instance-invalid" {
 		e := out.AsError(err)
 		e.Help = "run `shulker instances repair` to write it again"
@@ -180,11 +169,7 @@ func (f *File) Replace(dir string) (kept string, err error) {
 	if err := os.MkdirAll(filepath.Join(dir, Dir), 0o755); err != nil {
 		return "", err
 	}
-	data, err := fsutil.MarshalJSON(f)
-	if err != nil {
-		return "", err
-	}
-	return fsutil.Replace(Path(dir), data)
+	return managed.Replace(schema.Instance, Path(dir), f)
 }
 
 // Java is the Java the game runs with: the instance's own setting, else the one shulker resolved.

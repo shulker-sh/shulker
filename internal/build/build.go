@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -25,6 +24,7 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
@@ -991,39 +991,33 @@ type StateError struct {
 	Path string
 	// Newer is a file written by a newer shulker, whose fix is `shulker self update` rather than
 	// --force.
-	Newer     bool
-	Got, Want int
-	Err       error
+	Newer bool
+	// Cause is why, without the path.
+	Cause error
 }
 
 func (e *StateError) Error() string {
 	if e.Newer {
-		return fmt.Sprintf("%s %s; treating every file as not written by shulker", e.Path, schema.Newer(e.Got, e.Want))
+		return fmt.Sprintf("%s %v; treating every file as not written by shulker", e.Path, e.Cause)
 	}
-	return fmt.Sprintf("%s is unreadable (%v); treating every file as not written by shulker", e.Path, e.Err)
+	return fmt.Sprintf("%s is unreadable (%v); treating every file as not written by shulker", e.Path, e.Cause)
 }
 
 // ReadState treats a state file it can't read as empty, like LoadState, and also returns why.
 func ReadState(dir string) (State, *StateError) {
 	path := StatePath(dir)
 	empty := State{Files: map[string]string{}}
-	data, err := os.ReadFile(path)
+	var s State
+	err := managed.Read(schema.State, path, &s)
 	if errors.Is(err, fs.ErrNotExist) {
 		return empty, nil
 	}
 	if err != nil {
-		return empty, &StateError{Path: path, Err: err}
-	}
-	got, want, err := schema.ReadMarker(schema.State, data)
-	if err != nil {
-		return empty, &StateError{Path: path, Err: err}
-	}
-	if got > want {
-		return empty, &StateError{Path: path, Newer: true, Got: got, Want: want}
-	}
-	var s State
-	if err := json.Unmarshal(data, &s); err != nil {
-		return empty, &StateError{Path: path, Err: err}
+		e := out.AsError(err)
+		if e.Cause == nil {
+			return empty, &StateError{Path: path, Cause: err}
+		}
+		return empty, &StateError{Path: path, Newer: e.Code == "schema-newer", Cause: e.Cause}
 	}
 	if s.Files == nil {
 		s.Files = map[string]string{}

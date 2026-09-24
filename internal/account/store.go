@@ -1,14 +1,13 @@
 package account
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/schema"
 )
 
@@ -31,25 +30,13 @@ func Path(configPath string) string { return filepath.Join(filepath.Dir(configPa
 // Load reads the store. A file that isn't there yet is an empty store, the way an unlinked registry
 // is; anything shulker can't read is accounts-invalid, beside config-invalid and registry-invalid.
 func Load(path string) (Store, error) {
-	data, err := os.ReadFile(path)
+	var s Store
+	err := managed.Read(schema.Accounts, path, &s)
 	if errors.Is(err, os.ErrNotExist) {
 		return Store{}, nil
 	}
 	if err != nil {
 		return Store{}, err
-	}
-	if len(bytes.TrimSpace(data)) == 0 {
-		return Store{}, nil
-	}
-	if err := schema.CheckMarker(schema.Accounts, "accounts-invalid", path, data); err != nil {
-		return Store{}, err
-	}
-	if err := schema.Validate(schema.Accounts, data); err != nil {
-		return Store{}, schema.Invalid("accounts-invalid", path, data, err)
-	}
-	var s Store
-	if err := json.Unmarshal(data, &s); err != nil {
-		return Store{}, schema.Invalid("accounts-invalid", path, data, err)
 	}
 	return s, nil
 }

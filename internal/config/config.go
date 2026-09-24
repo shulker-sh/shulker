@@ -3,7 +3,6 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -16,6 +15,7 @@ import (
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/schema"
@@ -171,18 +171,12 @@ func Load() (Config, error) {
 // LoadFile reads config.json at path. A file that isn't there is the zero Config.
 func LoadFile(path string) (Config, error) {
 	var cfg Config
-	data, err := os.ReadFile(path)
+	err := managed.Read(schema.Config, path, &cfg)
 	if errors.Is(err, os.ErrNotExist) {
-		return cfg, nil
+		return Config{}, nil
 	}
 	if err != nil {
-		return cfg, err
-	}
-	if err := checkConfigSchema(path, data); err != nil {
-		return cfg, err
-	}
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return cfg, configInvalid(schema.Invalid("config-invalid", path, data, err))
+		return Config{}, configInvalid(err)
 	}
 	return cfg, nil
 }
@@ -191,20 +185,12 @@ func LoadFile(path string) (Config, error) {
 // dropping the ones Config doesn't know. A file that isn't there is an empty document.
 func LoadDocument(path string) (map[string]any, error) {
 	doc := map[string]any{}
-	data, err := os.ReadFile(path)
+	err := managed.Read(schema.Config, path, &doc)
 	if errors.Is(err, os.ErrNotExist) {
 		return doc, nil
 	}
 	if err != nil {
-		return nil, err
-	}
-	if err := checkConfigSchema(path, data); err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	if err := dec.Decode(&doc); err != nil {
-		return nil, configInvalid(schema.Invalid("config-invalid", path, data, err))
+		return nil, configInvalid(err)
 	}
 	if doc == nil {
 		doc = map[string]any{}
@@ -212,12 +198,7 @@ func LoadDocument(path string) (map[string]any, error) {
 	return doc, nil
 }
 
-// checkConfigSchema reads config.json's $schema line before anything else, so a config this shulker
-// can't read says so in one sentence. The file itself is never validated against the schema.
-func checkConfigSchema(path string, data []byte) error {
-	return configInvalid(schema.CheckMarker(schema.Config, "config-invalid", path, data))
-}
-
+// configInvalid points a config this shulker can't read at the one command that replaces it.
 func configInvalid(err error) error {
 	if out.CodeOf(err) == "config-invalid" {
 		e := out.AsError(err)
@@ -256,11 +237,7 @@ func SaveDocument(path string, doc map[string]any) error {
 // config.json.replaced, and returns where that went. The new file keeps the old one's mode.
 func ReplaceDocument(path string, doc map[string]any) (kept string, err error) {
 	doc["$schema"] = schema.URL(schema.Config)
-	data, err := fsutil.MarshalJSON(doc)
-	if err != nil {
-		return "", err
-	}
-	return fsutil.Replace(path, data)
+	return managed.Replace(schema.Config, path, doc)
 }
 
 // RegistryPath is the registry the config at configPath points to, registry.json beside it by default.
@@ -283,36 +260,22 @@ func Root(configPath, value, fallback string) string {
 
 // LoadInstances reads the registry at path. A registry that is missing or empty has no instances.
 func LoadInstances(path string) ([]Instance, error) {
-	data, err := os.ReadFile(path)
+	var registry struct {
+		Instances []Instance `json:"instances"`
+	}
+	err := managed.Read(schema.Registry, path, &registry)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, err
-	}
-	if len(bytes.TrimSpace(data)) == 0 {
-		return nil, nil
-	}
-	if err := checkRegistrySchema(path, data); err != nil {
-		return nil, err
-	}
-	if err := schema.Validate(schema.Registry, data); err != nil {
-		return nil, schema.Invalid("registry-invalid", path, data, err)
-	}
-	var registry struct {
-		Instances []Instance `json:"instances"`
-	}
-	if err := json.Unmarshal(data, &registry); err != nil {
-		return nil, schema.Invalid("registry-invalid", path, data, err)
+		return nil, registryInvalid(err)
 	}
 	return registry.Instances, nil
 }
 
-// checkRegistrySchema reports a registry this shulker can't read as something to repair, rather
-// than as the list of schema failures validating it would produce. A newer registry isn't: repair
-// would write it back in this shulker's shape.
-func checkRegistrySchema(path string, data []byte) error {
-	err := schema.CheckMarker(schema.Registry, "registry-invalid", path, data)
+// registryInvalid points a registry this shulker can't read at repair. A newer registry isn't
+// pointed there: repair would write it back in this shulker's shape.
+func registryInvalid(err error) error {
 	if out.CodeOf(err) == "registry-invalid" {
 		e := out.AsError(err)
 		e.Help = "run `shulker instances repair` to rebuild it"
@@ -392,33 +355,21 @@ func WriteInstances(path string, instances []Instance) (kept string, err error) 
 	if len(instances) > 0 {
 		doc["instances"] = instances
 	}
-	data, err := fsutil.MarshalJSON(doc)
-	if err != nil {
-		return "", err
-	}
-	return fsutil.Replace(path, data)
+	return managed.Replace(schema.Registry, path, doc)
 }
 
 // UpdateInstances rereads the registry right before writing and rewrites only the instances key, so
 // another writer's entries and keys shulker doesn't know survive.
 func UpdateInstances(path string, update func([]Instance) []Instance) (bool, error) {
 	top := map[string]json.RawMessage{}
-	data, err := os.ReadFile(path)
+	err := managed.Read(schema.Registry, path, &top)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return false, err
-	}
-	if len(bytes.TrimSpace(data)) > 0 {
-		if err := checkRegistrySchema(path, data); err != nil {
-			return false, err
-		}
-		if err := json.Unmarshal(data, &top); err != nil {
-			return false, schema.Invalid("registry-invalid", path, data, err)
-		}
+		return false, registryInvalid(err)
 	}
 	var instances []Instance
 	if raw, ok := top["instances"]; ok {
 		if err := json.Unmarshal(raw, &instances); err != nil {
-			return false, schema.Invalid("registry-invalid", path, data, err)
+			return false, schema.Invalid("registry-invalid", path, raw, err)
 		}
 	}
 	next := update(slices.Clone(instances))

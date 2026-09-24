@@ -64,6 +64,12 @@ func Replace(kind schema.Kind, path string, v any) (kept string, err error) {
 	return fsutil.Replace(path, data)
 }
 
+// MoveAside keeps the file at path as <name>.replaced without writing anything over it, for a
+// kind nothing writes before reading; kept is where it went, empty when there was none.
+func MoveAside(path string) (kept string, err error) {
+	return fsutil.MoveAside(path)
+}
+
 func managed(kind schema.Kind) schema.Managed {
 	m, ok := schema.ManagedFiles[kind]
 	if !ok {

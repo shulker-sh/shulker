@@ -61,28 +61,46 @@ func writeFrom(path string, r io.Reader, mode fs.FileMode) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// Replace writes data to path after renaming whatever is there to
-// <name>.replaced, clobbering only an older replaced file. kept is where the
-// old file went, empty when there was none. A symlink at path is followed, so
-// kept sits beside the link's target, not the link. The new file keeps the old
-// one's mode.
+// Replace writes data to path after moving whatever is there aside. The new
+// file keeps the old one's mode.
 func Replace(path string, data []byte) (kept string, err error) {
-	if info, err := os.Lstat(path); err == nil && info.Mode()&fs.ModeSymlink != 0 {
-		if path, err = filepath.EvalSymlinks(path); err != nil {
-			return "", err
-		}
+	if path, err = follow(path); err != nil {
+		return "", err
 	}
 	mode := fs.FileMode(0o644)
 	if info, err := os.Stat(path); err == nil {
 		mode = info.Mode().Perm()
 	}
-	kept = path + ".replaced"
-	if err := os.Rename(path, kept); errors.Is(err, fs.ErrNotExist) {
-		kept = ""
-	} else if err != nil {
+	kept, err = MoveAside(path)
+	if err != nil {
 		return "", err
 	}
 	return kept, writeFrom(path, bytes.NewReader(data), mode)
+}
+
+// MoveAside renames the file at path to <name>.replaced, clobbering only an
+// older replaced file. kept is where it went, empty when there was none. A
+// symlink at path is followed, so kept sits beside the link's target, not the
+// link.
+func MoveAside(path string) (kept string, err error) {
+	if path, err = follow(path); err != nil {
+		return "", err
+	}
+	kept = path + ".replaced"
+	if err := os.Rename(path, kept); errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	} else if err != nil {
+		return "", err
+	}
+	return kept, nil
+}
+
+// follow is the target of a symlink at path, or path itself.
+func follow(path string) (string, error) {
+	if info, err := os.Lstat(path); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+		return filepath.EvalSymlinks(path)
+	}
+	return path, nil
 }
 
 // MarshalJSON is the encoding of every JSON file shulker writes.
