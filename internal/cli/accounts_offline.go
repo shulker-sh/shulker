@@ -41,7 +41,7 @@ func (a *app) accountsAddCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !ownsTheGame(accounts) {
+			if !account.OwnsTheGame(accounts) {
 				return unprovenOwnership("create an offline one", out.Nudge{Lead: "Sign in to Microsoft", Command: "shulker accounts login"})
 			}
 			path, store, err := a.accountStore()
@@ -101,7 +101,7 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !force && !ownsTheGame(accounts) {
+			if !force && !account.OwnsTheGame(accounts) {
 				return unprovenOwnership("delete an offline one it couldn't create again",
 					out.Nudge{Lead: "Remove it anyway", Command: "shulker accounts remove " + accountSelector(r) + " --force"})
 			}
@@ -142,22 +142,6 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "remove it without being asked first")
 	cmd.Flags().BoolVar(&force, "force", false, "remove it with no account in sight that could create it again")
 	return cmd
-}
-
-// ownsTheGame reports whether shulker can see an account that owns Java Edition: the gate an
-// offline account passes at creation, and again at deletion, since the gate would block creating
-// it a second time. It is a statement of intent rather than a licence check, so it reads the Java
-// profile an account already carries and asks nothing of anybody. A profile is the proof whether
-// or not its session still works: an expired sign-in or borrowed token changes who can launch, not
-// who owns the game.
-func ownsTheGame(accounts []account.Resolved) bool {
-	for _, r := range accounts {
-		switch r.State {
-		case account.Playable, account.SignInExpired, account.TokenExpired:
-			return true
-		}
-	}
-	return false
 }
 
 func unprovenOwnership(what string, nudge out.Nudge) error {

@@ -21,3 +21,19 @@ func OfflineUUID(name string) string {
 func NewOffline(name, id string) Account {
 	return Account{Type: Offline, Profile: &Profile{ID: id, Name: name}}
 }
+
+// OwnsTheGame reports whether shulker can see an account that owns Java Edition: the gate an
+// offline account passes at creation, and again at deletion, since the gate would block creating
+// it a second time. It is a statement of intent rather than a licence check, so it reads the Java
+// profile an account already carries and asks nothing of anybody. A profile is the proof whether
+// or not its session still works: an expired sign-in or borrowed token changes who can launch, not
+// who owns the game.
+func OwnsTheGame(accounts []Resolved) bool {
+	for _, r := range accounts {
+		switch r.State {
+		case Playable, SignInExpired, TokenExpired:
+			return true
+		}
+	}
+	return false
+}
