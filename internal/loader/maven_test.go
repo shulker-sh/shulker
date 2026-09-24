@@ -1,4 +1,4 @@
-package meta
+package loader
 
 import "testing"
 

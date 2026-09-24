@@ -1,4 +1,4 @@
-package meta
+package mojang
 
 import (
 	"context"

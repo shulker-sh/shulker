@@ -14,6 +14,7 @@ import (
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/mavenver"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/proc"
@@ -72,8 +73,6 @@ type GDLauncherInstance struct {
 	// LoaderVersion is named the way GDLauncher's meta names it; see GDLauncherLoaderVersion.
 	LoaderVersion string
 }
-
-var gdlauncherLoaderTypes = map[string]string{"fabric": "Fabric", "quilt": "Quilt", "neoforge": "Neoforge", "forge": "Forge"}
 
 var gdlauncherReservedNames = []string{
 	"con", "prn", "aux", "clock$", "nul",
@@ -288,13 +287,11 @@ func GDLauncherFolder(name string) string {
 	}, folder)
 }
 
-// GDLauncherLoaderVersion is the loader version as GDLauncher's meta names it. Forge builds are named
-// <game>-<build> there, the way Forge's maven publishes them.
+// GDLauncherLoaderVersion is the loader version as GDLauncher's meta names it: the version the
+// loader's own Maven publishes it under, which for Forge carries the game version.
 func GDLauncherLoaderVersion(minecraft, loaderType, version string) string {
-	if loaderType == "forge" {
-		return minecraft + "-" + version
-	}
-	return version
+	l, _ := loader.Lookup(loaderType)
+	return l.ArtifactVersion(minecraft, version)
 }
 
 func (g *GDLauncher) InstanceDir(name string) string {
@@ -322,8 +319,8 @@ func (g *GDLauncher) WriteInstance(inst GDLauncherInstance) (InstanceResult, err
 		return res, err
 	}
 	modloaders := []map[string]string{}
-	if loaderType, ok := gdlauncherLoaderTypes[inst.LoaderType]; ok {
-		modloaders = append(modloaders, map[string]string{"type": loaderType, "version": inst.LoaderVersion})
+	if l, ok := loader.Lookup(inst.LoaderType); ok {
+		modloaders = append(modloaders, map[string]string{"type": l.GDLauncherType, "version": inst.LoaderVersion})
 	}
 	if config["version"], err = json.Marshal(map[string]any{"release": inst.Minecraft, "modloaders": modloaders}); err != nil {
 		return res, err

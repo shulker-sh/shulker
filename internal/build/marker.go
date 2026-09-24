@@ -82,7 +82,7 @@ func (b *Builder) markerJar(side string, cond conditions, sel selection) ([]byte
 		return nil, err
 	}
 	direct, deps := b.markerMods(side, sel)
-	l := b.Lock.RunningLoader()
+	l := loader.Running(b.Lock)
 	var entries []markerEntry
 	// The marker declares itself in the file its loader reads, and that file decides the format.
 	if strings.HasSuffix(l.MarkerFile, ".json") {
@@ -200,22 +200,17 @@ func (b *Builder) tomlMarker(l loader.Loader, side, lockHash string, direct, dep
 		Description: b.markerDescription(direct, deps, cond, plainText),
 	}
 	meta := markerToml{
-		ModLoader:       "lowcodefml",
-		LoaderVersion:   "[1,)",
+		ModLoader:       l.MarkerModLoader,
 		License:         b.markerLicense(),
 		LicenseURL:      b.Manifest.Links["license"],
 		IssueTrackerURL: b.Manifest.Links["issues"],
 	}
-	if l.Name == "neoforge" {
-		// NeoForge reads logoFile only as the wide banner on the detail pane; the square icon beside
-		// the name in the list comes from iconFile, which has no fallback, so a mod that sets just
-		// logoFile shows no icon at all. iconBlur scales the 128px icon into the 24px slot smoothly
-		// rather than by nearest neighbour.
+	if l.MarkerModLoader != "" {
+		meta.LoaderVersion = "[1,)"
+	}
+	if l.MarkerIconFile {
+		// iconBlur scales the 128px icon into the 24px slot smoothly rather than by nearest neighbour.
 		mod.IconFile, mod.IconBlur = markerLogo, true
-		// It also deprecated lowcodefml, mapping it to javafml, which loads a mod that declares no
-		// code; naming it only earns a warning. Both keys go together, since a loaderVersion without
-		// a modLoader is rejected. Forge has no such default and refuses a file missing either key.
-		meta.ModLoader, meta.LoaderVersion = "", ""
 	}
 	meta.Mods = []markerTomlMod{mod}
 	var metaData bytes.Buffer

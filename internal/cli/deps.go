@@ -13,9 +13,10 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/game"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/player"
@@ -33,11 +34,14 @@ type deps struct {
 	cache     *cache.Cache
 	providers provider.Providers
 	meta      *resolve.Meta
-	runtimes  *meta.Runtimes
-	players   *player.Client
-	// launcherMeta points a launcher at a fake metadata service, by launcher name.
-	launcherMeta map[string]string
-	signin       *account.SignIn
+	runtimes  *mojang.Runtimes
+	// loaders is what every loader row reaches out with.
+	loaders *loader.Remote
+	players *player.Client
+	// metaURLs replaces a launcher's metadata service, keyed by the URL its entry names, so a test
+	// can point it at a fake.
+	metaURLs map[string]string
+	signin   *account.SignIn
 	// resources is where the game store fetches asset objects from.
 	resources string
 }
@@ -80,12 +84,14 @@ func (a *app) deps() (*deps, error) {
 	mr.Log = a.progress
 	cf := curseforge.Open(f, cfg.CurseForge.Key, c.Dir)
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
+	loaders := &loader.Remote{Fetch: f, Cache: c, Log: a.progress, RunInstaller: a.installer}
 	a.d = &deps{
 		fetch:     f,
 		cache:     c,
 		providers: providers,
-		meta:      &resolve.Meta{Piston: meta.NewPiston(f), Fabric: meta.NewFabric(f), Quilt: meta.NewQuilt(f), NeoForge: meta.NewNeoForge(f), Forge: meta.NewForge(f), Cache: c},
-		runtimes:  meta.NewRuntimes(f),
+		loaders:   loaders,
+		meta:      &resolve.Meta{Piston: mojang.NewPiston(f), Loaders: loaders},
+		runtimes:  mojang.NewRuntimes(f),
 		players:   player.New(f),
 		signin:    account.NewSignIn(f),
 		resources: game.MojangResources,

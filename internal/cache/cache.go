@@ -114,3 +114,22 @@ func (c *Cache) CopyTo(sha, dst string) error {
 	}
 	return fsutil.WriteFrom(dst, src)
 }
+
+// FetchChecked downloads a file the first time it is locked, checking the sha1 its source
+// publishes, and returns its sha512.
+func (c *Cache) FetchChecked(ctx context.Context, client *fetch.Client, url, sha1 string) (string, error) {
+	sha, err := c.Fetch(ctx, client, url)
+	if err != nil || sha1 == "" {
+		return sha, err
+	}
+	got, err := fsutil.SHA1(c.Object(sha))
+	if err != nil {
+		return "", err
+	}
+	if got != sha1 {
+		e := out.Errorf("checksum-mismatch", "the download from %s doesn't match the sha1 its metadata gives", url)
+		e.Rows = []out.Detail{{Label: "want", Text: sha1}, {Label: "got", Text: got}}
+		return "", e
+	}
+	return sha, nil
+}

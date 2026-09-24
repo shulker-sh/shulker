@@ -651,7 +651,7 @@ func (a *app) storeVersion(ctx context.Context, p *project.Project, s game.Store
 		return id, nil
 	}
 	var id string
-	if l.InstallClientFlag != "" {
+	if l.HasInstaller() {
 		if err := a.fetchVanillaClient(ctx, s, p.Lock.Minecraft); err != nil {
 			return "", err
 		}

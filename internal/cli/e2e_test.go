@@ -25,8 +25,9 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/provider"
@@ -752,20 +753,18 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 		a.exe = func() (string, error) { return h.exe, nil }
 	}
 	f := fetch.New("test")
-	piston := meta.NewPiston(f)
+	piston := mojang.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"
-	fabric := meta.NewFabric(f)
-	fabric.BaseURL = h.server.URL + "/fabric"
-	quilt := meta.NewQuilt(f)
-	quilt.BaseURL = h.server.URL + "/quilt"
-	quilt.MavenURL = h.server.URL + "/qmaven"
-	neoforge := meta.NewNeoForge(f)
-	neoforge.BaseURL = h.server.URL + "/neoforge"
-	forge := meta.NewForge(f)
-	forge.BaseURL = h.server.URL + "/forge"
+	loaderURLs := map[string]string{
+		loader.FabricMetaURL:    h.server.URL + "/fabric",
+		loader.QuiltMetaURL:     h.server.URL + "/quilt",
+		loader.QuiltMavenURL:    h.server.URL + "/qmaven",
+		loader.NeoForgeMavenURL: h.server.URL + "/neoforge",
+		loader.ForgeMavenURL:    h.server.URL + "/forge",
+	}
 	mr := modrinth.New(f)
 	mr.BaseURL = h.server.URL + "/modrinth"
-	runtimes := meta.NewRuntimes(f)
+	runtimes := mojang.NewRuntimes(f)
 	runtimes.IndexURL = h.server.URL + "/jrt/all.json"
 	players := player.New(f)
 	players.APIURL = h.server.URL + "/mojang"
@@ -778,16 +777,18 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	cf.BaseURL = h.server.URL + "/curseforge"
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	c := &cache.Cache{Dir: h.cache}
+	loaders := &loader.Remote{Fetch: f, Cache: c, URLs: loaderURLs, Log: a.progress, RunInstaller: a.installer}
 	a.d = &deps{
-		fetch:        f,
-		cache:        c,
-		providers:    providers,
-		meta:         &resolve.Meta{Piston: piston, Fabric: fabric, Quilt: quilt, NeoForge: neoforge, Forge: forge, Cache: c},
-		runtimes:     runtimes,
-		players:      players,
-		launcherMeta: map[string]string{"gdlauncher": h.server.URL + "/gdl"},
-		signin:       h.msa.signIn(f, h.server.URL),
-		resources:    h.server.URL + "/resources",
+		fetch:     f,
+		cache:     c,
+		providers: providers,
+		loaders:   loaders,
+		meta:      &resolve.Meta{Piston: piston, Loaders: loaders},
+		runtimes:  runtimes,
+		players:   players,
+		metaURLs:  map[string]string{launcher.GDLauncherMetaURL: h.server.URL + "/gdl"},
+		signin:    h.msa.signIn(f, h.server.URL),
+		resources: h.server.URL + "/resources",
 	}
 	return a
 }

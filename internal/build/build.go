@@ -14,7 +14,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -28,7 +27,6 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
-	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
@@ -41,7 +39,7 @@ const (
 	StateDir          = ".shulker"
 	StateFile         = "state.json"
 	TemplateSuffix    = ".tmpl"
-	VanillaServerFile = "server.jar"
+	VanillaServerFile = loader.VanillaServerFile
 	EulaFile          = "eula.txt"
 )
 
@@ -533,7 +531,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectClient(side, opts, desired, vars, shipped); err != nil {
 			return nil, nil, err
 		}
-		if b.Lock.RunningLoader().MarkerFile != "" && b.markerOn(dir) {
+		if loader.Running(b.Lock).MarkerFile != "" && b.markerOn(dir) {
 			jar, err := b.markerJar(side, cond, sel)
 			if err != nil {
 				return nil, nil, err
@@ -758,23 +756,23 @@ func levelName(props properties) string {
 
 func (b *Builder) collectLauncher(desired map[string]source) error {
 	launcherMissing := notInstalled("the server launcher")
-	l := b.Lock.RunningLoader()
+	l := loader.Running(b.Lock)
 	jar, vanilla := b.Lock.Loader.Server, b.Lock.Server
 	if vanilla == nil || !b.Cache.Has(vanilla.Sha512) {
 		return launcherMissing
 	}
-	desired[vanillaServerPath(l, b.Lock.Minecraft)] = fromCache(vanilla.Sha512)
+	desired[l.VanillaServerPath(b.Lock.Minecraft)] = fromCache(vanilla.Sha512)
 	if b.Lock.Loader.Type == "" {
 		return nil
 	}
 	if jar == nil || !b.Cache.Has(jar.Sha512) {
 		return launcherMissing
 	}
-	if l.ServerSetup != loader.ServerInstaller {
+	if l.ServerLaunchJar != "" {
 		desired[l.ServerLaunchJar] = fromCache(jar.Sha512)
 	}
 	for name, dl := range jar.Libraries {
-		path, err := meta.MavenPath(name)
+		path, err := loader.MavenPath(name)
 		if err != nil {
 			return err
 		}
@@ -786,57 +784,9 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 	return nil
 }
 
-// vanillaServerPath is where a loader looks for the vanilla server jar: Fabric's launcher in its data
-// dir, where it downloads the jar only when missing; Quilt's launcher next to itself, which is also
-// where a project without a loader runs it; NeoForge's and Forge's installers under libraries/, or
-// in the server dir for Forge's older ones.
-func vanillaServerPath(l loader.Loader, minecraft string) string {
-	switch {
-	case l.RootServerJars:
-		return loader.VanillaServerJar(minecraft)
-	case l.ServerSetup == loader.ServerInstaller:
-		name := "server-" + minecraft
-		if l.MinecraftJarClassifier != "" {
-			name += "-" + l.MinecraftJarClassifier
-		}
-		return "libraries/net/minecraft/server/" + minecraft + "/" + name + ".jar"
-	case l.ServerSetup == loader.ServerLauncher:
-		return ".fabric/server/" + minecraft + "-server.jar"
-	}
-	return VanillaServerFile
-}
-
-// LaunchArgs start the server from its dir: the launch jar, the file a loader's installer left, or
-// the vanilla jar when there is no loader.
+// LaunchArgs start the server from its dir, as the locked loader has it.
 func LaunchArgs(lk *lock.Lock) []string {
-	l := lk.RunningLoader()
-	switch {
-	case l.Name == "":
-		return []string{"-jar", VanillaServerFile}
-	case l.RootServerJars:
-		return []string{"-jar", InstalledServerFile(lk)}
-	case l.ServerSetup == loader.ServerInstaller:
-		return []string{"@" + InstalledServerFile(lk)}
-	}
-	return []string{"-jar", l.ServerLaunchJar}
-}
-
-// InstalledServerFile is what a loader's server installer leaves for the server to start from,
-// relative to the server directory: an args file, or a jar for Forge's older installers. It is
-// empty when the loader has no installer.
-func InstalledServerFile(lk *lock.Lock) string {
-	l := lk.RunningLoader()
-	if l.ServerSetup != loader.ServerInstaller {
-		return ""
-	}
-	if l.RootServerJars {
-		return l.InstalledServerJar(lk.Minecraft, lk.Loader.Version)
-	}
-	name := "unix_args.txt"
-	if runtime.GOOS == "windows" {
-		name = "win_args.txt"
-	}
-	return "libraries/" + l.MavenPath + "/" + l.ArtifactVersion(lk.Minecraft, lk.Loader.Version) + "/" + name
+	return loader.Running(lk).LaunchArgs(lk)
 }
 
 // RecordLoader notes in dir's state that l was set up by its own installer.

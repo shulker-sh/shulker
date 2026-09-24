@@ -270,6 +270,31 @@ func (m *Mojang) WriteProfile(p Profile) error {
 	return m.writeProfiles(top, profiles)
 }
 
+// InstallLoader runs a loader's own installer against the launcher dir and returns the version id
+// it installed. The installer writes a launcher profile of its own; this puts launcher_profiles.json
+// back the way it was afterwards, so only shulker's profile shows, and reads the version id off
+// the entry the installer wrote.
+func (m *Mojang) InstallLoader(name string, run func() error) (string, error) {
+	if err := m.EnsureProfilesFile(); err != nil {
+		return "", err
+	}
+	before, err := m.Profiles()
+	if err != nil {
+		return "", err
+	}
+	if err := run(); err != nil {
+		return "", err
+	}
+	versionID, err := m.RestoreProfiles(before)
+	if err != nil {
+		return "", err
+	}
+	if versionID == "" {
+		return "", out.Errorf("loader-install-incomplete", "the %s installer wrote no launcher profile, so shulker can't tell which version it installed", name)
+	}
+	return versionID, nil
+}
+
 // EnsureProfilesFile writes an empty launcher_profiles.json when the launcher has never run, because
 // the NeoForge and Forge installers refuse a directory without one.
 func (m *Mojang) EnsureProfilesFile() error {

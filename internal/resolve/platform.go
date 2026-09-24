@@ -7,14 +7,13 @@ import (
 	"path"
 	"slices"
 
-	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
-	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 )
@@ -26,14 +25,10 @@ type Platform struct {
 	Java      lock.Java
 }
 
-// Meta reads the version metadata a platform is resolved from.
+// Meta reads the version metadata a platform is resolved from: Mojang's index and each loader's own.
 type Meta struct {
-	Piston   *meta.Piston
-	Fabric   *meta.Fabric
-	Quilt    *meta.Quilt
-	NeoForge *meta.NeoForge
-	Forge    *meta.Forge
-	Cache    *cache.Cache
+	Piston  *mojang.Piston
+	Loaders *loader.Remote
 }
 
 // Platform is nil, with no error, when the manifest sets no Minecraft version and no
@@ -60,8 +55,9 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 	if err != nil {
 		return nil, err
 	}
+	var row loader.Loader
 	if m.Loader.Type != "" {
-		if _, err := loader.Require(m.Loader.Type); err != nil {
+		if row, err = loader.Require(m.Loader.Type); err != nil {
 			return nil, err
 		}
 	}
@@ -80,20 +76,24 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 			}
 		}
 		if l := platform.Loader; l.Type != "" && l.Provides == nil {
-			if platform.Loader.Provides, err = mt.loaderProvides(ctx, l.Type, game, l.Version); err != nil {
+			inheritedRow, err := loader.Require(l.Type)
+			if err != nil {
+				return nil, err
+			}
+			if platform.Loader.Provides, err = mt.loaderProvides(ctx, inheritedRow, game, l.Version); err != nil {
 				return nil, err
 			}
 		}
 		return platform, nil
 	}
-	loaderVersion, err := mt.loaderVersion(ctx, m.Loader, game)
+	loaderVersion, err := mt.loaderVersion(ctx, row, m.Loader.Version, game)
 	if err != nil {
 		return nil, err
 	}
 	if err := loader.Supports(m.Loader.Type, game, loaderVersion); err != nil {
 		return nil, err
 	}
-	provides, err := mt.loaderProvides(ctx, m.Loader.Type, game, loaderVersion)
+	provides, err := mt.loaderProvides(ctx, row, game, loaderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -169,86 +169,52 @@ func inheritedPlatform(m *manifest.Manifest, packs []*pack.Loaded) (*Platform, e
 	return p, nil
 }
 
-type loaderVersions interface {
-	LoaderVersions(ctx context.Context, game string) ([]meta.LoaderVersion, error)
-}
-
-func (mt *Meta) versions(name string) (loaderVersions, error) {
-	switch name {
-	case "fabric":
-		return mt.Fabric, nil
-	case "quilt":
-		return mt.Quilt, nil
-	case "neoforge":
-		return mt.NeoForge, nil
-	case "forge":
-		return mt.Forge, nil
-	}
-	return nil, out.Errorf("unsupported-loader", "shulker has no version list for the %s loader", name)
-}
-
+// LoaderProfile is the launcher profile JSON a loader's meta serves for the locked loader.
 func (mt *Meta) LoaderProfile(ctx context.Context, l lock.Loader, game string) (json.RawMessage, error) {
-	switch l.Type {
-	case "fabric":
-		return mt.Fabric.LoaderProfile(ctx, game, l.Version)
-	case "quilt":
-		return mt.Quilt.LoaderProfile(ctx, game, l.Version)
+	row, err := loader.Require(l.Type)
+	if err != nil {
+		return nil, err
 	}
-	return nil, out.Errorf("unsupported-loader", "shulker has no launcher profile for the %s loader", l.Type)
+	return row.Profile(ctx, mt.Loaders, game, l.Version)
 }
 
-func (mt *Meta) InstallerURL(lk *lock.Lock) (string, error) {
-	switch lk.Loader.Type {
-	case "neoforge":
-		return mt.NeoForge.InstallerURL(lk.Loader.Version), nil
-	case "forge":
-		return mt.Forge.InstallerURL(lk.Minecraft, lk.Loader.Version), nil
-	}
-	return "", out.Errorf("unsupported-loader", "shulker has no installer for the %s loader", lk.Loader.Type)
-}
-
-func (mt *Meta) loaderVersion(ctx context.Context, l manifest.Loader, game string) (string, error) {
-	rng, err := loaderver.ParseRange(l.Version)
+func (mt *Meta) loaderVersion(ctx context.Context, row loader.Loader, rng, game string) (string, error) {
+	r, err := loaderver.ParseRange(rng)
 	if err != nil {
-		return "", rangeInvalid("loader.version", l.Version, err)
+		return "", rangeInvalid("loader.version", rng, err)
 	}
-	src, err := mt.versions(l.Type)
-	if err != nil {
-		return "", err
-	}
-	versions, err := src.LoaderVersions(ctx, game)
+	versions, err := row.Versions(ctx, mt.Loaders, game)
 	if err != nil {
 		return "", err
 	}
 	var candidates []loaderver.Version
 	for _, lv := range versions {
-		if v, err := loaderver.Parse(lv.Version); err == nil && (lv.Stable || !rng.IsAny()) {
+		if v, err := loaderver.Parse(lv.Version); err == nil && (lv.Stable || !r.IsAny()) {
 			candidates = append(candidates, v)
 		}
 	}
-	v, ok := loaderver.Newest(candidates, rng)
+	v, ok := loaderver.Newest(candidates, r)
 	if !ok {
-		return "", out.Errorf("platform-not-found", "no %s loader version matches %q for minecraft %s", l.Type, l.Version, game)
+		return "", out.Errorf("platform-not-found", "no %s loader version matches %q for minecraft %s", row.Name, rng, game)
 	}
 	return v.ID, nil
 }
 
-func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) (map[string]string, error) {
-	if name != "quilt" {
-		return nil, nil
+// loaderProvides is what the loader's own jar says it provides in place of another loader, for a
+// loader whose jar declares that; the jar is cached and hashed here, since its meta's hashes can't
+// be trusted.
+func (mt *Meta) loaderProvides(ctx context.Context, row loader.Loader, game, version string) (map[string]string, error) {
+	url, ok, err := row.ProvidesJar(ctx, mt.Loaders, game, version)
+	if err != nil || !ok {
+		return nil, err
 	}
-	url, err := mt.Quilt.LoaderJarURL(ctx, game, version)
+	sha, err := mt.Loaders.Cache.Fetch(ctx, mt.Loaders.Fetch, url)
 	if err != nil {
 		return nil, err
 	}
-	sha, err := mt.Cache.Fetch(ctx, mt.Quilt.Client, url)
+	info, err := jarmeta.Read(mt.Loaders.Cache.Object(sha), path.Base(url), row)
 	if err != nil {
-		return nil, err
-	}
-	quilt, _ := loader.Lookup(name)
-	info, err := jarmeta.Read(mt.Cache.Object(sha), path.Base(url), quilt)
-	if err != nil {
-		return nil, prefixed("quilt loader "+version, err)
+		return nil, prefixed(row.Name+" loader "+version, err)
 	}
 	return info.AllProvides(), nil
 }
@@ -265,7 +231,7 @@ func (mt *Meta) GameVersion(ctx context.Context, minecraft string) (string, erro
 
 // newestGame is the newest version the manifest lists that matches minecraft. An any range takes
 // the newest release, so a project that names no version is never authored against a snapshot.
-func newestGame(games *meta.GameManifest, minecraft string) (string, error) {
+func newestGame(games *mojang.GameManifest, minecraft string) (string, error) {
 	rng, err := mcver.ParseRange(minecraft)
 	if err != nil {
 		return "", rangeInvalid("minecraft", minecraft, err)
@@ -309,11 +275,11 @@ func (mt *Meta) GameVersions(ctx context.Context) ([]string, string, error) {
 // LoaderVersions lists a loader's versions for one Minecraft version, newest first, and the one
 // "*" resolves to, which is the newest stable.
 func (mt *Meta) LoaderVersions(ctx context.Context, name, game string) ([]string, string, error) {
-	src, err := mt.versions(name)
+	row, err := loader.Require(name)
 	if err != nil {
 		return nil, "", err
 	}
-	list, err := src.LoaderVersions(ctx, game)
+	list, err := row.Versions(ctx, mt.Loaders, game)
 	if err != nil {
 		return nil, "", err
 	}

@@ -11,7 +11,6 @@ import (
 	"sort"
 
 	"shulker.sh/shulker/internal/fsutil"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/schema"
@@ -302,13 +301,6 @@ func (l *Lock) DatapackFolder(side, levelName string) (folder string, loaded boo
 		return levelName + "/datapacks", true
 	}
 	return "datapacks", false
-}
-
-// RunningLoader is the locked loader as it runs on the locked Minecraft version, or the zero Loader
-// for a project without one.
-func (l *Lock) RunningLoader() loader.Loader {
-	running, _ := loader.For(l.Loader.Type, l.Minecraft)
-	return running
 }
 
 // JarID is the in-jar mod id dependencies name, which is the entry's key unless

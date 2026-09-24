@@ -1,4 +1,4 @@
-package meta
+package mojang
 
 import (
 	"context"
@@ -9,18 +9,6 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/out"
 )
-
-func TestFetchFailureKeepsNetwork(t *testing.T) {
-	c := fetch.New("test")
-	c.Offline = true
-	_, err := NewFabric(c).LoaderVersions(context.Background(), "1.21.1")
-	if out.CodeOf(err) != "meta-fetch" || !fetch.IsNetwork(err) {
-		t.Fatalf("offline: code %q, network %v", out.CodeOf(err), fetch.IsNetwork(err))
-	}
-	if rows := out.AsError(err).Rows; len(rows) != 1 || rows[0].Label != "fabric" {
-		t.Errorf("rows %+v", rows)
-	}
-}
 
 func TestServerErrorIsNotNetwork(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

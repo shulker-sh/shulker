@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	"shulker.sh/shulker/internal/fetch"
-	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -50,13 +50,13 @@ func RuntimeDir(cacheDir, component string) string {
 
 // EnsureRuntime installs a runtime component unless the cache already has it. With Refresh it
 // checks Mojang for a newer release first.
-func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *meta.Runtimes, cacheDir, component string, opts RuntimeOptions) (Runtime, error) {
+func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *mojang.Runtimes, cacheDir, component string, opts RuntimeOptions) (Runtime, error) {
 	dir := RuntimeDir(cacheDir, component)
 	existing, hasExisting := readRuntimeMarker(dir)
 	if hasExisting && !opts.Refresh {
 		return Runtime{Component: component, Version: existing.Version, Home: filepath.Join(dir, existing.Home)}, nil
 	}
-	platform, ok := meta.RuntimePlatform()
+	platform, ok := mojang.RuntimePlatform()
 	if !ok {
 		return Runtime{}, out.Errorf("runtime-unavailable", "Mojang publishes no Java runtime for %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
@@ -109,7 +109,7 @@ func EnsureRuntime(ctx context.Context, client *fetch.Client, runtimes *meta.Run
 // findRelease is the release of component Mojang publishes for platform. On Apple Silicon, where
 // Mojang publishes the oldest runtimes only for Intel Macs, it falls back to the Intel release, which
 // runs under Rosetta, as Mojang's own launcher does.
-func findRelease(ctx context.Context, runtimes *meta.Runtimes, platform, component string, rosetta func() bool) (meta.RuntimeRelease, error) {
+func findRelease(ctx context.Context, runtimes *mojang.Runtimes, platform, component string, rosetta func() bool) (mojang.RuntimeRelease, error) {
 	release, ok, err := runtimes.Release(ctx, platform, component)
 	if err != nil || ok {
 		return release, err
@@ -147,7 +147,7 @@ func readRuntimeMarker(dir string) (runtimeMarker, bool) {
 	return m, true
 }
 
-func runtimeHome(files map[string]meta.RuntimeFile) (string, error) {
+func runtimeHome(files map[string]mojang.RuntimeFile) (string, error) {
 	for name, f := range files {
 		if f.Type != "file" {
 			continue
@@ -159,7 +159,7 @@ func runtimeHome(files map[string]meta.RuntimeFile) (string, error) {
 	return "", out.Errorf("meta-invalid", "the Java runtime manifest lists no bin/java")
 }
 
-func countFiles(files map[string]meta.RuntimeFile) int {
+func countFiles(files map[string]mojang.RuntimeFile) int {
 	n := 0
 	for _, f := range files {
 		if f.Type == "file" {
@@ -169,7 +169,7 @@ func countFiles(files map[string]meta.RuntimeFile) int {
 	return n
 }
 
-func totalSize(files map[string]meta.RuntimeFile) int64 {
+func totalSize(files map[string]mojang.RuntimeFile) int64 {
 	var n int64
 	for _, f := range files {
 		if f.Type == "file" {
@@ -179,7 +179,7 @@ func totalSize(files map[string]meta.RuntimeFile) int64 {
 	return n
 }
 
-func materializeRuntime(ctx context.Context, client *fetch.Client, root string, files map[string]meta.RuntimeFile) error {
+func materializeRuntime(ctx context.Context, client *fetch.Client, root string, files map[string]mojang.RuntimeFile) error {
 	names := make([]string, 0, len(files))
 	for name := range files {
 		names = append(names, name)
@@ -241,7 +241,7 @@ func runtimePath(root, name string) (string, error) {
 	return filepath.Join(root, rel), nil
 }
 
-func downloadRuntimeFile(ctx context.Context, client *fetch.Client, path string, f meta.RuntimeFile) error {
+func downloadRuntimeFile(ctx context.Context, client *fetch.Client, path string, f mojang.RuntimeFile) error {
 	mode := os.FileMode(0o644)
 	if f.Executable {
 		mode = 0o755

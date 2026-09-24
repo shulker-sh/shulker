@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/instance"
-	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/mojang"
 )
 
 const fakeJava = `#!/bin/sh
@@ -95,7 +95,7 @@ func (f *fakeRuntime) manifest(base string) []byte {
 
 func (f *fakeRuntime) register(mux *http.ServeMux, base func() string) {
 	mux.HandleFunc("/jrt/all.json", func(w http.ResponseWriter, _ *http.Request) {
-		platform, _ := meta.RuntimePlatform()
+		platform, _ := mojang.RuntimePlatform()
 		if f.missing {
 			writeJSON(w, map[string]any{platform: map[string]any{}})
 			return

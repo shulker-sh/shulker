@@ -1,28 +1,62 @@
-// Package loader is the one table of what shulker knows about each mod loader.
+// Package loader is the one table of what shulker knows about each mod loader, and of what each
+// one does: reads its versions, serves its client profile, and sets up a server or a client.
 package loader
 
 import (
 	"cmp"
+	"context"
+	"encoding/json"
 	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
 )
 
-// ServerSetup is how a server gets its loader.
-type ServerSetup int
+// VanillaServerFile is the vanilla server jar's name in a server dir that runs it directly.
+const VanillaServerFile = "server.jar"
 
-const (
-	// ServerVanilla is no loader: the server runs the vanilla jar.
-	ServerVanilla ServerSetup = iota
-	// ServerLauncher is Fabric's: a server launch jar that fetches the vanilla jar where it expects it.
-	ServerLauncher
-	// ServerProfile is Quilt's: a launch jar and the libraries its server profile lists.
-	ServerProfile
-	// ServerInstaller is NeoForge's and Forge's: the loader's own installer, run with InstallServerFlag.
-	ServerInstaller
-)
+// Version is one of the versions a loader publishes for a Minecraft version.
+type Version struct {
+	Version string
+	Stable  bool
+}
+
+// Remote is what a row reaches out with: the fetch client, the cache every download lands in,
+// and the seams the CLI hands it for reporting and for running an installer.
+type Remote struct {
+	Fetch *fetch.Client
+	Cache *cache.Cache
+	// URLs replaces a service's base URL, keyed by the one the row would use, so a test can point
+	// it at a fake.
+	URLs map[string]string
+	// Log reports each download and install as its own step line.
+	Log func(format string, args ...any)
+	// RunInstaller runs a loader's own installer jar with the given Java.
+	RunInstaller func(ctx context.Context, java, jar string, args []string) error
+}
+
+func (r *Remote) url(base string) string {
+	if replaced, ok := r.URLs[base]; ok {
+		return replaced
+	}
+	return base
+}
+
+func (r *Remote) log(format string, args ...any) {
+	if r.Log != nil {
+		r.Log(format, args...)
+	}
+}
+
+// ServerResult says what ensuring a server's files did.
+type ServerResult struct {
+	ChangedLock bool
+	WasFetched  bool
+}
 
 type Loader struct {
 	Name string
@@ -36,13 +70,19 @@ type Loader struct {
 	MrpackKey string
 	// CurseForgeType is CurseForge's numeric modLoaderType.
 	CurseForgeType string
+	// CurseForgeGameInID lists the Minecraft versions whose loader id in a CurseForge pack manifest
+	// carries the game version too, as neoforge-1.20.1-<v>: those builds kept Forge's numbering,
+	// and the game version is how CurseForge tells them apart.
+	CurseForgeGameInID []string
+	// GDLauncherType is the loader's name in a GDLauncher instance's modloaders list.
+	GDLauncherType string
 	// AlsoRuns are the loaders whose mods this one runs as well.
-	AlsoRuns    []string
-	ServerSetup ServerSetup
-	// ServerLaunchJar is the jar a server built for this loader starts from.
+	AlsoRuns []string
+	// ServerLaunchJar is the jar a server built for this loader starts from, for a loader whose
+	// server shulker assembles rather than installs.
 	ServerLaunchJar string
 	// InstallServerFlag is the flag the loader's own installer takes, with the server dir, to set up
-	// a ServerInstaller server.
+	// a server. Empty means shulker assembles the server itself.
 	InstallServerFlag string
 	// InstallClientFlag, when set, means the launcher is set up by running the loader's own
 	// installer jar with this flag and the launcher dir, instead of writing a meta profile json.
@@ -60,6 +100,13 @@ type Loader struct {
 	// it; the suffix picks the format, JSON for Fabric's and TOML for FML's. Empty means the loader
 	// takes no marker.
 	MarkerFile string
+	// MarkerModLoader is the modLoader a TOML marker declares, with the loaderVersion that goes
+	// with it. Empty leaves both keys out, for a loader that rejects a loaderVersion without a
+	// modLoader and defaults a missing modLoader itself.
+	MarkerModLoader string
+	// MarkerIconFile means the TOML marker names its logo as iconFile too, for a loader that shows
+	// the square icon beside the name only from that key.
+	MarkerIconFile bool
 	// RootServerJars means the installer looks for the vanilla server jar in the server dir itself
 	// and leaves the jar the server starts from there, rather than an args file under libraries/.
 	RootServerJars bool
@@ -74,6 +121,23 @@ type Loader struct {
 	// MavenVersionPrefixesGame means those jars are published under <game>-<version>, the way Forge
 	// numbers its builds; NeoForge's build number already encodes the game version.
 	MavenVersionPrefixesGame bool
+
+	// versions lists what the loader publishes for a Minecraft version.
+	versions func(ctx context.Context, r *Remote, game string) ([]Version, error)
+	// profile is the launcher profile JSON the loader's meta serves, for a loader a launcher installs
+	// from one rather than with an installer.
+	profile func(ctx context.Context, r *Remote, game, version string) (json.RawMessage, error)
+	// providesJar is the URL of the loader's own jar, for a loader whose jar declares what it
+	// provides in place of another loader.
+	providesJar func(ctx context.Context, r *Remote, game, version string) (string, error)
+	// installerURL is where the loader's own installer jar is published.
+	installerURL func(r *Remote, minecraft, version string) string
+	// ensureServer caches the loader's server files, locking any the lock doesn't have yet.
+	ensureServer func(ctx context.Context, l Loader, r *Remote, lk *lock.Lock) (ServerResult, error)
+	// vanillaServer is where the loader looks for the vanilla server jar, relative to the server dir.
+	vanillaServer func(l Loader, minecraft string) string
+	// launchArgs start the server from its dir, for a loader that doesn't start from ServerLaunchJar.
+	launchArgs func(l Loader, lk *lock.Lock) []string
 }
 
 // ArtifactVersion is the version the loader publishes its own jars under.
@@ -84,19 +148,14 @@ func (l Loader) ArtifactVersion(minecraft, version string) string {
 	return version
 }
 
-var All = []Loader{
-	{Name: "fabric", Title: "Fabric", DependencyID: "fabricloader", ComponentUID: "net.fabricmc.fabric-loader", MrpackKey: "fabric-loader", CurseForgeType: "4", ServerSetup: ServerLauncher, ServerLaunchJar: "fabric-server-launch.jar", MetadataFiles: []string{"fabric.mod.json"}, MarkerFile: "fabric.mod.json", DependencyOverrides: "config/fabric_loader_dependencies.json"},
-	{Name: "quilt", Title: "Quilt", DependencyID: "quilt_loader", ComponentUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}, ServerSetup: ServerProfile, ServerLaunchJar: "quilt-server-launch.jar", MetadataFiles: []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json", TopLevelMandatory: true},
-	{Name: "neoforge", Title: "NeoForge", DependencyID: "neoforge", ComponentUID: "net.neoforged", MrpackKey: "neoforge", CurseForgeType: "6", ServerSetup: ServerInstaller, InstallServerFlag: "--install-server", InstallClientFlag: "--install-client", MetadataFiles: []string{"META-INF/neoforge.mods.toml", "META-INF/mods.toml"}, MarkerFile: "META-INF/neoforge.mods.toml", MavenPath: "net/neoforged/neoforge"},
-	{Name: "forge", Title: "Forge", DependencyID: "forge", ComponentUID: "net.minecraftforge", MrpackKey: "forge", CurseForgeType: "1", ServerSetup: ServerInstaller, InstallServerFlag: "--installServer", InstallClientFlag: "--installClient", MetadataFiles: []string{"META-INF/mods.toml"}, MarkerFile: "META-INF/mods.toml", MinecraftJarClassifier: "bundled", MavenPath: "net/minecraftforge/forge", MavenVersionPrefixesGame: true},
-}
+var All = []Loader{fabric, quilt, neoforge, forge}
 
 // For is the named loader as it runs on the given Minecraft version. Forge before 1.13 reads @Mod
 // annotations and mcmod.info and has no marker jar, and its installers before 1.17 set no
 // serverJarPath or args file.
 func For(name, minecraft string) (Loader, bool) {
 	l, ok := Lookup(name)
-	if !ok || l.Name != "forge" {
+	if !ok || l.Name != forge.Name {
 		return l, ok
 	}
 	v, err := mcver.Parse(minecraft)
@@ -115,6 +174,13 @@ func For(name, minecraft string) (Loader, bool) {
 	return l, ok
 }
 
+// Running is the locked loader as it runs on the locked Minecraft version, or the zero Loader for
+// a project without one.
+func Running(lk *lock.Lock) Loader {
+	l, _ := For(lk.Loader.Type, lk.Minecraft)
+	return l
+}
+
 // VanillaServerJar is the name a RootServerJars installer looks for the vanilla server jar under.
 func VanillaServerJar(minecraft string) string {
 	return "minecraft_server." + minecraft + ".jar"
@@ -125,6 +191,65 @@ func (l Loader) InstalledServerJar(minecraft, version string) string {
 	return l.Name + "-" + l.ArtifactVersion(minecraft, version) + ".jar"
 }
 
+// Versions lists the loader's versions for a Minecraft version.
+func (l Loader) Versions(ctx context.Context, r *Remote, game string) ([]Version, error) {
+	if l.versions == nil {
+		return nil, out.Errorf("unsupported-loader", "shulker has no version list for the %s loader", l.Name)
+	}
+	return l.versions(ctx, r, game)
+}
+
+// HasInstaller reports whether a client gets the loader by running its own installer rather than
+// from a launcher profile its meta serves.
+func (l Loader) HasInstaller() bool { return l.InstallClientFlag != "" }
+
+// Profile is the launcher profile JSON the loader's meta serves for a version on a Minecraft version.
+func (l Loader) Profile(ctx context.Context, r *Remote, game, version string) (json.RawMessage, error) {
+	if l.profile == nil {
+		return nil, out.Errorf("unsupported-loader", "shulker has no launcher profile for the %s loader", l.Name)
+	}
+	return l.profile(ctx, r, game, version)
+}
+
+// ProvidesJar is the URL of the loader's own jar when its metadata says what the loader provides
+// in place of another loader, which the lock records so validation stays offline.
+func (l Loader) ProvidesJar(ctx context.Context, r *Remote, game, version string) (string, bool, error) {
+	if l.providesJar == nil {
+		return "", false, nil
+	}
+	url, err := l.providesJar(ctx, r, game, version)
+	return url, err == nil, err
+}
+
+// EnsureServer caches the loader's server files, locking any the lock doesn't have yet.
+func (l Loader) EnsureServer(ctx context.Context, r *Remote, lk *lock.Lock) (ServerResult, error) {
+	if l.ensureServer == nil {
+		return ServerResult{}, nil
+	}
+	return l.ensureServer(ctx, l, r, lk)
+}
+
+// VanillaServerPath is where the loader looks for the vanilla server jar, relative to the server
+// dir; a project without a loader runs it from there.
+func (l Loader) VanillaServerPath(minecraft string) string {
+	if l.vanillaServer == nil {
+		return VanillaServerFile
+	}
+	return l.vanillaServer(l, minecraft)
+}
+
+// LaunchArgs start the server from its dir: the launch jar, the file the loader's installer left,
+// or the vanilla jar when there is no loader.
+func (l Loader) LaunchArgs(lk *lock.Lock) []string {
+	if l.launchArgs != nil {
+		return l.launchArgs(l, lk)
+	}
+	if l.ServerLaunchJar != "" {
+		return []string{"-jar", l.ServerLaunchJar}
+	}
+	return []string{"-jar", VanillaServerFile}
+}
+
 // firstModernForge is the first Forge build whose installer shulker can run offline: every earlier
 // one ships the legacy installer, which reads another install profile layout.
 const firstModernForge = "14.23.5.2851"
@@ -132,7 +257,7 @@ const firstModernForge = "14.23.5.2851"
 // Supports reports whether shulker can set up the named loader's version on the given Minecraft
 // version.
 func Supports(name, minecraft, version string) error {
-	if name != "forge" {
+	if name != forge.Name {
 		return nil
 	}
 	v, err := mcver.Parse(minecraft)

@@ -19,13 +19,13 @@ import (
 // loader isn't installed there yet, recording it on the report. The build already placed every
 // file the installer would download, so it runs offline and only generates the rest.
 func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *build.Report) error {
-	l := p.Lock.RunningLoader()
-	if l.ServerSetup != loader.ServerInstaller || rep.Side != "server" {
+	l := loader.Running(p.Lock)
+	if l.InstallServerFlag == "" || rep.Side != "server" {
 		return nil
 	}
 	want := build.InstalledLoader{Type: l.Name, Version: p.Lock.Loader.Version}
 	if installed := build.LoadState(rep.Dir).InstalledLoader; installed != nil && *installed == want {
-		if _, err := os.Stat(filepath.Join(rep.Dir, build.InstalledServerFile(p.Lock))); err == nil {
+		if _, err := os.Stat(filepath.Join(rep.Dir, l.InstalledServerFile(p.Lock))); err == nil {
 			return nil
 		}
 	}
@@ -41,8 +41,7 @@ func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *
 	if err != nil {
 		return err
 	}
-	a.progress("installing %s %s", want.Type, want.Version)
-	if err := a.installer(ctx, java.Path, d.cache.Object(p.Lock.Loader.Server.Sha512), []string{l.InstallServerFlag, dir, "--offline"}); err != nil {
+	if err := l.InstallServer(ctx, d.loaders, p.Lock, dir, java.Path); err != nil {
 		return a.keepInstallerOutput(err)
 	}
 	rep.InstalledLoader = &want

@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/loader"
 )
 
 const (
@@ -61,8 +62,6 @@ type ATLauncherInstance struct {
 	// Version is the merged version JSON the launcher installs and starts the game from.
 	Version json.RawMessage
 }
-
-var atlauncherLoaderTypes = map[string]string{"fabric": "Fabric", "quilt": "Quilt", "neoforge": "NeoForge", "forge": "Forge"}
 
 // DefaultATLauncherDir is where ATLauncher keeps its data. It runs from its working directory, which
 // the macOS app bundle sets to Contents/Java inside the app.
@@ -226,11 +225,12 @@ func (a *ATLauncher) WriteInstance(inst ATLauncherInstance) (InstanceResult, err
 	if err != nil {
 		return res, err
 	}
+	l, _ := loader.Lookup(inst.LoaderType)
 	loaderVersion, err := json.Marshal(map[string]any{
 		"version":     inst.LoaderVersion,
 		"rawVersion":  inst.LoaderVersion,
 		"recommended": false,
-		"type":        atlauncherLoaderTypes[inst.LoaderType],
+		"type":        l.Title,
 	})
 	if err != nil {
 		return res, err

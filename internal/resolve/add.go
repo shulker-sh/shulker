@@ -53,7 +53,7 @@ type Resolver struct {
 
 // readJar reads a jar's metadata the way the locked loader would.
 func (r *Resolver) readJar(path, name string) (*jarmeta.Info, error) {
-	return jarmeta.Read(path, name, r.Lock.RunningLoader())
+	return jarmeta.Read(path, name, loader.Running(r.Lock))
 }
 
 // jarKey is the requires key a mod jar takes: its mod id, or fallback when the id is missing or

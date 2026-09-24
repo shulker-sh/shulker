@@ -87,7 +87,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	}
 	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []Suggestion{}}
 	builtin := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
-	l := r.Lock.RunningLoader()
+	l := loader.Running(r.Lock)
 	if l.DependencyID != "" {
 		builtin[l.DependencyID] = r.Lock.Loader.Version
 	}

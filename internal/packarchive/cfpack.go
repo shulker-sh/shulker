@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -113,11 +114,12 @@ func (cfpack) NotListed(what string, n int) *out.Error {
 	return out.Errorf("curseforge-not-found", "%s %s on CurseForge", what, verb)
 }
 
-// cfModLoaderID is the loader id a pack manifest names for a loader version. NeoForge's 1.20.1
-// builds kept Forge's numbering, and CurseForge tells them apart by the game version in the id.
+// cfModLoaderID is the loader id a pack manifest names for a loader version, carrying the game
+// version where the row says CurseForge needs it to tell builds apart.
 func cfModLoaderID(loaderName, minecraft, version string) string {
-	if loaderName == "neoforge" && minecraft == "1.20.1" {
-		return loaderName + "-1.20.1-" + version
+	l, _ := loader.Lookup(loaderName)
+	if slices.Contains(l.CurseForgeGameInID, minecraft) {
+		return loaderName + "-" + minecraft + "-" + version
 	}
 	return loaderName + "-" + version
 }
@@ -129,11 +131,12 @@ func cfParseModLoaderID(id string) (string, string, bool) {
 	if !ok || version == "" {
 		return "", "", false
 	}
-	if _, known := loader.Lookup(name); !known {
+	l, known := loader.Lookup(name)
+	if !known {
 		return "", "", false
 	}
-	if name == "neoforge" {
-		version = strings.TrimPrefix(version, "1.20.1-")
+	for _, game := range l.CurseForgeGameInID {
+		version = strings.TrimPrefix(version, game+"-")
 	}
 	return name, version, true
 }

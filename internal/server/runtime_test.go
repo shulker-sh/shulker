@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
-	"shulker.sh/shulker/internal/meta"
+	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 )
 
-func runtimeIndex(t *testing.T, index map[string]map[string]string) *meta.Runtimes {
+func runtimeIndex(t *testing.T, index map[string]map[string]string) *mojang.Runtimes {
 	t.Helper()
 	body := map[string]map[string][]map[string]any{}
 	for platform, components := range index {
@@ -28,7 +28,7 @@ func runtimeIndex(t *testing.T, index map[string]map[string]string) *meta.Runtim
 		json.NewEncoder(w).Encode(body)
 	}))
 	t.Cleanup(srv.Close)
-	return &meta.Runtimes{Client: fetch.New("test"), IndexURL: srv.URL}
+	return &mojang.Runtimes{Client: fetch.New("test"), IndexURL: srv.URL}
 }
 
 func TestFindReleaseFallsBackToIntelOnAppleSilicon(t *testing.T) {

@@ -19,7 +19,6 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/meta"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
@@ -271,9 +270,9 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 }
 
 // metaURL is where a link reads a launcher's own metadata: the entry's service, unless the run
-// points that launcher at a fake.
+// points that service at a fake.
 func (a *app) metaURL(d *deps, e *launcher.Entry) string {
-	if url, ok := d.launcherMeta[e.Name]; ok {
+	if url, ok := d.metaURLs[e.MetaURL]; ok {
 		return url
 	}
 	return e.MetaURL
@@ -402,7 +401,7 @@ func (v clientVersions) Vanilla(ctx context.Context) (json.RawMessage, error) {
 	return d.meta.Piston.Version(ctx, v.p.Lock.Minecraft)
 }
 
-func (v clientVersions) HasInstaller() bool { return v.l.InstallClientFlag != "" }
+func (v clientVersions) HasInstaller() bool { return v.l.HasInstaller() }
 
 func (v clientVersions) LoaderProfile(ctx context.Context) (json.RawMessage, error) {
 	d, err := v.a.deps()
@@ -417,11 +416,12 @@ func (v clientVersions) InstallClient(ctx context.Context, launcherDir string) (
 }
 
 func (v clientVersions) InstallerVersion(ctx context.Context) (json.RawMessage, error) {
-	jar, err := v.a.clientInstaller(ctx, v.p)
+	d, err := v.a.deps()
 	if err != nil {
 		return nil, err
 	}
-	return meta.InstallerVersion(jar)
+	raw, changed, err := v.l.InstallerVersion(ctx, d.loaders, v.p.Lock)
+	return raw, saveChangedLock(v.p, changed, err)
 }
 
 // linkAsked is a bare link at a terminal: it asks which launcher, then runs that launcher's own
