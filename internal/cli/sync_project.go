@@ -62,7 +62,7 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 				continue
 			}
 			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(side), Dir: d, Source: dir})
-			e.ID = uniqueID(taken, "", filepath.Base(d), d)
+			e.ID = config.InstanceID(taken, "", filepath.Base(d), d)
 			taken = append(taken, config.Instance{ID: e.ID, Dir: d})
 			e.detached = true
 			if e.Side == "" {

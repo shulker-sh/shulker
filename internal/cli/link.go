@@ -455,22 +455,6 @@ func (a *app) linkAsked(cmd *cobra.Command) error {
 // overrides; without the line a server-only pack would just give a near-empty instance.
 const noClientPack = "the source declares no client; building one from its shared mods and overrides"
 
-// linkID is the id a link gives a game directory: the one its registry row already holds, else
-// --as or a slug of the display name, made unique across the registry. A new instance takes it as
-// its manifest's name too, so the id a player types and the project they play are the same thing.
-func (a *app) linkID(as, display, dir string) (string, error) {
-	instances, err := a.loadInstances()
-	if err != nil {
-		return "", err
-	}
-	if as == "" {
-		if i, ok := config.FindInstance(instances, dir); ok && instances[i].ID != "" {
-			return instances[i].ID, nil
-		}
-	}
-	return uniqueID(instances, as, display, dir), nil
-}
-
 // linkInstance is the half of a link every instanced launcher shares: the project its game
 // directory becomes, the settings this link seeds it with, the registry row that finds it again,
 // and the build that leaves it ready to play.
@@ -478,10 +462,11 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, s
 	if err := a.checkID(as, row.Dir); err != nil {
 		return nil, syncResult{}, err
 	}
-	id, err := a.linkID(as, row.Name, row.Dir)
+	instances, err := a.loadInstances()
 	if err != nil {
 		return nil, syncResult{}, err
 	}
+	id := config.InstanceID(instances, as, row.Name, row.Dir)
 	p, linked, err := a.linkProject(row.Dir, id, row.Name, src)
 	if err != nil {
 		return nil, syncResult{}, err

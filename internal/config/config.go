@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
@@ -332,6 +333,37 @@ func SlugID(name string) string {
 }
 
 var unsafeIDChars = regexp.MustCompile(`[^a-z0-9._-]+`)
+
+// InstanceID is the id a game directory gets: the one its registry row already holds, else the id
+// asked for or a slug of its display name, suffixed until free across the registry the way history
+// entries taken in the same second are suffixed. A new instance takes it as its manifest's name
+// too, so the id a player types and the project they play are the same thing.
+func InstanceID(instances []Instance, as, display, dir string) string {
+	if as == "" {
+		if i, ok := FindInstance(instances, dir); ok && instances[i].ID != "" {
+			return instances[i].ID
+		}
+		as = SlugID(display)
+	}
+	if _, taken := IDTaken(instances, as, dir); !taken {
+		return as
+	}
+	for n := 2; ; n++ {
+		id := as + "-" + strconv.Itoa(n)
+		if _, taken := IDTaken(instances, id, dir); !taken {
+			return id
+		}
+	}
+}
+
+// IDTaken is the directory of another instance whose row already holds id; the instance at dir
+// itself may hold it.
+func IDTaken(instances []Instance, id, dir string) (heldBy string, taken bool) {
+	if i, ok := FindID(instances, id); ok && !SameDir(instances[i].Dir, dir) {
+		return instances[i].Dir, true
+	}
+	return "", false
+}
 
 // SameDir also treats a symlink to dir as dir, since a launcher's game directory may be reached
 // through one.

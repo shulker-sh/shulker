@@ -89,7 +89,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 			in.Name = name
 		}
 		if in.ID == "" {
-			in.ID = uniqueID(instances, inPlaceID(in.Dir), in.Name, in.Dir)
+			in.ID = config.InstanceID(instances, inPlaceID(in.Dir), in.Name, in.Dir)
 		}
 		if in.Name != from {
 			res.Renamed = append(res.Renamed, repairRename{ID: in.ID, Dir: in.Dir, From: from, To: in.Name})
@@ -108,7 +108,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 			continue
 		}
 		registered[filepath.Clean(found.Dir)] = true
-		found.ID = uniqueID(instances, inPlaceID(found.Dir), found.Name, found.Dir)
+		found.ID = config.InstanceID(instances, inPlaceID(found.Dir), found.Name, found.Dir)
 		wrote, err := a.repairIntent(found)
 		if err != nil {
 			return res, err

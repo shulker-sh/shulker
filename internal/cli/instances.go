@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -260,7 +259,7 @@ func (a *app) registerInstance(in config.Instance) {
 			instances[i] = in
 			return instances
 		}
-		in.ID = uniqueID(instances, in.ID, in.Name, in.Dir)
+		in.ID = config.InstanceID(instances, in.ID, in.Name, in.Dir)
 		return append(instances, in)
 	})
 	a.reconcileOrWarn(in)
@@ -350,30 +349,6 @@ func loadIntent(dir, source string, at pack.At, side string, assumeClient bool) 
 	return f, fresh, nil
 }
 
-// uniqueID keeps want when it is free, and otherwise suffixes the slug the way history entries
-// taken in the same second are suffixed.
-func uniqueID(instances []config.Instance, want, name, dir string) string {
-	if want == "" {
-		want = config.SlugID(name)
-	}
-	if want == "" {
-		want = config.SlugID(filepath.Base(dir))
-	}
-	taken := func(id string) bool {
-		i, ok := config.FindID(instances, id)
-		return ok && !config.SameDir(instances[i].Dir, dir)
-	}
-	if !taken(want) {
-		return want
-	}
-	for n := 2; ; n++ {
-		id := want + "-" + strconv.Itoa(n)
-		if !taken(id) {
-			return id
-		}
-	}
-}
-
 // checkID refuses an --as value that isn't a valid key, or that another instance already holds.
 func (a *app) checkID(as, dir string) error {
 	if as == "" {
@@ -386,8 +361,8 @@ func (a *app) checkID(as, dir string) error {
 	if err != nil {
 		return err
 	}
-	if i, ok := config.FindID(instances, as); ok && !config.SameDir(instances[i].Dir, dir) {
-		e := out.Errorf("instance-id-taken", "another instance is already called %s (%s)", as, instances[i].Dir)
+	if heldBy, taken := config.IDTaken(instances, as, dir); taken {
+		e := out.Errorf("instance-id-taken", "another instance is already called %s (%s)", as, heldBy)
 		e.Help = "pass a different --as"
 		return e
 	}
