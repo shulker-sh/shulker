@@ -4,9 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 
-	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
@@ -45,31 +43,13 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 	if err != nil {
 		return nil, err
 	}
-	var all []project.InstanceEntry
-	for _, in := range registry {
-		if config.SameDir(in.Source, dir) && !config.SameDir(in.Dir, dir) {
-			all = append(all, project.Inspect(in))
-		}
-	}
 	lf, err := a.loadLocal(dir)
 	if err != nil {
 		return nil, err
 	}
-	taken := slices.Clone(registry)
-	for _, side := range p.Manifest.Sides() {
-		for _, d := range lf.ExistingSyncDirs(side) {
-			if config.SameDir(d, dir) || slices.ContainsFunc(all, func(e project.InstanceEntry) bool { return config.SameDir(e.Dir, d) }) {
-				continue
-			}
-			e := project.Inspect(config.Instance{Name: p.Manifest.DisplayName(side), Dir: d, Source: dir})
-			e.ID = config.InstanceID(taken, "", filepath.Base(d), d)
-			taken = append(taken, config.Instance{ID: e.ID, Dir: d})
-			e.Detached = true
-			if e.Side == "" {
-				e.Side = side
-			}
-			all = append(all, e)
-		}
+	all, err := project.SyncedFrom(p, registry, lf)
+	if err != nil {
+		return nil, err
 	}
 	if len(all) == 0 {
 		e := out.Errorf("no-instances", "nothing is synced from %s yet", dir)
