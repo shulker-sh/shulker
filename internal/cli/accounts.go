@@ -146,11 +146,11 @@ func (a *app) changeDefault(id string) (configChange, error) {
 		return configChange{}, err
 	}
 	change := configChange{Path: accountsDefault, To: id}
-	change.From, _ = field.get(doc)
+	change.From, _ = field.Get(doc)
 	if id == "" {
-		field.removeEmptied(doc)
+		field.RemoveEmptied(doc)
 	} else {
-		field.put(doc, id)
+		field.Put(doc, id)
 	}
 	return change, config.SaveDocument(path, doc)
 }

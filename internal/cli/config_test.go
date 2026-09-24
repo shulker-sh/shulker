@@ -349,12 +349,11 @@ func TestConfigSetDefaultAccountMustExist(t *testing.T) {
 func TestConfigKeysAreTheSchemaLeaves(t *testing.T) {
 	var leaves []string
 	for _, key := range []string{"accounts", "curseforge", "log", "play"} {
-		s, err := loadSchemaAt(schema.Config, config.FileName, key)
+		s, err := schema.Fields(schema.Config, config.FileName, key)
 		if err != nil {
 			t.Fatal(err)
 		}
-		props, _ := s.deref(s.root)["properties"].(map[string]any)
-		for name := range props {
+		for _, name := range s.Names() {
 			leaves = append(leaves, key+"."+name)
 		}
 	}

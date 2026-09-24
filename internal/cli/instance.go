@@ -71,7 +71,7 @@ func (a *app) instanceGetCmd() *cobra.Command {
 					if err != nil {
 						return err
 					}
-					if v, ok := field.get(defaults); ok {
+					if v, ok := field.Get(defaults); ok {
 						if _, set := all[key]; !set {
 							all[key] = v
 						}
@@ -79,22 +79,22 @@ func (a *app) instanceGetCmd() *cobra.Command {
 				}
 				return a.printer.Emit(all, func(l *out.Lines) { writeValue(l.W, all) })
 			}
-			field, err := f.schema.lookup(args[0])
+			field, err := f.fields.Lookup(args[0])
 			if err != nil {
 				return err
 			}
-			got := instanceSetting{Path: field.path}
+			got := instanceSetting{Path: field.Path}
 			global := globalKey(field)
 			if global != "" {
 				field, err := configField(global)
 				if err != nil {
 					return err
 				}
-				got.Default, _ = field.get(defaults)
+				got.Default, _ = field.Get(defaults)
 			} else {
-				got.Default = field.schema["default"]
+				got.Default, _ = field.Default()
 			}
-			if v, ok := field.get(f.doc); ok {
+			if v, ok := field.Get(f.doc); ok {
 				got.Value, got.From = v, fromInstance
 			} else if got.Default != nil {
 				got.Value, got.From = got.Default, fromConfig
@@ -102,7 +102,7 @@ func (a *app) instanceGetCmd() *cobra.Command {
 					got.From = fromDefault
 				}
 			} else {
-				return out.Errorf("path-not-set", "%s is not set", field.path)
+				return out.Errorf("path-not-set", "%s is not set", field.Path)
 			}
 			return a.printer.Emit(got, func(l *out.Lines) {
 				writeValue(l.W, got.Value)
@@ -137,9 +137,9 @@ func valueText(v any) string {
 }
 
 // globalKey is the config.json key behind a setting, or empty for a setting only an instance has.
-func globalKey(field *settingField) string {
-	if len(field.keys) == 2 && slices.Contains(instance.LaunchKeys, field.keys[1]) {
-		return "play." + field.keys[1]
+func globalKey(field *schema.Field) string {
+	if len(field.Keys) == 2 && slices.Contains(instance.LaunchKeys, field.Keys[1]) {
+		return "play." + field.Keys[1]
 	}
 	return ""
 }
@@ -156,35 +156,35 @@ func (a *app) instanceSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			field, err := f.schema.lookup(args[0])
+			field, err := f.fields.Lookup(args[0])
 			if err != nil {
 				return err
 			}
-			from, _ := field.get(f.doc)
+			from, _ := field.Get(f.doc)
 			var to any
 			if literal {
-				to, err = decodeLiteral(field.path, args[1])
+				to, err = decodeLiteral(field.Path, args[1])
 			} else {
-				to, err = field.coerce(args[1], from)
+				to, err = field.Coerce(args[1], from)
 			}
 			if err != nil {
 				return err
 			}
 			if globalKey(field) != "" {
-				if err := config.CheckPlaySetting(field.path, field.keys[1], to); err != nil {
+				if err := config.CheckPlaySetting(field.Path, field.Keys[1], to); err != nil {
 					return err
 				}
 			}
-			if field.path == "account" {
+			if field.Path == "account" {
 				if to, err = a.pinnedAccountID(to); err != nil {
 					return err
 				}
 			}
-			field.put(f.doc, to)
+			field.Put(f.doc, to)
 			if err := f.save(); err != nil {
 				return err
 			}
-			return a.emitSettingChange(settingChange{Path: field.path, From: from, To: to})
+			return a.emitSettingChange(settingChange{Path: field.Path, From: from, To: to})
 		},
 	}
 	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for a list")
@@ -216,21 +216,21 @@ func (a *app) instanceUnsetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			field, err := f.schema.lookup(args[0])
+			field, err := f.fields.Lookup(args[0])
 			if err != nil {
 				return err
 			}
-			from, ok := field.get(f.doc)
+			from, ok := field.Get(f.doc)
 			if !ok {
-				return a.printer.Emit(settingChange{Path: field.path}, func(l *out.Lines) {
-					l.Info(field.path + " was not set")
+				return a.printer.Emit(settingChange{Path: field.Path}, func(l *out.Lines) {
+					l.Info(field.Path + " was not set")
 				})
 			}
-			field.remove(f.doc)
+			field.Remove(f.doc)
 			if err := f.save(); err != nil {
 				return err
 			}
-			return a.emitSettingChange(settingChange{Path: field.path, From: from})
+			return a.emitSettingChange(settingChange{Path: field.Path, From: from})
 		},
 	}
 }
@@ -319,7 +319,7 @@ func (a *app) emitSettingChange(change settingChange) error {
 type instanceFile struct {
 	dir, path string
 	doc       map[string]any
-	schema    *settingsSchema
+	fields    *schema.FieldSet
 }
 
 // openInstanceFile opens the instance file of the directory the command acts on: the one it runs
@@ -344,11 +344,11 @@ func (a *app) openInstanceFile() (*instanceFile, error) {
 	if err := dec.Decode(&doc); err != nil {
 		return nil, schema.Invalid("instance-invalid", path, data, err)
 	}
-	s, err := loadSchemaAt(schema.Instance, instance.FileName, "settings")
+	s, err := schema.Fields(schema.Instance, instance.FileName, "settings")
 	if err != nil {
 		return nil, err
 	}
-	return &instanceFile{dir: dir, path: path, doc: doc, schema: s}, nil
+	return &instanceFile{dir: dir, path: path, doc: doc, fields: s}, nil
 }
 
 // instanceDir is the directory the command acts on — the one it runs in, -C, or the instance -i

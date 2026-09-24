@@ -79,9 +79,9 @@ func (a *app) configGetCmd() *cobra.Command {
 			case resolved[key] != "":
 				value = resolved[key]
 			default:
-				v, ok := field.get(doc)
+				v, ok := field.Get(doc)
 				if !ok {
-					if v, ok = field.schema["default"]; !ok {
+					if v, ok = field.Default(); !ok {
 						return out.Errorf("path-not-set", "%s is not set", key)
 					}
 				}
@@ -124,12 +124,12 @@ func (a *app) configSetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			from, _ := field.get(doc)
+			from, _ := field.Get(doc)
 			var to any
 			if literal {
 				to, err = decodeLiteral(key, value)
 			} else {
-				to, err = field.coerce(value, from)
+				to, err = field.Coerce(value, from)
 			}
 			if err != nil {
 				return err
@@ -137,7 +137,7 @@ func (a *app) configSetCmd() *cobra.Command {
 			if to, err = config.CheckValue(key, to, launcher.AccountStores()); err != nil {
 				return err
 			}
-			field.put(doc, to)
+			field.Put(doc, to)
 			if err := checkConfigDocument(field, doc, to); err != nil {
 				return err
 			}
@@ -188,7 +188,7 @@ func (a *app) configUnsetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			from, ok := field.get(doc)
+			from, ok := field.Get(doc)
 			if !ok {
 				return a.printer.Emit(configChange{Path: key}, func(l *out.Lines) {
 					l.Info(key + " was not set")
@@ -202,7 +202,7 @@ func (a *app) configUnsetCmd() *cobra.Command {
 					return err
 				}
 			}
-			field.removeEmptied(doc)
+			field.RemoveEmptied(doc)
 			if err := config.SaveDocument(path, doc); err != nil {
 				return err
 			}
@@ -276,12 +276,12 @@ func maskKey(key string) string {
 	return dots + key[len(key)-4:]
 }
 
-var configSchema = sync.OnceValues(func() (*settingsSchema, error) {
-	return loadSchemaAt(schema.Config, config.FileName)
+var configSchema = sync.OnceValues(func() (*schema.FieldSet, error) {
+	return schema.Fields(schema.Config, config.FileName)
 })
 
 // configField is key's field in config.json's schema, or nil for no key.
-func configField(key string) (*settingField, error) {
+func configField(key string) (*schema.Field, error) {
 	if key == "" {
 		return nil, nil
 	}
@@ -289,7 +289,7 @@ func configField(key string) (*settingField, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.lookup(key)
+	return s.Lookup(key)
 }
 
 // checkAccountID refuses a default account shulker can't see, which every launch would then fail on.
@@ -308,7 +308,7 @@ func (a *app) checkAccountID(id string) error {
 
 // checkConfigDocument refuses a value, typed with --literal, that config.json's schema doesn't allow
 // at field, so the next run doesn't find the file broken.
-func checkConfigDocument(field *settingField, doc map[string]any, v any) error {
+func checkConfigDocument(field *schema.Field, doc map[string]any, v any) error {
 	written := maps.Clone(doc)
 	written["$schema"] = schema.URL(schema.Config)
 	data, err := json.Marshal(written)
@@ -316,7 +316,7 @@ func checkConfigDocument(field *settingField, doc map[string]any, v any) error {
 		return err
 	}
 	if schema.Validate(schema.Config, data) != nil {
-		return out.Errorf("usage", "%s takes %s, not %s", field.path, field.kind(), out.ValueText(v))
+		return out.Errorf("usage", "%s takes %s, not %s", field.Path, field.Kind(), settingText(v))
 	}
 	return nil
 }
