@@ -61,7 +61,7 @@ func (a *app) ignoreCmd() *cobra.Command {
 					return err
 				}
 				a.warn(v.Warnings)
-				problem, err := matchProblem(v.Problems, mod, on, rule)
+				problem, err := resolve.MatchProblem(v.Problems, mod, on, rule)
 				if err != nil {
 					return err
 				}
@@ -72,7 +72,7 @@ func (a *app) ignoreCmd() *cobra.Command {
 					kept := p.Manifest.Ignore[existing]
 					entry.Rule, entry.Declared = kept.Rule, kept.Declared
 				default:
-					return noProblem(v.Problems, mod, on)
+					return resolve.NoProblem(v.Problems, mod, on)
 				}
 			}
 			if existing >= 0 {
@@ -98,46 +98,6 @@ func (a *app) ignoreCmd() *cobra.Command {
 	cmd.Flags().StringVar(&declared, "declared", "", "the range the jar declares (printed with the problem); with it, nothing is resolved")
 	cmd.Flags().BoolVar(&force, "force", false, "replace an existing ignore for the pair")
 	return cmd
-}
-
-func matchProblem(problems []resolve.Problem, mod, on, rule string) (*resolve.Problem, error) {
-	var matches []resolve.Problem
-	for _, p := range problems {
-		if p.Mod == mod && p.On == on && (rule == "" || p.Rule == rule) {
-			matches = append(matches, p)
-		}
-	}
-	switch len(matches) {
-	case 0:
-		return nil, nil
-	case 1:
-		return &matches[0], nil
-	}
-	e := out.Errorf("usage", "%s on %s has both a depends and a breaks problem", mod, on)
-	e.Help = "pass --rule depends or --rule breaks"
-	return nil, e
-}
-
-func noProblem(problems []resolve.Problem, mod, on string) error {
-	var pairs, ons []string
-	for _, p := range problems {
-		pairs = append(pairs, p.Mod+" "+p.On)
-		if p.Mod == mod {
-			ons = append(ons, p.On)
-		}
-	}
-	if len(problems) == 0 {
-		e := out.Errorf("no-problem", "the locked mods have no problem between %s and %s", mod, on)
-		e.Help = "pass --rule and --declared from the failed command"
-		return e
-	}
-	e := out.Errorf("no-problem", "the locked mods have no problem between %s and %s", mod, on)
-	e.Help = "pass --rule and --declared from the failed command, or pick a current problem"
-	e.Candidates = pairs
-	if len(ons) > 0 {
-		e.Candidates, e.Given = ons, on
-	}
-	return e
 }
 
 func (a *app) unignoreCmd() *cobra.Command {
