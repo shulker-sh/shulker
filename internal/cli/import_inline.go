@@ -131,7 +131,7 @@ func inlined(p *project.Project, loaded *pack.Loaded) (*incoming, error) {
 	}
 	inc := &incoming{manifest: &pm, lock: pl, dir: loaded.Dir, hasBlocks: true, overrides: loaded.Overrides}
 	if loaded.Dir != "" && loaded.Archive == nil {
-		overrides, err := readOverrideFolders(loaded.Dir, loaded.Manifest)
+		overrides, err := project.ReadOverrideFolders(loaded.Dir, loaded.Manifest)
 		if err != nil {
 			return nil, err
 		}
