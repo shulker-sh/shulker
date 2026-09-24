@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,7 +30,7 @@ func (a *app) instancesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sortInstanceEntries(entries)
+			project.SortInstances(entries)
 			return a.printer.Emit(entries, func(l *out.Lines) { printInstanceEntries(l, entries) })
 		},
 	}
@@ -58,23 +56,6 @@ func (a *app) loadInstanceEntries() ([]project.InstanceEntry, error) {
 		entries[i] = project.Inspect(in)
 	}
 	return entries, nil
-}
-
-func compareInstances(x, y project.InstanceEntry) int {
-	if d := launcher.Rank(x.Launcher) - launcher.Rank(y.Launcher); d != 0 {
-		return d
-	}
-	if c := strings.Compare(x.Launcher, y.Launcher); c != 0 {
-		return c
-	}
-	if c := strings.Compare(strings.ToLower(x.Label()), strings.ToLower(y.Label())); c != 0 {
-		return c
-	}
-	return strings.Compare(x.Dir, y.Dir)
-}
-
-func sortInstanceEntries(entries []project.InstanceEntry) {
-	slices.SortStableFunc(entries, compareInstances)
 }
 
 func printInstanceEntries(l *out.Lines, entries []project.InstanceEntry) {

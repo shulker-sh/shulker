@@ -4,10 +4,13 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -92,4 +95,23 @@ func Inspect(in config.Instance) InstanceEntry {
 		e.Side = state.Side
 	}
 	return e
+}
+
+// SortInstances orders entries for display: launchers in the launcher table's order, then by
+// launcher name, label and directory.
+func SortInstances(entries []InstanceEntry) {
+	slices.SortStableFunc(entries, compareInstances)
+}
+
+func compareInstances(x, y InstanceEntry) int {
+	if d := launcher.Rank(x.Launcher) - launcher.Rank(y.Launcher); d != 0 {
+		return d
+	}
+	if c := strings.Compare(x.Launcher, y.Launcher); c != 0 {
+		return c
+	}
+	if c := strings.Compare(strings.ToLower(x.Label()), strings.ToLower(y.Label())); c != 0 {
+		return c
+	}
+	return strings.Compare(x.Dir, y.Dir)
 }

@@ -67,7 +67,7 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]project.Inst
 		e.Help = "`shulker link prism` adds an instance"
 		return nil, e
 	}
-	sortInstanceEntries(entries)
+	project.SortInstances(entries)
 	var pool []project.InstanceEntry
 	for _, e := range entries {
 		if s.admits(e) {

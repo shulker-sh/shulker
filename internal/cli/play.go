@@ -573,7 +573,7 @@ func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (conf
 	for i, in := range own {
 		entries[i] = project.Inspect(in)
 	}
-	sortInstanceEntries(entries)
+	project.SortInstances(entries)
 	t := a.printer.ErrTheme
 	e, err := pickOne(a, "Play which one?", entries,
 		func(e project.InstanceEntry) string { return e.ID },

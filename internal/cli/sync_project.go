@@ -76,7 +76,7 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 		e.Help = "`shulker link prism` adds an instance and `shulker sync --into <dir>` a detached build, and `shulker sync --all` syncs every instance"
 		return nil, e
 	}
-	sortInstanceEntries(all)
+	project.SortInstances(all)
 	for _, e := range all {
 		if s.admits(e) {
 			entries = append(entries, e)
