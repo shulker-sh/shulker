@@ -569,15 +569,15 @@ func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (conf
 		a.logInstance(own[0].ID)
 		return own[0], nil, nil
 	}
-	entries := make([]instanceEntry, len(own))
+	entries := make([]project.InstanceEntry, len(own))
 	for i, in := range own {
-		entries[i] = inspectInstance(in)
+		entries[i] = project.Inspect(in)
 	}
 	sortInstanceEntries(entries)
 	t := a.printer.ErrTheme
 	e, err := pickOne(a, "Play which one?", entries,
-		func(e instanceEntry) string { return e.ID },
-		func(e instanceEntry) string { return instancePickLabel(t, e) },
+		func(e project.InstanceEntry) string { return e.ID },
+		func(e project.InstanceEntry) string { return instancePickLabel(t, e) },
 		func() error {
 			e := out.Errorf("ambiguous-instance", "several shulker instances play %s", p.Manifest.DisplayName("client"))
 			e.Help = "pass -i <id> to choose one"

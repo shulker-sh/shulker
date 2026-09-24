@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 // savesWhere is the selection backup, restore, saves and saves prune share: the current directory,
@@ -25,7 +26,7 @@ func (s *savesWhere) register(cmd *cobra.Command, group, all string) {
 // why the rows' target couldn't be resolved.
 type savesPick struct {
 	savesTarget
-	rows []instanceEntry
+	rows []project.InstanceEntry
 	err  error
 }
 
@@ -65,13 +66,13 @@ func (a *app) savesPicks(w savesWhere) ([]savesPick, error) {
 	for _, e := range entries {
 		t, err := a.savesTargetAt(e.Dir)
 		if err != nil {
-			picks = append(picks, savesPick{rows: []instanceEntry{e}, err: err})
+			picks = append(picks, savesPick{rows: []project.InstanceEntry{e}, err: err})
 			continue
 		}
 		t.via = e.ID
 		i := slices.IndexFunc(picks, func(p savesPick) bool { return p.err == nil && p.backups == t.backups })
 		if i < 0 {
-			picks = append(picks, savesPick{savesTarget: t, rows: []instanceEntry{e}})
+			picks = append(picks, savesPick{savesTarget: t, rows: []project.InstanceEntry{e}})
 			continue
 		}
 		picks[i].rows = append(picks[i].rows, e)

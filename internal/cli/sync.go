@@ -119,7 +119,7 @@ func (a *app) syncCmd() *cobra.Command {
 					if err != nil {
 						return err
 					}
-					entries = []instanceEntry{picked}
+					entries = []project.InstanceEntry{picked}
 				}
 				if sel.all {
 					return a.syncInstances(cmd, entries, req)
@@ -354,7 +354,7 @@ func (a *app) syncRecorded(cmd *cobra.Command, req syncRequest) (syncResult, err
 	if err != nil {
 		return syncResult{}, err
 	}
-	e := inspectInstance(config.Instance{Dir: into})
+	e := project.Inspect(config.Instance{Dir: into})
 	if e.Source == "" {
 		e := out.Errorf("source-unknown", "%s has no record of what it was synced from", into)
 		e.Help = "name the source"

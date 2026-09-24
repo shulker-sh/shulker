@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 type unlinkResult struct {
@@ -98,7 +99,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) unlink(configPath string, l instanceEntry) (unlinkResult, error) {
+func (a *app) unlink(configPath string, l project.InstanceEntry) (unlinkResult, error) {
 	r := unlinkResult{Instance: l.Instance, OK: true}
 	r.Relink, r.RelinkIn = launcher.Relink(launcher.Linked{Instance: l.Instance, Side: l.Side, AssumesClient: l.AssumesClient, Ref: l.Ref, Path: l.Path})
 	f, err := launcher.Forget(l.Instance)

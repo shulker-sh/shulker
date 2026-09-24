@@ -1,46 +1,20 @@
 package cli
 
 import (
-	"errors"
-	"os"
-	"path/filepath"
-
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
 
-type instanceEntry struct {
-	config.Instance
-	Status        string `json:"status"`
-	SyncedAt      string `json:"syncedAt,omitempty"`
-	Side          string `json:"side,omitempty"`
-	AssumesClient bool   `json:"assumeClient,omitempty"`
-	Ref           string `json:"ref,omitempty"`
-	Path          string `json:"path,omitempty"`
-	Problem       string `json:"problem,omitempty"`
-	LaunchError   string `json:"launchError,omitempty"`
-	intent        *instance.File
-	detached      bool
-}
-
-const (
-	instanceSynced     = "synced"
-	instanceNotSynced  = "not-synced"
-	instanceMissing    = "missing"
-	instanceUnreadable = "unreadable"
-)
-
-func (i instanceEntry) intentPath() string { return filepath.Join(instance.Dir, instance.FileName) }
+// instanceText phrases an entry's status for the instances list.
+type instanceText struct{ project.InstanceEntry }
 
 func (a *app) instancesCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -74,76 +48,19 @@ func (a *app) loadInstances() ([]config.Instance, error) {
 	return config.LoadInstances(path)
 }
 
-func (a *app) loadInstanceEntries() ([]instanceEntry, error) {
+func (a *app) loadInstanceEntries() ([]project.InstanceEntry, error) {
 	instances, err := a.loadInstances()
 	if err != nil {
 		return nil, err
 	}
-	entries := make([]instanceEntry, len(instances))
+	entries := make([]project.InstanceEntry, len(instances))
 	for i, in := range instances {
-		entries[i] = inspectInstance(in)
+		entries[i] = project.Inspect(in)
 	}
 	return entries, nil
 }
 
-// inspectInstance reads what the instance directory says about itself: its manifest where it is a
-// project, its instance file otherwise, and what the last build recorded where there is neither. A
-// directory shulker can't read is still listed: `instances repair` is what fixes it.
-func inspectInstance(in config.Instance) instanceEntry {
-	e := instanceEntry{Instance: in, Status: instanceSynced}
-	if _, err := os.Stat(in.Dir); errors.Is(err, os.ErrNotExist) {
-		e.Status = instanceMissing
-		return e
-	} else if err != nil {
-		e.Status = instanceUnreadable
-		return e
-	}
-	switch f, err := instance.Load(in.Dir); {
-	case errors.Is(err, instance.ErrNotFound):
-		e.Problem = "no " + e.intentPath()
-	case err != nil:
-		e.Problem = out.AsError(err).Message
-	default:
-		e.intent = f
-		e.Side, e.Ref, e.Path, e.AssumesClient = f.Side, f.Ref, f.Path, f.AssumesClient
-		if e.Source == "" {
-			e.Source = f.Source
-		}
-	}
-	if records := instance.LoadLaunches(in.Dir); len(records) > 0 {
-		if last := records[len(records)-1]; last.Outcome == instance.OutcomeNotStarted {
-			e.LaunchError = last.Error
-		}
-	}
-	pack, side, inPlace := project.InPlaceIntent(in.Dir)
-	state, _ := build.ReadState(in.Dir)
-	switch {
-	case inPlace:
-		e.Ref, e.Path, e.Side = pack.Ref, pack.Path, side
-		if pack.Source != "" {
-			e.Source = pack.Source
-		}
-	case e.intent == nil:
-		e.Ref, e.Path = state.Ref, state.Path
-		if e.Source == "" {
-			e.Source = state.Source
-		}
-	}
-	if _, err := os.Stat(build.StatePath(in.Dir)); errors.Is(err, os.ErrNotExist) {
-		e.Status = instanceNotSynced
-		return e
-	} else if err != nil {
-		e.Status = instanceUnreadable
-		return e
-	}
-	e.SyncedAt = state.BuiltAt
-	if e.Side == "" {
-		e.Side = state.Side
-	}
-	return e
-}
-
-func compareInstances(x, y instanceEntry) int {
+func compareInstances(x, y project.InstanceEntry) int {
 	if d := launcher.Rank(x.Launcher) - launcher.Rank(y.Launcher); d != 0 {
 		return d
 	}
@@ -156,11 +73,11 @@ func compareInstances(x, y instanceEntry) int {
 	return strings.Compare(x.Dir, y.Dir)
 }
 
-func sortInstanceEntries(entries []instanceEntry) {
+func sortInstanceEntries(entries []project.InstanceEntry) {
 	slices.SortStableFunc(entries, compareInstances)
 }
 
-func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
+func printInstanceEntries(l *out.Lines, entries []project.InstanceEntry) {
 	if len(entries) == 0 {
 		l.Info("Nothing is linked yet; `shulker link prism` adds an instance.")
 		return
@@ -190,25 +107,25 @@ func printInstanceEntries(l *out.Lines, entries []instanceEntry) {
 		if e.Side != "" {
 			detail += ", side " + e.Side
 		}
-		group = append(group, out.Entry{Synced: e.Status == instanceSynced && e.LastError == "" && e.LaunchError == "", Name: e.ID, Tag: e.Side, Aside: e.statusText(), Path: e.Dir, Detail: detail, Note: e.launchText()})
+		group = append(group, out.Entry{Synced: e.Status == project.StatusSynced && e.LastError == "" && e.LaunchError == "", Name: e.ID, Tag: e.Side, Aside: instanceText{e}.statusText(), Path: e.Dir, Detail: detail, Note: instanceText{e}.launchText()})
 	}
 	flush(entries[len(entries)-1].Launcher)
 }
 
 // launchText is the line under a directory whose last launch never got as far as running the game.
 // It is its own line because the reason is an operating system message, too long for the aside.
-func (i instanceEntry) launchText() string {
+func (i instanceText) launchText() string {
 	if i.LaunchError == "" {
 		return ""
 	}
 	return "last launch didn't start: " + i.LaunchError
 }
 
-func (i instanceEntry) statusText() string {
+func (i instanceText) statusText() string {
 	switch i.Status {
-	case instanceMissing:
+	case project.StatusMissing:
 		return "directory is missing"
-	case instanceUnreadable:
+	case project.StatusUnreadable:
 		return "can't read the directory"
 	}
 	text := i.syncedText()
@@ -218,8 +135,8 @@ func (i instanceEntry) statusText() string {
 	return text
 }
 
-func (i instanceEntry) syncedText() string {
-	if i.Status == instanceNotSynced {
+func (i instanceText) syncedText() string {
+	if i.Status == project.StatusNotSynced {
 		return "not synced yet"
 	}
 	if i.Problem != "" {

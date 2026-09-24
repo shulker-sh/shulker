@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/project"
 )
 
 func registryPath(h *harness) string {
@@ -199,7 +200,7 @@ func TestInPlaceInstanceFileKeepsSettingsOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	var env struct {
-		Data []instanceEntry `json:"data"`
+		Data []project.InstanceEntry `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &env); err != nil {
 		t.Fatal(err)
@@ -236,7 +237,7 @@ func TestInstancesList(t *testing.T) {
 	t.Cleanup(func() { os.Chmod(locked, 0o755) })
 
 	var env struct {
-		Data []instanceEntry `json:"data"`
+		Data []project.InstanceEntry `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &env); err != nil {
 		t.Fatal(err)
@@ -796,7 +797,7 @@ func TestInstancesShowsALaunchThatNeverStarted(t *testing.T) {
 	}
 
 	var env struct {
-		Data []instanceEntry `json:"data"`
+		Data []project.InstanceEntry `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &env); err != nil {
 		t.Fatal(err)

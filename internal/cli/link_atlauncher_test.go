@@ -9,6 +9,7 @@ import (
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/project"
 )
 
 func TestLinkATLauncher(t *testing.T) {
@@ -71,12 +72,12 @@ func TestLinkATLauncher(t *testing.T) {
 	}
 
 	var listed struct {
-		Data []instanceEntry `json:"data"`
+		Data []project.InstanceEntry `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &listed); err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Data) != 1 || listed.Data[0].Launcher != "atlauncher" || listed.Data[0].Dir != instDir || listed.Data[0].Status != instanceSynced {
+	if len(listed.Data) != 1 || listed.Data[0].Launcher != "atlauncher" || listed.Data[0].Dir != instDir || listed.Data[0].Status != project.StatusSynced {
 		t.Fatalf("links: %+v", listed.Data)
 	}
 

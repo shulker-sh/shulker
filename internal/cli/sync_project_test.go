@@ -9,6 +9,7 @@ import (
 
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 func TestBareSyncInProjectSyncsItsOwnEntries(t *testing.T) {
@@ -141,8 +142,8 @@ func TestProjectSyncGivesADetachedBuildItsDirectorysID(t *testing.T) {
 
 func TestInstanceHeadingMarksADetachedBuild(t *testing.T) {
 	var theme out.Theme
-	linked := instanceEntry{Instance: config.Instance{ID: "client", Name: "Pack", Launcher: "prism", Dir: "/p/client"}, Side: "client"}
-	detached := instanceEntry{Instance: config.Instance{ID: "fo-test", Name: "Pack", Dir: "/packs/fo-test"}, Side: "client", detached: true}
+	linked := project.InstanceEntry{Instance: config.Instance{ID: "client", Name: "Pack", Launcher: "prism", Dir: "/p/client"}, Side: "client"}
+	detached := project.InstanceEntry{Instance: config.Instance{ID: "fo-test", Name: "Pack", Dir: "/packs/fo-test"}, Side: "client", Detached: true}
 	if got := instanceHeading(theme, linked); got != "Pack client client (Prism Launcher)" {
 		t.Fatalf("linked heading = %q", got)
 	}

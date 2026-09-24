@@ -16,6 +16,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/project"
 )
 
 type instanceSelection struct {
@@ -47,13 +48,13 @@ func (i instanceSelection) check() error {
 	return nil
 }
 
-func (i instanceSelection) admits(e instanceEntry) bool {
+func (i instanceSelection) admits(e project.InstanceEntry) bool {
 	return (i.launcher == "" || e.Launcher == i.launcher) && (i.side == "" || e.Side == i.side)
 }
 
 // selectInstances matches query against ids, then against names (case-insensitive), then against
 // directories. With no query it returns every instance the filters admit, sorted for display.
-func (a *app) selectInstances(query string, s instanceSelection) ([]instanceEntry, error) {
+func (a *app) selectInstances(query string, s instanceSelection) ([]project.InstanceEntry, error) {
 	if err := s.check(); err != nil {
 		return nil, err
 	}
@@ -67,7 +68,7 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]instanceEntr
 		return nil, e
 	}
 	sortInstanceEntries(entries)
-	var pool []instanceEntry
+	var pool []project.InstanceEntry
 	for _, e := range entries {
 		if s.admits(e) {
 			pool = append(pool, e)
@@ -78,7 +79,7 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]instanceEntr
 		matches = nil
 		for _, e := range pool {
 			if e.ID == query {
-				matches = []instanceEntry{e}
+				matches = []project.InstanceEntry{e}
 				break
 			}
 			if strings.EqualFold(e.Name, query) {
@@ -108,9 +109,9 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]instanceEntr
 	return matches, nil
 }
 
-func findEntry(entries []instanceEntry, dir string) int {
+func findEntry(entries []project.InstanceEntry, dir string) int {
 	dir = filepath.Clean(dir)
-	return slices.IndexFunc(entries, func(e instanceEntry) bool { return filepath.Clean(e.Dir) == dir })
+	return slices.IndexFunc(entries, func(e project.InstanceEntry) bool { return filepath.Clean(e.Dir) == dir })
 }
 
 func describeSelection(query string, s instanceSelection) string {
@@ -127,7 +128,7 @@ func describeSelection(query string, s instanceSelection) string {
 	return strings.Join(parts, " with ")
 }
 
-func instanceCandidates(entries []instanceEntry) []string {
+func instanceCandidates(entries []project.InstanceEntry) []string {
 	names := make([]string, len(entries))
 	for i, e := range entries {
 		label := e.ID
@@ -135,7 +136,7 @@ func instanceCandidates(entries []instanceEntry) []string {
 			label += " (" + e.Name + ")"
 		}
 		names[i] = fmt.Sprintf("%s — %s", label, e.Dir)
-		if e.detached {
+		if e.Detached {
 			names[i] = fmt.Sprintf("%s — detached build, %s", label, e.Dir)
 		} else if e.Launcher != "" {
 			names[i] = fmt.Sprintf("%s — %s, %s", label, launcher.Title(e.Launcher), e.Dir)
@@ -144,7 +145,7 @@ func instanceCandidates(entries []instanceEntry) []string {
 	return names
 }
 
-func instanceIDs(entries []instanceEntry) []string {
+func instanceIDs(entries []project.InstanceEntry) []string {
 	ids := make([]string, len(entries))
 	for i, e := range entries {
 		ids[i] = e.ID
@@ -152,7 +153,7 @@ func instanceIDs(entries []instanceEntry) []string {
 	return ids
 }
 
-func instanceDirs(entries []instanceEntry) []string {
+func instanceDirs(entries []project.InstanceEntry) []string {
 	dirs := make([]string, len(entries))
 	for i, e := range entries {
 		dirs[i] = e.Dir
@@ -162,7 +163,7 @@ func instanceDirs(entries []instanceEntry) []string {
 
 // unlinkTargets is what unlink's argument picks. Inside a project, a launcher name that no instance
 // is called picks the project's instances in that launcher, the reverse of `link <launcher>`.
-func (a *app) unlinkTargets(query string, s instanceSelection) ([]instanceEntry, error) {
+func (a *app) unlinkTargets(query string, s instanceSelection) ([]project.InstanceEntry, error) {
 	name := launcherArg(query)
 	if name == "" || s.launcher != "" {
 		return a.selectOrDetached(query, s)
@@ -185,7 +186,7 @@ func (a *app) unlinkTargets(query string, s instanceSelection) ([]instanceEntry,
 	if !inProject {
 		return a.selectOrDetached(query, s)
 	}
-	var matches []instanceEntry
+	var matches []project.InstanceEntry
 	for _, e := range entries {
 		if inLauncher.admits(e) {
 			matches = append(matches, e)
@@ -202,7 +203,7 @@ func (a *app) unlinkTargets(query string, s instanceSelection) ([]instanceEntry,
 
 // selectOrDetached falls back, when no registered instance matches, to a directory the query names
 // that holds a detached build: one with a source in its instance file and no registry row.
-func (a *app) selectOrDetached(query string, s instanceSelection) ([]instanceEntry, error) {
+func (a *app) selectOrDetached(query string, s instanceSelection) ([]project.InstanceEntry, error) {
 	entries, err := a.selectInstances(query, s)
 	if err == nil || query == "" {
 		return entries, err
@@ -211,26 +212,26 @@ func (a *app) selectOrDetached(query string, s instanceSelection) ([]instanceEnt
 		return nil, err
 	}
 	if e, ok := detachedBuild(query); ok && s.admits(e) {
-		return []instanceEntry{e}, nil
+		return []project.InstanceEntry{e}, nil
 	}
 	return nil, err
 }
 
-func detachedBuild(query string) (instanceEntry, bool) {
+func detachedBuild(query string) (project.InstanceEntry, bool) {
 	dir, err := filepath.Abs(query)
 	if err != nil {
-		return instanceEntry{}, false
+		return project.InstanceEntry{}, false
 	}
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
-		return instanceEntry{}, false
+		return project.InstanceEntry{}, false
 	}
 	f, err := instance.Load(dir)
 	if err != nil || f.Source == "" || f.IsUnlinked {
-		return instanceEntry{}, false
+		return project.InstanceEntry{}, false
 	}
-	e := inspectInstance(config.Instance{Name: filepath.Base(dir), Dir: dir})
+	e := project.Inspect(config.Instance{Name: filepath.Base(dir), Dir: dir})
 	e.ID = config.SlugID(e.Name)
-	e.detached = true
+	e.Detached = true
 	return e, true
 }
 
@@ -241,8 +242,8 @@ func launcherArg(arg string) string {
 	return ""
 }
 
-func instanceAside(t out.Theme, e instanceEntry) string {
-	if e.detached {
+func instanceAside(t out.Theme, e project.InstanceEntry) string {
+	if e.Detached {
 		return t.Aside("detached build")
 	}
 	if e.Launcher == "" {
@@ -252,26 +253,26 @@ func instanceAside(t out.Theme, e instanceEntry) string {
 }
 
 // instanceHeading shows a detached build's directory, since unlink takes one by path.
-func instanceHeading(t out.Theme, e instanceEntry) string {
+func instanceHeading(t out.Theme, e project.InstanceEntry) string {
 	heading := t.Bold(e.Label()) + " " + t.Grey(e.ID) + " " + t.Cyan(e.Side) + instanceAside(t, e)
-	if e.detached {
+	if e.Detached {
 		heading += " " + t.Link(t.Grey(e.Dir), e.Dir)
 	}
 	return heading
 }
 
-func instancePickLabel(t out.Theme, e instanceEntry) string {
-	if e.detached {
+func instancePickLabel(t out.Theme, e project.InstanceEntry) string {
+	if e.Detached {
 		return instanceHeading(t, e)
 	}
 	return instanceHeading(t, e) + " " + t.Link(t.Grey(e.Dir), e.Dir)
 }
 
-func (a *app) pickInstance(entries []instanceEntry) (instanceEntry, error) {
+func (a *app) pickInstance(entries []project.InstanceEntry) (project.InstanceEntry, error) {
 	t := a.printer.ErrTheme
 	return pickOne(a, "Sync which one?", entries,
-		func(e instanceEntry) string { return e.ID },
-		func(e instanceEntry) string { return instancePickLabel(t, e) },
+		func(e project.InstanceEntry) string { return e.ID },
+		func(e project.InstanceEntry) string { return instancePickLabel(t, e) },
 		func() error {
 			e := out.Errorf("ambiguous-instance", "pass a source, -i <id>, or --all to choose what to sync")
 			e.Candidates, e.Pass, e.Flag = instanceCandidates(entries), instanceIDs(entries), "--instance"
@@ -279,7 +280,7 @@ func (a *app) pickInstance(entries []instanceEntry) (instanceEntry, error) {
 		})
 }
 
-func (a *app) syncInstance(cmd *cobra.Command, e instanceEntry, req syncRequest) (syncResult, error) {
+func (a *app) syncInstance(cmd *cobra.Command, e project.InstanceEntry, req syncRequest) (syncResult, error) {
 	if l := launcher.Find(e.Launcher); l != nil && l.IsInstanced {
 		if _, err := os.Stat(l.InstanceDir(e.Dir)); errors.Is(err, os.ErrNotExist) {
 			fail := out.Errorf("instance-missing", "the %s instance %q is gone (%s)", launcher.Title(e.Launcher), e.Label(), l.InstanceDir(e.Dir))
@@ -309,7 +310,7 @@ type syncInstanceResult struct {
 	Error    *out.Error  `json:"error,omitempty"`
 }
 
-func (a *app) syncInstances(cmd *cobra.Command, entries []instanceEntry, req syncRequest) error {
+func (a *app) syncInstances(cmd *cobra.Command, entries []project.InstanceEntry, req syncRequest) error {
 	results, failed := a.syncEach(cmd, entries, req, false)
 	if failed > 0 {
 		e := out.Errorf("sync-failed", "%d of %d instances failed to sync", failed, len(entries))
@@ -321,7 +322,7 @@ func (a *app) syncInstances(cmd *cobra.Command, entries []instanceEntry, req syn
 
 // syncEach syncs every entry, printing each as it finishes; after says a result was printed
 // above the first one.
-func (a *app) syncEach(cmd *cobra.Command, entries []instanceEntry, req syncRequest, after bool) ([]syncInstanceResult, int) {
+func (a *app) syncEach(cmd *cobra.Command, entries []project.InstanceEntry, req syncRequest, after bool) ([]syncInstanceResult, int) {
 	lines := a.printer.Out()
 	results := []syncInstanceResult{}
 	failed := 0
@@ -332,7 +333,7 @@ func (a *app) syncEach(cmd *cobra.Command, entries []instanceEntry, req syncRequ
 			}
 			lines.Heading(instanceHeading(lines.T, e))
 		}
-		r := syncInstanceResult{Instance: e.Instance, Detached: e.detached, OK: true}
+		r := syncInstanceResult{Instance: e.Instance, Detached: e.Detached, OK: true}
 		restore := func() {}
 		if len(entries) > 1 || after {
 			restore = a.scopeWarnings(e.Label())

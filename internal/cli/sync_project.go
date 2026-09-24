@@ -11,7 +11,7 @@ import (
 	"shulker.sh/shulker/internal/project"
 )
 
-func (a *app) projectInstances(s instanceSelection) (entries []instanceEntry, inProject bool, err error) {
+func (a *app) projectInstances(s instanceSelection) (entries []project.InstanceEntry, inProject bool, err error) {
 	p, err := a.openProject()
 	if errors.Is(err, project.ErrNoManifest) {
 		return nil, false, nil
@@ -33,7 +33,7 @@ func (a *app) hasSyncedInstances(p *project.Project) (bool, error) {
 	return len(entries) > 0, err
 }
 
-func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries []instanceEntry, err error) {
+func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries []project.InstanceEntry, err error) {
 	if err := s.check(); err != nil {
 		return nil, err
 	}
@@ -45,10 +45,10 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 	if err != nil {
 		return nil, err
 	}
-	var all []instanceEntry
+	var all []project.InstanceEntry
 	for _, in := range registry {
 		if config.SameDir(in.Source, dir) && !config.SameDir(in.Dir, dir) {
-			all = append(all, inspectInstance(in))
+			all = append(all, project.Inspect(in))
 		}
 	}
 	lf, err := a.loadLocal(dir)
@@ -58,13 +58,13 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 	taken := slices.Clone(registry)
 	for _, side := range p.Manifest.Sides() {
 		for _, d := range lf.ExistingSyncDirs(side) {
-			if config.SameDir(d, dir) || slices.ContainsFunc(all, func(e instanceEntry) bool { return config.SameDir(e.Dir, d) }) {
+			if config.SameDir(d, dir) || slices.ContainsFunc(all, func(e project.InstanceEntry) bool { return config.SameDir(e.Dir, d) }) {
 				continue
 			}
-			e := inspectInstance(config.Instance{Name: p.Manifest.DisplayName(side), Dir: d, Source: dir})
+			e := project.Inspect(config.Instance{Name: p.Manifest.DisplayName(side), Dir: d, Source: dir})
 			e.ID = config.InstanceID(taken, "", filepath.Base(d), d)
 			taken = append(taken, config.Instance{ID: e.ID, Dir: d})
-			e.detached = true
+			e.Detached = true
 			if e.Side == "" {
 				e.Side = side
 			}
@@ -92,7 +92,7 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 
 // selectProjectDetached falls back, when no registered instance matches, to the id of a detached
 // build among the project's entries, which only the project knows.
-func (a *app) selectProjectDetached(query string, s instanceSelection, miss error) ([]instanceEntry, error) {
+func (a *app) selectProjectDetached(query string, s instanceSelection, miss error) ([]project.InstanceEntry, error) {
 	if code := out.AsError(miss).Code; code != "instance-not-found" && code != "no-instances" {
 		return nil, miss
 	}
@@ -113,8 +113,8 @@ func (a *app) selectProjectDetached(query string, s instanceSelection, miss erro
 		return nil, miss
 	}
 	for _, e := range entries {
-		if e.detached && e.ID == query {
-			return []instanceEntry{e}, nil
+		if e.Detached && e.ID == query {
+			return []project.InstanceEntry{e}, nil
 		}
 	}
 	return nil, miss

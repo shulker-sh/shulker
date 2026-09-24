@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/project"
 )
 
 // playGame points an instance at a game that does what the test needs. It answers -version like the
@@ -271,7 +272,7 @@ func TestAWatchedLaunchThatNeverStartedReachesTheInstanceList(t *testing.T) {
 		t.Fatalf("recorded %+v", run)
 	}
 	var env struct {
-		Data []instanceEntry `json:"data"`
+		Data []project.InstanceEntry `json:"data"`
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "instances", "--json")), &env); err != nil {
 		t.Fatal(err)
