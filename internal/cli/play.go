@@ -162,7 +162,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
-	signed, err := a.accountSession(ctx, who)
+	signed, err := a.sessionFor(ctx, who)
 	if err != nil {
 		return err
 	}

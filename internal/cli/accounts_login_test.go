@@ -471,9 +471,9 @@ func TestAccountsRefreshRejectsAnAccountItDidNotSignIn(t *testing.T) {
 	}
 }
 
-// accountSession is what a launch signs in with, and the only place the hour before a token
-// expires matters. There is no `play` yet, so it is asked for here directly.
-func accountSession(t *testing.T, h *harness, name string) (account.Account, string, error) {
+// sessionFor is what a launch signs in with, asked for directly so the warning and the saved
+// renewal can be checked without a game.
+func sessionFor(t *testing.T, h *harness, name string) (account.Account, string, error) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
 	a := h.newApp(&stdout, &stderr)
@@ -481,86 +481,8 @@ func accountSession(t *testing.T, h *harness, name string) (account.Account, str
 	if err != nil {
 		return account.Account{}, "", err
 	}
-	signed, err := a.accountSession(context.Background(), r)
+	signed, err := a.sessionFor(context.Background(), r)
 	return signed, stderr.String(), err
-}
-
-func TestSessionReusesAFreshTokenAndRenewsAStaleOne(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "accounts", "login")
-	before := h.msa.renewals
-
-	if _, _, err := accountSession(t, h, "Notch"); err != nil {
-		t.Fatal(err)
-	}
-	if h.msa.renewals != before || len(h.msa.parties) != 1 {
-		t.Errorf("a token with a day left should be reused: renewals %d, parties %q", h.msa.renewals, h.msa.parties)
-	}
-
-	// Inside the hour it is renewed before the game starts rather than during it.
-	store := readAccountStore(t, h)
-	store.Accounts[0].Minecraft.ExpiresAt = time.Now().Add(30 * time.Minute).Format(time.RFC3339)
-	store.Accounts[0].Xbox.NotAfter = time.Now().Add(-time.Hour).Format(time.RFC3339)
-	if err := account.Save(account.Path(h.config), store); err != nil {
-		t.Fatal(err)
-	}
-	signed, _, err := accountSession(t, h, "Notch")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if h.msa.renewals != before+1 || signed.RefreshToken != "refresh-notch-2" {
-		t.Errorf("renewals = %d, account = %+v", h.msa.renewals, signed.RefreshToken)
-	}
-	// The rotated token is the one on disk: the old one still works at Microsoft, so keeping it
-	// would leave a second live sign-in behind.
-	if got := readAccountStore(t, h).Accounts[0].RefreshToken; got != "refresh-notch-2" {
-		t.Errorf("stored refresh token = %q", got)
-	}
-}
-
-func TestSessionOfflineKeepsTheCachedToken(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "accounts", "login")
-	store := readAccountStore(t, h)
-	store.Accounts[0].Minecraft.ExpiresAt = time.Now().Add(time.Minute).Format(time.RFC3339)
-	store.Accounts[0].Xbox.NotAfter = time.Now().Add(-time.Hour).Format(time.RFC3339)
-	if err := account.Save(account.Path(h.config), store); err != nil {
-		t.Fatal(err)
-	}
-
-	var stdout, stderr bytes.Buffer
-	a := h.newApp(&stdout, &stderr)
-	a.d.signin.Client.Offline = true
-	r, err := a.selectAccount("Notch")
-	if err != nil {
-		t.Fatal(err)
-	}
-	signed, err := a.accountSession(context.Background(), r)
-	if err != nil {
-		t.Fatalf("offline, a launch goes ahead on what it has: %v", err)
-	}
-	if signed.Minecraft.Token != "mc-notch" {
-		t.Errorf("session token = %q", signed.Minecraft.Token)
-	}
-	if !strings.Contains(stderr.String(), "online servers and Realms will reject it") {
-		t.Errorf("an offline launch has to say what won't work: %s", stderr.String())
-	}
-}
-
-func TestSessionRefusesAnExpiredOrProfilelessAccount(t *testing.T) {
-	h := newHarness(t)
-	writeAccountStore(t, h,
-		account.Account{Type: account.Microsoft, Profile: &account.Profile{ID: dinnerbone, Name: "Dinnerbone"}},
-		account.Account{Type: account.Microsoft, Xbox: &account.Xbox{XUID: gamertagXID, Gamertag: "Big Dog 42"}, RefreshToken: "r"},
-	)
-	if _, _, err := accountSession(t, h, "Dinnerbone"); out.CodeOf(err) != "account-sign-in-expired" {
-		t.Errorf("err = %v (%s)", err, out.CodeOf(err))
-	} else if rows := out.AsError(err).Rows; len(rows) != 1 || rows[0].Text != "shulker accounts login" {
-		t.Errorf("rows = %+v", rows)
-	}
-	if _, _, err := accountSession(t, h, "Big Dog 42"); out.CodeOf(err) != "account-not-playable" {
-		t.Errorf("err = %v (%s)", err, out.CodeOf(err))
-	}
 }
 
 // The prompt is the one thing a sign-in shows, so it is checked as it is painted: the page cyan

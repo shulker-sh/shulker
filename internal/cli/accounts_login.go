@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
-	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 )
@@ -310,41 +309,35 @@ func (a *app) reseatDefault(gone accountRow) (*account.Resolved, error) {
 	return &usable[0], nil
 }
 
-// accountSession is the account a launch plays on: the stored one while its Minecraft token has
-// over an hour left, and a silently renewed one otherwise. Offline it falls back to the token it
-// has, which still opens singleplayer, LAN and offline-mode servers.
-func (a *app) accountSession(ctx context.Context, r account.Resolved) (account.Account, error) {
-	if err := r.State.Error(r.Name); err != nil {
-		return account.Account{}, err
-	}
-	if r.State == account.TokenExpired {
-		a.printer.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session", r.Name, launcher.Title(r.Source))
-		return r.Account, nil
-	}
-	if r.Group != account.GroupOwn || r.Account.IsFresh(time.Now()) {
-		return r.Account, nil
-	}
+// sessionFor is the account a launch plays on, renewed and saved when its token was stale, with
+// the warning a session that online servers may reject carries.
+func (a *app) sessionFor(ctx context.Context, r account.Resolved) (account.Account, error) {
 	d, err := a.deps()
 	if err != nil {
 		return account.Account{}, err
 	}
-	renewed, err := d.signin.Renew(ctx, r.Account)
+	signed, renewed, warning, err := d.signin.Session(ctx, r, time.Now())
 	if err != nil {
-		if fetch.IsNetwork(err) && r.Account.Minecraft != nil {
-			a.printer.Warn("shulker couldn't reach Microsoft, so %s plays on the session it already had; online servers and Realms will reject it", r.Name)
-			return r.Account, nil
-		}
 		return account.Account{}, err
+	}
+	switch warning {
+	case account.WarnTokenExpired:
+		a.printer.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session", r.Name, launcher.Title(r.Source))
+	case account.WarnOffline:
+		a.printer.Warn("shulker couldn't reach Microsoft, so %s plays on the session it already had; online servers and Realms will reject it", r.Name)
+	}
+	if !renewed {
+		return signed, nil
 	}
 	path, store, err := a.accountStore()
 	if err != nil {
 		return account.Account{}, err
 	}
-	store.Put(renewed)
+	store.Put(signed)
 	if err := account.Save(path, store); err != nil {
 		return account.Account{}, err
 	}
-	return renewed, nil
+	return signed, nil
 }
 
 // ownAccountOf is one of shulker's own accounts as every command that names one sees it.

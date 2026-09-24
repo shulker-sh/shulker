@@ -250,7 +250,7 @@ func TestLaunchWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
 	prismAccounts(t, h, prismNotch)
 	h.mustRun(t, "accounts", "stores", "set", "prism")
 
-	signed, stderr, err := accountSession(t, h, "Jeb_")
+	signed, stderr, err := sessionFor(t, h, "Jeb_")
 	if err != nil {
 		t.Fatalf("an expired borrowed account still launches: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestLaunchWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
 		t.Errorf("a borrowed account must not land in shulker's own store: %v", err)
 	}
 	// A borrowed account that is still good says nothing.
-	if _, stderr, err := accountSession(t, h, "Notch"); err != nil || strings.Contains(stderr, "Realms") {
+	if _, stderr, err := sessionFor(t, h, "Notch"); err != nil || strings.Contains(stderr, "Realms") {
 		t.Errorf("a token that still holds launches quietly: %q %v", stderr, err)
 	}
 }
@@ -370,7 +370,7 @@ func TestAccountsMergesAnAccountInBothMojangFiles(t *testing.T) {
 	if strings.Count(stdout, notchID) != 1 {
 		t.Errorf("one UUID is one account:\n%s", stdout)
 	}
-	signed, _, err := accountSession(t, h, "Notch")
+	signed, _, err := sessionFor(t, h, "Notch")
 	if err != nil {
 		t.Fatal(err)
 	}
