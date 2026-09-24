@@ -427,19 +427,7 @@ func (v clientVersions) InstallerVersion(ctx context.Context) (json.RawMessage, 
 		return nil, err
 	}
 	raw, changed, err := v.l.InstallerVersion(ctx, d.loaders, v.p.Lock)
-	return raw, saveChangedLock(v.p, changed, err)
-}
-
-// saveChangedLock saves the lock when a row call changed it, whether or not the call succeeded,
-// since what it locked stays valid; the call's own error wins over a save failure.
-func saveChangedLock(p *project.Project, changed bool, err error) error {
-	if !changed {
-		return err
-	}
-	if saveErr := p.Lock.Save(p.LockPath()); saveErr != nil && err == nil {
-		return saveErr
-	}
-	return err
+	return raw, v.p.SaveIfChanged(changed, err)
 }
 
 // linkAsked is a bare link at a terminal: it asks which launcher, then runs that launcher's own

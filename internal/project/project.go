@@ -100,3 +100,15 @@ func (p *Project) SaveLock() error {
 	p.ReplacedLock = kept
 	return err
 }
+
+// SaveIfChanged saves the lock when a row call changed it, whether or not the call succeeded,
+// since what it locked stays valid; the call's own error wins over a save failure.
+func (p *Project) SaveIfChanged(changed bool, err error) error {
+	if !changed {
+		return err
+	}
+	if saveErr := p.SaveLock(); saveErr != nil && err == nil {
+		return saveErr
+	}
+	return err
+}
