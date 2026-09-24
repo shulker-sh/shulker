@@ -477,7 +477,7 @@ func copyProjectFiles(src, dir string, paths []string) ([]string, error) {
 			continue
 		}
 		created = append(created, to)
-		if err := copyPath(from, to); err != nil {
+		if err := fsutil.CopyPath(from, to); err != nil {
 			return created, err
 		}
 	}

@@ -246,7 +246,7 @@ func mergePack(p *project.Project, inc *incoming, sides []string) (*mergeReport,
 			return rep, pack.FileMissing(inc.manifest.Name, rel)
 		}
 		rep.created = append(rep.created, to)
-		if err := copyPath(from, to); err != nil {
+		if err := fsutil.CopyPath(from, to); err != nil {
 			return rep, err
 		}
 	}
@@ -353,29 +353,4 @@ func mergeValue(mine, theirs any) any {
 		mineObj[k] = mergeValue(mineObj[k], v)
 	}
 	return mineObj
-}
-
-// copyPath copies a file, or a folder and everything in it, to to.
-func copyPath(from, to string) error {
-	return filepath.WalkDir(from, func(path string, e fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(from, path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(to, rel)
-		if e.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		return fsutil.Write(target, data)
-	})
 }
