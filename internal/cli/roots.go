@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/saves"
 )
 
 // rootDirs are the three directories the config keys of the same names move: where the instances
@@ -45,4 +46,8 @@ func (a *app) rootsOf(configPath string, cfg config.Config) (rootDirs, error) {
 		Store:     config.Root(configPath, cfg.Store, d.cache.Game()),
 		Backups:   filepath.Join(data, "backups"),
 	}, nil
+}
+
+func (r rootDirs) saves() saves.Roots {
+	return saves.Roots{Saves: r.Saves, Backups: r.Backups}
 }

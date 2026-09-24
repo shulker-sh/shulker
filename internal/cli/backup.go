@@ -52,7 +52,7 @@ func (a *app) backup(target savesTarget, only []string) (backupResult, error) {
 		}
 	}
 	start := time.Now()
-	taken, err := saves.Take(src, target.home(), "backup", a.zipping("zipping"))
+	taken, err := saves.Take(src, target.Home(), "backup", a.zipping("zipping"))
 	if err != nil {
 		return backupResult{}, err
 	}
@@ -124,10 +124,6 @@ func (a *app) zipping(verb string) func(world string, open bool) {
 	}
 }
 
-func (s savesTarget) home() saves.Home {
-	return saves.Home{Dir: s.backups, IsShared: s.Group != ""}
-}
-
 // beforeModChange is what a build runs before it changes dir's mod set: the automatic backup of
 // its worlds, found through the saves target the directory belongs to and kept to
 // play.saveBackups. A target that can't be found is a warning, not a failed build.
@@ -143,7 +139,7 @@ func (a *app) beforeModChange(reason, dir string) func() error {
 		if _, err := a.loadInstances(); err != nil {
 			return skip(err)
 		}
-		target, err := a.savesTargetAt(dir)
+		target, err := a.targetOfDir(dir)
 		if err != nil {
 			return skip(err)
 		}
@@ -154,7 +150,7 @@ func (a *app) beforeModChange(reason, dir string) func() error {
 		if a.backedUp == nil {
 			a.backedUp = map[saves.Home]bool{}
 		}
-		_, warning, err := saves.Auto(a.backupSource(target), target.home(), reason, keep, a.backedUp, a.zipping("backing up"))
+		_, warning, err := saves.Auto(a.backupSource(target), target.Home(), reason, keep, a.backedUp, a.zipping("backing up"))
 		if warning != "" {
 			a.printer.Warn("%s", warning)
 		}

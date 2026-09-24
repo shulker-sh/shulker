@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
@@ -31,13 +31,11 @@ type backupRow struct {
 // savesTarget is whose worlds and backups one command looks at: a save group, or a game
 // directory keeping its own. World is set for a server, whose only world is that folder in
 // WorldsDir. via is the -i the commands saves prints name it by, when --all reached it.
+// savesTarget is a saves.Target with the -i id it was reached through, for the command a nudge
+// names.
 type savesTarget struct {
-	Group     string `json:"group,omitempty"`
-	Dir       string `json:"dir,omitempty"`
-	WorldsDir string `json:"worldsDir"`
-	World     string `json:"world,omitempty"`
-	backups   string
-	via       string
+	saves.Target
+	via string
 }
 
 type savesView struct {
@@ -100,11 +98,11 @@ func (a *app) savesPruneCmd() *cobra.Command {
 }
 
 func pruneBackups(target savesTarget, keep int) (savesPruned, error) {
-	pruned, err := saves.Prune(target.backups, keep)
+	pruned, err := saves.Prune(target.Backups, keep)
 	if err != nil {
 		return savesPruned{}, err
 	}
-	left, err := saves.Backups(target.backups)
+	left, err := saves.Backups(target.Backups)
 	if err != nil {
 		return savesPruned{}, err
 	}
@@ -173,7 +171,7 @@ func (a *app) savesView(target savesTarget) (savesView, error) {
 	if target.World != "" {
 		worlds = slices.DeleteFunc(worlds, func(w string) bool { return w != target.World })
 	}
-	backups, err := saves.Backups(target.backups)
+	backups, err := saves.Backups(target.Backups)
 	if err != nil {
 		return savesView{}, err
 	}
@@ -277,7 +275,7 @@ func (a *app) savesTargetOf(group string) (savesTarget, error) {
 		if a.instance != "" {
 			return savesTarget{}, out.Errorf("usage", "pass --group or -i, not both: each names whose saves to act on")
 		}
-		t := groupTarget(r, group)
+		t := savesTarget{Target: saves.GroupTarget(r.saves(), group)}
 		if info, err := os.Stat(t.WorldsDir); err != nil || !info.IsDir() || !saves.IsValidGroup(group) {
 			return savesTarget{}, out.Errorf("group-not-found", "no save group %q in %s", group, r.Saves)
 		}
@@ -287,27 +285,19 @@ func (a *app) savesTargetOf(group string) (savesTarget, error) {
 	if err != nil {
 		return savesTarget{}, err
 	}
-	return a.savesTargetAt(dir)
+	return a.targetOfDir(dir)
 }
 
-// savesTargetAt is the target a directory's worlds belong to: its save group when it is a shulker
-// instance in one, and the directory itself otherwise.
-func (a *app) savesTargetAt(dir string) (savesTarget, error) {
+// targetOfDir is the saves target of dir, looked up through the registry, the instance file and
+// the manifest that builds dir in place.
+func (a *app) targetOfDir(dir string) (savesTarget, error) {
 	r, err := a.roots()
 	if err != nil {
 		return savesTarget{}, err
 	}
-	if dir, err = filepath.Abs(dir); err != nil {
-		return savesTarget{}, err
-	}
-	g, _, err := a.saveGroupOf(dir)
+	in, f, err := a.ownedInstance(dir)
 	if err != nil {
 		return savesTarget{}, err
-	}
-	if g != saves.None {
-		t := groupTarget(r, g)
-		t.Dir = dir
-		return t, nil
 	}
 	m, _, inPlace, err := project.InPlace(dir)
 	if err != nil {
@@ -316,43 +306,40 @@ func (a *app) savesTargetAt(dir string) (savesTarget, error) {
 	if !inPlace {
 		m = nil
 	}
-	w, err := build.WorldsOf(dir, m)
+	t, err := saves.TargetAt(dir, r.saves(), in, f, m)
 	if err != nil {
 		return savesTarget{}, err
 	}
-	return savesTarget{Dir: dir, WorldsDir: w.Dir, World: w.Level, backups: filepath.Join(dir, instance.Dir, "backups")}, nil
+	return savesTarget{Target: t}, nil
 }
 
-func groupTarget(r rootDirs, group string) savesTarget {
-	return savesTarget{Group: group, WorldsDir: filepath.Join(r.Saves, group), backups: filepath.Join(r.Backups, group)}
-}
-
-// saveGroupOf is the group a registered shulker instance joins, and None for every other directory,
-// since only instances shulker launches itself share worlds. owned says whether dir is one.
-func (a *app) saveGroupOf(dir string) (group string, owned bool, err error) {
+// ownedInstance is dir's registry row when shulker launches the instance there, and its instance
+// file when it has one; any other directory gets nil for both.
+func (a *app) ownedInstance(dir string) (*config.Instance, *instance.File, error) {
 	in, ok := a.registeredInstance(dir)
 	if !ok || in.Launcher != launcher.Shulker.Name {
-		return saves.None, false, nil
+		return nil, nil, nil
 	}
 	f, err := instance.Load(dir)
 	if errors.Is(err, instance.ErrNotFound) {
-		return saves.Default, true, nil
+		return &in, nil, nil
 	}
 	if err != nil {
-		return "", true, err
+		return nil, nil, err
 	}
-	if f.Settings.SavesGroup == "" {
-		return saves.Default, true, nil
-	}
-	return f.Settings.SavesGroup, true, nil
+	return &in, f, nil
 }
 
 // linkSaves points a shulker instance's saves/ at its save group. Any other directory keeps its
 // own worlds, and gets nil.
 func (a *app) linkSaves(dir string) (*saves.Result, error) {
-	group, owned, err := a.saveGroupOf(dir)
-	if err != nil || !owned {
+	in, f, err := a.ownedInstance(dir)
+	if err != nil {
 		return nil, err
+	}
+	group, owned := saves.GroupOf(in, f)
+	if !owned {
+		return nil, nil
 	}
 	r, err := a.roots()
 	if err != nil {

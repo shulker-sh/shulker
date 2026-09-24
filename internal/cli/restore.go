@@ -93,7 +93,7 @@ func (a *app) restore(target savesTarget, req restoreRequest) (restoreResult, er
 		return restoreResult{}, e
 	}
 	res := restoreResult{savesTarget: target, From: from}
-	snapshot, err := saves.Take(a.backupSource(target), target.home(), "restore", a.zipping("zipping"))
+	snapshot, err := saves.Take(a.backupSource(target), target.Home(), "restore", a.zipping("zipping"))
 	if err != nil {
 		return restoreResult{}, err
 	}
@@ -175,7 +175,7 @@ func restoreScope(archive *saves.Archive, target savesTarget, only []string, as 
 // -i's is; any other is a name in target's backups.
 func (a *app) pickBackup(target savesTarget, args []string, named string) (saves.Backup, error) {
 	if named != "" {
-		path := filepath.Join(target.backups, strings.TrimSuffix(named, ".zip")+".zip")
+		path := filepath.Join(target.Backups, strings.TrimSuffix(named, ".zip")+".zip")
 		if _, err := os.Stat(named); err == nil || strings.ContainsRune(named, '/') || strings.ContainsRune(named, filepath.Separator) {
 			if path, err = filepath.Abs(named); err != nil {
 				return saves.Backup{}, err
@@ -194,7 +194,7 @@ func (a *app) pickBackup(target savesTarget, args []string, named string) (saves
 			return saves.Backup{}, out.Errorf("usage", "backups are numbered from 1, newest first, not %q", args[0])
 		}
 	}
-	backups, err := saves.Backups(target.backups)
+	backups, err := saves.Backups(target.Backups)
 	if err != nil {
 		return saves.Backup{}, err
 	}

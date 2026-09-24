@@ -48,7 +48,7 @@ func (a *app) savesTargetFor(w savesWhere) (savesTarget, error) {
 	if err != nil {
 		return savesTarget{}, err
 	}
-	return a.savesTargetAt(entries[0].Dir)
+	return a.targetOfDir(entries[0].Dir)
 }
 
 // savesPicks is every target --all reaches: one per row the selection admits, except that the rows
@@ -64,13 +64,13 @@ func (a *app) savesPicks(w savesWhere) ([]savesPick, error) {
 	}
 	var picks []savesPick
 	for _, e := range entries {
-		t, err := a.savesTargetAt(e.Dir)
+		t, err := a.targetOfDir(e.Dir)
 		if err != nil {
 			picks = append(picks, savesPick{rows: []project.InstanceEntry{e}, err: err})
 			continue
 		}
 		t.via = e.ID
-		i := slices.IndexFunc(picks, func(p savesPick) bool { return p.err == nil && p.backups == t.backups })
+		i := slices.IndexFunc(picks, func(p savesPick) bool { return p.err == nil && p.Backups == t.Backups })
 		if i < 0 {
 			picks = append(picks, savesPick{savesTarget: t, rows: []project.InstanceEntry{e}})
 			continue
