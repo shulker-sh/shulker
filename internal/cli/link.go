@@ -468,6 +468,11 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, s
 	return p, synced, err
 }
 
+// linkSource is the source as the project a link writes takes it.
+func (s *syncSource) linkSource() *project.LinkSource {
+	return &project.LinkSource{Checkout: s.Checkout, Name: s.name, Project: s.project, IsAuthor: s.isAuthor}
+}
+
 // linkProject is the project a link leaves in the game directory: the minimal manifest ADR 0001
 // calls an instance, following the link's source as a modpack and building where it stands. A
 // project already there is adopted, never replaced, so a relink keeps whatever the player added
@@ -485,7 +490,7 @@ func (a *app) linkProject(gameDir, id, display string, src *syncSource) (p *proj
 		return p, "", err
 	}
 	if errors.Is(err, project.ErrNoManifest) {
-		p, err := newInstance(gameDir, id, display, src)
+		p, err := project.NewInstance(gameDir, id, display, src.linkSource())
 		return p, src.project.Manifest.Name, err
 	}
 	if err != nil {
@@ -524,33 +529,6 @@ func (a *app) linkProject(gameDir, id, display string, src *syncSource) (p *proj
 		return p, linked, nil
 	}
 	return p, linked, p.SaveManifest()
-}
-
-// newInstance writes the instance manifest. It pins no platform and lists no feature: the pack is
-// locked, so the relock inherits all of that, and a pack that moves platform is followed rather
-// than fought. What it does copy is the two preferences only the pack's author can weigh, its
-// history retention and whether builds carry the marker mod; from then on both are the player's.
-func newInstance(gameDir, id, display string, src *syncSource) (*project.Project, error) {
-	pack := src.project.Manifest
-	m := &manifest.Manifest{
-		Schema:   manifest.SchemaURL,
-		Name:     id,
-		Requires: map[string]manifest.Require{pack.Name: {Source: src.name, Ref: src.Ref, Path: src.Path}},
-		Client:   &manifest.Client{Name: display, Build: "."},
-	}
-	if pack.History != nil {
-		keep := *pack.History
-		m.History = &keep
-	}
-	if pack.Marker != nil {
-		marker := *pack.Marker
-		m.Marker = &marker
-	}
-	if err := os.MkdirAll(gameDir, 0o755); err != nil {
-		return nil, err
-	}
-	p := &project.Project{Dir: gameDir, Manifest: m, Lock: lock.New()}
-	return p, p.SaveManifest()
 }
 
 // authorInstance writes the project the link's answers describe into the game directory, which
