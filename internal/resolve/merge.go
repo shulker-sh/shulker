@@ -44,6 +44,23 @@ func (m *Merged) Undo() {
 	}
 }
 
+// IncomingFromSource reads a shulker source for a merge: its manifest, its lock, and the files in
+// its override folders.
+func IncomingFromSource(c *pack.Checkout) (*Incoming, error) {
+	src, err := project.OpenReplacingLock(c.Dir)
+	if err != nil {
+		return nil, err
+	}
+	if err := src.RequireLock(); err != nil {
+		return nil, err
+	}
+	overrides, err := project.ReadOverrideFolders(c.Dir, src.Manifest)
+	if err != nil {
+		return nil, err
+	}
+	return &Incoming{Manifest: src.Manifest, Lock: src.Lock, Overrides: overrides, Dir: c.Dir, HasBlocks: true}, nil
+}
+
 // Merge merges inc into p within sides: the pack's entries, lock entries, local files and
 // overrides, and a marker's or source's blocks, the project keeping its own on every clash.
 func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {

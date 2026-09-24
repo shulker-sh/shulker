@@ -25,7 +25,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 	var inc *resolve.Incoming
 	var mods *resolve.Imported
 	if source != nil {
-		if inc, err = readSourcePack(source); err != nil {
+		if inc, err = resolve.IncomingFromSource(source); err != nil {
 			return err
 		}
 		if err := resolve.CheckImportPlatform(p, inc.Lock.Minecraft, inc.Lock.Loader.Type, inc.Lock.Loader.Version); err != nil {
@@ -85,21 +85,4 @@ func mergeSides(m *manifest.Manifest, side string) ([]string, error) {
 		return nil, out.Errorf("usage", "--side %s names a side the project doesn't declare", side)
 	}
 	return []string{side}, nil
-}
-
-// readSourcePack reads a shulker source for a merge: its manifest, its lock, and the files in its
-// override folders.
-func readSourcePack(c *pack.Checkout) (*resolve.Incoming, error) {
-	src, err := project.OpenReplacingLock(c.Dir)
-	if err != nil {
-		return nil, err
-	}
-	if err := src.RequireLock(); err != nil {
-		return nil, err
-	}
-	overrides, err := project.ReadOverrideFolders(c.Dir, src.Manifest)
-	if err != nil {
-		return nil, err
-	}
-	return &resolve.Incoming{Manifest: src.Manifest, Lock: src.Lock, Overrides: overrides, Dir: c.Dir, HasBlocks: true}, nil
 }
