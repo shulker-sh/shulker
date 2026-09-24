@@ -68,7 +68,7 @@ func (a *app) playCmd() *cobra.Command {
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.window != "" {
-				if err := checkPlaySetting("--window", "window", opts.window); err != nil {
+				if err := config.CheckPlaySetting("--window", "window", opts.window); err != nil {
 					return err
 				}
 			}

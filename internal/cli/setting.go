@@ -121,6 +121,19 @@ func (a *app) getCmd() *cobra.Command {
 	return cmd
 }
 
+func settingText(v any) string {
+	if v == nil {
+		return "(unset)"
+	}
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return fmt.Sprint(v)
+	}
+	return strings.TrimSuffix(b.String(), "\n")
+}
+
 func writeValue(w io.Writer, value any) {
 	if text, ok := value.(string); ok {
 		fmt.Fprintln(w, text)
@@ -225,19 +238,6 @@ func decodeLiteral(path, value string) (any, error) {
 		return nil, out.Errorf("usage", "--literal takes a JSON value for %s, got %q", path, value)
 	}
 	return v, nil
-}
-
-func settingText(v any) string {
-	if v == nil {
-		return "(unset)"
-	}
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
-		return fmt.Sprint(v)
-	}
-	return strings.TrimSuffix(b.String(), "\n")
 }
 
 // settingsSchema is the schema a dotted path is looked up in. base is where in the file the paths

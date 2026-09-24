@@ -51,7 +51,7 @@ func (a *app) storesAddCmd() *cobra.Command {
 				return err
 			}
 			if slices.Contains(from, args[0]) {
-				return out.Errorf("usage", "%s already reads accounts from %s", accountsStores, args[0])
+				return out.Errorf("usage", "%s already reads accounts from %s", config.AccountsStoresKey, args[0])
 			}
 			return a.changeStores(from, append(slices.Clone(from), args[0]))
 		},
@@ -71,7 +71,7 @@ func (a *app) storesRemoveCmd() *cobra.Command {
 			}
 			to := slices.DeleteFunc(slices.Clone(from), func(p string) bool { return p == args[0] })
 			if len(to) == len(from) {
-				e := out.Errorf("usage", "%s does not read accounts from %s", accountsStores, args[0])
+				e := out.Errorf("usage", "%s does not read accounts from %s", config.AccountsStoresKey, args[0])
 				e.Candidates, e.Given = from, args[0]
 				return e
 			}
@@ -99,7 +99,7 @@ func (a *app) storesSetCmd() *cobra.Command {
 // the same key. A launcher newly in the list is checked for where it keeps its accounts, which is
 // the one moment a player asked about it; the readers themselves stay quiet on every run after.
 func (a *app) changeStores(from, to []string) error {
-	if err := checkStores(to); err != nil {
+	if err := config.CheckStores(to, launcher.AccountStores()); err != nil {
 		return err
 	}
 	path, err := a.configFile()
@@ -110,7 +110,7 @@ func (a *app) changeStores(from, to []string) error {
 	if err != nil {
 		return err
 	}
-	field, err := configField(accountsStores)
+	field, err := configField(config.AccountsStoresKey)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (a *app) changeStores(from, to []string) error {
 		return err
 	}
 	a.warnMissingLaunchers(from, to)
-	return a.emitConfigChange(configChange{Path: accountsStores, From: from, To: to})
+	return a.emitConfigChange(configChange{Path: config.AccountsStoresKey, From: from, To: to})
 }
 
 func (a *app) warnMissingLaunchers(from, to []string) {

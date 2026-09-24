@@ -171,7 +171,7 @@ func (a *app) instanceSetCmd() *cobra.Command {
 				return err
 			}
 			if globalKey(field) != "" {
-				if err := checkPlaySetting(field.path, field.keys[1], to); err != nil {
+				if err := config.CheckPlaySetting(field.path, field.keys[1], to); err != nil {
 					return err
 				}
 			}
