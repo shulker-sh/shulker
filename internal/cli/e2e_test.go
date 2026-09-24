@@ -27,6 +27,7 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
@@ -92,8 +93,8 @@ type harness struct {
 	newer          bool
 	newerAPI       bool
 	serverJar      fakeJar
-	serverJarHits  int
 	quiltLoader    fakeJar
+	quiltLaunch    fakeJar
 	mixin          fakeJar
 	vanilla        fakeJar
 	clientJar      fakeJar
@@ -105,14 +106,12 @@ type harness struct {
 	noRanges       bool
 	hitsMu         sync.Mutex
 	storeHits      int
-	quiltHits      int
+	cdnHits        int
 	neoInstaller   fakeJar
 	neoLibs        map[string]fakeJar
-	neoHits        int
 	forgeLibs      map[string]fakeJar
 	loaders        map[string]fakeLoaderInstall
 	forgeInstaller fakeJar
-	forgeHits      int
 	installs       [][]string
 	installErr     error
 	stdin          io.Reader
@@ -256,6 +255,10 @@ func newHarness(t *testing.T) *harness {
 	h.quiltLoader = makeJarFile(t, "quilt_loader", "quilt-loader-0.30.1.jar", "quilt.mod.json",
 		`{"schema_version":1,"quilt_loader":{"id":"quilt_loader","version":"0.30.1","provides":[{"id":"fabricloader","version":"0.19.5"}]}}`)
 	h.mixin = makeJarFile(t, "mixin", "sponge-mixin-0.17.3.jar", "mixin.txt", "mixin")
+	h.quiltLaunch = makeJarFiles(t, "quilt-server-launch", "quilt-server-launch.jar", map[string]string{
+		"META-INF/MANIFEST.MF":           "Manifest-Version: 1.0\r\nMain-Class: org.quiltmc.loader.impl.launch.server.QuiltServerLauncher\r\nClass-Path: libraries/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17\r\n .3.jar libraries/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.ja\r\n r\r\n\r\n",
+		"quilt-server-launch.properties": "launch.mainClass=org.quiltmc.loader.impl.launch.knot.KnotServer\n",
+	})
 	mavenFiles := map[string][]byte{
 		"/piston-data/server.jar": h.vanilla.data,
 		"/qmaven/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar":  h.quiltLoader.data,
@@ -267,7 +270,6 @@ func newHarness(t *testing.T) *harness {
 				http.ServeContent(w, r, filepath.Base(path), time.Time{}, bytes.NewReader(data))
 				return
 			}
-			h.hit(&h.quiltHits)
 			w.Write(data)
 		})
 	}
@@ -323,7 +325,6 @@ func newHarness(t *testing.T) *harness {
 		writeJSON(w, map[string]any{"isSnapshot": false, "versions": []string{"26.1.2.40", "26.2.0.56-beta", "26.2.0.87"}})
 	})
 	mux.HandleFunc("/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar", func(w http.ResponseWriter, r *http.Request) {
-		h.hit(&h.neoHits)
 		w.Write(h.neoInstaller.data)
 	})
 	mux.HandleFunc("/forge/net/minecraftforge/forge/maven-metadata.xml", func(w http.ResponseWriter, r *http.Request) {
@@ -334,7 +335,6 @@ func newHarness(t *testing.T) *harness {
 			`</versions></versioning></metadata>`)
 	})
 	mux.HandleFunc("/forge/net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-installer.jar", func(w http.ResponseWriter, r *http.Request) {
-		h.hit(&h.forgeHits)
 		w.Write(h.forgeInstaller.data)
 	})
 	h.neoLibs = map[string]fakeJar{
@@ -348,11 +348,7 @@ func newHarness(t *testing.T) *harness {
 		path := strings.TrimPrefix(r.URL.Path, "/neomaven/")
 		jar, ok := h.neoLibs[path]
 		if !ok {
-			if jar, ok = h.forgeLibs[path]; ok {
-				h.hit(&h.forgeHits)
-			}
-		} else {
-			h.hit(&h.neoHits)
+			jar, ok = h.forgeLibs[path]
 		}
 		if !ok {
 			http.NotFound(w, r)
@@ -362,7 +358,6 @@ func newHarness(t *testing.T) *harness {
 	})
 	h.serverJar = makeJar(t, "fabric-server-launch", "fabric-server-launch.jar", "server")
 	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/1.1.2/server/jar", func(w http.ResponseWriter, r *http.Request) {
-		h.hit(&h.serverJarHits)
 		w.Write(h.serverJar.data)
 	})
 	projects := map[string]map[string]any{
@@ -579,6 +574,7 @@ func newHarness(t *testing.T) *harness {
 		}
 		for _, jar := range h.jars {
 			if strings.HasSuffix(r.URL.Path, jar.filename) {
+				h.hit(&h.cdnHits)
 				if h.cdnCut[r.URL.Path] {
 					w.Header().Set("Content-Length", strconv.Itoa(len(jar.data)))
 					w.Write(jar.data[:len(jar.data)/2])
@@ -648,7 +644,7 @@ func newHarness(t *testing.T) *harness {
 		if !ok {
 			jar = h.forgeLibs[path]
 		}
-		return map[string]any{"name": name, "downloads": map[string]any{"artifact": map[string]any{"path": path, "url": base + "/neomaven/" + path, "sha1": jar.sha1}}}
+		return map[string]any{"name": name, "downloads": map[string]any{"artifact": map[string]any{"path": path, "url": base + "/cdn/" + path, "sha1": jar.sha1}}}
 	}
 	profile, _ := json.Marshal(map[string]any{"minecraft": "26.2", "libraries": []any{
 		library("org.ow2.asm:asm:9.10.1", "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"),
@@ -702,8 +698,110 @@ func newHarness(t *testing.T) *harness {
 			libs:      []string{"org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", vanillaLib("forge")},
 		},
 	}
+	h.fakeRows(t, base)
 	t.Cleanup(h.server.Close)
 	return h
+}
+
+func fakeVersions(ids ...string) []loader.Version {
+	versions := make([]loader.Version, len(ids))
+	for i, id := range ids {
+		versions[i] = loader.Version{Version: id, Stable: !strings.Contains(id, "-")}
+	}
+	return versions
+}
+
+// fakeRows replaces the loader table with a fake row per loader for the test, each answering
+// what the CLI's slices ask of it from the cdn: versions, a profile or an installer, and a server.
+func (h *harness) fakeRows(t *testing.T, base string) {
+	t.Helper()
+	h.jars["fabric-loader"], h.jars["quilt-loader"], h.jars["mixin"] = h.fabricLoader, h.quiltLoader, h.mixin
+	h.jars["fabric-server-launch"], h.jars["quilt-server-launch"] = h.serverJar, h.quiltLaunch
+	h.jars["neoforge-installer"], h.jars["forge-installer"] = h.neoInstaller, h.forgeInstaller
+	for path, jar := range h.neoLibs {
+		h.jars[path] = jar
+	}
+	for path, jar := range h.forgeLibs {
+		h.jars[path] = jar
+	}
+	profile := func(id, mainClass, library string) json.RawMessage {
+		raw, _ := json.Marshal(map[string]any{
+			"id": id, "inheritsFrom": "26.2", "type": "release", "mainClass": mainClass,
+			"libraries": []map[string]any{{"name": library, "url": base + "/cdn/"}},
+		})
+		return raw
+	}
+	asm := h.neoLibs["org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"]
+	fakes := []loader.Fake{
+		{
+			Name: "fabric", Versions: fakeVersions("0.18.0-beta.1", "0.17.3", "0.17.2"),
+			Profile:      profile("fabric-loader-0.17.3-26.2", "net.fabricmc.loader.impl.launch.knot.KnotClient", "net.fabricmc:fabric-loader:0.17.3"),
+			EnsureServer: h.fakeServer("1.1.2", h.serverJar, nil),
+		},
+		{
+			Name: "quilt", Versions: fakeVersions("0.20.0-beta.9", "0.30.1", "0.31.0-beta.4", "0.30.0"),
+			Profile:      profile("quilt-loader-0.30.1-26.2", "org.quiltmc.loader.impl.launch.knot.KnotClient", "org.quiltmc:quilt-loader:0.30.1"),
+			ProvidesJar:  base + "/cdn/org/quiltmc/quilt-loader/0.30.1/" + h.quiltLoader.filename,
+			EnsureServer: h.fakeServer("", h.quiltLaunch, map[string]fakeJar{"org.quiltmc:quilt-loader:0.30.1": h.quiltLoader, "net.fabricmc:sponge-mixin:0.17.3": h.mixin}),
+		},
+		{
+			Name: "neoforge", Versions: fakeVersions("26.2.0.56-beta", "26.2.0.87"),
+			Installer:    base + "/cdn/net/neoforged/neoforge/26.2.0.87/" + h.neoInstaller.filename,
+			EnsureServer: h.fakeServer("", h.neoInstaller, map[string]fakeJar{"net.neoforged:neoforge:26.2.0.87:universal": h.neoLibs["net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"], "org.ow2.asm:asm:9.10.1": asm}),
+		},
+		{
+			Name: "forge", Versions: fakeVersions("65.0.9", "65.1.3"),
+			Installer:    base + "/cdn/net/minecraftforge/forge/26.2-65.1.3/" + h.forgeInstaller.filename,
+			EnsureServer: h.fakeServer("", h.forgeInstaller, map[string]fakeJar{"net.minecraftforge:forge:26.2-65.1.3:universal": h.forgeLibs["net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"], "org.ow2.asm:asm:9.10.1": asm}),
+		},
+	}
+	rows := make([]loader.Loader, len(fakes))
+	for i, f := range fakes {
+		rows[i] = f.Row()
+	}
+	real := loader.All
+	loader.All = rows
+	t.Cleanup(func() { loader.All = real })
+}
+
+// fakeServer is a fake row's server install: it locks jar as loader.server with libs under it,
+// every one on the cdn, and downloads only what the cache lacks.
+func (h *harness) fakeServer(installer string, jar fakeJar, libs map[string]fakeJar) func(context.Context, *loader.Remote, *lock.Lock) (loader.ServerResult, error) {
+	return func(ctx context.Context, r *loader.Remote, lk *lock.Lock) (loader.ServerResult, error) {
+		var res loader.ServerResult
+		s := lk.Loader.Server
+		if s == nil {
+			s = &lock.ServerJar{Installer: installer, URL: h.server.URL + "/cdn/" + jar.filename, Sha512: jar.sha512}
+			if len(libs) > 0 {
+				s.Libraries = map[string]lock.Download{}
+			}
+			for name, lib := range libs {
+				path, err := loader.MavenPath(name)
+				if err != nil {
+					return res, err
+				}
+				s.Libraries[name] = lock.Download{URL: h.server.URL + "/cdn/" + path, Sha512: lib.sha512}
+			}
+			lk.Loader.Server = s
+			res.ChangedLock = true
+		}
+		if s.URL == "" {
+			s.URL = h.server.URL + "/cdn/" + jar.filename
+			res.ChangedLock = true
+		}
+		downloads := append([]lock.Download{{URL: s.URL, Sha512: s.Sha512}}, slices.Collect(maps.Values(s.Libraries))...)
+		for _, dl := range downloads {
+			if r.Cache.Has(dl.Sha512) {
+				continue
+			}
+			r.Log("downloading the %s server launcher %s", lk.Loader.Type, lk.Loader.Version)
+			if _, err := r.Cache.Ensure(ctx, r.Fetch, dl.URL, dl.Sha512); err != nil {
+				return res, err
+			}
+			res.WasFetched = true
+		}
+		return res, nil
+	}
 }
 
 // matchesQuery is how the fake providers search: every word of the query
@@ -1572,13 +1670,20 @@ type fakeLoaderInstall struct {
 	generated map[string]string
 }
 
-func installerLoader(flag string) (loader.Loader, bool) {
-	for _, l := range loader.All {
-		if flag == l.InstallServerFlag || flag == l.InstallClientFlag {
-			return l, true
+// installerLoader is the loader whose installer jar is at path, since the fake rows share a
+// client flag.
+func (h *harness) installerLoader(path string) (loader.Loader, fakeLoaderInstall, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return loader.Loader{}, fakeLoaderInstall{}, err
+	}
+	for name, fake := range h.loaders {
+		if string(data) == string(fake.installer.data) {
+			l, _ := loader.Lookup(name)
+			return l, fake, nil
 		}
 	}
-	return loader.Loader{}, false
+	return loader.Loader{}, fakeLoaderInstall{}, fmt.Errorf("installer jar %s is not a locked one", path)
 }
 
 // fakeInstaller stands in for NeoForge's and Forge's installers: on a server it checks that the
@@ -1592,18 +1697,14 @@ func (h *harness) fakeInstaller(_ context.Context, java, jar string, args []stri
 	if _, err := os.Stat(java); err != nil {
 		return err
 	}
-	l, ok := installerLoader(args[0])
-	if !ok {
-		return fmt.Errorf("installer args %v", args)
-	}
-	fake := h.loaders[l.Name]
-	if got, err := os.ReadFile(jar); err != nil || string(got) != string(fake.installer.data) {
-		return fmt.Errorf("installer jar %s is not the locked %s one (%v)", jar, l.Name, err)
+	l, fake, err := h.installerLoader(jar)
+	if err != nil {
+		return err
 	}
 	if args[0] == l.InstallClientFlag {
 		return h.fakeClientInstall(args, fake)
 	}
-	if len(args) != 3 || args[2] != "--offline" {
+	if args[0] != l.InstallServerFlag || len(args) != 3 || args[2] != "--offline" {
 		return fmt.Errorf("installer args %v", args)
 	}
 	dir := args[1]

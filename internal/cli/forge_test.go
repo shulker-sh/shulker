@@ -31,11 +31,11 @@ func TestForgeServer(t *testing.T) {
 	h.readJSON(t, "shulker.lock", &l)
 	base := h.server.URL
 	want := &lock.ServerJar{
-		URL:    base + "/forge/net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-installer.jar",
+		URL:    base + "/cdn/forge-26.2-65.1.3-installer.jar",
 		Sha512: h.forgeInstaller.sha512,
 		Libraries: map[string]lock.Download{
-			"net.minecraftforge:forge:26.2-65.1.3:universal": {URL: base + "/neomaven/net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", Sha512: h.forgeLibs["net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"].sha512},
-			"org.ow2.asm:asm:9.10.1":                         {URL: base + "/neomaven/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", Sha512: h.neoLibs["org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"].sha512},
+			"net.minecraftforge:forge:26.2-65.1.3:universal": {URL: base + "/cdn/net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", Sha512: h.forgeLibs["net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"].sha512},
+			"org.ow2.asm:asm:9.10.1":                         {URL: base + "/cdn/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", Sha512: h.neoLibs["org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"].sha512},
 		},
 	}
 	if !reflect.DeepEqual(l.Loader.Server, want) {

@@ -35,11 +35,11 @@ func TestNeoForgeServer(t *testing.T) {
 	base := h.server.URL
 	h.readJSON(t, "shulker.lock", &l)
 	want := &lock.ServerJar{
-		URL:    base + "/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar",
+		URL:    base + "/cdn/neoforge-26.2.0.87-installer.jar",
 		Sha512: h.neoInstaller.sha512,
 		Libraries: map[string]lock.Download{
-			"net.neoforged:neoforge:26.2.0.87:universal": {URL: base + "/neomaven/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar", Sha512: h.neoLibs["net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"].sha512},
-			"org.ow2.asm:asm:9.10.1":                     {URL: base + "/neomaven/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", Sha512: h.neoLibs["org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"].sha512},
+			"net.neoforged:neoforge:26.2.0.87:universal": {URL: base + "/cdn/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar", Sha512: h.neoLibs["net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar"].sha512},
+			"org.ow2.asm:asm:9.10.1":                     {URL: base + "/cdn/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", Sha512: h.neoLibs["org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"].sha512},
 		},
 	}
 	if !reflect.DeepEqual(l.Loader.Server, want) {
@@ -67,11 +67,11 @@ func TestNeoForgeServer(t *testing.T) {
 		}
 	}
 
-	hits := h.neoHits
+	hits := h.cdnHits
 	h.mustRun(t, "install")
 	stdout = h.mustRun(t, "build")
-	if len(h.installs) != 1 || h.neoHits != hits {
-		t.Fatalf("an installed loader ran the installer again (%d runs, %d downloads)", len(h.installs), h.neoHits-hits)
+	if len(h.installs) != 1 || h.cdnHits != hits {
+		t.Fatalf("an installed loader ran the installer again (%d runs, %d downloads)", len(h.installs), h.cdnHits-hits)
 	}
 	if !strings.Contains(stdout, "(5 unchanged)") || build.LoadState(buildDir).InstalledLoader == nil {
 		t.Fatalf("rebuild: %s", stdout)
@@ -157,7 +157,7 @@ func TestNeoForgeLinkMojang(t *testing.T) {
 	var l lock.Lock
 	h.readJSON(t, "shulker.lock", &l)
 	want := &lock.Download{
-		URL:    h.server.URL + "/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar",
+		URL:    h.server.URL + "/cdn/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar",
 		Sha512: h.neoInstaller.sha512,
 	}
 	if !reflect.DeepEqual(l.Loader.Client, want) {
@@ -174,10 +174,10 @@ func TestNeoForgeLinkMojang(t *testing.T) {
 		t.Fatalf("linked profile: %v", linked)
 	}
 
-	hits := h.neoHits
+	hits := h.cdnHits
 	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
-	if h.neoHits != hits {
-		t.Fatalf("a locked installer should come from the cache (%d downloads)", h.neoHits-hits)
+	if h.cdnHits != hits {
+		t.Fatalf("a locked installer should come from the cache (%d downloads)", h.cdnHits-hits)
 	}
 }
 

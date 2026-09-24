@@ -28,7 +28,7 @@ func TestServerTargetBuild(t *testing.T) {
 	}
 	var l lock.Lock
 	h.readJSON(t, "shulker.lock", &l)
-	launcherURL := h.server.URL + "/fabric/versions/loader/26.2/0.17.3/1.1.2/server/jar"
+	launcherURL := h.server.URL + "/cdn/fabric-server-launch.jar"
 	if l.Loader.Server == nil || l.Loader.Server.Installer != "1.1.2" || l.Loader.Server.URL != launcherURL || l.Loader.Server.Sha512 != h.serverJar.sha512 {
 		t.Fatalf("lock loader: %+v", l.Loader)
 	}
@@ -63,9 +63,10 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatalf("server.properties: %q", got)
 	}
 
+	hits := h.cdnHits
 	h.mustRun(t, "install")
-	if h.serverJarHits != 1 {
-		t.Fatalf("server jar downloaded %d times", h.serverJarHits)
+	if h.cdnHits != hits {
+		t.Fatalf("a second install downloaded %d files", h.cdnHits-hits)
 	}
 
 	gameRewritten := "#Minecraft server properties\n#Thu Sep 10 00:00:00 UTC 2026\nonline-mode=false\nmotd=Welcome to pack\nview-distance=10\nmax-players=8\n"

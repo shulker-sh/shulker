@@ -29,10 +29,10 @@ func TestQuiltServer(t *testing.T) {
 	s := l.Loader.Server
 	base := h.server.URL
 	wantLibs := map[string]lock.Download{
-		"org.quiltmc:quilt-loader:0.30.1":  {URL: base + "/qmaven/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar", Sha512: h.quiltLoader.sha512},
-		"net.fabricmc:sponge-mixin:0.17.3": {URL: base + "/fmaven/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar", Sha512: h.mixin.sha512},
+		"org.quiltmc:quilt-loader:0.30.1":  {URL: base + "/cdn/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar", Sha512: h.quiltLoader.sha512},
+		"net.fabricmc:sponge-mixin:0.17.3": {URL: base + "/cdn/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar", Sha512: h.mixin.sha512},
 	}
-	if s == nil || s.Installer != "" || s.URL != "" || !maps.Equal(s.Libraries, wantLibs) {
+	if s == nil || s.Installer != "" || s.Sha512 != h.quiltLaunch.sha512 || !maps.Equal(s.Libraries, wantLibs) {
 		t.Fatalf("lock loader server: %+v", s)
 	}
 	if l.Server == nil || *l.Server != (lock.Download{URL: base + "/piston-data/server.jar", Sha512: h.vanilla.sha512}) {
@@ -64,10 +64,10 @@ func TestQuiltServer(t *testing.T) {
 		t.Fatalf("launch properties: %q", entries["quilt-server-launch.properties"])
 	}
 
-	hits := h.quiltHits
+	hits := h.cdnHits
 	h.mustRun(t, "install")
-	if h.quiltHits != hits {
-		t.Fatalf("second install downloaded %d more files", h.quiltHits-hits)
+	if h.cdnHits != hits {
+		t.Fatalf("second install downloaded %d more files", h.cdnHits-hits)
 	}
 
 	if err := os.RemoveAll(h.cache); err != nil {
