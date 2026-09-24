@@ -78,15 +78,13 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, for
 		return nil, out.Errorf("version-required", "set \"version\" in shulker.json or pass --version")
 	}
 	if job.output == "" {
-		dir := filepath.Join(p.Dir, "build")
-		if src.isRemote() {
-			if dir = a.dir; dir == "" {
-				if dir, err = os.Getwd(); err != nil {
-					return nil, err
-				}
+		cwd := a.dir
+		if src.isRemote() && cwd == "" {
+			if cwd, err = os.Getwd(); err != nil {
+				return nil, err
 			}
 		}
-		job.output = filepath.Join(dir, build.ExportFileName(p.Manifest, job.version, format))
+		job.output = build.ExportPath(p.Dir, p.Manifest, job.version, format, src.isRemote(), cwd)
 	}
 	if job.output, err = filepath.Abs(job.output); err != nil {
 		return nil, err

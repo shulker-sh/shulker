@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -80,5 +81,16 @@ func TestIdentifyOnMatchesByFingerprintThenLookalike(t *testing.T) {
 	report = &ExportReport{}
 	if matched, err := b.identifyOn(context.Background(), format, []string{"sodium"}, map[string][]byte{"sodium": locked}, entries, true, report); err != nil || len(matched) != 0 || len(report.Warnings) != 1 {
 		t.Fatalf("with --bundle the failure is a warning: %v %v", err, report.Warnings)
+	}
+}
+
+func TestExportPathIsUnderBuildUnlessTheSourceIsRemote(t *testing.T) {
+	m := &manifest.Manifest{Name: "pack"}
+	f := packarchive.Formats[0]
+	if got, want := ExportPath("/p", m, "1.0", f, false, "/cwd"), filepath.Join("/p", "build", "pack-1.0"+f.Extension()); got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if got, want := ExportPath("/p", m, "1.0", f, true, "/cwd"), filepath.Join("/cwd", "pack-1.0"+f.Extension()); got != want {
+		t.Fatalf("a remote source exports into the working directory: got %q, want %q", got, want)
 	}
 }

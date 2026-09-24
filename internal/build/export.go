@@ -92,6 +92,17 @@ func ExportFileName(m *manifest.Manifest, version string, f packarchive.Format) 
 	return m.Name + "-" + version + f.Extension()
 }
 
+// ExportPath is where an export lands when --output names nothing: under build/ in the project at
+// dir, or under cwd for a remote source, whose project is not the user's to write in, named by
+// ExportFileName.
+func ExportPath(dir string, m *manifest.Manifest, version string, f packarchive.Format, remote bool, cwd string) string {
+	into := filepath.Join(dir, "build")
+	if remote {
+		into = cwd
+	}
+	return filepath.Join(into, ExportFileName(m, version, f))
+}
+
 // Export writes the project as a pack archive in the format opts names.
 func (b *Builder) Export(ctx context.Context, opts ExportOptions) (*ExportReport, error) {
 	f := opts.Format
