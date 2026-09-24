@@ -122,6 +122,14 @@ func (mt *Meta) FillDataVersion(ctx context.Context, l *lock.Lock) (warning stri
 	return ""
 }
 
+// ResolvingLine is the step a relock logs before it reads the platform.
+func ResolvingLine(minecraft string, l manifest.Loader) string {
+	if l.Type == "" {
+		return "resolving Minecraft " + minecraft
+	}
+	return fmt.Sprintf("resolving Minecraft %s with %s %s", minecraft, l.Type, l.Version)
+}
+
 // NewLock starts a new project's lock from the exact platform m names: Minecraft, loader, Java
 // and the data version, whose failure to read comes back as the warning FillDataVersion gives.
 func (mt *Meta) NewLock(ctx context.Context, m *manifest.Manifest) (*lock.Lock, string, error) {

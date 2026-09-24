@@ -103,7 +103,7 @@ func (a *app) initCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			a.progress("%s", resolvingLine(minecraft, projectLoader))
+			a.progress("%s", resolve.ResolvingLine(minecraft, projectLoader))
 			l, warning, err := d.meta.NewLock(cmd.Context(), m)
 			if err != nil {
 				return err
@@ -301,13 +301,6 @@ func (a *app) initPack(cmd *cobra.Command, p *project.Project, source string) (f
 }
 
 const noLoader = "none"
-
-func resolvingLine(minecraft string, l manifest.Loader) string {
-	if l.Type == "" {
-		return "resolving Minecraft " + minecraft
-	}
-	return fmt.Sprintf("resolving Minecraft %s with %s %s", minecraft, l.Type, l.Version)
-}
 
 func platformLabel(minecraft, loaderType, loaderVersion string) string {
 	if loaderType == "" {

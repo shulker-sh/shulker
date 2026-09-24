@@ -8,6 +8,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/resolve"
 )
 
 // authorSource asks init's questions for a link with nothing to follow. A pack comes first, since a
@@ -46,7 +47,7 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.progress("%s", resolvingLine(m.Minecraft, m.Loader))
+	a.progress("%s", resolve.ResolvingLine(m.Minecraft, m.Loader))
 	platform, err := d.meta.Platform(ctx, m, nil)
 	if err != nil {
 		return nil, err
