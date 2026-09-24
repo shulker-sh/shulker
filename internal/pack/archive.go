@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
+	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -326,4 +328,43 @@ func (s *Store) archiveStatus(p manifest.Require, pinned lock.Modpack) (string, 
 		return "changed", nil
 	}
 	return "ok", nil
+}
+
+// FetchArchive downloads url and, when it is a modpack archive, keeps it in the cache at its
+// sha512 and returns its path there. Anything else, or nothing at the URL, returns no path, for
+// the URL to be read as a git source, unless its name says it is an archive; a download that
+// fails otherwise fails the import.
+func (s *Store) FetchArchive(ctx context.Context, url string) (string, error) {
+	s.log("fetching %s", url)
+	tmp, err := s.Cache.TempFile("import")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tmp.Name())
+	_, err = s.Fetch.Download(ctx, url, tmp)
+	tmp.Close()
+	isNamedArchive := packarchive.HasArchiveExtension(strings.SplitN(url, "?", 2)[0])
+	if errors.Is(err, fetch.ErrNotFound) && !isNamedArchive {
+		return "", nil
+	}
+	if err != nil {
+		e := out.Errorf("modpack-fetch", "couldn't download %s", url)
+		return "", e.WithCause("http", err)
+	}
+	if !packarchive.IsArchive(tmp.Name()) {
+		if isNamedArchive {
+			return "", packarchive.NotArchive(url)
+		}
+		return "", nil
+	}
+	file, err := os.Open(tmp.Name())
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	sha, err := s.Cache.Put(file)
+	if err != nil {
+		return "", err
+	}
+	return s.Cache.Object(sha), nil
 }

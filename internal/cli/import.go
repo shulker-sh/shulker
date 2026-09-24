@@ -3,7 +3,6 @@ package cli
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -13,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -206,7 +204,8 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 		return a.importHosted(ctx, d, dir, target, arg, f)
 	}
 	if (strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")) && pack.Classify(arg) == pack.Git {
-		path, err := a.fetchImportArchive(ctx, d, arg)
+		store := &pack.Store{Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+		path, err := store.FetchArchive(ctx, arg)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -219,45 +218,6 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 		}
 	}
 	return a.importCheckout(ctx, d, dir, arg, f)
-}
-
-// fetchImportArchive downloads url and, when it is a modpack archive, keeps it in the cache at its
-// sha512 and returns its path there. Anything else, or nothing at the URL, returns no path, for the
-// URL to be read as a git source, unless its name says it is an archive; a download that fails
-// otherwise fails the import.
-func (a *app) fetchImportArchive(ctx context.Context, d *deps, url string) (string, error) {
-	a.progress("fetching %s", url)
-	tmp, err := d.cache.TempFile("import")
-	if err != nil {
-		return "", err
-	}
-	defer os.Remove(tmp.Name())
-	_, err = d.fetch.Download(ctx, url, tmp)
-	tmp.Close()
-	isNamedArchive := packarchive.HasArchiveExtension(strings.SplitN(url, "?", 2)[0])
-	if errors.Is(err, fetch.ErrNotFound) && !isNamedArchive {
-		return "", nil
-	}
-	if err != nil {
-		e := out.Errorf("modpack-fetch", "couldn't download %s", url)
-		return "", e.WithCause("http", err)
-	}
-	if !packarchive.IsArchive(tmp.Name()) {
-		if isNamedArchive {
-			return "", packarchive.NotArchive(url)
-		}
-		return "", nil
-	}
-	file, err := os.Open(tmp.Name())
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	sha, err := d.cache.Put(file)
-	if err != nil {
-		return "", err
-	}
-	return d.cache.Object(sha), nil
 }
 
 func isImportURL(arg string) bool {
