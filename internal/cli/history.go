@@ -1,19 +1,13 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
-	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/lock"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
@@ -23,17 +17,10 @@ type historyRow struct {
 	build.HistoryEntry
 }
 
-type historyChange struct {
-	Mod  string `json:"mod"`
-	Kind string `json:"kind,omitempty"`
-	From string `json:"from,omitempty"`
-	To   string `json:"to,omitempty"`
-}
-
 type historyShown struct {
-	N       int                `json:"n"`
-	Entry   build.HistoryEntry `json:"entry"`
-	Changes []historyChange    `json:"changes"`
+	N       int                   `json:"n"`
+	Entry   build.HistoryEntry    `json:"entry"`
+	Changes []build.HistoryChange `json:"changes"`
 }
 
 type historyPruned struct {
@@ -140,7 +127,7 @@ func (a *app) historyShowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			changes, err := historyChanges(p, e)
+			changes, err := build.HistoryChanges(p.Dir, p.Lock, e)
 			if err != nil {
 				return err
 			}
@@ -178,7 +165,7 @@ func (a *app) historyShowCmd() *cobra.Command {
 	}
 }
 
-func changeItem(c historyChange) out.Item {
+func changeItem(c build.HistoryChange) out.Item {
 	switch {
 	case c.From == "":
 		return out.Item{Kind: out.Add, Name: c.Mod, Version: c.To}
@@ -186,76 +173,6 @@ func changeItem(c historyChange) out.Item {
 		return out.Item{Kind: out.Drop, Name: c.Mod, Version: c.From}
 	}
 	return out.Item{Kind: out.Change, Name: c.Mod, From: c.From, To: c.To}
-}
-
-// historyChanges compares what an entry's lock holds with what is locked now,
-// across mods, resource packs and shaders, so From is what is installed and To
-// is what restoring would put back.
-func historyChanges(p *project.Project, e build.HistoryEntry) ([]historyChange, error) {
-	entry := filepath.Join(build.HistoryPath(p.Dir), e.ID)
-	was, err := lock.Load(filepath.Join(entry, lock.FileName))
-	if errors.Is(err, fs.ErrNotExist) {
-		fail := out.Errorf("history-invalid", "history entry %s has no lock", e.ID)
-		fail.Help = fmt.Sprintf("delete %s to drop it", entry)
-		return nil, fail
-	}
-	if err != nil {
-		invalid := out.Errorf("history-invalid", "history entry %s has an unreadable lock", e.ID)
-		invalid.Help = fmt.Sprintf("delete %s to drop it", entry)
-		invalid.Rows = []out.Detail{{Label: "lock", Text: out.AsError(err).Message}}
-		return nil, invalid
-	}
-	type section struct {
-		kind string
-		now  map[string]string
-		was  map[string]string
-	}
-	sections := []section{{"", modVersions(p.Lock.Mods), modVersions(was.Mods)}}
-	for _, kind := range manifest.PackKinds {
-		sections = append(sections, section{kind, packVersions(p.Lock.Packs(kind)), packVersions(was.Packs(kind))})
-	}
-	changes := []historyChange{}
-	for _, s := range sections {
-		keys := []string{}
-		for key := range s.now {
-			keys = append(keys, key)
-		}
-		for key := range s.was {
-			if _, both := s.now[key]; !both {
-				keys = append(keys, key)
-			}
-		}
-		slices.Sort(keys)
-		for _, key := range keys {
-			now, installed := s.now[key]
-			then, kept := s.was[key]
-			switch {
-			case installed && !kept:
-				changes = append(changes, historyChange{Mod: key, Kind: s.kind, From: now})
-			case !installed && kept:
-				changes = append(changes, historyChange{Mod: key, Kind: s.kind, To: then})
-			case now != then:
-				changes = append(changes, historyChange{Mod: key, Kind: s.kind, From: now, To: then})
-			}
-		}
-	}
-	return changes, nil
-}
-
-func modVersions(mods map[string]lock.Mod) map[string]string {
-	versions := make(map[string]string, len(mods))
-	for key, m := range mods {
-		versions[key] = m.VersionNumber
-	}
-	return versions
-}
-
-func packVersions(packs map[string]lock.Pack) map[string]string {
-	versions := make(map[string]string, len(packs))
-	for key, p := range packs {
-		versions[key] = p.VersionNumber
-	}
-	return versions
 }
 
 func (a *app) historyPruneCmd() *cobra.Command {

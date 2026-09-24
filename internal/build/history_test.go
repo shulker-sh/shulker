@@ -9,7 +9,9 @@ import (
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
 )
 
 func TestHistoryLeavesPlacedDatapacksToTheCache(t *testing.T) {
@@ -206,5 +208,46 @@ func TestRestoreHistoryPutsTheKeptStateBack(t *testing.T) {
 	}
 	if _, err := PickHistory(p.b.Dir, 3); out.CodeOf(err) != "history-missing" {
 		t.Fatalf("picking past the end: %v", err)
+	}
+}
+
+func TestHistoryChangesReadAsWhatRestoringWouldDo(t *testing.T) {
+	p := inPlaceProject(t)
+	lockVersioned := func(key, version string) {
+		v := provider.Version{ID: "m-" + key + "-" + version, Number: version, File: provider.File{Filename: key + "-" + version + ".jar"}}
+		p.lockMod(key, p.modrinth, p.modrinth.publish(mod(key+"-id", key), v, modJar(t, key, version)))
+	}
+	lockVersioned("sodium", "0.9")
+	lockVersioned("iris", "3.0")
+	bsl := provider.Version{ID: "m-bsl-8", Number: "8", File: provider.File{Filename: "bsl-8.zip"}}
+	p.lockPack(manifest.TypeShader, "bsl", p.modrinth, p.modrinth.publish(mod("bsl-id", "bsl"), bsl, packZip(t, "bsl")))
+	p.save()
+	e, err := TakeHistory(p.b.Dir, 5, HistoryEntry{Side: "client", Reason: "update"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	delete(p.b.Lock.Mods, "iris")
+	lockVersioned("sodium", "1.0")
+	lockVersioned("lithium", "2.0")
+	p.b.Lock.Shaders = nil
+
+	changes, err := HistoryChanges(p.b.Dir, p.b.Lock, e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []HistoryChange{
+		{Mod: "iris", To: "3.0"},
+		{Mod: "lithium", From: "2.0"},
+		{Mod: "sodium", From: "1.0", To: "0.9"},
+		{Mod: "bsl", Kind: manifest.TypeShader, To: "8"},
+	}
+	if !slices.Equal(changes, want) {
+		t.Fatalf("got %+v, want %+v", changes, want)
+	}
+	if err := os.Remove(filepath.Join(HistoryPath(p.b.Dir), e.ID, lock.FileName)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := HistoryChanges(p.b.Dir, p.b.Lock, e); out.CodeOf(err) != "history-invalid" {
+		t.Fatalf("an entry without its lock is history-invalid, got %v", err)
 	}
 }

@@ -252,6 +252,85 @@ func readHistoryEntry(dir, id string) (HistoryEntry, error) {
 	return e, nil
 }
 
+// HistoryChange is what restoring an entry would do to one key: From is what is locked now and
+// To what the entry holds, so one of them empty is a drop or an add back.
+type HistoryChange struct {
+	Mod  string `json:"mod"`
+	Kind string `json:"kind,omitempty"`
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+}
+
+// HistoryChanges compares what an entry's lock holds with now, the lock as it stands, across mods
+// and each pack kind, keys sorted, so From is what is installed and To is what restoring would put
+// back.
+func HistoryChanges(dir string, now *lock.Lock, e HistoryEntry) ([]HistoryChange, error) {
+	entry := historyEntryPath(dir, e.ID)
+	was, err := lock.Load(filepath.Join(entry, lock.FileName))
+	if errors.Is(err, fs.ErrNotExist) {
+		fail := out.Errorf("history-invalid", "history entry %s has no lock", e.ID)
+		fail.Help = fmt.Sprintf("delete %s to drop it", entry)
+		return nil, fail
+	}
+	if err != nil {
+		invalid := out.Errorf("history-invalid", "history entry %s has an unreadable lock", e.ID)
+		invalid.Help = fmt.Sprintf("delete %s to drop it", entry)
+		invalid.Rows = []out.Detail{{Label: "lock", Text: out.AsError(err).Message}}
+		return nil, invalid
+	}
+	type section struct {
+		kind string
+		now  map[string]string
+		was  map[string]string
+	}
+	sections := []section{{"", modVersions(now.Mods), modVersions(was.Mods)}}
+	for _, kind := range manifest.PackKinds {
+		sections = append(sections, section{kind, packVersions(now.Packs(kind)), packVersions(was.Packs(kind))})
+	}
+	changes := []HistoryChange{}
+	for _, s := range sections {
+		keys := []string{}
+		for key := range s.now {
+			keys = append(keys, key)
+		}
+		for key := range s.was {
+			if _, both := s.now[key]; !both {
+				keys = append(keys, key)
+			}
+		}
+		slices.Sort(keys)
+		for _, key := range keys {
+			now, installed := s.now[key]
+			then, kept := s.was[key]
+			switch {
+			case installed && !kept:
+				changes = append(changes, HistoryChange{Mod: key, Kind: s.kind, From: now})
+			case !installed && kept:
+				changes = append(changes, HistoryChange{Mod: key, Kind: s.kind, To: then})
+			case now != then:
+				changes = append(changes, HistoryChange{Mod: key, Kind: s.kind, From: now, To: then})
+			}
+		}
+	}
+	return changes, nil
+}
+
+func modVersions(mods map[string]lock.Mod) map[string]string {
+	versions := make(map[string]string, len(mods))
+	for key, m := range mods {
+		versions[key] = m.VersionNumber
+	}
+	return versions
+}
+
+func packVersions(packs map[string]lock.Pack) map[string]string {
+	versions := make(map[string]string, len(packs))
+	for key, p := range packs {
+		versions[key] = p.VersionNumber
+	}
+	return versions
+}
+
 // PickHistory takes the nth newest entry, 1 being the newest.
 func PickHistory(dir string, n int) (HistoryEntry, error) {
 	entries, err := History(dir)
