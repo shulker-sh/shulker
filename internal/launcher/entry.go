@@ -186,6 +186,18 @@ func (e *Entry) defaultDir() string {
 	return dir
 }
 
+// AccountsDir is where the launcher's accounts are read from: the directory a registered instance
+// was linked against, since the player named it with `link --launcher-dir` and re-deriving would
+// read a folder they don't use, else the launcher's default on this machine, else nowhere.
+func (e *Entry) AccountsDir(instances []config.Instance) string {
+	for _, in := range instances {
+		if in.Launcher == e.Name && in.LauncherDir != "" {
+			return in.LauncherDir
+		}
+	}
+	return e.defaultDir()
+}
+
 // HasDir says whether the launcher has a directory of its own, which a link records and
 // --launcher-dir names. Shulker's own instances root stands in for one otherwise.
 func (e *Entry) HasDir() bool { return e.Usage.Dir != "" }

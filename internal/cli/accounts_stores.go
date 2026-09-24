@@ -123,13 +123,17 @@ func (a *app) changeStores(from, to []string) error {
 }
 
 func (a *app) warnMissingLaunchers(from, to []string) {
+	instances, err := a.loadInstances()
+	if err != nil {
+		return
+	}
 	for _, name := range to {
 		e := launcher.Find(name)
 		if e == nil || e.Accounts == nil || slices.Contains(from, name) {
 			continue
 		}
-		dir, err := a.launcherDir(e)
-		if err != nil || dir == "" {
+		dir := e.AccountsDir(instances)
+		if dir == "" {
 			continue
 		}
 		if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
@@ -159,17 +163,17 @@ func (a *app) stores() ([]string, error) {
 // corrupt one must not take the whole account list down with it.
 func (a *app) borrowedAccounts(stores []string) (map[string][]account.Resolved, error) {
 	var borrowed map[string][]account.Resolved
+	instances, err := a.loadInstances()
+	if err != nil {
+		return nil, err
+	}
 	now := time.Now()
 	for _, name := range stores {
 		e := launcher.Find(name)
 		if e == nil || e.Accounts == nil {
 			continue
 		}
-		dir, err := a.launcherDir(e)
-		if err != nil {
-			return nil, err
-		}
-		found, errs := e.ReadAccounts(dir, now)
+		found, errs := e.ReadAccounts(e.AccountsDir(instances), now)
 		for _, err := range errs {
 			a.printer.Warn("%s", err)
 		}
@@ -182,29 +186,4 @@ func (a *app) borrowedAccounts(stores []string) (map[string][]account.Resolved, 
 		borrowed[name] = found
 	}
 	return borrowed, nil
-}
-
-// launcherDir is where a launcher keeps its own files: the directory a registered instance was
-// linked against, since the player named it with `link --launcher-dir` and re-deriving would read
-// a folder they don't use, and the launcher's default on this machine otherwise.
-func (a *app) launcherDir(e *launcher.Entry) (string, error) {
-	instances, err := a.loadInstances()
-	if err != nil {
-		return "", err
-	}
-	for _, in := range instances {
-		if in.Launcher == e.Name && in.LauncherDir != "" {
-			return in.LauncherDir, nil
-		}
-	}
-	if e.DefaultDir == nil {
-		return "", nil
-	}
-	// A default that can't be worked out on this machine is no directory at all, the way
-	// scanLaunchers reads one: a launcher shulker can't place has nothing to read.
-	dir, err := e.DefaultDir()
-	if err != nil {
-		return "", nil
-	}
-	return dir, nil
 }
