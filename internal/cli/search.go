@@ -85,30 +85,21 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 	if err != nil {
 		return searchReply{}, err
 	}
-	reply := searchReply{results: searchResults{Query: query, Results: []searchHit{}}}
-	var skipped []*out.Error
-	var failures []error
-	for _, name := range names {
-		p, err := d.providers.Get(name)
-		if err != nil {
-			skipped = append(skipped, out.AsError(err))
-			continue
-		}
-		if steps {
+	var step func(name string) func(error)
+	if steps {
+		step = func(name string) func(error) {
 			a.progress("searching %s", name)
-		}
-		found, err := p.Search(ctx, query, kind, limit)
-		if err != nil {
-			if steps {
-				a.printer.Drop()
+			return func(err error) {
+				if err != nil {
+					a.printer.Drop()
+				}
 			}
-			failures = append(failures, err)
-			continue
 		}
-		reply.searched = append(reply.searched, name)
-		for _, proj := range found {
-			reply.results.Results = append(reply.results.Results, searchHitOf(name, proj))
-		}
+	}
+	hits, searched, skipped, failures := d.providers.Search(ctx, names, query, kind, limit, step)
+	reply := searchReply{results: searchResults{Query: query, Results: []searchHit{}}, searched: searched}
+	for _, hit := range hits {
+		reply.results.Results = append(reply.results.Results, searchHitOf(hit.Provider, hit.Project))
 	}
 	if len(reply.searched) > 0 {
 		for _, err := range failures {
