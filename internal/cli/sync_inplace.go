@@ -30,35 +30,6 @@ func (a *app) inPlaceProject(dir string) (*project.Project, string, bool, error)
 	return p, side, ok, nil
 }
 
-// inPlaceManifest answers the same question for a reader deciding what a directory is, which needs
-// no lock: nothing it does builds.
-func inPlaceManifest(dir string) (*manifest.Manifest, string, bool, error) {
-	m, err := manifest.Load(filepath.Join(dir, manifest.FileName))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, "", false, nil
-	}
-	if err != nil {
-		return nil, "", false, err
-	}
-	side, ok := m.InPlaceSide()
-	return m, side, ok, nil
-}
-
-// inPlaceIntent is what an instance that is a project reads from its manifest rather than from its
-// instance file: the modpack entry it follows, and the side that builds where it stands. With
-// several modpacks required, none of them is the one it was linked from, so the entry comes back
-// empty.
-func inPlaceIntent(dir string) (pack manifest.Require, side string, inPlace bool) {
-	m, side, inPlace, err := inPlaceManifest(dir)
-	if err != nil || !inPlace {
-		return manifest.Require{}, "", false
-	}
-	if key := project.ModpackKey(m, ""); key != "" {
-		pack = m.Requires[key]
-	}
-	return pack, side, true
-}
-
 // syncInPlace refreshes the modpacks that follow their source, relocks without moving the
 // project's own mods, and builds the instance where it stands.
 func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, req syncRequest) (syncResult, error) {

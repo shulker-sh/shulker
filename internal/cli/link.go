@@ -552,7 +552,7 @@ func (ls linkSettings) isSet() bool {
 
 // save writes what a directory syncs from, and the settings this link decided.
 func (ls linkSettings) save(dir, source string, at pack.At, side string, assumeClient bool, m *manifest.Manifest) error {
-	_, _, inPlace, err := inPlaceManifest(dir)
+	_, _, inPlace, err := project.InPlace(dir)
 	if err != nil {
 		return err
 	}

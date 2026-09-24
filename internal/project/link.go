@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"path/filepath"
 	"slices"
 
 	"shulker.sh/shulker/internal/lock"
@@ -149,7 +148,7 @@ func authoredOver(gameDir string) error {
 // noun, name and second word the refusal: what the launcher calls the instance, what this one is
 // called, and the flag that would make a second one instead.
 func CheckAdopt(gameDir string, src *LinkSource, noun, name, second string, force bool) error {
-	m, inPlace, err := inPlaceManifest(gameDir)
+	m, _, inPlace, err := InPlace(gameDir)
 	if err != nil || !inPlace {
 		return err
 	}
@@ -166,20 +165,6 @@ func CheckAdopt(gameDir string, src *LinkSource, noun, name, second string, forc
 	e := out.Errorf("instance-exists", "%s %q already follows %s from %s", noun, name, key, m.Requires[key].Source)
 	e.Help = fmt.Sprintf("pass %s to create a second %s, or --force to repoint the modpack it follows", second, noun)
 	return e
-}
-
-// inPlaceManifest is the manifest at dir when a side of it builds there, which is what makes the
-// directory an instance rather than a project that builds elsewhere.
-func inPlaceManifest(dir string) (*manifest.Manifest, bool, error) {
-	m, err := manifest.Load(filepath.Join(dir, manifest.FileName))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	_, ok := m.InPlaceSide()
-	return m, ok, nil
 }
 
 // ModpackKey is the key an instance follows a link's source under: the source manifest's name

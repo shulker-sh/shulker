@@ -291,7 +291,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}
 	if syncedDir {
-		_, _, inPlace, err := inPlaceManifest(into)
+		_, _, inPlace, err := project.InPlace(into)
 		if err != nil {
 			return syncResult{}, err
 		}

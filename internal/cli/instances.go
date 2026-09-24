@@ -16,6 +16,7 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 type instanceEntry struct {
@@ -114,7 +115,7 @@ func inspectInstance(in config.Instance) instanceEntry {
 			e.LaunchError = last.Error
 		}
 	}
-	pack, side, inPlace := inPlaceIntent(in.Dir)
+	pack, side, inPlace := project.InPlaceIntent(in.Dir)
 	state, _ := build.ReadState(in.Dir)
 	switch {
 	case inPlace:

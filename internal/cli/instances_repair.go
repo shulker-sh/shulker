@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
 type repairResult struct {
@@ -89,7 +90,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 			in.Name = name
 		}
 		if in.ID == "" {
-			in.ID = config.InstanceID(instances, inPlaceID(in.Dir), in.Name, in.Dir)
+			in.ID = config.InstanceID(instances, project.InPlaceID(in.Dir), in.Name, in.Dir)
 		}
 		if in.Name != from {
 			res.Renamed = append(res.Renamed, repairRename{ID: in.ID, Dir: in.Dir, From: from, To: in.Name})
@@ -108,7 +109,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 			continue
 		}
 		registered[filepath.Clean(found.Dir)] = true
-		found.ID = config.InstanceID(instances, inPlaceID(found.Dir), found.Name, found.Dir)
+		found.ID = config.InstanceID(instances, project.InPlaceID(found.Dir), found.Name, found.Dir)
 		wrote, err := a.repairIntent(found)
 		if err != nil {
 			return res, err
@@ -147,7 +148,7 @@ func (a *app) repairIntent(in config.Instance) (bool, error) {
 		return false, nil
 	}
 	f := instance.New()
-	if _, _, inPlace := inPlaceIntent(in.Dir); !inPlace {
+	if _, _, inPlace := project.InPlaceIntent(in.Dir); !inPlace {
 		st, _ := build.ReadState(in.Dir)
 		source := st.Source
 		if source == "" {
@@ -163,16 +164,6 @@ func (a *app) repairIntent(in config.Instance) (bool, error) {
 		a.warnReplaced(loadErr, kept)
 	}
 	return true, err
-}
-
-// inPlaceID is the id an instance that is a project was linked under: link makes the manifest's name
-// and the id one value, and the folder the launcher named after it is a different one.
-func inPlaceID(dir string) string {
-	m, _, inPlace, err := inPlaceManifest(dir)
-	if err != nil || !inPlace {
-		return ""
-	}
-	return m.Name
 }
 
 // scanLaunchers looks where each launcher keeps its instances, and for shulker's own that is the
@@ -232,7 +223,7 @@ func instanceAt(dir string) (config.Instance, bool) {
 	// With several modpacks required none of them is the one the instance was linked from, so the
 	// manifest says nothing and the sources below answer instead. A directory with no source
 	// anywhere is no row shulker can write: the registry needs one.
-	pack, _, _ := inPlaceIntent(dir)
+	pack, _, _ := project.InPlaceIntent(dir)
 	source := pack.Source
 	if source == "" && err == nil {
 		source = f.Source

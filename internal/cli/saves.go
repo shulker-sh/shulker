@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/saves"
 )
 
@@ -308,7 +309,7 @@ func (a *app) savesTargetAt(dir string) (savesTarget, error) {
 		t.Dir = dir
 		return t, nil
 	}
-	m, _, inPlace, err := inPlaceManifest(dir)
+	m, _, inPlace, err := project.InPlace(dir)
 	if err != nil {
 		return savesTarget{}, err
 	}
