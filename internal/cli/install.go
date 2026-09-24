@@ -50,7 +50,7 @@ func (a *app) installCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			overrides, err := featureOverrides(b, lf.Features, ff)
+			overrides, err := ff.overrides(b, lf.Features)
 			if err != nil {
 				return err
 			}

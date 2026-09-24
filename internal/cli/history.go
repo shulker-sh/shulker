@@ -344,7 +344,7 @@ func (a *app) rollbackCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			overrides, err := featureOverrides(b, lf.Features, featureFlags{})
+			overrides, err := featureFlags{}.overrides(b, lf.Features)
 			if err != nil {
 				return err
 			}

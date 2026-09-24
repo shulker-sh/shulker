@@ -2,6 +2,7 @@ package build
 
 import (
 	"fmt"
+	"maps"
 	"runtime"
 	"slices"
 	"sort"
@@ -387,4 +388,26 @@ func warnFeatureConflict(report *Report, was, now, rel string) {
 		return
 	}
 	report.Warnings = append(report.Warnings, fmt.Sprintf("%s and %s both write %s; %s wins", was, now, rel, now))
+}
+
+// FeatureOverrides is every feature decision in force for a build: the layered decisions, then
+// each feature --with turns on and --without turns off.
+func FeatureOverrides(decisions map[string]bool, with, without []string) map[string]bool {
+	overrides := MergeDecisions(decisions)
+	for _, name := range with {
+		overrides[name] = true
+	}
+	for _, name := range without {
+		overrides[name] = false
+	}
+	return overrides
+}
+
+// MergeDecisions layers feature decisions, a later layer's choice winning over an earlier one's.
+func MergeDecisions(layers ...map[string]bool) map[string]bool {
+	merged := map[string]bool{}
+	for _, l := range layers {
+		maps.Copy(merged, l)
+	}
+	return merged
 }

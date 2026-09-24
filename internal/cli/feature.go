@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -42,21 +41,12 @@ func (f featureFlags) check(b *build.Builder) error {
 	return nil
 }
 
-func featureOverrides(b *build.Builder, decisions map[string]bool, f featureFlags) (map[string]bool, error) {
+// overrides is the feature decisions a build takes, once the flags name features the build knows.
+func (f featureFlags) overrides(b *build.Builder, decisions map[string]bool) (map[string]bool, error) {
 	if err := f.check(b); err != nil {
 		return nil, err
 	}
-	overrides := map[string]bool{}
-	for name, on := range decisions {
-		overrides[name] = on
-	}
-	for _, name := range f.with {
-		overrides[name] = true
-	}
-	for _, name := range f.without {
-		overrides[name] = false
-	}
-	return overrides, nil
+	return build.FeatureOverrides(decisions, f.with, f.without), nil
 }
 
 func featureNames(features []build.Feature) []string {
@@ -94,14 +84,6 @@ func (a *app) saveLocal(lf *local.File, inProject bool) error {
 		a.progress("added /%s to .gitignore", local.FileName)
 	}
 	return err
-}
-
-func mergeDecisions(layers ...map[string]bool) map[string]bool {
-	merged := map[string]bool{}
-	for _, l := range layers {
-		maps.Copy(merged, l)
-	}
-	return merged
 }
 
 // refreshLocal saves the bookkeeping a build or sync collected. It is best
@@ -198,7 +180,7 @@ func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool)
 	if err != nil {
 		return nil, err
 	}
-	sc.decisions = mergeDecisions(proj.Features, sc.file.Features)
+	sc.decisions = build.MergeDecisions(proj.Features, sc.file.Features)
 	return sc, nil
 }
 

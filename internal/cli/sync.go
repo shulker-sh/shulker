@@ -250,7 +250,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	if err != nil {
 		return syncResult{}, err
 	}
-	overrides, err := featureOverrides(b, mergeDecisions(lf.Features, inst.Features), req.features)
+	overrides, err := req.features.overrides(b, build.MergeDecisions(lf.Features, inst.Features))
 	if err != nil {
 		return syncResult{}, err
 	}

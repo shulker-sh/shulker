@@ -1,6 +1,7 @@
 package build
 
 import (
+	"maps"
 	"slices"
 	"testing"
 
@@ -54,5 +55,17 @@ func TestPlacementsFollowFeatureDefaultsAndIgnoreOS(t *testing.T) {
 	}
 	if len(got["cloth"].Feature) != 0 || len(got["cloth"].OS) != 0 {
 		t.Errorf("a dependency has no conditions of its own: %v", got["cloth"])
+	}
+}
+
+func TestFeatureOverridesLayersFlagsOverDecisions(t *testing.T) {
+	decisions := MergeDecisions(map[string]bool{"shaders": true, "extras": false}, map[string]bool{"extras": true})
+	got := FeatureOverrides(decisions, []string{"lite"}, []string{"shaders"})
+	want := map[string]bool{"shaders": false, "extras": true, "lite": true}
+	if !maps.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if decisions["shaders"] != true || decisions["lite"] {
+		t.Fatalf("the decisions given are left as they were: %v", decisions)
 	}
 }

@@ -104,7 +104,7 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, for
 	if err != nil {
 		return nil, err
 	}
-	if job.features, err = featureOverrides(job.builder, lf.Features, f.ff); err != nil {
+	if job.features, err = f.ff.overrides(job.builder, lf.Features); err != nil {
 		return nil, err
 	}
 	return job, nil
