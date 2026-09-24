@@ -25,6 +25,9 @@ type Provider struct {
 	Label string
 	// Unavailable, when set, is what Available answers.
 	Unavailable error
+	// KeyedByID says a slug is no sure key on this provider, as on CurseForge, so an entry
+	// records the project id.
+	KeyedByID bool
 	// Requests counts the lookups made, by method name.
 	Requests map[string]int
 }
@@ -46,7 +49,7 @@ func (p *Provider) Title() string {
 
 func (p *Provider) Available() error { return p.Unavailable }
 
-func (p *Provider) KeysBySlug() bool { return true }
+func (p *Provider) KeysBySlug() bool { return !p.KeyedByID }
 
 func (p *Provider) NotFoundHelp() string { return "" }
 

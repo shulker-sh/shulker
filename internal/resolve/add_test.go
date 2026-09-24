@@ -1,0 +1,323 @@
+package resolve
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
+)
+
+// twoHosts is a first provider with sodium and fabric-api, and a sha1-only second one with jei,
+// sodium and fabric-api, the way Modrinth and CurseForge overlap.
+func twoHosts(t *testing.T) (*host, *host, *harness) {
+	t.Helper()
+	c := newCDN(t)
+	alpha, beta := newHost(c, "alpha"), newHost(c, "beta")
+	beta.likeCurseForge()
+	alpha.publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
+	alpha.publish(mod("a-sodium", "sodium"), provider.Version{Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}, Dependencies: []provider.Dependency{dependsOn("a-fapi")}}, modJar(t, "sodium", "1.0.0", "client"))
+	beta.publish(mod("306612", "fabric-api"), provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
+	beta.publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "sodium", "1.0.0", "client"))
+	beta.publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "jei", "1.0.0", "*"))
+	return alpha, beta, newHarness(t, alpha, beta)
+}
+
+func TestAddFallsThroughToTheNextProvider(t *testing.T) {
+	_, beta, h := twoHosts(t)
+	h.mustAdd("jei", AddOptions{})
+
+	jei := h.mod("jei")
+	jar := h.cdn.bytes(beta.Files[2])
+	if jei.Provider != "beta" || jei.Project != "238222" || jei.Version != "5000001" || jei.Sha512 != sha512Hex(jar) || jei.Size != int64(len(jar)) || jei.URL == nil || jei.Page != "" || jei.Side != "both" {
+		t.Fatalf("jei lock entry: %+v", jei)
+	}
+	if dep := h.mod("fabric-api"); dep.Provider != "beta" || dep.RequiredBy[0] != "jei" {
+		t.Fatalf("fabric-api lock entry: %+v", dep)
+	}
+	if entry := h.r.Manifest.Mods()["jei"]; entry.Project != "238222" || entry.Provider != "beta" {
+		t.Fatalf("jei manifest entry: %+v", entry)
+	}
+	if _, ok := h.r.Manifest.Requires["fabric-api"]; ok {
+		t.Fatal("a dependency is not a manifest entry")
+	}
+
+	err := h.add("nothing-anywhere", AddOptions{})
+	if e := out.AsError(err); e == nil || e.Code != "mod-not-found" || !strings.Contains(e.Message, "alpha or beta") {
+		t.Fatalf("expected mod-not-found, got %v", err)
+	}
+
+	h.mustAdd("394468", AddOptions{})
+	if sodium := h.mod("sodium"); sodium.Provider != "beta" || h.r.Manifest.Mods()["sodium"].Project != "394468" {
+		t.Fatalf("add by id: %+v", sodium)
+	}
+}
+
+func TestOutdatedUpdateAndPin(t *testing.T) {
+	_, beta, h := twoHosts(t)
+	h.mustAdd("jei", AddOptions{})
+	ctx := context.Background()
+
+	if got, err := h.r.Outdated(ctx, nil); err != nil || len(got) != 0 {
+		t.Fatalf("outdated before a new file: %v %v", got, err)
+	}
+	beta.publish(mod("238222", "jei"), provider.Version{ID: "5000002", Number: "1.1.0", File: provider.File{Filename: "jei-26.2-fabric-1.1.0.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "jei", "1.1.0", "*"))
+	got, err := h.r.Outdated(ctx, nil)
+	if err != nil || len(got) != 1 || got[0] != (Outdated{ID: "jei", Current: "1.0.0", Latest: "1.1.0"}) {
+		t.Fatalf("outdated: %+v %v", got, err)
+	}
+	if err := h.r.Update(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	if v := h.mod("jei").Version; v != "5000002" {
+		t.Fatalf("update left version %s", v)
+	}
+	if pinned, err := h.r.Pin(ctx, "jei", "5000001"); err != nil || pinned != "5000001" {
+		t.Fatalf("pin: %s %v", pinned, err)
+	}
+	if pin := h.r.Manifest.Mods()["jei"].Pin; pin != "5000001" {
+		t.Fatalf("pin: %v", pin)
+	}
+	if v := h.mod("jei").Version; v != "5000001" {
+		t.Fatalf("pin left version %s", v)
+	}
+	if got, _ := h.r.Outdated(ctx, nil); len(got) != 1 || !got[0].Pinned {
+		t.Fatalf("outdated after a pin: %+v", got)
+	}
+	if err := h.r.Unpin(ctx, "jei"); err != nil || h.mod("jei").Version != "5000002" {
+		t.Fatalf("unpin: %v %+v", err, h.mod("jei"))
+	}
+}
+
+func TestAddSwitchesProviderAndKeepsTheOtherAsAlias(t *testing.T) {
+	_, _, h := twoHosts(t)
+	h.mustAdd("sodium", AddOptions{})
+	if sodium := h.mod("sodium"); sodium.Provider != "alpha" {
+		t.Fatalf("first add: %+v", sodium)
+	}
+
+	before := h.r.Snapshot()
+	h.mustAdd("sodium", AddOptions{Provider: "beta"})
+	sodium := h.mod("sodium")
+	if sodium.Provider != "beta" || sodium.Project != "394468" || sodium.Aliases["alpha"] != "a-sodium" || sodium.Aliases["beta"] != "" {
+		t.Fatalf("switched entry: %+v", sodium)
+	}
+	if c := h.r.Changes(before); len(c.Added) != 0 || len(c.Updated) != 1 || c.Updated[0].FromProvider != "alpha" || c.Updated[0].ToProvider != "beta" {
+		t.Fatalf("a switch is reported as an update between providers: %+v", c)
+	}
+	if !h.logged("switching sodium from alpha to beta") {
+		t.Fatalf("log: %v", h.log)
+	}
+	if by := h.mod("fabric-api").RequiredBy; len(by) != 1 || by[0] != "sodium" {
+		t.Fatalf("fabric-api requiredBy after switch: %v", by)
+	}
+	if entry := h.r.Manifest.Mods()["sodium"]; entry.Provider != "beta" || entry.Project != "394468" {
+		t.Fatalf("manifest after switch: %+v", entry)
+	}
+
+	h.mustAdd("sodium", AddOptions{Provider: "alpha"})
+	sodium = h.mod("sodium")
+	if sodium.Provider != "alpha" || sodium.Aliases["beta"] != "394468" || sodium.Aliases["alpha"] != "" {
+		t.Fatalf("switched back entry: %+v", sodium)
+	}
+	if entry := h.r.Manifest.Mods()["sodium"]; entry.Provider != "" || entry.Project != "" {
+		t.Fatalf("manifest after switching back to the first provider by slug: %+v", entry)
+	}
+
+	h.mustAdd("sodium", AddOptions{Provider: "beta"})
+	h.mustAdd("sodium", AddOptions{})
+	if sodium := h.mod("sodium"); sodium.Provider != "beta" {
+		t.Fatalf("a plain add should keep the switched provider: %+v", sodium)
+	}
+}
+
+func TestAddNamesAProviderItCannotReach(t *testing.T) {
+	_, beta, h := twoHosts(t)
+	beta.Unavailable = &out.Error{Code: "provider-unavailable", Message: "beta needs an API key", Help: "set SHULKER_BETA_KEY"}
+
+	err := h.add("jei", AddOptions{Provider: "beta"})
+	if e := out.AsError(err); e == nil || e.Code != "provider-unavailable" || !strings.Contains(e.Help, "SHULKER_BETA_KEY") {
+		t.Fatalf("expected provider-unavailable naming the key, got %v", err)
+	}
+	err = h.add("jei", AddOptions{})
+	if e := out.AsError(err); e == nil || e.Code != "mod-not-found" || e.Message != "jei was not found on alpha" || len(e.Items) != 1 || e.Items[0] != "skipped: beta needs an API key" {
+		t.Fatalf("expected a miss naming the skipped provider, got %v", err)
+	}
+}
+
+func TestAddTakesAManualDownloadFromTheDownloadsFolder(t *testing.T) {
+	c := newCDN(t)
+	cf := newHost(c, "curse").likeCurseForge()
+	nodist := modJar(t, "nodist", "1.0.0", "client")
+	v := cf.publishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, nodist)
+	h := newHarness(t, cf)
+
+	err := h.add("nodist", AddOptions{})
+	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !strings.Contains(e.Help, v.Page) || !strings.Contains(e.Help, "nodist-1.0.0.jar") || !strings.Contains(e.Help, DownloadsDir+"/") {
+		t.Fatalf("expected manual-download, got %v", err)
+	}
+
+	h.drop("nodist-1.0.0.jar", nodist)
+	h.mustAdd("nodist", AddOptions{})
+	got := h.mod("nodist")
+	if got.URL != nil || got.Page != v.Page || got.Sha512 != sha512Hex(nodist) || got.Side != "client" {
+		t.Fatalf("nodist lock entry: %+v", got)
+	}
+}
+
+func TestAddTreatsAForbiddenDownloadAsManual(t *testing.T) {
+	c := newCDN(t)
+	cf := newHost(c, "curse").likeCurseForge()
+	locked := modJar(t, "locked", "1.0.0", "*")
+	v := cf.publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, locked)
+	c.forbid(v)
+	h := newHarness(t, cf)
+
+	err := h.add("locked", AddOptions{})
+	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !strings.Contains(e.Help, v.Page) {
+		t.Fatalf("expected manual-download after 403, got %v", err)
+	}
+	if !h.logged("treating locked 1.0.0 as distribution-disabled: download forbidden") {
+		t.Fatalf("log: %v", h.log)
+	}
+	h.drop("locked-1.0.0.jar", locked)
+	h.mustAdd("locked", AddOptions{})
+	if got := h.mod("locked"); got.URL != nil || got.Page != v.Page {
+		t.Fatalf("locked lock entry: %+v", got)
+	}
+}
+
+func TestInstallWarnsOfStrayDownloadsAndListsMissingFiles(t *testing.T) {
+	c := newCDN(t)
+	cf := newHost(c, "curse").likeCurseForge()
+	nodist, locked := modJar(t, "nodist", "1.0.0", "client"), modJar(t, "locked", "1.0.0", "*")
+	cf.publishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, nodist)
+	forbidden := cf.publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, locked)
+	c.forbid(forbidden)
+	h := newHarness(t, cf)
+	h.drop("nodist-1.0.0.jar", nodist)
+	h.drop("locked-1.0.0.jar", locked)
+	h.mustAdd("nodist", AddOptions{})
+	h.mustAdd("locked", AddOptions{})
+
+	h.drop("unrelated.jar", []byte("not a mod"))
+	h.r.Cache = &cache.Cache{Dir: t.TempDir()}
+	fetched, warnings, err := h.install()
+	if err != nil || len(fetched) != 0 || len(warnings) != 1 || warnings[0] != DownloadsDir+"/unrelated.jar matches no mod in the lock" {
+		t.Fatalf("install: %v %v %v", fetched, warnings, err)
+	}
+	for _, id := range []string{"nodist", "locked"} {
+		if !h.r.Cache.Has(h.mod(id).Sha512) {
+			t.Fatalf("%s was not taken from %s/", id, DownloadsDir)
+		}
+	}
+
+	if err := os.RemoveAll(filepath.Join(h.r.Dir, DownloadsDir)); err != nil {
+		t.Fatal(err)
+	}
+	h.r.Cache = &cache.Cache{Dir: t.TempDir()}
+	_, _, err = h.install()
+	e := out.AsError(err)
+	if e == nil || e.Code != "missing-files" || len(e.Items) != 2 || !strings.Contains(e.Items[0], forbidden.Page) || !strings.Contains(e.Items[1], "nodist-1.0.0.jar") {
+		t.Fatalf("expected missing-files, got %v", err)
+	}
+}
+
+// betaDependency gives a host a library with only beta files, older one first, and a release mod
+// that requires it, the shape Framework and Goblin Traders have.
+func betaDependency(t *testing.T, cf *host) {
+	t.Helper()
+	framework := mod("667391", "framework-fabric")
+	cf.publish(framework, provider.Version{ID: "5600002", Number: "0.6.17", Channel: "beta", Published: day(10), File: provider.File{Filename: "framework-fabric-0.6.17.jar"}}, modJar(t, "framework", "0.6.17", "*"))
+	cf.publish(framework, provider.Version{ID: "5600001", Number: "0.6.16", Channel: "beta", Published: day(1), File: provider.File{Filename: "framework-fabric-0.6.16.jar"}}, modJar(t, "framework", "0.6.16", "*"))
+	cf.publish(mod("667389", "goblin-traders-fabric"), provider.Version{ID: "5600011", Number: "1.9.3", File: provider.File{Filename: "goblintraders-fabric-1.9.3.jar"}, Dependencies: []provider.Dependency{dependsOn("667391")}}, modJar(t, "goblintraders", "1.9.3", "*"))
+}
+
+func TestPinningABetaFileAcceptsBeta(t *testing.T) {
+	cf := newHost(newCDN(t), "curse").likeCurseForge()
+	betaDependency(t, cf)
+	h := newHarness(t, cf)
+
+	h.mustAdd("667391", AddOptions{Pin: "5600001"})
+
+	if !slices.Contains(h.r.Warnings, "framework 0.6.16 is a beta; accepting beta for it") {
+		t.Fatalf("add should say the pin widens the channel: %v", h.r.Warnings)
+	}
+	if got := h.mod("framework").Channel; got != "beta" {
+		t.Fatalf("lock channel = %q, want beta", got)
+	}
+	if entry := h.r.Manifest.Mods()["framework"]; entry.Channel != "beta" || entry.Pin != "5600001" || entry.Project != "667391" {
+		t.Fatalf("manifest entry: %+v", entry)
+	}
+	if err := h.add("667391", AddOptions{Pin: "5600011"}); out.CodeOf(err) != "pin-mismatch" {
+		t.Fatalf("a pin from another project: %v", err)
+	}
+	if err := h.add("667391", AddOptions{Pin: "nope"}); out.CodeOf(err) != "version-not-found" || !strings.Contains(out.AsError(err).Help, cf.VersionsPage(manifest.TypeMod, "framework-fabric")) {
+		t.Fatalf("a pin that is no version: %v", err)
+	}
+}
+
+func TestPinWidensTheChannel(t *testing.T) {
+	_, beta, h := twoHosts(t)
+	beta.publish(mod("238222", "jei"), provider.Version{ID: "5000003", Number: "1.0.1-beta", Channel: "beta", File: provider.File{Filename: "jei-26.2-fabric-1.0.1-beta.jar"}}, modJar(t, "jei", "1.0.1-beta", "*"))
+	h.mustAdd("jei", AddOptions{})
+	if v := h.mod("jei").Version; v != "5000001" {
+		t.Fatalf("a plain add should skip the beta: %s", v)
+	}
+
+	if _, err := h.r.Pin(context.Background(), "jei", "5000003"); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(h.r.Warnings, "jei 1.0.1-beta is a beta; accepting beta for it") {
+		t.Fatalf("pin should say the pin widens the channel: %v", h.r.Warnings)
+	}
+	if got := h.r.Manifest.Mods()["jei"].Channel; got != "beta" {
+		t.Fatalf("manifest channel = %q, want beta", got)
+	}
+	if got := h.mod("jei"); got.Channel != "beta" || got.Version != "5000003" {
+		t.Fatalf("lock entry: %+v", got)
+	}
+}
+
+func TestADependencyAlreadyLockedKeepsItsVersion(t *testing.T) {
+	cf := newHost(newCDN(t), "curse").likeCurseForge()
+	betaDependency(t, cf)
+	h := newHarness(t, cf)
+	h.mustAdd("667391", AddOptions{Pin: "5600001"})
+
+	h.mustAdd("667389", AddOptions{})
+
+	framework := h.mod("framework")
+	if framework.Version != "5600001" || !slices.Contains(framework.RequiredBy, "goblintraders") {
+		t.Fatalf("framework should stay at its pinned file and gain goblintraders: %+v", framework)
+	}
+	if _, ok := h.r.Lock.Mods["framework-fabric"]; ok {
+		t.Fatalf("the dependency was locked a second time: %+v", h.r.Lock.Mods)
+	}
+}
+
+func TestAddRefusesAVersionOffTheChannel(t *testing.T) {
+	cf := newHost(newCDN(t), "curse").likeCurseForge()
+	betaDependency(t, cf)
+	h := newHarness(t, cf)
+
+	err := h.add("667391", AddOptions{})
+	e := out.AsError(err)
+	if e == nil || e.Code != "no-compatible-version" || e.Message != "framework-fabric has no release version for Minecraft 26.2 with fabric" || e.Flag != "--channel" || !slices.Equal(e.Candidates, []string{"0.6.17 (beta)", "0.6.16 (beta)"}) {
+		t.Fatalf("expected no-compatible-version listing the betas, got %+v", e)
+	}
+	err = h.add("667389", AddOptions{})
+	if e := out.AsError(err); e == nil || e.Code != "no-compatible-version" || !strings.HasPrefix(e.Message, "dependency of goblintraders: ") {
+		t.Fatalf("a dependency off the channel: %v", err)
+	}
+	h.mustAdd("667391", AddOptions{Channel: "beta"})
+	if got := h.mod("framework"); got.Version != "5600002" || got.Channel != "beta" || h.r.Manifest.Mods()["framework"].Channel != "beta" {
+		t.Fatalf("beta add: %+v", got)
+	}
+}
