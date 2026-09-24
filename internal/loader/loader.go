@@ -2,8 +2,11 @@
 package loader
 
 import (
+	"cmp"
+	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -46,13 +49,20 @@ type Loader struct {
 	InstallClientFlag string
 	// MetadataFiles are the mod metadata files the loader reads from a jar, in the order it prefers them.
 	MetadataFiles []string
+	// ModAnnotations means the loader finds mods by the @Mod annotations in a jar's classes, with
+	// MetadataFiles only filling in, as FML did before 1.13.
+	ModAnnotations bool
 	// MinecraftJarClassifier is the classifier the loader's installer expects on the vanilla server
 	// jar it finds under libraries/: Forge looks for the bundled jar it would have downloaded,
 	// NeoForge for the plain name.
 	MinecraftJarClassifier string
 	// MarkerFile is the file the marker jar declares itself in. Quilt reads Fabric's, so both use
-	// it; the suffix picks the format, JSON for Fabric's and TOML for FML's.
+	// it; the suffix picks the format, JSON for Fabric's and TOML for FML's. Empty means the loader
+	// takes no marker.
 	MarkerFile string
+	// RootServerJars means the installer looks for the vanilla server jar in the server dir itself
+	// and leaves the jar the server starts from there, rather than an args file under libraries/.
+	RootServerJars bool
 	// TopLevelMandatory means a jar in mods/ always loads as itself, so a nested copy of its id
 	// never stands in for it.
 	TopLevelMandatory bool
@@ -104,6 +114,83 @@ var All = []Loader{
 	{Name: "quilt", Title: "Quilt", DependencyID: "quilt_loader", ComponentUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}, ServerSetup: ServerProfile, ServerLaunchJar: "quilt-server-launch.jar", MetadataFiles: []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json", TopLevelMandatory: true},
 	{Name: "neoforge", Title: "NeoForge", DependencyID: "neoforge", ComponentUID: "net.neoforged", MrpackKey: "neoforge", CurseForgeType: "6", ServerSetup: ServerInstaller, InstallServerFlag: "--install-server", InstallClientFlag: "--install-client", MetadataFiles: []string{"META-INF/neoforge.mods.toml", "META-INF/mods.toml"}, MarkerFile: "META-INF/neoforge.mods.toml", MavenPath: "net/neoforged/neoforge"},
 	{Name: "forge", Title: "Forge", DependencyID: "forge", ComponentUID: "net.minecraftforge", MrpackKey: "forge", CurseForgeType: "1", ServerSetup: ServerInstaller, InstallServerFlag: "--installServer", InstallClientFlag: "--installClient", MetadataFiles: []string{"META-INF/mods.toml"}, MarkerFile: "META-INF/mods.toml", MinecraftJarClassifier: "bundled", MavenPath: "net/minecraftforge/forge", MavenVersionPrefixesGame: true},
+}
+
+// For is the named loader as it runs on the given Minecraft version. Forge before 1.13 reads @Mod
+// annotations and mcmod.info and has no marker jar, and its installers before 1.17 set no
+// serverJarPath or args file.
+func For(name, minecraft string) (Loader, bool) {
+	l, ok := Lookup(name)
+	if !ok || l.Name != "forge" {
+		return l, ok
+	}
+	v, err := mcver.Parse(minecraft)
+	if err != nil {
+		return l, ok
+	}
+	if mcver.Compare(v, mcver.MustParse("1.13")) < 0 {
+		l.MetadataFiles = []string{"mcmod.info"}
+		l.ModAnnotations = true
+		l.MarkerFile = ""
+	}
+	if mcver.Compare(v, mcver.MustParse("1.17")) < 0 {
+		l.RootServerJars = true
+		l.MinecraftJarClassifier = ""
+	}
+	return l, ok
+}
+
+// VanillaServerJar is the name a RootServerJars installer looks for the vanilla server jar under.
+func VanillaServerJar(minecraft string) string {
+	return "minecraft_server." + minecraft + ".jar"
+}
+
+// InstalledServerJar is the jar a RootServerJars installer leaves in the server dir to start from.
+func (l Loader) InstalledServerJar(minecraft, version string) string {
+	return l.Name + "-" + l.ArtifactVersion(minecraft, version) + ".jar"
+}
+
+// firstModernForge is the first Forge build whose installer shulker can run offline: every earlier
+// one ships the legacy installer, which reads another install profile layout.
+const firstModernForge = "14.23.5.2851"
+
+// Supports reports whether shulker can set up the named loader's version on the given Minecraft
+// version.
+func Supports(name, minecraft, version string) error {
+	if name != "forge" {
+		return nil
+	}
+	v, err := mcver.Parse(minecraft)
+	if err != nil {
+		return nil
+	}
+	switch c := mcver.Compare(v, mcver.MustParse("1.12.2")); {
+	case c > 0:
+		return nil
+	case c == 0 && compareBuilds(version, firstModernForge) >= 0:
+		return nil
+	}
+	e := out.Errorf("loader-version-unsupported", "Forge %s for Minecraft %s ships the legacy installer, which shulker can't run", version, minecraft)
+	e.Help = "use Minecraft 1.12.2 with Forge " + firstModernForge + " or newer"
+	return e
+}
+
+// compareBuilds orders dotted build numbers like 14.23.5.2860 part by part.
+func compareBuilds(a, b string) int {
+	as, bs := strings.Split(a, "."), strings.Split(b, ".")
+	for i := range max(len(as), len(bs)) {
+		var x, y int
+		if i < len(as) {
+			x, _ = strconv.Atoi(as[i])
+		}
+		if i < len(bs) {
+			y, _ = strconv.Atoi(bs[i])
+		}
+		if x != y {
+			return cmp.Compare(x, y)
+		}
+	}
+	return 0
 }
 
 func Lookup(name string) (Loader, bool) {

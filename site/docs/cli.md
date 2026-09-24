@@ -1888,6 +1888,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `launcher-file-invalid` | A launcher file shulker reads or rewrites (an instance's JSON, `launcher_profiles.json`, `mmc-pack.json`) isn't valid JSON, or not the shape shulker expects. A row carries the parser's own error |
 | `launcher-not-found` | No launcher directory where shulker looked |
 | `loader-profile-invalid` | The loader profile shulker fetched isn't a version JSON with an id, so it can't be installed into the launcher. A row says what was wrong with it |
+| `loader-version-unsupported` | The locked Forge version ships the legacy installer, which shulker can't run: every Forge before Minecraft 1.12.2, and 1.12.2 builds before 14.23.5.2851 |
 | `loader-required` | `add` of a mod in a project without a loader, or `import` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
 | `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |

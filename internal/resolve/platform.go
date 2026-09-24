@@ -74,6 +74,11 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 	if m.Loader.Type == "" {
 		platform.Loader = inherited.Loader
 		// A modpack archive names its loader's version but not what that loader provides.
+		if l := platform.Loader; l.Type != "" {
+			if err := loader.Supports(l.Type, game, l.Version); err != nil {
+				return nil, err
+			}
+		}
 		if l := platform.Loader; l.Type != "" && l.Provides == nil {
 			if platform.Loader.Provides, err = mt.loaderProvides(ctx, l.Type, game, l.Version); err != nil {
 				return nil, err
@@ -83,6 +88,9 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 	}
 	loaderVersion, err := mt.loaderVersion(ctx, m.Loader, game)
 	if err != nil {
+		return nil, err
+	}
+	if err := loader.Supports(m.Loader.Type, game, loaderVersion); err != nil {
 		return nil, err
 	}
 	provides, err := mt.loaderProvides(ctx, m.Loader.Type, game, loaderVersion)
