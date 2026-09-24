@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
@@ -47,7 +46,7 @@ func (a *app) inlineImport(cmd *cobra.Command, p *project.Project, key string, f
 		}
 		loaded := r.Packs[i]
 		name, version = cmp.Or(loaded.Manifest.Name, key), loaded.Manifest.Version
-		inc, err := inlined(p, loaded)
+		inc, err := resolve.Inlined(p, loaded)
 		if err != nil {
 			return "", err
 		}
@@ -68,74 +67,4 @@ func (a *app) inlineImport(cmd *cobra.Command, p *project.Project, key string, f
 	}
 	res := importResult{Dir: p.Dir, Name: name, Version: version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: key, Sides: p.Manifest.Sides(), Overrides: []string{}, Merged: true, KeptYours: rep.KeptYours, LeftOut: rep.LeftOut}
 	return a.emitImport(res, out.Row{Text: plural(len(rep.Entries), "entry", "entries") + " now the project's own"}, overrideRow(rep))
-}
-
-// inlined is a required modpack as a pack to merge: the project's lock entries it provides, taken
-// out of the project's lock and listed under the pack's own requires entry where it has one, its
-// manifest's blocks, and its override files.
-func inlined(p *project.Project, loaded *pack.Loaded) (*resolve.Incoming, error) {
-	key := loaded.Name
-	pm := *loaded.Manifest
-	pm.Requires = map[string]manifest.Require{}
-	pl := lock.New()
-	provides := func(modpack string, requiredBy []string, id string) bool {
-		_, own := p.Manifest.Requires[id]
-		return modpack == key || (!own && slices.Contains(requiredBy, key))
-	}
-	entry := func(id, kind string, project, providerName string) manifest.Require {
-		req, ok := loaded.Manifest.Requires[id]
-		if !ok {
-			req = manifest.Require{}
-			if kind != manifest.TypeMod {
-				req.Type = kind
-			}
-		}
-		req.Pin = ""
-		if project != "" {
-			req.Project = project
-			req.Provider = ""
-			if providerName != "" && providerName != p.Manifest.ProviderOrder()[0] {
-				req.Provider = providerName
-			}
-		}
-		return req
-	}
-	for id, m := range p.Lock.Mods {
-		if !provides(m.Modpack, m.RequiredBy, id) {
-			for i, by := range m.RequiredBy {
-				if by == key {
-					m.RequiredBy = slices.Delete(slices.Clone(m.RequiredBy), i, i+1)
-					p.Lock.Mods[id] = m
-					break
-				}
-			}
-			continue
-		}
-		delete(p.Lock.Mods, id)
-		m.Modpack = ""
-		m.RequiredBy = slices.DeleteFunc(slices.Clone(m.RequiredBy), func(by string) bool { return by == key })
-		pl.Mods[id] = m
-		pm.Requires[id] = entry(id, manifest.TypeMod, m.Project, m.Provider)
-	}
-	for _, kind := range manifest.PackKinds {
-		section := p.Lock.Packs(kind)
-		for id, lp := range section {
-			if lp.Modpack != key {
-				continue
-			}
-			delete(section, id)
-			lp.Modpack = ""
-			pl.Packs(kind)[id] = lp
-			pm.Requires[id] = entry(id, kind, lp.Project, lp.Provider)
-		}
-	}
-	inc := &resolve.Incoming{Manifest: &pm, Lock: pl, Dir: loaded.Dir, HasBlocks: true, Overrides: loaded.Overrides}
-	if loaded.Dir != "" && loaded.Archive == nil {
-		overrides, err := project.ReadOverrideFolders(loaded.Dir, loaded.Manifest)
-		if err != nil {
-			return nil, err
-		}
-		inc.Overrides = overrides
-	}
-	return inc, nil
 }
