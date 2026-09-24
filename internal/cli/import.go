@@ -361,7 +361,7 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 	if f.name != "" {
 		m.Name = f.name
 	}
-	paths := projectPaths(m)
+	paths := project.OwnPaths(m)
 	leftOut := []string{}
 	if f.side != "" {
 		other := otherSide(f.side)
@@ -405,27 +405,6 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 	slices.Sort(leftOut)
 	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: c.Source, Sides: m.Sides(), KeptYours: []string{}, LeftOut: leftOut, Overrides: []string{}}
 	return a.emitImport(res, out.Row{Text: fmt.Sprintf("%s copied from %s", plural(len(m.Requires), "entry", "entries"), c.Source)})
-}
-
-// projectPaths are the paths of a project's own files, relative to its folder: its lock, override
-// folders, a feature's included, local files, icon and .gitignore. Anything else in the folder, such
-// as a build the project makes in place, is not the project's to copy.
-func projectPaths(m *manifest.Manifest) []string {
-	paths := []string{lock.FileName, ".gitignore", manifest.FilesDir}
-	paths = append(paths, project.OverrideLayers(m)...)
-	if m.Icon != "" {
-		paths = append(paths, m.Icon)
-	}
-	for _, req := range m.Requires {
-		if req.File != "" {
-			paths = append(paths, req.File)
-		}
-		if pack.Classify(req.Source) == pack.Local && req.Source != "" && filepath.IsLocal(req.Source) {
-			paths = append(paths, filepath.ToSlash(filepath.Clean(req.Source)))
-		}
-	}
-	slices.Sort(paths)
-	return slices.Compact(paths)
 }
 
 func otherSide(side string) string {
