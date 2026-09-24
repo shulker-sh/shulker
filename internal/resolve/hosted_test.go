@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -65,5 +66,54 @@ func TestAModpackMemberPinnedToABetaFileLocksBeta(t *testing.T) {
 	}
 	if _, listed := h.r.Manifest.Requires["framework"]; listed {
 		t.Fatalf("a pack's member is not the project's own: %+v", h.r.Manifest.Requires)
+	}
+}
+
+func TestObtainModpackLocksAHostedCurseForgePack(t *testing.T) {
+	cf := curseForgeHost(t)
+	path := filepath.Join(t.TempDir(), "craft-1.0.zip")
+	writeCurseForgeZip(t, path, craftFiles, map[string]string{"extras/config/jei.toml": "jei = hosted\n"})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	craftpack := provider.Project{ID: "800000", Slug: "craftpack", Title: "Craft Pack", Type: manifest.TypeModpack}
+	release := cf.publish(craftpack, provider.Version{ID: "7000001", Number: "1.0", Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, data)
+	h := newHarness(t, cf)
+
+	pin, err := h.r.ObtainModpack(context.Background(), "craftpack", manifest.Require{Type: manifest.TypeModpack})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pin.Provider != "curseforge" || pin.Project != "800000" || pin.Version != "7000001" || pin.VersionNumber != "1.0" || pin.Sha512 != sha512Hex(data) || pin.URL == nil || *pin.URL != release.File.URL || pin.Filename != "craft-1.0.zip" || pin.Size != int64(len(data)) || !h.r.Cache.Has(pin.Sha512) {
+		t.Fatalf("modpack pin: %+v", pin)
+	}
+}
+
+func TestObtainModpackTakesAnUndistributedPackFromTheDownloadsFolder(t *testing.T) {
+	cf := curseForgeHost(t)
+	path := filepath.Join(t.TempDir(), "craft-1.0.zip")
+	writeCurseForgeZip(t, path, craftFiles, map[string]string{"extras/config/jei.toml": "jei = manual\n"})
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	craftpack := provider.Project{ID: "800000", Slug: "craftpack", Title: "Craft Pack", Type: manifest.TypeModpack}
+	manual := cf.publishManual(craftpack, provider.Version{ID: "7000001", Number: "1.0", Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, data)
+	h := newHarness(t, cf)
+	entry := manifest.Require{Type: manifest.TypeModpack}
+
+	_, err = h.r.ObtainModpack(context.Background(), "craftpack", entry)
+	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !strings.Contains(e.Help, manual.Page) || !strings.Contains(e.Help, "craft-1.0.zip") {
+		t.Fatalf("an undistributed pack asks for a manual download: %v", err)
+	}
+
+	h.drop("craft-1.0.zip", data)
+	pin, err := h.r.ObtainModpack(context.Background(), "craftpack", entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pin.URL != nil || pin.Page != manual.Page || pin.Sha512 != sha512Hex(data) || !h.r.Cache.Has(pin.Sha512) {
+		t.Fatalf("modpack pin: %+v", pin)
 	}
 }

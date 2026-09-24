@@ -71,6 +71,19 @@ func (c *cdn) forbid(v provider.Version) {
 	c.forbidden[pathOf(v)] = true
 }
 
+// truncate has the cdn cut v's bytes short, and restore serves them whole again.
+func (c *cdn) truncate(v provider.Version) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.truncated[pathOf(v)] = true
+}
+
+func (c *cdn) restore(v provider.Version) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.truncated, pathOf(v))
+}
+
 // bytes is the file published at v.
 func (c *cdn) bytes(v provider.Version) []byte {
 	c.mu.Lock()
