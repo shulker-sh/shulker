@@ -87,7 +87,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	}
 	v := &Validation{Problems: []Problem{}, Warnings: []string{}, Suggestions: []Suggestion{}}
 	builtin := map[string]string{"minecraft": r.Lock.Minecraft, "java": fmt.Sprintf("%d.0", r.Lock.Java.Major)}
-	l, _ := loader.Lookup(r.Lock.Loader.Type)
+	l := r.Lock.RunningLoader()
 	if l.DependencyID != "" {
 		builtin[l.DependencyID] = r.Lock.Loader.Version
 	}
@@ -106,7 +106,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 			unread[id] = true
 			continue
 		}
-		info, err := jarmeta.Read(r.Cache.Object(m.Sha512), m.Filename, r.Lock.Loader.Type)
+		info, err := r.readJar(r.Cache.Object(m.Sha512), m.Filename)
 		if err != nil {
 			return nil, prefixed("mod "+id, err)
 		}

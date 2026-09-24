@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -268,7 +269,7 @@ func TestReadPrefersTheProjectLoader(t *testing.T) {
 		t.Fatal(err)
 	}
 	for loaderName, want := range map[string]string{"fabric": "multi_fabric", "quilt": "multi_fabric", "neoforge": "multi_neo", "": "multi_fabric"} {
-		info, err := Read(path, "multi.jar", loaderName)
+		info, err := Read(path, "multi.jar", loaderNamed(loaderName))
 		if err != nil {
 			t.Fatalf("%s: %v", loaderName, err)
 		}
@@ -276,7 +277,7 @@ func TestReadPrefersTheProjectLoader(t *testing.T) {
 			t.Errorf("%s read %s, want %s", loaderName, info.ID, want)
 		}
 	}
-	if _, err := Read(path, "multi.jar", "forge"); out.CodeOf(err) != "jar-metadata-missing" {
+	if _, err := Read(path, "multi.jar", loaderNamed("forge")); out.CodeOf(err) != "jar-metadata-missing" {
 		t.Errorf("forge: %v, want no metadata", err)
 	}
 }
@@ -286,8 +287,13 @@ func TestReadErrorsNameTheJar(t *testing.T) {
 	if err := os.WriteFile(path, buildZip(t, map[string]string{"fabric.mod.json": `{"id":`}), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Read(path, "better-end-4.0.11.jar", "fabric")
+	_, err := Read(path, "better-end-4.0.11.jar", loaderNamed("fabric"))
 	if out.CodeOf(err) != "jar-metadata-invalid" || !strings.Contains(err.Error(), "better-end-4.0.11.jar") || strings.Contains(err.Error(), path) {
 		t.Errorf("got %v, want jar-metadata-invalid naming better-end-4.0.11.jar and not %s", err, path)
 	}
+}
+
+func loaderNamed(name string) loader.Loader {
+	l, _ := loader.Lookup(name)
+	return l
 }

@@ -245,7 +245,8 @@ func (mt *Meta) loaderProvides(ctx context.Context, name, game, version string) 
 	if err != nil {
 		return nil, err
 	}
-	info, err := jarmeta.Read(mt.Cache.Object(sha), path.Base(url), name)
+	quilt, _ := loader.Lookup(name)
+	info, err := jarmeta.Read(mt.Cache.Object(sha), path.Base(url), quilt)
 	if err != nil {
 		return nil, prefixed("quilt loader "+version, err)
 	}

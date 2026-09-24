@@ -168,6 +168,32 @@ func TestValidateNeoForgeMavenRanges(t *testing.T) {
 	}
 }
 
+func TestValidateLegacyForge(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	jars := map[string][]byte{
+		"carrots":       zipBytes(t, "mcmod.info", `[{"modid": "carrots", "version": "1.0.0b1"}]`),
+		"armorunder":    zipBytes(t, "mcmod.info", `[{"modid": "armorunder", "version": "1.0.0", "useDependencyInformation": true, "requiredMods": ["forge@[14.23.4.2705,)", "carrots@[1.0.0b2,)", "FML"]}]`),
+		"llibrary-core": zipBytes(t, "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\nFMLCorePlugin: net.ilexiconn.llibrary.server.core.plugin.LLibraryPlugin\n"),
+	}
+	l := &lock.Lock{Minecraft: "1.12.2", Loader: lock.Loader{Type: "forge", Version: "14.23.5.2860"}, Mods: map[string]lock.Mod{}}
+	for id, jar := range jars {
+		sha, err := c.Put(bytes.NewReader(jar))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Mods[id] = lock.Mod{Sha512: sha, Side: "both"}
+	}
+	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{{Rule: "depends", Mod: "armorunder", ModVersion: "1.0.0", On: "carrots", Declared: "[1.0.0b2,)", Found: "1.0.0b1"}}
+	if !reflect.DeepEqual(v.Problems, want) || len(v.Warnings) > 0 {
+		t.Fatalf("problems %+v, warnings %v, want %+v", v.Problems, v.Warnings, want)
+	}
+}
+
 func zipFiles(t *testing.T, files map[string]string) []byte {
 	t.Helper()
 	var buf bytes.Buffer

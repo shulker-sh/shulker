@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"shulker.sh/shulker/internal/loader"
@@ -46,25 +47,28 @@ type Info struct {
 
 var allFiles = []string{"quilt.mod.json", "fabric.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml"}
 
-// Read reads the metadata the named loader would, so a jar built for several loaders yields the
-// right one. An unknown loader reads whichever metadata the jar has. Errors call the jar name, since
-// path may be a cache object named by its hash.
-func Read(path, name, loaderName string) (*Info, error) {
+// Read reads the metadata loader l would, so a jar built for several loaders yields the right one.
+// The zero Loader reads whichever metadata the jar has. Errors call the jar name, since path may be
+// a cache object named by its hash.
+func Read(path, name string, l loader.Loader) (*Info, error) {
+	if l.ModAnnotations {
+		return readLegacyJar(path, name)
+	}
 	zr, err := zip.OpenReader(path)
 	if err != nil {
 		return nil, metadataInvalid(name, "zip", err)
 	}
 	defer zr.Close()
 	files := allFiles
-	if l, ok := loader.Lookup(loaderName); ok {
+	if l.Name != "" {
 		files = l.MetadataFiles
 	}
 	info, err := readZip(&zr.Reader, files)
 	if errors.Is(err, errNoMetadata) {
-		if loaderName == "" {
+		if l.Name == "" {
 			return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata", name)
 		}
-		return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata for %s", name, loaderName)
+		return nil, out.Errorf("jar-metadata-missing", "%s holds no mod metadata for %s", name, l.Name)
 	}
 	var bad *fileError
 	if errors.As(err, &bad) {
@@ -74,6 +78,20 @@ func Read(path, name, loaderName string) (*Info, error) {
 		return nil, metadataInvalid(name, "zip", err)
 	}
 	return info, nil
+}
+
+// readLegacyJar reads a jar for a loader that finds mods by their annotations. That inflates every
+// class, and the zip reader's many small reads cost more than holding the whole jar in memory.
+func readLegacyJar(path, name string) (*Info, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, metadataInvalid(name, "zip", err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, metadataInvalid(name, "zip", err)
+	}
+	return readLegacyForge(zr), nil
 }
 
 func metadataInvalid(name, source string, err error) *out.Error {

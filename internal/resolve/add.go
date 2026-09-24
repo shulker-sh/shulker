@@ -51,6 +51,20 @@ type Resolver struct {
 	LockModpack func(ctx context.Context, key string, entry manifest.Require) error
 }
 
+// readJar reads a jar's metadata the way the locked loader would.
+func (r *Resolver) readJar(path, name string) (*jarmeta.Info, error) {
+	return jarmeta.Read(path, name, r.Lock.RunningLoader())
+}
+
+// jarKey is the requires key a mod jar takes: its mod id, or fallback when the id is missing or
+// can't be a key, as Forge before 1.13 allows capitals and more in ids.
+func jarKey(id, fallback string) string {
+	if manifest.IsValidKey(id) {
+		return id
+	}
+	return fallback
+}
+
 type AddOptions struct {
 	Side     string
 	Channel  string
@@ -448,13 +462,16 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	if err != nil {
 		return "", nil, err
 	}
-	info, err := jarmeta.Read(got.path, v.File.Filename, r.Lock.Loader.Type)
+	info, err := r.readJar(got.path, v.File.Filename)
 	if err != nil {
 		return "", nil, prefixed("mod "+proj.Slug, err)
 	}
 	id := key
 	if id == "" {
-		id = info.ID
+		id = jarKey(info.ID, proj.Slug)
+	}
+	if info.ID == "" {
+		info.ID = id
 	}
 	if held, ok := r.Manifest.Requires[id]; ok && held.Kind() != manifest.TypeMod {
 		return "", nil, manifest.KeyTaken(id, held.Kind(), manifest.TypeMod)

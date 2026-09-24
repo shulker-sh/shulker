@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 
-	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -86,12 +85,12 @@ func (im *importer) alreadyRequired(o mrpack.Override, proj *provider.Project) b
 	}
 	key := proj.Slug
 	if mrpack.IsModJar(o.Path) {
-		info, err := jarmeta.Read(filepath.Join(im.r.Dir, o.Layer, filepath.FromSlash(o.Path)), path.Base(o.Path), im.r.Lock.Loader.Type)
+		info, err := im.r.readJar(filepath.Join(im.r.Dir, o.Layer, filepath.FromSlash(o.Path)), path.Base(o.Path))
 		if err != nil {
 			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: %v; kept as an override", o.Layer+"/"+o.Path, err))
 			return true
 		}
-		key = info.ID
+		key = jarKey(info.ID, proj.Slug)
 	}
 	_, listed := im.r.Manifest.Requires[key]
 	_, locked := im.r.Lock.Mods[key]
