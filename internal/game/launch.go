@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/proc"
 )
 
@@ -23,6 +24,25 @@ type Session struct {
 	XUID     string
 	ClientID string
 	Type     string
+}
+
+// SessionOf is the account as the game's own arguments name it. An offline account presents the
+// placeholder token Prism uses: no offline-mode host looks at it, and no online one would take a
+// real one from an account that has none.
+func SessionOf(acc account.Account) Session {
+	s := Session{Name: acc.Name(), UUID: acc.ID()}
+	if acc.Type == account.Offline {
+		s.Token, s.Type = "0", "offline"
+		return s
+	}
+	s.ClientID, s.Type = account.ClientID, "msa"
+	if acc.Minecraft != nil {
+		s.Token = acc.Minecraft.Token
+	}
+	if acc.Xbox != nil {
+		s.XUID = acc.Xbox.XUID
+	}
+	return s
 }
 
 // Vars are the substitutions only the account can fill, added on top of Assembly.Vars. The legacy

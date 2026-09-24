@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
@@ -174,7 +173,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		return err
 	}
 	vars := plan.launch.Assembly.Vars(plan.store, "shulker", version, in.Dir, plan.natives)
-	for name, value := range gameSession(signed).Vars() {
+	for name, value := range game.SessionOf(signed).Vars() {
 		vars[name] = value
 	}
 	log, err := launchLog(in.Dir, time.Now())
@@ -311,25 +310,6 @@ func (a *app) pinnedAccount(id string) (string, error) {
 	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)
 	e.Nudge = out.Nudge{Lead: "Play it as the default account instead with", Command: "shulker instance unset account"}
 	return "", e
-}
-
-// gameSession is the account as the game's own arguments name it. An offline account presents the
-// placeholder token Prism uses: no offline-mode host looks at it, and no online one would take a
-// real one from an account that has none.
-func gameSession(acc account.Account) game.Session {
-	s := game.Session{Name: acc.Name(), UUID: acc.ID()}
-	if acc.Type == account.Offline {
-		s.Token, s.Type = "0", "offline"
-		return s
-	}
-	s.ClientID, s.Type = account.ClientID, "msa"
-	if acc.Minecraft != nil {
-		s.Token = acc.Minecraft.Token
-	}
-	if acc.Xbox != nil {
-		s.XUID = acc.Xbox.XUID
-	}
-	return s
 }
 
 // launchLog is where a run's output goes. Every launch gets a file of its own, named for when it
