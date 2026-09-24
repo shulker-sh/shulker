@@ -20,12 +20,11 @@ type matchResult struct {
 func TestMatchLocksOverrideFiles(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	sodium, jei, iris, nodist, fresh := h.jars["sodium"], h.jars["jei"], h.jars["irisshaders"], h.jars["nodist"], h.jars["fresh-animations"]
+	sodium, jei, iris, fresh := h.jars["sodium"], h.jars["jei"], h.jars["irisshaders"], h.jars["fresh-animations"]
 	files := map[string][]byte{
 		"overrides/mods/" + sodium.filename:                   sodium.data,
 		"overrides/mods/" + jei.filename:                      jei.data,
 		"client-overrides/mods/" + iris.filename:              iris.data,
-		"overrides/mods/" + nodist.filename:                   nodist.data,
 		"overrides/mods/unknown-1.0.jar":                      []byte("not on any provider"),
 		"client-overrides/resourcepacks/Fresh Animations.zip": fresh.data,
 		"overrides/config/client.txt":                         []byte("setting=1"),
@@ -46,17 +45,17 @@ func TestMatchLocksOverrideFiles(t *testing.T) {
 	}
 	wantLocked := []resolve.LockedFile{
 		{ID: "fresh-animations", Type: "resourcepack", Provider: "modrinth"},
-		{ID: "iris", Type: "mod", Provider: "curseforge"},
+		{ID: "iris", Type: "mod", Provider: "modrinth"},
 		{ID: "jei", Type: "mod", Provider: "curseforge"},
 		{ID: "sodium", Type: "mod", Provider: "modrinth"},
 	}
-	wantKept := "overrides/mods/" + nodist.filename + ",overrides/mods/unknown-1.0.jar"
+	wantKept := "overrides/mods/unknown-1.0.jar"
 
 	res, _ := match(t, "--dry-run")
 	if !slices.Equal(res.Locked, wantLocked) || strings.Join(res.Kept, ",") != wantKept || len(res.Moved) != 4 {
 		t.Fatalf("dry run: %+v", res)
 	}
-	if got := h.mustRun(t, "match", "--dry-run"); !strings.Contains(got, "3 mods (2 CurseForge, 1 Modrinth), 1 resource pack (Modrinth) locked, 2 files kept as overrides") {
+	if got := h.mustRun(t, "match", "--dry-run"); !strings.Contains(got, "3 mods (2 Modrinth, 1 CurseForge), 1 resource pack (Modrinth) locked, 1 file kept as overrides") {
 		t.Fatalf("dry run text:\n%s", got)
 	}
 	if m, _ := readProject(t, h.dir); len(m.Requires) != 0 {
@@ -70,7 +69,7 @@ func TestMatchLocksOverrideFiles(t *testing.T) {
 	if !slices.Equal(res.Locked, wantLocked) || strings.Join(res.Kept, ",") != wantKept {
 		t.Fatalf("match: %+v", res)
 	}
-	if len(warnings) != 1 || !strings.Contains(warnings[0], nodist.filename) || !strings.Contains(warnings[0], "third-party downloads") {
+	if len(warnings) != 0 {
 		t.Fatalf("warnings: %v", warnings)
 	}
 	m, l := readProject(t, h.dir)

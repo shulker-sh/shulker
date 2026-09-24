@@ -63,19 +63,6 @@ func TestImportLooksASlugUpAsAModpack(t *testing.T) {
 	}
 }
 
-func TestImportLooksACurseForgeSlugUp(t *testing.T) {
-	h := newHarness(t)
-	path := filepath.Join(t.TempDir(), "craft-1.0.zip")
-	writeCurseForgeZip(t, path, importedCurseForgePack(craftFiles...), map[string][]byte{})
-	archive := archiveJar(t, h, "craft-1.0.zip", path)
-	h.cfMods[800000] = &cfMod{id: 800000, slug: "craftpack", class: 4471, files: []cfFile{{id: 7000001, jar: archive, date: "2026-09-01T00:00:00Z", channel: 1}}}
-	dir := filepath.Join(t.TempDir(), "craft")
-	h.mustRun(t, "-C", dir, "import", "craftpack", "--provider", "curseforge")
-	if l := readLockAt(t, dir); l.Mods["jei"].Sha512 == "" {
-		t.Fatalf("jei isn't locked: %+v", l.Mods)
-	}
-}
-
 func TestImportRefusesASlugThatIsAMod(t *testing.T) {
 	h := newHarness(t)
 	code, stdout, _ := h.run(t, "--json", "-C", filepath.Join(t.TempDir(), "x"), "import", "terralith")

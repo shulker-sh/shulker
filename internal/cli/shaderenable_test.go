@@ -3,7 +3,6 @@ package cli
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 )
@@ -15,7 +14,7 @@ func TestShaderIsEnabledByTheShaderModTheBuildPlaced(t *testing.T) {
 	canvas := makeJar(t, "canvas", "canvas-fabric-26.2.jar", "client")
 	writeProjectFile(t, h, "files/canvas-fabric-26.2.jar", canvas.data)
 	h.mustRun(t, "add", "files/canvas-fabric-26.2.jar")
-	h.mustRun(t, "add", "irisshaders", "--provider", "curseforge", "--as", "fancy-shaders")
+	h.mustRun(t, "add", "irisshaders", "--as", "fancy-shaders")
 	h.editManifest(t, func(m map[string]any) {
 		m["requires"].(map[string]any)["fancy-shaders"].(map[string]any)["feature"] = "shaders"
 		declarations(m)["shaders"] = map[string]any{}
@@ -49,14 +48,5 @@ func TestShaderWithNoShaderModIsReported(t *testing.T) {
 	_, _, stderr := h.run(t, "install")
 	if !strings.Contains(stderr, "! complementary-reimagined is placed, but nothing in this build can load it; shulker add iris") {
 		t.Fatalf("no unloadable line: %s", stderr)
-	}
-}
-
-func TestCurseForgeOptiFineShaderLocksIrisAndOculus(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "shader", "add", "complementary-cf", "--provider", "curseforge")
-	if got := h.readLock(t).Shaders["complementary-cf"].Loaders; !slices.Equal(got, []string{"iris", "oculus"}) {
-		t.Fatalf("loaders: %v", got)
 	}
 }

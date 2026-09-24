@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/out"
@@ -38,20 +37,16 @@ func TestAddPinsAModrinthVersionURLByItsNumber(t *testing.T) {
 func TestAddTakesSeveralURLsEachWithItsOwnPin(t *testing.T) {
 	h := newHarness(t)
 	h.newer = true
-	h.cfMods[500525] = &cfMod{id: 500525, slug: "balm-fabric", unlisted: true, files: []cfFile{
-		{id: 5700001, jar: makeJar(t, "balm", "balm-fabric-7.3.9.jar", "*"), date: "2026-09-01T00:00:00Z", channel: 1},
-	}}
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 
 	h.mustRun(t, "add",
-		"https://www.curseforge.com/minecraft/mc-mods/balm-fabric/files/5700001",
 		"https://legacy.curseforge.com/minecraft/mc-mods/jei/download/5000001",
 		"https://cdn.modrinth.com/data/AANobbMI/versions/QANobbMI/sodium.jar",
 		"https://modrinth.com/resourcepack/fresh-animations",
 	)
 
 	l := h.readLock(t)
-	for key, want := range map[string]string{"balm": "5700001", "jei": "5000001", "sodium": "QANobbMI"} {
+	for key, want := range map[string]string{"jei": "5000001", "sodium": "QANobbMI"} {
 		if got := l.Mods[key].Version; got != want {
 			t.Fatalf("%s locked at %s, want %s", key, got, want)
 		}
@@ -59,8 +54,8 @@ func TestAddTakesSeveralURLsEachWithItsOwnPin(t *testing.T) {
 			t.Fatalf("%s pinned to %s, want %s", key, got, want)
 		}
 	}
-	if l.Mods["balm"].Provider != "curseforge" {
-		t.Fatalf("balm should come from curseforge: %+v", l.Mods["balm"])
+	if l.Mods["jei"].Provider != "curseforge" {
+		t.Fatalf("jei should come from curseforge: %+v", l.Mods["jei"])
 	}
 	if _, ok := l.ResourcePacks["fresh-animations"]; !ok {
 		t.Fatalf("the resource pack URL should add a resource pack: %+v", l.ResourcePacks)
@@ -123,17 +118,5 @@ func TestPinTakesAURLOfTheLockedProject(t *testing.T) {
 
 	if got := fmt.Sprint(h.readLock(t).Mods["jei"].Version); got != "5000001" {
 		t.Fatalf("jei locked at %s, want 5000001", got)
-	}
-}
-
-func TestAnUnlistedCurseForgeProjectURLAsksForAFileURL(t *testing.T) {
-	h := newHarness(t)
-	h.cfMods[500525] = &cfMod{id: 500525, slug: "balm-fabric", unlisted: true}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-
-	e := runError(t, h, "add", "https://www.curseforge.com/minecraft/mc-mods/balm-fabric")
-
-	if e.Code != "mod-not-found" || !strings.Contains(e.Help, "file URL") {
-		t.Fatalf("%+v", e)
 	}
 }

@@ -179,6 +179,7 @@ func newHarness(t *testing.T) *harness {
 	h.jars["fabric-api-next"] = makeJarVersion(t, "fabric-api", "fabric-api-0.140.0+26.2.jar", "*", "2.0.0", `"depends":{"fabricloader":">=0.17"}`)
 	h.jars["fresh-animations"] = makeJarFile(t, "fresh-animations", "FreshAnimations_v1.9.4.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"fresh"}}`)
 	h.jars["complementary"] = makeJarFile(t, "complementary", "ComplementaryReimagined_r5.5.1.zip", "shaders/gbuffers_basic.vsh", "// shader")
+	h.jars["irisshaders"] = makeJar(t, "iris", "iris-fabric-1.11.3+mc26.2.jar", "client")
 	h.jars["autoslabs"] = makeJarFiles(t, "autoslabs", "AutoslabsCompat.zip", map[string]string{"pack.mcmeta": `{"pack":{"pack_format":15,"description":"autoslabs"}}`, "data/autoslabs/tags/block/slabs.json": "{}", "assets/autoslabs/lang/en_us.json": "{}"})
 	h.jars["terralith"] = makeJarFiles(t, "terralith", "Terralith_26.2_v2.6.4.zip", map[string]string{"pack.mcmeta": `{"pack":{"pack_format":107,"description":"terralith"}}`, "data/terralith/worldgen/biome/moonlight_grove.json": "{}"})
 
@@ -373,6 +374,8 @@ func newHarness(t *testing.T) *harness {
 		"50dA9Sha":                 {"id": "50dA9Sha", "slug": "fresh-animations", "title": "Fresh Animations", "client_side": "required", "server_side": "unsupported", "project_type": "resourcepack"},
 		"complementary-reimagined": {"id": "HVnmMxH1", "slug": "complementary-reimagined", "title": "Complementary Reimagined", "client_side": "required", "server_side": "unsupported", "project_type": "shader"},
 		"HVnmMxH1":                 {"id": "HVnmMxH1", "slug": "complementary-reimagined", "title": "Complementary Reimagined", "client_side": "required", "server_side": "unsupported", "project_type": "shader"},
+		"irisshaders":              {"id": "YL57xq9U", "slug": "irisshaders", "title": "Iris Shaders", "client_side": "required", "server_side": "unsupported"},
+		"YL57xq9U":                 {"id": "YL57xq9U", "slug": "irisshaders", "title": "Iris Shaders", "client_side": "required", "server_side": "unsupported"},
 		"terralith":                {"id": "8oi3bsk5", "slug": "terralith", "title": "Terralith", "client_side": "optional", "server_side": "required", "project_type": "mod", "loaders": []string{"datapack"}},
 		"8oi3bsk5":                 {"id": "8oi3bsk5", "slug": "terralith", "title": "Terralith", "client_side": "optional", "server_side": "required", "project_type": "mod", "loaders": []string{"datapack"}},
 		// Illustrative ids: a datapack whose zip also carries assets/, as BMC2's AutoslabsCompat does.
@@ -413,6 +416,8 @@ func newHarness(t *testing.T) *harness {
 			return []map[string]any{versionTagged("Vb7Kq2Xn", "50dA9Sha", "1.9.4", "2026-09-01T00:00:00Z", h.jars["fresh-animations"], nil, []string{"minecraft"})}
 		case "HVnmMxH1":
 			return []map[string]any{versionTagged("pcrMhvuU", "HVnmMxH1", "r5.5.1", "2026-09-01T00:00:00Z", h.jars["complementary"], nil, []string{"iris"})}
+		case "YL57xq9U":
+			return []map[string]any{versionOf("yl57v113", "YL57xq9U", "1.11.3+mc26.2", "2026-09-01T00:00:00Z", h.jars["irisshaders"], nil)}
 		case "8oi3bsk5":
 			return []map[string]any{versionTagged("urbokcOc", "8oi3bsk5", "2.6.4", "2026-09-01T00:00:00Z", h.jars["terralith"], nil, []string{"datapack"})}
 		case "AutoSlb1":
@@ -433,7 +438,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	mux.HandleFunc("/modrinth/version/", func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/modrinth/version/")
-		for _, projectID := range append([]string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1", "8oi3bsk5", "AutoSlb1"}, slices.Collect(maps.Keys(h.modrinthPacks))...) {
+		for _, projectID := range append([]string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1", "YL57xq9U", "8oi3bsk5", "AutoSlb1"}, slices.Collect(maps.Keys(h.modrinthPacks))...) {
 			for _, v := range versions(projectID) {
 				if v["id"] == id {
 					writeJSON(w, v)
@@ -445,7 +450,7 @@ func newHarness(t *testing.T) *harness {
 	})
 	mux.HandleFunc("/modrinth/version_file/", func(w http.ResponseWriter, r *http.Request) {
 		sha1 := strings.TrimPrefix(r.URL.Path, "/modrinth/version_file/")
-		for _, projectID := range []string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1", "8oi3bsk5", "AutoSlb1"} {
+		for _, projectID := range []string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1", "YL57xq9U", "8oi3bsk5", "AutoSlb1"} {
 			for _, v := range versions(projectID) {
 				for _, jar := range h.jars {
 					if jar.sha1 == sha1 && v["files"].([]map[string]any)[0]["filename"] == jar.filename {
@@ -465,7 +470,7 @@ func newHarness(t *testing.T) *harness {
 		h.modrinthBatches++
 		found := map[string]any{}
 		for _, sha1 := range body.Hashes {
-			for _, projectID := range []string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1", "8oi3bsk5", "AutoSlb1"} {
+			for _, projectID := range []string{"AANobbMI", "P7dR8mSH", "50dA9Sha", "HVnmMxH1", "YL57xq9U", "8oi3bsk5", "AutoSlb1"} {
 				for _, v := range versions(projectID) {
 					for _, jar := range h.jars {
 						if jar.sha1 == sha1 && v["files"].([]map[string]any)[0]["filename"] == jar.filename {

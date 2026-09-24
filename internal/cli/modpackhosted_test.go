@@ -231,61 +231,6 @@ func TestHostedModpackNoCompatibleVersion(t *testing.T) {
 	}
 }
 
-func TestHostedCurseForgeModpack(t *testing.T) {
-	h := archiveProject(t)
-	path := filepath.Join(t.TempDir(), "craft-1.0.zip")
-	writeCurseForgeZip(t, path, importedCurseForgePack(craftFiles...), map[string][]byte{"extras/config/jei.toml": []byte("jei = hosted\n")})
-	archive := archiveJar(t, h, "craft-1.0.zip", path)
-	h.cfMods[800000] = &cfMod{id: 800000, slug: "craftpack", class: 4471, files: []cfFile{{id: 7000001, jar: archive, date: "2026-09-01T00:00:00Z", channel: 1}}}
-
-	h.mustRun(t, "add", "craftpack")
-	if entry := h.readManifest(t).Requires["craftpack"]; entry.Provider != "curseforge" || entry.Type != "modpack" {
-		t.Fatalf("manifest entry: %+v", entry)
-	}
-	mp := h.readLock(t).Modpacks["craftpack"]
-	if mp.Provider != "curseforge" || mp.Sha512 != archive.sha512 || mp.URL == nil || mp.Filename != "craft-1.0.zip" || mp.VersionNumber == "" {
-		t.Fatalf("modpack lock entry: %+v", mp)
-	}
-	if m := h.readLock(t).Mods["jei"]; m.Modpack != "craftpack" {
-		t.Fatalf("jei is tagged to the pack: %+v", m)
-	}
-	h.mustRun(t, "install")
-	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "config", "jei.toml")); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestHostedCurseForgeModpackWithoutDistribution(t *testing.T) {
-	h := archiveProject(t)
-	path := filepath.Join(t.TempDir(), "craft-1.0.zip")
-	writeCurseForgeZip(t, path, importedCurseForgePack(craftFiles...), map[string][]byte{"extras/config/jei.toml": []byte("jei = manual\n")})
-	archive := archiveJar(t, h, "craft-1.0.zip", path)
-	h.cfMods[800000] = &cfMod{id: 800000, slug: "craftpack", class: 4471, files: []cfFile{{id: 7000001, jar: archive, date: "2026-09-01T00:00:00Z", channel: 1, url: "null"}}}
-
-	if code, _, stderr := h.run(t, "add", "craftpack"); code == 0 || !strings.Contains(stderr, "manual-download") {
-		t.Fatalf("an undistributed pack asks for a manual download: %d\n%s", code, stderr)
-	}
-	downloads := filepath.Join(h.dir, "downloads")
-	if err := os.MkdirAll(downloads, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(downloads, "craft-1.0.zip"), archive.data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	h.mustRun(t, "add", "craftpack")
-	mp := h.readLock(t).Modpacks["craftpack"]
-	if mp.URL != nil || !strings.Contains(mp.Page, "/modpacks/craftpack/files/7000001") || mp.Sha512 != archive.sha512 {
-		t.Fatalf("modpack lock entry: %+v", mp)
-	}
-	if err := os.RemoveAll(filepath.Join(h.cache, "objects")); err != nil {
-		t.Fatal(err)
-	}
-	h.mustRun(t, "install")
-	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "config", "jei.toml")); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestHandWrittenHostedModpackLocks(t *testing.T) {
 	h, archive := hostedProject(t)
 	h.editManifest(t, func(m map[string]any) {

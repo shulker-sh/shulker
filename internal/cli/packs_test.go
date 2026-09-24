@@ -35,7 +35,7 @@ func TestResourcePacksAndShaders(t *testing.T) {
 		t.Fatalf("a pack should name the sides it reaches: %s", stdout)
 	}
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
-	h.mustRun(t, "add", "irisshaders", "--provider", "curseforge")
+	h.mustRun(t, "add", "irisshaders")
 
 	var l packLock
 	h.readJSON(t, "shulker.lock", &l)
@@ -110,7 +110,7 @@ func TestPackFilename(t *testing.T) {
 	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
-	h.mustRun(t, "add", "irisshaders", "--provider", "curseforge")
+	h.mustRun(t, "add", "irisshaders")
 	h.mustRun(t, "install")
 	options := filepath.Join(h.dir, "build", "client", "options.txt")
 	if err := os.WriteFile(options, []byte("resourcePacks:[\"vanilla\",\"file/FreshAnimations_v1.9.4.zip\",\"file/other.zip\"]\n"), 0o644); err != nil {

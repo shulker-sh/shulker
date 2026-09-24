@@ -48,6 +48,9 @@ func TestInitWithoutAnswersTakesTheDefaults(t *testing.T) {
 			if !strings.Contains(stdout, "created shulker.json") {
 				t.Fatalf("%v: %s", args, stdout)
 			}
+			if gi, _ := os.ReadFile(filepath.Join(dir, ".gitignore")); string(gi) != "/build/\n/data/\n/downloads/\n/shulker.local.json\n/.shulker/\n" {
+				t.Fatalf(".gitignore: %q", gi)
+			}
 			continue
 		}
 		if stdout != first {

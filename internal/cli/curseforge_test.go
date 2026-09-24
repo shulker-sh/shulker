@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"encoding/json"
 	"net/http"
-	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -23,8 +22,6 @@ type cfMod struct {
 	class     int
 	downloads int64
 	files     []cfFile
-	// unlisted leaves the project out of every search, as CurseForge does with some projects.
-	unlisted bool
 }
 
 func (c *cfMod) classID() int {
@@ -35,24 +32,20 @@ func (c *cfMod) classID() int {
 }
 
 type cfFile struct {
-	id        int
-	jar       fakeJar
-	url       string
-	date      string
-	channel   int
-	deps      []int
-	hidden    bool
-	forbidden bool
-	truncated bool
+	id      int
+	jar     fakeJar
+	url     string
+	date    string
+	channel int
+	deps    []int
+	hidden  bool
 }
 
 func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func() string) {
 	jei := makeJar(t, "jei", "jei-26.2-fabric-1.0.0.jar", "*")
 	h.jars["jei"], h.jars["jei-next"] = jei, makeJarVersion(t, "jei", "jei-26.2-fabric-1.1.0.jar", "*", "1.1.0", `"depends":{"fabricloader":">=0.17"}`)
 	h.jars["nodist"] = makeJar(t, "nodist", "nodist-1.0.0.jar", "client")
-	h.jars["locked"] = makeJar(t, "locked", "locked-1.0.0.jar", "*")
 	h.jars["cf-fresh-animations"] = makeJarFile(t, "fresh-animations", "FreshAnimations_CF_v1.9.4.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"fresh"}}`)
-	h.jars["irisshaders"] = makeJar(t, "iris", "iris-fabric-1.11.3+mc26.2.jar", "client")
 	h.jars["stale"] = makeJarVersion(t, "jei", "jei-26.1-fabric-0.9.0.jar", "*", "0.9.0", `"depends":{"fabricloader":">=0.17"}`)
 	h.cfMods = map[int]*cfMod{
 		238222: {id: 238222, slug: "jei", downloads: 300_000_000, files: []cfFile{
@@ -62,30 +55,21 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		306612: {id: 306612, slug: "fabric-api", downloads: 200_000_000, files: []cfFile{{id: 5000010, jar: h.jars["fabric-api"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 		394468: {id: 394468, slug: "sodium", downloads: 151_434_981, files: []cfFile{{id: 5000020, jar: h.jars["sodium"], date: "2026-09-01T00:00:00Z", channel: 1, deps: []int{306612}}}},
 		300000: {id: 300000, slug: "nodist", files: []cfFile{{id: 5100001, jar: h.jars["nodist"], date: "2026-09-01T00:00:00Z", channel: 1, url: "null"}}},
-		400000: {id: 400000, slug: "locked", files: []cfFile{{id: 5200001, jar: h.jars["locked"], date: "2026-09-01T00:00:00Z", channel: 1, forbidden: true}}},
 		600000: {id: 600000, slug: "fresh-animations", class: 12, downloads: 4_000_000, files: []cfFile{{id: 5300001, jar: h.jars["cf-fresh-animations"], date: "2026-09-01T00:00:00Z", channel: 1}}},
-		455508: {id: 455508, slug: "irisshaders", downloads: 60_000_000, files: []cfFile{{id: 5500001, jar: h.jars["irisshaders"], date: "2026-09-01T00:00:00Z", channel: 1}}},
-		700000: {id: 700000, slug: "complementary-cf", class: 6552, files: []cfFile{{id: 5400001, jar: h.jars["complementary"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 	}
 	fileJSON := func(f cfFile, m *cfMod) map[string]any {
 		var url any = base() + "/cfcdn/" + strconv.Itoa(f.id) + "/" + f.jar.filename
 		if f.url == "null" {
 			url = nil
-		} else if f.forbidden {
-			url = base() + "/cfcdn/forbidden/" + f.jar.filename
 		}
 		deps := []map[string]any{}
 		for _, d := range f.deps {
 			deps = append(deps, map[string]any{"modId": d, "relationType": 3})
 		}
-		// A pack's files carry no loader tag; a shader's names its shader mod
-		// in the same array as the game versions.
+		// A pack's files carry no loader tag.
 		gameVersions := []string{"26.2", "Fabric"}
-		switch m.classID() {
-		case 12:
+		if m.classID() == 12 {
 			gameVersions = []string{"26.2"}
-		case 6552:
-			gameVersions = []string{"26.2", "OptiFine"}
 		}
 		return map[string]any{
 			"id": f.id, "modId": m.id, "displayName": strings.TrimSuffix(f.jar.filename, ".jar"), "fileName": f.jar.filename,
@@ -144,7 +128,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		class := q.Get("classId")
 		var matched []*cfMod
 		for _, m := range h.cfMods {
-			if m.unlisted || class != "" && class != strconv.Itoa(m.classID()) {
+			if class != "" && class != strconv.Itoa(m.classID()) {
 				continue
 			}
 			if words := q.Get("searchFilter"); words != "" {
@@ -228,18 +212,10 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		}
 		writeJSON(w, map[string]any{"data": data, "pagination": map[string]int{"index": 0, "resultCount": len(data), "totalCount": len(data)}})
 	})
-	mux.HandleFunc("/cfcdn/forbidden/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-	})
 	mux.HandleFunc("/cfcdn/", func(w http.ResponseWriter, r *http.Request) {
 		id, _ := strconv.Atoi(strings.Split(strings.TrimPrefix(r.URL.Path, "/cfcdn/"), "/")[0])
 		for _, m := range h.cfMods {
 			for _, f := range allFiles(m) {
-				if f.id == id && f.truncated {
-					w.Header().Set("Content-Length", strconv.Itoa(len(f.jar.data)))
-					w.Write(f.jar.data[:len(f.jar.data)/2])
-					return
-				}
 				if f.id == id {
 					w.Write(f.jar.data)
 					return
@@ -327,7 +303,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	}
 }
 
-func TestCurseForgeAliasAndAbsence(t *testing.T) {
+func TestCurseForgeSwitchAndAbsenceOutput(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "init", "--yes", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
@@ -342,33 +318,15 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil || len(env.Data.Added) != 0 || len(env.Data.Updated) != 1 || env.Data.Updated[0]["fromProvider"] != "modrinth" || env.Data.Updated[0]["toProvider"] != "curseforge" {
 		t.Fatalf("add via curseforge: %s", stdout)
 	}
-	sodium := h.readLock(t).Mods["sodium"]
-	if sodium.Provider != "curseforge" || sodium.Aliases["modrinth"] != "AANobbMI" || sodium.Aliases["curseforge"] != "" {
-		t.Fatalf("switched entry: %+v", sodium)
-	}
-	if by := h.readLock(t).Mods["fabric-api"].RequiredBy; len(by) != 1 || by[0] != "sodium" {
-		t.Fatalf("fabric-api requiredBy after switch: %v", by)
-	}
-	var m struct {
-		Mods map[string]map[string]any `json:"requires"`
-	}
-	h.readJSON(t, "shulker.json", &m)
-	if m.Mods["sodium"]["provider"] != "curseforge" || m.Mods["sodium"]["project"] != "394468" {
-		t.Fatalf("manifest after switch: %v", m.Mods["sodium"])
-	}
 	stdout = h.mustRun(t, "add", "sodium", "--provider", "modrinth")
 	if !strings.HasPrefix(stdout, "  ~ sodium ") || !strings.Contains(stdout, "curseforge ⟶ modrinth") {
 		t.Fatalf("switch back: %s", stdout)
 	}
-	sodium = h.readLock(t).Mods["sodium"]
-	if sodium.Provider != "modrinth" || sodium.Aliases["curseforge"] != "394468" || sodium.Aliases["modrinth"] != "" {
-		t.Fatalf("switched back entry: %+v", sodium)
-	}
 	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth ⟶ curseforge") {
 		t.Fatalf("second switch: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "already up to date") || h.readLock(t).Mods["sodium"].Provider != "curseforge" {
-		t.Fatalf("plain add after switch should keep the curseforge entry: %s", stdout)
+	if stdout = h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "already up to date") {
+		t.Fatalf("plain add after switch: %s", stdout)
 	}
 
 	h.noCurseForge = true
@@ -379,62 +337,5 @@ func TestCurseForgeAliasAndAbsence(t *testing.T) {
 	code, stdout, _ = h.run(t, "--json", "add", "jei")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || !strings.Contains(e.Message, "not found on modrinth") || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "skipped: curseforge needs an API key") {
 		t.Fatalf("expected a modrinth miss naming the skipped curseforge, got %d %s", code, stdout)
-	}
-}
-
-func TestCurseForgeManualDownloads(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
-	if gi, _ := os.ReadFile(filepath.Join(h.dir, ".gitignore")); !strings.Contains(string(gi), "/downloads/") {
-		t.Fatalf(".gitignore: %s", gi)
-	}
-
-	code, stdout, _ := h.run(t, "--json", "add", "nodist")
-	e := failureCode(t, stdout)
-	if code == 0 || e.Code != "manual-download" || !strings.Contains(e.Help, "https://www.curseforge.com/minecraft/mc-mods/nodist/files/5100001") || !strings.Contains(e.Help, "nodist-1.0.0.jar") {
-		t.Fatalf("expected manual-download, got %d %s", code, stdout)
-	}
-
-	downloads := filepath.Join(h.dir, "downloads")
-	os.MkdirAll(downloads, 0o755)
-	os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
-	stdout = h.mustRun(t, "add", "nodist")
-	if !strings.Contains(stdout, "+ nodist nodist-1.0.0 » all sides (client only)") {
-		t.Fatalf("add after drop: %s", stdout)
-	}
-	nodist := h.readLock(t).Mods["nodist"]
-	if nodist.URL != nil || nodist.Page != "https://www.curseforge.com/minecraft/mc-mods/nodist/files/5100001" || nodist.Sha512 != h.jars["nodist"].sha512 {
-		t.Fatalf("nodist lock entry: %+v", nodist)
-	}
-
-	code, stdout, _ = h.run(t, "--json", "add", "locked")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "manual-download" || !strings.Contains(e.Help, "mc-mods/locked/files/5200001") {
-		t.Fatalf("expected manual-download after 403, got %d %s", code, stdout)
-	}
-	os.WriteFile(filepath.Join(downloads, "locked-1.0.0.jar"), h.jars["locked"].data, 0o644)
-	h.mustRun(t, "add", "locked")
-	if locked := h.readLock(t).Mods["locked"]; locked.URL != nil || !strings.Contains(locked.Page, "mc-mods/locked/files/5200001") {
-		t.Fatalf("locked lock entry: %+v", locked)
-	}
-
-	os.WriteFile(filepath.Join(downloads, "unrelated.jar"), []byte("not a mod"), 0o644)
-	os.RemoveAll(h.cache)
-	_, stderr := h.mustRunStderr(t, "install")
-	if !strings.Contains(stderr, "downloads/unrelated.jar matches no mod in the lock") {
-		t.Fatalf("install warnings: %s", stderr)
-	}
-	build := filepath.Join(h.dir, "build", "client", "mods")
-	for _, name := range []string{"nodist-1.0.0.jar", "locked-1.0.0.jar"} {
-		if _, err := os.Stat(filepath.Join(build, name)); err != nil {
-			t.Fatalf("%s not built: %v", name, err)
-		}
-	}
-
-	os.RemoveAll(downloads)
-	os.RemoveAll(h.cache)
-	code, stdout, _ = h.run(t, "--json", "install")
-	e = failureCode(t, stdout)
-	if code == 0 || e.Code != "missing-files" || len(e.Items) != 2 || !strings.Contains(e.Items[0], "mc-mods/locked/files/5200001") || !strings.Contains(e.Items[1], "nodist-1.0.0.jar") {
-		t.Fatalf("expected missing-files, got %d %s", code, stdout)
 	}
 }

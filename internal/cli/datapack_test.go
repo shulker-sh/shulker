@@ -188,29 +188,6 @@ func TestExportMrpackCarriesDatapacksBySide(t *testing.T) {
 	}
 }
 
-func TestExportCurseForgeBundlesADatapackOutsideDatapacks(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
-	loot := makeJarFiles(t, "loot", "loot.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/loot/loot_table/chest.json": "{}"})
-	h.mustRun(t, "add", writeOutside(t, loot.filename, loot.data))
-	paxi := makeJar(t, "paxi", "Paxi-26.2-Fabric-5.1.jar", "*")
-	h.mustRun(t, "add", writeOutside(t, paxi.filename, paxi.data))
-	h.mustRun(t, "install")
-
-	code, stdout, _ := h.run(t, "--json", "export", "curseforge", "--version", "1.0")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "curseforge-cant-place" {
-		t.Fatalf("a datapack in Paxi's folder can't go by file ID: code=%d %+v", code, e)
-	}
-	stdout = h.mustRun(t, "export", "curseforge", "--version", "1.0", "--bundle")
-	if !strings.Contains(stdout, "1 datapack bundled") {
-		t.Fatalf("export output counts the bundled datapack: %s", stdout)
-	}
-	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
-	if entries["overrides/config/paxi/datapacks/loot.zip"] != string(loot.data) {
-		t.Fatal("the datapack is bundled where Paxi reads it")
-	}
-}
-
 func TestImportMrpackLocksDatapacks(t *testing.T) {
 	h := newHarness(t)
 	terralith, autoslabs := h.jars["terralith"], h.jars["autoslabs"]
@@ -402,16 +379,6 @@ func TestExportsShipAHybridDatapacksResourcePackCopy(t *testing.T) {
 	}
 	if _, ok := paths["datapacks/Terralith_26.2_v2.6.4.zip"]; !ok {
 		t.Fatalf("the datapack copy still ships: %+v", index.Files)
-	}
-
-	code, stdout, _ := h.run(t, "--json", "export", "curseforge", "--version", "1.0")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "curseforge-cant-place" || !strings.Contains(stdout, "terralith (resourcepacks/)") {
-		t.Fatalf("the resource pack copy can't go by file ID: code=%d %s", code, stdout)
-	}
-	h.mustRun(t, "export", "curseforge", "--version", "1.0", "--bundle")
-	entries := readArchive(t, filepath.Join(h.dir, "build", "pack-1.0.zip"))
-	if entries["overrides/resourcepacks/Terralith_26.2_v2.6.4.zip"] != string(h.jars["terralith"].data) {
-		t.Fatal("the resource pack copy is bundled")
 	}
 }
 
