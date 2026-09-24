@@ -74,24 +74,33 @@ func (a *app) watchRun(req watchRequest, stream io.Writer, running func(watchRep
 	g, err := game.Start(launch, stream)
 	if err != nil {
 		reason := runReason(launch.Program(), err)
-		a.failLaunch(req.Dir, s, false, reason)
+		if err := instance.FailLaunch(req.Dir, s.LaunchKeep(), false, reason); err != nil {
+			a.printer.Warn("%v", err)
+		}
 		running(watchReply{Error: reason})
 		return instance.Launch{Outcome: instance.OutcomeNotStarted, Error: reason}
 	}
-	a.openRun(req.Dir, s, instance.Launch{
+	err = instance.OpenRun(req.Dir, s.LaunchKeep(), instance.Launch{
 		StartedAt: started.UTC().Format(time.RFC3339),
 		Log:       req.Log,
 		PID:       g.PID,
 		Java:      req.Java,
 		Wrapped:   len(req.Wrapper) > 0,
 	})
+	if err != nil {
+		a.printer.Warn("%v", err)
+	}
 	running(watchReply{PID: g.PID})
 	code, err := g.Wait()
 	if err != nil {
 		// The game ran, so the run is real; what shulker lost is only the status it ended with.
-		code = noExitCode
+		code = instance.NoExitCode
 	}
-	return a.closeRun(req.Dir, s, g.PID, code)
+	rec, err := instance.CloseRun(req.Dir, s.LaunchKeep(), g.PID, code)
+	if err != nil {
+		a.printer.Warn("%v", err)
+	}
+	return rec
 }
 
 // startWatcher hands the launch to the watcher and reports the game it started. Tests replace it,

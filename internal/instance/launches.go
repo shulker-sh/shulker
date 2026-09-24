@@ -6,10 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/proc"
 )
 
 const (
@@ -128,4 +130,141 @@ func UpdateLaunches(dir string, keep int, change func([]Launch) []Launch) error 
 	}
 	defer unlock()
 	return SaveLaunches(dir, change(LoadLaunches(dir)), keep)
+}
+
+// NoExitCode stands for a run nothing passed the game's status on from, which is every run a
+// launcher drove: there a crash report is the only evidence the outcome can be read from.
+const NoExitCode = -1
+
+// NowStamp is the moment a record dates a run from, as StartedAt and EndedAt hold it.
+func NowStamp() string { return time.Now().UTC().Format(time.RFC3339) }
+
+// OpenRun stamps the record for a run that is starting. A launcher's pre-launch hook has only the
+// moment to write down; a watcher also has the game's own process and the file its output is going
+// to, and that pid is what lets a later command close a run whose watcher was killed. At a keep of
+// 0 nothing is written.
+func OpenRun(dir string, keep int, rec Launch) error {
+	if keep == 0 {
+		return nil
+	}
+	return UpdateLaunches(dir, keep, func(records []Launch) []Launch {
+		return append(records, rec)
+	})
+}
+
+// CloseRun ends the open record for the game with this pid, with how the run finished, and hands
+// back what it says. A pid of 0 is a launcher's run, which has none, and closes the newest open
+// record. exit is NoExitCode where nothing passed the game's status on. At a keep of 0 the run was
+// never written down and nothing is written now, but the record still comes back filled in, because
+// it is what the command that waited for the game reports.
+func CloseRun(dir string, keep, pid, exit int) (Launch, error) {
+	rec := Launch{StartedAt: NowStamp()}
+	if keep == 0 {
+		endRecord(&rec, dir, exit)
+		return rec, nil
+	}
+	found := false
+	err := UpdateLaunches(dir, keep, func(records []Launch) []Launch {
+		if open := openRecord(records, pid); open >= 0 {
+			endRecord(&records[open], dir, exit)
+			rec, found = records[open], true
+		}
+		return records
+	})
+	if !found {
+		endRecord(&rec, dir, exit)
+	}
+	return rec, err
+}
+
+// ReconcileRuns closes the runs whose watchers never did. A record left open with a pid belongs to
+// a run shulker was watching itself, so while that process is alive the run is still going; once it
+// has gone the record is closed from the crash reports, which is all a watcher that was killed left
+// behind. A record with no pid is a launcher's, and nothing but its own post-exit hook closes it. A
+// directory with no readable instance file has no runs to reconcile.
+func ReconcileRuns(dir string) error {
+	f, err := Load(dir)
+	if err != nil {
+		return nil
+	}
+	keep := f.Settings.LaunchKeep()
+	if keep == 0 || !slices.ContainsFunc(LoadLaunches(dir), isAbandoned) {
+		return nil
+	}
+	return UpdateLaunches(dir, keep, func(records []Launch) []Launch {
+		for i := range records {
+			if isAbandoned(records[i]) {
+				endRecord(&records[i], dir, NoExitCode)
+			}
+		}
+		return records
+	})
+}
+
+// isAbandoned is an open record for a game shulker was watching that has gone without its watcher
+// closing it.
+func isAbandoned(rec Launch) bool {
+	return rec.EndedAt == "" && rec.PID != 0 && !proc.IsAlive(rec.PID)
+}
+
+// openRecord is the newest record nothing has closed for the game with this pid, or -1 where there
+// is none. A pid of 0 takes the newest open record of any kind, which is what a launcher's hooks,
+// with no process of their own to go by, have always closed.
+func openRecord(records []Launch, pid int) int {
+	for i := len(records) - 1; i >= 0; i-- {
+		if records[i].EndedAt == "" && (pid == 0 || records[i].PID == pid) {
+			return i
+		}
+	}
+	return -1
+}
+
+// endRecord fills in how a run ended. A non-zero status is a crash in its own right; where no status
+// was passed on, a crash report newer than the start is the only evidence there is.
+func endRecord(rec *Launch, dir string, exit int) {
+	started, err := time.Parse(time.RFC3339, rec.StartedAt)
+	if err != nil {
+		started = time.Time{}
+	}
+	rec.EndedAt = NowStamp()
+	rec.Outcome = OutcomeOK
+	rec.PID, rec.Java, rec.Wrapped = 0, "", false
+	log, crash := FailureFiles(dir, started)
+	if rec.Log == "" {
+		rec.Log = log
+	}
+	if crash != "" {
+		rec.Outcome, rec.CrashReport = OutcomeCrashed, crash
+	}
+	if exit != NoExitCode {
+		rec.ExitCode = exit
+		if exit != 0 {
+			rec.Outcome = OutcomeCrashed
+		}
+	}
+}
+
+// FailLaunch records a run the game never began. It closes the record this run stamped, and opens
+// one already closed when there was none, so the history shows the launch either way. An open
+// record it did not stamp belongs to an abandoned run and is left alone. Only a keep of 0 silences
+// this: the post-exit switch governs a run that ended, and this one never ran. StartedAt and EndedAt
+// match, because whatever time passed was shulker's and not the game's.
+func FailLaunch(dir string, keep int, stamped bool, reason string) error {
+	if keep == 0 {
+		return nil
+	}
+	return UpdateLaunches(dir, keep, func(records []Launch) []Launch {
+		at := -1
+		if stamped {
+			at = openRecord(records, 0)
+		}
+		if at < 0 {
+			records = append(records, Launch{StartedAt: NowStamp()})
+			at = len(records) - 1
+		}
+		records[at].EndedAt = records[at].StartedAt
+		records[at].Outcome = OutcomeNotStarted
+		records[at].Error = reason
+		return records
+	})
 }

@@ -17,7 +17,9 @@ import (
 func (a *app) reconcileInstance(in config.Instance) error {
 	// A run whose watcher was killed comes first, because it is true of every instance, including
 	// the ones shulker launches itself, which fill no slot and return below.
-	a.reconcileRun(in.Dir)
+	if err := instance.ReconcileRuns(in.Dir); err != nil {
+		a.printer.Warn("%v", err)
+	}
 	e := launcher.Find(in.Launcher)
 	if e == nil || e.Slot == nil {
 		// A plain synced directory has no slot to fill, so it gets no scripts either.

@@ -88,7 +88,9 @@ func (a *app) hookPostExitCmd() *cobra.Command {
 			if !f.Settings.PostExit() {
 				return nil
 			}
-			a.closeRun(dir, f.Settings, 0, noExitCode)
+			if _, err := instance.CloseRun(dir, f.Settings.LaunchKeep(), 0, instance.NoExitCode); err != nil {
+				a.printer.Warn("%v", err)
+			}
 			return nil
 		},
 	}
@@ -130,7 +132,9 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			if java == "" {
 				reason := instance.Path(dir) + " records no Java to run the game with"
 				if launching {
-					a.failLaunch(dir, f.Settings, stamped, reason)
+					if err := instance.FailLaunch(dir, f.Settings.LaunchKeep(), stamped, reason); err != nil {
+						a.printer.Warn("%v", err)
+					}
 				}
 				e := notStarted(reason)
 				e.Rows = []out.Detail{{Label: "Fix", Text: "shulker instances repair", IsCommand: true}}
@@ -139,12 +143,16 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			code, err := a.runGame(f.Settings, java, argv)
 			if err != nil {
 				if launching {
-					a.failLaunch(dir, f.Settings, stamped, runReason(java, err))
+					if err := instance.FailLaunch(dir, f.Settings.LaunchKeep(), stamped, runReason(java, err)); err != nil {
+						a.printer.Warn("%v", err)
+					}
 				}
 				return notStarted(fmt.Sprintf("can't run Java at %s, so the game didn't start: %v", java, err))
 			}
 			if launching && f.Settings.PostExit() {
-				a.closeRun(dir, f.Settings, 0, noExitCode)
+				if _, err := instance.CloseRun(dir, f.Settings.LaunchKeep(), 0, instance.NoExitCode); err != nil {
+					a.printer.Warn("%v", err)
+				}
 			}
 			if code != 0 {
 				return &out.Error{Code: "game-exit", Message: fmt.Sprintf("game exited with status %d", code), Exit: code}
@@ -221,35 +229,6 @@ func (a *app) syncForLaunch(cmd *cobra.Command, dir string) (syncResult, error) 
 	}
 }
 
-// failLaunch records a run the game never began. It closes the record this run stamped, and opens
-// one already closed when there was none, so the history shows the launch either way. An open
-// record it did not stamp belongs to an abandoned run and is left alone. Only settings.launchHistory
-// silences this: postExit governs a run that ended, and this one never ran. StartedAt and EndedAt
-// match, because whatever time passed was shulker's and not the game's.
-func (a *app) failLaunch(dir string, s instance.Settings, stamped bool, reason string) {
-	keep := s.LaunchKeep()
-	if keep == 0 {
-		return
-	}
-	err := instance.UpdateLaunches(dir, keep, func(records []instance.Launch) []instance.Launch {
-		at := -1
-		if stamped {
-			at = openRecord(records, 0)
-		}
-		if at < 0 {
-			records = append(records, instance.Launch{StartedAt: nowStamp()})
-			at = len(records) - 1
-		}
-		records[at].EndedAt = records[at].StartedAt
-		records[at].Outcome = instance.OutcomeNotStarted
-		records[at].Error = reason
-		return records
-	})
-	if err != nil {
-		a.printer.Warn("%v", err)
-	}
-}
-
 // hookInstance is the directory the script named and the intent it records. Its callers decide what
 // an unreadable one costs: a hook running beside a launch the launcher drives itself warns and
 // leaves it alone, while `hook wrap` is the launch and has to say so.
@@ -277,7 +256,9 @@ func notStarted(reason string) *out.Error {
 // pid, because the launcher started the game and shulker has no process to point at. A run whose
 // post-exit never fires stays open, which is how an abandoned run reads.
 func (a *app) stampLaunch(dir string, s instance.Settings) {
-	a.openRun(dir, s, instance.Launch{StartedAt: nowStamp()})
+	if err := instance.OpenRun(dir, s.LaunchKeep(), instance.Launch{StartedAt: instance.NowStamp()}); err != nil {
+		a.printer.Warn("%v", err)
+	}
 }
 
 // instanceID is the id `-i` takes for a directory, for the message that names it. Empty when the
