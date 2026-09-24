@@ -63,6 +63,12 @@ func writeCurseForgeZip(t *testing.T, path string, m cfManifest, entries map[str
 	}
 }
 
+var craftFiles = []cfPackFile{
+	{ProjectID: 238222, FileID: 5000001, Required: true},
+	{ProjectID: 306612, FileID: 5000010, Required: true},
+	{ProjectID: 600000, FileID: 5300001, Required: true},
+}
+
 func importedCurseForgePack(files ...cfPackFile) cfManifest {
 	return cfManifest{
 		Minecraft:    cfMinecraft{Version: "26.2", ModLoaders: []cfModLoader{{ID: "fabric-0.17.3", Primary: true}}},
