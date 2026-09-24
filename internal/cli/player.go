@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/lock"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
@@ -29,7 +28,7 @@ func (a *app) playerCmd() *cobra.Command {
 			}
 			var refs []player.Ref
 			if all {
-				refs = manifestPlayerRefs(p.Manifest)
+				refs = player.RefsOf(p.Manifest)
 			} else {
 				for _, arg := range args {
 					ref, err := player.ParseRef(arg)
@@ -83,19 +82,8 @@ func describePlayer(r player.Result) out.Item {
 	return it
 }
 
-func manifestPlayerRefs(m *manifest.Manifest) []player.Ref {
-	var refs []player.Ref
-	if m.Server == nil {
-		return refs
-	}
-	for _, p := range m.Server.Players.All() {
-		refs = append(refs, player.Ref{Name: p.Name, UUID: p.UUID})
-	}
-	return refs
-}
-
 func (a *app) syncPlayers(ctx context.Context, p *project.Project, mode player.Mode, acceptChange, persist bool) error {
-	refs := manifestPlayerRefs(p.Manifest)
+	refs := player.RefsOf(p.Manifest)
 	if len(refs) == 0 && len(p.Lock.Players) == 0 {
 		return nil
 	}
