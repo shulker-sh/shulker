@@ -46,6 +46,9 @@ type Resolver struct {
 	// AskMove is shown the deps-held refusal before an add without --with-deps gives up;
 	// yes carries on as --with-deps would.
 	AskMove func(held *out.Error) (bool, error)
+	// AskUnlock is asked whether to unlock a modpack built for another Minecraft than the
+	// project's, so its mods resolve here; nil keeps the modpack-mismatch refusal.
+	AskUnlock func(key, minecraft string) (bool, error)
 	// LockModpack locks a hosted modpack entry and puts it in the manifest under key, in place of
 	// the modpack already there.
 	LockModpack func(ctx context.Context, key string, entry manifest.Require) error

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -188,6 +189,11 @@ func (a *app) resolverFor(ctx context.Context, p *project.Project, mode resolve.
 	}
 	r.LockModpack = func(ctx context.Context, key string, entry manifest.Require) error {
 		return a.lockHostedEntry(ctx, p, r, key, entry)
+	}
+	if a.canPick() {
+		r.AskUnlock = func(key, minecraft string) (bool, error) {
+			return a.askYes(fmt.Sprintf("Unlock %s and resolve its mods for Minecraft %s?", key, minecraft))
+		}
 	}
 	return r, nil
 }

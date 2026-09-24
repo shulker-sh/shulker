@@ -1,0 +1,67 @@
+package resolve
+
+import (
+	"context"
+
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/pack"
+)
+
+// AddPackSource resolves one modpack source through store and puts it in the manifest under the
+// key as names, or the name the pack's own manifest carries. A source already in the manifest, or
+// a key another entry holds, is refused.
+func (r *Resolver) AddPackSource(ctx context.Context, store *pack.Store, source, as string, entry manifest.Require) error {
+	for _, existing := range r.Manifest.Modpacks() {
+		if existing.Source == source && existing.Path == entry.Path {
+			return out.Errorf("modpack-exists", "modpack %s is already in the manifest", source)
+		}
+	}
+	loaded, err := store.Resolve(ctx, source, entry)
+	if err != nil {
+		return err
+	}
+	key := as
+	if key == "" {
+		key = loaded.Manifest.Name
+	}
+	if held, taken := r.Manifest.Requires[key]; taken {
+		return manifest.KeyTaken(key, held.Kind(), manifest.TypeModpack)
+	}
+	loaded.Name = key
+	return r.addLoadedPack(ctx, store, source, key, loaded, entry)
+}
+
+// addLoadedPack adds a resolved modpack under key. One built for another Minecraft than the
+// project's is refused as modpack-mismatch, unless AskUnlock says to unlock it, which resolves it
+// again as name with its mods resolved here.
+func (r *Resolver) addLoadedPack(ctx context.Context, store *pack.Store, name, key string, loaded *pack.Loaded, entry manifest.Require) error {
+	r.Warnings = append(r.Warnings, scoped(key, loaded.Warnings)...)
+	err := r.AddPack(ctx, loaded)
+	if r.AskUnlock != nil && unlockAnswers(err, loaded, r.Lock.Minecraft) {
+		unlock, askErr := r.AskUnlock(key, r.Lock.Minecraft)
+		if askErr != nil {
+			return askErr
+		}
+		if unlock {
+			no := false
+			entry.Locked = &no
+			if loaded, err = store.Resolve(ctx, name, entry); err != nil {
+				return err
+			}
+			loaded.Name = key
+			err = r.AddPack(ctx, loaded)
+		}
+	}
+	if err != nil {
+		return err
+	}
+	r.Manifest.Requires[key] = entry
+	return nil
+}
+
+// unlockAnswers reports whether a modpack refused for its platform is the one refusal unlocking
+// answers: locked, and built for another Minecraft than the project's.
+func unlockAnswers(err error, l *pack.Loaded, minecraft string) bool {
+	return out.CodeOf(err) == "modpack-mismatch" && l.Kind != pack.Hosted && l.UsesLock && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
+}

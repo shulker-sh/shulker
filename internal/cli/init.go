@@ -269,7 +269,11 @@ func (a *app) initPack(cmd *cobra.Command, p *project.Project, source string) (f
 		return func(*out.Lines) {}, nil
 	}
 	rl, err := a.relockProject(cmd, p, relockOptions{}, func(p *project.Project, r *resolve.Resolver) (string, error) {
-		return "", a.addPackEntry(cmd.Context(), p, r, source, "", manifest.Require{Source: source})
+		store, err := a.packStore(p)
+		if err != nil {
+			return "", err
+		}
+		return "", r.AddPackSource(cmd.Context(), store, source, "", manifest.Require{Source: source})
 	})
 	if err != nil {
 		e := out.AsError(err)
