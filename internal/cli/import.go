@@ -24,7 +24,6 @@ import (
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/resolve"
-	"shulker.sh/shulker/internal/server"
 )
 
 type importResult struct {
@@ -124,7 +123,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	m, l, mods := pk.manifest, pk.lock, pk.mods
 	leftOut := []string{}
 	if f.side != "" {
-		mods.Overrides, leftOut = keepSide(m, l, mods.Overrides, f.side)
+		mods.Overrides, leftOut = resolve.KeepSide(m, l, mods.Overrides, f.side)
 	}
 	if err := writeImportIcon(dir, m, arc.Icon); err != nil {
 		return err
@@ -371,7 +370,7 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 		p.Lock = lock.New()
 	}
 	if f.side != "" {
-		_, dropped := keepSide(m, p.Lock, nil, f.side)
+		_, dropped := resolve.KeepSide(m, p.Lock, nil, f.side)
 		leftOut = append(leftOut, dropped...)
 	}
 	if err := p.SaveManifest(); err != nil {
@@ -398,59 +397,6 @@ func readImportArchive(file, typ string) (*packarchive.Archive, error) {
 		return nil, out.Errorf("usage", "%s is a %s modpack, not a %s one", file, arc.Format.Title(), want.Title())
 	}
 	return arc, nil
-}
-
-// keepSide narrows a project to one side: the other side's block, its entries and its override
-// folders, a feature's included, go, and what went is returned by key and by override path.
-func keepSide(m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Override, side string) ([]packarchive.Override, []string) {
-	other := project.OtherSide(side)
-	leftOut := []string{}
-	switch side {
-	case "client":
-		m.Server = nil
-		l.Players = []lock.Player{}
-		if m.Client == nil {
-			m.Client = &manifest.Client{}
-		}
-	case "server":
-		m.Client = nil
-		if m.Server == nil {
-			m.Server = &manifest.Server{Memory: server.DefaultMemory}
-		}
-	}
-	for key, req := range m.Requires {
-		if req.Side == other {
-			delete(m.Requires, key)
-			leftOut = append(leftOut, key)
-		}
-	}
-	for key, mod := range l.Mods {
-		if mod.Side == other {
-			delete(l.Mods, key)
-			delete(m.Requires, key)
-			leftOut = append(leftOut, key)
-		}
-	}
-	for _, kind := range manifest.PackKinds {
-		packs := l.Packs(kind)
-		for key, p := range packs {
-			if p.Side == other {
-				delete(packs, key)
-				delete(m.Requires, key)
-				leftOut = append(leftOut, key)
-			}
-		}
-	}
-	kept := overrides[:0]
-	for _, o := range overrides {
-		if project.IsSideLayer(m, other, o.Layer) {
-			leftOut = append(leftOut, o.Layer+"/"+o.Path)
-			continue
-		}
-		kept = append(kept, o)
-	}
-	slices.Sort(leftOut)
-	return kept, slices.Compact(leftOut)
 }
 
 // lockedSummary counts an import's locked files by type, naming each type's providers when the

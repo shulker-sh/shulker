@@ -189,7 +189,7 @@ func mergePack(p *project.Project, inc *incoming, sides []string) (*mergeReport,
 	pm, pl := inc.manifest, inc.lock
 	overrides := inc.overrides
 	if len(sides) == 1 {
-		overrides, rep.leftOut = keepSide(pm, pl, overrides, sides[0])
+		overrides, rep.leftOut = resolve.KeepSide(pm, pl, overrides, sides[0])
 	}
 	takePlatform(p, pm, pl)
 	projectJars := map[string]bool{}
