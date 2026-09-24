@@ -5,13 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -30,7 +27,16 @@ func (a *app) matchCmd() *cobra.Command {
 			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			files, err := a.overrideFiles(p.Dir, args)
+			var rels []string
+			if len(args) == 0 {
+				rels, err = project.ScanOverrides(p.Dir)
+			} else {
+				rels, err = a.namedOverrides(p.Dir, args)
+			}
+			if err != nil {
+				return err
+			}
+			files, err := project.MatchableOverrides(p.Dir, rels)
 			if err != nil {
 				return err
 			}
@@ -83,56 +89,6 @@ func (a *app) matchCmd() *cobra.Command {
 	return cmd
 }
 
-// matchFolders are the folders of an override layer whose files a provider can host.
-var matchFolders = append([]string{"mods", "resourcepacks", "shaderpacks"}, lock.DatapackFolders...)
-
-// overrideFiles reads the jars and pack zips in the project's override layers, or only the named
-// ones, each named by its layer and its path within it.
-func (a *app) overrideFiles(dir string, named []string) ([]packarchive.Override, error) {
-	var rels []string
-	var err error
-	if len(named) == 0 {
-		rels, err = scanOverrides(dir)
-	} else {
-		rels, err = a.namedOverrides(dir, named)
-	}
-	if err != nil {
-		return nil, err
-	}
-	files := make([]packarchive.Override, len(rels))
-	for i, rel := range rels {
-		data, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
-		if err != nil {
-			return nil, err
-		}
-		layer, within, _ := strings.Cut(rel, "/")
-		files[i] = packarchive.Override{Layer: layer, Path: within, Data: data}
-	}
-	return files, nil
-}
-
-// scanOverrides lists every matchable file in the project's override layers, relative to dir.
-func scanOverrides(dir string) ([]string, error) {
-	var rels []string
-	for _, layer := range packarchive.Layers {
-		for _, folder := range matchFolders {
-			entries, err := os.ReadDir(filepath.Join(dir, layer, folder))
-			if os.IsNotExist(err) {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			for _, e := range entries {
-				if rel := layer + "/" + folder + "/" + e.Name(); e.Type().IsRegular() && isMatchable(rel) {
-					rels = append(rels, rel)
-				}
-			}
-		}
-	}
-	return rels, nil
-}
-
 // namedOverrides checks that each named path is a matchable file in an override layer, giving it
 // relative to dir.
 func (a *app) namedOverrides(dir string, named []string) ([]string, error) {
@@ -146,7 +102,7 @@ func (a *app) namedOverrides(dir string, named []string) ([]string, error) {
 			return nil, err
 		}
 		rel, err := filepath.Rel(dir, abs)
-		if err != nil || !filepath.IsLocal(rel) || !isMatchable(filepath.ToSlash(rel)) {
+		if err != nil || !filepath.IsLocal(rel) || !project.IsMatchable(filepath.ToSlash(rel)) {
 			e := out.Errorf("override-path", "%s isn't a jar in mods/ or a zip in resourcepacks/, shaderpacks/ or a datapack folder of an override folder", arg)
 			e.Help = "match looks up files in overrides/, client-overrides/ and server-overrides/"
 			return nil, e
@@ -159,9 +115,4 @@ func (a *app) namedOverrides(dir string, named []string) ([]string, error) {
 		}
 	}
 	return rels, nil
-}
-
-func isMatchable(rel string) bool {
-	layer, within, _ := strings.Cut(rel, "/")
-	return slices.Contains(packarchive.Layers, layer) && (packarchive.IsModJar(within) || packarchive.IsPackZip(within))
 }
