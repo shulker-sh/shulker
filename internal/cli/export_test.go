@@ -20,7 +20,7 @@ type mrpackIndex struct {
 	Game          string            `json:"game"`
 	VersionID     string            `json:"versionId"`
 	Name          string            `json:"name"`
-	Summary       string            `json:"summary"`
+	Summary       string            `json:"summary,omitempty"`
 	Files         []mrpackIndexFile `json:"files"`
 	Dependencies  map[string]string `json:"dependencies"`
 }

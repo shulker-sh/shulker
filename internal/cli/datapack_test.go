@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/resolve"
 )
 
@@ -215,13 +214,13 @@ func TestExportCurseForgeBundlesADatapackOutsideDatapacks(t *testing.T) {
 func TestImportMrpackLocksDatapacks(t *testing.T) {
 	h := newHarness(t)
 	terralith, autoslabs := h.jars["terralith"], h.jars["autoslabs"]
-	file := func(rel string, jar fakeJar) mrpack.File {
-		return mrpack.File{Path: rel, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	file := func(rel string, jar fakeJar) mrpackIndexFile {
+		return mrpackIndexFile{Path: rel, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
 	}
 	unknown := makeJarFiles(t, "inmis", "inmis_recipe_fix.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/inmis/recipe/fix.json": "{}"})
-	index := mrpack.Index{
+	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "40", Name: "Better",
-		Files: []mrpack.File{
+		Files: []mrpackIndexFile{
 			file("resourcepacks/Terralith.zip", terralith),
 			file("datapacks/Terralith.zip", terralith),
 			file("resourcepacks/AutoslabsCompat.zip", autoslabs),
@@ -443,10 +442,10 @@ func TestImportMrpackKeepsAHybridDatapackAsBoth(t *testing.T) {
 	h := newHarness(t)
 	autoslabs := h.jars["autoslabs"]
 	unknown := makeJarFiles(t, "tweaks", "Tweaks.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/tweaks/tags/x.json": "{}", "assets/tweaks/lang/en_us.json": "{}"})
-	index := mrpack.Index{
+	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "40", Name: "Better",
-		Files: []mrpack.File{{
-			Path: "resourcepacks/AutoslabsCompat.zip", Hashes: map[string]string{"sha1": autoslabs.sha1, "sha512": autoslabs.sha512}, Env: mrpack.Env("both"),
+		Files: []mrpackIndexFile{{
+			Path: "resourcepacks/AutoslabsCompat.zip", Hashes: map[string]string{"sha1": autoslabs.sha1, "sha512": autoslabs.sha512}, Env: mrpackEnv("both"),
 			Downloads: []string{h.server.URL + "/cdn/" + autoslabs.filename}, FileSize: int64(len(autoslabs.data)),
 		}},
 		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},

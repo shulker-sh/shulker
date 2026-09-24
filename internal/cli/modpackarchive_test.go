@@ -11,7 +11,6 @@ import (
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fsutil"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -21,12 +20,12 @@ import (
 func archivePack(t *testing.T, h *harness, rel, note string) fakeJar {
 	t.Helper()
 	extra := makeJar(t, "extra", "extra-1.0.jar", "*")
-	file := func(jar fakeJar, side string) mrpack.File {
-		return mrpack.File{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env(side), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	file := func(jar fakeJar, side string) mrpackIndexFile {
+		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv(side), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
 	}
-	index := mrpack.Index{
+	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "2.0", Name: "Someone's Pack",
-		Files:        []mrpack.File{file(h.jars["sodium"], "client"), file(h.jars["fabric-api"], "both"), file(extra, "server")},
+		Files:        []mrpackIndexFile{file(h.jars["sodium"], "client"), file(h.jars["fabric-api"], "both"), file(extra, "server")},
 		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
 	}
 	path := filepath.Join(h.dir, filepath.FromSlash(rel))

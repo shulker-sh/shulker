@@ -5,13 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"shulker.sh/shulker/internal/cfpack"
 )
 
 // curseForgeArchive writes a CurseForge zip at rel in h's project naming files, with a config and
 // a jar in its overrides folder. note varies the bytes.
-func curseForgeArchive(t *testing.T, h *harness, rel, note string, files ...cfpack.File) {
+func curseForgeArchive(t *testing.T, h *harness, rel, note string, files ...cfPackFile) {
 	t.Helper()
 	path := filepath.Join(h.dir, filepath.FromSlash(rel))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -31,7 +29,7 @@ func curseForgeModpack(t *testing.T, h *harness) {
 	})
 }
 
-var craftFiles = []cfpack.File{
+var craftFiles = []cfPackFile{
 	{ProjectID: 238222, FileID: 5000001, Required: true},
 	{ProjectID: 306612, FileID: 5000010, Required: true},
 	{ProjectID: 600000, FileID: 5300001, Required: true},
@@ -76,7 +74,7 @@ func TestCurseForgeArchiveModpackLocksAndBuilds(t *testing.T) {
 
 func TestCurseForgeArchiveModpackManualDownload(t *testing.T) {
 	h := archiveProject(t)
-	curseForgeArchive(t, h, "packs/craft.zip", "v1", cfpack.File{ProjectID: 238222, FileID: 5000001, Required: true}, cfpack.File{ProjectID: 300000, FileID: 5100001, Required: true})
+	curseForgeArchive(t, h, "packs/craft.zip", "v1", cfPackFile{ProjectID: 238222, FileID: 5000001, Required: true}, cfPackFile{ProjectID: 300000, FileID: 5100001, Required: true})
 	curseForgeModpack(t, h)
 	code, stdout, _ := h.run(t, "--json", "lock")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "missing-files" || len(e.Items) != 1 || !strings.Contains(e.Items[0], "nodist-1.0.0.jar") {

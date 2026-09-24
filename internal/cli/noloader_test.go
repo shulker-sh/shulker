@@ -10,7 +10,6 @@ import (
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -175,9 +174,9 @@ func TestLinkWithoutALoader(t *testing.T) {
 func TestImportMrpackWithoutALoader(t *testing.T) {
 	h := newHarness(t)
 	archive := filepath.Join(t.TempDir(), "vanilla.mrpack")
-	writeMrpack(t, archive, mrpack.Index{
+	writeMrpack(t, archive, mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Vanilla",
-		Files:        []mrpack.File{},
+		Files:        []mrpackIndexFile{},
 		Dependencies: map[string]string{"minecraft": "26.2"},
 	}, map[string][]byte{"overrides/options.txt": []byte("fov:0.5\n")})
 	dir := filepath.Join(t.TempDir(), "vanilla")

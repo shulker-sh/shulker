@@ -7,11 +7,38 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"shulker.sh/shulker/internal/cfpack"
 )
 
-func writeCurseForgeZip(t *testing.T, path string, m cfpack.Manifest, entries map[string][]byte) {
+// cfManifest is a CurseForge pack's manifest.json, as the format writes it.
+type cfManifest struct {
+	Minecraft       cfMinecraft  `json:"minecraft"`
+	ManifestType    string       `json:"manifestType"`
+	ManifestVersion int          `json:"manifestVersion"`
+	Name            string       `json:"name"`
+	Version         string       `json:"version"`
+	Author          string       `json:"author,omitempty"`
+	Files           []cfPackFile `json:"files"`
+	Overrides       string       `json:"overrides"`
+	Image           string       `json:"image,omitempty"`
+}
+
+type cfMinecraft struct {
+	Version    string        `json:"version"`
+	ModLoaders []cfModLoader `json:"modLoaders"`
+}
+
+type cfModLoader struct {
+	ID      string `json:"id"`
+	Primary bool   `json:"primary"`
+}
+
+type cfPackFile struct {
+	ProjectID int  `json:"projectID"`
+	FileID    int  `json:"fileID"`
+	Required  bool `json:"required"`
+}
+
+func writeCurseForgeZip(t *testing.T, path string, m cfManifest, entries map[string][]byte) {
 	t.Helper()
 	f, err := os.Create(path)
 	if err != nil {
@@ -23,7 +50,7 @@ func writeCurseForgeZip(t *testing.T, path string, m cfpack.Manifest, entries ma
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries[cfpack.ManifestName] = data
+	entries["manifest.json"] = data
 	for name, content := range entries {
 		w, err := zw.Create(name)
 		if err != nil {
@@ -36,10 +63,10 @@ func writeCurseForgeZip(t *testing.T, path string, m cfpack.Manifest, entries ma
 	}
 }
 
-func importedCurseForgePack(files ...cfpack.File) cfpack.Manifest {
-	return cfpack.Manifest{
-		Minecraft:    cfpack.Minecraft{Version: "26.2", ModLoaders: []cfpack.ModLoader{{ID: "fabric-0.17.3", Primary: true}}},
-		ManifestType: cfpack.ManifestType, ManifestVersion: cfpack.ManifestVersion,
+func importedCurseForgePack(files ...cfPackFile) cfManifest {
+	return cfManifest{
+		Minecraft:    cfMinecraft{Version: "26.2", ModLoaders: []cfModLoader{{ID: "fabric-0.17.3", Primary: true}}},
+		ManifestType: "minecraftModpack", ManifestVersion: 1,
 		Name: "Craft Pack", Version: "3.1", Author: "someone", Files: files, Overrides: "extras",
 	}
 }
@@ -48,10 +75,10 @@ func TestImportCurseForge(t *testing.T) {
 	h := newHarness(t)
 	archive := filepath.Join(t.TempDir(), "craft.zip")
 	writeCurseForgeZip(t, archive, importedCurseForgePack(
-		cfpack.File{ProjectID: 238222, FileID: 5000001, Required: true},
-		cfpack.File{ProjectID: 306612, FileID: 5000010, Required: true},
-		cfpack.File{ProjectID: 600000, FileID: 5300001, Required: true},
-		cfpack.File{ProjectID: 394468, FileID: 5000020, Required: false},
+		cfPackFile{ProjectID: 238222, FileID: 5000001, Required: true},
+		cfPackFile{ProjectID: 306612, FileID: 5000010, Required: true},
+		cfPackFile{ProjectID: 600000, FileID: 5300001, Required: true},
+		cfPackFile{ProjectID: 394468, FileID: 5000020, Required: false},
 	), map[string][]byte{
 		"extras/config/jei.toml":  []byte("jei = true\n"),
 		"extras/mods/bundled.jar": []byte("not really a jar"),
@@ -124,9 +151,9 @@ func TestImportCurseForgeManualDownload(t *testing.T) {
 	h := newHarness(t)
 	archive := filepath.Join(t.TempDir(), "craft.zip")
 	writeCurseForgeZip(t, archive, importedCurseForgePack(
-		cfpack.File{ProjectID: 238222, FileID: 5000001, Required: true},
-		cfpack.File{ProjectID: 300000, FileID: 5100001, Required: true},
-		cfpack.File{ProjectID: 400000, FileID: 5200001, Required: true},
+		cfPackFile{ProjectID: 238222, FileID: 5000001, Required: true},
+		cfPackFile{ProjectID: 300000, FileID: 5100001, Required: true},
+		cfPackFile{ProjectID: 400000, FileID: 5200001, Required: true},
 	), map[string][]byte{})
 	parent := t.TempDir()
 	h.dir = parent

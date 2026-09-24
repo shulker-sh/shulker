@@ -12,7 +12,6 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -30,7 +29,19 @@ func readProject(t *testing.T, dir string) (*manifest.Manifest, *lock.Lock) {
 	return m, l
 }
 
-func writeMrpack(t *testing.T, path string, index mrpack.Index, entries map[string][]byte) {
+// mrpackEnv is the index env for a file needed on side, as the Modrinth format writes it.
+func mrpackEnv(side string) map[string]string {
+	env := map[string]string{"client": "required", "server": "required"}
+	switch side {
+	case "client":
+		env["server"] = "unsupported"
+	case "server":
+		env["client"] = "unsupported"
+	}
+	return env
+}
+
+func writeMrpack(t *testing.T, path string, index mrpackIndex, entries map[string][]byte) {
 	t.Helper()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
@@ -38,7 +49,7 @@ func writeMrpack(t *testing.T, path string, index mrpack.Index, entries map[stri
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := zw.Create(mrpack.IndexName)
+	w, err := zw.Create("modrinth.index.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,14 +69,14 @@ func writeMrpack(t *testing.T, path string, index mrpack.Index, entries map[stri
 	}
 }
 
-func rewriteMrpack(t *testing.T, src, dst string, edit func(index *mrpack.Index, entries map[string][]byte)) {
+func rewriteMrpack(t *testing.T, src, dst string, edit func(index *mrpackIndex, entries map[string][]byte)) {
 	t.Helper()
 	zr, err := zip.OpenReader(src)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer zr.Close()
-	var index mrpack.Index
+	var index mrpackIndex
 	entries := map[string][]byte{}
 	for _, f := range zr.File {
 		r, err := f.Open()
@@ -75,7 +86,7 @@ func rewriteMrpack(t *testing.T, src, dst string, edit func(index *mrpack.Index,
 		var b bytes.Buffer
 		b.ReadFrom(r)
 		r.Close()
-		if f.Name == mrpack.IndexName {
+		if f.Name == "modrinth.index.json" {
 			if err := json.Unmarshal(b.Bytes(), &index); err != nil {
 				t.Fatal(err)
 			}
@@ -206,7 +217,7 @@ func TestImportMrpackTamperedMarker(t *testing.T) {
 	h.mustRun(t, "export", "mrpack", "--version", "1.0.0")
 	archive := filepath.Join(h.dir, "build", "pack-1.0.0.mrpack")
 	tampered := filepath.Join(t.TempDir(), "tampered.mrpack")
-	rewriteMrpack(t, archive, tampered, func(index *mrpack.Index, entries map[string][]byte) {
+	rewriteMrpack(t, archive, tampered, func(index *mrpackIndex, entries map[string][]byte) {
 		files := index.Files[:0]
 		for _, f := range index.Files {
 			if f.Path == "mods/"+h.jars["sodium"].filename {
@@ -246,12 +257,12 @@ func TestImportMrpackForeign(t *testing.T) {
 	extra := makeJar(t, "extra", "extra-1.0.jar", "*")
 	h.jars["extra"] = extra
 	sodium, fabricAPI := h.jars["sodium"], h.jars["fabric-api"]
-	file := func(jar fakeJar, side string) mrpack.File {
-		return mrpack.File{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env(side), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	file := func(jar fakeJar, side string) mrpackIndexFile {
+		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv(side), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
 	}
-	index := mrpack.Index{
+	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "2.0", Name: "Someone's Pack", Summary: "hello",
-		Files:        []mrpack.File{file(sodium, "client"), file(fabricAPI, "both"), file(extra, "server")},
+		Files:        []mrpackIndexFile{file(sodium, "client"), file(fabricAPI, "both"), file(extra, "server")},
 		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
 	}
 	archive := filepath.Join(t.TempDir(), "foreign.mrpack")
@@ -308,12 +319,12 @@ func TestImportMrpackForeign(t *testing.T) {
 func TestImportMrpackLocksHostedPacks(t *testing.T) {
 	h := newHarness(t)
 	fresh, complementary, sodium := h.jars["fresh-animations"], h.jars["complementary"], h.jars["sodium"]
-	file := func(dir string, jar fakeJar, name string) mrpack.File {
-		return mrpack.File{Path: dir + "/" + name, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env("client"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	file := func(dir string, jar fakeJar, name string) mrpackIndexFile {
+		return mrpackIndexFile{Path: dir + "/" + name, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("client"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
 	}
-	index := mrpack.Index{
+	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Packs",
-		Files: []mrpack.File{
+		Files: []mrpackIndexFile{
 			file("resourcepacks", fresh, "Fresh Animations.zip"),
 			file("shaderpacks", complementary, complementary.filename),
 			file("resourcepacks", sodium, "sodium-datapack.zip"),
@@ -366,12 +377,12 @@ func TestImportMrpackLocksHostedPacks(t *testing.T) {
 func TestImportMrpackMatchesCurseForge(t *testing.T) {
 	h := newHarness(t)
 	jei, nodist, iris := h.jars["jei"], h.jars["nodist"], h.jars["irisshaders"]
-	file := func(jar fakeJar) mrpack.File {
-		return mrpack.File{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	file := func(jar fakeJar) mrpackIndexFile {
+		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
 	}
-	index := mrpack.Index{
+	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Mixed",
-		Files:        []mrpack.File{file(jei), file(nodist), file(h.jars["sodium"])},
+		Files:        []mrpackIndexFile{file(jei), file(nodist), file(h.jars["sodium"])},
 		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
 	}
 	archive := filepath.Join(t.TempDir(), "mixed.mrpack")
@@ -442,9 +453,9 @@ func TestImportMrpackKeepsAnIndexFileModrinthFailsToServe(t *testing.T) {
 	h.cdnDown = map[string]bool{"/cdn/" + sodium.filename: true}
 	importWith := func(t *testing.T, downloads ...string) (int, string, string) {
 		t.Helper()
-		index := mrpack.Index{
+		index := mrpackIndex{
 			FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Mirrored",
-			Files:        []mrpack.File{{Path: "mods/" + sodium.filename, Hashes: map[string]string{"sha1": sodium.sha1, "sha512": sodium.sha512}, Env: mrpack.Env("client"), Downloads: downloads, FileSize: int64(len(sodium.data))}},
+			Files:        []mrpackIndexFile{{Path: "mods/" + sodium.filename, Hashes: map[string]string{"sha1": sodium.sha1, "sha512": sodium.sha512}, Env: mrpackEnv("client"), Downloads: downloads, FileSize: int64(len(sodium.data))}},
 			Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
 		}
 		archive := filepath.Join(t.TempDir(), "mirrored.mrpack")
@@ -485,16 +496,16 @@ func TestImportMrpackTakesAModsSideFromThePackOnlyWhereItAddsABuiltSide(t *testi
 	h.cfMods[800000] = &cfMod{id: 800000, slug: "config-manager", files: []cfFile{{id: 5600001, jar: h.jars["config-manager"], date: "2026-09-01T00:00:00Z", channel: 1}}}
 	h.jars["server-tweaks"] = makeJar(t, "server_tweaks", "server_tweaks-1.0.0.jar", "server")
 	h.cfMods[800001] = &cfMod{id: 800001, slug: "server-tweaks", files: []cfFile{{id: 5600002, jar: h.jars["server-tweaks"], date: "2026-09-01T00:00:00Z", channel: 1}}}
-	file := func(jar fakeJar, env map[string]string) mrpack.File {
-		return mrpack.File{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: env, Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	file := func(jar fakeJar, env map[string]string) mrpackIndexFile {
+		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: env, Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
 	}
-	index := mrpack.Index{
+	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Singleplayer",
-		Files: []mrpack.File{
-			file(h.jars["config-manager"], mrpack.Env("both")),
-			file(h.jars["server-tweaks"], mrpack.Env("client")),
-			file(h.jars["sodium"], mrpack.Env("both")),
-			file(h.jars["jei"], mrpack.Env("client")),
+		Files: []mrpackIndexFile{
+			file(h.jars["config-manager"], mrpackEnv("both")),
+			file(h.jars["server-tweaks"], mrpackEnv("client")),
+			file(h.jars["sodium"], mrpackEnv("both")),
+			file(h.jars["jei"], mrpackEnv("client")),
 			file(h.jars["fabric-api"], nil),
 		},
 		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
@@ -533,7 +544,7 @@ func TestImportMrpackTakesAModsSideFromThePackOnlyWhereItAddsABuiltSide(t *testi
 func TestImportMrpackRecordsAnOverrideLayersSideQuietly(t *testing.T) {
 	h := newHarness(t)
 	iris := h.jars["irisshaders"]
-	index := mrpack.Index{FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Server", Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"}}
+	index := mrpackIndex{FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Server", Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"}}
 	archive := filepath.Join(t.TempDir(), "server.mrpack")
 	writeMrpack(t, archive, index, map[string][]byte{"server-overrides/mods/" + iris.filename: iris.data})
 	dir := filepath.Join(t.TempDir(), "server")
@@ -557,7 +568,7 @@ func TestImportMrpackRecordsAnOverrideLayersSideQuietly(t *testing.T) {
 func writeEmptyMrpack(t *testing.T) string {
 	t.Helper()
 	archive := filepath.Join(t.TempDir(), "empty.mrpack")
-	writeMrpack(t, archive, mrpack.Index{FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Empty Pack", Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"}}, nil)
+	writeMrpack(t, archive, mrpackIndex{FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Empty Pack", Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"}}, nil)
 	return archive
 }
 
@@ -612,7 +623,7 @@ func TestImportTypeRefusesAMismatch(t *testing.T) {
 func TestImportSideNarrowsANewProject(t *testing.T) {
 	h := newHarness(t)
 	archive := filepath.Join(t.TempDir(), "sided.mrpack")
-	writeMrpack(t, archive, mrpack.Index{FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Sided", Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"}}, map[string][]byte{
+	writeMrpack(t, archive, mrpackIndex{FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Sided", Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"}}, map[string][]byte{
 		"overrides/config/both.txt":          []byte("both"),
 		"server-overrides/config/server.txt": []byte("server"),
 		"client-overrides/config/client.txt": []byte("client"),

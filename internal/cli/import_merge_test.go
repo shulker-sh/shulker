@@ -11,7 +11,6 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mrpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
@@ -20,12 +19,12 @@ import (
 // with entries as its override files.
 func writeMergePack(t *testing.T, h *harness, loaderKey, loaderVersion string, jars []fakeJar, entries map[string][]byte) string {
 	t.Helper()
-	var files []mrpack.File
+	var files []mrpackIndexFile
 	for _, jar := range jars {
-		files = append(files, mrpack.File{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpack.Env("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))})
+		files = append(files, mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))})
 	}
 	path := filepath.Join(t.TempDir(), "merged.mrpack")
-	writeMrpack(t, path, mrpack.Index{FormatVersion: 1, Game: "minecraft", VersionID: "3.0", Name: "Merged", Files: files, Dependencies: map[string]string{"minecraft": "26.2", loaderKey: loaderVersion}}, entries)
+	writeMrpack(t, path, mrpackIndex{FormatVersion: 1, Game: "minecraft", VersionID: "3.0", Name: "Merged", Files: files, Dependencies: map[string]string{"minecraft": "26.2", loaderKey: loaderVersion}}, entries)
 	return path
 }
 
