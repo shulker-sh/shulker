@@ -209,7 +209,7 @@ func newHarness(t *testing.T, providers ...*host) *harness {
 		Fetch:     fetch.New("test"),
 		Log:       func(format string, args ...any) { h.log = append(h.log, fmt.Sprintf(format, args...)) },
 	}
-	h.r.Lock.Minecraft = "26.2"
+	h.r.Lock.Minecraft, h.r.Lock.DataVersion = "26.2", 4600
 	h.r.Lock.Loader = lock.Loader{Type: "fabric", Version: "0.17.3"}
 	for _, p := range providers {
 		h.r.Providers[p.Name()] = p
@@ -226,6 +226,17 @@ func (h *harness) mustAdd(slug string, opts AddOptions) {
 	h.t.Helper()
 	if err := h.add(slug, opts); err != nil {
 		h.t.Fatalf("add %s: %v", slug, err)
+	}
+}
+
+func (h *harness) reconcile() ([]string, error) {
+	return h.r.Reconcile(context.Background())
+}
+
+func (h *harness) mustReconcile() {
+	h.t.Helper()
+	if _, err := h.reconcile(); err != nil {
+		h.t.Fatalf("reconcile: %v", err)
 	}
 }
 
