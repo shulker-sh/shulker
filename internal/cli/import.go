@@ -361,31 +361,11 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 	if f.name != "" {
 		m.Name = f.name
 	}
-	paths := project.OwnPaths(m)
-	leftOut := []string{}
-	if f.side != "" {
-		other := otherSide(f.side)
-		paths = slices.DeleteFunc(paths, func(p string) bool {
-			if !project.IsSideLayer(m, other, p) {
-				return false
-			}
-			if _, err := os.Stat(filepath.Join(c.Dir, filepath.FromSlash(p))); err == nil {
-				leftOut = append(leftOut, p)
-			}
-			return true
-		})
-	}
-	created, err := project.CopyOwnFiles(c.Dir, dir, paths)
-	undo := func() {
-		for _, path := range slices.Backward(created) {
-			os.RemoveAll(path)
-		}
-	}
+	_, leftOut, undo, err := project.CopySource(c.Dir, dir, m, f.side)
 	if err != nil {
 		undo()
 		return err
 	}
-	created = append(created, filepath.Join(dir, manifest.FileName))
 	p := &project.Project{Dir: dir, Manifest: m, Lock: src.Lock}
 	if p.Lock == nil {
 		p.Lock = lock.New()
@@ -407,13 +387,6 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *
 	return a.emitImport(res, out.Row{Text: fmt.Sprintf("%s copied from %s", plural(len(m.Requires), "entry", "entries"), c.Source)})
 }
 
-func otherSide(side string) string {
-	if side == "server" {
-		return "client"
-	}
-	return "server"
-}
-
 // readImportArchive reads a modpack archive by its content, refusing one that isn't the format
 // typ names when it names one.
 func readImportArchive(file, typ string) (*packarchive.Archive, error) {
@@ -430,7 +403,7 @@ func readImportArchive(file, typ string) (*packarchive.Archive, error) {
 // keepSide narrows a project to one side: the other side's block, its entries and its override
 // folders, a feature's included, go, and what went is returned by key and by override path.
 func keepSide(m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Override, side string) ([]packarchive.Override, []string) {
-	other := otherSide(side)
+	other := project.OtherSide(side)
 	leftOut := []string{}
 	switch side {
 	case "client":

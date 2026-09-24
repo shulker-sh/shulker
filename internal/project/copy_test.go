@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -41,5 +42,51 @@ func TestCopyOwnFilesSkipsMissingAndKeepsTheTargets(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(filepath.Join(dir, "overrides", "config", "a.toml")); string(data) != "theirs" {
 		t.Fatalf("override = %q", data)
+	}
+}
+
+func TestCopySourceLeavesOutTheOtherSidesFolders(t *testing.T) {
+	src, dir := t.TempDir(), t.TempDir()
+	for _, layer := range []string{"overrides", "client-overrides", "server-overrides", "admin-server-overrides"} {
+		os.MkdirAll(filepath.Join(src, layer), 0o755)
+		os.WriteFile(filepath.Join(src, layer, "a.txt"), []byte(layer), 0o644)
+	}
+	created, leftOut, _, err := CopySource(src, dir, featureManifest(), "client")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"admin-server-overrides", "server-overrides"}; !slices.Equal(leftOut, want) {
+		t.Fatalf("leftOut = %v, want %v", leftOut, want)
+	}
+	if want := []string{filepath.Join(dir, "client-overrides"), filepath.Join(dir, "overrides")}; !slices.Equal(created, want) {
+		t.Fatalf("created = %v, want %v", created, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "server-overrides")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("server-overrides should not have been copied")
+	}
+}
+
+func TestCopySourceUndoRemovesWhatAFailedCopyMade(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root reads unreadable files")
+	}
+	src, dir := t.TempDir(), t.TempDir()
+	os.WriteFile(filepath.Join(src, ".gitignore"), []byte("/build/\n"), 0o644)
+	os.MkdirAll(filepath.Join(src, "overrides"), 0o755)
+	unreadable := filepath.Join(src, "overrides", "secret.txt")
+	os.WriteFile(unreadable, []byte("x"), 0o000)
+	t.Cleanup(func() { os.Chmod(unreadable, 0o644) })
+	created, _, undo, err := CopySource(src, dir, &manifest.Manifest{}, "")
+	if err == nil {
+		t.Fatal("the copy should fail on the unreadable file")
+	}
+	if want := []string{filepath.Join(dir, ".gitignore"), filepath.Join(dir, "overrides")}; !slices.Equal(created, want) {
+		t.Fatalf("created = %v, want %v", created, want)
+	}
+	os.WriteFile(filepath.Join(dir, manifest.FileName), []byte("{}"), 0o644)
+	undo()
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 0 {
+		t.Fatalf("undo left %v", entries)
 	}
 }

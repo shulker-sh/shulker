@@ -51,3 +51,40 @@ func CopyOwnFiles(src, dir string, paths []string) ([]string, error) {
 	}
 	return created, nil
 }
+
+// CopySource lays a new project at dir out of the shulker source at srcDir: the paths that are m's
+// own, less the other side's override folders when side names one. It returns what it created,
+// the folders it left out for side, and an undo that removes what it created, the manifest the
+// caller writes next included, for a later step that fails.
+func CopySource(srcDir, dir string, m *manifest.Manifest, side string) (created, leftOut []string, undo func(), err error) {
+	paths := OwnPaths(m)
+	leftOut = []string{}
+	if side != "" {
+		other := OtherSide(side)
+		paths = slices.DeleteFunc(paths, func(p string) bool {
+			if !IsSideLayer(m, other, p) {
+				return false
+			}
+			if _, err := os.Stat(filepath.Join(srcDir, filepath.FromSlash(p))); err == nil {
+				leftOut = append(leftOut, p)
+			}
+			return true
+		})
+	}
+	created, err = CopyOwnFiles(srcDir, dir, paths)
+	undo = func() {
+		os.Remove(filepath.Join(dir, manifest.FileName))
+		for _, path := range slices.Backward(created) {
+			os.RemoveAll(path)
+		}
+	}
+	return created, leftOut, undo, err
+}
+
+// OtherSide is the side that isn't side.
+func OtherSide(side string) string {
+	if side == "server" {
+		return "client"
+	}
+	return "server"
+}
