@@ -1,8 +1,11 @@
 package resolve
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/lock"
 )
 
@@ -150,4 +153,30 @@ func nonNil(s []string) []string {
 		return []string{}
 	}
 	return append([]string{}, s...)
+}
+
+// Unshipped is the warning for each mod added on a side the project does not declare, and
+// unconditioned, so no side of the project ships it. A required mod, a pack or one that a
+// condition already keeps off a side gets none.
+func (c *Changes) Unshipped(sides []string, mods map[string]lock.Mod, placements map[string]build.Placement) []string {
+	var warnings []string
+	for _, m := range c.Added {
+		if _, isMod := mods[m.ID]; !isMod || len(m.RequiredBy) > 0 || len(sides) == 0 || IsSideDeclared(sides, m.Side) {
+			continue
+		}
+		if place := placements[m.ID]; len(place.OS) > 0 || len(place.Feature) > 0 {
+			continue
+		}
+		warnings = append(warnings, fmt.Sprintf("%s is %s only, so no side of this project ships it; shulker set requires.%s.side both ships it anyway", m.ID, m.Side, m.ID))
+	}
+	return warnings
+}
+
+// IsSideDeclared reports whether a mod's side is one the project declares; a mod on both is
+// declared whenever the project has any side.
+func IsSideDeclared(sides []string, side string) bool {
+	if side == "" || side == "both" {
+		return len(sides) > 0
+	}
+	return slices.Contains(sides, side)
 }

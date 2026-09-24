@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -270,7 +268,7 @@ func (a *app) relockProject(cmd *cobra.Command, p *project.Project, opts relockO
 	}
 	a.warn(r.Warnings)
 	a.warn(v.Warnings)
-	a.warn(unshippedWarnings(rl.Changes, p.Manifest.Sides(), r.Lock.Mods, placements))
+	a.warn(rl.Changes.Unshipped(p.Manifest.Sides(), r.Lock.Mods, placements))
 	if opts.keepUnchanged && !stale {
 		now, err := json.Marshal(p.Lock)
 		if err != nil {
@@ -421,7 +419,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 			it.Aside = append(it.Aside, text)
 		}
 		if text := conditionText("feature", place.Feature); text != "" {
-			if len(place.Sides) == 0 && isSideDeclared(sides, m.Side) {
+			if len(place.Sides) == 0 && resolve.IsSideDeclared(sides, m.Side) {
 				text += ", off on every side"
 			}
 			it.Aside = append(it.Aside, text)
@@ -466,27 +464,6 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 		}
 	}
 	l.Items(items...)
-}
-
-func unshippedWarnings(c *resolve.Changes, sides []string, mods map[string]lock.Mod, placements map[string]build.Placement) []string {
-	var warnings []string
-	for _, m := range c.Added {
-		if _, isMod := mods[m.ID]; !isMod || len(m.RequiredBy) > 0 || len(sides) == 0 || isSideDeclared(sides, m.Side) {
-			continue
-		}
-		if place := placements[m.ID]; len(place.OS) > 0 || len(place.Feature) > 0 {
-			continue
-		}
-		warnings = append(warnings, fmt.Sprintf("%s is %s only, so no side of this project ships it; shulker set requires.%s.side both ships it anyway", m.ID, m.Side, m.ID))
-	}
-	return warnings
-}
-
-func isSideDeclared(sides []string, side string) bool {
-	if side == "" || side == "both" {
-		return len(sides) > 0
-	}
-	return slices.Contains(sides, side)
 }
 
 // conditionText reads a condition list back as the manifest means it: any of
