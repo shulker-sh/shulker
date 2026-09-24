@@ -238,10 +238,6 @@ func newHarness(t *testing.T) *harness {
 		h.hit(&h.storeHits)
 		w.Write(h.brigadier.data)
 	})
-	mux.HandleFunc("/fmaven/net/fabricmc/fabric-loader/0.17.3/fabric-loader-0.17.3.jar", func(w http.ResponseWriter, r *http.Request) {
-		h.hit(&h.storeHits)
-		w.Write(h.fabricLoader.data)
-	})
 	mux.HandleFunc("/resources/", func(w http.ResponseWriter, r *http.Request) {
 		h.hit(&h.storeHits)
 		for _, body := range h.assets {
@@ -259,83 +255,12 @@ func newHarness(t *testing.T) *harness {
 		"META-INF/MANIFEST.MF":           "Manifest-Version: 1.0\r\nMain-Class: org.quiltmc.loader.impl.launch.server.QuiltServerLauncher\r\nClass-Path: libraries/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17\r\n .3.jar libraries/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.ja\r\n r\r\n\r\n",
 		"quilt-server-launch.properties": "launch.mainClass=org.quiltmc.loader.impl.launch.knot.KnotServer\n",
 	})
-	mavenFiles := map[string][]byte{
-		"/piston-data/server.jar": h.vanilla.data,
-		"/qmaven/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar":  h.quiltLoader.data,
-		"/fmaven/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar": h.mixin.data,
-	}
-	for path, data := range mavenFiles {
-		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-			if !h.noRanges && (r.Method == http.MethodHead || r.Header.Get("Range") != "") {
-				http.ServeContent(w, r, filepath.Base(path), time.Time{}, bytes.NewReader(data))
-				return
-			}
-			w.Write(data)
-		})
-	}
-	mux.HandleFunc("/quilt/versions/loader/26.2/0.30.1", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"loader": map[string]any{"maven": "org.quiltmc:quilt-loader:0.30.1", "hashes": map[string]string{"sha512": h.quiltLoader.sha512}}})
-	})
-	mux.HandleFunc("/quilt/versions/loader/26.2/0.30.1/server/json", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{
-			"id": "quilt-loader-0.30.1-26.2", "mainClass": "org.quiltmc.loader.impl.launch.knot.KnotServer",
-			"launcherMainClass": "org.quiltmc.loader.impl.launch.server.QuiltServerLauncher",
-			"libraries": []map[string]string{
-				{"name": "net.fabricmc:sponge-mixin:0.17.3", "url": base + "/fmaven/"},
-				{"name": "org.quiltmc:quilt-loader:0.30.1", "url": base + "/qmaven/"},
-			},
-		})
-	})
-	mux.HandleFunc("/quilt/versions/loader/26.2/0.30.1/profile/json", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{
-			"id": "quilt-loader-0.30.1-26.2", "inheritsFrom": "26.2", "type": "release",
-			"mainClass": "org.quiltmc.loader.impl.launch.knot.KnotClient",
-			"libraries": []map[string]any{{"name": "org.quiltmc:quilt-loader:0.30.1", "url": base + "/qmaven/"}},
-		})
-	})
-	mux.HandleFunc("/fabric/versions/loader/26.2", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, []map[string]any{
-			{"loader": map[string]any{"version": "0.18.0-beta.1", "stable": false}},
-			{"loader": map[string]any{"version": "0.17.3", "stable": true}},
-			{"loader": map[string]any{"version": "0.17.2", "stable": true}},
-		})
-	})
-	mux.HandleFunc("/quilt/versions/loader/26.2", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, []map[string]any{
-			{"loader": map[string]any{"version": "0.20.0-beta.9"}},
-			{"loader": map[string]any{"version": "0.30.1"}},
-			{"loader": map[string]any{"version": "0.31.0-beta.4"}},
-			{"loader": map[string]any{"version": "0.30.0"}},
-		})
-	})
-	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/profile/json", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{
-			"id": "fabric-loader-0.17.3-26.2", "inheritsFrom": "26.2", "type": "release",
-			"mainClass": "net.fabricmc.loader.impl.launch.knot.KnotClient",
-			"libraries": []map[string]any{{"name": "net.fabricmc:fabric-loader:0.17.3", "url": base + "/fmaven/"}},
-		})
-	})
-	mux.HandleFunc("/fabric/versions/installer", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, []map[string]any{
-			{"version": "1.2.0-beta.1", "stable": false},
-			{"version": "1.1.2", "stable": true},
-		})
-	})
-	mux.HandleFunc("/neoforge/api/maven/versions/releases/net/neoforged/neoforge", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, map[string]any{"isSnapshot": false, "versions": []string{"26.1.2.40", "26.2.0.56-beta", "26.2.0.87"}})
-	})
-	mux.HandleFunc("/neoforge/releases/net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-installer.jar", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(h.neoInstaller.data)
-	})
-	mux.HandleFunc("/forge/net/minecraftforge/forge/maven-metadata.xml", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/xml")
-		io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><metadata><versioning><versions>`+
-			`<version>26.1-64.0.12</version><version>26.2-65.0.9</version><version>26.2-65.1.3</version>`+
-			`<version>26.2-65.1.4-1.26.x</version>`+
-			`</versions></versioning></metadata>`)
-	})
-	mux.HandleFunc("/forge/net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-installer.jar", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(h.forgeInstaller.data)
+	mux.HandleFunc("/piston-data/server.jar", func(w http.ResponseWriter, r *http.Request) {
+		if !h.noRanges && (r.Method == http.MethodHead || r.Header.Get("Range") != "") {
+			http.ServeContent(w, r, "server.jar", time.Time{}, bytes.NewReader(h.vanilla.data))
+			return
+		}
+		w.Write(h.vanilla.data)
 	})
 	h.neoLibs = map[string]fakeJar{
 		"net/neoforged/neoforge/26.2.0.87/neoforge-26.2.0.87-universal.jar": makeJarFile(t, "neoforge", "neoforge-26.2.0.87-universal.jar", "META-INF/neoforge.mods.toml", "[[mods]]\nmodId=\"neoforge\"\n"),
@@ -344,22 +269,7 @@ func newHarness(t *testing.T) *harness {
 	h.forgeLibs = map[string]fakeJar{
 		"net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar": makeJarFile(t, "forge", "forge-26.2-65.1.3-universal.jar", "META-INF/mods.toml", "[[mods]]\nmodId=\"forge\"\n"),
 	}
-	mux.HandleFunc("/neomaven/", func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/neomaven/")
-		jar, ok := h.neoLibs[path]
-		if !ok {
-			jar, ok = h.forgeLibs[path]
-		}
-		if !ok {
-			http.NotFound(w, r)
-			return
-		}
-		w.Write(jar.data)
-	})
 	h.serverJar = makeJar(t, "fabric-server-launch", "fabric-server-launch.jar", "server")
-	mux.HandleFunc("/fabric/versions/loader/26.2/0.17.3/1.1.2/server/jar", func(w http.ResponseWriter, r *http.Request) {
-		w.Write(h.serverJar.data)
-	})
 	projects := map[string]map[string]any{
 		"sodium":                   {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},
 		"AANobbMI":                 {"id": "AANobbMI", "slug": "sodium", "title": "Sodium", "client_side": "required", "server_side": "unsupported"},
@@ -858,13 +768,6 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	f := fetch.New("test")
 	piston := mojang.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"
-	loaderURLs := map[string]string{
-		loader.FabricMetaURL:    h.server.URL + "/fabric",
-		loader.QuiltMetaURL:     h.server.URL + "/quilt",
-		loader.QuiltMavenURL:    h.server.URL + "/qmaven",
-		loader.NeoForgeMavenURL: h.server.URL + "/neoforge",
-		loader.ForgeMavenURL:    h.server.URL + "/forge",
-	}
 	mr := modrinth.New(f)
 	mr.BaseURL = h.server.URL + "/modrinth"
 	runtimes := mojang.NewRuntimes(f)
@@ -880,7 +783,7 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	cf.BaseURL = h.server.URL + "/curseforge"
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	c := &cache.Cache{Dir: h.cache}
-	loaders := &loader.Remote{Fetch: f, Cache: c, URLs: loaderURLs, Log: a.progress, RunInstaller: a.installer}
+	loaders := &loader.Remote{Fetch: f, Cache: c, Log: a.progress, RunInstaller: a.installer}
 	a.d = &deps{
 		fetch:     f,
 		cache:     c,
