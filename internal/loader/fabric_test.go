@@ -2,32 +2,55 @@ package loader
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/out"
 )
 
+// fakeFile is a download a fake route serves, counting the times it was fetched.
+type fakeFile struct {
+	data []byte
+	hits int
+}
+
+func (f *fakeFile) sha512() string {
+	sum := sha512.Sum512(f.data)
+	return hex.EncodeToString(sum[:])
+}
+
+// fakeRemote serves routes at base: a string as is, a *fakeFile counted, a func given the server's
+// URL for a body that names it, and anything else as JSON. The remote gets a cache of its own.
 func fakeRemote(t *testing.T, base string, routes map[string]any) *Remote {
 	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, ok := routes[r.URL.Path]
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
+		if lazy, ok := body.(func(base string) any); ok {
+			body = lazy(srv.URL)
+		}
 		switch body := body.(type) {
 		case string:
 			w.Write([]byte(body))
+		case *fakeFile:
+			body.hits++
+			w.Write(body.data)
 		default:
 			json.NewEncoder(w).Encode(body)
 		}
 	}))
 	t.Cleanup(srv.Close)
-	return &Remote{Fetch: fetch.New("test"), URLs: map[string]string{base: srv.URL}}
+	return &Remote{Fetch: fetch.New("test"), Cache: &cache.Cache{Dir: t.TempDir()}, URLs: map[string]string{base: srv.URL}}
 }
 
 func TestFabricVersionsKeepTheStableFlag(t *testing.T) {

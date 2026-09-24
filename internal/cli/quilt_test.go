@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"archive/zip"
-	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,16 +23,10 @@ func TestQuiltServer(t *testing.T) {
 	if l.Loader.Type != "quilt" || l.Loader.Version != "0.30.1" || l.Loader.Provides["fabricloader"] != "0.19.5" {
 		t.Fatalf("lock loader: %+v", l.Loader)
 	}
-	s := l.Loader.Server
-	base := h.server.URL
-	wantLibs := map[string]lock.Download{
-		"org.quiltmc:quilt-loader:0.30.1":  {URL: base + "/cdn/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar", Sha512: h.quiltLoader.sha512},
-		"net.fabricmc:sponge-mixin:0.17.3": {URL: base + "/cdn/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar", Sha512: h.mixin.sha512},
-	}
-	if s == nil || s.Installer != "" || s.Sha512 != h.quiltLaunch.sha512 || !maps.Equal(s.Libraries, wantLibs) {
+	if s := l.Loader.Server; s == nil || s.Sha512 != h.quiltLaunch.sha512 || len(s.Libraries) != 2 {
 		t.Fatalf("lock loader server: %+v", s)
 	}
-	if l.Server == nil || *l.Server != (lock.Download{URL: base + "/piston-data/server.jar", Sha512: h.vanilla.sha512}) {
+	if l.Server == nil || *l.Server != (lock.Download{URL: h.server.URL + "/piston-data/server.jar", Sha512: h.vanilla.sha512}) {
 		t.Fatalf("lock server: %+v", l.Server)
 	}
 
@@ -43,40 +34,17 @@ func TestQuiltServer(t *testing.T) {
 	if got := readFile(t, filepath.Join(buildDir, "server.jar")); got != string(h.vanilla.data) {
 		t.Fatal("server.jar is not the vanilla jar")
 	}
-	for _, rel := range []string{"libraries/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar", "libraries/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar", "mods/fabric-api-0.130.0+26.2.jar"} {
+	for _, rel := range []string{"quilt-server-launch.jar", "libraries/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar", "libraries/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar", "mods/fabric-api-0.130.0+26.2.jar"} {
 		if _, err := os.Stat(filepath.Join(buildDir, filepath.FromSlash(rel))); err != nil {
 			t.Fatal(err)
 		}
 	}
-	entries := zipEntries(t, filepath.Join(buildDir, "quilt-server-launch.jar"))
-	manifest := strings.ReplaceAll(entries["META-INF/MANIFEST.MF"], "\r\n ", "")
-	want := "Main-Class: org.quiltmc.loader.impl.launch.server.QuiltServerLauncher\r\n" +
-		"Class-Path: libraries/net/fabricmc/sponge-mixin/0.17.3/sponge-mixin-0.17.3.jar libraries/org/quiltmc/quilt-loader/0.30.1/quilt-loader-0.30.1.jar\r\n"
-	if !strings.Contains(manifest, want) {
-		t.Fatalf("manifest:\n%s", entries["META-INF/MANIFEST.MF"])
-	}
-	for _, line := range strings.Split(entries["META-INF/MANIFEST.MF"], "\r\n") {
-		if len(line) > 72 {
-			t.Fatalf("manifest line over 72 bytes: %q", line)
-		}
-	}
-	if entries["quilt-server-launch.properties"] != "launch.mainClass=org.quiltmc.loader.impl.launch.knot.KnotServer\n" {
-		t.Fatalf("launch properties: %q", entries["quilt-server-launch.properties"])
-	}
 
-	hits := h.cdnHits
-	h.mustRun(t, "install")
-	if h.cdnHits != hits {
-		t.Fatalf("second install downloaded %d more files", h.cdnHits-hits)
-	}
-
-	if err := os.RemoveAll(h.cache); err != nil {
-		t.Fatal(err)
-	}
-	lockBefore := readFile(t, filepath.Join(h.dir, "shulker.lock"))
-	h.mustRun(t, "install")
-	if got := readFile(t, filepath.Join(h.dir, "shulker.lock")); got != lockBefore {
-		t.Fatalf("a fresh cache changed the lock:\n%s", got)
+	h.stdin = strings.NewReader("stop\n")
+	h.mustRun(t, "serve")
+	args := readFile(t, filepath.Join(buildDir, "args.txt"))
+	if !strings.HasSuffix(args, "\n-jar\nquilt-server-launch.jar\n--nogui\n") {
+		t.Fatalf("serve args:\n%s", args)
 	}
 }
 
@@ -94,27 +62,4 @@ func TestQuiltLinkMojang(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(launcherDir, "versions", "quilt-loader-0.30.1-26.2", "quilt-loader-0.30.1-26.2.json")); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func zipEntries(t *testing.T, path string) map[string]string {
-	t.Helper()
-	zr, err := zip.OpenReader(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer zr.Close()
-	entries := map[string]string{}
-	for _, f := range zr.File {
-		rc, err := f.Open()
-		if err != nil {
-			t.Fatal(err)
-		}
-		data, err := io.ReadAll(rc)
-		rc.Close()
-		if err != nil {
-			t.Fatal(err)
-		}
-		entries[f.Name] = string(data)
-	}
-	return entries
 }
