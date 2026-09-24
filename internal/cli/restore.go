@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -74,7 +73,7 @@ func (a *app) restore(target savesTarget, req restoreRequest) (restoreResult, er
 		return restoreResult{}, err
 	}
 	defer archive.Close()
-	worlds, err := restoreScope(archive, target, req.only, req.as)
+	worlds, err := saves.RestoreScope(archive, target.World, req.only, req.as)
 	if err != nil {
 		return restoreResult{}, err
 	}
@@ -131,43 +130,6 @@ func (res restoreResult) print(l *out.Lines) {
 		items = append(items, item)
 	}
 	l.Items(items...)
-}
-
-// restoreScope is the worlds a restore takes from archive: those only names, else all it holds. A
-// server takes only its level-name world, or with as, the one world renamed to it.
-func restoreScope(archive *saves.Archive, target savesTarget, only []string, as string) ([]string, error) {
-	worlds := archive.Worlds
-	if len(only) > 0 {
-		worlds = distinct(only)
-		for _, w := range worlds {
-			if !slices.Contains(archive.Worlds, w) {
-				return nil, out.Errorf("world-not-found", "%s holds no world %s", archive.Path, w)
-			}
-		}
-	}
-	switch {
-	case as != "":
-		if len(worlds) != 1 {
-			e := out.Errorf("usage", "--as renames one world, and this restore takes %d: %s", len(worlds), strings.Join(worlds, ", "))
-			e.Help = "pick one with --world"
-			return nil, e
-		}
-		if target.World != "" && as != target.World {
-			return nil, out.Errorf("usage", "this server loads %s, its level-name, so --as must name %s, not %s", target.World, target.World, as)
-		}
-	case target.World != "" && !slices.Contains(worlds, target.World):
-		if len(only) > 0 {
-			e := out.Errorf("world-not-found", "this server loads only %s, its level-name, which --world leaves out", target.World)
-			e.Help = fmt.Sprintf("--as %s restores another world under that name", target.World)
-			return nil, e
-		}
-		e := out.Errorf("world-not-found", "%s holds no world %s, the level-name this server loads", archive.Path, target.World)
-		e.Help = fmt.Sprintf("--as %s restores another world under that name", target.World)
-		return nil, e
-	case target.World != "":
-		worlds = []string{target.World}
-	}
-	return worlds, nil
 }
 
 // pickBackup is the backup restore puts back: the one --backup names, else the nth of target's,

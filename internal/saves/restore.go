@@ -3,6 +3,7 @@ package saves
 import (
 	"archive/zip"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -91,6 +92,44 @@ func (a *Archive) Restore(dir string, worlds []string, each func(world string)) 
 		restored = append(restored, r)
 	}
 	return restored, nil
+}
+
+// RestoreScope is the worlds a restore takes from the archive: those only names, else all it holds.
+// A server, whose level names the one world it loads, takes only that one, or with as, the one
+// world renamed to it.
+func RestoreScope(archive *Archive, level string, only []string, as string) ([]string, error) {
+	worlds := archive.Worlds
+	if len(only) > 0 {
+		worlds = distinct(only)
+		for _, w := range worlds {
+			if !slices.Contains(archive.Worlds, w) {
+				return nil, out.Errorf("world-not-found", "%s holds no world %s", archive.Path, w)
+			}
+		}
+	}
+	switch {
+	case as != "":
+		if len(worlds) != 1 {
+			e := out.Errorf("usage", "--as renames one world, and this restore takes %d: %s", len(worlds), strings.Join(worlds, ", "))
+			e.Help = "pick one with --world"
+			return nil, e
+		}
+		if level != "" && as != level {
+			return nil, out.Errorf("usage", "this server loads %s, its level-name, so --as must name %s, not %s", level, level, as)
+		}
+	case level != "" && !slices.Contains(worlds, level):
+		if len(only) > 0 {
+			e := out.Errorf("world-not-found", "this server loads only %s, its level-name, which --world leaves out", level)
+			e.Help = fmt.Sprintf("--as %s restores another world under that name", level)
+			return nil, e
+		}
+		e := out.Errorf("world-not-found", "%s holds no world %s, the level-name this server loads", archive.Path, level)
+		e.Help = fmt.Sprintf("--as %s restores another world under that name", level)
+		return nil, e
+	case level != "":
+		worlds = []string{level}
+	}
+	return worlds, nil
 }
 
 // RestoreAs puts world from the zip into dir under name, as Restore does.

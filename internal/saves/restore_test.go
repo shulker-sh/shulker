@@ -119,3 +119,38 @@ func TestOpenArchiveRefusesWhatIsNotWorlds(t *testing.T) {
 		t.Errorf("not a zip: %v", err)
 	}
 }
+
+func TestRestoreScopeNarrowsToNamedWorldsAndAServersLevel(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "b.zip")
+	zipOf(t, path, []string{"survival/level.dat", "creative/level.dat"}, "")
+	a, err := OpenArchive(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+
+	if got, err := RestoreScope(a, "", nil, ""); err != nil || len(got) != 2 {
+		t.Fatalf("no narrowing takes every world: %q %v", got, err)
+	}
+	if got, err := RestoreScope(a, "", []string{"survival", "survival"}, ""); err != nil || len(got) != 1 || got[0] != "survival" {
+		t.Fatalf("--world narrows and is distinct: %q %v", got, err)
+	}
+	if _, err := RestoreScope(a, "", []string{"other"}, ""); out.CodeOf(err) != "world-not-found" {
+		t.Fatalf("a world the zip lacks is world-not-found, got %v", err)
+	}
+	if _, err := RestoreScope(a, "", nil, "mine"); out.CodeOf(err) != "usage" {
+		t.Fatalf("--as needs exactly one world, got %v", err)
+	}
+	if got, err := RestoreScope(a, "survival", nil, ""); err != nil || len(got) != 1 || got[0] != "survival" {
+		t.Fatalf("a server takes only its level: %q %v", got, err)
+	}
+	if _, err := RestoreScope(a, "world", nil, ""); out.CodeOf(err) != "world-not-found" {
+		t.Fatalf("a zip without the level is world-not-found, got %v", err)
+	}
+	if _, err := RestoreScope(a, "world", []string{"creative"}, "other"); out.CodeOf(err) != "usage" {
+		t.Fatalf("--as on a server must name the level, got %v", err)
+	}
+	if got, err := RestoreScope(a, "world", []string{"creative"}, "world"); err != nil || len(got) != 1 || got[0] != "creative" {
+		t.Fatalf("--as the level restores another world under it: %q %v", got, err)
+	}
+}
