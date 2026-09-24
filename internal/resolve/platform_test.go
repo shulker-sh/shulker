@@ -28,6 +28,8 @@ func versions(ids ...string) []loader.Version {
 func TestLoaderVersionRanges(t *testing.T) {
 	quilt := loader.Fake{Name: "quilt", Versions: versions("0.20.0-beta.9", "0.30.1", "0.31.0-beta.4", "0.30.0")}.Row()
 	neoforge := loader.Fake{Name: "neoforge", Versions: versions("26.2.0.0-beta", "26.2.0.56-beta", "26.2.0.57", "26.2.0.87")}.Row()
+	// Forge's maven lists branch builds like 26.2-65.1.4-1.26.x as stable; they are skipped as unparseable.
+	forge := loader.Fake{Name: "forge", Versions: append(versions("65.0.9", "65.1.3"), loader.Version{Version: "65.1.4-1.26.x", Stable: true})}.Row()
 	cases := []struct {
 		row       loader.Loader
 		rng, want string
@@ -44,6 +46,7 @@ func TestLoaderVersionRanges(t *testing.T) {
 		{neoforge, ">=26.2.0.0-beta", "26.2.0.87"},
 		{neoforge, "26.2.0.56-beta", "26.2.0.56-beta"},
 		{neoforge, "~26.2.0 <26.2.0.57", ""},
+		{forge, "*", "65.1.3"},
 	}
 	mt := &Meta{}
 	for _, c := range cases {

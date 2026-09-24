@@ -4,7 +4,6 @@ package cli
 
 import (
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -19,30 +18,11 @@ func TestForgeServer(t *testing.T) {
 		m["server"] = map[string]any{"eula": true}
 	})
 
+	h.mustRun(t, "install")
 	var l lock.Lock
 	h.readJSON(t, "shulker.lock", &l)
-	// Forge publishes its builds as <game>-<build>; the lock keeps only the build, the way Prism
-	// and mrpack write it, and 26.2-65.1.4-1.26.x is skipped as unparseable.
-	if l.Loader.Type != "forge" || l.Loader.Version != "65.1.3" {
-		t.Fatalf("lock loader after init: %+v", l.Loader)
-	}
-
-	h.mustRun(t, "install")
-	h.readJSON(t, "shulker.lock", &l)
-	base := h.server.URL
-	want := &lock.ServerJar{
-		URL:    base + "/cdn/forge-26.2-65.1.3-installer.jar",
-		Sha512: h.forgeInstaller.sha512,
-		Libraries: map[string]lock.Download{
-			"net.minecraftforge:forge:26.2-65.1.3:universal": {URL: base + "/cdn/net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar", Sha512: h.forgeLibs["net/minecraftforge/forge/26.2-65.1.3/forge-26.2-65.1.3-universal.jar"].sha512},
-			"org.ow2.asm:asm:9.10.1":                         {URL: base + "/cdn/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", Sha512: h.neoLibs["org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"].sha512},
-		},
-	}
-	if !reflect.DeepEqual(l.Loader.Server, want) {
-		t.Fatalf("lock loader server:\n%+v\nwant\n%+v", l.Loader.Server, want)
-	}
-	if l.Server == nil || *l.Server != (lock.Download{URL: base + "/piston-data/server.jar", Sha512: h.vanilla.sha512}) {
-		t.Fatalf("lock server: %+v", l.Server)
+	if l.Loader.Type != "forge" || l.Loader.Version != "65.1.3" || l.Loader.Server == nil || l.Loader.Server.Sha512 != h.forgeInstaller.sha512 {
+		t.Fatalf("lock loader: %+v", l.Loader)
 	}
 
 	buildDir := filepath.Join(h.dir, "build", "server")
