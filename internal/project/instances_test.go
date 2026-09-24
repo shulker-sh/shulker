@@ -83,3 +83,29 @@ func TestRepairIntentWritesADefaultsOnlyFileForAnInPlaceProjectAndKeepsAnUnreada
 		t.Fatalf("a readable file is left alone: %+v, %v", rep, err)
 	}
 }
+
+func TestDetachedBuildNeedsASourcedInstanceFileAndNoManifest(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "My Pack")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := DetachedBuild(dir); ok {
+		t.Fatal("an empty directory is no detached build")
+	}
+	f := instance.New()
+	f.Source = "https://example.com/pack.git"
+	f.Side = "client"
+	if err := f.Save(dir); err != nil {
+		t.Fatal(err)
+	}
+	e, ok := DetachedBuild(dir)
+	if !ok || !e.Detached || e.ID != "my-pack" || e.Name != "My Pack" || e.Source != f.Source || e.Side != "client" || e.Status != StatusNotSynced {
+		t.Fatalf("entry = %+v, %v", e, ok)
+	}
+	if err := os.WriteFile(filepath.Join(dir, manifest.FileName), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := DetachedBuild(dir); ok {
+		t.Fatal("a directory with a manifest is a project, not a detached build")
+	}
+}

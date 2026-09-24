@@ -11,9 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
@@ -211,28 +209,14 @@ func (a *app) selectOrDetached(query string, s instanceSelection) ([]project.Ins
 	if code := out.AsError(err).Code; code != "instance-not-found" && code != "no-instances" {
 		return nil, err
 	}
-	if e, ok := detachedBuild(query); ok && s.admits(e) {
+	dir, absErr := filepath.Abs(query)
+	if absErr != nil {
+		return nil, err
+	}
+	if e, ok := project.DetachedBuild(dir); ok && s.admits(e) {
 		return []project.InstanceEntry{e}, nil
 	}
 	return nil, err
-}
-
-func detachedBuild(query string) (project.InstanceEntry, bool) {
-	dir, err := filepath.Abs(query)
-	if err != nil {
-		return project.InstanceEntry{}, false
-	}
-	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
-		return project.InstanceEntry{}, false
-	}
-	f, err := instance.Load(dir)
-	if err != nil || f.Source == "" || f.IsUnlinked {
-		return project.InstanceEntry{}, false
-	}
-	e := project.Inspect(config.Instance{Name: filepath.Base(dir), Dir: dir})
-	e.ID = config.SlugID(e.Name)
-	e.Detached = true
-	return e, true
 }
 
 func launcherArg(arg string) string {

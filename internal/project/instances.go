@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -186,4 +187,21 @@ func RepairIntent(in config.Instance) (Repaired, error) {
 		rep.Unreadable = loadErr
 	}
 	return rep, err
+}
+
+// DetachedBuild is the directory as an entry when it holds a detached build: a sourced instance
+// file, no manifest of its own and no registry row. Its id is slugged from the folder, since no
+// row gave it one.
+func DetachedBuild(dir string) (InstanceEntry, bool) {
+	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
+		return InstanceEntry{}, false
+	}
+	f, err := instance.Load(dir)
+	if err != nil || f.Source == "" || f.IsUnlinked {
+		return InstanceEntry{}, false
+	}
+	e := Inspect(config.Instance{Name: filepath.Base(dir), Dir: dir})
+	e.ID = config.SlugID(e.Name)
+	e.Detached = true
+	return e, true
 }
