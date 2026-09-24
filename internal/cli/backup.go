@@ -128,12 +128,10 @@ func (s savesTarget) home() saves.Home {
 	return saves.Home{Dir: s.backups, IsShared: s.Group != ""}
 }
 
-// autoBackup is the backup a build takes of dir's worlds before it changes the mod set, then trims
-// that target's automatic backups to play.saveBackups. Only a zip that can't be written stops the
-// build: a target with no worlds backs up as nothing, and one whose worlds can't be found, or
-// whose trim fails, is a warning. A target is backed up once a run, so a build retried after
-// failing part way through its mods doesn't copy the same worlds again.
-func (a *app) autoBackup(reason, dir string) func() error {
+// beforeModChange is what a build runs before it changes dir's mod set: the automatic backup of
+// its worlds, found through the saves target the directory belongs to and kept to
+// play.saveBackups. A target that can't be found is a warning, not a failed build.
+func (a *app) beforeModChange(reason, dir string) func() error {
 	if reason == "" {
 		return nil
 	}
@@ -149,36 +147,18 @@ func (a *app) autoBackup(reason, dir string) func() error {
 		if err != nil {
 			return skip(err)
 		}
-		key := savesTarget{WorldsDir: target.WorldsDir, World: target.World}
-		if a.backedUp[key] {
-			return nil
-		}
-		worlds, err := saves.Worlds(target.WorldsDir)
-		if err != nil {
-			return skip(err)
-		}
-		if len(worlds) == 0 {
-			return nil
-		}
 		keep, err := a.saveBackups()
 		if err != nil {
 			a.printer.Warn("couldn't read play.saveBackups, keeping %d automatic backups: %v", keep, err)
 		}
-		if keep == 0 {
-			return nil
-		}
-		taken, err := saves.Take(a.backupSource(target), target.home(), reason, a.zipping("backing up"))
-		if err != nil || taken.Path == "" {
-			return err
-		}
 		if a.backedUp == nil {
-			a.backedUp = map[savesTarget]bool{}
+			a.backedUp = map[saves.Home]bool{}
 		}
-		a.backedUp[key] = true
-		if err := saves.TrimAutomatic(target.backups, keep); err != nil {
-			a.printer.Warn("couldn't trim the automatic backups in %s: %v", target.backups, err)
+		_, warning, err := saves.Auto(a.backupSource(target), target.home(), reason, keep, a.backedUp, a.zipping("backing up"))
+		if warning != "" {
+			a.printer.Warn("%s", warning)
 		}
-		return nil
+		return err
 	}
 }
 

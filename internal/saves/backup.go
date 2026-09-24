@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"math"
@@ -121,6 +122,36 @@ func Take(src Source, home Home, reason string, each func(world string, open boo
 		return Backup{}, err
 	}
 	return Backup{ID: id, Path: path, Taken: at, Reason: reason, Instance: src.Instance, Size: info.Size(), Worlds: len(worlds), Names: worlds, Minecraft: src.Minecraft, Loader: src.Loader, LoaderVersion: src.LoaderVersion, seq: seq}, nil
+}
+
+// Auto is the backup a build takes of src's worlds before it changes the mod set, then trims
+// home's automatic backups to keep. A home is backed up once a run, which taken records when it is
+// given, so a build retried after failing part way through its mods doesn't copy the same worlds again; a
+// home already taken, worlds that hold nothing, or keep at 0 back up as nothing. Only a zip that
+// can't be written is an error: worlds that can't be listed, or a trim that fails, come back as
+// the warning to print, since the build can go on without them.
+func Auto(src Source, home Home, reason string, keep int, taken map[Home]bool, each func(world string, open bool)) (Backup, string, error) {
+	if taken[home] {
+		return Backup{}, "", nil
+	}
+	worlds, err := Worlds(src.Dir)
+	if err != nil {
+		return Backup{}, fmt.Sprintf("couldn't back up the worlds in %s before the mods changed: %v", src.Dir, err), nil
+	}
+	if len(worlds) == 0 || keep == 0 {
+		return Backup{}, "", nil
+	}
+	b, err := Take(src, home, reason, each)
+	if err != nil || b.Path == "" {
+		return Backup{}, "", err
+	}
+	if taken != nil {
+		taken[home] = true
+	}
+	if err := TrimAutomatic(home.Dir, keep); err != nil {
+		return b, fmt.Sprintf("couldn't trim the automatic backups in %s: %v", home.Dir, err), nil
+	}
+	return b, "", nil
 }
 
 // nextSeq is the collision counter for a backup taken at at: 1 when none in dir shares its second,

@@ -18,6 +18,7 @@ import (
 	"shulker.sh/shulker/internal/auditlog"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/saves"
 	"shulker.sh/shulker/internal/selfupdate"
 	"shulker.sh/shulker/internal/server"
 )
@@ -43,7 +44,7 @@ type app struct {
 	installer  func(ctx context.Context, java, jar string, args []string) error
 	watcher    func(req watchRequest) (int, error)
 	isRunning  bool
-	backedUp   map[savesTarget]bool
+	backedUp   map[saves.Home]bool
 	log        *auditlog.Log
 	logState   logState
 	failFast   bool

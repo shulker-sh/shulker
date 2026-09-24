@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -93,22 +92,6 @@ func TestUpdateBacksUpUnderThePlatformTheWorldsWerePlayedOn(t *testing.T) {
 	}
 	if got := build.LoadState(h.dir); got.Minecraft != "26.2" || got.Loader != "fabric" || got.LoaderVersion != "0.17.3" {
 		t.Fatalf("the build records what it installed: %+v", got)
-	}
-}
-
-func TestAutomaticBackupRunsOncePerTargetPerRun(t *testing.T) {
-	h := newInPlace(t)
-	h.mustRun(t, "install")
-	addWorld(t, filepath.Join(h.dir, "saves"), "mine")
-	var stdout, stderr bytes.Buffer
-	backup := h.newApp(&stdout, &stderr).autoBackup("sync", h.dir)
-	for range 2 {
-		if err := backup(); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if got := backupReasons(t, filepath.Join(h.dir, instance.Dir, "backups")); len(got) != 1 {
-		t.Fatalf("one backup per target per run: %v", got)
 	}
 }
 

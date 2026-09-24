@@ -393,3 +393,54 @@ func TestTakeZipsAnOpenWorldAndSaysSo(t *testing.T) {
 		t.Fatalf("entries = %v", names)
 	}
 }
+
+func TestAutoBacksUpOncePerHomePerRun(t *testing.T) {
+	src, home := t.TempDir(), Home{Dir: filepath.Join(t.TempDir(), "backups")}
+	world(t, src, "mine")
+	taken := map[Home]bool{}
+	for range 2 {
+		if _, warning, err := Auto(Source{Dir: src}, home, "sync", 5, taken, nil); err != nil || warning != "" {
+			t.Fatalf("auto: %q %v", warning, err)
+		}
+	}
+	backups, err := Backups(home.Dir)
+	if err != nil || len(backups) != 1 || backups[0].Reason != "sync" {
+		t.Fatalf("one backup per home per run: %+v %v", backups, err)
+	}
+	if _, _, err := Auto(Source{Dir: src}, home, "update", 0, map[Home]bool{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Auto(Source{Dir: t.TempDir()}, home, "update", 5, map[Home]bool{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if backups, _ := Backups(home.Dir); len(backups) != 1 {
+		t.Fatalf("keep 0 and no worlds back up as nothing: %+v", backups)
+	}
+}
+
+func TestAutoTrimsTheAutomaticBackupsItKeeps(t *testing.T) {
+	src, home := t.TempDir(), Home{Dir: filepath.Join(t.TempDir(), "backups")}
+	world(t, src, "mine")
+	if err := os.MkdirAll(home.Dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"20260910-000000-backup.zip", "20260911-000000-sync.zip", "20260912-000000-update.zip"} {
+		if err := os.WriteFile(filepath.Join(home.Dir, name), []byte("zip"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, warning, err := Auto(Source{Dir: src}, home, "sync", 2, map[Home]bool{}, nil); err != nil || warning != "" {
+		t.Fatalf("auto: %q %v", warning, err)
+	}
+	backups, err := Backups(home.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reasons := []string{}
+	for _, b := range backups {
+		reasons = append(reasons, b.Reason)
+	}
+	if want := []string{"sync", "update", "backup"}; !slices.Equal(reasons, want) {
+		t.Fatalf("the oldest automatic backup goes and the asked-for one stays: %v", reasons)
+	}
+}
