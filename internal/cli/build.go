@@ -9,6 +9,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
+	"shulker.sh/shulker/internal/project"
 )
 
 func (a *app) buildCmd() *cobra.Command {
@@ -46,7 +47,7 @@ func (a *app) buildCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sides, err := projectSides(p, args)
+			sides, err := project.Sides(p.Manifest, firstArg(args))
 			if err != nil {
 				return err
 			}

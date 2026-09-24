@@ -63,7 +63,7 @@ func (a *app) serveCmd() *cobra.Command {
 				return err
 			}
 			if !p.Manifest.HasSide("server") {
-				return noSide("server")
+				return project.NoSide("server")
 			}
 			var in io.Reader = a.stdin
 			if in == nil {

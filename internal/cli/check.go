@@ -43,7 +43,7 @@ func (a *app) checkCmd() *cobra.Command {
 			}
 			if slices.Contains(scopes, "server") && !p.Manifest.HasSide("server") {
 				if !all {
-					return noSide("server")
+					return project.NoSide("server")
 				}
 				scopes = slices.DeleteFunc(scopes, func(s string) bool { return s == "server" })
 			}

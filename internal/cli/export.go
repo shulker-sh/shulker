@@ -171,9 +171,12 @@ func (a *app) exportFormatCmd(f packarchive.Format) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			job, err := a.openExport(cmd.Context(), args, &flags, f, func(m *manifest.Manifest) ([]string, error) {
 				if f.Sided() {
-					return a.exportSides(m, flags.side, flags.assumeClient)
+					sides, assumed, err := project.ExportSides(m, flags.side, flags.assumeClient)
+					a.warnAssumedClient(assumed)
+					return sides, err
 				}
-				side, err := a.clientSide(m, flags.assumeClient)
+				side, assumed, err := project.ClientSide(m, flags.assumeClient)
+				a.warnAssumedClient(assumed)
 				return []string{side}, err
 			})
 			if err != nil {

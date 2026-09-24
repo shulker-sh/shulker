@@ -212,10 +212,11 @@ func (a *app) openSource(ctx context.Context, from string, at pack.At) (*syncSou
 
 func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res syncResult, err error) {
 	p := src.project
-	side, err := a.syncSide(p, req.side, req.assumeClient)
+	side, assumed, err := project.SyncSide(p.Manifest, req.side, req.assumeClient)
 	if err != nil {
 		return syncResult{}, err
 	}
+	a.warnAssumedClient(assumed)
 	remote := src.isRemote()
 	into := req.into
 	if into == "" && remote {

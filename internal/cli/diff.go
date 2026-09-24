@@ -43,13 +43,13 @@ func (a *app) diffCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			sides, err := projectSides(p, args)
+			sides, err := project.Sides(p.Manifest, firstArg(args))
 			if err != nil {
 				return err
 			}
 			if into != "" {
 				if len(sides) != 1 {
-					return ambiguousSide(sides, "")
+					return project.AmbiguousSide(sides, "")
 				}
 				if into, err = filepath.Abs(into); err != nil {
 					return err
@@ -124,7 +124,7 @@ func (a *app) pullCmd() *cobra.Command {
 			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			side, err := singleSide(p, side)
+			side, err := project.SingleSide(p.Manifest, side)
 			if err != nil {
 				return err
 			}
