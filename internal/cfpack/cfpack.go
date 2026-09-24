@@ -8,6 +8,7 @@ import (
 	"io"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 
 	"shulker.sh/shulker/internal/loader"
@@ -18,6 +19,8 @@ import (
 )
 
 const (
+	// Provider is the provider whose ids a pack's files name.
+	Provider        = "curseforge"
 	ManifestName    = "manifest.json"
 	ManifestType    = "minecraftModpack"
 	ManifestVersion = 1
@@ -55,6 +58,47 @@ type File struct {
 	IsLocked  bool `json:"isLocked"`
 }
 
+// FileFor is the required file entry for Provider's project and version ids, which the format
+// writes as integers; ok is false for ids that aren't.
+func FileFor(project, version string) (File, bool) {
+	p, err := strconv.Atoi(project)
+	f, err2 := strconv.Atoi(version)
+	if err != nil || err2 != nil {
+		return File{}, false
+	}
+	return File{ProjectID: p, FileID: f, Required: true}, true
+}
+
+// IDs are the file's project and version ids as Provider names them.
+func (f File) IDs() (project, version string) {
+	return strconv.Itoa(f.ProjectID), strconv.Itoa(f.FileID)
+}
+
+// ModLoaderID is the loader id a pack manifest names for a loader version. NeoForge's 1.20.1
+// builds kept Forge's numbering, and CurseForge tells them apart by the game version in the id.
+func ModLoaderID(loaderName, minecraft, version string) string {
+	if loaderName == "neoforge" && minecraft == "1.20.1" {
+		return loaderName + "-1.20.1-" + version
+	}
+	return loaderName + "-" + version
+}
+
+// ParseModLoaderID reads a loader name and version from a pack manifest's loader id, the inverse
+// of ModLoaderID.
+func ParseModLoaderID(id string) (string, string, bool) {
+	name, version, ok := strings.Cut(id, "-")
+	if !ok || version == "" {
+		return "", "", false
+	}
+	if _, known := loader.Lookup(name); !known {
+		return "", "", false
+	}
+	if name == "neoforge" {
+		version = strings.TrimPrefix(version, "1.20.1-")
+	}
+	return name, version, true
+}
+
 type Archive struct {
 	Manifest Manifest
 	// Overrides are the files under the folder the manifest names, all in OverridesLayer, less the
@@ -80,7 +124,7 @@ func (a *Archive) Loader() (string, string, error) {
 			break
 		}
 	}
-	name, version, ok := loader.ParseCurseForgeModLoader(id)
+	name, version, ok := ParseModLoaderID(id)
 	if !ok {
 		return "", "", out.Errorf("unsupported-loader", "shulker doesn't support the pack's loader %s", id)
 	}

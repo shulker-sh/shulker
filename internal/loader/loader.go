@@ -84,31 +84,6 @@ func (l Loader) ArtifactVersion(minecraft, version string) string {
 	return version
 }
 
-// CurseForgeModLoader is the loader id a CurseForge modpack manifest names. NeoForge's 1.20.1 builds
-// kept Forge's numbering, and CurseForge tells them apart by the game version in the id.
-func (l Loader) CurseForgeModLoader(minecraft, version string) string {
-	if l.Name == "neoforge" && minecraft == "1.20.1" {
-		return l.Name + "-1.20.1-" + version
-	}
-	return l.Name + "-" + version
-}
-
-// ParseCurseForgeModLoader reads a loader id from a CurseForge modpack manifest, the inverse of
-// CurseForgeModLoader.
-func ParseCurseForgeModLoader(id string) (string, string, bool) {
-	name, version, ok := strings.Cut(id, "-")
-	if !ok || version == "" {
-		return "", "", false
-	}
-	if _, known := Lookup(name); !known {
-		return "", "", false
-	}
-	if name == "neoforge" {
-		version = strings.TrimPrefix(version, "1.20.1-")
-	}
-	return name, version, true
-}
-
 var All = []Loader{
 	{Name: "fabric", Title: "Fabric", DependencyID: "fabricloader", ComponentUID: "net.fabricmc.fabric-loader", MrpackKey: "fabric-loader", CurseForgeType: "4", ServerSetup: ServerLauncher, ServerLaunchJar: "fabric-server-launch.jar", MetadataFiles: []string{"fabric.mod.json"}, MarkerFile: "fabric.mod.json", DependencyOverrides: "config/fabric_loader_dependencies.json"},
 	{Name: "quilt", Title: "Quilt", DependencyID: "quilt_loader", ComponentUID: "org.quiltmc.quilt-loader", MrpackKey: "quilt-loader", CurseForgeType: "5", AlsoRuns: []string{"fabric"}, ServerSetup: ServerProfile, ServerLaunchJar: "quilt-server-launch.jar", MetadataFiles: []string{"quilt.mod.json", "fabric.mod.json"}, MarkerFile: "fabric.mod.json", TopLevelMandatory: true},
