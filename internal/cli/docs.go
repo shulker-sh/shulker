@@ -98,28 +98,7 @@ func (a *app) emitDocsIndex(pages []*docs.Page) error {
 }
 
 func (a *app) emitDocsText(text docsText) error {
-	return a.printer.Emit(text, func(l *out.Lines) {
-		if !l.T.HasColor {
-			fmt.Fprint(l.W, text.Markdown)
-			return
-		}
-		fence := false
-		for _, line := range strings.Split(strings.TrimSuffix(text.Markdown, "\n"), "\n") {
-			switch {
-			case strings.HasPrefix(strings.TrimSpace(line), "```"):
-				fence = !fence
-				l.Plain(line)
-			case line == "":
-				l.Blank()
-			case fence:
-				l.Plain(line)
-			case strings.HasPrefix(line, "#"):
-				l.Heading(strings.ReplaceAll(line, "`", ""))
-			default:
-				l.Text(line)
-			}
-		}
-	})
+	return a.printer.Emit(text, func(l *out.Lines) { l.Markdown(text.Markdown) })
 }
 
 func (a *app) emitDocsMatches(pages []*docs.Page, query string, sections []*docs.Section) error {

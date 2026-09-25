@@ -261,3 +261,30 @@ func TestTableWrapsOnlyItsWidestColumn(t *testing.T) {
 		t.Fatalf("at the floor the table overflows rather than folding every column:\n%s", strings.Join(floor, "\n"))
 	}
 }
+
+func TestMarkdownRendersInTheThemeAndPrintsPlainWithoutColour(t *testing.T) {
+	page := "### `shulker add`\n\nRun `shulker add sodium` to add [a mod](https://example.com).\n\n```sh\nshulker add sodium\n```\n\n| Flag | Description |\n| --- | --- |\n| `--pin` | Pin it |\n"
+	if plain := render(Theme{}, func(l *Lines) { l.Markdown(page) }); strings.Join(plain, "\n") != strings.TrimSuffix(page, "\n") {
+		t.Fatalf("without colour the markdown prints as it is:\n%s", strings.Join(plain, "\n"))
+	}
+	lines := render(coloured(), func(l *Lines) { l.Markdown(page) })
+	text := strings.Join(lines, "\n")
+	for _, want := range []string{"### shulker add", "shulker add sodium", "a mod", "https://example.com", "--pin", "Pin it"} {
+		if !strings.Contains(sgrSeq.ReplaceAllString(text, ""), want) {
+			t.Fatalf("missing %q in:\n%s", want, text)
+		}
+	}
+	if strings.Contains(text, "`") || strings.Contains(text, "\x1b[34") || strings.Contains(text, "[4") {
+		t.Fatalf("no backticks, no blue, no backgrounds:\n%q", text)
+	}
+	for _, line := range lines {
+		if bare := sgrSeq.ReplaceAllString(line, ""); strings.TrimSpace(bare) != "" && !strings.HasPrefix(bare, gutter) {
+			t.Fatalf("every line sits in the gutter: %q", line)
+		}
+	}
+	for _, line := range lines {
+		if strings.HasSuffix(line, " ") {
+			t.Fatalf("no line carries glamour's padding: %q", line)
+		}
+	}
+}
