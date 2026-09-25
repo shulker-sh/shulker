@@ -90,13 +90,13 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 			}
 			switch dependencyType(dep.Type, dep.Mandatory) {
 			case "required":
-				info.Depends[dep.ModID] = rng
+				info.Depends[dep.ModID] = Range{rng}
 			case "optional":
-				info.Optional[dep.ModID] = rng
+				info.Optional[dep.ModID] = Range{rng}
 			case "incompatible":
-				info.Breaks[dep.ModID] = rng
+				info.Breaks[dep.ModID] = Range{rng}
 			case "discouraged":
-				info.Conflicts[dep.ModID] = rng
+				info.Conflicts[dep.ModID] = Range{rng}
 			}
 		}
 	}
@@ -140,12 +140,12 @@ func newFMLInfo(id, version, loaderName string) *Info {
 		Version:         version,
 		Loader:          loaderName,
 		Side:            "both",
-		Depends:         map[string]string{},
-		Breaks:          map[string]string{},
-		Conflicts:       map[string]string{},
-		Recommends:      map[string]string{},
-		Suggests:        map[string]string{},
-		Optional:        map[string]string{},
+		Depends:         map[string]Range{},
+		Breaks:          map[string]Range{},
+		Conflicts:       map[string]Range{},
+		Recommends:      map[string]Range{},
+		Suggests:        map[string]Range{},
+		Optional:        map[string]Range{},
 		Provides:        map[string]string{},
 		DependencySides: map[string]string{},
 		UsesMavenRanges: true,

@@ -134,10 +134,10 @@ func TestReadLegacyForgeFromModAnnotation(t *testing.T) {
 	if info.ID != "spawnercontrol" || info.Version != "1.6.3b" || info.Loader != "forge" || info.Side != "both" || !info.UsesMavenRanges {
 		t.Fatalf("got %+v", info)
 	}
-	if want := map[string]string{"forge": "[14.23.2.2596,)"}; !maps.Equal(info.Depends, want) {
+	if want := map[string]Range{"forge": {"[14.23.2.2596,)"}}; !maps.EqualFunc(info.Depends, want, slices.Equal) {
 		t.Errorf("depends %v", info.Depends)
 	}
-	if want := map[string]string{"jei": "[4.8,)", "ctm": "*"}; !maps.Equal(info.Optional, want) {
+	if want := map[string]Range{"jei": {"[4.8,)"}, "ctm": {"*"}}; !maps.EqualFunc(info.Optional, want, slices.Equal) {
 		t.Errorf("optional %v", info.Optional)
 	}
 }
@@ -161,7 +161,7 @@ func TestReadLegacyForgeUsesMcmodDependenciesWhenAsked(t *testing.T) {
 		"mcmod.info": `{"modListVersion": 2, "modList": [{"modid": "a", "version": "1", "useDependencyInformation": true, "requiredMods": ["b@[2,)"], "dependencies": ["c"]}]}`,
 		"A.class":    modClass(t, "Lcpw/mods/fml/common/Mod;", map[string]any{"modid": "a", "dependencies": "required-after:ignored"}),
 	})
-	if !maps.Equal(info.Depends, map[string]string{"b": "[2,)"}) || !maps.Equal(info.Optional, map[string]string{"c": "*"}) {
+	if !maps.EqualFunc(info.Depends, map[string]Range{"b": {"[2,)"}}, slices.Equal) || !maps.EqualFunc(info.Optional, map[string]Range{"c": {"*"}}, slices.Equal) {
 		t.Errorf("depends %v, optional %v", info.Depends, info.Optional)
 	}
 }

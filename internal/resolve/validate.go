@@ -247,7 +247,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 					continue
 				}
 			}
-			p := Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found}
+			p := Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared.String(), Found: found}
 			if !ok {
 				p.LockedAs = elsewhere[on]
 				if locked, found := r.Lock.Mods[p.LockedAs]; found && p.LockedAs != "" {
@@ -260,7 +260,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 			declared := info.Optional[on]
 			found, ok := installed[on]
 			if !ok {
-				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared, InstalledAs: sc.byName[on]})
+				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared.String(), InstalledAs: sc.byName[on]})
 				continue
 			}
 			match, err := satisfies(info, on, found, declared, sc.compatible[on])
@@ -269,7 +269,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 				continue
 			}
 			if !match {
-				v.Problems = append(v.Problems, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+				v.Problems = append(v.Problems, Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared.String(), Found: found})
 			}
 		}
 		for _, on := range sortedKeys(info.Breaks) {
@@ -284,7 +284,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 				continue
 			}
 			if match {
-				v.Problems = append(v.Problems, Problem{Rule: "breaks", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found})
+				v.Problems = append(v.Problems, Problem{Rule: "breaks", Mod: id, ModVersion: info.Version, On: on, Declared: declared.String(), Found: found})
 			}
 		}
 		for _, on := range sortedKeys(info.Conflicts) {
@@ -296,10 +296,10 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s)", id, info.Version, on, info.Conflicts[on], found))
 			}
 		}
-		for kind, set := range map[string]map[string]string{"recommends": info.Recommends, "suggests": info.Suggests} {
+		for kind, set := range map[string]map[string]jarmeta.Range{"recommends": info.Recommends, "suggests": info.Suggests} {
 			for _, on := range sortedKeys(set) {
 				if _, ok := installed[on]; !ok {
-					v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: kind, On: on, Declared: set[on], InstalledAs: sc.byName[on]})
+					v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: kind, On: on, Declared: set[on].String(), InstalledAs: sc.byName[on]})
 				}
 			}
 		}
@@ -321,9 +321,9 @@ func onSide(info *jarmeta.Info, side string) *jarmeta.Info {
 		return info
 	}
 	c := *info
-	for _, set := range []*map[string]string{&c.Depends, &c.Breaks, &c.Conflicts, &c.Recommends, &c.Suggests, &c.Optional} {
+	for _, set := range []*map[string]jarmeta.Range{&c.Depends, &c.Breaks, &c.Conflicts, &c.Recommends, &c.Suggests, &c.Optional} {
 		*set = maps.Clone(*set)
-		maps.DeleteFunc(*set, func(id, _ string) bool { return skip(id) })
+		maps.DeleteFunc(*set, func(id string, _ jarmeta.Range) bool { return skip(id) })
 	}
 	return &c
 }
@@ -410,7 +410,7 @@ func (c candidates) pick(infos map[string]*jarmeta.Info, topLevelOnly bool) map[
 
 func accepts(infos map[string]*jarmeta.Info, id, version string) bool {
 	for _, info := range infos {
-		for _, set := range []map[string]string{info.Depends, info.Optional} {
+		for _, set := range []map[string]jarmeta.Range{info.Depends, info.Optional} {
 			if declared, ok := set[id]; ok {
 				if match, err := satisfies(info, id, version, declared, nil); err == nil && !match {
 					return false
@@ -554,9 +554,9 @@ func (p Problem) ignoreCommand() string {
 	return fmt.Sprintf(`shulker ignore %s %s --rule %s --declared "%s" --note "why this is safe"`, p.Mod, p.On, p.Rule, p.Declared)
 }
 
-func satisfies(info *jarmeta.Info, on, version, declared string, also []string) (bool, error) {
+func satisfies(info *jarmeta.Info, on, version string, declared jarmeta.Range, also []string) (bool, error) {
 	if info.UsesMavenRanges {
-		rng, err := maven.ParseRange(declared)
+		rng, err := maven.ParseRange(declared.String())
 		if err != nil {
 			return false, err
 		}
@@ -568,12 +568,11 @@ func satisfies(info *jarmeta.Info, on, version, declared string, also []string) 
 	return fabricSatisfies(version, declared)
 }
 
-// fabricSatisfies matches as Fabric Loader does. Alternatives are joined by "||", the way an array
-// of ranges in fabric.mod.json and a Quilt any-of are held.
-func fabricSatisfies(version, declared string) (bool, error) {
+// fabricSatisfies matches as Fabric Loader does: a version must meet one of the alternatives.
+func fabricSatisfies(version string, declared jarmeta.Range) (bool, error) {
 	var alts []fabric.Predicate
-	for _, alt := range strings.Split(declared, "||") {
-		p, err := fabric.ParsePredicate(strings.TrimSpace(alt))
+	for _, alt := range declared {
+		p, err := fabric.ParsePredicate(alt)
 		if err != nil {
 			return false, errors.New("the range is not understood")
 		}

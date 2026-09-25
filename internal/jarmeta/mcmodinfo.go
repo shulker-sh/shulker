@@ -44,12 +44,12 @@ func readLegacyForge(zr *zip.Reader) *Info {
 	info := &Info{
 		Loader:          "forge",
 		Side:            "both",
-		Depends:         map[string]string{},
-		Breaks:          map[string]string{},
-		Conflicts:       map[string]string{},
-		Recommends:      map[string]string{},
-		Suggests:        map[string]string{},
-		Optional:        map[string]string{},
+		Depends:         map[string]Range{},
+		Breaks:          map[string]Range{},
+		Conflicts:       map[string]Range{},
+		Recommends:      map[string]Range{},
+		Suggests:        map[string]Range{},
+		Optional:        map[string]Range{},
 		Provides:        map[string]string{},
 		UsesMavenRanges: true,
 	}
@@ -256,17 +256,17 @@ func addDependencyString(info *Info, deps string, own map[string]bool) {
 			continue
 		}
 		if required && !sided {
-			info.Depends[id] = rng
+			info.Depends[id] = Range{rng}
 		} else {
-			info.Optional[id] = rng
+			info.Optional[id] = Range{rng}
 		}
 	}
 }
 
-func addReferences(into map[string]string, refs []string, own map[string]bool) {
+func addReferences(into map[string]Range, refs []string, own map[string]bool) {
 	for _, ref := range refs {
 		if id, rng := versionReference(ref); id != "" && !own[id] && !legacyBuiltins[id] {
-			into[id] = rng
+			into[id] = Range{rng}
 		}
 	}
 }

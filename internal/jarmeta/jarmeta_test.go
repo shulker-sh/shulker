@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -69,6 +70,16 @@ func TestReadAcceptsRawControlCharactersInStrings(t *testing.T) {
 	}
 }
 
+func TestReadFabricKeepsEachArrayEntryAsAnAlternative(t *testing.T) {
+	info := readBytes(t, buildZip(t, map[string]string{
+		"fabric.mod.json": `{"schemaVersion":1,"id":"easy_npc","version":"7.12.1","breaks":{"easy_model_entities":"<2.4.0 || >=3.0.0","old":["<1","2.x"]}}`,
+	}))
+	want := map[string]Range{"easy_model_entities": {"<2.4.0 || >=3.0.0"}, "old": {"<1", "2.x"}}
+	if !maps.EqualFunc(info.Breaks, want, slices.Equal) {
+		t.Errorf("breaks %q, want %q", info.Breaks, want)
+	}
+}
+
 func TestReadFabricAcceptsWhatStrictGsonAccepts(t *testing.T) {
 	info := readBytes(t, buildZip(t, map[string]string{
 		"fabric.mod.json": "{\"id\":\"lenient\",\"version\":\"1.0\",\"description\":\"it\\'s a \\\nline\",\"environment\":\"server\"}\n}trailing",
@@ -128,14 +139,14 @@ func TestReadQuilt(t *testing.T) {
 	if info.ID != "shiny" || info.Loader != "quilt" || info.Side != "server" {
 		t.Fatalf("parsed %+v", info)
 	}
-	wantDepends := map[string]string{"quilt_loader": "*", "minecraft": ">=26.2", "qsl": "^8.0 || ^9.0", "fabric-api": ">=0.130 <0.200"}
-	if !maps.Equal(info.Depends, wantDepends) {
+	wantDepends := map[string]Range{"quilt_loader": {"*"}, "minecraft": {">=26.2"}, "qsl": {"^8.0", "^9.0"}, "fabric-api": {">=0.130 <0.200"}}
+	if !maps.EqualFunc(info.Depends, wantDepends, slices.Equal) {
 		t.Errorf("depends %v, want %v", info.Depends, wantDepends)
 	}
-	if want := map[string]string{"sodium": "^0.9"}; !maps.Equal(info.Optional, want) {
+	if want := map[string]Range{"sodium": {"^0.9"}}; !maps.EqualFunc(info.Optional, want, slices.Equal) {
 		t.Errorf("optional %v, want %v", info.Optional, want)
 	}
-	if want := map[string]string{"optifabric": "*"}; !maps.Equal(info.Breaks, want) {
+	if want := map[string]Range{"optifabric": {"*"}}; !maps.EqualFunc(info.Breaks, want, slices.Equal) {
 		t.Errorf("breaks %v, want %v", info.Breaks, want)
 	}
 	if want := map[string]string{"shiny_api": "1.4.0", "old_shiny": "1.0", "inner": "2.0"}; !maps.Equal(info.AllProvides(), want) {
@@ -146,16 +157,16 @@ func TestReadQuilt(t *testing.T) {
 func TestQuiltRange(t *testing.T) {
 	cases := []struct {
 		versions any
-		want     string
+		want     Range
 	}{
-		{nil, "*"},
-		{"=1.0", "=1.0"},
-		{[]any{"1.0", "2.0"}, "1.0 || 2.0"},
-		{map[string]any{"any": []any{"1.0", map[string]any{"all": []any{">=2", "<3"}}}}, "1.0 || >=2 <3"},
-		{map[string]any{"all": []any{">=1", map[string]any{"any": []any{"1.5", "1.7"}}}}, "*"},
+		{nil, Range{"*"}},
+		{"=1.0", Range{"=1.0"}},
+		{[]any{"1.0", "2.0"}, Range{"1.0", "2.0"}},
+		{map[string]any{"any": []any{"1.0", map[string]any{"all": []any{">=2", "<3"}}}}, Range{"1.0", ">=2 <3"}},
+		{map[string]any{"all": []any{">=1", map[string]any{"any": []any{"1.5", "1.7"}}}}, Range{"*"}},
 	}
 	for _, c := range cases {
-		if got := quiltRange(c.versions); got != c.want {
+		if got := quiltRange(c.versions); !slices.Equal(got, c.want) {
 			t.Errorf("quiltRange(%v) = %q, want %q", c.versions, got, c.want)
 		}
 	}
@@ -215,16 +226,16 @@ type="required"
 	if want := "0.8.1+mc26.2-build.12345678901234567890123456789012345678901234567890123"; info.Version != want {
 		t.Errorf("version %q, want %q", info.Version, want)
 	}
-	if want := map[string]string{"neoforge": "[26.1.2.10-beta,)", "minecraft": "[26.2,26.3)"}; !maps.Equal(info.Depends, want) {
+	if want := map[string]Range{"neoforge": {"[26.1.2.10-beta,)"}, "minecraft": {"[26.2,26.3)"}}; !maps.EqualFunc(info.Depends, want, slices.Equal) {
 		t.Errorf("depends %v, want %v", info.Depends, want)
 	}
-	if want := map[string]string{"iris": "[1.9,)"}; !maps.Equal(info.Optional, want) {
+	if want := map[string]Range{"iris": {"[1.9,)"}}; !maps.EqualFunc(info.Optional, want, slices.Equal) {
 		t.Errorf("optional %v, want %v", info.Optional, want)
 	}
-	if want := map[string]string{"optifine": "*"}; !maps.Equal(info.Breaks, want) {
+	if want := map[string]Range{"optifine": {"*"}}; !maps.EqualFunc(info.Breaks, want, slices.Equal) {
 		t.Errorf("breaks %v, want %v", info.Breaks, want)
 	}
-	if want := map[string]string{"rubidium": "*"}; !maps.Equal(info.Conflicts, want) {
+	if want := map[string]Range{"rubidium": {"*"}}; !maps.EqualFunc(info.Conflicts, want, slices.Equal) {
 		t.Errorf("conflicts %v, want %v", info.Conflicts, want)
 	}
 	if want := map[string]string{"sodium_extra_api": "2.0", "inner": "3.1"}; !maps.Equal(info.AllProvides(), want) {
@@ -252,10 +263,10 @@ versionRange="[65.1,)"
 	if info.ID != "geckolib" || info.Loader != "forge" || info.Version != "1" {
 		t.Fatalf("parsed %+v", info)
 	}
-	if want := map[string]string{"minecraft": "[26.2,)"}; !maps.Equal(info.Depends, want) {
+	if want := map[string]Range{"minecraft": {"[26.2,)"}}; !maps.EqualFunc(info.Depends, want, slices.Equal) {
 		t.Errorf("depends %v, want %v", info.Depends, want)
 	}
-	if want := map[string]string{"forge": "[65.1,)"}; !maps.Equal(info.Optional, want) {
+	if want := map[string]Range{"forge": {"[65.1,)"}}; !maps.EqualFunc(info.Optional, want, slices.Equal) {
 		t.Errorf("optional %v, want %v", info.Optional, want)
 	}
 }
@@ -275,7 +286,7 @@ type="required"
 versionRange="[21.0,)"
 `,
 	}))
-	if want := map[string]string{"neoforge": "[21.0,)"}; !maps.Equal(info.Depends, want) {
+	if want := map[string]Range{"neoforge": {"[21.0,)"}}; !maps.EqualFunc(info.Depends, want, slices.Equal) {
 		t.Errorf("depends %v, want %v", info.Depends, want)
 	}
 }

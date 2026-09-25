@@ -25,6 +25,12 @@ type fileError struct {
 
 func (e *fileError) Error() string { return e.name + ": " + e.err.Error() }
 
+// Range is a declared version range. A version that meets any one alternative meets the range;
+// only an array in the metadata makes more than one, never "||" inside a single string.
+type Range []string
+
+func (r Range) String() string { return strings.Join(r, " || ") }
+
 // Info is the mod a jar declares. Each dependency map is keyed by mod id and holds a version range.
 type Info struct {
 	ID      string
@@ -34,13 +40,13 @@ type Info struct {
 	// SideFromDependencies marks a Side read from a mods.toml's dependency sides, since the file
 	// names none of its own.
 	SideFromDependencies bool
-	Depends              map[string]string
-	Breaks               map[string]string
-	Conflicts            map[string]string
-	Recommends           map[string]string
-	Suggests             map[string]string
+	Depends              map[string]Range
+	Breaks               map[string]Range
+	Conflicts            map[string]Range
+	Recommends           map[string]Range
+	Suggests             map[string]Range
 	// Optional dependencies aren't required, but a present mod must match the range.
-	Optional map[string]string
+	Optional map[string]Range
 	// Provides are the ids the jar itself declares; a nested jar's are on its own Info in Nested.
 	Provides map[string]string
 	// DependencySides are the dependencies FML checks on one side only, "client" or "server" by id.
@@ -209,7 +215,7 @@ func readFabric(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		Conflicts:  rangeMap(raw.Conflicts),
 		Recommends: rangeMap(raw.Recommends),
 		Suggests:   rangeMap(raw.Suggests),
-		Optional:   map[string]string{},
+		Optional:   map[string]Range{},
 		Provides:   map[string]string{},
 	}
 	for _, id := range raw.Provides {
@@ -251,12 +257,12 @@ func readQuilt(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		Version:    raw.Loader.Version,
 		Loader:     "quilt",
 		Side:       quiltSide(raw.Minecraft.Environment),
-		Depends:    map[string]string{},
-		Breaks:     map[string]string{},
-		Conflicts:  map[string]string{},
-		Recommends: map[string]string{},
-		Suggests:   map[string]string{},
-		Optional:   map[string]string{},
+		Depends:    map[string]Range{},
+		Breaks:     map[string]Range{},
+		Conflicts:  map[string]Range{},
+		Recommends: map[string]Range{},
+		Suggests:   map[string]Range{},
+		Optional:   map[string]Range{},
 		Provides:   map[string]string{},
 	}
 	for _, entry := range raw.Loader.Depends {
@@ -321,10 +327,10 @@ func stripGroup(id string) string {
 	return id
 }
 
-func quiltRange(v any) string {
+func quiltRange(v any) Range {
 	switch r := v.(type) {
 	case string:
-		return r
+		return Range{r}
 	case []any:
 		return anyOf(r)
 	case map[string]any:
@@ -335,23 +341,26 @@ func quiltRange(v any) string {
 			parts := make([]string, 0, len(list))
 			for _, item := range list {
 				part := quiltRange(item)
-				if strings.Contains(part, "||") {
-					return "*"
+				if len(part) != 1 {
+					return Range{"*"}
 				}
-				parts = append(parts, part)
+				parts = append(parts, part[0])
 			}
-			return strings.Join(parts, " ")
+			return Range{strings.Join(parts, " ")}
 		}
 	}
-	return "*"
+	return Range{"*"}
 }
 
-func anyOf(list []any) string {
-	parts := make([]string, 0, len(list))
+func anyOf(list []any) Range {
+	var alts Range
 	for _, item := range list {
-		parts = append(parts, quiltRange(item))
+		alts = append(alts, quiltRange(item)...)
 	}
-	return strings.Join(parts, " || ")
+	if len(alts) == 0 {
+		return Range{""}
+	}
+	return alts
 }
 
 func quiltSide(env string) string {
@@ -413,8 +422,8 @@ func lookup(zr *zip.Reader, name string) *zip.File {
 	return nil
 }
 
-func rangeMap(raw json.RawMessage) map[string]string {
-	m := map[string]string{}
+func rangeMap(raw json.RawMessage) map[string]Range {
+	m := map[string]Range{}
 	if len(raw) == 0 {
 		return m
 	}
@@ -423,7 +432,7 @@ func rangeMap(raw json.RawMessage) map[string]string {
 		return m
 	}
 	for id, rng := range decoded {
-		m[id] = rangeString(rng)
+		m[id] = fabricRange(rng)
 	}
 	return m
 }
@@ -438,21 +447,18 @@ func fabricSide(env string) string {
 	return "both"
 }
 
-func rangeString(v any) string {
+func fabricRange(v any) Range {
 	switch r := v.(type) {
 	case string:
-		return r
+		return Range{r}
 	case []any:
-		out := ""
-		for i, item := range r {
+		var alts Range
+		for _, item := range r {
 			if s, ok := item.(string); ok {
-				if i > 0 {
-					out += " || "
-				}
-				out += s
+				alts = append(alts, s)
 			}
 		}
-		return out
+		return alts
 	}
-	return "*"
+	return Range{"*"}
 }

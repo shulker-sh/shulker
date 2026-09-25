@@ -44,8 +44,8 @@ func TestSatisfies(t *testing.T) {
 		{"1.3.0", "~1.2.0", false},
 		{"1.9.0", "^1.2.0", true},
 		{"2.0.0", "^1.2.0", false},
-		{"1.0.0", "<0.9 || >=1.0", true},
-		{"0.9.5", "<0.9 || >=1.0", false},
+		{"1.0.0", "<0.9 || >=1.0", false},
+		{"0.5.0", "<0.9 || >=1.0", false},
 		{"1.0.0", ">=0.5 <2.0", true},
 		{"4.0.3.4", ">=4.0.3.2", true},
 		{"4.0.3.4", ">=4.0.3.5", false},
@@ -54,13 +54,22 @@ func TestSatisfies(t *testing.T) {
 		{"custom", ">=1.0", false},
 	}
 	for _, c := range cases {
-		got, err := fabricSatisfies(c.version, c.declared)
+		got, err := fabricSatisfies(c.version, jarmeta.Range{c.declared})
 		if err != nil {
 			t.Errorf("fabricSatisfies(%q, %q): %v", c.version, c.declared, err)
 			continue
 		}
 		if got != c.want {
 			t.Errorf("fabricSatisfies(%q, %q) = %v, want %v", c.version, c.declared, got, c.want)
+		}
+	}
+}
+
+func TestSatisfiesAnyArrayEntry(t *testing.T) {
+	either := jarmeta.Range{"<0.9", ">=1.0"}
+	for version, want := range map[string]bool{"1.0.0": true, "0.5.0": true, "0.9.5": false} {
+		if got, err := fabricSatisfies(version, either); err != nil || got != want {
+			t.Errorf("fabricSatisfies(%q, %q) = %v, %v, want %v", version, either, got, err, want)
 		}
 	}
 }
@@ -76,20 +85,23 @@ func TestSatisfiesMinecraftAsFabricSeesIt(t *testing.T) {
 		{"1.21-pre1", ">=1.21-beta.1", true},
 		{"1.20.1", "~1.20", true},
 	} {
-		got, err := satisfies(&jarmeta.Info{}, "minecraft", c.version, c.declared, nil)
+		got, err := satisfies(&jarmeta.Info{}, "minecraft", c.version, jarmeta.Range{c.declared}, nil)
 		if err != nil || got != c.want {
 			t.Errorf("satisfies(minecraft %q, %q) = %v, %v, want %v", c.version, c.declared, got, err, c.want)
 		}
 	}
-	if got, _ := satisfies(&jarmeta.Info{}, "some-mod", "24w33a", ">=1.21.2-", nil); got {
+	if got, _ := satisfies(&jarmeta.Info{}, "some-mod", "24w33a", jarmeta.Range{">=1.21.2-"}, nil); got {
 		t.Error("a mod versioned like a weekly snapshot is matched as the game")
 	}
 }
 
 func TestSatisfiesUnparsable(t *testing.T) {
-	for _, c := range [][2]string{{"1.0.0", ">=1.x"}, {"1.0.0", "<custom"}, {"1.0.0", "<1.0 || >x"}} {
-		if _, err := fabricSatisfies(c[0], c[1]); err == nil {
-			t.Errorf("fabricSatisfies(%q, %q) should not parse", c[0], c[1])
+	for _, c := range []struct {
+		version  string
+		declared jarmeta.Range
+	}{{"1.0.0", jarmeta.Range{">=1.x"}}, {"1.0.0", jarmeta.Range{"<custom"}}, {"1.0.0", jarmeta.Range{"<1.0", ">x"}}} {
+		if _, err := fabricSatisfies(c.version, c.declared); err == nil {
+			t.Errorf("fabricSatisfies(%q, %q) should not parse", c.version, c.declared)
 		}
 	}
 }

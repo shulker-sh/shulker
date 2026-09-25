@@ -17,7 +17,7 @@ type DependencyOverrides map[string][]overrideEntry
 type overrideEntry struct {
 	op   byte
 	kind string
-	deps map[string]string
+	deps map[string]Range
 }
 
 var overrideKinds = []string{"depends", "recommends", "suggests", "conflicts", "breaks"}
@@ -72,7 +72,7 @@ func isOne(tok json.Token) bool {
 }
 
 func parseOverrideKeys(keys map[string]json.RawMessage) ([]overrideEntry, error) {
-	byKind := map[string]map[byte]map[string]string{}
+	byKind := map[string]map[byte]map[string]Range{}
 	for key, raw := range keys {
 		op := byte('=')
 		if strings.HasPrefix(key, "+") || strings.HasPrefix(key, "-") {
@@ -85,15 +85,15 @@ func parseOverrideKeys(keys map[string]json.RawMessage) ([]overrideEntry, error)
 		if err := json.Unmarshal(raw, &deps); err != nil {
 			return nil, fmt.Errorf("%s must be an object", key)
 		}
-		ranges := map[string]string{}
+		ranges := map[string]Range{}
 		for id, r := range deps {
 			var one string
 			var many []string
 			switch {
 			case json.Unmarshal(r, &one) == nil:
-				ranges[id] = one
+				ranges[id] = Range{one}
 			case json.Unmarshal(r, &many) == nil:
-				ranges[id] = strings.Join(many, " || ")
+				ranges[id] = many
 			default:
 				return nil, fmt.Errorf("%s %s: a version range must be a string or an array of strings", key, id)
 			}
@@ -102,7 +102,7 @@ func parseOverrideKeys(keys map[string]json.RawMessage) ([]overrideEntry, error)
 			continue
 		}
 		if byKind[key] == nil {
-			byKind[key] = map[byte]map[string]string{}
+			byKind[key] = map[byte]map[string]Range{}
 		}
 		byKind[key][op] = ranges
 	}
@@ -130,11 +130,11 @@ func (o DependencyOverrides) Apply(info *Info) *Info {
 		return info
 	}
 	c := *info
-	sets := map[string]*map[string]string{"depends": &c.Depends, "recommends": &c.Recommends, "suggests": &c.Suggests, "conflicts": &c.Conflicts, "breaks": &c.Breaks}
+	sets := map[string]*map[string]Range{"depends": &c.Depends, "recommends": &c.Recommends, "suggests": &c.Suggests, "conflicts": &c.Conflicts, "breaks": &c.Breaks}
 	for _, set := range sets {
 		*set = maps.Clone(*set)
 		if *set == nil {
-			*set = map[string]string{}
+			*set = map[string]Range{}
 		}
 	}
 	for _, e := range entries {
