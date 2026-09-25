@@ -112,7 +112,12 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if source != nil {
 		return a.importSource(cmd, dir, source, f)
 	}
-	r, mods, err := a.importPack(ctx, d, arc, dir, f)
+	var r *resolve.Resolver
+	var mods *resolve.Imported
+	err = a.awaitingDownloads(ctx, dir, func() error {
+		r, mods, err = a.importPack(ctx, d, arc, dir, f)
+		return err
+	})
 	if err != nil {
 		return err
 	}

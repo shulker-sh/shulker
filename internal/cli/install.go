@@ -35,7 +35,11 @@ func (a *app) installCmd() *cobra.Command {
 			if err := a.requireLock(p); err != nil {
 				return err
 			}
-			fetched, err := a.fetchLocked(cmd.Context(), p, nil, p.Manifest.HasSide("server"))
+			var fetched []string
+			err = a.awaitingDownloads(cmd.Context(), p.Dir, func() error {
+				fetched, err = a.fetchLocked(cmd.Context(), p, nil, p.Manifest.HasSide("server"))
+				return err
+			})
 			if err != nil {
 				return err
 			}
