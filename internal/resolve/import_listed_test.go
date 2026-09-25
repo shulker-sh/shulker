@@ -214,3 +214,31 @@ func TestImportNamesAListedFileItCouldNotDownload(t *testing.T) {
 		t.Fatalf("expected download-failed naming the file, got %+v", e)
 	}
 }
+
+func TestImportKeepsTheChannelOfEachListedFile(t *testing.T) {
+	cf := curseForgeHost(t)
+	cf.publish(mod("272515", "better-advancements"), provider.Version{ID: "5700001", Number: "0.4.3.21", Channel: "beta", File: provider.File{Filename: "BetterAdvancements-0.4.3.21.jar"}}, modJar(t, "betteradvancements", "0.4.3.21", "client"))
+	shaders := provider.Project{ID: "700000", Slug: "complementary-reimagined", Title: "Complementary Reimagined", Type: manifest.TypeShader}
+	cf.publish(shaders, provider.Version{ID: "5800001", Number: "r5.5", Channel: "alpha", Loaders: []string{"iris"}, File: provider.File{Filename: "ComplementaryReimagined_r5.5.zip"}}, zipFiles(t, map[string]string{"shaders/composite.fsh": "x"}))
+	archive := filepath.Join(t.TempDir(), "craft.zip")
+	writeCurseForgeZip(t, archive, []cfPackFile{
+		{ProjectID: 238222, FileID: 5000001, Required: true},
+		{ProjectID: 306612, FileID: 5000010, Required: true},
+		{ProjectID: 272515, FileID: 5700001, Required: true},
+		{ProjectID: 700000, FileID: 5800001, Required: true},
+	}, map[string]string{})
+
+	h, _, err := importInto(t, cf, t.TempDir(), archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, entry := h.mod("betteradvancements").Channel, h.r.Manifest.Requires["betteradvancements"]; got != "beta" || entry.Channel != "beta" {
+		t.Fatalf("beta mod: lock %q, manifest %+v", got, entry)
+	}
+	if got, entry := h.r.Lock.Packs(manifest.TypeShader)["complementary-reimagined"].Channel, h.r.Manifest.Requires["complementary-reimagined"]; got != "alpha" || entry.Channel != "alpha" {
+		t.Fatalf("alpha shader: lock %q, manifest %+v", got, entry)
+	}
+	if got, entry := h.mod("jei").Channel, h.r.Manifest.Requires["jei"]; got != "release" || entry.Channel != "" {
+		t.Fatalf("release mod: lock %q, manifest %+v", got, entry)
+	}
+}

@@ -132,8 +132,9 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 	if v.ProjectID != proj.ID {
 		return nil, nil, out.Errorf("pin-mismatch", "file %s belongs to project %s, not %s", f.Version, v.ProjectID, proj.Slug)
 	}
+	channel := shippedChannel(v)
 	listedFrom := func(p provider.Provider, proj *provider.Project) manifest.Require {
-		listed := manifest.Require{Project: proj.ID}
+		listed := manifest.Require{Project: proj.ID, Channel: channel}
 		if p.Name() != r.Manifest.ProviderOrder()[0] {
 			listed.Provider = p.Name()
 		}
@@ -148,7 +149,7 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 		if r.Lock.Loader.Type == "" {
 			return nil, nil, out.Errorf("loader-required", "%s is a mod, and the pack names no mod loader", proj.Slug)
 		}
-		from, id, prior, err := r.placeAnywhere(ctx, hosted{p, proj, v}, "", "", "", "", false, func(w string) { rep.Warnings = append(rep.Warnings, w) })
+		from, id, prior, err := r.placeAnywhere(ctx, hosted{p, proj, v}, "", "", "", channel, false, func(w string) { rep.Warnings = append(rep.Warnings, w) })
 		p, proj, v = from.p, from.proj, from.v
 		if err != nil {
 			return proj, v, err
@@ -162,7 +163,7 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 		if ok, err := im.canListPack(key, kind); !ok {
 			return proj, v, err
 		}
-		if err := r.lockPackVersion(ctx, p, proj, v, key, kind, ""); err != nil {
+		if err := r.lockPackVersion(ctx, p, proj, v, key, kind, channel); err != nil {
 			return proj, v, err
 		}
 		listed := listedFrom(p, proj)

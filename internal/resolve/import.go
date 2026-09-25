@@ -568,7 +568,8 @@ func zipHasAssets(zr *zip.Reader) bool {
 // env places the mod on a side the project builds and the provider's side doesn't: packwiz
 // marks every mod as needed on both sides, so the env alone says little.
 func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, packSide string, proj *provider.Project, v *provider.Version) error {
-	id, prior, err := im.r.place(ctx, p, proj, v, "", "", "", "", false)
+	channel := shippedChannel(v)
+	id, prior, err := im.r.place(ctx, p, proj, v, "", "", "", channel, false)
 	if err != nil {
 		return err
 	}
@@ -583,7 +584,13 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, pack
 			entry.Pin = ""
 		}
 	}
-	providerSide := im.r.Lock.Mods[id].Side
+	if !provider.ChannelAllows(entry.Channel, v.Channel) {
+		entry.Channel = v.Channel
+	}
+	locked := im.r.Lock.Mods[id]
+	locked.Channel = channelLabel(entry.Channel)
+	im.r.Lock.Mods[id] = locked
+	providerSide := locked.Side
 	if _, fromEnv := im.indexSides[file]; fromEnv {
 		if im.addsBuiltSide(packSide, providerSide) {
 			entry.Side = "both"
@@ -643,7 +650,7 @@ func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename,
 			delete(r.Manifest.Requires, key)
 		}
 	}()
-	listed := manifest.Require{Type: kind, Pin: v.ID}
+	listed := manifest.Require{Type: kind, Pin: v.ID, Channel: shippedChannel(v)}
 	if filename != key+manifest.FileExtension(kind) {
 		listed.Filename = filename
 	}
@@ -652,11 +659,20 @@ func (im *importer) lockPack(ctx context.Context, p provider.Provider, filename,
 		listed.Side = side
 	}
 	r.Manifest.Requires[key] = listed
-	if err := r.lockPackVersion(ctx, p, proj, v, key, kind, ""); err != nil {
+	if err := r.lockPackVersion(ctx, p, proj, v, key, kind, listed.Channel); err != nil {
 		return err
 	}
 	im.rep.locked(key, kind, p.Name())
 	return nil
+}
+
+// shippedChannel is the channel an entry needs for the file a pack ships to stay locked: empty for a
+// release, else the file's own.
+func shippedChannel(v *provider.Version) string {
+	if provider.ChannelAllows("", v.Channel) {
+		return ""
+	}
+	return v.Channel
 }
 
 // canListPack reports whether the pack's resource pack or shader can be listed under key. One the
