@@ -345,3 +345,38 @@ func loaderNamed(name string) loader.Loader {
 	l, _ := loader.Lookup(name)
 	return l
 }
+
+func TestReadModsTOMLSides(t *testing.T) {
+	dep := func(id, side string) string {
+		s := "[[dependencies.m]]\nmodId=\"" + id + "\"\ntype=\"required\"\nversionRange=\"[1,)\"\n"
+		if side != "" {
+			s += "side=\"" + side + "\"\n"
+		}
+		return s
+	}
+	tests := []struct {
+		name     string
+		deps     string
+		side     string
+		depSides map[string]string
+	}{
+		{"every dependency client", dep("minecraft", "CLIENT") + dep("neoforge", "CLIENT"), "client", map[string]string{"minecraft": "client", "neoforge": "client"}},
+		{"client and both", dep("minecraft", "CLIENT") + dep("neoforge", "BOTH"), "both", map[string]string{"minecraft": "client"}},
+		{"side left out", dep("minecraft", "CLIENT") + dep("neoforge", ""), "both", map[string]string{"minecraft": "client"}},
+		{"every dependency server", dep("minecraft", "SERVER"), "both", map[string]string{"minecraft": "server"}},
+		{"no dependencies", "", "both", map[string]string{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info := readBytes(t, buildZip(t, map[string]string{
+				"META-INF/neoforge.mods.toml": "[[mods]]\nmodId=\"m\"\n" + tt.deps,
+			}))
+			if info.Side != tt.side || info.SideFromDependencies != (tt.side == "client") {
+				t.Errorf("side %q (from dependencies %v), want %q", info.Side, info.SideFromDependencies, tt.side)
+			}
+			if !maps.Equal(info.DependencySides, tt.depSides) {
+				t.Errorf("dependency sides %v, want %v", info.DependencySides, tt.depSides)
+			}
+		})
+	}
+}

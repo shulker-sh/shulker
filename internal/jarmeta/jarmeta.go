@@ -27,20 +27,25 @@ func (e *fileError) Error() string { return e.name + ": " + e.err.Error() }
 
 // Info is the mod a jar declares. Each dependency map is keyed by mod id and holds a version range.
 type Info struct {
-	ID         string
-	Version    string
-	Loader     string
-	Side       string
-	Depends    map[string]string
-	Breaks     map[string]string
-	Conflicts  map[string]string
-	Recommends map[string]string
-	Suggests   map[string]string
+	ID      string
+	Version string
+	Loader  string
+	Side    string
+	// SideFromDependencies marks a Side read from a mods.toml's dependency sides, since the file
+	// names none of its own.
+	SideFromDependencies bool
+	Depends              map[string]string
+	Breaks               map[string]string
+	Conflicts            map[string]string
+	Recommends           map[string]string
+	Suggests             map[string]string
 	// Optional dependencies aren't required, but a present mod must match the range.
 	Optional map[string]string
 	// Provides are the ids the jar itself declares; a nested jar's are on its own Info in Nested.
 	Provides map[string]string
-	Nested   []*Info
+	// DependencySides are the dependencies FML checks on one side only, "client" or "server" by id.
+	DependencySides map[string]string
+	Nested          []*Info
 	// UsesMavenRanges marks ranges written in Maven syntax (NeoForge and Forge) rather than Fabric's.
 	UsesMavenRanges bool
 }

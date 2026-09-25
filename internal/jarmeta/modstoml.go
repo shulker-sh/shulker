@@ -22,10 +22,13 @@ type modsTOMLDependency struct {
 	Type         string `toml:"type"`
 	Mandatory    any    `toml:"mandatory"`
 	VersionRange string `toml:"versionRange"`
+	Side         string `toml:"side"`
 }
 
-// readModsTOML reads NeoForge's neoforge.mods.toml and Forge's mods.toml. Both leave the side to
-// the provider, and FML reads dependencies only from tables keyed by one of the jar's own mods.
+// readModsTOML reads NeoForge's neoforge.mods.toml and Forge's mods.toml. FML reads dependencies
+// only from tables keyed by one of the jar's own mods, and checks each only on the side it names.
+// Neither file names the mod's own side, so a jar is client-only when it declares dependencies and
+// every one is CLIENT: on a server FML skips them all, loads the mod, and it fails there.
 func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	data, err := readFile(f)
 	if err != nil {
@@ -57,6 +60,8 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 			info.Provides[m.ModID] = version(m.Version)
 		}
 	}
+	sides := map[string]bool{}
+	depSides := map[string]string{}
 	for _, m := range raw.Mods {
 		table, ok := raw.Dependencies[m.ModID]
 		if !ok {
@@ -70,6 +75,15 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 			if dep.ModID == "" || own[dep.ModID] {
 				continue
 			}
+			side := strings.ToLower(dep.Side)
+			if side != "client" && side != "server" {
+				side = "both"
+			}
+			sides[side] = true
+			if was, seen := depSides[dep.ModID]; seen && was != side {
+				side = "both"
+			}
+			depSides[dep.ModID] = side
 			rng := strings.TrimSpace(dep.VersionRange)
 			if rng == "" {
 				rng = "*"
@@ -85,6 +99,14 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 				info.Conflicts[dep.ModID] = rng
 			}
 		}
+	}
+	for id, side := range depSides {
+		if side != "both" {
+			info.DependencySides[id] = side
+		}
+	}
+	if len(sides) == 1 && sides["client"] {
+		info.Side, info.SideFromDependencies = "client", true
 	}
 	addJarJar(zr, info, files)
 	return info, nil
@@ -125,6 +147,7 @@ func newFMLInfo(id, version, loaderName string) *Info {
 		Suggests:        map[string]string{},
 		Optional:        map[string]string{},
 		Provides:        map[string]string{},
+		DependencySides: map[string]string{},
 		UsesMavenRanges: true,
 	}
 }
