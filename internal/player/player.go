@@ -1,5 +1,5 @@
-// Package player resolves the player names and uuids a manifest lists against Mojang, and decides
-// what the lock records for them.
+// Package player resolves the player names and uuids a manifest lists, through Mojang's profiles,
+// and decides what the lock records for them.
 package player
 
 import (
@@ -10,16 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/near"
 	"shulker.sh/shulker/internal/out"
-)
-
-const (
-	DefaultAPIURL     = "https://api.mojang.com"
-	DefaultSessionURL = "https://sessionserver.mojang.com"
-	bulkLimit         = 10
 )
 
 var (
@@ -27,20 +21,14 @@ var (
 	uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$`)
 )
 
-type Client struct {
-	Fetch      *fetch.Client
-	APIURL     string
-	SessionURL string
-	Now        func() time.Time
+// Resolver looks players up through Mojang's profiles and stamps each answer with its clock.
+type Resolver struct {
+	Profiles *mojang.Profiles
+	Now      func() time.Time
 }
 
-func New(f *fetch.Client) *Client {
-	return &Client{Fetch: f, APIURL: DefaultAPIURL, SessionURL: DefaultSessionURL, Now: time.Now}
-}
-
-type Profile struct {
-	Name string
-	UUID string
+func NewResolver(profiles *mojang.Profiles) *Resolver {
+	return &Resolver{Profiles: profiles, Now: time.Now}
 }
 
 type Ref struct {
@@ -58,7 +46,7 @@ func IsUUID(s string) bool { return uuidPattern.MatchString(s) }
 func ParseRef(s string) (Ref, error) {
 	switch {
 	case IsUUID(s):
-		return Ref{UUID: Dashed(s)}, nil
+		return Ref{UUID: mojang.Dashed(s)}, nil
 	case IsName(s):
 		return Ref{Name: s}, nil
 	}
@@ -70,16 +58,6 @@ func (r Ref) String() string {
 		return r.Name
 	}
 	return r.UUID
-}
-
-// Dashed is a uuid in lowercase with its four dashes. An id that isn't 32 characters once
-// undashed comes back lowercased with no dashes at all.
-func Dashed(id string) string {
-	id = strings.ToLower(strings.ReplaceAll(id, "-", ""))
-	if len(id) != 32 {
-		return id
-	}
-	return id[:8] + "-" + id[8:12] + "-" + id[12:16] + "-" + id[16:20] + "-" + id[20:]
 }
 
 // State is how a player compares with the lock: Ok, Renamed (same uuid, new name), Reassigned
@@ -111,39 +89,6 @@ const (
 	MissingOnly
 )
 
-type apiProfile struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-func (c *Client) ByNames(ctx context.Context, names []string) (map[string]Profile, error) {
-	found := map[string]Profile{}
-	for start := 0; start < len(names); start += bulkLimit {
-		end := min(start+bulkLimit, len(names))
-		var profiles []apiProfile
-		if err := c.Fetch.PostJSON(ctx, c.APIURL+"/profiles/minecraft", names[start:end], &profiles); err != nil {
-			return nil, fmt.Errorf("mojang name lookup: %w", err)
-		}
-		for _, p := range profiles {
-			found[strings.ToLower(p.Name)] = Profile{Name: p.Name, UUID: Dashed(p.ID)}
-		}
-	}
-	return found, nil
-}
-
-func (c *Client) ByUUID(ctx context.Context, uuid string) (Profile, bool, error) {
-	var p apiProfile
-	url := c.SessionURL + "/session/minecraft/profile/" + strings.ReplaceAll(uuid, "-", "")
-	ok, err := c.Fetch.GetJSONIfFound(ctx, url, &p)
-	if err != nil {
-		return Profile{}, false, fmt.Errorf("mojang profile lookup: %w", err)
-	}
-	if !ok {
-		return Profile{}, false, nil
-	}
-	return Profile{Name: p.Name, UUID: Dashed(p.ID)}, true, nil
-}
-
 // Dedupe drops later refs to a player already listed: by uuid when a ref has one, else by name
 // in any case.
 func Dedupe(refs []Ref) []Ref {
@@ -152,7 +97,7 @@ func Dedupe(refs []Ref) []Ref {
 	for _, r := range refs {
 		key := strings.ToLower(r.Name)
 		if r.UUID != "" {
-			key = Dashed(r.UUID)
+			key = mojang.Dashed(r.UUID)
 		}
 		if seen[key] {
 			continue
@@ -165,7 +110,7 @@ func Dedupe(refs []Ref) []Ref {
 
 func Find(locked []lock.Player, ref Ref) (lock.Player, bool) {
 	for _, p := range locked {
-		if ref.UUID != "" && p.UUID == Dashed(ref.UUID) {
+		if ref.UUID != "" && p.UUID == mojang.Dashed(ref.UUID) {
 			return p, true
 		}
 		if ref.UUID == "" && strings.EqualFold(p.Name, ref.Name) {
@@ -176,7 +121,7 @@ func Find(locked []lock.Player, ref Ref) (lock.Player, bool) {
 }
 
 // Sync resolves refs against Mojang and classifies each against the lock.
-func (c *Client) Sync(ctx context.Context, refs []Ref, locked []lock.Player, mode Mode) ([]Result, error) {
+func (r *Resolver) Sync(ctx context.Context, refs []Ref, locked []lock.Player, mode Mode) ([]Result, error) {
 	refs = Dedupe(refs)
 	results := make([]Result, len(refs))
 	var pending []int
@@ -199,28 +144,28 @@ func (c *Client) Sync(ctx context.Context, refs []Ref, locked []lock.Player, mod
 			names = append(names, refs[i].Name)
 		}
 	}
-	byName, err := c.ByNames(ctx, names)
+	byName, err := r.Profiles.ByNames(ctx, names)
 	if err != nil {
 		return nil, err
 	}
-	now := c.Now().UTC().Format(time.RFC3339)
+	now := r.Now().UTC().Format(time.RFC3339)
 	for _, i := range pending {
 		ref := refs[i]
-		var profile Profile
+		var profile mojang.Profile
 		var found bool
 		if ref.UUID != "" {
-			if profile, found, err = c.ByUUID(ctx, ref.UUID); err != nil {
+			if profile, found, err = r.Profiles.ByUUID(ctx, ref.UUID); err != nil {
 				return nil, err
 			}
 		} else {
 			profile, found = byName[strings.ToLower(ref.Name)]
 		}
-		results[i] = c.classify(ref, profile, found, locked, now)
+		results[i] = classify(ref, profile, found, locked, now)
 	}
 	return results, nil
 }
 
-func (c *Client) classify(ref Ref, profile Profile, found bool, locked []lock.Player, now string) Result {
+func classify(ref Ref, profile mojang.Profile, found bool, locked []lock.Player, now string) Result {
 	r := Result{Input: ref.String(), ResolvedAt: now}
 	if !found {
 		r.State = Unknown

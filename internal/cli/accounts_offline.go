@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
+	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 )
@@ -34,7 +35,7 @@ func (a *app) accountsAddCmd() *cobra.Command {
 				if !player.IsUUID(uuid) {
 					return out.Errorf("usage", "--uuid takes a player uuid, dashed or not, and %q is neither", uuid)
 				}
-				id = player.Dashed(uuid)
+				id = mojang.Dashed(uuid)
 			}
 			accounts, _, err := a.accounts()
 			if err != nil {

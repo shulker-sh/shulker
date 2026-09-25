@@ -9,6 +9,7 @@ import (
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 )
@@ -151,7 +152,7 @@ func parsePlayerEntries(data []byte) ([]playerEntry, error) {
 
 func entryUUID(e playerEntry) string {
 	u, _ := e["uuid"].(string)
-	return player.Dashed(u)
+	return mojang.Dashed(u)
 }
 
 func (b *Builder) collectPlayers(players *manifest.Players, desired map[string]source) error {

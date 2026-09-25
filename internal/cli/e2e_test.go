@@ -772,9 +772,10 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	mr.BaseURL = h.server.URL + "/modrinth"
 	runtimes := mojang.NewRuntimes(f)
 	runtimes.IndexURL = h.server.URL + "/jrt/all.json"
-	players := player.New(f)
-	players.APIURL = h.server.URL + "/mojang"
-	players.SessionURL = h.server.URL + "/session"
+	profiles := mojang.NewProfiles(f)
+	profiles.APIURL = h.server.URL + "/mojang"
+	profiles.SessionURL = h.server.URL + "/session"
+	players := player.NewResolver(profiles)
 	key := curseForgeTestKey
 	if h.noCurseForge {
 		key = ""

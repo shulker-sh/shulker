@@ -36,7 +36,7 @@ type deps struct {
 	runtimes  *mojang.Runtimes
 	// loaders is what every loader row reaches out with.
 	loaders *loader.Remote
-	players *player.Client
+	players *player.Resolver
 	// metaURLs replaces a launcher's metadata service, keyed by the URL its entry names, so a test
 	// can point it at a fake.
 	metaURLs map[string]string
@@ -91,7 +91,7 @@ func (a *app) deps() (*deps, error) {
 		loaders:   loaders,
 		meta:      &resolve.Meta{Piston: mojang.NewPiston(f), Loaders: loaders},
 		runtimes:  mojang.NewRuntimes(f),
-		players:   player.New(f),
+		players:   player.NewResolver(mojang.NewProfiles(f)),
 		signin:    account.NewSignIn(f),
 		resources: game.MojangResources,
 	}
