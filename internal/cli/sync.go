@@ -76,7 +76,7 @@ func (a *app) syncCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				d.fetch.Offline = true
+				d.Fetch.Offline = true
 			}
 			if len(args) == 0 {
 				if req.into != "" && req.side == "" && req.at == (modpack.At{}) && a.instance == "" && !sel.all && !sel.narrows() {
@@ -377,7 +377,7 @@ func (a *app) sourceLocalFiles(src *syncSource, into string) (proj, inst *local.
 }
 
 func (a *app) sourceStore() *modpack.Store {
-	return &modpack.Store{Cache: a.d.cache, Fetch: a.d.fetch, Log: a.progress, Warn: a.printer.Warn}
+	return &modpack.Store{Cache: a.d.Cache, Fetch: a.d.Fetch, Log: a.progress, Warn: a.printer.Warn}
 }
 
 func (a *app) checkout(ctx context.Context, source string, at modpack.At) (*modpack.Checkout, error) {

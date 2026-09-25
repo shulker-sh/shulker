@@ -181,8 +181,8 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 		LoaderVersion: p.Lock.Loader.Version,
 		Force:         k.force,
 		Registry:      instances,
-		Cache:         d.cache,
-		Fetch:         d.fetch,
+		Cache:         d.Cache,
+		Fetch:         d.Fetch,
 		MetaURL:       a.metaURL(d, e),
 		Versions:      clientVersions{a: a, p: p, l: l},
 		Log:           a.progress,
@@ -412,7 +412,7 @@ func (v clientVersions) InstallerVersion(ctx context.Context) (json.RawMessage, 
 	if err != nil {
 		return nil, err
 	}
-	raw, changed, err := v.l.InstallerVersion(ctx, d.loaders, v.p.Lock)
+	raw, changed, err := v.l.InstallerVersion(ctx, d.Loaders, v.p.Lock)
 	return raw, v.p.SaveIfChanged(changed, err)
 }
 

@@ -439,10 +439,10 @@ func (a *app) storeSources(p *project.Project) (game.Sources, error) {
 		}
 	}
 	return game.Sources{
-		Fetch:   d.fetch,
+		Fetch:   d.Fetch,
 		Piston:  d.meta.Piston,
 		Loader:  row,
-		Loaders: d.loaders,
+		Loaders: d.Loaders,
 		InstallerJava: func(ctx context.Context) (string, error) {
 			java, err := a.projectJava(ctx, p)
 			return java.Path, err

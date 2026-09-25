@@ -68,7 +68,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			usage, err := d.cache.Usage()
+			usage, err := d.Cache.Usage()
 			if err != nil {
 				return err
 			}
@@ -76,7 +76,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			would, err := d.cache.Prune(r.locks, true)
+			would, err := d.Cache.Prune(r.locks, true)
 			if err != nil {
 				return err
 			}
@@ -129,7 +129,7 @@ func (a *app) cachePruneCmd() *cobra.Command {
 			if len(r.unreadable) > 0 {
 				return out.Errorf("cache-root-unreadable", "%s", r.unreadable[0])
 			}
-			pruned, err := d.cache.Prune(r.locks, false)
+			pruned, err := d.Cache.Prune(r.locks, false)
 			if err != nil {
 				return err
 			}
@@ -177,7 +177,7 @@ func (a *app) cacheRoots(named []string) (roots, error) {
 			continue
 		}
 		seen[dir] = true
-		locks, present, unreadable, err := build.CacheRoots(d.cache, dir, cache.Root{Source: in.Source, Ref: in.Ref, Path: in.Path})
+		locks, present, unreadable, err := build.CacheRoots(d.Cache, dir, cache.Root{Source: in.Source, Ref: in.Ref, Path: in.Path})
 		if err != nil {
 			return roots{}, err
 		}
@@ -201,7 +201,7 @@ func (a *app) cacheRoots(named []string) (roots, error) {
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err != nil {
 		return r, nil
 	}
-	locks, _, unreadable, err := build.CacheRoots(d.cache, dir, cache.Root{})
+	locks, _, unreadable, err := build.CacheRoots(d.Cache, dir, cache.Root{})
 	if err != nil {
 		return roots{}, err
 	}

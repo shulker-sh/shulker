@@ -10,12 +10,12 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/env"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/java"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
@@ -29,14 +29,8 @@ import (
 )
 
 type deps struct {
-	fetch     *fetch.Client
-	cache     *cache.Cache
-	providers provider.Providers
-	meta      *resolve.Meta
-	runtimes  *mojang.Runtimes
-	// loaders is what every loader row reaches out with.
-	loaders *loader.Remote
-	players *player.Resolver
+	*env.Env
+	meta *resolve.Meta
 	// metaURLs replaces a launcher's metadata service, keyed by the URL its entry names, so a test
 	// can point it at a fake.
 	metaURLs map[string]string
@@ -49,13 +43,14 @@ type deps struct {
 // when none are.
 func (a *app) titles() provider.Providers {
 	if d, err := a.deps(); err == nil {
-		return d.providers
+		return d.Providers
 	}
 	return nil
 }
 
 func (a *app) deps() (*deps, error) {
 	if a.d != nil {
+		a.d.FailFast = a.failFast
 		return a.d, nil
 	}
 	c, err := cache.Open()
@@ -84,18 +79,29 @@ func (a *app) deps() (*deps, error) {
 	cf := curseforge.Open(f, cfg.CurseForge.Key, c.Dir)
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	loaders := &loader.Remote{Fetch: f, Cache: c, Log: a.progress, RunInstaller: a.installer}
-	a.d = &deps{
-		fetch:     f,
-		cache:     c,
-		providers: providers,
-		loaders:   loaders,
-		meta:      &resolve.Meta{Piston: mojang.NewPiston(f), Loaders: loaders},
-		runtimes:  mojang.NewRuntimes(f),
-		players:   player.NewResolver(mojang.NewProfiles(f)),
-		signin:    account.NewSignIn(f),
-		resources: game.MojangResources,
-	}
+	a.d = a.newDeps(&env.Env{
+		Fetch:     f,
+		Cache:     c,
+		Providers: providers,
+		Loaders:   loaders,
+		Piston:    mojang.NewPiston(f),
+		Runtimes:  mojang.NewRuntimes(f),
+		Players:   player.NewResolver(mojang.NewProfiles(f)),
+		EULA:      cfg.EULA,
+	})
+	a.d.signin = account.NewSignIn(f)
+	a.d.resources = game.MojangResources
 	return a.d, nil
+}
+
+// newDeps completes e with the app's own sinks and flags and wraps it as the app's deps.
+func (a *app) newDeps(e *env.Env) *deps {
+	e.FailFast = a.failFast
+	e.Log = a.progress
+	e.Progress = a.printer.Progress
+	e.Warn = a.printer.Warn
+	e.WarnNudge = a.printer.WarnNudge
+	return &deps{Env: e, meta: &resolve.Meta{Piston: e.Piston, Loaders: e.Loaders}}
 }
 
 func (a *app) openProject() (*project.Project, error) {
@@ -165,30 +171,9 @@ func (a *app) resolverFor(ctx context.Context, p *project.Project, mode resolve.
 	if err != nil {
 		return nil, err
 	}
-	store, err := a.packStore(p)
+	r, err := resolve.New(ctx, d.Env, p, mode)
 	if err != nil {
 		return nil, err
-	}
-	packs, warnings, err := resolve.OpenPacks(ctx, store, p, mode)
-	if err != nil {
-		return nil, err
-	}
-	a.warn(warnings)
-	r := &resolve.Resolver{
-		Dir:       p.Dir,
-		Manifest:  p.Manifest,
-		Lock:      p.Lock,
-		Providers: d.providers,
-		Cache:     d.cache,
-		Fetch:     d.fetch,
-		Packs:     packs,
-		Meta:      d.meta,
-		Log:       a.progress,
-		Progress:  a.printer.Progress,
-		FailFast:  a.failFast,
-	}
-	r.LockModpack = func(ctx context.Context, key string, entry manifest.Require) error {
-		return r.LockHosted(ctx, store, p, key, entry)
 	}
 	if a.canPick() {
 		r.AskUnlock = func(key, minecraft string) (bool, error) {
@@ -207,18 +192,7 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 	if err != nil {
 		return nil, err
 	}
-	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers, Fetch: d.fetch, Log: a.progress, EULA: a.eulaAccepted()}, nil
-}
-
-// eulaAccepted is whether config.json records this user's acceptance of the Minecraft EULA; a
-// config shulker can't read accepts nothing.
-func (a *app) eulaAccepted() bool {
-	path, err := a.configFile()
-	if err != nil {
-		return false
-	}
-	cfg, err := config.LoadFile(path)
-	return err == nil && cfg.EULA
+	return build.New(d.Env, p, packs), nil
 }
 
 // openPacks reads p's modpacks at their pins, once: a later call answers from what the first read.
@@ -240,17 +214,7 @@ func (a *app) packStore(p *project.Project) (*modpack.Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	consume := func(ctx context.Context, l *modpack.Loaded) error {
-		r := &resolve.Resolver{Dir: p.Dir, Manifest: p.Manifest, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
-		return r.ConsumeArchive(ctx, l)
-	}
-	obtain := func(ctx context.Context, name string, entry manifest.Require) (lock.Modpack, error) {
-		r := &resolve.Resolver{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
-		pin, err := r.ObtainModpack(ctx, name, entry)
-		a.warn(r.Warnings)
-		return pin, err
-	}
-	return &modpack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
+	return resolve.NewStore(d.Env, p), nil
 }
 
 // managedJava ensures the lock's runtime component. fix is the Fix row a runtime-unavailable error
@@ -261,7 +225,7 @@ func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool,
 		return java.Runtime{}, err
 	}
 	opts := java.RuntimeOptions{Refresh: refresh, Log: a.progress}
-	rt, err := java.EnsureRuntime(ctx, d.fetch, d.runtimes, d.cache.Dir, p.Lock.Java.Component, opts)
+	rt, err := java.EnsureRuntime(ctx, d.Fetch, d.Runtimes, d.Cache.Dir, p.Lock.Java.Component, opts)
 	switch out.CodeOf(err) {
 	case "runtime-unavailable":
 		out.AsError(err).Rows = []out.Detail{fix}
@@ -320,7 +284,7 @@ func (a *app) requireLock(p *project.Project) error {
 	if err != nil {
 		return err
 	}
-	a.warn(p.GoneFiles(d.cache.Has))
+	a.warn(p.GoneFiles(d.Cache.Has))
 	return nil
 }
 

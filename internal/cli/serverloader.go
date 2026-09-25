@@ -42,7 +42,7 @@ func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *
 	if err != nil {
 		return err
 	}
-	if err := l.InstallServer(ctx, d.loaders, p.Lock, dir, java.Path); err != nil {
+	if err := l.InstallServer(ctx, d.Loaders, p.Lock, dir, java.Path); err != nil {
 		return a.keepInstallerOutput(err)
 	}
 	rep.InstalledLoader = &want
@@ -60,7 +60,7 @@ func (a *app) keepInstallerOutput(err error) error {
 	if err != nil {
 		return failure.Err
 	}
-	path, err := d.cache.InstallerLog(time.Now())
+	path, err := d.Cache.InstallerLog(time.Now())
 	if err == nil {
 		err = fsutil.Write(path, []byte(failure.Output))
 	}

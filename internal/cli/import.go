@@ -190,7 +190,7 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 // importPack reads arc as the project it would make at dir, its local files copied out there,
 // and returns the resolver holding that project's manifest and lock.
 func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir string, f *importFlags) (*resolve.Resolver, *resolve.Imported, error) {
-	r := &resolve.Resolver{Dir: dir, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Meta: d.meta, Log: a.progress}
+	r := resolve.NewAt(d.Env, dir)
 	mods, err := r.ImportProject(ctx, arc, resolve.ImportOptions{Name: f.name, IgnoreMarker: f.ignoreShulker, ServerPack: !f.noServerPack})
 	a.warn(r.Warnings)
 	if err != nil {
@@ -220,7 +220,7 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 		return a.importHosted(ctx, d, dir, target, arg, f)
 	}
 	if (strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")) && modpack.Classify(arg) == modpack.Git {
-		store := &modpack.Store{Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+		store := &modpack.Store{Cache: d.Cache, Fetch: d.Fetch, Log: a.progress}
 		path, err := store.FetchArchive(ctx, arg)
 		if err != nil {
 			return nil, nil, err
@@ -264,7 +264,8 @@ func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *pro
 	if err := refuseImportFlags(f, modpack.Hosted); err != nil {
 		return nil, nil, err
 	}
-	r := &resolve.Resolver{Dir: dir, Manifest: &manifest.Manifest{}, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+	r := resolve.NewAt(d.Env, dir)
+	r.Manifest = &manifest.Manifest{}
 	if target != nil {
 		r.Manifest, r.Lock = target.Manifest, target.Lock
 	}
@@ -273,7 +274,7 @@ func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *pro
 	if err != nil {
 		return nil, nil, err
 	}
-	arc, err := readImportArchive(d.cache.Object(pin.Sha512), f.typ)
+	arc, err := readImportArchive(d.Cache.Object(pin.Sha512), f.typ)
 	return arc, nil, err
 }
 
@@ -286,7 +287,7 @@ func (a *app) importCheckout(ctx context.Context, d *deps, dir, source string, f
 	if want, ok := packarchive.Lookup(f.typ); ok {
 		return nil, nil, out.Errorf("usage", "%s is a shulker source, not a %s modpack", source, want.Title())
 	}
-	store := &modpack.Store{Cache: d.cache, ProjectDir: dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn}
+	store := &modpack.Store{Cache: d.Cache, ProjectDir: dir, Fetch: d.Fetch, Log: a.progress, Warn: a.printer.Warn}
 	c, err := store.Checkout(ctx, source, f.at)
 	return nil, c, err
 }

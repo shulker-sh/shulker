@@ -172,7 +172,7 @@ func (a *app) providerURLs(args []string) (map[string]provider.Ref, error) {
 	}
 	urls := map[string]provider.Ref{}
 	for _, arg := range args {
-		u, ok, err := d.providers.ParseURL(arg)
+		u, ok, err := d.Providers.ParseURL(arg)
 		if err != nil {
 			return nil, err
 		}
@@ -187,7 +187,7 @@ func (a *app) providerURLs(args []string) (map[string]provider.Ref, error) {
 // modpack: an .mrpack by its name, and a zip by holding a CurseForge manifest.
 func (a *app) isArchive(arg string) bool {
 	if d, err := a.deps(); err == nil {
-		if _, ok, _ := d.providers.ParseURL(arg); ok {
+		if _, ok, _ := d.Providers.ParseURL(arg); ok {
 			return false
 		}
 	}

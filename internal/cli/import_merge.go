@@ -66,7 +66,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 	summary := plural(len(rep.Entries), "entry", "entries") + " merged"
 	if mods != nil {
 		locked := slices.DeleteFunc(slices.Clone(mods.Locked), func(f resolve.LockedFile) bool { return !slices.Contains(rep.Entries, f.ID) })
-		summary = lockedSummary(d.providers, locked)
+		summary = lockedSummary(d.Providers, locked)
 	}
 	return a.emitImport(res, out.Row{Text: summary}, overrideRow(rep))
 }

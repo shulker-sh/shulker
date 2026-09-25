@@ -43,7 +43,7 @@ func (a *app) browseSearch(cmd *cobra.Command, kind string, names []string, limi
 func (a *app) searchTitle(names []string) string {
 	var titles []string
 	for _, name := range names {
-		if p, err := a.d.providers.Get(name); err == nil {
+		if p, err := a.d.Providers.Get(name); err == nil {
 			titles = append(titles, p.Title())
 		}
 	}

@@ -43,7 +43,7 @@ func (a *app) rootsOf(configPath string, cfg config.Config) (rootDirs, error) {
 	return rootDirs{
 		Instances: config.Root(configPath, cfg.Instances, filepath.Join(data, "instances")),
 		Saves:     config.Root(configPath, cfg.Saves, filepath.Join(data, "saves")),
-		Store:     config.Root(configPath, cfg.Store, d.cache.Game()),
+		Store:     config.Root(configPath, cfg.Store, d.Cache.Game()),
 		Backups:   filepath.Join(data, "backups"),
 	}, nil
 }

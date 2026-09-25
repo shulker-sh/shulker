@@ -23,6 +23,8 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/env"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
@@ -34,7 +36,6 @@ import (
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/provider/curseforge"
 	"shulker.sh/shulker/internal/provider/modrinth"
-	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/selfupdate"
 	"shulker.sh/shulker/schema"
 )
@@ -758,6 +759,13 @@ func (h *harness) run(t *testing.T, args ...string) (int, string, string) {
 	return code, stdout.String(), stderr.String()
 }
 
+// eulaIn is whether the config file at path accepts the Minecraft EULA; a config a test hasn't
+// written accepts nothing.
+func eulaIn(path string) bool {
+	cfg, err := config.LoadFile(path)
+	return err == nil && cfg.EULA
+}
+
 // newApp is what every run in a test is built from: the harness's own directories and stdin, and
 // every client pointed at its fake server.
 func (h *harness) newApp(stdout, stderr io.Writer) *app {
@@ -794,18 +802,19 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	c := &cache.Cache{Dir: h.cache}
 	loaders := &loader.Remote{Fetch: f, Cache: c, Log: a.progress, RunInstaller: a.installer}
-	a.d = &deps{
-		fetch:     f,
-		cache:     c,
-		providers: providers,
-		loaders:   loaders,
-		meta:      &resolve.Meta{Piston: piston, Loaders: loaders},
-		runtimes:  runtimes,
-		players:   players,
-		metaURLs:  map[string]string{launcher.GDLauncherMetaURL: h.server.URL + "/gdl"},
-		signin:    h.msa.signIn(f, h.server.URL),
-		resources: h.server.URL + "/resources",
-	}
+	a.d = a.newDeps(&env.Env{
+		Fetch:     f,
+		Cache:     c,
+		Providers: providers,
+		Loaders:   loaders,
+		Piston:    piston,
+		Runtimes:  runtimes,
+		Players:   players,
+		EULA:      eulaIn(h.config),
+	})
+	a.d.metaURLs = map[string]string{launcher.GDLauncherMetaURL: h.server.URL + "/gdl"}
+	a.d.signin = h.msa.signIn(f, h.server.URL)
+	a.d.resources = h.server.URL + "/resources"
 	return a
 }
 

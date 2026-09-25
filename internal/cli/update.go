@@ -86,7 +86,7 @@ func (a *app) pinCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			u, isURL, err := d.providers.ParseURL(version)
+			u, isURL, err := d.Providers.ParseURL(version)
 			if err != nil {
 				return err
 			}

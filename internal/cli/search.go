@@ -96,7 +96,7 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 			}
 		}
 	}
-	hits, searched, skipped, failures := d.providers.Search(ctx, names, query, kind, limit, step)
+	hits, searched, skipped, failures := d.Providers.Search(ctx, names, query, kind, limit, step)
 	reply := searchReply{results: searchResults{Query: query, Results: []searchHit{}}, searched: searched}
 	for _, hit := range hits {
 		reply.results.Results = append(reply.results.Results, searchHitOf(hit.Provider, hit.Project))

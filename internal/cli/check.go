@@ -121,7 +121,7 @@ func (a *app) checkLocked(ctx context.Context, p *project.Project, scopes []stri
 	}
 	var warnings []string
 	if files {
-		warnings = p.GoneFiles(d.cache.Has)
+		warnings = p.GoneFiles(d.Cache.Has)
 	}
 	r, err := a.resolver(ctx, p)
 	if err != nil {

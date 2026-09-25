@@ -42,7 +42,7 @@ func (a *app) playerCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			results, err := d.players.Sync(cmd.Context(), refs, p.Lock.Players, player.Recheck)
+			results, err := d.Players.Sync(cmd.Context(), refs, p.Lock.Players, player.Recheck)
 			if err != nil {
 				return err
 			}
@@ -91,7 +91,7 @@ func (a *app) syncPlayers(ctx context.Context, p *project.Project, mode player.M
 	if err != nil {
 		return err
 	}
-	results, err := d.players.Sync(ctx, refs, p.Lock.Players, mode)
+	results, err := d.Players.Sync(ctx, refs, p.Lock.Players, mode)
 	if err != nil {
 		return err
 	}
