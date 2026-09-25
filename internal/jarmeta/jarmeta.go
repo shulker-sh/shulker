@@ -119,6 +119,9 @@ func readZip(zr *zip.Reader, files []string) (*Info, error) {
 		}
 		return info, nil
 	}
+	if info := readFMLLibrary(zr, files); info != nil {
+		return info, nil
+	}
 	return nil, errNoMetadata
 }
 
@@ -371,6 +374,10 @@ func addNested(zr *zip.Reader, info *Info, name string, files []string) {
 	}
 	child, err := readZip(inner, files)
 	if err != nil {
+		return
+	}
+	if child.ID == "" {
+		info.Nested = append(info.Nested, child.Nested...)
 		return
 	}
 	info.Nested = append(info.Nested, child)

@@ -49,24 +49,7 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		}
 		return strings.ReplaceAll(v, "${file.jarVersion}", jarVersion)
 	}
-	loaderName := "forge"
-	if f.Name == "META-INF/neoforge.mods.toml" {
-		loaderName = "neoforge"
-	}
-	info := &Info{
-		ID:              raw.Mods[0].ModID,
-		Version:         version(raw.Mods[0].Version),
-		Loader:          loaderName,
-		Side:            "both",
-		Depends:         map[string]string{},
-		Breaks:          map[string]string{},
-		Conflicts:       map[string]string{},
-		Recommends:      map[string]string{},
-		Suggests:        map[string]string{},
-		Optional:        map[string]string{},
-		Provides:        map[string]string{},
-		UsesMavenRanges: true,
-	}
+	info := newFMLInfo(raw.Mods[0].ModID, version(raw.Mods[0].Version), modsTOMLLoader(f.Name))
 	own := map[string]bool{}
 	for _, m := range raw.Mods {
 		own[m.ModID] = true
@@ -105,6 +88,55 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	}
 	addJarJar(zr, info, files)
 	return info, nil
+}
+
+// readFMLLibrary reads a jar with no mods.toml that FML still loads, as a library, language
+// provider or game library, because its manifest names an FMLModType. It declares no mod id, and
+// FML versions it by its Implementation-Version; its jar-in-jar mods load as any mod's do.
+func readFMLLibrary(zr *zip.Reader, files []string) *Info {
+	loaderName := ""
+	for _, name := range files {
+		if loaderName = modsTOMLLoader(name); loaderName != "" {
+			break
+		}
+	}
+	if loaderName == "" || manifestAttribute(zr, "FMLModType") == "" {
+		return nil
+	}
+	version := manifestAttribute(zr, "Implementation-Version")
+	if version == "" {
+		version = "1"
+	}
+	info := newFMLInfo("", version, loaderName)
+	addJarJar(zr, info, files)
+	return info
+}
+
+func newFMLInfo(id, version, loaderName string) *Info {
+	return &Info{
+		ID:              id,
+		Version:         version,
+		Loader:          loaderName,
+		Side:            "both",
+		Depends:         map[string]string{},
+		Breaks:          map[string]string{},
+		Conflicts:       map[string]string{},
+		Recommends:      map[string]string{},
+		Suggests:        map[string]string{},
+		Optional:        map[string]string{},
+		Provides:        map[string]string{},
+		UsesMavenRanges: true,
+	}
+}
+
+func modsTOMLLoader(file string) string {
+	switch file {
+	case "META-INF/neoforge.mods.toml":
+		return "neoforge"
+	case "META-INF/mods.toml":
+		return "forge"
+	}
+	return ""
 }
 
 // dependencyType reads NeoForge's type, falling back to Forge's mandatory flag.

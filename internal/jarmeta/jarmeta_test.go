@@ -280,6 +280,34 @@ versionRange="[21.0,)"
 	}
 }
 
+func TestReadTakesAnFMLModTypeJarAsALibrary(t *testing.T) {
+	toml := "[[mods]]\nmodId=\"kotlinforforge\"\nversion=\"5.12.0\"\n"
+	nested := buildZip(t, map[string]string{"META-INF/neoforge.mods.toml": toml, "META-INF/mods.toml": toml})
+	path := filepath.Join(t.TempDir(), "kff.jar")
+	if err := os.WriteFile(path, buildZip(t, map[string]string{
+		"META-INF/MANIFEST.MF":          "Manifest-Version: 1.0\r\nFMLModType: LIBRARY\r\nImplementation-Version: 5.12.0\r\n\r\n",
+		"META-INF/jarjar/metadata.json": `{"jars":[{"path":"META-INF/jarjar/kff.jar"}]}`,
+		"META-INF/jarjar/kff.jar":       string(nested),
+	}), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"neoforge", "forge", ""} {
+		info, err := Read(path, "kff.jar", loaderNamed(name))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if info.ID != "" || info.Version != "5.12.0" {
+			t.Errorf("%s: library read as %s %s, want no id and its Implementation-Version", name, info.ID, info.Version)
+		}
+		if got := info.AllProvides(); !maps.Equal(got, map[string]string{"kotlinforforge": "5.12.0"}) {
+			t.Errorf("%s: provides %v", name, got)
+		}
+	}
+	if _, err := Read(path, "kff.jar", loaderNamed("fabric")); out.CodeOf(err) != "jar-metadata-missing" {
+		t.Errorf("fabric: %v, want no metadata", err)
+	}
+}
+
 func TestReadPrefersTheProjectLoader(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "multi.jar")
 	if err := os.WriteFile(path, buildZip(t, map[string]string{
