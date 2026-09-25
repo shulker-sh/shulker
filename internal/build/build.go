@@ -182,7 +182,8 @@ type Builder struct {
 	Fetch     *fetch.Client
 	Log       func(format string, args ...any)
 	// EULA is whether this user accepted the Minecraft EULA in config.json, which a server build
-	// writes to eula.txt. A manifest can't accept it on anyone's behalf.
+	// writes to eula.txt unless the player wrote one there themselves. A manifest can't accept it on
+	// anyone's behalf.
 	EULA bool
 }
 
@@ -515,7 +516,8 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 	var shipped string
 	if side == "server" {
 		var err error
-		if levelName, err = b.collectServer(desired, vars, cond, opts.NoLauncher, opts.NoEULA, report); err != nil {
+		eula := b.EULA && !opts.NoEULA && !handwritten(dir, EulaFile)
+		if levelName, err = b.collectServer(desired, vars, cond, opts.NoLauncher, eula, report); err != nil {
 			return nil, nil, err
 		}
 		dirs = dataDirs(side, levelName)
@@ -720,7 +722,7 @@ func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole 
 	return nil
 }
 
-func (b *Builder) collectServer(desired map[string]source, vars map[string]string, cond conditions, noLauncher, noEULA bool, report *Report) (string, error) {
+func (b *Builder) collectServer(desired map[string]source, vars map[string]string, cond conditions, noLauncher, eula bool, report *Report) (string, error) {
 	if !noLauncher {
 		if err := b.collectLauncher(desired); err != nil {
 			return "", err
@@ -730,7 +732,7 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if srv == nil {
 		srv = &manifest.Server{}
 	}
-	if b.EULA && !noEULA {
+	if eula {
 		desired[EulaFile] = source{content: literal{[]byte("eula=true\n")}}
 	}
 	props, err := renderProperties(PropertiesFile, srv.Properties, vars)
@@ -982,6 +984,21 @@ func canonicalValues(values map[string]string) []byte {
 		fmt.Fprintf(&buf, "%s=%s\n", k, values[k])
 	}
 	return buf.Bytes()
+}
+
+// HasEula is whether dir holds an eula.txt, however it got there; the server reads it as it is.
+func HasEula(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, EulaFile))
+	return err == nil
+}
+
+// handwritten is whether rel is in dir without shulker having written it there.
+func handwritten(dir, rel string) bool {
+	if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+		return false
+	}
+	_, ours := LoadState(dir).Files[rel]
+	return !ours
 }
 
 // LoadState is ReadState without the reason: a state it can't read is empty.

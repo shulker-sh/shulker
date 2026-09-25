@@ -75,9 +75,6 @@ func (a *app) serveCmd() *cobra.Command {
 				p.Manifest.Server = &manifest.Server{}
 			}
 			srv := p.Manifest.Server
-			if err := a.requireEula(acceptEula); err != nil {
-				return err
-			}
 			jvm, err := server.JVMArgs(srv.Memory, srv.JVMFlags, srv.JVMArgs)
 			if err != nil {
 				return err
@@ -99,6 +96,15 @@ func (a *app) serveCmd() *cobra.Command {
 			rep, err := b.Build("server", build.Options{Force: force})
 			if err != nil {
 				return err
+			}
+			if !build.HasEula(rep.Dir) {
+				if err := a.requireEula(acceptEula); err != nil {
+					return err
+				}
+				b.EULA = true
+				if rep, err = b.Build("server", build.Options{Force: force}); err != nil {
+					return err
+				}
 			}
 			a.warnState(rep.State, takeOver(cmd, nil, force))
 			if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
@@ -162,12 +168,9 @@ func (a *app) serveCmd() *cobra.Command {
 	return cmd
 }
 
-// requireEula has this user accept the Minecraft EULA once, by the prompt or --accept-eula, and
-// records it in config.json. A manifest never accepts it for them.
+// requireEula has this user accept the Minecraft EULA, by the prompt or --accept-eula, and records
+// it in config.json. A manifest never accepts it for them.
 func (a *app) requireEula(flag bool) error {
-	if a.eulaAccepted() {
-		return nil
-	}
 	accepted := flag
 	if !accepted && a.canPick() {
 		l := a.printer.Err()

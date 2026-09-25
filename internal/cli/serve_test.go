@@ -109,10 +109,8 @@ func TestServeErrors(t *testing.T) {
 
 	old := h.fakeJDK(t, "17.0.12", "0")
 	h.editManifest(t, func(m map[string]any) { m["java"] = old })
-	code, _, stderr := h.run(t, "serve", "--accept-eula")
-	if h.configEula(t) != true {
-		t.Fatal("--accept-eula must record eula: true in config.json")
-	}
+	h.mustRun(t, "config", "set", "eula", "true")
+	code, _, stderr := h.run(t, "serve")
 	if code == 0 || !strings.Contains(stderr, "needs Java 25") {
 		t.Fatalf("expected java-version error, got %d: %s", code, stderr)
 	}
@@ -266,6 +264,41 @@ func TestServeEulaFromConfigSkipsPrompt(t *testing.T) {
 	}
 	if got := readFile(t, filepath.Join(h.dir, "build", "server", "eula.txt")); got != "eula=true\n" {
 		t.Fatalf("eula.txt: %q", got)
+	}
+}
+
+func TestServeRunsAHandwrittenEula(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "install")
+	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
+	writeOverride(t, h.dir, "build/server/eula.txt", "#mine\neula=true\n")
+	h.tty = true
+	h.stdin = strings.NewReader("stop\n")
+	code, stdout, stderr := h.run(t, "serve")
+	if code != 0 || strings.Contains(stderr, "Accept and record") {
+		t.Fatalf("a handwritten eula.txt must serve without asking: %d\n%s\n%s", code, stdout, stderr)
+	}
+	if h.configEula(t) != nil {
+		t.Fatal("a handwritten eula.txt must not record acceptance in config.json")
+	}
+
+	h.mustRun(t, "config", "set", "eula", "true")
+	h.mustRun(t, "build")
+	if got := readFile(t, filepath.Join(h.dir, "build", "server", "eula.txt")); got != "#mine\neula=true\n" {
+		t.Fatalf("an accepted build must leave a handwritten eula.txt alone: %q", got)
+	}
+}
+
+func TestServeTakesAnEulaFromOverrides(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "install")
+	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
+	writeOverride(t, h.dir, "server-overrides/eula.txt", "eula=true\n")
+	h.stdin = strings.NewReader("stop\n")
+	if code, stdout, stderr := h.run(t, "serve"); code != 0 {
+		t.Fatalf("an eula.txt from the overrides must serve on the first run: %d\n%s\n%s", code, stdout, stderr)
 	}
 }
 
