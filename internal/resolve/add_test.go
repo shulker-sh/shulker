@@ -207,6 +207,7 @@ func TestInstallWarnsOfStrayDownloadsAndListsMissingFiles(t *testing.T) {
 	h.mustAdd("locked", AddOptions{})
 
 	h.drop("unrelated.jar", []byte("not a mod"))
+	h.drop("log.json", nil)
 	h.r.Cache = &cache.Cache{Dir: t.TempDir()}
 	fetched, warnings, err := h.install()
 	if err != nil || len(fetched) != 0 || len(warnings) != 1 || warnings[0] != DownloadsDir+"/unrelated.jar matches no mod in the lock" {
