@@ -18,8 +18,8 @@ func registerPrism(t *testing.T, h *harness, dir string) {
 	t.Helper()
 	if _, err := config.UpdateInstances(registryPath(h), func(instances []config.Instance) []config.Instance {
 		return append(instances, config.Instance{
-			ID: "borrowed", Launcher: "prism", LauncherDir: dir,
-			Dir: filepath.Join(dir, "instances", "borrowed", "minecraft"), Source: ".",
+			ID: "linked", Launcher: "prism", LauncherDir: dir,
+			Dir: filepath.Join(dir, "instances", "linked", "minecraft"), Source: ".",
 		})
 	}); err != nil {
 		t.Fatal(err)
@@ -150,7 +150,7 @@ func TestProvidersWarnOnceAboutALauncherThatIsNotThere(t *testing.T) {
 	}
 }
 
-func TestAccountsBorrowsFromPrism(t *testing.T) {
+func TestAccountsReadsFromPrism(t *testing.T) {
 	h := newHarness(t)
 	prismAccounts(t, h, prismNotch)
 	writeAccountStore(t, h, ownAccount("Dinnerbone", dinnerbone))
@@ -160,9 +160,9 @@ func TestAccountsBorrowsFromPrism(t *testing.T) {
 	for _, want := range []string{
 		"    Account     UUID                      Group     State\n",
 		"    Dinnerbone  0e05d36c-9cbd-4b0a-ae4e-  own       playable\n                7b2e2b7eb1f4\n",
-		"    Jeb_        853c80ef-3c37-49fd-aa49-  borrowed  token expired ",
-		"    Notch       069a79f4-44e9-4726-a5be-  borrowed  playable\n",
-		"    Steve       5627dd98-e6be-3c21-b8a8-  borrowed  offline\n",
+		"    Jeb_        853c80ef-3c37-49fd-aa49-  launcher  token expired ",
+		"    Notch       069a79f4-44e9-4726-a5be-  launcher  playable\n",
+		"    Steve       5627dd98-e6be-3c21-b8a8-  launcher  offline\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)
@@ -173,15 +173,15 @@ func TestAccountsBorrowsFromPrism(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, row := range rows[1:] {
-		if row.Source != "prism" || row.Group != account.GroupBorrowed {
-			t.Errorf("borrowed row = %+v", row)
+		if row.Source != "prism" || row.Group != account.GroupLauncher {
+			t.Errorf("launcher row = %+v", row)
 		}
 	}
-	// A borrowed account is selected by @prism and named by the launcher it belongs to.
+	// A launcher account is selected by @prism and named by the launcher it belongs to.
 	h.mustRun(t, "accounts", "use", "Notch@prism")
 	code, stdout, _ := h.run(t, "accounts", "logout", "Notch", "--yes", "--json")
-	if e := failureCode(t, stdout); code == 0 || !strings.Contains(e.Message, "borrowed from prism") {
-		t.Fatalf("logout on a borrowed account: %s", stdout)
+	if e := failureCode(t, stdout); code == 0 || !strings.Contains(e.Message, "belongs to prism") {
+		t.Fatalf("logout on a launcher account: %s", stdout)
 	}
 }
 
@@ -244,14 +244,14 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentPrismFile(t *testing.T) {
 	}
 }
 
-func TestLaunchWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
+func TestLaunchWarnsOnALauncherTokenThatRanOut(t *testing.T) {
 	h := newHarness(t)
 	prismAccounts(t, h, prismNotch)
 	h.mustRun(t, "accounts", "stores", "set", "prism")
 
 	signed, stderr, err := sessionFor(t, h, "Jeb_")
 	if err != nil {
-		t.Fatalf("an expired borrowed account still launches: %v", err)
+		t.Fatalf("an expired launcher account still launches: %v", err)
 	}
 	if signed.Minecraft == nil || signed.Minecraft.Token != "stale" {
 		t.Errorf("the launch plays on the token it has: %+v", signed.Minecraft)
@@ -262,9 +262,9 @@ func TestLaunchWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
 	}
 	// Shulker never writes another launcher's account into its own file, renewed or not.
 	if _, err := os.Stat(account.Path(h.config)); !os.IsNotExist(err) {
-		t.Errorf("a borrowed account must not land in shulker's own store: %v", err)
+		t.Errorf("a launcher account must not land in shulker's own store: %v", err)
 	}
-	// A borrowed account that is still good says nothing.
+	// A launcher account that is still good says nothing.
 	if _, stderr, err := sessionFor(t, h, "Notch"); err != nil || strings.Contains(stderr, "Realms") {
 		t.Errorf("a token that still holds launches quietly: %q %v", stderr, err)
 	}
@@ -308,7 +308,7 @@ func mojangAccountEntry(local, id, name, token, expires string) string {
 		`"minecraftProfile":{"id":"` + id + `","name":"` + name + `"}}`
 }
 
-func TestAccountsBorrowsFromMojang(t *testing.T) {
+func TestAccountsReadsFromMojang(t *testing.T) {
 	h := newHarness(t)
 	mojangAccounts(t, h, map[string]string{
 		launcher.MojangAccountsFile: mojangFile(
@@ -331,9 +331,9 @@ func TestAccountsBorrowsFromMojang(t *testing.T) {
 	}
 	for _, want := range []string{
 		"    Account     UUID                      Group     State\n",
-		"    Dinnerbone  " + dinnerbone[:24] + "  borrowed  playable\n                " + dinnerbone[24:] + "\n",
-		"    Notch       " + notchID[:24] + "  borrowed  playable\n                " + notchID[24:] + "\n",
-		"    Steve       " + steveID[:24] + "  borrowed  token expired ",
+		"    Dinnerbone  " + dinnerbone[:24] + "  launcher  playable\n                " + dinnerbone[24:] + "\n",
+		"    Notch       " + notchID[:24] + "  launcher  playable\n                " + notchID[24:] + "\n",
+		"    Steve       " + steveID[:24] + "  launcher  token expired ",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)
@@ -344,14 +344,14 @@ func TestAccountsBorrowsFromMojang(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, row := range rows {
-		if row.Source != "mojang" || row.Group != account.GroupBorrowed {
-			t.Errorf("borrowed row = %+v", row)
+		if row.Source != "mojang" || row.Group != account.GroupLauncher {
+			t.Errorf("launcher row = %+v", row)
 		}
 	}
 	h.mustRun(t, "accounts", "use", "Notch@mojang")
 	code, stdout, _ := h.run(t, "accounts", "logout", "Notch", "--yes", "--json")
-	if e := failureCode(t, stdout); code == 0 || !strings.Contains(e.Message, "borrowed from mojang") {
-		t.Fatalf("logout on a borrowed account: %s", stdout)
+	if e := failureCode(t, stdout); code == 0 || !strings.Contains(e.Message, "belongs to mojang") {
+		t.Fatalf("logout on a launcher account: %s", stdout)
 	}
 }
 

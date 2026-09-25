@@ -35,7 +35,7 @@ type prismFile struct {
 }
 
 // prismAccount is one entry of that list (AccountData::saveState). Only the profile and the
-// yggdrasil session token are read: shulker never renews a borrowed account, so the Microsoft,
+// yggdrasil session token are read: shulker never renews a launcher account, so the Microsoft,
 // Xbox and XSTS tokens beside them — msa, utoken and xrp-mc — are of no use to it.
 type prismAccount struct {
 	Type    string        `json:"type"`
@@ -92,7 +92,7 @@ func readPrismAccounts(e *Entry, dir string, now time.Time) ([]account.Resolved,
 	return out, nil
 }
 
-// resolve is one borrowed account, or nothing when the entry names none shulker can use. An entry
+// resolve is one launcher account, or nothing when the entry names none shulker can use. An entry
 // with no profile is skipped silently, because the username and the UUID both live there and the
 // file's own username field is most likely the Microsoft email shulker took care never to handle.
 // A type Prism itself refuses to load goes the same way.
@@ -104,7 +104,7 @@ func (p prismAccount) resolve(e *Entry, now time.Time) (account.Resolved, bool) 
 		ID:      p.Profile.ID,
 		Name:    p.Profile.Name,
 		Source:  e.Name,
-		Group:   account.GroupBorrowed,
+		Group:   account.GroupLauncher,
 		State:   account.OfflineOnly,
 		Account: account.Account{Type: account.Offline, Profile: &account.Profile{ID: p.Profile.ID, Name: p.Profile.Name}},
 	}

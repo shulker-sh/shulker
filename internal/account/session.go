@@ -13,7 +13,7 @@ type Warning string
 const (
 	// WarnNone is a session with nothing to say.
 	WarnNone Warning = ""
-	// WarnTokenExpired is a borrowed session token that ran out, which only its launcher renews.
+	// WarnTokenExpired is a launcher account's session token that ran out, which only its launcher renews.
 	WarnTokenExpired Warning = "token-expired"
 	// WarnOffline is an own account that couldn't be renewed because Microsoft was unreachable.
 	WarnOffline Warning = "offline"
@@ -21,7 +21,7 @@ const (
 
 // Session is the account a launch plays on: the stored one while its Minecraft token has over an
 // hour left at now, and a silently renewed one otherwise, which renewed reports so the caller can
-// save it. A borrowed account is never renewed: an expired one plays on the token it has, with a
+// save it. A launcher account is never renewed: an expired one plays on the token it has, with a
 // warning. Offline, an own account falls back to the token it has too, which still opens
 // singleplayer, LAN and offline-mode servers.
 func (s *SignIn) Session(ctx context.Context, r Resolved, now time.Time) (Account, bool, Warning, error) {

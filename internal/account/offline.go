@@ -29,7 +29,7 @@ func NewOffline(name, id string) Account {
 // offline account passes at creation, and again at deletion, since the gate would block creating
 // it a second time. It is a statement of intent rather than a licence check, so it reads the Java
 // profile an account already carries and asks nothing of anybody. A profile is the proof whether
-// or not its session still works: an expired sign-in or borrowed token changes who can launch, not
+// or not its session still works: an expired sign-in or launcher token changes who can launch, not
 // who owns the game.
 func OwnsTheGame(accounts []Resolved) bool {
 	for _, r := range accounts {
@@ -91,7 +91,7 @@ func whereItCameFrom(r Resolved) string {
 	case SourceOffline:
 		return "an offline account"
 	}
-	return "borrowed from " + r.Source
+	return "an account from " + r.Source
 }
 
 // QuoteName quotes a name a shell would otherwise split: a gamertag may hold spaces, and so may an

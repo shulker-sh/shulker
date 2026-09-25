@@ -101,7 +101,7 @@ func (m mojangAccount) merge(byID map[string]mojangAccount) {
 	byID[id] = m
 }
 
-// resolve is the borrowed account as every command sees it. An entry with a profile but no usable
+// resolve is the launcher account as every command sees it. An entry with a profile but no usable
 // token is expired rather than skipped: the account is real, it proves the player owns Java, and a
 // launch already says what an expired session can't do.
 func (m mojangAccount) resolve(e *Entry, now time.Time) account.Resolved {
@@ -109,7 +109,7 @@ func (m mojangAccount) resolve(e *Entry, now time.Time) account.Resolved {
 		ID:      m.Profile.ID,
 		Name:    m.Profile.Name,
 		Source:  e.Name,
-		Group:   account.GroupBorrowed,
+		Group:   account.GroupLauncher,
 		State:   account.TokenExpired,
 		Account: account.Account{Type: account.Microsoft, Profile: &account.Profile{ID: m.Profile.ID, Name: m.Profile.Name}},
 	}

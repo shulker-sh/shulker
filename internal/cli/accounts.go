@@ -66,7 +66,7 @@ func groupAccounts(accounts []account.Resolved) []accountGroup {
 	}{
 		{account.GroupOwn, "Own"},
 		{account.GroupOffline, "Offline"},
-		{account.GroupBorrowed, "Borrowed"},
+		{account.GroupLauncher, "Launcher"},
 	} {
 		if in := account.InGroup(accounts, g.group); len(in) > 0 {
 			groups = append(groups, accountGroup{heading: g.heading, accounts: in})
@@ -150,7 +150,7 @@ func (a *app) changeDefault(id string) (configChange, error) {
 }
 
 // accountStore is shulker's own accounts.json: where it is, and what it holds. Only the accounts
-// shulker signed in or created itself are in there; a borrowed one is read where it lives.
+// shulker signed in or created itself are in there; one from a launcher is read where it lives.
 func (a *app) accountStore() (string, account.Store, error) {
 	path, err := a.configFile()
 	if err != nil {
@@ -178,9 +178,9 @@ func (a *app) accounts() ([]account.Resolved, config.Config, error) {
 	if stores == nil {
 		stores = account.DefaultStores()
 	}
-	borrowed, err := a.borrowedAccounts(stores)
+	fromLaunchers, err := a.launcherAccounts(stores)
 	if err != nil {
 		return nil, config.Config{}, err
 	}
-	return account.Resolve(stores, store, borrowed), cfg, nil
+	return account.Resolve(stores, store, fromLaunchers), cfg, nil
 }

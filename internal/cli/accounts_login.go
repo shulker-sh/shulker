@@ -272,7 +272,7 @@ func notOwnAccount(r account.Resolved, verb string) error {
 		e.Help = fmt.Sprintf("`shulker accounts remove %s` deletes it", accountSelector(r))
 		return e
 	}
-	return out.Errorf("usage", "%s is borrowed from %s, so only %s can %s it", r.Name, r.Source, r.Source, verb)
+	return out.Errorf("usage", "%s belongs to %s, so only %s can %s it", r.Name, r.Source, r.Source, verb)
 }
 
 // reseatDefault keeps accounts.default pointing at an account that is still there, handing it to

@@ -1,5 +1,5 @@
 // Package account holds the accounts shulker can launch with: the ones it signed in or created
-// itself, kept in accounts.json, and the ones it borrows from another launcher's own file.
+// itself, kept in accounts.json, and the ones it reads from another launcher's own file.
 package account
 
 import (
@@ -82,7 +82,7 @@ const (
 	OfflineOnly   State = "offline"
 )
 
-// State reads an own or offline account's state off the record. A borrowed account's token-expired
+// State reads an own or offline account's state off the record. A launcher account's token-expired
 // state comes from its provider's reader, which knows when the token ran out.
 func (a Account) State() State {
 	switch {
@@ -96,7 +96,7 @@ func (a Account) State() State {
 	return Playable
 }
 
-// Text is the state as the account list prints it. A borrowed token that has run out says how long
+// Text is the state as the account list prints it. An expired launcher token says how long
 // ago, which is the only thing a player can act on: the other launcher has to renew it.
 func (s State) Text(expired, now time.Time) string {
 	switch s {

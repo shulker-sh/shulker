@@ -119,7 +119,7 @@ type CurseForge struct {
 }
 
 // Accounts is which accounts shulker can see and which one it uses by default. The default lives
-// here rather than in accounts.json because a borrowed account may be it, and shulker never writes
+// here rather than in accounts.json because a launcher account may be it, and shulker never writes
 // another launcher's accounts into its own file.
 type Accounts struct {
 	// Stores is where accounts are read from, in the order the earliest one wins ties by UUID.

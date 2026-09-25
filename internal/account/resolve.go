@@ -7,7 +7,7 @@ import (
 )
 
 // The sources a selector names after @. An account shulker signed in itself is @shulker and one it
-// created is @offline, both out of its own accounts.json; a borrowed account takes the name of the
+// created is @offline, both out of its own accounts.json; a launcher account takes the name of the
 // launcher it came from.
 const (
 	SourceShulker = "shulker"
@@ -23,7 +23,7 @@ type Group string
 const (
 	GroupOwn      Group = "own"
 	GroupOffline  Group = "offline"
-	GroupBorrowed Group = "borrowed"
+	GroupLauncher Group = "launcher"
 )
 
 // Resolved is one account as every command that names one sees it.
@@ -33,7 +33,7 @@ type Resolved struct {
 	Source string `json:"source"`
 	Group  Group  `json:"group"`
 	State  State  `json:"state"`
-	// Expired is when a borrowed session token ran out, which the state line dates.
+	// Expired is when a launcher account's session token ran out, which the state line dates.
 	Expired time.Time `json:"-"`
 	Account Account   `json:"-"`
 }
@@ -56,11 +56,11 @@ func Launchable(accounts []Resolved) []Resolved {
 // Resolve is every account the stores yield, in store order: shulker's own file, and what each
 // launcher's reader already took from it. One Microsoft account can sit in several launchers, so
 // the list is deduped by id and the earliest store wins.
-func Resolve(stores []string, own Store, borrowed map[string][]Resolved) []Resolved {
+func Resolve(stores []string, own Store, fromLaunchers map[string][]Resolved) []Resolved {
 	var out []Resolved
 	seen := map[string]bool{}
 	for _, p := range stores {
-		for _, r := range fromStore(p, own, borrowed) {
+		for _, r := range fromStore(p, own, fromLaunchers) {
 			if r.ID == "" || seen[NormalizeID(r.ID)] {
 				continue
 			}
@@ -73,9 +73,9 @@ func Resolve(stores []string, own Store, borrowed map[string][]Resolved) []Resol
 
 // fromStore is what one store contributes. A launcher's accounts are read where they live, before
 // this, and a launcher with nothing to offer yields nothing.
-func fromStore(store string, own Store, borrowed map[string][]Resolved) []Resolved {
+func fromStore(store string, own Store, fromLaunchers map[string][]Resolved) []Resolved {
 	if store != SourceShulker {
-		return borrowed[store]
+		return fromLaunchers[store]
 	}
 	out := make([]Resolved, 0, len(own.Accounts))
 	for _, a := range own.Accounts {

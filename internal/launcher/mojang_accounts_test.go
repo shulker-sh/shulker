@@ -66,7 +66,7 @@ func TestReadMojangTakesAccountsFromBothFiles(t *testing.T) {
 	if jeb.Name != "Jeb_" || notch.Name != "Notch" {
 		t.Fatalf("accounts = %+v", got)
 	}
-	if notch.Source != mojangEntry.Name || notch.Group != account.GroupBorrowed || notch.State != account.Playable {
+	if notch.Source != mojangEntry.Name || notch.Group != account.GroupLauncher || notch.State != account.Playable {
 		t.Errorf("row = %+v", notch)
 	}
 	if notch.ID != notchUUID || notch.Account.Profile == nil || notch.Account.Profile.Name != "Notch" {
@@ -76,7 +76,7 @@ func TestReadMojangTakesAccountsFromBothFiles(t *testing.T) {
 		t.Errorf("the session token is what a launch needs: %+v", notch.Account)
 	}
 	if notch.Account.RefreshToken != "" {
-		t.Error("a borrowed account is never renewed, so no refresh token is kept")
+		t.Error("a launcher account is never renewed, so no refresh token is kept")
 	}
 }
 
@@ -155,7 +155,7 @@ func TestReadMojangExpiredTokenStaysUsable(t *testing.T) {
 		t.Fatalf("read = %+v %v", got, errs)
 	}
 	if got[0].Account.Minecraft == nil || got[0].Account.Minecraft.Token != "stale" {
-		t.Error("an expired borrowed account keeps its token: a launch uses it and warns")
+		t.Error("an expired launcher account keeps its token: a launch uses it and warns")
 	}
 	if text := got[0].State.Text(got[0].Expired, mojangNow); text != "token expired 2 days ago" {
 		t.Errorf("state text = %q", text)

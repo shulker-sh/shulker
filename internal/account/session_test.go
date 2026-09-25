@@ -77,13 +77,13 @@ func TestSessionRefusesAnExpiredOrProfilelessAccount(t *testing.T) {
 	}
 }
 
-func TestSessionWarnsOnABorrowedTokenThatRanOut(t *testing.T) {
+func TestSessionWarnsOnALauncherTokenThatRanOut(t *testing.T) {
 	s := newFakeMSA(t).signIn()
 	a := Account{Type: Microsoft, Profile: &Profile{ID: "id", Name: "Jeb_"}, Minecraft: &Minecraft{Token: "stale", ExpiresAt: signInNow.Add(-time.Hour).Format(time.RFC3339)}}
-	r := Resolved{ID: "id", Name: "Jeb_", Source: "prism", Group: GroupBorrowed, State: TokenExpired, Account: a}
+	r := Resolved{ID: "id", Name: "Jeb_", Source: "prism", Group: GroupLauncher, State: TokenExpired, Account: a}
 	signed, renewed, warning, err := s.Session(context.Background(), r, signInNow)
 	if err != nil {
-		t.Fatalf("an expired borrowed account still launches: %v", err)
+		t.Fatalf("an expired launcher account still launches: %v", err)
 	}
 	if renewed || warning != WarnTokenExpired || signed.Minecraft.Token != "stale" {
 		t.Errorf("renewed = %v, warning = %q, token = %q", renewed, warning, signed.Minecraft.Token)

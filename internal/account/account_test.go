@@ -176,22 +176,22 @@ func TestResolveIgnoresAStoreThatFoundNothing(t *testing.T) {
 
 func TestResolveTakesTheEarliestStoresCopyOfAnAccount(t *testing.T) {
 	id := "069a79f4-44e9-4726-a5be-fca90e38aaf5"
-	borrowed := map[string][]Resolved{"prism": {{
+	fromLaunchers := map[string][]Resolved{"prism": {{
 		ID: "069A79F444E94726A5BEFCA90E38AAF5", Name: "Notch",
-		Source: "prism", Group: GroupBorrowed, State: TokenExpired,
+		Source: "prism", Group: GroupLauncher, State: TokenExpired,
 	}}}
 	store := Store{Accounts: []Account{own("Notch", id)}}
 
-	got := Resolve([]string{SourceShulker, "prism"}, store, borrowed)
+	got := Resolve([]string{SourceShulker, "prism"}, store, fromLaunchers)
 	if len(got) != 1 || got[0].Source != SourceShulker {
 		t.Fatalf("shulker comes first, so its copy wins: %+v", got)
 	}
-	got = Resolve([]string{"prism", SourceShulker}, store, borrowed)
+	got = Resolve([]string{"prism", SourceShulker}, store, fromLaunchers)
 	if len(got) != 1 || got[0].Source != "prism" {
 		t.Fatalf("prism comes first, so its copy wins: %+v", got)
 	}
-	if got = Resolve([]string{"prism"}, store, borrowed); len(got) != 1 || got[0].State != TokenExpired {
-		t.Fatalf("without shulker only the borrowed copy is left: %+v", got)
+	if got = Resolve([]string{"prism"}, store, fromLaunchers); len(got) != 1 || got[0].State != TokenExpired {
+		t.Fatalf("without shulker only the launcher copy is left: %+v", got)
 	}
 }
 

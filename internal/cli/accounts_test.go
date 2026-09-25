@@ -65,8 +65,8 @@ func TestAccountsListsEachGroupWithItsState(t *testing.T) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)
 		}
 	}
-	if strings.Contains(stdout, "borrowed") {
-		t.Errorf("no provider yields borrowed accounts yet:\n%s", stdout)
+	if strings.Contains(stdout, "launcher") {
+		t.Errorf("no launcher accounts without a store for one:\n%s", stdout)
 	}
 }
 

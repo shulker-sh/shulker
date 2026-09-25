@@ -49,7 +49,7 @@ func TestReadPrismTakesMSAAndOfflineAccounts(t *testing.T) {
 		t.Fatalf("accounts = %+v", got)
 	}
 	notch := got[0]
-	if notch.Name != "Notch" || notch.Source != prismEntry.Name || notch.Group != account.GroupBorrowed {
+	if notch.Name != "Notch" || notch.Source != prismEntry.Name || notch.Group != account.GroupLauncher {
 		t.Errorf("msa row = %+v", notch)
 	}
 	if notch.State != account.Playable {
@@ -59,10 +59,10 @@ func TestReadPrismTakesMSAAndOfflineAccounts(t *testing.T) {
 		t.Errorf("the session token is what a launch needs: %+v", notch.Account.Minecraft)
 	}
 	if notch.Account.RefreshToken != "" {
-		t.Error("a borrowed account is never renewed, so no refresh token is kept")
+		t.Error("a launcher account is never renewed, so no refresh token is kept")
 	}
 	steve := got[1]
-	if steve.State != account.OfflineOnly || steve.Source != prismEntry.Name || steve.Group != account.GroupBorrowed {
+	if steve.State != account.OfflineOnly || steve.Source != prismEntry.Name || steve.Group != account.GroupLauncher {
 		t.Errorf("offline row = %+v", steve)
 	}
 }
@@ -108,7 +108,7 @@ func TestReadPrismExpiredTokenStaysUsable(t *testing.T) {
 		t.Fatalf("read = %+v %v", got, err)
 	}
 	if got[0].Account.Minecraft == nil || got[0].Account.Minecraft.Token != "stale" {
-		t.Error("an expired borrowed account keeps its token: a launch uses it and warns")
+		t.Error("an expired launcher account keeps its token: a launch uses it and warns")
 	}
 	if text := got[0].State.Text(got[0].Expired, prismNow); text != "token expired 2 days ago" {
 		t.Errorf("state text = %q", text)

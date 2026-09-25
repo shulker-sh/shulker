@@ -158,11 +158,11 @@ func (a *app) stores() ([]string, error) {
 	return cfg.Accounts.Stores, nil
 }
 
-// borrowedAccounts is what each configured launcher's reader takes from its own accounts file. A
+// launcherAccounts is what each configured launcher's reader takes from its own accounts file. A
 // file that doesn't read warns and is skipped: shulker neither wrote it nor can repair it, so a
 // corrupt one must not take the whole account list down with it.
-func (a *app) borrowedAccounts(stores []string) (map[string][]account.Resolved, error) {
-	var borrowed map[string][]account.Resolved
+func (a *app) launcherAccounts(stores []string) (map[string][]account.Resolved, error) {
+	var fromLaunchers map[string][]account.Resolved
 	instances, err := a.loadInstances()
 	if err != nil {
 		return nil, err
@@ -180,10 +180,10 @@ func (a *app) borrowedAccounts(stores []string) (map[string][]account.Resolved, 
 		if len(found) == 0 {
 			continue
 		}
-		if borrowed == nil {
-			borrowed = map[string][]account.Resolved{}
+		if fromLaunchers == nil {
+			fromLaunchers = map[string][]account.Resolved{}
 		}
-		borrowed[name] = found
+		fromLaunchers[name] = found
 	}
-	return borrowed, nil
+	return fromLaunchers, nil
 }
