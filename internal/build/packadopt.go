@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/packarchive"
@@ -36,7 +37,7 @@ func AdoptPackChoices(m *manifest.Manifest, lk *lock.Lock, overrides []packarchi
 		case o.Path == m.OptionsPath():
 			key = resourcePacksKey
 			adopted, warned = adoptPackList(m, listFormFor(lk.Minecraft), o)
-		case slices.ContainsFunc(shaderConfigs, func(c struct{ mod, file string }) bool { return c.file == o.Path }):
+		case slices.ContainsFunc(integrations.Shaders, func(s integrations.Shader) bool { return s.Config != "" && s.Config == o.Path }):
 			key = "shaderPack"
 			adopted, warned = adoptShader(m, o)
 		}

@@ -11,9 +11,9 @@ import (
 	"sort"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/version/minecraft"
 	"shulker.sh/shulker/schema"
 )
 
@@ -269,7 +269,17 @@ func (l *Lock) PackSections() []map[string]Pack {
 
 // DatapackFolders are the folders outside a world that a datapack is placed in, by
 // DatapackFolder, and that the game or a global datapack mod loads datapacks from.
-var DatapackFolders = []string{"datapacks", "config/paxi/datapacks", "config/openloader/data", "config/openloader/packs"}
+var DatapackFolders = datapackFolders()
+
+func datapackFolders() []string {
+	folders := []string{"datapacks"}
+	for _, l := range integrations.DatapackLoaders {
+		for _, f := range l.Folders {
+			folders = append(folders, f.Path)
+		}
+	}
+	return folders
+}
 
 // PackPath is where a side's build places a pack of kind: a datapack in DatapackFolder, the
 // other kinds by Pack.Path.
@@ -291,15 +301,13 @@ func (l *Lock) DatapackFolder(side, levelName string) (folder string, loaded boo
 			placed[l.JarID(key)] = true
 		}
 	}
-	switch {
-	case placed["paxi"]:
-		return "config/paxi/datapacks", true
-	case placed["openloader"]:
-		if v, err := minecraft.Parse(l.Minecraft); err == nil && v.Compare(minecraft.MustParse("1.21")) < 0 {
-			return "config/openloader/data", true
+	present := integrations.Match(placed, nil)
+	for _, loader := range integrations.DatapackLoaders {
+		if present[loader.ID] {
+			return loader.Folder(l.Minecraft), true
 		}
-		return "config/openloader/packs", true
-	case side == "server":
+	}
+	if side == "server" {
 		return levelName + "/datapacks", true
 	}
 	return "datapacks", false

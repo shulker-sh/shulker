@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -133,16 +134,11 @@ func (b *Builder) packRefs() []packRef {
 	return refs
 }
 
-// shaderConfigs are the config files each shader mod enables its pack in, in the
-// order they are tried. Canvas has none, and a vanilla shader is a resource pack,
-// so neither appears.
-var shaderConfigs = []struct{ mod, file string }{{"iris", "config/iris.properties"}, {"oculus", "config/oculus.properties"}}
-
 // chooseShader selects the shader client.shader names in the config file of the placed shader
 // mod that loads it, "" clearing the selection. Only the keys shulker owns are written, through the
 // per-key merge, so the rest of the player's shader settings survive a rebuild. With client.shader
 // absent nothing is written, so the pack's own config stands, or no shader is selected.
-func (b *Builder) chooseShader(side string, opts Options, desired map[string]source, placed map[string]bool, report *Report) error {
+func (b *Builder) chooseShader(side string, opts Options, desired map[string]source, present map[string]bool, report *Report) error {
 	cl := b.Manifest.Client
 	if cl == nil || cl.Shader == nil {
 		return nil
@@ -151,9 +147,9 @@ func (b *Builder) chooseShader(side string, opts Options, desired map[string]sou
 	var config, value string
 	switch p, locked := b.Lock.Shaders[key]; {
 	case key == "":
-		for _, c := range shaderConfigs {
-			if placed[c.mod] {
-				config = c.file
+		for _, s := range integrations.Shaders {
+			if present[s.ID] && s.Config != "" {
+				config = s.Config
 				break
 			}
 		}
@@ -161,7 +157,7 @@ func (b *Builder) chooseShader(side string, opts Options, desired map[string]sou
 		return unknownPack("client.shader", key, "shader")
 	default:
 		if _, isPlaced := desired[p.Path(manifest.TypeShader)]; isPlaced {
-			config, value = shaderConfig(p, placed), p.Filename
+			config, value = shaderConfig(p, present), p.Filename
 		}
 	}
 	if config == "" {
@@ -181,12 +177,12 @@ func unknownPack(field, key, kind string) error {
 	return e
 }
 
-// reportUnloadableShaders warns about each placed shader nothing in the build can load.
-func (b *Builder) reportUnloadableShaders(desired map[string]source, placed map[string]bool, report *Report) {
+// reportUnloadableShaders warns about each placed shader no shader mod in the build can load.
+func (b *Builder) reportUnloadableShaders(desired map[string]source, present map[string]bool, report *Report) {
 	for _, key := range b.placedShaders(desired) {
 		p := b.Lock.Shaders[key]
-		if shaderConfig(p, placed) == "" && !loadsShader(p, "canvas", placed) {
-			report.Warnings = append(report.Warnings, key+" is placed, but nothing in this build can load it; shulker add iris")
+		if !slices.ContainsFunc(integrations.Shaders, func(s integrations.Shader) bool { return s.Loads(p.Loaders, present) }) {
+			report.Warnings = append(report.Warnings, key+" is placed, but nothing in this build can load it; shulker add "+integrations.Shaders[0].Key)
 		}
 	}
 }
@@ -234,21 +230,15 @@ func (b *Builder) placedShaders(desired map[string]source) []string {
 	return keys
 }
 
-// shaderConfig is the config file of the first placed mod that can enable p, empty
-// when none can.
-func shaderConfig(p lock.Pack, placed map[string]bool) string {
-	for _, c := range shaderConfigs {
-		if loadsShader(p, c.mod, placed) {
-			return c.file
+// shaderConfig is the config file of the first present shader mod that can enable p,
+// empty when none can.
+func shaderConfig(p lock.Pack, present map[string]bool) string {
+	for _, s := range integrations.Shaders {
+		if s.Config != "" && s.Loads(p.Loaders, present) {
+			return s.Config
 		}
 	}
 	return ""
-}
-
-// loadsShader reports whether mod is placed and can load p: p names it among its
-// loaders, or names none.
-func loadsShader(p lock.Pack, mod string, placed map[string]bool) bool {
-	return placed[mod] && (len(p.Loaders) == 0 || slices.Contains(p.Loaders, mod))
 }
 
 // seedResourcePacks fills in options.txt's enabled list once, and holds it from
@@ -567,7 +557,7 @@ func (b *Builder) collectDatapacks(side, levelName string, cond conditions, desi
 		placed = append(placed, key)
 	}
 	if !loaded && len(placed) > 0 {
-		report.Warnings = append(report.Warnings, fmt.Sprintf("%s: placed in %s/, which only some global datapack mods read; add one, such as paxi, to load it in every world", strings.Join(placed, ", "), folder))
+		report.Warnings = append(report.Warnings, fmt.Sprintf("%s: placed in %s/, which only some global datapack mods read; add one, such as %s, to load it in every world", strings.Join(placed, ", "), folder, integrations.DatapackLoaders[0].Key))
 	}
 	return nil
 }

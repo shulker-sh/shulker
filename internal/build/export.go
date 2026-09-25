@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
@@ -598,8 +599,11 @@ func enableByListedNames(t *exportSide, files []packarchive.File, optionsPath st
 		}
 	}
 	rewriteProperty(t.files, optionsPath, resourcePacksKey+":", func(list string) string { return form.rename(list, renamed) })
-	for _, config := range shaderConfigs {
-		rewriteProperty(t.files, config.file, "shaderPack=", func(v string) string {
+	for _, s := range integrations.Shaders {
+		if s.Config == "" {
+			continue
+		}
+		rewriteProperty(t.files, s.Config, "shaderPack=", func(v string) string {
 			if name := fileNames["shaderpacks/"+v]; name != "" {
 				return name
 			}

@@ -21,6 +21,7 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/lock"
@@ -529,10 +530,11 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectPacks(cond, desired, report); err != nil {
 			return nil, nil, err
 		}
-		if err := b.chooseShader(side, opts, desired, placed, report); err != nil {
+		present := integrations.Match(placed, nil)
+		if err := b.chooseShader(side, opts, desired, present, report); err != nil {
 			return nil, nil, err
 		}
-		b.reportUnloadableShaders(desired, placed, report)
+		b.reportUnloadableShaders(desired, present, report)
 		var err error
 		if shipped, err = b.shippedPackList(side, cond, vars); err != nil {
 			return nil, nil, err
