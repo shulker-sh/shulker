@@ -89,13 +89,13 @@ Type: `"modrinth"` \| `"curseforge"`
 
 ### integration
 
-A mod shulker acts on by role: iris, oculus and canvas load shader packs; paxi and openloader load datapacks into every world.
+A mod shulker acts on by role: iris, oculus and canvas load shader packs; paxi and openloader load datapacks into every world; configmanager, yosbr and configured-defaults seed files, so an export puts seeded files in their folder.
 
-Type: `"iris"` \| `"oculus"` \| `"canvas"` \| `"paxi"` \| `"openloader"`
+Type: `"iris"` \| `"oculus"` \| `"canvas"` \| `"paxi"` \| `"openloader"` \| `"configmanager"` \| `"yosbr"` \| `"configured-defaults"`
 
 ### integrations
 
-The jar ids shulker recognises the mods it acts on by, keyed by integration: the shader mod whose config a build writes the chosen shader into, and the global datapack mod whose folder a build places datapacks in. A listed integration's jar ids replace its built-in ones, so a fork is marked by listing it beside the original, and an empty list turns the integration off. An unlisted integration keeps its built-in ids. It reaches every placed jar: a requires entry, a dependency, a modpack's mod or a local file.
+The jar ids shulker recognises the mods it acts on by, keyed by integration: the shader mod whose config a build writes the chosen shader into, the global datapack mod whose folder a build places datapacks in, and the seed mod whose folder an export puts seeded files in. A listed integration's jar ids replace its built-in ones, so a fork is marked by listing it beside the original, and an empty list turns the integration off. An unlisted integration keeps its built-in ids. It reaches every placed jar: a requires entry, a dependency, a modpack's mod or a local file.
 
 Type: map of `string`[]. keys are [`integration`](#integration)
 

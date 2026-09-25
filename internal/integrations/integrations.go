@@ -1,5 +1,6 @@
 // Package integrations is shulker's knowledge of specific mods it acts on by role: the shader mods
-// whose config a build writes, and the datapack loaders whose folder it fills. It is data, one list
+// whose config a build writes, the datapack loaders whose folder it fills, and the seed mods whose
+// folder an export puts seeded files in. It is data, one list
 // per role in order of preference, plus small methods on plain types; the behaviour stays with its
 // callers, so this package imports nothing that knows about builds or locks.
 package integrations
@@ -107,6 +108,33 @@ func (l DatapackLoader) Folder(mc string) string {
 	return folder
 }
 
+// SeedMod is a mod that copies each file under Folder to the same path in the game directory when
+// that path is missing, which is how an exported pack seeds a file past a launcher's update.
+type SeedMod struct {
+	ID     string
+	JarIDs []string
+	Name   string
+	Key    string
+	Folder string
+}
+
+// SeedMods are the seed mods, in the order an export prefers them.
+var SeedMods = []SeedMod{
+	{ID: "configmanager", JarIDs: []string{"config_manager"}, Name: "Config Manager", Key: "configmanager", Folder: "config/modpack_defaults"},
+	{ID: "yosbr", JarIDs: []string{"yosbr"}, Name: "YOSBR", Key: "yosbr", Folder: "config/yosbr"},
+	{ID: "configured-defaults", JarIDs: []string{"configureddefaults"}, Name: "Configured Defaults", Key: "configured-defaults", Folder: "configureddefaults"},
+}
+
+// FirstSeedMod is the first seed mod among present, and false when none is.
+func FirstSeedMod(present map[string]bool) (SeedMod, bool) {
+	for _, m := range SeedMods {
+		if present[m.ID] {
+			return m, true
+		}
+	}
+	return SeedMod{}, false
+}
+
 // IDs are every integration's id, shaders first.
 func IDs() []string {
 	var ids []string
@@ -115,6 +143,9 @@ func IDs() []string {
 	}
 	for _, l := range DatapackLoaders {
 		ids = append(ids, l.ID)
+	}
+	for _, m := range SeedMods {
+		ids = append(ids, m.ID)
 	}
 	return ids
 }
@@ -126,6 +157,9 @@ func jarIDs() map[string][]string {
 	}
 	for _, l := range DatapackLoaders {
 		byID[l.ID] = l.JarIDs
+	}
+	for _, m := range SeedMods {
+		byID[m.ID] = m.JarIDs
 	}
 	return byID
 }

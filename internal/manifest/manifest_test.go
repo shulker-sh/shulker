@@ -466,7 +466,7 @@ func TestParseChecksIntegrations(t *testing.T) {
 	if out.CodeOf(err) != "manifest-invalid" {
 		t.Fatalf("unknown integration: %v", err)
 	}
-	if want := "shulker.json: integrations.optifine: key must be one of 'iris', 'oculus', 'canvas', 'paxi', 'openloader'"; err.Error() != want {
+	if want := "shulker.json: integrations.optifine: key must be one of 'iris', 'oculus', 'canvas', 'paxi', 'openloader', 'configmanager', 'yosbr', 'configured-defaults'"; err.Error() != want {
 		t.Errorf("unknown integration error %q, want %q", err, want)
 	}
 }

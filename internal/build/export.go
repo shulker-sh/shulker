@@ -66,6 +66,9 @@ type exportSide struct {
 	packs  map[string]bool
 	// datapacks is where the side places each datapack, by key.
 	datapacks map[string]string
+	// seeded are the paths of the side's seeded files, and seedMod the first seed mod it places.
+	seeded  []string
+	seedMod *integrations.SeedMod
 }
 
 // exportEntry is one file the export ships, whatever kind it is, so mods and packs go through
@@ -131,6 +134,13 @@ func (b *Builder) Export(ctx context.Context, opts ExportOptions) (*ExportReport
 		for _, t := range sides {
 			enableByListedNames(t, files, b.Manifest.OptionsPath(), b.listForm())
 		}
+	}
+	if plain := relocateSeeded(sides); len(plain) > 0 {
+		var keys []string
+		for _, m := range integrations.SeedMods {
+			keys = append(keys, m.Key)
+		}
+		report.Warnings = append(report.Warnings, fmt.Sprintf("seeded files ship as plain overrides, which launchers write over the player's copy on each update: %s; add %s to keep them seeded", strings.Join(plain, ", "), strings.Join(keys[:len(keys)-1], ", ")+" or "+keys[len(keys)-1]))
 	}
 	overrides := splitOverrides(sides)
 	for _, o := range overrides {
@@ -216,10 +226,15 @@ func (b *Builder) exportCollect(t *exportSide, version, osName string, features 
 	}
 	warnings := append([]string{}, rep.Warnings...)
 	t.mods = map[string]bool{}
+	placed := map[string]bool{}
 	for id, m := range b.Lock.Mods {
 		if _, ok := desired["mods/"+m.Filename]; ok {
 			t.mods[id] = true
+			placed[b.Lock.JarID(id)] = true
 		}
+	}
+	if m, ok := integrations.FirstSeedMod(integrations.Match(placed, b.Manifest.Integrations)); ok {
+		t.seedMod = &m
 	}
 	t.packs = map[string]bool{}
 	for _, ref := range b.packRefs() {
@@ -241,6 +256,9 @@ func (b *Builder) exportCollect(t *exportSide, version, osName string, features 
 	for path, s := range desired {
 		if s.isCached() {
 			continue
+		}
+		if s.seeded {
+			t.seeded = append(t.seeded, path)
 		}
 		if f := s.owned(); f != nil {
 			data, err := f.render(nil, nil, nil)
@@ -582,6 +600,24 @@ func zipContents(data []byte) (map[string][]byte, error) {
 		contents[f.Name] = content
 	}
 	return contents, nil
+}
+
+// relocateSeeded moves each side's seeded files into the folder of the seed mod it places, which
+// copies them back to their own path in game only where the player has none. It returns the seeded
+// files a side ships as plain overrides, having no seed mod.
+func relocateSeeded(sides []*exportSide) []string {
+	plain := map[string]bool{}
+	for _, t := range sides {
+		for _, path := range t.seeded {
+			if t.seedMod == nil {
+				plain[path] = true
+				continue
+			}
+			t.files[t.seedMod.Folder+"/"+path] = t.files[path]
+			delete(t.files, path)
+		}
+	}
+	return slices.Sorted(maps.Keys(plain))
 }
 
 // enableByListedNames points the options file and the shader loader's config at the names the
