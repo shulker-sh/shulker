@@ -35,6 +35,7 @@ import (
 	"shulker.sh/shulker/internal/provider/curseforge"
 	"shulker.sh/shulker/internal/provider/modrinth"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/selfupdate"
 	"shulker.sh/shulker/schema"
 )
 
@@ -98,6 +99,7 @@ type harness struct {
 	mixin          fakeJar
 	vanilla        fakeJar
 	clientJar      fakeJar
+	build          *selfupdate.Build
 	brigadier      fakeJar
 	fabricLoader   fakeJar
 	assetIndex     []byte
@@ -762,6 +764,9 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	a.tty = func() bool { return h.tty }
 	a.installer = h.fakeInstaller
 	a.watcher = h.watch
+	if h.build != nil {
+		a.build = func() selfupdate.Build { return *h.build }
+	}
 	if h.exe != "" {
 		a.exe = func() (string, error) { return h.exe, nil }
 	}

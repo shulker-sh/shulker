@@ -52,7 +52,8 @@ func (v versionInfo) shortCommit() string {
 }
 
 func (a *app) versionCmd() *cobra.Command {
-	return &cobra.Command{
+	var verbose bool
+	cmd := &cobra.Command{
 		Use:         "version",
 		Annotations: reads(),
 		Short:       "Print the shulker version",
@@ -72,12 +73,14 @@ func (a *app) versionCmd() *cobra.Command {
 			if c, err := cache.Open(); err == nil {
 				info.Cache = c.Dir
 			}
-			return a.printer.Emit(info, func(l *out.Lines) { printVersion(l, info) })
+			return a.printer.Emit(info, func(l *out.Lines) { printVersion(l, info, verbose) })
 		},
 	}
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "also print the build and the environment: Go, install route, binary, config and cache")
+	return cmd
 }
 
-func printVersion(l *out.Lines, info versionInfo) {
+func printVersion(l *out.Lines, info versionInfo, verbose bool) {
 	t := l.T
 	head := t.Command("shulker " + info.Version)
 	if info.Commit != "" {
@@ -86,9 +89,15 @@ func printVersion(l *out.Lines, info versionInfo) {
 			head += t.Yellow("-dirty")
 		}
 	}
+	if !verbose && info.Built != "" {
+		head += t.Aside("built " + info.builtAt())
+	}
 	l.Blank()
 	l.Text(head)
 	l.Blank()
+	if !verbose {
+		return
+	}
 	row := func(label, value string) {
 		if value != "" {
 			l.Text(t.Grey(fmt.Sprintf("%-9s", label)) + " " + value)
@@ -96,6 +105,7 @@ func printVersion(l *out.Lines, info versionInfo) {
 	}
 	row("Built", info.builtAt())
 	row("Go", info.platform())
+	row("Install", info.Install)
 	row("Binary", pathLink(t, info.Binary))
 	row("Config", pathLink(t, info.Config))
 	row("Cache", pathLink(t, info.Cache))

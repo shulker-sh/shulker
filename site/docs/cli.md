@@ -1682,11 +1682,16 @@ shulker log --cmd "hook wrap" --code launch-not-started
 
 ### `shulker version`
 
-Print the shulker version.
+Print the shulker version on one line, with when it was built: `shulker 0.0.1 (built 2026-09-20 14:02 UTC)`. A build from a clone prints `shulker dev` with its commit, and `-dirty` when the tree had uncommitted changes. `--verbose` adds a table: when it was built, the Go version and platform, how shulker was installed (`release`, `go install` or `source`, left out when it can't tell), and where the binary, `config.json` and the cache are. `--json` always carries every field.
 
 ```sh
 shulker version
+shulker version --verbose
 ```
+
+| Flag | Description |
+| --- | --- |
+| `--verbose` | Also print the build and the environment |
 
 ### `shulker self update`
 

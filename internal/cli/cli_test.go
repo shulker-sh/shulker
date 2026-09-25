@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/selfupdate"
 )
 
 func run(t *testing.T, args ...string) (int, string, string) {
@@ -26,15 +27,67 @@ func TestVersionHuman(t *testing.T) {
 	if code != out.ExitOK {
 		t.Fatalf("exit %d", code)
 	}
-	lines := strings.Split(stdout, "\n")
-	if len(lines) < 5 || lines[0] != "" || !strings.HasPrefix(lines[1], "  shulker dev") || lines[2] != "" {
-		t.Fatalf("unexpected output %q", stdout)
+	if lines := strings.Split(stdout, "\n"); len(lines) != 4 || lines[0] != "" || !strings.HasPrefix(lines[1], "  shulker dev") || lines[2] != "" || lines[3] != "" {
+		t.Fatalf("one line, padded: %q", stdout)
+	}
+	code, stdout, _ = run(t, "version", "--verbose")
+	if code != out.ExitOK {
+		t.Fatalf("exit %d", code)
 	}
 	for _, label := range []string{"Go        go", "Binary    ", "Config    ", "Cache     "} {
 		if !strings.Contains(stdout, "\n  "+label) {
 			t.Fatalf("missing %q row in %q", strings.TrimSpace(label), stdout)
 		}
 	}
+}
+
+func TestVersionNamesTheRouteOnlyWhenVerbose(t *testing.T) {
+	h := newHarness(t)
+	h.build = &selfupdate.Build{Version: "0.0.1", Built: "2026-09-20T14:02:00Z", Route: selfupdate.Release}
+	if stdout := h.mustRun(t, "version"); stdout != "\n  shulker 0.0.1 (built 2026-09-20 14:02 UTC)\n\n" {
+		t.Fatalf("release: %q", stdout)
+	}
+	stdout := h.mustRun(t, "version", "--verbose")
+	if !strings.HasPrefix(stdout, "\n  shulker 0.0.1\n\n  Built     2026-09-20 14:02 UTC\n") || !strings.Contains(stdout, "\n  Install   release\n") {
+		t.Fatalf("release --verbose: %q", stdout)
+	}
+
+	h.build = &selfupdate.Build{Version: "0.0.1", Route: selfupdate.GoInstall}
+	if stdout := h.mustRun(t, "version"); stdout != "\n  shulker 0.0.1\n\n" {
+		t.Fatalf("go install: %q", stdout)
+	}
+	if stdout := h.mustRun(t, "version", "--verbose"); !strings.Contains(stdout, "\n  Install   go install\n") || strings.Contains(stdout, "Built") {
+		t.Fatalf("go install --verbose: %q", stdout)
+	}
+
+	h.build = &selfupdate.Build{Version: selfupdate.Dev, Commit: "d1556f95d232", Modified: true, Built: "2026-09-18T22:25:43Z", Route: selfupdate.Source}
+	if stdout := h.mustRun(t, "version"); stdout != "\n  shulker dev  d1556f9-dirty (built 2026-09-18 22:25 UTC)\n\n" {
+		t.Fatalf("source: %q", stdout)
+	}
+	if stdout := h.mustRun(t, "version", "--verbose"); !strings.Contains(stdout, "\n  Install   source\n") || strings.Contains(stdout, "(built") {
+		t.Fatalf("source --verbose: %q", stdout)
+	}
+
+	h.build = &selfupdate.Build{Version: selfupdate.Dev}
+	if stdout := h.mustRun(t, "version", "--verbose"); strings.Contains(stdout, "Install") {
+		t.Fatalf("an unknown route says nothing: %q", stdout)
+	}
+	if data := h.versionData(t); data["install"] != nil {
+		t.Fatalf("an unknown route is left out of the JSON: %+v", data)
+	}
+	h.build = &selfupdate.Build{Version: "0.0.1", Route: selfupdate.GoInstall}
+	if data := h.versionData(t); data["install"] != "go install" || data["version"] != "0.0.1" {
+		t.Fatalf("--json always carries the route: %+v", data)
+	}
+}
+
+func (h *harness) versionData(t *testing.T) map[string]any {
+	t.Helper()
+	var data map[string]any
+	if err := json.Unmarshal(h.runSetting(t, 0, "version").Data, &data); err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
 func TestVersionJSON(t *testing.T) {
