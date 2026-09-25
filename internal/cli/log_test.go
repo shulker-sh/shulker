@@ -91,7 +91,6 @@ func TestLogShowsTheLastDayWithItsPreamble(t *testing.T) {
 		"sync",
 		"✘ ",
 		"launch-not-started",
-		"can't run Java at /x/java: no such file",
 		"cache prune",
 		"Widen with:",
 		"$ shulker log --since 30d",
@@ -103,10 +102,14 @@ func TestLogShowsTheLastDayWithItsPreamble(t *testing.T) {
 	if strings.Contains(stdout, "jei has no build") {
 		t.Errorf("a two-day-old entry is outside the default window:\n%s", stdout)
 	}
+	rows := tableRows(stdout)
+	if len(rows) != 3 || rows[1][""] != "✘" || rows[1]["Command"] != "hook wrap" || squash(rows[1]["Event"]) != "launch-not-startedcan'trunJavaat/x/java:nosuchfile" {
+		t.Errorf("an error is marked in the first column, its code over its message in the event cell:\n%s", stdout)
+	}
 	lines := strings.Split(stdout, "\n")
 	for i, line := range lines {
 		if strings.Contains(line, "launch-not-started") {
-			if !strings.HasPrefix(line, "✘ ") || i+1 >= len(lines) || !strings.Contains(lines[i+1], "can't run Java") {
+			if !strings.HasPrefix(line, "  ✘  ") || i+1 >= len(lines) || !strings.Contains(lines[i+1], "can't run Java") {
 				t.Errorf("an error is marked and has its message on the next line:\n%s", stdout)
 			}
 		}
@@ -327,6 +330,18 @@ func seedSecretLog(t *testing.T) (home string) {
 	return home
 }
 
+// cellsOf is every cell of the log table with its folds joined and spaces dropped, one per line:
+// a URL, path or secret is checked whole this way, where a fold would otherwise hide it.
+func cellsOf(stdout string) string {
+	var cells []string
+	for _, row := range tableRows(stdout) {
+		for _, cell := range row {
+			cells = append(cells, squash(cell))
+		}
+	}
+	return strings.Join(cells, "\n")
+}
+
 func TestLogRedactsByDefault(t *testing.T) {
 	home := seedSecretLog(t)
 	for _, args := range [][]string{{"log", "--no-color"}, {"log", "--json"}} {
@@ -334,13 +349,17 @@ func TestLogRedactsByDefault(t *testing.T) {
 		if code != out.ExitOK {
 			t.Fatalf("%v: exit %d: %s", args, code, stderr)
 		}
+		shown := stdout
+		if args[1] != "--json" {
+			shown = cellsOf(stdout)
+		}
 		for _, secret := range []string{logKey, "ghp_s3cr3t", home} {
-			if strings.Contains(stdout, secret) || strings.Contains(stdout, strings.ReplaceAll(secret, `\`, `\\`)) {
+			if strings.Contains(shown, secret) || strings.Contains(shown, strings.ReplaceAll(secret, `\`, `\\`)) {
 				t.Errorf("%v shows %q:\n%s", args, secret, stdout)
 			}
 		}
 		for _, want := range []string{"https://github.com/org/pack.git", filepath.Join("~", "Games", "friends"), "[key]"} {
-			if !strings.Contains(stdout, strings.ReplaceAll(want, `\`, `\\`)) && !strings.Contains(stdout, want) {
+			if !strings.Contains(shown, strings.ReplaceAll(want, `\`, `\\`)) && !strings.Contains(shown, want) {
 				t.Errorf("%v is missing %q:\n%s", args, want, stdout)
 			}
 		}
@@ -361,8 +380,11 @@ func TestLogUnredactedPrintsEntriesAsStored(t *testing.T) {
 	if code != out.ExitOK {
 		t.Fatalf("exit %d: %s", code, stderr)
 	}
-	for _, want := range []string{"days kept, unredacted)", logKey, "https://ghp_s3cr3t@github.com/org/pack.git", filepath.Join(home, "Games", "friends")} {
-		if !strings.Contains(stdout, want) {
+	if !strings.Contains(stdout, "days kept, unredacted)") {
+		t.Errorf("the preamble says the output is unredacted:\n%s", stdout)
+	}
+	for _, want := range []string{logKey, "https://ghp_s3cr3t@github.com/org/pack.git", filepath.Join(home, "Games", "friends")} {
+		if !strings.Contains(cellsOf(stdout), want) {
 			t.Errorf("missing %q in:\n%s", want, stdout)
 		}
 	}

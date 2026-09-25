@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+
 	"shulker.sh/shulker/internal/auditlog"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
@@ -182,40 +184,56 @@ func printLog(l *out.Lines, r logReport, isWidest bool) {
 	}
 }
 
+// printLogEntries is the table of entries: the level glyph in the first column, time, command and
+// instance grey, then the event. An error's code is red with its message as the cell's second line.
+// The instance column is left out when no entry names one.
 func printLogEntries(l *out.Lines, entries []auditlog.Entry) {
 	t := l.T
 	stamp := "15:04:05"
 	today := time.Now().Format(time.DateOnly)
-	cmdWidth, instanceWidth := 0, 0
+	named := false
 	for _, e := range entries {
 		if at, err := time.Parse(time.RFC3339Nano, e.At); err == nil && at.Local().Format(time.DateOnly) != today {
 			stamp = "Jan 02 15:04:05"
 		}
-		cmdWidth, instanceWidth = max(cmdWidth, out.Width(logCmdName(e))), max(instanceWidth, out.Width(e.Instance))
+		named = named || e.Instance != ""
 	}
-	for _, e := range entries {
+	headers := []string{"", "Time", "Command", "Instance", "Event"}
+	rows := make([][]string, len(entries))
+	for i, e := range entries {
 		at := e.At
 		if parsed, err := time.Parse(time.RFC3339Nano, e.At); err == nil {
 			at = parsed.Local().Format(stamp)
 		}
-		lead := pad(at, len(stamp)) + "  " + pad(logCmdName(e), cmdWidth) + "  "
-		if instanceWidth > 0 {
-			lead += pad(e.Instance, instanceWidth) + "  "
-		}
-		indent := "  " + strings.Repeat(" ", out.Width(lead))
-		msg := strings.ReplaceAll(e.Msg, "\n", "\n"+indent)
+		mark, event := "", logSummary(e)
 		switch e.Level {
 		case auditlog.LevelError:
-			l.Raw(t.Red(t.GlyphError()) + " " + t.Grey(lead) + t.Red(cmp.Or(e.Code, "error")))
+			mark, event = t.GlyphError(), t.Red(cmp.Or(e.Code, "error"))
 			if e.Msg != "" {
-				l.Raw(indent + msg)
+				event += "\n" + e.Msg
 			}
 		case auditlog.LevelWarn:
-			l.Raw(t.Yellow("!") + " " + t.Grey(lead) + msg)
-		default:
-			l.Plain(t.Grey(lead) + logSummary(e))
+			mark, event = "!", e.Msg
+		}
+		rows[i] = []string{mark, at, logCmdName(e), e.Instance, event}
+		if !named {
+			rows[i] = slices.Delete(rows[i], 3, 4)
 		}
 	}
+	if !named {
+		headers = slices.Delete(headers, 3, 4)
+	}
+	l.Table(headers, rows, func(row, col int) lipgloss.Style {
+		switch {
+		case col == 0 && entries[row].Level == auditlog.LevelError:
+			return t.StyleRed()
+		case col == 0:
+			return t.StyleYellow()
+		case col < len(headers)-1:
+			return t.StyleGrey()
+		}
+		return t.Style()
+	})
 }
 
 // logCmdName is the command an entry names. The root's own runs, like a bare `shulker`, have none.
@@ -235,8 +253,4 @@ func logSummary(e auditlog.Entry) string {
 		return "exit " + strconv.Itoa(*e.Exit) + took
 	}
 	return e.Msg
-}
-
-func pad(s string, width int) string {
-	return s + strings.Repeat(" ", max(0, width-out.Width(s)))
 }
