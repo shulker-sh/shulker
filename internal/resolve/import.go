@@ -225,6 +225,10 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 	}
 	if arc.Marker != nil {
 		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
+	} else {
+		var warnings []string
+		mods.Overrides, warnings = build.AdoptPackChoices(m, r.Lock, mods.Overrides)
+		mods.Warnings = append(mods.Warnings, warnings...)
 	}
 	if opts.ServerPack && arc.Path != "" {
 		mods.ServerPack, err = r.serverPackOf(ctx, arc)

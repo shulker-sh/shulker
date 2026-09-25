@@ -23,8 +23,10 @@ const resourcePacksKey = "resourcePacks"
 // resourcepacks/; before that the list is the bare file names alone.
 type packForm struct{ prefix string }
 
-func (b *Builder) listForm() packForm {
-	if v, err := minecraft.Parse(b.Lock.Minecraft); err == nil && v.Major == 1 && v.Minor < 13 {
+func (b *Builder) listForm() packForm { return listFormFor(b.Lock.Minecraft) }
+
+func listFormFor(version string) packForm {
+	if v, err := minecraft.Parse(version); err == nil && v.Major == 1 && v.Minor < 13 {
 		return packForm{}
 	}
 	return packForm{prefix: "file/"}
