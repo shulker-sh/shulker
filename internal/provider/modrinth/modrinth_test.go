@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"testing"
 	"time"
 
@@ -219,5 +220,33 @@ func TestURLsRoundTrip(t *testing.T) {
 	}
 	if got := m.VersionsPage("mod", "sodium"); got != "https://modrinth.com/mod/sodium/versions" {
 		t.Errorf("versions page %s", got)
+	}
+}
+
+func TestConvertNamesShaderModsByIntegration(t *testing.T) {
+	cases := []struct {
+		loaders []string
+		want    []string
+	}{
+		{loaders: []string{"optifine", "iris"}, want: []string{"iris", "oculus"}},
+		{loaders: []string{"iris"}, want: []string{"iris"}},
+		{loaders: []string{"vanilla", "canvas"}, want: []string{"canvas", "vanilla"}},
+		{loaders: []string{"vanilla"}, want: []string{"vanilla"}},
+		{loaders: []string{"quilt", "fabric"}, want: []string{"quilt", "fabric"}},
+	}
+	for _, c := range cases {
+		loaders, _ := json.Marshal(c.loaders)
+		var v version
+		raw := `{"id":"v1","loaders":` + string(loaders) + `,"files":[{"url":"https://x/a.zip","filename":"a.zip","primary":true,"hashes":{"sha512":"abc"}}]}`
+		if err := json.Unmarshal([]byte(raw), &v); err != nil {
+			t.Fatal(err)
+		}
+		got, err := convert(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(got.Loaders, c.want) {
+			t.Errorf("loaders %v became %v, want %v", c.loaders, got.Loaders, c.want)
+		}
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
@@ -31,13 +32,11 @@ var (
 	hosts = []string{"modrinth.com", "www.modrinth.com"}
 	// sections are the modrinth.com/<section>/<slug> pages a project has.
 	sections = []string{"mod", "project", "plugin", "resourcepack", "shader", "datapack", "modpack"}
-	// packTags are the loader tags Modrinth files each pack kind's versions under: resource packs
-	// under minecraft, datapacks under datapack and shaders under the shader loader they target.
-	packTags = map[string][]string{
-		manifest.TypeShader:   {"iris", "oculus", "canvas", "vanilla"},
-		manifest.TypeDatapack: {provider.DatapackLoader},
-	}
 )
+
+// vanillaShader is the loader tag of a shader that is really a resource pack of core shaders. It is
+// no shader mod, so it passes through to the lock as it is.
+const vanillaShader = "vanilla"
 
 // longestWait is the longest rate-limit reset worth waiting out. Modrinth's window is a minute.
 const longestWait = time.Minute
@@ -112,9 +111,14 @@ func (m *Modrinth) KeysBySlug() bool { return true }
 
 func (m *Modrinth) NotFoundHelp() string { return "" }
 
+// PackTags are the loader tags Modrinth files each pack kind's versions under: resource packs
+// under minecraft, datapacks under datapack and shaders under the shader loader they target.
 func (m *Modrinth) PackTags(kind string) []string {
-	if tags, ok := packTags[kind]; ok {
-		return tags
+	switch kind {
+	case manifest.TypeShader:
+		return append(integrations.ShaderTags(m.Name()), vanillaShader)
+	case manifest.TypeDatapack:
+		return []string{provider.DatapackLoader}
 	}
 	return []string{"minecraft"}
 }
@@ -355,8 +359,20 @@ func (m *Modrinth) Projects(ctx context.Context, ids []string) (map[string]provi
 	return found, nil
 }
 
+// loaders are a version's loader tags, with a shader's shader mods named by integration id.
+func loaders(tags []string) []string {
+	ids := integrations.ShadersTagged("modrinth", tags)
+	if len(ids) == 0 {
+		return tags
+	}
+	if slices.Contains(tags, vanillaShader) {
+		ids = append(ids, vanillaShader)
+	}
+	return ids
+}
+
 func convert(v version) (provider.Version, error) {
-	pv := provider.Version{ID: v.ID, ProjectID: v.ProjectID, Number: v.VersionNumber, Channel: v.VersionType, GameVersions: v.GameVersions, Loaders: v.Loaders}
+	pv := provider.Version{ID: v.ID, ProjectID: v.ProjectID, Number: v.VersionNumber, Channel: v.VersionType, GameVersions: v.GameVersions, Loaders: loaders(v.Loaders)}
 	pv.Published, _ = time.Parse(time.RFC3339, v.DatePublished)
 	found := false
 	for _, f := range v.Files {

@@ -20,6 +20,7 @@ import (
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -61,10 +62,6 @@ var sections = map[string]string{
 }
 
 var hosts = []string{"curseforge.com", "www.curseforge.com", "legacy.curseforge.com"}
-
-// shaderTags are the shader loaders CurseForge tags files with, in gameVersions beside the game
-// versions; resource packs and datapacks carry no loader tag at all.
-var shaderTags = []string{"iris", "optifine"}
 
 var embeddedKey string
 
@@ -184,9 +181,11 @@ func (c *CurseForge) NotFoundHelp() string {
 	return "CurseForge's search doesn't list every project; add one it misses by a file URL (" + siteURL + "/minecraft/mc-mods/<slug>/files/<file id>), by " + siteURL + "/projects/<project id>, or by its project id, shown on its CurseForge page under About Project, with `--provider curseforge`"
 }
 
+// PackTags are the shader loaders CurseForge tags shader files with, in gameVersions beside the
+// game versions; resource packs and datapacks carry no loader tag at all.
 func (c *CurseForge) PackTags(kind string) []string {
 	if kind == manifest.TypeShader {
-		return shaderTags
+		return integrations.ShaderTags(c.Name())
 	}
 	return nil
 }
@@ -713,6 +712,9 @@ func convertFile(f file) (provider.Version, error) {
 		} else {
 			v.GameVersions = append(v.GameVersions, g)
 		}
+	}
+	if shaders := integrations.ShadersTagged("curseforge", f.GameVersions); len(shaders) > 0 {
+		v.Loaders = shaders
 	}
 	for _, d := range f.Dependencies {
 		v.Dependencies = append(v.Dependencies, provider.Dependency{ProjectID: strconv.Itoa(d.ModID), Type: relations[d.RelationType]})

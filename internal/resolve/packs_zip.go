@@ -33,23 +33,6 @@ func packSide(kind string, e manifest.Require) string {
 	return "both"
 }
 
-// shaderLoaders are the shader mods a provider tagged a version for. Modrinth
-// files them as loaders; CurseForge keeps them among the game versions, and tags
-// OptiFine rather than Oculus, whose OptiFine-format packs Iris and Oculus both read.
-func shaderLoaders(v *provider.Version) []string {
-	tags := map[string]bool{}
-	for _, tag := range slices.Concat(v.Loaders, v.GameVersions) {
-		tags[strings.ToLower(tag)] = true
-	}
-	var loaders []string
-	for _, name := range []string{"iris", "oculus", "canvas", "vanilla"} {
-		if tags[name] || (tags["optifine"] && (name == "iris" || name == "oculus")) {
-			loaders = append(loaders, name)
-		}
-	}
-	return loaders
-}
-
 func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provider.Project, kind string, opts AddOptions) error {
 	key := opts.As
 	if key == "" {
@@ -287,7 +270,7 @@ func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, pro
 		ResourcePack:     r.Manifest.Requires[key].ResourcePack,
 	}
 	if kind == manifest.TypeShader {
-		locked.Loaders = shaderLoaders(v)
+		locked.Loaders = v.Loaders
 	}
 	r.Lock.Packs(kind)[key] = locked
 	return nil

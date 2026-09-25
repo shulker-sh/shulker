@@ -6,6 +6,7 @@ package integrations
 
 import (
 	"slices"
+	"strings"
 
 	"shulker.sh/shulker/internal/version/minecraft"
 )
@@ -22,19 +23,49 @@ type Shader struct {
 	// Config is the properties file the mod reads its shaderPack and enableShaders from, "" when
 	// it has none shulker can write.
 	Config string
+	// Tags are the tags each provider, by name, files the mod's shader packs under.
+	Tags map[string][]string
 }
 
-// Shaders are the shader mods, in the order enabling a pack tries them.
+// Shaders are the shader mods, in the order enabling a pack tries them. Neither provider has an
+// Oculus tag: both file its packs under OptiFine, whose format Iris and Oculus both read.
 var Shaders = []Shader{
-	{ID: "iris", JarIDs: []string{"iris"}, Name: "Iris", Key: "iris", Config: "config/iris.properties"},
-	{ID: "oculus", JarIDs: []string{"oculus"}, Name: "Oculus", Key: "oculus", Config: "config/oculus.properties"},
-	{ID: "canvas", JarIDs: []string{"canvas"}, Name: "Canvas", Key: "canvas"},
+	{ID: "iris", JarIDs: []string{"iris"}, Name: "Iris", Key: "iris", Config: "config/iris.properties", Tags: map[string][]string{"modrinth": {"iris", "optifine"}, "curseforge": {"iris", "optifine"}}},
+	{ID: "oculus", JarIDs: []string{"oculus"}, Name: "Oculus", Key: "oculus", Config: "config/oculus.properties", Tags: map[string][]string{"modrinth": {"optifine"}, "curseforge": {"optifine"}}},
+	{ID: "canvas", JarIDs: []string{"canvas"}, Name: "Canvas", Key: "canvas", Tags: map[string][]string{"modrinth": {"canvas"}}},
 }
 
 // Loads reports whether s is among present and can load a pack whose loaders are packLoaders:
 // they name s, or name none.
 func (s Shader) Loads(packLoaders []string, present map[string]bool) bool {
 	return present[s.ID] && (len(packLoaders) == 0 || slices.Contains(packLoaders, s.ID))
+}
+
+// ShaderTags are the tags provider files shader packs under, once each.
+func ShaderTags(provider string) []string {
+	var tags []string
+	for _, s := range Shaders {
+		for _, tag := range s.Tags[provider] {
+			if !slices.Contains(tags, tag) {
+				tags = append(tags, tag)
+			}
+		}
+	}
+	return tags
+}
+
+// ShadersTagged are the ids of the shader mods whose provider tags are among tags, in preference
+// order. Tags match regardless of case, since CurseForge capitalises them.
+func ShadersTagged(provider string, tags []string) []string {
+	var ids []string
+	for _, s := range Shaders {
+		if slices.ContainsFunc(s.Tags[provider], func(tag string) bool {
+			return slices.ContainsFunc(tags, func(t string) bool { return strings.EqualFold(t, tag) })
+		}) {
+			ids = append(ids, s.ID)
+		}
+	}
+	return ids
 }
 
 // DatapackLoader is a mod that loads datapacks into every world from a folder outside them.

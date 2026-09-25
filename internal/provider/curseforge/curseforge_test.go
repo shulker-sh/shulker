@@ -392,3 +392,31 @@ func TestAVersionNamesItsServerPack(t *testing.T) {
 		t.Fatalf("server packs %q and %q", found["100"].ServerPack, found["102"].ServerPack)
 	}
 }
+
+func TestConvertFileNamesShaderModsByIntegration(t *testing.T) {
+	cases := []struct {
+		gameVersions []string
+		loaders      []string
+		game         []string
+	}{
+		{gameVersions: []string{"26.2", "OptiFine"}, loaders: []string{"iris", "oculus"}, game: []string{"26.2", "OptiFine"}},
+		{gameVersions: []string{"26.2", "Iris", "OptiFine"}, loaders: []string{"iris", "oculus"}, game: []string{"26.2", "Iris", "OptiFine"}},
+		{gameVersions: []string{"26.2", "Fabric"}, loaders: []string{"fabric"}, game: []string{"26.2"}},
+		{gameVersions: []string{"26.2"}, game: []string{"26.2"}},
+	}
+	for _, c := range cases {
+		gameVersions, _ := json.Marshal(c.gameVersions)
+		var f file
+		raw := `{"id":1,"modId":2,"fileName":"a.zip","downloadUrl":"https://x/a.zip","hashes":[{"algo":1,"value":"abc"}],"gameVersions":` + string(gameVersions) + `}`
+		if err := json.Unmarshal([]byte(raw), &f); err != nil {
+			t.Fatal(err)
+		}
+		v, err := convertFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(v.Loaders, c.loaders) || !slices.Equal(v.GameVersions, c.game) {
+			t.Errorf("%v became loaders %v and game versions %v", c.gameVersions, v.Loaders, v.GameVersions)
+		}
+	}
+}

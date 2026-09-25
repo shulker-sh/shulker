@@ -100,3 +100,40 @@ func TestDatapackLoaderFolder(t *testing.T) {
 		t.Errorf("paxi Folder = %s", got)
 	}
 }
+
+func TestShaderTags(t *testing.T) {
+	cases := map[string][]string{
+		"modrinth":   {"iris", "optifine", "canvas"},
+		"curseforge": {"iris", "optifine"},
+		"other":      nil,
+	}
+	for provider, want := range cases {
+		if got := ShaderTags(provider); !slices.Equal(got, want) {
+			t.Errorf("ShaderTags(%s) = %v, want %v", provider, got, want)
+		}
+	}
+}
+
+func TestShadersTagged(t *testing.T) {
+	cases := []struct {
+		name     string
+		provider string
+		tags     []string
+		want     []string
+	}{
+		{name: "modrinth iris", provider: "modrinth", tags: []string{"iris"}, want: []string{"iris"}},
+		{name: "modrinth optifine", provider: "modrinth", tags: []string{"iris", "optifine"}, want: []string{"iris", "oculus"}},
+		{name: "vanilla is no integration", provider: "modrinth", tags: []string{"vanilla", "canvas"}, want: []string{"canvas"}},
+		{name: "curseforge optifine", provider: "curseforge", tags: []string{"26.2", "OptiFine"}, want: []string{"iris", "oculus"}},
+		{name: "curseforge iris and optifine", provider: "curseforge", tags: []string{"Iris", "OptiFine"}, want: []string{"iris", "oculus"}},
+		{name: "curseforge has no canvas tag", provider: "curseforge", tags: []string{"canvas"}},
+		{name: "untagged", provider: "modrinth", tags: []string{"26.2"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := ShadersTagged(c.provider, c.tags); !slices.Equal(got, c.want) {
+				t.Errorf("ShadersTagged = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
