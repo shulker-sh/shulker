@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"shulker.sh/shulker/internal/build/marker"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
@@ -42,7 +43,7 @@ func (b *Builder) exportIcon() ([]byte, string, error) {
 		return data, path.Base(b.Manifest.Icon), err
 	}
 	if b.Manifest.UsesMarker() {
-		return markerIcon, markerLogo, nil
+		return marker.Icon, marker.IconFile, nil
 	}
 	return nil, "", nil
 }

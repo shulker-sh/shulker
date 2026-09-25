@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"shulker.sh/shulker/internal/build/marker"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
@@ -542,12 +543,16 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectClient(side, opts, desired, vars, shipped, report); err != nil {
 			return nil, nil, err
 		}
-		if loader.Running(b.Lock).MarkerFile != "" && b.markerOn(dir) {
-			jar, err := b.markerJar(side, cond, sel)
+		if l := loader.Running(b.Lock); l.MarkerFile != "" && b.markerOn(dir) {
+			info, err := b.markerInfo(side, cond, sel)
 			if err != nil {
 				return nil, nil, err
 			}
-			desired[markerJarPath(b.Manifest.Name)] = source{content: literal{jar}}
+			jar, err := marker.Jar(l, info)
+			if err != nil {
+				return nil, nil, err
+			}
+			desired[marker.JarPath(b.Manifest.Name)] = source{content: literal{jar}}
 		}
 	}
 	whole := func(rel string) bool {

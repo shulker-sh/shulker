@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/build/marker"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -131,7 +132,7 @@ func (p *project) mods() []string {
 	if err != nil && !os.IsNotExist(err) {
 		p.t.Fatal(err)
 	}
-	marker := filepath.Base(markerJarPath(p.b.Manifest.Name))
+	marker := filepath.Base(marker.JarPath(p.b.Manifest.Name))
 	var names []string
 	for _, e := range entries {
 		if strings.HasSuffix(e.Name(), ".jar") && e.Name() != marker {
