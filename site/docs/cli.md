@@ -3,7 +3,7 @@ description: Every shulker command with its flags and examples.
 outline: [2, 3]
 ---
 
-# CLI reference
+# CLI Reference
 
 | Command | Description |
 | --- | --- |
