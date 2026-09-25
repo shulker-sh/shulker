@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/near"
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 // Type is the kind of value a server.properties key takes.
@@ -129,7 +129,7 @@ type PropertyCheck struct {
 
 // CheckProperties checks server.properties values against the keys and values a Minecraft version
 // reads.
-func CheckProperties(values map[string]string, minecraft mcver.Version) PropertyCheck {
+func CheckProperties(values map[string]string, game minecraft.Version) PropertyCheck {
 	byKey := map[string]Property{}
 	for _, p := range Properties {
 		byKey[p.Key] = p
@@ -150,15 +150,15 @@ func CheckProperties(values map[string]string, minecraft mcver.Version) Property
 			}
 			c.Warnings = append(c.Warnings, msg)
 			continue
-		case p.Until != "" && mcver.Compare(minecraft, mcver.MustParse(p.Until)) >= 0:
+		case p.Until != "" && minecraft.Compare(game, minecraft.MustParse(p.Until)) >= 0:
 			msg := fmt.Sprintf("%s (removed in %s", key, p.Until)
 			if p.Replacement != "" {
 				msg += fmt.Sprintf("; use the %s game rule", p.Replacement)
 			}
 			c.Problems = append(c.Problems, msg+")")
 			continue
-		case p.Since != "" && mcver.Compare(minecraft, mcver.MustParse(p.Since)) < 0:
-			c.Warnings = append(c.Warnings, fmt.Sprintf("server.properties key %q was added in Minecraft %s and is ignored by %s", key, p.Since, minecraft))
+		case p.Since != "" && minecraft.Compare(game, minecraft.MustParse(p.Since)) < 0:
+			c.Warnings = append(c.Warnings, fmt.Sprintf("server.properties key %q was added in Minecraft %s and is ignored by %s", key, p.Since, game))
 		}
 		if problem, warning := p.checkValue(values[key]); problem != "" {
 			c.Problems = append(c.Problems, problem)

@@ -1,7 +1,7 @@
-// Package mcver orders Minecraft versions: releases, their snapshots, pre-releases and release
+// Package minecraft orders Minecraft versions: releases, their snapshots, pre-releases and release
 // candidates, and weekly snapshots such as 24w14a, which sort as snapshots of the release their cycle
 // led to.
-package mcver
+package minecraft
 
 import (
 	"fmt"

@@ -26,12 +26,12 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/server"
+	"shulker.sh/shulker/internal/version/minecraft"
 	"shulker.sh/shulker/schema"
 )
 
@@ -823,11 +823,11 @@ func (b *Builder) collectClient(side string, opts Options, desired map[string]so
 }
 
 func (b *Builder) checkProperties(props properties, report *Report) error {
-	minecraft, err := mcver.Parse(b.Lock.Minecraft)
+	mc, err := minecraft.Parse(b.Lock.Minecraft)
 	if err != nil {
 		return out.Errorf("properties-invalid", "server.properties can't be checked against Minecraft %s", b.Lock.Minecraft).WithCause("minecraft", err)
 	}
-	check := server.CheckProperties(props, minecraft)
+	check := server.CheckProperties(props, mc)
 	report.Warnings = append(report.Warnings, check.Warnings...)
 	if len(check.Problems) > 0 {
 		e := out.Errorf("properties-invalid", "%d server.properties key(s) are not valid for Minecraft %s", len(check.Problems), b.Lock.Minecraft)

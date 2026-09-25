@@ -22,9 +22,9 @@ import (
 	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 // Kind is where a source lives, which decides how it is fetched.
@@ -472,21 +472,21 @@ func sha256hex(data []byte) string {
 // Compatible checks a modpack against the project's platform. A locked modpack
 // contributes exact versions, so its own lock has to match; a floating one is
 // resolved here and only has to admit the project's versions in its ranges.
-func Compatible(l *Loaded, minecraft string, loader lock.Loader) error {
+func Compatible(l *Loaded, mc string, loader lock.Loader) error {
 	if l.UsesLock {
-		return compatibleLocked(l, minecraft, loader)
+		return compatibleLocked(l, mc, loader)
 	}
 	pm := l.Manifest
-	game, err := mcver.Parse(minecraft)
+	game, err := minecraft.Parse(mc)
 	if err != nil {
 		return err
 	}
-	rng, err := mcver.ParseRange(pm.Minecraft)
+	rng, err := minecraft.ParseRange(pm.Minecraft)
 	if err != nil {
 		return rangeInvalid(l.Name, "minecraft", err)
 	}
 	if !rng.Matches(game) {
-		return out.Errorf("modpack-mismatch", "modpack %s wants minecraft %s; this project locked %s", l.Name, pm.Minecraft, minecraft)
+		return out.Errorf("modpack-mismatch", "modpack %s wants mc %s; this project locked %s", l.Name, pm.Minecraft, mc)
 	}
 	if pm.Loader.Type != loader.Type {
 		return out.Errorf("modpack-mismatch", "modpack %s uses %s; this project uses %s", l.Name, describeLoader(pm.Loader.Type), describeLoader(loader.Type))

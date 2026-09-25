@@ -1,4 +1,4 @@
-package mcver
+package minecraft
 
 import "testing"
 

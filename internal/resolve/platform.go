@@ -13,11 +13,11 @@ import (
 	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 // Platform is the Minecraft version, loader and Java a project resolves to.
@@ -104,7 +104,7 @@ func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pac
 }
 
 // firstWithDataVersion is the first 1.14 snapshot, where the server jar's version.json starts.
-var firstWithDataVersion = mcver.MustParse("1.13").TildeUpper()
+var firstWithDataVersion = minecraft.MustParse("1.13").TildeUpper()
 
 // FillDataVersion gives l the data version of its Minecraft version when it has none yet, and none
 // is looked for before 1.14. Reading it never blocks a lock: a failure comes back as a warning, l
@@ -113,7 +113,7 @@ func (mt *Meta) FillDataVersion(ctx context.Context, l *lock.Lock) (warning stri
 	if l.Minecraft == "" || l.DataVersion != 0 {
 		return ""
 	}
-	if v, err := mcver.Parse(l.Minecraft); err == nil && v.Compare(firstWithDataVersion) < 0 {
+	if v, err := minecraft.Parse(l.Minecraft); err == nil && v.Compare(firstWithDataVersion) < 0 {
 		return ""
 	}
 	dataVersion, err := mt.Piston.DataVersion(ctx, l.Minecraft)
@@ -280,20 +280,20 @@ func (mt *Meta) GameVersion(ctx context.Context, minecraft string) (string, erro
 
 // newestGame is the newest version the manifest lists that matches minecraft. An any range takes
 // the newest release, so a project that names no version is never authored against a snapshot.
-func newestGame(games *mojang.GameManifest, minecraft string) (string, error) {
-	rng, err := mcver.ParseRange(minecraft)
+func newestGame(games *mojang.GameManifest, want string) (string, error) {
+	rng, err := minecraft.ParseRange(want)
 	if err != nil {
-		return "", rangeInvalid("minecraft", minecraft, err)
+		return "", rangeInvalid("minecraft", want, err)
 	}
-	var candidates []mcver.Version
+	var candidates []minecraft.Version
 	for _, g := range games.Versions {
-		if v, err := mcver.Parse(g.ID); err == nil {
+		if v, err := minecraft.Parse(g.ID); err == nil {
 			candidates = append(candidates, v)
 		}
 	}
-	game, ok := mcver.Newest(candidates, rng)
+	game, ok := minecraft.Newest(candidates, rng)
 	if !ok {
-		e := out.Errorf("platform-not-found", "no minecraft version matches %q", minecraft)
+		e := out.Errorf("platform-not-found", "no want version matches %q", want)
 		e.Rows = []out.Detail{{Label: "latest release", Text: games.Latest.Release}}
 		return "", e
 	}
@@ -307,13 +307,13 @@ func (mt *Meta) GameVersions(ctx context.Context) ([]string, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	var releases []mcver.Version
+	var releases []minecraft.Version
 	for _, g := range games.Versions {
-		if v, err := mcver.Parse(g.ID); err == nil && v.IsRelease() {
+		if v, err := minecraft.Parse(g.ID); err == nil && v.IsRelease() {
 			releases = append(releases, v)
 		}
 	}
-	slices.SortFunc(releases, func(a, b mcver.Version) int { return mcver.Compare(b, a) })
+	slices.SortFunc(releases, func(a, b minecraft.Version) int { return minecraft.Compare(b, a) })
 	ids := make([]string, len(releases))
 	for i, v := range releases {
 		ids[i] = v.ID

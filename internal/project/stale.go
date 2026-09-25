@@ -16,7 +16,7 @@ import (
 	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/version/minecraft"
 	"shulker.sh/shulker/internal/zipfile"
 )
 
@@ -326,11 +326,11 @@ func lockedProject(lm lock.Mod, provider string) (string, bool) {
 }
 
 func minecraftMatches(raw, id string) bool {
-	rng, err := mcver.ParseRange(raw)
+	rng, err := minecraft.ParseRange(raw)
 	if err != nil {
 		return false
 	}
-	v, err := mcver.Parse(id)
+	v, err := minecraft.Parse(id)
 	return err == nil && rng.Matches(v)
 }
 

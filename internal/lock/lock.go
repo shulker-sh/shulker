@@ -13,7 +13,7 @@ import (
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/version/minecraft"
 	"shulker.sh/shulker/schema"
 )
 
@@ -294,7 +294,7 @@ func (l *Lock) DatapackFolder(side, levelName string) (folder string, loaded boo
 	case placed["paxi"]:
 		return "config/paxi/datapacks", true
 	case placed["openloader"]:
-		if v, err := mcver.Parse(l.Minecraft); err == nil && v.Compare(mcver.MustParse("1.21")) < 0 {
+		if v, err := minecraft.Parse(l.Minecraft); err == nil && v.Compare(minecraft.MustParse("1.21")) < 0 {
 			return "config/openloader/data", true
 		}
 		return "config/openloader/packs", true

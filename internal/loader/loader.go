@@ -12,8 +12,8 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
-	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 // VanillaServerFile is the vanilla server jar's name in a server dir that runs it directly.
@@ -153,21 +153,21 @@ var All = []Loader{fabric, quilt, neoforge, forge}
 // For is the named loader as it runs on the given Minecraft version. Forge before 1.13 reads @Mod
 // annotations and mcmod.info and has no marker jar, and its installers before 1.17 set no
 // serverJarPath or args file.
-func For(name, minecraft string) (Loader, bool) {
+func For(name, mc string) (Loader, bool) {
 	l, ok := Lookup(name)
 	if !ok || l.Name != forge.Name {
 		return l, ok
 	}
-	v, err := mcver.Parse(minecraft)
+	v, err := minecraft.Parse(mc)
 	if err != nil {
 		return l, ok
 	}
-	if mcver.Compare(v, mcver.MustParse("1.13")) < 0 {
+	if minecraft.Compare(v, minecraft.MustParse("1.13")) < 0 {
 		l.MetadataFiles = []string{"mcmod.info"}
 		l.ModAnnotations = true
 		l.MarkerFile = ""
 	}
-	if mcver.Compare(v, mcver.MustParse("1.17")) < 0 {
+	if minecraft.Compare(v, minecraft.MustParse("1.17")) < 0 {
 		l.RootServerJars = true
 		l.MinecraftJarClassifier = ""
 	}
@@ -256,21 +256,21 @@ const firstModernForge = "14.23.5.2851"
 
 // Supports reports whether shulker can set up the named loader's version on the given Minecraft
 // version.
-func Supports(name, minecraft, version string) error {
+func Supports(name, mc, version string) error {
 	if name != forge.Name {
 		return nil
 	}
-	v, err := mcver.Parse(minecraft)
+	v, err := minecraft.Parse(mc)
 	if err != nil {
 		return nil
 	}
-	switch c := mcver.Compare(v, mcver.MustParse("1.12.2")); {
+	switch c := minecraft.Compare(v, minecraft.MustParse("1.12.2")); {
 	case c > 0:
 		return nil
 	case c == 0 && compareBuilds(version, firstModernForge) >= 0:
 		return nil
 	}
-	e := out.Errorf("loader-version-unsupported", "Forge %s for Minecraft %s ships the legacy installer, which shulker can't run", version, minecraft)
+	e := out.Errorf("loader-version-unsupported", "Forge %s for Minecraft %s ships the legacy installer, which shulker can't run", version, mc)
 	e.Help = "use Minecraft 1.12.2 with Forge " + firstModernForge + " or newer"
 	return e
 }

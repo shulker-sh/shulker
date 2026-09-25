@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 var (
@@ -19,7 +19,7 @@ var (
 // 1.21-beta.1. An id it doesn't recognise comes back unchanged.
 func Game(id string) string {
 	if m := weeklyRe.FindStringSubmatch(id); m != nil {
-		release, ok := mcver.WeeklyRelease(id)
+		release, ok := minecraft.WeeklyRelease(id)
 		if !ok {
 			return id
 		}
@@ -38,8 +38,8 @@ func Game(id string) string {
 	if m == nil {
 		return id
 	}
-	release, build := mcver.MustParse(m[1]), m[3]
-	legacy := mcver.Compare(release, mcver.MustParse("1.16")) <= 0
+	release, build := minecraft.MustParse(m[1]), m[3]
+	legacy := minecraft.Compare(release, minecraft.MustParse("1.16")) <= 0
 	switch {
 	case m[2] == "pre" && legacy:
 		return m[1] + "-rc." + build

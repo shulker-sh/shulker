@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"shulker.sh/shulker/internal/mcver"
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 func TestCheckProperties(t *testing.T) {
@@ -32,7 +32,7 @@ func TestCheckProperties(t *testing.T) {
 			[]string{`server.properties key "pause-when-empty-seconds" was added in Minecraft 1.21.2 and is ignored by 1.21.1`}},
 	}
 	for _, c := range cases {
-		got := CheckProperties(c.values, mcver.MustParse(c.minecraft))
+		got := CheckProperties(c.values, minecraft.MustParse(c.minecraft))
 		if !reflect.DeepEqual(got.Problems, c.problems) || !reflect.DeepEqual(got.Warnings, c.warnings) {
 			t.Errorf("%s %v:\n problems %q\n warnings %q", c.minecraft, c.values, got.Problems, got.Warnings)
 		}
@@ -51,7 +51,7 @@ func TestPropertyTableIsSortedAndUnique(t *testing.T) {
 		}
 		for _, v := range []string{p.Since, p.Until} {
 			if v != "" {
-				if _, err := mcver.Parse(v); err != nil {
+				if _, err := minecraft.Parse(v); err != nil {
 					t.Errorf("%s: %v", p.Key, err)
 				}
 			}

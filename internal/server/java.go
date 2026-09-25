@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"shulker.sh/shulker/internal/mcver"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 // Java is a java executable and the major version it reports.
@@ -83,11 +83,11 @@ func FindJava(override string, required int) (Java, error) {
 	}
 	j := Java{Path: path, Major: major}
 	if override != "" {
-		r, err := mcver.ParseRange(override)
+		r, err := minecraft.ParseRange(override)
 		if err != nil {
 			return j, out.Errorf("java-range", "manifest java %q is neither an absolute path nor a version range", override)
 		}
-		if !r.Contains(mcver.MustParse(fmt.Sprintf("%d.0.0", major))) {
+		if !r.Contains(minecraft.MustParse(fmt.Sprintf("%d.0.0", major))) {
 			return j, out.Errorf("java-version", "java at %s is version %d, outside the manifest range %q", path, major, override)
 		}
 		return j, nil
