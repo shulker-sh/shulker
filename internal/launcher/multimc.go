@@ -36,6 +36,7 @@ var multimcEntry = &Entry{
 	relink: relinkLauncher, forget: forgetInstance, name: multimcName, gameDirs: multimcGameDirs,
 	readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots,
 	place: placeMultiMC, link: linkMultiMC, after: restartIfUpdated,
+	Accounts: prismAccounts,
 }
 
 type MultiMC struct {

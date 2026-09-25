@@ -54,11 +54,11 @@ type prismToken struct {
 	Expires  int64  `json:"exp"`
 }
 
-// prismAccounts is the accounts Prism holds in dir. A directory or file that isn't there yields
-// nothing and says nothing: opting in to a launcher that isn't installed is worth one line where
-// the opting in happens, not on every run afterwards. A file that doesn't read is an error to
-// warn with and skip, since shulker neither wrote it nor can repair it and a corrupt one must not
-// take `shulker accounts` down.
+// prismAccounts is the accounts Prism or MultiMC holds in dir, since both write this list. A
+// directory or file that isn't there yields nothing and says nothing: opting in to a launcher that
+// isn't installed is worth one line where the opting in happens, not on every run afterwards. A
+// file that doesn't read is an error to warn with and skip, since shulker neither wrote it nor can
+// repair it and a corrupt one must not take `shulker accounts` down.
 func prismAccounts(e *Entry, dir string, now time.Time) ([]account.Resolved, []error) {
 	found, err := readPrismAccounts(e, dir, now)
 	if err != nil {

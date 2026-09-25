@@ -20,7 +20,7 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "items": { "enum": ["shulker", "prism", "mojang"] },
+          "items": { "enum": ["shulker", "prism", "multimc", "mojang", "atlauncher"] },
           "default": ["shulker"],
           "description": "Where accounts are read from, in order. The earliest store wins an account several hold."
         },
