@@ -48,20 +48,23 @@ func TestDescribe(t *testing.T) {
 
 func TestRouteCommands(t *testing.T) {
 	cases := []struct {
-		route                     Route
-		managed                   bool
-		origin, update, uninstall string
+		route                           Route
+		managed                         bool
+		origin, lead, update, uninstall string
 	}{
-		{Release, true, "installed from a release", "shulker self update", ""},
-		{GoInstall, false, "installed with go install", "go install shulker.sh/shulker@latest", ""},
-		{Source, false, "built from source", "go build .", ""},
-		{"", false, "built from source", "go build .", ""},
-		{Homebrew, false, "installed by Homebrew", "brew upgrade shulker", "brew uninstall shulker"},
-		{Scoop, false, "installed by Scoop", "scoop update shulker", "scoop uninstall shulker"},
+		{Release, true, "installed from a release", "Install it", "shulker self update", ""},
+		{GoInstall, false, "installed with go install", "Update it with", "go install shulker.sh/shulker@latest", ""},
+		{Source, false, "built from source", "Rebuild it with", "go build .", ""},
+		{"", false, "built from source", "Rebuild it with", "go build .", ""},
+		{Homebrew, false, "installed by Homebrew", "Update it with", "brew upgrade shulker", "brew uninstall shulker"},
+		{Scoop, false, "installed by Scoop", "Update it with", "scoop update shulker", "scoop uninstall shulker"},
 	}
 	for _, c := range cases {
-		if c.route.Managed() != c.managed || c.route.Origin() != c.origin || c.route.UpdateCommand() != c.update || c.route.UninstallCommand() != c.uninstall {
-			t.Errorf("%q: managed %v, origin %q, update %q, uninstall %q", c.route, c.route.Managed(), c.route.Origin(), c.route.UpdateCommand(), c.route.UninstallCommand())
+		if c.route.Managed() != c.managed || c.route.Origin() != c.origin || c.route.UpdateLead() != c.lead || c.route.UpdateCommand() != c.update || c.route.UninstallCommand() != c.uninstall {
+			t.Errorf("%q: managed %v, origin %q, lead %q, update %q, uninstall %q", c.route, c.route.Managed(), c.route.Origin(), c.route.UpdateLead(), c.route.UpdateCommand(), c.route.UninstallCommand())
 		}
+	}
+	if got := (Build{Route: Source, Commit: "d1556f95d232aa7f"}).Origin(); got != "built from source at d1556f9" {
+		t.Errorf("a source build names its commit: %q", got)
 	}
 }

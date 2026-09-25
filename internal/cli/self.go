@@ -17,9 +17,12 @@ import (
 )
 
 type selfUpdateResult struct {
-	Current    string `json:"current"`
-	Latest     string `json:"latest"`
-	Available  bool   `json:"available"`
+	Current string `json:"current"`
+	Latest  string `json:"latest"`
+	// Available is nil for a build with no version to compare, a dev build, since "false" would
+	// read as up to date.
+	Available  *bool  `json:"available"`
+	Install    string `json:"install,omitempty"`
 	Updated    bool   `json:"updated"`
 	Path       string `json:"path,omitempty"`
 	Provenance string `json:"provenance,omitempty"`
@@ -191,15 +194,30 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	case err != nil:
 		return out.Errorf("self-update-check", "can't check for updates").WithCause("github", err)
 	}
-	res := selfUpdateResult{Current: version, Latest: strings.TrimPrefix(tag, "v"), Available: selfupdate.NeedsUpdate(version, tag)}
-	if !res.Available {
-		return a.printer.Emit(res, func(l *out.Lines) { l.OK("shulker is up to date", version) })
+	b := a.build()
+	res := selfUpdateResult{Current: b.Version, Latest: strings.TrimPrefix(tag, "v"), Install: string(b.Route)}
+	if b.Version != selfupdate.Dev {
+		available := selfupdate.NeedsUpdate(b.Version, tag)
+		res.Available = &available
+	}
+	if res.Available != nil && !*res.Available {
+		return a.printer.Emit(res, func(l *out.Lines) { l.OK("shulker is up to date", b.Version) })
 	}
 	if check {
 		return a.printer.Emit(res, func(l *out.Lines) {
-			l.Items(out.Item{Kind: out.Change, Name: "shulker", From: version, To: res.Latest, Aside: []string{"update available"}})
-			l.Nudge("Install it", "shulker self update")
+			if res.Available == nil {
+				l.Info("the latest release is shulker " + res.Latest)
+			} else {
+				l.Items(out.Item{Kind: out.Change, Name: "shulker", From: b.Version, To: res.Latest, Aside: []string{"update available"}})
+			}
+			l.Nudge(b.Route.UpdateLead(), b.Route.UpdateCommand())
 		})
+	}
+	if !b.Route.Managed() {
+		e := out.Errorf("self-update-unmanaged", "this shulker was %s", b.Origin())
+		e.Nudge = out.Nudge{Lead: b.Route.UpdateLead(), Command: b.Route.UpdateCommand()}
+		e.Data = res
+		return e
 	}
 
 	exe, err := a.exe()
@@ -235,7 +253,7 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 		a.printer.Warn("instances not repaired: %v", err)
 	}
 	return a.printer.Emit(res, func(l *out.Lines) {
-		l.OKInto("updated shulker "+l.T.Bump(version, res.Latest), exe, "")
+		l.OKInto("updated shulker "+l.T.Bump(b.Version, res.Latest), exe, "")
 	})
 }
 

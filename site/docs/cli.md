@@ -1697,6 +1697,8 @@ shulker version --verbose
 
 Replace the running shulker with the latest release from GitHub. It checks the download against the release's SHA256 checksums and, when the [GitHub CLI](https://cli.github.com) (`gh`) is installed, verifies its build provenance. Without `gh`, it installs on the checksum alone.
 
+It only replaces a binary that came from a release archive, which is what the install scripts and a GitHub download give you. One installed with `go install` or built from a clone fails `self-update-unmanaged`, naming the command that updates it instead: `go install shulker.sh/shulker@latest`, or `go build .`. `--check` works for every build: it prints the latest release, and the command for this build's route. A build from a clone has no version to compare, so `--check` reports the latest release without saying whether it is newer, and `available` is `null` in JSON. `install` in the JSON names the route: `release`, `go install` or `source`.
+
 ```sh
 shulker self update
 shulker self update --check
@@ -2004,6 +2006,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `self-update-download` | The download failed |
 | `self-update-install` | The running binary couldn't be replaced |
 | `self-update-provenance` | `--require-attestation` is set and the build provenance couldn't be verified |
+| `self-update-unmanaged` | The running binary isn't from a release archive, so shulker can't replace it; the message names what installed it and the command that updates it |
 | `server-exit` | The server exited with an error. `items`: its `logs/latest.log` and, when the server wrote one during the run, its crash report; `data` carries them as `log` and `crashReport` |
 | `shim-build-failed` | On Windows, shulker couldn't make an instance's `javaw.exe` shim from its own binary, because that binary isn't a Windows executable it can patch |
 | `sign-in-failed` | The Microsoft sign-in didn't finish: it was declined, the code ran out before it was used, or Microsoft or Xbox Live refused it — including an account with no Xbox profile, which can't reach Minecraft at all |

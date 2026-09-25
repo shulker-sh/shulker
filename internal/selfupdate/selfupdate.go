@@ -138,12 +138,10 @@ func ParseChecksums(data string) map[string]string {
 	return sums
 }
 
-// NeedsUpdate reports whether latest is newer than current. A dev build always updates;
-// pre-release and build suffixes are ignored.
+// NeedsUpdate reports whether latest is newer than current, a release version; pre-release and
+// build suffixes are ignored. A Dev build has no version to compare, and the answer for it is
+// unknown rather than false.
 func NeedsUpdate(current, latest string) bool {
-	if current == "dev" || current == "" {
-		return true
-	}
 	c, l := splitVersion(current), splitVersion(latest)
 	for i := 0; i < len(c) && i < len(l); i++ {
 		if l[i] != c[i] {

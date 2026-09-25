@@ -24,7 +24,6 @@ func TestNeedsUpdate(t *testing.T) {
 		current, latest string
 		want            bool
 	}{
-		{"dev", "v0.0.1", true},
 		{"0.0.1", "v0.0.2", true},
 		{"0.0.2", "v0.0.2", false},
 		{"0.0.3", "v0.0.2", false},

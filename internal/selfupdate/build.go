@@ -26,15 +26,15 @@ const (
 )
 
 type routeFacts struct {
-	origin, update, uninstall string
+	origin, updateLead, update, uninstall string
 }
 
 var routes = map[Route]routeFacts{
-	Release:   {origin: "installed from a release", update: "shulker self update"},
-	GoInstall: {origin: "installed with go install", update: "go install shulker.sh/shulker@latest"},
-	Source:    {origin: "built from source", update: "go build ."},
-	Homebrew:  {origin: "installed by Homebrew", update: "brew upgrade shulker", uninstall: "brew uninstall shulker"},
-	Scoop:     {origin: "installed by Scoop", update: "scoop update shulker", uninstall: "scoop uninstall shulker"},
+	Release:   {origin: "installed from a release", updateLead: "Install it", update: "shulker self update"},
+	GoInstall: {origin: "installed with go install", updateLead: "Update it with", update: "go install shulker.sh/shulker@latest"},
+	Source:    {origin: "built from source", updateLead: "Rebuild it with", update: "go build ."},
+	Homebrew:  {origin: "installed by Homebrew", updateLead: "Update it with", update: "brew upgrade shulker", uninstall: "brew uninstall shulker"},
+	Scoop:     {origin: "installed by Scoop", updateLead: "Update it with", update: "scoop update shulker", uninstall: "scoop uninstall shulker"},
 }
 
 func (r Route) facts() routeFacts {
@@ -52,8 +52,10 @@ func (r Route) Managed() bool { return r == Release }
 // Origin says how the binary got here, completing "this shulker was …".
 func (r Route) Origin() string { return r.facts().origin }
 
-// UpdateCommand is the route's own way to a newer shulker.
+// UpdateCommand is the route's own way to a newer shulker, and UpdateLead introduces it.
 func (r Route) UpdateCommand() string { return r.facts().update }
+
+func (r Route) UpdateLead() string { return r.facts().updateLead }
 
 // UninstallCommand is the package manager's way to remove the binary, or "" when nothing tracks
 // the file and shulker removes it itself.
@@ -69,6 +71,22 @@ type Build struct {
 	Built string
 	// Route is "" when the binary answers to none of them.
 	Route Route
+}
+
+// Origin says how the binary got here, completing "this shulker was …", with the commit a source
+// build sits on.
+func (b Build) Origin() string {
+	if b.Commit == "" {
+		return b.Route.Origin()
+	}
+	return b.Route.Origin() + " at " + b.ShortCommit()
+}
+
+func (b Build) ShortCommit() string {
+	if len(b.Commit) > 7 {
+		return b.Commit[:7]
+	}
+	return b.Commit
 }
 
 var (
