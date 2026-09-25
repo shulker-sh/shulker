@@ -141,6 +141,11 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 		overrides, rep.LeftOut = KeepSide(pm, pl, overrides, sides[0])
 	}
 	takePlatform(p, pm, pl)
+	for _, pattern := range pm.SeedFiles {
+		if !slices.Contains(p.Manifest.SeedFiles, pattern) {
+			p.Manifest.SeedFiles = append(p.Manifest.SeedFiles, pattern)
+		}
+	}
 	projectJars := map[string]bool{}
 	for key := range p.Lock.Mods {
 		projectJars[p.Lock.JarID(key)] = true

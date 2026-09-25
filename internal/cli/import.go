@@ -176,6 +176,11 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 	if mods != nil && len(mods.Dropped) > 0 {
 		rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
 	}
+	if mods != nil {
+		for _, folder := range slices.Sorted(maps.Keys(mods.Seeded)) {
+			rows = append(rows, out.Row{Text: plural(len(mods.Seeded[folder]), "seeded file", "seeded files") + " from " + folder})
+		}
+	}
 	if mods != nil && len(mods.Duplicates) > 0 {
 		rows = append(rows, out.Row{Label: "left out as copies of a datapack a global datapack mod loads", Children: mods.Duplicates})
 	}

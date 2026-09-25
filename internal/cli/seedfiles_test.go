@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -226,5 +227,61 @@ func TestDiffAndPullTreatSeededFilesAsThePlayers(t *testing.T) {
 	h.mustRun(t, "pull", "config/a.json")
 	if got := readFile(t, seeded); got != "mine\n" {
 		t.Fatalf("a named pull copies a seeded file: %q", got)
+	}
+}
+
+func TestASeedModsFolderRoundTripsThroughExportAndImport(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	h.editManifest(t, func(m map[string]any) {
+		m["seedFiles"] = []string{"config/a.json"}
+		m["integrations"] = map[string]any{"configmanager": []string{"sodium"}}
+	})
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "a.json"), "{}\n")
+	h.mustRun(t, "install")
+	h.allowMrpackHost(t)
+	h.mustRun(t, "export", "mrpack", "--version", "1.0")
+	archive := filepath.Join(h.dir, "build", "pack-1.0.mrpack")
+	layout := func(path string) []string {
+		_, entries := readMrpack(t, path)
+		var got []string
+		for name := range entries {
+			if strings.HasSuffix(name, "a.json") {
+				got = append(got, name)
+			}
+		}
+		return got
+	}
+	if got := layout(archive); len(got) != 1 || got[0] != "overrides/config/modpack_defaults/config/a.json" {
+		t.Fatalf("the export seeds through Config Manager's folder: %v", got)
+	}
+
+	dir := filepath.Join(t.TempDir(), "imported")
+	stdout := h.mustRun(t, "import", archive, "--dir", dir)
+	if !strings.Contains(stdout, "1 seeded file from config/modpack_defaults") {
+		t.Fatalf("import reports the seeded files: %s", stdout)
+	}
+	if got := readFile(t, filepath.Join(dir, "overrides", "config", "a.json")); got != "{}\n" {
+		t.Fatalf("the default comes back at its own path: %q", got)
+	}
+	h.dir = dir
+	if m := h.readManifest(t); !slices.Equal(m.SeedFiles, []string{"config/a.json"}) {
+		t.Fatalf("seedFiles: %v", m.SeedFiles)
+	}
+	h.mustRun(t, "export", "mrpack", "--version", "1.0")
+	if got := layout(filepath.Join(dir, "build", "pack-1.0.mrpack")); len(got) != 1 || got[0] != "overrides/config/modpack_defaults/config/a.json" {
+		t.Fatalf("the imported project exports the same layout: %v", got)
+	}
+
+	other := t.TempDir()
+	h.dir = other
+	h.mustRun(t, "create", "--loader", "fabric")
+	importMerge(t, h, archive)
+	if m := h.readManifest(t); !slices.Contains(m.SeedFiles, "config/a.json") {
+		t.Fatalf("a merge adds to the project's seedFiles: %v", m.SeedFiles)
+	}
+	if got := readFile(t, filepath.Join(other, "overrides", "config", "a.json")); got != "{}\n" {
+		t.Fatalf("a merge brings the default to its own path: %q", got)
 	}
 }

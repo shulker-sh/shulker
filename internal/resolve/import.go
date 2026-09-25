@@ -50,9 +50,11 @@ type Imported struct {
 	// Sides are the mods the index's env widens beyond their provider's side.
 	Sides []SideChoice `json:"sides"`
 	// ServerPack is what the server files the pack pairs with decided, when it pairs some.
-	ServerPack *ServerPack            `json:"serverPack,omitempty"`
-	Warnings   []string               `json:"-"`
-	Overrides  []packarchive.Override `json:"-"`
+	ServerPack *ServerPack `json:"serverPack,omitempty"`
+	// Seeded are the files moved out of a seed mod's folder to be seeded, by that folder.
+	Seeded    map[string][]string    `json:"seeded,omitempty"`
+	Warnings  []string               `json:"-"`
+	Overrides []packarchive.Override `json:"-"`
 }
 
 // SideChoice is a mod locked on a wider side than its provider's, since the index's env places it
@@ -223,6 +225,7 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 	if err := r.AdoptLocalFiles(); err != nil {
 		return nil, err
 	}
+	mods.Overrides = seedFromSeedMods(m, r.Lock, mods.Overrides, mods)
 	if arc.Marker != nil {
 		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
 	} else {
