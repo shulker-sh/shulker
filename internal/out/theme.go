@@ -190,7 +190,6 @@ func (t Theme) GlyphOK() string    { return t.glyph("✔", "*") }
 func (t Theme) GlyphError() string { return t.glyph("✘", "x") }
 func (t Theme) GlyphDot() string   { return t.glyph("•", "*") }
 func (t Theme) GlyphTee() string   { return t.glyph("├─", "|-") }
-func (t Theme) GlyphElbow() string { return t.glyph("└─", "\\-") }
 
 // GlyphElbowRound closes a tree: the rounded corner under the last child.
 func (t Theme) GlyphElbowRound() string { return t.glyph("╰─", "\\-") }

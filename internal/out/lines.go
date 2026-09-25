@@ -328,51 +328,6 @@ func (l *Lines) Nudge(lead, command string) {
 	l.line(gutter + l.T.Grey("$") + " " + l.T.Command(command))
 }
 
-// Entry is one row of Entries.
-type Entry struct {
-	Synced bool
-	Name   string
-	Tag    string
-	Aside  string
-	Path   string
-	Detail string
-	// Note is a last grey line under the detail, for a problem the status aside is too narrow to
-	// carry.
-	Note string
-}
-
-// Entries is a bold heading with a tree of status-dotted entries, each with
-// its full path on the line below.
-func (l *Lines) Entries(heading string, entries []Entry) {
-	t := l.T
-	l.Heading(heading)
-	for i, e := range entries {
-		last := i == len(entries)-1
-		branch, below := t.GlyphTee(), t.Grey(t.GlyphBar())
-		if last {
-			branch, below = t.GlyphElbowRound(), " "
-		}
-		dot := t.paint(t.GlyphDot(), sgrYellow, sgrBold)
-		if e.Synced {
-			dot = t.paint(t.GlyphDot(), sgrGreen, sgrBold)
-		}
-		line := t.Grey(branch) + " " + dot + " " + t.Bold(e.Name)
-		if e.Tag != "" {
-			line += " " + t.Cyan(e.Tag)
-		}
-		fmt.Fprintln(l.W, gutter+gutter+line+t.Aside(e.Aside))
-		if e.Path != "" {
-			fmt.Fprintln(l.W, gutter+gutter+below+"    "+t.Link(t.Grey(e.Path), e.Path))
-		}
-		if e.Detail != "" {
-			fmt.Fprintln(l.W, gutter+gutter+below+"    "+t.Grey(e.Detail))
-		}
-		if e.Note != "" {
-			fmt.Fprintln(l.W, gutter+gutter+below+"    "+t.Grey(e.Note))
-		}
-	}
-}
-
 // Error renders the error tree: the red line with its code, then the items,
 // candidates, and help underneath.
 func (l *Lines) Error(e *Error) {

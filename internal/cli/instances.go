@@ -4,6 +4,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
@@ -60,39 +62,44 @@ func (a *app) loadInstanceEntries() ([]project.InstanceEntry, error) {
 	return entries, nil
 }
 
+// printInstanceEntries is one table across launchers: the sync dot, the id bold, the launcher,
+// side and status, then the full directory so it copies, wrapped in a link. A launch that never
+// started puts its reason on the status cell's second line. Source and ref are left to --json.
 func printInstanceEntries(l *out.Lines, entries []project.InstanceEntry) {
 	if len(entries) == 0 {
 		l.Info("Nothing is linked yet; `shulker link prism` adds an instance.")
 		return
 	}
-	var group []out.Entry
-	flush := func(name string) {
-		if len(group) > 0 {
-			l.Entries(launcher.Title(name), group)
-			group = nil
-		}
-	}
+	t := l.T
+	rows := make([][]string, len(entries))
+	statusWidth := 0
 	for i, e := range entries {
-		if i > 0 && e.Launcher != entries[i-1].Launcher {
-			flush(entries[i-1].Launcher)
-			l.Blank()
-		}
-		detail := "from " + e.Source
-		if e.Name != "" && e.Name != e.ID {
-			detail = e.Name + ", from " + e.Source
-		}
-		if e.Ref != "" {
-			detail += ", ref " + e.Ref
-		}
-		if e.Path != "" {
-			detail += ", path " + e.Path
-		}
-		if e.Side != "" {
-			detail += ", side " + e.Side
-		}
-		group = append(group, out.Entry{Synced: e.Status == project.StatusSynced && e.LastError == "" && e.LaunchError == "", Name: e.ID, Tag: e.Side, Aside: instanceText{e}.statusText(), Path: e.Dir, Detail: detail, Note: instanceText{e}.launchText()})
+		rows[i] = []string{t.GlyphDot(), e.ID, e.Launcher, e.Side, instanceText{e}.statusText(), t.Link(e.Dir, e.Dir)}
+		statusWidth = max(statusWidth, out.Width(rows[i][4]))
 	}
-	flush(entries[len(entries)-1].Launcher)
+	// The note folds to the statuses' own width, so the path stays the column that gives way.
+	for i, e := range entries {
+		if note := (instanceText{e}).launchText(); note != "" {
+			rows[i][4] += "\n" + t.Grey(ansi.Wrap(note, statusWidth, "/-"))
+		}
+	}
+	l.Table([]string{"", "Instance", "Launcher", "Side", "Status", "Path"}, rows, func(row, col int) lipgloss.Style {
+		e := entries[row]
+		switch col {
+		case 0:
+			if e.Status == project.StatusSynced && e.LastError == "" && e.LaunchError == "" {
+				return t.StyleGreen().Bold(true)
+			}
+			return t.StyleYellow().Bold(true)
+		case 1:
+			return t.StyleBold()
+		case 2, 5:
+			return t.StyleGrey()
+		case 3:
+			return t.StyleCyan()
+		}
+		return t.Style()
+	})
 }
 
 // launchText is the line under a directory whose last launch never got as far as running the game.

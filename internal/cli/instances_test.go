@@ -256,17 +256,25 @@ func TestInstancesList(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "instances")
-	for _, part := range []string{
-		"Prism Launcher\n    ├─ • alpha client (synced ",
-		"• zed client (synced ",
-		filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         Zed, from " + h.dir + ", side client\n",
-		"\n\n  Minecraft Launcher\n    ╰─ • pack client (synced ",
-		"• gone (directory is missing)\n",
-		"• locked (can't read the directory)\n",
+	rows := tableRows(stdout)
+	if len(rows) != 5 {
+		t.Fatalf("instances is one table across launchers:\n%s", stdout)
+	}
+	for i, want := range []map[string]string{
+		{"": "•", "Instance": "alpha", "Launcher": "prism", "Side": "client", "Status": "synced "},
+		{"": "•", "Instance": "gone", "Launcher": "prism", "Side": "", "Status": "directory is missing"},
+		{"": "•", "Instance": "locked", "Launcher": "prism", "Side": "", "Status": "can't read the directory"},
+		{"": "•", "Instance": "zed", "Launcher": "prism", "Side": "client", "Status": "synced ", "Path": filepath.Join(prismDir, "instances", "shulker-zed", "minecraft")},
+		{"": "•", "Instance": "pack", "Launcher": "mojang", "Side": "client", "Status": "synced "},
 	} {
-		if !strings.Contains(stdout, part) {
-			t.Fatalf("instances output lacks %q:\n%s", part, stdout)
+		for header, value := range want {
+			if got := rows[i][header]; !strings.HasPrefix(got, value) {
+				t.Fatalf("row %d %s = %q, want %q:\n%s", i, header, got, value, stdout)
+			}
 		}
+	}
+	if strings.Contains(stdout, "Zed, from") || strings.Contains(stdout, "ref ") {
+		t.Fatalf("the source and ref are left to --json:\n%s", stdout)
 	}
 }
 
@@ -436,8 +444,8 @@ func TestSyncDetectsAPrismInstance(t *testing.T) {
 	if len(instances) != 1 || instances[0].Launcher != "prism" || instances[0].LauncherDir != prismDir {
 		t.Fatalf("a sync into a Prism instance records the launcher: %+v", instances)
 	}
-	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "Prism Launcher") {
-		t.Fatalf("instances groups it under its launcher: %s", stdout)
+	if rows := tableRows(h.mustRun(t, "instances")); len(rows) != 1 || rows[0]["Launcher"] != "prism" {
+		t.Fatalf("instances names its launcher: %+v", rows)
 	}
 }
 
@@ -806,8 +814,8 @@ func TestInstancesShowsALaunchThatNeverStarted(t *testing.T) {
 		t.Fatalf("the entry should carry the reason the launch never started: %+v", env.Data)
 	}
 	stdout := h.mustRun(t, "instances")
-	if !strings.Contains(stdout, "last launch didn't start: ") || !strings.Contains(stdout, java) {
-		t.Fatalf("instances should show the failed launch:\n%s", stdout)
+	if rows := tableRows(stdout); len(rows) != 1 || !strings.Contains(squash(rows[0]["Status"]), "lastlaunchdidn'tstart:") || !strings.Contains(squash(rows[0]["Status"]), squash(java)) {
+		t.Fatalf("instances should show the failed launch under its status:\n%s", stdout)
 	}
 	if strings.Contains(stdout, accessToken) {
 		t.Fatalf("instances repeats the game argv:\n%s", stdout)
