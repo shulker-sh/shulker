@@ -168,6 +168,8 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 		}
 		listed := listedFrom(p, proj)
 		listed.Type = kind
+		listed.Filename = providerPackName(key, kind, v.File.Filename)
+		r.placePack(key, kind, listed)
 		im.lockedListed(p, key, kind, listed)
 	default:
 		return nil, nil, out.Errorf("requires-unsupported", "%s is a %s, which a pack can't carry", proj.Slug, kind)

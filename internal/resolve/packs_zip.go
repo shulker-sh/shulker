@@ -75,12 +75,11 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 		listed.Pin = opts.Pin
 	}
 	r.setSource(&listed, key, p, proj)
-	locked := r.Lock.Packs(kind)[key]
 	listed.Filename = r.Manifest.Requires[key].Filename
-	if name := locked.ProviderFilename; listed.Filename == "" && strings.HasSuffix(name, ".zip") && name != key+".zip" {
-		listed.Filename = name
+	if listed.Filename == "" {
+		listed.Filename = providerPackName(key, kind, r.Lock.Packs(kind)[key].ProviderFilename)
 	}
-	locked.Filename = manifest.PackFilename(key, listed)
+	locked := r.placePack(key, kind, listed)
 	if kind == manifest.TypeDatapack {
 		listed.Side, listed.ResourcePack = opts.Side, opts.ResourcePack
 		locked.Side, locked.ResourcePack = packSide(kind, listed), listed.ResourcePack
@@ -88,6 +87,23 @@ func (r *Resolver) addPack(ctx context.Context, p provider.Provider, proj *provi
 	r.Lock.Packs(kind)[key] = locked
 	r.Manifest.Requires[key] = listed
 	return nil
+}
+
+// providerPackName is the provider's file name when a pack can be placed under it and it isn't
+// the key's own, since other packs' options.txt and load orders name a pack by that name.
+func providerPackName(key, kind, name string) string {
+	if ext := manifest.FileExtension(kind); strings.HasSuffix(name, ext) && name != key+ext {
+		return name
+	}
+	return ""
+}
+
+// placePack records the name listed places key under in its lock entry, and returns the entry.
+func (r *Resolver) placePack(key, kind string, listed manifest.Require) lock.Pack {
+	locked := r.Lock.Packs(kind)[key]
+	locked.Filename = manifest.PackFilename(key, listed)
+	r.Lock.Packs(kind)[key] = locked
+	return locked
 }
 
 // packKeyFree refuses a key another entry already holds, whatever kind it is:

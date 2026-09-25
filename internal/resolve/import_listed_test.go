@@ -115,7 +115,7 @@ func TestImportLocksListedFilesAndSkipsOptionalOnes(t *testing.T) {
 	if jei := m.Mods()["jei"]; jei.Provider != "curseforge" || jei.Project != "238222" || jei.Pin != "" {
 		t.Fatalf("jei manifest entry: %+v", jei)
 	}
-	if pack := m.ResourcePacks()["fresh-animations"]; pack.Provider != "curseforge" || pack.Project != "600000" {
+	if pack := m.ResourcePacks()["fresh-animations"]; pack.Provider != "curseforge" || pack.Project != "600000" || pack.Filename != "FreshAnimations_CF_v1.9.4.zip" {
 		t.Fatalf("fresh-animations manifest entry: %+v", pack)
 	}
 	if api := m.Mods()["fabric-api"]; api.Provider != "curseforge" || api.Project != "306612" {
@@ -125,7 +125,7 @@ func TestImportLocksListedFilesAndSkipsOptionalOnes(t *testing.T) {
 	if jei.Provider != "curseforge" || jei.Version != "5000001" || jei.Sha512 != sha512Hex(h.cdn.bytes(cf.Files[1])) || jei.URL == nil {
 		t.Fatalf("jei lock entry: %+v", jei)
 	}
-	if pack := l.ResourcePacks["fresh-animations"]; pack.Version != "5300001" || pack.Sha512 != sha512Hex(h.cdn.bytes(cf.Files[3])) || pack.Provider != "curseforge" {
+	if pack := l.ResourcePacks["fresh-animations"]; pack.Version != "5300001" || pack.Sha512 != sha512Hex(h.cdn.bytes(cf.Files[3])) || pack.Provider != "curseforge" || pack.Filename != "FreshAnimations_CF_v1.9.4.zip" {
 		t.Fatalf("fresh-animations lock entry: %+v", pack)
 	}
 	if _, ok := l.Mods["sodium"]; ok {
