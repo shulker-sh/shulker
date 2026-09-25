@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/local"
@@ -240,7 +239,7 @@ func TestUnlinkDetachedBuild(t *testing.T) {
 	if inf, err := instance.Load(into); err != nil || !inf.IsUnlinked {
 		t.Fatalf("unlink marks the detached build unlinked: %+v %v", inf, err)
 	}
-	if _, err := os.Stat(build.StatePath(into)); err != nil {
+	if _, err := os.Stat(instance.StatePath(into)); err != nil {
 		t.Fatalf("unlink keeps the detached build's files: %v", err)
 	}
 

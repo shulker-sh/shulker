@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/instance"
 )
 
 // DataDir is the project folder, one subfolder per side, that holds the saves, logs and other data
@@ -30,7 +31,7 @@ type linkPlan struct {
 	remove []string
 }
 
-func (b *Builder) planLinks(dir, side string, dirs []string, prev State, report *Report) (linkPlan, error) {
+func (b *Builder) planLinks(dir, side string, dirs []string, prev instance.State, report *Report) (linkPlan, error) {
 	var plan linkPlan
 	dataRoot := filepath.Join(b.Dir, DataDir, side)
 	wanted := map[string]bool{}

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/schema"
 )
@@ -104,7 +105,7 @@ func TestFeatureIntoGitSyncedDir(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(into, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("--sync from the recorded git source should ship the gated mod: %v", err)
 	}
-	if st := build.LoadState(into); st.Source != source {
+	if st := instance.LoadState(into); st.Source != source {
 		t.Fatalf("state origin: %+v", st.Origin)
 	}
 }

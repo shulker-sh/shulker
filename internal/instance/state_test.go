@@ -1,4 +1,4 @@
-package build
+package instance
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 
 func TestWriteStateMarksSchema(t *testing.T) {
 	dir := t.TempDir()
-	if err := writeState(dir, State{Files: map[string]string{"mods/a.jar": "abc"}}); err != nil {
+	if err := WriteState(dir, State{Files: map[string]string{"mods/a.jar": "abc"}}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(StatePath(dir))
@@ -29,7 +29,7 @@ func TestWriteStateMarksSchema(t *testing.T) {
 	}
 	s, stateErr := ReadState(dir)
 	if stateErr != nil || s.Files["mods/a.jar"] != "abc" {
-		t.Fatalf("ReadState after writeState = %+v, %v", s, stateErr)
+		t.Fatalf("ReadState after WriteState = %+v, %v", s, stateErr)
 	}
 }
 
@@ -50,7 +50,7 @@ func TestReadStateMarker(t *testing.T) {
 				doc["$schema"] = c.schema
 			}
 			data, _ := json.Marshal(doc)
-			if err := os.MkdirAll(filepath.Join(dir, StateDir), 0o755); err != nil {
+			if err := os.MkdirAll(filepath.Join(dir, Dir), 0o755); err != nil {
 				t.Fatal(err)
 			}
 			if err := os.WriteFile(StatePath(dir), data, 0o644); err != nil {

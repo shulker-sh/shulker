@@ -11,7 +11,7 @@ import (
 const datapackMcmeta = `{"pack":{"pack_format":48,"description":"a datapack"}}`
 
 // lockDatapack locks a datapack zip of entries from Modrinth as key on side, and returns its bytes.
-func (p *project) lockDatapack(key, side string, entries map[string]string) string {
+func (p *testProject) lockDatapack(key, side string, entries map[string]string) string {
 	p.t.Helper()
 	data := zipOf(p.t, entries)
 	p.lockPack(manifest.TypeDatapack, key, p.modrinth, p.modrinth.publish(mod("dp-"+key, key), provider.Version{ID: "m-" + key + "-1", Number: "1.0", File: provider.File{Filename: key + "-1.0.zip"}}, data))

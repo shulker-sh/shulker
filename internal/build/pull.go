@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/near"
@@ -30,11 +31,11 @@ type FileDiff struct {
 }
 
 type DiffReport struct {
-	Side     string      `json:"side"`
-	Dir      string      `json:"dir"`
-	Files    []FileDiff  `json:"files"`
-	Warnings []string    `json:"-"`
-	State    *StateError `json:"-"`
+	Side     string               `json:"side"`
+	Dir      string               `json:"dir"`
+	Files    []FileDiff           `json:"files"`
+	Warnings []string             `json:"-"`
+	State    *instance.StateError `json:"-"`
 }
 
 type PullReport struct {
@@ -46,11 +47,11 @@ type PullReport struct {
 	// Entries are the jars and packs adopted as file entries, filled by the caller from Adoptable.
 	Entries []string `json:"entries"`
 	// Adoptable are the named files to adopt as file entries rather than copy to an override.
-	Adoptable       []string    `json:"-"`
-	Skipped         []string    `json:"skipped"`
-	Warnings        []string    `json:"-"`
-	State           *StateError `json:"-"`
-	ManifestChanged bool        `json:"manifestChanged"`
+	Adoptable       []string             `json:"-"`
+	Skipped         []string             `json:"skipped"`
+	Warnings        []string             `json:"-"`
+	State           *instance.StateError `json:"-"`
+	ManifestChanged bool                 `json:"manifestChanged"`
 }
 
 // Diff is how the files in side's build directory differ from what a build would write.
@@ -131,7 +132,7 @@ func (b *Builder) checkNamed(side string, files []string, opts Options) error {
 func listFiles(dir string, skips func(rel string) bool) ([]string, error) {
 	files := []string{}
 	err := filepath.WalkDir(dir, func(path string, e fs.DirEntry, err error) error {
-		if err != nil || e.IsDir() || e.Name() == StateFile {
+		if err != nil || e.IsDir() || e.Name() == instance.StateFile {
 			return err
 		}
 		rel, err := filepath.Rel(dir, path)
@@ -322,7 +323,7 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 		}
 		prev.Files[rel] = hash
 		if src.owned() != nil {
-			prev.record(rel, src.owned())
+			recordValues(&prev, rel, src.owned())
 		} else {
 			delete(prev.Values, rel)
 		}
@@ -375,10 +376,10 @@ func (b *Builder) pullDest(side, to string) (string, error) {
 type drift struct {
 	dir      string
 	desired  map[string]source
-	prev     State
+	prev     instance.State
 	plans    []planned
 	warnings []string
-	state    *StateError
+	state    *instance.StateError
 }
 
 func (b *Builder) drift(side string, opts Options) (*drift, error) {
@@ -398,7 +399,7 @@ func (b *Builder) drift(side string, opts Options) (*drift, error) {
 		e.Help = "run `shulker build`"
 		return nil, e
 	}
-	prev, stateErr := ReadState(dir)
+	prev, stateErr := instance.ReadState(dir)
 	plans, err := b.plan(dir, desired, prev, false)
 	if err != nil {
 		return nil, err

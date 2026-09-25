@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 )
 
 func newInPlace(t *testing.T) *harness {
@@ -24,7 +25,7 @@ func TestBuildInPlace(t *testing.T) {
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
 
-	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "options.txt", filepath.Join(build.StateDir, build.StateFile)} {
+	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "options.txt", filepath.Join(instance.Dir, instance.StateFile)} {
 		if _, err := os.Stat(filepath.Join(h.dir, rel)); err != nil {
 			t.Fatalf("expected %s in the project directory: %v", rel, err)
 		}

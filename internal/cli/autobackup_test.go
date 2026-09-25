@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/saves"
 )
@@ -69,13 +68,13 @@ func TestUpdateBacksUpUnderThePlatformTheWorldsWerePlayedOn(t *testing.T) {
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
 	addWorld(t, filepath.Join(h.dir, "saves"), "mine")
-	state := build.LoadState(h.dir)
+	state := instance.LoadState(h.dir)
 	state.Minecraft, state.LoaderVersion = "26.1", "0.17.2"
 	raw, err := json.Marshal(state)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(build.StatePath(h.dir), raw, 0o644); err != nil {
+	if err := os.WriteFile(instance.StatePath(h.dir), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	h.newer = true
@@ -90,7 +89,7 @@ func TestUpdateBacksUpUnderThePlatformTheWorldsWerePlayedOn(t *testing.T) {
 	if rows := tableRows(h.mustRun(t, "saves", "-C", h.dir)); len(rows) != 1 || rows[0]["Game"] != "26.1 fabric 0.17.2" {
 		t.Fatalf("saves: %+v", rows)
 	}
-	if got := build.LoadState(h.dir); got.Minecraft != "26.2" || got.Loader != "fabric" || got.LoaderVersion != "0.17.3" {
+	if got := instance.LoadState(h.dir); got.Minecraft != "26.2" || got.Loader != "fabric" || got.LoaderVersion != "0.17.3" {
 		t.Fatalf("the build records what it installed: %+v", got)
 	}
 }

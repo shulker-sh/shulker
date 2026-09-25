@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"shulker.sh/shulker/internal/account"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/schema"
@@ -18,7 +18,7 @@ import (
 // it beneath: `shulker self update` for one a newer shulker wrote, otherwise force, the command
 // that takes the directory's files over. An empty force, as on a run that already forces, leaves
 // the warning without one.
-func (a *app) warnState(e *build.StateError, force string) {
+func (a *app) warnState(e *instance.StateError, force string) {
 	switch {
 	case e == nil:
 	case e.Newer:
@@ -32,7 +32,7 @@ func (a *app) warnState(e *build.StateError, force string) {
 
 // warnBuild is warnFor for a build's report, its state warning last so its nudge sits under the
 // warnings rather than between them.
-func (a *app) warnBuild(side string, several bool, warnings []string, state *build.StateError, force string) {
+func (a *app) warnBuild(side string, several bool, warnings []string, state *instance.StateError, force string) {
 	if several {
 		defer a.scopeWarnings(side)()
 	}

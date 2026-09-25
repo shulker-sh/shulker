@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -97,7 +98,7 @@ func HistoryWarning(dir string, keep int) (string, error) {
 }
 
 func HistoryPath(dir string) string {
-	return filepath.Join(dir, StateDir, HistoryDir)
+	return filepath.Join(dir, instance.Dir, HistoryDir)
 }
 
 func historyEntryPath(dir, id string) string {
@@ -137,7 +138,7 @@ func TakeHistory(dir string, keep int, e HistoryEntry) (HistoryEntry, error) {
 			return HistoryEntry{}, err
 		}
 	}
-	if err := copyFile(StatePath(dir), filepath.Join(into, StateFile)); err != nil {
+	if err := copyFile(instance.StatePath(dir), filepath.Join(into, instance.StateFile)); err != nil {
 		return HistoryEntry{}, err
 	}
 	cached := leftToCache(dir, lk)
@@ -161,7 +162,7 @@ func TakeHistory(dir string, keep int, e HistoryEntry) (HistoryEntry, error) {
 // the cache can place again from the lock.
 func managedFiles(dir string, cached func(rel string) bool) []string {
 	var rels []string
-	for rel := range LoadState(dir).Files {
+	for rel := range instance.LoadState(dir).Files {
 		if cached(rel) || rel == historyConfig || strings.HasPrefix(rel, historyConfig+"/") {
 			continue
 		}
@@ -369,8 +370,8 @@ func RestoreHistory(dir string, e HistoryEntry) error {
 		switch rel {
 		case historyMeta:
 			return nil
-		case StateFile:
-			return copyFile(path, StatePath(dir))
+		case instance.StateFile:
+			return copyFile(path, instance.StatePath(dir))
 		}
 		return copyFile(path, filepath.Join(dir, rel))
 	})

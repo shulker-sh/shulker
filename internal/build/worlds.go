@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 )
@@ -22,7 +23,7 @@ type Worlds struct {
 // when there is none; without it the side comes from the build state, or else from whether dir
 // has a server.properties. A separate-dir build's worlds are read where its data link points.
 func WorldsOf(dir string, m *manifest.Manifest) (Worlds, error) {
-	state, _ := ReadState(dir)
+	state, _ := instance.ReadState(dir)
 	side := state.Side
 	if m != nil {
 		side, _ = m.InPlaceSide()
@@ -67,7 +68,7 @@ func serverLevelName(dir string, m *manifest.Manifest) (string, error) {
 	return levelName(parseProperties(data)), nil
 }
 
-func linkTarget(dir, rel string, state State) string {
+func linkTarget(dir, rel string, state instance.State) string {
 	abs := filepath.Join(dir, rel)
 	if !slices.Contains(state.Links, rel) {
 		return abs

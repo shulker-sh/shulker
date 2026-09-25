@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/project"
 )
@@ -64,7 +64,7 @@ func TestLinkGDLauncher(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("a link builds the instance before it returns: %v", err)
 	}
-	if st := build.LoadState(gameDir); st.Source != gameDir {
+	if st := instance.LoadState(gameDir); st.Source != gameDir {
 		t.Fatalf("an instance builds from itself: %+v", st.Origin)
 	}
 

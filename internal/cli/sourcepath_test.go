@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 )
 
@@ -48,7 +48,7 @@ func TestSyncFromGitSubfolder(t *testing.T) {
 	if got, _ := os.ReadFile(filepath.Join(into, "config", "which.txt")); string(got) != "beta\n" {
 		t.Fatalf("--path packs/beta content: %q", got)
 	}
-	if st := build.LoadState(into); st.Origin != (build.Origin{Source: source, Path: "packs/beta", Commit: commit}) {
+	if st := instance.LoadState(into); st.Origin != (instance.Origin{Source: source, Path: "packs/beta", Commit: commit}) {
 		t.Fatalf("state origin: %+v", st.Origin)
 	}
 

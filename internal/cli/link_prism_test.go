@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 )
 
@@ -49,7 +49,7 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("the first sync should ship the mod turned on by --with: %v", err)
 	}
-	if st := build.LoadState(gameDir); st.Source != gameDir {
+	if st := instance.LoadState(gameDir); st.Source != gameDir {
 		t.Fatalf("an instance builds from itself: %+v", st.Origin)
 	}
 	key, entry := onlyModpack(t, instanceManifest(t, gameDir))

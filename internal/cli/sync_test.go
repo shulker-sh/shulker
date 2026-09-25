@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 )
 
 func TestSyncIntoDirectory(t *testing.T) {
@@ -25,7 +26,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 	if !strings.Contains(stdout, "synced client » "+into) {
 		t.Fatalf("sync output: %s", stdout)
 	}
-	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", filepath.Join(build.StateDir, build.StateFile)} {
+	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", filepath.Join(instance.Dir, instance.StateFile)} {
 		if _, err := os.Stat(filepath.Join(into, rel)); err != nil {
 			t.Fatalf("expected %s in the sync directory: %v", rel, err)
 		}
@@ -125,7 +126,7 @@ func TestSyncFromGit(t *testing.T) {
 	if res := env.Data; res.Kind != "git" || res.Commit != first || res.Source != source || res.Dir != into {
 		t.Fatalf("json result: %+v", res)
 	}
-	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "config/x.txt", filepath.Join(build.StateDir, build.StateFile)} {
+	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "config/x.txt", filepath.Join(instance.Dir, instance.StateFile)} {
 		if _, err := os.Stat(filepath.Join(into, rel)); err != nil {
 			t.Fatalf("expected %s in the sync directory: %v", rel, err)
 		}
@@ -159,7 +160,7 @@ func TestSyncFromGit(t *testing.T) {
 	if got, _ := os.ReadFile(filepath.Join(into, "config", "x.txt")); string(got) != "v1\n" {
 		t.Fatalf("--ref v1 content: %q", got)
 	}
-	if st := build.LoadState(into); st.Origin != (build.Origin{Source: source, Ref: "v1", Commit: first}) {
+	if st := instance.LoadState(into); st.Origin != (instance.Origin{Source: source, Ref: "v1", Commit: first}) {
 		t.Fatalf("state origin: %+v", st.Origin)
 	}
 
@@ -535,7 +536,7 @@ func TestSyncFromLocalProjectReadsInstanceDecisions(t *testing.T) {
 	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); !strings.Contains(stdout, "excluded: sodium") {
 		t.Fatalf("the instance decision should beat the project one: %s", stdout)
 	}
-	if st := build.LoadState(into); st.Origin != (build.Origin{Source: h.dir}) {
+	if st := instance.LoadState(into); st.Origin != (instance.Origin{Source: h.dir}) {
 		t.Fatalf("state origin: %+v", st.Origin)
 	}
 }
@@ -557,7 +558,7 @@ func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
 	if err := os.Symlink(rel, filepath.Join(into, "saves")); err != nil {
 		t.Fatal(err)
 	}
-	statePath := build.StatePath(into)
+	statePath := instance.StatePath(into)
 	var state map[string]any
 	if err := json.Unmarshal([]byte(readFile(t, statePath)), &state); err != nil {
 		t.Fatal(err)

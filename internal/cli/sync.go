@@ -246,7 +246,7 @@ func (a *app) sync(ctx context.Context, src *syncSource, req syncRequest) (res s
 	if err != nil {
 		return syncResult{}, err
 	}
-	origin := build.Origin{Source: src.name, Ref: src.Ref, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256}
+	origin := instance.Origin{Source: src.name, Ref: src.Ref, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256}
 	rep, err := b.Build(side, build.Options{Force: req.force, Dir: into, NoDataLinks: !ownBuild, OS: req.os, Features: overrides, Origin: origin, BeforeModChange: a.beforeModChange(req.backup, into), KeepConflicts: req.keepConflicts})
 	if err != nil {
 		return syncResult{}, err
@@ -400,10 +400,10 @@ func (a *app) syncLauncherImage(dir string, b *build.Builder) {
 	}
 	icon, err := b.InstanceIcon()
 	if err == nil {
-		last := build.LoadState(dir).LauncherImage
+		last := instance.LoadState(dir).LauncherImage
 		var hash string
 		if hash, err = e.SyncImage(dir, icon, last); err == nil && hash != last {
-			err = build.RecordLauncherImage(dir, hash)
+			err = instance.RecordLauncherImage(dir, hash)
 		}
 	}
 	if err != nil {

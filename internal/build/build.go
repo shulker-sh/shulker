@@ -22,11 +22,11 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/lock"
-	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
@@ -34,62 +34,16 @@ import (
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/server"
 	"shulker.sh/shulker/internal/version/minecraft"
-	"shulker.sh/shulker/schema"
 )
 
 const (
-	StateDir          = ".shulker"
-	StateFile         = "state.json"
 	TemplateSuffix    = ".tmpl"
 	VanillaServerFile = loader.VanillaServerFile
 	EulaFile          = "eula.txt"
 	OptionsFile       = "options.txt"
 )
 
-func StatePath(dir string) string {
-	return filepath.Join(dir, StateDir, StateFile)
-}
-
-// Origin is where the project a build came from was synced from: a source, a ref, path and commit,
-// or an archive's sha256. It is empty for a build of the local project.
-type Origin struct {
-	Source string `json:"source,omitempty"`
-	Ref    string `json:"ref,omitempty"`
-	Path   string `json:"path,omitempty"`
-	Commit string `json:"commit,omitempty"`
-	Sha256 string `json:"sha256,omitempty"`
-}
-
-// State is .shulker/state.json: what the last build wrote into a directory, and the hash of each
-// file it owns.
-type State struct {
-	Schema string `json:"$schema"`
-	Side   string `json:"side"`
-	Origin
-	BuiltAt       string                       `json:"builtAt"`
-	LockSha256    string                       `json:"lockSha256"`
-	Minecraft     string                       `json:"minecraft,omitempty"`
-	Loader        string                       `json:"loader,omitempty"`
-	LoaderVersion string                       `json:"loaderVersion,omitempty"`
-	Files         map[string]string            `json:"files"`
-	Values        map[string]map[string]string `json:"managedValues,omitempty"`
-	Links         []string                     `json:"links,omitempty"`
-	// Packs is the file name each resource pack was placed under, so a renamed
-	// pack's entry in the enabled list can follow it.
-	Packs map[string]string `json:"packs,omitempty"`
-	// InstalledLoader is the loader its own installer set up in the dir; the installer's files aren't tracked.
-	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
-	// LauncherImage is the hash of the instance image shulker last wrote into the launcher.
-	LauncherImage string `json:"launcherImage,omitempty"`
-}
-
-// InstalledLoader is a loader that its own installer set up, rather than shulker.
-type InstalledLoader struct {
-	Type    string `json:"type"`
-	Version string `json:"version"`
-}
-
-func (s State) recordedKeys(rel string) []string {
+func recordedKeys(s instance.State, rel string) []string {
 	keys := make([]string, 0, len(s.Values[rel]))
 	for k := range s.Values[rel] {
 		keys = append(keys, k)
@@ -101,7 +55,7 @@ func (s State) recordedKeys(rel string) []string {
 // isUntouched reports whether the file at abs, hashing to current, is still what the last build
 // left there. A file the last build merged key by key is recorded by its values rather than its
 // bytes, so it is untouched only while it holds exactly those keys and values.
-func (s State) isUntouched(rel, abs, current string) (bool, error) {
+func isUntouched(s instance.State, rel, abs, current string) (bool, error) {
 	values, merged := s.Values[rel]
 	if !merged {
 		return current == s.Files[rel], nil
@@ -113,7 +67,7 @@ func (s State) isUntouched(rel, abs, current string) (bool, error) {
 	return maps.Equal(map[string]string(parseProperties(data)), values), nil
 }
 
-func (s *State) record(rel string, f ownedFile) {
+func recordValues(s *instance.State, rel string, f ownedFile) {
 	if s.Values == nil {
 		s.Values = map[string]map[string]string{}
 	}
@@ -138,11 +92,11 @@ type Report struct {
 	Warnings      []string `json:"-"`
 	// State is why the directory's state file was read as empty, warned apart from Warnings since
 	// its fix is a command.
-	State   *StateError `json:"-"`
-	Forced  bool        `json:"forced"`
-	History string      `json:"history,omitempty"`
+	State   *instance.StateError `json:"-"`
+	Forced  bool                 `json:"forced"`
+	History string               `json:"history,omitempty"`
 	// InstalledLoader is set when the loader's own installer ran into the dir after the build.
-	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
+	InstalledLoader *instance.InstalledLoader `json:"installedLoader,omitempty"`
 }
 
 // Options change how a build runs. Dir builds somewhere other than the side's build directory, and
@@ -155,7 +109,7 @@ type Options struct {
 	OS          string
 	NoOS        bool
 	Features    map[string]bool
-	Origin      Origin
+	Origin      instance.Origin
 	// NoLauncher leaves the server launcher out, for an export that ships none of it.
 	NoLauncher bool
 	// NoEULA leaves eula.txt out, for an export: the acceptance is this user's, not the pack's.
@@ -395,9 +349,9 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	if opts.NoDataLinks || inPlace {
 		dirs = nil
 	}
-	prev, stateErr := ReadState(dir)
+	prev, stateErr := instance.ReadState(dir)
 	report.State = stateErr
-	next := State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, LauncherImage: prev.LauncherImage, Packs: b.placedPackNames(desired)}
+	next := instance.State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, LauncherImage: prev.LauncherImage, Packs: b.placedPackNames(desired)}
 	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
 		return nil, err
@@ -449,7 +403,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		}
 		next.Files[f.rel] = f.hash
 		if f.src.owned() != nil {
-			next.record(f.rel, f.src.owned())
+			recordValues(&next, f.rel, f.src.owned())
 			for _, k := range f.merge.seeded {
 				next.Values[f.rel][k] = prev.Values[f.rel][k]
 			}
@@ -838,20 +792,6 @@ func LaunchArgs(lk *lock.Lock) []string {
 	return loader.Running(lk).LaunchArgs(lk)
 }
 
-// RecordLoader notes in dir's state that l was set up by its own installer.
-func RecordLoader(dir string, l InstalledLoader) error {
-	s := LoadState(dir)
-	s.InstalledLoader = &l
-	return writeState(dir, s)
-}
-
-// RecordLauncherImage notes in dir's state the hash of the instance image written into the launcher.
-func RecordLauncherImage(dir, hash string) error {
-	s := LoadState(dir)
-	s.LauncherImage = hash
-	return writeState(dir, s)
-}
-
 func (b *Builder) collectClient(side string, opts Options, desired map[string]source, vars map[string]string, shipped string, report *Report) error {
 	cl := b.Manifest.Client
 	file := OptionsFile
@@ -906,7 +846,7 @@ func renderProperties(file string, raw map[string]any, vars map[string]string) (
 
 func (b *Builder) hashSource(s source) (string, error) { return s.content.hash(b) }
 
-func (b *Builder) plan(dir string, desired map[string]source, prev State, force bool) ([]planned, error) {
+func (b *Builder) plan(dir string, desired map[string]source, prev instance.State, force bool) ([]planned, error) {
 	paths := make([]string, 0, len(desired))
 	for p := range desired {
 		paths = append(paths, p)
@@ -926,7 +866,7 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 			if err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return nil, err
 			}
-			f.merge = mergeKeys(src.owned(), existing, prev.Values[rel], prev.recordedKeys(rel), force, src.seeded)
+			f.merge = mergeKeys(src.owned(), existing, prev.Values[rel], recordedKeys(prev, rel), force, src.seeded)
 			f.isForced = f.merge.isForced
 			switch {
 			case f.merge.hasChanged:
@@ -946,7 +886,7 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 		recorded := prev.Files[rel]
 		untouched := false
 		if exists {
-			if untouched, err = prev.isUntouched(rel, abs, current); err != nil {
+			if untouched, err = isUntouched(prev, rel, abs, current); err != nil {
 				return nil, err
 			}
 		}
@@ -985,7 +925,7 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 		if !exists {
 			continue
 		}
-		untouched, err := prev.isUntouched(rel, abs, current)
+		untouched, err := isUntouched(prev, rel, abs, current)
 		if err != nil {
 			return nil, err
 		}
@@ -1041,61 +981,15 @@ func handwritten(dir, rel string) bool {
 	if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
 		return false
 	}
-	_, ours := LoadState(dir).Files[rel]
+	_, ours := instance.LoadState(dir).Files[rel]
 	return !ours
 }
 
-// LoadState is ReadState without the reason: a state it can't read is empty.
-func LoadState(dir string) State {
-	s, _ := ReadState(dir)
-	return s
-}
-
-// StateError is why ReadState treated a state file as empty: every file in the directory then counts
-// as not written by shulker.
-type StateError struct {
-	Path string
-	// Newer is a file written by a newer shulker, whose fix is `shulker self update` rather than
-	// --force.
-	Newer bool
-	// Cause is why, without the path.
-	Cause error
-}
-
-func (e *StateError) Error() string {
-	if e.Newer {
-		return fmt.Sprintf("%s %v; treating every file as not written by shulker", e.Path, e.Cause)
-	}
-	return fmt.Sprintf("%s is unreadable (%v); treating every file as not written by shulker", e.Path, e.Cause)
-}
-
-// ReadState treats a state file it can't read as empty, like LoadState, and also returns why.
-func ReadState(dir string) (State, *StateError) {
-	path := StatePath(dir)
-	empty := State{Files: map[string]string{}}
-	var s State
-	err := managed.Read(schema.State, path, &s)
-	if errors.Is(err, fs.ErrNotExist) {
-		return empty, nil
-	}
-	if err != nil {
-		e := out.AsError(err)
-		if e.Cause == nil {
-			return empty, &StateError{Path: path, Cause: err}
-		}
-		return empty, &StateError{Path: path, Newer: e.Code == "schema-newer", Cause: e.Cause}
-	}
-	if s.Files == nil {
-		s.Files = map[string]string{}
-	}
-	return s, nil
-}
-
-func (b *Builder) saveState(dir string, s State) error {
+func (b *Builder) saveState(dir string, s instance.State) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return writeState(dir, s)
+	return instance.WriteState(dir, s)
 }
 
 func sameDir(a, b string) bool {
@@ -1136,15 +1030,7 @@ func reservedPath(rel string, data []string) bool {
 		return true
 	}
 	top, _, _ := strings.Cut(rel, "/")
-	return top == StateDir || top == DataDir || top == manifest.FilesDir || slices.Contains(data, top)
-}
-
-func writeState(dir string, s State) error {
-	if err := os.MkdirAll(filepath.Join(dir, StateDir), 0o755); err != nil {
-		return err
-	}
-	s.Schema = schema.URL(schema.State)
-	return fsutil.WriteJSON(StatePath(dir), s)
+	return top == instance.Dir || top == DataDir || top == manifest.FilesDir || slices.Contains(data, top)
 }
 
 func fileSha256(path string) (string, bool, error) {

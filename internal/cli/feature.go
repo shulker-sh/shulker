@@ -119,7 +119,7 @@ type featureScope struct {
 	decisions map[string]bool
 	into      string
 	source    *syncSource
-	state     build.State
+	state     instance.State
 }
 
 func (a *app) openFeatures(cmd *cobra.Command, into string) (*featureScope, *build.Builder, error) {
@@ -157,7 +157,7 @@ func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool)
 	if err != nil {
 		return nil, err
 	}
-	state, stateErr := build.ReadState(dir)
+	state, stateErr := instance.ReadState(dir)
 	a.warnState(stateErr, a.forceCommand(nil, "", dir))
 	sc := &featureScope{into: dir, state: state}
 	if sc.file, err = a.loadLocal(dir); err != nil {

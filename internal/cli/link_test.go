@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -282,7 +282,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("the first build should ship the mods: %v", err)
 	}
-	if st := build.LoadState(gameDir); st.Source != gameDir {
+	if st := instance.LoadState(gameDir); st.Source != gameDir {
 		t.Fatalf("an instance builds from itself: %+v", st.Origin)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "build")); !os.IsNotExist(err) {

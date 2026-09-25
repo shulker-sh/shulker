@@ -12,7 +12,7 @@ import (
 )
 
 // save writes the manifest and lock to the project dir, since a build records the lock file's hash.
-func (p *project) save() {
+func (p *testProject) save() {
 	p.t.Helper()
 	if err := p.b.Manifest.Save(filepath.Join(p.b.Dir, manifest.FileName)); err != nil {
 		p.t.Fatal(err)
@@ -33,20 +33,20 @@ func writeFile(t *testing.T, path, content string) {
 }
 
 // file writes content at rel under the project dir.
-func (p *project) file(rel, content string) {
+func (p *testProject) file(rel, content string) {
 	p.t.Helper()
 	writeFile(p.t, filepath.Join(p.b.Dir, filepath.FromSlash(rel)), content)
 }
 
 // project reads the file at rel under the project dir, "" when there is none.
-func (p *project) project(rel string) string {
+func (p *testProject) project(rel string) string {
 	data, _ := os.ReadFile(filepath.Join(p.b.Dir, filepath.FromSlash(rel)))
 	return string(data)
 }
 
 // lockDependency locks the version from h as key, required by the given mods rather than listed
 // in the manifest.
-func (p *project) lockDependency(key string, h *host, v provider.Version, requiredBy ...string) {
+func (p *testProject) lockDependency(key string, h *host, v provider.Version, requiredBy ...string) {
 	p.t.Helper()
 	p.lockMod(key, h, v)
 	delete(p.b.Manifest.Requires, key)
@@ -55,13 +55,13 @@ func (p *project) lockDependency(key string, h *host, v provider.Version, requir
 	p.b.Lock.Mods[key] = m
 }
 
-func (p *project) build(side string, opts Options) (*Report, error) {
+func (p *testProject) build(side string, opts Options) (*Report, error) {
 	p.t.Helper()
 	p.save()
 	return p.b.Build(side, opts)
 }
 
-func (p *project) mustBuild(side string, opts Options) *Report {
+func (p *testProject) mustBuild(side string, opts Options) *Report {
 	p.t.Helper()
 	report, err := p.build(side, opts)
 	if err != nil {
@@ -70,7 +70,7 @@ func (p *project) mustBuild(side string, opts Options) *Report {
 	return report
 }
 
-func (p *project) diff(side string) *DiffReport {
+func (p *testProject) diff(side string) *DiffReport {
 	p.t.Helper()
 	p.save()
 	report, err := p.b.Diff(side, Options{})
@@ -80,13 +80,13 @@ func (p *project) diff(side string) *DiffReport {
 	return report
 }
 
-func (p *project) pull(side string, req PullRequest) (*PullReport, error) {
+func (p *testProject) pull(side string, req PullRequest) (*PullReport, error) {
 	p.t.Helper()
 	p.save()
 	return p.b.Pull(side, req, Options{})
 }
 
-func (p *project) mustPull(side string, req PullRequest) *PullReport {
+func (p *testProject) mustPull(side string, req PullRequest) *PullReport {
 	p.t.Helper()
 	report, err := p.pull(side, req)
 	if err != nil {
@@ -95,11 +95,11 @@ func (p *project) mustPull(side string, req PullRequest) *PullReport {
 	return report
 }
 
-func (p *project) builtPath(side, rel string) string {
+func (p *testProject) builtPath(side, rel string) string {
 	return filepath.Join(p.b.Dir, "build", side, filepath.FromSlash(rel))
 }
 
-func (p *project) built(side, rel string) string {
+func (p *testProject) built(side, rel string) string {
 	p.t.Helper()
 	data, err := os.ReadFile(p.builtPath(side, rel))
 	if err != nil {
@@ -108,17 +108,17 @@ func (p *project) built(side, rel string) string {
 	return string(data)
 }
 
-func (p *project) hasBuilt(side, rel string) bool {
+func (p *testProject) hasBuilt(side, rel string) bool {
 	_, err := os.Stat(p.builtPath(side, rel))
 	return err == nil
 }
 
-func (p *project) writeBuilt(side, rel, content string) {
+func (p *testProject) writeBuilt(side, rel, content string) {
 	p.t.Helper()
 	writeFile(p.t, p.builtPath(side, rel), content)
 }
 
-func (p *project) removeBuilt(side, rel string) {
+func (p *testProject) removeBuilt(side, rel string) {
 	p.t.Helper()
 	if err := os.Remove(p.builtPath(side, rel)); err != nil {
 		p.t.Fatal(err)
@@ -126,7 +126,7 @@ func (p *project) removeBuilt(side, rel string) {
 }
 
 // mods lists the jars the client build placed, the marker aside.
-func (p *project) mods() []string {
+func (p *testProject) mods() []string {
 	p.t.Helper()
 	entries, err := os.ReadDir(p.builtPath("client", "mods"))
 	if err != nil && !os.IsNotExist(err) {

@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/saves"
 )
@@ -82,7 +82,7 @@ func (a *app) backupSource(target savesTarget) saves.Source {
 	if in, ok := a.registeredInstance(target.Dir); ok {
 		src.Instance = in.ID
 	}
-	state := build.LoadState(target.Dir)
+	state := instance.LoadState(target.Dir)
 	src.Minecraft, src.Loader, src.LoaderVersion = state.Minecraft, state.Loader, state.LoaderVersion
 	return src
 }

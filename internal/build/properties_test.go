@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -22,7 +23,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	}
 
 	p.writeBuilt("client", rel, "#Iris config\ncolorSpace=SRGB\nenableShaders=false\nmaxShadowRenderDistance=32\n")
-	if err := os.Remove(StatePath(p.builtPath("client", ""))); err != nil {
+	if err := os.Remove(instance.StatePath(p.builtPath("client", ""))); err != nil {
 		t.Fatal(err)
 	}
 	p.mustBuild("client", Options{})

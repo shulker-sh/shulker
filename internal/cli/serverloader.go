@@ -9,6 +9,7 @@ import (
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -23,8 +24,8 @@ func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *
 	if l.InstallServerFlag == "" || rep.Side != "server" {
 		return nil
 	}
-	want := build.InstalledLoader{Type: l.Name, Version: p.Lock.Loader.Version}
-	if installed := build.LoadState(rep.Dir).InstalledLoader; installed != nil && *installed == want {
+	want := instance.InstalledLoader{Type: l.Name, Version: p.Lock.Loader.Version}
+	if installed := instance.LoadState(rep.Dir).InstalledLoader; installed != nil && *installed == want {
 		if _, err := os.Stat(filepath.Join(rep.Dir, l.InstalledServerFile(p.Lock))); err == nil {
 			return nil
 		}
@@ -45,7 +46,7 @@ func (a *app) installServerLoader(ctx context.Context, p *project.Project, rep *
 		return a.keepInstallerOutput(err)
 	}
 	rep.InstalledLoader = &want
-	return build.RecordLoader(rep.Dir, want)
+	return instance.RecordLoader(rep.Dir, want)
 }
 
 // keepInstallerOutput saves a failed installer's whole output in shulker's cache and names the file

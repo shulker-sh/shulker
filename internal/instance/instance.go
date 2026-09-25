@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// Dir also holds state.json and history/; build.StateDir names the same directory.
+	// Dir also holds state.json and history/.
 	Dir       = ".shulker"
 	FileName  = "instance.json"
 	SchemaURL = schema.Base + string(schema.Instance)

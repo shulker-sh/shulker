@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -35,7 +36,7 @@ func TestHistoryLeavesPlacedDatapacksToTheCache(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := writeState(dir, State{Files: files}); err != nil {
+	if err := instance.WriteState(dir, instance.State{Files: files}); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, PropertiesFile), []byte("level-name=survival\n"), 0o644); err != nil {
@@ -59,14 +60,14 @@ func TestHistoryLeavesPlacedDatapacksToTheCache(t *testing.T) {
 }
 
 // inPlaceProject builds its client into the project dir itself, where a build keeps history.
-func inPlaceProject(t *testing.T) *project {
+func inPlaceProject(t *testing.T) *testProject {
 	t.Helper()
 	p := newProject(t)
 	p.b.Manifest.Client.Build = "."
 	return p
 }
 
-func (p *project) history() []HistoryEntry {
+func (p *testProject) history() []HistoryEntry {
 	p.t.Helper()
 	entries, err := History(p.b.Dir)
 	if err != nil {
@@ -76,7 +77,7 @@ func (p *project) history() []HistoryEntry {
 }
 
 // kept reads rel out of the history entry id.
-func (p *project) kept(id, rel string) string {
+func (p *testProject) kept(id, rel string) string {
 	data, _ := os.ReadFile(filepath.Join(HistoryPath(p.b.Dir), id, filepath.FromSlash(rel)))
 	return string(data)
 }

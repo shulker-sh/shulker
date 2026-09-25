@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
@@ -71,7 +70,7 @@ func Inspect(in config.Instance) InstanceEntry {
 		}
 	}
 	pack, side, inPlace := InPlaceIntent(in.Dir)
-	state, _ := build.ReadState(in.Dir)
+	state, _ := instance.ReadState(in.Dir)
 	switch {
 	case inPlace:
 		e.Ref, e.Path, e.Side = pack.Ref, pack.Path, side
@@ -84,7 +83,7 @@ func Inspect(in config.Instance) InstanceEntry {
 			e.Source = state.Source
 		}
 	}
-	if _, err := os.Stat(build.StatePath(in.Dir)); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(instance.StatePath(in.Dir)); errors.Is(err, os.ErrNotExist) {
 		e.Status = StatusNotSynced
 		return e
 	} else if err != nil {
@@ -139,7 +138,7 @@ func InstanceAt(dir string) (config.Instance, bool) {
 		source = f.Source
 	}
 	if source == "" {
-		st, _ := build.ReadState(dir)
+		st, _ := instance.ReadState(dir)
 		source = st.Source
 	}
 	if source == "" {
@@ -171,7 +170,7 @@ func RepairIntent(in config.Instance) (Repaired, error) {
 	}
 	f := instance.New()
 	if _, _, inPlace := InPlaceIntent(in.Dir); !inPlace {
-		st, _ := build.ReadState(in.Dir)
+		st, _ := instance.ReadState(in.Dir)
 		source := st.Source
 		if source == "" {
 			source = in.Source

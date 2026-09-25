@@ -15,7 +15,7 @@ import (
 
 // pullPack adds a directory modpack named name beside the project, with the manifest given, and
 // returns it for its files to be written.
-func (p *project) pullPack(name string, m *manifest.Manifest) *modpack.Loaded {
+func (p *testProject) pullPack(name string, m *manifest.Manifest) *modpack.Loaded {
 	p.t.Helper()
 	dir := filepath.Join(p.b.Dir, name)
 	m.Name, m.Minecraft, m.Loader = name, "~26.2", manifest.Loader{Type: "fabric", Version: "*"}
@@ -38,7 +38,7 @@ func (p *project) pullPack(name string, m *manifest.Manifest) *modpack.Loaded {
 }
 
 // exportMrpack exports the project's client as an mrpack with the version given.
-func (p *project) exportMrpack(version string) (*ExportReport, error) {
+func (p *testProject) exportMrpack(version string) (*ExportReport, error) {
 	p.t.Helper()
 	p.save()
 	format, _ := packarchive.Lookup("mrpack")

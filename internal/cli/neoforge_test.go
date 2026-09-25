@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/server"
@@ -43,8 +43,8 @@ func TestNeoForgeServer(t *testing.T) {
 	if len(h.installs) != 1 || strings.Join(h.installs[0], " ") != "--install-server "+buildDir+" --offline" {
 		t.Fatalf("installer runs: %v", h.installs)
 	}
-	state := build.LoadState(buildDir)
-	if got := state.InstalledLoader; got == nil || *got != (build.InstalledLoader{Type: "neoforge", Version: "26.2.0.87"}) {
+	state := instance.LoadState(buildDir)
+	if got := state.InstalledLoader; got == nil || *got != (instance.InstalledLoader{Type: "neoforge", Version: "26.2.0.87"}) {
 		t.Fatalf("state loader: %+v", got)
 	}
 	for _, rel := range []string{"libraries/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar", "libraries/net/minecraft/server/26.2/server-26.2.jar"} {
@@ -64,7 +64,7 @@ func TestNeoForgeServer(t *testing.T) {
 	if len(h.installs) != 1 || h.cdnHits != hits {
 		t.Fatalf("an installed loader ran the installer again (%d runs, %d downloads)", len(h.installs), h.cdnHits-hits)
 	}
-	if !strings.Contains(stdout, "(5 unchanged)") || build.LoadState(buildDir).InstalledLoader == nil {
+	if !strings.Contains(stdout, "(5 unchanged)") || instance.LoadState(buildDir).InstalledLoader == nil {
 		t.Fatalf("rebuild: %s", stdout)
 	}
 

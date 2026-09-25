@@ -10,7 +10,7 @@ import (
 
 // gatedProject is a project with sodium locked from Modrinth and fabric-api locked as its
 // dependency, with the features fancy, shaders and api declared and off.
-func gatedProject(t *testing.T) *project {
+func gatedProject(t *testing.T) *testProject {
 	t.Helper()
 	p := newProject(t)
 	p.lockMod("sodium", p.modrinth, p.modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "m-sodium-1", Number: "0.9.2", File: provider.File{Filename: "sodium-0.9.2.jar"}}, modJar(t, "sodium", "0.9.2")))
@@ -19,13 +19,13 @@ func gatedProject(t *testing.T) *project {
 	return p
 }
 
-func (p *project) gate(key string, edit func(r *manifest.Require)) {
+func (p *testProject) gate(key string, edit func(r *manifest.Require)) {
 	r := p.b.Manifest.Requires[key]
 	edit(&r)
 	p.b.Manifest.Requires[key] = r
 }
 
-func (p *project) enable(features ...string) {
+func (p *testProject) enable(features ...string) {
 	for name := range p.b.Manifest.Features {
 		p.b.Manifest.Features[name] = manifest.Feature{Default: slices.Contains(features, name)}
 	}

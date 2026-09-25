@@ -85,7 +85,7 @@ func unloadable(key string) string {
 }
 
 // lockFresh locks a resource pack from the fake CurseForge under key, placed as filename.
-func (p *project) lockFresh(key, filename string) {
+func (p *testProject) lockFresh(key, filename string) {
 	p.t.Helper()
 	fresh := provider.Project{ID: "600000", Slug: key, Title: "Fresh Animations", Type: manifest.TypeResourcePack}
 	p.lockPack(manifest.TypeResourcePack, key, p.cf, p.cf.publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, packZip(p.t, "fresh")))

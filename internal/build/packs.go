@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -196,7 +197,7 @@ func (b *Builder) reportUnloadableShaders(desired map[string]source, present map
 // that instead.
 func (b *Builder) seed(side string, opts Options, rel, key, want string, renamed map[string]string, report *Report) string {
 	dir := b.Target(side, opts.Dir)
-	was, recorded := LoadState(dir).Values[rel][key]
+	was, recorded := instance.LoadState(dir).Values[rel][key]
 	if opts.Force || !recorded || want == was {
 		return want
 	}
@@ -255,7 +256,7 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		if err != nil {
 			return err
 		}
-		state := LoadState(b.Target(side, opts.Dir))
+		state := instance.LoadState(b.Target(side, opts.Dir))
 		options[resourcePacksKey] = b.seed(side, opts, OptionsFile, resourcePacksKey, list, b.renamedPacks(state, desired), report)
 		return nil
 	}
@@ -264,7 +265,7 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 	}
 	dir := b.Target(side, opts.Dir)
 	file := filepath.Join(dir, filepath.FromSlash(OptionsFile))
-	state := LoadState(dir)
+	state := instance.LoadState(dir)
 	was, recorded := state.Values[OptionsFile][resourcePacksKey]
 	switch {
 	case opts.Force:
@@ -323,7 +324,7 @@ func (b *Builder) chosenPackList(desired map[string]source, chosen []string) (st
 
 // renamedPacks maps the old file name of each resource pack placed under a new one since the last
 // build to that new name.
-func (b *Builder) renamedPacks(state State, desired map[string]source) map[string]string {
+func (b *Builder) renamedPacks(state instance.State, desired map[string]source) map[string]string {
 	renamed := map[string]string{}
 	for key, name := range b.placedPackNames(desired) {
 		if old := state.Packs[key]; old != "" && old != name {
@@ -388,7 +389,7 @@ func (b *Builder) enabledPackList(side string, opts Options, desired map[string]
 	if !written {
 		return live, nil
 	}
-	state := LoadState(dir)
+	state := instance.LoadState(dir)
 	if src.owned() == nil {
 		// A whole file the player changed, or one no build recorded, is kept
 		// rather than written; one that also changed in the source fails the build.
@@ -398,7 +399,7 @@ func (b *Builder) enabledPackList(side string, opts Options, desired map[string]
 		}
 		untouched := false
 		if exists && state.Files[rel] != "" {
-			if untouched, err = state.isUntouched(rel, abs, current); err != nil {
+			if untouched, err = isUntouched(state, rel, abs, current); err != nil {
 				return "", err
 			}
 		}

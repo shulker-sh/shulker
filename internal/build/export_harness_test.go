@@ -215,7 +215,7 @@ func unzip(t *testing.T, data []byte) map[string]string {
 // project is a fabric 26.2 project in a temp dir with a client and a server side, its
 // manifest and lock on disk and the lock's files in the cache, beside a fake Modrinth and a fake
 // CurseForge on one cdn.
-type project struct {
+type testProject struct {
 	t        *testing.T
 	b        *Builder
 	cdn      *cdn
@@ -224,9 +224,9 @@ type project struct {
 	log      []string
 }
 
-func newProject(t *testing.T) *project {
+func newProject(t *testing.T) *testProject {
 	t.Helper()
-	p := &project{t: t, cdn: newCDN(t)}
+	p := &testProject{t: t, cdn: newCDN(t)}
 	p.modrinth = newHost(p.cdn, "modrinth")
 	p.cf = newHost(p.cdn, "curseforge")
 	p.cf.Label, p.cf.KeyedByID = "CurseForge", true
@@ -255,7 +255,7 @@ func newProject(t *testing.T) *project {
 }
 
 // lockMod locks the version from h as key, with its file in the cache.
-func (p *project) lockMod(key string, h *host, v provider.Version) {
+func (p *testProject) lockMod(key string, h *host, v provider.Version) {
 	p.t.Helper()
 	p.b.Manifest.Requires[key] = manifest.Require{Provider: h.Name()}
 	p.b.Lock.Mods[key] = lock.Mod{
@@ -268,7 +268,7 @@ func (p *project) lockMod(key string, h *host, v provider.Version) {
 
 // lockPack locks the version from h as key of the given kind, placed under the key's name with
 // the zip extension, the way an add names a pack.
-func (p *project) lockPack(kind, key string, h *host, v provider.Version, loaders ...string) {
+func (p *testProject) lockPack(kind, key string, h *host, v provider.Version, loaders ...string) {
 	p.t.Helper()
 	p.b.Manifest.Requires[key] = manifest.Require{Type: kind, Provider: h.Name()}
 	p.b.Lock.Packs(kind)[key] = lock.Pack{
@@ -279,7 +279,7 @@ func (p *project) lockPack(kind, key string, h *host, v provider.Version, loader
 	p.cacheFile(v)
 }
 
-func (p *project) cacheFile(v provider.Version) {
+func (p *testProject) cacheFile(v provider.Version) {
 	p.t.Helper()
 	p.cdn.mu.Lock()
 	data := p.cdn.files[pathOf(v)]
@@ -294,7 +294,7 @@ func (p *project) cacheFile(v provider.Version) {
 }
 
 // override writes a file into the project's shared overrides folder.
-func (p *project) override(rel, content string) {
+func (p *testProject) override(rel, content string) {
 	p.t.Helper()
 	path := filepath.Join(p.b.Dir, "overrides", filepath.FromSlash(rel))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -307,19 +307,19 @@ func (p *project) override(rel, content string) {
 
 // exportCurseForge exports the project as a CurseForge pack to
 // build/pack-1.0.zip.
-func (p *project) exportCurseForge(bundle bool) (*ExportReport, error) {
+func (p *testProject) exportCurseForge(bundle bool) (*ExportReport, error) {
 	p.t.Helper()
 	p.save()
 	format, _ := packarchive.Lookup("curseforge")
 	return p.b.Export(context.Background(), ExportOptions{Format: format, Version: "1.0", Output: p.archivePath(), Bundle: bundle})
 }
 
-func (p *project) archivePath() string {
+func (p *testProject) archivePath() string {
 	return filepath.Join(p.b.Dir, "build", "pack-1.0.zip")
 }
 
 // archive is the exported zip's entries by name.
-func (p *project) archive() map[string]string {
+func (p *testProject) archive() map[string]string {
 	p.t.Helper()
 	data, err := os.ReadFile(p.archivePath())
 	if err != nil {
@@ -329,7 +329,7 @@ func (p *project) archive() map[string]string {
 }
 
 // listed reads the archive back and returns its listed files.
-func (p *project) listed() []packarchive.File {
+func (p *testProject) listed() []packarchive.File {
 	p.t.Helper()
 	arc, err := packarchive.Read(p.archivePath())
 	if err != nil {
@@ -338,7 +338,7 @@ func (p *project) listed() []packarchive.File {
 	return arc.Files
 }
 
-func (p *project) logged(text string) bool {
+func (p *testProject) logged(text string) bool {
 	return slices.ContainsFunc(p.log, func(line string) bool { return strings.Contains(line, text) })
 }
 
@@ -352,7 +352,7 @@ func listedIDs(files []packarchive.File) []string {
 }
 
 // cacheBytes puts data in the cache under its sha512 and returns the digest.
-func (p *project) cacheBytes(data []byte) string {
+func (p *testProject) cacheBytes(data []byte) string {
 	p.t.Helper()
 	sum := sha512Hex(data)
 	path := p.b.Cache.Object(sum)
@@ -366,14 +366,14 @@ func (p *project) cacheBytes(data []byte) string {
 }
 
 // lockLocalMod locks data as the project's own jar files/filename under key.
-func (p *project) lockLocalMod(key, filename string, data []byte) {
+func (p *testProject) lockLocalMod(key, filename string, data []byte) {
 	p.t.Helper()
 	p.b.Manifest.Requires[key] = manifest.Require{File: "files/" + filename}
 	p.b.Lock.Mods[key] = lock.Mod{File: "files/" + filename, Filename: filename, Sha512: p.cacheBytes(data), Size: int64(len(data)), Side: "both", RequiredBy: []string{}, Aliases: lock.Aliases{}}
 }
 
 // lockLocalDatapack locks data as the project's own datapack files/filename under key.
-func (p *project) lockLocalDatapack(key, filename string, data []byte) {
+func (p *testProject) lockLocalDatapack(key, filename string, data []byte) {
 	p.t.Helper()
 	p.b.Manifest.Requires[key] = manifest.Require{Type: manifest.TypeDatapack, File: "files/" + filename}
 	p.b.Lock.Datapacks[key] = lock.Pack{File: "files/" + filename, Filename: filename, Sha512: p.cacheBytes(data), Size: int64(len(data)), Side: "both"}

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/saves"
@@ -113,13 +112,13 @@ func TestBackupOfAStateWithoutAPlatformNamesNone(t *testing.T) {
 	gameDir := filepath.Join(t.TempDir(), "game")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
-	state := build.LoadState(gameDir)
+	state := instance.LoadState(gameDir)
 	state.Minecraft, state.Loader, state.LoaderVersion = "", "", ""
 	raw, err := json.Marshal(state)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(build.StatePath(gameDir), raw, 0o644); err != nil {
+	if err := os.WriteFile(instance.StatePath(gameDir), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if got := backupOf(t, h, "-C", gameDir); got.Minecraft != "" || got.Loader != "" || got.LoaderVersion != "" {

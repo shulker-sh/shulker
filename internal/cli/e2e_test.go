@@ -22,9 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
@@ -907,17 +907,17 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatalf("install output: %s", stdout)
 	}
 	buildDir := filepath.Join(h.dir, "build", "client")
-	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", filepath.Join(build.StateDir, build.StateFile)} {
+	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", filepath.Join(instance.Dir, instance.StateFile)} {
 		if _, err := os.Stat(filepath.Join(buildDir, rel)); err != nil {
 			t.Fatal(err)
 		}
 	}
-	var state build.State
+	var state instance.State
 	h.readJSON(t, "build/client/.shulker/state.json", &state)
 	if state.Side != "client" || len(state.Files) != 4 || state.Schema != schema.URL(schema.State) {
 		t.Fatalf("state: %+v", state)
 	}
-	if err := schema.Validate(schema.State, []byte(readFile(t, filepath.Join(buildDir, build.StateDir, build.StateFile)))); err != nil {
+	if err := schema.Validate(schema.State, []byte(readFile(t, filepath.Join(buildDir, instance.Dir, instance.StateFile)))); err != nil {
 		t.Fatalf("state.json against its schema: %v", err)
 	}
 

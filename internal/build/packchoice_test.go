@@ -12,7 +12,7 @@ import (
 
 // shaderProject has iris placed and the bsl and complementary shaders locked, and two resource
 // packs, faithful and fresh.
-func shaderProject(t *testing.T) *project {
+func shaderProject(t *testing.T) *testProject {
 	t.Helper()
 	p := newProject(t)
 	iris := provider.Project{ID: "iris-id", Slug: "iris", Title: "Iris", Type: manifest.TypeMod}

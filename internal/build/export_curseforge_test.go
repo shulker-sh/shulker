@@ -15,13 +15,13 @@ import (
 // curseForgeExport is a project with sodium and fabric-api locked from Modrinth and jei from
 // CurseForge, where CurseForge also has sodium and fabric-api as the same bytes.
 type curseForgeExport struct {
-	*project
+	*testProject
 	sodium, fabricAPI, jei provider.Version
 }
 
 func newCurseForgeExport(t *testing.T) *curseForgeExport {
 	t.Helper()
-	x := &curseForgeExport{project: newProject(t)}
+	x := &curseForgeExport{testProject: newProject(t)}
 	sodium, api, jei := modJar(t, "sodium", "1.0.0"), modJar(t, "fabric-api", "1.0.0"), modJar(t, "jei", "1.0.0")
 	x.lockMod("sodium", x.modrinth, x.modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "m-sodium-1", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodium))
 	x.lockMod("fabric-api", x.modrinth, x.modrinth.publish(mod("P7dR8mSH", "fabric-api"), provider.Version{ID: "m-api-1", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, api))
