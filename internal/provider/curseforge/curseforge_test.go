@@ -368,3 +368,27 @@ func TestAFileIDReachesAProjectTheSearchMisses(t *testing.T) {
 		t.Fatalf("the file names its project: %+v", v)
 	}
 }
+
+func TestAVersionNamesItsServerPack(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/mods/10":
+			w.Write([]byte(`{"data":{"id":10,"slug":"atm","name":"ATM","classId":4471,"links":{"websiteUrl":"https://www.curseforge.com/minecraft/modpacks/atm"}}}`))
+			return
+		case "/mods":
+			w.Write([]byte(`{"data":[{"id":10,"slug":"atm","name":"ATM","classId":4471,"links":{"websiteUrl":"https://www.curseforge.com/minecraft/modpacks/atm"}}]}`))
+			return
+		}
+		w.Write([]byte(`{"data":[{"id":100,"modId":10,"displayName":"8.2","fileName":"pack.zip","downloadUrl":"https://x/pack.zip","hashes":[{"algo":1,"value":"abc"}],"serverPackFileId":101},{"id":102,"modId":10,"displayName":"8.1","fileName":"old.zip","downloadUrl":"https://x/old.zip","hashes":[{"algo":1,"value":"def"}]}]}`))
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+	found, _, err := c.VersionsByID(context.Background(), []string{"100", "102"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found["100"].ServerPack != "101" || found["102"].ServerPack != "" {
+		t.Fatalf("server packs %q and %q", found["100"].ServerPack, found["102"].ServerPack)
+	}
+}

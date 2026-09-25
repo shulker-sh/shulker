@@ -216,6 +216,7 @@ type file struct {
 	FileLength   int64    `json:"fileLength"`
 	IsAvailable  bool     `json:"isAvailable"`
 	GameVersions []string `json:"gameVersions"`
+	ServerPack   int      `json:"serverPackFileId"`
 	Hashes       []struct {
 		Value string `json:"value"`
 		Algo  int    `json:"algo"`
@@ -695,6 +696,9 @@ func convertFile(f file) (provider.Version, error) {
 		File:      provider.File{URL: f.DownloadURL, Filename: f.FileName, Size: f.FileLength},
 	}
 	v.Published, _ = time.Parse(time.RFC3339, f.FileDate)
+	if f.ServerPack != 0 {
+		v.ServerPack = strconv.Itoa(f.ServerPack)
+	}
 	for _, h := range f.Hashes {
 		if h.Algo == 1 {
 			v.File.Sha1 = h.Value

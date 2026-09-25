@@ -68,6 +68,9 @@ type Version struct {
 	GameVersions []string
 	Loaders      []string
 	Page         string
+	// ServerPack is the version holding a modpack version's server files, where the provider
+	// pairs one with it.
+	ServerPack string
 }
 
 // Hosted is a file a provider hosts: the version it is and that version's project.
