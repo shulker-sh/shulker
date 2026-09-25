@@ -55,6 +55,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		306612: {id: 306612, slug: "fabric-api", downloads: 200_000_000, files: []cfFile{{id: 5000010, jar: h.jars["fabric-api"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 		394468: {id: 394468, slug: "sodium", downloads: 151_434_981, files: []cfFile{{id: 5000020, jar: h.jars["sodium"], date: "2026-09-01T00:00:00Z", channel: 1, deps: []int{306612}}}},
 		300000: {id: 300000, slug: "nodist", files: []cfFile{{id: 5100001, jar: h.jars["nodist"], date: "2026-09-01T00:00:00Z", channel: 1, url: "null"}}},
+		300002: {id: 300002, slug: "iris-cf", files: []cfFile{{id: 5100002, jar: h.jars["irisshaders"], date: "2026-09-01T00:00:00Z", channel: 1, url: "null"}}},
 		600000: {id: 600000, slug: "fresh-animations", class: 12, downloads: 4_000_000, files: []cfFile{{id: 5300001, jar: h.jars["cf-fresh-animations"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 	}
 	fileJSON := func(f cfFile, m *cfMod) map[string]any {

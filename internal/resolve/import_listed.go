@@ -132,9 +132,12 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 	if v.ProjectID != proj.ID {
 		return nil, nil, out.Errorf("pin-mismatch", "file %s belongs to project %s, not %s", f.Version, v.ProjectID, proj.Slug)
 	}
-	listed := manifest.Require{Project: proj.ID}
-	if p.Name() != r.Manifest.ProviderOrder()[0] {
-		listed.Provider = p.Name()
+	listedFrom := func(p provider.Provider, proj *provider.Project) manifest.Require {
+		listed := manifest.Require{Project: proj.ID}
+		if p.Name() != r.Manifest.ProviderOrder()[0] {
+			listed.Provider = p.Name()
+		}
+		return listed
 	}
 	kind := proj.Type
 	if kind == "" {
@@ -145,7 +148,8 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 		if r.Lock.Loader.Type == "" {
 			return nil, nil, out.Errorf("loader-required", "%s is a mod, and the pack names no mod loader", proj.Slug)
 		}
-		id, prior, err := r.place(ctx, p, proj, v, "", "", "", "", false)
+		from, id, prior, err := r.placeAnywhere(ctx, hosted{p, proj, v}, "", "", "", "", false, func(w string) { rep.Warnings = append(rep.Warnings, w) })
+		p, proj, v = from.p, from.proj, from.v
 		if err != nil {
 			return proj, v, err
 		}
@@ -153,7 +157,7 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, r.Lock.Mods[id].Filename))
 			return proj, v, nil
 		}
-		im.lockedListed(p, id, kind, listed)
+		im.lockedListed(p, id, kind, listedFrom(p, proj))
 	case manifest.TypeResourcePack, manifest.TypeShader, manifest.TypeDatapack:
 		key := proj.Slug
 		if ok, err := im.canListPack(key, kind); !ok {
@@ -162,6 +166,7 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 		if err := r.lockPackVersion(ctx, p, proj, v, key, kind, ""); err != nil {
 			return proj, v, err
 		}
+		listed := listedFrom(p, proj)
 		listed.Type = kind
 		im.lockedListed(p, key, kind, listed)
 	default:

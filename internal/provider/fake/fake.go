@@ -155,10 +155,23 @@ func (p *Provider) VersionsByID(_ context.Context, ids []string) (map[string]pro
 
 func (p *Provider) Identify(_ context.Context, files map[string][]byte) (map[string]provider.Hosted, error) {
 	p.Requests["Identify"]++
+	sha1s := make(map[string]string, len(files))
+	for key, data := range files {
+		sum := sha1.Sum(data)
+		sha1s[key] = hex.EncodeToString(sum[:])
+	}
+	return p.identifySHA1(sha1s), nil
+}
+
+func (p *Provider) IdentifySHA1(_ context.Context, sha1s map[string]string) (map[string]provider.Hosted, error) {
+	p.Requests["IdentifySHA1"]++
+	return p.identifySHA1(sha1s), nil
+}
+
+func (p *Provider) identifySHA1(sha1s map[string]string) map[string]provider.Hosted {
 	found := map[string]provider.Hosted{}
-	for _, key := range slices.Sorted(maps.Keys(files)) {
-		sum := sha1.Sum(files[key])
-		sha1Hex := hex.EncodeToString(sum[:])
+	for _, key := range slices.Sorted(maps.Keys(sha1s)) {
+		sha1Hex := sha1s[key]
 		for _, v := range p.Files {
 			if v.File.Sha1 != sha1Hex {
 				continue
@@ -169,7 +182,7 @@ func (p *Provider) Identify(_ context.Context, files map[string][]byte) (map[str
 			break
 		}
 	}
-	return found, nil
+	return found
 }
 
 func (p *Provider) host() string { return p.name + ".test" }

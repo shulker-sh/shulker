@@ -282,12 +282,15 @@ func (m *Modrinth) VersionsByID(ctx context.Context, ids []string) (map[string]p
 // count, since Modrinth rate-limits by the request.
 func (m *Modrinth) Identify(ctx context.Context, files map[string][]byte) (map[string]provider.Hosted, error) {
 	sha1s := make(map[string]string, len(files))
-	var hashes []string
-	for _, key := range slices.Sorted(maps.Keys(files)) {
-		sum := sha1.Sum(files[key])
+	for key, data := range files {
+		sum := sha1.Sum(data)
 		sha1s[key] = hex.EncodeToString(sum[:])
-		hashes = append(hashes, sha1s[key])
 	}
+	return m.IdentifySHA1(ctx, sha1s)
+}
+
+func (m *Modrinth) IdentifySHA1(ctx context.Context, sha1s map[string]string) (map[string]provider.Hosted, error) {
+	hashes := slices.Sorted(maps.Values(sha1s))
 	if len(hashes) == 0 {
 		return map[string]provider.Hosted{}, nil
 	}

@@ -219,7 +219,8 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 	if err != nil {
 		return err
 	}
-	id, prior, err := r.place(ctx, p, proj, v, opts.As, "", opts.Side, opts.Channel, explicit)
+	from, id, prior, err := r.placeAnywhere(ctx, hosted{p, proj, v}, opts.As, "", opts.Side, opts.Channel, explicit, func(w string) { r.Warnings = append(r.Warnings, w) })
+	p, proj, v = from.p, from.proj, from.v
 	if err != nil {
 		return err
 	}

@@ -472,6 +472,11 @@ func (c *CurseForge) Identify(ctx context.Context, files map[string][]byte) (map
 	return found, nil
 }
 
+// IdentifySHA1 finds nothing: CurseForge indexes files by its own fingerprint, not by sha1.
+func (c *CurseForge) IdentifySHA1(context.Context, map[string]string) (map[string]provider.Hosted, error) {
+	return map[string]provider.Hosted{}, nil
+}
+
 // numbers are the ids CurseForge has, which are integers; any other id is left out.
 func numbers(ids []string) []int {
 	var ns []int

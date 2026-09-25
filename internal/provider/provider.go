@@ -134,6 +134,9 @@ type Provider interface {
 	// Identify finds the versions the provider hosts these files as, hashing each the way the
 	// provider indexes files, keyed as given. A file it doesn't host is left out.
 	Identify(ctx context.Context, files map[string][]byte) (map[string]Hosted, error)
+	// IdentifySHA1 is Identify for files known by sha1 alone, keyed as given. A provider that
+	// doesn't index files by sha1 finds none.
+	IdentifySHA1(ctx context.Context, sha1s map[string]string) (map[string]Hosted, error)
 
 	// ParseURL reads what a URL on the provider's own hosts names. It is ErrNotHosted for a URL
 	// on another host, and a usage error for a shape on its hosts it doesn't read.

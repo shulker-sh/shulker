@@ -358,3 +358,28 @@ func TestASlugTheProviderLacksCarriesItsHelp(t *testing.T) {
 		t.Fatalf("an add by project id: %+v", got)
 	}
 }
+
+func TestAddLocksABlockedFileFromAnotherProviderHostingItsBytes(t *testing.T) {
+	c := newCDN(t)
+	alpha := newHost(c, "alpha")
+	cf := newHost(c, "curse").likeCurseForge()
+	iris := modJar(t, "iris", "1.0.0", "client")
+	mirrored := alpha.publish(mod("YL57", "irisshaders"), provider.Version{ID: "v1", Number: "1.0.0", File: provider.File{Filename: "iris-1.0.0.jar"}}, iris)
+	cf.publishManual(mod("300002", "iris-cf"), provider.Version{ID: "5100002", Number: "1.0.0", File: provider.File{Filename: "iris-1.0.0.jar"}}, iris)
+	h := newHarness(t, alpha, cf)
+
+	h.mustAdd("iris-cf", AddOptions{Provider: "curse"})
+	got := h.mod("iris")
+	if got.Provider != "alpha" || got.Project != "YL57" || got.URL == nil || *got.URL != mirrored.File.URL || got.Sha512 != sha512Hex(iris) {
+		t.Fatalf("iris lock entry: %+v", got)
+	}
+	if entry := h.r.Manifest.Requires["iris"]; entry.Provider != "" || entry.Project != "YL57" {
+		t.Fatalf("iris manifest entry: %+v", entry)
+	}
+	if !slices.Contains(h.r.Warnings, "iris-cf: Curse doesn't allow third-party downloads of iris-1.0.0.jar; locked from Alpha as irisshaders instead") {
+		t.Fatalf("add should say where the file was locked from: %v", h.r.Warnings)
+	}
+	if alpha.Requests["IdentifySHA1"] != 1 || cf.Requests["IdentifySHA1"] != 0 {
+		t.Fatalf("the blocking provider isn't asked for its own file: %v %v", alpha.Requests, cf.Requests)
+	}
+}
