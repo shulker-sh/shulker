@@ -3,6 +3,7 @@ package build
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,6 +12,7 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/version/minecraft"
 )
 
@@ -37,12 +39,21 @@ func (f packForm) name(entry string) (string, bool) { return strings.CutPrefix(e
 // list is options.txt's own syntax: a json array, vanilla first where the game
 // lists it, then each pack's entry.
 func (f packForm) list(names []string) string {
-	quoted := make([]string, 0, len(names)+1)
+	entries := make([]string, len(names))
+	for i, name := range names {
+		entries[i] = f.entry(name)
+	}
+	return f.listOf(entries)
+}
+
+// listOf is list for entries already in the list's own form.
+func (f packForm) listOf(entries []string) string {
+	quoted := make([]string, 0, len(entries)+1)
 	if f.prefix != "" {
 		quoted = append(quoted, `"vanilla"`)
 	}
-	for _, name := range names {
-		quoted = append(quoted, `"`+f.entry(name)+`"`)
+	for _, entry := range entries {
+		quoted = append(quoted, `"`+entry+`"`)
 	}
 	return "[" + strings.Join(quoted, ",") + "]"
 }
@@ -125,41 +136,87 @@ func (b *Builder) packRefs() []packRef {
 // so neither appears.
 var shaderConfigs = []struct{ mod, file string }{{"iris", "config/iris.properties"}, {"oculus", "config/oculus.properties"}}
 
-// enableShader points a shader mod this build placed at the first placed pack it
-// can load, and returns that pack's key, empty when none. placed holds the placed
-// mods' jar ids, so a renamed mod or one from another provider is still found.
-// Only the two keys shulker owns are written, through the per-key merge, so the
-// rest of the player's shader settings survive a rebuild.
-func (b *Builder) enableShader(desired map[string]source, placed map[string]bool) string {
-	for _, key := range b.placedShaders(desired) {
-		p := b.Lock.Shaders[key]
-		if config := shaderConfig(p, placed); config != "" {
-			props := properties{"shaderPack": p.Filename, "enableShaders": "true"}
-			desired[config] = ownedSource(propsFile{props: props, sep: "="})
-			return key
+// chooseShader selects the shader client.shader names in the config file of the placed shader
+// mod that loads it, "" clearing the selection. Only the keys shulker owns are written, through the
+// per-key merge, so the rest of the player's shader settings survive a rebuild. With client.shader
+// absent nothing is written, so the pack's own config stands, or no shader is selected.
+func (b *Builder) chooseShader(side string, opts Options, desired map[string]source, placed map[string]bool, report *Report) error {
+	cl := b.Manifest.Client
+	if cl == nil || cl.Shader == nil {
+		return nil
+	}
+	key := *cl.Shader
+	var config, value string
+	switch p, locked := b.Lock.Shaders[key]; {
+	case key == "":
+		for _, c := range shaderConfigs {
+			if placed[c.mod] {
+				config = c.file
+				break
+			}
+		}
+	case !locked:
+		return unknownPack("client.shader", key, "shader")
+	default:
+		if _, isPlaced := desired[p.Path(manifest.TypeShader)]; isPlaced {
+			config, value = shaderConfig(p, placed), p.Filename
 		}
 	}
-	return ""
+	if config == "" {
+		return nil
+	}
+	props := properties{"shaderPack": b.seed(side, opts, config, "shaderPack", value, nil, report)}
+	if value != "" {
+		props["enableShaders"] = "true"
+	}
+	desired[config] = ownedSource(propsFile{props: props, sep: "="})
+	return nil
 }
 
-// reportUnenabledShaders warns about every placed shader but the enabled one,
-// with what it takes to turn it on.
-func (b *Builder) reportUnenabledShaders(desired map[string]source, placed map[string]bool, enabled string, report *Report) {
+func unknownPack(field, key, kind string) error {
+	e := out.Errorf("pack-unknown", "%s names %q, which is no locked %s", field, key, kind)
+	e.Help = "fix the name, or add the " + kind + " first"
+	return e
+}
+
+// reportUnloadableShaders warns about each placed shader nothing in the build can load.
+func (b *Builder) reportUnloadableShaders(desired map[string]source, placed map[string]bool, report *Report) {
 	for _, key := range b.placedShaders(desired) {
 		p := b.Lock.Shaders[key]
-		var hint string
-		switch {
-		case key == enabled:
-			continue
-		case shaderConfig(p, placed) != "":
-			hint = " is placed but not enabled; turn it on in game under Options, Video Settings, Shader Packs"
-		case loadsShader(p, "canvas", placed):
-			hint = " is placed but not enabled; turn it on in Canvas's own menu"
-		default:
-			hint = " is placed, but nothing in this build can load it; shulker add iris"
+		if shaderConfig(p, placed) == "" && !loadsShader(p, "canvas", placed) {
+			report.Warnings = append(report.Warnings, key+" is placed, but nothing in this build can load it; shulker add iris")
 		}
-		report.Warnings = append(report.Warnings, key+hint)
 	}
+}
+
+// seed is the value to desire for key in the build's rel so the manifest's want is written once,
+// and again when want changes, but never over a value the player has changed in game since the
+// last write: that is kept, with a note, until --force. Desiring the last written value is what
+// has the per-key merge keep the player's, and keeps the recorded value the manifest's. renamed
+// maps a placed file's old name to its new one: a want that differs from the last write only by
+// those is no manifest change, but the player's value still names the old file, so the note says
+// that instead.
+func (b *Builder) seed(side string, opts Options, rel, key, want string, renamed map[string]string, report *Report) string {
+	dir := b.Target(side, opts.Dir)
+	was, recorded := LoadState(dir).Values[rel][key]
+	if opts.Force || !recorded || want == was {
+		return want
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
+	if live, present := parseProperties(data)[key]; !present || live == was {
+		return want
+	}
+	if report == nil {
+		return was
+	}
+	if len(renamed) > 0 && b.listForm().rename(was, renamed) == want {
+		for _, old := range slices.Sorted(maps.Keys(renamed)) {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was renamed %s, but the %s changed in game still names it; kept it, `shulker build --force` writes %s's", rel, old, renamed[old], key, manifest.FileName))
+		}
+		return was
+	}
+	report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s changed in %s and in game; kept the game's, `shulker build --force` writes %s's", rel, key, manifest.FileName, manifest.FileName))
+	return was
 }
 
 // placedShaders are the keys of the locked shaders this build places, in the
@@ -197,12 +254,21 @@ func loadsShader(p lock.Pack, mod string, placed map[string]bool) bool {
 // own shulker stops touching it: a later add or remove leaves the line alone and
 // the pack is enabled in game by hand. --force seeds it again. A list the
 // override folders ship is the pack's own, so it is never seeded over.
-func (b *Builder) seedResourcePacks(side string, opts Options, desired map[string]source, options properties, shipped string) {
+func (b *Builder) seedResourcePacks(side string, opts Options, desired map[string]source, options properties, shipped string, report *Report) error {
 	if _, own := options[resourcePacksKey]; own {
-		return
+		return nil
+	}
+	if cl := b.Manifest.Client; cl != nil && cl.ResourcePacks != nil {
+		list, err := b.chosenPackList(desired, *cl.ResourcePacks)
+		if err != nil {
+			return err
+		}
+		state := LoadState(b.Target(side, opts.Dir))
+		options[resourcePacksKey] = b.seed(side, opts, b.Manifest.OptionsPath(), resourcePacksKey, list, b.renamedPacks(state, desired), report)
+		return nil
 	}
 	if shipped != "" && !untouchedPackList(shipped) {
-		return
+		return nil
 	}
 	dir := b.Target(side, opts.Dir)
 	file := filepath.Join(dir, filepath.FromSlash(b.Manifest.OptionsPath()))
@@ -214,14 +280,9 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		// Keep desiring what was written, so the merge neither drops the key nor
 		// overrules a list the player has since changed in game.
 		options[resourcePacksKey] = was
-		renamed := map[string]string{}
-		for key, name := range b.placedPackNames(desired) {
-			if old := state.Packs[key]; old != "" && old != name {
-				renamed[old] = name
-			}
-		}
+		renamed := b.renamedPacks(state, desired)
 		if len(renamed) == 0 {
-			return
+			return nil
 		}
 		data, _ := os.ReadFile(file)
 		live, present := parseProperties(data)[resourcePacksKey]
@@ -231,16 +292,53 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		if swapped := b.listForm().rename(live, renamed); swapped != live {
 			options[resourcePacksKey] = swapped
 		}
-		return
+		return nil
 	default:
 		data, _ := os.ReadFile(file)
 		if current, present := parseProperties(data)[resourcePacksKey]; present && !untouchedPackList(current) {
-			return
+			return nil
 		}
 	}
 	if packs := placedPacks(desired); len(packs) > 0 {
 		options[resourcePacksKey] = b.listForm().list(packs)
 	}
+	return nil
+}
+
+// chosenPackList is the enabled list for client.resourcePacks, whose first name is on top, so
+// last in the list. A pack its conditions don't place is left out.
+func (b *Builder) chosenPackList(desired map[string]source, chosen []string) (string, error) {
+	names := b.placedPackNames(desired)
+	locked := map[string]bool{}
+	for _, ref := range b.packRefs() {
+		locked[ref.key] = locked[ref.key] || ref.kind == manifest.TypeResourcePack
+	}
+	form := b.listForm()
+	var entries []string
+	for _, name := range slices.Backward(chosen) {
+		file, isPlaced := names[name]
+		switch {
+		case slices.Contains(manifest.BuiltinResourcePacks, name):
+			entries = append(entries, name)
+		case isPlaced:
+			entries = append(entries, form.entry(file))
+		case !locked[name]:
+			return "", unknownPack("client.resourcePacks", name, "resource pack")
+		}
+	}
+	return form.listOf(entries), nil
+}
+
+// renamedPacks maps the old file name of each resource pack placed under a new one since the last
+// build to that new name.
+func (b *Builder) renamedPacks(state State, desired map[string]source) map[string]string {
+	renamed := map[string]string{}
+	for key, name := range b.placedPackNames(desired) {
+		if old := state.Packs[key]; old != "" && old != name {
+			renamed[old] = name
+		}
+	}
+	return renamed
 }
 
 // shippedPackList is the enabled list the override folders put in options.txt,
@@ -344,11 +442,13 @@ func (b *Builder) reportPackList(side string, opts Options, desired map[string]s
 	_ = json.Unmarshal([]byte(list), &entries)
 	placed := placedPacks(desired)
 	form := b.listForm()
-	for _, name := range placed {
-		if slices.Contains(entries, form.entry(name)) {
-			continue
+	// A pack client.resourcePacks leaves out is off by choice.
+	if cl := b.Manifest.Client; cl == nil || cl.ResourcePacks == nil {
+		for _, name := range placed {
+			if !slices.Contains(entries, form.entry(name)) {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s is placed but not enabled; turn it on in game under Options, Resource Packs", strings.TrimSuffix(name, ".zip")))
+			}
 		}
-		report.Warnings = append(report.Warnings, fmt.Sprintf("%s is placed but not enabled; turn it on in game under Options, Resource Packs", strings.TrimSuffix(name, ".zip")))
 	}
 	if shipped == "" || list != shipped {
 		return nil

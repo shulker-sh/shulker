@@ -2011,6 +2011,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `override-path` | A path named to `match` isn't a jar in `mods/` or a zip in `resourcepacks/`, `shaderpacks/` or a datapack folder of `overrides/`, `client-overrides/` or `server-overrides/` |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
 | `pack-filename-taken` | Two resource packs or shaders would be placed under one file name in the same folder, compared without case. Give one a different `filename` |
+| `pack-unknown` | `client.resourcePacks` or `client.shader` names a pack the lock doesn't have, as a pack of a modpack in `requires` can be. Fix the name, or add the pack first |
 | `path-invalid` | `shulker.json`, `config.json` or an instance's settings have no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get`, `config get` or `instance get` names a field that isn't set |
 | `pin-mismatch` | The pinned version belongs to a different project |

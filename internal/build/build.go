@@ -529,13 +529,15 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectPacks(cond, desired, report); err != nil {
 			return nil, nil, err
 		}
-		enabled := b.enableShader(desired, placed)
-		b.reportUnenabledShaders(desired, placed, enabled, report)
+		if err := b.chooseShader(side, opts, desired, placed, report); err != nil {
+			return nil, nil, err
+		}
+		b.reportUnloadableShaders(desired, placed, report)
 		var err error
 		if shipped, err = b.shippedPackList(side, cond, vars); err != nil {
 			return nil, nil, err
 		}
-		if err := b.collectClient(side, opts, desired, vars, shipped); err != nil {
+		if err := b.collectClient(side, opts, desired, vars, shipped, report); err != nil {
 			return nil, nil, err
 		}
 		if loader.Running(b.Lock).MarkerFile != "" && b.markerOn(dir) {
@@ -810,7 +812,7 @@ func RecordLauncherImage(dir, hash string) error {
 	return writeState(dir, s)
 }
 
-func (b *Builder) collectClient(side string, opts Options, desired map[string]source, vars map[string]string, shipped string) error {
+func (b *Builder) collectClient(side string, opts Options, desired map[string]source, vars map[string]string, shipped string, report *Report) error {
 	cl := b.Manifest.Client
 	file := b.Manifest.OptionsPath()
 	options := properties{}
@@ -821,7 +823,9 @@ func (b *Builder) collectClient(side string, opts Options, desired map[string]so
 		}
 		options = rendered
 	}
-	b.seedResourcePacks(side, opts, desired, options, shipped)
+	if err := b.seedResourcePacks(side, opts, desired, options, shipped, report); err != nil {
+		return err
+	}
 	if len(options) == 0 {
 		return nil
 	}

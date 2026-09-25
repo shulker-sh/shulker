@@ -230,6 +230,8 @@ func TestExportEnablesPacksByTheirCurseForgeNames(t *testing.T) {
 	iris := x.b.Lock.Mods["irisshaders"]
 	iris.ModID = "iris"
 	x.b.Lock.Mods["irisshaders"] = iris
+	chosen := "complementary-reimagined"
+	x.b.Manifest.Client.Shader = &chosen
 
 	if _, err := x.exportCurseForge(false); err != nil {
 		t.Fatal(err)

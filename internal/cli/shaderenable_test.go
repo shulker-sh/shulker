@@ -19,6 +19,7 @@ func TestShaderIsEnabledByTheShaderModTheBuildPlaced(t *testing.T) {
 		m["requires"].(map[string]any)["fancy-shaders"].(map[string]any)["feature"] = "shaders"
 		declarations(m)["shaders"] = map[string]any{}
 	})
+	h.mustRun(t, "set", "client.shader", "complementary-reimagined")
 	h.mustRun(t, "lock")
 
 	_, _, stderr := h.run(t, "install")
