@@ -16,7 +16,7 @@ fi
 mkdir -p dist
 CGO_ENABLED=0 go build \
   -ldflags "-s -w -X shulker.sh/shulker/internal/provider/curseforge.embeddedKey=$key" \
-  -o dist/shulker ./cmd/shulker
+  -o dist/shulker .
 echo "built dist/shulker with an embedded CurseForge key"
 
 if [ "${1:-}" != "--check" ]; then

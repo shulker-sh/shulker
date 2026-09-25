@@ -8,7 +8,7 @@ before:
 
 builds:
   - id: shulker
-    main: ./cmd/shulker
+    main: .
     binary: shulker
     env:
       - CGO_ENABLED=0
