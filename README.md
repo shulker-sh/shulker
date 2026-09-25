@@ -92,13 +92,13 @@ Shulker is a launcher itself, and it links into five others. A link creates an i
 
 | Launcher | Command | Syncs before each launch | Can use its accounts |
 | --- | --- | --- | --- |
-| Shulker | `shulker link shulker` | yes | its own |
-| Prism Launcher | `shulker link prism` | yes | yes |
-| MultiMC | `shulker link multimc` | yes | yes |
-| Minecraft Launcher | `shulker link mojang` | yes | yes |
-| ATLauncher | `shulker link atlauncher` | yes | yes |
-| GDLauncher | `shulker link gdlauncher` | yes, paused after four minutes | yes |
-| Modrinth App, CurseForge app | `shulker export mrpack`, `shulker export curseforge` | no | no |
+| [Shulker](https://shulker.sh) | `shulker link shulker` | yes | its own |
+| [Prism Launcher](https://github.com/PrismLauncher/PrismLauncher) | `shulker link prism` | yes | yes |
+| [MultiMC](https://github.com/MultiMC/Launcher) | `shulker link multimc` | yes | yes |
+| [Minecraft Launcher](https://www.minecraft.net/en-us/download) | `shulker link mojang` | yes | yes |
+| [ATLauncher](https://github.com/ATLauncher/ATLauncher) | `shulker link atlauncher` | yes | yes |
+| [GDLauncher](https://github.com/gorilla-devs/GDLauncher-Carbon) | `shulker link gdlauncher` | yes, paused after four minutes | yes |
+| [Modrinth App](https://github.com/modrinth/code), [CurseForge app](https://www.curseforge.com/download/app) | `shulker export mrpack`, `shulker export curseforge` | no | no |
 
 Some launchers need a word more.
 
