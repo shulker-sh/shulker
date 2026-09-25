@@ -108,16 +108,24 @@ func (p *Players) All() []Player {
 }
 
 type Client struct {
-	Name        string          `json:"name,omitempty"`
-	Build       string          `json:"build,omitempty"`
-	Variables   Variables       `json:"variables,omitempty"`
-	Hooks       *Hooks          `json:"hooks,omitempty"`
-	Memory      string          `json:"memory,omitempty"`
-	Options     map[string]any  `json:"options,omitempty"`
-	OptionsPath string          `json:"optionsPath,omitempty"`
-	Servers     json.RawMessage `json:"servers,omitempty"`
-	Note        string          `json:"note,omitempty"`
+	Name        string         `json:"name,omitempty"`
+	Build       string         `json:"build,omitempty"`
+	Variables   Variables      `json:"variables,omitempty"`
+	Hooks       *Hooks         `json:"hooks,omitempty"`
+	Memory      string         `json:"memory,omitempty"`
+	Options     map[string]any `json:"options,omitempty"`
+	OptionsPath string         `json:"optionsPath,omitempty"`
+	// ResourcePacks are the resource packs that start enabled, top first, and Shader the shader,
+	// "" for none. Each is nil when the manifest leaves the choice to the pack and the defaults.
+	ResourcePacks *[]string       `json:"resourcePacks,omitempty"`
+	Shader        *string         `json:"shader,omitempty"`
+	Servers       json.RawMessage `json:"servers,omitempty"`
+	Note          string          `json:"note,omitempty"`
 }
+
+// BuiltinResourcePacks are the resource packs the game ships that a player may turn on, named
+// as options.txt names them. The ones it always loads, such as vanilla, are never listed.
+var BuiltinResourcePacks = []string{"programmer_art", "high_contrast"}
 
 // OptionsPath is where client.options is written, relative to the build.
 func (m *Manifest) OptionsPath() string {
@@ -418,6 +426,9 @@ func (m *Manifest) check() error {
 		e.Rows = []out.Detail{{Label: "Fix", Text: `give a path relative to the build, such as "config/modpack_defaults/options.txt"`}}
 		return e
 	}
+	if err := m.checkPackChoices(); err != nil {
+		return err
+	}
 	if m.Icon != "" && !insideBuild(m.Icon) {
 		e := out.Errorf("manifest-invalid", "icon %q is not a file inside the project", m.Icon)
 		e.Rows = []out.Detail{{Label: "Fix", Text: `give a path relative to the project, such as "assets/icon.png"`}}
@@ -429,6 +440,55 @@ func (m *Manifest) check() error {
 		return e
 	}
 	return nil
+}
+
+// checkPackChoices checks that client.resourcePacks and client.shader name packs requires has, or
+// a built-in resource pack. A modpack's packs aren't known until it is locked, so with a modpack in
+// requires an unknown name waits for the build.
+func (m *Manifest) checkPackChoices() error {
+	if m.Client == nil {
+		return nil
+	}
+	invalid := func(fix, format string, args ...any) error {
+		e := out.Errorf("manifest-invalid", format, args...)
+		e.Rows = []out.Detail{{Label: "Fix", Text: fix}}
+		return e
+	}
+	hasModpack := len(m.byKind(TypeModpack)) > 0
+	if list := m.Client.ResourcePacks; list != nil {
+		if _, set := m.Client.Options["resourcePacks"]; set {
+			return invalid("keep one of them", "client.resourcePacks and client.options.resourcePacks both set the enabled resource packs")
+		}
+		seen := map[string]bool{}
+		for _, name := range *list {
+			if seen[name] {
+				return invalid("list it once", "client.resourcePacks lists %q twice", name)
+			}
+			seen[name] = true
+			if _, ok := m.PlacedAsResourcePacks()[name]; ok || slices.Contains(BuiltinResourcePacks, name) || hasModpack {
+				continue
+			}
+			return invalid(fmt.Sprintf("name a resource pack in requires, or %s", strings.Join(BuiltinResourcePacks, " or ")), "client.resourcePacks names %q, which is no resource pack", name)
+		}
+	}
+	if s := m.Client.Shader; s != nil && *s != "" && !hasModpack {
+		if _, ok := m.Shaders()[*s]; !ok {
+			return invalid(`name a shader in requires, or "" for none`, "client.shader names %q, which is no shader", *s)
+		}
+	}
+	return nil
+}
+
+// PlacedAsResourcePacks are the requires entries placed as resource packs: resource packs, and
+// datapacks whose zip also loads as one.
+func (m *Manifest) PlacedAsResourcePacks() map[string]Require {
+	keys := m.ResourcePacks()
+	for key, r := range m.Datapacks() {
+		if r.ResourcePack {
+			keys[key] = r
+		}
+	}
+	return keys
 }
 
 // IsSubfolder reports whether rel names a folder below a repository's root, in the slash-separated

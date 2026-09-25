@@ -648,6 +648,16 @@
           "pattern": "^[^/\\\\]",
           "description": "Where options and the seeded resourcePacks list are written, relative to the build, in builds and exports alike. Defaults to options.txt. config/modpack_defaults/options.txt ships it for Config Manager, which copies it into place only where the player has none, so a pack update never resets their settings. The tool rejects absolute paths and paths that leave the build."
         },
+        "resourcePacks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The resource packs that start enabled, top of the list first: resource pack keys in requires, or the game's own programmer_art and high_contrast. A placed pack left out starts off. Absent, the list options.txt ships in the overrides stands, else every placed pack starts on. Written to options.txt once and again when this list changes, keeping a list the player changed in game until `build --force`. Not together with options.resourcePacks."
+        },
+        "shader": {
+          "type": "string",
+          "description": "The shader Iris or Oculus starts with, a shader key in requires, or \"\" for none. Absent, the shaderPack the overrides ship stands, else none is selected. Seeded as resourcePacks is."
+        },
         "servers": {
           "type": "array",
           "items": {

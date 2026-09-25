@@ -409,3 +409,44 @@ func TestSaveWritesTheMarker(t *testing.T) {
 		t.Errorf("saved $schema = %q, want %q", head.Schema, SchemaURL)
 	}
 }
+
+func TestClientPackChoices(t *testing.T) {
+	doc := func(requires, client string) []byte {
+		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"requires":{` + requires + `},"client":{` + client + `}}`)
+	}
+	packs := `"extras":{"type":"resourcepack","file":"extras.zip"},"fa":{"type":"resourcepack","file":"fa.zip"},"bsl":{"type":"shader","file":"bsl.zip"}`
+	m, err := Parse(doc(packs, `"resourcePacks":["fa","programmer_art","extras"],"shader":"bsl"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := *m.Client.ResourcePacks; !slices.Equal(got, []string{"fa", "programmer_art", "extras"}) || *m.Client.Shader != "bsl" {
+		t.Fatalf("parsed %v, %q", got, *m.Client.Shader)
+	}
+	off, err := Parse(doc(packs, `"resourcePacks":[],"shader":""`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := off.Encode()
+	if s := string(data); !strings.Contains(s, `"resourcePacks": []`) || !strings.Contains(s, `"shader": ""`) {
+		t.Fatalf("an empty choice didn't survive encoding: %s", s)
+	}
+	for name, client := range map[string]string{
+		"both lists":     `"resourcePacks":["fa"],"options":{"resourcePacks":"[\"vanilla\"]"}`,
+		"repeated pack":  `"resourcePacks":["fa","fa"]`,
+		"unknown pack":   `"resourcePacks":["nope"]`,
+		"shader as pack": `"resourcePacks":["bsl"]`,
+		"vanilla listed": `"resourcePacks":["vanilla"]`,
+		"pack as shader": `"shader":"fa"`,
+		"unknown shader": `"shader":"nope"`,
+	} {
+		if _, err := Parse(doc(packs, client)); out.CodeOf(err) != "manifest-invalid" {
+			t.Errorf("%s: err %v, want manifest-invalid", name, err)
+		}
+	}
+	if _, err := Parse(doc(`"base":{"source":"../base"}`, `"resourcePacks":["from-base"],"shader":"base-shader"`)); err != nil {
+		t.Errorf("a modpack's packs are known only at build: %v", err)
+	}
+	if _, err := Parse(doc(packs, `"options":{"resourcePacks":"[\"vanilla\"]"}`)); err != nil {
+		t.Errorf("client.options.resourcePacks alone: %v", err)
+	}
+}
