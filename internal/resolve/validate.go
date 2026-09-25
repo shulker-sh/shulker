@@ -3,6 +3,7 @@ package resolve
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -26,8 +27,10 @@ type Problem struct {
 	// Side is the sides whose builds have the problem, when not every checked side does.
 	Side string `json:"side,omitempty"`
 	// LockedAs is the lock key of a mod that provides On but that this side doesn't place.
-	LockedAs  string `json:"lockedAs,omitempty"`
-	StaleNote string `json:"staleNote,omitempty"`
+	LockedAs string `json:"lockedAs,omitempty"`
+	// LockedSide is the side LockedAs is locked for.
+	LockedSide string `json:"lockedSide,omitempty"`
+	StaleNote  string `json:"staleNote,omitempty"`
 }
 
 type Validation struct {
@@ -225,7 +228,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 		installed[id] = version
 	}
 	for _, id := range sortedKeys(placed) {
-		info := placed[id]
+		info := onSide(placed[id], side)
 		for _, on := range sortedKeys(info.Depends) {
 			declared := info.Depends[on]
 			found, ok := installed[on]
@@ -245,6 +248,9 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 			p := Problem{Rule: "depends", Mod: id, ModVersion: info.Version, On: on, Declared: declared, Found: found}
 			if !ok {
 				p.LockedAs = elsewhere[on]
+				if locked, found := r.Lock.Mods[p.LockedAs]; found && p.LockedAs != "" {
+					p.LockedSide = locked.Side
+				}
 			}
 			v.Problems = append(v.Problems, p)
 		}
@@ -297,6 +303,27 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 		}
 	}
 	return v
+}
+
+// onSide is info without the dependencies FML skips on side, info itself when there are none.
+func onSide(info *jarmeta.Info, side string) *jarmeta.Info {
+	skip := func(id string) bool {
+		only, ok := info.DependencySides[id]
+		return ok && only != side
+	}
+	skips := false
+	for id := range info.DependencySides {
+		skips = skips || skip(id)
+	}
+	if !skips {
+		return info
+	}
+	c := *info
+	for _, set := range []*map[string]string{&c.Depends, &c.Breaks, &c.Conflicts, &c.Recommends, &c.Suggests, &c.Optional} {
+		*set = maps.Clone(*set)
+		maps.DeleteFunc(*set, func(id, _ string) bool { return skip(id) })
+	}
+	return &c
 }
 
 // sideOverrides is the loader's dependency overrides file each validated side's build ships, nil
@@ -454,7 +481,7 @@ func (v *Validation) Err() error {
 			fmt.Fprintf(&b, "\n      %s", p.StaleNote)
 			row.Children = append(row.Children, out.Detail{Text: p.StaleNote})
 		}
-		if fix := p.fix(); fix != "" {
+		for _, fix := range p.fixes() {
 			fmt.Fprintf(&b, "\n      Fix: %s", fix)
 			row.Children = append(row.Children, out.Detail{Label: "Fix", Text: fix, IsCommand: true})
 		}
@@ -487,15 +514,19 @@ func (p Problem) line() string {
 	return line
 }
 
-// fix is the command that clears the problem, empty when there isn't one to suggest.
-func (p Problem) fix() string {
+// fixes are the commands that clear the problem, none when there isn't one to suggest. For a
+// dependency another side places, moving the dependent there comes first: it can't put a
+// client-only mod on a server.
+func (p Problem) fixes() []string {
 	switch {
 	case p.Rule != "depends" || p.Found != "" || isBuiltin(p.On):
-		return ""
+		return nil
+	case p.LockedAs != "" && p.LockedSide != "both" && p.LockedSide != "":
+		return []string{fmt.Sprintf("shulker set requires.%s.side %s", p.Mod, p.LockedSide), fmt.Sprintf("shulker set requires.%s.side both", p.LockedAs)}
 	case p.LockedAs != "":
-		return fmt.Sprintf("shulker set requires.%s.side both", p.LockedAs)
+		return []string{fmt.Sprintf("shulker set requires.%s.side both", p.LockedAs)}
 	}
-	return "shulker add " + p.On
+	return []string{"shulker add " + p.On}
 }
 
 func (p Problem) ignoreCommand() string {

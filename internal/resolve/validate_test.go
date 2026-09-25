@@ -412,10 +412,10 @@ func TestValidateEachSideAgainstWhatItPlaces(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Problem{
-		{Rule: "depends", Mod: "bwg", ModVersion: "1.4.0", On: "trees", Declared: ">=1.3.8", Side: "client", LockedAs: "trees"},
+		{Rule: "depends", Mod: "bwg", ModVersion: "1.4.0", On: "trees", Declared: ">=1.3.8", Side: "client", LockedAs: "trees", LockedSide: "server"},
 		{Rule: "depends", Mod: "common", ModVersion: "1.4.0", On: "nothere", Declared: "*"},
-		{Rule: "depends", Mod: "hybrid", ModVersion: "1.4.0", On: "lith", Declared: "*", Side: "client", LockedAs: "lith"},
-		{Rule: "depends", Mod: "serveronly", ModVersion: "1.4.0", On: "clientlib", Declared: "*", Side: "server", LockedAs: "clientlib"},
+		{Rule: "depends", Mod: "hybrid", ModVersion: "1.4.0", On: "lith", Declared: "*", Side: "client", LockedAs: "lith", LockedSide: "server"},
+		{Rule: "depends", Mod: "serveronly", ModVersion: "1.4.0", On: "clientlib", Declared: "*", Side: "server", LockedAs: "clientlib", LockedSide: "client"},
 	}
 	if !reflect.DeepEqual(v.Problems, want) {
 		t.Fatalf("problems %+v, want %+v", v.Problems, want)
@@ -440,5 +440,42 @@ func TestValidateEachSideAgainstWhatItPlaces(t *testing.T) {
 	}
 	if !reflect.DeepEqual(v.Problems, serverWant) {
 		t.Fatalf("server project: problems %+v, want %+v", v.Problems, serverWant)
+	}
+}
+
+func TestValidateSkipsADependencyOnTheSideItDoesNotApplyTo(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	toml := func(id, deps string) []byte {
+		return zipBytes(t, "META-INF/neoforge.mods.toml", "[[mods]]\nmodId=\""+id+"\"\nversion=\"1.0\"\n"+deps)
+	}
+	jars := map[string]struct {
+		side string
+		jar  []byte
+	}{
+		"iris":        {"client", toml("iris", "")},
+		"iris_search": {"both", toml("iris_search", "[[dependencies.iris_search]]\nmodId=\"iris\"\ntype=\"required\"\nversionRange=\"[0,)\"\nside=\"CLIENT\"\n")},
+		"shaderaddon": {"both", toml("shaderaddon", "[[dependencies.shaderaddon]]\nmodId=\"iris\"\ntype=\"required\"\nversionRange=\"[0,)\"\nside=\"BOTH\"\n")},
+	}
+	l := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "neoforge", Version: "26.2.0.87"}, Mods: map[string]lock.Mod{}}
+	for id, m := range jars {
+		sha, err := c.Put(bytes.NewReader(m.jar))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Mods[id] = lock.Mod{Sha512: sha, Side: m.side}
+	}
+	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{{Rule: "depends", Mod: "shaderaddon", ModVersion: "1.0", On: "iris", Declared: "[0,)", Side: "server", LockedAs: "iris", LockedSide: "client"}}
+	if !reflect.DeepEqual(v.Problems, want) {
+		t.Fatalf("problems %+v, want %+v", v.Problems, want)
+	}
+	e := out.AsError(v.Err())
+	fixes := e.Rows[0].Children
+	if len(fixes) < 2 || fixes[0].Text != "shulker set requires.shaderaddon.side client" || fixes[1].Text != "shulker set requires.iris.side both" {
+		t.Fatalf("fixes %+v", fixes)
 	}
 }
