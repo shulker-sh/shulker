@@ -27,7 +27,8 @@ type RemoteFile struct {
 	next     int64
 }
 
-// Remote opens url for ranged reads, asking the server for its size first.
+// Remote opens url for ranged reads, asking the server for its size first. The ranges are read
+// from where url redirects, since a CDN's front door may answer a range request with a 404.
 func (c *Client) Remote(ctx context.Context, url string) (*RemoteFile, error) {
 	resp, err := c.do(ctx, http.MethodHead, url, nil, nil)
 	if err != nil {
@@ -37,7 +38,7 @@ func (c *Client) Remote(ctx context.Context, url string) (*RemoteFile, error) {
 	if resp.ContentLength < 0 {
 		return nil, fmt.Errorf("%s: the server gives no size", url)
 	}
-	return &RemoteFile{c: c, ctx: ctx, url: url, size: resp.ContentLength, next: remoteBlock}, nil
+	return &RemoteFile{c: c, ctx: ctx, url: resp.Request.URL.String(), size: resp.ContentLength, next: remoteBlock}, nil
 }
 
 // Size is the file's length in bytes, as the server gave it.

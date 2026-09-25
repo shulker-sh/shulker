@@ -74,3 +74,29 @@ func (c *countingResponse) Write(p []byte) (int, error) {
 	*c.n += int64(len(p))
 	return c.ResponseWriter.Write(p)
 }
+
+func TestRemoteReadsRangesFromWhereItsURLRedirects(t *testing.T) {
+	data := bytes.Repeat([]byte("abcdefgh"), 1<<14)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/file", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodHead {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/cdn/file", http.StatusFound)
+	})
+	mux.HandleFunc("/cdn/file", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, "file", time.Time{}, bytes.NewReader(data))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	f, err := New("test").Remote(context.Background(), srv.URL+"/file")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make([]byte, 8)
+	if _, err := f.ReadAt(got, 8); err != nil || string(got) != "abcdefgh" {
+		t.Fatalf("read %q, %v", got, err)
+	}
+}
