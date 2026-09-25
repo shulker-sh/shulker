@@ -33,7 +33,9 @@ func NoClient() error {
 	return e
 }
 
-func checkSide(name, flag string) error {
+// CheckSide refuses a name that is not a side; flag names the flag it came from, or is empty when
+// it was positional.
+func CheckSide(name, flag string) error {
 	if manifest.IsSide(name) {
 		return nil
 	}
@@ -45,7 +47,7 @@ func checkSide(name, flag string) error {
 // DeclaredSide is the side name, once it is a side the manifest declares; flag names the flag it
 // came from, or is empty when it was positional.
 func DeclaredSide(m *manifest.Manifest, name, flag string) (string, error) {
-	if err := checkSide(name, flag); err != nil {
+	if err := CheckSide(name, flag); err != nil {
 		return "", err
 	}
 	if !m.HasSide(name) {
@@ -121,7 +123,7 @@ func ExportSides(m *manifest.Manifest, want string, assume bool) (sides []string
 	if want == "" {
 		return sides, assumed, nil
 	}
-	if err := checkSide(want, "--side"); err != nil {
+	if err := CheckSide(want, "--side"); err != nil {
 		return nil, false, err
 	}
 	if !slices.Contains(sides, want) {

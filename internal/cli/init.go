@@ -54,7 +54,7 @@ func (a *app) initCmd() *cobra.Command {
 			if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
 				return out.Errorf("manifest-exists", "%s already exists here", manifest.FileName)
 			}
-			if err := checkSide(opts.side, "--side"); err != nil {
+			if err := project.CheckSide(opts.side, "--side"); err != nil {
 				return err
 			}
 			loaders := append([]string{noLoader}, loader.Names()...)
