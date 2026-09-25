@@ -67,10 +67,14 @@ func TestRestorePutsTheZipsWorldsBackWhole(t *testing.T) {
 	h.dir = ""
 	stdout = h.mustRun(t, "saves", "-i", "pack")
 	h.dir = project
-	for _, want := range []string{"1) ", "-pack-restore (taken", "before a restore, 2 worlds", "2) " + first.ID, "Restore one:", "shulker -i pack restore <n>"} {
+	for _, want := range []string{"Restore one:", "shulker -i pack restore <n>"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("saves lacks %q: %s", want, stdout)
 		}
+	}
+	rows := tableRows(stdout)
+	if len(rows) != 2 || rows[0]["#"] != "1" || !strings.HasSuffix(rows[0]["Backup"], "-pack-restore") || rows[0]["Reason"] != "before a restore" || rows[0]["Worlds"] != "2" || rows[1]["#"] != "2" || rows[1]["Backup"] != first.ID {
+		t.Fatalf("saves: %s", stdout)
 	}
 
 	if got := restoreOf(t, h, "2"); got.From.ID != first.ID {

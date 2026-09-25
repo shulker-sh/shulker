@@ -156,10 +156,14 @@ func TestSavesListsGroupsWorldsAndBackups(t *testing.T) {
 	h.dir = ""
 	stdout = h.mustRun(t, "saves", "-i", "pack")
 	h.dir = project
-	for _, want := range []string{"Worlds", "creative", "survival", "Backups", "1) 20260918-210000-pack-backup", "on request", "3) 20260917-101500-pack-sync", "before sync"} {
+	for _, want := range []string{"Worlds", "creative", "survival", "Backups"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("saves -i pack lacks %q: %s", want, stdout)
 		}
+	}
+	rows := tableRows(stdout)
+	if len(rows) != 3 || rows[0]["#"] != "1" || rows[0]["Backup"] != "20260918-210000-pack-backup" || rows[0]["Reason"] != "on request" || rows[2]["#"] != "3" || rows[2]["Backup"] != "20260917-101500-pack-sync" || rows[2]["Reason"] != "before sync" {
+		t.Fatalf("saves -i pack: %s", stdout)
 	}
 	if stdout := h.mustRun(t, "saves", "--group", "hardcore"); !strings.Contains(stdout, "no worlds") || !strings.Contains(stdout, "shulker backup --group hardcore") {
 		t.Fatalf("saves --group: %s", stdout)
@@ -195,7 +199,7 @@ func TestSavesTargetsAnInstanceWithoutAGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "saves", "-C", gameDir)
-	if !strings.Contains(stdout, "mine") || !strings.Contains(stdout, "1) 20260918-203015-update") || !strings.Contains(stdout, "before update") {
+	if rows := tableRows(stdout); !strings.Contains(stdout, "mine") || len(rows) != 1 || rows[0]["#"] != "1" || rows[0]["Backup"] != "20260918-203015-update" || rows[0]["Reason"] != "before update" {
 		t.Fatalf("saves -C: %s", stdout)
 	}
 }

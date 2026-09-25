@@ -2,7 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -201,11 +200,15 @@ func (a *app) printSavesView(view savesView, l *out.Lines) {
 		l.Info("no backups yet; `" + a.savesCommand(view.savesTarget, "backup") + "` takes one")
 		return
 	}
-	width := len(strconv.Itoa(len(view.Backups)))
-	for _, b := range view.Backups {
-		label := fmt.Sprintf("%*d)", width, b.N)
-		l.Plain(t.Cyan(label) + " " + t.Bold(b.ID) + " " + t.Grey(backupAside(b.Backup)))
+	rows := make([][]string, len(view.Backups))
+	for i, b := range view.Backups {
+		worlds := ""
+		if b.Worlds > 0 {
+			worlds = strconv.Itoa(b.Worlds)
+		}
+		rows[i] = []string{strconv.Itoa(b.N), b.ID, b.Taken.Format("2006-01-02 15:04"), backupReason(b.Backup), worlds, out.HumanBytes(b.Size), backupGame(b.Backup)}
 	}
+	l.Table([]string{"#", "Backup", "Taken", "Reason", "Worlds", "Size", "Game"}, rows, out.Columns(t.StyleCyan(), t.StyleBold(), t.StyleGrey(), t.Style(), t.StyleGrey()))
 	l.Nudge("Restore one", a.savesCommand(view.savesTarget, "restore <n>"))
 }
 
@@ -232,28 +235,28 @@ func shellWord(s string) string {
 	return s
 }
 
-func backupAside(b saves.Backup) string {
-	parts := []string{"taken " + b.Taken.Format("2006-01-02 15:04")}
+func backupReason(b saves.Backup) string {
 	switch b.Reason {
 	case "backup":
-		parts = append(parts, "on request")
+		return "on request"
 	case "restore":
-		parts = append(parts, "before a restore")
+		return "before a restore"
 	case "":
-	default:
-		parts = append(parts, "before "+b.Reason)
+		return ""
 	}
-	if b.Worlds > 0 {
-		parts = append(parts, plural(b.Worlds, "world", "worlds"))
-	}
-	parts = append(parts, out.HumanBytes(b.Size))
+	return "before " + b.Reason
+}
+
+// backupGame is the Minecraft version, then the loader with its version when the backup recorded them.
+func backupGame(b saves.Backup) string {
+	parts := []string{}
 	if b.Minecraft != "" {
-		parts = append(parts, "Minecraft "+b.Minecraft)
+		parts = append(parts, b.Minecraft)
 	}
 	if b.Loader != "" {
 		parts = append(parts, strings.TrimSpace(b.Loader+" "+b.LoaderVersion))
 	}
-	return "(" + strings.Join(parts, ", ") + ")"
+	return strings.Join(parts, " ")
 }
 
 func worldCount(n int) string {

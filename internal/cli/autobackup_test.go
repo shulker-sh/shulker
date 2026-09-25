@@ -87,8 +87,8 @@ func TestUpdateBacksUpUnderThePlatformTheWorldsWerePlayedOn(t *testing.T) {
 	if len(backups) != 1 || backups[0].Minecraft != "26.1" || backups[0].Loader != "fabric" || backups[0].LoaderVersion != "0.17.2" {
 		t.Fatalf("the backup names the platform the worlds were played on: %+v", backups)
 	}
-	if stdout := h.mustRun(t, "saves", "-C", h.dir); !strings.Contains(stdout, "Minecraft 26.1, fabric 0.17.2)") {
-		t.Fatalf("saves: %s", stdout)
+	if rows := tableRows(h.mustRun(t, "saves", "-C", h.dir)); len(rows) != 1 || rows[0]["Game"] != "26.1 fabric 0.17.2" {
+		t.Fatalf("saves: %+v", rows)
 	}
 	if got := build.LoadState(h.dir); got.Minecraft != "26.2" || got.Loader != "fabric" || got.LoaderVersion != "0.17.3" {
 		t.Fatalf("the build records what it installed: %+v", got)

@@ -49,10 +49,9 @@ func TestBackupZipsAnInstancesSaveGroup(t *testing.T) {
 	h.dir = ""
 	stdout = h.mustRun(t, "saves", "-i", "pack")
 	h.dir = project
-	for _, want := range []string{"-pack-backup (taken", "on request, 2 worlds", "Minecraft 26.2, fabric 0.17.3)"} {
-		if !strings.Contains(stdout, want) {
-			t.Fatalf("saves -i pack lacks %q: %s", want, stdout)
-		}
+	rows := tableRows(stdout)
+	if len(rows) != 1 || !strings.HasSuffix(rows[0]["Backup"], "-pack-backup") || rows[0]["Reason"] != "on request" || rows[0]["Worlds"] != "2" || rows[0]["Game"] != "26.2 fabric 0.17.3" {
+		t.Fatalf("saves -i pack: %s", stdout)
 	}
 
 	h.dir = ""
@@ -126,15 +125,18 @@ func TestBackupOfAStateWithoutAPlatformNamesNone(t *testing.T) {
 	if got := backupOf(t, h, "-C", gameDir); got.Minecraft != "" || got.Loader != "" || got.LoaderVersion != "" {
 		t.Fatalf("backed up %+v", got)
 	}
-	if stdout := h.mustRun(t, "saves", "-C", gameDir); strings.Contains(stdout, "Minecraft") {
-		t.Fatalf("saves: %s", stdout)
+	if rows := tableRows(h.mustRun(t, "saves", "-C", gameDir)); len(rows) != 1 || rows[0]["Game"] != "" {
+		t.Fatalf("saves: %+v", rows)
 	}
 }
 
-func TestBackupAsideNamesTheLoaderWithoutAVersion(t *testing.T) {
+func TestBackupGameNamesTheLoaderWithoutAVersion(t *testing.T) {
 	b := saves.Backup{Reason: "sync", Worlds: 1, Minecraft: "26.2", Loader: "fabric"}
-	if got := backupAside(b); !strings.HasSuffix(got, ", Minecraft 26.2, fabric)") {
-		t.Fatalf("aside: %s", got)
+	if got := backupGame(b); got != "26.2 fabric" {
+		t.Fatalf("game: %s", got)
+	}
+	if got := backupReason(b); got != "before sync" {
+		t.Fatalf("reason: %s", got)
 	}
 }
 
