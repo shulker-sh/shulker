@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -118,8 +119,8 @@ func (a *app) help(cmd *cobra.Command) {
 		if i > 0 {
 			l.Blank()
 		}
-		for _, line := range wrapWords(docs.PlainLinks(paragraph), width) {
-			l.Text(line)
+		for line := range strings.SplitSeq(ansi.Wordwrap(t.Markup(docs.PlainLinks(paragraph)), width, ""), "\n") {
+			l.Plain(line)
 		}
 	}
 	l.Blank()
@@ -160,42 +161,6 @@ func (a *app) help(cmd *cobra.Command) {
 	}
 	l.Text(t.Grey("Docs") + " " + t.Link(t.Cyan(url), url))
 	l.Text(t.Grey("For agents") + " " + t.Link(t.Cyan(agentsURL), agentsURL))
-}
-
-// wrapWords breaks text into lines of at most width columns, not counting
-// backticks. A `code span` cut by a line break is closed and reopened, because
-// Markup pairs backticks line by line.
-func wrapWords(text string, width int) []string {
-	var lines []string
-	var line strings.Builder
-	lineWidth, open := 0, false
-	for _, word := range strings.Fields(text) {
-		w := out.Width(strings.ReplaceAll(word, "`", ""))
-		if lineWidth > 0 && lineWidth+1+w > width {
-			if open {
-				line.WriteString("`")
-			}
-			lines = append(lines, line.String())
-			line.Reset()
-			lineWidth = 0
-			if open {
-				line.WriteString("`")
-			}
-		}
-		if lineWidth > 0 {
-			line.WriteString(" ")
-			lineWidth++
-		}
-		line.WriteString(word)
-		lineWidth += w
-		if strings.Count(word, "`")%2 == 1 {
-			open = !open
-		}
-	}
-	if line.Len() > 0 {
-		lines = append(lines, line.String())
-	}
-	return lines
 }
 
 func helpRoot(l *out.Lines, root *cobra.Command) {

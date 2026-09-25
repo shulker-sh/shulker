@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 type stepState struct {
@@ -141,7 +143,7 @@ func (s *step) spin(t Theme, w *waits) {
 		}
 		room := terminalWidth(s.tty) - len(gutter) - 3
 		text := s.text + slowAside(time.Since(start), w.latest())
-		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+t.paint(spinner, sgrCyan, sgrBold)+" "+t.Grey(clip(text, room, t.Ellipsis())))
+		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+t.paint(spinner, sgrCyan, sgrBold)+" "+t.Grey(ansi.Truncate(text, room, t.Ellipsis())))
 		select {
 		case <-s.stop:
 			return

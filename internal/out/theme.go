@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/term"
 )
 
@@ -218,9 +219,5 @@ func hyperlink(text, target string) string {
 	return "\x1b]8;;" + target + "\x1b\\" + text + "\x1b]8;;\x1b\\"
 }
 
-var ansiSeq = regexp.MustCompile(`\x1b\[[0-9;]*m|\x1b\]8;;[^\x1b]*\x1b\\`)
-
 // Width counts the columns a rendered line occupies.
-func Width(s string) int {
-	return len([]rune(ansiSeq.ReplaceAllString(s, "")))
-}
+func Width(s string) int { return ansi.StringWidth(s) }

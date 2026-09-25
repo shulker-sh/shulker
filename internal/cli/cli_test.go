@@ -204,18 +204,6 @@ func TestUsageErrorsShowUsageAndFlags(t *testing.T) {
 	}
 }
 
-func TestWrapWordsKeepsCodeSpansPaired(t *testing.T) {
-	lines := wrapWords("run `shulker lock --force now` to fix it", 18)
-	for _, line := range lines {
-		if strings.Count(line, "`")%2 != 0 || out.Width(strings.ReplaceAll(line, "`", "")) > 18 {
-			t.Fatalf("lines %q", lines)
-		}
-	}
-	if strings.Join(lines, " ") != "run `shulker lock` `--force now` to fix it" {
-		t.Fatalf("lines %q", lines)
-	}
-}
-
 func TestEveryRunnableCommandDeclaresWhatItsRunsDo(t *testing.T) {
 	var walk func(c *cobra.Command)
 	walk = func(c *cobra.Command) {

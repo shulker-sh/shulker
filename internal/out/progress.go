@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
@@ -219,13 +221,13 @@ func (pr *Progress) render(width int) []string {
 	need := min(pr.longest, nameCap)
 	name := pr.current
 	if room >= need {
-		return []string{head + " " + t.Grey(clip(name, room, t.Ellipsis()))}
+		return []string{head + " " + t.Grey(ansi.Truncate(name, room, t.Ellipsis()))}
 	}
 	aside := ""
 	if size := pr.sizes[name]; size > 0 {
 		aside = t.Aside(humanBytes(size))
 	}
-	return []string{head, gutter + gutter + t.Grey(clip(name, width-len(gutter)*2-Width(aside), t.Ellipsis())) + aside}
+	return []string{head, gutter + gutter + t.Grey(ansi.Truncate(name, width-len(gutter)*2-Width(aside), t.Ellipsis())) + aside}
 }
 
 // head renders the spinner, verb, bar, and count. Level drops the byte aside
@@ -284,18 +286,6 @@ func (pr *Progress) bar() string {
 		filled += tip
 	}
 	return t.Cyan(filled) + t.Grey(strings.Repeat(empty, max(0, barWidth-n-1)))
-}
-
-func clip(s string, room int, ellipsis string) string {
-	r := []rune(s)
-	if room < 1 {
-		return ""
-	}
-	if len(r) <= room {
-		return s
-	}
-	keep := max(0, room-len([]rune(ellipsis)))
-	return string(r[:keep]) + ellipsis
 }
 
 // HumanBytes prints a size the way the progress lines do, with GB for the sizes
