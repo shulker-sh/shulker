@@ -146,3 +146,14 @@ func TestSelfUninstallWithNothingLinked(t *testing.T) {
 		t.Fatalf("a binary that can't be removed: exit %d %s", code, stdout)
 	}
 }
+
+func TestSelfUninstallPurgeLeavesShulkersOwnInstancesFindable(t *testing.T) {
+	h, _, _, _ := uninstallHarness(t)
+	shulkerInstances(t, h)
+	h.mustRun(t, "link", "shulker", "--as", "smp")
+
+	stdout := h.mustRun(t, "self", "uninstall", "--purge")
+	if !strings.Contains(stdout, "pack (Shulker)") || strings.Contains(stdout, "can't be found again") {
+		t.Fatalf("a shulker instance is unhooked with the rest and found again by a repair of the instances root: %s", stdout)
+	}
+}

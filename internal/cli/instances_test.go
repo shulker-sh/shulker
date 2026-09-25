@@ -824,3 +824,44 @@ func TestInstancesShowsALaunchThatNeverStarted(t *testing.T) {
 		t.Fatalf("a launch that started clears the line:\n%s", stdout)
 	}
 }
+
+func TestInstancesRepairKeepsTheIDALinkChose(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--as", "mine")
+
+	h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
+	if in := readInstances(t, h); len(in) != 1 || in[0].ID != "mine" {
+		t.Fatalf("a repair over a whole registry keeps the id: %+v", in)
+	}
+
+	if err := os.Remove(registryPath(h)); err != nil {
+		t.Fatal(err)
+	}
+	stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
+	if !strings.Contains(stdout, "registered mine") {
+		t.Fatalf("a repair from scratch reads the id back from the manifest, not the folder: %s", stdout)
+	}
+	if in := readInstances(t, h); len(in) != 1 || in[0].ID != "mine" || in[0].Launcher != "prism" {
+		t.Fatalf("rebuilt row: %+v", in)
+	}
+}
+
+func TestInstancesRepairWithoutARegistryFindsShulkersOwnInstances(t *testing.T) {
+	h := newHarness(t)
+	root := shulkerInstances(t, h)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "link", "shulker", "--as", "smp")
+	if err := os.Remove(registryPath(h)); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := h.mustRun(t, "instances", "repair")
+	if !strings.Contains(stdout, "registered smp") {
+		t.Fatalf("a bare repair scans the instances root with the launchers: %s", stdout)
+	}
+	if in := readInstances(t, h); len(in) != 1 || in[0].ID != "smp" || in[0].Launcher != "shulker" || in[0].Dir != filepath.Join(root, "smp") {
+		t.Fatalf("rebuilt row: %+v", in)
+	}
+}
