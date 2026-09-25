@@ -8,10 +8,12 @@ outline: [2, 3]
 | Command | Description |
 | --- | --- |
 | [`shulker init`](#shulker-init) | Create shulker.json and a lock in the current directory |
-| [`shulker add <mod>...`](#shulker-add) | Add mods to the manifest and lock |
+| [`shulker add <mod>...`](#shulker-add) | Add mods or modpacks to the manifest and lock |
 | [`shulker search [words...]`](#shulker-search) | Search the providers for projects to add |
-| [`shulker remove <mod>...`](#shulker-remove) | Remove mods from the manifest and lock |
+| [`shulker remove <mod>...`](#shulker-remove) | Remove mods or modpacks from the manifest and prune what only they provided |
 | [`shulker lock`](#shulker-lock) | Bring the lock in line with shulker.json without upgrading |
+| [`shulker check [lock\|files\|deps\|server]...`](#shulker-check) | Fail when the lock is stale, a locked file can't be fetched, or a mod's dependencies aren't met |
+| [`shulker match [file...]`](#shulker-match) | Lock override jars and packs that Modrinth or CurseForge host |
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
 | [`shulker outdated [mod...]`](#shulker-outdated) | Show mods with a newer compatible version |
 | [`shulker suggests`](#shulker-suggests) | List mods that locked mods recommend and that aren't installed |
@@ -22,6 +24,9 @@ outline: [2, 3]
 | [`shulker set <path> <value>`](#shulker-set) | Set a field in shulker.json |
 | [`shulker unset <path>`](#shulker-unset) | Remove a field from shulker.json |
 | [`shulker get [path]`](#shulker-get) | Print a field of shulker.json, or all of it |
+| [`shulker config get [key]`](#shulker-config-get) | Print a key of config.json, or all of it |
+| [`shulker config set <key> <value>`](#shulker-config-set) | Set a key in config.json |
+| [`shulker config unset <key>`](#shulker-config-unset) | Remove a key from config.json |
 | [`shulker feature on\|off <feature>`](#shulker-feature-on-off) | Turn a feature on or off on this machine |
 | [`shulker feature reset <feature>`](#shulker-feature-reset) | Go back to the declared default for a feature |
 | [`shulker feature list`](#shulker-feature-list) | List features and whether they're on |
@@ -35,6 +40,7 @@ outline: [2, 3]
 | [`shulker rollback [n]`](#shulker-rollback) | Restore a history entry and build it in place |
 | [`shulker play [nickname]`](#shulker-play) | Start a shulker instance |
 | [`shulker serve`](#shulker-serve) | Build the server side and run it in the foreground |
+| [`shulker link`](#shulker-link) | Ask which launcher to link, then link it |
 | [`shulker link shulker [source]`](#shulker-link-shulker) | Create an instance shulker owns and launches itself |
 | [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
 | [`shulker link gdlauncher [source]`](#shulker-link-gdlauncher) | Create a GDLauncher instance for the client build |
@@ -45,6 +51,16 @@ outline: [2, 3]
 | [`shulker instances`](#shulker-instances) | List the instances shulker keeps in sync |
 | [`shulker instances repair`](#shulker-instances-repair) | Register instances shulker has lost track of and write any missing instance files |
 | [`shulker unlink <name>`](#shulker-unlink) | Stop syncing a linked instance or synced directory, keeping its files |
+| [`shulker instance get [path]`](#shulker-instance-get) | Print a setting in effect and the default behind it, or every setting |
+| [`shulker instance set <path> <value>`](#shulker-instance-set) | Set a setting in this instance, over the default |
+| [`shulker instance unset <path>`](#shulker-instance-unset) | Remove a setting from this instance, back to the default |
+| [`shulker instance edit`](#shulker-instance-edit) | Open this instance's instance.json in your editor |
+| [`shulker instance dump`](#shulker-instance-dump) | Print where the running game's main and render threads are, from a thread dump |
+| [`shulker instance log`](#shulker-instance-log) | Print the game's output from the latest run |
+| [`shulker saves`](#shulker-saves) | Show save groups, or one group's or instance's worlds and backups |
+| [`shulker saves prune`](#shulker-saves-prune) | Delete all but the newest backups of a save group or instance |
+| [`shulker backup`](#shulker-backup) | Zip an instance's or save group's worlds into its backups |
+| [`shulker restore [n]`](#shulker-restore) | Put a backup's worlds back, taking a backup of the worlds there first |
 | [`shulker list`](#shulker-list) | List everything in `requires` with its locked version |
 | [`shulker mod add\|remove\|list`](#shulker-mod-add-remove-list) | The plain verbs with `--type mod` |
 | [`shulker modpack add\|remove\|list`](#shulker-modpack-add-remove-list) | Manage modpacks whose mods and overrides merge into this project |
@@ -71,6 +87,7 @@ outline: [2, 3]
 | [`shulker log`](#shulker-log) | Show what shulker did, from its log |
 | [`shulker version`](#shulker-version) | Print the shulker version |
 | [`shulker self update`](#shulker-self-update) | Update shulker to the latest release |
+| [`shulker self uninstall`](#shulker-self-uninstall) | Take shulker out of every launcher it hooked, then remove the binary |
 | [`shulker completion bash`](#shulker-completion-bash) | Print the bash completion script |
 | [`shulker completion zsh`](#shulker-completion-zsh) | Print the zsh completion script |
 | [`shulker completion fish`](#shulker-completion-fish) | Print the fish completion script |
@@ -492,7 +509,7 @@ shulker get --locked loader.type
 
 ## Configuration
 
-`config get`, `config set`, and `config unset` read and change shulker's own `config.json`, which applies to every project. It lives in your user config directory, or wherever `SHULKER_CONFIG` points. Three of its keys name a directory under shulker's data directory — `~/Library/Application Support/shulker` on macOS, `%AppData%\shulker` on Windows, `~/.local/share/shulker` on Linux, or wherever `SHULKER_DATA` points. Each of the four path keys takes an absolute path, or one relative to the directory holding `config.json`:
+`config get`, `config set`, and `config unset` read and change shulker's own `config.json`, which applies to every project. It lives in your user config directory, or wherever `SHULKER_CONFIG` points. `instances` and `saves` name directories under shulker's data directory — `~/Library/Application Support/shulker` on macOS, `%AppData%\shulker` on Windows, `~/.local/share/shulker` on Linux, or wherever `SHULKER_DATA` points — while `store` defaults into the cache and `registry` beside `config.json`. Each of the four path keys takes an absolute path, or one relative to the directory holding `config.json`:
 
 | Key | Description |
 | --- | --- |
@@ -582,7 +599,7 @@ shulker feature on shaders -i friends-smp
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | Change the choice for a directory you synced into, instead of this project |
-| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `shulker`, `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only match `-i` against `client` or `server` instances |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
@@ -598,7 +615,7 @@ shulker feature reset shaders --into ~/instances/my-pack
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | Forget the choice for a directory you synced into, instead of this project |
-| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `shulker`, `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only match `-i` against `client` or `server` instances |
 | `--sync` | Sync the directory from its source right away, instead of at the next sync |
 
@@ -614,7 +631,7 @@ shulker feature list --into ~/instances/my-pack
 | Flag | Description |
 | --- | --- |
 | `--into <path>` | List the choices that apply to a directory you synced into |
-| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--launcher <launcher>` | Only match `-i` against instances linked in this launcher: `shulker`, `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only match `-i` against `client` or `server` instances |
 
 ## Builds
@@ -1224,7 +1241,7 @@ A file changed both in the directory and in the source fails the sync with `buil
 | --- | --- |
 | `--into <path>` | Output directory (default: the side's build directory) |
 | `--all` | Sync every instance `-i` matches, or every instance when there's no `-i` |
-| `--launcher <launcher>` | Only instances linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--launcher <launcher>` | Only instances linked in this launcher: `shulker`, `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Side to build from a source (default: the only declared side); with `-i`, `--all`, or the picker, only `client` or `server` instances |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
 | `--force` | Overwrite files edited in the output directory |
@@ -1382,7 +1399,7 @@ With `--json`, the data is `{ "log", "lines" }`.
 
 Stop syncing a linked instance and remove it from the list. Its files, worlds, and feature choices stay. For a Prism Launcher or MultiMC instance, `unlink` removes the pre-launch sync but keeps the instance. It leaves a pre-launch command alone if you replaced shulker's with your own. For the official launcher, it removes the profile but keeps the instance directory and the installed loader. The directory's `.shulker/instance.json` is marked unlinked, so [`shulker instances repair`](#shulker-instances-repair) doesn't register it again; linking or syncing into it clears the mark. `unlink` also drops the directory from its source project's `shulker.local.json`, so a bare `shulker sync` there no longer builds it. A `sync --into` directory is a detached build with no row on the list: name it by its directory, from anywhere, and `unlink` marks it unlinked and drops it from its source project's `syncDirs`, keeping its files, so `shulker sync <source> --into <dir>` picks it up again.
 
-Name the instance by the id [`shulker instances`](#shulker-instances) shows, by the name its launcher shows, or by its directory. Inside a project, a launcher name (`mojang`, `prism`, `multimc`, `atlauncher`, `gdlauncher`) unlinks that project's instance in that launcher, the reverse of `shulker link <launcher>`; an instance actually called that name comes first. A name several instances share needs `--launcher`, `--side`, or `--all`, while an id always picks one. `unlink` prints the command that sets the instance up again.
+Name the instance by the id [`shulker instances`](#shulker-instances) shows, by the name its launcher shows, or by its directory. Inside a project, a launcher name (`shulker`, `mojang`, `prism`, `multimc`, `atlauncher`, `gdlauncher`) unlinks that project's instance in that launcher, the reverse of `shulker link <launcher>`; an instance actually called that name comes first. A name several instances share needs `--launcher`, `--side`, or `--all`, while an id always picks one. `unlink` prints the command that sets the instance up again.
 
 ```sh
 shulker unlink mojang
@@ -1395,7 +1412,7 @@ shulker unlink ~/servers/smp
 | Flag | Description |
 | --- | --- |
 | `--all` | Unlink every entry the name matches, or every entry when there's no name |
-| `--launcher <launcher>` | Only entries linked in this launcher: `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
+| `--launcher <launcher>` | Only entries linked in this launcher: `shulker`, `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Only `client` or `server` entries |
 
 ### `shulker saves`
@@ -1833,8 +1850,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `ambiguous-instance` | Several instances match the name given, or several shulker instances play the project `play` was run in. `candidates`: the matches, `pass`: their ids, which are unique |
 | `ambiguous-into` | The side has edits in several synced directories; pass `--into`. `candidates`: the directories |
 | `ambiguous-side` | The manifest declares both sides and the command works on one; `sync` and `pull` take `--side`, `diff --into` names it. `candidates`: the sides |
-| `archive-not-modpack` | The file given as a modpack isn't one: not a zip, or a zip without the index its format needs, like a CurseForge `manifest.json` of type `minecraftModpack`. A modpack's `file` that is neither a Modrinth nor a CurseForge modpack is refused the same way |
 | `appdata-unset` | `APPDATA` isn't set on Windows, so shulker can't find a launcher's default folder. `link` takes `--launcher-dir` instead |
+| `archive-not-modpack` | The file given as a modpack isn't one: not a zip, or a zip without the index its format needs, like a CurseForge `manifest.json` of type `minecraftModpack`. A modpack's `file` that is neither a Modrinth nor a CurseForge modpack is refused the same way |
 | `backup-failed` | `backup --all` failed for some targets; `data` has each target's result |
 | `backup-invalid` | `restore` was given a zip that won't open, or that holds anything other than world folders at its root |
 | `backup-missing` | `restore` found no backup with that number, or none by the name or at the path `--backup` gives |
@@ -1846,17 +1863,15 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes, and the file at `install` |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
 | `config-invalid` | shulker's `config.json` isn't valid JSON (the message names the line and column), or names a `$schema` this shulker doesn't know or names none. Only commands that need its registry location fail, as they do when it fails `schema-newer`; the rest warn and go on without it. `shulker config set` replaces it, keeping the old file as `config.json.replaced` |
+| `curseforge-cant-place` | `export curseforge` can't name these datapacks by file ID, since the CurseForge app installs datapacks in `datapacks/` and the build places them elsewhere: in a global datapack mod's folder, or a hybrid's copy in `resourcepacks/`; pass `--bundle`. `items`: each datapack and its folder |
 | `curseforge-invalid` | The CurseForge modpack is malformed: its `manifest.json` doesn't parse, names no Minecraft version, is a manifest version other than 1, or the zip holds an unsafe path |
 | `curseforge-key-rejected` | CurseForge rejected the API key: your own, or shulker's built-in one when shulker.sh has no working replacement |
-| `curseforge-cant-place` | `export curseforge` can't name these datapacks by file ID, since the CurseForge app installs datapacks in `datapacks/` and the build places them elsewhere: in a global datapack mod's folder, or a hybrid's copy in `resourcepacks/`; pass `--bundle`. `items`: each datapack and its folder |
 | `curseforge-not-found` | `export curseforge` found nothing on CurseForge for these mods, resource packs, shaders or datapacks; pass `--bundle`. `items`: what is missing |
 | `dependency-overrides-invalid` | Fabric Loader would refuse the `config/fabric_loader_dependencies.json` a side's build places, so the game wouldn't start: its first key isn't `"version": 1`, a key or dependency kind is unknown, or a range isn't a string or array of strings. The `cause` row says which |
 | `deps-held` | A mod being added needs another version of a dependency the lock holds; `--with-deps` moves them. `items`: each held version and what needs it |
 | `download-failed` | A locked file's provider failed to serve it at `install`, `sync`, `serve`, `export` or `check`: its CDN cut the file short, answered with an HTTP error, or the connection dropped. The message names the file and provider; rows show the URL and cause. Help says to try again later, or to run `shulker update` when the provider no longer has the file. Every file is tried before the run fails, unless `--fail-fast`: with several failures the message counts them, a row names each file with its URL and cause, and `items` holds each file's message. When files also need a manual download, `missing-files` is the run's error and this one is in `data.errors` |
 | `dump-failed` | On Windows, `jcmd` ran but took no thread dump of the game, so the pid is no JVM or one it may not attach to. The row holds what `jcmd` said |
 | `dump-timeout` | The game `instance dump` asked for a thread dump printed none within 10 seconds, which a JVM started with `-Xrs` never does |
-| `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
-| `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` rebuilds it, keeping the old file as `registry.json.replaced` |
 | `editor-failed` | The editor `instance edit` ran couldn't be started or exited with an error; set `$EDITOR` to the one you use |
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
@@ -1873,12 +1888,11 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `history-missing` | There is no history entry with that number; `shulker history` lists the ones kept |
 | `import-mismatch` | `import` into a project whose Minecraft version, loader or loader version, set or inherited, differs from the pack's; import it into a new folder with `-C` |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
-| `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` for a second one, or `--force` |
-| `instance-missing` | A linked instance's directory is gone |
-| `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
-| `instance-not-found` | No instance matches, or the directory `shulker instance` acts on holds no `.shulker/instance.json`. `candidates`: the instances shulker knows, `pass`: their ids |
+| `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` (`--as` for `link shulker`) for a second one, or `--force` |
 | `instance-id-taken` | Another instance already has the `--as` id; the message names its directory |
 | `instance-invalid` | An instance's `.shulker/instance.json` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` writes it again, keeping the old file as `.shulker/instance.json.replaced` |
+| `instance-missing` | A linked instance's directory is gone |
+| `instance-not-found` | No instance matches, or the directory `shulker instance` acts on holds no `.shulker/instance.json`. `candidates`: the instances shulker knows, `pass`: their ids |
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |
@@ -1894,13 +1908,13 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-file-invalid` | A launcher file shulker reads or rewrites (an instance's JSON, `launcher_profiles.json`, `mmc-pack.json`) isn't valid JSON, or not the shape shulker expects. A row carries the parser's own error |
 | `launcher-not-found` | No launcher directory where shulker looked |
-| `loader-profile-invalid` | The loader profile shulker fetched isn't a version JSON with an id, so it can't be installed into the launcher. A row says what was wrong with it |
-| `loader-version-unsupported` | The locked Forge version ships the legacy installer, which shulker can't run: every Forge before Minecraft 1.12.2, and 1.12.2 builds before 14.23.5.2851 |
-| `loader-required` | `add` of a mod in a project without a loader, or `import` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
 | `loader-install-incomplete` | The loader's installer left no launcher profile to read the installed version from |
+| `loader-profile-invalid` | The loader profile shulker fetched isn't a version JSON with an id, so it can't be installed into the launcher. A row says what was wrong with it |
+| `loader-required` | `add` of a mod in a project without a loader, or `import` of a pack that names mods but no loader; set one with `shulker set loader.type <loader>`. On a terminal `add` asks `Which mod loader?` instead, sets `loader.type` to the answer and carries on |
+| `loader-version-unsupported` | The locked Forge version ships the legacy installer, which shulker can't run: every Forge before Minecraft 1.12.2, and 1.12.2 builds before 14.23.5.2851 |
 | `local-file` | `pin` or `unpin` named a local `file` entry, which has no provider version to pin |
-| `local-invalid` | `shulker.local.json` isn't valid JSON, or names a `$schema` this shulker doesn't know or names none. It never fails a command: the file is moved aside to `shulker.local.json.replaced` with a warning, and the manifest's feature defaults apply |
 | `local-file-missing` | A local `file` entry's file is gone and the cache has no copy of the bytes it was locked at, at `lock`, `sync` or any command that relocks; put the file back or remove the entry. A modpack's `file` entry resolves in the modpack's own directory, so one its author never committed fails the same way, and a modpack archive that is gone fails the same way too. While the cache still has them, a gone file only warns and builds from the cache |
+| `local-invalid` | `shulker.local.json` isn't valid JSON, or names a `$schema` this shulker doesn't know or names none. It never fails a command: the file is moved aside to `shulker.local.json.replaced` with a warning, and the manifest's feature defaults apply |
 | `lock-invalid` | `shulker.lock` isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema (one line per failing field, by dotted path), or a change would make it invalid. `shulker lock` replaces it, keeping the old file as `shulker.lock.replaced`. `items`: the failing fields when there are several |
 | `lock-not-found` | No `shulker.lock`; run `shulker lock`. Also a lock file named with `--lock` to `cache info` or `cache prune` that isn't there |
 | `lock-stale` | `export` and `check` need a lock that matches `shulker.json`; run `shulker lock`. Other commands only warn. `items`: each difference |
@@ -1914,10 +1928,25 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `minecraft-required` | `shulker.json` sets no `minecraft` and no locked modpack supplies one; set it with `shulker set minecraft <version>` |
 | `missing-files` | Files that need a manual download are missing, at `install`, or files a CurseForge modpack names at `import` (both wait for them at a terminal instead) or when a modpack's CurseForge zip is read, or a hosted modpack's archive when its author turned off third-party downloads; also a local `file` entry whose file is gone or changed when the cache has no copy either. `items`: what to download or restore |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
+| `modpack-changed` | A modpack no longer matches the lock; run `shulker update`. Also a locked modpack whose local `file` has changed since the modpack was locked, when the cache has no copy of the locked bytes; run `shulker lock` in the modpack |
+| `modpack-conflict` | Two modpacks list the same mod with different settings |
 | `modpack-download` | A file a modpack archive lists couldn't be downloaded |
+| `modpack-exists` | The modpack is already in `shulker.json` |
+| `modpack-fetch` | A modpack couldn't be fetched |
+| `modpack-lock-missing` | A modpack is set `locked: true` but its source has no `shulker.lock`; run `shulker lock` there, or set locked false |
+| `modpack-lookup` | A file a modpack archive lists, or one in its override folders, couldn't be looked up on Modrinth or CurseForge, by `import`, `match`, or when a modpack archive is read. The `modrinth` or `curseforge` row says why; offline, it is the network the lookup needs |
+| `modpack-manifest` | A modpack source has no `shulker.json` |
+| `modpack-mismatch` | A modpack wants a different Minecraft version or loader |
+| `modpack-not-found` | The modpack isn't in `shulker.json`. `candidates`: the modpacks |
+| `modpack-offline` | A modpack archive that lists its files by provider ID, like a CurseForge zip, was read without the network. An ID carries no hash, so no cached copy can stand in; the provider's row, when there is one, is the network error |
+| `modpack-path` | A modpack's `path` is set on a source that isn't git |
+| `modpack-platform` | Locked modpacks disagree about Minecraft or the loader, and `shulker.json` sets neither; set `minecraft`/`loader`, or unlock one |
+| `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
+| `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
+| `modpack-unlocked` | A modpack has no commit, archive hash or version in the lock; run `shulker update`, or `shulker lock` before pinning a hosted one |
+| `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
 | `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files, and a local `file` entry has no download at all; pass `--bundle`. `items`: the files |
 | `mrpack-invalid` | The modpack is malformed |
-| `modpack-lookup` | A file a modpack archive lists, or one in its override folders, couldn't be looked up on Modrinth or CurseForge, by `import`, `match`, or when a modpack archive is read. The `modrinth` or `curseforge` row says why; offline, it is the network the lookup needs |
 | `mrpack-marker` | The modpack's own `shulker.json` or `shulker.lock` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-accounts` | shulker can see no account at all, so there is nothing to play with |
@@ -1935,21 +1964,6 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `not-pinned` | The mod has no pin |
 | `not-shulker` | The instance belongs to another launcher, which starts it itself |
 | `not-synced` | The directory has no record of the source it was synced from |
-| `modpack-changed` | A modpack no longer matches the lock; run `shulker update`. Also a locked modpack whose local `file` has changed since the modpack was locked, when the cache has no copy of the locked bytes; run `shulker lock` in the modpack |
-| `modpack-conflict` | Two modpacks list the same mod with different settings |
-| `modpack-exists` | The modpack is already in `shulker.json` |
-| `modpack-fetch` | A modpack couldn't be fetched |
-| `modpack-lock-missing` | A modpack is set `locked: true` but its source has no `shulker.lock`; run `shulker lock` there, or set locked false |
-| `modpack-manifest` | A modpack source has no `shulker.json` |
-| `modpack-mismatch` | A modpack wants a different Minecraft version or loader |
-| `modpack-not-found` | The modpack isn't in `shulker.json`. `candidates`: the modpacks |
-| `modpack-offline` | A modpack archive that lists its files by provider ID, like a CurseForge zip, was read without the network. An ID carries no hash, so no cached copy can stand in; the provider's row, when there is one, is the network error |
-| `modpack-platform` | Locked modpacks disagree about Minecraft or the loader, and `shulker.json` sets neither; set `minecraft`/`loader`, or unlock one |
-| `modpack-provided` | The mod comes from a modpack, so it can't be removed on its own |
-| `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
-| `modpack-path` | A modpack's `path` is set on a source that isn't git |
-| `modpack-unlocked` | A modpack has no commit, archive hash or version in the lock; run `shulker update`, or `shulker lock` before pinning a hosted one |
-| `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
 | `override-path` | A path named to `match` isn't a jar in `mods/` or a zip in `resourcepacks/`, `shaderpacks/` or a datapack folder of `overrides/`, `client-overrides/` or `server-overrides/` |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
 | `pack-filename-taken` | Two resource packs or shaders would be placed under one file name in the same folder, compared without case. Give one a different `filename` |
@@ -1965,6 +1979,8 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `properties-invalid` | `server.properties` keys removed in this Minecraft version, or values that aren't valid, including a `shulker.json` value that can't be written as a property. Unknown keys only warn, with a did-you-mean. `items`: the problems |
 | `provider-unavailable` | The provider isn't set up, like CurseForge without an API key |
 | `rate-limited` | Modrinth or CurseForge is refusing shulker's requests for making too many; CurseForge refusing a key it has already accepted in the same run counts too. A Modrinth limit that resets within a minute is waited out once first; the help says when to run the command again |
+| `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
+| `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` rebuilds it, keeping the old file as `registry.json.replaced` |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry or a project being added is a kind shulker can't resolve |
 | `resourcepack-conflict` | `server.resourcePack` pushes a pack while `resource-pack` or `resource-pack-sha1` is also set in `server.properties` |
@@ -1983,15 +1999,16 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `self-update-download` | The download failed |
 | `self-update-install` | The running binary couldn't be replaced |
 | `self-update-provenance` | `--require-attestation` is set and the build provenance couldn't be verified |
+| `server-exit` | The server exited with an error. `items`: its `logs/latest.log` and, when the server wrote one during the run, its crash report; `data` carries them as `log` and `crashReport` |
 | `shim-build-failed` | On Windows, shulker couldn't make an instance's `javaw.exe` shim from its own binary, because that binary isn't a Windows executable it can patch |
 | `sign-in-failed` | The Microsoft sign-in didn't finish: it was declined, the code ran out before it was used, or Microsoft or Xbox Live refused it — including an account with no Xbox profile, which can't reach Minecraft at all |
-| `server-exit` | The server exited with an error. `items`: its `logs/latest.log` and, when the server wrote one during the run, its crash report; `data` carries them as `log` and `crashReport` |
 | `source-fetch` | The sync source couldn't be fetched |
 | `source-incomplete` | The sync source is a raw manifest URL whose manifest has a local `file` entry, which can't come with it; use the repository's git URL |
 | `source-lock` | The sync source has no `shulker.lock` |
 | `source-offline` | Offline, and the source has never synced here, so there's no copy to use |
-| `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
 | `source-path` | `--path` doesn't apply to the source, isn't a folder inside the repository, or holds no shulker.json at the commit |
+| `source-ref` | `--ref` doesn't apply to the source, or wasn't found |
+| `source-unknown` | `sync --into` found no record in the directory of what it was synced from; name the source |
 | `state-invalid` | An instance's `.shulker/state.json` isn't valid JSON, or names a `$schema` this shulker doesn't know or names none. It never fails a command: the build warns and treats every file in the directory as not written by shulker |
 | `store-incomplete` | The game store can't supply what a launch needs: a file with no source that isn't on disk, a native jar that won't unpack, or a version JSON that doesn't hold together |
 | `strict-warnings` | `check --strict` saw warnings. `items`: the warnings |
