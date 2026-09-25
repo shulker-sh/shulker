@@ -48,10 +48,10 @@ Only [Go](https://github.com/golang/go) is required. A source build carries no C
 
 ## Examples
 
-These commands create a new Shulker manifest in the current directory, using Minecraft 26.3 with the latest version of the Fabric mod loader, add both the [Sodium](https://modrinth.com/mod/sodium) and [Lithium](https://modrinth.com/mod/lithium) mods, and launch the game.
+These commands create a new Shulker manifest in the current directory, using Minecraft 26.2 with the latest version of the Fabric mod loader, add both the [Sodium](https://modrinth.com/mod/sodium) and [Lithium](https://modrinth.com/mod/lithium) mods, and launch the game.
 
 ```sh
-shulker create --fabric --minecraft 26.3
+shulker create --fabric --minecraft 26.2
 shulker add sodium lithium
 shulker link shulker
 shulker play
@@ -64,7 +64,7 @@ The `create` command will use the manifest defaults unless overridden. If you wa
 To create a server manifest instead, run these commands.
 
 ```sh
-shulker create --server --fabric --minecraft 26.3
+shulker create --server --fabric --minecraft 26.2
 shulker add lithium
 shulker serve
 ```

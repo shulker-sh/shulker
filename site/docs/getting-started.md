@@ -24,10 +24,10 @@ The installer downloads the latest release and verifies its checksum, and when t
 
 ## Create a Project
 
-In an empty directory, create a manifest for Minecraft 26.3 with the latest version of the Fabric mod loader.
+In an empty directory, create a manifest for Minecraft 26.2 with the latest version of the Fabric mod loader.
 
 ```sh
-shulker create --fabric --minecraft 26.3
+shulker create --fabric --minecraft 26.2
 ```
 
 This writes `shulker.json`, which you edit and commit, and `shulker.lock`, which Shulker keeps up to date. The `create` command takes the manifest defaults for anything not given, so with no flags at all it makes a vanilla Minecraft client on the latest release, which takes no mods. Pass another loader such as `--neoforge` to start from something else. To walk through each choice interactively instead, run `shulker init`. Every default is listed under [`shulker create`](/docs/cli#shulker-create) in the CLI Reference, with [`shulker init`](/docs/cli#shulker-init) beside it.
@@ -138,7 +138,7 @@ Turn the hooks off with `--no-hooks`, or one of them with `--no-pre-launch` or `
 A server project is created the same way, with `--server`. `serve` builds it and starts it in the foreground, downloading what the lock needs first.
 
 ```sh
-shulker create --server --fabric --minecraft 26.3
+shulker create --server --fabric --minecraft 26.2
 shulker add lithium
 shulker serve
 ```
