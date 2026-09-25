@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
@@ -301,10 +302,8 @@ func (a *app) pinnedAccount(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	for _, r := range accounts {
-		if r.ID == id {
-			return id, nil
-		}
+	if _, ok := account.ByID(accounts, id); ok {
+		return id, nil
 	}
 	e := out.Errorf("account-not-found", "this instance is pinned to account %s, which shulker can no longer see", id)
 	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)

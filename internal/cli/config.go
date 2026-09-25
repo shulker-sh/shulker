@@ -291,7 +291,7 @@ func (a *app) checkAccountID(id string) error {
 	if err != nil {
 		return err
 	}
-	if slices.ContainsFunc(accounts, func(r account.Resolved) bool { return r.ID == id }) {
+	if _, ok := account.ByID(accounts, id); ok {
 		return nil
 	}
 	e := out.Errorf("account-not-found", "no account has the id %s", id)

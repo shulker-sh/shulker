@@ -56,7 +56,7 @@ func (a *app) accountsAddCmd() *cobra.Command {
 			if err := account.Save(path, store); err != nil {
 				return err
 			}
-			r := offlineAccountOf(created)
+			r := created.Resolved()
 			if use {
 				if _, err := a.changeDefault(r.ID); err != nil {
 					return err
@@ -159,9 +159,4 @@ func notOfflineAccount(r account.Resolved) error {
 		return e
 	}
 	return notOwnAccount(r, "remove")
-}
-
-// offlineAccountOf is an account shulker created as every command that names one sees it.
-func offlineAccountOf(a account.Account) account.Resolved {
-	return account.Resolved{ID: a.ID(), Name: a.Name(), Source: account.SourceOffline, Group: account.GroupOffline, State: a.State(), Account: a}
 }

@@ -276,3 +276,53 @@ func TestLoadRejectsAnAccountItCouldNotName(t *testing.T) {
 		})
 	}
 }
+
+func TestResolvedOfAnAccountIsOwnOrOfflineByItsType(t *testing.T) {
+	own := Account{Type: Microsoft, Profile: &Profile{ID: "1111", Name: "Steve"}, RefreshToken: "r"}
+	r := own.Resolved()
+	if r.ID != "1111" || r.Name != "Steve" || r.Source != SourceShulker || r.Group != GroupOwn || r.State != Playable || !r.IsOwn() {
+		t.Fatalf("own = %+v", r)
+	}
+	o := NewOffline("Alex", "2222").Resolved()
+	if o.Source != SourceOffline || o.Group != GroupOffline || o.State != OfflineOnly || o.IsOwn() {
+		t.Fatalf("offline = %+v", o)
+	}
+}
+
+func TestOwnAndWithoutProfileFilterTheList(t *testing.T) {
+	accounts := []Resolved{
+		{ID: "1", Source: SourceShulker, State: Playable},
+		{ID: "2", Source: SourceShulker, State: NoProfile},
+		{ID: "3", Source: "prism", State: Playable},
+		{ID: "4", Source: SourceOffline, State: OfflineOnly},
+	}
+	ids := func(rs []Resolved) []string {
+		var got []string
+		for _, r := range rs {
+			got = append(got, r.ID)
+		}
+		return got
+	}
+	if got := ids(Own(accounts)); !slices.Equal(got, []string{"1", "2"}) {
+		t.Fatalf("own = %v", got)
+	}
+	if got := ids(WithoutProfile(accounts)); !slices.Equal(got, []string{"2"}) {
+		t.Fatalf("without profile = %v", got)
+	}
+	if got, ok := ByID(accounts, "3"); !ok || got.Source != "prism" {
+		t.Fatalf("by id = %+v, %v", got, ok)
+	}
+	if _, ok := ByID(accounts, "9"); ok {
+		t.Fatal("an unknown id is not found")
+	}
+}
+
+func TestIsDefaultMatchesTheConfiguredIDInEitherForm(t *testing.T) {
+	r := Resolved{ID: "069a79f4-44e9-4726-a5be-fca90e38aaf5"}
+	if !r.IsDefault("069a79f444e94726a5befca90e38aaf5") {
+		t.Fatal("dashes don't matter")
+	}
+	if r.IsDefault("") || r.IsDefault("other") {
+		t.Fatal("no default, or another id, is not this account")
+	}
+}

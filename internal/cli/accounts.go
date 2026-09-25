@@ -85,7 +85,7 @@ func writeAccounts(l *out.Lines, groups []accountGroup, cfg config.Config) {
 	for _, g := range groups {
 		for _, r := range g.accounts {
 			mark := ""
-			if isDefault(r, cfg) {
+			if r.IsDefault(cfg.Accounts.Default) {
 				mark = t.GlyphOK()
 			}
 			rows = append(rows, []string{mark, r.Name, r.ID, string(r.Group), r.State.Text(r.Expired, now)})
@@ -96,11 +96,7 @@ func writeAccounts(l *out.Lines, groups []accountGroup, cfg config.Config) {
 
 // rowFor is one account as a command prints it, and as --json carries it.
 func rowFor(r account.Resolved, cfg config.Config) accountRow {
-	return accountRow{ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State, Default: isDefault(r, cfg)}
-}
-
-func isDefault(r account.Resolved, cfg config.Config) bool {
-	return cfg.Accounts.Default != "" && account.SameID(r.ID, cfg.Accounts.Default)
+	return accountRow{ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State, Default: r.IsDefault(cfg.Accounts.Default)}
 }
 
 func (a *app) accountsUseCmd() *cobra.Command {

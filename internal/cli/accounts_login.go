@@ -46,12 +46,12 @@ func (a *app) accountsLoginCmd() *cobra.Command {
 			if err := account.Save(path, store); err != nil {
 				return err
 			}
-			r := ownAccountOf(signed)
+			r := signed.Resolved()
 			_, cfg, err := a.accounts()
 			if err != nil {
 				return err
 			}
-			used := isDefault(r, cfg)
+			used := r.IsDefault(cfg.Accounts.Default)
 			switch {
 			case r.State == account.NoProfile:
 				a.printer.Warn("%s owns no Java profile, so it can't launch or be the default account; Minecraft: Java Edition is at minecraft.net", r.Name)
@@ -166,7 +166,7 @@ func (a *app) accountsRefreshCmd() *cobra.Command {
 					continue
 				}
 				store.Put(renewed)
-				got := ownAccountOf(renewed)
+				got := renewed.Resolved()
 				rows = append(rows, accountRow{ID: got.ID, Name: got.Name, Source: got.Source, Group: got.Group, State: got.State})
 			}
 			// A run that renewed nothing fails with the first reason, rather than warning about
@@ -206,30 +206,20 @@ func (a *app) accountsToRenew(names []string, missingProfile bool) ([]account.Re
 		if err != nil {
 			return nil, err
 		}
-		for _, r := range accounts {
-			if r.Source == account.SourceShulker {
-				chosen = append(chosen, r)
-			}
-		}
+		chosen = account.Own(accounts)
 	}
 	for _, name := range names {
 		r, err := a.selectAccount(name)
 		if err != nil {
 			return nil, err
 		}
-		if r.Source != account.SourceShulker {
+		if !r.IsOwn() {
 			return nil, notOwnAccount(r, "renew")
 		}
 		chosen = append(chosen, r)
 	}
 	if missingProfile {
-		kept := chosen[:0]
-		for _, r := range chosen {
-			if r.State == account.NoProfile {
-				kept = append(kept, r)
-			}
-		}
-		chosen = kept
+		chosen = account.WithoutProfile(chosen)
 	}
 	return chosen, nil
 }
@@ -253,7 +243,7 @@ func (a *app) selectOwnAccount(args []string, verb string) (accountRow, error) {
 		return accountRow{}, err
 	}
 	for _, r := range accounts {
-		if isDefault(r, cfg) {
+		if r.IsDefault(cfg.Accounts.Default) {
 			return rowFor(r, cfg), checkOwn(r, verb)
 		}
 	}
@@ -268,7 +258,7 @@ func (a *app) selectOwnAccount(args []string, verb string) (accountRow, error) {
 }
 
 func checkOwn(r account.Resolved, verb string) error {
-	if r.Source == account.SourceShulker {
+	if r.IsOwn() {
 		return nil
 	}
 	return notOwnAccount(r, verb)
@@ -335,11 +325,6 @@ func (a *app) sessionFor(ctx context.Context, r account.Resolved) (account.Accou
 		return account.Account{}, err
 	}
 	return signed, nil
-}
-
-// ownAccountOf is one of shulker's own accounts as every command that names one sees it.
-func ownAccountOf(a account.Account) account.Resolved {
-	return account.Resolved{ID: a.ID(), Name: a.Name(), Source: account.SourceShulker, Group: account.GroupOwn, State: a.State(), Account: a}
 }
 
 // accountSelector names an account the way it has to be typed back.

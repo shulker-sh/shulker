@@ -79,13 +79,56 @@ func fromStore(store string, own Store, borrowed map[string][]Resolved) []Resolv
 	}
 	out := make([]Resolved, 0, len(own.Accounts))
 	for _, a := range own.Accounts {
-		r := Resolved{ID: a.ID(), Name: a.Name(), Source: SourceShulker, Group: GroupOwn, State: a.State(), Account: a}
-		if a.Type == Offline {
-			r.Source, r.Group = SourceOffline, GroupOffline
-		}
-		out = append(out, r)
+		out = append(out, a.Resolved())
 	}
 	return out
+}
+
+// Resolved is the account as a command sees it: one of shulker's own, or an offline one by its type.
+func (a Account) Resolved() Resolved {
+	r := Resolved{ID: a.ID(), Name: a.Name(), Source: SourceShulker, Group: GroupOwn, State: a.State(), Account: a}
+	if a.Type == Offline {
+		r.Source, r.Group = SourceOffline, GroupOffline
+	}
+	return r
+}
+
+// IsOwn reports an account shulker signed in itself, which is the only kind it can renew or log out.
+func (r Resolved) IsOwn() bool { return r.Source == SourceShulker }
+
+// IsDefault reports whether this account is the one accounts.default names.
+func (r Resolved) IsDefault(id string) bool { return id != "" && SameID(r.ID, id) }
+
+// Own keeps the accounts shulker signed in itself.
+func Own(accounts []Resolved) []Resolved {
+	var own []Resolved
+	for _, r := range accounts {
+		if r.IsOwn() {
+			own = append(own, r)
+		}
+	}
+	return own
+}
+
+// WithoutProfile keeps the accounts that own no Java profile.
+func WithoutProfile(accounts []Resolved) []Resolved {
+	var kept []Resolved
+	for _, r := range accounts {
+		if r.State == NoProfile {
+			kept = append(kept, r)
+		}
+	}
+	return kept
+}
+
+// ByID is the account with exactly this id, as the registry or an instance file records it.
+func ByID(accounts []Resolved, id string) (Resolved, bool) {
+	for _, r := range accounts {
+		if r.ID == id {
+			return r, true
+		}
+	}
+	return Resolved{}, false
 }
 
 // Sort orders a group's rows the way the list prints them: by name, and by id where two accounts

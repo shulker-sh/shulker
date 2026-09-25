@@ -25,7 +25,7 @@ func (a *app) launchAccount(selector string) (account.Resolved, bool, error) {
 		return account.Resolved{}, false, e
 	}
 	for _, r := range accounts {
-		if isDefault(r, cfg) {
+		if r.IsDefault(cfg.Accounts.Default) {
 			return r, false, nil
 		}
 	}
