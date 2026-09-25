@@ -318,7 +318,6 @@ Keys written into server.properties. Values may reference ${variables}. Known ke
 | `name` | `string` | Display name launchers show for this side (Prism instance name, official launcher profile name). Defaults to the manifest name.<br>min length 1 |
 | `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;side&gt;; "." builds into the project directory itself, which is what makes the project an instance. |
 | `variables` | [`variables`](#variables) |  |
-| `eula` | `boolean` | eula.txt is written only when true. serve refuses to start otherwise.<br>default `false` |
 | `memory` | `string` | Heap size passed as -Xms/-Xmx, e.g. "6G".<br>pattern `^[1-9][0-9]*[MmGg]$` |
 | `jvmFlags` | `"aikars"` \| `"none"` | JVM flags preset used by serve. aikars applies Aikar's G1 flags (12 GB+ variant chosen from memory, -Xms set equal to -Xmx); none passes only the memory flags.<br>default `"aikars"` |
 | `jvmArgs` | `string`[] | Extra JVM arguments appended after the preset, e.g. ZGC flags. |

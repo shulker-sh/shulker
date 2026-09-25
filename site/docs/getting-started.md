@@ -76,7 +76,7 @@ Declare a server side by adding `"server": {}` to `shulker.json`, then build and
 shulker serve
 ```
 
-The first run asks you to accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) and records your answer in `shulker.json`. Client-only mods are left out of the server build automatically.
+The first run asks you to accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) and records your answer in your shulker config, so no project asks again. Client-only mods are left out of the server build automatically.
 
 ## Next steps
 

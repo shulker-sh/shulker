@@ -481,7 +481,7 @@ With `--json`, `data` is the entry removed.
 
 ## Settings
 
-`set`, `unset`, and `get` edit and read any field of `shulker.json` by its dotted path, like `server.eula` or `requires.sodium.channel`. They never change `shulker.lock`. When an edit leaves the lock out of date, they warn and name each difference; `shulker lock` brings it back in line.
+`set`, `unset`, and `get` edit and read any field of `shulker.json` by its dotted path, like `server.memory` or `requires.sodium.channel`. They never change `shulker.lock`. When an edit leaves the lock out of date, they warn and name each difference; `shulker lock` brings it back in line.
 
 Inside a map of plain values (`server.properties`, `variables`, `client.options`, `links`), everything after the map's name is the key, so `server.properties.rcon.port` needs no escaping.
 
@@ -494,7 +494,7 @@ Set a field. A plain value becomes the most specific type the field allows: `tru
 The edited `shulker.json` is checked against the schema before anything is written, and the error names the field.
 
 ```sh
-shulker set server.eula true
+shulker set server.memory 6G
 shulker set server.properties.max-players 20
 shulker set variables.zip --literal '"02134"'
 shulker set server.jvmArgs --literal '["-XX:+UseZGC"]'
@@ -546,6 +546,7 @@ shulker get --locked loader.type
 | `play.saveBackups` | How many automatic backups of a save group or instance's worlds to keep, taken before `update` or `sync` changes the mods. After each one, the oldest `before update` and `before sync` backups past this number are deleted; one taken by `shulker backup` or before a restore never counts and is never deleted. An instance with no worlds backs up as nothing. A backup that can't be written stops the `update` or `sync` before any mod changes; one whose worlds can't be found, because a file it reads is unreadable, is a warning, and the change goes ahead. Without it, 5; `0` takes none. No instance setting overrides it |
 | `log.keepDays` | How many days of runs `log.jsonl`, beside `config.json`, keeps. Each run that writes to it drops the entries older than this, and so does `shulker log` before it reads. Without it, 30; the least is 1. Past 4 MiB the oldest entries go whatever their age, down to 3 MiB |
 | `curseforge.key` | Your CurseForge API key. `SHULKER_CURSEFORGE_KEY` takes priority when it is set |
+| `eula` | `true` accepts the [Minecraft EULA](https://aka.ms/MinecraftEULA) for every project, so server builds write `eula.txt` and `serve` doesn't ask. A build never writes over an `eula.txt` shulker didn't write. A manifest can't accept it for you |
 | `registry` | The file listing linked instances and synced directories: absolute, or relative to the directory holding `config.json`. Without it, `registry.json` beside `config.json` |
 | `instances` | Where [`shulker link shulker`](#shulker-link-shulker) puts the instances shulker owns. Without it, `instances` in shulker's data directory |
 | `saves` | Where the save groups those instances share live. Without it, `saves` in the same data directory |
@@ -995,7 +996,7 @@ With `--json`, the data is `{ "instance", "version", "account", "pid", "gameDir"
 
 Build the server side and run it in the foreground. It downloads whatever the lock needs first, the way `install` does, so a fresh clone reaches a running server in one command.
 
-A server whose EULA isn't accepted yet asks `Accept and record "eula": true in shulker.json?` on a terminal, with no preselected, and yes records it before the server starts. Off a terminal, or with `--no-input` or `--json`, nothing is asked and it fails with `eula-required` unless `--accept-eula` is passed.
+A server build that already holds an `eula.txt`, written by hand or copied from an override folder, runs as it is: nothing is asked or recorded, and no build writes over it. Otherwise, until you accept the Minecraft EULA, `serve` asks `Accept and record "eula": true in your shulker config?` on a terminal, with no preselected, and yes records it in `config.json` before the server starts, so no project asks again. Off a terminal, or with `--no-input` or `--json`, nothing is asked and it fails with `eula-required` unless `--accept-eula` is passed. `shulker config set eula true` accepts it ahead of time.
 
 ```sh
 shulker serve
@@ -1005,7 +1006,7 @@ shulker serve server --accept-eula
 | Flag | Description |
 | --- | --- |
 | `--force` | Overwrite files edited in the build directory |
-| `--accept-eula` | Record acceptance of the Minecraft EULA in shulker.json without prompting |
+| `--accept-eula` | Accept the Minecraft EULA and record it in config.json without prompting |
 | `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 
 ### `shulker link`
