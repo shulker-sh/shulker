@@ -14,7 +14,7 @@ import { VPButton } from 'vitepress/theme'
         <slot />
       </div>
       <div class="actions">
-        <VPButton text="Get started" href="/docs/getting-started" />
+        <VPButton text="Get Started" href="/docs/getting-started" />
         <VPButton text="GitHub" href="https://github.com/shulker-sh/shulker" theme="alt" />
       </div>
     </section>
