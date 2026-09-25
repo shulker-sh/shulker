@@ -83,6 +83,7 @@ export default defineConfig({
       { text: 'CLI', link: '/docs/cli' },
       { text: 'Schema', link: '/docs/manifest' },
       { text: 'Changelog', link: '/docs/changelog' },
+      { text: 'About', link: '/docs/about' },
     ],
     sidebar: {
       '/docs/': [
@@ -92,6 +93,7 @@ export default defineConfig({
             { text: 'Getting started', link: '/docs/getting-started' },
             { text: 'Concepts', link: '/docs/concepts' },
             { text: 'GitHub Actions', link: '/docs/github-actions' },
+            { text: 'About', link: '/docs/about' },
           ],
         },
         {
