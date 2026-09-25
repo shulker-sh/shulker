@@ -2,7 +2,7 @@
   "$id": "https://shulker.sh/schema/v1/accounts.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Shulker accounts",
-  "description": "The accounts shulker signed in or created itself, and their tokens. Borrowed accounts are read from another launcher's own file and never written here.",
+  "description": "The accounts shulker signed in or created itself, and their tokens. Launcher accounts are read from another launcher's own file and never written here.",
   "type": "object",
   "additionalProperties": false,
   "required": ["$schema"],

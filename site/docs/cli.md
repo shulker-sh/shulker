@@ -781,7 +781,7 @@ shulker rollback --prune
 
 ### `shulker accounts`
 
-List every account shulker can see, grouped by where it came from: **Own** for the ones signed in through Microsoft, **Offline** for the ones `accounts add` created, and **Borrowed** for the ones read from another launcher. Each row carries the account's id and its state, and the default account's row is marked `✔` instead of `•`.
+List every account shulker can see, grouped by where it came from: **Own** for the ones signed in through Microsoft, **Offline** for the ones `accounts add` created, and **Launcher** for the ones read from another launcher. Each row carries the account's id and its state, and the default account's row is marked `✔` instead of `•`.
 
 The id is a player UUID, or an Xbox user id for an account that owns no Java profile and so has no UUID. It is on every row because it is what tells two accounts with the same name apart, and what you type to pick one.
 
@@ -789,7 +789,7 @@ The id is a player UUID, or an Xbox user id for an account that owns no Java pro
 shulker accounts
 ```
 
-The states are `playable`, `not playable (no Java profile)`, `sign-in expired`, `token expired <ago>` for a borrowed account whose launcher has not renewed it, and `offline`.
+The states are `playable`, `not playable (no Java profile)`, `sign-in expired`, `token expired <ago>` for a launcher account whose launcher has not renewed it, and `offline`.
 
 Which accounts are read comes from `accounts.stores`. With `--json`, each row is `{ "id", "name", "source", "group", "state", "default" }`.
 
@@ -820,9 +820,9 @@ shulker accounts logout Notch
 shulker accounts logout Notch --yes
 ```
 
-Shulker asks before it signs anything out, and `--yes` answers the question ahead of time — which a run that isn't on a terminal has to pass, since there is nobody to ask. Signing out the default account leaves the one account a launch could still use behind it as the default — offline or borrowed as readily as signed in — and no default at all when there isn't exactly one to take over.
+Shulker asks before it signs anything out, and `--yes` answers the question ahead of time — which a run that isn't on a terminal has to pass, since there is nobody to ask. Signing out the default account leaves the one account a launch could still use behind it as the default — offline or from a launcher as readily as signed in — and no default at all when there isn't exactly one to take over.
 
-An offline account has no sign-in to end, so `logout` on one is an error naming [`shulker accounts remove`](#shulker-accounts-remove); a borrowed account belongs to the launcher it came from, and only that launcher can sign it out.
+An offline account has no sign-in to end, so `logout` on one is an error naming [`shulker accounts remove`](#shulker-accounts-remove); a launcher account belongs to the launcher it came from, and only that launcher can sign it out.
 
 | Flag | Description |
 | --- | --- |
@@ -842,7 +842,7 @@ The UUID is Java's type 3 UUID over `OfflinePlayer:<name>`, which is the player 
 
 Names are held to the pattern a Minecraft username matches, three to sixteen letters, digits or underscores; `--allow-invalid-name` takes any other. Two offline accounts may share a name if `--force` says so, but never a UUID, since the UUID is what shulker's own file is keyed by — so a second account with the same name needs `--uuid` as well.
 
-Creating one needs an account in sight that owns Minecraft: Java Edition, own or borrowed: any with a Java profile, even one whose sign-in or session token has run out. It is a statement of intent rather than a licence check, and it is checked only here: afterwards the offline account plays on, and stays the default, with every Microsoft account signed out.
+Creating one needs an account in sight that owns Minecraft: Java Edition, own or from a launcher: any with a Java profile, even one whose sign-in or session token has run out. It is a statement of intent rather than a licence check, and it is checked only here: afterwards the offline account plays on, and stays the default, with every Microsoft account signed out.
 
 The default account is left alone, and the [`shulker accounts use`](#shulker-accounts-use) line that switches it is printed; `--use` switches at once.
 
@@ -864,7 +864,7 @@ shulker accounts remove Steve --yes
 
 Shulker asks first, and `--yes` answers the question ahead of time — which a run that isn't on a terminal has to pass, since there is nobody to ask. Removing the default account reseats it the way [`shulker accounts logout`](#shulker-accounts-logout) does.
 
-With no account in sight that owns Java Edition, removing one is refused with `ownership-unproven`, since the same gate would block creating it again; `--force` removes it anyway. A Microsoft account is signed out rather than deleted, so `remove` on one is an error naming [`shulker accounts logout`](#shulker-accounts-logout), and a borrowed account belongs to the launcher it came from.
+With no account in sight that owns Java Edition, removing one is refused with `ownership-unproven`, since the same gate would block creating it again; `--force` removes it anyway. A Microsoft account is signed out rather than deleted, so `remove` on one is an error naming [`shulker accounts logout`](#shulker-accounts-logout), and a launcher account belongs to the launcher it came from.
 
 | Flag | Description |
 | --- | --- |
@@ -909,7 +909,7 @@ shulker accounts stores
 
 The order is what settles a Microsoft account signed in to more than one launcher: it is listed once, from the earliest store that has it. With `--json`, the list comes back as an array of names.
 
-Where a launcher's accounts are read is the directory a registered instance of it was linked against — the one named with [`shulker link prism --launcher-dir`](#shulker-link-prism) — and the launcher's usual directory on this machine otherwise. Prism's accounts come from `accounts.json` there, Microsoft and offline accounts alike. The Minecraft Launcher's come from both `launcher_accounts.json` and `launcher_accounts_microsoft_store.json` in [its own directory](#shulker-link-mojang), because that suffix is per file rather than per install; an account in both is listed once, with the session that lasts longer. Shulker opens neither the entitlements file beside them nor the launcher's stored credentials: an account's Java profile is its own proof that it owns the game, and an account with no profile isn't listed at all, since its username and UUID both live there. Shulker never renews a borrowed account and never writes to another launcher's files: a borrowed session token that has run out is shown as `token expired <ago>`, still plays, and warns at launch that online servers and Realms will reject it until that launcher renews it. A file shulker can't read warns, naming itself, and is skipped, so a corrupt one can't take the account list down — the other accounts file in the same directory still loads.
+Where a launcher's accounts are read is the directory a registered instance of it was linked against — the one named with [`shulker link prism --launcher-dir`](#shulker-link-prism) — and the launcher's usual directory on this machine otherwise. Prism's accounts come from `accounts.json` there, Microsoft and offline accounts alike. The Minecraft Launcher's come from both `launcher_accounts.json` and `launcher_accounts_microsoft_store.json` in [its own directory](#shulker-link-mojang), because that suffix is per file rather than per install; an account in both is listed once, with the session that lasts longer. Shulker opens neither the entitlements file beside them nor the launcher's stored credentials: an account's Java profile is its own proof that it owns the game, and an account with no profile isn't listed at all, since its username and UUID both live there. Shulker never renews a launcher account and never writes to another launcher's files: a launcher account's session token that has run out is shown as `token expired <ago>`, still plays, and warns at launch that online servers and Realms will reject it until that launcher renews it. A file shulker can't read warns, naming itself, and is skipped, so a corrupt one can't take the account list down — the other accounts file in the same directory still loads.
 
 ### `shulker accounts stores add|remove`
 
@@ -964,7 +964,7 @@ shulker play --server mc.example.com:25565
 
 The game gets no terminal, so everything it writes goes to `.shulker/logs/<time>.log` inside the instance, one file per launch, whether or not anyone is watching. The game's own arguments carry a session access token, so they are printed nowhere: not in the log, not in a progress line, not in an error.
 
-Who plays is the instance's pinned `account` when it has one, and otherwise the default account; `--account` names another for a single run, matched the way [`shulker accounts use`](#shulker-accounts-use) matches one. [`shulker instance set account`](#shulker-instance-set) pins one. A pinned account that has since been removed fails with `account-not-found` rather than playing as someone else. With no default account shulker takes the only account that could play and makes it the default, saying so; with several it asks on a terminal and records the answer, and off one it is a usage error naming `--account`. With no account at all it is `no-accounts`. An account whose sign-in has expired refuses the launch with the line that fixes it, and one playing on a token shulker couldn't renew — a borrowed one its launcher has let run out, or a cached one with no network — launches with a warning that online servers and Realms will reject the session.
+Who plays is the instance's pinned `account` when it has one, and otherwise the default account; `--account` names another for a single run, matched the way [`shulker accounts use`](#shulker-accounts-use) matches one. [`shulker instance set account`](#shulker-instance-set) pins one. A pinned account that has since been removed fails with `account-not-found` rather than playing as someone else. With no default account shulker takes the only account that could play and makes it the default, saying so; with several it asks on a terminal and records the answer, and off one it is a usage error naming `--account`. With no account at all it is `no-accounts`. An account whose sign-in has expired refuses the launch with the line that fixes it, and one playing on a token shulker couldn't renew — one from a launcher that has let it run out, or a cached one with no network — launches with a warning that online servers and Realms will reject the session.
 
 The launch takes its memory, extra JVM arguments, Java, window size and wrapper from the instance's settings, and each one the instance leaves out from its `play.` default in `config.json` — see [`shulker instance`](#shulker-instance). The heap has two more steps: the pack's `client.memory` in `shulker.json`, which its author sets to what the pack needs, and then `4G`, the default other launchers use, so the game never gets the JVM's own guess of a quarter of the machine's RAM. `memory` becomes `-Xms` and `-Xmx`, and it and `jvmArgs` go after the version's own JVM arguments, so they win over them. The window becomes `--width` and `--height`, which the game takes for the run and never writes back; `--window` sets it for one run over both, and nothing is saved. Fullscreen isn't a launch setting: the game keeps it in `options.txt`, which the manifest's `client.options` owns. A wrapper runs the launch as its own command, with java and its arguments after the wrapper's.
 
