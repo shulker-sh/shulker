@@ -75,18 +75,11 @@ func TestBackToTopCountsRewrappedRows(t *testing.T) {
 }
 
 func TestProgressFillsByBytesWhenSizesKnown(t *testing.T) {
-	l := &Lines{T: Theme{}}
-	pr := &Progress{l: l, verb: "fetching", sizes: map[string]int64{}}
-	for _, f := range []Download{{"a.jar", 3 << 20}, {"b.jar", 1 << 20}} {
-		pr.total++
-		pr.longest = len(f.Name)
-		pr.sizes[f.Name] = f.Size
-		pr.totalBy += f.Size
-	}
+	pr := newProgress(&Lines{T: Theme{}}, "fetching", []Download{{"a.jar", 3 << 20}, {"b.jar", 1 << 20}})
 	pr.bytes = 2 << 20
 	pr.current = "b.jar"
 	got := pr.render(120)
-	want := "  ⠋ fetching ━━━━━━━━━━╸───────── 0/2 (2.0 MB of 4.0 MB) b.jar"
+	want := "  ⣾ fetching ━━━━━━━━━━╸───────── 0/2 (2.0 MB of 4.0 MB) b.jar"
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
@@ -95,7 +88,7 @@ func TestProgressFillsByBytesWhenSizesKnown(t *testing.T) {
 	}
 	pr.totalBy = 0
 	pr.done = 1
-	if got := pr.render(120)[0]; got != "  ⠋ fetching ━━━━━━━━━━╸───────── 1/2 (2.0 MB) b.jar" {
+	if got := pr.render(120)[0]; got != "  ⣾ fetching ━━━━━━━━━━╸───────── 1/2 (2.0 MB) b.jar" {
 		t.Fatalf("unknown sizes: got %q", got)
 	}
 }

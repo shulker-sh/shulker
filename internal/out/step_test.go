@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/bubbles/spinner"
 )
 
 func TestStepsSettleOffTerminal(t *testing.T) {
@@ -74,5 +76,23 @@ func TestStepsStayQuietInJSON(t *testing.T) {
 	p.Settle()
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr: %q", stderr.String())
+	}
+}
+
+func TestSpinnerFramesSitOneSpaceBeforeTheText(t *testing.T) {
+	for _, theme := range []Theme{{}, {ASCII: true}} {
+		s := newSpinner(theme)
+		for range s.Spinner.Frames {
+			if frame := s.View(); frame != strings.TrimSpace(frame) || Width(frame) != 1 {
+				t.Fatalf("ascii %v: frame %q", theme.ASCII, frame)
+			}
+			s, _ = s.Update(spinner.TickMsg{})
+		}
+	}
+	if got := newSpinner(Theme{ASCII: true}).View(); got != "|" {
+		t.Fatalf("ascii spinner starts at %q", got)
+	}
+	if got := newSpinner(Theme{HasColor: true}).View(); got != "\x1b[1;36m⣾\x1b[0m" && got != "\x1b[36;1m⣾\x1b[0m" {
+		t.Fatalf("coloured spinner %q", got)
 	}
 }

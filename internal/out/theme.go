@@ -8,8 +8,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"golang.org/x/term"
 )
 
@@ -193,6 +196,37 @@ func (t Theme) ArrowBump() string  { return t.glyph("⟶", "->") }
 func (t Theme) ArrowInto() string  { return t.glyph("»", ">>") }
 func (t Theme) ArrowPick() string  { return t.glyph("‣", "*") }
 func (t Theme) Ellipsis() string   { return t.glyph("…", "...") }
+
+var (
+	colourRenderer = sync.OnceValue(func() *lipgloss.Renderer { return renderer(termenv.ANSI256) })
+	plainRenderer  = sync.OnceValue(func() *lipgloss.Renderer { return renderer(termenv.Ascii) })
+)
+
+func renderer(profile termenv.Profile) *lipgloss.Renderer {
+	r := lipgloss.NewRenderer(io.Discard)
+	r.SetColorProfile(profile)
+	return r
+}
+
+// Style is the blank lipgloss style a charm surface builds on. lipgloss detects colour from
+// stdout on its own, so its styles are bound to a renderer with the theme's own profile instead:
+// a bar on stderr follows the theme's decision the way every hand-painted line does.
+func (t Theme) Style() lipgloss.Style {
+	if t.HasColor {
+		return colourRenderer().NewStyle()
+	}
+	return plainRenderer().NewStyle()
+}
+
+// Profile is the termenv profile for a charm surface that paints with termenv directly.
+func (t Theme) Profile() termenv.Profile {
+	if t.HasColor {
+		return termenv.ANSI256
+	}
+	return termenv.Ascii
+}
+
+func (t Theme) lipglossGrey() lipgloss.Color { return lipgloss.Color(strconv.Itoa(t.GreyIndex)) }
 
 // Link wraps text in an OSC 8 file:// hyperlink when the terminal follows them.
 func (t Theme) Link(text, path string) string {

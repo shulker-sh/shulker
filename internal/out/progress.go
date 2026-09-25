@@ -8,18 +8,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/x/ansi"
 )
 
 const (
-	barWidth     = 20
-	nameCap      = 48
-	frameEvery   = 80 * time.Millisecond
-	widestBytes  = "999.9 MB"
-	spinnerASCII = `|/-\`
+	barWidth    = 20
+	nameCap     = 48
+	frameEvery  = 80 * time.Millisecond
+	widestBytes = "999.9 MB"
 )
-
-var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 // Progress draws a download bar on a terminal and settles into one ok line.
 // Off a terminal only the final line prints; with --json nothing does.
@@ -38,7 +36,7 @@ type Progress struct {
 	many    string
 	longest int
 	drawn   []int
-	frame   int
+	wheel   spinner.Model
 	start   time.Time
 	stop    chan struct{}
 	stopped chan struct{}
@@ -57,21 +55,26 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 		return nil
 	}
 	p.Settle()
-	pr := &Progress{l: p.Err(), verb: verb, total: len(files), sizes: map[string]int64{}, start: time.Now()}
+	pr := newProgress(p.Err(), verb, files)
+	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
+		pr.tty = f
+		pr.stop, pr.stopped = make(chan struct{}), make(chan struct{})
+		go pr.spin()
+	}
+	return pr
+}
+
+func newProgress(l *Lines, verb string, files []Download) *Progress {
+	pr := &Progress{l: l, verb: verb, total: len(files), sizes: map[string]int64{}, start: time.Now(), wheel: newSpinner(l.T)}
 	known := true
 	for _, f := range files {
-		pr.longest = max(pr.longest, len([]rune(f.Name)))
+		pr.longest = max(pr.longest, Width(f.Name))
 		pr.sizes[f.Name] = f.Size
 		pr.totalBy += f.Size
 		known = known && f.Size > 0
 	}
 	if !known {
 		pr.totalBy = 0
-	}
-	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
-		pr.tty = f
-		pr.stop, pr.stopped = make(chan struct{}), make(chan struct{})
-		go pr.spin()
 	}
 	return pr
 }
@@ -161,7 +164,7 @@ func (pr *Progress) spin() {
 			return
 		case <-tick.C:
 			pr.mu.Lock()
-			pr.frame++
+			pr.wheel, _ = pr.wheel.Update(spinner.TickMsg{})
 			pr.mu.Unlock()
 			pr.redraw()
 		}
@@ -234,11 +237,7 @@ func (pr *Progress) render(width int) []string {
 // first and the bar second when the window is too narrow for them.
 func (pr *Progress) head(width, level int, widest bool) string {
 	t := pr.l.T
-	spinner := spinnerFrames[pr.frame%len(spinnerFrames)]
-	if t.ASCII {
-		spinner = string(spinnerASCII[pr.frame%len(spinnerASCII)])
-	}
-	line := gutter + t.paint(spinner, sgrCyan, sgrBold) + " " + pr.verb + " "
+	line := gutter + pr.wheel.View() + " " + pr.verb + " "
 	if level == 0 || level == 1 {
 		line += pr.bar() + " "
 	}

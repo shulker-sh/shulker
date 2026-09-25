@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -21,8 +23,25 @@ type stepState struct {
 type step struct {
 	text    string
 	tty     *os.File
+	wheel   spinner.Model
 	stop    chan struct{}
 	stopped chan struct{}
+}
+
+// newSpinner is the cyan spinner every running line shares, driven by the caller's own clock
+// through Update. bubbles' Dot frames end in a space, which is trimmed so one space sits before
+// the text.
+func newSpinner(t Theme) spinner.Model {
+	kind := spinner.Dot
+	if t.ASCII {
+		kind = spinner.Line
+	}
+	frames := make([]string, len(kind.Frames))
+	for i, f := range kind.Frames {
+		frames[i] = strings.TrimSpace(f)
+	}
+	kind.Frames = frames
+	return spinner.New(spinner.WithSpinner(kind), spinner.WithStyle(t.Style().Foreground(lipgloss.Color("6")).Bold(true)))
 }
 
 // slowAfter is how long a step runs before its spinner says how long it has waited, and on what.
@@ -95,6 +114,7 @@ func (p *Printer) Step(format string, args ...any) {
 	s := &step{text: text}
 	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
 		s.tty = f
+		s.wheel = newSpinner(p.ErrTheme)
 		s.stop, s.stopped = make(chan struct{}), make(chan struct{})
 		go s.spin(p.ErrTheme, &p.waits)
 	}
@@ -136,18 +156,15 @@ func (s *step) spin(t Theme, w *waits) {
 	tick := time.NewTicker(frameEvery)
 	defer tick.Stop()
 	start := time.Now()
-	for frame := 0; ; frame++ {
-		spinner := spinnerFrames[frame%len(spinnerFrames)]
-		if t.ASCII {
-			spinner = string(spinnerASCII[frame%len(spinnerASCII)])
-		}
+	for {
 		room := terminalWidth(s.tty) - len(gutter) - 3
 		text := s.text + slowAside(time.Since(start), w.latest())
-		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+t.paint(spinner, sgrCyan, sgrBold)+" "+t.Grey(ansi.Truncate(text, room, t.Ellipsis())))
+		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+s.wheel.View()+" "+t.Grey(ansi.Truncate(text, room, t.Ellipsis())))
 		select {
 		case <-s.stop:
 			return
 		case <-tick.C:
+			s.wheel, _ = s.wheel.Update(spinner.TickMsg{})
 		}
 	}
 }
