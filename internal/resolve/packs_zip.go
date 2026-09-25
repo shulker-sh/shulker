@@ -260,7 +260,7 @@ func (r *Resolver) lockPack(ctx context.Context, p provider.Provider, proj *prov
 
 func (r *Resolver) lockPackVersion(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, key, kind, channel string) error {
 	r.log("fetching %s %s", proj.Slug, v.Number)
-	got, err := r.obtain(ctx, proj, v)
+	got, err := r.obtainFrom(ctx, p, proj, v)
 	if err != nil {
 		return err
 	}

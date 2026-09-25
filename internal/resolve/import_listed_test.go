@@ -201,3 +201,16 @@ func TestImportListsEveryManualDownload(t *testing.T) {
 		t.Fatalf("jei lock entry: %+v", got)
 	}
 }
+
+func TestImportNamesAListedFileItCouldNotDownload(t *testing.T) {
+	cf := curseForgeHost(t)
+	archive := filepath.Join(t.TempDir(), "craft.zip")
+	writeCurseForgeZip(t, archive, []cfPackFile{{ProjectID: 394468, FileID: 5000020, Required: true}}, map[string]string{})
+	cf.cdn.truncate(cf.Files[2])
+
+	_, _, err := importInto(t, cf, t.TempDir(), archive)
+	e := out.AsError(err)
+	if e == nil || e.Code != "download-failed" || !strings.Contains(e.Message, "sodium (sodium-fabric-0.9.2+mc26.2.jar) from CurseForge") || e.Help == "" {
+		t.Fatalf("expected download-failed naming the file, got %+v", e)
+	}
+}

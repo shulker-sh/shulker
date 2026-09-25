@@ -436,6 +436,16 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	return obtained{}, e
 }
 
+// obtainFrom is obtain, naming the file and p in the error when p fails to serve it.
+func (r *Resolver) obtainFrom(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version) (obtained, error) {
+	got, err := r.obtain(ctx, proj, v)
+	if code := out.CodeOf(err); err != nil && v.File.URL != "" && (code == "" || code == "checksum-mismatch") {
+		url := v.File.URL
+		err = downloadable{id: proj.Slug, filename: v.File.Filename, host: p.Title(), url: &url}.downloadError(err)
+	}
+	return got, err
+}
+
 func (r *Resolver) settle(id, side, channel string) {
 	m, ok := r.Lock.Mods[id]
 	if !ok {
@@ -461,7 +471,7 @@ func (r *Resolver) setSource(entry *manifest.Require, key string, p provider.Pro
 
 func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, key, requiredBy, sideOverride, channel string, replace bool) (string, *lock.Mod, error) {
 	r.log("fetching %s %s", proj.Slug, v.Number)
-	got, err := r.obtain(ctx, proj, v)
+	got, err := r.obtainFrom(ctx, p, proj, v)
 	if err != nil {
 		return "", nil, err
 	}
@@ -812,6 +822,7 @@ func (f downloadable) downloadError(err error) error {
 	}
 	e = out.Errorf("download-failed", "couldn't download %s (%s) from %s", f.id, f.filename, host)
 	e.Help = fault.help
+	e.Wrapped = err
 	e.Rows = []out.Detail{{Label: "url", Text: *f.url}, {Label: "cause", Text: downloadCause(err, *f.url)}}
 	return e
 }

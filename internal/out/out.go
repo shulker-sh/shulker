@@ -64,6 +64,8 @@ type Error struct {
 	// IsSummary marks an error whose items repeat errors the run already reported, so it adds no
 	// annotations of its own.
 	IsSummary bool `json:"-"`
+	// Wrapped is the error this one explains, which errors.Is and errors.As see through to.
+	Wrapped error `json:"-"`
 }
 
 // Detail is one row under an error line; Children nest one level beneath it.
@@ -81,6 +83,8 @@ type Nudge struct {
 }
 
 func (e *Error) Error() string { return e.Message }
+
+func (e *Error) Unwrap() error { return e.Wrapped }
 
 // Headline is the message's first line, without the colon that introduces the lines under it.
 func (e *Error) Headline() string {
