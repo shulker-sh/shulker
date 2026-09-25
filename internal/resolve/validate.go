@@ -2,6 +2,7 @@ package resolve
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -574,7 +575,7 @@ func fabricSatisfies(version, declared string) (bool, error) {
 	for _, alt := range strings.Split(declared, "||") {
 		p, err := fabric.ParsePredicate(strings.TrimSpace(alt))
 		if err != nil {
-			return false, fmt.Errorf("range %q is not understood", declared)
+			return false, errors.New("the range is not understood")
 		}
 		alts = append(alts, p)
 	}

@@ -139,6 +139,26 @@ func TestValidateSkipsDependenciesNotDownloaded(t *testing.T) {
 	}
 }
 
+func TestValidateWarnsOnceOnAnUnreadableRange(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	toml := "[[mods]]\nmodId=\"factory_blocks\"\nversion=\"1.0\"\n" +
+		"[[dependencies.factory_blocks]]\nmodId=\"minecraft\"\ntype=\"required\"\nversionRange=\"[1.21,1.21.1,1.21.2]\"\n"
+	sha, err := c.Put(bytes.NewReader(zipBytes(t, "META-INF/neoforge.mods.toml", toml)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := &lock.Lock{Minecraft: "1.21.1", Loader: lock.Loader{Type: "neoforge", Version: "21.1.251"}, Mods: map[string]lock.Mod{"factory_blocks": {Sha512: sha, Side: "both"}}}
+	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"factory_blocks depends on minecraft [1.21,1.21.1,1.21.2] but the range has more than two bounds: not checked"}
+	if !reflect.DeepEqual(v.Warnings, want) || len(v.Problems) > 0 {
+		t.Fatalf("warnings %q, problems %+v, want %q", v.Warnings, v.Problems, want)
+	}
+}
+
 func TestValidateNeoForgeMavenRanges(t *testing.T) {
 	c := &cache.Cache{Dir: t.TempDir()}
 	jars := map[string]string{

@@ -3,6 +3,7 @@
 package maven
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -256,14 +257,18 @@ func ParseRange(spec string) (Range, error) {
 	for strings.HasPrefix(rest, "[") || strings.HasPrefix(rest, "(") {
 		end := strings.IndexAny(rest, ")]")
 		if end < 0 {
-			return Range{}, fmt.Errorf("range %q is unbounded", spec)
+			return Range{}, errors.New("the range is unbounded")
 		}
-		res, err := parseRestriction(rest[:end+1])
+		set := rest[:end+1]
+		res, err := parseRestriction(set)
 		if err != nil {
-			return Range{}, fmt.Errorf("range %q: %w", spec, err)
+			if set == strings.TrimSpace(spec) {
+				return Range{}, fmt.Errorf("the range %w", err)
+			}
+			return Range{}, fmt.Errorf("the range's set %s %w", set, err)
 		}
 		if upper != nil && (res.lower == nil || Compare(*res.lower, *upper) < 0) {
-			return Range{}, fmt.Errorf("range %q has overlapping sets", spec)
+			return Range{}, errors.New("the range has overlapping sets")
 		}
 		r.restrictions = append(r.restrictions, res)
 		upper = res.upper
@@ -272,7 +277,7 @@ func ParseRange(spec string) (Range, error) {
 	}
 	if rest != "" {
 		if len(r.restrictions) > 0 {
-			return Range{}, fmt.Errorf("range %q mixes a bare version with sets", spec)
+			return Range{}, errors.New("the range mixes a bare version with sets")
 		}
 		return Range{matchesAll: true}, nil
 	}
@@ -285,7 +290,7 @@ func parseRestriction(spec string) (restriction, error) {
 	lower, upper, found := strings.Cut(body, ",")
 	if !found {
 		if !res.includesLower || !res.includesUpper {
-			return restriction{}, fmt.Errorf("a single version must be written [%s]", body)
+			return restriction{}, fmt.Errorf("must be written [%s]", body)
 		}
 		v := Parse(body)
 		res.lower, res.upper = &v, &v
@@ -293,7 +298,7 @@ func parseRestriction(spec string) (restriction, error) {
 	}
 	lower, upper = strings.TrimSpace(lower), strings.TrimSpace(upper)
 	if strings.Contains(upper, ",") {
-		return restriction{}, fmt.Errorf("%s has more than two bounds", spec)
+		return restriction{}, errors.New("has more than two bounds")
 	}
 	if lower != "" {
 		v := Parse(lower)
@@ -304,7 +309,7 @@ func parseRestriction(spec string) (restriction, error) {
 		res.upper = &v
 	}
 	if res.lower != nil && res.upper != nil && Compare(*res.upper, *res.lower) < 0 {
-		return restriction{}, fmt.Errorf("%s has its bounds reversed", spec)
+		return restriction{}, errors.New("has its bounds reversed")
 	}
 	return res, nil
 }

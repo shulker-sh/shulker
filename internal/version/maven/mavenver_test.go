@@ -78,3 +78,20 @@ func TestRange(t *testing.T) {
 		}
 	}
 }
+
+func TestParseRangeErrorNamesTheRangeOnce(t *testing.T) {
+	for spec, want := range map[string]string{
+		"[1.21,1.21.1,1.21.2]": "the range has more than two bounds",
+		"[2,1]":                "the range has its bounds reversed",
+		"(1.0)":                "the range must be written [1.0]",
+		"[1,2),[4,3]":          "the range's set [4,3] has its bounds reversed",
+		"[1.0":                 "the range is unbounded",
+		"[1,3),[2,4)":          "the range has overlapping sets",
+		"[1,2),3":              "the range mixes a bare version with sets",
+	} {
+		_, err := ParseRange(spec)
+		if err == nil || err.Error() != want {
+			t.Errorf("%s: %v, want %q", spec, err, want)
+		}
+	}
+}
