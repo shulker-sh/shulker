@@ -109,3 +109,18 @@ func TestStepCollapsesNewlinesInText(t *testing.T) {
 		t.Fatalf("stderr: %q", stderr.String())
 	}
 }
+
+func TestPastTense(t *testing.T) {
+	for verb, want := range map[string]string{
+		"fetching":    "fetched",
+		"downloading": "downloaded",
+		"keeping":     "kept",
+		"reading":     "read",
+		"copying":     "copied",
+		"looking":     "looked",
+	} {
+		if got := pastTense(verb); got != want {
+			t.Errorf("pastTense(%q) = %q, want %q", verb, got, want)
+		}
+	}
+}
