@@ -497,6 +497,13 @@ func TestInstancesRepair(t *testing.T) {
 
 // Repair rewrites a registry or instance file it can't read, a newer shulker's included, so it keeps
 // the old bytes as <name>.replaced first.
+func TestInstancesRepairJSONPrintsEmptyLists(t *testing.T) {
+	_, stdout, _ := run(t, "instances", "repair", "--json")
+	if !strings.Contains(stdout, `"registered": [],`) || strings.Contains(stdout, "null") {
+		t.Fatalf("repair with nothing to do:\n%s", stdout)
+	}
+}
+
 func TestInstancesRepairKeepsWhatItReplaces(t *testing.T) {
 	h := newHarness(t)
 	prismDir := t.TempDir()

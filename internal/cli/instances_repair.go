@@ -67,7 +67,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 	if err != nil {
 		return repairResult{}, err
 	}
-	var res repairResult
+	res := repairResult{Registered: []config.Instance{}, Renamed: []repairRename{}, Wrote: []string{}, Missing: []string{}}
 	instances, loadErr := config.LoadInstances(path)
 	if loadErr != nil {
 		instances, res.Rebuilt = nil, true
