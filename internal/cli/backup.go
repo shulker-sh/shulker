@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -67,12 +66,6 @@ func (a *app) backup(target savesTarget, only []string) (backupResult, error) {
 
 func (b backupResult) print(l *out.Lines) {
 	l.OKInto("backed up "+plural(b.Worlds, "world", "worlds"), b.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(b.Size), b.elapsed.Seconds()))
-}
-
-func distinct(names []string) []string {
-	names = slices.Clone(names)
-	slices.Sort(names)
-	return slices.Compact(names)
 }
 
 // backupSource is where target's worlds are, and what the zip comment records about them: the
