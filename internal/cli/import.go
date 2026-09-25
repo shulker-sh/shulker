@@ -43,6 +43,7 @@ type importFlags struct {
 	name, typ, side, provider string
 	at                        modpack.At
 	ignoreShulker             bool
+	noServerPack              bool
 }
 
 func (a *app) importCmd() *cobra.Command {
@@ -63,6 +64,7 @@ func (a *app) importCmd() *cobra.Command {
 	cmd.Flags().StringVar(&f.at.Path, "path", "", "folder of a git source's repository holding its shulker.json (default: the root)")
 	cmd.Flags().StringVar(&f.side, "side", "", "take one side only: client or server (default: every side the pack declares)")
 	cmd.Flags().BoolVar(&f.ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
+	cmd.Flags().BoolVar(&f.noServerPack, "no-server-pack", false, "don't read the server files the pack pairs with for which mods are client-only")
 	return cmd
 }
 
@@ -167,6 +169,10 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 	if len(leftOut) > 0 {
 		rows = append(rows, out.Row{Label: "left out for side", Children: leftOut})
 	}
+	if mods != nil && mods.ServerPack != nil && len(mods.ServerPack.Client)+len(mods.ServerPack.Both) > 0 {
+		sp := mods.ServerPack
+		rows = append(rows, out.Row{Label: "sides from the pack's server files", Text: fmt.Sprintf("%d client-only, %d on both sides", len(sp.Client), len(sp.Both))})
+	}
 	if mods != nil && len(mods.Dropped) > 0 {
 		rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
 	}
@@ -180,7 +186,7 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 // and returns the resolver holding that project's manifest and lock.
 func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir string, f *importFlags) (*resolve.Resolver, *resolve.Imported, error) {
 	r := &resolve.Resolver{Dir: dir, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Meta: d.meta, Log: a.progress}
-	mods, err := r.ImportProject(ctx, arc, f.name, f.ignoreShulker)
+	mods, err := r.ImportProject(ctx, arc, resolve.ImportOptions{Name: f.name, IgnoreMarker: f.ignoreShulker, ServerPack: !f.noServerPack})
 	a.warn(r.Warnings)
 	if err != nil {
 		return nil, nil, err

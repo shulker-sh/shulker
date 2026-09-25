@@ -30,6 +30,9 @@ type Provider struct {
 	// KeyedByID says a slug is no sure key on this provider, as on CurseForge, so an entry
 	// records the project id.
 	KeyedByID bool
+	// UnhashedTypes are the project types Identify never finds, as CurseForge's fingerprints
+	// leave modpacks out.
+	UnhashedTypes []string
 	// Requests counts the lookups made, by method name.
 	Requests map[string]int
 }
@@ -176,7 +179,7 @@ func (p *Provider) identifySHA1(sha1s map[string]string) map[string]provider.Hos
 			if v.File.Sha1 != sha1Hex {
 				continue
 			}
-			if i := slices.IndexFunc(p.Known, func(proj provider.Project) bool { return proj.ID == v.ProjectID }); i >= 0 {
+			if i := slices.IndexFunc(p.Known, func(proj provider.Project) bool { return proj.ID == v.ProjectID }); i >= 0 && !slices.Contains(p.UnhashedTypes, p.Known[i].Type) {
 				found[key] = provider.Hosted{Project: p.Known[i], Version: v}
 			}
 			break

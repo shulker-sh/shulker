@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"crypto/sha512"
@@ -51,7 +52,7 @@ func newCDN(t *testing.T) *cdn {
 			w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 			w.Write(data[:len(data)/2])
 		default:
-			w.Write(data)
+			http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
 		}
 	}))
 	t.Cleanup(c.srv.Close)

@@ -48,9 +48,11 @@ type Imported struct {
 	Duplicates []string `json:"duplicates"`
 	Unmanaged  []string `json:"unmanaged"`
 	// Sides are the mods the index's env widens beyond their provider's side.
-	Sides     []SideChoice           `json:"sides"`
-	Warnings  []string               `json:"-"`
-	Overrides []packarchive.Override `json:"-"`
+	Sides []SideChoice `json:"sides"`
+	// ServerPack is what the server files the pack pairs with decided, when it pairs some.
+	ServerPack *ServerPack            `json:"serverPack,omitempty"`
+	Warnings   []string               `json:"-"`
+	Overrides  []packarchive.Override `json:"-"`
 }
 
 // SideChoice is a mod locked on a wider side than its provider's, since the index's env places it
@@ -181,10 +183,20 @@ func newImporter(r *Resolver, a *packarchive.Archive, reuseLocal bool) *importer
 // the files Import locks, its local files adopted, and, after a marker, the overrides the manifest
 // renders itself dropped.
 // The manifest's and the lock's warnings go to r.Warnings; the import's own come back in Imported.
-func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, name string, ignoreMarker bool) (*Imported, error) {
-	if ignoreMarker {
+// ImportOptions shape ImportProject. Name is the project's, the pack's slugified when empty.
+// IgnoreMarker imports a shulker export as any other pack, and ServerPack reads the server files
+// the pack pairs with for its mods' sides.
+type ImportOptions struct {
+	Name         string
+	IgnoreMarker bool
+	ServerPack   bool
+}
+
+func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, opts ImportOptions) (*Imported, error) {
+	if opts.IgnoreMarker {
 		arc.Marker = nil
 	}
+	name := opts.Name
 	if name == "" && arc.Marker == nil {
 		name = project.Slugify(arc.Name)
 	}
@@ -214,11 +226,13 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 	if arc.Marker != nil {
 		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
 	}
-	all := &Changes{}
-	for _, id := range slices.Sorted(maps.Keys(r.Lock.Mods)) {
-		all.Added = append(all.Added, AddedMod{ID: id})
+	if opts.ServerPack && arc.Path != "" {
+		mods.ServerPack, err = r.serverPackOf(ctx, arc)
+		if err != nil {
+			mods.Warnings = append(mods.Warnings, fmt.Sprintf("the pack's server files weren't read (%v); each mod's side comes from its own metadata", err))
+		}
 	}
-	mods.Warnings = append(mods.Warnings, all.DependencySides(r.Lock.Mods)...)
+	mods.Warnings = append(mods.Warnings, dependencySideNotes(r.Lock.Mods, slices.Sorted(maps.Keys(r.Lock.Mods)))...)
 	return mods, nil
 }
 

@@ -135,6 +135,8 @@ func Titles() string {
 
 // Archive is a pack archive as every format describes one.
 type Archive struct {
+	// Path is the file the archive was read from.
+	Path      string
 	Format    Format
 	Name      string
 	Version   string
@@ -271,7 +273,7 @@ func Read(file string) (*Archive, error) {
 			if err != nil {
 				return nil, err
 			}
-			a.Format = f
+			a.Format, a.Path = f, file
 			return a, nil
 		}
 	}
