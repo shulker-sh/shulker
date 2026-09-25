@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/saves"
 )
 
 // savesWhere is the selection backup, restore, saves and saves prune share: the current directory,
@@ -51,9 +52,8 @@ func (a *app) savesTargetFor(w savesWhere) (savesTarget, error) {
 	return a.targetOfDir(entries[0].Dir)
 }
 
-// savesPicks is every target --all reaches: one per row the selection admits, except that the rows
-// in one save group share a single target. A group reached by one row still names that instance;
-// one reached by several names none, as --group does.
+// savesPicks is every target --all reaches, one per row the selection admits, grouped by
+// saves.Picks so the rows of one save group share a target.
 func (a *app) savesPicks(w savesWhere) ([]savesPick, error) {
 	if w.group != "" {
 		return nil, out.Errorf("usage", "pass --group or --all, not both: --group names one save group, --all every instance")
@@ -62,21 +62,23 @@ func (a *app) savesPicks(w savesWhere) ([]savesPick, error) {
 	if err != nil {
 		return nil, err
 	}
-	var picks []savesPick
-	for _, e := range entries {
+	reaches := make([]saves.Reach, len(entries))
+	byID := make(map[string]project.InstanceEntry, len(entries))
+	for i, e := range entries {
 		t, err := a.targetOfDir(e.Dir)
-		if err != nil {
-			picks = append(picks, savesPick{rows: []project.InstanceEntry{e}, err: err})
-			continue
+		reaches[i] = saves.Reach{ID: e.ID, Target: t.Target, Err: err}
+		byID[e.ID] = e
+	}
+	var picks []savesPick
+	for _, p := range saves.Picks(reaches) {
+		pick := savesPick{savesTarget: savesTarget{Target: p.Target}, err: p.Err}
+		if p.Err == nil && len(p.Instances) == 1 {
+			pick.via = p.Instances[0]
 		}
-		t.via = e.ID
-		i := slices.IndexFunc(picks, func(p savesPick) bool { return p.err == nil && p.Backups == t.Backups })
-		if i < 0 {
-			picks = append(picks, savesPick{savesTarget: t, rows: []project.InstanceEntry{e}})
-			continue
+		for _, id := range p.Instances {
+			pick.rows = append(pick.rows, byID[id])
 		}
-		picks[i].rows = append(picks[i].rows, e)
-		picks[i].Dir, picks[i].via = "", ""
+		picks = append(picks, pick)
 	}
 	return picks, nil
 }

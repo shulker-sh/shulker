@@ -1,7 +1,9 @@
 package saves
 
 import (
+	"errors"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"shulker.sh/shulker/internal/config"
@@ -32,5 +34,34 @@ func TestTargetAtIsTheGroupOfAShulkerInstanceElseTheDirectory(t *testing.T) {
 	}
 	if group, owned := GroupOf(nil, f); group != None || owned {
 		t.Fatalf("no registry row is no group: %q %v", group, owned)
+	}
+}
+
+func TestPicksShareOneTargetBetweenTheInstancesOfASaveGroup(t *testing.T) {
+	shared := Target{Group: "survival", Dir: "/i/a", WorldsDir: "/saves/survival", Backups: "/backups/survival"}
+	alone := Target{Group: "creative", Dir: "/i/c", WorldsDir: "/saves/creative", Backups: "/backups/creative"}
+	own := Target{Dir: "/i/d", WorldsDir: "/i/d/saves", Backups: "/i/d/.shulker/backups"}
+	failed := errors.New("no instance")
+	picks := Picks([]Reach{
+		{ID: "a", Target: shared},
+		{ID: "b", Target: Target{Group: "survival", Dir: "/i/b", WorldsDir: "/saves/survival", Backups: "/backups/survival"}},
+		{ID: "c", Target: alone},
+		{ID: "d", Target: own},
+		{ID: "e", Err: failed},
+	})
+	if len(picks) != 4 {
+		t.Fatalf("picks = %+v", picks)
+	}
+	if g := picks[0]; g.Group != "survival" || g.Dir != "" || !slices.Equal(g.Instances, []string{"a", "b"}) {
+		t.Fatalf("a group reached twice names no directory: %+v", g)
+	}
+	if c := picks[1]; c.Dir != "/i/c" || !slices.Equal(c.Instances, []string{"c"}) {
+		t.Fatalf("a group reached once keeps its instance: %+v", c)
+	}
+	if d := picks[2]; d.Dir != "/i/d" || !slices.Equal(d.Instances, []string{"d"}) {
+		t.Fatalf("an instance with its own saves is its own pick: %+v", d)
+	}
+	if e := picks[3]; e.Err != failed || !slices.Equal(e.Instances, []string{"e"}) || e.Backups != "" {
+		t.Fatalf("a failed reach is its own pick with no target: %+v", e)
 	}
 }

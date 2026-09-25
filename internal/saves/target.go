@@ -2,6 +2,7 @@ package saves
 
 import (
 	"path/filepath"
+	"slices"
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
@@ -67,4 +68,40 @@ func TargetAt(dir string, r Roots, in *config.Instance, f *instance.File, m *man
 		return Target{}, err
 	}
 	return Target{Dir: dir, WorldsDir: w.Dir, World: w.Level, Backups: filepath.Join(dir, instance.Dir, "backups")}, nil
+}
+
+// Reach is one instance and the target it resolves to, or why it couldn't.
+type Reach struct {
+	ID     string
+	Target Target
+	Err    error
+}
+
+// Pick is one target a fanned-out command acts on, and the instances that reach it. Err is why
+// their target couldn't be resolved.
+type Pick struct {
+	Target
+	Instances []string
+	Err       error
+}
+
+// Picks is one target per instance, except that the instances of one save group share a single
+// pick: reached by one instance it still names that instance's directory, reached by several it
+// names none, as --group does. A reach that failed is its own pick.
+func Picks(reaches []Reach) []Pick {
+	var picks []Pick
+	for _, r := range reaches {
+		if r.Err != nil {
+			picks = append(picks, Pick{Instances: []string{r.ID}, Err: r.Err})
+			continue
+		}
+		i := slices.IndexFunc(picks, func(p Pick) bool { return p.Err == nil && p.Backups == r.Target.Backups })
+		if i < 0 {
+			picks = append(picks, Pick{Target: r.Target, Instances: []string{r.ID}})
+			continue
+		}
+		picks[i].Instances = append(picks[i].Instances, r.ID)
+		picks[i].Dir = ""
+	}
+	return picks
 }
