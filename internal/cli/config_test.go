@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -361,5 +362,15 @@ func TestConfigKeysAreTheSchemaLeaves(t *testing.T) {
 	slices.Sort(leaves)
 	if !slices.Equal(leaves, config.Keys) {
 		t.Fatalf("config.Keys %v, schema %v", config.Keys, leaves)
+	}
+}
+
+func TestConfigPath(t *testing.T) {
+	h := newHarness(t)
+	if stdout := h.mustRun(t, "config", "path"); stdout != h.config+"\n" {
+		t.Fatalf("config path = %q, want %q", stdout, h.config)
+	}
+	if env := h.runSetting(t, 0, "config", "path"); string(env.Data) != strconv.Quote(h.config) {
+		t.Fatalf("config path --json = %s", env.Data)
 	}
 }

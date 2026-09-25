@@ -28,8 +28,24 @@ func (a *app) configCmd() *cobra.Command {
 		Use:   "config",
 		Short: "Read and change shulker's own config.json",
 	}
-	cmd.AddCommand(a.configGetCmd(), a.configSetCmd(), a.configUnsetCmd())
+	cmd.AddCommand(a.configGetCmd(), a.configSetCmd(), a.configUnsetCmd(), a.configPathCmd())
 	return cmd
+}
+
+func (a *app) configPathCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:         "path",
+		Annotations: reads(),
+		Short:       "Print where config.json is",
+		Args:        noArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			path, err := a.configFile()
+			if err != nil {
+				return err
+			}
+			return a.printer.Emit(path, func(l *out.Lines) { writeValue(l.W, path) })
+		},
+	}
 }
 
 func (a *app) configGetCmd() *cobra.Command {

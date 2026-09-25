@@ -89,6 +89,7 @@ All notable changes to shulker are documented here. The format is based on
 - `version` prints one line, the version and when it was built; `--verbose` adds the Go version, how shulker was installed (a release archive, `go install` or a source build) and where the binary, `config.json` and the cache are. A `go install shulker.sh/shulker@v0.0.1` build reports `0.0.1`, not `dev`.
 - `self update` replaces only a binary that came from a release archive. One installed with `go install` or built from a clone fails `self-update-unmanaged` and names the command that updates it instead, and `self update --check` reports the latest release for every build, without claiming a build from a clone is behind it.
 - `self uninstall` leaves a binary a package manager installed for that manager to remove, once every hook is off, and names the command.
+- `config path` prints where `config.json` is.
 - `completion bash|zsh|fish|powershell` prints a shell completion script, and the CLI reference shows how to load it in each shell.
 - `search` finds projects on Modrinth and CurseForge and prints the ids to add them by; with no words it opens a search box whose results follow what you type.
 - A bare `add` on a terminal opens the same search box, where you mark as many results as you like and add them all at once.
