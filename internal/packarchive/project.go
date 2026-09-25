@@ -13,7 +13,8 @@ import (
 // Manifest is the manifest a project imported from the archive starts from, with the warnings
 // deriving it raised. Without a marker it is built from what the archive says; with one, the
 // exporting project's own manifest is the base, and the archive wins where the two disagree,
-// since the archive is what was shipped.
+// since the archive is what was shipped. name names the project; with a marker it may be empty,
+// which keeps the exporting project's name.
 func (a *Archive) Manifest(name string) (*manifest.Manifest, []string) {
 	if a.Marker == nil {
 		m := &manifest.Manifest{
@@ -37,6 +38,9 @@ func (a *Archive) Manifest(name string) (*manifest.Manifest, []string) {
 	var warnings []string
 	copied := *a.Marker.Manifest
 	m := &copied
+	if name != "" {
+		m.Name = name
+	}
 	ml := a.Marker.Lock
 	if ml.Minecraft != a.Minecraft {
 		warnings = append(warnings, fmt.Sprintf("the marker was locked to Minecraft %s but the pack is for %s; using %s", ml.Minecraft, a.Minecraft, a.Minecraft))

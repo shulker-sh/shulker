@@ -26,6 +26,7 @@ import (
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
+	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -174,13 +175,17 @@ func newImporter(r *Resolver, a *packarchive.Archive, reuseLocal bool) *importer
 // locked, reused, dropped and left unmanaged. A file the exporting shulker project locked, matched
 // by sha512, comes back as that project locked it.
 // ImportProject reads arc as the project it makes at r.Dir, into r.Manifest and r.Lock: the
-// manifest arc gives under name, a lock from the exact platform the pack names, where a marker's
-// manifest may hold a range, the marker's players when it keeps some, the files Import locks, its
-// local files adopted, and, after a marker, the overrides the manifest renders itself dropped.
+// manifest arc gives under name, or its own when name is empty, a lock from the exact platform the
+// pack names, where a marker's manifest may hold a range, the marker's players when it keeps some,
+// the files Import locks, its local files adopted, and, after a marker, the overrides the manifest
+// renders itself dropped.
 // The manifest's and the lock's warnings go to r.Warnings; the import's own come back in Imported.
 func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, name string, ignoreMarker bool) (*Imported, error) {
 	if ignoreMarker {
 		arc.Marker = nil
+	}
+	if name == "" && arc.Marker == nil {
+		name = project.Slugify(arc.Name)
 	}
 	m, warnings := arc.Manifest(name)
 	r.Warnings = append(r.Warnings, warnings...)

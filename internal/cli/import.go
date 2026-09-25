@@ -175,7 +175,7 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 // and returns the resolver holding that project's manifest and lock.
 func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir string, f *importFlags) (*resolve.Resolver, *resolve.Imported, error) {
 	r := &resolve.Resolver{Dir: dir, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Meta: d.meta, Log: a.progress}
-	mods, err := r.ImportProject(ctx, arc, cmp.Or(f.name, project.Slugify(arc.Name)), f.ignoreShulker)
+	mods, err := r.ImportProject(ctx, arc, f.name, f.ignoreShulker)
 	a.warn(r.Warnings)
 	if err != nil {
 		return nil, nil, err

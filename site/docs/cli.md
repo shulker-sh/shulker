@@ -148,7 +148,7 @@ shulker import https://github.com/friends/pack.git --ref v2 --path packs/surviva
 
 | Flag | Description |
 | --- | --- |
-| `--name <name>` | Project name (default: the modpack name, slugified) |
+| `--name <name>` | Project name (default: the modpack name, slugified, or the name a pack with a shulker marker was exported under) |
 | `--type <kind>` | Refuse the modpack unless it is this kind: `mrpack`, `curseforge`, `source`, or `modpack` for one the project requires (default: detected) |
 | `--provider <name>` | Look a slug up on this provider only: `modrinth` or `curseforge` (default: the first that has it) |
 | `--ref <ref>` | Git ref of a git source (default: the remote HEAD) |

@@ -531,3 +531,25 @@ func TestImportSideNarrowsANewProject(t *testing.T) {
 		t.Fatalf("--side both: exit %d: %s", code, stdout)
 	}
 }
+
+func TestImportNamesAMarkedPack(t *testing.T) {
+	h := newCurseForgeExport(t)
+	h.allowMrpackHost(t)
+	h.mustRun(t, "export", "mrpack")
+	h.mustRun(t, "export", "curseforge")
+	for _, file := range []string{"pack-1.0.mrpack", "pack-1.0.zip"} {
+		t.Run(file, func(t *testing.T) {
+			archive := filepath.Join(h.dir, "build", file)
+			named := filepath.Join(t.TempDir(), "named")
+			h.mustRun(t, "import", archive, "--dir", named, "--name", "other")
+			if m, _ := readProject(t, named); m.Name != "other" {
+				t.Fatalf("--name on a pack with a marker gave %q", m.Name)
+			}
+			kept := filepath.Join(t.TempDir(), "kept")
+			h.mustRun(t, "import", archive, "--dir", kept)
+			if m, _ := readProject(t, kept); m.Name != "pack" {
+				t.Fatalf("without --name the marker's name is kept, got %q", m.Name)
+			}
+		})
+	}
+}
