@@ -3,7 +3,9 @@
 package instance
 
 import (
+	"encoding/json"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -182,6 +184,35 @@ func (f *File) Java() string {
 		return f.Settings.Java
 	}
 	return f.Resolved.Java
+}
+
+// RecordSync stamps how a sync ended. A failed one leaves LastSyncAt where it is: the files in the
+// directory are still the ones the last good sync built.
+func (f *File) RecordSync(at, result string) {
+	r := f.EnsureResolved()
+	if result == ResultOK {
+		r.LastSyncAt = at
+	}
+	r.LastResult = result
+}
+
+// SaveDocument writes the instance file as a document, once the schema allows it, through Save so
+// the file keeps the order shulker writes it in.
+func SaveDocument(dir string, doc map[string]any) error {
+	doc = maps.Clone(doc)
+	doc["$schema"] = SchemaURL
+	data, err := json.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	if err := schema.Validate(schema.Instance, data); err != nil {
+		return schema.Invalid("instance-invalid", Path(dir), data, err)
+	}
+	var f File
+	if err := json.Unmarshal(data, &f); err != nil {
+		return err
+	}
+	return f.Save(dir)
 }
 
 // EnsureResolved returns f.Resolved, creating it first if the file records none.

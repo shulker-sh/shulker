@@ -105,3 +105,33 @@ func TestLoadTellsANewerFileFromOneItCantRead(t *testing.T) {
 		})
 	}
 }
+
+func TestRecordSyncStampsTheResultAndOnlyAGoodSyncsTime(t *testing.T) {
+	f := New()
+	f.RecordSync("t1", ResultOK)
+	if r := f.Resolved; r == nil || r.LastSyncAt != "t1" || r.LastResult != ResultOK {
+		t.Fatalf("ok = %+v", r)
+	}
+	f.RecordSync("t2", ResultFailed)
+	if r := f.Resolved; r.LastSyncAt != "t1" || r.LastResult != ResultFailed {
+		t.Fatalf("failed = %+v", r)
+	}
+}
+
+func TestSaveDocumentChecksTheSchemaBeforeWriting(t *testing.T) {
+	dir := t.TempDir()
+	if err := SaveDocument(dir, map[string]any{"settings": map[string]any{"memory": "4G"}}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := Load(dir)
+	if err != nil || f.Settings.Memory != "4G" {
+		t.Fatalf("loaded = %+v, %v", f, err)
+	}
+	err = SaveDocument(dir, map[string]any{"settings": map[string]any{"memory": 4}})
+	if out.CodeOf(err) != "instance-invalid" {
+		t.Fatalf("a document the schema refuses is instance-invalid, not %v", err)
+	}
+	if f, err := Load(dir); err != nil || f.Settings.Memory != "4G" {
+		t.Fatalf("the file is untouched: %+v, %v", f, err)
+	}
+}

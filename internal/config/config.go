@@ -141,6 +141,15 @@ type Instance struct {
 	LastError   string `json:"lastError,omitempty"`
 }
 
+// RecordSync stamps how a sync ended. A failed one leaves LastSync where it is: the files in the
+// directory are still the ones the last good sync built.
+func (i *Instance) RecordSync(at, failure string) {
+	if failure == "" {
+		i.LastSync = at
+	}
+	i.LastError = failure
+}
+
 // Label is what shulker calls an instance in its own output: the name the launcher shows, or the
 // id when there is none.
 func (i Instance) Label() string {

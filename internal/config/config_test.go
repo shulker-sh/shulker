@@ -256,3 +256,28 @@ func TestRedactMasksEachSecretKeyAndLeavesTheRestAlone(t *testing.T) {
 		t.Fatalf("a secret that isn't text is left as it is: %v", got)
 	}
 }
+
+func TestCheckDocumentIsTheSchemasVerdict(t *testing.T) {
+	if err := CheckDocument(map[string]any{"instances": "/data/instances"}); err != nil {
+		t.Fatalf("a valid document passes: %v", err)
+	}
+	if err := CheckDocument(map[string]any{"instances": 5}); err == nil {
+		t.Fatal("a value of the wrong type fails")
+	}
+}
+
+func TestRecordSyncKeepsTheLastGoodStampOnFailure(t *testing.T) {
+	in := Instance{LastSync: "then"}
+	in.RecordSync("now", "")
+	if in.LastSync != "now" || in.LastError != "" {
+		t.Fatalf("ok = %+v", in)
+	}
+	in.RecordSync("later", "boom")
+	if in.LastSync != "now" || in.LastError != "boom" {
+		t.Fatalf("failed = %+v", in)
+	}
+	in.RecordSync("latest", "")
+	if in.LastSync != "latest" || in.LastError != "" {
+		t.Fatalf("recovered = %+v", in)
+	}
+}

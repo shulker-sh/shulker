@@ -310,14 +310,9 @@ func (a *app) stampSync(dir string, syncErr error) {
 	}
 	a.stampIntent(dir, at, result)
 	a.updateInstances(func(instances []config.Instance) []config.Instance {
-		i, ok := config.FindInstance(instances, dir)
-		if !ok {
-			return instances
+		if i, ok := config.FindInstance(instances, dir); ok {
+			instances[i].RecordSync(at, failure)
 		}
-		if syncErr == nil {
-			instances[i].LastSync = at
-		}
-		instances[i].LastError = failure
 		return instances
 	})
 }
@@ -328,11 +323,7 @@ func (a *app) stampIntent(dir, at, result string) {
 		return
 	}
 	if err == nil {
-		r := f.EnsureResolved()
-		if result == instance.ResultOK {
-			r.LastSyncAt = at
-		}
-		r.LastResult = result
+		f.RecordSync(at, result)
 		err = f.Save(dir)
 	}
 	if err != nil {

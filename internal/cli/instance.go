@@ -376,22 +376,7 @@ func (i *instanceFile) settings() map[string]any {
 	return maps.Clone(s)
 }
 
-// save checks the document against the schema and writes it back through instance.File, so the
-// file keeps the order shulker writes it in.
-func (i *instanceFile) save() error {
-	data, err := json.Marshal(i.doc)
-	if err != nil {
-		return err
-	}
-	if err := schema.Validate(schema.Instance, data); err != nil {
-		return schema.Invalid("instance-invalid", i.path, data, err)
-	}
-	var file instance.File
-	if err := json.Unmarshal(data, &file); err != nil {
-		return err
-	}
-	return file.Save(i.dir)
-}
+func (i *instanceFile) save() error { return instance.SaveDocument(i.dir, i.doc) }
 
 // playDefaults is config.json as a document, for the play.* defaults an instance inherits.
 func (a *app) playDefaults() (map[string]any, error) {

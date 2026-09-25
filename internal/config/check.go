@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -143,4 +144,15 @@ func valueText(v any) string {
 		return fmt.Sprint(v)
 	}
 	return strings.TrimSuffix(b.String(), "\n")
+}
+
+// CheckDocument is whether doc, written as config.json, would read back; the error is the schema's.
+func CheckDocument(doc map[string]any) error {
+	written := maps.Clone(doc)
+	written["$schema"] = schema.URL(schema.Config)
+	data, err := json.Marshal(written)
+	if err != nil {
+		return err
+	}
+	return schema.Validate(schema.Config, data)
 }

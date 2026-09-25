@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -302,13 +301,7 @@ func (a *app) checkAccountID(id string) error {
 // checkConfigDocument refuses a value, typed with --literal, that config.json's schema doesn't allow
 // at field, so the next run doesn't find the file broken.
 func checkConfigDocument(field *schema.Field, doc map[string]any, v any) error {
-	written := maps.Clone(doc)
-	written["$schema"] = schema.URL(schema.Config)
-	data, err := json.Marshal(written)
-	if err != nil {
-		return err
-	}
-	if schema.Validate(schema.Config, data) != nil {
+	if config.CheckDocument(doc) != nil {
 		return out.Errorf("usage", "%s takes %s, not %s", field.Path, field.Kind(), settingText(v))
 	}
 	return nil
