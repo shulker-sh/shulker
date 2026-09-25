@@ -138,3 +138,14 @@ func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
 		}
 	}
 }
+
+func TestLinkShulkerFreshDoesNotWarnAboutTheLock(t *testing.T) {
+	h := newHarness(t)
+	shulkerInstances(t, h)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	_, stderr := h.mustRunStderr(t, "link", "shulker")
+	if strings.Contains(stderr, "not in the lock") {
+		t.Fatalf("a fresh link has no lock to be missing from: %s", stderr)
+	}
+}

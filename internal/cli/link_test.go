@@ -412,3 +412,13 @@ func readJSONFile(t *testing.T, path string, v any) {
 		t.Fatalf("%s: %v", path, err)
 	}
 }
+
+func TestLinkMojangFreshDoesNotWarnAboutTheLock(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+	_, stderr := h.mustRunStderr(t, "link", "vanilla", "--launcher-dir", mojangLauncherDir(t))
+	if strings.Contains(stderr, "not in the lock") {
+		t.Fatalf("a fresh link has no lock to be missing from: %s", stderr)
+	}
+}

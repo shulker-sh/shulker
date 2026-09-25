@@ -250,6 +250,9 @@ func TestModpackMissingFromTheLockWarnsOnlyBesideOtherPins(t *testing.T) {
 	if err := os.WriteFile(lockPath, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if _, stderr := h.mustRunStderr(t, "build"); strings.Count(stderr, "modpack two is not in the lock yet") != 1 {
+		t.Fatalf("a read without a relock warns once: %s", stderr)
+	}
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env)
 	if !strings.Contains(strings.Join(env.Warnings, "\n"), "modpack two is not in the lock yet") {
