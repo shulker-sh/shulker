@@ -234,3 +234,25 @@ func TestRootsAreKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestRedactMasksEachSecretKeyAndLeavesTheRestAlone(t *testing.T) {
+	doc := map[string]any{
+		"curseforge": map[string]any{"key": "abcdef1234", "other": "kept"},
+		"instances":  "/data/instances",
+	}
+	got := Redact(doc, func(s string) string { return "masked" })
+	cf := got["curseforge"].(map[string]any)
+	if cf["key"] != "masked" || cf["other"] != "kept" || got["instances"] != "/data/instances" {
+		t.Fatalf("redacted = %v", got)
+	}
+	if doc["curseforge"].(map[string]any)["key"] != "abcdef1234" {
+		t.Fatal("the document given is not written to")
+	}
+	if !IsSecret("curseforge.key") || IsSecret("instances") {
+		t.Fatal("curseforge.key is the secret")
+	}
+	bare := map[string]any{"curseforge": map[string]any{"key": 5}, "registry": "r"}
+	if got := Redact(bare, func(string) string { return "masked" }); got["curseforge"].(map[string]any)["key"] != 5 {
+		t.Fatalf("a secret that isn't text is left as it is: %v", got)
+	}
+}

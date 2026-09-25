@@ -15,10 +15,7 @@ import (
 	"shulker.sh/shulker/schema"
 )
 
-const (
-	curseForgeKey   = "curseforge.key"
-	accountsDefault = "accounts.default"
-)
+const accountsDefault = "accounts.default"
 
 type configChange struct {
 	Path    string `json:"path"`
@@ -68,12 +65,8 @@ func (a *app) configGetCmd() *cobra.Command {
 				for k, v := range resolved {
 					all[k] = v
 				}
-				if cf, ok := doc["curseforge"].(map[string]any); ok && !reveal {
-					if secret, ok := cf["key"].(string); ok {
-						cf = maps.Clone(cf)
-						cf["key"] = maskKey(secret)
-						all["curseforge"] = cf
-					}
+				if !reveal {
+					all = config.Redact(all, maskKey)
 				}
 				value = all
 			case resolved[key] != "":
@@ -85,7 +78,7 @@ func (a *app) configGetCmd() *cobra.Command {
 						return out.Errorf("path-not-set", "%s is not set", key)
 					}
 				}
-				if key == curseForgeKey && !reveal {
+				if config.IsSecret(key) && !reveal {
 					if secret, isText := v.(string); isText {
 						v = maskKey(secret)
 					}
@@ -252,7 +245,7 @@ func (a *app) openConfig(key string) (string, config.Config, map[string]any, err
 	return path, cfg, doc, nil
 }
 func (a *app) emitConfigChange(change configChange) error {
-	if change.Path == curseForgeKey {
+	if config.IsSecret(change.Path) {
 		if s, ok := change.From.(string); ok {
 			change.From = maskKey(s)
 		}

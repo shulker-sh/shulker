@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -32,6 +33,38 @@ const (
 
 // Keys are the config.json keys `shulker config` reads and sets.
 var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
+
+// Secrets are the keys whose values `shulker config` masks unless asked to reveal them.
+var Secrets = []string{"curseforge.key"}
+
+// IsSecret reports whether key holds a secret.
+func IsSecret(key string) bool { return slices.Contains(Secrets, key) }
+
+// Redact is a copy of the document with every secret's text passed through mask; a secret that is
+// not text, or is unset, is left as it is.
+func Redact(doc map[string]any, mask func(string) string) map[string]any {
+	doc = maps.Clone(doc)
+	for _, key := range Secrets {
+		path := strings.Split(key, ".")
+		parent := doc
+		for i, part := range path {
+			if i == len(path)-1 {
+				if text, ok := parent[part].(string); ok {
+					parent[part] = mask(text)
+				}
+				break
+			}
+			child, ok := parent[part].(map[string]any)
+			if !ok {
+				break
+			}
+			child = maps.Clone(child)
+			parent[part] = child
+			parent = child
+		}
+	}
+	return doc
+}
 
 // Config is config.json.
 type Config struct {
