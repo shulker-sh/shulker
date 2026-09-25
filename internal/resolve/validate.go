@@ -231,6 +231,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 	}
 	for _, id := range sortedKeys(placed) {
 		info := onSide(placed[id], side)
+		v.Warnings = append(v.Warnings, orInsideRange(id, info, installed)...)
 		for _, on := range sortedKeys(info.Depends) {
 			declared := info.Depends[on]
 			found, ok := installed[on]
@@ -305,6 +306,27 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 		}
 	}
 	return v
+}
+
+// orInsideRange warns of a range string that holds "||" on a dependency that is installed. Only an
+// array of ranges is an "or"; inside one string the loader reads "||" as a version no mod has.
+func orInsideRange(id string, info *jarmeta.Info, installed map[string]string) []string {
+	if info.UsesMavenRanges {
+		return nil
+	}
+	var warnings []string
+	for _, kind := range []struct {
+		verb   string
+		ranges map[string]jarmeta.Range
+	}{{"depends on", info.Depends}, {"optionally depends on", info.Optional}, {"breaks", info.Breaks}, {"conflicts with", info.Conflicts}} {
+		for _, on := range sortedKeys(kind.ranges) {
+			declared := kind.ranges[on]
+			if _, ok := installed[on]; ok && slices.ContainsFunc(declared, func(alt string) bool { return strings.Contains(alt, "||") }) {
+				warnings = append(warnings, fmt.Sprintf(`%s %s %s %s, but "||" inside one range string is read as a version, not as "or"`, id, kind.verb, on, declared))
+			}
+		}
+	}
+	return warnings
 }
 
 // onSide is info without the dependencies FML skips on side, info itself when there are none.

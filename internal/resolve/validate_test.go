@@ -131,6 +131,35 @@ func TestValidateOptionalAndLoaderProvides(t *testing.T) {
 	}
 }
 
+func TestValidateTakesOrOnlyFromAnArray(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	jars := map[string]string{
+		"easy_npc":            `{"id":"easy_npc","version":"7.12.1","breaks":{"easy_model_entities":"<2.4.0 || >=3.0.0"}}`,
+		"strict":              `{"id":"strict","version":"1.0.0","breaks":{"easy_model_entities":["<2.4.0",">=3.0.0"]}}`,
+		"easy_model_entities": `{"id":"easy_model_entities","version":"2.3.0"}`,
+	}
+	l := &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "fabric", Version: "0.17.3"}, Mods: map[string]lock.Mod{}}
+	for id, meta := range jars {
+		sha, err := c.Put(bytes.NewReader(zipBytes(t, "fabric.mod.json", meta)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Mods[id] = lock.Mod{Sha512: sha, Side: "both"}
+	}
+	v, err := (&Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}).Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantProblems := []Problem{{Rule: "breaks", Mod: "strict", ModVersion: "1.0.0", On: "easy_model_entities", Declared: "<2.4.0 || >=3.0.0", Found: "2.3.0"}}
+	if !reflect.DeepEqual(v.Problems, wantProblems) {
+		t.Errorf("problems %+v, want %+v", v.Problems, wantProblems)
+	}
+	wantWarnings := []string{`easy_npc breaks easy_model_entities <2.4.0 || >=3.0.0, but "||" inside one range string is read as a version, not as "or"`}
+	if !reflect.DeepEqual(v.Warnings, wantWarnings) {
+		t.Errorf("warnings %q, want %q", v.Warnings, wantWarnings)
+	}
+}
+
 func TestValidateSkipsDependenciesNotDownloaded(t *testing.T) {
 	c := &cache.Cache{Dir: t.TempDir()}
 	sha, err := c.Put(bytes.NewReader(zipBytes(t, "fabric.mod.json", `{"id":"private-mod","version":"1.0.0","depends":{"fabric-api":"*","sodium":"*"}}`)))
