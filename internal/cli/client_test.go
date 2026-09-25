@@ -9,7 +9,7 @@ import (
 
 func TestClientBuildMergesOptions(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "install")
 
 	path := filepath.Join(h.dir, "build", "client", "options.txt")
@@ -49,7 +49,7 @@ func TestClientBuildMergesOptions(t *testing.T) {
 
 func TestClientBuildMergesIntoGameWrittenOptions(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 
 	path := filepath.Join(h.dir, "build", "client", "options.txt")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -71,7 +71,7 @@ func TestClientBuildMergesIntoGameWrittenOptions(t *testing.T) {
 
 func TestClientBuildRestoresDroppedOptions(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.editManifest(t, func(m map[string]any) {
 		m["client"] = map[string]any{"options": map[string]any{"key_zoomify.key.zoom": "key.keyboard.z", "fov": 0.5}}
 	})

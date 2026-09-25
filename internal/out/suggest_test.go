@@ -48,7 +48,7 @@ func TestExampleCommand(t *testing.T) {
 		{"drops the typo when the pick is already typed", []string{"mod", "add"}, Error{Given: "mod"}, "add", "shulker add"},
 		{"sets a flag that was given", []string{"export", "--side", "client", "-o", "x.mrpack"}, Error{Flag: "--side"}, "server", "shulker export --side server -o x.mrpack"},
 		{"adds a flag that was missing", []string{"sync"}, Error{Flag: "--side"}, "client", "shulker sync --side client"},
-		{"the typed argument wins over the flag", []string{"init", "--yes", "--side", "clint"}, Error{Given: "clint", Flag: "--side"}, "client", "shulker init --yes --side client"},
+		{"the typed argument wins over the flag", []string{"create", "--side", "clint"}, Error{Given: "clint", Flag: "--side"}, "client", "shulker create --side client"},
 		{"a value typed twice has no example", []string{"remove", "sodim", "sodim"}, Error{Given: "sodim"}, "sodium", ""},
 		{"quotes an argument with spaces", []string{"pull"}, Error{Flag: "--into"}, "/Users/me/Application Support/x", "shulker pull --into '/Users/me/Application Support/x'"},
 	} {

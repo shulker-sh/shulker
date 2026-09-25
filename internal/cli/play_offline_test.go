@@ -15,7 +15,7 @@ func TestAnUnreachableModpackReadsAsOffline(t *testing.T) {
 			h := newHarness(t)
 			shulkerInstances(t, h)
 			h.mustRun(t, "config", "set", "store", filepath.Join(t.TempDir(), "store"))
-			h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+			h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 			h.mustRun(t, "add", "sodium")
 			var srv *httptest.Server
 			var source string

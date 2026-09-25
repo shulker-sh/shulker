@@ -20,7 +20,7 @@ func markerJarIn(t *testing.T, gameDir string) string {
 
 func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["marker"] = false
@@ -105,7 +105,7 @@ func TestLinkSeedsHooksFromTheManifestThenTheFlags(t *testing.T) {
 
 func TestLinkSettingsFlagsOnEveryLauncher(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 
 	launcherDir := t.TempDir()
 	code, stdout, _ := h.run(t, "link", "prism", "--launcher-dir", launcherDir, "--java", "jdk/bin/java", "--json")

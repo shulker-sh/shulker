@@ -19,7 +19,7 @@ type matchResult struct {
 
 func TestMatchLocksOverrideFiles(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	sodium, jei, iris, fresh := h.jars["sodium"], h.jars["jei"], h.jars["irisshaders"], h.jars["fresh-animations"]
 	files := map[string][]byte{
 		"overrides/mods/" + sodium.filename:                   sodium.data,

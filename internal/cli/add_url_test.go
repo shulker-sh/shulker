@@ -22,7 +22,7 @@ func runError(t *testing.T, h *harness, args ...string) *out.Error {
 func TestAddPinsAModrinthVersionURLByItsNumber(t *testing.T) {
 	h := newHarness(t)
 	h.newer = true
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	h.mustRun(t, "add", "https://modrinth.com/mod/sodium/version/1.0.0+mc26.2")
 
@@ -37,7 +37,7 @@ func TestAddPinsAModrinthVersionURLByItsNumber(t *testing.T) {
 func TestAddTakesSeveralURLsEachWithItsOwnPin(t *testing.T) {
 	h := newHarness(t)
 	h.newer = true
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	h.mustRun(t, "add",
 		"https://legacy.curseforge.com/minecraft/mc-mods/jei/download/5000001",
@@ -67,7 +67,7 @@ func TestAddTakesSeveralURLsEachWithItsOwnPin(t *testing.T) {
 
 func TestAddRefusesFlagsThatDisagreeWithTheURL(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	for _, args := range [][]string{
 		{"add", "https://modrinth.com/mod/sodium", "--provider", "curseforge"},
@@ -98,7 +98,7 @@ func TestAHostedModpackURL(t *testing.T) {
 func TestPinTakesAURLOfTheLockedProject(t *testing.T) {
 	h := newHarness(t)
 	h.newer = true
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "jei")
 
 	if e := runError(t, h, "pin", "nope", "https://modrinth.com/mod/sodium/version/QANobbMI"); e.Code != "mod-not-found" {

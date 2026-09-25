@@ -32,7 +32,7 @@ func dataJSON(t *testing.T, stdout string) string {
 func TestAnUnreadableDataVersionLeavesTheLockToTheNextRelock(t *testing.T) {
 	h := newHarness(t)
 	h.noRanges = true
-	code, _, stderr := h.run(t, "init", "--yes", "--loader", "fabric")
+	code, _, stderr := h.run(t, "create", "--loader", "fabric")
 	if code != 0 || !strings.Contains(stderr, "couldn't read the Minecraft 26.2 data version") {
 		t.Fatalf("an unreadable data version warns rather than failing the lock: %d %s", code, stderr)
 	}

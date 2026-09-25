@@ -11,7 +11,7 @@ import (
 func TestInstallNamesTheFileAProviderFailsToServe(t *testing.T) {
 	h := newHarness(t)
 	sodium := h.jars["sodium"]
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	os.RemoveAll(h.cache)
 
@@ -53,7 +53,7 @@ func TestInstallNamesTheFileAProviderFailsToServe(t *testing.T) {
 func TestInstallTriesEveryDownloadUnlessFailFast(t *testing.T) {
 	h := newHarness(t)
 	sodium, api := h.jars["sodium"], h.jars["fabric-api"]
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium", "fabric-api")
 	os.RemoveAll(h.cache)
 	h.cdnDown = map[string]bool{"/cdn/" + sodium.filename: true, "/cdn/" + api.filename: true}
@@ -77,7 +77,7 @@ func TestInstallTriesEveryDownloadUnlessFailFast(t *testing.T) {
 func TestCheckReportsFailedDownloadsAndManualDownloadsApart(t *testing.T) {
 	h := newHarness(t)
 	sodium := h.jars["sodium"]
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	downloads := filepath.Join(h.dir, "downloads")
 	os.MkdirAll(downloads, 0o755)
 	os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
@@ -116,7 +116,7 @@ func TestSyncServeAndExportTryEveryDownloadUnlessFailFast(t *testing.T) {
 		t.Run(tc.args[0], func(t *testing.T) {
 			h := newHarness(t)
 			sodium, api := h.jars["sodium"], h.jars["fabric-api"]
-			h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", tc.side)
+			h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", tc.side)
 			h.editManifest(t, func(m map[string]any) {
 				m[tc.side].(map[string]any)["build"] = "."
 			})

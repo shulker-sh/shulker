@@ -166,7 +166,7 @@ func resolvedJava(t *testing.T, dir string) string {
 
 func TestLinkMojangRecordsTheManagedRuntime(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	launcherDir := writeMojangLauncher(t)
 	gameDir := mojangGameDir(launcherDir, "pack")
@@ -202,7 +202,7 @@ func TestLinkMojangRecordsTheManagedRuntime(t *testing.T) {
 
 func TestClientJavaSettingStandsInForTheRuntime(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	launcherDir := writeMojangLauncher(t)
 	gameDir := mojangGameDir(launcherDir, "pack")
 	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
@@ -229,7 +229,7 @@ func TestClientJavaSettingStandsInForTheRuntime(t *testing.T) {
 func TestLinkMojangNamesTheJavaFlagWhenNoRuntimeExists(t *testing.T) {
 	h := newHarness(t)
 	h.runtime.missing = true
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	launcherDir := writeMojangLauncher(t)
 	code, stdout, stderr := h.run(t, "link", "mojang", "--launcher-dir", launcherDir)
 	if code == 0 || !strings.Contains(stderr, "runtime-unavailable") || !strings.Contains(stderr, "Fix: shulker link mojang --java <path>") {
@@ -242,7 +242,7 @@ func TestLinkMojangNamesTheJavaFlagWhenNoRuntimeExists(t *testing.T) {
 
 func TestOtherLaunchersBringTheirOwnJava(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Friends")
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")

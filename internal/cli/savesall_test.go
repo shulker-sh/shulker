@@ -38,7 +38,7 @@ func fourRows(t *testing.T, h *harness) string {
 	t.Helper()
 	root := savesRoot(t, h)
 	shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "link", "shulker")
 	h.mustRun(t, "link", "shulker", "--as", "pack2")
 	prismDir := t.TempDir()

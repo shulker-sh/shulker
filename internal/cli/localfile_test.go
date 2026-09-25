@@ -15,7 +15,7 @@ import (
 func localFiles(t *testing.T) (*harness, fakeJar) {
 	t.Helper()
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	jar := makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
 	files := map[string][]byte{
 		"files/private-mod-1.4.jar": jar.data,
@@ -230,7 +230,7 @@ func TestImportMrpackTakesBundledLocalFilesAsItsOwn(t *testing.T) {
 
 func TestImportMrpackRestoresAPackFolder(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writeFolder(t, filepath.Join(h.dir, "packs", "Helper"), helperFiles)
 	h.mustRun(t, "resourcepack", "add", "packs/Helper")
 	_, sha := folderZip(t, h, "packs/Helper")

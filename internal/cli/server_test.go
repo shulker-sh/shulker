@@ -12,7 +12,7 @@ import (
 
 func TestServerTargetBuild(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "add", "fabric-api")
 	h.editManifest(t, func(m map[string]any) {
 		m["variables"] = map[string]any{"motd": "Welcome"}
@@ -167,7 +167,7 @@ func readFile(t *testing.T, path string) string {
 
 func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 
 	path := filepath.Join(h.dir, "build", "server", "server.properties")
@@ -216,7 +216,7 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 
 func TestServerBuildValidatesPropertyKeys(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"] = map[string]any{"properties": map[string]any{"difficulty": "easy", "pvp": false, "vew-distance": 8}}
 	})
@@ -244,7 +244,7 @@ func TestServerBuildValidatesPropertyKeys(t *testing.T) {
 
 func TestServerBuildPushesResourcePack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "add", "fresh-animations")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"].(map[string]any)["resourcePack"] = "fresh-animations"
@@ -273,7 +273,7 @@ func TestServerBuildPushesResourcePack(t *testing.T) {
 
 func TestPullSkipsAPushedKeyBesideAnOverrideServerProperties(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "add", "fresh-animations")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"].(map[string]any)["resourcePack"] = "fresh-animations"

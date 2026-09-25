@@ -20,7 +20,7 @@ func playHarness(t *testing.T, h *harness, args ...string) (store, gameDir strin
 	root := shulkerInstances(t, h)
 	store = filepath.Join(t.TempDir(), "store")
 	h.mustRun(t, "config", "set", "store", store)
-	h.mustRun(t, append([]string{"init", "--yes", "--name", "pack"}, args...)...)
+	h.mustRun(t, append([]string{"create", "--name", "pack"}, args...)...)
 	h.mustRun(t, "link", "shulker")
 	h.dir = ""
 	return store, filepath.Join(root, "pack")
@@ -122,7 +122,7 @@ func TestPlayDryRunMergesTheLoaderOverVanilla(t *testing.T) {
 func TestPlayRefusesAnotherLaunchersInstance(t *testing.T) {
 	h := newHarness(t)
 	launcherDir := t.TempDir()
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--name", "Friends")
 	h.dir = ""
 
@@ -350,7 +350,7 @@ func TestPlayDryRunReportsTheHeapTheLaunchGets(t *testing.T) {
 	h := newHarness(t)
 	shulkerInstances(t, h)
 	h.mustRun(t, "config", "set", "store", filepath.Join(t.TempDir(), "store"))
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 	h.mustRun(t, "link", "shulker")
 	source := h.dir
 	h.dir = ""

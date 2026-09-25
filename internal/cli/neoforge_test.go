@@ -17,7 +17,7 @@ import (
 
 func TestNeoForgeServer(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge", "--side", "server")
+	h.mustRun(t, "create", "--name", "pack", "--loader", "neoforge", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"] = map[string]any{"eula": true}
 	})
@@ -114,7 +114,7 @@ func TestNeoForgeServer(t *testing.T) {
 
 func TestNeoForgeLinkMojang(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
+	h.mustRun(t, "create", "--name", "pack", "--loader", "neoforge")
 
 	launcherDir := t.TempDir()
 	writeProfiles(t, launcherDir, launcherProfiles{
@@ -153,7 +153,7 @@ func TestNeoForgeLinkMojang(t *testing.T) {
 // A launcher that has never run has no launcher_profiles.json, which the installers refuse.
 func TestNeoForgeLinkMojangFreshLauncher(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
+	h.mustRun(t, "create", "--name", "pack", "--loader", "neoforge")
 
 	launcherDir := t.TempDir()
 	h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)

@@ -47,7 +47,7 @@ func TestPlayersBuild(t *testing.T) {
 	h.mojang["Alice"] = aliceUUID
 	h.mojang["Bob"] = bobUUID
 	h.mojang["Mallory"] = malUUID
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 	buildDir := filepath.Join(h.dir, "build", "server")
 	whitelist := filepath.Join(buildDir, "whitelist.json")
@@ -170,7 +170,7 @@ func TestPlayerCommand(t *testing.T) {
 	h := newHarness(t)
 	h.mojang["Alice"] = aliceUUID
 	h.mojang["Bob"] = bobUUID
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 	setPlayers(t, h, map[string]any{"whitelist": []any{map[string]any{"name": "Alice"}, map[string]any{"name": "Bob"}}})
 	h.mustRun(t, "build")

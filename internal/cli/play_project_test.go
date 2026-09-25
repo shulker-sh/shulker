@@ -13,7 +13,7 @@ func projectPlayHarness(t *testing.T, h *harness) (root string) {
 	t.Helper()
 	root = shulkerInstances(t, h)
 	h.mustRun(t, "config", "set", "store", filepath.Join(t.TempDir(), "store"))
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 	return root
 }
 

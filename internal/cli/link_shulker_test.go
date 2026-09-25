@@ -23,7 +23,7 @@ func shulkerInstances(t *testing.T, h *harness) string {
 func TestLinkShulker(t *testing.T) {
 	h := newHarness(t)
 	root := shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	stdout := h.mustRun(t, "link", "shulker")
@@ -90,7 +90,7 @@ func TestLinkShulker(t *testing.T) {
 func TestLinkShulkerNicknames(t *testing.T) {
 	h := newHarness(t)
 	root := shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 
 	h.mustRun(t, "link", "shulker", "--as", "smp")
 	if _, err := os.Stat(filepath.Join(root, "smp", "shulker.json")); err != nil {
@@ -102,7 +102,7 @@ func TestLinkShulkerNicknames(t *testing.T) {
 
 	// A second source under the same nickname is a different instance asking for one folder.
 	other := t.TempDir()
-	h.mustRun(t, "-C", other, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "-C", other, "create", "--loader", "fabric", "--name", "pack")
 	code, _, stderr := h.run(t, "-C", other, "link", "shulker", "--as", "smp")
 	if code == 0 || !strings.Contains(stderr, "already follows") {
 		t.Fatalf("exit %d: %s", code, stderr)
@@ -119,7 +119,7 @@ func TestLinkShulkerNicknames(t *testing.T) {
 func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
 	h := newHarness(t)
 	root := shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "link", "shulker", "--as", "smp")
 
 	for _, args := range [][]string{
@@ -142,7 +142,7 @@ func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
 func TestLinkShulkerFreshDoesNotWarnAboutTheLock(t *testing.T) {
 	h := newHarness(t)
 	shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	_, stderr := h.mustRunStderr(t, "link", "shulker")
 	if strings.Contains(stderr, "not in the lock") {

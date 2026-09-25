@@ -48,7 +48,7 @@ func importMerge(t *testing.T, h *harness, args ...string) mergeResult {
 
 func TestImportMergeKeepsTheProjectsVersion(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "fabric-api")
 	h.newerAPI = true
 	archive := writeMergePack(t, h, "fabric-loader", "0.17.3", []fakeJar{h.jars["fabric-api-next"], h.jars["sodium"]}, nil)
@@ -74,7 +74,7 @@ func TestImportMergeKeepsTheProjectsVersion(t *testing.T) {
 
 func TestImportMergeKeepsYourOverride(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writeFile(t, filepath.Join(h.dir, "overrides", "config", "a.txt"), "mine")
 	archive := writeMergePack(t, h, "fabric-loader", "0.17.3", nil, map[string][]byte{"overrides/config/a.txt": []byte("theirs"), "overrides/config/b.txt": []byte("theirs")})
 	res := importMerge(t, h, archive)
@@ -90,7 +90,7 @@ func TestImportMergeKeepsYourOverride(t *testing.T) {
 
 func TestImportMergeRefusesAnotherPlatform(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	manifestBefore, _ := os.ReadFile(filepath.Join(h.dir, manifest.FileName))
 	lockBefore, _ := os.ReadFile(filepath.Join(h.dir, lock.FileName))
 	archive := writeMergePack(t, h, "neoforge", "26.2.0.87", nil, map[string][]byte{"overrides/config/n.txt": []byte("neo")})
@@ -109,7 +109,7 @@ func TestImportMergeRefusesAnotherPlatform(t *testing.T) {
 
 func TestImportMergeTakesOnlyTheProjectsSides(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	if h.readManifest(t).HasSide("server") {
 		t.Fatal("init made a server side")
 	}
@@ -138,7 +138,7 @@ func TestImportMergeTakesOnlyTheProjectsSides(t *testing.T) {
 
 func TestImportMergesAMarkersFeaturesAndVariables(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "source")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "source")
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0.0"
 		m["variables"] = map[string]any{"a": "pack", "b": "pack"}
@@ -149,7 +149,7 @@ func TestImportMergesAMarkersFeaturesAndVariables(t *testing.T) {
 	archive := filepath.Join(h.dir, "build", "source-1.0.0.mrpack")
 
 	h.dir = t.TempDir()
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "mine")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "mine")
 	h.editManifest(t, func(m map[string]any) {
 		m["variables"] = map[string]any{"a": "mine"}
 		m["features"] = map[string]any{"shared": map[string]any{"note": "mine"}}
@@ -177,7 +177,7 @@ func TestImportMergeIntoAnInstanceTakesAHistoryEntry(t *testing.T) {
 
 func TestImportMergeRefusesAnotherLoaderVersion(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	archive := writeMergePack(t, h, "fabric-loader", "0.16.0", nil, nil)
 	if code, stdout, _ := h.run(t, "--json", "import", archive); code == 0 || failureCode(t, stdout).Code != "import-mismatch" {
 		t.Fatalf("exit %d: %s", code, stdout)
@@ -186,7 +186,7 @@ func TestImportMergeRefusesAnotherLoaderVersion(t *testing.T) {
 
 func TestImportMergeTakesTheSlugsVersionForTheProjectsLoader(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	older := hostedMrpack(t, h, "cozy-1.0.0.mrpack", "1.0.0")
 	newer := hostedMrpack(t, h, "cozy-2.0.0.mrpack", "2.0.0")
 	h.modrinthPacks = map[string]*modrinthPack{"COZYpack": {slug: "cozy", versions: []modrinthPackVersion{

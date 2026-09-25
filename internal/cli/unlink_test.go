@@ -27,7 +27,7 @@ func unlinkJSON(t *testing.T, h *harness, args ...string) []unlinkResult {
 
 func TestUnlink(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	prismDir := t.TempDir()
@@ -91,7 +91,7 @@ func TestUnlink(t *testing.T) {
 
 func TestUnlinkLauncherNameInProject(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	mojangDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(mojangDir, launcher.ProfilesFile), []byte(`{"profiles":{}}`), 0o644); err != nil {
@@ -121,7 +121,7 @@ func TestUnlinkLauncherNameInProject(t *testing.T) {
 
 func TestUnlinkAll(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "link", "multimc", h.dir, "--launcher-dir", t.TempDir(), "--name", "Twin")
 	h.mustRun(t, "link", "multimc", h.dir, "--launcher-dir", t.TempDir(), "--name", "Twin")
@@ -144,7 +144,7 @@ func TestUnlinkAll(t *testing.T) {
 
 func TestUnlinkedInstanceStaysUnlinked(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--as", "friends")
@@ -175,7 +175,7 @@ func TestUnlinkedInstanceStaysUnlinked(t *testing.T) {
 // instance follows — and a link that disagrees with it still has to ask for --force.
 func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	other := filepath.Join(t.TempDir(), "other")
 	lockedPack(t, h, other, `"fabric-api": {}`)
@@ -223,7 +223,7 @@ func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 
 func TestUnlinkDetachedBuild(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	into := filepath.Join(t.TempDir(), "detached")
 	h.mustRun(t, "sync", h.dir, "--into", into)
 	if lf, _ := local.Load(h.dir); len(lf.SyncDirs["client"]) != 1 {

@@ -20,7 +20,7 @@ func uninstallHarness(t *testing.T) (h *harness, prismDir, mojangDir, into strin
 	if err := os.WriteFile(h.exe, []byte("binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	prismDir, mojangDir = t.TempDir(), writeMojangLauncher(t)
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir)
 	h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)
@@ -110,7 +110,7 @@ func TestSelfUninstallWarnsAndCarriesOn(t *testing.T) {
 	if err := os.WriteFile(h.exe, []byte("binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	launcherDir := t.TempDir()
 	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir)
 	instanceFile := filepath.Join(launcherDir, "instances", "pack", launcher.ATLauncherInstanceFile)

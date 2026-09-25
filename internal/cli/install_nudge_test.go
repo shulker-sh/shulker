@@ -9,7 +9,7 @@ const launcherNudge = "Play it in a launcher"
 
 func TestInstallNudgesAtALauncherUntilLinked(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 	if stdout := h.mustRun(t, "install"); !strings.Contains(stdout, launcherNudge) || !strings.Contains(stdout, "$ shulker link <launcher>") {
 		t.Fatalf("unlinked install output: %s", stdout)
 	}
@@ -25,7 +25,7 @@ func TestInstallNudgesAtALauncherUntilLinked(t *testing.T) {
 
 func TestInstallSkipsTheLauncherNudge(t *testing.T) {
 	server := newHarness(t)
-	server.mustRun(t, "init", "--yes", "--name", "pack", "--side", "server")
+	server.mustRun(t, "create", "--name", "pack", "--side", "server")
 	if stdout := server.mustRun(t, "install"); strings.Contains(stdout, launcherNudge) {
 		t.Fatalf("server-only install output: %s", stdout)
 	}

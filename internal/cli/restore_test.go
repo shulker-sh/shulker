@@ -102,7 +102,7 @@ func TestRestorePutsTheZipsWorldsBackWhole(t *testing.T) {
 func TestRestoreAZipFromElsewhereIntoAnyTarget(t *testing.T) {
 	h := newHarness(t)
 	root := savesRoot(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	gameDir := filepath.Join(t.TempDir(), "prism", "pack", "minecraft")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
@@ -153,7 +153,7 @@ func TestRestoreAZipFromElsewhereIntoAnyTarget(t *testing.T) {
 
 func TestRestoreIntoAServerTakesOnlyItsLevel(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 	buildDir := filepath.Join(h.dir, "build", "server")
 	elsewhere := t.TempDir()
@@ -220,7 +220,7 @@ func TestAWorldOpenInARunningGame(t *testing.T) {
 
 func TestRestoreOnlyTheWorldsNamed(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	gameDir := filepath.Join(t.TempDir(), "minecraft")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 	worlds := filepath.Join(gameDir, "saves")
@@ -277,7 +277,7 @@ func TestRestoreOnlyTheWorldsNamed(t *testing.T) {
 
 func TestRestoreIntoAServerWithAnotherLevel(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 	buildDir := filepath.Join(h.dir, "build", "server")
 	other := t.TempDir()

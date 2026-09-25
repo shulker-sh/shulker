@@ -75,7 +75,7 @@ func TestBareAddMarksSeveralAndAddsThemInOneRelock(t *testing.T) {
 
 func TestBareAddTakesEachRowFromItsOwnProvider(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	code, stdout, stderr, _ := h.runMarking(t, map[string][]markStep{
 		"Add which mods?": {{"sodium", "curseforge:394468"}},
 	}, "add")
@@ -89,7 +89,7 @@ func TestBareAddTakesEachRowFromItsOwnProvider(t *testing.T) {
 
 func TestBareAddSearchesTheTypeItAdds(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	code, stdout, stderr, _ := h.runMarking(t, map[string][]markStep{
 		"Add which resource packs?": {{"fresh", "modrinth:50dA9Sha"}},
 	}, "resourcepack", "add")
@@ -103,7 +103,7 @@ func TestBareAddSearchesTheTypeItAdds(t *testing.T) {
 
 func TestAddAsksOnlyForWhatIsMissing(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	if code, stdout, stderr, s := h.runMarking(t, nil, "add", "sodium"); code != 0 || len(s.asked) != 0 {
 		t.Fatalf("add with an argument should ask nothing: exit %d, asked %q\n%s\n%s", code, s.asked, stdout, stderr)
 	}
@@ -117,7 +117,7 @@ func TestAddAsksOnlyForWhatIsMissing(t *testing.T) {
 
 func TestEscapingBareAddAddsNothing(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	before := projectFiles(t, h.dir)
 	code, stdout, stderr, _ := h.runMarking(t, map[string][]markStep{"Add which mods?": nil}, "add")
 	if code != out.ExitInterrupted {

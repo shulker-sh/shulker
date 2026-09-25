@@ -31,7 +31,7 @@ func enterAfter(n int, then func()) readerFunc {
 func lockedManualDownload(t *testing.T) *harness {
 	t.Helper()
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	downloads := filepath.Join(h.dir, "downloads")
 	os.MkdirAll(downloads, 0o755)
 	os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)

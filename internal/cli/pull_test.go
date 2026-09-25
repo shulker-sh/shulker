@@ -33,7 +33,7 @@ func pullReport(t *testing.T, h *harness, args ...string) build.PullReport {
 
 func TestPullAdoptsADroppedJarOrPackAsAFileEntry(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "install")
 	buildDir := filepath.Join(h.dir, "build", "client")
 	jar := makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17"}`)
@@ -99,7 +99,7 @@ func TestPullAdoptsADroppedJarOrPackAsAFileEntry(t *testing.T) {
 
 func TestPullKeepsAnAdoptedPacksName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "install")
 	buildDir := filepath.Join(h.dir, "build", "client")
 	pack := makeJarFile(t, "stay", "Stay True.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"stay true"}}`)
@@ -141,7 +141,7 @@ func TestPullKeepsAnAdoptedPacksName(t *testing.T) {
 
 func TestPullReportsWhereAnAdoptedFileLives(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "install")
 	jar := makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17"}`)
 	synced := filepath.Join(h.dir, "synced")

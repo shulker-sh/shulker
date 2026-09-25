@@ -69,7 +69,7 @@ func TestImportInlinesALockedGitSource(t *testing.T) {
 	if err := os.MkdirAll(h.dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "base")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "base")
 	h.mustRun(t, "add", "sodium")
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
 	gitRun(t, h.dir, "add", ".")
@@ -77,7 +77,7 @@ func TestImportInlinesALockedGitSource(t *testing.T) {
 	remote := filepath.Join(t.TempDir(), "base.git")
 	gitRun(t, h.dir, "clone", "-q", "--bare", h.dir, remote)
 	h.dir = project
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "modpack", "add", "file://"+remote)
 	if h.readLock(t).Modpacks["base"].Commit == "" {
 		t.Fatalf("not locked at a commit: %+v", h.readLock(t).Modpacks)
@@ -94,11 +94,11 @@ func TestImportInlinesAFloatingLocalSource(t *testing.T) {
 	if err := os.MkdirAll(h.dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "base")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "base")
 	h.mustRun(t, "add", "sodium")
 	writeFile(t, filepath.Join(h.dir, "overrides", "config", "base.txt"), "base")
 	h.dir = project
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "modpack", "add", "./base", "--unlocked")
 	refusesRemoval(t, h, "sodium")
 	h.mustRun(t, "import", "base")
@@ -110,7 +110,7 @@ func TestImportInlinesAFloatingLocalSource(t *testing.T) {
 
 func TestImportTypeModpackRefusesAnythingElse(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	if code, stdout, _ := h.run(t, "--json", "import", "sodium", "--type", "modpack"); code == 0 || failureCode(t, stdout).Code != "usage" {
 		t.Fatalf("exit %d: %s", code, stdout)

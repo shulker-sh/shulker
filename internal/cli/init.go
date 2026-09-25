@@ -2,10 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/loader"
@@ -15,149 +11,39 @@ import (
 	"shulker.sh/shulker/internal/resolve"
 )
 
-type initResult struct {
-	Name      string `json:"name"`
-	Minecraft string `json:"minecraft"`
-	Loader    string `json:"loader,omitempty"`
-	Version   string `json:"loaderVersion,omitempty"`
-	Java      int    `json:"java"`
-	Side      string `json:"side"`
-}
-
-// initOptions is what the flags set and what the wizard fills in for the ones left out.
-type initOptions struct {
-	yes           bool
-	name          string
-	minecraft     string
-	loaderName    string
-	loaderVersion string
-	side          string
-	pack          string
-}
-
 func (a *app) initCmd() *cobra.Command {
 	var opts initOptions
 	cmd := &cobra.Command{
 		Use:         "init",
 		Annotations: acts(),
-		Short:       "Create shulker.json and a lock in the current directory",
+		Short:       "Create shulker.json and a lock in the current directory, asking what is not given",
 		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			dir := a.dir
-			if dir == "" {
-				var err error
-				if dir, err = os.Getwd(); err != nil {
-					return err
-				}
-			}
-			if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err == nil {
-				return out.Errorf("manifest-exists", "%s already exists here", manifest.FileName)
-			}
-			if err := project.CheckSide(opts.side, "--side"); err != nil {
+			dir, err := a.initDir()
+			if err != nil {
 				return err
 			}
-			loaders := append([]string{noLoader}, loader.Names()...)
-			if _, ok := loader.Lookup(opts.loaderName); !ok && opts.loaderName != noLoader {
-				e := out.Errorf("usage", "unknown loader %q", opts.loaderName)
-				e.Help = fmt.Sprintf("use one of %s", strings.Join(loaders, ", "))
-				e.Candidates, e.Given, e.Flag = loaders, opts.loaderName, "--loader"
-				return e
-			}
-			if opts.loaderName == noLoader && cmd.Flags().Changed("loader-version") {
-				return out.Errorf("usage", "--loader-version needs --loader")
-			}
-			// --yes is init's own spelling of --no-input, since the wizard leaves the
-			// command no required value.
-			if opts.yes {
-				a.printer.NoInput = true
+			if err := opts.settle(cmd.Flags()); err != nil {
+				return err
 			}
 			if err := a.askInit(cmd, &opts); err != nil {
 				return err
 			}
-			var projectLoader manifest.Loader
-			if opts.loaderName != noLoader {
-				projectLoader = manifest.Loader{Type: opts.loaderName, Version: opts.loaderVersion}
-			}
-			name := opts.name
-			if name == "" {
-				name = project.Slugify(filepath.Base(dir))
-			}
-			minecraft := project.OrLatest(opts.minecraft)
-			m := &manifest.Manifest{
-				Schema:    manifest.SchemaURL,
-				Name:      name,
-				Authors:   project.DefaultAuthors(),
-				Minecraft: minecraft,
-				Loader:    projectLoader,
-				Requires:  map[string]manifest.Require{},
-			}
-			if opts.side == "server" {
-				m.Server = &manifest.Server{EULA: false, Memory: manifest.DefaultServerMemory, Properties: map[string]any{"difficulty": "easy"}}
-			}
-			if opts.side == "client" {
-				m.Client = project.NewClient()
-			}
-			d, err := a.deps()
-			if err != nil {
-				return err
-			}
-			a.progress("%s", resolve.ResolvingLine(minecraft, projectLoader))
-			l, warning, err := d.meta.NewLock(cmd.Context(), m)
-			if err != nil {
-				return err
-			}
-			if warning != "" {
-				a.printer.Warn("%s", warning)
-			}
-			if m.Minecraft == "*" {
-				m.Minecraft = l.Minecraft
-			}
-			p := &project.Project{Dir: dir, Manifest: m, Lock: l}
-			if err := p.SaveManifest(); err != nil {
-				return err
-			}
-			if err := p.SaveLock(); err != nil {
-				os.Remove(filepath.Join(dir, manifest.FileName))
-				return err
-			}
-			if err := project.Scaffold(dir); err != nil {
-				return err
-			}
-			packItems, err := a.initPack(cmd, p, opts.pack)
-			if err != nil {
-				return err
-			}
-			res := initResult{Name: name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Side: opts.side}
-			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OK("created "+manifest.FileName, fmt.Sprintf("%s, Java %d", resolve.PlatformLabel(res.Minecraft, res.Loader, res.Version), res.Java))
-				packItems(l)
-				switch {
-				case res.Loader != "":
-					l.Nudge("Add a mod", "shulker add <mod>")
-				case opts.side == "server":
-					l.Nudge("Download and build it", "shulker install")
-				default:
-					l.Nudge("Play it in a launcher", "shulker link <launcher>")
-				}
-			})
+			return a.createProject(cmd, dir, &opts)
 		},
 	}
-	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "accept defaults without asking: latest release, no loader, client side")
-	cmd.Flags().StringVar(&opts.name, "name", "", "project name (default: directory name)")
-	cmd.Flags().StringVar(&opts.minecraft, "minecraft", "", "Minecraft version or range (default: latest release)")
-	cmd.Flags().StringVar(&opts.loaderName, "loader", noLoader, "mod loader: "+noLoader+", "+strings.Join(loader.Names(), ", "))
-	cmd.Flags().StringVar(&opts.loaderVersion, "loader-version", "*", "loader version range")
-	cmd.Flags().StringVar(&opts.side, "side", "client", "side to declare: client or server")
+	initFlags(cmd, &opts)
 	return cmd
 }
 
 // askInit walks the wizard's questions in order. Each is skipped by the flag that answers it,
-// and every default is that flag's, so accepting them all creates what --yes creates.
+// and every default is that flag's, so accepting them all creates what create creates.
 func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 	if !a.canPick() {
 		return nil
 	}
-	if !cmd.Flags().Changed("side") {
+	given := func(flag string) bool { return opts.given(cmd.Flags(), flag) }
+	if !given("side") {
 		side, err := a.ask("What are you making?", []out.Choice{
 			{Label: "a client pack", Value: "client"},
 			{Label: "a server pack", Value: "server"},
@@ -167,7 +53,7 @@ func (a *app) askInit(cmd *cobra.Command, opts *initOptions) error {
 		}
 		opts.side = side
 	}
-	if err := a.askPlatform(cmd.Context(), opts, cmd.Flags().Changed); err != nil {
+	if err := a.askPlatform(cmd.Context(), opts, given); err != nil {
 		return err
 	}
 	from, err := a.ask("Start from an existing pack?", packChoices)
@@ -282,5 +168,3 @@ func (a *app) initPack(cmd *cobra.Command, p *project.Project, source string) (f
 	}
 	return rl.printItems, nil
 }
-
-const noLoader = "none"

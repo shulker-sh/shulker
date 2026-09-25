@@ -68,7 +68,7 @@ func editPackLock(t *testing.T, dir string, edit func(m map[string]any)) {
 func projectWithLockedPack(t *testing.T, name string) (*harness, string) {
 	t.Helper()
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	dir := filepath.Join(h.dir, name)
 	lockedPack(t, h, dir, `"sodium": {}`)
@@ -118,7 +118,7 @@ func TestLockedModpackNeedsAnExactPlatform(t *testing.T) {
 
 func TestModpackLockedWithoutALockFails(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
 	h.mustRun(t, "modpack", "add", "./base")
 

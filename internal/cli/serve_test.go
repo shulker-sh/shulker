@@ -12,7 +12,7 @@ import (
 
 func TestServeRunsServerAndStops(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	var m map[string]any
 	h.readJSON(t, "shulker.json", &m)
 	srv, _ := m["server"].(map[string]any)
@@ -101,7 +101,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 
 func TestServeErrors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 
 	old := h.fakeJDK(t, "17.0.12", "0")
@@ -136,7 +136,7 @@ func TestServeErrors(t *testing.T) {
 
 func TestManagedJava(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "add", "fabric-api")
 
 	code, stdout, _ := h.run(t, "--json", "install")
@@ -228,7 +228,7 @@ func TestManagedJava(t *testing.T) {
 func TestManagedJavaUnavailable(t *testing.T) {
 	h := newHarness(t)
 	h.runtime.missing = true
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	_, stderr := h.mustRunStderr(t, "install")
 	if !strings.Contains(stderr, "runtime") || !strings.Contains(stderr, "shulker.json") {
 		t.Fatalf("install should warn about the missing runtime: %s", stderr)
@@ -242,7 +242,7 @@ func TestManagedJavaUnavailable(t *testing.T) {
 
 func TestServeInstallsWhatTheLockNeeds(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--side", "server", "--loader", "neoforge")
+	h.mustRun(t, "create", "--name", "pack", "--side", "server", "--loader", "neoforge")
 	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
 	h.stdin = strings.NewReader("stop\n")
 	stdout, _ := h.mustRunStderr(t, "serve", "--accept-eula")

@@ -8,7 +8,7 @@ import (
 
 func TestAddAsKeysAMod(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium", "--as", "speed")
 
 	var m struct {
@@ -52,7 +52,7 @@ func TestAddAsKeysAMod(t *testing.T) {
 
 func TestAddRefusesATakenKey(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 
 	code, stdout, _ := h.run(t, "add", "fabric-api", "--as", "sodium", "--json")
@@ -63,7 +63,7 @@ func TestAddRefusesATakenKey(t *testing.T) {
 
 func TestAddRefusesOneJarIDUnderTwoKeys(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium", "--as", "speed")
 
 	code, stdout, _ := h.run(t, "add", "sodium", "--json")
@@ -74,7 +74,7 @@ func TestAddRefusesOneJarIDUnderTwoKeys(t *testing.T) {
 
 func TestAddRefusesAnInvalidAsKey(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	code, stdout, _ := h.run(t, "add", "sodium", "--as", "Speed Mod", "--json")
 	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" {

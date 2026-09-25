@@ -73,7 +73,7 @@ func TestImportRefusesASlugThatIsAMod(t *testing.T) {
 
 func TestImportCopiesALocalSource(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "friends")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "friends")
 	h.mustRun(t, "add", "sodium")
 	writeFile(t, filepath.Join(h.dir, "overrides", "config", "a.txt"), "a")
 	source := h.dir
@@ -104,7 +104,7 @@ func TestImportCopiesAGitSourceAtARefAndPath(t *testing.T) {
 	if err := os.MkdirAll(h.dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "one")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "one")
 	h.mustRun(t, "add", "sodium")
 	gitRun(t, repo, "init", "-q", "-b", "main")
 	gitRun(t, repo, "add", ".")

@@ -30,6 +30,6 @@ cd "$tmp"
 # Unset the env var and point at an empty config so only the embedded key can be used.
 unset SHULKER_CURSEFORGE_KEY
 export SHULKER_CONFIG="$tmp/config.json"
-"$bin" init --yes --loader fabric --minecraft 26.2 >/dev/null
+"$bin" create --fabric --minecraft 26.2 >/dev/null
 "$bin" add --provider curseforge fabric-api jei
 echo "embedded key works"

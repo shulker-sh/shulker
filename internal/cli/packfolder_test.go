@@ -18,7 +18,7 @@ import (
 func packFolders(t *testing.T) *harness {
 	t.Helper()
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	for rel, body := range map[string]string{
 		"Resource Packs/Mod Menu Helper/pack.mcmeta":                    `{"pack":{"pack_format":64,"description":"helper"}}`,
 		"Resource Packs/Mod Menu Helper/assets/modmenu/lang/en_us.json": `{"modmenu.title":"Mods"}`,
@@ -162,7 +162,7 @@ func TestFolderRefusedOffAPack(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.mustRun(t, "init", "--yes", "--loader", "fabric")
+			h.mustRun(t, "create", "--loader", "fabric")
 			if tc.rel != "" {
 				writeProjectFile(t, h, tc.rel, []byte("{}"))
 			} else {

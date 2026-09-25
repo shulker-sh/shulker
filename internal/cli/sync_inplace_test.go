@@ -175,7 +175,7 @@ func TestUpdateWithoutChildrenHasNoSyncNudge(t *testing.T) {
 	}
 
 	h = newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	if stdout := h.mustRun(t, "update"); strings.Contains(stdout, "shulker sync") {
 		t.Fatalf("a project that doesn't build in place has no children to nudge at: %s", stdout)
@@ -204,7 +204,7 @@ func TestCachePruneKeepsARemoteSourcedInstance(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
 	gitRun(t, h.dir, "add", ".")

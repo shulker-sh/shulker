@@ -52,3 +52,17 @@ func TestDefaultAuthorsEndWithShulker(t *testing.T) {
 		t.Fatalf("authors = %v", authors)
 	}
 }
+
+func TestNewManifestTakesEveryDefault(t *testing.T) {
+	m := NewManifest("", "/tmp/My Pack", "", manifest.Loader{}, "client")
+	if m.Name != "my-pack" || m.Minecraft != "*" || m.Loader.Type != "" || m.Client == nil || m.Server != nil {
+		t.Fatalf("defaults: %+v", m)
+	}
+	if m.Schema != manifest.SchemaURL || m.Requires == nil || len(m.Authors) == 0 {
+		t.Fatalf("shape: %+v", m)
+	}
+	m = NewManifest("srv", "/tmp/x", "1.21.1", manifest.Loader{Type: "neoforge", Version: "*"}, "server")
+	if m.Name != "srv" || m.Minecraft != "1.21.1" || m.Loader.Type != "neoforge" || m.Client != nil || m.Server == nil || m.Server.EULA {
+		t.Fatalf("server: %+v", m)
+	}
+}

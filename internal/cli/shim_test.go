@@ -31,7 +31,7 @@ func hookFiles(dir string) []string {
 
 func TestLinkMojangPointsTheProfileAtTheShim(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	launcherDir := writeMojangLauncher(t)
 	gameDir := mojangGameDir(launcherDir, "pack")
 
@@ -64,7 +64,7 @@ func TestLinkMojangPointsTheProfileAtTheShim(t *testing.T) {
 
 func TestMojangShimFollowsTheSwitchesAndGivesTheJavaBack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	launcherDir := t.TempDir()
 	gameDir := mojangGameDir(launcherDir, "pack")
 	// A profile from an earlier link, with a Java the player chose for it.

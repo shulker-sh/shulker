@@ -23,7 +23,7 @@ var helpGroups = []struct {
 	ID, Title string
 	Commands  []string
 }{
-	{"project", "Project", []string{"init", "get", "set", "unset", "lock", "check", "import", "export"}},
+	{"project", "Project", []string{"init", "create", "get", "set", "unset", "lock", "check", "import", "export"}},
 	{"mods", "Mods and modpacks", []string{"add", "match", "search", "remove", "list", "update", "outdated", "pin", "unpin", "ignore", "unignore", "suggests", "mod", "modpack", "resourcepack", "shader", "datapack"}},
 	{"builds", "Builds", []string{"install", "build", "diff", "pull", "feature", "history", "rollback"}},
 	{"launchers", "Launchers", []string{"link", "instances", "instance", "sync", "unlink", "saves", "backup", "restore", "hook"}},

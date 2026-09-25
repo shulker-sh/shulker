@@ -37,7 +37,7 @@ func rawURLWarnings(warnings []string) []string {
 
 func TestRawURLSourceWarnsItCarriesNoOverrides(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	source := servePack(t, h.dir)
 	into := filepath.Join(t.TempDir(), "minecraft")
@@ -81,7 +81,7 @@ func TestRawURLModpackWarnsOncePerCommand(t *testing.T) {
 	pack := t.TempDir()
 	writePrismPack(t, pack, "~26.2", `"sodium": {}`, nil)
 	source := servePack(t, pack)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	var env struct {
 		Warnings []string `json:"warnings"`

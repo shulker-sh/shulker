@@ -18,7 +18,7 @@ const datapackMcmeta = `{"pack":{"pack_format":48,"description":"loot"}}`
 
 func TestAddLocalDatapacks(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	loot := makeJarFiles(t, "loot", "loot-tweaks.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/loot/loot_table/chest.json": "{}"})
 	h.mustRun(t, "add", writeOutside(t, loot.filename, loot.data))
 	writeProjectFile(t, h, "packs/recipes/pack.mcmeta", []byte(datapackMcmeta))
@@ -43,7 +43,7 @@ func TestAddLocalDatapacks(t *testing.T) {
 
 func TestAddLocalDatapackAmbiguity(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	hybrid := makeJarFiles(t, "hybrid", "autoslabs.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/a/tags/x.json": "{}", "assets/a/lang/en_us.json": "{}"})
 	path := writeOutside(t, hybrid.filename, hybrid.data)
 	code, stdout, _ := h.run(t, "--json", "add", path)
@@ -58,7 +58,7 @@ func TestAddLocalDatapackAmbiguity(t *testing.T) {
 
 func TestAddHostedDatapack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "terralith")
 
 	if got := h.readManifest(t).Requires["terralith"]; !reflect.DeepEqual(got, manifest.Require{Type: manifest.TypeDatapack, Filename: "Terralith_26.2_v2.6.4.zip"}) {
@@ -76,7 +76,7 @@ func TestAddHostedDatapack(t *testing.T) {
 
 func TestExportMrpackCarriesDatapacksBySide(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"] = map[string]any{}
 	})
@@ -193,7 +193,7 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 
 func TestPullAdoptsADroppedDatapack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "install")
 	buildDir := filepath.Join(h.dir, "build", "client")
 	loot := makeJarFiles(t, "loot", "Loot Tweaks.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/loot/loot_table/chest.json": "{}"})
@@ -218,7 +218,7 @@ func TestPullAdoptsADroppedDatapack(t *testing.T) {
 
 func TestMatchLocksAnOverrideDatapack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	terralith := h.jars["terralith"]
 	writeFile(t, filepath.Join(h.dir, "overrides/config/paxi/datapacks/Terralith.zip"), string(terralith.data))
 
@@ -241,7 +241,7 @@ func TestMatchLocksAnOverrideDatapack(t *testing.T) {
 
 func TestHybridDatapackFlagLocks(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	hybrid := makeJarFiles(t, "hybrid", "autoslabs.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/a/tags/x.json": "{}", "assets/a/lang/en_us.json": "{}"})
 	h.mustRun(t, "add", writeOutside(t, hybrid.filename, hybrid.data), "--type", "datapack")
 	h.mustRun(t, "set", "requires.autoslabs.resourcepack", "true")
@@ -264,7 +264,7 @@ func TestHybridDatapackFlagLocks(t *testing.T) {
 
 func TestExportsShipAHybridDatapacksResourcePackCopy(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "terralith")
 	h.mustRun(t, "set", "requires.terralith.resourcepack", "true")
 	h.mustRun(t, "lock")
@@ -287,7 +287,7 @@ func TestExportsShipAHybridDatapacksResourcePackCopy(t *testing.T) {
 
 func TestAddAHybridDatapack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	hybrid := makeJarFiles(t, "hybrid", "autoslabs.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/a/tags/x.json": "{}", "assets/a/lang/en_us.json": "{}"})
 	path := writeOutside(t, hybrid.filename, hybrid.data)
 	code, stdout, _ := h.run(t, "--json", "add", path)

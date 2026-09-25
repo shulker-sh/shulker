@@ -28,7 +28,7 @@ func backupReasons(t *testing.T, dir string) []string {
 
 func TestSyncBacksUpWorldsBeforeTheModsChange(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	gameDir := filepath.Join(t.TempDir(), "game")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
@@ -150,7 +150,7 @@ func TestAutomaticBackupThatCantBeWrittenStopsTheSync(t *testing.T) {
 
 func TestAutomaticBackupWarnsWhenConfigIsUnreadable(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	gameDir := filepath.Join(t.TempDir(), "game")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 	addWorld(t, filepath.Join(gameDir, "saves"), "mine")

@@ -19,7 +19,7 @@ func writeFile(t *testing.T, path, content string) {
 
 func TestPropertiesOverridesMergePerKey(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	built := filepath.Join(h.dir, "build", "client", "config", "iris.properties")
 	writeFile(t, filepath.Join(h.dir, "overrides", "config", "iris.properties"), "enableShaders=true\nshaderPack=pack.zip\n")
 	h.mustRun(t, "build")
@@ -52,7 +52,7 @@ func TestPropertiesOverridesMergePerKey(t *testing.T) {
 
 func TestPropertiesOverrideNothingMergesIntoKeepsItsBytes(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	upstream := "#Iris config\r\nenableShaders: true\r\nshaderPack = pack.zip\r\ncolorSpace=SRGB"
 	writeFile(t, filepath.Join(h.dir, "overrides", "config", "iris.properties"), upstream)
 	writeFile(t, filepath.Join(h.dir, "overrides", "config", "layered.properties"), "z=1\ny=2\nshaderPack=pack.zip\n")

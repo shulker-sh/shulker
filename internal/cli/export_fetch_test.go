@@ -42,7 +42,7 @@ func (h *harness) emptyCache(t *testing.T) {
 
 func TestExportFetchesMissingLockedFiles(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"

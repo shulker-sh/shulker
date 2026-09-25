@@ -114,7 +114,7 @@ func TestHistoryPruneAndWarning(t *testing.T) {
 
 func TestHistoryNeedsAnInstance(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	code, stdout, _ := h.run(t, "--json", "history", "list")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "not-in-place" {
 		t.Fatalf("history outside an instance: code=%d %+v", code, e)

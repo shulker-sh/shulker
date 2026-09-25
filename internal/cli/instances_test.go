@@ -62,7 +62,7 @@ func readIntent(t *testing.T, dir string) *instance.File {
 
 func TestSyncIntoTakesNoRegistryRow(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	h.mustRun(t, "sync", h.dir)
@@ -98,7 +98,7 @@ func TestSyncIntoTakesNoRegistryRow(t *testing.T) {
 
 func TestSyncHasNoInstanceIDFlags(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	into := filepath.Join(t.TempDir(), "instance")
@@ -125,7 +125,7 @@ func TestSyncHasNoInstanceIDFlags(t *testing.T) {
 
 func TestLinkRegisters(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	prismDir := t.TempDir()
@@ -169,7 +169,7 @@ func TestInPlaceInstanceFileKeepsSettingsOnly(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
 	gitRun(t, h.dir, "add", ".")
@@ -218,7 +218,7 @@ func TestInstancesList(t *testing.T) {
 	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "Nothing is linked yet") {
 		t.Fatalf("empty registry: %s", stdout)
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	prismDir := t.TempDir()
@@ -280,7 +280,7 @@ func TestInstancesList(t *testing.T) {
 
 func TestSyncInstance(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
@@ -377,7 +377,7 @@ func TestSyncInstance(t *testing.T) {
 
 func TestFeatureInstance(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	prismDir := t.TempDir()
@@ -410,7 +410,7 @@ func TestFeatureInstance(t *testing.T) {
 
 func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	blocker := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
@@ -425,7 +425,7 @@ func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 
 func TestSyncDetectsAPrismInstance(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	prismDir := t.TempDir()
@@ -455,7 +455,7 @@ func TestInstancesRepair(t *testing.T) {
 	if stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir); !strings.Contains(stdout, "Nothing is linked yet") {
 		t.Fatalf("repair with nothing to find: %s", stdout)
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
@@ -500,7 +500,7 @@ func TestInstancesRepair(t *testing.T) {
 func TestInstancesRepairKeepsWhatItReplaces(t *testing.T) {
 	h := newHarness(t)
 	prismDir := t.TempDir()
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
@@ -533,7 +533,7 @@ func TestInstancesRepairKeepsWhatItReplaces(t *testing.T) {
 // the player kept.
 func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Lost")
@@ -602,7 +602,7 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 func TestInstancesRepairNamesAnInstanceTheWayItsLauncherShowsIt(t *testing.T) {
 	h := newHarness(t)
 	shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	dirs := map[string]string{}
 	for _, name := range []string{"prism", "atlauncher", "gdlauncher", "mojang"} {
@@ -642,7 +642,7 @@ func TestInstancesRepairNamesAnInstanceTheWayItsLauncherShowsIt(t *testing.T) {
 // file and says so. The id is what scripts and -i use, so it stays.
 func TestInstancesRepairFollowsARenameInTheLauncher(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
@@ -697,7 +697,7 @@ func TestInstancesRepairFollowsARenameInTheLauncher(t *testing.T) {
 // state the last build left where the file is gone too.
 func TestInstancesRepairReadsASyncedDirectory(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	gameDir := filepath.Join(prismDir, "instances", "handmade", "minecraft")
@@ -728,7 +728,7 @@ func TestInstancesRepairReadsASyncedDirectory(t *testing.T) {
 
 func TestSyncStampsTheInstanceAndTheRow(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	overrides := filepath.Join(h.dir, "overrides")
 	if err := os.MkdirAll(overrides, 0o755); err != nil {
@@ -835,7 +835,7 @@ func TestInstancesShowsALaunchThatNeverStarted(t *testing.T) {
 
 func TestInstancesRepairKeepsTheIDALinkChose(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--as", "mine")
 
@@ -859,7 +859,7 @@ func TestInstancesRepairKeepsTheIDALinkChose(t *testing.T) {
 func TestInstancesRepairWithoutARegistryFindsShulkersOwnInstances(t *testing.T) {
 	h := newHarness(t)
 	root := shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "link", "shulker", "--as", "smp")
 	if err := os.Remove(registryPath(h)); err != nil {
 		t.Fatal(err)

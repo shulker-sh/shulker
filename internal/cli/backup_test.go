@@ -71,7 +71,7 @@ func TestBackupZipsAnInstancesSaveGroup(t *testing.T) {
 
 func TestBackupKeepsAnInstancesOwnWorldsInItsFolder(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	gameDir := filepath.Join(t.TempDir(), "prism", "pack", "minecraft")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 
@@ -93,7 +93,7 @@ func TestBackupKeepsAnInstancesOwnWorldsInItsFolder(t *testing.T) {
 
 func TestBackupOfAServerTakesOnlyItsLevel(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 	buildDir := filepath.Join(h.dir, "build", "server")
 	if env := h.runSetting(t, 1, "backup", "-C", buildDir); env.Error == nil || env.Error.Code != "no-worlds" || !strings.Contains(env.Error.Message, "no world world in") {
@@ -109,7 +109,7 @@ func TestBackupOfAServerTakesOnlyItsLevel(t *testing.T) {
 
 func TestBackupOfAStateWithoutAPlatformNamesNone(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	gameDir := filepath.Join(t.TempDir(), "game")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
@@ -165,7 +165,7 @@ func TestBackupOnlyTheWorldsNamed(t *testing.T) {
 
 func TestBackupAServerHoldsOnlyItsLevel(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 	worlds := filepath.Join(h.dir, "data", "server")
 	addWorld(t, worlds, "world")

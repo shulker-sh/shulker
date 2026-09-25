@@ -23,7 +23,7 @@ func setOptionsPath(t *testing.T, h *harness, rel string) {
 
 func TestOptionsPathMovesTheBuiltOptions(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	setOptionsPath(t, h, modpackDefaults)
 	h.mustRun(t, "install")
@@ -49,7 +49,7 @@ func TestOptionsPathMovesTheBuiltOptions(t *testing.T) {
 
 func TestOptionsPathSeedsOverAnUntouchedList(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	setOptionsPath(t, h, modpackDefaults)
 	writeOverride(t, h.dir, "build/client/options.txt", "resourcePacks:[\"vanilla\",\"file/mine.zip\"]\n")
@@ -66,7 +66,7 @@ func TestOptionsPathSeedsOverAnUntouchedList(t *testing.T) {
 
 func TestOptionsPathInExports(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations", "--provider", "curseforge")
 	setOptionsPath(t, h, modpackDefaults)
 	h.mustRun(t, "install")
@@ -95,7 +95,7 @@ func TestOptionsPathStaysInTheBuild(t *testing.T) {
 	for _, rel := range []string{"/etc/options.txt", `C:\options.txt`, "C:/options.txt", "../options.txt", "config/../../options.txt", ".", "config/.."} {
 		t.Run(rel, func(t *testing.T) {
 			h := newHarness(t)
-			h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+			h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 			setOptionsPath(t, h, rel)
 			code, stdout, _ := h.run(t, "build", "--json")
 			if code == 0 || !strings.Contains(stdout, "manifest-invalid") {

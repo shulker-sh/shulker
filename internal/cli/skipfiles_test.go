@@ -9,7 +9,7 @@ import (
 
 func TestOverridesLeaveOutSkippedFiles(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.allowMrpackHost(t)
 	h.editManifest(t, func(m map[string]any) {
 		m["skipFiles"] = []string{"*.bak"}
@@ -48,7 +48,7 @@ func TestOverridesLeaveOutSkippedFiles(t *testing.T) {
 
 func TestLocalModpackIgnoresSkippedFiles(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, map[string]string{"config/base.txt": "from pack\n"})
 	h.mustRun(t, "modpack", "add", "./base")
 
@@ -64,7 +64,7 @@ func TestLocalModpackIgnoresSkippedFiles(t *testing.T) {
 
 func TestPullLeavesSkippedFilesInTheBuild(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "build")
 	writeFile(t, filepath.Join(h.dir, "build", "client", "config", ".DS_Store"), "junk")
 

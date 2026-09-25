@@ -253,7 +253,7 @@ func (h *harness) readManifest(t *testing.T) *manifest.Manifest {
 
 func TestCurseForgeAddFallsThrough(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	stdout := h.mustRun(t, "add", "jei")
 	if !strings.Contains(stdout, "+ jei ") || !strings.Contains(stdout, "» all sides\n") || !strings.Contains(stdout, "+ fabric-api fabric-api-0.130.0+26.2 » all sides (required by jei)") {
@@ -306,7 +306,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 
 func TestCurseForgeSwitchAndAbsenceOutput(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 
 	_, stdout, _ := h.run(t, "--json", "add", "sodium", "--provider", "curseforge")

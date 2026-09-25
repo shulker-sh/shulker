@@ -19,7 +19,7 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
@@ -78,7 +78,7 @@ func TestLinkPrismFromRemoteSource(t *testing.T) {
 
 func TestLinkPrism(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := t.TempDir()
@@ -163,7 +163,7 @@ func TestLinkPrism(t *testing.T) {
 // that follows it, so a later sync relocks around what the player put there.
 func TestLinkPrismSaysNothingAboutThePackItJustFollowed(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := t.TempDir()
@@ -180,7 +180,7 @@ func TestLinkPrismSaysNothingAboutThePackItJustFollowed(t *testing.T) {
 
 func TestLinkPrismKeepsWhatThePlayerAdds(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := t.TempDir()
@@ -217,7 +217,7 @@ func TestLinkPrismFromManifestURL(t *testing.T) {
 
 func TestLinkPrismTargetNameAndErrors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["client"].(map[string]any)["name"] = "Pack (dev)"
@@ -284,7 +284,7 @@ func readINIFile(t *testing.T, path string) map[string]string {
 
 func TestLinkPrismConfigFormats(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 	cmdValue := `sh "$INST_MC_DIR/.shulker/pre-launch"`
 

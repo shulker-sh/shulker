@@ -137,7 +137,7 @@ func TestCachePruneSkipsAGoneInstance(t *testing.T) {
 // in the project would make it a root in its own right and hide the difference.
 func TestCachePruneKeepsASeparateDirInstance(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
 
@@ -213,7 +213,7 @@ func TestBuildIngestsFilesBeforeSweepingThem(t *testing.T) {
 // each pack's lock to keep; the prune runs from a folder that is no project.
 func TestCachePruneKeepsNamedLocks(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
 	named := filepath.Join(t.TempDir(), "other.lock")

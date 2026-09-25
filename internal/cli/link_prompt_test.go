@@ -71,7 +71,7 @@ func multimcDir(t *testing.T) string {
 
 func TestBareLinkAsksForTheLauncher(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	dir := multimcDir(t)
 
@@ -156,7 +156,7 @@ func TestBareLinkIsTheGroupHelpWhenItCantAsk(t *testing.T) {
 
 func TestLinkMultiMCAsksWhereItIsInstalled(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	dir := multimcDir(t)
 	code, stdout, stderr, s := h.runAnswering(t, map[string]string{"Where is MultiMC installed?": dir}, "link", "multimc")
 	if code != 0 || !slices.Equal(s.asked, []string{"Where is MultiMC installed?"}) {
@@ -172,7 +172,7 @@ func TestLinkMultiMCAsksWhereItIsInstalled(t *testing.T) {
 func TestLinkNestsTheSourceItIsGiven(t *testing.T) {
 	h := newHarness(t)
 	root := shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	elsewhere := t.TempDir()
 	h.dir, elsewhere = elsewhere, h.dir
@@ -270,7 +270,7 @@ func TestLinkAuthorsAVanillaInstanceUnderTheNameGiven(t *testing.T) {
 func TestLinkStartsFromAnExistingPack(t *testing.T) {
 	h := newHarness(t)
 	root := shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	pack := h.dir
 	h.dir = t.TempDir()

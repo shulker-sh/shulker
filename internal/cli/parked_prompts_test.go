@@ -105,7 +105,7 @@ func TestDecliningTheUnlockKeepsTheMismatch(t *testing.T) {
 
 func TestLoaderRequiredAsksForTheLoader(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 
 	code, stdout, stderr, s := h.runAnswering(t, map[string]string{"Which mod loader?": "fabric"}, "add", "sodium")
 
@@ -123,7 +123,7 @@ func TestLoaderRequiredAsksForTheLoader(t *testing.T) {
 
 func TestEscapingTheLoaderSelectKeepsLoaderRequired(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 
 	var stderr bytes.Buffer
 	a := h.newApp(io.Discard, &stderr)

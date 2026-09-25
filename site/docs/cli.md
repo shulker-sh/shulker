@@ -7,7 +7,8 @@ outline: [2, 3]
 
 | Command | Description |
 | --- | --- |
-| [`shulker init`](#shulker-init) | Create shulker.json and a lock in the current directory |
+| [`shulker init`](#shulker-init) | Create shulker.json and a lock in the current directory, asking what is not given |
+| [`shulker create`](#shulker-create) | Create shulker.json and a lock in the current directory without asking |
 | [`shulker add <mod>...`](#shulker-add) | Add mods or modpacks to the manifest and lock |
 | [`shulker search [words...]`](#shulker-search) | Search the providers for projects to add |
 | [`shulker remove <mod>...`](#shulker-remove) | Remove mods or modpacks from the manifest and prune what only they provided |
@@ -113,24 +114,45 @@ These work with every command.
 
 ### `shulker init`
 
-Create `shulker.json` and `shulker.lock` in the current directory. On a terminal it asks six questions, in order: what you are making, which Minecraft version, whether to add mods, which mod loader, which version of it, and whether to start from an existing pack. Each question is skipped by the flag that answers it, and every answer starts on the default that flag has, so taking all six as they come creates what `--yes` creates. Answering *from an existing pack* asks for a source and adds it as a modpack, exactly as [`shulker add <source> --type modpack`](#shulker-add) would.
+Create `shulker.json` and `shulker.lock` in the current directory. On a terminal it asks six questions, in order: what you are making, which Minecraft version, whether to add mods, which mod loader, which version of it, and whether to start from an existing pack. Each question is skipped by the flag that answers it, and every answer starts on the default that flag has, so taking all six as they come creates what [`shulker create`](#shulker-create) creates. Answering *from an existing pack* asks for a source and adds it as a modpack, exactly as [`shulker add <source> --type modpack`](#shulker-add) would.
 
-Under [`--no-input`](#global-flags) — which a script gets without asking for it, since output that isn't going to a terminal implies it — nothing is asked and every answer is its default: the latest release, no loader, the client side, and no pack.
+Under [`--no-input`](#global-flags) — which a script gets without asking for it, since output that isn't going to a terminal implies it — nothing is asked and every answer is its default: the latest release, no loader, the client side, and no pack. That is `shulker create`, which is the spelling for a script.
 
 ```sh
 shulker init
-shulker init --yes
+shulker init --fabric
 shulker init --name my-server --minecraft 1.21.1 --loader neoforge --side server
 ```
 
 | Flag | Description |
 | --- | --- |
-| `-y, --yes` | Accept the defaults without asking: latest release, no loader, client side. On this command it is an alias of [`--no-input`](#global-flags), which leaves it nothing else to mean |
 | `--name <name>` | Project name (default: directory name) |
 | `--minecraft <version>` | Minecraft version or range (default: latest release) |
 | `--loader <loader>` | Mod loader: `none` (the default, vanilla Minecraft), `fabric`, `quilt`, `neoforge`, `forge` |
-| `--loader-version <range>` | Loader version range (default: `*`); needs `--loader` |
+| `--fabric`, `--quilt`, `--neoforge`, `--forge` | The same as `--loader` naming that loader. Two of them together, or one beside a `--loader` that names another, is a usage error |
+| `--loader-version <range>` | Loader version range (default: `*`); needs a loader |
 | `--side <side>` | Side to declare: `client` or `server` |
+| `--client`, `--server` | The same as `--side` naming that side. Both together, or one beside a `--side` that names the other, is a usage error |
+
+### `shulker create`
+
+Create `shulker.json` and `shulker.lock` in the current directory without asking anything, on a terminal or off one. Every choice no flag makes takes its default: the latest Minecraft release, no loader, the latest version of the loader named, the client side, and no pack to start from. So `shulker create --fabric` alone makes a Fabric client on the latest release and the latest Fabric. The flags are [`shulker init`](#shulker-init)'s, and the project is the one `init` makes with the same answers.
+
+```sh
+shulker create
+shulker create --fabric --minecraft 26.2
+shulker create --name my-server --minecraft 1.21.1 --neoforge --side server
+```
+
+| Flag | Description |
+| --- | --- |
+| `--name <name>` | Project name (default: directory name) |
+| `--minecraft <version>` | Minecraft version or range (default: latest release) |
+| `--loader <loader>` | Mod loader: `none` (the default, vanilla Minecraft), `fabric`, `quilt`, `neoforge`, `forge` |
+| `--fabric`, `--quilt`, `--neoforge`, `--forge` | The same as `--loader` naming that loader. Two of them together, or one beside a `--loader` that names another, is a usage error |
+| `--loader-version <range>` | Loader version range (default: `*`); needs a loader |
+| `--side <side>` | Side to declare: `client` or `server` |
+| `--client`, `--server` | The same as `--side` naming that side. Both together, or one beside a `--side` that names the other, is a usage error |
 
 ### `shulker import`
 

@@ -29,7 +29,7 @@ func packWithLocalFiles(t *testing.T, dir string) (*harness, fakeJar) {
 			t.Fatal(err)
 		}
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	if err := os.RemoveAll(h.cache); err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func cacheLocalCopy(t *testing.T, h *harness, jar fakeJar) {
 
 func TestURLModpackFileEntryFails(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tiny.json" {
 			http.NotFound(w, r)
@@ -223,7 +223,7 @@ func TestNestedModpackFileServedOnlyFromCache(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "modpack", "add", outer)
 	if l := h.readLock(t); l.Mods["private-mod"].Sha512 != jar.sha512 || l.Mods["private-mod"].Modpack != "outer" {
 		t.Fatalf("the nested modpack's local mod: %+v", l.Mods["private-mod"])

@@ -12,7 +12,7 @@ import (
 func newInPlace(t *testing.T) *harness {
 	t.Helper()
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.editManifest(t, func(m map[string]any) {
 		m["client"].(map[string]any)["build"] = "."
 	})

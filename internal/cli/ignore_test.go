@@ -10,7 +10,7 @@ import (
 func TestIgnoreCommandWritesAndDropsEntries(t *testing.T) {
 	h := newHarness(t)
 	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "client", `"depends":{"fabricloader":">=0.17","fabric-api":">=2.0.0"}`)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	if code, _, _ := h.run(t, "add", "sodium"); code == 0 {
 		t.Fatal("add should fail validation")
 	}

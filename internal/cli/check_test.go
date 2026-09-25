@@ -74,7 +74,7 @@ func (h *harness) editLock(t *testing.T, edit func(l *lock.Lock)) {
 
 func TestCheckPassesACleanProjectAndWritesNothing(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	if err := os.RemoveAll(h.cache); err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestCheckPassesACleanProjectAndWritesNothing(t *testing.T) {
 
 func TestCheckFailsAStaleLockWithoutRelocking(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["requires"].(map[string]any)["sodium"] = map[string]any{"side": "server"}
@@ -126,7 +126,7 @@ func TestCheckFailsAStaleLockWithoutRelocking(t *testing.T) {
 func TestCheckReportsAMissingDependencyAsInstallDoes(t *testing.T) {
 	h := newHarness(t)
 	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "client", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	h.editLock(t, func(l *lock.Lock) { delete(l.Mods, "fabric-api") })
 
@@ -146,7 +146,7 @@ func TestCheckReportsAMissingDependencyAsInstallDoes(t *testing.T) {
 
 func TestCheckNamesAManualDownloadMissingFromDownloads(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	downloads := filepath.Join(h.dir, "downloads")
 	os.MkdirAll(downloads, 0o755)
 	os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
@@ -170,7 +170,7 @@ func TestCheckNamesAManualDownloadMissingFromDownloads(t *testing.T) {
 func TestCheckChecksEverySide(t *testing.T) {
 	h := newHarness(t)
 	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "*", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.editManifest(t, func(m map[string]any) { m["server"] = map[string]any{} })
 	h.mustRun(t, "add", "sodium")
 	h.editLock(t, func(l *lock.Lock) {
@@ -188,7 +188,7 @@ func TestCheckChecksEverySide(t *testing.T) {
 
 func TestCheckStrictFailsOnWarnings(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["ignore"] = []any{map[string]any{"rule": "depends", "mod": "sodium", "on": "nothing", "declared": "*", "note": "stale"}}
@@ -211,7 +211,7 @@ func (h *harness) isCached(sha512 string) bool {
 
 func TestCheckRunsOnlyTheScopesNamed(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "resourcepack", "add", "fresh-animations")
 	os.RemoveAll(h.cache)
@@ -238,7 +238,7 @@ func TestCheckRunsOnlyTheScopesNamed(t *testing.T) {
 
 func TestCheckServerOnlyWhenNamedOrAll(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 
 	if e := runError(t, h, "check", "server"); e.Code != "no-side" {
@@ -262,7 +262,7 @@ func TestCheckServerOnlyWhenNamedOrAll(t *testing.T) {
 
 func TestCheckAnnotatesEachProblemInGitHubActions(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["requires"].(map[string]any)["sodium"] = map[string]any{"side": "server"}

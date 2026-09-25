@@ -9,7 +9,7 @@ import (
 
 func TestShaderIsEnabledByTheShaderModTheBuildPlaced(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
 	canvas := makeJar(t, "canvas", "canvas-fabric-26.2.jar", "client")
 	writeProjectFile(t, h, "files/canvas-fabric-26.2.jar", canvas.data)
@@ -43,7 +43,7 @@ func TestShaderIsEnabledByTheShaderModTheBuildPlaced(t *testing.T) {
 
 func TestShaderWithNoShaderModIsReported(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
 	_, _, stderr := h.run(t, "install")
 	if !strings.Contains(stderr, "! complementary-reimagined is placed, but nothing in this build can load it; shulker add iris") {

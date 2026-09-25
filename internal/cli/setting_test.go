@@ -38,7 +38,7 @@ func (h *harness) runSetting(t *testing.T, wantExit int, args ...string) setting
 
 func TestSetGetUnset(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	lockBefore, err := os.ReadFile(filepath.Join(h.dir, "shulker.lock"))
 	if err != nil {
 		t.Fatal(err)
@@ -142,7 +142,7 @@ func TestSetGetUnset(t *testing.T) {
 
 func TestSetRejectsBadPathsAndValues(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	before, err := os.ReadFile(filepath.Join(h.dir, "shulker.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -183,7 +183,7 @@ func TestSetRejectsBadPathsAndValues(t *testing.T) {
 
 func TestSetWarnsOnlyWhenTheLockDiffers(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 
 	if env := h.runSetting(t, 0, "set", "providers", "--literal", `["curseforge","modrinth"]`); env.LockStale || len(env.Warnings) != 0 {
@@ -197,7 +197,7 @@ func TestSetWarnsOnlyWhenTheLockDiffers(t *testing.T) {
 
 func TestGetLocked(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	for _, c := range []struct{ path, want string }{
 		{"minecraft", "26.2\n"},

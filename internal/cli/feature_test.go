@@ -34,7 +34,7 @@ func readLocal(t *testing.T, dir string) localView {
 
 func TestFeatureIntoSyncedDir(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	into := filepath.Join(t.TempDir(), "instance")
@@ -90,7 +90,7 @@ func TestFeatureIntoGitSyncedDir(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
@@ -111,7 +111,7 @@ func TestFeatureIntoGitSyncedDir(t *testing.T) {
 
 func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	localPath := filepath.Join(h.dir, "shulker.local.json")
@@ -199,7 +199,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 
 func TestUnreadableLocalFileFallsBackToDefaults(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	localPath := filepath.Join(h.dir, "shulker.local.json")
@@ -240,7 +240,7 @@ func TestUnreadableLocalFileFallsBackToDefaults(t *testing.T) {
 
 func TestBuildForAnotherOS(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"os": "windows"})
 	h.mustRun(t, "build", "--os", "windows")
@@ -254,7 +254,7 @@ func TestBuildForAnotherOS(t *testing.T) {
 
 func TestLinkPrismKeepsFeatureFlags(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 
@@ -281,7 +281,7 @@ func TestLinkPrismKeepsFeatureFlags(t *testing.T) {
 
 func TestFeatureListNamesWhereAFeatureComesFrom(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	writeFile(t, filepath.Join(h.dir, "base", "shulker.json"), `{"name": "base", "minecraft": "~26.2", "loader": {"type": "fabric", "version": "*"},
   "features": {"shaders": {"default": true, "note": "the pack's note"}, "voice": {}},
   "requires": {}, "client": {}}`)

@@ -11,7 +11,7 @@ import (
 
 func TestStateWarningNudges(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "build")
 	statePath := filepath.Join(h.dir, "build", "client", ".shulker", "state.json")

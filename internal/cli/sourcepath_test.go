@@ -79,7 +79,7 @@ func TestSyncFromGitSubfolder(t *testing.T) {
 func TestGitModpackSubfolder(t *testing.T) {
 	h := newHarness(t)
 	_, source, commit := monorepo(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	h.mustRun(t, "modpack", "add", source, "--path", "packs/alpha", "--as", "alpha")
 	if stdout := h.mustRun(t, "modpack", "list"); stdout != "  Modpacks\n  • alpha "+source+" (git, ok, pinned "+commit[:12]+", path packs/alpha)\n" {

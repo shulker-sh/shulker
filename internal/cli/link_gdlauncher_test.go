@@ -14,7 +14,7 @@ import (
 
 func TestLinkGDLauncher(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 
 	unresolved := t.TempDir()
@@ -116,7 +116,7 @@ func TestLinkGDLauncher(t *testing.T) {
 
 func TestLinkGDLauncherNeoForge(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
+	h.mustRun(t, "create", "--name", "pack", "--loader", "neoforge")
 
 	launcherDir := t.TempDir()
 	instDir := filepath.Join(launcherDir, "instances", "Neo")
@@ -160,7 +160,7 @@ func TestLinkGDLauncherNeoForge(t *testing.T) {
 
 func TestLinkGDLauncherForge(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "forge")
+	h.mustRun(t, "create", "--name", "pack", "--loader", "forge")
 
 	launcherDir := t.TempDir()
 	warnings := gdlWarnings(t, h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Forge", "--json"))

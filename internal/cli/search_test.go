@@ -145,7 +145,7 @@ func TestSearchNeedsWords(t *testing.T) {
 
 func TestSearchWritesNothing(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	before := projectFiles(t, h.dir)
 	h.mustRun(t, "search", "sodium")
 	if after := projectFiles(t, h.dir); after != before {

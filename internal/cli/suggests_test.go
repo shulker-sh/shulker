@@ -15,7 +15,7 @@ func TestSuggestsKeepsOptionalIntegrationsBehindAFlag(t *testing.T) {
 	h.jars["sodium"] = makeJarFile(t, "sodium", h.jars["sodium"].filename, "quilt.mod.json",
 		`{"schema_version":1,"quilt_loader":{"id":"sodium","version":"1.0.0","depends":[{"id":"iris","versions":"^1.8","optional":true},{"id":"modmenu","optional":true}]}}`)
 	h.jars["fabric-api"] = makeJarWith(t, "fabric-api", h.jars["fabric-api"].filename, "*", `"depends":{"fabricloader":">=0.17"},"recommends":{"indium":"*"}`)
-	h.mustRun(t, "init", "--yes", "--loader", "quilt")
+	h.mustRun(t, "create", "--loader", "quilt")
 
 	stdout := h.mustRun(t, "add", "sodium", "fabric-api")
 	if !strings.Contains(stdout, "• fabric-api (recommends indium, not installed)") || !strings.Contains(stdout, "2 optional integrations to see:\n    $ shulker suggests --optional") {
@@ -61,7 +61,7 @@ func TestSuggestsRecognisesAModLockedUnderItsSlug(t *testing.T) {
 	h := newHarness(t)
 	h.jars["sodium"] = makeJar(t, "sodium_fabric", h.jars["sodium"].filename, "client")
 	h.jars["fabric-api"] = makeJarWith(t, "fabric-api", h.jars["fabric-api"].filename, "*", `"depends":{"fabricloader":">=0.17"},"suggests":{"sodium":"*","indium":"*"}`)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	stdout := h.mustRun(t, "add", "sodium", "--as", "speed")
 	if strings.Contains(stdout, "suggests sodium") || !strings.Contains(stdout, "• fabric-api (suggests indium, not installed)") {
@@ -82,7 +82,7 @@ func TestRelockingRecordsTheSlugOfAModAlreadyLocked(t *testing.T) {
 		t.Run(args[0], func(t *testing.T) {
 			h := newHarness(t)
 			h.jars["sodium"] = makeJar(t, "sodium_fabric", h.jars["sodium"].filename, "client")
-			h.mustRun(t, "init", "--yes", "--loader", "fabric")
+			h.mustRun(t, "create", "--loader", "fabric")
 			h.mustRun(t, "add", "sodium", "--as", "speed")
 			l := h.readLock(t)
 			m := l.Mods["speed"]

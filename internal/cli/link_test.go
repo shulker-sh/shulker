@@ -65,7 +65,7 @@ func mojangLauncherDir(t *testing.T) string {
 
 func TestLinkMojang(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := mojangLauncherDir(t)
@@ -163,7 +163,7 @@ func TestLinkMojang(t *testing.T) {
 // ADR 0001: a later sync relocks around it instead of sweeping it away.
 func TestLinkMojangKeepsWhatThePlayerAdds(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := mojangLauncherDir(t)
@@ -188,7 +188,7 @@ func TestLinkMojangKeepsWhatThePlayerAdds(t *testing.T) {
 // exists so what a player added survives the pack they follow changing.
 func TestLinkMojangForceRepointsTheModpack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	other := filepath.Join(t.TempDir(), "other")
 	lockedPack(t, h, other, `"fabric-api": {}`)
@@ -216,7 +216,7 @@ func TestLinkMojangForceRepointsTheModpack(t *testing.T) {
 // big a build is and whether the mod list has to match exactly. From then on both are the player's.
 func TestLinkMojangCopiesThePacksPreferences(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.editManifest(t, func(m map[string]any) {
 		m["history"] = 2
 		m["marker"] = false
@@ -243,7 +243,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
 	gitRun(t, h.dir, "add", ".")
@@ -334,7 +334,7 @@ func TestLinkMojangFromManifestURL(t *testing.T) {
 // goes ahead and says why the instance is thinner than the pack.
 func TestLinkMojangWarnsWhenTheSourceDeclaresNoClient(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fabric-api")
 	h.editManifest(t, func(m map[string]any) {
 		delete(m, "client")
@@ -354,7 +354,7 @@ func TestLinkMojangWarnsWhenTheSourceDeclaresNoClient(t *testing.T) {
 
 func TestLinkMojangErrors(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	code, stdout, _ := h.run(t, "link", "mojang", "--launcher-dir", filepath.Join(t.TempDir(), "missing"), "--json")
@@ -415,7 +415,7 @@ func readJSONFile(t *testing.T, path string, v any) {
 
 func TestLinkMojangFreshDoesNotWarnAboutTheLock(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	_, stderr := h.mustRunStderr(t, "link", "vanilla", "--launcher-dir", mojangLauncherDir(t))
 	if strings.Contains(stderr, "not in the lock") {

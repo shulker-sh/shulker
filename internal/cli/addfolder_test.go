@@ -33,7 +33,7 @@ var (
 
 func TestAddFolderInsideTheProjectIsReferencedInPlace(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writeFolder(t, filepath.Join(h.dir, "Resource Packs", "Mod Menu Helper"), helperFiles)
 	writeFolder(t, filepath.Join(h.dir, "shaders", "bsl.v8"), shaderFiles)
 	h.mustRun(t, "resourcepack", "add", "Resource Packs/Mod Menu Helper/")
@@ -62,7 +62,7 @@ func TestAddFolderInsideTheProjectIsReferencedInPlace(t *testing.T) {
 
 func TestAddFolderFromOutsideIsCopiedIntoFiles(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	outside := filepath.Join(t.TempDir(), "BSL Shaders")
 	writeFolder(t, outside, shaderFiles)
 	writeFolder(t, outside, map[string]string{"shaders/old.fsh": "// old", ".git/HEAD": "ref: refs/heads/main", "shaders/.DS_Store": "junk"})
@@ -119,7 +119,7 @@ func TestAddFolderInAnOwnedFolderIsCopied(t *testing.T) {
 
 func TestAddFolderRefusals(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	helper := filepath.Join(t.TempDir(), "Helper")
 	writeFolder(t, helper, helperFiles)
 	writeFolder(t, filepath.Join(h.dir, "files", "Helper"), map[string]string{"pack.mcmeta": `{"pack":{"pack_format":64,"description":"another"}}`})
@@ -149,7 +149,7 @@ func TestAddFolderRefusals(t *testing.T) {
 
 func TestAddFolderThroughASymlinkCopiesItsTarget(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	target := filepath.Join(t.TempDir(), "Real")
 	writeFolder(t, target, helperFiles)
 	link := filepath.Join(t.TempDir(), "Helper")
@@ -164,7 +164,7 @@ func TestAddFolderThroughASymlinkCopiesItsTarget(t *testing.T) {
 
 func TestAddFolderThroughASymlinkToItsOwnCopyKeepsIt(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writeFolder(t, filepath.Join(h.dir, "files", "Helper"), helperFiles)
 	link := filepath.Join(t.TempDir(), "Helper")
 	if err := os.Symlink(filepath.Join(h.dir, "files", "Helper"), link); err != nil {
@@ -182,7 +182,7 @@ func TestAddFolderThroughASymlinkToItsOwnCopyKeepsIt(t *testing.T) {
 
 func TestAddFolderHoldingTheProjectIsRefused(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	code, stdout, _ := h.run(t, "--json", "resourcepack", "add", filepath.Dir(h.dir))
 	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" {
 		t.Fatalf("a folder the project lies in can't be copied into it: code=%d %+v", code, e)
@@ -194,7 +194,7 @@ func TestAddFolderHoldingTheProjectIsRefused(t *testing.T) {
 
 func TestAddFolderFollowsSymlinksInsideWithAWarning(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	outside := filepath.Join(t.TempDir(), "Helper")
 	writeFolder(t, outside, helperFiles)
 	shared := filepath.Join(t.TempDir(), "logo.png")

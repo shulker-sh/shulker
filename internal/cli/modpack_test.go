@@ -59,7 +59,7 @@ type lockView struct {
 
 func TestLocalModpack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, map[string]string{
 		"config/base.txt":       "from pack\n",
 		"config/shared.txt":     "pack\n",
@@ -202,7 +202,7 @@ func TestLocalModpack(t *testing.T) {
 
 func TestModpackMismatchAndConflict(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writePrismPack(t, filepath.Join(h.dir, "old"), "~26.1", `"sodium": {}`, nil)
 	code, stdout, _ := h.run(t, "modpack", "add", "./old", "--json")
 	var env out.Envelope
@@ -233,7 +233,7 @@ func TestModpackMismatchAndConflict(t *testing.T) {
 
 func TestModpackMissingFromTheLockWarnsOnlyBesideOtherPins(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writePrismPack(t, filepath.Join(h.dir, "one"), "~26.2", `"sodium": {}`, nil)
 	writePrismPack(t, filepath.Join(h.dir, "two"), "~26.2", `"sodium": {}`, nil)
 	h.mustRun(t, "modpack", "add", "./one")
@@ -271,7 +271,7 @@ func TestModpackMissingFromTheLockWarnsOnlyBesideOtherPins(t *testing.T) {
 
 func TestModpackSourceMovedUnderTheSameName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	writePrismPack(t, filepath.Join(h.dir, "base"), "~26.2", `"sodium": {}`, nil)
 	h.mustRun(t, "modpack", "add", "./base")
 	if err := os.Rename(filepath.Join(h.dir, "base"), filepath.Join(h.dir, "moved")); err != nil {
@@ -308,7 +308,7 @@ func TestGitModpack(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	repo := filepath.Join(t.TempDir(), "shared-pack")
 	writePrismPack(t, repo, "^26.1", `"sodium": {}`, map[string]string{"config/git.txt": "v1\n"})
 	gitRun(t, repo, "init", "-q", "-b", "main")
@@ -364,7 +364,7 @@ func TestGitModpack(t *testing.T) {
 
 func TestURLModpackAndHandEdits(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tiny.json" {
 			http.NotFound(w, r)
@@ -442,7 +442,7 @@ func renamePack(t *testing.T, dir, name string) {
 
 func TestModpackKeyComesFromTheManifestName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	repo := filepath.Join(h.dir, "mc-pack-v3")
 	writePrismPack(t, repo, "~26.2", `"sodium": {}`, nil)
 	renamePack(t, repo, "westcoast-smp")

@@ -30,7 +30,7 @@ func needsNewAPI(t *testing.T, h *harness) {
 // anything that moves it has to be the add under test.
 func heldProject(t *testing.T, h *harness) {
 	t.Helper()
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "fabric-api")
 	h.newerAPI = true
 }
@@ -38,7 +38,7 @@ func heldProject(t *testing.T, h *harness) {
 func TestWithDepsListsAModpacksDependencyAsItMovesIt(t *testing.T) {
 	h := newHarness(t)
 	needsNewAPI(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "fabric-api")
 	lockedPack(t, h, filepath.Join(h.dir, "base"), `"fabric-api": {}`)
 	h.mustRun(t, "remove", "fabric-api")

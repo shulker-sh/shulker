@@ -30,7 +30,7 @@ func TestImportLocksABlockedCurseForgeFileFromModrinth(t *testing.T) {
 
 func TestAddLocksABlockedCurseForgeFileFromModrinth(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 
 	stdout, stderr := h.mustRunStderr(t, "add", "iris-cf", "--provider", "curseforge")
 	if !strings.Contains(stderr, "iris-cf: CurseForge doesn't allow third-party downloads of "+h.jars["irisshaders"].filename+"; locked from Modrinth as irisshaders instead") {

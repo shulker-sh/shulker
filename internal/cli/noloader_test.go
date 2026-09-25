@@ -15,7 +15,7 @@ import (
 
 func TestInitWithoutALoader(t *testing.T) {
 	h := newHarness(t)
-	stdout := h.mustRun(t, "init", "--yes", "--name", "pack")
+	stdout := h.mustRun(t, "create", "--name", "pack")
 	if !strings.Contains(stdout, "created shulker.json (Minecraft 26.2, Java 25)") || !strings.Contains(stdout, "Play it in a launcher") || !strings.Contains(stdout, "$ shulker link <launcher>") || strings.Count(stdout, "$ shulker") != 1 {
 		t.Fatalf("init output: %s", stdout)
 	}
@@ -28,29 +28,29 @@ func TestInitWithoutALoader(t *testing.T) {
 	}
 
 	server := newHarness(t)
-	stdout = server.mustRun(t, "init", "--yes", "--name", "pack", "--side", "server")
+	stdout = server.mustRun(t, "create", "--name", "pack", "--side", "server")
 	if !strings.Contains(stdout, "Download and build it") || !strings.Contains(stdout, "$ shulker install") || strings.Contains(stdout, "launcher") {
 		t.Fatalf("server init output: %s", stdout)
 	}
 
 	modded := newHarness(t)
-	stdout = modded.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	stdout = modded.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	if !strings.Contains(stdout, "Add a mod") || !strings.Contains(stdout, "$ shulker add <mod>") || strings.Contains(stdout, "launcher") {
 		t.Fatalf("fabric init output: %s", stdout)
 	}
 
 	fresh := newHarness(t)
-	if code, _, _ := fresh.run(t, "init", "--yes", "--loader-version", "0.17.3"); code != out.ExitUsage {
+	if code, _, _ := fresh.run(t, "create", "--loader-version", "0.17.3"); code != out.ExitUsage {
 		t.Fatalf("--loader-version without --loader: code=%d", code)
 	}
-	if code, _, _ := fresh.run(t, "init", "--yes", "--loader", "none", "--json"); code != 0 {
+	if code, _, _ := fresh.run(t, "create", "--loader", "none", "--json"); code != 0 {
 		t.Fatalf("--loader none: code=%d", code)
 	}
 }
 
 func TestAddNeedsALoader(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 	code, stdout, _ := h.run(t, "add", "sodium", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "loader-required" || !strings.Contains(e.Help, "shulker set loader.type <fabric|quilt|neoforge|forge>") {
 		t.Fatalf("add without a loader: code=%d %s", code, stdout)
@@ -65,7 +65,7 @@ func TestAddNeedsALoader(t *testing.T) {
 
 func TestServerWithoutALoader(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--name", "pack", "--side", "server")
 	h.mustRun(t, "install")
 	_, l := readProject(t, h.dir)
 	if l.Server == nil || l.Server.Sha512 != h.vanilla.sha512 || l.Loader.Type != "" {
@@ -85,7 +85,7 @@ func TestServerWithoutALoader(t *testing.T) {
 
 func TestClientWithoutALoader(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 	h.mustRun(t, "install")
 	if _, err := os.Stat(filepath.Join(h.dir, "build", "client", "mods")); err == nil {
 		t.Fatal("a project without a loader has a mods dir with the marker jar")
@@ -120,7 +120,7 @@ func TestClientWithoutALoader(t *testing.T) {
 
 func TestLinkWithoutALoader(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 
 	mojangDir := t.TempDir()
 	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)

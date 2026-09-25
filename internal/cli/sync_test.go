@@ -17,7 +17,7 @@ import (
 
 func TestSyncIntoDirectory(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 
 	into := filepath.Join(t.TempDir(), "instance", "minecraft")
@@ -77,7 +77,7 @@ func TestSyncErrors(t *testing.T) {
 		t.Fatalf("missing project: exit %d %s", code, stdout)
 	}
 
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	code, stdout, _ = h.run(t, "sync", h.dir, "--side", "nope", "--json")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || strings.Join(e.Candidates, ",") != "client,server" {
@@ -95,7 +95,7 @@ func TestSyncFromGit(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	if err := os.MkdirAll(filepath.Join(h.dir, "overrides", "config"), 0o755); err != nil {
 		t.Fatal(err)
@@ -178,7 +178,7 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	gitRun(t, h.dir, "init", "-q", "-b", "main")
 	gitRun(t, h.dir, "add", ".")
@@ -246,7 +246,7 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 
 func TestSyncOfflineKeepsTheInstalledRuntime(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.mustRun(t, "add", "fabric-api")
 	into := filepath.Join(t.TempDir(), "server")
 	h.mustRun(t, "sync", h.dir, "--into", into)
@@ -258,7 +258,7 @@ func TestSyncOfflineKeepsTheInstalledRuntime(t *testing.T) {
 
 func TestSyncFromManifestURL(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	files := map[string]bool{"shulker.json": true, "shulker.lock": true}
 	down, broken, hits := false, false, 0
@@ -350,7 +350,7 @@ func TestSyncFromManifestURL(t *testing.T) {
 
 func TestDiffAndPullInto(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	overrides := filepath.Join(h.dir, "overrides", "config")
 	if err := os.MkdirAll(overrides, 0o755); err != nil {
@@ -384,7 +384,7 @@ func TestDiffAndPullInto(t *testing.T) {
 
 func TestPullPicksTheDriftedSyncDir(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	overrides := filepath.Join(h.dir, "overrides", "config")
 	if err := os.MkdirAll(overrides, 0o755); err != nil {
 		t.Fatal(err)
@@ -436,7 +436,7 @@ func TestPullPicksTheDriftedSyncDir(t *testing.T) {
 
 func TestPullNamedFileNarrowsTheSyncDirs(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	overrides := filepath.Join(h.dir, "overrides", "config")
 	if err := os.MkdirAll(overrides, 0o755); err != nil {
 		t.Fatal(err)
@@ -475,7 +475,7 @@ func TestPullNamedFileNarrowsTheSyncDirs(t *testing.T) {
 
 func TestPullIntoMissingDirNamesThePath(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "build")
 	missing := filepath.Join(t.TempDir(), "gone")
 	for _, cmd := range []string{"pull", "diff"} {
@@ -492,7 +492,7 @@ func TestPullIntoMissingDirNamesThePath(t *testing.T) {
 
 func TestSyncDoesNotFailOnUnwritableLocalFile(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	into := filepath.Join(t.TempDir(), "one")
 	h.mustRun(t, "sync", h.dir, "--into", into)
@@ -520,7 +520,7 @@ func TestSyncDoesNotFailOnUnwritableLocalFile(t *testing.T) {
 
 func TestSyncFromLocalProjectReadsInstanceDecisions(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
 	h.mustRun(t, "feature", "on", "fancy")
@@ -542,7 +542,7 @@ func TestSyncFromLocalProjectReadsInstanceDecisions(t *testing.T) {
 
 func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	into := filepath.Join(t.TempDir(), "instance", "minecraft")
 	h.mustRun(t, "sync", h.dir, "--into", into)
 
@@ -585,7 +585,7 @@ func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
 
 func TestSyncIntoRecoversTheSourceWithoutTheRegistry(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	into := filepath.Join(t.TempDir(), "instance")
 	h.mustRun(t, "sync", h.dir, "--into", into)

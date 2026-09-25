@@ -101,7 +101,7 @@ func rewriteMrpack(t *testing.T, src, dst string, edit func(index *mrpackIndex, 
 func TestImportMrpackRoundTrip(t *testing.T) {
 	h := newHarness(t)
 	h.allowMrpackHost(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	if err := os.MkdirAll(filepath.Join(h.dir, "overrides", "config"), 0o755); err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 func TestImportMrpackIgnoreShulker(t *testing.T) {
 	h := newHarness(t)
 	h.allowMrpackHost(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "export", "mrpack", "--version", "1.0.0")
 	archive := filepath.Join(h.dir, "build", "pack-1.0.0.mrpack")
@@ -179,7 +179,7 @@ func TestImportMrpackIgnoreShulker(t *testing.T) {
 func TestImportMrpackVanillaRoundTrip(t *testing.T) {
 	h := newHarness(t)
 	h.allowMrpackHost(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "create", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
 	h.mustRun(t, "export", "mrpack", "--version", "1.0.0")
@@ -212,7 +212,7 @@ func TestImportMrpackVanillaRoundTrip(t *testing.T) {
 func TestImportMrpackTamperedMarker(t *testing.T) {
 	h := newHarness(t)
 	h.allowMrpackHost(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "export", "mrpack", "--version", "1.0.0")
 	archive := filepath.Join(h.dir, "build", "pack-1.0.0.mrpack")

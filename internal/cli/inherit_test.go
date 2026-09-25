@@ -89,7 +89,7 @@ func TestLockedModpacksDisagreeingAboutThePlatform(t *testing.T) {
 
 func TestNoMinecraftAndNoModpackToInheritFrom(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.editManifest(t, func(m map[string]any) { delete(m, "minecraft") })
 	removeLock(t, h)
 

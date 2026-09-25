@@ -42,7 +42,7 @@ func savesLink(t *testing.T, gameDir string) string {
 func linkShulkerPack(t *testing.T, h *harness) string {
 	t.Helper()
 	root := shulkerInstances(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	stdout := h.mustRun(t, "link", "shulker")
 	if !strings.Contains(stdout, "saves: group default") {
 		t.Fatalf("link reports the group it joined: %s", stdout)
@@ -115,7 +115,7 @@ func TestSavesGroupRefusesABadName(t *testing.T) {
 func TestOtherLaunchersKeepTheirSaves(t *testing.T) {
 	h := newHarness(t)
 	savesRoot(t, h)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	gameDir := filepath.Join(t.TempDir(), "game")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 	if _, err := os.Readlink(filepath.Join(gameDir, "saves")); err == nil {
@@ -224,7 +224,7 @@ func wantWorlds(t *testing.T, v savesView, dir string, worlds ...string) {
 
 func TestSavesReadsASeparateDirBuildFromData(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "install")
 	data := filepath.Join(h.dir, "data", "client", "saves")
 	addWorld(t, data, "First")
@@ -244,7 +244,7 @@ func TestSavesReadsASeparateDirBuildFromData(t *testing.T) {
 
 func TestSavesReadsAnotherLaunchersInstanceInPlace(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	gameDir := filepath.Join(t.TempDir(), "game")
 	h.mustRun(t, "sync", h.dir, "--into", gameDir)
 	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
@@ -253,7 +253,7 @@ func TestSavesReadsAnotherLaunchersInstanceInPlace(t *testing.T) {
 
 func TestSavesReadsOnlyAServersLevelName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["level-name"] = "creative"
 	})
@@ -282,7 +282,7 @@ func TestSavesReadsOnlyAServersLevelName(t *testing.T) {
 
 func TestSavesReadsAnInPlaceServersLevelNameFromItsManifest(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
 		server := m["server"].(map[string]any)
 		server["build"] = "."

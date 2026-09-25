@@ -26,7 +26,7 @@ type packLock struct {
 
 func TestResourcePacksAndShaders(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 
 	// No --type: the provider's own project type settles what each one is.
 	// Packs are placed on the client side, so the add line names them rather
@@ -107,7 +107,7 @@ func TestResourcePacksAndShaders(t *testing.T) {
 
 func TestPackFilename(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
 	h.mustRun(t, "add", "irisshaders")
@@ -147,7 +147,7 @@ func TestPackFilename(t *testing.T) {
 
 func TestPackFilenameRefused(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	h.mustRun(t, "shader", "add", "complementary-reimagined", "--as", "fresh")
 
@@ -177,7 +177,7 @@ func TestPackFilenameRefused(t *testing.T) {
 
 func TestPackTypeDisagreesWithProvider(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	code, stdout, _ := h.run(t, "add", "fresh-animations", "--type", "shader", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
@@ -188,7 +188,7 @@ func TestPackTypeDisagreesWithProvider(t *testing.T) {
 
 func TestShippedPackListIsTheEnabledList(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	h.mustRun(t, "set", "requires.fresh-animations.filename", "Fresh's Pack.zip")
 	h.mustRun(t, "lock")
@@ -214,7 +214,7 @@ func TestShippedPackListIsTheEnabledList(t *testing.T) {
 
 func TestPlayersPackListReportsOnlyWhatItLeavesOff(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	h.mustRun(t, "install")
 	options := filepath.Join(h.dir, "build", "client", "options.txt")
@@ -231,7 +231,7 @@ func TestPlayersPackListReportsOnlyWhatItLeavesOff(t *testing.T) {
 
 func TestPlayersEditToAShippedListIsWhatIsReported(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	writeFile(t, filepath.Join(h.dir, "overrides", "options.txt"), "resourcePacks:[\"vanilla\",\"file/FreshAnimations_v1.9.4.zip\",\"file/Missing.zip\"]\n")
 	h.mustRun(t, "install")

@@ -11,7 +11,7 @@ import (
 
 func TestQuiltServer(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "quilt", "--side", "server")
+	h.mustRun(t, "create", "--name", "pack", "--loader", "quilt", "--side", "server")
 	h.mustRun(t, "add", "fabric-api")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"] = map[string]any{"eula": true}
@@ -50,7 +50,7 @@ func TestQuiltServer(t *testing.T) {
 
 func TestQuiltLinkMojang(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "quilt")
+	h.mustRun(t, "create", "--name", "pack", "--loader", "quilt")
 	launcherDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(launcherDir, "launcher_profiles.json"), []byte(`{"profiles":{},"version":3}`), 0o644); err != nil {
 		t.Fatal(err)

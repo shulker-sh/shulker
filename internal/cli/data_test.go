@@ -11,7 +11,7 @@ import (
 
 func TestBuildLinksDataDirs(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	buildDir := filepath.Join(h.dir, "build", "client")
 	if err := os.MkdirAll(filepath.Join(buildDir, "saves", "First"), 0o755); err != nil {
 		t.Fatal(err)
@@ -66,7 +66,7 @@ func TestBuildLinksDataDirs(t *testing.T) {
 
 func TestServerBuildLinksWorldByLevelName(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	buildDir := filepath.Join(h.dir, "build", "server")
 
 	stdout := h.mustRun(t, "install")
@@ -97,7 +97,7 @@ func TestServerBuildLinksWorldByLevelName(t *testing.T) {
 
 func TestBuildKeepsAbsoluteDataLinks(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	buildDir := filepath.Join(h.dir, "build", "server")
 	h.mustRun(t, "install")
 	world := filepath.Join(h.dir, "data", "server", "world")

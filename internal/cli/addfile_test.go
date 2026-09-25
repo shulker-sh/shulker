@@ -30,7 +30,7 @@ func readProjectFile(t *testing.T, h *harness, rel string) string {
 
 func TestAddLocalJarFromOutsideCopiesIntoFiles(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	jar := makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
 	h.mustRun(t, "add", writeOutside(t, jar.filename, jar.data))
 
@@ -51,7 +51,7 @@ func TestAddLocalJarFromOutsideCopiesIntoFiles(t *testing.T) {
 
 func TestAddLocalPacksInsideAndOutside(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	faithful := makeJarFile(t, "faithful", "faithful.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"faithful"}}`)
 	writeProjectFile(t, h, "packs/faithful.zip", faithful.data)
 	h.mustRun(t, "resourcepack", "add", "packs/faithful.zip")
@@ -81,7 +81,7 @@ func TestAddLocalPacksInsideAndOutside(t *testing.T) {
 
 func TestAddLocalFileKeys(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	jar := makeJar(t, "private-mod", "private-mod-1.4.jar", "client")
 	path := writeOutside(t, jar.filename, jar.data)
 	h.mustRun(t, "add", path, "--as", "mine")
@@ -136,7 +136,7 @@ func TestBuildInPlaceRefusesAnOverrideIntoFiles(t *testing.T) {
 
 func TestAddLocalFileRefusals(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	pack := makeJarFile(t, "faithful", "faithful.zip", "pack.mcmeta", `{"pack":{"pack_format":34,"description":"faithful"}}`)
 	writeProjectFile(t, h, "files/faithful.zip", []byte("another"))
 	unknown := makeJarFile(t, "notes", "notes.zip", "notes.txt", "hi")
@@ -172,7 +172,7 @@ func TestAddLocalFileRefusals(t *testing.T) {
 
 func TestAddLocalJarOverADependencyKeepsItsDependents(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	jar := makeJarWith(t, "private-mod", "private-mod-1.4.jar", "client", `"depends":{"fabricloader":">=0.17","fabric-api":"*"}`)
 	h.mustRun(t, "add", writeOutside(t, jar.filename, jar.data))
 	own := makeJar(t, "fabric-api", "fabric-api-local.jar", "*")
@@ -184,7 +184,7 @@ func TestAddLocalJarOverADependencyKeepsItsDependents(t *testing.T) {
 
 func TestReaddingAnOutsideFileRefreshesItsCopy(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	jar := makeJar(t, "private-mod", "private-mod.jar", "client")
 	path := writeOutside(t, jar.filename, jar.data)
 	h.mustRun(t, "add", path, "--side", "both")

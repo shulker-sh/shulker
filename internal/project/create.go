@@ -13,6 +13,29 @@ import (
 	"shulker.sh/shulker/internal/packarchive"
 )
 
+// NewManifest is the manifest a new project starts from: name defaults to dir's own name,
+// minecraft to the latest release, and side decides which side block it declares.
+func NewManifest(name, dir, minecraft string, l manifest.Loader, side string) *manifest.Manifest {
+	if name == "" {
+		name = Slugify(filepath.Base(dir))
+	}
+	m := &manifest.Manifest{
+		Schema:    manifest.SchemaURL,
+		Name:      name,
+		Authors:   DefaultAuthors(),
+		Minecraft: OrLatest(minecraft),
+		Loader:    l,
+		Requires:  map[string]manifest.Require{},
+	}
+	switch side {
+	case "server":
+		m.Server = &manifest.Server{EULA: false, Memory: manifest.DefaultServerMemory, Properties: map[string]any{"difficulty": "easy"}}
+	case "client":
+		m.Client = NewClient()
+	}
+	return m
+}
+
 // Scaffold gives an empty project folder what every project has: an overrides folder and a
 // .gitignore for what a build makes in place.
 func Scaffold(dir string) error {

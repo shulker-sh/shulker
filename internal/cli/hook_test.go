@@ -11,7 +11,7 @@ import (
 
 func TestPreLaunchReportsTheSync(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Friends")
@@ -64,7 +64,7 @@ func readArgs(t *testing.T, path string) string {
 func wrappedInstance(t *testing.T, exit string, edit func(f *instance.File)) (h *harness, gameDir, argsFile string) {
 	t.Helper()
 	h = newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	prismDir := t.TempDir()
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Friends")
@@ -337,7 +337,7 @@ func TestWrapWithoutGameDirStillFallsBackPastTheWrapper(t *testing.T) {
 
 func TestPreLaunchKeepsThePlayersFileOnAConflict(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	overrides := filepath.Join(h.dir, "overrides")
 	writeFile(t, filepath.Join(overrides, "options.txt"), "renderDistance:8\n")
 	prismDir := t.TempDir()
@@ -383,7 +383,7 @@ func TestPreLaunchKeepsThePlayersFileOnAConflict(t *testing.T) {
 
 func TestPreLaunchKeepsAConflictInASyncedDirectory(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	overrides := filepath.Join(h.dir, "overrides")
 	writeFile(t, filepath.Join(overrides, "options.txt"), "renderDistance:8\n")
 	into := t.TempDir()

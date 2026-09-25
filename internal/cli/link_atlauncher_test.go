@@ -14,7 +14,7 @@ import (
 
 func TestLinkATLauncher(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	h.mustRun(t, "add", "sodium")
 
 	launcherDir := t.TempDir()
@@ -106,7 +106,7 @@ func TestLinkATLauncher(t *testing.T) {
 
 func TestLinkATLauncherNeoForge(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--name", "pack", "--loader", "neoforge")
+	h.mustRun(t, "create", "--name", "pack", "--loader", "neoforge")
 
 	launcherDir := t.TempDir()
 	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Neo")

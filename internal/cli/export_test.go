@@ -87,7 +87,7 @@ func writeOverride(t *testing.T, dir, rel, content string) {
 
 func TestExportMrpack(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"
@@ -178,7 +178,7 @@ func TestExportMrpack(t *testing.T) {
 
 func TestExportMrpackCarriesPacks(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "fresh-animations")
 	h.mustRun(t, "shader", "add", "complementary-reimagined")
 	h.mustRun(t, "install")
@@ -209,7 +209,7 @@ func TestExportMrpackCarriesPacks(t *testing.T) {
 
 func TestExportMrpackBundlesForeignHosts(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
 
@@ -261,7 +261,7 @@ func keys(m map[string]string) []string {
 
 func TestExportMrpackBundleRoundTripsASidedLocalJar(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	jar := makeJar(t, "private-mod", "private-mod-1.4.jar", "client")
 	h.mustRun(t, "add", writeOutside(t, jar.filename, jar.data))
 	h.editManifest(t, func(m map[string]any) { m["version"] = "1.0" })

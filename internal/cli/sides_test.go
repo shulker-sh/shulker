@@ -11,7 +11,7 @@ import (
 
 func TestBuildTakesASidePositionally(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	twoSided(t, h)
 	h.mustRun(t, "install")
 
@@ -39,7 +39,7 @@ func TestBuildTakesASidePositionally(t *testing.T) {
 
 func TestDiffIntoNeedsOneSide(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	twoSided(t, h)
 	h.mustRun(t, "install")
 
@@ -52,7 +52,7 @@ func TestDiffIntoNeedsOneSide(t *testing.T) {
 
 func TestSyncNeedsOneSideWhenBothAreDeclared(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	twoSided(t, h)
 
 	code, stdout, _ := h.run(t, "sync", h.dir, "--into", t.TempDir(), "--json")
@@ -71,7 +71,7 @@ func TestSyncNeedsOneSideWhenBothAreDeclared(t *testing.T) {
 
 func TestLauncherCommandsTakeNoSideFlag(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 
 	for _, args := range [][]string{
 		{"link", "mojang", "--launcher-dir", t.TempDir(), "--side", "client"},
@@ -87,7 +87,7 @@ func TestLauncherCommandsTakeNoSideFlag(t *testing.T) {
 
 func TestAssumeClientBuildsAnUndeclaredClient(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	writeOverride(t, h.dir, "overrides/config/shared.txt", "shared\n")
 	into := filepath.Join(t.TempDir(), "client")
 
@@ -157,7 +157,7 @@ func TestAssumeClientBuildsAnUndeclaredClient(t *testing.T) {
 
 func TestAssumeClientExportsAnUndeclaredClient(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.editManifest(t, func(m map[string]any) { m["version"] = "1.0" })
 	h.mustRun(t, "install")
 
@@ -184,7 +184,7 @@ func TestAssumeClientExportsAnUndeclaredClient(t *testing.T) {
 
 func TestAddWarnsWhenAModShipsOnNoDeclaredSide(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	_, stderr := h.mustRunStderr(t, "add", "sodium")
 	if !strings.Contains(stderr, "sodium is client only, so no side of this project ships it; shulker set requires.sodium.side both ships it anyway") {
 		t.Fatalf("stderr: %s", stderr)
@@ -199,7 +199,7 @@ func TestAddWarnsWhenAModShipsOnNoDeclaredSide(t *testing.T) {
 
 func TestUpdateSkipsTheNoSideWarningForAConditionedMod(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
 		m["features"] = map[string]any{"shiny": map[string]any{}}
 		m["requires"] = map[string]any{"sodium": map[string]any{"feature": "shiny"}}

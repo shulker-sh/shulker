@@ -98,7 +98,7 @@ func TestExportRefusesAnIconThatIsNotAPNG(t *testing.T) {
 
 func TestLinkedInstanceFollowsThePackIcon(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	launcherDir := t.TempDir()
 	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Friends SMP")
 	instDir := filepath.Join(launcherDir, "instances", "FriendsSMP")
@@ -146,7 +146,7 @@ func TestLinkedInstanceFollowsThePackIcon(t *testing.T) {
 
 func TestLinkedGDLauncherInstanceTakesThePackIcon(t *testing.T) {
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "my-pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
 	icon := squarePNG(t, 48, color.NRGBA{R: 9, G: 9, B: 9, A: 255})
 	writeOverride(t, h.dir, "icon.png", string(icon))
 	h.editManifest(t, func(m map[string]any) { m["icon"] = "icon.png" })
@@ -164,7 +164,7 @@ func TestLinkedGDLauncherInstanceTakesThePackIcon(t *testing.T) {
 func TestImportMrpackRestoresTheIcon(t *testing.T) {
 	h := newHarness(t)
 	h.allowMrpackHost(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	icon := squarePNG(t, 24, color.NRGBA{R: 1, G: 2, B: 3, A: 255})
 	writeOverride(t, h.dir, "assets/pack.png", string(icon))
 	h.editManifest(t, func(m map[string]any) { m["icon"] = "assets/pack.png" })

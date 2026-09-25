@@ -44,7 +44,7 @@ func archivePack(t *testing.T, h *harness, rel, note string) fakeJar {
 func archiveProject(t *testing.T) *harness {
 	t.Helper()
 	h := newHarness(t)
-	h.mustRun(t, "init", "--yes", "--loader", "fabric")
+	h.mustRun(t, "create", "--loader", "fabric")
 	h.editManifest(t, func(m map[string]any) {
 		m["server"] = map[string]any{"memory": "2G"}
 	})

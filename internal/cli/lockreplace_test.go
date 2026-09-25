@@ -19,7 +19,7 @@ func TestLockReplacesALockItCantRead(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.mustRun(t, "init", "--yes", "--loader", "fabric")
+			h.mustRun(t, "create", "--loader", "fabric")
 			path := filepath.Join(h.dir, "shulker.lock")
 			if err := os.WriteFile(path, []byte(tc.lock), 0o644); err != nil {
 				t.Fatal(err)
