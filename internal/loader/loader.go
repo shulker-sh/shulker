@@ -102,7 +102,7 @@ type Loader struct {
 	MarkerFile string
 	// MarkerModLoader is the modLoader a TOML marker declares, with the loaderVersion that goes
 	// with it. Empty leaves both keys out, for a loader that rejects a loaderVersion without a
-	// modLoader and defaults a missing modLoader itself.
+	// modLoader and defaults a missing modLoader itself: NeoForge from 1.21.5 on.
 	MarkerModLoader string
 	// MarkerIconFile means the TOML marker names its logo as iconFile too, for a loader that shows
 	// the square icon beside the name only from that key.
@@ -138,6 +138,9 @@ type Loader struct {
 	vanillaServer func(l Loader, minecraft string) string
 	// launchArgs start the server from its dir, for a loader that doesn't start from ServerLaunchJar.
 	launchArgs func(l Loader, lk *lock.Lock) []string
+	// onMinecraft is the row as it runs on one Minecraft version, for a loader whose older
+	// generations differ.
+	onMinecraft func(l Loader, mc minecraft.Version) Loader
 }
 
 // ArtifactVersion is the version the loader publishes its own jars under.
@@ -150,28 +153,18 @@ func (l Loader) ArtifactVersion(minecraft, version string) string {
 
 var All = []Loader{fabric, quilt, neoforge, forge}
 
-// For is the named loader as it runs on the given Minecraft version. Forge before 1.13 reads @Mod
-// annotations and mcmod.info and has no marker jar, and its installers before 1.17 set no
-// serverJarPath or args file.
+// For is the named loader as it runs on the given Minecraft version, for a loader whose older
+// generations differ.
 func For(name, mc string) (Loader, bool) {
 	l, ok := Lookup(name)
-	if !ok || l.Name != forge.Name {
+	if !ok || l.onMinecraft == nil {
 		return l, ok
 	}
 	v, err := minecraft.Parse(mc)
 	if err != nil {
 		return l, ok
 	}
-	if minecraft.Compare(v, minecraft.MustParse("1.13")) < 0 {
-		l.MetadataFiles = []string{"mcmod.info"}
-		l.ModAnnotations = true
-		l.MarkerFile = ""
-	}
-	if minecraft.Compare(v, minecraft.MustParse("1.17")) < 0 {
-		l.RootServerJars = true
-		l.MinecraftJarClassifier = ""
-	}
-	return l, ok
+	return l.onMinecraft(l, v), ok
 }
 
 // Running is the locked loader as it runs on the locked Minecraft version, or the zero Loader for

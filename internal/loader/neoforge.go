@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 const NeoForgeMavenURL = "https://maven.neoforged.net"
@@ -19,6 +21,17 @@ var neoforge = Loader{
 	MavenPath:      "net/neoforged/neoforge",
 	versions:       neoforgeVersions, installerURL: neoforgeInstallerURL,
 	ensureServer: installerEnsureServer, vanillaServer: installerVanillaServer, launchArgs: installerLaunchArgs,
+	onMinecraft: neoforgeOnMinecraft,
+}
+
+// neoforgeOnMinecraft is NeoForge before 1.21.5, whose FML rejects a mod file that names no
+// modLoader and loaderVersion. From 1.21.5 on both are optional, and FML warns that lowcodefml
+// is deprecated.
+func neoforgeOnMinecraft(l Loader, mc minecraft.Version) Loader {
+	if minecraft.Compare(mc, minecraft.MustParse("1.21.5")) < 0 {
+		l.MarkerModLoader = "lowcodefml"
+	}
+	return l
 }
 
 // neoforgeVersions lists the NeoForge builds for a game. NeoForge numbers its builds after the game

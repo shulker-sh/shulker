@@ -29,7 +29,7 @@ func markerFor(t *testing.T, loaderName string, edit func(m *manifest.Manifest))
 		edit(m)
 	}
 	lk := lock.New()
-	lk.Minecraft = "26.2"
+	lk.Minecraft = m.Minecraft
 	lk.Loader = lock.Loader{Type: loaderName, Version: "1.0.0"}
 	lk.Java = lock.Java{Major: 25, Component: "java-runtime-epsilon"}
 	b := &Builder{Dir: dir, Manifest: m, Lock: lk, LockPath: filepath.Join(dir, lock.FileName), Cache: &cache.Cache{Dir: t.TempDir()}}
@@ -154,6 +154,26 @@ func TestQuiltMarkerJarIsFabricMetadata(t *testing.T) {
 	}
 	if parsed["id"] != "shulker_pack" {
 		t.Fatalf("marker id: %v", parsed["id"])
+	}
+}
+
+func TestNeoForgeMarkerNamesItsLanguageLoaderWhereFMLRequiresOne(t *testing.T) {
+	for _, c := range []struct {
+		minecraft string
+		declares  bool
+	}{
+		{"1.20.4", true},
+		{"1.21.1", true},
+		{"1.21.4", true},
+		{"1.21.5", false},
+		{"26.2", false},
+	} {
+		entries := markerFor(t, "neoforge", func(m *manifest.Manifest) { m.Minecraft = c.minecraft })
+		meta := entries["META-INF/neoforge.mods.toml"]
+		named := strings.Contains(meta, `modLoader = "lowcodefml"`) && strings.Contains(meta, `loaderVersion = "[1,)"`)
+		if named != c.declares || (!c.declares && strings.Contains(meta, "modLoader")) {
+			t.Errorf("minecraft %s: marker should declare a language loader: %v\n%s", c.minecraft, c.declares, meta)
+		}
 	}
 }
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 const ForgeMavenURL = "https://maven.minecraftforge.net"
@@ -18,6 +20,22 @@ var forge = Loader{
 	MavenPath:              "net/minecraftforge/forge", MavenVersionPrefixesGame: true,
 	versions: forgeVersions, installerURL: forgeInstallerURL,
 	ensureServer: installerEnsureServer, vanillaServer: installerVanillaServer, launchArgs: installerLaunchArgs,
+	onMinecraft: forgeOnMinecraft,
+}
+
+// forgeOnMinecraft is Forge before 1.13, which reads @Mod annotations and mcmod.info and has no
+// marker jar, and before 1.17, whose installers set no serverJarPath or args file.
+func forgeOnMinecraft(l Loader, mc minecraft.Version) Loader {
+	if minecraft.Compare(mc, minecraft.MustParse("1.13")) < 0 {
+		l.MetadataFiles = []string{"mcmod.info"}
+		l.ModAnnotations = true
+		l.MarkerFile = ""
+	}
+	if minecraft.Compare(mc, minecraft.MustParse("1.17")) < 0 {
+		l.RootServerJars = true
+		l.MinecraftJarClassifier = ""
+	}
+	return l
 }
 
 // forgeVersions lists the Forge builds for a game. Forge publishes them all under one artifact,
