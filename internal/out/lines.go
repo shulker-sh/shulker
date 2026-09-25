@@ -82,6 +82,10 @@ func (l *Lines) Text(text string) { l.line(l.T.Markup(text)) }
 func (l *Lines) Heading(text string) { l.line(l.T.Bold(text)) }
 
 func (l *Lines) Items(items ...Item) {
+	items = slices.Clone(items)
+	for i := range items {
+		items[i] = items[i].oneLine()
+	}
 	nameWidth, versionWidth := 0, 0
 	for _, it := range items {
 		if it.Version != "" || it.From != "" || it.Text != "" || it.OfSides > 0 {
@@ -123,6 +127,31 @@ func (l *Lines) item(it Item, nameWidth, versionWidth int) string {
 	parts = append(parts, l.glyph(it.Kind), t.Bold(name))
 	parts = append(parts, rest...)
 	return strings.Join(parts, " ") + t.Aside(strings.Join(it.Aside, ", "))
+}
+
+func (it Item) oneLine() Item {
+	it.Name, it.Version, it.From, it.To, it.Text = OneLine(it.Name), OneLine(it.Version), OneLine(it.From), OneLine(it.To), OneLine(it.Text)
+	aside := make([]string, len(it.Aside))
+	for i, a := range it.Aside {
+		aside[i] = OneLine(a)
+	}
+	it.Aside = aside
+	return it
+}
+
+// OneLine fits text shulker doesn't write itself, such as a provider's display name, onto one
+// line: each line break and the space around it becomes a single space, and the ends are trimmed.
+func OneLine(s string) string {
+	if !strings.ContainsAny(s, "\r\n") {
+		return strings.TrimSpace(s)
+	}
+	var parts []string
+	for part := range strings.FieldsFuncSeq(s, func(r rune) bool { return r == '\r' || r == '\n' }) {
+		if part = strings.TrimSpace(part); part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func afterVersion(it Item) bool {

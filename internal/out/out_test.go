@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -124,5 +125,18 @@ func TestAnnotationsEscapeWhatTheRunnerUnescapes(t *testing.T) {
 	want := "::warning::100%25 done%0Anext\n::error title=a%3A b%2C c (some-code)::one: 1\n"
 	if stderr.String() != want {
 		t.Fatalf("annotations:\n%q\nwant\n%q", stderr.String(), want)
+	}
+}
+
+func TestItemsCollapseNewlinesInText(t *testing.T) {
+	var buf bytes.Buffer
+	l := &Lines{W: &buf}
+	l.Items(
+		Item{Kind: Note, Name: "\nRefurbished Furniture", Version: "1.0.22\n", Aside: []string{"client\nonly"}},
+		Item{Kind: Change, Name: "jei", From: "19.57\n", To: "\n19.58"},
+	)
+	got := buf.String()
+	if strings.Count(got, "\n") != 2 || !strings.Contains(got, "Refurbished Furniture 1.0.22") || !strings.Contains(got, "client only") || !strings.Contains(got, "19.57 ⟶ 19.58") {
+		t.Fatalf("items: %q", got)
 	}
 }

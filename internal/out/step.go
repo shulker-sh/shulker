@@ -99,7 +99,7 @@ func (p *Printer) Step(format string, args ...any) {
 	if p.JSON {
 		return
 	}
-	text := fmt.Sprintf(format, args...)
+	text := OneLine(fmt.Sprintf(format, args...))
 	p.steps.mu.Lock()
 	defer p.steps.mu.Unlock()
 	if slices.Contains(p.steps.shown, text) {

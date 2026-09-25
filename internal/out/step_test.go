@@ -96,3 +96,16 @@ func TestSpinnerFramesSitOneSpaceBeforeTheText(t *testing.T) {
 		t.Fatalf("coloured spinner %q", got)
 	}
 }
+
+func TestStepCollapsesNewlinesInText(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	p.Step("fetching %s %s", "refurbished-furniture", "\nMrCrayfish's Furniture Mod: Refurbished 1.0.22")
+	p.Step("fetching %s %s", "twilight", "The Twilight\r\n  Forest 4.7")
+	p.Step("fetching %s", "trailing 1.0 ")
+	p.Settle()
+	want := "  ✔ fetched refurbished-furniture MrCrayfish's Furniture Mod: Refurbished 1.0.22\n  ✔ fetched twilight The Twilight Forest 4.7\n  ✔ fetched trailing 1.0\n"
+	if stderr.String() != want {
+		t.Fatalf("stderr: %q", stderr.String())
+	}
+}
