@@ -43,6 +43,7 @@ func (a *app) watchCmd() *cobra.Command {
 		Hidden:      true,
 		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			a.printer.Raw()
 			var req watchRequest
 			if err := json.NewDecoder(a.stdin).Decode(&req); err != nil {
 				return out.Errorf("usage", "the watcher reads one launch from its stdin").WithCause("json", err)

@@ -140,3 +140,33 @@ func TestItemsCollapseNewlinesInText(t *testing.T) {
 		t.Fatalf("items: %q", got)
 	}
 }
+
+func TestFinishPrintsAnEnvelopeWhenNothingWasEmitted(t *testing.T) {
+	var stdout bytes.Buffer
+	p := &Printer{JSON: true, Command: "hook pre-launch", Stdout: &stdout, Stderr: &bytes.Buffer{}}
+	p.Warn("not an instance")
+	p.Finish()
+	var env Envelope
+	if err := json.Unmarshal(stdout.Bytes(), &env); err != nil {
+		t.Fatalf("%v: %q", err, stdout.String())
+	}
+	if !env.OK || env.Command != "hook pre-launch" || env.Data != nil || !slices.Equal(env.Warnings, []string{"not an instance"}) {
+		t.Fatalf("envelope %+v", env)
+	}
+}
+
+func TestFinishPrintsNothingMoreAfterEmitOrRaw(t *testing.T) {
+	for name, run := range map[string]func(p *Printer){
+		"emit": func(p *Printer) { _ = p.Emit(1, nil) },
+		"raw":  func(p *Printer) { p.Raw() },
+	} {
+		var stdout bytes.Buffer
+		p := &Printer{JSON: true, Stdout: &stdout, Stderr: &bytes.Buffer{}}
+		run(p)
+		before := stdout.Len()
+		p.Finish()
+		if stdout.Len() != before {
+			t.Fatalf("%s: Finish printed %q", name, stdout.String()[before:])
+		}
+	}
+}

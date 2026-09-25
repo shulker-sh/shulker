@@ -102,7 +102,7 @@ func (a *app) run(ctx context.Context, args []string) int {
 		}
 		code = a.printer.Fail(err)
 	} else {
-		a.printer.Settle()
+		a.printer.Finish()
 	}
 	a.endLog(code)
 	return code

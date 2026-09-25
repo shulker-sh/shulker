@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestPreLaunchReportsTheSync(t *testing.T) {
@@ -402,5 +404,16 @@ func TestPreLaunchKeepsAConflictInASyncedDirectory(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(into, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("the rest of the update applies: %v", err)
+	}
+}
+
+func TestPreLaunchOutsideAnInstancePrintsAnEnvelope(t *testing.T) {
+	code, stdout, stderr := run(t, "hook", "pre-launch", "-C", t.TempDir(), "--json")
+	var env out.Envelope
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil || code != out.ExitOK || stderr != "" {
+		t.Fatalf("code=%d err=%v stdout=%q stderr=%q", code, err, stdout, stderr)
+	}
+	if !env.OK || env.Command != "hook pre-launch" || len(env.Warnings) != 1 {
+		t.Fatalf("envelope %+v", env)
 	}
 }

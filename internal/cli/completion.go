@@ -43,6 +43,7 @@ func (a *app) completionCmd() *cobra.Command {
 			Args:              noArgs,
 			ValidArgsFunction: cobra.NoFileCompletions,
 			RunE: func(cmd *cobra.Command, _ []string) error {
+				a.printer.Raw()
 				return shell.write(cmd.Root(), cmd.OutOrStdout(), !noDescriptions)
 			},
 		}

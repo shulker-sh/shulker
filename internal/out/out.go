@@ -159,6 +159,9 @@ type Printer struct {
 	// the runner reads from either stream and shows as an annotation on the run.
 	Annotate bool
 	warnings []string
+	// printed is whether stdout already holds the run's output: an envelope, or what a Raw command
+	// wrote itself.
+	printed  bool
 	steps    stepState
 	waits    waits
 	Theme    Theme
@@ -296,7 +299,21 @@ func (p *Printer) Fail(err error) int {
 	return e.Exit
 }
 
+// Raw marks the run's stdout as the command's own output, such as a completion script, so Finish
+// prints no envelope after it.
+func (p *Printer) Raw() { p.printed = true }
+
+// Finish ends a run that succeeded. Under --json, a command that emitted nothing still prints an
+// envelope, so its warnings reach the caller.
+func (p *Printer) Finish() {
+	p.Settle()
+	if p.JSON && !p.printed {
+		_ = p.encode(p.envelope(true, nil, nil))
+	}
+}
+
 func (p *Printer) encode(v any) error {
+	p.printed = true
 	enc := json.NewEncoder(p.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
