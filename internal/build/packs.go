@@ -256,16 +256,16 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 			return err
 		}
 		state := LoadState(b.Target(side, opts.Dir))
-		options[resourcePacksKey] = b.seed(side, opts, b.Manifest.OptionsPath(), resourcePacksKey, list, b.renamedPacks(state, desired), report)
+		options[resourcePacksKey] = b.seed(side, opts, OptionsFile, resourcePacksKey, list, b.renamedPacks(state, desired), report)
 		return nil
 	}
 	if shipped != "" && !untouchedPackList(shipped) {
 		return nil
 	}
 	dir := b.Target(side, opts.Dir)
-	file := filepath.Join(dir, filepath.FromSlash(b.Manifest.OptionsPath()))
+	file := filepath.Join(dir, filepath.FromSlash(OptionsFile))
 	state := LoadState(dir)
-	was, recorded := state.Values[b.Manifest.OptionsPath()][resourcePacksKey]
+	was, recorded := state.Values[OptionsFile][resourcePacksKey]
 	switch {
 	case opts.Force:
 	case recorded:
@@ -337,7 +337,7 @@ func (b *Builder) renamedPacks(state State, desired map[string]source) map[strin
 // the last folder's winning as it does when the build lays them, or empty when
 // none sets one.
 func (b *Builder) shippedPackList(side string, cond conditions, vars map[string]string) (string, error) {
-	rel := b.Manifest.OptionsPath()
+	rel := OptionsFile
 	var list string
 	for _, l := range b.overrideLayers(side, cond, vars) {
 		for _, name := range []string{rel, rel + TemplateSuffix} {
@@ -379,7 +379,7 @@ func overrideData(l overrideLayer, rel string) ([]byte, bool) {
 // written: the one the build writes, unless the build keeps the file already
 // there, or the merge keeps a list the player changed in game.
 func (b *Builder) enabledPackList(side string, opts Options, desired map[string]source) (string, error) {
-	rel := b.Manifest.OptionsPath()
+	rel := OptionsFile
 	dir := b.Target(side, opts.Dir)
 	abs := filepath.Join(dir, filepath.FromSlash(rel))
 	data, _ := os.ReadFile(abs)
@@ -447,7 +447,7 @@ func (b *Builder) reportPackList(side string, opts Options, desired map[string]s
 	}
 	for _, entry := range entries {
 		if name, ok := form.name(entry); ok && !slices.Contains(placed, name) {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("%s enables %s, but no pack is placed under that name", b.Manifest.OptionsPath(), name))
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s enables %s, but no pack is placed under that name", OptionsFile, name))
 		}
 	}
 	return nil

@@ -43,6 +43,7 @@ const (
 	TemplateSuffix    = ".tmpl"
 	VanillaServerFile = loader.VanillaServerFile
 	EulaFile          = "eula.txt"
+	OptionsFile       = "options.txt"
 )
 
 func StatePath(dir string) string {
@@ -853,7 +854,7 @@ func RecordLauncherImage(dir, hash string) error {
 
 func (b *Builder) collectClient(side string, opts Options, desired map[string]source, vars map[string]string, shipped string, report *Report) error {
 	cl := b.Manifest.Client
-	file := b.Manifest.OptionsPath()
+	file := OptionsFile
 	options := properties{}
 	if cl != nil && len(cl.Options) > 0 {
 		rendered, err := renderProperties(file, cl.Options, vars)

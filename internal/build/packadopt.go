@@ -34,7 +34,7 @@ func AdoptPackChoices(m *manifest.Manifest, lk *lock.Lock, overrides []packarchi
 		var key string
 		var warned []string
 		switch {
-		case o.Path == m.OptionsPath():
+		case o.Path == OptionsFile:
 			key = resourcePacksKey
 			adopted, warned = adoptPackList(m, listFormFor(lk.Minecraft), o)
 		case slices.ContainsFunc(integrations.Shaders, func(s integrations.Shader) bool { return s.Config != "" && s.Config == o.Path }):

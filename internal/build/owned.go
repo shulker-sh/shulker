@@ -10,7 +10,7 @@ import (
 func DropManifestOwned(m *manifest.Manifest, overrides []packarchive.Override) []packarchive.Override {
 	owned := map[string]bool{}
 	if m.Client != nil && m.Client.Options != nil {
-		owned[m.OptionsPath()] = true
+		owned[OptionsFile] = true
 	}
 	if m.Server != nil {
 		owned[PropertiesFile] = true

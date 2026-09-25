@@ -111,13 +111,12 @@ func (p *Players) All() []Player {
 }
 
 type Client struct {
-	Name        string         `json:"name,omitempty"`
-	Build       string         `json:"build,omitempty"`
-	Variables   Variables      `json:"variables,omitempty"`
-	Hooks       *Hooks         `json:"hooks,omitempty"`
-	Memory      string         `json:"memory,omitempty"`
-	Options     map[string]any `json:"options,omitempty"`
-	OptionsPath string         `json:"optionsPath,omitempty"`
+	Name      string         `json:"name,omitempty"`
+	Build     string         `json:"build,omitempty"`
+	Variables Variables      `json:"variables,omitempty"`
+	Hooks     *Hooks         `json:"hooks,omitempty"`
+	Memory    string         `json:"memory,omitempty"`
+	Options   map[string]any `json:"options,omitempty"`
 	// ResourcePacks are the resource packs that start enabled, top first, and Shader the shader,
 	// "" for none. Each is nil when the manifest leaves the choice to the pack and the defaults.
 	ResourcePacks *[]string       `json:"resourcePacks,omitempty"`
@@ -129,14 +128,6 @@ type Client struct {
 // BuiltinResourcePacks are the resource packs the game ships that a player may turn on, named
 // as options.txt names them. The ones it always loads, such as vanilla, are never listed.
 var BuiltinResourcePacks = []string{"programmer_art", "high_contrast"}
-
-// OptionsPath is where client.options is written, relative to the build.
-func (m *Manifest) OptionsPath() string {
-	if m.Client == nil || m.Client.OptionsPath == "" {
-		return "options.txt"
-	}
-	return path.Clean(m.Client.OptionsPath)
-}
 
 // Hooks are the author's defaults for a launcher instance's hook switches. They seed the instance's
 // own settings when it is created; nothing reads them after that.
@@ -434,11 +425,6 @@ func (m *Manifest) check() error {
 				return e
 			}
 		}
-	}
-	if m.Client != nil && m.Client.OptionsPath != "" && !insideBuild(m.Client.OptionsPath) {
-		e := out.Errorf("manifest-invalid", "client.optionsPath %q is not a file inside the build", m.Client.OptionsPath)
-		e.Rows = []out.Detail{{Label: "Fix", Text: `give a path relative to the build, such as "config/modpack_defaults/options.txt"`}}
-		return e
 	}
 	if err := m.checkPackChoices(); err != nil {
 		return err

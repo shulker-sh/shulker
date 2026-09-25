@@ -555,7 +555,7 @@ func (b *Builder) manifestBlock(rel string) map[string]any {
 	switch {
 	case rel == PropertiesFile && b.Manifest.Server != nil:
 		return b.Manifest.Server.Properties
-	case rel == b.Manifest.OptionsPath() && b.Manifest.Client != nil:
+	case rel == OptionsFile && b.Manifest.Client != nil:
 		return b.Manifest.Client.Options
 	}
 	return nil

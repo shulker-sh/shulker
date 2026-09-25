@@ -132,7 +132,7 @@ func (b *Builder) Export(ctx context.Context, opts ExportOptions) (*ExportReport
 	}
 	if f.Renames() {
 		for _, t := range sides {
-			enableByListedNames(t, files, b.Manifest.OptionsPath(), b.listForm())
+			enableByListedNames(t, files, b.listForm())
 		}
 	}
 	if plain := relocateSeeded(sides); len(plain) > 0 {
@@ -623,7 +623,7 @@ func relocateSeeded(sides []*exportSide) []string {
 // enableByListedNames points the options file and the shader loader's config at the names the
 // launcher saves listed packs under, which are the provider's own file names rather than the
 // <key>.zip a build places.
-func enableByListedNames(t *exportSide, files []packarchive.File, optionsPath string, form packForm) {
+func enableByListedNames(t *exportSide, files []packarchive.File, form packForm) {
 	fileNames := map[string]string{}
 	for _, f := range files {
 		fileNames[f.Path] = f.Filename
@@ -634,7 +634,7 @@ func enableByListedNames(t *exportSide, files []packarchive.File, optionsPath st
 			renamed[base] = name
 		}
 	}
-	rewriteProperty(t.files, optionsPath, resourcePacksKey+":", func(list string) string { return form.rename(list, renamed) })
+	rewriteProperty(t.files, OptionsFile, resourcePacksKey+":", func(list string) string { return form.rename(list, renamed) })
 	for _, s := range integrations.Shaders {
 		if s.Config == "" {
 			continue
