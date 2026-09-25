@@ -1720,6 +1720,8 @@ Nothing else goes. Every instance folder stays, with its worlds and its builds, 
 
 An instance shulker can't unhook — an unreadable launcher file, say — is a warning, and the rest of the uninstall carries on. On Windows the running binary can't be deleted, so it is renamed to `shulker.exe.old` and the last line tells you to delete it.
 
+A binary a package manager installed is left for it: the hooks come off and the registry is handled as above, then the last line names the command that removes the binary, `brew uninstall shulker` or `scoop uninstall shulker`. That is a success, not an error; in JSON, `removed` is empty beside `install`, which names the route the binary came from.
+
 ```sh
 shulker self uninstall
 shulker self uninstall --purge

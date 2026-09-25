@@ -64,6 +64,9 @@ func TestRouteCommands(t *testing.T) {
 			t.Errorf("%q: managed %v, origin %q, lead %q, update %q, uninstall %q", c.route, c.route.Managed(), c.route.Origin(), c.route.UpdateLead(), c.route.UpdateCommand(), c.route.UninstallCommand())
 		}
 	}
+	if Homebrew.Owner() != "Homebrew" || Scoop.Owner() != "Scoop" || Release.Owner() != "" || GoInstall.Owner() != "" {
+		t.Errorf("only a package manager owns the binary")
+	}
 	if got := (Build{Route: Source, Commit: "d1556f95d232aa7f"}).Origin(); got != "built from source at d1556f9" {
 		t.Errorf("a source build names its commit: %q", got)
 	}

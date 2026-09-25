@@ -38,8 +38,10 @@ func (a *app) selfCmd() *cobra.Command {
 }
 
 type selfUninstallResult struct {
-	Unhooked  []config.Instance `json:"unhooked"`
-	Removed   string            `json:"removed,omitempty"`
+	Unhooked []config.Instance `json:"unhooked"`
+	// Removed is "" when a package manager owns the binary and the uninstall stops short of it.
+	Removed   string            `json:"removed"`
+	Install   string            `json:"install,omitempty"`
 	Renamed   string            `json:"renamed,omitempty"`
 	Purged    bool              `json:"purged"`
 	Forgotten []config.Instance `json:"forgotten,omitempty"`
@@ -63,13 +65,16 @@ func (a *app) selfUninstallCmd() *cobra.Command {
 // selfUninstall leaves the instance folders and, unless --purge, the registry, so reinstalling and
 // running `instances repair` puts every hook back. Nothing prompts: typing the command is the intent,
 // and --purge is a second explicit act. A failure to unhook one instance is a warning, because
-// leaving shulker installed over one unreadable launcher file helps nobody.
+// leaving shulker installed over one unreadable launcher file helps nobody. A binary a package
+// manager installed is left for it to remove, since that manager tracks the file and this
+// command has already done everything else.
 func (a *app) selfUninstall(purge bool) error {
 	exe, err := a.exe()
 	if err != nil {
 		return out.Errorf("self-uninstall", "can't find the running shulker binary").WithCause("os", err)
 	}
-	res := selfUninstallResult{Unhooked: []config.Instance{}, Purged: purge}
+	route := a.build().Route
+	res := selfUninstallResult{Unhooked: []config.Instance{}, Install: string(route), Purged: purge}
 	instances, err := a.loadInstances()
 	if err != nil {
 		a.printer.Warn("no instance was unhooked: %v", err)
@@ -90,19 +95,21 @@ func (a *app) selfUninstall(purge bool) error {
 		}
 		res.Unhooked = append(res.Unhooked, in)
 	}
-	res.Removed = exe
-	if runtime.GOOS == "windows" {
-		// os.Remove can't touch a running exe, and the .old sweep `self update` relies on happens on
-		// the next run, which an uninstall never has.
-		res.Renamed = exe + ".old"
-		err = os.Rename(exe, res.Renamed)
-	} else {
-		err = os.Remove(exe)
-	}
-	if err != nil {
-		e := out.Errorf("self-uninstall", "can't remove %s", exe).WithCause("os", err)
-		e.Data = res
-		return e
+	if route.UninstallCommand() == "" {
+		res.Removed = exe
+		if runtime.GOOS == "windows" {
+			// os.Remove can't touch a running exe, and the .old sweep `self update` relies on happens on
+			// the next run, which an uninstall never has.
+			res.Renamed = exe + ".old"
+			err = os.Rename(exe, res.Renamed)
+		} else {
+			err = os.Remove(exe)
+		}
+		if err != nil {
+			e := out.Errorf("self-uninstall", "can't remove %s", exe).WithCause("os", err)
+			e.Data = res
+			return e
+		}
 	}
 	if purge {
 		if err := a.forgetRegistry(); err != nil {
@@ -135,7 +142,12 @@ func (s selfUninstallResult) print(l *out.Lines) {
 		}
 		l.Items(items...)
 	}
-	l.OK("removed "+s.Removed, "")
+	route := selfupdate.Route(s.Install)
+	if s.Removed != "" {
+		l.OK("removed "+s.Removed, "")
+	} else {
+		l.Info("the binary is " + route.Owner() + "'s to remove")
+	}
 	if s.Purged {
 		l.OK("forgot the registry", "")
 		if len(s.Forgotten) > 0 {
@@ -152,6 +164,9 @@ func (s selfUninstallResult) print(l *out.Lines) {
 	}
 	if s.Renamed != "" {
 		l.Nudge("Delete the leftover binary", `del "`+s.Renamed+`"`)
+	}
+	if s.Removed == "" {
+		l.Nudge("Remove it with", route.UninstallCommand())
 	}
 }
 

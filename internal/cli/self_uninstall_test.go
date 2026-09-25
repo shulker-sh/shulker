@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/selfupdate"
 )
 
 // uninstallHarness is a project with a Prism instance, an official launcher profile and a
@@ -155,5 +157,37 @@ func TestSelfUninstallPurgeLeavesShulkersOwnInstancesFindable(t *testing.T) {
 	stdout := h.mustRun(t, "self", "uninstall", "--purge")
 	if !strings.Contains(stdout, "pack (Shulker)") || strings.Contains(stdout, "can't be found again") {
 		t.Fatalf("a shulker instance is unhooked with the rest and found again by a repair of the instances root: %s", stdout)
+	}
+}
+
+func TestSelfUninstallHandsTheBinaryToItsPackageManager(t *testing.T) {
+	h, prismDir, _, _ := uninstallHarness(t)
+	h.build = &selfupdate.Build{Version: "0.0.1", Route: selfupdate.Homebrew}
+	prismCfg := filepath.Join(prismDir, "instances", "shulker-pack", launcher.PrismInstanceFile)
+
+	stdout := h.mustRun(t, "self", "uninstall")
+	if !strings.Contains(stdout, "unhooked 2 instances") || strings.Contains(stdout, "removed ") {
+		t.Fatalf("the hooks go and the binary stays: %s", stdout)
+	}
+	if !strings.Contains(stdout, "i the binary is Homebrew's to remove") || !strings.HasSuffix(stdout, "\n  Remove it with:\n    $ brew uninstall shulker\n") {
+		t.Fatalf("the handoff closes the output: %s", stdout)
+	}
+	if !strings.Contains(stdout, "$ shulker instances repair") {
+		t.Fatalf("the registry is kept as ever: %s", stdout)
+	}
+	if _, err := os.Stat(h.exe); err != nil {
+		t.Fatalf("the binary is the package manager's: %v", err)
+	}
+	if cfg := readINIFile(t, prismCfg); cfg["PreLaunchCommand"] != "" {
+		t.Fatalf("the launcher's slots are cleared: %+v", cfg)
+	}
+
+	env := h.runSetting(t, 0, "self", "uninstall")
+	var res selfUninstallResult
+	if err := json.Unmarshal(env.Data, &res); err != nil {
+		t.Fatal(err)
+	}
+	if res.Removed != "" || res.Install != "homebrew" || !strings.Contains(string(env.Data), `"removed": ""`) {
+		t.Fatalf("removed is empty beside the route: %s", env.Data)
 	}
 }

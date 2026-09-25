@@ -26,15 +26,15 @@ const (
 )
 
 type routeFacts struct {
-	origin, updateLead, update, uninstall string
+	origin, updateLead, update, owner, uninstall string
 }
 
 var routes = map[Route]routeFacts{
 	Release:   {origin: "installed from a release", updateLead: "Install it", update: "shulker self update"},
 	GoInstall: {origin: "installed with go install", updateLead: "Update it with", update: "go install shulker.sh/shulker@latest"},
 	Source:    {origin: "built from source", updateLead: "Rebuild it with", update: "go build ."},
-	Homebrew:  {origin: "installed by Homebrew", updateLead: "Update it with", update: "brew upgrade shulker", uninstall: "brew uninstall shulker"},
-	Scoop:     {origin: "installed by Scoop", updateLead: "Update it with", update: "scoop update shulker", uninstall: "scoop uninstall shulker"},
+	Homebrew:  {origin: "installed by Homebrew", updateLead: "Update it with", update: "brew upgrade shulker", owner: "Homebrew", uninstall: "brew uninstall shulker"},
+	Scoop:     {origin: "installed by Scoop", updateLead: "Update it with", update: "scoop update shulker", owner: "Scoop", uninstall: "scoop uninstall shulker"},
 }
 
 func (r Route) facts() routeFacts {
@@ -57,8 +57,10 @@ func (r Route) UpdateCommand() string { return r.facts().update }
 
 func (r Route) UpdateLead() string { return r.facts().updateLead }
 
-// UninstallCommand is the package manager's way to remove the binary, or "" when nothing tracks
-// the file and shulker removes it itself.
+// Owner is the package manager that tracks the binary, and UninstallCommand its way to remove it;
+// both are "" when nothing tracks the file and shulker removes it itself.
+func (r Route) Owner() string { return r.facts().owner }
+
 func (r Route) UninstallCommand() string { return r.facts().uninstall }
 
 // Build is what a shulker binary knows about itself.
