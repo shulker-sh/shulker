@@ -1,7 +1,7 @@
-// Package verrange is the version range syntax Minecraft and loader versions share: *, ~v, ^v, >=,
+// Package version is the version range syntax Minecraft and loader versions share: *, ~v, ^v, >=,
 // <=, >, <, =, a space for "and", || for "or". Each version kind brings its own ordering and its own
 // upper bounds for ~ and ^.
-package verrange
+package version
 
 import (
 	"fmt"

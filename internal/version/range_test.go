@@ -1,4 +1,4 @@
-package verrange
+package version
 
 import (
 	"strconv"

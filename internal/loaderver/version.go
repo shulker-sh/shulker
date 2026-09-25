@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"shulker.sh/shulker/internal/verrange"
+	"shulker.sh/shulker/internal/version"
 )
 
 type Version struct {
@@ -60,7 +60,7 @@ func Compare(a, b Version) int {
 	case b.Pre == "":
 		return -1
 	}
-	return verrange.ComparePrerelease(a.Pre, b.Pre)
+	return version.ComparePrerelease(a.Pre, b.Pre)
 }
 
 func compareCore(a, b Version) int {

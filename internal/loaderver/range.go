@@ -1,12 +1,12 @@
 package loaderver
 
-import "shulker.sh/shulker/internal/verrange"
+import "shulker.sh/shulker/internal/version"
 
-type Range = verrange.Range[Version]
+type Range = version.Range[Version]
 
-func ParseRange(raw string) (Range, error) { return verrange.Parse(raw, Parse) }
+func ParseRange(raw string) (Range, error) { return version.Parse(raw, Parse) }
 
-func Newest(candidates []Version, r Range) (Version, bool) { return verrange.Newest(candidates, r) }
+func Newest(candidates []Version, r Range) (Version, bool) { return version.Newest(candidates, r) }
 
 func (v Version) Compare(o Version) int { return Compare(v, o) }
 

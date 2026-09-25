@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"shulker.sh/shulker/internal/verrange"
+	"shulker.sh/shulker/internal/version"
 )
 
 // Kind is what a version is relative to its release. The constants are in the order they sort.
@@ -118,7 +118,7 @@ func Compare(a, b Version) int {
 	case Release:
 		return 0
 	case Other:
-		return verrange.ComparePrerelease(a.Tag, b.Tag)
+		return version.ComparePrerelease(a.Tag, b.Tag)
 	}
 	if a.Num != b.Num {
 		if a.Num < b.Num {
