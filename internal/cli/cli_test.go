@@ -379,6 +379,24 @@ func TestUnknownCommandJSON(t *testing.T) {
 	}
 }
 
+func TestUsageErrorJSONNamesTheCommand(t *testing.T) {
+	for args, want := range map[string]string{
+		"list --bogus":  "list",
+		"feature on":    "feature on",
+		"bogus":         "",
+		"feature bogus": "feature",
+	} {
+		_, stdout, _ := run(t, append(strings.Fields(args), "--json")...)
+		var env out.Envelope
+		if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+			t.Fatalf("%s: %v %q", args, err, stdout)
+		}
+		if env.Error == nil || env.Error.Code != "usage" || env.Command != want {
+			t.Fatalf("%s: command %q, want %q: %s", args, env.Command, want, stdout)
+		}
+	}
+}
+
 func TestUnknownCommandPicks(t *testing.T) {
 	code, stdout, _ := run(t, "ad", "add", "--json")
 	if code != out.ExitUsage {

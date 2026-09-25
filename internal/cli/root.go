@@ -97,6 +97,9 @@ func (a *app) run(ctx context.Context, args []string) int {
 		if e := out.AsError(err); e.Flag != "" && cmd != nil && cmd.Flags().Lookup(strings.TrimPrefix(e.Flag, "--")) == nil {
 			e.Flag = ""
 		}
+		if a.printer.Command == "" && cmd != nil && cmd.HasParent() {
+			a.printer.Command = strings.TrimPrefix(cmd.CommandPath(), "shulker ")
+		}
 		if ctx.Err() != nil {
 			err = &out.Error{Code: "interrupted", Message: "interrupted", Exit: out.ExitInterrupted, Data: out.AsError(err).Data}
 		}
