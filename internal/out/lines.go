@@ -3,10 +3,14 @@ package out
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/lipgloss/tree"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const gutter = "  "
@@ -246,6 +250,75 @@ func (t Theme) indenter(children tree.Children, i int) string {
 		return "  "
 	}
 	return t.GlyphBar() + " "
+}
+
+// tableFloor is the narrowest a wrapped column goes; below it the table overflows instead.
+const tableFloor = 12
+
+// Table prints a header-rule table in the gutter: grey title-case headers over a grey rule, no
+// other border, two spaces between columns, and style deciding each body cell's paint. It renders
+// at its natural width; when that overflows the terminal less the gutter, only the widest column's
+// cells wrap, at / and -, so the other columns keep their width and no header is ever clipped. The
+// column wraps no narrower than tableFloor or its header, and past that the table overflows.
+func (l *Lines) Table(headers []string, rows [][]string, style func(row, col int) lipgloss.Style) {
+	t := l.T
+	grey := t.Style().Foreground(t.lipglossGrey())
+	cells := func(row, col int) lipgloss.Style {
+		cell := grey
+		if row != table.HeaderRow {
+			cell = style(row, col)
+		}
+		if col == len(headers)-1 {
+			return cell
+		}
+		return cell.PaddingRight(2)
+	}
+	render := func(rows [][]string) string {
+		return table.New().Headers(headers...).Rows(rows...).
+			Border(lipgloss.NormalBorder()).BorderStyle(grey).
+			BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).BorderColumn(false).
+			StyleFunc(cells).Render()
+	}
+	rendered := render(rows)
+	if excess := lipgloss.Width(rendered) - (TerminalWidth(l.W) - len(gutter)); excess > 0 {
+		rendered = render(fold(headers, rows, excess))
+	}
+	for line := range strings.SplitSeq(rendered, "\n") {
+		l.line(strings.TrimRight(line, " "))
+	}
+}
+
+// Columns is a Table style that paints each column the same way on every row; a column past the
+// list takes the last style given.
+func Columns(styles ...lipgloss.Style) func(row, col int) lipgloss.Style {
+	return func(_, col int) lipgloss.Style { return styles[min(col, len(styles)-1)] }
+}
+
+// fold wraps the cells of the widest column to take up the excess, down to that column's floor.
+func fold(headers []string, rows [][]string, excess int) [][]string {
+	widths := make([]int, len(headers))
+	for _, row := range rows {
+		for col, cell := range row {
+			if col < len(widths) {
+				widths[col] = max(widths[col], lipgloss.Width(cell))
+			}
+		}
+	}
+	widest := 0
+	for col, w := range widths {
+		if w > widths[widest] {
+			widest = col
+		}
+	}
+	limit := max(widths[widest]-excess, tableFloor, lipgloss.Width(headers[widest]))
+	folded := make([][]string, len(rows))
+	for i, row := range rows {
+		folded[i] = slices.Clone(row)
+		if widest < len(row) {
+			folded[i][widest] = ansi.Wrap(row[widest], limit, "/-")
+		}
+	}
+	return folded
 }
 
 // Nudge is a grey lead-in ending in a colon, then the command to run.

@@ -41,8 +41,12 @@ func luminance(rgb [3]float64) float64 {
 	return 0.2126*lin(rgb[0]) + 0.7152*lin(rgb[1]) + 0.0722*lin(rgb[2])
 }
 
-// TerminalWidth is w's column count, or 80 when w isn't a terminal.
+// TerminalWidth is w's column count, or 80 when w isn't a terminal. A result stream settles the
+// running step before each write, and that wrapper is looked through.
 func TerminalWidth(w io.Writer) int {
+	if s, ok := w.(settling); ok {
+		w = s.w
+	}
 	if f, ok := w.(*os.File); ok && IsTerminal(w) {
 		return terminalWidth(f)
 	}

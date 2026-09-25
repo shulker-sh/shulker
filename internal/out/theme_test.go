@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 var sgrSeq = regexp.MustCompile(`\x1b\[[0-9;]*m`)
@@ -207,5 +209,55 @@ func TestTreeNestsChildrenUnderTheirRow(t *testing.T) {
 	}
 	if empty := render(Theme{}, func(l *Lines) { l.Tree() }); len(empty) != 1 || empty[0] != "" {
 		t.Fatalf("an empty tree prints nothing: %q", empty)
+	}
+}
+
+func TestTableRulesUnderGreyHeadersAndPadsCells(t *testing.T) {
+	style := func(row, col int) lipgloss.Style { return lipgloss.NewStyle() }
+	lines := render(Theme{}, func(l *Lines) {
+		l.Table([]string{"", "Account", "UUID"}, [][]string{{"✔", "Steve", "8667ba71"}, {"", "Alt", "069a79f4"}}, style)
+	})
+	want := []string{
+		"     Account  UUID",
+		"  ────────────────────",
+		"  ✔  Steve    8667ba71",
+		"     Alt      069a79f4",
+	}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
+	}
+	coloured := render(coloured(), func(l *Lines) {
+		l.Table([]string{"Name", "Note", "More"}, [][]string{{"x", "y", "z"}}, Columns(l.T.StyleBold(), l.T.StyleGrey()))
+	})
+	if !strings.HasPrefix(coloured[0], "  \x1b[38;5;248mName") || !strings.Contains(coloured[2], "\x1b[1mx\x1b[0m") || strings.Count(coloured[2], "\x1b[38;5;248m") != 2 {
+		t.Fatalf("coloured table, columns past the list taking the last style: %q", coloured)
+	}
+}
+
+func TestTableWrapsOnlyItsWidestColumn(t *testing.T) {
+	style := func(row, col int) lipgloss.Style { return lipgloss.NewStyle() }
+	path := "/Users/dev/Library/Application Support/PrismLauncher/instances/survival-1.21.4/minecraft"
+	lines := render(Theme{}, func(l *Lines) {
+		l.Table([]string{"Instance", "Path"}, [][]string{{"survival-1.21.4", path}, {"creative", "/tmp/creative"}}, style)
+	})
+	if len(lines) < 4 || lines[2] != "  survival-1.21.4  /Users/dev/Library/Application Support/PrismLauncher/" || !strings.HasPrefix(lines[3], "                   instances/") {
+		t.Fatalf("the path folds at a separator and the instance column keeps its width:\n%s", strings.Join(lines, "\n"))
+	}
+	for _, line := range lines {
+		if Width(line) > 80 {
+			t.Fatalf("line over 80 columns: %q", line)
+		}
+	}
+	two := render(Theme{}, func(l *Lines) {
+		l.Table([]string{"Dir", "Message"}, [][]string{{strings.Repeat("a/", 30), strings.Repeat("word ", 20)}}, style)
+	})
+	if !strings.HasPrefix(two[2], "  "+strings.Repeat("a/", 30)+"  word word word") || Width(two[2]) > 80 {
+		t.Fatalf("only the widest column folds; the other keeps its width:\n%s", strings.Join(two, "\n"))
+	}
+	floor := render(Theme{}, func(l *Lines) {
+		l.Table([]string{"Dir", "Message"}, [][]string{{strings.Repeat("a/", 40), strings.Repeat("word ", 20)}}, style)
+	})
+	if !strings.HasPrefix(floor[2], "  "+strings.Repeat("a/", 40)+"  word word") || Width(floor[2]) <= 80 {
+		t.Fatalf("at the floor the table overflows rather than folding every column:\n%s", strings.Join(floor, "\n"))
 	}
 }
