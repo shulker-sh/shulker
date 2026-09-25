@@ -75,25 +75,23 @@ func groupAccounts(accounts []account.Resolved) []accountGroup {
 	return groups
 }
 
-// writeAccounts prints a bold heading per kind and a list row per account: the name bold, the id
-// grey and aligned as a version is, then the state. The default row takes the ok glyph in place of
-// the grey dot, and carries no aside — the mark is the whole message.
+// writeAccounts prints one table for every account: the default's row takes the green ok glyph
+// in the first column and carries no aside, since the mark is the whole message. The id column is
+// UUID whatever kind of id the account has.
 func writeAccounts(l *out.Lines, groups []accountGroup, cfg config.Config) {
+	t := l.T
 	now := time.Now()
-	for i, g := range groups {
-		if i > 0 {
-			l.Blank()
-		}
-		l.Heading(g.heading)
-		items := make([]out.Item, len(g.accounts))
-		for j, r := range g.accounts {
-			items[j] = out.Item{Kind: out.Note, Name: r.Name, Version: r.ID, Text: r.State.Text(r.Expired, now)}
+	var rows [][]string
+	for _, g := range groups {
+		for _, r := range g.accounts {
+			mark := ""
 			if isDefault(r, cfg) {
-				items[j].Kind = out.Good
+				mark = t.GlyphOK()
 			}
+			rows = append(rows, []string{mark, r.Name, r.ID, string(r.Group), r.State.Text(r.Expired, now)})
 		}
-		l.Items(items...)
 	}
+	l.Table([]string{"", "Account", "UUID", "Group", "State"}, rows, out.Columns(t.StyleGreen().Bold(true), t.StyleBold(), t.StyleGrey(), t.StyleGrey(), t.Style()))
 }
 
 // rowFor is one account as a command prints it, and as --json carries it.

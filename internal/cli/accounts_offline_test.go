@@ -44,7 +44,7 @@ func TestAccountsAddCreatesAnOfflineAccount(t *testing.T) {
 	if created.RefreshToken != "" || created.Minecraft != nil {
 		t.Errorf("an offline account holds no token: %+v", created)
 	}
-	if !strings.Contains(h.mustRun(t, "accounts"), "• Steve "+steveOffline+" offline") {
+	if !strings.Contains(h.mustRun(t, "accounts"), "Steve    "+steveOffline+"  offline  offline") {
 		t.Error("the account should list under Offline")
 	}
 	if readConfigDoc(t, h.config)["accounts"].(map[string]any)["default"] != notchID {
@@ -58,7 +58,7 @@ func TestAccountsAddUseSwitchesTheDefault(t *testing.T) {
 	if !strings.Contains(stdout, "now the default account") {
 		t.Errorf("--use result: %s", stdout)
 	}
-	if !strings.Contains(h.mustRun(t, "accounts"), "✔ Steve") {
+	if !strings.Contains(h.mustRun(t, "accounts"), "✔  Steve") {
 		t.Error("the account it created should be marked the default")
 	}
 }
@@ -174,7 +174,7 @@ func TestAccountsAddGateIsCheckedOnlyAtCreation(t *testing.T) {
 	h.mustRun(t, "accounts", "add", "Steve", "--use")
 	h.mustRun(t, "accounts", "logout", "Notch", "--yes")
 
-	if stdout := h.mustRun(t, "accounts"); !strings.Contains(stdout, "✔ Steve") {
+	if stdout := h.mustRun(t, "accounts"); !strings.Contains(stdout, "✔  Steve") {
 		t.Errorf("the offline account outlives the one that proved ownership:\n%s", stdout)
 	}
 	h.mustRun(t, "accounts", "use", "Steve")

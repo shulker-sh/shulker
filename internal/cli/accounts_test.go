@@ -51,22 +51,21 @@ func TestAccountsListsEachGroupWithItsState(t *testing.T) {
 	)
 	h.mustRun(t, "config", "set", "accounts.default", notchID)
 
-	// Names and ids each align within their group, the way a list block's version column does.
-	pad := strings.Repeat(" ", len(notchID)-len(gamertagXID))
+	// One table across the groups; at 80 columns the UUID column, the widest, folds at a hyphen
+	// while every other column keeps its width.
 	stdout := h.mustRun(t, "accounts")
 	for _, want := range []string{
-		"  Own\n",
-		"  ✔ Notch      " + notchID + " playable",
-		"  • Big Dog 42 " + gamertagXID + pad + " not playable (no Java profile)",
-		"  • Dinnerbone " + dinnerbone + " sign-in expired",
-		"  Offline\n",
-		"  • Steve " + steveID + " offline",
+		"     Account     UUID                 Group    State\n",
+		"     Big Dog 42  " + gamertagXID + "     own      not playable (no Java profile)\n",
+		"     Dinnerbone  " + dinnerbone[:19] + "  own      sign-in expired\n                 " + dinnerbone[19:] + "\n",
+		"  ✔  Notch       " + notchID[:19] + "  own      playable\n                 " + notchID[19:] + "\n",
+		"     Steve       " + steveID[:19] + "  offline  offline\n                 " + steveID[19:] + "\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)
 		}
 	}
-	if strings.Contains(stdout, "Borrowed") {
+	if strings.Contains(stdout, "borrowed") {
 		t.Errorf("no provider yields borrowed accounts yet:\n%s", stdout)
 	}
 }
@@ -142,7 +141,7 @@ func TestAccountsUse(t *testing.T) {
 	if accounts["default"] != steveID {
 		t.Fatalf("accounts.default = %v, want %s", accounts["default"], steveID)
 	}
-	if stdout := h.mustRun(t, "accounts"); !strings.Contains(stdout, "✔ Steve") {
+	if stdout := h.mustRun(t, "accounts"); !strings.Contains(stdout, "✔  Steve") {
 		t.Errorf("the default should be marked:\n%s", stdout)
 	}
 	// A UUID selects too, undashed and in any case.

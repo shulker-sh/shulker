@@ -158,12 +158,11 @@ func TestAccountsBorrowsFromPrism(t *testing.T) {
 
 	stdout := h.mustRun(t, "accounts")
 	for _, want := range []string{
-		"  Own\n",
-		"• Dinnerbone " + dinnerbone + " playable",
-		"  Borrowed\n",
-		"• Jeb_  853c80ef-3c37-49fd-aa49-938b674adae6 token expired ",
-		"• Notch 069a79f4-44e9-4726-a5be-fca90e38aaf5 playable",
-		"• Steve 5627dd98-e6be-3c21-b8a8-e92344183641 offline",
+		"    Account     UUID                      Group     State\n",
+		"    Dinnerbone  0e05d36c-9cbd-4b0a-ae4e-  own       playable\n                7b2e2b7eb1f4\n",
+		"    Jeb_        853c80ef-3c37-49fd-aa49-  borrowed  token expired ",
+		"    Notch       069a79f4-44e9-4726-a5be-  borrowed  playable\n",
+		"    Steve       5627dd98-e6be-3c21-b8a8-  borrowed  offline\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)
@@ -193,12 +192,12 @@ func TestAccountsDedupeKeepsTheEarliestProvider(t *testing.T) {
 
 	h.mustRun(t, "accounts", "stores", "set", "shulker", "prism")
 	stdout := h.mustRun(t, "accounts")
-	if !strings.Contains(stdout, "Own") || strings.Count(stdout, notchID) != 1 {
+	if !strings.Contains(stdout, "  own  ") || strings.Count(stdout, notchID[:19]) != 1 {
 		t.Errorf("shulker comes first, so its own Notch is the only one:\n%s", stdout)
 	}
 	h.mustRun(t, "accounts", "stores", "set", "prism", "shulker")
 	stdout = h.mustRun(t, "accounts")
-	if strings.Contains(stdout, "  Own\n") || strings.Count(stdout, notchID) != 1 {
+	if strings.Contains(stdout, "  own  ") || strings.Count(stdout, notchID[:19]) != 1 {
 		t.Errorf("prism comes first, so its Notch is the only one:\n%s", stdout)
 	}
 }
@@ -331,10 +330,10 @@ func TestAccountsBorrowsFromMojang(t *testing.T) {
 		t.Errorf("reading the launcher's own files says nothing: %q", stderr)
 	}
 	for _, want := range []string{
-		"  Borrowed\n",
-		"• Dinnerbone " + dinnerbone + " playable",
-		"• Notch      " + notchID + " playable",
-		"• Steve      " + steveID + " token expired ",
+		"    Account     UUID                      Group     State\n",
+		"    Dinnerbone  " + dinnerbone[:24] + "  borrowed  playable\n                " + dinnerbone[24:] + "\n",
+		"    Notch       " + notchID[:24] + "  borrowed  playable\n                " + notchID[24:] + "\n",
+		"    Steve       " + steveID[:24] + "  borrowed  token expired ",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)

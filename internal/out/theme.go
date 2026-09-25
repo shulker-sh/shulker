@@ -231,6 +231,15 @@ func (t Theme) Profile() termenv.Profile {
 
 func (t Theme) lipglossGrey() lipgloss.Color { return lipgloss.Color(strconv.Itoa(t.GreyIndex)) }
 
+// The colour roles as lipgloss styles, for the cells of a Table: the same paint Bold, Grey, Cyan,
+// Green, Yellow and Red give a string.
+func (t Theme) StyleBold() lipgloss.Style   { return t.Style().Bold(true) }
+func (t Theme) StyleGrey() lipgloss.Style   { return t.Style().Foreground(t.lipglossGrey()) }
+func (t Theme) StyleCyan() lipgloss.Style   { return t.Style().Foreground(lipgloss.Color("6")) }
+func (t Theme) StyleGreen() lipgloss.Style  { return t.Style().Foreground(lipgloss.Color("2")) }
+func (t Theme) StyleYellow() lipgloss.Style { return t.Style().Foreground(lipgloss.Color("3")) }
+func (t Theme) StyleRed() lipgloss.Style    { return t.Style().Foreground(lipgloss.Color("1")) }
+
 // Link wraps text in an OSC 8 file:// hyperlink when the terminal follows them.
 func (t Theme) Link(text, path string) string {
 	if !t.HasLinks || !t.HasColor {

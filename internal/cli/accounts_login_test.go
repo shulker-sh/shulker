@@ -305,7 +305,7 @@ func TestAccountsLoginUseSwitchesTheDefault(t *testing.T) {
 	if !strings.Contains(stdout, "✔ signed in as Notch, now the default account") {
 		t.Errorf("--use result: %s", stdout)
 	}
-	if !strings.Contains(h.mustRun(t, "accounts"), "✔ Notch") {
+	if !strings.Contains(h.mustRun(t, "accounts"), "✔  Notch") {
 		t.Error("the account it signed in should be marked the default")
 	}
 }
@@ -356,7 +356,7 @@ func TestAccountsLogoutTakesTheDefaultAndReseatsIt(t *testing.T) {
 	if !strings.Contains(stdout, "signed out Notch") || !strings.Contains(stdout, "Dinnerbone is the default account now") {
 		t.Fatalf("logout result: %s", stdout)
 	}
-	if !strings.Contains(h.mustRun(t, "accounts"), "✔ Dinnerbone") {
+	if !strings.Contains(h.mustRun(t, "accounts"), "✔  Dinnerbone") {
 		t.Error("the account left should be the default")
 	}
 	stdout = h.mustRun(t, "accounts", "logout", "--yes")
