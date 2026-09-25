@@ -153,8 +153,7 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 		if err != nil {
 			return proj, v, err
 		}
-		if prior != nil {
-			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, r.Lock.Mods[id].Filename))
+		if prior != nil && !im.duplicate(id, prior, proj.ID, v.File.Filename) {
 			return proj, v, nil
 		}
 		im.lockedListed(p, id, kind, listedFrom(p, proj))

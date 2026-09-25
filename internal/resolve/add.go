@@ -52,6 +52,11 @@ type Resolver struct {
 	// LockModpack locks a hosted modpack entry and puts it in the manifest under key, in place of
 	// the modpack already there.
 	LockModpack func(ctx context.Context, key string, entry manifest.Require) error
+
+	// keepNewest has a mod another project already locks under the same jar id replace it when
+	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
+	// file order is arbitrary.
+	keepNewest bool
 }
 
 // readJar reads a jar's metadata the way the locked loader would.
@@ -478,13 +483,15 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		return "", nil, err
 	}
 	var prior *lock.Mod
+	replacesProject := false
 	if existing, ok := r.Lock.Mods[id]; ok {
 		if !isSameMod(existing, r.Lock.JarID(id), p.Name(), proj.ID, info.ID) {
 			e := out.Errorf("requires-taken", "requires already has %s as %s", id, r.Lock.JarID(id))
 			e.Help = fmt.Sprintf("pass `--as <key>` to give %s another key", info.ID)
 			return "", nil, e
 		}
-		if existing.Provider == p.Name() && existing.Slug == "" && proj.Slug != id {
+		otherProject := existing.Provider == p.Name() && existing.Project != proj.ID
+		if existing.Provider == p.Name() && existing.Slug == "" && proj.Slug != id && !otherProject {
 			existing.Slug = proj.Slug
 			r.Lock.Mods[id] = existing
 		}
@@ -493,6 +500,16 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			r.Lock.AddRequiredBy(id, requiredBy)
 		}
 		switch {
+		case otherProject && r.keepNewest:
+			newer, err := r.newerThanLocked(existing, info)
+			if err != nil {
+				return "", nil, err
+			}
+			if !newer {
+				r.log("keeping %s %s already in lock", id, existing.VersionNumber)
+				return id, prior, nil
+			}
+			replacesProject = true
 		case existing.Provider != p.Name() && replace:
 			r.log("switching %s from %s to %s", id, existing.Provider, p.Name())
 		case existing.Provider != p.Name():
@@ -534,6 +551,8 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	if prior != nil {
 		entry.RequiredBy = prior.RequiredBy
+	}
+	if prior != nil && !replacesProject {
 		entry.Aliases = maps.Clone(prior.Aliases)
 		if sideOverride == "" {
 			entry.Side = prior.Side
@@ -552,6 +571,19 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	}
 	r.Lock.Mods[id] = entry
 	return id, prior, nil
+}
+
+// newerThanLocked reports whether info's jar is newer than the one the entry locks. An entry whose
+// jar isn't cached is kept: only a file this import locked is sure to be there.
+func (r *Resolver) newerThanLocked(existing lock.Mod, info *jarmeta.Info) (bool, error) {
+	if !r.Cache.Has(existing.Sha512) {
+		return false, nil
+	}
+	locked, err := r.readJar(r.Cache.Object(existing.Sha512), existing.Filename)
+	if err != nil {
+		return false, err
+	}
+	return compareVersions(candidate{version: info.Version, maven: info.UsesMavenRanges}, candidate{version: locked.Version, maven: locked.UsesMavenRanges}) > 0, nil
 }
 
 // isSameMod reports whether a lock entry and a freshly resolved jar are the same

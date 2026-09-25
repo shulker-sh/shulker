@@ -133,6 +133,40 @@ func TestImportLocksListedFilesAndSkipsOptionalOnes(t *testing.T) {
 	}
 }
 
+func TestImportKeepsTheNewestOfTwoProjectsWithOneModID(t *testing.T) {
+	older := cfPackFile{ProjectID: 282001, FileID: 6000001, Required: true}
+	newer := cfPackFile{ProjectID: 1676502, FileID: 6000002, Required: true}
+	for _, order := range [][]cfPackFile{{older, newer}, {newer, older}} {
+		cf := curseForgeHost(t)
+		cf.publish(mod("282001", "cc-tweaked"), provider.Version{ID: "6000001", Number: "1.113.1", File: provider.File{Filename: "cc-tweaked-1.113.1.jar"}}, modJar(t, "computercraft", "1.113.1", "*"))
+		cf.publish(mod("1676502", "cc-tweaked-compat"), provider.Version{ID: "6000002", Number: "1.120.2", File: provider.File{Filename: "cc-tweaked-1.120.2.jar"}}, modJar(t, "computercraft", "1.120.2", "*"))
+		archive := filepath.Join(t.TempDir(), "craft.zip")
+		writeCurseForgeZip(t, archive, order, map[string]string{})
+
+		h, res, err := importInto(t, cf, t.TempDir(), archive)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := h.mod("computercraft"); got.Project != "1676502" || got.Filename != "cc-tweaked-1.120.2.jar" {
+			t.Fatalf("lock entry: %+v", got)
+		}
+		if got := h.r.Manifest.Mods()["computercraft"]; got.Project != "1676502" {
+			t.Fatalf("manifest entry: %+v", got)
+		}
+		if strings.Join(res.LockedIDs(), ",") != "computercraft" {
+			t.Fatalf("locked: %v", res.LockedIDs())
+		}
+		first, second := "cc-tweaked-1.113.1.jar", "cc-tweaked-1.120.2.jar"
+		if order[0] == newer {
+			first, second = second, first
+		}
+		want := "computercraft appears twice in the pack (" + first + ", " + second + "); kept cc-tweaked-1.120.2.jar, the newest"
+		if strings.Join(res.Warnings, "\n") != want {
+			t.Fatalf("warnings: %q", res.Warnings)
+		}
+	}
+}
+
 func TestImportListsEveryManualDownload(t *testing.T) {
 	cf := curseForgeHost(t)
 	archive := filepath.Join(t.TempDir(), "craft.zip")

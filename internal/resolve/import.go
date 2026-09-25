@@ -78,6 +78,7 @@ func (rep *Imported) LockedIDs() []string {
 }
 
 func (rep *Imported) locked(id, kind, provider string) {
+	rep.Locked = slices.DeleteFunc(rep.Locked, func(f LockedFile) bool { return f.ID == id && f.Type == kind })
 	rep.Locked = append(rep.Locked, LockedFile{ID: id, Type: kind, Provider: provider})
 }
 
@@ -224,6 +225,8 @@ func (r *Resolver) Import(ctx context.Context, a *packarchive.Archive) (*Importe
 // an override rather than reused: its path is the exporter's, and outside the archive only the
 // cache holds its bytes.
 func (r *Resolver) importArchive(ctx context.Context, a *packarchive.Archive, reuseLocal bool) (*Imported, error) {
+	r.keepNewest = true
+	defer func() { r.keepNewest = false }()
 	im := newImporter(r, a, reuseLocal)
 	im.keepSides = !a.Format.Sided()
 	im.findLoadedDatapacks(a)
@@ -569,8 +572,7 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, pack
 	if err != nil {
 		return err
 	}
-	if prior != nil {
-		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, im.r.Lock.Mods[id].Filename))
+	if prior != nil && !im.duplicate(id, prior, proj.ID, v.File.Filename) {
 		return nil
 	}
 	entry := manifest.Require{}
@@ -600,6 +602,21 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, pack
 	im.r.Manifest.Requires[id] = entry
 	im.rep.locked(id, manifest.TypeMod, p.Name())
 	return nil
+}
+
+// duplicate warns of a mod id the pack carries twice, and reports whether the file just placed
+// replaced the one locked before it.
+func (im *importer) duplicate(id string, prior *lock.Mod, project, filename string) bool {
+	kept := im.r.Lock.Mods[id]
+	switch {
+	case prior.Project == project && prior.Filename == filename:
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, kept.Filename))
+	case prior.Project == project:
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack (%s, %s); kept %s", id, prior.Filename, filename, kept.Filename))
+	default:
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack (%s, %s); kept %s, the newest", id, prior.Filename, filename, kept.Filename))
+	}
+	return kept.Project != prior.Project
 }
 
 func (im *importer) addsBuiltSide(packSide, providerSide string) bool {
