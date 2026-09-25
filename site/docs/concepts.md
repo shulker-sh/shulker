@@ -110,19 +110,21 @@ Each is placed under its entry's `filename`. `shulker add` sets it to the provid
 
 ### Shaders
 
-A shader is enabled through its shader mod's own config, `config/iris.properties`, or `config/oculus.properties` on Forge. Shulker writes only `shaderPack` and `enableShaders` there, so the rest of your shader settings survive a rebuild.
+A shader starts enabled only when `client.shader` names it; with none named, the build selects no shader, since a shader is a performance choice. `"shader": ""` clears a selection the pack's overrides ship. It is written into its shader mod's own config, `config/iris.properties`, or `config/oculus.properties` on Forge. Shulker writes only `shaderPack` and `enableShaders` there, so the rest of your shader settings survive a rebuild.
 
 - Each build looks for Iris or Oculus among the mods it placed, so a shader mod behind a feature only enables a shader in the builds that have it.
-- It enables the first shader that mod can load, going by the shader mods the provider tagged it for. A shader added from a file loads in either.
-- Every other shader the build placed gets a line in the build report. Turn it on in game, or in Canvas's own menu, which has no config file for Shulker to write, or, when nothing in the build can load it, add a shader mod with `shulker add iris`.
+- The named shader goes to the first of those mods that can load it, going by the shader mods the provider tagged it for. A shader added from a file loads in either.
+- The other shaders are placed but off, with no warning. Only a shader nothing in the build can load gets a line in the build report, with `shulker add iris` to fix it.
 - A shader that ships vanilla core shaders needs no shader mod at all. It goes in `resourcepacks/` and is enabled like a resource pack.
 
 ### The Enabled List
 
-The enabled list in `options.txt` works differently, because it is in priority order and yours to arrange. Shulker seeds it once, on the first build, when the line is missing or still Minecraft's own `["vanilla"]`, and then leaves it alone.
+The enabled list in `options.txt` works differently, because it is in priority order and yours to arrange. `client.resourcePacks` names the packs that start on, top first, by their keys, along with the game's own `programmer_art` and `high_contrast`; a placed pack it leaves out is off. Without it, Shulker seeds the list once, on the first build, with every placed pack, when the line is missing or still Minecraft's own `["vanilla"]`, and then leaves it alone.
 
-- A pack you add later is placed but not enabled. Turn it on in game, and Shulker won't reorder what you chose. `shulker build --force` seeds the list again.
-- An `options.txt` in your overrides that sets its own `resourcePacks` list is never seeded over. That list is the pack's own, and the build names each pack entry in it that no pack is placed under, such as a pack renamed since the list was written.
+- With `client.resourcePacks`, the build writes the list again whenever you change it, unless the player has changed the list in game since: then theirs stays, and the build report says so. The shader named in `client.shader` works the same way. `shulker build --force` writes yours.
+- Without it, a pack you add later is placed but not enabled. Turn it on in game, and Shulker won't reorder what you chose. `shulker build --force` seeds the list again.
+- An `options.txt` in your overrides that sets its own `resourcePacks` list is never seeded over, unless `client.resourcePacks` is set. That list is the pack's own, and the build names each pack entry in it that no pack is placed under, such as a pack renamed since the list was written. `client.options.resourcePacks` sets the raw list too, for a list that names packs `client.resourcePacks` can't, but not together with it.
+- Importing a pack moves the list its `options.txt` ships, and the shader its `iris.properties` or `oculus.properties` selects, into `client.resourcePacks` and `client.shader`, unless the list names a pack a mod provides.
 - Before Minecraft 1.13 the game names a pack by its bare file name rather than `file/<name>`, and the seed and the checks follow that.
 
 ## Datapacks
