@@ -464,18 +464,21 @@ func TestValidateSkipsADependencyOnTheSideItDoesNotApplyTo(t *testing.T) {
 		}
 		l.Mods[id] = lock.Mod{Sha512: sha, Side: m.side}
 	}
+	iris := l.Mods["iris"]
+	iris.SideFrom = "dependencies"
+	l.Mods["iris"] = iris
 	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
 	v, err := r.Validate()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Problem{{Rule: "depends", Mod: "shaderaddon", ModVersion: "1.0", On: "iris", Declared: "[0,)", Side: "server", LockedAs: "iris", LockedSide: "client"}}
+	want := []Problem{{Rule: "depends", Mod: "shaderaddon", ModVersion: "1.0", On: "iris", Declared: "[0,)", Side: "server", LockedAs: "iris", LockedSide: "client", LockedSideFrom: "dependencies"}}
 	if !reflect.DeepEqual(v.Problems, want) {
 		t.Fatalf("problems %+v, want %+v", v.Problems, want)
 	}
 	e := out.AsError(v.Err())
-	fixes := e.Rows[0].Children
-	if len(fixes) < 2 || fixes[0].Text != "shulker set requires.shaderaddon.side client" || fixes[1].Text != "shulker set requires.iris.side both" {
-		t.Fatalf("fixes %+v", fixes)
+	rows := e.Rows[0].Children
+	if len(rows) < 3 || rows[0].Text != "iris is client-only: every dependency in its mods.toml is CLIENT" || rows[1].Text != "shulker set requires.shaderaddon.side client" || rows[2].Text != "shulker set requires.iris.side both" {
+		t.Fatalf("rows %+v", rows)
 	}
 }

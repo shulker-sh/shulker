@@ -28,9 +28,10 @@ type Problem struct {
 	Side string `json:"side,omitempty"`
 	// LockedAs is the lock key of a mod that provides On but that this side doesn't place.
 	LockedAs string `json:"lockedAs,omitempty"`
-	// LockedSide is the side LockedAs is locked for.
-	LockedSide string `json:"lockedSide,omitempty"`
-	StaleNote  string `json:"staleNote,omitempty"`
+	// LockedSide is the side LockedAs is locked for, and LockedSideFrom where that came from.
+	LockedSide     string `json:"lockedSide,omitempty"`
+	LockedSideFrom string `json:"lockedSideFrom,omitempty"`
+	StaleNote      string `json:"staleNote,omitempty"`
 }
 
 type Validation struct {
@@ -249,7 +250,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 			if !ok {
 				p.LockedAs = elsewhere[on]
 				if locked, found := r.Lock.Mods[p.LockedAs]; found && p.LockedAs != "" {
-					p.LockedSide = locked.Side
+					p.LockedSide, p.LockedSideFrom = locked.Side, locked.SideFrom
 				}
 			}
 			v.Problems = append(v.Problems, p)
@@ -481,6 +482,10 @@ func (v *Validation) Err() error {
 			fmt.Fprintf(&b, "\n      %s", p.StaleNote)
 			row.Children = append(row.Children, out.Detail{Text: p.StaleNote})
 		}
+		if reason := p.sideReason(); reason != "" {
+			fmt.Fprintf(&b, "\n      %s", reason)
+			row.Children = append(row.Children, out.Detail{Text: reason})
+		}
 		for _, fix := range p.fixes() {
 			fmt.Fprintf(&b, "\n      Fix: %s", fix)
 			row.Children = append(row.Children, out.Detail{Label: "Fix", Text: fix, IsCommand: true})
@@ -512,6 +517,21 @@ func (p Problem) line() string {
 		line += " on the " + p.Side
 	}
 	return line
+}
+
+// sideReason says why the dependency is placed on one side only, empty when nothing but the
+// default decided it.
+func (p Problem) sideReason() string {
+	why := map[string]string{
+		sideFromDependencies: "every dependency in its mods.toml is CLIENT",
+		sideFromJar:          "its jar's metadata says so",
+		sideFromProvider:     "its provider's project data says so",
+		sideFromRequires:     "shulker.json sets its side",
+	}[p.LockedSideFrom]
+	if why == "" || p.LockedSide == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s is %s-only: %s", p.LockedAs, p.LockedSide, why)
 }
 
 // fixes are the commands that clear the problem, none when there isn't one to suggest. For a
