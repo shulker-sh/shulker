@@ -53,3 +53,21 @@ func PlatformName(minecraft, loaderType string) string {
 	}
 	return "Minecraft " + minecraft
 }
+
+// ClientMemory is the heap the pack author recommends for playing this project: its own
+// client.memory, else that of the first modpack it requires, by key, that names one. The packs
+// are those a command opened; a project whose packs are unread answers from its manifest alone.
+func (p *Project) ClientMemory() string {
+	if memory := p.Manifest.ClientMemory(); memory != "" {
+		return memory
+	}
+	if p.Packs == nil {
+		return ""
+	}
+	for _, l := range p.Packs.Loaded {
+		if memory := l.Manifest.ClientMemory(); memory != "" {
+			return memory
+		}
+	}
+	return ""
+}

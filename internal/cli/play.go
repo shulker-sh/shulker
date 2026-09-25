@@ -30,6 +30,7 @@ type playReport struct {
 	Inherits       string `json:"inherits,omitempty"`
 	MainClass      string `json:"mainClass"`
 	Java           string `json:"java"`
+	Memory         string `json:"memory"`
 	GameDir        string `json:"gameDir"`
 	NativesDir     string `json:"nativesDir"`
 	AssetIndex     string `json:"assetIndex,omitempty"`
@@ -142,6 +143,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
+	a.openPacksForLaunch(ctx, p)
 	plan, err := a.assemble(ctx, in, p)
 	if err != nil {
 		return err
@@ -149,7 +151,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err := opts.target.Check(plan.launch.Version, p.Lock.Minecraft); err != nil {
 		return err
 	}
-	settings, err := a.launchSettings(in.Dir)
+	settings, err := a.launchSettings(in.Dir, p)
 	if err != nil {
 		return err
 	}
@@ -273,10 +275,20 @@ func (p playResult) print(l *out.Lines) {
 	}
 }
 
-// launchSettings are the settings a launch runs with: the instance's own where it sets one, and the
-// play.* default in config.json where it doesn't. A list the instance sets, even to nothing,
-// replaces the default rather than adding to it.
-func (a *app) launchSettings(dir string) (instance.Settings, error) {
+// openPacksForLaunch reads the modpacks an instance requires, for the client.memory their authors
+// set. A pack that can't be read costs the launch only that hint, never the launch: the sync
+// before it has already said what is wrong, and the game starts from what is on disk.
+func (a *app) openPacksForLaunch(ctx context.Context, p *project.Project) {
+	if _, err := a.openPacks(ctx, p); err != nil {
+		a.printer.Warn("using %s: the modpacks couldn't be read for a client.memory: %v", instance.DefaultMemory, err)
+	}
+}
+
+// launchSettings are the settings a launch runs with: the instance's own where it sets one, the
+// play.* default in config.json where it doesn't, and for memory the pack author's client.memory
+// and then the fixed default after those. A list the instance sets, even to nothing, replaces the
+// default rather than adding to it. The pack's key comes from the modpacks openPacksForLaunch read.
+func (a *app) launchSettings(dir string, p *project.Project) (instance.Settings, error) {
 	f, err := instance.Load(dir)
 	if err != nil {
 		return instance.Settings{}, err
@@ -290,7 +302,7 @@ func (a *app) launchSettings(dir string) (instance.Settings, error) {
 		return instance.Settings{}, err
 	}
 	s := f.Settings
-	s.LaunchSettings = s.LaunchSettings.Over(cfg.Play.LaunchSettings)
+	s.LaunchSettings = s.LaunchSettings.ForLaunch(cfg.Play.LaunchSettings, p.ClientMemory())
 	return s, nil
 }
 
@@ -321,11 +333,16 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) e
 	if err != nil {
 		return err
 	}
+	a.openPacksForLaunch(ctx, p)
 	plan, err := a.assemble(ctx, in, p)
 	if err != nil {
 		return err
 	}
 	if err := target.Check(plan.launch.Version, p.Lock.Minecraft); err != nil {
+		return err
+	}
+	settings, err := a.launchSettings(in.Dir, p)
+	if err != nil {
 		return err
 	}
 	l := plan.launch
@@ -335,6 +352,7 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) e
 		Inherits:       l.Top.InheritsFrom,
 		MainClass:      l.Version.MainClass,
 		Java:           plan.java,
+		Memory:         settings.Memory,
 		GameDir:        in.Dir,
 		NativesDir:     plan.natives,
 		Classpath:      len(l.Assembly.Libraries) + 1,
@@ -359,6 +377,7 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) e
 		}
 		rows = append(rows,
 			out.Row{Label: "java", Text: rep.Java},
+			out.Row{Label: "memory", Text: rep.Memory},
 			out.Row{Label: "game dir", Text: rep.GameDir},
 			out.Row{Label: "natives", Text: rep.NativesDir},
 		)
@@ -566,7 +585,7 @@ func (a *app) gameStore() (game.Store, error) {
 // clientJava is what the launch runs: the `java` setting when the instance or play.java has one,
 // and otherwise shulker's managed runtime for the component the lock names.
 func (a *app) clientJava(ctx context.Context, p *project.Project, dir string) (string, error) {
-	s, err := a.launchSettings(dir)
+	s, err := a.launchSettings(dir, p)
 	if err != nil {
 		return "", err
 	}

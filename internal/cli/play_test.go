@@ -345,3 +345,46 @@ func TestPlayRefusesAnAccountWhoseSignInHasExpired(t *testing.T) {
 		t.Fatalf("a launch that never happened is no result: %s", stdout)
 	}
 }
+
+func TestPlayDryRunReportsTheHeapTheLaunchGets(t *testing.T) {
+	h := newHarness(t)
+	shulkerInstances(t, h)
+	h.mustRun(t, "config", "set", "store", filepath.Join(t.TempDir(), "store"))
+	h.mustRun(t, "init", "--yes", "--name", "pack")
+	h.mustRun(t, "link", "shulker")
+	source := h.dir
+	h.dir = ""
+
+	if rep := playJSON(t, h, "-i", "pack", "play", "--dry-run"); rep.Memory != instance.DefaultMemory {
+		t.Fatalf("with nothing set the launch gets the fixed default, not the JVM's own: %+v", rep)
+	}
+	if stdout := h.mustRun(t, "-i", "pack", "play", "--dry-run"); !strings.Contains(stdout, "memory") || !strings.Contains(stdout, instance.DefaultMemory) {
+		t.Fatalf("play --dry-run should print the heap:\n%s", stdout)
+	}
+
+	h.dir = source
+	h.mustRun(t, "set", "client.memory", "6G")
+	h.dir = ""
+	h.mustRun(t, "-i", "pack", "sync")
+	if rep := playJSON(t, h, "-i", "pack", "play", "--dry-run"); rep.Memory != "6G" {
+		t.Fatalf("the pack's client.memory reaches the instance and beats the default: %+v", rep)
+	}
+	h.mustRun(t, "config", "set", "play.memory", "8G")
+	if rep := playJSON(t, h, "-i", "pack", "play", "--dry-run"); rep.Memory != "8G" {
+		t.Fatalf("play.memory beats the pack's client.memory: %+v", rep)
+	}
+	h.mustRun(t, "-i", "pack", "instance", "set", "memory", "10G")
+	if rep := playJSON(t, h, "-i", "pack", "play", "--dry-run"); rep.Memory != "10G" {
+		t.Fatalf("the instance's own memory beats everything: %+v", rep)
+	}
+
+	h.mustRun(t, "-i", "pack", "instance", "unset", "memory")
+	h.mustRun(t, "config", "unset", "play.memory")
+	if err := os.RemoveAll(source); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play", "--dry-run")
+	if !strings.Contains(stdout, instance.DefaultMemory) || !strings.Contains(stderr, "client.memory") {
+		t.Fatalf("a pack that can't be read costs the launch its client.memory, not the launch:\n%s%s", stdout, stderr)
+	}
+}

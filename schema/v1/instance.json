@@ -87,7 +87,7 @@
         "memory": {
           "type": "string",
           "pattern": "^[1-9][0-9]*[MmGg]$",
-          "description": "Heap size `shulker play` gives the game, as -Xms and -Xmx, e.g. \"6G\". Omitted inherits `play.memory` from config.json, and without that the JVM picks its own. Another launcher's instance takes its memory from that launcher."
+          "description": "Heap size `shulker play` gives the game, as -Xms and -Xmx, e.g. \"6G\". Omitted inherits `play.memory` from config.json, then the pack's `client.memory`, and without any of them 4G. Another launcher's instance takes its memory from that launcher."
         },
         "jvmArgs": {
           "type": "array",

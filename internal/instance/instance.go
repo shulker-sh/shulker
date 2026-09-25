@@ -79,6 +79,24 @@ type LaunchSettings struct {
 // LaunchKeys are the JSON keys of LaunchSettings.
 var LaunchKeys = []string{"memory", "jvmArgs", "java", "window", "wrapper"}
 
+// DefaultMemory is the heap a launch gets when neither the instance, config.json nor the pack
+// names one: the fixed default other launchers use, never the JVM's own quarter of RAM.
+const DefaultMemory = "4G"
+
+// ForLaunch is the settings a launch runs with: s over config.json's play defaults, and memory
+// falling through two more steps, to the pack's client.memory and then DefaultMemory, so the
+// game always gets a heap shulker chose.
+func (s LaunchSettings) ForLaunch(play LaunchSettings, packMemory string) LaunchSettings {
+	s = s.Over(play)
+	if s.Memory == "" {
+		s.Memory = packMemory
+	}
+	if s.Memory == "" {
+		s.Memory = DefaultMemory
+	}
+	return s
+}
+
 // Over is s with each setting it leaves unset taken from base.
 func (s LaunchSettings) Over(base LaunchSettings) LaunchSettings {
 	if s.Memory == "" {

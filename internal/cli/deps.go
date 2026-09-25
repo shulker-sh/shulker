@@ -203,6 +203,15 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 	if err != nil {
 		return nil, err
 	}
+	packs, err := a.openPacks(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers, Fetch: d.fetch, Log: a.progress}, nil
+}
+
+// openPacks reads p's modpacks at their pins, once: a later call answers from what the first read.
+func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*modpack.Loaded, error) {
 	store, err := a.packStore(p)
 	if err != nil {
 		return nil, err
@@ -212,7 +221,7 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 		return nil, err
 	}
 	a.warn(warnings)
-	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers, Fetch: d.fetch, Log: a.progress}, nil
+	return packs, nil
 }
 
 func (a *app) packStore(p *project.Project) (*modpack.Store, error) {

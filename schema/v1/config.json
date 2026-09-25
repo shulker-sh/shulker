@@ -62,7 +62,7 @@
       "properties": {
         "memory": {
           "type": "string",
-          "description": "The heap size shulker play gives the game, like 6G."
+          "description": "The heap size shulker play gives the game, like 6G. An instance's own memory wins over it; without either, the pack's client.memory, then 4G."
         },
         "jvmArgs": {
           "type": "array",
