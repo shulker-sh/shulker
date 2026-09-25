@@ -117,6 +117,12 @@ A shader starts enabled only when `client.shader` names it; with none named, the
 - The other shaders are placed but off, with no warning. Only a shader nothing in the build can load gets a line in the build report, with `shulker add iris` to fix it.
 - A shader that ships vanilla core shaders needs no shader mod at all. It goes in `resourcepacks/` and is enabled like a resource pack.
 
+Shulker knows Iris, Oculus and Canvas by their jar ids. A fork under another id is marked in [`integrations`](/docs/manifest#integrations), which replaces the ids Shulker looks for, so list the original beside it. An empty list turns a shader mod off:
+
+```json
+"integrations": { "iris": ["iris", "iris_fork"] }
+```
+
 ### The Enabled List
 
 The enabled list in `options.txt` works differently, because it is in priority order and yours to arrange. `client.resourcePacks` names the packs that start on, top first, by their keys, along with the game's own `programmer_art` and `high_contrast`; a placed pack it leaves out is off. Without it, Shulker seeds the list once, on the first build, with every placed pack, when the line is missing or still Minecraft's own `["vanilla"]`, and then leaves it alone.
@@ -137,6 +143,12 @@ Vanilla loads datapacks only per world, so a datapack for every world needs a gl
 - `config/openloader/data/` before Minecraft 1.21, or `config/openloader/packs/` from it, for Open Loader.
 - A server without one places it in its world's own `datapacks/` folder, the world `level-name` names, which the game loads with no mod at all. That one folder inside the world is the build's to fill, so a datapack edited or replaced there, as by restoring an old backup, is a conflict until `--force`.
 - A client without one places it in `datapacks/`, which only some global datapack mods read, and says so.
+
+Shulker knows Paxi and Open Loader by their jar ids. Mark a fork under another id in [`integrations`](/docs/manifest#integrations), listing the original beside it, or turn one off with an empty list:
+
+```json
+"integrations": { "paxi": ["paxi", "paxi_fork"] }
+```
 
 A datapack is placed on both sides unless its `side` says otherwise, since a singleplayer world runs its server inside the client. Load order isn't Shulker's. Ship Paxi's `datapack_load_order.json` as an override, naming each datapack by its file name, which is `<key>.zip` unless `filename` says otherwise.
 
