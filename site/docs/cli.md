@@ -175,7 +175,7 @@ shulker export mrpack https://github.com/me/my-pack.git --ref v1.0
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
 | `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
-| `--bundle` | Put files that Modrinth launchers can't download inside the archive |
+| `--bundle` | Put files that Modrinth launchers can't download inside the archive, each in the override folder for its side: `overrides/` for both, `client-overrides/` or `server-overrides/` for one side |
 | `--assume-client` | Export a client even when the source declares none, from the mods and overrides both sides share |
 | `--ref <ref>` | Branch, tag, or commit to export from a git source (default: the remote HEAD) |
 | `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |

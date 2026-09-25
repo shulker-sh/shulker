@@ -182,7 +182,7 @@ func TestExportMrpackBundlesLocalFiles(t *testing.T) {
 	if len(index.Files) != 1 || index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename {
 		t.Fatalf("only the provider mod ships by download: %+v", index.Files)
 	}
-	if entries["overrides/mods/private-mod-1.4.jar"] != string(jar.data) || entries["overrides/resourcepacks/faithful.zip"] == "" || entries["overrides/shaderpacks/bsl.zip"] == "" {
+	if entries["client-overrides/mods/private-mod-1.4.jar"] != string(jar.data) || entries["client-overrides/resourcepacks/faithful.zip"] == "" || entries["client-overrides/shaderpacks/bsl.zip"] == "" {
 		t.Fatalf("bundled entries: %v", keys(entries))
 	}
 }

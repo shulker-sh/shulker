@@ -58,8 +58,11 @@ type ExportReport struct {
 type exportSide struct {
 	side  string
 	files map[string][]byte
-	mods  map[string]bool
-	packs map[string]bool
+	// layers is the override folder each bundled file goes in, by path: its entry's side decides,
+	// not which sides the export happens to have.
+	layers map[string]string
+	mods   map[string]bool
+	packs  map[string]bool
 	// datapacks is where the side places each datapack, by key.
 	datapacks map[string]string
 }
@@ -188,7 +191,7 @@ func (b *Builder) exportSides(names []string) ([]*exportSide, error) {
 			continue
 		}
 		seen[name] = true
-		sides = append(sides, &exportSide{side: name, files: map[string][]byte{}})
+		sides = append(sides, &exportSide{side: name, files: map[string][]byte{}, layers: map[string]string{}})
 	}
 	return sides, nil
 }
@@ -306,15 +309,19 @@ func (b *Builder) exportEntries(sides []*exportSide) []exportEntry {
 
 // exportFiles lists what the format can carry by listing and bundles the rest into the sides'
 // override files, or refuses when bundling wasn't asked for. It returns the listing and the
-// override paths the bundled files took, in both spellings splitOverrides can give them.
+// override paths the bundled files took, as layer/path.
 func (b *Builder) exportFiles(ctx context.Context, f packarchive.Format, sides []*exportSide, bundle bool, report *ExportReport) ([]packarchive.File, map[string]bool, error) {
 	entries := b.exportEntries(sides)
 	bundled := map[string]bool{}
 	bundleInto := func(e exportEntry, data []byte, why string) {
+		layer := packarchive.LayerFor("both")
+		if f.Sided() {
+			layer = packarchive.LayerFor(e.side)
+		}
 		for _, t := range e.owners {
 			t.files[e.path] = data
-			bundled[packarchive.LayerFor("both")+"/"+e.path] = true
-			bundled[packarchive.LayerFor(t.side)+"/"+e.path] = true
+			t.layers[e.path] = layer
+			bundled[layer+"/"+e.path] = true
 		}
 		list := reportList(report, e.kind, true)
 		if !slices.Contains(*list, e.key) {
@@ -661,35 +668,28 @@ func origin(ps provider.Providers, name string, u *string) string {
 	return name + ", " + parsed.Host
 }
 
-// splitOverrides lays the sides' files out by layer: a file identical in every side goes to the
-// shared folder, the rest to each side's own.
+// splitOverrides lays the sides' files out by layer: a bundled file goes where its entry's side
+// says, a file identical in every side goes to the shared folder, and the rest to each side's own.
 func splitOverrides(sides []*exportSide) []packarchive.Override {
 	entries := map[string][]byte{}
 	shared := packarchive.LayerFor("both")
-	if len(sides) == 1 {
-		for path, data := range sides[0].files {
-			entries[shared+"/"+path] = data
-		}
-	} else {
-		for path, data := range sides[0].files {
-			everywhere := true
-			for _, t := range sides[1:] {
-				if other, ok := t.files[path]; !ok || !bytes.Equal(other, data) {
-					everywhere = false
-					break
-				}
-			}
-			if everywhere {
-				entries[shared+"/"+path] = data
-			}
-		}
+	everywhere := func(path string, data []byte) bool {
 		for _, t := range sides {
-			for path, data := range t.files {
-				if _, ok := entries[shared+"/"+path]; ok {
-					continue
-				}
-				entries[packarchive.LayerFor(t.side)+"/"+path] = data
+			if other, ok := t.files[path]; !ok || !bytes.Equal(other, data) {
+				return false
 			}
+		}
+		return true
+	}
+	for _, t := range sides {
+		for path, data := range t.files {
+			layer := packarchive.LayerFor(t.side)
+			if bundledIn, ok := t.layers[path]; ok {
+				layer = bundledIn
+			} else if everywhere(path, data) {
+				layer = shared
+			}
+			entries[layer+"/"+path] = data
 		}
 	}
 	overrides := make([]packarchive.Override, 0, len(entries))

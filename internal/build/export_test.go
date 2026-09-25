@@ -6,9 +6,12 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -92,5 +95,34 @@ func TestExportPathIsUnderBuildUnlessTheSourceIsRemote(t *testing.T) {
 	}
 	if got, want := ExportPath("/p", m, "1.0", f, true, "/cwd"), filepath.Join("/cwd", "pack-1.0"+f.Extension()); got != want {
 		t.Fatalf("a remote source exports into the working directory: got %q, want %q", got, want)
+	}
+}
+
+func TestExportMrpackBundlesALocalJarInItsSidesOverrides(t *testing.T) {
+	p := newProject(t)
+	p.b.Manifest.Server = nil
+	private := modJar(t, "private", "1.0")
+	p.lockLocalMod("private", "private-1.0.jar", private)
+	entry, locked := p.b.Manifest.Requires["private"], p.b.Lock.Mods["private"]
+	entry.Side, locked.Side = "client", "client"
+	p.b.Manifest.Requires["private"], p.b.Lock.Mods["private"] = entry, locked
+	shared := modJar(t, "shared", "1.0")
+	p.lockLocalMod("shared", "shared-1.0.jar", shared)
+	p.save()
+
+	format, _ := packarchive.Lookup("mrpack")
+	report, err := p.b.Export(context.Background(), ExportOptions{Format: format, Version: "1.0", Output: p.archivePath(), Bundle: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := p.archive()
+	if archive["client-overrides/mods/private-1.0.jar"] != string(private) || archive["overrides/mods/shared-1.0.jar"] != string(shared) {
+		t.Fatalf("a bundled jar goes in its side's folder: %v", slices.Sorted(maps.Keys(archive)))
+	}
+	if _, ok := archive["overrides/mods/private-1.0.jar"]; ok {
+		t.Fatal("a client-only jar must not be shared")
+	}
+	if strings.Join(report.BundledMods, ",") != "private,shared" || strings.Join(report.Overrides, ",") != "overrides/mods/shulker-pack.jar" {
+		t.Fatalf("report: %+v", report)
 	}
 }

@@ -225,11 +225,11 @@ func TestExportMrpackBundlesForeignHosts(t *testing.T) {
 	if len(index.Files) != 0 {
 		t.Fatalf("files: %+v", index.Files)
 	}
-	if entries["overrides/mods/"+h.jars["sodium"].filename] != string(h.jars["sodium"].data) || entries["overrides/mods/"+h.jars["fabric-api"].filename] != string(h.jars["fabric-api"].data) {
+	if entries["client-overrides/mods/"+h.jars["sodium"].filename] != string(h.jars["sodium"].data) || entries["overrides/mods/"+h.jars["fabric-api"].filename] != string(h.jars["fabric-api"].data) {
 		t.Fatalf("bundled entries: %v", keys(entries))
 	}
 
-	// A bundled file is written into overrides/, but it is already counted as
+	// A bundled file is written into an override folder, but it is already counted as
 	// bundled, so the override tally must not count it a second time.
 	_, stdout, _ := h.run(t, "--json", "export", "mrpack", "--version", "0.1", "--bundle")
 	var report struct {
@@ -257,4 +257,30 @@ func keys(m map[string]string) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+func TestExportMrpackBundleRoundTripsASidedLocalJar(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "init", "--yes", "--loader", "fabric", "--name", "pack")
+	jar := makeJar(t, "private-mod", "private-mod-1.4.jar", "client")
+	h.mustRun(t, "add", writeOutside(t, jar.filename, jar.data))
+	h.editManifest(t, func(m map[string]any) { m["version"] = "1.0" })
+	h.mustRun(t, "install")
+
+	h.mustRun(t, "export", "mrpack", "--bundle")
+	archive := filepath.Join(h.dir, "build", "pack-1.0.mrpack")
+	_, entries := readMrpack(t, archive)
+	if entries["client-overrides/mods/private-mod-1.4.jar"] != string(jar.data) {
+		t.Fatalf("a client-only local jar goes in client-overrides/: %v", keys(entries))
+	}
+
+	dir := filepath.Join(t.TempDir(), "again")
+	code, stdout, stderr := h.run(t, "import", archive, "--dir", dir)
+	if code != 0 || strings.Contains(stdout+stderr, "side") {
+		t.Fatalf("import: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	m, l := readProject(t, dir)
+	if m.Requires["private-mod"].File != "files/private-mod-1.4.jar" || l.Mods["private-mod"].Side != "client" {
+		t.Fatalf("round trip: %+v %+v", m.Requires["private-mod"], l.Mods["private-mod"])
+	}
 }
