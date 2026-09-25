@@ -45,7 +45,7 @@ outline: [2, 3]
 | [`shulker link shulker [source]`](#shulker-link-shulker) | Create an instance shulker owns and launches itself |
 | [`shulker link atlauncher [source]`](#shulker-link-atlauncher) | Create an ATLauncher instance for the client build |
 | [`shulker link gdlauncher [source]`](#shulker-link-gdlauncher) | Create a GDLauncher instance for the client build |
-| [`shulker link mojang [source]`](#shulker-link-mojang) | Add a profile for the client build to the official launcher |
+| [`shulker link mojang [source]`](#shulker-link-mojang) | Add an official launcher profile that follows a pack |
 | [`shulker link prism [source]`](#shulker-link-prism) | Create a Prism Launcher instance for the client build |
 | [`shulker link multimc [source]`](#shulker-link-multimc) | Create a MultiMC instance for the client build |
 | [`shulker sync [source]`](#shulker-sync) | Download and build one side of a project into a directory, or update a linked one |

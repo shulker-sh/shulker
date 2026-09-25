@@ -61,7 +61,7 @@ func (a *app) linkCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:         "link",
 		Annotations: decides(),
-		Short:       "Point a launcher at this project's client build",
+		Short:       "Create a launcher instance that follows a pack",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				return unknownSubcommand(cmd, args[0])

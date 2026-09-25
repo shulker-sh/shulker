@@ -37,7 +37,7 @@ var mojangEntry = &Entry{
 	Name: "mojang", Title: "Minecraft Launcher", DefaultDir: DefaultMojangDir,
 	Slot: &Slot{UsesShim: true}, NeedsRuntime: true,
 	Usage: Usage{
-		Short:   "Add a profile for the client build to the official launcher, installing its loader if it has one",
+		Short:   "Add an official launcher profile that follows a pack, installing the pack's loader if it has one",
 		Aliases: []string{"vanilla"},
 		Noun:    "profile",
 		Dir:     "launcher directory (default: the official launcher's .minecraft folder)",
