@@ -57,7 +57,6 @@ type Server struct {
 	Name       string         `json:"name,omitempty"`
 	Build      string         `json:"build,omitempty"`
 	Variables  Variables      `json:"variables,omitempty"`
-	EULA       bool           `json:"eula"`
 	Memory     string         `json:"memory,omitempty"`
 	JVMFlags   string         `json:"jvmFlags,omitempty"`
 	JVMArgs    []string       `json:"jvmArgs,omitempty"`

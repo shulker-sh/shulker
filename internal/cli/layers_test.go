@@ -12,7 +12,7 @@ import (
 func twoSided(t *testing.T, h *harness) {
 	t.Helper()
 	h.editManifest(t, func(m map[string]any) {
-		m["server"] = map[string]any{"eula": true}
+		m["server"] = map[string]any{}
 	})
 }
 

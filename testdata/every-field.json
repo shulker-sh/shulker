@@ -52,7 +52,6 @@
     "name": "Every Field Server",
     "build": "build/server",
     "variables": { "motd": "Server" },
-    "eula": true,
     "memory": "6G",
     "jvmFlags": "aikars",
     "jvmArgs": ["-XX:+UseZGC"],

@@ -40,6 +40,11 @@
         }
       }
     },
+    "eula": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this user accepts the Minecraft EULA (https://aka.ms/MinecraftEULA). Server builds write eula.txt only when true."
+    },
     "instances": {
       "type": "string",
       "description": "The directory shulker's own instances live in, absolute or relative to config.json's directory."

@@ -44,7 +44,7 @@ func TestSetGetUnset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stdout := h.mustRun(t, "set", "server.eula", "true"); stdout != "  ~ server.eula (unset) ⟶ true\n" {
+	if stdout := h.mustRun(t, "set", "server.properties.hardcore", "true"); stdout != "  ~ server.properties.hardcore (unset) ⟶ true\n" {
 		t.Fatalf("set output = %q", stdout)
 	}
 	h.mustRun(t, "set", "server.properties.rcon.port", "25575")
@@ -81,7 +81,7 @@ func TestSetGetUnset(t *testing.T) {
 		name      string
 		got, want any
 	}{
-		{"server.eula", m.Server.EULA, true},
+		{"properties.hardcore", m.Server.Properties["hardcore"], true},
 		{"rcon.port", m.Server.Properties["rcon.port"], json.Number("25575")},
 		{"properties.motd", m.Server.Properties["motd"], "20"},
 		{"variables.port", m.Variables["port"], json.Number("25565")},
@@ -135,9 +135,6 @@ func TestSetGetUnset(t *testing.T) {
 	if _, ok := h.readManifest(t).Variables["port"]; ok {
 		t.Fatal("unset left variables.port in shulker.json")
 	}
-	if got := h.mustRun(t, "unset", "server.eula"); got != "  ~ server.eula true ⟶ false\n" {
-		t.Fatalf("unset server.eula reports %q; the saved file keeps eula false", got)
-	}
 }
 
 func TestSetRejectsBadPathsAndValues(t *testing.T) {
@@ -148,7 +145,7 @@ func TestSetRejectsBadPathsAndValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	env := h.runSetting(t, 1, "set", "sever.eula", "true")
+	env := h.runSetting(t, 1, "set", "sever.memory", "4G")
 	if env.Error.Code != "path-invalid" || strings.Contains(env.Error.Message, "did you mean") || !slices.Contains(env.Error.Candidates, "server") {
 		t.Fatalf("typo error = %+v", env.Error)
 	}
@@ -160,7 +157,7 @@ func TestSetRejectsBadPathsAndValues(t *testing.T) {
 	}{
 		{1, "path-invalid", "single value", []string{"set", "name.first", "x"}},
 		{1, "path-invalid", "is a list", []string{"set", "server.jvmArgs.first", "x"}},
-		{2, "usage", "true or false", []string{"set", "server.eula", "yes"}},
+		{2, "usage", "true or false", []string{"set", "server.properties.hardcore", "yes"}},
 		{2, "usage", "--literal", []string{"set", "server.jvmArgs", "UseZGC"}},
 		{2, "usage", "--literal", []string{"set", "variables.x", "--literal", "{nope"}},
 		{1, "manifest-invalid", "server.memory: ", []string{"set", "server.memory", "6"}},

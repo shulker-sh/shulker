@@ -94,8 +94,9 @@ func TestExportMrpack(t *testing.T) {
 		m["note"] = "A demo pack"
 		m["description"] = "Survival with friends."
 		m["client"].(map[string]any)["name"] = "Demo Pack"
-		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"motd": "Demo"}}
+		m["server"] = map[string]any{"properties": map[string]any{"motd": "Demo"}}
 	})
+	h.mustRun(t, "config", "set", "eula", "true")
 	writeOverride(t, h.dir, "overrides/config/same.txt", "same\n")
 	writeOverride(t, h.dir, "overrides/config/shared.toml", "common\n")
 	writeOverride(t, h.dir, "client-overrides/config/client.toml", "client\n")
@@ -112,7 +113,7 @@ func TestExportMrpack(t *testing.T) {
 	h.allowMrpackHost(t)
 	stdout = h.mustRun(t, "export", "mrpack")
 	archive := filepath.Join(h.dir, "build", "pack-1.0.mrpack")
-	if !strings.Contains(stdout, "wrote Demo Pack 1.0 » "+archive) || !strings.Contains(stdout, "2 mods by download") || !strings.Contains(stdout, "8 override files") {
+	if !strings.Contains(stdout, "wrote Demo Pack 1.0 » "+archive) || !strings.Contains(stdout, "2 mods by download") || !strings.Contains(stdout, "7 override files") {
 		t.Fatalf("export output: %s", stdout)
 	}
 	index, entries := readMrpack(t, archive)
@@ -137,7 +138,6 @@ func TestExportMrpack(t *testing.T) {
 		"client-overrides/config/shared.toml": "common\n",
 		"server-overrides/config/shared.toml": "server\n",
 		"client-overrides/config/client.toml": "client\n",
-		"server-overrides/eula.txt":           "eula=true\n",
 	}
 	for path, content := range want {
 		if entries[path] != content {
@@ -147,7 +147,7 @@ func TestExportMrpack(t *testing.T) {
 	if !strings.Contains(entries["server-overrides/server.properties"], "motd=Demo") || !strings.Contains(entries["client-overrides/options.txt"], "tutorialStep:") {
 		t.Fatalf("first-class files: %v", keys(entries))
 	}
-	if _, ok := entries["client-overrides/mods/shulker-pack.jar"]; !ok || len(entries) != 11 {
+	if _, ok := entries["client-overrides/mods/shulker-pack.jar"]; !ok || len(entries) != 10 {
 		t.Fatalf("entries: %v", keys(entries))
 	}
 	if !strings.Contains(entries["shulker.json"], `"sodium"`) || !strings.Contains(entries["shulker.lock"], `"sodium"`) {
@@ -171,7 +171,7 @@ func TestExportMrpack(t *testing.T) {
 		t.Fatalf("a partial export names its side: %s", stdout)
 	}
 	index, entries = readMrpack(t, filepath.Join(h.dir, "out", "server.mrpack"))
-	if index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename || entries["overrides/config/shared.toml"] != "server\n" || entries["overrides/eula.txt"] == "" || len(entries) != 7 {
+	if index.Files[0].Path != "mods/"+h.jars["fabric-api"].filename || entries["overrides/config/shared.toml"] != "server\n" || len(entries) != 6 {
 		t.Fatalf("server export: files=%+v entries=%v", index.Files, keys(entries))
 	}
 }

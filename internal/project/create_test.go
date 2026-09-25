@@ -62,7 +62,7 @@ func TestNewManifestTakesEveryDefault(t *testing.T) {
 		t.Fatalf("shape: %+v", m)
 	}
 	m = NewManifest("srv", "/tmp/x", "1.21.1", manifest.Loader{Type: "neoforge", Version: "*"}, "server")
-	if m.Name != "srv" || m.Minecraft != "1.21.1" || m.Loader.Type != "neoforge" || m.Client != nil || m.Server == nil || m.Server.EULA {
+	if m.Name != "srv" || m.Minecraft != "1.21.1" || m.Loader.Type != "neoforge" || m.Client != nil || m.Server == nil {
 		t.Fatalf("server: %+v", m)
 	}
 }

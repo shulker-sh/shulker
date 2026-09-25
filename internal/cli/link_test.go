@@ -338,7 +338,7 @@ func TestLinkMojangWarnsWhenTheSourceDeclaresNoClient(t *testing.T) {
 	h.mustRun(t, "add", "fabric-api")
 	h.editManifest(t, func(m map[string]any) {
 		delete(m, "client")
-		m["server"] = map[string]any{"eula": true}
+		m["server"] = map[string]any{}
 	})
 	h.mustRun(t, "lock")
 

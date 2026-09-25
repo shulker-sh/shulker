@@ -37,7 +37,7 @@ func collectPush(t *testing.T, b *Builder, cond conditions) (properties, *Report
 	t.Helper()
 	desired := map[string]source{}
 	report := &Report{}
-	if _, err := b.collectServer(desired, nil, cond, true, report); err != nil {
+	if _, err := b.collectServer(desired, nil, cond, true, false, report); err != nil {
 		return nil, report, err
 	}
 	return desired[PropertiesFile].owned().(propsFile).props, report, nil

@@ -19,8 +19,9 @@ func TestNeoForgeServer(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--name", "pack", "--loader", "neoforge", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
-		m["server"] = map[string]any{"eula": true}
+		m["server"] = map[string]any{}
 	})
+	h.mustRun(t, "config", "set", "eula", "true")
 	var l lock.Lock
 	h.readJSON(t, "shulker.lock", &l)
 	if l.Loader.Type != "neoforge" || l.Loader.Version != "26.2.0.87" || l.Loader.Server != nil {

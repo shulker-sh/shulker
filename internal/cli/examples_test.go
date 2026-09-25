@@ -17,7 +17,7 @@ func TestErrorsShowAnExampleCommand(t *testing.T) {
 		want []string
 	}{
 		{h, []string{"remove", "sodim"}, []string{"did you mean:", "‣ sodium", "For example:", "$ shulker remove sodium\n"}},
-		{h, []string{"set", "sever.eula", "true"}, []string{"did you mean:", "‣ server", "$ shulker set server.eula true\n"}},
+		{h, []string{"set", "sever.memory", "4G"}, []string{"did you mean:", "‣ server", "$ shulker set server.memory 4G\n"}},
 		{fresh, []string{"create", "--name", "pack", "--side", "clint"}, []string{"did you mean:", "‣ client", "$ shulker create --name pack --side client\n"}},
 	} {
 		code, _, stderr := tc.h.run(t, tc.args...)

@@ -4,6 +4,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,7 +18,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	h.readJSON(t, "shulker.json", &m)
 	srv, _ := m["server"].(map[string]any)
 	props, _ := srv["properties"].(map[string]any)
-	if srv == nil || srv["eula"] != false || srv["memory"] != "4G" || props["difficulty"] != "easy" {
+	if srv == nil || srv["eula"] != nil || srv["memory"] != "4G" || props["difficulty"] != "easy" {
 		t.Fatalf("init did not seed the server block: %v", m["server"])
 	}
 	h.mustRun(t, "add", "fabric-api")
@@ -31,7 +32,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	jdk := h.fakeJDK(t, "25.0.1", "0")
 	h.editManifest(t, func(m map[string]any) {
 		m["java"] = jdk
-		m["server"] = map[string]any{"eula": false, "memory": "2G", "jvmArgs": []any{"-Dshulker.test=1"}}
+		m["server"] = map[string]any{"memory": "2G", "jvmArgs": []any{"-Dshulker.test=1"}}
 	})
 	h.tty = true
 	h.stdin = strings.NewReader("y\n")
@@ -39,17 +40,19 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if code == 0 || strings.Contains(stderr, "Accept and record") || !strings.Contains(stderr, "--accept-eula") {
 		t.Fatalf("--no-input must decline without asking: %d %s", code, stderr)
 	}
-	h.readJSON(t, "shulker.json", &m)
-	if m["server"].(map[string]any)["eula"] != false {
-		t.Fatal("declining must not change the manifest")
+	if h.configEula(t) != nil {
+		t.Fatal("declining must not record acceptance")
 	}
 	h.tty = false
 
 	h.stdin = strings.NewReader("say hi\nstop\n")
 	code, stdout, stderr := h.run(t, "serve", "--accept-eula")
+	if h.configEula(t) != true {
+		t.Fatal("accepting must record eula: true in config.json")
+	}
 	h.readJSON(t, "shulker.json", &m)
-	if m["server"].(map[string]any)["eula"] != true {
-		t.Fatal("accepting must record eula: true")
+	if _, ok := m["server"].(map[string]any)["eula"]; ok {
+		t.Fatal("accepting must leave the manifest alone")
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "build", "server", "eula.txt")); err != nil {
 		t.Fatal("eula.txt not written after accepting")
@@ -107,10 +110,8 @@ func TestServeErrors(t *testing.T) {
 	old := h.fakeJDK(t, "17.0.12", "0")
 	h.editManifest(t, func(m map[string]any) { m["java"] = old })
 	code, _, stderr := h.run(t, "serve", "--accept-eula")
-	var m map[string]any
-	h.readJSON(t, "shulker.json", &m)
-	if m["server"].(map[string]any)["eula"] != true {
-		t.Fatal("--accept-eula must record eula: true")
+	if h.configEula(t) != true {
+		t.Fatal("--accept-eula must record eula: true in config.json")
 	}
 	if code == 0 || !strings.Contains(stderr, "needs Java 25") {
 		t.Fatalf("expected java-version error, got %d: %s", code, stderr)
@@ -249,4 +250,37 @@ func TestServeInstallsWhatTheLockNeeds(t *testing.T) {
 	if !strings.Contains(stdout, "server stopped") {
 		t.Fatalf("serve must fetch the server files itself, not stop at `shulker install`: %s", stdout)
 	}
+}
+
+func TestServeEulaFromConfigSkipsPrompt(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
+	h.mustRun(t, "install")
+	h.mustRun(t, "config", "set", "eula", "true")
+	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
+	h.tty = true
+	h.stdin = strings.NewReader("stop\n")
+	code, stdout, stderr := h.run(t, "serve")
+	if code != 0 || strings.Contains(stderr, "Accept and record") {
+		t.Fatalf("an accepted config must serve without asking: %d\n%s\n%s", code, stdout, stderr)
+	}
+	if got := readFile(t, filepath.Join(h.dir, "build", "server", "eula.txt")); got != "eula=true\n" {
+		t.Fatalf("eula.txt: %q", got)
+	}
+}
+
+func (h *harness) configEula(t *testing.T) any {
+	t.Helper()
+	var cfg map[string]any
+	data, err := os.ReadFile(h.config)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	return cfg["eula"]
 }

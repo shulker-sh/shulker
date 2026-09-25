@@ -46,7 +46,7 @@ func TestExportFetchesMissingLockedFiles(t *testing.T) {
 	h.mustRun(t, "add", "sodium")
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"
-		m["server"] = map[string]any{"eula": true}
+		m["server"] = map[string]any{}
 	})
 	h.allowMrpackHost(t)
 	requests := h.recordRequests(t)

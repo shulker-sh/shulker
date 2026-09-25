@@ -42,7 +42,7 @@ func shulkerExport(t *testing.T, dir string) (archive string, modrinth, cf *host
 			"recipes":     {Provider: "curseforge", Project: "238222"},
 			"private-mod": {File: "files/private-mod-1.4.jar"},
 		},
-		Client: &manifest.Client{}, Server: &manifest.Server{EULA: true},
+		Client: &manifest.Client{}, Server: &manifest.Server{},
 	}
 	locked := func(h *host, v provider.Version, side string) lock.Mod {
 		return lock.Mod{Provider: h.Name(), Project: v.ProjectID, Version: v.ID, VersionNumber: v.Number, Filename: v.File.Filename, URL: &v.File.URL, Sha512: sha512Hex(c.bytes(v)), Size: v.File.Size, Side: side, Channel: "release", RequiredBy: []string{}, Aliases: lock.Aliases{}}
@@ -110,7 +110,7 @@ func TestImportRestoresAShulkerExport(t *testing.T) {
 		t.Fatalf("result: %+v", res)
 	}
 	m, l := h.r.Manifest, h.r.Lock
-	if _, ok := m.Features["fast"]; !ok || m.Server == nil || !m.Server.EULA || m.Version != "1.0" {
+	if _, ok := m.Features["fast"]; !ok || m.Server == nil || m.Version != "1.0" {
 		t.Fatalf("manifest: %+v", m)
 	}
 	if sodium := m.Requires["sodium"]; strings.Join(sodium.Feature, ",") != "fast" || l.Mods["sodium"].Provider != "modrinth" || l.Mods["sodium"].Version != "QANobbMI" {

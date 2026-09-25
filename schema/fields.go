@@ -92,7 +92,7 @@ type Field struct {
 // is one key, since those keys may contain dots themselves.
 func (s *FieldSet) Lookup(path string) (*Field, error) {
 	if path == "" {
-		return nil, out.Errorf("usage", "pass a path like server.eula")
+		return nil, out.Errorf("usage", "pass a path like server.memory")
 	}
 	segs := strings.Split(path, ".")
 	node := s.root

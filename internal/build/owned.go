@@ -6,7 +6,7 @@ import (
 )
 
 // DropManifestOwned leaves out the override files the manifest renders itself: the client options
-// when the manifest sets them, and a server's properties, eula and player lists.
+// when the manifest sets them, and a server's properties and player lists.
 func DropManifestOwned(m *manifest.Manifest, overrides []packarchive.Override) []packarchive.Override {
 	owned := map[string]bool{}
 	if m.Client != nil && m.Client.Options != nil {
@@ -14,7 +14,6 @@ func DropManifestOwned(m *manifest.Manifest, overrides []packarchive.Override) [
 	}
 	if m.Server != nil {
 		owned[PropertiesFile] = true
-		owned[EulaFile] = true
 		if m.Server.Players != nil {
 			owned[WhitelistFile] = true
 			owned[OpsFile] = true

@@ -209,7 +209,7 @@ func (b *Builder) exportName(sides []*exportSide) string {
 // exportCollect fills a side's override files and the mods it ships, returning the warnings.
 func (b *Builder) exportCollect(t *exportSide, version, osName string, features map[string]bool) ([]string, error) {
 	rep := &Report{}
-	desired, dirs, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features, NoLauncher: true, ProjectVersion: version}, rep)
+	desired, dirs, err := b.collect(t.side, Options{OS: osName, NoOS: osName == "", Features: features, NoLauncher: true, NoEULA: true, ProjectVersion: version}, rep)
 	if err != nil {
 		return nil, err
 	}

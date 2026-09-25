@@ -14,8 +14,9 @@ func TestQuiltServer(t *testing.T) {
 	h.mustRun(t, "create", "--name", "pack", "--loader", "quilt", "--side", "server")
 	h.mustRun(t, "add", "fabric-api")
 	h.editManifest(t, func(m map[string]any) {
-		m["server"] = map[string]any{"eula": true}
+		m["server"] = map[string]any{}
 	})
+	h.mustRun(t, "config", "set", "eula", "true")
 
 	h.mustRun(t, "install")
 	var l lock.Lock

@@ -155,6 +155,8 @@ type Options struct {
 	Origin      Origin
 	// NoLauncher leaves the server launcher out, for an export that ships none of it.
 	NoLauncher bool
+	// NoEULA leaves eula.txt out, for an export: the acceptance is this user's, not the pack's.
+	NoEULA bool
 	// ProjectVersion stands in for the manifest's version in the project's ${project.version}, for an
 	// export given a version of its own.
 	ProjectVersion string
@@ -179,6 +181,9 @@ type Builder struct {
 	Providers provider.Providers
 	Fetch     *fetch.Client
 	Log       func(format string, args ...any)
+	// EULA is whether this user accepted the Minecraft EULA in config.json, which a server build
+	// writes to eula.txt. A manifest can't accept it on anyone's behalf.
+	EULA bool
 }
 
 type source struct {
@@ -510,7 +515,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 	var shipped string
 	if side == "server" {
 		var err error
-		if levelName, err = b.collectServer(desired, vars, cond, opts.NoLauncher, report); err != nil {
+		if levelName, err = b.collectServer(desired, vars, cond, opts.NoLauncher, opts.NoEULA, report); err != nil {
 			return nil, nil, err
 		}
 		dirs = dataDirs(side, levelName)
@@ -715,7 +720,7 @@ func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole 
 	return nil
 }
 
-func (b *Builder) collectServer(desired map[string]source, vars map[string]string, cond conditions, noLauncher bool, report *Report) (string, error) {
+func (b *Builder) collectServer(desired map[string]source, vars map[string]string, cond conditions, noLauncher, noEULA bool, report *Report) (string, error) {
 	if !noLauncher {
 		if err := b.collectLauncher(desired); err != nil {
 			return "", err
@@ -725,7 +730,7 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if srv == nil {
 		srv = &manifest.Server{}
 	}
-	if srv.EULA {
+	if b.EULA && !noEULA {
 		desired[EulaFile] = source{content: literal{[]byte("eula=true\n")}}
 	}
 	props, err := renderProperties(PropertiesFile, srv.Properties, vars)

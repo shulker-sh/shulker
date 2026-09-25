@@ -32,7 +32,7 @@ const (
 )
 
 // Keys are the config.json keys `shulker config` reads and sets.
-var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
+var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
 
 // Secrets are the keys whose values `shulker config` masks unless asked to reveal them.
 var Secrets = []string{"curseforge.key"}
@@ -70,6 +70,7 @@ func Redact(doc map[string]any, mask func(string) string) map[string]any {
 type Config struct {
 	Accounts   Accounts   `json:"accounts"`
 	CurseForge CurseForge `json:"curseforge"`
+	EULA       bool       `json:"eula,omitempty"`
 	Instances  string     `json:"instances,omitempty"`
 	Log        Log        `json:"log"`
 	Play       Play       `json:"play"`
@@ -281,6 +282,16 @@ func SaveDocument(path string, doc map[string]any) error {
 func ReplaceDocument(path string, doc map[string]any) (kept string, err error) {
 	doc["$schema"] = schema.URL(schema.Config)
 	return managed.Replace(schema.Config, path, doc)
+}
+
+// AcceptEULA records in config.json that this user accepts the Minecraft EULA.
+func AcceptEULA(path string) error {
+	doc, err := LoadDocument(path)
+	if err != nil {
+		return err
+	}
+	doc["eula"] = true
+	return SaveDocument(path, doc)
 }
 
 // RegistryPath is the registry the config at configPath points to, registry.json beside it by default.

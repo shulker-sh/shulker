@@ -84,7 +84,7 @@ func newCurseForgeExport(t *testing.T) *harness {
 		m["version"] = "1.0"
 		m["authors"] = []string{"Ann", "Bo"}
 		m["client"].(map[string]any)["name"] = "Demo Pack"
-		m["server"] = map[string]any{"eula": true}
+		m["server"] = map[string]any{}
 	})
 	h.mustRun(t, "install")
 	return h

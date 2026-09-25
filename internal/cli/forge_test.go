@@ -15,8 +15,9 @@ func TestForgeServer(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--name", "pack", "--loader", "forge", "--side", "server")
 	h.editManifest(t, func(m map[string]any) {
-		m["server"] = map[string]any{"eula": true}
+		m["server"] = map[string]any{}
 	})
+	h.mustRun(t, "config", "set", "eula", "true")
 
 	h.mustRun(t, "install")
 	var l lock.Lock

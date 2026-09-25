@@ -358,7 +358,7 @@ func TestConfigKeysAreTheSchemaLeaves(t *testing.T) {
 			leaves = append(leaves, key+"."+name)
 		}
 	}
-	leaves = append(leaves, "instances", "registry", "saves", "store")
+	leaves = append(leaves, "eula", "instances", "registry", "saves", "store")
 	slices.Sort(leaves)
 	if !slices.Equal(leaves, config.Keys) {
 		t.Fatalf("config.Keys %v, schema %v", config.Keys, leaves)

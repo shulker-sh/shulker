@@ -29,7 +29,7 @@ func NewManifest(name, dir, minecraft string, l manifest.Loader, side string) *m
 	}
 	switch side {
 	case "server":
-		m.Server = &manifest.Server{EULA: false, Memory: manifest.DefaultServerMemory, Properties: map[string]any{"difficulty": "easy"}}
+		m.Server = &manifest.Server{Memory: manifest.DefaultServerMemory, Properties: map[string]any{"difficulty": "easy"}}
 	case "client":
 		m.Client = NewClient()
 	}

@@ -536,11 +536,6 @@
           "description": "Output directory. Defaults to build/<side>; \".\" builds into the project directory itself, which is what makes the project an instance."
         },
         "variables": { "$ref": "#/$defs/variables" },
-        "eula": {
-          "type": "boolean",
-          "default": false,
-          "description": "eula.txt is written only when true. serve refuses to start otherwise."
-        },
         "memory": {
           "type": "string",
           "pattern": "^[1-9][0-9]*[MmGg]$",

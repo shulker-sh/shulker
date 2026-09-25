@@ -207,7 +207,18 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 	if err != nil {
 		return nil, err
 	}
-	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers, Fetch: d.fetch, Log: a.progress}, nil
+	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers, Fetch: d.fetch, Log: a.progress, EULA: a.eulaAccepted()}, nil
+}
+
+// eulaAccepted is whether config.json records this user's acceptance of the Minecraft EULA; a
+// config shulker can't read accepts nothing.
+func (a *app) eulaAccepted() bool {
+	path, err := a.configFile()
+	if err != nil {
+		return false
+	}
+	cfg, err := config.LoadFile(path)
+	return err == nil && cfg.EULA
 }
 
 // openPacks reads p's modpacks at their pins, once: a later call answers from what the first read.

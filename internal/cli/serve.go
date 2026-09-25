@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/java"
 	"shulker.sh/shulker/internal/manifest"
@@ -74,18 +75,8 @@ func (a *app) serveCmd() *cobra.Command {
 				p.Manifest.Server = &manifest.Server{}
 			}
 			srv := p.Manifest.Server
-			if !srv.EULA {
-				accepted, err := a.acceptEula(acceptEula)
-				if err != nil {
-					return err
-				}
-				if !accepted {
-					return out.Errorf("eula-required", "set \"server\": {\"eula\": true} in shulker.json or pass --accept-eula once you accept the Minecraft EULA (%s)", eulaURL)
-				}
-				srv.EULA = true
-				if err := p.SaveManifest(); err != nil {
-					return err
-				}
+			if err := a.requireEula(acceptEula); err != nil {
+				return err
 			}
 			jvm, err := server.JVMArgs(srv.Memory, srv.JVMFlags, srv.JVMArgs)
 			if err != nil {
@@ -167,18 +158,33 @@ func (a *app) serveCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory")
 	a.registerFailFast(cmd)
-	cmd.Flags().BoolVar(&acceptEula, "accept-eula", false, "record acceptance of the Minecraft EULA in shulker.json without prompting")
+	cmd.Flags().BoolVar(&acceptEula, "accept-eula", false, "accept the Minecraft EULA and record it in config.json without prompting")
 	return cmd
 }
 
-func (a *app) acceptEula(flag bool) (bool, error) {
-	if flag {
-		return true, nil
+// requireEula has this user accept the Minecraft EULA once, by the prompt or --accept-eula, and
+// records it in config.json. A manifest never accepts it for them.
+func (a *app) requireEula(flag bool) error {
+	if a.eulaAccepted() {
+		return nil
 	}
-	if !a.canPick() {
-		return false, nil
+	accepted := flag
+	if !accepted && a.canPick() {
+		l := a.printer.Err()
+		l.Text("Running a Minecraft server requires accepting the EULA: " + l.T.Cyan(eulaURL))
+		var err error
+		if accepted, err = a.askYes(`Accept and record "eula": true in your shulker config?`); err != nil {
+			return err
+		}
 	}
-	l := a.printer.Err()
-	l.Text("Running a Minecraft server requires accepting the EULA: " + l.T.Cyan(eulaURL))
-	return a.askYes(`Accept and record "eula": true in shulker.json?`)
+	if !accepted {
+		e := out.Errorf("eula-required", "accept the Minecraft EULA (%s) to run a server", eulaURL)
+		e.Help = "pass --accept-eula, or run `shulker config set eula true`"
+		return e
+	}
+	path, err := a.configFile()
+	if err != nil {
+		return err
+	}
+	return config.AcceptEULA(path)
 }

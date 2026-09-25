@@ -239,7 +239,7 @@ func newProject(t *testing.T) *project {
 			Providers: []string{"modrinth", "curseforge"},
 			Requires:  map[string]manifest.Require{},
 			Client:    &manifest.Client{Name: "Demo Pack"},
-			Server:    &manifest.Server{EULA: true},
+			Server:    &manifest.Server{},
 		},
 		Lock:      lock.New(),
 		LockPath:  filepath.Join(dir, lock.FileName),

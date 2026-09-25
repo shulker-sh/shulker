@@ -17,10 +17,10 @@ func TestServerTargetBuild(t *testing.T) {
 	h.editManifest(t, func(m map[string]any) {
 		m["variables"] = map[string]any{"motd": "Welcome"}
 		m["server"] = map[string]any{
-			"eula":       true,
 			"properties": map[string]any{"motd": "${motd} to pack", "max-players": 8, "online-mode": false},
 		}
 	})
+	h.mustRun(t, "config", "set", "eula", "true")
 
 	stdout, stderr := h.mustRunStderr(t, "install")
 	if !strings.Contains(stderr, "downloaded the fabric server launcher") || !strings.Contains(stderr, "downloaded Java runtime") {
@@ -189,10 +189,10 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 	}
 
 	h.editManifest(t, func(m map[string]any) {
-		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"difficulty": "easy", "online-mode": false}}
+		m["server"] = map[string]any{"properties": map[string]any{"difficulty": "easy", "online-mode": false}}
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "2 written, 2 unchanged") {
+	if !strings.Contains(stdout, "1 written, 2 unchanged") {
 		t.Fatalf("rebuild with owned key: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\ndifficulty=easy\nmotd=A Minecraft Server\nonline-mode=false\n" {
@@ -200,16 +200,16 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 	}
 
 	h.editManifest(t, func(m map[string]any) {
-		m["server"] = map[string]any{"eula": true, "properties": map[string]any{"online-mode": false}}
+		m["server"] = map[string]any{"properties": map[string]any{"online-mode": false}}
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "1 written, 3 unchanged") {
+	if !strings.Contains(stdout, "1 written, 2 unchanged") {
 		t.Fatalf("rebuild after dropping a key: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\n" {
 		t.Fatalf("file after dropping difficulty: %q", data)
 	}
-	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "built server (4 unchanged)") {
+	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "built server (3 unchanged)") {
 		t.Fatalf("rebuild after drop should be clean: %s", stdout)
 	}
 }
