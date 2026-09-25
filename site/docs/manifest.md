@@ -355,6 +355,7 @@ No other properties are allowed.
 | `build` | [`relativePath`](#relativepath) | Output directory. Defaults to build/&lt;side&gt;; "." builds into the project directory itself, which is what makes the project an instance. |
 | `variables` | [`variables`](#variables) |  |
 | `hooks` | [`clientHooks`](#clienthooks) |  |
+| `memory` | `string` | Heap size `shulker play` gives the game, as -Xms and -Xmx, e.g. "6G", when neither the instance's `memory` nor `play.memory` in config.json sets one. Without any of them shulker uses 4G. Another launcher's instance takes its memory from that launcher.<br>pattern `^[1-9][0-9]*[MmGg]$` |
 | `options` | map of `string` \| `number` \| `boolean` | Keys written into options.txt as key:value. Other keys already in the file are left alone. Values expand ${name} variables, the built-ins included, so "version": "${minecraft.dataVersion}" keeps the file's data version in step with the lock.<br>keys match `^[A-Za-z][A-Za-z0-9_.:]*$` |
 | `optionsPath` | `string` | Where options and the seeded resourcePacks list are written, relative to the build, in builds and exports alike. Defaults to options.txt. config/modpack_defaults/options.txt ships it for Config Manager, which copies it into place only where the player has none, so a pack update never resets their settings. The tool rejects absolute paths and paths that leave the build.<br>pattern `^[^/\\]`, min length 1 |
 | `servers` | object[] | Entries written into servers.dat. |

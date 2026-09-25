@@ -113,6 +113,7 @@ type Client struct {
 	Build       string          `json:"build,omitempty"`
 	Variables   Variables       `json:"variables,omitempty"`
 	Hooks       *Hooks          `json:"hooks,omitempty"`
+	Memory      string          `json:"memory,omitempty"`
 	Options     map[string]any  `json:"options,omitempty"`
 	OptionsPath string          `json:"optionsPath,omitempty"`
 	Servers     json.RawMessage `json:"servers,omitempty"`
@@ -619,6 +620,15 @@ func (m *Manifest) ClientHooks() Hooks {
 func (m *Manifest) UsesMarker() bool { return m.Marker == nil || *m.Marker }
 
 const DefaultHistory = 5
+
+// ClientMemory is the heap the pack's author recommends for playing it, empty where the manifest
+// names none.
+func (m *Manifest) ClientMemory() string {
+	if m.Client == nil {
+		return ""
+	}
+	return m.Client.Memory
+}
 
 // DefaultServerMemory is the heap a server block gets when it names none.
 const DefaultServerMemory = "4G"

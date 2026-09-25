@@ -86,6 +86,7 @@
     "build": "build/client",
     "variables": { "motd": "Client" },
     "hooks": { "preLaunch": true, "postExit": true },
+    "memory": "6G",
     "options": { "fov": 0.5, "lang": "en_us", "autoJump": false },
     "optionsPath": "config/modpack_defaults/options.txt",
     "servers": [{ "name": "Home", "ip": "example.com:25565", "note": "servers" }],
