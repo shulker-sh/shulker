@@ -21,20 +21,8 @@ func (a *app) projectInstances(s instanceSelection) (entries []project.InstanceE
 	return entries, true, err
 }
 
-// hasSyncedInstances reports whether anything is synced from p: a registered instance or a
-// detached build.
-func (a *app) hasSyncedInstances(p *project.Project) (bool, error) {
-	entries, err := a.projectEntries(p, instanceSelection{})
-	if out.CodeOf(err) == "no-instances" {
-		return false, nil
-	}
-	return len(entries) > 0, err
-}
-
-func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries []project.InstanceEntry, err error) {
-	if err := s.check(); err != nil {
-		return nil, err
-	}
+// syncedFrom is everything synced from p, registered instances and detached builds alike.
+func (a *app) syncedFrom(p *project.Project) ([]project.InstanceEntry, error) {
 	dir, err := filepath.Abs(p.Dir)
 	if err != nil {
 		return nil, err
@@ -47,7 +35,18 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 	if err != nil {
 		return nil, err
 	}
-	all, err := project.SyncedFrom(p, registry, lf)
+	return project.SyncedFrom(p, registry, lf)
+}
+
+func (a *app) projectEntries(p *project.Project, s instanceSelection) ([]project.InstanceEntry, error) {
+	if err := s.check(); err != nil {
+		return nil, err
+	}
+	dir, err := filepath.Abs(p.Dir)
+	if err != nil {
+		return nil, err
+	}
+	all, err := a.syncedFrom(p)
 	if err != nil {
 		return nil, err
 	}
@@ -57,11 +56,7 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) (entries [
 		return nil, e
 	}
 	project.SortInstances(all)
-	for _, e := range all {
-		if s.admits(e) {
-			entries = append(entries, e)
-		}
-	}
+	entries := s.Narrow(all)
 	if len(entries) == 0 {
 		e := out.Errorf("instance-not-found", "no instance synced from %s matches %s", dir, describeSelection("", s))
 		e.Candidates = instanceCandidates(all)

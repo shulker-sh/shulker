@@ -17,8 +17,8 @@ import (
 )
 
 type instanceSelection struct {
-	launcher, side string
-	all            bool
+	project.InstanceFilter
+	all bool
 }
 
 func (i *instanceSelection) register(cmd *cobra.Command, all string) {
@@ -26,27 +26,23 @@ func (i *instanceSelection) register(cmd *cobra.Command, all string) {
 }
 
 func (i *instanceSelection) registerWith(cmd *cobra.Command, all, side string) {
-	cmd.Flags().StringVar(&i.launcher, "launcher", "", "only instances linked in this launcher: "+launcher.NameList())
-	cmd.Flags().StringVar(&i.side, "side", "", side)
+	cmd.Flags().StringVar(&i.Launcher, "launcher", "", "only instances linked in this launcher: "+launcher.NameList())
+	cmd.Flags().StringVar(&i.Side, "side", "", side)
 	if all != "" {
 		cmd.Flags().BoolVar(&i.all, "all", false, all)
 	}
 }
 
-func (i instanceSelection) narrows() bool { return i.launcher != "" || i.side != "" }
+func (i instanceSelection) narrows() bool { return i.Launcher != "" || i.Side != "" }
 
 func (i instanceSelection) check() error {
-	if i.launcher != "" && launcher.Find(i.launcher) == nil {
-		return out.Errorf("usage", "--launcher must be %s, not %q", launcher.NameList(), i.launcher)
+	if i.Launcher != "" && launcher.Find(i.Launcher) == nil {
+		return out.Errorf("usage", "--launcher must be %s, not %q", launcher.NameList(), i.Launcher)
 	}
-	if i.side != "" && i.side != "client" && i.side != "server" {
-		return out.Errorf("usage", "--side must be client or server, not %q", i.side)
+	if i.Side != "" && i.Side != "client" && i.Side != "server" {
+		return out.Errorf("usage", "--side must be client or server, not %q", i.Side)
 	}
 	return nil
-}
-
-func (i instanceSelection) admits(e project.InstanceEntry) bool {
-	return (i.launcher == "" || e.Launcher == i.launcher) && (i.side == "" || e.Side == i.side)
 }
 
 // selectInstances matches query against ids, then against names (case-insensitive), then against
@@ -65,12 +61,7 @@ func (a *app) selectInstances(query string, s instanceSelection) ([]project.Inst
 		return nil, e
 	}
 	project.SortInstances(entries)
-	var pool []project.InstanceEntry
-	for _, e := range entries {
-		if s.admits(e) {
-			pool = append(pool, e)
-		}
-	}
+	pool := s.Narrow(entries)
 	matches := project.MatchInstances(pool, query)
 	if len(matches) == 0 {
 		e := out.Errorf("instance-not-found", "no instance matches %s", describeSelection(query, s))
@@ -94,11 +85,11 @@ func describeSelection(query string, s instanceSelection) string {
 	if query != "" {
 		parts = append(parts, strconv.Quote(query))
 	}
-	if s.launcher != "" {
-		parts = append(parts, "--launcher "+s.launcher)
+	if s.Launcher != "" {
+		parts = append(parts, "--launcher "+s.Launcher)
 	}
-	if s.side != "" {
-		parts = append(parts, "--side "+s.side)
+	if s.Side != "" {
+		parts = append(parts, "--side "+s.Side)
 	}
 	return strings.Join(parts, " with ")
 }
@@ -140,7 +131,7 @@ func instanceDirs(entries []project.InstanceEntry) []string {
 // is called picks the project's instances in that launcher, the reverse of `link <launcher>`.
 func (a *app) unlinkTargets(query string, s instanceSelection) ([]project.InstanceEntry, error) {
 	name := launcherArg(query)
-	if name == "" || s.launcher != "" {
+	if name == "" || s.Launcher != "" {
 		return a.selectOrDetached(query, s)
 	}
 	registry, err := a.loadInstances()
@@ -153,19 +144,13 @@ func (a *app) unlinkTargets(query string, s instanceSelection) ([]project.Instan
 		}
 	}
 	inLauncher := s
-	inLauncher.launcher = name
-	entries, inProject, err := a.projectInstances(inLauncher)
+	inLauncher.Launcher = name
+	matches, inProject, err := a.projectInstances(inLauncher)
 	if err != nil {
 		return nil, err
 	}
 	if !inProject {
 		return a.selectOrDetached(query, s)
-	}
-	var matches []project.InstanceEntry
-	for _, e := range entries {
-		if inLauncher.admits(e) {
-			matches = append(matches, e)
-		}
 	}
 	if len(matches) > 1 && !s.all {
 		e := out.Errorf("ambiguous-instance", "this project has %d instances in %s", len(matches), launcher.Title(name))
@@ -190,7 +175,7 @@ func (a *app) selectOrDetached(query string, s instanceSelection) ([]project.Ins
 	if absErr != nil {
 		return nil, err
 	}
-	if e, ok := project.DetachedBuild(dir); ok && s.admits(e) {
+	if e, ok := project.DetachedBuild(dir); ok && s.Admits(e) {
 		return []project.InstanceEntry{e}, nil
 	}
 	return nil, err

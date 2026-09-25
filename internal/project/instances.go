@@ -229,3 +229,25 @@ func MatchInstances(pool []InstanceEntry, query string) []InstanceEntry {
 	}
 	return matches
 }
+
+// InstanceFilter narrows instances to one launcher, one side, or both; an empty field admits all.
+type InstanceFilter struct {
+	Launcher string
+	Side     string
+}
+
+// Admits reports whether the entry passes the filter.
+func (f InstanceFilter) Admits(e InstanceEntry) bool {
+	return (f.Launcher == "" || e.Launcher == f.Launcher) && (f.Side == "" || e.Side == f.Side)
+}
+
+// Narrow keeps the entries the filter admits, in their order.
+func (f InstanceFilter) Narrow(entries []InstanceEntry) []InstanceEntry {
+	var kept []InstanceEntry
+	for _, e := range entries {
+		if f.Admits(e) {
+			kept = append(kept, e)
+		}
+	}
+	return kept
+}

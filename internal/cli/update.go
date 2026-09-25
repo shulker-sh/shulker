@@ -171,7 +171,8 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 		}
 		rl.Synced = &synced
 		// The nudge is only a hint: a registry it can't read mustn't fail an update that is done.
-		hasChildren, _ = a.hasSyncedInstances(p)
+		children, _ := a.syncedFrom(p)
+		hasChildren = len(children) > 0
 	}
 	res := rl.lockChanges
 	var local []string

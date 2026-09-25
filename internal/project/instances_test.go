@@ -131,3 +131,33 @@ func TestMatchInstancesPrefersTheIDThenNamesThenTheDirectory(t *testing.T) {
 		t.Fatalf("nothing matches: %+v", got)
 	}
 }
+
+func TestInstanceFilterNarrowsByLauncherAndSide(t *testing.T) {
+	entries := []InstanceEntry{
+		{Instance: config.Instance{ID: "a", Launcher: "prism"}, Side: "client"},
+		{Instance: config.Instance{ID: "b", Launcher: "prism"}, Side: "server"},
+		{Instance: config.Instance{ID: "c", Launcher: "shulker"}, Side: "client"},
+	}
+	ids := func(entries []InstanceEntry) []string {
+		var got []string
+		for _, e := range entries {
+			got = append(got, e.ID)
+		}
+		return got
+	}
+	if got := ids(InstanceFilter{}.Narrow(entries)); !slices.Equal(got, []string{"a", "b", "c"}) {
+		t.Fatalf("no filter keeps everything: %v", got)
+	}
+	if got := ids(InstanceFilter{Launcher: "prism"}.Narrow(entries)); !slices.Equal(got, []string{"a", "b"}) {
+		t.Fatalf("launcher = %v", got)
+	}
+	if got := ids(InstanceFilter{Side: "client"}.Narrow(entries)); !slices.Equal(got, []string{"a", "c"}) {
+		t.Fatalf("side = %v", got)
+	}
+	if got := ids(InstanceFilter{Launcher: "prism", Side: "client"}.Narrow(entries)); !slices.Equal(got, []string{"a"}) {
+		t.Fatalf("both = %v", got)
+	}
+	if got := (InstanceFilter{Launcher: "prism", Side: "client"}).Narrow(entries[1:]); got != nil {
+		t.Fatalf("nothing admitted is nil, not %v", got)
+	}
+}

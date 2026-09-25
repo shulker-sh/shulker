@@ -133,10 +133,10 @@ func (a *app) syncCmd() *cobra.Command {
 			if a.instance != "" || sel.all {
 				return out.Errorf("usage", "pass a source or -i/--all, not both")
 			}
-			if sel.launcher != "" {
+			if sel.Launcher != "" {
 				return out.Errorf("usage", "--launcher narrows -i, --all, or the picker; it doesn't apply to a source")
 			}
-			req.side = sel.side
+			req.side = sel.Side
 			src, err := a.openSource(cmd.Context(), args[0], req.at)
 			if err != nil {
 				return err

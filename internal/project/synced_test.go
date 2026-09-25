@@ -109,3 +109,21 @@ func TestSyncTargetTellsTheOwnBuildFromASyncedDirectory(t *testing.T) {
 		t.Fatalf("a remote source needs --into, got %v", err)
 	}
 }
+
+func TestAwaitsLauncherWantsAnOutOfPlaceClientNothingIsSyncedFrom(t *testing.T) {
+	p, _, _ := syncedFixture(t)
+	if !AwaitsLauncher(p, nil) {
+		t.Fatal("a client project nothing is synced from awaits a launcher")
+	}
+	if AwaitsLauncher(p, []InstanceEntry{{Instance: config.Instance{ID: "pack-client"}}}) {
+		t.Fatal("a synced instance is a launcher")
+	}
+	server := &Project{Dir: p.Dir, Manifest: &manifest.Manifest{Name: "pack", Server: &manifest.Server{}}}
+	if AwaitsLauncher(server, nil) {
+		t.Fatal("a server-only project runs itself")
+	}
+	inPlace := &Project{Dir: p.Dir, Manifest: &manifest.Manifest{Name: "pack", Client: &manifest.Client{Build: "."}}}
+	if AwaitsLauncher(inPlace, nil) {
+		t.Fatal("an in-place client is already an instance")
+	}
+}

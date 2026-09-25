@@ -101,3 +101,15 @@ func SyncTarget(m *manifest.Manifest, srcDir, side, into, remoteSource string) (
 	ownBuild = config.SameDir(dir, buildDir)
 	return dir, ownBuild, into != "" && !ownBuild, nil
 }
+
+// AwaitsLauncher reports a client project that builds out of place and has nothing synced from it
+// yet, which is when a fresh build is only playable once a launcher is linked.
+func AwaitsLauncher(p *Project, synced []InstanceEntry) bool {
+	if !p.Manifest.HasSide("client") {
+		return false
+	}
+	if _, ok := p.Manifest.InPlaceSide(); ok {
+		return false
+	}
+	return len(synced) == 0
+}

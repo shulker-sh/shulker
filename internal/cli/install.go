@@ -90,17 +90,9 @@ func (a *app) installCmd() *cobra.Command {
 	return cmd
 }
 
-// awaitsALauncher reports a client project that builds out of place and has nothing linked or
-// synced from it yet.
 func (a *app) awaitsALauncher(p *project.Project) bool {
-	if !p.Manifest.HasSide("client") {
-		return false
-	}
-	if _, ok := p.Manifest.InPlaceSide(); ok {
-		return false
-	}
-	synced, err := a.hasSyncedInstances(p)
-	return err == nil && !synced
+	synced, err := a.syncedFrom(p)
+	return err == nil && project.AwaitsLauncher(p, synced)
 }
 
 // fetchLocked puts the locked files the given sides use in the cache, every locked file with no
