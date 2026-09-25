@@ -98,3 +98,15 @@ func TestOwnedIsShulkersInstancesOfAProjectButNotTheProjectItself(t *testing.T) 
 		t.Fatalf("owned = %+v", own)
 	}
 }
+
+func TestLaunchesIsWhetherTheRowNamesThisLauncher(t *testing.T) {
+	if !Shulker.Launches(config.Instance{Launcher: "shulker"}) {
+		t.Fatal("shulker launches its own rows")
+	}
+	if Shulker.Launches(config.Instance{Launcher: "prism"}) || Shulker.Launches(config.Instance{}) {
+		t.Fatal("another launcher's row, or an unlinked one, is not shulker's to launch")
+	}
+	if !prismEntry.Launches(config.Instance{Launcher: "prism"}) {
+		t.Fatal("prism launches its rows")
+	}
+}

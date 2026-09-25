@@ -320,7 +320,7 @@ func (a *app) targetOfDir(dir string) (savesTarget, error) {
 // file when it has one; any other directory gets nil for both.
 func (a *app) ownedInstance(dir string) (*config.Instance, *instance.File, error) {
 	in, ok := a.registeredInstance(dir)
-	if !ok || in.Launcher != launcher.Shulker.Name {
+	if !ok || !launcher.Shulker.Launches(in) {
 		return nil, nil, nil
 	}
 	f, err := instance.Load(dir)

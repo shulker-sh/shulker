@@ -33,7 +33,7 @@ var Shulker = &Entry{
 func Owned(registry []config.Instance, source string) []config.Instance {
 	var own []config.Instance
 	for _, in := range registry {
-		if in.Launcher == Shulker.Name && config.SameDir(in.Source, source) && !config.SameDir(in.Dir, source) {
+		if Shulker.Launches(in) && config.SameDir(in.Source, source) && !config.SameDir(in.Dir, source) {
 			own = append(own, in)
 		}
 	}

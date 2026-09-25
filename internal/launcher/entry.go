@@ -103,6 +103,9 @@ type Linked struct {
 	Path          string
 }
 
+// Launches reports whether the registry row is this launcher's to start.
+func (e *Entry) Launches(in config.Instance) bool { return in.Launcher == e.Name }
+
 // All is every launcher shulker knows, in the order Rank displays them.
 var All = []*Entry{Shulker, prismEntry, multimcEntry, mojangEntry, atlauncherEntry, gdlauncherEntry}
 

@@ -458,7 +458,7 @@ func (a *app) playInstance(cmd *cobra.Command, args []string, create bool) (conf
 	if !ok {
 		return config.Instance{}, nil, notRegistered(dir)
 	}
-	if in.Launcher != launcher.Shulker.Name {
+	if !launcher.Shulker.Launches(in) {
 		e := out.Errorf("not-shulker", "%s belongs to %s, which starts it itself", in.ID, in.Launcher)
 		e.Help = "shulker only launches the instances it owns"
 		return config.Instance{}, nil, e
