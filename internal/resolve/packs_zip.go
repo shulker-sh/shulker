@@ -213,7 +213,7 @@ func (r *Resolver) checkPackFilenames() error {
 	for _, kind := range manifest.PackKinds {
 		section := r.Lock.Packs(kind)
 		for _, key := range sortedKeys(section) {
-			paths := []string{r.Lock.PackPath(kind, section[key], "client", "")}
+			paths := []string{r.Lock.PackPath(kind, section[key], "client", "", r.Manifest.Integrations)}
 			if section[key].ResourcePack {
 				paths = append(paths, section[key].Path(manifest.TypeResourcePack))
 			}

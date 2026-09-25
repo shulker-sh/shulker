@@ -536,7 +536,7 @@ func sortedPacks(m map[string]lock.Pack) []string {
 // collectDatapacks places the datapacks locked for side in the folder DatapackFolder picks, and
 // warns when that is a client's datapacks/, which only some global datapack mods read.
 func (b *Builder) collectDatapacks(side, levelName string, cond conditions, desired map[string]source, report *Report) error {
-	folder, loaded := b.Lock.DatapackFolder(side, levelName)
+	folder, loaded := b.Lock.DatapackFolder(side, levelName, b.Manifest.Integrations)
 	listed := b.Manifest.Datapacks()
 	var placed []string
 	for _, key := range sortedPacks(b.Lock.Datapacks) {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/provider"
@@ -14,13 +15,14 @@ func TestChooseShader(t *testing.T) {
 	bsl := "bsl"
 	none := ""
 	cases := []struct {
-		name    string
-		shaders map[string][]string
-		placed  []string
-		choice  *string
-		file    string
-		pack    string
-		warns   []string
+		name         string
+		shaders      map[string][]string
+		placed       []string
+		integrations map[string][]string
+		choice       *string
+		file         string
+		pack         string
+		warns        []string
 	}{
 		{name: "tagged only for oculus, with only iris placed", shaders: map[string][]string{"bsl": {"oculus"}}, placed: []string{"iris"}, choice: &bsl, warns: []string{unloadable("bsl")}},
 		{name: "local shader with iris", shaders: map[string][]string{"bsl": nil}, placed: []string{"iris"}, choice: &bsl, file: "config/iris.properties", pack: "bsl.zip"},
@@ -34,10 +36,12 @@ func TestChooseShader(t *testing.T) {
 		{name: "none clears the selection", shaders: map[string][]string{"bsl": {"iris"}}, placed: []string{"iris"}, choice: &none, file: "config/iris.properties", pack: ""},
 		{name: "none with no shader mod", shaders: map[string][]string{"bsl": nil}, placed: nil, choice: &none, warns: []string{unloadable("bsl")}},
 		{name: "vanilla shader is a resource pack", shaders: map[string][]string{"bsl": {"vanilla"}}, placed: nil},
+		{name: "fork marked as iris", shaders: map[string][]string{"bsl": {"iris"}}, placed: []string{"iris_fork"}, integrations: map[string][]string{"iris": {"iris", "iris_fork"}}, choice: &bsl, file: "config/iris.properties", pack: "bsl.zip"},
+		{name: "iris turned off", shaders: map[string][]string{"bsl": {"iris", "oculus"}}, placed: []string{"iris", "oculus"}, integrations: map[string][]string{"iris": {}}, choice: &bsl, file: "config/oculus.properties", pack: "bsl.zip"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			b := &Builder{Manifest: &manifest.Manifest{Client: &manifest.Client{Shader: c.choice}}, Lock: &lock.Lock{Shaders: map[string]lock.Pack{}}}
+			b := &Builder{Manifest: &manifest.Manifest{Client: &manifest.Client{Shader: c.choice}, Integrations: c.integrations}, Lock: &lock.Lock{Shaders: map[string]lock.Pack{}}}
 			desired := map[string]source{}
 			for key, loaders := range c.shaders {
 				b.Lock.Shaders[key] = lock.Pack{Filename: key + ".zip", Loaders: loaders}
@@ -47,11 +51,12 @@ func TestChooseShader(t *testing.T) {
 			for _, id := range c.placed {
 				placed[id] = true
 			}
+			present := integrations.Match(placed, b.Manifest.Integrations)
 			report := &Report{}
-			if err := b.chooseShader("client", Options{Dir: t.TempDir()}, desired, placed, report); err != nil {
+			if err := b.chooseShader("client", Options{Dir: t.TempDir()}, desired, present, report); err != nil {
 				t.Fatal(err)
 			}
-			b.reportUnloadableShaders(desired, placed, report)
+			b.reportUnloadableShaders(desired, present, report)
 			if !slices.Equal(report.Warnings, c.warns) {
 				t.Fatalf("warnings: %q, want %q", report.Warnings, c.warns)
 			}

@@ -48,9 +48,11 @@ type Manifest struct {
 	WholeFiles  []string           `json:"wholeFiles,omitempty"`
 	SkipFiles   []string           `json:"skipFiles,omitempty"`
 	Marker      *bool              `json:"marker,omitempty"`
-	Variables   Variables          `json:"variables,omitempty"`
-	Server      *Server            `json:"server,omitempty"`
-	Client      *Client            `json:"client,omitempty"`
+	// Integrations replaces the built-in jar ids of each integration it lists, by integration id.
+	Integrations map[string][]string `json:"integrations,omitempty"`
+	Variables    Variables           `json:"variables,omitempty"`
+	Server       *Server             `json:"server,omitempty"`
+	Client       *Client             `json:"client,omitempty"`
 }
 
 type Server struct {

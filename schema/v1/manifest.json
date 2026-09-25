@@ -100,6 +100,7 @@
       "type": "boolean",
       "description": "Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both, and exports also leave out the shulker.json and shulker.lock they carry at the archive root, and the shulker icon when the pack names no icon of its own. Default true. An instance that sets its own settings.marker decides for itself instead."
     },
+    "integrations": { "$ref": "#/$defs/integrations" },
     "variables": { "$ref": "#/$defs/variables" },
     "server": { "$ref": "#/$defs/server" },
     "client": { "$ref": "#/$defs/client" },
@@ -149,6 +150,17 @@
     "provider": {
       "type": "string",
       "enum": ["modrinth", "curseforge"]
+    },
+    "integration": {
+      "type": "string",
+      "enum": ["iris", "oculus", "canvas", "paxi", "openloader"],
+      "description": "A mod shulker acts on by role: iris, oculus and canvas load shader packs; paxi and openloader load datapacks into every world."
+    },
+    "integrations": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/integration" },
+      "additionalProperties": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+      "description": "The jar ids shulker recognises the mods it acts on by, keyed by integration: the shader mod whose config a build writes the chosen shader into, and the global datapack mod whose folder a build places datapacks in. A listed integration's jar ids replace its built-in ones, so a fork is marked by listing it beside the original, and an empty list turns the integration off. An unlisted integration keeps its built-in ids. It reaches every placed jar: a requires entry, a dependency, a modpack's mod or a local file."
     },
     "osCondition": {
       "type": "string",

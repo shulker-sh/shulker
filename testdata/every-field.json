@@ -47,6 +47,7 @@
   "wholeFiles": ["config/whole.properties"],
   "skipFiles": ["*.bak", "config/*.log"],
   "marker": true,
+  "integrations": { "iris": ["iris", "iris_fork"], "paxi": [] },
   "variables": { "motd": "Welcome", "port": 25565, "hardcore": false, "ratio": 1.50 },
   "server": {
     "name": "Every Field Server",

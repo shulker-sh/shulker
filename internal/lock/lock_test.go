@@ -194,16 +194,19 @@ func TestDatapackFolder(t *testing.T) {
 	cases := []struct {
 		name, minecraft, side string
 		mods                  map[string]Mod
+		overrides             map[string][]string
 		folder                string
 		loaded                bool
 	}{
-		{"paxi", "1.20.1", "client", map[string]Mod{"paxi": {Side: "both"}}, "config/paxi/datapacks", true},
-		{"paxi renamed", "26.2", "server", map[string]Mod{"globals": {ModID: "paxi", Side: "both"}}, "config/paxi/datapacks", true},
-		{"open loader before 1.21", "1.20.4", "client", map[string]Mod{"openloader": {Side: "both"}}, "config/openloader/data", true},
-		{"open loader from 1.21", "1.21.1", "client", map[string]Mod{"openloader": {Side: "both"}}, "config/openloader/packs", true},
-		{"loader on the other side", "26.2", "server", map[string]Mod{"paxi": {Side: "client"}}, "adventure/datapacks", true},
-		{"server world", "26.2", "server", nil, "adventure/datapacks", true},
-		{"client without a loader", "26.2", "client", nil, "datapacks", false},
+		{"paxi", "1.20.1", "client", map[string]Mod{"paxi": {Side: "both"}}, nil, "config/paxi/datapacks", true},
+		{"paxi renamed", "26.2", "server", map[string]Mod{"globals": {ModID: "paxi", Side: "both"}}, nil, "config/paxi/datapacks", true},
+		{"open loader before 1.21", "1.20.4", "client", map[string]Mod{"openloader": {Side: "both"}}, nil, "config/openloader/data", true},
+		{"open loader from 1.21", "1.21.1", "client", map[string]Mod{"openloader": {Side: "both"}}, nil, "config/openloader/packs", true},
+		{"loader on the other side", "26.2", "server", map[string]Mod{"paxi": {Side: "client"}}, nil, "adventure/datapacks", true},
+		{"server world", "26.2", "server", nil, nil, "adventure/datapacks", true},
+		{"client without a loader", "26.2", "client", nil, nil, "datapacks", false},
+		{"forked paxi", "26.2", "client", map[string]Mod{"paxi_fork": {Side: "both"}}, map[string][]string{"paxi": {"paxi", "paxi_fork"}}, "config/paxi/datapacks", true},
+		{"paxi turned off", "26.2", "client", map[string]Mod{"paxi": {Side: "both"}}, map[string][]string{"paxi": {}}, "datapacks", false},
 	}
 	for _, c := range cases {
 		l := New()
@@ -211,7 +214,7 @@ func TestDatapackFolder(t *testing.T) {
 		for id, m := range c.mods {
 			l.Mods[id] = m
 		}
-		folder, loaded := l.DatapackFolder(c.side, "adventure")
+		folder, loaded := l.DatapackFolder(c.side, "adventure", c.overrides)
 		if folder != c.folder || loaded != c.loaded {
 			t.Errorf("%s: got %s %v, want %s %v", c.name, folder, loaded, c.folder, c.loaded)
 		}

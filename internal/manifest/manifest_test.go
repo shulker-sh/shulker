@@ -450,3 +450,23 @@ func TestClientPackChoices(t *testing.T) {
 		t.Errorf("client.options.resourcePacks alone: %v", err)
 	}
 }
+
+func TestParseChecksIntegrations(t *testing.T) {
+	doc := func(integrations string) []byte {
+		return []byte(`{"name":"p","minecraft":"26.2","loader":{"type":"fabric","version":"*"},"requires":{},"client":{},"integrations":` + integrations + `}`)
+	}
+	m, err := Parse(doc(`{"iris":["iris","iris_fork"],"paxi":[]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Integrations["iris"]; !slices.Equal(got, []string{"iris", "iris_fork"}) {
+		t.Errorf("iris = %v", got)
+	}
+	_, err = Parse(doc(`{"optifine":["optifine"]}`))
+	if out.CodeOf(err) != "manifest-invalid" {
+		t.Fatalf("unknown integration: %v", err)
+	}
+	if want := "shulker.json: integrations.optifine: key must be one of 'iris', 'oculus', 'canvas', 'paxi', 'openloader'"; err.Error() != want {
+		t.Errorf("unknown integration error %q, want %q", err, want)
+	}
+}

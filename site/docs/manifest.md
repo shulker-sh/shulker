@@ -35,6 +35,7 @@ Required properties are marked with *.
 | `wholeFiles` | [`relativePath`](#relativepath)[] | Build-relative paths or globs (* and ? match within one path segment) of .properties overrides to copy whole. Other .properties overrides merge per key: only the keys they list are managed, and keys a mod adds are left alone.<br>unique items |
 | `skipFiles` | [`relativePath`](#relativepath)[] | Globs (* and ? match within one path segment) of override files to leave out of builds and exports. A glob with no slash matches a file name at any depth; one with a slash matches the build-relative path. .DS_Store, ._* files, Thumbs.db and desktop.ini are always left out.<br>unique items |
 | `marker` | `boolean` | Include the marker mod in a client build: the pack's own entry in the in-game mod list, which also lets an export of the build be recognised as this pack again. Off drops both, and exports also leave out the shulker.json and shulker.lock they carry at the archive root, and the shulker icon when the pack names no icon of its own. Default true. An instance that sets its own settings.marker decides for itself instead. |
+| `integrations` | [`integrations`](#integrations) |  |
 | `variables` | [`variables`](#variables) |  |
 | `server` | [`server`](#server) |  |
 | `client` | [`client`](#client) |  |
@@ -84,6 +85,18 @@ Type: `string`. pattern `^\S(.*\S)?$`, min length 1
 ### provider
 
 Type: `"modrinth"` \| `"curseforge"`
+
+### integration
+
+A mod shulker acts on by role: iris, oculus and canvas load shader packs; paxi and openloader load datapacks into every world.
+
+Type: `"iris"` \| `"oculus"` \| `"canvas"` \| `"paxi"` \| `"openloader"`
+
+### integrations
+
+The jar ids shulker recognises the mods it acts on by, keyed by integration: the shader mod whose config a build writes the chosen shader into, and the global datapack mod whose folder a build places datapacks in. A listed integration's jar ids replace its built-in ones, so a fork is marked by listing it beside the original, and an empty list turns the integration off. An unlisted integration keeps its built-in ids. It reaches every placed jar: a requires entry, a dependency, a modpack's mod or a local file.
+
+Type: map of `string`[]. keys are [`integration`](#integration)
 
 ### osCondition
 

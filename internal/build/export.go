@@ -229,7 +229,7 @@ func (b *Builder) exportCollect(t *exportSide, version, osName string, features 
 	}
 	t.datapacks = map[string]string{}
 	for key, p := range b.Lock.Datapacks {
-		if rel := b.Lock.PackPath(manifest.TypeDatapack, p, t.side, dirs[0]); desired[rel].isCached() {
+		if rel := b.Lock.PackPath(manifest.TypeDatapack, p, t.side, dirs[0], b.Manifest.Integrations); desired[rel].isCached() {
 			t.datapacks[key] = rel
 		}
 	}

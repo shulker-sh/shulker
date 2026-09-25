@@ -283,9 +283,9 @@ func datapackFolders() []string {
 
 // PackPath is where a side's build places a pack of kind: a datapack in DatapackFolder, the
 // other kinds by Pack.Path.
-func (l *Lock) PackPath(kind string, p Pack, side, levelName string) string {
+func (l *Lock) PackPath(kind string, p Pack, side, levelName string, overrides map[string][]string) string {
 	if kind == manifest.TypeDatapack {
-		folder, _ := l.DatapackFolder(side, levelName)
+		folder, _ := l.DatapackFolder(side, levelName, overrides)
 		return folder + "/" + p.Filename
 	}
 	return p.Path(kind)
@@ -294,14 +294,15 @@ func (l *Lock) PackPath(kind string, p Pack, side, levelName string) string {
 // DatapackFolder is where a datapack placed on side goes: the folder of a global datapack mod
 // placed there, else a server's world, whose datapacks vanilla loads. A client with neither gets
 // the game folder's datapacks/, which only some global datapack mods read, and loaded is false.
-func (l *Lock) DatapackFolder(side, levelName string) (folder string, loaded bool) {
+// overrides is the manifest's integrations.
+func (l *Lock) DatapackFolder(side, levelName string, overrides map[string][]string) (folder string, loaded bool) {
 	placed := map[string]bool{}
 	for key, m := range l.Mods {
 		if m.PlacedOn(side) {
 			placed[l.JarID(key)] = true
 		}
 	}
-	present := integrations.Match(placed, nil)
+	present := integrations.Match(placed, overrides)
 	for _, loader := range integrations.DatapackLoaders {
 		if present[loader.ID] {
 			return loader.Folder(l.Minecraft), true

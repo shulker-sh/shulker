@@ -530,7 +530,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if err := b.collectPacks(cond, desired, report); err != nil {
 			return nil, nil, err
 		}
-		present := integrations.Match(placed, nil)
+		present := integrations.Match(placed, b.Manifest.Integrations)
 		if err := b.chooseShader(side, opts, desired, present, report); err != nil {
 			return nil, nil, err
 		}
