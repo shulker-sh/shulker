@@ -119,7 +119,7 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 	}
 	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeModpack, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
-		return lock.Modpack{}, err
+		return lock.Modpack{}, channelSetting(err, name)
 	}
 	channel := r.relistedChannel(name, entry, v)
 	r.log("fetching modpack %s %s", proj.Slug, v.Number)

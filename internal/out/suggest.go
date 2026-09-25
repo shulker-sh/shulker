@@ -84,6 +84,8 @@ func exampleCommand(args []string, e *Error, value string) (string, bool) {
 		if !set {
 			words = append(words, e.Flag, value)
 		}
+	case e.Setting != "":
+		words = []string{"set", e.Setting, value}
 	default:
 		return "", false
 	}

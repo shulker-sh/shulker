@@ -217,7 +217,7 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 	}
 	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
-		return err
+		return channelSetting(err, id)
 	}
 	if _, _, err := r.place(ctx, p, proj, v, id, "", entry.Side, entry.Channel, false); err != nil {
 		return err

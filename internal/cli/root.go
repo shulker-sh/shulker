@@ -94,6 +94,9 @@ func (a *app) run(ctx context.Context, args []string) int {
 		if out.CodeOf(err) == "usage" && cmd != nil {
 			out.AsError(err).Usage = func(l *out.Lines) { helpUsage(l, cmd) }
 		}
+		if e := out.AsError(err); e.Flag != "" && cmd != nil && cmd.Flags().Lookup(strings.TrimPrefix(e.Flag, "--")) == nil {
+			e.Flag = ""
+		}
 		if ctx.Err() != nil {
 			err = &out.Error{Code: "interrupted", Message: "interrupted", Exit: out.ExitInterrupted, Data: out.AsError(err).Data}
 		}

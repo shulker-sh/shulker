@@ -218,7 +218,7 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 	}
 	v, err := pickVersion(ctx, p, proj, r.queryFor(kind, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
-		return err
+		return channelSetting(err, key)
 	}
 	return r.lockPackVersion(ctx, p, proj, v, key, kind, r.relistedChannel(key, entry, v))
 }

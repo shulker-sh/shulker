@@ -1991,7 +1991,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `mrpack-marker` | The modpack's own `shulker.json` or `shulker.lock` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-accounts` | shulker can see no account at all, so there is nothing to play with |
-| `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one |
+| `no-compatible-version` | The mod has no version for this Minecraft and loader. `candidates`: other release channels that have one. The example passes `--channel` to `add` and its type aliases, the commands that take it; anywhere else, such as `lock`, `pin` or `update`, it sets the entry's channel: `shulker set requires.<key>.channel beta` |
 | `no-instances` | Nothing is linked yet |
 | `no-problem` | The locked mods have no dependency problem for the pair; pass `--rule` and `--declared` from the failed command. `candidates`: the current problems, where there are any |
 | `no-side` | `shulker.json` declares no side of the kind the command needs. A local command (`build`, `diff`, `serve`) says to add the block; a command that can take a remote source (`sync`, `export *`) says to pass `--assume-client` |

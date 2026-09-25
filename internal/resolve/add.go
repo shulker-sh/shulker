@@ -315,6 +315,16 @@ func pickVersion(ctx context.Context, p provider.Provider, proj *provider.Projec
 	return &v, nil
 }
 
+// channelSetting names key's channel in shulker.json as what a no-compatible-version pick sets, in
+// place of --channel, which would widen the channel of the command's own argument instead.
+func channelSetting(err error, key string) error {
+	var e *out.Error
+	if errors.As(err, &e) && e.Code == "no-compatible-version" {
+		e.Setting, e.Flag = "requires."+key+".channel", ""
+	}
+	return err
+}
+
 // newerThan is the newest version q finds on channel, and whether it is not the locked one.
 func newerThan(ctx context.Context, p provider.Provider, projectID string, q versionQuery, channel string, locked string) (*provider.Version, bool, error) {
 	versions, err := p.Versions(ctx, projectID, q.game, q.tags)

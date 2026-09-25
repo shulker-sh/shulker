@@ -54,6 +54,9 @@ type Error struct {
 	Given string `json:"-"`
 	// Flag receives the pick in the example command when no typed argument is replaced.
 	Flag string `json:"-"`
+	// Setting is the shulker.json key the pick is the value of, for a command without Flag: the
+	// example is then `shulker set <Setting> <pick>`.
+	Setting string `json:"-"`
 	// Pass is what to type for each candidate, when that differs from how it reads.
 	Pass []string `json:"-"`
 	// Rows are the human-only tree rows under the error line. Without them the

@@ -92,6 +92,7 @@ type harness struct {
 	cache          string
 	config         string
 	newer          bool
+	sodiumBeta     bool
 	newerAPI       bool
 	serverJar      fakeJar
 	quiltLoader    fakeJar
@@ -309,6 +310,9 @@ func newHarness(t *testing.T) *harness {
 		switch projectID {
 		case "AANobbMI":
 			list := []map[string]any{versionOf("QANobbMI", "AANobbMI", "1.0.0+mc26.2", "2026-09-01T00:00:00Z", h.jars["sodium"], needsFabricAPI)}
+			if h.sodiumBeta {
+				list[0]["version_type"] = "beta"
+			}
 			if h.newer {
 				list = append(list, versionOf("QANobbM2", "AANobbMI", "1.1.0+mc26.2", "2026-09-05T00:00:00Z", h.jars["sodium-next"], needsFabricAPI))
 			}
@@ -814,6 +818,16 @@ func (h *harness) mustRunStderr(t *testing.T, args ...string) (string, string) {
 	return stdout, stderr
 }
 
+// runStderr runs a command expected to fail and returns its code and stderr.
+func (h *harness) runStderr(t *testing.T, args ...string) (int, string) {
+	t.Helper()
+	code, _, stderr := h.run(t, args...)
+	if code == 0 {
+		t.Fatalf("%v succeeded", args)
+	}
+	return code, stderr
+}
+
 func (h *harness) mustRun(t *testing.T, args ...string) string {
 	t.Helper()
 	code, stdout, stderr := h.run(t, args...)
@@ -1100,6 +1114,25 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 		code, stdout, _ := h.run(t, append(args, "--json")...)
 		if code != 1 || !strings.Contains(stdout, `"version-not-found"`) || !strings.Contains(stdout, "modrinth.com/mod/sodium/versions") {
 			t.Fatalf("%v with an unknown version id: %d %s", args, code, stdout)
+		}
+	}
+}
+
+func TestNoCompatibleVersionExampleFitsTheCommand(t *testing.T) {
+	h := newHarness(t)
+	h.sodiumBeta = true
+	h.mustRun(t, "create", "--loader", "fabric")
+	if _, stderr := h.runStderr(t, "add", "sodium"); !strings.Contains(stderr, "$ shulker add sodium --channel beta") {
+		t.Fatalf("add example:\n%s", stderr)
+	}
+	h.mustRun(t, "add", "sodium", "--channel", "beta")
+	h.editManifest(t, func(m map[string]any) {
+		m["requires"].(map[string]any)["sodium"] = map[string]any{"side": "client"}
+	})
+	for _, args := range [][]string{{"lock"}, {"pin", "sodium"}, {"update", "sodium"}, {"add", "irisshaders"}} {
+		_, stderr := h.runStderr(t, args...)
+		if !strings.Contains(stderr, "no-compatible-version") || !strings.Contains(stderr, "$ shulker set requires.sodium.channel beta") || strings.Contains(stderr, "--channel") {
+			t.Fatalf("%v example:\n%s", args, stderr)
 		}
 	}
 }
