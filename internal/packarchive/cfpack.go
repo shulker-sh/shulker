@@ -39,13 +39,13 @@ type cfManifest struct {
 	Files           []cfFile    `json:"files"`
 	Overrides       string      `json:"overrides"`
 	Image           string      `json:"image,omitempty"`
-	// RecommendedRAM is the heap in MB the CurseForge app offers for the pack.
-	RecommendedRAM int `json:"recommendedRam,omitempty"`
 }
 
 type cfMinecraft struct {
 	Version    string        `json:"version"`
 	ModLoaders []cfModLoader `json:"modLoaders"`
+	// RecommendedRAM is the heap in MB the CurseForge app offers for the pack.
+	RecommendedRAM int `json:"recommendedRam,omitempty"`
 }
 
 type cfModLoader struct {
@@ -178,7 +178,7 @@ func (cfpack) decode(file string, z *zipEntries) (*Archive, error) {
 	if m.Minecraft.Version == "" {
 		return nil, out.Errorf("curseforge-invalid", "%s names no minecraft version", file)
 	}
-	a := &Archive{Name: m.Name, Version: m.Version, Minecraft: m.Minecraft.Version, Memory: cfHeap(m.RecommendedRAM), Files: []File{}}
+	a := &Archive{Name: m.Name, Version: m.Version, Minecraft: m.Minecraft.Version, Memory: cfHeap(m.Minecraft.RecommendedRAM), Files: []File{}}
 	if m.Author != "" {
 		a.Authors = []string{m.Author}
 	}

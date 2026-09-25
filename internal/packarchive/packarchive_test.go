@@ -51,15 +51,14 @@ func markerJar(t *testing.T, manifestJSON, lockJSON string) string {
 }
 
 const cfManifestFixture = `{
-  "minecraft": {"version": "1.20.1", "modLoaders": [{"id": "forge-47.2.0", "primary": false}, {"id": "neoforge-1.20.1-47.1.84", "primary": true}]},
+  "minecraft": {"version": "1.20.1", "modLoaders": [{"id": "forge-47.2.0", "primary": false}, {"id": "neoforge-1.20.1-47.1.84", "primary": true}], "recommendedRam": 8196},
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "All the Things",
   "version": "1.2",
   "author": "someone",
   "files": [{"projectID": 238222, "fileID": 5000001, "required": true}, {"projectID": 306612, "fileID": 5000010, "required": false}],
-  "overrides": "extras",
-  "recommendedRam": 8196
+  "overrides": "extras"
 }`
 
 const mrpackIndexFixture = `{
