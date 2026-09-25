@@ -8,7 +8,11 @@
   "anyOf": [{ "required": ["client"] }, { "required": ["server"] }],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string", "format": "uri" },
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "Always https://shulker.sh/schema/v1/manifest.json. A manifest with no $schema loads as this version and gains the line the next time shulker saves it; one naming a schema shulker doesn't know is refused."
+    },
     "name": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9._-]*$",

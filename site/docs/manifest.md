@@ -17,7 +17,7 @@ Required properties are marked with *.
 
 | Property | Type | Description |
 | --- | --- | --- |
-| `$schema` | `string` | format `uri` |
+| `$schema` | `string` | Always https://shulker.sh/schema/v1/manifest.json. A manifest with no $schema loads as this version and gains the line the next time shulker saves it; one naming a schema shulker doesn't know is refused.<br>format `uri` |
 | `name` * | `string` | Project name. Used in messages and as the default instance name for launchers.<br>pattern `^[a-z0-9][a-z0-9._-]*$` |
 | `version` | `string` | Pack version shown to people, e.g. "1.0" or "2026-09". Never parsed. Used as the versionId of an exported .mrpack and in its file name.<br>min length 1 |
 | `description` | `string` | One paragraph about the pack, shown to players. First paragraph of the ModMenu entry and, joined with note, the summary of an exported .mrpack.<br>min length 1 |
