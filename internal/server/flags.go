@@ -94,5 +94,3 @@ func memoryMB(memory string) (int, error) {
 func Command(jvmArgs, launch []string) []string {
 	return append(append(append([]string{}, jvmArgs...), launch...), "--nogui")
 }
-
-func (j Java) String() string { return fmt.Sprintf("Java %d (%s)", j.Major, j.Path) }

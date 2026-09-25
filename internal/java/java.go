@@ -1,4 +1,7 @@
-package server
+// Package java finds the Java shulker launches the game and its servers with: a runtime from
+// Mojang's manifest for the version's component, kept under the cache, or a Java already on the
+// machine, checked against the major version the lock needs.
+package java
 
 import (
 	"bytes"
@@ -16,15 +19,15 @@ import (
 )
 
 // Java is a java executable and the major version it reports.
-type Java struct {
+type Binary struct {
 	Path  string `json:"path"`
 	Major int    `json:"major"`
 }
 
 var versionLine = regexp.MustCompile(`version "([^"]+)"`)
 
-// JavaBin is the java executable under a runtime home.
-func JavaBin(home string) string {
+// Bin is the java executable under a runtime home.
+func Bin(home string) string {
 	bin := filepath.Join(home, "bin", "java")
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
@@ -32,56 +35,56 @@ func JavaBin(home string) string {
 	return bin
 }
 
-// JavaAt is the java under a Java home.
-func JavaAt(home string) (Java, error) {
-	bin := JavaBin(home)
+// At is the java under a Java home.
+func At(home string) (Binary, error) {
+	bin := Bin(home)
 	if _, err := exec.LookPath(bin); err != nil {
-		return Java{}, out.Errorf("java-not-found", "no java executable under %s (looked for %s)", home, bin)
+		return Binary{}, out.Errorf("java-not-found", "no java executable under %s (looked for %s)", home, bin)
 	}
 	major, err := javaMajor(bin)
 	if err != nil {
-		return Java{}, err
+		return Binary{}, err
 	}
-	return Java{Path: bin, Major: major}, nil
+	return Binary{Path: bin, Major: major}, nil
 }
 
-// ClientJava is the java a `java` setting names: the binary at path, or the one under it when path
+// Client is the java a `java` setting names: the binary at path, or the one under it when path
 // is a Java home. It is refused when it is older than the Minecraft version needs.
-func ClientJava(path string, required int) (Java, error) {
+func Client(path string, required int) (Binary, error) {
 	bin := path
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
-		bin = JavaBin(path)
+		bin = Bin(path)
 	}
 	if _, err := exec.LookPath(bin); err != nil {
 		e := out.Errorf("java-not-found", "no java executable at %s", path)
 		e.Help = "the java setting takes the path of a java binary or a Java home"
-		return Java{}, e
+		return Binary{}, e
 	}
 	major, err := javaMajor(bin)
 	if err != nil {
-		return Java{}, err
+		return Binary{}, err
 	}
-	j := Java{Path: bin, Major: major}
+	j := Binary{Path: bin, Major: major}
 	return j, requireMajor(j, required)
 }
 
-// FindJava picks a server's java. An absolute override is a java binary or a Java home; any other
+// Find picks a server's java. An absolute override is a java binary or a Java home; any other
 // override is a version range the java on PATH must fall in, and without one it must reach required.
-func FindJava(override string, required int) (Java, error) {
+func Find(override string, required int) (Binary, error) {
 	if filepath.IsAbs(override) {
-		return ClientJava(override, required)
+		return Client(override, required)
 	}
 	path, err := exec.LookPath("java")
 	if err != nil {
 		e := out.Errorf("java-not-found", "no java on PATH")
 		e.Help = "install a JDK or set \"java\" in shulker.json to a JDK path"
-		return Java{}, e
+		return Binary{}, e
 	}
 	major, err := javaMajor(path)
 	if err != nil {
-		return Java{}, err
+		return Binary{}, err
 	}
-	j := Java{Path: path, Major: major}
+	j := Binary{Path: path, Major: major}
 	if override != "" {
 		r, err := minecraft.ParseRange(override)
 		if err != nil {
@@ -95,7 +98,7 @@ func FindJava(override string, required int) (Java, error) {
 	return j, requireMajor(j, required)
 }
 
-func requireMajor(j Java, required int) error {
+func requireMajor(j Binary, required int) error {
 	if j.Major < required {
 		e := out.Errorf("java-version", "java at %s is version %d; this Minecraft version needs Java %d or newer", j.Path, j.Major, required)
 		e.Help = "set \"java\" in shulker.json to a JDK path or put a newer java on PATH"
@@ -129,3 +132,5 @@ func parseMajor(output []byte) (int, error) {
 	}
 	return major, nil
 }
+
+func (j Binary) String() string { return fmt.Sprintf("Java %d (%s)", j.Major, j.Path) }

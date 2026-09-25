@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/game"
+	"shulker.sh/shulker/internal/java"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
@@ -24,7 +25,6 @@ import (
 	"shulker.sh/shulker/internal/provider/curseforge"
 	"shulker.sh/shulker/internal/provider/modrinth"
 	"shulker.sh/shulker/internal/resolve"
-	"shulker.sh/shulker/internal/server"
 	"shulker.sh/shulker/schema"
 )
 
@@ -235,13 +235,13 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 
 // managedJava ensures the lock's runtime component. fix is the Fix row a runtime-unavailable error
 // carries, which depends on which side needs the Java.
-func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool, fix out.Detail) (server.Runtime, error) {
+func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool, fix out.Detail) (java.Runtime, error) {
 	d, err := a.deps()
 	if err != nil {
-		return server.Runtime{}, err
+		return java.Runtime{}, err
 	}
-	opts := server.RuntimeOptions{Refresh: refresh, Log: a.progress}
-	rt, err := server.EnsureRuntime(ctx, d.fetch, d.runtimes, d.cache.Dir, p.Lock.Java.Component, opts)
+	opts := java.RuntimeOptions{Refresh: refresh, Log: a.progress}
+	rt, err := java.EnsureRuntime(ctx, d.fetch, d.runtimes, d.cache.Dir, p.Lock.Java.Component, opts)
 	switch out.CodeOf(err) {
 	case "runtime-unavailable":
 		out.AsError(err).Rows = []out.Detail{fix}

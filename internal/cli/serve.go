@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/java"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
@@ -25,26 +26,26 @@ const eulaURL = "https://aka.ms/MinecraftEULA"
 type serveResult struct {
 	Side        string      `json:"side"`
 	Dir         string      `json:"dir"`
-	Java        server.Java `json:"java"`
+	Java        java.Binary `json:"java"`
 	Args        []string    `json:"args"`
 	ExitCode    int         `json:"exitCode"`
 	Log         string      `json:"log,omitempty"`
 	CrashReport string      `json:"crashReport,omitempty"`
 }
 
-func (a *app) projectJava(ctx context.Context, p *project.Project) (server.Java, error) {
+func (a *app) projectJava(ctx context.Context, p *project.Project) (java.Binary, error) {
 	if p.Manifest.Java != "" {
-		return server.FindJava(p.Manifest.Java, p.Lock.Java.Major)
+		return java.Find(p.Manifest.Java, p.Lock.Java.Major)
 	}
 	rt, err := a.managedJava(ctx, p, false, serverJavaFix)
 	if err != nil {
 		if out.CodeOf(err) != "runtime-unavailable" {
-			return server.Java{}, err
+			return java.Binary{}, err
 		}
 		a.printer.Warn("%s; using java on PATH", runtimeWarning(err))
-		return server.FindJava("", p.Lock.Java.Major)
+		return java.Find("", p.Lock.Java.Major)
 	}
-	return server.JavaAt(rt.Home)
+	return java.At(rt.Home)
 }
 
 func (a *app) serveCmd() *cobra.Command {
