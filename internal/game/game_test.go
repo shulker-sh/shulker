@@ -3,6 +3,7 @@ package game
 import (
 	"archive/zip"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -94,6 +95,25 @@ func TestMergeLetsMinecraftArgumentsReplaceTheParentsGameArguments(t *testing.T)
 	_, game := Args(Merge(vanilla, forge), linux64, nil, map[string]string{"auth_player_name": "Notch", "version_name": "1.12.2-forge"})
 
 	if !slices.Equal(game, []string{"--username", "Notch", "--version", "1.12.2-forge", "--tweakClass", "FML"}) {
+		t.Fatalf("game %q", game)
+	}
+}
+
+func TestLoaderIgnoreListNamesTheClientJarOnTheClasspath(t *testing.T) {
+	vanilla := parse(t, `{"id": "1.21.1", "downloads": {"client": {"url": "https://example.test/client.jar"}}, "arguments": {"game": ["--version", "${version_name}"]}}`)
+	neoforge := parse(t, `{"id": "neoforge-21.1.251", "inheritsFrom": "1.21.1", "arguments": {"jvm": ["-DignoreList=client-extra,${version_name}.jar"]}}`)
+	merged := Merge(vanilla, neoforge)
+	client, err := ClientJar(merged)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	jvm, game := Args(merged, linux64, nil, map[string]string{"version_name": merged.ID})
+
+	if want := "-DignoreList=client-extra," + path.Base(client.Path); !slices.Contains(jvm, want) {
+		t.Fatalf("jvm %q, want %q", jvm, want)
+	}
+	if !slices.Equal(game, []string{"--version", "neoforge-21.1.251"}) {
 		t.Fatalf("game %q", game)
 	}
 }

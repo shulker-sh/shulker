@@ -1,6 +1,7 @@
 package game
 
 import (
+	"maps"
 	"os"
 	"strings"
 )
@@ -48,7 +49,19 @@ func Args(v Version, p Platform, features map[string]bool, vars map[string]strin
 	if len(jvmArgs) == 0 {
 		jvmArgs = legacyJVM
 	}
-	return expand(jvmArgs, p, features, vars), expand(args.Game, p, features, vars)
+	return expand(jvmArgs, p, features, jvmVars(v, vars)), expand(args.Game, p, features, vars)
+}
+
+// jvmVars names the client jar in the JVM arguments' version_name. Forge and NeoForge keep the
+// vanilla jar out of the module layer with -DignoreList=…,${version_name}.jar, which assumes the
+// jar is filed under the loader's own id; shulker files it once under the vanilla id instead.
+func jvmVars(v Version, vars map[string]string) map[string]string {
+	if name, ok := vars["version_name"]; !ok || v.ClientID == "" || name == v.ClientID {
+		return vars
+	}
+	jvm := maps.Clone(vars)
+	jvm["version_name"] = v.ClientID
+	return jvm
 }
 
 func expand(args []Argument, p Platform, features map[string]bool, vars map[string]string) []string {
