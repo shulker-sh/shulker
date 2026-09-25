@@ -77,7 +77,7 @@ func (a *app) deps() (*deps, error) {
 	case err != nil:
 		return nil, err
 	}
-	f := fetch.New(version)
+	f := fetch.New(a.build().Version)
 	f.Waiting = a.printer.Waiting
 	mr := modrinth.New(f)
 	mr.Log = a.progress

@@ -77,7 +77,7 @@ func (a *app) logCmd() *cobra.Command {
 			}
 			keepDays := configuredKeepDays()
 			r := logReport{
-				Version:  version,
+				Version:  a.build().Version,
 				Platform: runtime.GOOS + "/" + runtime.GOARCH,
 				Since:    f.since,
 				From:     from.UTC().Format(time.RFC3339),

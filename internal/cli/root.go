@@ -23,8 +23,6 @@ import (
 	"shulker.sh/shulker/internal/server"
 )
 
-var version = devVersion
-
 const agentHelp = `Scripts and agents: pass --json. Every command then prints one JSON object on
 stdout, errors included. Act on error.code rather than the message, and run
 "shulker lock" when lockStale is true.`
@@ -40,6 +38,7 @@ type app struct {
 	d          *deps
 	configPath string
 	releases   *selfupdate.Releases
+	build      func() selfupdate.Build
 	exe        func() (string, error)
 	installer  func(ctx context.Context, java, jar string, args []string) error
 	watcher    func(req watchRequest) (int, error)
@@ -68,7 +67,7 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 }
 
 func newApp(stdout, stderr io.Writer) *app {
-	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal, exe: selfupdate.Executable, installer: server.RunInstaller}
+	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal, build: describeBuild, exe: selfupdate.Executable, installer: server.RunInstaller}
 }
 
 func (a *app) run(ctx context.Context, args []string) int {

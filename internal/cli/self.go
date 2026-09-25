@@ -178,7 +178,7 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 func (a *app) selfUpdate(ctx context.Context, check, without, require bool) error {
 	r := a.releases
 	if r == nil {
-		f := fetch.New(version)
+		f := fetch.New(a.build().Version)
 		f.Waiting = a.printer.Waiting
 		r = selfupdate.New(f)
 	}

@@ -13,15 +13,19 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/selfupdate"
 )
 
-const devVersion = "dev"
+// version and date are set by the release build's ldflags; a source or `go install` build leaves
+// them empty and is described from its build info instead.
+var version, date string
 
 type versionInfo struct {
 	Version  string `json:"version"`
 	Commit   string `json:"commit,omitempty"`
 	Modified bool   `json:"modified,omitempty"`
 	Built    string `json:"built,omitempty"`
+	Install  string `json:"install,omitempty"`
 	Go       string `json:"go"`
 	OS       string `json:"os"`
 	Arch     string `json:"arch"`
@@ -54,12 +58,8 @@ func (a *app) versionCmd() *cobra.Command {
 		Short:       "Print the shulker version",
 		Args:        noArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			info := versionInfo{Version: version, Go: runtime.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH}
-			commit, modified, built := buildVCS()
-			info.Built = built
-			if version == devVersion {
-				info.Commit, info.Modified = commit, modified
-			}
+			b := a.build()
+			info := versionInfo{Version: b.Version, Commit: b.Commit, Modified: b.Modified, Built: b.Built, Install: string(b.Route), Go: runtime.Version(), OS: runtime.GOOS, Arch: runtime.GOARCH}
 			if exe, err := os.Executable(); err == nil {
 				if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 					exe = resolved
@@ -117,22 +117,7 @@ func homeTilde(path string) string {
 	return "~" + path[len(home):]
 }
 
-// buildVCS reads what the Go toolchain stamps into a binary built inside a worktree. A build from
-// an unpacked source tree, a module cache, or -buildvcs=false carries none of it.
-func buildVCS() (commit string, modified bool, built string) {
-	info, ok := debug.ReadBuildInfo()
-	if !ok {
-		return "", false, ""
-	}
-	for _, s := range info.Settings {
-		switch s.Key {
-		case "vcs.revision":
-			commit = s.Value
-		case "vcs.modified":
-			modified = s.Value == "true"
-		case "vcs.time":
-			built = s.Value
-		}
-	}
-	return commit, modified, built
+func describeBuild() selfupdate.Build {
+	info, _ := debug.ReadBuildInfo()
+	return selfupdate.Describe(version, date, info)
 }

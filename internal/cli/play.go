@@ -173,7 +173,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
-	vars := plan.launch.Assembly.Vars(plan.store, "shulker", version, in.Dir, plan.natives)
+	vars := plan.launch.Assembly.Vars(plan.store, "shulker", a.build().Version, in.Dir, plan.natives)
 	for name, value := range game.SessionOf(signed).Vars() {
 		vars[name] = value
 	}
