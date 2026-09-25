@@ -116,7 +116,7 @@ func (s *State) record(rel string, f ownedFile) {
 	if s.Values == nil {
 		s.Values = map[string]map[string]string{}
 	}
-	s.Values[rel] = f.values()
+	s.Values[rel] = maps.Clone(f.values())
 }
 
 // Report is what a build did, file by file.
@@ -304,14 +304,17 @@ type ownedFile interface {
 }
 
 type keyMerge struct {
-	kept       map[string]bool
-	dropped    map[string]bool
-	overrode   []string
+	kept     map[string]bool
+	dropped  map[string]bool
+	overrode []string
+	// seeded are the keys of a seeded file changed in the pack and in game, kept as the player has
+	// them and still recorded at their last written value.
+	seeded     []string
 	hasChanged bool
 	isForced   bool
 }
 
-func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recordedKeys []string, force bool) keyMerge {
+func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recordedKeys []string, force, seeded bool) keyMerge {
 	m := keyMerge{kept: map[string]bool{}, dropped: map[string]bool{}}
 	desired := f.values()
 	current := f.existingValues(existing)
@@ -330,6 +333,9 @@ func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recorde
 			m.isForced = true
 		case want == last:
 			m.kept[k] = true
+		case seeded:
+			m.kept[k] = true
+			m.seeded = append(m.seeded, k)
 		default:
 			m.overrode = append(m.overrode, k)
 			m.hasChanged = true
@@ -339,7 +345,12 @@ func mergeKeys(f ownedFile, existing []byte, recorded map[string]string, recorde
 		if _, still := desired[k]; still {
 			continue
 		}
-		if _, present := current[k]; present {
+		have, present := current[k]
+		switch {
+		case !present:
+		case seeded && !force && have != recorded[k]:
+			m.kept[k] = true
+		default:
 			m.dropped[k] = true
 			m.hasChanged = true
 		}
@@ -438,11 +449,17 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		next.Files[f.rel] = f.hash
 		if f.src.owned() != nil {
 			next.record(f.rel, f.src.owned())
+			for _, k := range f.merge.seeded {
+				next.Values[f.rel][k] = prev.Values[f.rel][k]
+			}
 			for _, k := range sortedKeys(f.merge.kept) {
 				report.Kept = append(report.Kept, f.rel+" "+k+" (edited in place)")
 			}
 			for _, k := range f.merge.overrode {
 				report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was edited in place and changed in the manifest; the manifest value was written", f.rel, k))
+			}
+			if len(f.merge.seeded) > 0 {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s changed in the pack and in game at %s; kept yours. Delete it to take the pack's, or `shulker build --force` for every file.", f.rel, strings.Join(f.merge.seeded, ", ")))
 			}
 		}
 	}
@@ -771,7 +788,7 @@ func (b *Builder) collectServer(desired map[string]source, vars map[string]strin
 	if err := b.checkProperties(props, report); err != nil {
 		return "", err
 	}
-	desired[PropertiesFile] = ownedSource(propsFile{props: props, sep: "="})
+	desired[PropertiesFile] = source{content: ownedContent{propsFile{props: props, sep: "="}}, seeded: b.Manifest.Seeds(PropertiesFile)}
 	if err := b.collectPlayers(srv.Players, desired); err != nil {
 		return "", err
 	}
@@ -851,7 +868,7 @@ func (b *Builder) collectClient(side string, opts Options, desired map[string]so
 	if len(options) == 0 {
 		return nil
 	}
-	desired[file] = ownedSource(propsFile{props: options, sep: ":"})
+	desired[file] = source{content: ownedContent{propsFile{props: options, sep: ":"}}, seeded: b.Manifest.Seeds(file)}
 	return nil
 }
 
@@ -908,7 +925,7 @@ func (b *Builder) plan(dir string, desired map[string]source, prev State, force 
 			if err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return nil, err
 			}
-			f.merge = mergeKeys(src.owned(), existing, prev.Values[rel], prev.recordedKeys(rel), force)
+			f.merge = mergeKeys(src.owned(), existing, prev.Values[rel], prev.recordedKeys(rel), force, src.seeded)
 			f.isForced = f.merge.isForced
 			switch {
 			case f.merge.hasChanged:

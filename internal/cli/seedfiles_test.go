@@ -92,3 +92,79 @@ func TestSkipFilesWinsOverSeedFiles(t *testing.T) {
 		t.Fatalf("a skipped file is left out even when seeded: %v", err)
 	}
 }
+
+func TestASeededOptionsFileSeedsKeyByKey(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	setOptions := func(options map[string]any) {
+		h.editManifest(t, func(m map[string]any) {
+			m["seedFiles"] = []string{"options.txt"}
+			m["client"] = map[string]any{"options": options}
+		})
+	}
+	setOptions(map[string]any{"fov": 70, "gamma": 0.5, "lang": "en_us"})
+	h.mustRun(t, "build")
+	options := filepath.Join(h.dir, "build", "client", "options.txt")
+	writeFile(t, options, strings.NewReplacer("fov:70", "fov:90", "lang:en_us", "lang:de_de").Replace(readFile(t, options))+"modKey:1\n")
+
+	setOptions(map[string]any{"fov": 80, "gamma": 0.7})
+	for range 2 {
+		_, stderr := h.mustRunStderr(t, "build")
+		if !strings.Contains(stderr, "options.txt changed in the pack and in game at fov; kept yours.") {
+			t.Fatalf("a key changed in both is kept with a note on every build: %s", stderr)
+		}
+		got := readFile(t, options)
+		for _, want := range []string{"fov:90", "gamma:0.7", "lang:de_de", "modKey:1"} {
+			if !strings.Contains(got, want+"\n") {
+				t.Fatalf("options.txt lacks %s: %q", want, got)
+			}
+		}
+	}
+
+	setOptions(map[string]any{"fov": 80})
+	h.mustRun(t, "build")
+	if got := readFile(t, options); strings.Contains(got, "gamma:") || !strings.Contains(got, "lang:de_de\n") {
+		t.Fatalf("a dropped key goes only when the player left it: %q", got)
+	}
+
+	h.mustRun(t, "build", "--force")
+	if got := readFile(t, options); !strings.Contains(got, "fov:80\n") {
+		t.Fatalf("--force writes the pack's value: %q", got)
+	}
+}
+
+func TestASeededPropertiesOverrideSeedsKeyByKey(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	h.editManifest(t, func(m map[string]any) { m["seedFiles"] = []string{"seeded.properties"} })
+	seeded := filepath.Join(h.dir, "overrides", "config", "seeded.properties")
+	plain := filepath.Join(h.dir, "overrides", "config", "plain.properties")
+	writeFile(t, seeded, "a=1\nb=1\n")
+	writeFile(t, plain, "a=1\n")
+	h.mustRun(t, "build")
+	built := filepath.Join(h.dir, "build", "client", "config", "seeded.properties")
+	builtPlain := filepath.Join(h.dir, "build", "client", "config", "plain.properties")
+	writeFile(t, built, "a=mine\nb=1\n")
+	writeFile(t, builtPlain, "a=mine\n")
+
+	writeFile(t, seeded, "a=2\nb=2\n")
+	writeFile(t, plain, "a=2\n")
+	_, stderr := h.mustRunStderr(t, "build")
+	if !strings.Contains(stderr, "config/seeded.properties changed in the pack and in game at a; kept yours.") {
+		t.Fatalf("a seeded key changed in both is kept with a note: %s", stderr)
+	}
+	if got := readFile(t, built); got != "a=mine\nb=2\n" {
+		t.Fatalf("the player's key stays and an untouched one follows the pack: %q", got)
+	}
+	if !strings.Contains(stderr, "config/plain.properties: a was edited in place and changed in the manifest; the manifest value was written") {
+		t.Fatalf("an unseeded key changed in both still takes the pack's: %s", stderr)
+	}
+	if got := readFile(t, builtPlain); got != "a=2\n" {
+		t.Fatalf("unseeded file: %q", got)
+	}
+
+	h.mustRun(t, "build", "--force")
+	if got := readFile(t, built); got != "a=2\nb=2\n" {
+		t.Fatalf("--force writes the pack's values: %q", got)
+	}
+}

@@ -693,7 +693,7 @@ Assemble a side's build directory from the lock and its overrides. With no side,
 
 A file you edited in the build directory is kept until the source changes it too. Then it is a conflict, and so is a file in the way that shulker never wrote: the build fails `build-conflict` before writing anything, listing each one. `shulker diff` shows them, `--force` takes the source's version, and `shulker pull` copies yours into the project instead. `build`, `sync` and `install` all stop this way; only a sync for a launch, from [`play`](#shulker-play) or a launcher's [pre-launch hook](#shulker-hook-pre-launch), keeps your file and applies the rest.
 
-A file the manifest's `seedFiles` lists is never a conflict. When both changed it, every build keeps yours and warns `<path> changed in the pack and in game; kept yours`, naming the two ways to take the pack's: delete the file, or `--force`, which resets every seeded file along with the rest.
+A file the manifest's `seedFiles` lists is never a conflict. When both changed it, every build keeps yours and warns `<path> changed in the pack and in game; kept yours`, naming the two ways to take the pack's: delete the file, or `--force`, which resets every seeded file along with the rest. A file merged per key, such as `options.txt` from `client.options` or a `.properties` override, is seeded key by key: the warning names the keys you changed, and the rest follow the pack.
 
 ```sh
 shulker build
