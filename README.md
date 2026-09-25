@@ -27,7 +27,7 @@ curl -fsSL https://shulker.sh/install.sh | sh
 irm https://shulker.sh/install.ps1 | iex
 ```
 
-Both verify the release's checksum, and its build provenance when the [GitHub CLI](https://cli.github.com/) is installed, then install `shulker` to a directory of your own and add it to your PATH. Once installed, running `shulker self update` will update it to the latest Shulker release on GitHub. The archives, `checksums.txt` and the attestation bundle are on the [releases page](https://github.com/shulker-sh/shulker/releases) for anyone who would rather not pipe curl into a shell.
+Both verify the release's checksum, and when the [GitHub CLI](https://cli.github.com/) is installed they also check its build provenance, then install `shulker` to a directory of your own and add it to your PATH. Once installed, running `shulker self update` will update it to the latest Shulker release on GitHub. The archives, `checksums.txt` and the attestation bundle are on the [releases page](https://github.com/shulker-sh/shulker/releases) for anyone who would rather not pipe curl into a shell.
 
 ## Building from Source
 
