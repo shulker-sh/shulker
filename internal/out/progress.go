@@ -8,7 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -37,6 +39,8 @@ type Progress struct {
 	longest int
 	drawn   []int
 	wheel   spinner.Model
+	bar     progress.Model
+	pending tea.Cmd
 	start   time.Time
 	stop    chan struct{}
 	stopped chan struct{}
@@ -65,7 +69,7 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 }
 
 func newProgress(l *Lines, verb string, files []Download) *Progress {
-	pr := &Progress{l: l, verb: verb, total: len(files), sizes: map[string]int64{}, start: time.Now(), wheel: newSpinner(l.T)}
+	pr := &Progress{l: l, verb: verb, total: len(files), sizes: map[string]int64{}, start: time.Now(), wheel: newSpinner(l.T), bar: newBar(l.T)}
 	known := true
 	for _, f := range files {
 		pr.longest = max(pr.longest, Width(f.Name))
@@ -154,6 +158,16 @@ func (pr *Progress) halt() {
 	pr.mu.Unlock()
 }
 
+func newBar(t Theme) progress.Model {
+	bar := progress.New(progress.WithSolidFill("6"), progress.WithWidth(barWidth), progress.WithFillCharacters('━', '─'), progress.WithSpringOptions(8, 1), progress.WithColorProfile(t.Profile()))
+	bar.EmptyColor = strconv.Itoa(t.GreyIndex)
+	bar.PercentageStyle = t.Style().Foreground(t.lipglossGrey())
+	if t.ASCII {
+		bar.Full, bar.Empty = '#', '-'
+	}
+	return bar
+}
+
 func (pr *Progress) spin() {
 	defer close(pr.stopped)
 	tick := time.NewTicker(frameEvery)
@@ -166,9 +180,43 @@ func (pr *Progress) spin() {
 			pr.mu.Lock()
 			pr.wheel, _ = pr.wheel.Update(spinner.TickMsg{})
 			pr.mu.Unlock()
+			pr.ease()
 			pr.redraw()
 		}
 	}
+}
+
+// ease pumps the bar's spring for one frame of the 80 ms clock. The model animates on its own
+// 60 fps clock, and each frame command sleeps one tick of that clock before it returns, so pumping
+// until the next redraw is due keeps the spring in real time without a tea.Program.
+func (pr *Progress) ease() {
+	deadline := time.Now().Add(frameEvery)
+	for {
+		pr.mu.Lock()
+		if target := pr.fraction(); target != pr.bar.Percent() {
+			pr.pending = pr.bar.SetPercent(target)
+		}
+		cmd := pr.pending
+		pr.mu.Unlock()
+		if cmd == nil || !time.Now().Before(deadline) {
+			return
+		}
+		msg := cmd()
+		pr.mu.Lock()
+		next, c := pr.bar.Update(msg)
+		pr.bar, pr.pending = next.(progress.Model), c
+		pr.mu.Unlock()
+	}
+}
+
+func (pr *Progress) fraction() float64 {
+	switch {
+	case pr.totalBy > 0:
+		return float64(min(pr.bytes, pr.totalBy)) / float64(pr.totalBy)
+	case pr.total > 0:
+		return float64(pr.done) / float64(pr.total)
+	}
+	return 0
 }
 
 func (pr *Progress) redraw() {
@@ -239,7 +287,7 @@ func (pr *Progress) head(width, level int, widest bool) string {
 	t := pr.l.T
 	line := gutter + pr.wheel.View() + " " + pr.verb + " "
 	if level == 0 || level == 1 {
-		line += pr.bar() + " "
+		line += pr.bar.View() + " "
 	}
 	count := fmt.Sprintf("%d/%d", pr.done, pr.total)
 	if widest {
@@ -265,26 +313,6 @@ func (pr *Progress) aside(widest bool) string {
 		return widestBytes + " of " + humanBytes(pr.totalBy)
 	}
 	return humanBytes(min(pr.bytes, pr.totalBy)) + " of " + humanBytes(pr.totalBy)
-}
-
-func (pr *Progress) bar() string {
-	t := pr.l.T
-	full, tip, empty := "━", "╸", "─"
-	if t.ASCII {
-		full, tip, empty = "=", ">", "-"
-	}
-	n := 0
-	switch {
-	case pr.totalBy > 0:
-		n = int(int64(barWidth) * min(pr.bytes, pr.totalBy) / pr.totalBy)
-	case pr.total > 0:
-		n = barWidth * pr.done / pr.total
-	}
-	filled := strings.Repeat(full, n)
-	if n < barWidth {
-		filled += tip
-	}
-	return t.Cyan(filled) + t.Grey(strings.Repeat(empty, max(0, barWidth-n-1)))
 }
 
 // HumanBytes prints a size the way the progress lines do, with GB for the sizes

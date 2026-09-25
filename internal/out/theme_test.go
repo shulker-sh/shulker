@@ -78,8 +78,11 @@ func TestProgressFillsByBytesWhenSizesKnown(t *testing.T) {
 	pr := newProgress(&Lines{T: Theme{}}, "fetching", []Download{{"a.jar", 3 << 20}, {"b.jar", 1 << 20}})
 	pr.bytes = 2 << 20
 	pr.current = "b.jar"
+	if got := pr.fraction(); got != 0.5 {
+		t.Fatalf("fraction by bytes = %v", got)
+	}
 	got := pr.render(120)
-	want := "  ⣾ fetching ━━━━━━━━━━╸───────── 0/2 (2.0 MB of 4.0 MB) b.jar"
+	want := "  ⣾ fetching ───────────────   0% 0/2 (2.0 MB of 4.0 MB) b.jar"
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
@@ -88,8 +91,31 @@ func TestProgressFillsByBytesWhenSizesKnown(t *testing.T) {
 	}
 	pr.totalBy = 0
 	pr.done = 1
-	if got := pr.render(120)[0]; got != "  ⣾ fetching ━━━━━━━━━━╸───────── 1/2 (2.0 MB) b.jar" {
+	if got := pr.fraction(); got != 0.5 {
+		t.Fatalf("fraction by count = %v", got)
+	}
+	if got := pr.render(120)[0]; got != "  ⣾ fetching ───────────────   0% 1/2 (2.0 MB) b.jar" {
 		t.Fatalf("unknown sizes: got %q", got)
+	}
+}
+
+func TestProgressBarEasesTowardTheCount(t *testing.T) {
+	pr := newProgress(&Lines{T: Theme{ASCII: true}}, "fetching", []Download{{"a.jar", 0}, {"b.jar", 0}})
+	pr.done = 2
+	before := pr.bar.View()
+	pr.ease()
+	after := pr.bar.View()
+	if !strings.HasPrefix(before, "-----") || strings.Contains(before, "#") {
+		t.Fatalf("the bar starts empty: %q", before)
+	}
+	if !strings.HasPrefix(after, "#") || strings.HasSuffix(after, "100%") {
+		t.Fatalf("one frame of easing fills some of the bar, not all: %q", after)
+	}
+	for range 100 {
+		pr.ease()
+	}
+	if got := pr.bar.View(); got != "############### 100%" {
+		t.Fatalf("settled bar %q", got)
 	}
 }
 
