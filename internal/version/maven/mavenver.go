@@ -1,6 +1,6 @@
-// Package mavenver orders versions and matches version ranges the way Maven's ComparableVersion
+// Package maven orders versions and matches version ranges the way Maven's ComparableVersion
 // and VersionRange do, which is how NeoForge and Forge check mod dependencies.
-package mavenver
+package maven
 
 import (
 	"fmt"

@@ -11,9 +11,9 @@ import (
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/mavenver"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/version/fabric"
+	"shulker.sh/shulker/internal/version/maven"
 )
 
 type Problem struct {
@@ -398,7 +398,7 @@ func accepts(infos map[string]*jarmeta.Info, id, version string) bool {
 
 func compareVersions(a, b candidate) int {
 	if a.maven && b.maven {
-		return mavenver.Compare(mavenver.Parse(a.version), mavenver.Parse(b.version))
+		return maven.Compare(maven.Parse(a.version), maven.Parse(b.version))
 	}
 	return fabric.Compare(fabric.Parse(a.version), fabric.Parse(b.version))
 }
@@ -503,11 +503,11 @@ func (p Problem) ignoreCommand() string {
 
 func satisfies(info *jarmeta.Info, on, version, declared string) (bool, error) {
 	if info.UsesMavenRanges {
-		rng, err := mavenver.ParseRange(declared)
+		rng, err := maven.ParseRange(declared)
 		if err != nil {
 			return false, err
 		}
-		return rng.Contains(mavenver.Parse(version)), nil
+		return rng.Contains(maven.Parse(version)), nil
 	}
 	if on == "minecraft" {
 		version = fabric.Game(version)

@@ -1,4 +1,4 @@
-package mavenver
+package maven
 
 import "testing"
 

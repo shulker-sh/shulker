@@ -15,9 +15,9 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/mavenver"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/proc"
+	"shulker.sh/shulker/internal/version/maven"
 )
 
 const (
@@ -219,7 +219,7 @@ func gdlauncherLoaderVersion(ctx context.Context, req *Link) (string, error) {
 		return want, nil
 	}
 	newest := slices.MaxFunc(listed, func(x, y string) int {
-		return mavenver.Compare(mavenver.Parse(x), mavenver.Parse(y))
+		return maven.Compare(maven.Parse(x), maven.Parse(y))
 	})
 	if req.Force {
 		req.Warn("GDLauncher can't install %s %s yet, so the instance won't start until it can; without --force it would use %s", req.LoaderType, want, newest)
