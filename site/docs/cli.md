@@ -1850,6 +1850,24 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 `serve` exits with the server's own status when the server fails (`server-exit`).
 
+`completion <shell>` is the one exception: it prints its script, since a shell sources it as it is.
+
+### Help
+
+`--help`, `help [command]`, and a command that groups others run without a subcommand, like `shulker feature`, return the command's help as `data`:
+
+| Field | Description |
+| --- | --- |
+| `command` | The command the help is for, like `feature list`; empty for shulker itself |
+| `short` | Its one-line summary |
+| `description` | Its description, one string per paragraph |
+| `usage` | Its usage line |
+| `commands` | Its subcommands, each with `name` and `short` |
+| `flags` | Its own flags, each with `name` and `usage`, plus `shorthand`, `type` (the value it takes, like `string`; left out for a switch) and `default` when it has them |
+| `globalFlags` | The flags every command takes, in the same shape |
+| `examples` | Example command lines |
+| `docs` | The command's page on this site |
+
 ### Lock changes
 
 `lock`, `add`, `remove`, `update`, `pin`, `unpin`, `modpack add`, and `modpack remove` all return the same `data`: what changed in `shulker.lock` and `shulker.json`.

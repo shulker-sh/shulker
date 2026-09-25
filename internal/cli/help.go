@@ -106,7 +106,83 @@ func subcommand(parent *cobra.Command, word string) *cobra.Command {
 	return nil
 }
 
+type helpData struct {
+	Command     string            `json:"command"`
+	Short       string            `json:"short"`
+	Description []string          `json:"description"`
+	Usage       string            `json:"usage"`
+	Commands    []helpDataCommand `json:"commands"`
+	Flags       []helpDataFlag    `json:"flags"`
+	GlobalFlags []helpDataFlag    `json:"globalFlags"`
+	Examples    []string          `json:"examples"`
+	Docs        string            `json:"docs"`
+}
+
+type helpDataCommand struct {
+	Name  string `json:"name"`
+	Short string `json:"short"`
+}
+
+type helpDataFlag struct {
+	Name      string `json:"name"`
+	Shorthand string `json:"shorthand,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Usage     string `json:"usage"`
+	Default   string `json:"default,omitempty"`
+}
+
+func (a *app) helpJSON(cmd *cobra.Command) {
+	path := ""
+	if cmd.HasParent() {
+		path = strings.TrimPrefix(cmd.CommandPath(), "shulker ")
+	}
+	if a.printer.Command == "" {
+		a.printer.Command = path
+	}
+	doc, documented := docs.HelpFor(cmd.CommandPath())
+	d := helpData{Command: path, Short: cmd.Short, Description: []string{}, Usage: helpUsageText(cmd), Commands: []helpDataCommand{}, Examples: []string{}, Docs: docsURL}
+	if documented {
+		d.Docs = docsURL + "/cli#" + doc.Anchor
+		for _, paragraph := range doc.Description {
+			d.Description = append(d.Description, docs.PlainLinks(paragraph))
+		}
+		d.Examples = append(d.Examples, doc.Examples...)
+	} else if cmd.Short != "" {
+		d.Description = append(d.Description, cmd.Short)
+	}
+	if long := strings.TrimSpace(cmd.Long); long != "" {
+		d.Description = append(d.Description, strings.Join(strings.Fields(long), " "))
+	}
+	for _, c := range cmd.Commands() {
+		if c.IsAvailableCommand() {
+			d.Commands = append(d.Commands, helpDataCommand{Name: c.Name(), Short: c.Short})
+		}
+	}
+	local, global := cmd.NonInheritedFlags(), cmd.InheritedFlags()
+	if !cmd.HasParent() {
+		local, global = global, local
+	}
+	d.Flags, d.GlobalFlags = helpDataFlags(local), helpDataFlags(global)
+	_ = a.printer.Emit(d, nil)
+}
+
+func helpDataFlags(flags *pflag.FlagSet) []helpDataFlag {
+	rows := []helpDataFlag{}
+	flags.VisitAll(func(f *pflag.Flag) {
+		if f.Name == "help" || f.Hidden {
+			return
+		}
+		kind, usage := flagKind(f)
+		rows = append(rows, helpDataFlag{Name: f.Name, Shorthand: f.Shorthand, Type: kind, Usage: usage, Default: flagDefault(f)})
+	})
+	return rows
+}
+
 func (a *app) help(cmd *cobra.Command) {
+	if a.printer.JSON {
+		a.helpJSON(cmd)
+		return
+	}
 	l := &out.Lines{W: cmd.OutOrStdout(), T: a.printer.Theme}
 	t := l.T
 	doc, documented := docs.HelpFor(cmd.CommandPath())
@@ -234,11 +310,14 @@ func helpUsage(l *out.Lines, cmd *cobra.Command) {
 func helpUsageLine(l *out.Lines, cmd *cobra.Command) {
 	t := l.T
 	l.Heading("Usage")
-	usage := cmd.UseLine()
+	l.Text(helpIndent + t.Grey("$") + " " + t.Command(helpUsageText(cmd)))
+}
+
+func helpUsageText(cmd *cobra.Command) string {
 	if cmd.HasAvailableSubCommands() {
-		usage = cmd.CommandPath() + " <command> [flags]"
+		return cmd.CommandPath() + " <command> [flags]"
 	}
-	l.Text(helpIndent + t.Grey("$") + " " + t.Command(usage))
+	return cmd.UseLine()
 }
 
 func helpFlags(l *out.Lines, title string, flags *pflag.FlagSet) {
@@ -258,21 +337,34 @@ func flagRows(t out.Theme, flags *pflag.FlagSet) []helpFlag {
 		if f.Shorthand != "" {
 			name = "-" + f.Shorthand + ", " + name
 		}
-		kind, usage := pflag.UnquoteUsage(f)
-		kind = strings.TrimSuffix(strings.TrimSuffix(kind, "Array"), "Slice")
+		kind, usage := flagKind(f)
 		row := helpFlag{head: t.Command(name), usage: usage, width: len(name)}
 		if kind != "" {
 			row.head += " " + t.Grey("<"+kind+">")
 			row.width += len(kind) + 3
 		}
-		switch def := strings.Trim(f.DefValue, "[]"); def {
-		case "", "false", "0":
-		default:
+		if def := flagDefault(f); def != "" {
 			row.aside = t.Aside("default: " + def)
 		}
 		rows = append(rows, row)
 	})
 	return rows
+}
+
+// flagKind is the flag's value type as help shows it, with a list flag named by its element, and
+// its usage without the backquotes that name that type.
+func flagKind(f *pflag.Flag) (kind, usage string) {
+	kind, usage = pflag.UnquoteUsage(f)
+	return strings.TrimSuffix(strings.TrimSuffix(kind, "Array"), "Slice"), usage
+}
+
+func flagDefault(f *pflag.Flag) string {
+	switch def := strings.Trim(f.DefValue, "[]"); def {
+	case "false", "0":
+		return ""
+	default:
+		return def
+	}
 }
 
 func printFlagRows(l *out.Lines, title string, rows []helpFlag) {

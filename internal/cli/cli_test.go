@@ -175,6 +175,58 @@ func TestHelpShowsTheReferenceDescriptionAndExamples(t *testing.T) {
 	}
 }
 
+func TestHelpJSON(t *testing.T) {
+	for args, want := range map[string]string{
+		"--help":              "",
+		"help add":            "add",
+		"add --help":          "add",
+		"feature":             "feature",
+		"feature list --help": "feature list",
+	} {
+		code, stdout, stderr := run(t, append(strings.Fields(args), "--json")...)
+		var env struct {
+			OK      bool     `json:"ok"`
+			Command string   `json:"command"`
+			Data    helpData `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(stdout), &env); err != nil || code != out.ExitOK || stderr != "" {
+			t.Fatalf("%s: code=%d err=%v stdout=%q stderr=%q", args, code, err, stdout, stderr)
+		}
+		if !env.OK || env.Data.Command != want || env.Data.Short == "" || env.Data.Usage == "" {
+			t.Fatalf("%s: %+v", args, env)
+		}
+	}
+	_, stdout, _ := run(t, "feature", "--json")
+	var group struct{ Data helpData }
+	_ = json.Unmarshal([]byte(stdout), &group)
+	if len(group.Data.Commands) == 0 || group.Data.Commands[0].Name == "" {
+		t.Fatalf("feature lists no commands: %s", stdout)
+	}
+	_, stdout, _ = run(t, "add", "--help", "--json")
+	var add struct{ Data helpData }
+	_ = json.Unmarshal([]byte(stdout), &add)
+	if len(add.Data.Examples) == 0 || len(add.Data.Description) == 0 || !slices.ContainsFunc(add.Data.Flags, func(f helpDataFlag) bool { return f.Name == "side" }) {
+		t.Fatalf("add help: %s", stdout)
+	}
+	if slices.ContainsFunc(add.Data.Flags, func(f helpDataFlag) bool { return f.Name == "json" }) || !slices.ContainsFunc(add.Data.GlobalFlags, func(f helpDataFlag) bool { return f.Name == "json" }) {
+		t.Fatalf("add help puts --json in the wrong list: %s", stdout)
+	}
+	if !slices.ContainsFunc(add.Data.Flags, func(f helpDataFlag) bool { return f.Name == "as" && f.Type == "string" }) {
+		t.Fatalf("add help gives --as no type: %s", stdout)
+	}
+	for _, f := range append(add.Data.Flags, add.Data.GlobalFlags...) {
+		if f.Default == "0" || strings.ContainsAny(f.Default, "[]") {
+			t.Fatalf("add help flag %s default %q", f.Name, f.Default)
+		}
+	}
+	_, stdout, _ = run(t, "--help", "--json")
+	var root struct{ Data helpData }
+	_ = json.Unmarshal([]byte(stdout), &root)
+	if !strings.Contains(strings.Join(root.Data.Description, "\n"), "error.code") {
+		t.Fatalf("root help leaves out the agent note: %s", stdout)
+	}
+}
+
 func TestCompletionScripts(t *testing.T) {
 	for shell, marker := range map[string]string{"bash": "bash completion V2 for shulker", "zsh": "#compdef shulker", "fish": "fish completion for shulker", "powershell": "powershell completion for shulker"} {
 		code, stdout, _ := run(t, "completion", shell)
