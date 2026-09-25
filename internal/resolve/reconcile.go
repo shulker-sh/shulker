@@ -59,9 +59,20 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 		if d.locked != "" {
 			continue
 		}
-		if m, ok := r.Lock.Mods[id]; !ok || len(project.ModDifferences(r.fileDir(id, "", d.entry.File), id, d.entry, m)) > 0 {
+		m, ok := r.Lock.Mods[id]
+		if !ok {
 			targets = append(targets, id)
+			continue
 		}
+		// A new side needs no new version, so it is taken without resolving again.
+		if d.entry.Side != "" {
+			m.Side = d.entry.Side
+		}
+		if len(project.ModDifferences(r.fileDir(id, "", d.entry.File), id, d.entry, m)) > 0 {
+			targets = append(targets, id)
+			continue
+		}
+		r.Lock.Mods[id] = m
 	}
 	if len(targets) == 0 {
 		return nil, nil

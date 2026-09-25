@@ -1081,7 +1081,7 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium", "fabric-api")
-	h.newer = true
+	h.newer, h.newerAPI = true, true
 	h.editManifest(t, func(m map[string]any) {
 		m["requires"].(map[string]any)["fabric-api"] = map[string]any{"side": "server"}
 	})
@@ -1098,8 +1098,8 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	if code != 0 || len(updated) != 1 || updated[0].(map[string]any)["fromSide"] != "both" || updated[0].(map[string]any)["toSide"] != "server" {
 		t.Fatalf("lock must report the side change: %s", stdout)
 	}
-	if l := h.readLock(t); l.Mods["sodium"].VersionNumber != "1.0.0+mc26.2" || l.Mods["fabric-api"].Side != "server" {
-		t.Fatalf("lock must re-pick only fabric-api: %+v", l.Mods)
+	if l := h.readLock(t); l.Mods["sodium"].VersionNumber != "1.0.0+mc26.2" || l.Mods["fabric-api"].Side != "server" || l.Mods["fabric-api"].VersionNumber != "1.0.0+mc26.2" {
+		t.Fatalf("a side change must move no version: %+v", l.Mods)
 	}
 	h.editManifest(t, func(m map[string]any) {
 		m["requires"].(map[string]any)["fabric-api"] = map[string]any{"side": "client"}
