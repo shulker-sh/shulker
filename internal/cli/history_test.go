@@ -28,7 +28,8 @@ func TestHistoryRollback(t *testing.T) {
 	// The build after the remove keeps nothing of its own: the remove already
 	// kept the state it was about to rewrite.
 	stdout := h.mustRun(t, "history", "list")
-	if !strings.Contains(stdout, "1) ") || !strings.Contains(stdout, "before remove") || strings.Contains(stdout, "before build") {
+	rows := tableRows(stdout)
+	if len(rows) != 2 || rows[0]["#"] != "1" || rows[0]["Before"] != "remove" || rows[1]["Before"] != "add" {
 		t.Fatalf("history list: %s", stdout)
 	}
 	if stdout = h.mustRun(t, "history", "show", "1"); !strings.Contains(stdout, "History entry 1") || !strings.Contains(stdout, "+ sodium") {
@@ -46,8 +47,8 @@ func TestHistoryRollback(t *testing.T) {
 		t.Fatalf("the manifest should be restored too: %s", manifest)
 	}
 	// The rollback kept the state it replaced, so it can itself be undone.
-	if stdout = h.mustRun(t, "history", "list"); !strings.Contains(stdout, "before a rollback") {
-		t.Fatalf("the rollback should leave an entry of its own: %s", stdout)
+	if rows := tableRows(h.mustRun(t, "history", "list")); len(rows) == 0 || rows[0]["Before"] != "a rollback" {
+		t.Fatalf("the rollback should leave an entry of its own: %+v", rows)
 	}
 }
 
@@ -62,7 +63,7 @@ func TestHistoryCountsPacks(t *testing.T) {
 	h.mustRun(t, "remove", "fresh-animations")
 
 	stdout := h.mustRun(t, "history", "list")
-	if !strings.Contains(stdout, "1 resource pack") || !strings.Contains(stdout, "1 shader") {
+	if rows := tableRows(stdout); len(rows) != 3 || squash(rows[0]["Contents"]) != "0mods,1resourcepack,1shader" {
 		t.Fatalf("history list should count packs: %s", stdout)
 	}
 	if stdout = h.mustRun(t, "history", "show", "1"); !strings.Contains(stdout, "resource packs:") || !strings.Contains(stdout, "+ fresh-animations") {

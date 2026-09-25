@@ -95,11 +95,12 @@ func (a *app) historyListCmd() *cobra.Command {
 					l.Info("no history entries yet; one is taken before an in-place build changes anything")
 					return
 				}
-				width := len(strconv.Itoa(len(rows)))
-				for _, r := range rows {
-					label := fmt.Sprintf("%*d)", width, r.N)
-					l.Plain(l.T.Cyan(label) + " " + l.T.Bold(r.ID) + " " + l.T.Grey(historyAside(r.HistoryEntry)))
+				t := l.T
+				cells := make([][]string, len(rows))
+				for i, r := range rows {
+					cells[i] = []string{strconv.Itoa(r.N), r.ID, historyWhen(r.HistoryEntry), historyBefore(r.HistoryEntry), historyContents(r.HistoryEntry)}
 				}
+				l.Table([]string{"#", "Entry", "Taken", "Before", "Contents"}, cells, out.Columns(t.StyleCyan(), t.StyleBold(), t.StyleGrey()))
 				if keep := p.Manifest.HistoryKeep(); keep >= 0 && len(rows) > keep {
 					l.Nudge("Trim them", "shulker history prune")
 				}
@@ -294,9 +295,8 @@ func (a *app) rollbackCmd() *cobra.Command {
 	return cmd
 }
 
-func historyAside(e build.HistoryEntry) string {
-	parts := []string{"taken " + historyTaken(e)}
-	parts = append(parts, plural(e.Mods, "mod", "mods"))
+func historyContents(e build.HistoryEntry) string {
+	parts := []string{plural(e.Mods, "mod", "mods")}
 	if e.ResourcePacks > 0 {
 		parts = append(parts, plural(e.ResourcePacks, "resource pack", "resource packs"))
 	}
@@ -306,23 +306,33 @@ func historyAside(e build.HistoryEntry) string {
 	if e.Datapacks > 0 {
 		parts = append(parts, plural(e.Datapacks, "datapack", "datapacks"))
 	}
-	return "(" + strings.Join(parts, ", ") + ")"
+	return strings.Join(parts, ", ")
 }
 
+// historyTaken is when the entry was taken and what it preceded, for the show heading's row.
 func historyTaken(e build.HistoryEntry) string {
-	when := e.TakenAt
-	if t, err := time.Parse(time.RFC3339, e.TakenAt); err == nil {
-		when = t.Local().Format("2006-01-02 15:04")
+	if before := historyBefore(e); before != "" {
+		return historyWhen(e) + ", before " + before
 	}
+	return historyWhen(e)
+}
+
+func historyWhen(e build.HistoryEntry) string {
+	if t, err := time.Parse(time.RFC3339, e.TakenAt); err == nil {
+		return t.Local().Format("2006-01-02 15:04")
+	}
+	return e.TakenAt
+}
+
+// historyBefore is what the entry was taken ahead of: a rollback, a side's build, or the command.
+func historyBefore(e build.HistoryEntry) string {
 	switch {
 	case e.Reason == "rollback":
-		return when + ", before a rollback"
+		return "a rollback"
 	case e.Reason == "build" && e.Side != "":
-		return when + ", before build " + e.Side
-	case e.Reason != "":
-		return when + ", before " + e.Reason
+		return "build " + e.Side
 	}
-	return when
+	return e.Reason
 }
 
 func historyPlatform(e build.HistoryEntry) string {
