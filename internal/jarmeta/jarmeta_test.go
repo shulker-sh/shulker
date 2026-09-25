@@ -260,6 +260,26 @@ versionRange="[65.1,)"
 	}
 }
 
+func TestReadModsTOMLIgnoresDependencyTablesKeyedByAnotherID(t *testing.T) {
+	info := readBytes(t, buildZip(t, map[string]string{
+		"META-INF/neoforge.mods.toml": `
+[[mods]]
+modId="modelfix"
+[[dependencies.1.21-1.10]]
+modId="minecraft"
+type="required"
+versionRange="[1.21,)"
+[[dependencies.modelfix]]
+modId="neoforge"
+type="required"
+versionRange="[21.0,)"
+`,
+	}))
+	if want := map[string]string{"neoforge": "[21.0,)"}; !maps.Equal(info.Depends, want) {
+		t.Errorf("depends %v, want %v", info.Depends, want)
+	}
+}
+
 func TestReadPrefersTheProjectLoader(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "multi.jar")
 	if err := os.WriteFile(path, buildZip(t, map[string]string{

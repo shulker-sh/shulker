@@ -14,12 +14,14 @@ type modsTOML struct {
 		ModID   string `toml:"modId"`
 		Version string `toml:"version"`
 	} `toml:"mods"`
-	Dependencies map[string][]struct {
-		ModID        string `toml:"modId"`
-		Type         string `toml:"type"`
-		Mandatory    any    `toml:"mandatory"`
-		VersionRange string `toml:"versionRange"`
-	} `toml:"dependencies"`
+	Dependencies map[string]toml.Primitive `toml:"dependencies"`
+}
+
+type modsTOMLDependency struct {
+	ModID        string `toml:"modId"`
+	Type         string `toml:"type"`
+	Mandatory    any    `toml:"mandatory"`
+	VersionRange string `toml:"versionRange"`
 }
 
 // readModsTOML reads NeoForge's neoforge.mods.toml and Forge's mods.toml. Both leave the side to
@@ -30,7 +32,8 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		return nil, err
 	}
 	var raw modsTOML
-	if _, err := toml.Decode(string(data), &raw); err != nil {
+	md, err := toml.Decode(string(data), &raw)
+	if err != nil {
 		return nil, err
 	}
 	if len(raw.Mods) == 0 || raw.Mods[0].ModID == "" {
@@ -72,7 +75,15 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		}
 	}
 	for _, m := range raw.Mods {
-		for _, dep := range raw.Dependencies[m.ModID] {
+		table, ok := raw.Dependencies[m.ModID]
+		if !ok {
+			continue
+		}
+		var deps []modsTOMLDependency
+		if err := md.PrimitiveDecode(table, &deps); err != nil {
+			return nil, err
+		}
+		for _, dep := range deps {
 			if dep.ModID == "" || own[dep.ModID] {
 				continue
 			}
