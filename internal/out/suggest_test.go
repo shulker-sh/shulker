@@ -71,9 +71,9 @@ func TestFailShowsPicksAndAnExampleCommand(t *testing.T) {
 	e.Candidates, e.Flag = []string{"client", "server"}, "--side"
 	p.Fail(e)
 	want := "  ✘ error: shulker.json declares both sides; choose one (ambiguous-side)\n" +
-		"    └─ pick one:\n" +
-		"         ‣ client\n" +
-		"         ‣ server\n" +
+		"    ╰─ pick one:\n" +
+		"         ├─ ‣ client\n" +
+		"         ╰─ ‣ server\n" +
 		"\n" +
 		"  For example:\n" +
 		"    $ shulker sync --side client\n"

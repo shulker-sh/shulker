@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss/tree"
 )
 
 const gutter = "  "
@@ -200,34 +202,50 @@ type Row struct {
 	Children []string
 }
 
-func (l *Lines) Tree(rows ...Row) { l.tree(gutter+gutter, rows) }
-
-func (l *Lines) tree(indent string, rows []Row) {
-	t := l.T
-	for i, row := range rows {
-		last := i == len(rows)-1
-		branch := t.GlyphTee()
-		if last {
-			branch = t.GlyphElbow()
-		}
-		body := t.Markup(row.Text)
-		if row.Label != "" {
-			head := t.Grey(row.Label + ":")
-			if body != "" {
-				body = head + " " + body
-			} else {
-				body = head
-			}
-		}
-		fmt.Fprintln(l.W, indent+t.Grey(branch)+" "+body)
-		below := t.Grey(t.GlyphBar())
-		if last {
-			below = " "
-		}
-		for _, child := range row.Children {
-			fmt.Fprintln(l.W, indent+below+"    "+child)
-		}
+// Tree prints rows as branches under the line above, each child row nested one gutter further in.
+func (l *Lines) Tree(rows ...Row) {
+	if len(rows) == 0 {
+		return
 	}
+	t := l.T
+	root := tree.New().Enumerator(t.enumerator).Indenter(t.indenter).EnumeratorStyle(t.Style().Foreground(t.lipglossGrey()).PaddingLeft(2).PaddingRight(1))
+	for _, row := range rows {
+		node := tree.Root(l.rowText(row))
+		for _, child := range row.Children {
+			node.Child(child)
+		}
+		root.Child(node)
+	}
+	for line := range strings.SplitSeq(root.String(), "\n") {
+		l.line(line)
+	}
+}
+
+func (l *Lines) rowText(row Row) string {
+	t := l.T
+	body := t.Markup(row.Text)
+	if row.Label == "" {
+		return body
+	}
+	head := t.Grey(row.Label + ":")
+	if body == "" {
+		return head
+	}
+	return head + " " + body
+}
+
+func (t Theme) enumerator(children tree.Children, i int) string {
+	if i == children.Length()-1 {
+		return t.GlyphElbowRound()
+	}
+	return t.GlyphTee()
+}
+
+func (t Theme) indenter(children tree.Children, i int) string {
+	if i == children.Length()-1 {
+		return "  "
+	}
+	return t.GlyphBar() + " "
 }
 
 // Nudge is a grey lead-in ending in a colon, then the command to run.
@@ -259,7 +277,7 @@ func (l *Lines) Entries(heading string, entries []Entry) {
 		last := i == len(entries)-1
 		branch, below := t.GlyphTee(), t.Grey(t.GlyphBar())
 		if last {
-			branch, below = t.GlyphElbow(), " "
+			branch, below = t.GlyphElbowRound(), " "
 		}
 		dot := t.paint(t.GlyphDot(), sgrYellow, sgrBold)
 		if e.Synced {

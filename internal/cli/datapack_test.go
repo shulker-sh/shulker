@@ -160,7 +160,7 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 	}
 	text := h.mustRun(t, "import", archive, "--dir", filepath.Join(t.TempDir(), "text"))
 	for _, rel := range res.Duplicates {
-		if !regexp.MustCompile(`(?m)^\s*│?\s+` + regexp.QuoteMeta(rel) + `$`).MatchString(text) {
+		if !regexp.MustCompile(`(?m)^\s+(├─|╰─) ` + regexp.QuoteMeta(rel) + `$`).MatchString(text) {
 			t.Fatalf("each left-out copy gets a line of its own:\n%s", text)
 		}
 	}

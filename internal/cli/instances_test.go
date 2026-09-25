@@ -260,7 +260,7 @@ func TestInstancesList(t *testing.T) {
 		"Prism Launcher\n    ├─ • alpha client (synced ",
 		"• zed client (synced ",
 		filepath.Join(prismDir, "instances", "shulker-zed", "minecraft") + "\n         Zed, from " + h.dir + ", side client\n",
-		"\n\n  Minecraft Launcher\n    └─ • pack client (synced ",
+		"\n\n  Minecraft Launcher\n    ╰─ • pack client (synced ",
 		"• gone (directory is missing)\n",
 		"• locked (can't read the directory)\n",
 	} {

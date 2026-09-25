@@ -191,11 +191,14 @@ func (t Theme) GlyphError() string { return t.glyph("✘", "x") }
 func (t Theme) GlyphDot() string   { return t.glyph("•", "*") }
 func (t Theme) GlyphTee() string   { return t.glyph("├─", "|-") }
 func (t Theme) GlyphElbow() string { return t.glyph("└─", "\\-") }
-func (t Theme) GlyphBar() string   { return t.glyph("│", "|") }
-func (t Theme) ArrowBump() string  { return t.glyph("⟶", "->") }
-func (t Theme) ArrowInto() string  { return t.glyph("»", ">>") }
-func (t Theme) ArrowPick() string  { return t.glyph("‣", "*") }
-func (t Theme) Ellipsis() string   { return t.glyph("…", "...") }
+
+// GlyphElbowRound closes a tree: the rounded corner under the last child.
+func (t Theme) GlyphElbowRound() string { return t.glyph("╰─", "\\-") }
+func (t Theme) GlyphBar() string        { return t.glyph("│", "|") }
+func (t Theme) ArrowBump() string       { return t.glyph("⟶", "->") }
+func (t Theme) ArrowInto() string       { return t.glyph("»", ">>") }
+func (t Theme) ArrowPick() string       { return t.glyph("‣", "*") }
+func (t Theme) Ellipsis() string        { return t.glyph("…", "...") }
 
 var (
 	colourRenderer = sync.OnceValue(func() *lipgloss.Renderer { return renderer(termenv.ANSI256) })

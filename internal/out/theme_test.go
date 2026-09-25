@@ -129,16 +129,16 @@ func TestErrorRowsRenderStructured(t *testing.T) {
 	lines := render(Theme{}, func(l *Lines) { l.Error(e) })
 	want := []string{
 		"  ✘ error: 1 problem(s) in the locked mods (validation-failed)",
-		"    └─ sodium 1.0 requires fabric-api >=2, not installed",
-		"         the ignore is stale",
-		"         Fix: shulker add fabric-api",
-		`         Ignore: {"rule":"depends"}`,
+		"    ╰─ sodium 1.0 requires fabric-api >=2, not installed",
+		"         ├─ the ignore is stale",
+		"         ├─ Fix: shulker add fabric-api",
+		`         ╰─ Ignore: {"rule":"depends"}`,
 	}
 	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("got\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
 	}
 	plain := render(Theme{}, func(l *Lines) { l.Error(&Error{Code: "x", Message: "top line\n  second\n\n  third"}) })
-	if len(plain) != 3 || plain[1] != "    ├─ second" || plain[2] != "    └─ third" {
+	if len(plain) != 3 || plain[1] != "    ├─ second" || plain[2] != "    ╰─ third" {
 		t.Fatalf("remaining message lines should render plain: %q", plain)
 	}
 }
@@ -176,5 +176,36 @@ func TestDiffPaintsInsideTheGutter(t *testing.T) {
 	}
 	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("got %q\nwant %q", lines, want)
+	}
+}
+
+func TestTreeNestsChildrenUnderTheirRow(t *testing.T) {
+	lines := render(Theme{}, func(l *Lines) {
+		l.Tree(
+			Row{Label: "loader", Text: "fabric 0.16.10"},
+			Row{Label: "mods", Text: "3", Children: []string{"fabric-api", "sodium"}},
+			Row{Label: "launcher", Text: "prism"},
+		)
+	})
+	want := []string{
+		"    ├─ loader: fabric 0.16.10",
+		"    ├─ mods: 3",
+		"    │    ├─ fabric-api",
+		"    │    ╰─ sodium",
+		"    ╰─ launcher: prism",
+	}
+	if strings.Join(lines, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
+	}
+	ascii := render(Theme{ASCII: true}, func(l *Lines) { l.Tree(Row{Text: "a", Children: []string{"b"}}) })
+	if strings.Join(ascii, "\n") != "    \\- a\n         \\- b" {
+		t.Fatalf("ascii tree %q", ascii)
+	}
+	coloured := render(coloured(), func(l *Lines) { l.Tree(Row{Label: "help", Text: "run `shulker sync`"}) })
+	if len(coloured) != 1 || !strings.Contains(coloured[0], sgrCyan+sgrBold+"shulker sync"+sgrReset) || !strings.HasPrefix(coloured[0], "    \x1b[38;5;248m╰─") {
+		t.Fatalf("coloured tree %q", coloured)
+	}
+	if empty := render(Theme{}, func(l *Lines) { l.Tree() }); len(empty) != 1 || empty[0] != "" {
+		t.Fatalf("an empty tree prints nothing: %q", empty)
 	}
 }
