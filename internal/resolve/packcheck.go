@@ -26,14 +26,14 @@ func (r *Resolver) checkPackFolder(key, kind string, entry manifest.Require) {
 }
 
 // packFolderProblems says what keeps a resource pack or shader folder, rel under dir, from
-// loading: the game wants pack.mcmeta at a pack's root, with a description and a format, and Iris
+// loading: the game wants pack.mcmeta at a pack's root, with a description and a format, and a shader mod
 // wants shaders/ at a shader's. The format is not held to the project's Minecraft version.
 func packFolderProblems(dir, rel, kind string) []string {
 	root := filepath.Join(dir, filepath.FromSlash(rel))
 	problems := symlinkProblems(root, rel)
 	if kind == manifest.TypeShader {
 		if !hasShaders(root) {
-			problems = append(problems, rel+" has no shaders/ folder at its root, so Iris won't load it")
+			problems = append(problems, rel+" has no shaders/ folder at its root, so no shader mod will load it")
 		}
 		return problems
 	}

@@ -46,7 +46,7 @@ func TestPackFolderThatWontLoadWarns(t *testing.T) {
 			"helper: packs/helper/pack.mcmeta has no pack format (min_format and max_format, or pack_format), so the game won't load it",
 		}},
 		{"no shaders folder", "shader", map[string]string{"gbuffers_basic.vsh": "// bsl"}, []string{
-			"helper: packs/helper has no shaders/ folder at its root, so Iris won't load it",
+			"helper: packs/helper has no shaders/ folder at its root, so no shader mod will load it",
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
