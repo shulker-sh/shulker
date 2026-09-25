@@ -1,9 +1,12 @@
 package fsutil
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -175,5 +178,37 @@ func TestReplaceFollowsASymlink(t *testing.T) {
 	}
 	if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
 		t.Fatalf("link = %v, %v", info, err)
+	}
+}
+
+func TestReadTailKeepsTheLastLinesWhole(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "log")
+	var b strings.Builder
+	for i := range 3000 {
+		fmt.Fprintf(&b, "line %d %s\n", i, strings.Repeat("x", 40))
+	}
+	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	tail, err := ReadTail(f, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(tail, "line 2999 "+strings.Repeat("x", 40)+"\n") || strings.Count(tail, "\n") < 6 || len(tail) > 2*tailChunk {
+		t.Fatalf("the tail holds the last lines whole and no more than a chunk past them: %d bytes ending %q", len(tail), tail[max(0, len(tail)-60):])
+	}
+	if pos, _ := f.Seek(0, io.SeekCurrent); pos != int64(b.Len()) {
+		t.Fatalf("the file is left at its end, not %d", pos)
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		t.Fatal(err)
+	}
+	if all, err := ReadTail(f, 0); err != nil || all != b.String() {
+		t.Fatalf("no limit is the whole file: %v", err)
 	}
 }

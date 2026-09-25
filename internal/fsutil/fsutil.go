@@ -144,3 +144,31 @@ func hashFile(path string, h hash.Hash) (string, error) {
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
+
+// tailChunk is how much of a file ReadTail takes at a time from its end.
+const tailChunk = 64 << 10
+
+// ReadTail is the file from its end back to where its last limit lines begin, a whole line further
+// so those lines are whole, and leaves f at its end for following. With no limit it is the whole
+// file from where f is.
+func ReadTail(f *os.File, limit int) (string, error) {
+	if limit == 0 {
+		data, err := io.ReadAll(f)
+		return string(data), err
+	}
+	end, err := f.Seek(0, io.SeekEnd)
+	if err != nil {
+		return "", err
+	}
+	var data []byte
+	for start := end; start > 0 && bytes.Count(data, []byte{'\n'}) <= limit; {
+		next := max(0, start-tailChunk)
+		chunk := make([]byte, start-next)
+		if _, err := f.ReadAt(chunk, next); err != nil {
+			return "", err
+		}
+		data = append(chunk, data...)
+		start = next
+	}
+	return string(data), nil
+}

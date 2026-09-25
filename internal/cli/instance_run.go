@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
@@ -147,7 +147,7 @@ func (a *app) instanceLogCmd() *cobra.Command {
 				return err
 			}
 			defer f.Close()
-			text, err := readTail(f, limit)
+			text, err := fsutil.ReadTail(f, limit)
 			if err != nil {
 				return err
 			}
@@ -213,34 +213,6 @@ func (a *app) followLog(ctx context.Context, dir string, rec instance.Launch, f 
 		case <-time.After(followInterval):
 		}
 	}
-}
-
-// tailChunk is how much of a log readTail takes at a time from its end.
-const tailChunk = 64 << 10
-
-// readTail is the log from its end back to where its last limit lines begin, a whole line further
-// so those lines are whole, and leaves f at its end for following. With no limit it is the whole
-// log, which is what gets printed then.
-func readTail(f *os.File, limit int) (string, error) {
-	if limit == 0 {
-		data, err := io.ReadAll(f)
-		return string(data), err
-	}
-	end, err := f.Seek(0, io.SeekEnd)
-	if err != nil {
-		return "", err
-	}
-	var data []byte
-	for start := end; start > 0 && bytes.Count(data, []byte{'\n'}) <= limit; {
-		next := max(0, start-tailChunk)
-		chunk := make([]byte, start-next)
-		if _, err := f.ReadAt(chunk, next); err != nil {
-			return "", err
-		}
-		data = append(chunk, data...)
-		start = next
-	}
-	return string(data), nil
 }
 
 // lastLines is the log's lines, only the last limit of them when limit is set.
