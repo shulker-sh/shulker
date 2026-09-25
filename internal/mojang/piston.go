@@ -1,3 +1,5 @@
+// Package mojang reads Mojang's services: the version manifest and each version's JSON (Piston),
+// the Java runtime index (Runtimes) and player profiles (Profiles).
 package mojang
 
 import (

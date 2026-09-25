@@ -1,3 +1,5 @@
+// Package out is how a command speaks: the JSON envelope and the human lines, errors with their
+// codes, help and picks, warnings and nudges, progress steps and the terminal they print on.
 package out
 
 import (

@@ -1,3 +1,6 @@
+// Package launcher holds the launcher seam: one file per launcher, each with its entry in the table,
+// its usage block, where its instances go, how a link is placed, its after-note and its accounts
+// reader. Shulker's own instances are a launcher here too.
 package launcher
 
 import (

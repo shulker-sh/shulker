@@ -1,3 +1,6 @@
+// Package schema embeds the JSON schemas shulker's files carry as $schema, validates a file against
+// its kind and phrases what is wrong with one. It lives at the module root so schema/v1 is the
+// public path the site serves.
 package schema
 
 import (
