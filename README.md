@@ -94,10 +94,10 @@ Shulker is a launcher itself, and it links into five others. A link creates an i
 | --- | --- | --- | --- |
 | Shulker | `shulker link shulker` | yes | its own |
 | Prism Launcher | `shulker link prism` | yes | yes |
-| MultiMC | `shulker link multimc` | yes | no |
+| MultiMC | `shulker link multimc` | yes | yes |
 | Minecraft Launcher | `shulker link mojang` | yes | yes |
-| ATLauncher | `shulker link atlauncher` | yes | no |
-| GDLauncher | `shulker link gdlauncher` | yes, paused after four minutes | no |
+| ATLauncher | `shulker link atlauncher` | yes | yes |
+| GDLauncher | `shulker link gdlauncher` | yes, paused after four minutes | yes |
 | Modrinth App, CurseForge app | `shulker export mrpack`, `shulker export curseforge` | no | no |
 
 Some launchers need a word more.
@@ -120,7 +120,7 @@ shulker accounts login
 
 Shulker then shows a Microsoft sign-in page to open and a code to enter there, which lets you play Minecraft through Shulker. Shulker stores only the sign-in tokens a launch needs, and never prints them. If only one account is signed in, every launch uses it.
 
-If you are already signed in to Prism Launcher or the Minecraft Launcher, Shulker can use that account instead of asking you to sign in again. Add the launcher to the stores Shulker reads accounts from, and its accounts appear beside your own. Then pick the default.
+If you are already signed in to another launcher (Prism Launcher, MultiMC, the Minecraft Launcher, ATLauncher or GDLauncher), Shulker can use that account instead of asking you to sign in again. Add the launcher to the stores Shulker reads accounts from, and its accounts appear beside your own. Then pick the default.
 
 ```console
 ❯ shulker accounts stores add prism
