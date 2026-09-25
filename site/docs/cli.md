@@ -681,7 +681,7 @@ shulker install
 
 | Flag | Description |
 | --- | --- |
-| `--force` | Overwrite files edited in the build directory |
+| `--force` | Overwrite files edited in the build directory, seeded files included |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
@@ -693,6 +693,8 @@ Assemble a side's build directory from the lock and its overrides. With no side,
 
 A file you edited in the build directory is kept until the source changes it too. Then it is a conflict, and so is a file in the way that shulker never wrote: the build fails `build-conflict` before writing anything, listing each one. `shulker diff` shows them, `--force` takes the source's version, and `shulker pull` copies yours into the project instead. `build`, `sync` and `install` all stop this way; only a sync for a launch, from [`play`](#shulker-play) or a launcher's [pre-launch hook](#shulker-hook-pre-launch), keeps your file and applies the rest.
 
+A file the manifest's `seedFiles` lists is never a conflict. When both changed it, every build keeps yours and warns `<path> changed in the pack and in game; kept yours`, naming the two ways to take the pack's: delete the file, or `--force`, which resets every seeded file along with the rest.
+
 ```sh
 shulker build
 shulker build client
@@ -700,7 +702,7 @@ shulker build client
 
 | Flag | Description |
 | --- | --- |
-| `--force` | Overwrite files edited in the build directory |
+| `--force` | Overwrite files edited in the build directory, seeded files included |
 | `--accept-player-change` | Relock a player name that now belongs to a different account |
 | `--os <os>` | Build for this OS instead of the detected one: `macos`, `windows`, or `linux` |
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
@@ -1008,7 +1010,7 @@ shulker serve server --accept-eula
 
 | Flag | Description |
 | --- | --- |
-| `--force` | Overwrite files edited in the build directory |
+| `--force` | Overwrite files edited in the build directory, seeded files included |
 | `--accept-eula` | Accept the Minecraft EULA and record it in config.json without prompting |
 | `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 
@@ -1279,7 +1281,7 @@ A file changed both in the directory and in the source fails the sync with `buil
 | `--launcher <launcher>` | Only instances linked in this launcher: `shulker`, `prism`, `multimc`, `mojang`, `atlauncher`, or `gdlauncher` |
 | `--side <side>` | Side to build from a source (default: the only declared side); with `-i`, `--all`, or the picker, only `client` or `server` instances |
 | `--offline` | Don't use the network; build from the last successful sync and cached files |
-| `--force` | Overwrite files edited in the output directory |
+| `--force` | Overwrite files edited in the output directory, seeded files included |
 | `--assume-client` | Build a client even when the source declares none, from the mods and overrides both sides share; recorded in the directory so later syncs keep building it |
 | `--ref <ref>` | Branch, tag, or commit to sync from a git source (default: the remote HEAD) |
 | `--path <path>` | Folder of a git source's repository that holds its shulker.json (default: the root) |
@@ -1918,7 +1920,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `backup-invalid` | `restore` was given a zip that won't open, or that holds anything other than world folders at its root |
 | `backup-missing` | `restore` found no backup with that number, or none by the name or at the path `--backup` gives |
 | `backups-empty` | `restore` found no backups for the target |
-| `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite. A sync for a launch keeps them instead. `items`: the files |
+| `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite, which also resets seeded files. A sync for a launch keeps them instead, and a seeded file never conflicts. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
 | `check-failed` | `check` found a problem; each one printed above it. `items`: every problem's items as `<code>: <item>`; `data.problems`: each problem as an error |

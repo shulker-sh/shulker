@@ -46,6 +46,7 @@
   ],
   "wholeFiles": ["config/whole.properties"],
   "skipFiles": ["*.bak", "config/*.log"],
+  "seedFiles": ["options.txt", "config/*.json5"],
   "marker": true,
   "integrations": { "iris": ["iris", "iris_fork"], "paxi": [] },
   "variables": { "motd": "Welcome", "port": 25565, "hardcore": false, "ratio": 1.50 },

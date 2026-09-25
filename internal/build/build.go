@@ -195,6 +195,8 @@ type source struct {
 	pack       string
 	feature    string
 	isTemplate bool
+	// seeded is set when a manifest contributing to the file lists it in seedFiles.
+	seeded bool
 	// managed is the owned file an override replaced, remembered so pull can
 	// still adopt the keys the manifest sets in it.
 	managed ownedFile
@@ -406,6 +408,17 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 				report.Kept = append(report.Kept, f.rel)
 			}
 		case stateConflict, stateUntracked:
+			if f.src.seeded && f.src.owned() == nil {
+				why := "changed in the pack and in game"
+				if f.state == stateUntracked {
+					why = "was not written by shulker"
+				}
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s %s; kept yours. Delete it to take the pack's, or `shulker build --force` for every file.", f.rel, why))
+				if recorded, ok := prev.Files[f.rel]; ok {
+					next.Files[f.rel] = recorded
+				}
+				continue
+			}
 			conflict := f.rel + " (changed in place and in the source)"
 			if f.state == stateUntracked {
 				conflict = f.rel + " (not written by shulker)"
@@ -435,7 +448,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	}
 	if len(report.Conflicts) > 0 {
 		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the output directory and in the source", side, len(report.Conflicts))
-		e.Help = "run `shulker diff`, or `shulker build --force` to overwrite"
+		e.Help = "run `shulker diff`, or `shulker build --force` to overwrite, which also resets seeded files"
 		e.Items = report.Conflicts
 		return report, e
 	}
@@ -583,6 +596,7 @@ type overrideLayer struct {
 	feature string
 	vars    map[string]string
 	skips   func(rel string) bool
+	seeds   func(rel string) bool
 	// archived marks a layer read from a modpack archive: files holds it, and root only names
 	// where each file came from.
 	archived bool
@@ -603,14 +617,14 @@ func (b *Builder) overrideLayers(side string, cond conditions, vars map[string]s
 			return pack + ":" + folder
 		}
 		for _, folder := range []string{"overrides", side + "-overrides"} {
-			layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, vars: vars, skips: m.Skips})
+			layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, vars: vars, skips: m.Skips, seeds: m.Seeds})
 		}
 		for _, name := range slices.Sorted(maps.Keys(m.Features)) {
 			if !cond.features[name] {
 				continue
 			}
 			for _, folder := range featureFolders(name, m.Features[name], side) {
-				layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, feature: name, vars: vars, skips: m.Skips})
+				layers = append(layers, overrideLayer{root: filepath.Join(dir, folder), label: label(folder), pack: pack, feature: name, vars: vars, skips: m.Skips, seeds: m.Seeds})
 			}
 		}
 	}
@@ -618,7 +632,7 @@ func (b *Builder) overrideLayers(side string, cond conditions, vars map[string]s
 		packVars := pulledTemplateVars(pk.Manifest, b.Lock, side, vars)
 		if pk.Archive != nil {
 			for _, folder := range []string{"overrides", side + "-overrides"} {
-				l := overrideLayer{root: filepath.Join(b.Dir, filepath.FromSlash(pk.Source), folder), label: pk.Name + ":" + folder, pack: pk.Name, vars: packVars, skips: pk.Manifest.Skips, archived: true}
+				l := overrideLayer{root: filepath.Join(b.Dir, filepath.FromSlash(pk.Source), folder), label: pk.Name + ":" + folder, pack: pk.Name, vars: packVars, skips: pk.Manifest.Skips, seeds: pk.Manifest.Seeds, archived: true}
 				for _, o := range pk.Overrides {
 					if o.Layer == folder && !l.skips(o.Path) {
 						l.files = append(l.files, o)
@@ -713,6 +727,7 @@ func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole 
 			return err
 		}
 	}
+	src.seeded = desired[rel].seeded || l.seeds != nil && l.seeds(rel)
 	if strings.HasSuffix(rel, ".properties") && !whole(rel) {
 		desired[rel] = mergedProperties(desired[rel], data, keySource{path: path, pack: l.pack, feature: l.feature, isTemplate: src.isTemplate}, src, rel, report)
 		return nil

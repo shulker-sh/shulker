@@ -47,6 +47,7 @@ type Manifest struct {
 	Ignore      []Ignore           `json:"ignore,omitempty"`
 	WholeFiles  []string           `json:"wholeFiles,omitempty"`
 	SkipFiles   []string           `json:"skipFiles,omitempty"`
+	SeedFiles   []string           `json:"seedFiles,omitempty"`
 	Marker      *bool              `json:"marker,omitempty"`
 	// Integrations replaces the built-in jar ids of each integration it lists, by integration id.
 	Integrations map[string][]string `json:"integrations,omitempty"`
@@ -165,10 +166,21 @@ func (m *Manifest) Skips(rel string) bool {
 	case name == ".DS_Store", strings.HasPrefix(name, "._"), strings.EqualFold(name, "Thumbs.db"), strings.EqualFold(name, "desktop.ini"):
 		return true
 	}
-	for _, pattern := range m.SkipFiles {
+	return matchesAny(m.SkipFiles, rel)
+}
+
+// Seeds reports whether the build-relative path rel is a seeded file: one of SeedFiles matches it
+// the way SkipFiles would. A seeded file is the player's once written, and a build keeps their
+// changes to it.
+func (m *Manifest) Seeds(rel string) bool {
+	return matchesAny(m.SeedFiles, rel)
+}
+
+func matchesAny(patterns []string, rel string) bool {
+	for _, pattern := range patterns {
 		target := rel
 		if !strings.Contains(pattern, "/") {
-			target = name
+			target = path.Base(rel)
 		}
 		if ok, _ := path.Match(pattern, target); ok {
 			return true

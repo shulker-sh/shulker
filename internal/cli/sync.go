@@ -149,7 +149,7 @@ func (a *app) syncCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&req.into, "into", "", "output directory (default: the side's build directory)")
-	cmd.Flags().BoolVar(&req.force, "force", false, "overwrite files edited in the output directory")
+	cmd.Flags().BoolVar(&req.force, "force", false, "overwrite files edited in the output directory, seeded files included")
 	cmd.Flags().BoolVar(&req.assumeClient, "assume-client", false, "build a client even when the source declares none, from the mods and overrides both sides share")
 	cmd.Flags().StringVar(&req.at.Ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
