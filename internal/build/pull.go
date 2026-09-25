@@ -24,7 +24,9 @@ type FileDiff struct {
 	Path string `json:"path"`
 	// State is kept, conflict, untracked or orphan.
 	State string `json:"state"`
-	Diff  string `json:"diff"`
+	// Seeded is set for a file a manifest lists in seedFiles, whose edits a build keeps.
+	Seeded bool   `json:"seeded,omitempty"`
+	Diff   string `json:"diff"`
 }
 
 type DiffReport struct {
@@ -77,7 +79,7 @@ func (b *Builder) Diff(side string, opts Options) (*DiffReport, error) {
 		if f.src.owned() != nil {
 			state = stateKept
 		}
-		report.Files = append(report.Files, FileDiff{Path: f.rel, State: string(state), Diff: unifiedDiff(f.rel, project, existing)})
+		report.Files = append(report.Files, FileDiff{Path: f.rel, State: string(state), Seeded: f.src.seeded, Diff: unifiedDiff(f.rel, project, existing)})
 	}
 	return report, nil
 }
@@ -223,6 +225,10 @@ func (b *Builder) Pull(side string, req PullRequest, opts Options) (*PullReport,
 	}
 	for _, f := range plans {
 		if !drifted(f) || (len(named) > 0 && !named[f.rel]) {
+			continue
+		}
+		if f.src.seeded && len(named) == 0 {
+			report.Skipped = append(report.Skipped, f.rel+" (seeded; name it to pull)")
 			continue
 		}
 		abs := filepath.Join(dir, filepath.FromSlash(f.rel))

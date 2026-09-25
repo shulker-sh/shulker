@@ -94,7 +94,11 @@ func (a *app) diffCmd() *cobra.Command {
 						if i > 0 {
 							l.Blank()
 						}
-						l.Items(out.Item{Kind: diffKind(f.State), Name: f.Path, Aside: []string{diffAside(f.State)}})
+						aside := []string{diffAside(f.State)}
+						if f.Seeded && f.State == "conflict" {
+							aside = append(aside, "seeded, the build keeps yours")
+						}
+						l.Items(out.Item{Kind: diffKind(f.State), Name: f.Path, Aside: aside})
 						l.Diff(f.Diff)
 					}
 				}

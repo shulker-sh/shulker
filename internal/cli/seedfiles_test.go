@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -166,5 +167,64 @@ func TestASeededPropertiesOverrideSeedsKeyByKey(t *testing.T) {
 	h.mustRun(t, "build", "--force")
 	if got := readFile(t, built); got != "a=2\nb=2\n" {
 		t.Fatalf("--force writes the pack's values: %q", got)
+	}
+}
+
+func TestDiffAndPullTreatSeededFilesAsThePlayers(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	h.editManifest(t, func(m map[string]any) { m["seedFiles"] = []string{"a.json"} })
+	seeded := filepath.Join(h.dir, "overrides", "config", "a.json")
+	plain := filepath.Join(h.dir, "overrides", "config", "b.json")
+	writeFile(t, seeded, "pack 1\n")
+	writeFile(t, plain, "pack 1\n")
+	h.mustRun(t, "build")
+	built := filepath.Join(h.dir, "build", "client", "config", "a.json")
+	writeFile(t, built, "mine\n")
+	writeFile(t, filepath.Join(h.dir, "build", "client", "config", "b.json"), "mine\n")
+	writeFile(t, seeded, "pack 2\n")
+
+	stdout := h.mustRun(t, "diff")
+	if !strings.Contains(stdout, "config/a.json (edited on both sides, seeded, the build keeps yours)") {
+		t.Fatalf("diff marks a seeded conflict: %s", stdout)
+	}
+	if !strings.Contains(stdout, "+mine") || !strings.Contains(stdout, "-pack 2") {
+		t.Fatalf("diff is from the pack's current version: %s", stdout)
+	}
+	var files []struct {
+		Path   string `json:"path"`
+		State  string `json:"state"`
+		Seeded bool   `json:"seeded"`
+	}
+	var reports []struct {
+		Files json.RawMessage `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(dataJSON(t, h.mustRun(t, "diff", "--json"))), &reports); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(reports[0].Files, &files); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, f := range files {
+		seen[f.Path] = f.Seeded
+		if f.Path == "config/a.json" && f.State != "conflict" {
+			t.Fatalf("a seeded file changed in both is a conflict in diff: %+v", f)
+		}
+	}
+	if !seen["config/a.json"] || seen["config/b.json"] {
+		t.Fatalf("seeded marks only the seeded file: %+v", files)
+	}
+
+	stdout = h.mustRun(t, "pull", "--json")
+	if !strings.Contains(stdout, "config/a.json (seeded; name it to pull)") || !strings.Contains(stdout, `"config/b.json -\u003e overrides/config/b.json"`) {
+		t.Fatalf("a bare pull skips a seeded file: %s", stdout)
+	}
+	if got := readFile(t, seeded); got != "pack 2\n" {
+		t.Fatalf("a bare pull left the seeded override alone: %q", got)
+	}
+	h.mustRun(t, "pull", "config/a.json")
+	if got := readFile(t, seeded); got != "mine\n" {
+		t.Fatalf("a named pull copies a seeded file: %q", got)
 	}
 }

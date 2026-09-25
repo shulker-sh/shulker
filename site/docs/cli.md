@@ -712,6 +712,8 @@ shulker build client
 
 Show what was edited in a build directory since `build` wrote it, such as config changed in-game, as a diff from the project to the directory. `build` leaves these files alone and `pull` copies the edits back. A per-key file shows only its managed keys. With no side, checks every side the manifest declares.
 
+A seeded file, one the manifest's `seedFiles` lists, shows up like any other: `kept` when only you changed it, `conflict` when the pack did too, marked "seeded, the build keeps yours", since the build keeps it rather than failing. Its diff is from the pack's current version, so it shows what you aren't getting. With `--json`, each entry is `{ "path", "state", "seeded", "diff" }`, `seeded` set only for a seeded file.
+
 ```sh
 shulker diff
 shulker diff client
@@ -725,6 +727,8 @@ shulker diff server --into /srv/minecraft
 ### `shulker pull`
 
 Copy edits made in a build directory back into their source, an override file or keys in shulker.json, so the next build keeps them. With no files, pulls every changed file. Paths are relative to the build directory. A file some override folder already holds is updated there; a file no folder holds yet goes to `overrides/`, and `--to` names another folder instead. For a `.properties` override, only the keys it lists are pulled; name more with `--key` to start managing them.
+
+A bare `pull` leaves seeded files out, so a pack author's own settings don't become the pack's defaults, and lists each under `skipped` as `<path> (seeded; name it to pull)`. Naming the file, with or without `--key`, pulls it as any other.
 
 A named file that is a mod or a pack the game loads, a `.jar` directly under `mods/` or a `.zip` directly under `resourcepacks/`, `shaderpacks/` or a datapack folder (`datapacks/`, `config/paxi/datapacks/`, `config/openloader/data/`, `config/openloader/packs/`), is adopted as a `file` entry instead of an override: copied into `files/`, written into `requires` with no conditions, and locked. Its key is the jar's mod id or the pack file's name; a jar's side is the one the jar declares. A pack whose file name isn't `<key>.zip` gets that name as its `filename`, so builds keep placing it under the name the game already enables it by. A key `requires` already holds skips the file, and `--as` names another. The result's `entries` lists the adopted files.
 
