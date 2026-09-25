@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -87,7 +86,7 @@ func (a *app) initCmd() *cobra.Command {
 			m := &manifest.Manifest{
 				Schema:    manifest.SchemaURL,
 				Name:      name,
-				Authors:   defaultAuthors(),
+				Authors:   project.DefaultAuthors(),
 				Minecraft: minecraft,
 				Loader:    projectLoader,
 				Requires:  map[string]manifest.Require{},
@@ -285,15 +284,3 @@ func (a *app) initPack(cmd *cobra.Command, p *project.Project, source string) (f
 }
 
 const noLoader = "none"
-
-func defaultAuthors() []string {
-	authors := []string{"shulker.sh"}
-	name, err := exec.Command("git", "config", "user.name").Output()
-	if err != nil {
-		return authors
-	}
-	if user := strings.TrimSpace(string(name)); user != "" {
-		authors = append([]string{user}, authors...)
-	}
-	return authors
-}

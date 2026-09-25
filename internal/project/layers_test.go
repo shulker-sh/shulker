@@ -1,6 +1,7 @@
 package project
 
 import (
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -34,5 +35,19 @@ func TestIsSideLayerKnowsAFeaturesSideFolders(t *testing.T) {
 				t.Errorf("IsSideLayer(%s, %s) = %v, want %v", side, layer, got, want)
 			}
 		}
+	}
+}
+
+func TestOverrideRelIsAMatchableFileInsideTheProject(t *testing.T) {
+	dir := t.TempDir()
+	rel, ok := OverrideRel(dir, filepath.Join(dir, "overrides", "mods", "jei.jar"))
+	if !ok || rel != "overrides/mods/jei.jar" {
+		t.Fatalf("rel = %q, %v", rel, ok)
+	}
+	if _, ok := OverrideRel(dir, filepath.Join(dir, "..", "elsewhere", "overrides", "mods", "jei.jar")); ok {
+		t.Fatal("a path outside the project is no override")
+	}
+	if _, ok := OverrideRel(dir, filepath.Join(dir, "overrides", "config", "jei.toml")); ok {
+		t.Fatal("a config file is not matchable")
 	}
 }

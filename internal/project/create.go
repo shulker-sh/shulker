@@ -3,7 +3,9 @@ package project
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
@@ -61,4 +63,17 @@ func WriteIcon(dir string, m *manifest.Manifest, icon []byte) error {
 		return err
 	}
 	return fsutil.Write(path, icon)
+}
+
+// DefaultAuthors is who a new manifest credits: the git user, when git knows one, then shulker.sh.
+func DefaultAuthors() []string {
+	authors := []string{"shulker.sh"}
+	name, err := exec.Command("git", "config", "user.name").Output()
+	if err != nil {
+		return authors
+	}
+	if user := strings.TrimSpace(string(name)); user != "" {
+		authors = append([]string{user}, authors...)
+	}
+	return authors
 }

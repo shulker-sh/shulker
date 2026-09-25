@@ -85,3 +85,14 @@ func IsMatchable(rel string) bool {
 	layer, within, _ := strings.Cut(rel, "/")
 	return slices.Contains(packarchive.Layers, layer) && (packarchive.IsModJar(within) || packarchive.IsPackZip(within))
 }
+
+// OverrideRel is abs relative to the project at dir, with forward slashes, when it names a
+// matchable file in one of the project's override layers.
+func OverrideRel(dir, abs string) (string, bool) {
+	rel, err := filepath.Rel(dir, abs)
+	if err != nil || !filepath.IsLocal(rel) {
+		return "", false
+	}
+	rel = filepath.ToSlash(rel)
+	return rel, IsMatchable(rel)
+}

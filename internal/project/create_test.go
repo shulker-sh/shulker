@@ -45,3 +45,10 @@ func TestWriteIconDropsTheKeyWhenTheArchiveHadNone(t *testing.T) {
 		t.Fatalf("written %q, %v", data, err)
 	}
 }
+
+func TestDefaultAuthorsEndWithShulker(t *testing.T) {
+	authors := DefaultAuthors()
+	if n := len(authors); n < 1 || n > 2 || authors[n-1] != "shulker.sh" {
+		t.Fatalf("authors = %v", authors)
+	}
+}

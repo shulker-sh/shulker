@@ -101,8 +101,8 @@ func (a *app) namedOverrides(dir string, named []string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		rel, err := filepath.Rel(dir, abs)
-		if err != nil || !filepath.IsLocal(rel) || !project.IsMatchable(filepath.ToSlash(rel)) {
+		rel, ok := project.OverrideRel(dir, abs)
+		if !ok {
 			e := out.Errorf("override-path", "%s isn't a jar in mods/ or a zip in resourcepacks/, shaderpacks/ or a datapack folder of an override folder", arg)
 			e.Help = "match looks up files in overrides/, client-overrides/ and server-overrides/"
 			return nil, e
@@ -110,7 +110,7 @@ func (a *app) namedOverrides(dir string, named []string) ([]string, error) {
 		if info, err := os.Stat(abs); err != nil || !info.Mode().IsRegular() {
 			return nil, out.Errorf("file-not-found", "%s isn't a file", arg)
 		}
-		if rel = filepath.ToSlash(rel); !slices.Contains(rels, rel) {
+		if !slices.Contains(rels, rel) {
 			rels = append(rels, rel)
 		}
 	}
