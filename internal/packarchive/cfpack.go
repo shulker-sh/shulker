@@ -39,6 +39,8 @@ type cfManifest struct {
 	Files           []cfFile    `json:"files"`
 	Overrides       string      `json:"overrides"`
 	Image           string      `json:"image,omitempty"`
+	// RecommendedRAM is the heap in MB the CurseForge app offers for the pack.
+	RecommendedRAM int `json:"recommendedRam,omitempty"`
 }
 
 type cfMinecraft struct {
@@ -176,7 +178,7 @@ func (cfpack) decode(file string, z *zipEntries) (*Archive, error) {
 	if m.Minecraft.Version == "" {
 		return nil, out.Errorf("curseforge-invalid", "%s names no minecraft version", file)
 	}
-	a := &Archive{Name: m.Name, Version: m.Version, Minecraft: m.Minecraft.Version, Files: []File{}}
+	a := &Archive{Name: m.Name, Version: m.Version, Minecraft: m.Minecraft.Version, Memory: cfHeap(m.RecommendedRAM), Files: []File{}}
 	if m.Author != "" {
 		a.Authors = []string{m.Author}
 	}
@@ -202,6 +204,17 @@ func (cfpack) decode(file string, z *zipEntries) (*Archive, error) {
 		return nil, err
 	}
 	return a, nil
+}
+
+// cfHeap is a recommendedRam in MB as a heap size: whole gigabytes where it is one, else megabytes.
+func cfHeap(mb int) string {
+	switch {
+	case mb <= 0:
+		return ""
+	case mb%1024 == 0:
+		return strconv.Itoa(mb/1024) + "G"
+	}
+	return strconv.Itoa(mb) + "M"
 }
 
 // cfLoader is the pack's primary mod loader, or its first when none is marked primary. A pack for

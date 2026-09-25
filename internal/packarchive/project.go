@@ -25,7 +25,7 @@ func (a *Archive) Manifest(name string) (*manifest.Manifest, []string) {
 			Minecraft: a.Minecraft,
 			Loader:    manifest.Loader{Type: a.Loader.Type, Version: a.Loader.Version},
 			Requires:  map[string]manifest.Require{},
-			Client:    &manifest.Client{},
+			Client:    &manifest.Client{Memory: a.Memory},
 		}
 		if len(a.Authors) > 0 {
 			m.Authors = slices.Clone(a.Authors)

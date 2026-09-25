@@ -142,6 +142,8 @@ type Archive struct {
 	Authors   []string
 	Minecraft string
 	Loader    Loader
+	// Memory is the heap the pack recommends for the client, as client.memory takes it.
+	Memory string
 	// Files are the files the archive lists rather than carries.
 	Files []File
 	// Overrides are the files the archive carries, less the marker jar of the project that

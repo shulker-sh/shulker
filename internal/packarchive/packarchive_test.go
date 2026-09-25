@@ -58,7 +58,8 @@ const cfManifestFixture = `{
   "version": "1.2",
   "author": "someone",
   "files": [{"projectID": 238222, "fileID": 5000001, "required": true}, {"projectID": 306612, "fileID": 5000010, "required": false}],
-  "overrides": "extras"
+  "overrides": "extras",
+  "recommendedRam": 8196
 }`
 
 const mrpackIndexFixture = `{
@@ -229,8 +230,16 @@ func TestManifestFromTheArchive(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, warnings := a.Manifest("things")
-	if len(warnings) != 0 || m.Name != "things" || m.Version != "1.2" || m.Minecraft != "1.20.1" || m.Loader.Type != "neoforge" || m.Client == nil || m.Server != nil || len(m.Authors) != 1 {
+	if len(warnings) != 0 || m.Name != "things" || m.Version != "1.2" || m.Minecraft != "1.20.1" || m.Loader.Type != "neoforge" || m.Client == nil || m.Client.Memory != "8196M" || m.Server != nil || len(m.Authors) != 1 {
 		t.Fatalf("manifest: %+v %v", m, warnings)
+	}
+}
+
+func TestCurseForgeRecommendedRamIsAHeap(t *testing.T) {
+	for ram, want := range map[int]string{0: "", -1: "", 8196: "8196M", 8192: "8G", 1024: "1G", 512: "512M"} {
+		if got := cfHeap(ram); got != want {
+			t.Errorf("cfHeap(%d) = %q, want %q", ram, got, want)
+		}
 	}
 }
 
