@@ -1,4 +1,4 @@
-package fabricver
+package fabric
 
 import (
 	"fmt"

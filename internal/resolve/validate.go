@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/fabricver"
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mavenver"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/version/fabric"
 )
 
 type Problem struct {
@@ -400,7 +400,7 @@ func compareVersions(a, b candidate) int {
 	if a.maven && b.maven {
 		return mavenver.Compare(mavenver.Parse(a.version), mavenver.Parse(b.version))
 	}
-	return fabricver.Compare(fabricver.Parse(a.version), fabricver.Parse(b.version))
+	return fabric.Compare(fabric.Parse(a.version), fabric.Parse(b.version))
 }
 
 type ignoreEntry struct {
@@ -510,7 +510,7 @@ func satisfies(info *jarmeta.Info, on, version, declared string) (bool, error) {
 		return rng.Contains(mavenver.Parse(version)), nil
 	}
 	if on == "minecraft" {
-		version = fabricver.Game(version)
+		version = fabric.Game(version)
 	}
 	return fabricSatisfies(version, declared)
 }
@@ -518,16 +518,16 @@ func satisfies(info *jarmeta.Info, on, version, declared string) (bool, error) {
 // fabricSatisfies matches as Fabric Loader does. Alternatives are joined by "||", the way an array
 // of ranges in fabric.mod.json and a Quilt any-of are held.
 func fabricSatisfies(version, declared string) (bool, error) {
-	var alts []fabricver.Predicate
+	var alts []fabric.Predicate
 	for _, alt := range strings.Split(declared, "||") {
-		p, err := fabricver.ParsePredicate(strings.TrimSpace(alt))
+		p, err := fabric.ParsePredicate(strings.TrimSpace(alt))
 		if err != nil {
 			return false, fmt.Errorf("range %q is not understood", declared)
 		}
 		alts = append(alts, p)
 	}
-	v := fabricver.Parse(version)
-	return slices.ContainsFunc(alts, func(p fabricver.Predicate) bool { return p.Test(v) }), nil
+	v := fabric.Parse(version)
+	return slices.ContainsFunc(alts, func(p fabric.Predicate) bool { return p.Test(v) }), nil
 }
 
 func sortedKeys[V any](m map[string]V) []string {

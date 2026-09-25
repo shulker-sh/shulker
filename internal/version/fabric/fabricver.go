@@ -1,7 +1,7 @@
-// Package fabricver parses, orders and matches versions the way Fabric Loader does: a semantic
+// Package fabric parses, orders and matches versions the way Fabric Loader does: a semantic
 // version has any number of numeric components, and anything else is a plain string version that
 // only equality can match.
-package fabricver
+package fabric
 
 import (
 	"errors"
