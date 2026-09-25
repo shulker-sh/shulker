@@ -2,9 +2,12 @@ package build
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/provider"
 )
 
 func TestEnableShader(t *testing.T) {
@@ -75,4 +78,73 @@ func inCanvas(key string) string {
 
 func inGame(key string) string {
 	return key + " is placed but not enabled; turn it on in game under Options, Video Settings, Shader Packs"
+}
+
+// lockFresh locks a resource pack from the fake CurseForge under key, placed as filename.
+func (p *project) lockFresh(key, filename string) {
+	p.t.Helper()
+	fresh := provider.Project{ID: "600000", Slug: key, Title: "Fresh Animations", Type: manifest.TypeResourcePack}
+	p.lockPack(manifest.TypeResourcePack, key, p.cf, p.cf.publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, packZip(p.t, "fresh")))
+	entry := p.b.Manifest.Requires[key]
+	entry.Filename = filename
+	p.b.Manifest.Requires[key] = entry
+	locked := p.b.Lock.ResourcePacks[key]
+	locked.Filename = filename
+	p.b.Lock.ResourcePacks[key] = locked
+}
+
+func hasWarning(report *Report, text string) bool {
+	return slices.ContainsFunc(report.Warnings, func(w string) bool { return strings.Contains(w, text) })
+}
+
+func TestPackListBeforeOneThirteenNamesPacksBare(t *testing.T) {
+	p := newProject(t)
+	p.b.Manifest.Minecraft, p.b.Lock.Minecraft = "1.12.2", "1.12.2"
+	p.lockFresh("fresh-animations", "Fresh.zip")
+
+	report := p.mustBuild("client", Options{})
+	if got := p.built("client", "options.txt"); !strings.Contains(got, `resourcePacks:["Fresh.zip"]`) {
+		t.Fatalf("a 1.12 seed carries bare names and no vanilla entry: %q", got)
+	}
+	if hasWarning(report, "placed but not enabled") {
+		t.Fatalf("the seeded pack was reported: %v", report.Warnings)
+	}
+
+	p.lockFresh("fresh-animations", "Fresher.zip")
+	report = p.mustBuild("client", Options{})
+	if got := p.built("client", "options.txt"); !strings.Contains(got, `resourcePacks:["Fresher.zip"]`) {
+		t.Fatalf("a renamed pack is swapped by its bare name: %q", got)
+	}
+	if hasWarning(report, "placed but not enabled") {
+		t.Fatalf("the renamed pack was reported: %v", report.Warnings)
+	}
+}
+
+func TestShippedPackListBeforeOneThirteenIsCheckedByBareNames(t *testing.T) {
+	p := newProject(t)
+	p.b.Manifest.Minecraft, p.b.Lock.Minecraft = "1.12.2", "1.12.2"
+	p.lockFresh("fresh-animations", "Fresh.zip")
+	p.file("overrides/options.txt", "resourcePacks:[\"Fresh.zip\",\"Missing.zip\"]\n")
+
+	report := p.mustBuild("client", Options{})
+	if hasWarning(report, "placed but not enabled") {
+		t.Fatalf("a pack the shipped list enables was reported: %v", report.Warnings)
+	}
+	if !hasWarning(report, "options.txt enables Missing.zip, but no pack is placed under that name") {
+		t.Fatalf("no warning for a shipped entry nothing places: %v", report.Warnings)
+	}
+}
+
+func TestPackListFromOneThirteenKeepsTheFilePrefix(t *testing.T) {
+	p := newProject(t)
+	p.b.Manifest.Minecraft, p.b.Lock.Minecraft = "1.13-pre1", "1.13-pre1"
+	p.lockFresh("fresh-animations", "Fresh.zip")
+
+	report := p.mustBuild("client", Options{})
+	if got := p.built("client", "options.txt"); !strings.Contains(got, `resourcePacks:["vanilla","file/Fresh.zip"]`) {
+		t.Fatalf("1.13 seeds file/ entries after vanilla: %q", got)
+	}
+	if hasWarning(report, "placed but not enabled") {
+		t.Fatalf("the seeded pack was reported: %v", report.Warnings)
+	}
 }

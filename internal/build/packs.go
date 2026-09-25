@@ -11,9 +11,52 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/version/minecraft"
 )
 
 const resourcePacksKey = "resourcePacks"
+
+// packForm is how options.txt's enabled list names a placed pack. Minecraft 1.13
+// gave the list its "vanilla" entry and the file/ prefix on a pack from
+// resourcepacks/; before that the list is the bare file names alone.
+type packForm struct{ prefix string }
+
+func (b *Builder) listForm() packForm {
+	if v, err := minecraft.Parse(b.Lock.Minecraft); err == nil && v.Major == 1 && v.Minor < 13 {
+		return packForm{}
+	}
+	return packForm{prefix: "file/"}
+}
+
+func (f packForm) entry(name string) string { return f.prefix + name }
+
+// name is the placed file name an entry enables, false when the entry is not a
+// pack from resourcepacks/.
+func (f packForm) name(entry string) (string, bool) { return strings.CutPrefix(entry, f.prefix) }
+
+// list is options.txt's own syntax: a json array, vanilla first where the game
+// lists it, then each pack's entry.
+func (f packForm) list(names []string) string {
+	quoted := make([]string, 0, len(names)+1)
+	if f.prefix != "" {
+		quoted = append(quoted, `"vanilla"`)
+	}
+	for _, name := range names {
+		quoted = append(quoted, `"`+f.entry(name)+`"`)
+	}
+	return "[" + strings.Join(quoted, ",") + "]"
+}
+
+// rename swaps each old file name in an enabled list for its new one, in place
+// so its priority holds. It is one pass, so a new name that is another pack's
+// old one isn't renamed twice.
+func (f packForm) rename(list string, names map[string]string) string {
+	var pairs []string
+	for from, to := range names {
+		pairs = append(pairs, `"`+f.entry(from)+`"`, `"`+f.entry(to)+`"`)
+	}
+	return strings.NewReplacer(pairs...).Replace(list)
+}
 
 // collectPacks places the resource packs and shaders. Both are client-only, and
 // both are placed under their requires key rather than the provider's file name,
@@ -185,7 +228,7 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		if !present {
 			live = was
 		}
-		if swapped := renamePacks(live, renamed); swapped != live {
+		if swapped := b.listForm().rename(live, renamed); swapped != live {
 			options[resourcePacksKey] = swapped
 		}
 		return
@@ -196,7 +239,7 @@ func (b *Builder) seedResourcePacks(side string, opts Options, desired map[strin
 		}
 	}
 	if packs := placedPacks(desired); len(packs) > 0 {
-		options[resourcePacksKey] = packList(packs)
+		options[resourcePacksKey] = b.listForm().list(packs)
 	}
 }
 
@@ -300,8 +343,9 @@ func (b *Builder) reportPackList(side string, opts Options, desired map[string]s
 	var entries []string
 	_ = json.Unmarshal([]byte(list), &entries)
 	placed := placedPacks(desired)
+	form := b.listForm()
 	for _, name := range placed {
-		if slices.Contains(entries, "file/"+name) {
+		if slices.Contains(entries, form.entry(name)) {
 			continue
 		}
 		report.Warnings = append(report.Warnings, fmt.Sprintf("%s is placed but not enabled; turn it on in game under Options, Resource Packs", strings.TrimSuffix(name, ".zip")))
@@ -310,7 +354,7 @@ func (b *Builder) reportPackList(side string, opts Options, desired map[string]s
 		return nil
 	}
 	for _, entry := range entries {
-		if name, ok := strings.CutPrefix(entry, "file/"); ok && !slices.Contains(placed, name) {
+		if name, ok := form.name(entry); ok && !slices.Contains(placed, name) {
 			report.Warnings = append(report.Warnings, fmt.Sprintf("%s enables %s, but no pack is placed under that name", b.Manifest.OptionsPath(), name))
 		}
 	}
@@ -342,28 +386,6 @@ func (b *Builder) placedPackNames(desired map[string]source) map[string]string {
 		}
 	}
 	return names
-}
-
-// renamePacks swaps each old file name in an enabled list for its new one, in
-// place so its priority holds. It is one pass, so a new name that is another
-// pack's old one isn't renamed twice.
-func renamePacks(list string, names map[string]string) string {
-	var pairs []string
-	for from, to := range names {
-		pairs = append(pairs, `"file/`+from+`"`, `"file/`+to+`"`)
-	}
-	return strings.NewReplacer(pairs...).Replace(list)
-}
-
-// packList is options.txt's own syntax: a json array, vanilla first, each pack
-// as file/<name>.
-func packList(names []string) string {
-	quoted := make([]string, 0, len(names)+1)
-	quoted = append(quoted, `"vanilla"`)
-	for _, name := range names {
-		quoted = append(quoted, `"file/`+name+`"`)
-	}
-	return "[" + strings.Join(quoted, ",") + "]"
 }
 
 // untouchedPackList reports whether the list is still what Minecraft writes for
