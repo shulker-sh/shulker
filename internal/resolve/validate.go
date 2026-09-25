@@ -123,7 +123,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	if err != nil {
 		return nil, err
 	}
-	sc := sideCheck{infos: infos, unread: unread, builtin: builtin, topLevelOnly: l.TopLevelMandatory, byName: map[string]string{}}
+	sc := sideCheck{infos: infos, unread: unread, builtin: builtin, compatible: l.CompatibleVersions, topLevelOnly: l.TopLevelMandatory, byName: map[string]string{}}
 	for _, id := range r.lockIDs() {
 		sc.byName[id] = id
 		if slug := r.Lock.Mods[id].Slug; slug != "" {
@@ -186,6 +186,7 @@ type sideCheck struct {
 	// unread are the locked mods whose jars aren't downloaded, by lock key.
 	unread       map[string]bool
 	builtin      map[string]string
+	compatible   map[string][]string
 	topLevelOnly bool
 	// byName is each locked mod's key by its key and its provider slug.
 	byName map[string]string
@@ -232,7 +233,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 				continue
 			}
 			if ok {
-				match, err := satisfies(info, on, found, declared)
+				match, err := satisfies(info, on, found, declared, sc.compatible[on])
 				if err != nil {
 					v.Warnings = append(v.Warnings, fmt.Sprintf("%s depends on %s %s but %s: not checked", id, on, declared, err))
 					continue
@@ -254,7 +255,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 				v.Suggestions = append(v.Suggestions, Suggestion{Mod: id, Kind: "optional", On: on, Declared: declared, InstalledAs: sc.byName[on]})
 				continue
 			}
-			match, err := satisfies(info, on, found, declared)
+			match, err := satisfies(info, on, found, declared, sc.compatible[on])
 			if err != nil {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s optionally depends on %s %s but %s: not checked", id, on, declared, err))
 				continue
@@ -269,7 +270,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 			if !ok {
 				continue
 			}
-			match, err := satisfies(info, on, found, declared)
+			match, err := satisfies(info, on, found, declared, sc.compatible[on])
 			if err != nil {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s breaks %s %s but %s: not checked", id, on, declared, err))
 				continue
@@ -283,7 +284,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 			if !ok {
 				continue
 			}
-			if match, err := satisfies(info, on, found, info.Conflicts[on]); err == nil && match {
+			if match, err := satisfies(info, on, found, info.Conflicts[on], sc.compatible[on]); err == nil && match {
 				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s)", id, info.Version, on, info.Conflicts[on], found))
 			}
 		}
@@ -382,13 +383,13 @@ func accepts(infos map[string]*jarmeta.Info, id, version string) bool {
 	for _, info := range infos {
 		for _, set := range []map[string]string{info.Depends, info.Optional} {
 			if declared, ok := set[id]; ok {
-				if match, err := satisfies(info, id, version, declared); err == nil && !match {
+				if match, err := satisfies(info, id, version, declared, nil); err == nil && !match {
 					return false
 				}
 			}
 		}
 		if declared, ok := info.Breaks[id]; ok {
-			if match, err := satisfies(info, id, version, declared); err == nil && match {
+			if match, err := satisfies(info, id, version, declared, nil); err == nil && match {
 				return false
 			}
 		}
@@ -501,13 +502,13 @@ func (p Problem) ignoreCommand() string {
 	return fmt.Sprintf(`shulker ignore %s %s --rule %s --declared "%s" --note "why this is safe"`, p.Mod, p.On, p.Rule, p.Declared)
 }
 
-func satisfies(info *jarmeta.Info, on, version, declared string) (bool, error) {
+func satisfies(info *jarmeta.Info, on, version, declared string, also []string) (bool, error) {
 	if info.UsesMavenRanges {
 		rng, err := maven.ParseRange(declared)
 		if err != nil {
 			return false, err
 		}
-		return rng.Contains(maven.Parse(version)), nil
+		return rng.Contains(maven.Parse(version)) || slices.ContainsFunc(also, func(v string) bool { return rng.Contains(maven.Parse(v)) }), nil
 	}
 	if on == "minecraft" {
 		version = fabric.Game(version)

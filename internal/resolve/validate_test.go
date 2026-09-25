@@ -76,12 +76,12 @@ func TestSatisfiesMinecraftAsFabricSeesIt(t *testing.T) {
 		{"1.21-pre1", ">=1.21-beta.1", true},
 		{"1.20.1", "~1.20", true},
 	} {
-		got, err := satisfies(&jarmeta.Info{}, "minecraft", c.version, c.declared)
+		got, err := satisfies(&jarmeta.Info{}, "minecraft", c.version, c.declared, nil)
 		if err != nil || got != c.want {
 			t.Errorf("satisfies(minecraft %q, %q) = %v, %v, want %v", c.version, c.declared, got, err, c.want)
 		}
 	}
-	if got, _ := satisfies(&jarmeta.Info{}, "some-mod", "24w33a", ">=1.21.2-"); got {
+	if got, _ := satisfies(&jarmeta.Info{}, "some-mod", "24w33a", ">=1.21.2-", nil); got {
 		t.Error("a mod versioned like a weekly snapshot is matched as the game")
 	}
 }
@@ -163,6 +163,34 @@ func TestValidateNeoForgeMavenRanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Problem{{Rule: "depends", Mod: "iris", ModVersion: "1.9.0", On: "sodium", Declared: "[mc26.2-0.9,)", Found: "mc26.2-0.8.1"}}
+	if !reflect.DeepEqual(v.Problems, want) || len(v.Warnings) > 0 {
+		t.Fatalf("problems %+v, warnings %v, want %+v", v.Problems, v.Warnings, want)
+	}
+}
+
+func TestValidateNeoForgeAcceptsFMLsSupportMatrix(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	jars := map[string]string{
+		"jei": "[[mods]]\nmodId=\"jei\"\nversion=\"19.57.0.446\"\n" +
+			"[[dependencies.jei]]\nmodId=\"minecraft\"\ntype=\"required\"\nversionRange=\"[1.21, 1.21.1)\"\n" +
+			"[[dependencies.jei]]\nmodId=\"neoforge\"\ntype=\"required\"\nversionRange=\"[21.0.166,21.1)\"\n",
+		"old": "[[mods]]\nmodId=\"old\"\nversion=\"1.0\"\n" +
+			"[[dependencies.old]]\nmodId=\"minecraft\"\ntype=\"required\"\nversionRange=\"[1.20.6]\"\n",
+	}
+	l := &lock.Lock{Minecraft: "1.21.1", Loader: lock.Loader{Type: "neoforge", Version: "21.1.251"}, Mods: map[string]lock.Mod{}}
+	for id, toml := range jars {
+		sha, err := c.Put(bytes.NewReader(zipBytes(t, "META-INF/neoforge.mods.toml", toml)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Mods[id] = lock.Mod{Sha512: sha, Side: "both"}
+	}
+	r := &Resolver{Manifest: &manifest.Manifest{}, Lock: l, Cache: c}
+	v, err := r.Validate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Problem{{Rule: "depends", Mod: "old", ModVersion: "1.0", On: "minecraft", Declared: "[1.20.6]", Found: "1.21.1"}}
 	if !reflect.DeepEqual(v.Problems, want) || len(v.Warnings) > 0 {
 		t.Fatalf("problems %+v, warnings %v, want %+v", v.Problems, v.Warnings, want)
 	}

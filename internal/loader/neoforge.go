@@ -25,12 +25,16 @@ var neoforge = Loader{
 }
 
 // neoforgeOnMinecraft is NeoForge before 1.21.5, whose FML rejects a mod file that names no
-// modLoader and loaderVersion. From 1.21.5 on both are optional, and FML warns that lowcodefml
-// is deprecated.
+// modLoader and loaderVersion (from 1.21.5 on both are optional, and FML warns that lowcodefml is
+// deprecated), and the rows of FML's VersionSupportMatrix.
 func neoforgeOnMinecraft(l Loader, mc minecraft.Version) Loader {
 	if minecraft.Compare(mc, minecraft.MustParse("1.21.5")) < 0 {
 		l.MarkerModLoader = "lowcodefml"
 	}
+	l.CompatibleVersions = supportMatrix(mc, map[string]map[string][]string{
+		"1.21.1": {"minecraft": {"1.21"}, "neoforge": {"21.0.166"}},
+		"1.21.8": {"minecraft": {"1.21.7"}, "neoforge": {"21.7.26-beta"}},
+	})
 	return l
 }
 

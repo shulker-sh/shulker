@@ -24,7 +24,8 @@ var forge = Loader{
 }
 
 // forgeOnMinecraft is Forge before 1.13, which reads @Mod annotations and mcmod.info and has no
-// marker jar, and before 1.17, whose installers set no serverJarPath or args file.
+// marker jar, before 1.17, whose installers set no serverJarPath or args file, and the rows of
+// FML's VersionSupportMatrix.
 func forgeOnMinecraft(l Loader, mc minecraft.Version) Loader {
 	if minecraft.Compare(mc, minecraft.MustParse("1.13")) < 0 {
 		l.MetadataFiles = []string{"mcmod.info"}
@@ -35,6 +36,11 @@ func forgeOnMinecraft(l Loader, mc minecraft.Version) Loader {
 		l.RootServerJars = true
 		l.MinecraftJarClassifier = ""
 	}
+	l.CompatibleVersions = supportMatrix(mc, map[string]map[string][]string{
+		"1.19.2": {"minecraft": {"1.19.1"}, "forge": {"42.0.9"}},
+		"1.20.1": {"forge": {"47.1.79"}},
+		"1.21.1": {"minecraft": {"1.21"}, "forge": {"51.0.33"}},
+	})
 	return l
 }
 

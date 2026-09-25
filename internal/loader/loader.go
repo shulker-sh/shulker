@@ -104,6 +104,10 @@ type Loader struct {
 	// with it. Empty leaves both keys out, for a loader that rejects a loaderVersion without a
 	// modLoader and defaults a missing modLoader itself: NeoForge from 1.21.5 on.
 	MarkerModLoader string
+	// CompatibleVersions are the versions, by dependency id, that a Maven range which rejects the
+	// running minecraft or loader version may accept instead: FML's VersionSupportMatrix, for a
+	// Minecraft patch release that keeps its mods compatible with the one before.
+	CompatibleVersions map[string][]string
 	// MarkerIconFile means the TOML marker names its logo as iconFile too, for a loader that shows
 	// the square icon beside the name only from that key.
 	MarkerIconFile bool
@@ -141,6 +145,17 @@ type Loader struct {
 	// onMinecraft is the row as it runs on one Minecraft version, for a loader whose older
 	// generations differ.
 	onMinecraft func(l Loader, mc minecraft.Version) Loader
+}
+
+// supportMatrix is the row of an FML VersionSupportMatrix for the running Minecraft version. The
+// rows are read from each FML branch; see docs/research/fml-version-support-matrix.md.
+func supportMatrix(mc minecraft.Version, rows map[string]map[string][]string) map[string][]string {
+	for game, row := range rows {
+		if minecraft.Compare(mc, minecraft.MustParse(game)) == 0 {
+			return row
+		}
+	}
+	return nil
 }
 
 // ArtifactVersion is the version the loader publishes its own jars under.

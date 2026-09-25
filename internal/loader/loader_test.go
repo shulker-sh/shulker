@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"reflect"
 	"slices"
 	"testing"
 
@@ -77,5 +78,24 @@ func TestServerJarNames(t *testing.T) {
 	}
 	if got := l.InstalledServerJar("1.12.2", "14.23.5.2860"); got != "forge-1.12.2-14.23.5.2860.jar" {
 		t.Errorf("installed jar %q", got)
+	}
+}
+
+func TestForCarriesFMLsSupportMatrixRow(t *testing.T) {
+	for _, c := range []struct {
+		name, minecraft string
+		want            map[string][]string
+	}{
+		{"neoforge", "1.21.1", map[string][]string{"minecraft": {"1.21"}, "neoforge": {"21.0.166"}}},
+		{"neoforge", "1.21.8", map[string][]string{"minecraft": {"1.21.7"}, "neoforge": {"21.7.26-beta"}}},
+		{"neoforge", "1.21.4", nil},
+		{"forge", "1.20.1", map[string][]string{"forge": {"47.1.79"}}},
+		{"forge", "1.21.1", map[string][]string{"minecraft": {"1.21"}, "forge": {"51.0.33"}}},
+		{"fabric", "1.21.1", nil},
+	} {
+		l, _ := For(c.name, c.minecraft)
+		if !reflect.DeepEqual(l.CompatibleVersions, c.want) {
+			t.Errorf("%s on %s: %v, want %v", c.name, c.minecraft, l.CompatibleVersions, c.want)
+		}
 	}
 }
