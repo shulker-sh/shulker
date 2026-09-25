@@ -45,7 +45,7 @@ func TestLookup(t *testing.T) {
 		{[]string{"link", "prism"}, "section cli: shulker link prism"},
 		{[]string{"sides"}, "section concepts: Sides"},
 		{[]string{"manifest", "require"}, "section manifest: require"},
-		{[]string{"Edits in the build directory"}, "section concepts: Edits in the build directory"},
+		{[]string{"Edits in the build directory"}, "section concepts: Edits in the Build Directory"},
 		{[]string{"completion"}, "matches"},
 		{[]string{"modpack"}, "section cli: shulker modpack add|remove|list"},
 		{[]string{"build", "directory"}, "hits"},
