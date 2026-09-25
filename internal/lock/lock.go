@@ -119,6 +119,7 @@ type Mod struct {
 	Sha512        string   `json:"sha512"`
 	Size          int64    `json:"size,omitempty"`
 	Side          string   `json:"side"`
+	SideFrom      string   `json:"sideFrom,omitempty"`
 	Channel       string   `json:"channel,omitempty"`
 	Modpack       string   `json:"modpack,omitempty"`
 	ModID         string   `json:"modId,omitempty"`

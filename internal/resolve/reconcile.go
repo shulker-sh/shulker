@@ -66,7 +66,7 @@ func (r *Resolver) Reconcile(ctx context.Context) (reresolved []string, err erro
 		}
 		// A new side needs no new version, so it is taken without resolving again.
 		if d.entry.Side != "" {
-			m.Side = d.entry.Side
+			m.Side, m.SideFrom = d.entry.Side, sideFromRequires
 		}
 		if len(project.ModDifferences(r.fileDir(id, "", d.entry.File), id, d.entry, m)) > 0 {
 			targets = append(targets, id)

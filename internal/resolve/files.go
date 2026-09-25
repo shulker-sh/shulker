@@ -239,9 +239,9 @@ func (r *Resolver) relockFile(ctx context.Context, dir, id string, entry manifes
 	if err := r.modIDFree(info.ID, id); err != nil {
 		return err
 	}
-	side := info.Side
+	side, sideFrom := jarSide(info)
 	if entry.Side != "" {
-		side = entry.Side
+		side, sideFrom = entry.Side, sideFromRequires
 	}
 	m := lock.Mod{
 		File:       entry.File,
@@ -249,6 +249,7 @@ func (r *Resolver) relockFile(ctx context.Context, dir, id string, entry manifes
 		Sha512:     got.sha512,
 		Size:       got.size,
 		Side:       side,
+		SideFrom:   sideFrom,
 		RequiredBy: []string{},
 	}
 	if info.ID != id {

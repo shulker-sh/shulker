@@ -214,6 +214,11 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 	if arc.Marker != nil {
 		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
 	}
+	all := &Changes{}
+	for _, id := range slices.Sorted(maps.Keys(r.Lock.Mods)) {
+		all.Added = append(all.Added, AddedMod{ID: id})
+	}
+	mods.Warnings = append(mods.Warnings, all.DependencySides(r.Lock.Mods)...)
 	return mods, nil
 }
 
@@ -602,7 +607,7 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, pack
 	}
 	if entry.Side != "" {
 		locked := im.r.Lock.Mods[id]
-		locked.Side = entry.Side
+		locked.Side, locked.SideFrom = entry.Side, sideFromRequires
 		im.r.Lock.Mods[id] = locked
 	}
 	im.r.setSource(&entry, id, p, proj)

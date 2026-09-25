@@ -463,7 +463,7 @@ func (r *Resolver) settle(id, side, channel string) {
 	}
 	m.Channel = channelLabel(channel)
 	if side != "" {
-		m.Side = side
+		m.Side, m.SideFrom = side, sideFromRequires
 	}
 	r.Lock.Mods[id] = m
 }
@@ -545,12 +545,12 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			return id, prior, nil
 		}
 	}
-	side := proj.Side
+	side, sideFrom := proj.Side, sideFromProvider
 	if side == "" {
-		side = info.Side
+		side, sideFrom = jarSide(info)
 	}
 	if sideOverride != "" {
-		side = sideOverride
+		side, sideFrom = sideOverride, sideFromRequires
 	}
 	entry := lock.Mod{
 		Provider:      p.Name(),
@@ -563,6 +563,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		Sha512:        got.sha512,
 		Size:          v.File.Size,
 		Side:          side,
+		SideFrom:      sideFrom,
 		Channel:       channelLabel(channel),
 		RequiredBy:    []string{},
 	}
@@ -575,7 +576,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	if prior != nil && !replacesProject {
 		entry.Aliases = maps.Clone(prior.Aliases)
 		if sideOverride == "" {
-			entry.Side = prior.Side
+			entry.Side, entry.SideFrom = prior.Side, prior.SideFrom
 		}
 		setAlias(&entry, prior.Provider, prior.Project)
 		clearAlias(&entry, p.Name())
