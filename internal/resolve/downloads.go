@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"sort"
 
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 )
 
-const DownloadsDir = pack.DownloadsDir
+const DownloadsDir = modpack.DownloadsDir
 
 type dropped struct {
 	Name   string

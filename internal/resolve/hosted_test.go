@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -53,7 +53,7 @@ func TestAModpackMemberPinnedToABetaFileLocksBeta(t *testing.T) {
 	cf := newHost(newCDN(t), "curseforge").likeCurseForge()
 	betaDependency(t, cf)
 	h := newHarness(t, cf)
-	base := &pack.Loaded{Name: "base", Kind: pack.Local, Manifest: &manifest.Manifest{
+	base := &modpack.Loaded{Name: "base", Kind: modpack.Local, Manifest: &manifest.Manifest{
 		Name: "base", Minecraft: "~26.2", Loader: manifest.Loader{Type: "fabric"},
 		Requires: map[string]manifest.Require{"framework": {Provider: "curseforge", Project: "667391", Pin: "5600001"}},
 	}}

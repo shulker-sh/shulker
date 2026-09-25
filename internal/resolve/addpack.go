@@ -6,15 +6,15 @@ import (
 	"slices"
 
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
 // AddPackSource resolves one modpack source through store and puts it in the manifest under the
 // key as names, or the name the pack's own manifest carries. A source already in the manifest, or
 // a key another entry holds, is refused.
-func (r *Resolver) AddPackSource(ctx context.Context, store *pack.Store, source, as string, entry manifest.Require) error {
+func (r *Resolver) AddPackSource(ctx context.Context, store *modpack.Store, source, as string, entry manifest.Require) error {
 	for _, existing := range r.Manifest.Modpacks() {
 		if existing.Source == source && existing.Path == entry.Path {
 			return out.Errorf("modpack-exists", "modpack %s is already in the manifest", source)
@@ -39,7 +39,7 @@ func (r *Resolver) AddPackSource(ctx context.Context, store *pack.Store, source,
 // archive outside the project, or in a folder whose files something else owns, is copied into
 // manifest.FilesDir, and adding the same file again refreshes that copy and relocks it, keeping
 // its locked and auto-update flags. A second key for the same file is refused.
-func (r *Resolver) AddArchive(ctx context.Context, store *pack.Store, path, as string, entry manifest.Require) error {
+func (r *Resolver) AddArchive(ctx context.Context, store *modpack.Store, path, as string, entry manifest.Require) error {
 	if st, err := os.Stat(path); err != nil || !st.Mode().IsRegular() {
 		return out.Errorf("file-not-found", "%s is not a file", path)
 	}
@@ -66,7 +66,7 @@ func (r *Resolver) AddArchive(ctx context.Context, store *pack.Store, path, as s
 			return out.Errorf("modpack-exists", "modpack %s is already in the manifest as %s", rel, name)
 		}
 	}
-	if err := pack.CheckArchive(key, path); err != nil {
+	if err := modpack.CheckArchive(key, path); err != nil {
 		return err
 	}
 	entry.Source, entry.Type, entry.File = "", manifest.TypeModpack, rel
@@ -98,7 +98,7 @@ func (r *Resolver) AddArchive(ctx context.Context, store *pack.Store, path, as s
 // LockHosted locks the hosted modpack entry through store and puts it in the manifest under key,
 // in place of the modpack already loaded there. The channel its version came from is recorded
 // unless it is release.
-func (r *Resolver) LockHosted(ctx context.Context, store *pack.Store, p *project.Project, key string, entry manifest.Require) error {
+func (r *Resolver) LockHosted(ctx context.Context, store *modpack.Store, p *project.Project, key string, entry manifest.Require) error {
 	loaded, err := store.Resolve(ctx, key, entry)
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (r *Resolver) LockHosted(ctx context.Context, store *pack.Store, p *project
 	if channel := loaded.Pin.Channel; channel != "release" {
 		entry.Channel = channel
 	}
-	i := slices.IndexFunc(r.Packs, func(l *pack.Loaded) bool { return l.Name == key })
+	i := slices.IndexFunc(r.Packs, func(l *modpack.Loaded) bool { return l.Name == key })
 	if i < 0 {
 		return r.addLoadedPack(ctx, store, key, key, loaded, entry)
 	}
@@ -123,7 +123,7 @@ func (r *Resolver) LockHosted(ctx context.Context, store *pack.Store, p *project
 // addLoadedPack adds a resolved modpack under key. One built for another Minecraft than the
 // project's is refused as modpack-mismatch, unless AskUnlock says to unlock it, which resolves it
 // again as name with its mods resolved here.
-func (r *Resolver) addLoadedPack(ctx context.Context, store *pack.Store, name, key string, loaded *pack.Loaded, entry manifest.Require) error {
+func (r *Resolver) addLoadedPack(ctx context.Context, store *modpack.Store, name, key string, loaded *modpack.Loaded, entry manifest.Require) error {
 	r.Warnings = append(r.Warnings, scoped(key, loaded.Warnings)...)
 	err := r.AddPack(ctx, loaded)
 	if r.AskUnlock != nil && unlockAnswers(err, loaded, r.Lock.Minecraft) {
@@ -150,6 +150,6 @@ func (r *Resolver) addLoadedPack(ctx context.Context, store *pack.Store, name, k
 
 // unlockAnswers reports whether a modpack refused for its platform is the one refusal unlocking
 // answers: locked, and built for another Minecraft than the project's.
-func unlockAnswers(err error, l *pack.Loaded, minecraft string) bool {
-	return out.CodeOf(err) == "modpack-mismatch" && l.Kind != pack.Hosted && l.UsesLock && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
+func unlockAnswers(err error, l *modpack.Loaded, minecraft string) bool {
+	return out.CodeOf(err) == "modpack-mismatch" && l.Kind != modpack.Hosted && l.UsesLock && l.Lock != nil && minecraft != "" && l.Lock.Minecraft != minecraft
 }

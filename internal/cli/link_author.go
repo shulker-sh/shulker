@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -25,7 +25,7 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 			return nil, err
 		}
 		if source != "" {
-			return a.openSource(ctx, source, pack.At{})
+			return a.openSource(ctx, source, modpack.At{})
 		}
 	}
 	opts := initOptions{loaderName: noLoader, loaderVersion: "*"}
@@ -54,5 +54,5 @@ func (a *app) authorSource(cmd *cobra.Command) (*syncSource, error) {
 			return nil, err
 		}
 	}
-	return &syncSource{Checkout: &pack.Checkout{Kind: pack.Local}, project: project.Authored(locked, minecraft, l, display), isAuthor: true}, nil
+	return &syncSource{Checkout: &modpack.Checkout{Kind: modpack.Local}, project: project.Authored(locked, minecraft, l, display), isAuthor: true}, nil
 }

@@ -8,7 +8,7 @@ import (
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 )
 
 // OwnPaths are the paths of a project's own files, relative to its folder: its lock, override
@@ -24,7 +24,7 @@ func OwnPaths(m *manifest.Manifest) []string {
 		if req.File != "" {
 			paths = append(paths, req.File)
 		}
-		if pack.Classify(req.Source) == pack.Local && req.Source != "" && filepath.IsLocal(req.Source) {
+		if modpack.Classify(req.Source) == modpack.Local && req.Source != "" && filepath.IsLocal(req.Source) {
 			paths = append(paths, filepath.ToSlash(filepath.Clean(req.Source)))
 		}
 	}

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 
 	"shulker.sh/shulker/internal/build"
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -39,7 +39,7 @@ type Relocked struct {
 // taken. An in-place project keeps a history entry before the manifest and lock are rewritten,
 // which is the state a rollback puts back. Nothing is saved when the lock is unchanged and not
 // stale and opts say to keep it.
-func (r *Resolver) Relock(ctx context.Context, store *pack.Store, p *project.Project, run func(*project.Project, *Resolver) (pin string, err error), opts RelockOptions) (Relocked, error) {
+func (r *Resolver) Relock(ctx context.Context, store *modpack.Store, p *project.Project, run func(*project.Project, *Resolver) (pin string, err error), opts RelockOptions) (Relocked, error) {
 	if err := p.RequireLock(); err != nil {
 		return Relocked{}, err
 	}
@@ -112,7 +112,7 @@ func (r *Resolver) Relock(ctx context.Context, store *pack.Store, p *project.Pro
 
 // resolveMovedRefs resolves again each modpack whose ref or path moved under the same source, so
 // the relock reads it where the manifest now points.
-func (r *Resolver) resolveMovedRefs(ctx context.Context, store *pack.Store) error {
+func (r *Resolver) resolveMovedRefs(ctx context.Context, store *modpack.Store) error {
 	modpacks := r.Manifest.Modpacks()
 	for i, l := range r.Packs {
 		mp := modpacks[l.Name]

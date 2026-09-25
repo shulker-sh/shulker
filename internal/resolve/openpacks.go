@@ -9,7 +9,7 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -24,14 +24,14 @@ type PackMode struct {
 // OpenPacks reads p's modpacks through store and records them on p for the command's later steps.
 // A new or moved modpack is resolved afresh, and so, on a relock, is one rereads says to take from
 // disk; the rest open at their pins. The warnings say which modpacks were resolved and why.
-func OpenPacks(ctx context.Context, store *pack.Store, p *project.Project, mode PackMode) ([]*pack.Loaded, []string, error) {
+func OpenPacks(ctx context.Context, store *modpack.Store, p *project.Project, mode PackMode) ([]*modpack.Loaded, []string, error) {
 	prior := p.Packs
 	if prior != nil && (prior.IsRelocking || !mode.IsRelocking) {
 		return prior.Loaded, nil, nil
 	}
 	var warnings []string
 	modpacks := p.Manifest.Modpacks()
-	loaded := []*pack.Loaded{}
+	loaded := []*modpack.Loaded{}
 	for _, name := range slices.Sorted(maps.Keys(modpacks)) {
 		mp := modpacks[name]
 		pinned, ok := p.Lock.Modpacks[name]
@@ -40,7 +40,7 @@ func OpenPacks(ctx context.Context, store *pack.Store, p *project.Project, mode 
 		// An earlier read already resolved a new or moved modpack, and holds the rest at the pins a
 		// relock reads them at too, so a relock reads again only what it would take from disk.
 		if prior != nil && (isFresh || !rereads(p.Dir, mp, pinned)) {
-			if i := slices.IndexFunc(prior.Loaded, func(l *pack.Loaded) bool { return l.Name == name }); i >= 0 {
+			if i := slices.IndexFunc(prior.Loaded, func(l *modpack.Loaded) bool { return l.Name == name }); i >= 0 {
 				loaded = append(loaded, prior.Loaded[i])
 				continue
 			}
@@ -93,12 +93,12 @@ const (
 // network. One whose source can't be reached stays as OpenPacks read it, at its pin, without
 // holding back the others, when onUnreachable says so: sync does, but update was asked for new
 // versions.
-func (r *Resolver) RefreshModpacks(ctx context.Context, store *pack.Store, p *project.Project, refresh func(manifest.Require) bool, onUnreachable Unreachable) ([]*pack.Loaded, error) {
+func (r *Resolver) RefreshModpacks(ctx context.Context, store *modpack.Store, p *project.Project, refresh func(manifest.Require) bool, onUnreachable Unreachable) ([]*modpack.Loaded, error) {
 	modpacks := r.Manifest.Modpacks()
-	loaded := make([]*pack.Loaded, 0, len(r.Packs))
+	loaded := make([]*modpack.Loaded, 0, len(r.Packs))
 	for _, l := range r.Packs {
 		mp := modpacks[l.Name]
-		if !refresh(mp) || (l.Kind == pack.File && !archiveMoved(r.Dir, mp, l.Pin, true)) {
+		if !refresh(mp) || (l.Kind == modpack.File && !archiveMoved(r.Dir, mp, l.Pin, true)) {
 			loaded = append(loaded, l)
 			continue
 		}
@@ -121,7 +121,7 @@ func (r *Resolver) RefreshModpacks(ctx context.Context, store *pack.Store, p *pr
 	return loaded, nil
 }
 
-func offlineReason(store *pack.Store) string {
+func offlineReason(store *modpack.Store) string {
 	if store.Fetch != nil && store.Fetch.Offline {
 		return "--offline"
 	}
@@ -140,10 +140,10 @@ func scoped(name string, warnings []string) []string {
 // rereads reports whether a relock reads a modpack afresh rather than at its pin: a local directory
 // always, and an archive when archiveMoved says so, taking changed bytes only when it follows them.
 func rereads(dir string, mp manifest.Require, pinned lock.Modpack) bool {
-	switch pack.KindOf(mp) {
-	case pack.Local:
+	switch modpack.KindOf(mp) {
+	case modpack.Local:
 		return true
-	case pack.File:
+	case modpack.File:
 		return archiveMoved(dir, mp, pinned, mp.AutoUpdates())
 	}
 	return false

@@ -9,8 +9,8 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 )
 
 // CacheRoots reads the locks one directory keeps alive: its own and one per
@@ -35,7 +35,7 @@ func CacheRoots(c *cache.Cache, dir string, from cache.Root) (roots []cache.Root
 	var paths []string
 	// A directory synced from a git or manifest URL runs on the lock of the checkout it was
 	// built from, and falls back offline to the one its last good sync recorded.
-	if kind := pack.Classify(from.Source); from.Source != "" && kind != pack.Local {
+	if kind := modpack.Classify(from.Source); from.Source != "" && kind != modpack.Local {
 		state, _ := ReadState(dir)
 		paths = append(paths, c.SourceLocks(from, state.Commit, state.Sha256)...)
 	}

@@ -26,8 +26,8 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/server"
@@ -173,7 +173,7 @@ type Builder struct {
 	Lock     *lock.Lock
 	LockPath string
 	Cache    *cache.Cache
-	Packs    []*pack.Loaded
+	Packs    []*modpack.Loaded
 	// Providers names the hosts the lock's entries come from, for messages that say who, and an
 	// export asks them which files the archive's format can list.
 	Providers provider.Providers

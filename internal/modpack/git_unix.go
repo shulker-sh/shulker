@@ -1,6 +1,6 @@
 //go:build !windows
 
-package pack
+package modpack
 
 import (
 	"os/exec"

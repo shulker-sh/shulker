@@ -1,4 +1,4 @@
-package pack
+package modpack
 
 import (
 	"archive/tar"

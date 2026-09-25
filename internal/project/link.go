@@ -9,8 +9,8 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 )
 
 // LinkSource is what a link makes an instance follow: the checkout it was read from, the name
@@ -18,7 +18,7 @@ import (
 // is a link's answers rather than a checkout: a project with no directory yet, which the link
 // writes into the instance it creates.
 type LinkSource struct {
-	*pack.Checkout
+	*modpack.Checkout
 	Name     string
 	Project  *Project
 	IsAuthor bool

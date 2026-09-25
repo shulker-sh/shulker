@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -101,7 +101,7 @@ func printList(l *out.Lines, res []project.ListEntry) {
 }
 
 func listItem(l *out.Lines, e project.ListEntry) out.Item {
-	if e.Kind == pack.Hosted {
+	if e.Kind == modpack.Hosted {
 		it := out.Item{Kind: out.Note, Name: e.Key, Version: e.Version, Aside: []string{"modpack"}}
 		if e.Version == "" {
 			it.Aside = append(it.Aside, "not locked")

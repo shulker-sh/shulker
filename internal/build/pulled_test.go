@@ -8,14 +8,14 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 )
 
 // pullPack adds a directory modpack named name beside the project, with the manifest given, and
 // returns it for its files to be written.
-func (p *project) pullPack(name string, m *manifest.Manifest) *pack.Loaded {
+func (p *project) pullPack(name string, m *manifest.Manifest) *modpack.Loaded {
 	p.t.Helper()
 	dir := filepath.Join(p.b.Dir, name)
 	m.Name, m.Minecraft, m.Loader = name, "~26.2", manifest.Loader{Type: "fabric", Version: "*"}
@@ -32,7 +32,7 @@ func (p *project) pullPack(name string, m *manifest.Manifest) *pack.Loaded {
 		p.t.Fatal(err)
 	}
 	p.b.Manifest.Requires[name] = manifest.Require{Source: "./" + name}
-	l := &pack.Loaded{Name: name, Source: "./" + name, Kind: pack.Local, Dir: dir, Manifest: m}
+	l := &modpack.Loaded{Name: name, Source: "./" + name, Kind: modpack.Local, Dir: dir, Manifest: m}
 	p.b.Packs = append(p.b.Packs, l)
 	return l
 }

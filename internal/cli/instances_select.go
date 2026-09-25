@@ -11,8 +11,8 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -254,7 +254,7 @@ func (a *app) syncInstance(cmd *cobra.Command, e project.InstanceEntry, req sync
 	} else if ok {
 		return a.syncInPlace(cmd, p, side, req)
 	}
-	src, err := a.openSource(cmd.Context(), e.Source, pack.At{Ref: e.Ref, Path: e.Path})
+	src, err := a.openSource(cmd.Context(), e.Source, modpack.At{Ref: e.Ref, Path: e.Path})
 	if err != nil {
 		return syncResult{}, err
 	}

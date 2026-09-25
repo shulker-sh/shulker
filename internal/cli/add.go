@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
@@ -20,7 +20,7 @@ func (a *app) addCmd() *cobra.Command { return a.addCmdFor("") }
 func (a *app) addCmdFor(kind string) *cobra.Command {
 	var opts resolve.AddOptions
 	var typ, as string
-	var at pack.At
+	var at modpack.At
 	var unlocked, noAutoUpdate bool
 	cmd := &cobra.Command{
 		Use:         "add " + addArgs(kind),

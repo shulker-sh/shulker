@@ -4,13 +4,13 @@ import (
 	"errors"
 
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 )
 
 // SaveIntent writes what a directory syncs from, keeping the settings block a person may have
 // edited: a sync never touches it. Every directory shulker syncs into gets one, launcher instance
 // or not; a link goes through Intent instead, so it can seed the settings first.
-func SaveIntent(dir string, inPlace bool, source string, at pack.At, side string, assumeClient bool) error {
+func SaveIntent(dir string, inPlace bool, source string, at modpack.At, side string, assumeClient bool) error {
 	f, _, err := Intent(dir, inPlace, source, at, side, assumeClient)
 	if err != nil {
 		return err
@@ -20,7 +20,7 @@ func SaveIntent(dir string, inPlace bool, source string, at pack.At, side string
 
 // Intent is the instance file for a directory with this sync recorded in it, and whether it had
 // to be created, which is what tells a link that the settings are still shulker's to seed.
-func Intent(dir string, inPlace bool, source string, at pack.At, side string, assumeClient bool) (*File, bool, error) {
+func Intent(dir string, inPlace bool, source string, at modpack.At, side string, assumeClient bool) (*File, bool, error) {
 	f, err := Load(dir)
 	fresh := false
 	switch {

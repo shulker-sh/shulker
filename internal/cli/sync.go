@@ -12,8 +12,8 @@ import (
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/local"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/saves"
@@ -22,7 +22,7 @@ import (
 
 type syncResult struct {
 	Source     string               `json:"source"`
-	Kind       pack.Kind            `json:"kind"`
+	Kind       modpack.Kind         `json:"kind"`
 	Path       string               `json:"path,omitempty"`
 	Commit     string               `json:"commit,omitempty"`
 	Sha256     string               `json:"sha256,omitempty"`
@@ -39,7 +39,7 @@ type syncResult struct {
 
 type syncRequest struct {
 	// at is the ref and path a sync names with its source, and what a sync without one refuses.
-	at                  pack.At
+	at                  modpack.At
 	side, into, os      string
 	force, assumeClient bool
 	features            featureFlags
@@ -79,14 +79,14 @@ func (a *app) syncCmd() *cobra.Command {
 				d.fetch.Offline = true
 			}
 			if len(args) == 0 {
-				if req.into != "" && req.side == "" && req.at == (pack.At{}) && a.instance == "" && !sel.all && !sel.narrows() {
+				if req.into != "" && req.side == "" && req.at == (modpack.At{}) && a.instance == "" && !sel.all && !sel.narrows() {
 					res, err := a.syncRecorded(cmd, req)
 					if err != nil {
 						return err
 					}
 					return a.printer.Emit(res, res.print)
 				}
-				if req.into != "" || req.at != (pack.At{}) {
+				if req.into != "" || req.at != (modpack.At{}) {
 					return out.Errorf("usage", "--into, --ref and --path need a source; a registered instance already has them")
 				}
 				if a.instance == "" && !sel.all {
@@ -174,7 +174,7 @@ func (s syncResult) print(l *out.Lines) {
 }
 
 type syncSource struct {
-	*pack.Checkout
+	*modpack.Checkout
 	name    string
 	project *project.Project
 	// isAuthor is a link's answers rather than a source: a project with no directory yet, which the
@@ -182,15 +182,15 @@ type syncSource struct {
 	isAuthor bool
 }
 
-func (s *syncSource) isRemote() bool { return s.Kind != pack.Local }
+func (s *syncSource) isRemote() bool { return s.Kind != modpack.Local }
 
-func (a *app) openSource(ctx context.Context, from string, at pack.At) (*syncSource, error) {
+func (a *app) openSource(ctx context.Context, from string, at modpack.At) (*syncSource, error) {
 	co, err := a.checkout(ctx, from, at)
 	if err != nil {
 		return nil, err
 	}
 	s := &syncSource{Checkout: co, name: co.Source}
-	if co.Kind == pack.Local {
+	if co.Kind == modpack.Local {
 		s.name = co.Dir
 	}
 	if co.Warning != "" {
@@ -385,11 +385,11 @@ func (a *app) sourceLocalFiles(src *syncSource, into string) (proj, inst *local.
 	return proj, inst, nil
 }
 
-func (a *app) sourceStore() *pack.Store {
-	return &pack.Store{Cache: a.d.cache, Fetch: a.d.fetch, Log: a.progress, Warn: a.printer.Warn}
+func (a *app) sourceStore() *modpack.Store {
+	return &modpack.Store{Cache: a.d.cache, Fetch: a.d.fetch, Log: a.progress, Warn: a.printer.Warn}
 }
 
-func (a *app) checkout(ctx context.Context, source string, at pack.At) (*pack.Checkout, error) {
+func (a *app) checkout(ctx context.Context, source string, at modpack.At) (*modpack.Checkout, error) {
 	if _, err := a.deps(); err != nil {
 		return nil, err
 	}

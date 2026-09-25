@@ -10,8 +10,8 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/schema"
 )
 
@@ -32,12 +32,12 @@ type Project struct {
 
 // OpenedPacks are the modpacks a command read for a project, and whether a relock read them.
 type OpenedPacks struct {
-	Loaded      []*pack.Loaded
+	Loaded      []*modpack.Loaded
 	IsRelocking bool
 }
 
 // ReplacePacks records the packs a command resolved again in place of what it first read for p.
-func (p *Project) ReplacePacks(loaded []*pack.Loaded) {
+func (p *Project) ReplacePacks(loaded []*modpack.Loaded) {
 	if p.Packs == nil {
 		p.Packs = &OpenedPacks{}
 	}

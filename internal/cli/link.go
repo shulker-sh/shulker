@@ -15,8 +15,8 @@ import (
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -83,7 +83,7 @@ func (a *app) linkCmd() *cobra.Command {
 // block leaves out.
 type launcherLink struct {
 	launcherDir, instanceName, as string
-	at                            pack.At
+	at                            modpack.At
 	force                         bool
 	ff                            featureFlags
 	ls                            linkSettings
@@ -276,7 +276,7 @@ func (a *app) metaURL(d *deps, e *launcher.Entry) string {
 
 // openLinkSource is what every link does first: check the settings, fetch the source, refuse a loader
 // this build doesn't know, and warn when the pack declares no client.
-func (a *app) openLinkSource(cmd *cobra.Command, args []string, at pack.At, ls linkSettings) (*syncSource, loader.Loader, error) {
+func (a *app) openLinkSource(cmd *cobra.Command, args []string, at modpack.At, ls linkSettings) (*syncSource, loader.Loader, error) {
 	if err := ls.check(); err != nil {
 		return nil, loader.Loader{}, err
 	}
@@ -475,7 +475,7 @@ func (s *syncSource) forLink() *project.LinkSource {
 
 // linkSource is the project a link command works from: the argument when there
 // is one, else the project in the current directory.
-func (a *app) linkSource(ctx context.Context, args []string, at pack.At) (*syncSource, error) {
+func (a *app) linkSource(ctx context.Context, args []string, at modpack.At) (*syncSource, error) {
 	if len(args) == 1 {
 		return a.openSource(ctx, args[0], at)
 	}
@@ -490,7 +490,7 @@ func (a *app) linkSource(ctx context.Context, args []string, at pack.At) (*syncS
 
 // linkFrom is linkSource for a link command: at a terminal, with nothing to follow, the link
 // authors the instance itself.
-func (a *app) linkFrom(cmd *cobra.Command, args []string, at pack.At) (*syncSource, error) {
+func (a *app) linkFrom(cmd *cobra.Command, args []string, at modpack.At) (*syncSource, error) {
 	src, err := a.linkSource(cmd.Context(), args, at)
 	if len(args) > 0 || !errors.Is(err, project.ErrNoManifest) || !a.canPick() {
 		return src, err
@@ -551,7 +551,7 @@ func (ls linkSettings) isSet() bool {
 }
 
 // save writes what a directory syncs from, and the settings this link decided.
-func (ls linkSettings) save(dir, source string, at pack.At, side string, assumeClient bool, m *manifest.Manifest) error {
+func (ls linkSettings) save(dir, source string, at modpack.At, side string, assumeClient bool, m *manifest.Manifest) error {
 	_, _, inPlace, err := project.InPlace(dir)
 	if err != nil {
 		return err
@@ -594,7 +594,7 @@ func (a *app) projectSource() (*syncSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &syncSource{Checkout: &pack.Checkout{Source: dir, Kind: pack.Local, Dir: dir}, name: dir, project: p}, nil
+	return &syncSource{Checkout: &modpack.Checkout{Source: dir, Kind: modpack.Local, Dir: dir}, name: dir, project: p}, nil
 }
 
 func (a *app) saveInstanceFeatures(gameDir string, ff featureFlags) error {

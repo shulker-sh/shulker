@@ -7,13 +7,13 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 )
 
 // lockedPack is a directory modpack listing keys, whose lock is a copy of the project's own, the
 // way a modpack resolved on the same providers and platform would carry.
-func (h *harness) lockedPack(name string, keys ...string) *pack.Loaded {
+func (h *harness) lockedPack(name string, keys ...string) *modpack.Loaded {
 	m := &manifest.Manifest{Name: name, Minecraft: "~26.2", Loader: manifest.Loader{Type: "fabric", Version: "*"}, Requires: map[string]manifest.Require{}, Client: &manifest.Client{}}
 	for _, key := range keys {
 		m.Requires[key] = h.r.Manifest.Requires[key]
@@ -24,7 +24,7 @@ func (h *harness) lockedPack(name string, keys ...string) *pack.Loaded {
 	for _, kind := range manifest.PackKinds {
 		maps.Copy(l.Packs(kind), h.r.Lock.Packs(kind))
 	}
-	return &pack.Loaded{Name: name, Source: "./" + name, Kind: pack.Local, Manifest: m, Lock: l, UsesLock: true, Pin: lock.Modpack{Source: "./" + name}}
+	return &modpack.Loaded{Name: name, Source: "./" + name, Kind: modpack.Local, Manifest: m, Lock: l, UsesLock: true, Pin: lock.Modpack{Source: "./" + name}}
 }
 
 // followLocked hands the named keys to a locked modpack and drops them from the project itself.

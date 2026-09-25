@@ -13,8 +13,8 @@ import (
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/zipfile"
 )
@@ -36,7 +36,7 @@ func (r *Resolver) cacheLocal(dir, key, rel, lockedSha512 string, folders bool) 
 	st, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
 		if lockedSha512 == "" || !r.Cache.Has(lockedSha512) {
-			return localCopy{}, pack.FileMissing(key, rel)
+			return localCopy{}, modpack.FileMissing(key, rel)
 		}
 		r.warnOnce(project.FileGone(key, rel))
 		path := r.Cache.Object(lockedSha512)
@@ -50,7 +50,7 @@ func (r *Resolver) cacheLocal(dir, key, rel, lockedSha512 string, folders bool) 
 		return localCopy{}, err
 	}
 	if !st.Mode().IsRegular() && !(folders && st.IsDir()) {
-		return localCopy{}, pack.NotAFile(key, rel)
+		return localCopy{}, modpack.NotAFile(key, rel)
 	}
 	return r.putLocal(path, st)
 }
@@ -99,15 +99,15 @@ func (r *Resolver) fileDir(id, modpack, file string) string {
 // cachePackFiles hashes the local files a locked modpack's own lock names into the cache, from the
 // modpack's directory. An entry the modpack took from a modpack of its own names a path in a
 // directory this project never sees, so only the cache can serve it.
-func (r *Resolver) cachePackFiles(p *pack.Loaded) error {
-	check := func(key, file, modpack, sha512 string, folders bool) error {
+func (r *Resolver) cachePackFiles(p *modpack.Loaded) error {
+	check := func(key, file, nested, sha512 string, folders bool) error {
 		if file == "" {
 			return nil
 		}
 		label := "modpack " + p.Name + ": " + key
-		if modpack != "" || p.Dir == "" {
+		if nested != "" || p.Dir == "" {
 			if !r.Cache.Has(sha512) {
-				return pack.FileMissing(label, file)
+				return modpack.FileMissing(label, file)
 			}
 			return nil
 		}
@@ -149,7 +149,7 @@ func (r *Resolver) checkLocalFiles() error {
 			continue
 		}
 		if !r.Cache.Has(f.sha512) {
-			return pack.FileMissing(f.id, f.file)
+			return modpack.FileMissing(f.id, f.file)
 		}
 		r.warnOnce(project.FileGone(f.id, f.file))
 	}

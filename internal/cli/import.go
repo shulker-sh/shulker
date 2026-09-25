@@ -14,8 +14,8 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
@@ -41,7 +41,7 @@ type importResult struct {
 // importFlags are import's own flags.
 type importFlags struct {
 	name, typ, side, provider string
-	at                        pack.At
+	at                        modpack.At
 	ignoreShulker             bool
 }
 
@@ -188,14 +188,14 @@ func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive,
 // as a source; a URL as an archive by its content, else a git or manifest source; and anything
 // else as a modpack slug, fitting target's platform when there is a target to merge into. It
 // returns the archive, or the source's checkout.
-func (a *app) findImport(ctx context.Context, d *deps, dir string, target *project.Project, arg string, f *importFlags) (*packarchive.Archive, *pack.Checkout, error) {
+func (a *app) findImport(ctx context.Context, d *deps, dir string, target *project.Project, arg string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, error) {
 	if !isImportURL(arg) {
 		path := a.localPath(arg)
 		if resolve.IsLocalFolder(path) {
 			return a.importCheckout(ctx, d, dir, path, f)
 		}
 		if _, err := os.Stat(path); err == nil {
-			if err := refuseImportFlags(f, pack.File); err != nil {
+			if err := refuseImportFlags(f, modpack.File); err != nil {
 				return nil, nil, err
 			}
 			arc, err := readImportArchive(path, f.typ)
@@ -203,14 +203,14 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 		}
 		return a.importHosted(ctx, d, dir, target, arg, f)
 	}
-	if (strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")) && pack.Classify(arg) == pack.Git {
-		store := &pack.Store{Cache: d.cache, Fetch: d.fetch, Log: a.progress}
+	if (strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")) && modpack.Classify(arg) == modpack.Git {
+		store := &modpack.Store{Cache: d.cache, Fetch: d.fetch, Log: a.progress}
 		path, err := store.FetchArchive(ctx, arg)
 		if err != nil {
 			return nil, nil, err
 		}
 		if path != "" {
-			if err := refuseImportFlags(f, pack.File); err != nil {
+			if err := refuseImportFlags(f, modpack.File); err != nil {
 				return nil, nil, err
 			}
 			arc, err := readImportArchive(path, f.typ)
@@ -221,22 +221,22 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 }
 
 func isImportURL(arg string) bool {
-	return pack.Classify(arg) != pack.Local || strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")
+	return modpack.Classify(arg) != modpack.Local || strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")
 }
 
 // refuseImportFlags refuses the flags that don't apply to a modpack of kind, with the codes a
 // source uses for --ref and --path.
-func refuseImportFlags(f *importFlags, kind pack.Kind) error {
-	if f.at.Ref != "" && kind != pack.Git {
+func refuseImportFlags(f *importFlags, kind modpack.Kind) error {
+	if f.at.Ref != "" && kind != modpack.Git {
 		return out.Errorf("source-ref", "--ref only applies to git sources")
 	}
-	if err := pack.CheckPath(f.at.Path, kind); err != nil {
+	if err := modpack.CheckPath(f.at.Path, kind); err != nil {
 		return err
 	}
-	if f.provider != "" && kind != pack.Hosted {
+	if f.provider != "" && kind != modpack.Hosted {
 		return out.Errorf("usage", "--provider only applies to a modpack slug")
 	}
-	if f.typ == "source" && (kind == pack.File || kind == pack.Hosted) {
+	if f.typ == "source" && (kind == modpack.File || kind == modpack.Hosted) {
 		return out.Errorf("usage", "--type source names a shulker project, and this is a modpack archive")
 	}
 	return nil
@@ -244,8 +244,8 @@ func refuseImportFlags(f *importFlags, kind pack.Kind) error {
 
 // importHosted picks a hosted modpack's newest release that fits target's platform, or any
 // platform without a target, and reads its archive from the cache.
-func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *project.Project, slug string, f *importFlags) (*packarchive.Archive, *pack.Checkout, error) {
-	if err := refuseImportFlags(f, pack.Hosted); err != nil {
+func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *project.Project, slug string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, error) {
+	if err := refuseImportFlags(f, modpack.Hosted); err != nil {
 		return nil, nil, err
 	}
 	r := &resolve.Resolver{Dir: dir, Manifest: &manifest.Manifest{}, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
@@ -262,22 +262,22 @@ func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *pro
 }
 
 // importCheckout fetches a shulker source for an import to copy.
-func (a *app) importCheckout(ctx context.Context, d *deps, dir, source string, f *importFlags) (*packarchive.Archive, *pack.Checkout, error) {
-	kind := pack.Classify(source)
+func (a *app) importCheckout(ctx context.Context, d *deps, dir, source string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, error) {
+	kind := modpack.Classify(source)
 	if err := refuseImportFlags(f, kind); err != nil {
 		return nil, nil, err
 	}
 	if want, ok := packarchive.Lookup(f.typ); ok {
 		return nil, nil, out.Errorf("usage", "%s is a shulker source, not a %s modpack", source, want.Title())
 	}
-	store := &pack.Store{Cache: d.cache, ProjectDir: dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn}
+	store := &modpack.Store{Cache: d.cache, ProjectDir: dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn}
 	c, err := store.Checkout(ctx, source, f.at)
 	return nil, c, err
 }
 
 // importSource creates the project as a copy of a shulker source: its manifest, its lock, whose
 // entries the relock reuses, and its files and override folders. A failure removes what it copied.
-func (a *app) importSource(cmd *cobra.Command, dir string, c *pack.Checkout, f *importFlags) error {
+func (a *app) importSource(cmd *cobra.Command, dir string, c *modpack.Checkout, f *importFlags) error {
 	src, err := project.OpenReplacingLock(c.Dir)
 	if err != nil {
 		return err

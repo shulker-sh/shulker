@@ -12,8 +12,8 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/local"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -172,7 +172,7 @@ func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool)
 		e.Help = fmt.Sprintf("run `shulker sync <source> --into %s` once", dir)
 		return nil, e
 	}
-	if sc.source, err = a.openSource(cmd.Context(), sc.state.Source, pack.At{Ref: sc.state.Ref, Path: sc.state.Path}); err != nil {
+	if sc.source, err = a.openSource(cmd.Context(), sc.state.Source, modpack.At{Ref: sc.state.Ref, Path: sc.state.Path}); err != nil {
 		return nil, err
 	}
 	sc.project = sc.source.project

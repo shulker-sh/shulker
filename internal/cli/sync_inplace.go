@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -56,11 +56,11 @@ func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, r
 }
 
 func (a *app) buildInPlace(ctx context.Context, dir string, req syncRequest) (syncResult, error) {
-	src, err := a.openSource(ctx, dir, pack.At{})
+	src, err := a.openSource(ctx, dir, modpack.At{})
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.at, req.into = pack.At{}, ""
+	req.at, req.into = modpack.At{}, ""
 	return a.sync(ctx, src, req)
 }
 

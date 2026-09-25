@@ -14,7 +14,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/local"
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 )
 
 func gitPack(t *testing.T, name, mods, file string) (repo, source, first string) {
@@ -226,7 +226,7 @@ func TestPreLaunchInPlaceFallsBackToTheLock(t *testing.T) {
 	repo, source, _ := gitPack(t, "follow", "", "follow.txt")
 	h.mustRun(t, "modpack", "add", source)
 	h.mustRun(t, "install")
-	if err := instance.SaveIntent(h.dir, true, h.dir, pack.At{}, "client", false); err != nil {
+	if err := instance.SaveIntent(h.dir, true, h.dir, modpack.At{}, "client", false); err != nil {
 		t.Fatal(err)
 	}
 	h.mustRun(t, "add", "sodium")

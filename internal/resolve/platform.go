@@ -12,9 +12,9 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/version/dotted"
 	"shulker.sh/shulker/internal/version/minecraft"
@@ -37,7 +37,7 @@ type Meta struct {
 // locked modpack supplies one. The relock leaves the lock's platform alone then, and
 // Validate refuses it at the end, once the command body has had its chance to add the
 // modpack that supplies one.
-func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*pack.Loaded) (*Platform, error) {
+func (mt *Meta) Platform(ctx context.Context, m *manifest.Manifest, packs []*modpack.Loaded) (*Platform, error) {
 	inherited, err := inheritedPlatform(m, packs)
 	if err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func (r *Resolver) inheritedDifferences() ([]string, error) {
 
 // inheritedPlatform takes the Minecraft version and loader the manifest leaves out
 // from the locked modpacks. Each pins exact versions, so they all have to agree.
-func inheritedPlatform(m *manifest.Manifest, packs []*pack.Loaded) (*Platform, error) {
+func inheritedPlatform(m *manifest.Manifest, packs []*modpack.Loaded) (*Platform, error) {
 	p := &Platform{}
 	var minecraftFrom, loaderFrom string
 	for _, l := range packs {

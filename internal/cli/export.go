@@ -11,8 +11,8 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 )
@@ -30,7 +30,7 @@ func (a *app) exportCmd() *cobra.Command {
 
 type exportFlags struct {
 	version, output, side, osName string
-	at                            pack.At
+	at                            modpack.At
 	bundle, assumeClient          bool
 	ff                            featureFlags
 }

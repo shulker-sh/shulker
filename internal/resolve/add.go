@@ -19,8 +19,8 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -33,7 +33,7 @@ type Resolver struct {
 	Providers provider.Providers
 	Cache     *cache.Cache
 	Fetch     *fetch.Client
-	Packs     []*pack.Loaded
+	Packs     []*modpack.Loaded
 	Meta      *Meta
 	Log       func(format string, args ...any)
 	// Warnings are raised while resolving, for the command to print when it finishes.

@@ -10,8 +10,8 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 )
 
 type ModpackChange struct {
@@ -52,7 +52,7 @@ func (r *Resolver) directMods() map[string]directMod {
 
 // packMods lists the mod ids a modpack provides: the entries of its own lock
 // when it is locked, dependencies included, and its manifest's otherwise.
-func packMods(p *pack.Loaded) []string {
+func packMods(p *modpack.Loaded) []string {
 	if p.UsesLock && p.Lock != nil {
 		return sortedKeys(p.Lock.Mods)
 	}
@@ -77,12 +77,12 @@ func (r *Resolver) directIDs() []string {
 // the project doesn't list itself.
 func (r *Resolver) CheckPacks() error {
 	own := r.Manifest.Mods()
-	owner := map[string]*pack.Loaded{}
+	owner := map[string]*modpack.Loaded{}
 	for _, p := range r.Packs {
 		// With no platform yet, the locked modpacks are what supplies one, so there is
 		// nothing to check them against until the next pass.
 		if r.Lock.Minecraft != "" {
-			if err := pack.Compatible(p, r.Lock.Minecraft, r.Lock.Loader); err != nil {
+			if err := modpack.Compatible(p, r.Lock.Minecraft, r.Lock.Loader); err != nil {
 				return err
 			}
 		}
@@ -106,7 +106,7 @@ func (r *Resolver) CheckPacks() error {
 // packConflict reports two modpacks that disagree about one mod: locked ones by
 // the version each pins, floating ones by the settings each lists. A locked
 // modpack and a floating one don't conflict, because the locked version wins.
-func packConflict(prev, p *pack.Loaded, id string) error {
+func packConflict(prev, p *modpack.Loaded, id string) error {
 	if prev.UsesLock || p.UsesLock {
 		if !prev.UsesLock || !p.UsesLock {
 			return nil
@@ -129,7 +129,7 @@ func packConflictError(headline, id string) *out.Error {
 	return e
 }
 
-func (r *Resolver) AddPack(ctx context.Context, l *pack.Loaded) error {
+func (r *Resolver) AddPack(ctx context.Context, l *modpack.Loaded) error {
 	before := r.directMods()
 	r.Packs = append(r.Packs, l)
 	if err := r.CheckPacks(); err != nil {
@@ -232,7 +232,7 @@ func (r *Resolver) dropPackZips(name string) {
 
 // RefreshPacks makes loaded the project's modpacks, pinning each in the lock and dropping the pins of
 // any no longer loaded.
-func (r *Resolver) RefreshPacks(loaded []*pack.Loaded) error {
+func (r *Resolver) RefreshPacks(loaded []*modpack.Loaded) error {
 	r.Packs = loaded
 	if err := r.CheckPacks(); err != nil {
 		return err

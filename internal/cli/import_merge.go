@@ -7,15 +7,15 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 )
 
 // mergeImport merges a modpack into the project p, the project winning on every clash.
-func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *packarchive.Archive, source *pack.Checkout, f *importFlags) error {
+func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *packarchive.Archive, source *modpack.Checkout, f *importFlags) error {
 	ctx := cmd.Context()
 	dir := p.Dir
 	sides, err := mergeSides(p.Manifest, f.side)

@@ -10,7 +10,7 @@ import (
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 )
@@ -46,7 +46,7 @@ func (m *Merged) Undo() {
 
 // IncomingFromSource reads a shulker source for a merge: its manifest, its lock, and the files in
 // its override folders.
-func IncomingFromSource(c *pack.Checkout) (*Incoming, error) {
+func IncomingFromSource(c *modpack.Checkout) (*Incoming, error) {
 	src, err := project.OpenReplacingLock(c.Dir)
 	if err != nil {
 		return nil, err
@@ -64,7 +64,7 @@ func IncomingFromSource(c *pack.Checkout) (*Incoming, error) {
 // Inlined is a required modpack as a pack to merge: the project's lock entries it provides, taken
 // out of the project's lock and listed under the pack's own requires entry where it has one, its
 // manifest's blocks, and its override files.
-func Inlined(p *project.Project, loaded *pack.Loaded) (*Incoming, error) {
+func Inlined(p *project.Project, loaded *modpack.Loaded) (*Incoming, error) {
 	key := loaded.Name
 	pm := *loaded.Manifest
 	pm.Requires = map[string]manifest.Require{}
@@ -192,7 +192,7 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 			continue
 		}
 		if _, err := os.Stat(from); inc.Dir == "" || err != nil {
-			return rep, pack.FileMissing(inc.Manifest.Name, rel)
+			return rep, modpack.FileMissing(inc.Manifest.Name, rel)
 		}
 		rep.Created = append(rep.Created, to)
 		if err := fsutil.CopyPath(from, to); err != nil {

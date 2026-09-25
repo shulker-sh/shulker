@@ -11,8 +11,8 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 )
 
@@ -24,7 +24,7 @@ var craftFiles = []cfPackFile{
 
 // craftArchive writes a CurseForge pack under the project at rel, with a config and a jar in its
 // overrides folder and a modlist beside them, and reads it back as the modpack craft.
-func craftArchive(t *testing.T, h *harness, rel string, files []cfPackFile, extras map[string]string) *pack.Loaded {
+func craftArchive(t *testing.T, h *harness, rel string, files []cfPackFile, extras map[string]string) *modpack.Loaded {
 	t.Helper()
 	path := filepath.Join(h.r.Dir, filepath.FromSlash(rel))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -44,7 +44,7 @@ func craftArchive(t *testing.T, h *harness, rel string, files []cfPackFile, extr
 		t.Fatal(err)
 	}
 	sum := sha512.Sum512(data)
-	return &pack.Loaded{Name: "craft", Source: rel, Kind: pack.File, Archive: arc, Pin: lock.Modpack{File: rel, Sha512: hex.EncodeToString(sum[:]), Size: int64(len(data))}}
+	return &modpack.Loaded{Name: "craft", Source: rel, Kind: modpack.File, Archive: arc, Pin: lock.Modpack{File: rel, Sha512: hex.EncodeToString(sum[:]), Size: int64(len(data))}}
 }
 
 func craftExtras() map[string]string {
@@ -53,7 +53,7 @@ func craftExtras() map[string]string {
 
 // consume locks the archive as the modpack's own, the way the pack store does before it adds the
 // modpack to the project, and adds it to the project locked.
-func (h *harness) consume(l *pack.Loaded) error {
+func (h *harness) consume(l *modpack.Loaded) error {
 	h.t.Helper()
 	if err := h.r.ConsumeArchive(context.Background(), l); err != nil {
 		return err

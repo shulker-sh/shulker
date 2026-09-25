@@ -16,9 +16,9 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
@@ -215,12 +215,12 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 	return &build.Builder{Dir: p.Dir, Manifest: p.Manifest, Lock: p.Lock, LockPath: p.LockPath(), Cache: d.cache, Packs: packs, Providers: d.providers, Fetch: d.fetch, Log: a.progress}, nil
 }
 
-func (a *app) packStore(p *project.Project) (*pack.Store, error) {
+func (a *app) packStore(p *project.Project) (*modpack.Store, error) {
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
 	}
-	consume := func(ctx context.Context, l *pack.Loaded) error {
+	consume := func(ctx context.Context, l *modpack.Loaded) error {
 		r := &resolve.Resolver{Dir: p.Dir, Manifest: p.Manifest, Providers: d.providers, Cache: d.cache, Fetch: d.fetch, Log: a.progress}
 		return r.ConsumeArchive(ctx, l)
 	}
@@ -230,7 +230,7 @@ func (a *app) packStore(p *project.Project) (*pack.Store, error) {
 		a.warn(r.Warnings)
 		return pin, err
 	}
-	return &pack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
+	return &modpack.Store{Cache: d.cache, ProjectDir: p.Dir, Fetch: d.fetch, Log: a.progress, Warn: a.printer.Warn, Lock: p.Lock, Consume: consume, Obtain: obtain}, nil
 }
 
 // managedJava ensures the lock's runtime component. fix is the Fix row a runtime-unavailable error

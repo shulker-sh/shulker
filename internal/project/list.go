@@ -6,7 +6,7 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/pack"
+	"shulker.sh/shulker/internal/modpack"
 )
 
 // ListEntry is one row of a listing: a modpack with its status, a mod or pack
@@ -18,7 +18,7 @@ type ListEntry struct {
 	Version    string              `json:"version,omitempty"`
 	File       string              `json:"file,omitempty"`
 	Source     string              `json:"source,omitempty"`
-	Kind       pack.Kind           `json:"kind,omitempty"`
+	Kind       modpack.Kind        `json:"kind,omitempty"`
 	Ref        string              `json:"ref,omitempty"`
 	Path       string              `json:"path,omitempty"`
 	State      string              `json:"state,omitempty"`
@@ -34,7 +34,7 @@ type ListEntry struct {
 
 // ModpackStatus is where one modpack stands against the lock; pinned and
 // locked are the lock's entry, if the lock has one.
-type ModpackStatus func(key string, req manifest.Require, pinned lock.Modpack, locked bool) (pack.Status, error)
+type ModpackStatus func(key string, req manifest.Require, pinned lock.Modpack, locked bool) (modpack.Status, error)
 
 // ListEntries is every row a listing of kind shows, or of every kind when
 // kind is empty: modpacks first, then mods, then the packs of each kind.
@@ -56,7 +56,7 @@ func ListEntries(p *Project, kind string, status ModpackStatus) ([]ListEntry, er
 				Key: key, Type: manifest.TypeModpack, Listed: true, Version: st.Pin,
 				Source: st.Source, Kind: st.Kind, Ref: st.Ref, Path: st.Path, State: st.State,
 			}
-			if st.Kind == pack.Hosted {
+			if st.Kind == modpack.Hosted {
 				e.Source, e.Provider = "", st.Source
 				e.Channel, e.Pinned = modpacks[key].Channel, modpacks[key].Pin != ""
 			}

@@ -23,8 +23,8 @@ import (
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -922,7 +922,7 @@ func unpackFile(f *zip.File, to string) error {
 // way Import locks one into a new project, and records in its pin the files the archive lays
 // itself. r's own lock is left alone; only its providers, provider order, cache and fetch client
 // are used.
-func (r *Resolver) ConsumeArchive(ctx context.Context, l *pack.Loaded) error {
+func (r *Resolver) ConsumeArchive(ctx context.Context, l *modpack.Loaded) error {
 	a := l.Archive
 	typ, version := a.Loader.Type, a.Loader.Version
 	m := &manifest.Manifest{Name: l.Name, Minecraft: a.Minecraft, Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}, Providers: r.Manifest.Providers}

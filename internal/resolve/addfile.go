@@ -14,8 +14,8 @@ import (
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/zipfile"
 )
@@ -33,7 +33,7 @@ func IsLocalPath(arg string) bool {
 // IsSlug reports whether a modpack argument names a project on a provider rather than a source: it
 // is no URL, no path and no directory that exists under dir, the directory the command acts on.
 func IsSlug(arg, dir string) bool {
-	if pack.Classify(arg) != pack.Local || strings.ContainsAny(arg, `/\`) || arg == "." || arg == ".." {
+	if modpack.Classify(arg) != modpack.Local || strings.ContainsAny(arg, `/\`) || arg == "." || arg == ".." {
 		return false
 	}
 	path := arg

@@ -1,6 +1,6 @@
 // Package pack loads the modpacks a project requires from a directory, a git repository, a URL, a
 // local archive or a provider, and checks them against the project's platform.
-package pack
+package modpack
 
 import (
 	"context"
