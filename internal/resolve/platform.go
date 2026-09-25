@@ -10,13 +10,13 @@ import (
 
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/pack"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/version/dotted"
 	"shulker.sh/shulker/internal/version/minecraft"
 )
 
@@ -228,7 +228,7 @@ func (mt *Meta) LoaderProfile(ctx context.Context, l lock.Loader, game string) (
 }
 
 func (mt *Meta) loaderVersion(ctx context.Context, row loader.Loader, rng, game string) (string, error) {
-	r, err := loaderver.ParseRange(rng)
+	r, err := dotted.ParseRange(rng)
 	if err != nil {
 		return "", rangeInvalid("loader.version", rng, err)
 	}
@@ -236,13 +236,13 @@ func (mt *Meta) loaderVersion(ctx context.Context, row loader.Loader, rng, game 
 	if err != nil {
 		return "", err
 	}
-	var candidates []loaderver.Version
+	var candidates []dotted.Version
 	for _, lv := range versions {
-		if v, err := loaderver.Parse(lv.Version); err == nil && (lv.Stable || !r.IsAny()) {
+		if v, err := dotted.Parse(lv.Version); err == nil && (lv.Stable || !r.IsAny()) {
 			candidates = append(candidates, v)
 		}
 	}
-	v, ok := loaderver.Newest(candidates, r)
+	v, ok := dotted.Newest(candidates, r)
 	if !ok {
 		return "", out.Errorf("platform-not-found", "no %s loader version matches %q for minecraft %s", row.Name, rng, game)
 	}
@@ -332,9 +332,9 @@ func (mt *Meta) LoaderVersions(ctx context.Context, name, game string) ([]string
 	if err != nil {
 		return nil, "", err
 	}
-	var all, stable []loaderver.Version
+	var all, stable []dotted.Version
 	for _, lv := range list {
-		v, err := loaderver.Parse(lv.Version)
+		v, err := dotted.Parse(lv.Version)
 		if err != nil {
 			continue
 		}
@@ -343,11 +343,11 @@ func (mt *Meta) LoaderVersions(ctx context.Context, name, game string) ([]string
 			stable = append(stable, v)
 		}
 	}
-	slices.SortFunc(all, func(a, b loaderver.Version) int { return loaderver.Compare(b, a) })
+	slices.SortFunc(all, func(a, b dotted.Version) int { return dotted.Compare(b, a) })
 	ids := make([]string, len(all))
 	for i, v := range all {
 		ids[i] = v.ID
 	}
-	newest, _ := loaderver.Newest(stable, loaderver.Range{})
+	newest, _ := dotted.Newest(stable, dotted.Range{})
 	return ids, newest.ID, nil
 }

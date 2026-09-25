@@ -13,9 +13,9 @@ import (
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/version/dotted"
 	"shulker.sh/shulker/internal/version/minecraft"
 	"shulker.sh/shulker/internal/zipfile"
 )
@@ -335,10 +335,10 @@ func minecraftMatches(raw, id string) bool {
 }
 
 func loaderMatches(raw, id string) bool {
-	rng, err := loaderver.ParseRange(raw)
+	rng, err := dotted.ParseRange(raw)
 	if err != nil {
 		return false
 	}
-	v, err := loaderver.Parse(id)
+	v, err := dotted.Parse(id)
 	return err == nil && rng.Matches(v)
 }

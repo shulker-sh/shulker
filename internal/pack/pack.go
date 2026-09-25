@@ -19,11 +19,11 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
-	"shulker.sh/shulker/internal/loaderver"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
+	"shulker.sh/shulker/internal/version/dotted"
 	"shulker.sh/shulker/internal/version/minecraft"
 )
 
@@ -494,11 +494,11 @@ func Compatible(l *Loaded, mc string, loader lock.Loader) error {
 	if loader.Type == "" {
 		return nil
 	}
-	lrng, err := loaderver.ParseRange(pm.Loader.Version)
+	lrng, err := dotted.ParseRange(pm.Loader.Version)
 	if err != nil {
 		return rangeInvalid(l.Name, "loader", err)
 	}
-	lv, err := loaderver.Parse(loader.Version)
+	lv, err := dotted.Parse(loader.Version)
 	if err != nil {
 		return err
 	}

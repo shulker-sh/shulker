@@ -1,4 +1,4 @@
-package loaderver
+package dotted
 
 import "shulker.sh/shulker/internal/version"
 

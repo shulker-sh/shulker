@@ -1,7 +1,7 @@
-// Package loaderver compares mod loader versions, which are dotted numbers of any length with an
-// optional semver-style prerelease and build suffix: 0.17.3, 0.31.0-beta.4, 26.2.0.87,
+// Package dotted orders dotted versions of any length with an optional semver-style prerelease
+// and build suffix, the way mod loaders number themselves: 0.17.3, 0.31.0-beta.4, 26.2.0.87,
 // 26.1.0.0-alpha.11+snapshot-7, 65.1.3.
-package loaderver
+package dotted
 
 import (
 	"fmt"
