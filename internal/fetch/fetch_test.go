@@ -1,9 +1,11 @@
 package fetch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -50,5 +52,70 @@ func TestRateLimitedSaysWhenToRetry(t *testing.T) {
 		if !errors.Is(err, ErrRateLimited) || !errors.As(err, &se) || se.RetryAfter != want {
 			t.Errorf("%s: %v", header, err)
 		}
+	}
+}
+
+func noRetryWaits(t *testing.T) {
+	saved := retryWaits
+	retryWaits = []time.Duration{0, 0}
+	t.Cleanup(func() { retryWaits = saved })
+}
+
+// dropping answers after closing the connection unanswered on the first drops requests, as a
+// server closing a kept-alive connection does.
+func dropping(t *testing.T, drops int) (*httptest.Server, *int) {
+	t.Helper()
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls <= drops {
+			conn, _, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				t.Fatal(err)
+			}
+			conn.Close()
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		fmt.Fprintf(w, `{"method": %q, "body": %q}`, r.Method, body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &calls
+}
+
+func TestADroppedConnectionIsRetried(t *testing.T) {
+	noRetryWaits(t)
+	srv, calls := dropping(t, 2)
+	c := New("test")
+	var got struct{ Method, Body string }
+	if err := c.PostJSON(context.Background(), srv.URL, map[string]int{"n": 1}, &got); err != nil {
+		t.Fatal(err)
+	}
+	if *calls != 3 || got.Method != "POST" || got.Body != `{"n":1}` {
+		t.Fatalf("calls %d, got %+v", *calls, got)
+	}
+}
+
+func TestADroppedConnectionFailsOnceTheRetriesRunOut(t *testing.T) {
+	noRetryWaits(t)
+	srv, calls := dropping(t, 3)
+	c := New("test")
+	var buf bytes.Buffer
+	_, err := c.Download(context.Background(), srv.URL+"/a.jar", &buf)
+	if err == nil || !IsNetwork(err) || *calls != 3 {
+		t.Fatalf("calls %d, err %v", *calls, err)
+	}
+}
+
+func TestAServerErrorIsNotRetried(t *testing.T) {
+	noRetryWaits(t)
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		http.Error(w, "broken", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	if err := New("test").GetJSON(context.Background(), srv.URL, &struct{}{}); err == nil || calls != 1 {
+		t.Fatalf("calls %d, err %v", calls, err)
 	}
 }

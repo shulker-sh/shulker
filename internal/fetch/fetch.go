@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -149,13 +150,8 @@ func (c *Client) do(ctx context.Context, method, url string, header http.Header,
 	for k, vs := range header {
 		req.Header[k] = vs
 	}
-	done := func() {}
-	if c.Waiting != nil {
-		done = c.Waiting(req.URL.Hostname())
-	}
-	resp, err := c.HTTP.Do(req)
+	resp, done, err := c.send(req)
 	if err != nil {
-		done()
 		return nil, err
 	}
 	resp.Body = waitingBody{resp.Body, done}
@@ -165,6 +161,44 @@ func (c *Client) do(ctx context.Context, method, url string, header http.Header,
 		return nil, &StatusError{URL: url, Status: resp.StatusCode, Body: answer, RetryAfter: retryAfter(resp)}
 	}
 	return resp, nil
+}
+
+// retryWaits are the pauses before each retry of a request whose connection dropped.
+var retryWaits = []time.Duration{500 * time.Millisecond, 2 * time.Second}
+
+// send makes the request, again after each of retryWaits while its connection drops before an
+// answer. A long run makes hundreds of requests, and a server closing an idle kept-alive connection
+// fails one with a bare EOF that Go's own retry skips for a request with a body.
+func (c *Client) send(req *http.Request) (*http.Response, func(), error) {
+	for attempt := 0; ; attempt++ {
+		done := func() {}
+		if c.Waiting != nil {
+			done = c.Waiting(req.URL.Hostname())
+		}
+		resp, err := c.HTTP.Do(req)
+		if err == nil {
+			return resp, done, nil
+		}
+		done()
+		if attempt == len(retryWaits) || !dropped(err) || (req.Body != nil && req.GetBody == nil) {
+			return nil, nil, err
+		}
+		select {
+		case <-req.Context().Done():
+			return nil, nil, err
+		case <-time.After(retryWaits[attempt]):
+		}
+		if req.GetBody != nil {
+			if req.Body, err = req.GetBody(); err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+}
+
+// dropped is whether err is a connection closed or reset before the server answered.
+func dropped(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED) || errors.Is(err, syscall.EPIPE)
 }
 
 func (c *Client) GetJSON(ctx context.Context, url string, v any) error {
