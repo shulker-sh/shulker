@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"shulker.sh/shulker/internal/out"
@@ -138,21 +139,30 @@ func plainSyntax(data []byte, e *json.SyntaxError) string {
 func schemaProblems(code, file string, ve *jsonschema.ValidationError) *out.Error {
 	printer := message.NewPrinter(language.English)
 	var problems []string
-	var collect func(*jsonschema.ValidationError)
-	collect = func(e *jsonschema.ValidationError) {
+	// parent is the location of e's parent. key, once set, is where a problem with a key is
+	// reported: the key's own checks are located as if its name were the whole document, and the
+	// library gives propertyNames itself a wrong location, so the key is named from the parent's.
+	var collect func(e *jsonschema.ValidationError, parent, key []string)
+	collect = func(e *jsonschema.ValidationError, parent, key []string) {
+		if pn, ok := e.ErrorKind.(*kind.PropertyNames); ok && key == nil {
+			key = append(slices.Clone(parent), pn.Property)
+		}
 		if len(e.Causes) > 0 {
 			for _, cause := range e.Causes {
-				collect(cause)
+				collect(cause, e.InstanceLocation, key)
 			}
 			return
 		}
-		where := strings.Join(e.InstanceLocation, ".")
+		where, problem := strings.Join(e.InstanceLocation, "."), e.ErrorKind.LocalizedString(printer)
+		if key != nil {
+			where, problem = strings.Join(key, "."), "key "+strings.TrimPrefix(problem, "value ")
+		}
 		if where == "" {
 			where = file
 		}
-		problems = append(problems, where+": "+e.ErrorKind.LocalizedString(printer))
+		problems = append(problems, where+": "+problem)
 	}
-	collect(ve)
+	collect(ve, nil, nil)
 	slices.Sort(problems)
 	problems = slices.Compact(problems)
 	if len(problems) == 1 {
