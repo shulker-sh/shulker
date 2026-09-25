@@ -7,7 +7,6 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
-	"shulker.sh/shulker/internal/server"
 )
 
 // KeepSide narrows a project to one side: the other side's block, its entries and its override
@@ -25,7 +24,7 @@ func KeepSide(m *manifest.Manifest, l *lock.Lock, overrides []packarchive.Overri
 	case "server":
 		m.Client = nil
 		if m.Server == nil {
-			m.Server = &manifest.Server{Memory: server.DefaultMemory}
+			m.Server = &manifest.Server{Memory: manifest.DefaultServerMemory}
 		}
 	}
 	for key, req := range m.Requires {

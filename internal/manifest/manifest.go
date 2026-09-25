@@ -620,6 +620,9 @@ func (m *Manifest) UsesMarker() bool { return m.Marker == nil || *m.Marker }
 
 const DefaultHistory = 5
 
+// DefaultServerMemory is the heap a server block gets when it names none.
+const DefaultServerMemory = "4G"
+
 // HistoryKeep is how many history entries `prune` leaves and the count a build
 // warns above. -1 keeps every entry, 0 takes none at all.
 func (m *Manifest) HistoryKeep() int {

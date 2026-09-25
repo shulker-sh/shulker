@@ -8,7 +8,6 @@ import (
 
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
-	"shulker.sh/shulker/internal/server"
 )
 
 // Manifest is the manifest a project imported from the archive starts from, with the warnings
@@ -31,7 +30,7 @@ func (a *Archive) Manifest(name string) (*manifest.Manifest, []string) {
 			m.Authors = slices.Clone(a.Authors)
 		}
 		if a.NeedsServer() {
-			m.Server = &manifest.Server{Memory: server.DefaultMemory}
+			m.Server = &manifest.Server{Memory: manifest.DefaultServerMemory}
 		}
 		return m, nil
 	}

@@ -14,7 +14,6 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
-	"shulker.sh/shulker/internal/server"
 )
 
 type initResult struct {
@@ -94,7 +93,7 @@ func (a *app) initCmd() *cobra.Command {
 				Requires:  map[string]manifest.Require{},
 			}
 			if opts.side == "server" {
-				m.Server = &manifest.Server{EULA: false, Memory: server.DefaultMemory, Properties: map[string]any{"difficulty": "easy"}}
+				m.Server = &manifest.Server{EULA: false, Memory: manifest.DefaultServerMemory, Properties: map[string]any{"difficulty": "easy"}}
 			}
 			if opts.side == "client" {
 				m.Client = project.NewClient()

@@ -5,14 +5,14 @@ import (
 	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
 const (
-	DefaultMemory = "4G"
-	FlagsAikars   = "aikars"
-	FlagsNone     = "none"
-	largeHeapMB   = 12 * 1024
+	FlagsAikars = "aikars"
+	FlagsNone   = "none"
+	largeHeapMB = 12 * 1024
 )
 
 var aikarsCommon = []string{
@@ -52,7 +52,7 @@ var aikarsLarge = []string{
 // JVMArgs are a server's heap flags, its preset's tuning flags and the author's own, in that order.
 func JVMArgs(memory, preset string, extra []string) ([]string, error) {
 	if memory == "" {
-		memory = DefaultMemory
+		memory = manifest.DefaultServerMemory
 	}
 	mb, err := memoryMB(memory)
 	if err != nil {
@@ -81,7 +81,7 @@ func memoryMB(memory string) (int, error) {
 	n, err := strconv.Atoi(memory[:len(memory)-1])
 	if err != nil || n <= 0 || (unit != "M" && unit != "G") {
 		e := out.Errorf("memory", "server memory %q must be a whole number of M or G", memory)
-		e.Help = fmt.Sprintf("for example %q", DefaultMemory)
+		e.Help = fmt.Sprintf("for example %q", manifest.DefaultServerMemory)
 		return 0, e
 	}
 	if unit == "G" {
