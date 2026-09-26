@@ -142,6 +142,8 @@ type relockPlan struct {
 	local func(*manifest.Manifest) []string
 	// ok is the line that confirms the command, printed first.
 	ok func(l *out.Lines, res lockChanges)
+	// isFetched marks a command that already fetched what it added, so no install nudge follows.
+	isFetched bool
 }
 
 func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
@@ -208,7 +210,7 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 			}
 			return
 		}
-		if !res.IsEmpty() {
+		if !res.IsEmpty() && !plan.isFetched {
 			l.Nudge("Download and build what changed", "shulker install")
 		}
 	})

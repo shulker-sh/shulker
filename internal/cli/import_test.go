@@ -458,7 +458,7 @@ func TestImportCreatesTheProjectInTheCurrentFolder(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(here, manifest.FileName)); err != nil {
 		t.Fatalf("not imported here: %v", err)
 	}
-	if strings.Contains(stdout, "cd ") || !strings.Contains(stdout, "shulker install") {
+	if strings.Contains(stdout, "cd ") || !strings.Contains(stdout, "Play it in a launcher:\n    $ shulker link <launcher>") || strings.Contains(stdout, "shulker install") {
 		t.Fatalf("nudge: %s", stdout)
 	}
 	h.mustRun(t, "-C", "new", "import", archive)

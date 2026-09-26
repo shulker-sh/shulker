@@ -130,7 +130,7 @@ func (a *app) addModpacks(cmd *cobra.Command, sources []string, opts resolve.Add
 	if err := refuseModpackFlags(cmd, hosted, !slices.ContainsFunc(sources, func(s string) bool { return !isHosted(s) })); err != nil {
 		return err
 	}
-	return a.relock(cmd, relockPlan{}, func(p *project.Project, r *resolve.Resolver) (string, error) {
+	return a.relock(cmd, relockPlan{isFetched: true}, func(p *project.Project, r *resolve.Resolver) (string, error) {
 		store, err := a.packStore(p)
 		if err != nil {
 			return "", err

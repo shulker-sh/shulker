@@ -146,7 +146,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 func (a *app) emitImport(res importResult, rows ...out.Row) error {
 	return a.printer.Emit(res, func(l *out.Lines) {
 		l.OKInto("Imported "+res.Name+" "+res.Version, res.Dir, resolve.PlatformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version), append(rows, importRows(res.Mods, res.KeptYours, res.LeftOut)...)...)
-		l.Nudge("Download and build it", "shulker install")
+		l.Nudge("Play it in a launcher", "shulker link <launcher>")
 	})
 }
 
