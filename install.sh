@@ -26,6 +26,9 @@
 # Pass flags through sh with -s --:
 #
 #   curl -fsSL https://shulker.sh/install.sh | sh -s -- --no-modify-path
+#
+# To uninstall, run `shulker self uninstall`, then delete the line marked
+# "# Added by the shulker installer" from your shell's startup file.
 set -eu
 
 INSTALL_DIR="${SHULKER_INSTALL_DIR:-$HOME/.local/bin}"

@@ -24,6 +24,9 @@
 # Set them in the same session before running it:
 #
 #   $env:SHULKER_NO_MODIFY_PATH = '1'; irm https://shulker.sh/install.ps1 | iex
+#
+# To uninstall, run `shulker self uninstall`, then remove the install directory from your
+# user PATH: search Start for "Edit environment variables for your account".
 
 # iex runs this in your own PowerShell session. Wrapping it in a script block keeps its
 # variables and settings out of that session, and a failure is printed rather than exiting,
