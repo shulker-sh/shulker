@@ -1,17 +1,12 @@
 package cli
 
 import (
-	"errors"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
-	"shulker.sh/shulker/internal/lock"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -24,27 +19,6 @@ type cacheInfo struct {
 	Locks      int      `json:"locks"`
 	Prunable   int64    `json:"prunable"`
 	Unreadable []string `json:"unreadable,omitempty"`
-}
-
-// roots are the locks a prune must not strip: every registered instance's and
-// the project the command runs in, each with the locks of its history entries,
-// and each lock file named with --lock.
-// A root whose lock won't load is carried as a problem rather than an error, so
-// `cache info` can still report while `cache prune` refuses.
-type roots struct {
-	locks      []cache.Root
-	instances  int
-	project    bool
-	lockFiles  int
-	unreadable []string
-}
-
-func (r roots) count() int {
-	n := r.instances + r.lockFiles
-	if r.project {
-		n++
-	}
-	return n
 }
 
 func (a *app) cacheCmd() *cobra.Command {
@@ -76,12 +50,12 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			would, err := d.Cache.Prune(r.locks, true)
+			would, err := r.Prune(d.Cache, true)
 			if err != nil {
 				return err
 			}
-			res := cacheInfo{Usage: usage, Roots: r.count(), Instances: r.instances, Project: r.project, LockFiles: r.lockFiles, Locks: len(r.locks), Prunable: would.Bytes, Unreadable: r.unreadable}
-			for _, problem := range r.unreadable {
+			res := cacheInfo{Usage: usage, Roots: r.Count(), Instances: r.Instances, Project: r.Project, LockFiles: r.LockFiles, Locks: len(r.Locks), Prunable: would.Bytes, Unreadable: r.Unreadable}
+			for _, problem := range r.Unreadable {
 				a.printer.Warn("%s", problem)
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
@@ -96,7 +70,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 					rows = append(rows, out.Row{Text: out.HumanBytes(would.Bytes) + " prunable (" + prunedAside(would) + ")"})
 				}
 				l.Tree(rows...)
-				if !would.Empty() && len(r.unreadable) == 0 {
+				if !would.Empty() && len(r.Unreadable) == 0 {
 					l.Nudge("Free it", "shulker cache prune")
 				}
 			})
@@ -126,10 +100,7 @@ func (a *app) cachePruneCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if len(r.unreadable) > 0 {
-				return out.Errorf("cache-root-unreadable", "%s", r.unreadable[0])
-			}
-			pruned, err := d.Cache.Prune(r.locks, false)
+			pruned, err := r.Prune(d.Cache, false)
 			if err != nil {
 				return err
 			}
@@ -146,86 +117,39 @@ func (a *app) cachePruneCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *app) cacheRoots(named []string) (roots, error) {
+func (a *app) cacheRoots(named []string) (build.Roots, error) {
 	d, err := a.deps()
 	if err != nil {
-		return roots{}, err
+		return build.Roots{}, err
 	}
 	entries, err := a.loadInstanceEntries()
 	if err != nil {
-		return roots{}, err
-	}
-	var r roots
-	for _, path := range named {
-		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-			return roots{}, out.Errorf("lock-not-found", "%s doesn't exist", path)
-		} else if err != nil {
-			return roots{}, err
-		}
-		r.lockFiles++
-		lk, err := lock.Load(path)
-		if err != nil {
-			r.unreadable = append(r.unreadable, path+" can't be read, so pruning could remove files it needs ("+out.AsError(err).Message+"); fix it, or leave out its --lock")
-			continue
-		}
-		r.locks = append(r.locks, cache.Root{Lock: lk})
-	}
-	seen := map[string]bool{}
-	for _, in := range entries {
-		dir := filepath.Clean(in.Dir)
-		if seen[dir] {
-			continue
-		}
-		seen[dir] = true
-		locks, present, unreadable, err := build.CacheRoots(d.Cache, dir, cache.Root{Source: in.Source, Ref: in.Ref, Path: in.Path})
-		if err != nil {
-			return roots{}, err
-		}
-		if !present {
-			continue
-		}
-		r.instances++
-		r.locks = append(r.locks, locks...)
-		r.unreadable = append(r.unreadable, unreadable...)
+		return build.Roots{}, err
 	}
 	dir := a.dir
 	if dir == "" {
 		if dir, err = os.Getwd(); err != nil {
-			return roots{}, err
+			return build.Roots{}, err
 		}
 	}
-	dir = filepath.Clean(dir)
-	if seen[dir] {
-		return r, nil
-	}
-	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err != nil {
-		return r, nil
-	}
-	locks, _, unreadable, err := build.CacheRoots(d.Cache, dir, cache.Root{})
-	if err != nil {
-		return roots{}, err
-	}
-	r.project = true
-	r.locks = append(r.locks, locks...)
-	r.unreadable = append(r.unreadable, unreadable...)
-	return r, nil
+	return build.CacheRoots(d.Cache, entries, dir, named)
 }
 
-func rootsText(r roots) string {
+func rootsText(r build.Roots) string {
 	var parts []string
-	if r.instances > 0 {
-		parts = append(parts, plural(r.instances, "instance", "instances"))
+	if r.Instances > 0 {
+		parts = append(parts, plural(r.Instances, "instance", "instances"))
 	}
-	if r.project {
+	if r.Project {
 		parts = append(parts, "this project")
 	}
-	if r.lockFiles > 0 {
-		parts = append(parts, plural(r.lockFiles, "lock file", "lock files"))
+	if r.LockFiles > 0 {
+		parts = append(parts, plural(r.LockFiles, "lock file", "lock files"))
 	}
 	if len(parts) == 0 {
 		return "no roots: no instance is registered and this is not a project"
 	}
-	return plural(r.count(), "root", "roots") + " (" + strings.Join(parts, ", ") + ")"
+	return plural(r.Count(), "root", "roots") + " (" + strings.Join(parts, ", ") + ")"
 }
 
 func prunedAside(p cache.Pruned) string {

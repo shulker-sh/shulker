@@ -12,14 +12,99 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 )
 
-// CacheRoots reads the locks one directory keeps alive: its own and one per
+// Roots are the locks a prune must not strip: every registered instance's and the project the
+// command runs in, each with the locks of its history entries, and each lock file named with
+// --lock. A root whose lock won't load is carried as a problem rather than an error, so an
+// inspection can still report while a prune refuses.
+type Roots struct {
+	Locks      []cache.Root
+	Instances  int
+	Project    bool
+	LockFiles  int
+	Unreadable []string
+}
+
+func (r Roots) Count() int {
+	n := r.Instances + r.LockFiles
+	if r.Project {
+		n++
+	}
+	return n
+}
+
+// CacheRoots gathers the roots of a prune run from dir: the named lock files, every registered
+// instance whose directory still exists, and dir itself when it is a project not already
+// registered. A named lock file that doesn't exist is an error, since the user asked for it by
+// name; one that won't load is carried as a problem like an instance's.
+func CacheRoots(c *cache.Cache, instances []project.InstanceEntry, dir string, named []string) (Roots, error) {
+	var r Roots
+	for _, path := range named {
+		if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+			return Roots{}, out.Errorf("lock-not-found", "%s doesn't exist", path)
+		} else if err != nil {
+			return Roots{}, err
+		}
+		r.LockFiles++
+		lk, err := lock.Load(path)
+		if err != nil {
+			r.Unreadable = append(r.Unreadable, path+" can't be read, so pruning could remove files it needs ("+out.AsError(err).Message+"); fix it, or leave out its --lock")
+			continue
+		}
+		r.Locks = append(r.Locks, cache.Root{Lock: lk})
+	}
+	seen := map[string]bool{}
+	for _, in := range instances {
+		at := filepath.Clean(in.Dir)
+		if seen[at] {
+			continue
+		}
+		seen[at] = true
+		locks, present, unreadable, err := dirRoots(c, at, cache.Root{Source: in.Source, Ref: in.Ref, Path: in.Path})
+		if err != nil {
+			return Roots{}, err
+		}
+		if !present {
+			continue
+		}
+		r.Instances++
+		r.Locks = append(r.Locks, locks...)
+		r.Unreadable = append(r.Unreadable, unreadable...)
+	}
+	dir = filepath.Clean(dir)
+	if seen[dir] {
+		return r, nil
+	}
+	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err != nil {
+		return r, nil
+	}
+	locks, _, unreadable, err := dirRoots(c, dir, cache.Root{})
+	if err != nil {
+		return Roots{}, err
+	}
+	r.Project = true
+	r.Locks = append(r.Locks, locks...)
+	r.Unreadable = append(r.Unreadable, unreadable...)
+	return r, nil
+}
+
+// Prune removes what no root references. A dry run reports even past an unreadable root; a real
+// prune refuses one, since it may be a live instance whose files would go.
+func (r Roots) Prune(c *cache.Cache, dryRun bool) (cache.Pruned, error) {
+	if !dryRun && len(r.Unreadable) > 0 {
+		return cache.Pruned{}, out.Errorf("cache-root-unreadable", "%s", r.Unreadable[0])
+	}
+	return c.Prune(r.Locks, dryRun)
+}
+
+// dirRoots reads the locks one directory keeps alive: its own and one per
 // history entry. A directory that is gone contributes nothing, since the
 // instance it held was deleted; one whose lock is there but can't be read is
 // returned as a problem, which stops a prune because it may be an instance that
 // still needs its files, but leaves an inspection free to report.
-func CacheRoots(c *cache.Cache, dir string, from cache.Root) (roots []cache.Root, present bool, unreadable []string, err error) {
+func dirRoots(c *cache.Cache, dir string, from cache.Root) (roots []cache.Root, present bool, unreadable []string, err error) {
 	if _, err := os.Stat(dir); errors.Is(err, fs.ErrNotExist) {
 		return nil, false, nil, nil
 	} else if err != nil {
