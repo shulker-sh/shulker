@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"errors"
 	"io"
 	"path/filepath"
@@ -9,15 +8,12 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
-
-	"shulker.sh/shulker/internal/java"
+	"shulker.sh/shulker/internal/play"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/sync"
 )
@@ -121,52 +117,32 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
-	// A run whose watcher was killed is still open in the record; this is the next command touching
-	// the instance, so it is the one that closes it.
-	if err := instance.ReconcileRuns(in.Dir); err != nil {
-		a.printer.Warn("%v", err)
-	}
-	f, err := instance.Load(in.Dir)
+	pe, err := a.playEnv()
 	if err != nil {
 		return err
 	}
+	plan, err := play.Assemble(ctx, pe, in, play.Request{Sync: linked == nil && !opts.noSync, Reason: cmd.Name(), Target: opts.target})
+	if err != nil {
+		return a.lastOf(err)
+	}
 	var synced *syncResult
-	if linked == nil && !opts.noSync && f.Settings.PreLaunch() {
-		res, err := a.syncForLaunch(cmd, in.Dir)
+	if plan.Sync != nil {
+		res, err := a.synced(*plan.Sync, syncRequest{Request: sync.Request{Into: in.Dir}}, nil)
 		if err != nil {
 			return err
 		}
 		synced = &res
 	}
-	// The project is opened after the sync, since a sync is what brings the lock the launch is
-	// assembled from up to date.
-	p, err := a.playProject(in.Dir)
+	who, adopted, err := play.Account(pe, plan, opts.account)
 	if err != nil {
 		return err
 	}
-	a.openPacksForLaunch(ctx, p)
-	plan, err := a.assemble(ctx, in, p)
-	if err != nil {
-		return err
-	}
-	if err := opts.target.Check(plan.launch.Version, p.Lock.Minecraft); err != nil {
-		return err
-	}
-	settings, err := a.launchSettings(in.Dir, p)
-	if err != nil {
-		return err
-	}
-	selector := opts.account
-	if selector == "" && settings.Account != "" {
-		if selector, err = a.pinnedAccount(settings.Account); err != nil {
+	if adopted {
+		if _, err := a.changeDefault(who.ID); err != nil {
 			return err
 		}
 	}
-	who, adopted, err := a.launchAccount(selector)
-	if err != nil {
-		return err
-	}
-	signed, err := a.sessionFor(ctx, who)
+	signed, err := play.Session(ctx, pe, who)
 	if err != nil {
 		return err
 	}
@@ -176,33 +152,19 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 	if err != nil {
 		return err
 	}
-	vars := plan.launch.Assembly.Vars(plan.store, "shulker", a.build().Version, in.Dir, plan.natives)
-	for name, value := range game.SessionOf(signed).Vars() {
-		vars[name] = value
-	}
-	log, err := instance.LaunchLog(in.Dir, time.Now())
+	launch, err := plan.Launch(pe, signed, opts.window, time.Now())
 	if err != nil {
 		return err
 	}
 	res := playResult{
 		Instance: in.ID,
-		Version:  plan.launch.ID,
+		Version:  plan.Launchable.ID,
 		Account:  rowFor(who, cfg),
 		GameDir:  in.Dir,
-		Log:      log,
+		Log:      launch.Log,
 		Sync:     synced,
 	}
-	window := settings.Window
-	if opts.window != "" {
-		window = opts.window
-	}
-	req := watchRequest{
-		Dir:     in.Dir,
-		Java:    plan.java,
-		Argv:    game.LaunchArgv(plan.launch.Version, plan.platform, vars, settings.Memory, settings.JVMArgs, window, opts.target),
-		Log:     res.Log,
-		Wrapper: settings.Wrapper,
-	}
+	req := watchRequest{Dir: launch.Dir, Java: launch.Java, Argv: launch.Argv, Log: launch.Log, Wrapper: launch.Wrapper}
 	a.progress("starting %s as %s", in.ID, who.Name)
 	if opts.waits() {
 		var rec instance.Launch
@@ -225,6 +187,39 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		}
 		res.print(l)
 	})
+}
+
+// playEnv is the play module's env: the sync env, the store the launch assembles in, and the
+// config.json, sign-in and picker a launch resolves its account with.
+func (a *app) playEnv() (*play.Env, error) {
+	if a.pe != nil {
+		return a.pe, nil
+	}
+	se, err := a.syncEnv()
+	if err != nil {
+		return nil, err
+	}
+	d, err := a.deps()
+	if err != nil {
+		return nil, err
+	}
+	r, err := a.roots()
+	if err != nil {
+		return nil, err
+	}
+	path, err := a.configFile()
+	if err != nil {
+		return nil, err
+	}
+	a.pe = &play.Env{
+		Env:        se,
+		Store:      game.Store{Root: r.Store, Resources: d.resources},
+		Config:     path,
+		SignIn:     d.signin,
+		Version:    a.build().Version,
+		AskAccount: a.accountPicker(),
+	}
+	return a.pe, nil
 }
 
 // playWaited keeps the launch in the foreground: this command starts the game, waits for it, and
@@ -276,95 +271,38 @@ func (p playResult) print(l *out.Lines) {
 	}
 }
 
-// openPacksForLaunch reads the modpacks an instance requires, for the client.memory their authors
-// set. A pack that can't be read costs the launch only that hint, never the launch: the sync
-// before it has already said what is wrong, and the game starts from what is on disk.
-func (a *app) openPacksForLaunch(ctx context.Context, p *project.Project) {
-	if _, err := a.openPacks(ctx, p); err != nil {
-		a.printer.Warn("using %s: the modpacks couldn't be read for a client.memory: %v", instance.DefaultMemory, err)
-	}
-}
-
-// launchSettings are the settings a launch runs with: the instance's own where it sets one, the
-// play.* default in config.json where it doesn't, and for memory the pack author's client.memory
-// and then the fixed default after those. A list the instance sets, even to nothing, replaces the
-// default rather than adding to it. The pack's key comes from the modpacks openPacksForLaunch read.
-func (a *app) launchSettings(dir string, p *project.Project) (instance.Settings, error) {
-	f, err := instance.Load(dir)
-	if err != nil {
-		return instance.Settings{}, err
-	}
-	path, err := a.configFile()
-	if err != nil {
-		return instance.Settings{}, err
-	}
-	cfg, err := config.LoadFile(path)
-	if err != nil {
-		return instance.Settings{}, err
-	}
-	s := f.Settings
-	s.LaunchSettings = s.LaunchSettings.ForLaunch(cfg.Play.LaunchSettings, p.ClientMemory())
-	return s, nil
-}
-
-// pinnedAccount is the selector for the account an instance is pinned to. A pin whose account has
-// gone fails the launch rather than playing as someone else: the pin is there because this
-// instance is meant to be played as that account.
-func (a *app) pinnedAccount(id string) (string, error) {
-	accounts, _, err := a.accounts()
-	if err != nil {
-		return "", err
-	}
-	if _, ok := account.ByID(accounts, id); ok {
-		return id, nil
-	}
-	e := out.Errorf("account-not-found", "this instance is pinned to account %s, which shulker can no longer see", id)
-	e.Candidates, e.Pass = account.Candidates(accounts), account.Picks(accounts)
-	e.Nudge = out.Nudge{Lead: "Play it as the default account instead with", Command: "shulker instance unset account"}
-	return "", e
-}
-
 func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) error {
-	ctx := cmd.Context()
 	in, _, err := a.playInstance(cmd, args, false)
 	if err != nil {
 		return err
 	}
-	p, err := a.playProject(in.Dir)
+	pe, err := a.playEnv()
 	if err != nil {
 		return err
 	}
-	a.openPacksForLaunch(ctx, p)
-	plan, err := a.assemble(ctx, in, p)
+	plan, err := play.Assemble(cmd.Context(), pe, in, play.Request{Target: target})
 	if err != nil {
 		return err
 	}
-	if err := target.Check(plan.launch.Version, p.Lock.Minecraft); err != nil {
-		return err
-	}
-	settings, err := a.launchSettings(in.Dir, p)
-	if err != nil {
-		return err
-	}
-	l := plan.launch
+	l := plan.Launchable
 	rep := playReport{
 		Instance:       in.ID,
 		Version:        l.ID,
 		Inherits:       l.Top.InheritsFrom,
 		MainClass:      l.Version.MainClass,
-		Java:           plan.java,
-		Memory:         settings.Memory,
+		Java:           plan.Java,
+		Memory:         plan.Settings.Memory,
 		GameDir:        in.Dir,
-		NativesDir:     plan.natives,
+		NativesDir:     plan.Natives,
 		Classpath:      len(l.Assembly.Libraries) + 1,
-		ClasspathBytes: l.Assembly.ClasspathSize(plan.store),
+		ClasspathBytes: l.Assembly.ClasspathSize(pe.Store),
 	}
 	if l.Version.AssetIndex != nil {
 		rep.AssetIndex = l.Version.AssetIndex.ID
 	}
 	if rep.Inherits != "" {
-		own := l.Assembly.LibrariesFrom(l.Top, plan.platform)
-		rep.LoaderLibraries, rep.LoaderLibrariesBytes = len(own), plan.store.Size(own)
+		own := l.Assembly.LibrariesFrom(l.Top, plan.Platform)
+		rep.LoaderLibraries, rep.LoaderLibrariesBytes = len(own), pe.Store.Size(own)
 	}
 	return a.printer.Emit(rep, func(l *out.Lines) {
 		l.OK("would launch "+rep.Instance, rep.Version)
@@ -388,70 +326,6 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) e
 		rows = append(rows, out.Row{Label: "classpath", Text: plural(rep.Classpath, "jar", "jars") + ", " + out.HumanBytes(rep.ClasspathBytes)})
 		l.Tree(rows...)
 	})
-}
-
-// launchPlan is everything a launch needs that doesn't depend on who is playing: the version it
-// runs, the store filled with what that version names, the natives unpacked, and the java to run
-// it with. A dry run prints it; a launch templates the account into it and starts the game.
-type launchPlan struct {
-	store    game.Store
-	launch   game.Launchable
-	natives  string
-	java     string
-	platform game.Platform
-}
-
-func (a *app) assemble(ctx context.Context, in config.Instance, p *project.Project) (launchPlan, error) {
-	s, err := a.gameStore()
-	if err != nil {
-		return launchPlan{}, err
-	}
-	java, err := a.clientJava(ctx, p, in.Dir)
-	if err != nil {
-		return launchPlan{}, err
-	}
-	platform := game.ForJava(java)
-	src, err := a.storeSources(p)
-	if err != nil {
-		return launchPlan{}, err
-	}
-	l, err := s.Fill(ctx, p.Lock, platform, src)
-	if err != nil {
-		return launchPlan{}, a.keepInstallerOutput(err)
-	}
-	natives := instance.NativesDir(in.Dir)
-	if err := l.Assembly.ExtractNatives(s, natives, platform); err != nil {
-		return launchPlan{}, err
-	}
-	return launchPlan{store: s, launch: l, natives: natives, java: java, platform: platform}, nil
-}
-
-// storeSources is what the store fills a launch of p from: every client the app holds, the row
-// the lock names, and the Java its installer would run with.
-func (a *app) storeSources(p *project.Project) (game.Sources, error) {
-	d, err := a.deps()
-	if err != nil {
-		return game.Sources{}, err
-	}
-	var row loader.Loader
-	if p.Lock.Loader.Type != "" {
-		if row, err = loader.Require(p.Lock.Loader.Type); err != nil {
-			return game.Sources{}, err
-		}
-	}
-	return game.Sources{
-		Fetch:   d.Fetch,
-		Piston:  d.meta.Piston,
-		Loader:  row,
-		Loaders: d.Loaders,
-		InstallerJava: func(ctx context.Context) (string, error) {
-			java, err := a.projectJava(ctx, p)
-			return java.Path, err
-		},
-		SaveLock: func() error { return p.Lock.Save(p.LockPath()) },
-		Log:      a.progress,
-		Progress: a.printer.Progress,
-	}, nil
 }
 
 // playInstance is the instance a launch acts on: the nickname given, else the one the current
@@ -559,47 +433,4 @@ func (a *app) createProjectInstance(cmd *cobra.Command, p *project.Project, dir 
 		return config.Instance{}, nil, notRegistered(rep.GameDir)
 	}
 	return in, rep, nil
-}
-
-// playProject is the pack a launch runs, read after the sync that may have changed it.
-func (a *app) playProject(dir string) (*project.Project, error) {
-	p, err := a.openProjectAt(dir)
-	if err != nil {
-		return nil, err
-	}
-	return p, a.requireLock(p)
-}
-
-func (a *app) gameStore() (game.Store, error) {
-	r, err := a.roots()
-	if err != nil {
-		return game.Store{}, err
-	}
-	d, err := a.deps()
-	if err != nil {
-		return game.Store{}, err
-	}
-	s := game.Store{Root: r.Store, Resources: d.resources}
-	return s, s.EnsureProfiles()
-}
-
-// clientJava is what the launch runs: the `java` setting when the instance or play.java has one,
-// and otherwise shulker's managed runtime for the component the lock names.
-func (a *app) clientJava(ctx context.Context, p *project.Project, dir string) (string, error) {
-	s, err := a.launchSettings(dir, p)
-	if err != nil {
-		return "", err
-	}
-	if s.Java != "" {
-		bin, err := java.Client(s.Java, p.Lock.Java.Major)
-		if err != nil {
-			return "", err
-		}
-		return bin.Path, nil
-	}
-	rt, err := a.freshestJava(ctx, p, sync.LinkJavaFix("shulker"))
-	if err != nil {
-		return "", err
-	}
-	return java.Bin(rt.Home), nil
 }

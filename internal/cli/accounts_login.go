@@ -1,13 +1,10 @@
 package cli
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
-	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -294,37 +291,6 @@ func (a *app) reseatDefault(gone accountRow) (*account.Resolved, error) {
 		return nil, err
 	}
 	return &heir, nil
-}
-
-// sessionFor is the account a launch plays on, renewed and saved when its token was stale, with
-// the warning a session that online servers may reject carries.
-func (a *app) sessionFor(ctx context.Context, r account.Resolved) (account.Account, error) {
-	d, err := a.deps()
-	if err != nil {
-		return account.Account{}, err
-	}
-	signed, renewed, warning, err := d.signin.Session(ctx, r, time.Now())
-	if err != nil {
-		return account.Account{}, err
-	}
-	switch warning {
-	case account.WarnTokenExpired:
-		a.printer.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session", r.Name, launcher.Title(r.Source))
-	case account.WarnOffline:
-		a.printer.Warn("shulker couldn't reach Microsoft, so %s plays on the session it already had; online servers and Realms will reject it", r.Name)
-	}
-	if !renewed {
-		return signed, nil
-	}
-	path, store, err := a.accountStore()
-	if err != nil {
-		return account.Account{}, err
-	}
-	store.Put(signed)
-	if err := account.Save(path, store); err != nil {
-		return account.Account{}, err
-	}
-	return signed, nil
 }
 
 // accountSelector names an account the way it has to be typed back.

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"slices"
-	"time"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
@@ -156,34 +155,4 @@ func (a *app) stores() ([]string, error) {
 		return account.DefaultStores(), nil
 	}
 	return cfg.Accounts.Stores, nil
-}
-
-// launcherAccounts is what each configured launcher's reader takes from its own accounts file. A
-// file that doesn't read warns and is skipped: shulker neither wrote it nor can repair it, so a
-// corrupt one must not take the whole account list down with it.
-func (a *app) launcherAccounts(stores []string) (map[string][]account.Resolved, error) {
-	var fromLaunchers map[string][]account.Resolved
-	instances, err := a.loadInstances()
-	if err != nil {
-		return nil, err
-	}
-	now := time.Now()
-	for _, name := range stores {
-		e := launcher.Find(name)
-		if e == nil || e.Accounts == nil {
-			continue
-		}
-		found, errs := e.ReadAccounts(e.AccountsDir(instances), now)
-		for _, err := range errs {
-			a.printer.Warn("%s", err)
-		}
-		if len(found) == 0 {
-			continue
-		}
-		if fromLaunchers == nil {
-			fromLaunchers = map[string][]account.Resolved{}
-		}
-		fromLaunchers[name] = found
-	}
-	return fromLaunchers, nil
 }

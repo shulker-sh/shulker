@@ -7,6 +7,7 @@ import (
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/play"
 )
 
 // accountRow is one line of `shulker accounts`, and what --json carries.
@@ -162,25 +163,9 @@ func (a *app) accountStore() (string, account.Store, error) {
 
 // accounts is every account the configured stores yield, with the config that named them.
 func (a *app) accounts() ([]account.Resolved, config.Config, error) {
-	path, err := a.configFile()
+	pe, err := a.playEnv()
 	if err != nil {
 		return nil, config.Config{}, err
 	}
-	cfg, err := config.LoadFile(path)
-	if err != nil {
-		return nil, config.Config{}, err
-	}
-	store, err := account.Load(account.Path(path))
-	if err != nil {
-		return nil, config.Config{}, err
-	}
-	stores := cfg.Accounts.Stores
-	if stores == nil {
-		stores = account.DefaultStores()
-	}
-	fromLaunchers, err := a.launcherAccounts(stores)
-	if err != nil {
-		return nil, config.Config{}, err
-	}
-	return account.Resolve(stores, store, fromLaunchers), cfg, nil
+	return play.Accounts(pe)
 }

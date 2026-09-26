@@ -18,6 +18,7 @@ import (
 	"shulker.sh/shulker/internal/auditlog"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/play"
 	"shulker.sh/shulker/internal/saves"
 	"shulker.sh/shulker/internal/selfupdate"
 	"shulker.sh/shulker/internal/server"
@@ -38,6 +39,7 @@ type app struct {
 	instance   string
 	d          *deps
 	se         *sync.Env
+	pe         *play.Env
 	configPath string
 	releases   *selfupdate.Releases
 	build      func() selfupdate.Build

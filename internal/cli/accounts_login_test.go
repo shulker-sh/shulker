@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/play"
 )
 
 // fakeMSA stands in for the whole sign-in chain: Microsoft's device code and token endpoints, Xbox
@@ -481,7 +482,11 @@ func sessionFor(t *testing.T, h *harness, name string) (account.Account, string,
 	if err != nil {
 		return account.Account{}, "", err
 	}
-	signed, err := a.sessionFor(context.Background(), r)
+	pe, err := a.playEnv()
+	if err != nil {
+		return account.Account{}, "", err
+	}
+	signed, err := play.Session(context.Background(), pe, r)
 	return signed, stderr.String(), err
 }
 
