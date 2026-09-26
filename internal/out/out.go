@@ -158,6 +158,10 @@ type Printer struct {
 	// Annotate prints each warning and error as a GitHub Actions workflow command as well, which
 	// the runner reads from either stream and shows as an annotation on the run.
 	Annotate bool
+	// Framed decides which streams get the blank lines around a run's output; unset, every
+	// terminal does.
+	Framed   func(io.Writer) bool
+	frame    frame
 	warnings []string
 	// printed is whether stdout already holds the run's output: an envelope, or what a Raw command
 	// wrote itself.
@@ -296,6 +300,7 @@ func (p *Printer) Fail(err error) int {
 	if e.Usage != nil && !picked && e.Nudge.Command == "" {
 		e.Usage(p.Err())
 	}
+	p.close()
 	return e.Exit
 }
 
@@ -310,6 +315,7 @@ func (p *Printer) Finish() {
 	if p.JSON && !p.printed {
 		_ = p.encode(p.envelope(true, nil, nil))
 	}
+	p.close()
 }
 
 func (p *Printer) encode(v any) error {

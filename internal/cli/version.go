@@ -92,12 +92,11 @@ func printVersion(l *out.Lines, info versionInfo, verbose bool) {
 	if !verbose && info.Built != "" {
 		head += t.Aside("built " + info.builtAt())
 	}
-	l.Blank()
 	l.Text(head)
-	l.Blank()
 	if !verbose {
 		return
 	}
+	l.Blank()
 	row := func(label, value string) {
 		if value != "" {
 			l.Text(t.Grey(fmt.Sprintf("%-9s", label)) + " " + value)
@@ -109,7 +108,6 @@ func printVersion(l *out.Lines, info versionInfo, verbose bool) {
 	row("Binary", pathLink(t, info.Binary))
 	row("Config", pathLink(t, info.Config))
 	row("Cache", pathLink(t, info.Cache))
-	l.Blank()
 }
 
 func pathLink(t out.Theme, path string) string {

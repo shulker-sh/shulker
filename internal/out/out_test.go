@@ -170,3 +170,27 @@ func TestFinishPrintsNothingMoreAfterEmitOrRaw(t *testing.T) {
 		}
 	}
 }
+
+func TestOutputIsFramedByBlankLinesOnATerminal(t *testing.T) {
+	var term, pipe bytes.Buffer
+	p := &Printer{Stdout: &pipe, Stderr: &term, Framed: func(w io.Writer) bool { return w == &term }}
+	p.Step("fetched the pack")
+	p.Warn("jei has no build")
+	_ = p.Emit(nil, func(l *Lines) { l.Raw("value") })
+	p.Finish()
+	if got := term.String(); !strings.HasPrefix(got, "\n  ") || !strings.HasSuffix(got, "jei has no build\n\n") {
+		t.Fatalf("the terminal isn't framed: %q", got)
+	}
+	if got := pipe.String(); got != "value\n" {
+		t.Fatalf("a pipe got %q", got)
+	}
+}
+
+func TestAFailedRunIsFramedToo(t *testing.T) {
+	var term bytes.Buffer
+	p := &Printer{Stdout: &term, Stderr: &term, Framed: func(io.Writer) bool { return true }}
+	p.Fail(Errorf("lock-not-found", "no shulker.lock"))
+	if got := term.String(); !strings.HasPrefix(got, "\n  ") || !strings.HasSuffix(got, "\n\n") || strings.HasSuffix(got, "\n\n\n") {
+		t.Fatalf("got %q", got)
+	}
+}

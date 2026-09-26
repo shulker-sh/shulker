@@ -107,6 +107,7 @@ func (p *Printer) Step(format string, args ...any) {
 	}
 	p.steps.shown = append(p.steps.shown, text)
 	p.settleLocked(true)
+	p.open(p.Stderr)
 	if verb, _, _ := strings.Cut(text, " "); !strings.HasSuffix(verb, "ing") {
 		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(text)
 		return
@@ -184,5 +185,6 @@ type settling struct {
 
 func (s settling) Write(b []byte) (int, error) {
 	s.p.Settle()
+	s.p.open(s.w)
 	return s.w.Write(b)
 }

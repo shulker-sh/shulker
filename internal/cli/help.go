@@ -183,7 +183,7 @@ func (a *app) help(cmd *cobra.Command) {
 		a.helpJSON(cmd)
 		return
 	}
-	l := &out.Lines{W: cmd.OutOrStdout(), T: a.printer.Theme}
+	l := a.printer.Out()
 	t := l.T
 	doc, documented := docs.HelpFor(cmd.CommandPath())
 	description := []string{cmd.Short}

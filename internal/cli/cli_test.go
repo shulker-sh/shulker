@@ -27,7 +27,7 @@ func TestVersionHuman(t *testing.T) {
 	if code != out.ExitOK {
 		t.Fatalf("exit %d", code)
 	}
-	if lines := strings.Split(stdout, "\n"); len(lines) != 4 || lines[0] != "" || !strings.HasPrefix(lines[1], "  shulker dev") || lines[2] != "" || lines[3] != "" {
+	if lines := strings.Split(stdout, "\n"); len(lines) != 2 || !strings.HasPrefix(lines[0], "  shulker dev") || lines[1] != "" {
 		t.Fatalf("one line, padded: %q", stdout)
 	}
 	code, stdout, _ = run(t, "version", "--verbose")
@@ -44,16 +44,16 @@ func TestVersionHuman(t *testing.T) {
 func TestVersionNamesTheRouteOnlyWhenVerbose(t *testing.T) {
 	h := newHarness(t)
 	h.build = &selfupdate.Build{Version: "0.0.1", Built: "2026-09-20T14:02:00Z", Route: selfupdate.Release}
-	if stdout := h.mustRun(t, "version"); stdout != "\n  shulker 0.0.1 (built 2026-09-20 14:02 UTC)\n\n" {
+	if stdout := h.mustRun(t, "version"); stdout != "  shulker 0.0.1 (built 2026-09-20 14:02 UTC)\n" {
 		t.Fatalf("release: %q", stdout)
 	}
 	stdout := h.mustRun(t, "version", "--verbose")
-	if !strings.HasPrefix(stdout, "\n  shulker 0.0.1\n\n  Built     2026-09-20 14:02 UTC\n") || !strings.Contains(stdout, "\n  Install   release\n") {
+	if !strings.HasPrefix(stdout, "  shulker 0.0.1\n\n  Built     2026-09-20 14:02 UTC\n") || !strings.Contains(stdout, "\n  Install   release\n") {
 		t.Fatalf("release --verbose: %q", stdout)
 	}
 
 	h.build = &selfupdate.Build{Version: "0.0.1", Route: selfupdate.GoInstall}
-	if stdout := h.mustRun(t, "version"); stdout != "\n  shulker 0.0.1\n\n" {
+	if stdout := h.mustRun(t, "version"); stdout != "  shulker 0.0.1\n" {
 		t.Fatalf("go install: %q", stdout)
 	}
 	if stdout := h.mustRun(t, "version", "--verbose"); !strings.Contains(stdout, "\n  Install   go install\n") || strings.Contains(stdout, "Built") {
@@ -61,7 +61,7 @@ func TestVersionNamesTheRouteOnlyWhenVerbose(t *testing.T) {
 	}
 
 	h.build = &selfupdate.Build{Version: selfupdate.Dev, Commit: "d1556f95d232", Modified: true, Built: "2026-09-18T22:25:43Z", Route: selfupdate.Source}
-	if stdout := h.mustRun(t, "version"); stdout != "\n  shulker dev  d1556f9-dirty (built 2026-09-18 22:25 UTC)\n\n" {
+	if stdout := h.mustRun(t, "version"); stdout != "  shulker dev  d1556f9-dirty (built 2026-09-18 22:25 UTC)\n" {
 		t.Fatalf("source: %q", stdout)
 	}
 	if stdout := h.mustRun(t, "version", "--verbose"); !strings.Contains(stdout, "\n  Install   source\n") || strings.Contains(stdout, "(built") {

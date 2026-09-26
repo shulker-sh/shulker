@@ -59,6 +59,7 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 		return nil
 	}
 	p.Settle()
+	p.open(p.Stderr)
 	pr := newProgress(p.Err(), verb, files)
 	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
 		pr.tty = f

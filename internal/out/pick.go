@@ -43,6 +43,7 @@ func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, er
 	// The field's own height is not enough: a form left to size itself gives every field the
 	// height of its whole content, so a long list prints in full instead of scrolling.
 	rows := min(len(choices), pickRows)
+	p.open(p.Stderr)
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title(gutter + title).
