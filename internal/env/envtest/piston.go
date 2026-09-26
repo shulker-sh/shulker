@@ -58,9 +58,14 @@ func NewPiston(t *testing.T) *Piston {
 	mux.HandleFunc("/26.2.json", func(w http.ResponseWriter, r *http.Request) {
 		p.Hits.Add(1)
 		json.NewEncoder(w).Encode(map[string]any{
-			"id":          "26.2",
-			"type":        "release",
-			"mainClass":   "net.minecraft.client.main.Main",
+			"id":        "26.2",
+			"type":      "release",
+			"mainClass": "net.minecraft.client.main.Main",
+			"arguments": map[string]any{
+				"game": []any{"--username", "${auth_player_name}", "--uuid", "${auth_uuid}", "--accessToken", "${auth_access_token}", "--gameDir", "${game_directory}",
+					map[string]any{"rules": []any{map[string]any{"action": "allow", "features": map[string]bool{"has_custom_resolution": true}}}, "value": []string{"--width", "${resolution_width}", "--height", "${resolution_height}"}}},
+				"jvm": []string{"-Djava.library.path=${natives_directory}", "-cp", "${classpath}"},
+			},
 			"libraries":   []map[string]any{{"name": "com.mojang:brigadier:1.3.10", "downloads": map[string]any{"artifact": map[string]any{"path": "com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar", "url": base + "/brigadier.jar", "sha1": Sha1Hex(p.Lib), "size": len(p.Lib)}}}},
 			"javaVersion": map[string]any{"component": "java-runtime-epsilon", "majorVersion": 25},
 			"assetIndex":  map[string]any{"id": "26", "url": base + "/assets/26.json", "sha1": Sha1Hex(index), "size": len(index)},

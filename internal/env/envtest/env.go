@@ -1,6 +1,7 @@
 package envtest
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -54,17 +55,18 @@ func New(t *testing.T) *Env {
 			e.Warnings = append(e.Warnings, fmt.Sprintf(format, args...))
 		},
 	}
-	FakeLoaders(t)
+	FakeLoaders(t, e.CDN)
 	return e
 }
 
 // FakeLoaders replaces the loader table with a fake row per loader for the rest of the test, each
-// answering its versions offline.
-func FakeLoaders(t *testing.T) {
+// answering its versions offline. The fabric and quilt rows serve a client profile whose loader
+// jar the CDN publishes, so a launch of either can be filled.
+func FakeLoaders(t *testing.T, cdn *CDN) {
 	t.Helper()
 	fakes := []loader.Fake{
-		{Name: "fabric", Versions: Versions("0.18.0-beta.1", "0.17.3", "0.17.2")},
-		{Name: "quilt", Versions: Versions("0.20.0-beta.9", "0.30.1", "0.31.0-beta.4", "0.30.0")},
+		{Name: "fabric", Versions: Versions("0.18.0-beta.1", "0.17.3", "0.17.2"), Profile: cdn.profile("fabric-loader-0.17.3-26.2", "net.fabricmc.loader.impl.launch.knot.KnotClient", "net.fabricmc:fabric-loader:0.17.3")},
+		{Name: "quilt", Versions: Versions("0.20.0-beta.9", "0.30.1", "0.31.0-beta.4", "0.30.0"), Profile: cdn.profile("quilt-loader-0.30.1-26.2", "org.quiltmc.loader.impl.launch.knot.KnotClient", "org.quiltmc:quilt-loader:0.30.1")},
 		{Name: "neoforge", Versions: Versions("26.2.0.56-beta", "26.2.0.87")},
 		{Name: "forge", Versions: Versions("65.0.9", "65.1.3")},
 	}
@@ -75,6 +77,19 @@ func FakeLoaders(t *testing.T) {
 	real := loader.All
 	loader.All = rows
 	t.Cleanup(func() { loader.All = real })
+}
+
+// profile is a loader's client version JSON on top of 26.2, with its one library published to the
+// CDN under its maven path.
+func (c *CDN) profile(id, mainClass, library string) json.RawMessage {
+	parts := strings.SplitN(library, ":", 3)
+	group, artifact, version := parts[0], parts[1], parts[2]
+	c.Serve("/"+strings.ReplaceAll(group, ".", "/")+"/"+artifact+"/"+version+"/"+artifact+"-"+version+".jar", []byte(artifact+" "+version))
+	raw, _ := json.Marshal(map[string]any{
+		"id": id, "inheritsFrom": "26.2", "type": "release", "mainClass": mainClass,
+		"libraries": []map[string]any{{"name": library, "url": c.URL() + "/"}},
+	})
+	return raw
 }
 
 // Versions is a fake row's version list; an id with a dash is a pre-release.
