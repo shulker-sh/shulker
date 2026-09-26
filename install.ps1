@@ -35,8 +35,13 @@
 
     # Character codes rather than literal symbols: Windows PowerShell 5.1 reads a saved .ps1
     # without a byte order mark as ANSI, which would garble them.
-    function Write-Ok($msg) { Write-Host ([char]0x2714) -ForegroundColor Green -NoNewline; Write-Host " $msg" }
-    function Write-Skip($msg) { Write-Host ([char]0x2022) -ForegroundColor DarkGray -NoNewline; Write-Host " $msg" }
+    function Write-Mark($glyph, $color, $msg) {
+        Write-Host "  $([char]$glyph)" -ForegroundColor $color -NoNewline
+        Write-Host " $msg"
+    }
+
+    function Write-Ok($msg) { Write-Mark 0x2714 Green $msg }
+    function Write-Skip($msg) { Write-Mark 0x2022 DarkGray $msg }
 
     try {
         $installDir = if ($env:SHULKER_INSTALL_DIR) { $env:SHULKER_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\shulker' }
@@ -59,7 +64,7 @@
         $base = "https://github.com/shulker-sh/shulker/releases/download/$version"
         $archive = "shulker_${plain}_windows_$arch.zip"
 
-        Write-Host "Installing shulker $plain for Windows ($arch)"
+        Write-Host "  Installing shulker $plain for Windows ($arch)"
         Write-Host ''
 
         $tmp = Join-Path ([IO.Path]::GetTempPath()) ("shulker-install-" + [Guid]::NewGuid())
@@ -131,7 +136,7 @@
         # 6. PATH. Your user PATH lives in the registry at HKCU\Environment. It is edited there
         # directly because [Environment]::SetEnvironmentVariable would expand entries like
         # %USERPROFILE% into fixed paths as it saves them.
-        $next = 'Run shulker --help to get started.'
+        $lead = 'Run'
         $envKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
 
         try {
@@ -141,7 +146,7 @@
             if ($entries -notcontains $installDir) {
                 if ($env:SHULKER_NO_MODIFY_PATH) {
                     Write-Skip "$installDir isn't on your PATH"
-                    $next = "Add $installDir to your PATH, then run shulker --help to get started."
+                    $lead = "Add $installDir to your PATH, then run"
                 } else {
                     $envKey.SetValue('Path', ((@($installDir) + $entries) -join ';'), [Microsoft.Win32.RegistryValueKind]::ExpandString)
                     # Tell running programs that the environment changed, the same way the System
@@ -169,10 +174,11 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wP
         }
 
         Write-Host ''
-        Write-Host $next
-        Write-Host 'Docs: https://shulker.sh/docs/getting-started'
+        Write-Host "  $lead " -NoNewline
+        Write-Host 'shulker --help' -ForegroundColor Cyan -NoNewline
+        Write-Host ' to get started.'
+        Write-Host '  Docs: https://shulker.sh/docs/getting-started'
     } catch {
-        Write-Host ([char]0x2718) -ForegroundColor Red -NoNewline
-        Write-Host " $($_.Exception.Message)"
+        Write-Mark 0x2718 Red $_.Exception.Message
     }
 }
