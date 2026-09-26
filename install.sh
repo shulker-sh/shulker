@@ -33,28 +33,37 @@ WITHOUT_ATTESTATION="${SHULKER_WITHOUT_ATTESTATION:-}"
 REQUIRE_ATTESTATION="${SHULKER_REQUIRE_ATTESTATION:-}"
 NO_MODIFY_PATH="${SHULKER_NO_MODIFY_PATH:-}"
 
-err() { echo "shulker install: $*" >&2; exit 1; }
-note() { echo "==> $*"; }
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  esc="$(printf '\033')"
+  green="$esc[32m" red="$esc[31m" grey="$esc[90m" bold="$esc[1m" reset="$esc[0m"
+else
+  green="" red="" grey="" bold="" reset=""
+fi
+
+ok() { printf '%s✔%s %s\n' "$green" "$reset" "$*"; }
+skip() { printf '%s•%s %s\n' "$grey" "$reset" "$*"; }
+fail() { printf '%s✘%s %s\n' "$red" "$reset" "$*" >&2; exit 1; }
+tilde() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
 
 for arg in "$@"; do
   case "$arg" in
     --without-attestation) WITHOUT_ATTESTATION=1 ;;
     --require-attestation) REQUIRE_ATTESTATION=1 ;;
     --no-modify-path) NO_MODIFY_PATH=1 ;;
-    *) echo "shulker install: unknown flag $arg" >&2; exit 2 ;;
+    *) fail "Unknown flag $arg" ;;
   esac
 done
 
 case "$(uname -s)" in
-  Darwin) os="darwin" ;;
-  Linux) os="linux" ;;
-  *) err "unsupported OS $(uname -s); on Windows run: irm https://shulker.sh/install.ps1 | iex" ;;
+  Darwin) os="darwin" os_name="macOS" ;;
+  Linux) os="linux" os_name="Linux" ;;
+  *) fail "Unsupported OS $(uname -s); on Windows, run irm https://shulker.sh/install.ps1 | iex" ;;
 esac
 
 case "$(uname -m)" in
   arm64 | aarch64) arch="arm64" ;;
   x86_64 | amd64) arch="amd64" ;;
-  *) err "unsupported architecture $(uname -m)" ;;
+  *) fail "Unsupported architecture $(uname -m)" ;;
 esac
 
 # A shell running under Rosetta reports x86_64 on Apple silicon.
@@ -66,29 +75,29 @@ fi
 version="${SHULKER_VERSION:-}"
 
 if [ -z "$version" ]; then
-  note "resolving latest release"
-  latest="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/shulker-sh/shulker/releases/latest")" \
-    || err "could not reach GitHub to resolve the latest release"
+  latest="$(curl -fsLI -o /dev/null -w '%{url_effective}' "https://github.com/shulker-sh/shulker/releases/latest")" || latest=""
   version="${latest##*/tag/}"
-  [ "$version" != "$latest" ] || err "no release found at https://github.com/shulker-sh/shulker/releases"
+  [ -n "$latest" ] && [ "$version" != "$latest" ] \
+    || fail "Couldn't get the latest release from https://github.com/shulker-sh/shulker/releases"
 fi
 
 base="https://github.com/shulker-sh/shulker/releases/download/$version"
 archive="shulker_${version#v}_${os}_${arch}.tar.gz"
+
+printf '%sInstalling shulker %s for %s (%s)%s\n\n' "$bold" "${version#v}" "$os_name" "$arch" "$reset"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 
 # 2. Download.
-note "downloading $archive"
-curl -fsSL -o "$archive" "$base/$archive" || err "download failed: $base/$archive"
-curl -fsSL -o checksums.txt "$base/checksums.txt" || err "could not download $base/checksums.txt"
+curl -fsL -o "$archive" "$base/$archive" || fail "Couldn't download $base/$archive"
+curl -fsL -o checksums.txt "$base/checksums.txt" || fail "Couldn't download $base/checksums.txt"
+ok "Downloaded $archive"
 
 # 3. Checksum.
-note "verifying SHA256 checksum"
 want="$(awk -v f="$archive" '$2 == f { print $1 }' checksums.txt)"
-[ -n "$want" ] || err "no checksum listed for $archive"
+[ -n "$want" ] || fail "No checksum listed for $archive in checksums.txt"
 
 if command -v sha256sum >/dev/null 2>&1; then
   got="$(sha256sum "$archive" | awk '{ print $1 }')"
@@ -96,45 +105,47 @@ else
   got="$(shasum -a 256 "$archive" | awk '{ print $1 }')"
 fi
 
-[ "$want" = "$got" ] || err "checksum mismatch for $archive (want $want, got $got)"
+[ "$want" = "$got" ] || fail "Checksum mismatch for $archive (expected $want, got $got)"
+ok "Checksum matches"
 
 # 4. Build provenance. The release workflow publishes a signed attestation for each
 # archive; gh checks the signature and that it names this archive and the shulker-sh owner.
 verify_attestation() {
-  curl -fsSL -o shulker.attestation.jsonl "$base/shulker.attestation.jsonl" 2>/dev/null || return 1
+  curl -fsL -o shulker.attestation.jsonl "$base/shulker.attestation.jsonl" || return 1
   gh attestation verify "$archive" --bundle shulker.attestation.jsonl --owner shulker-sh >/dev/null 2>&1
 }
 
 if [ -n "$WITHOUT_ATTESTATION" ]; then
-  note "skipping build provenance check (--without-attestation)"
+  skip "Build provenance not checked (--without-attestation)"
 elif command -v gh >/dev/null 2>&1; then
-  note "verifying build provenance with gh"
-
   if verify_attestation; then
-    note "build provenance verified"
+    ok "Build provenance verified"
   elif [ -n "$REQUIRE_ATTESTATION" ]; then
-    err "build provenance could not be verified and --require-attestation is set"
+    fail "Build provenance couldn't be verified, and --require-attestation is set"
   else
-    note "build provenance could not be verified, continuing on the checksum"
+    skip "Build provenance couldn't be verified; relying on the checksum"
   fi
 elif [ -n "$REQUIRE_ATTESTATION" ]; then
-  err "--require-attestation is set but gh is not installed"
+  fail "--require-attestation is set, but the GitHub CLI (gh) isn't installed"
 else
-  note "gh not found, skipping build provenance check"
+  skip "Build provenance not checked: install the GitHub CLI (gh) to check it"
 fi
 
 # 5. Install.
-note "installing to $INSTALL_DIR"
 tar -xzf "$archive" shulker
 mkdir -p "$INSTALL_DIR"
 install -m 0755 shulker "$INSTALL_DIR/shulker"
+ok "Installed to $(tilde "$INSTALL_DIR/shulker")"
 
 # 6. PATH. The line is only added once, and is marked so you can find and remove it.
+next="Run ${bold}shulker --help${reset} to get started."
+
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;
   *)
     if [ -n "$NO_MODIFY_PATH" ]; then
-      note "$INSTALL_DIR is not on your PATH"
+      skip "$(tilde "$INSTALL_DIR") isn't on your PATH"
+      next="Add $(tilde "$INSTALL_DIR") to your PATH, then run ${bold}shulker --help${reset} to get started."
     else
       case "$(basename "${SHELL:-sh}")" in
         zsh) rc="${ZDOTDIR:-$HOME}/.zshrc"; line="export PATH=\"$INSTALL_DIR:\$PATH\"" ;;
@@ -147,16 +158,18 @@ case ":$PATH:" in
       esac
 
       if [ -f "$rc" ] && grep -qF "$line" "$rc"; then
-        note "$rc already adds $INSTALL_DIR to PATH; open a new terminal to use shulker"
+        ok "$(tilde "$rc") already adds $(tilde "$INSTALL_DIR") to PATH"
       else
         mkdir -p "$(dirname "$rc")"
         printf '\n# Added by the shulker installer\n%s\n' "$line" >> "$rc"
-        note "added $INSTALL_DIR to PATH in $rc; open a new terminal to use shulker"
+        ok "Added $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc")"
       fi
+
+      next="Open a new terminal, then run ${bold}shulker --help${reset} to get started."
     fi
     ;;
 esac
 
-echo "shulker ${version#v} installed to $INSTALL_DIR/shulker"
 echo
-echo "Get started: https://shulker.sh/docs/getting-started"
+echo "$next"
+echo "Docs: https://shulker.sh/docs/getting-started"
