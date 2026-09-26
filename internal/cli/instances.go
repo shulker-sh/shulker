@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/sync"
@@ -155,21 +154,6 @@ func (a *app) registryFile() (string, error) {
 	return config.RegistryPath(path, cfg), nil
 }
 
-func (a *app) registerInstance(in config.Instance) {
-	a.updateInstances(func(instances []config.Instance) []config.Instance {
-		if i, ok := config.FindInstance(instances, in.Dir); ok {
-			if in.ID == "" {
-				in.ID = instances[i].ID
-			}
-			instances[i] = in
-			return instances
-		}
-		in.ID = config.InstanceID(instances, in.ID, in.Name, in.Dir)
-		return append(instances, in)
-	})
-	a.reconcileOrWarn(in)
-}
-
 func (a *app) reconcileOrWarn(in config.Instance) {
 	se, err := a.syncEnv()
 	if err != nil {
@@ -189,24 +173,4 @@ func (a *app) updateInstances(update func([]config.Instance) []config.Instance) 
 	}
 	a.printer.Warn("registry not updated: %v", err)
 	return false
-}
-
-// checkID refuses an --as value that isn't a valid key, or that another instance already holds.
-func (a *app) checkID(as, dir string) error {
-	if as == "" {
-		return nil
-	}
-	if !manifest.IsValidKey(as) {
-		return out.Errorf("usage", "--as must be lowercase letters, digits, dots, dashes or underscores, up to 64 characters, not %q", as)
-	}
-	instances, err := a.loadInstances()
-	if err != nil {
-		return err
-	}
-	if heldBy, taken := config.IDTaken(instances, as, dir); taken {
-		e := out.Errorf("instance-id-taken", "another instance is already called %s (%s)", as, heldBy)
-		e.Help = "pass a different --as"
-		return e
-	}
-	return nil
 }

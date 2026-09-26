@@ -12,6 +12,7 @@ import (
 
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/link"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
@@ -344,7 +345,7 @@ func TestLinkMojangWarnsWhenTheSourceDeclaresNoClient(t *testing.T) {
 
 	launcherDir := mojangLauncherDir(t)
 	_, stderr := h.mustRunStderr(t, "link", "mojang", "--launcher-dir", launcherDir)
-	if !strings.Contains(stderr, noClientPack) {
+	if !strings.Contains(stderr, link.NoClientPack) {
 		t.Fatalf("the warning explains the thin instance: %s", stderr)
 	}
 	if _, err := os.Stat(filepath.Join(launcherDir, "shulker", "pack", "mods", h.jars["fabric-api"].filename)); err != nil {

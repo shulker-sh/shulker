@@ -2,58 +2,38 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/link"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/sync"
 )
 
-// linkReport is what every link reports: the launcher and where it keeps the instance, the
-// instance's id and name, what it follows, and the build that left it ready to play.
+// linkReport is the link module's report with the sync block as the CLI finishes it: the same JSON
+// shape for every launcher, `sync` last.
 type linkReport struct {
-	Launcher    string      `json:"launcher"`
-	LauncherDir string      `json:"launcherDir,omitempty"`
-	ID          string      `json:"id"`
-	Instance    string      `json:"instance"`
-	InstanceDir string      `json:"instanceDir"`
-	Name        string      `json:"name"`
-	VersionID   string      `json:"versionId,omitempty"`
-	GameDir     string      `json:"gameDir"`
-	Command     string      `json:"command,omitempty"`
-	Created     bool        `json:"created"`
-	Source      string      `json:"source"`
-	Ref         string      `json:"ref,omitempty"`
-	Path        string      `json:"path,omitempty"`
-	Modpack     string      `json:"modpack"`
-	Sync        *syncResult `json:"sync"`
-	noun        string
-	shown       string
-	versionDir  string
-	rows        []out.Row
+	link.Report
+	Sync *syncResult `json:"sync"`
+	rows []out.Row
 }
 
 func (r *linkReport) print(l *out.Lines) {
 	if r.VersionID != "" {
-		l.OKInto("installed "+r.VersionID, r.versionDir, "")
+		l.OKInto("installed "+r.VersionID, r.VersionDir, "")
 	}
 	verb := "created"
 	if !r.Created {
 		verb = "updated"
 	}
-	l.OKInto(verb+" "+r.noun+" "+r.shown, r.InstanceDir, "")
+	l.OKInto(verb+" "+r.Noun+" "+r.Shown, r.InstanceDir, "")
 	l.Tree(r.rows...)
 	r.Sync.print(l)
 }
@@ -109,13 +89,18 @@ func (k *launcherLink) register(cmd *cobra.Command, e *launcher.Entry) {
 	k.ls.register(cmd)
 }
 
-func (k *launcherLink) hasFeatures() bool { return len(k.ff.with)+len(k.ff.without) > 0 }
-
-func (k *launcherLink) display(p *project.Project) string {
-	if k.instanceName != "" {
-		return k.instanceName
+// request is the flags as the link module takes them; reason names the command for the history.
+func (k *launcherLink) request(reason string) link.Request {
+	return link.Request{
+		LauncherDir: k.launcherDir,
+		Name:        k.instanceName,
+		ID:          k.as,
+		Force:       k.force,
+		With:        k.ff.with,
+		Without:     k.ff.without,
+		Settings:    k.ls.settings(),
+		Reason:      reason,
 	}
-	return p.Manifest.DisplayName("client")
 }
 
 // launcherLinkCmd is `link <launcher>` for one entry: the shared flags and flow around the
@@ -140,188 +125,66 @@ func (a *app) launcherLinkCmd(e *launcher.Entry) *cobra.Command {
 	return cmd
 }
 
-// linkInto links the source into one launcher: the launcher's own placement, checks and link step
-// around the project, registry row and build every link shares.
+// linkInto is the flags, prompts and output of one link: the launcher directory asked for when the
+// launcher has no default, the source named or asked for, then link.Into and the rows its report
+// prints as.
 func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *launcherLink) (*linkReport, error) {
+	if err := k.ls.check(); err != nil {
+		return nil, err
+	}
 	if e.HasDir() && e.DefaultDir == nil && k.launcherDir == "" {
-		if err := k.ls.check(); err != nil {
-			return nil, err
-		}
 		dir, err := a.askLauncherDir(e)
 		if err != nil {
 			return nil, err
 		}
 		k.launcherDir = dir
 	}
-	src, l, err := a.startLauncherLink(cmd, args, k, e)
+	src, err := a.linkFrom(cmd, args, k.at)
 	if err != nil {
 		return nil, err
 	}
-	p := src.Project
-	dir := k.launcherDir
-	if e.HasDir() {
-		if dir, err = e.Locate(dir); err != nil {
-			return nil, err
-		}
+	le, err := a.linkEnv()
+	if err != nil {
+		return nil, err
+	}
+	rep, err := link.Into(cmd.Context(), le, e, src, k.request(cmd.Name()))
+	if err != nil {
+		return nil, a.lastOf(err)
+	}
+	synced, err := a.synced(rep.Sync, syncRequest{}, nil)
+	if err != nil {
+		return nil, err
+	}
+	r := &linkReport{Report: *rep, Sync: &synced}
+	r.rows = follows(rep.Modpack, rep.Source, rep.Path)
+	if rep.Command != "" {
+		r.rows = append(r.rows, out.Row{Text: "the launcher syncs this instance before each launch"})
+	}
+	if rep.FeaturesSaved {
+		r.rows = append(r.rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(rep.GameDir) + "`"})
+	}
+	if rep.Note != "" {
+		r.rows = append(r.rows, out.Row{Text: rep.Note})
+	}
+	return r, nil
+}
+
+// linkEnv is the link module's env: the sync env, shulker's own instances root, and the launcher
+// metadata services a test replaces.
+func (a *app) linkEnv() (*link.Env, error) {
+	se, err := a.syncEnv()
+	if err != nil {
+		return nil, err
 	}
 	d, err := a.deps()
 	if err != nil {
 		return nil, err
 	}
-	instances, err := a.loadInstances()
-	if err != nil {
-		return nil, err
-	}
-	display := k.display(p)
-	req := &launcher.Link{
-		LauncherDir:   dir,
-		Name:          display,
-		ID:            k.as,
-		Minecraft:     p.Lock.Minecraft,
-		LoaderType:    p.Lock.Loader.Type,
-		LoaderVersion: p.Lock.Loader.Version,
-		Force:         k.force,
-		Registry:      instances,
-		Cache:         d.Cache,
-		Fetch:         d.Fetch,
-		MetaURL:       a.metaURL(d, e),
-		Versions:      clientVersions{a: a, p: p, l: l},
-		Log:           a.progress,
-		Warn:          a.printer.Warn,
-	}
-	place, err := e.Place(req)
-	if err != nil {
-		return nil, err
-	}
-	second := "--name"
-	if !e.Usage.Names {
-		second = "--as"
-	}
-	if err := project.CheckAdopt(place.GameDir, src.ForLink(), e.Usage.Noun, display, second, k.force); err != nil {
-		return nil, err
-	}
-	if err := a.checkID(k.as, place.GameDir); err != nil {
-		return nil, err
-	}
-	if err := a.refuseForeignInstance(k, e, dir, place.GameDir, display); err != nil {
-		return nil, err
-	}
-	res, err := e.Link(cmd.Context(), req, place)
-	if err != nil {
-		return nil, err
-	}
-	if k.hasFeatures() {
-		if err := a.saveInstanceFeatures(res.GameDir, k.ff); err != nil {
-			return nil, err
-		}
-	}
-	row := config.Instance{Launcher: e.Name, Name: display, Dir: res.GameDir, Source: src.Name}
-	if e.HasDir() {
-		row.LauncherDir = dir
-	}
-	inst, synced, err := a.linkInstance(cmd, row, place.ID, src, k.ls)
-	if err != nil {
-		return nil, err
-	}
-	if e.Slot != nil && e.Slot.UsesShim {
-		// The shim records the Java it falls back to, which the build just resolved.
-		row.ID = inst.Manifest.Name
-		a.reconcileOrWarn(row)
-	}
-	rep := &linkReport{
-		Launcher:    e.Name,
-		LauncherDir: row.LauncherDir,
-		ID:          inst.Manifest.Name,
-		Instance:    res.Key,
-		InstanceDir: res.Dir,
-		Name:        display,
-		VersionID:   res.Version,
-		GameDir:     res.GameDir,
-		Created:     res.Created,
-		Source:      src.Name,
-		Ref:         src.Ref,
-		Path:        src.Path,
-		Modpack:     project.ModpackKey(inst.Manifest, src.Name),
-		Sync:        &synced,
-		noun:        e.Usage.Noun,
-		shown:       display,
-		versionDir:  res.VersionDir,
-	}
-	// A launcher that shows no name of its own is addressed by the id, so that is what the line
-	// names.
-	if !e.Usage.Names {
-		rep.shown = rep.ID
-	}
-	rep.rows = follows(rep.Modpack, rep.Source, rep.Path)
-	if e.Slot != nil {
-		rep.Command = launcher.SlotCommand(e.Name, res.GameDir, launcher.HookPreLaunch)
-		rep.rows = append(rep.rows, out.Row{Text: "the launcher syncs this instance before each launch"})
-	}
-	if k.hasFeatures() {
-		rep.rows = append(rep.rows, out.Row{Text: "feature choices saved; change them with `shulker feature on|off <feature> --into " + launcher.CommandArg(res.GameDir) + "`"})
-	}
-	if note := e.AfterNote(res); note != "" {
-		rep.rows = append(rep.rows, out.Row{Text: note})
-	}
-	return rep, nil
-}
-
-// metaURL is where a link reads a launcher's own metadata: the entry's service, unless the run
-// points that service at a fake.
-func (a *app) metaURL(d *deps, e *launcher.Entry) string {
-	if url, ok := d.metaURLs[e.MetaURL]; ok {
-		return url
-	}
-	return e.MetaURL
-}
-
-// openLinkSource is what every link does first: check the settings, fetch the source, refuse a loader
-// this build doesn't know, and warn when the pack declares no client.
-func (a *app) openLinkSource(cmd *cobra.Command, args []string, at modpack.At, ls linkSettings) (*sync.Source, loader.Loader, error) {
-	if err := ls.check(); err != nil {
-		return nil, loader.Loader{}, err
-	}
-	src, err := a.linkFrom(cmd, args, at)
-	if err != nil {
-		return nil, loader.Loader{}, err
-	}
-	p := src.Project
-	var l loader.Loader
-	if p.Lock.Loader.Type != "" {
-		if l, err = loader.Require(p.Lock.Loader.Type); err != nil {
-			return nil, loader.Loader{}, err
-		}
-	}
-	if !p.Manifest.HasSide("client") {
-		a.printer.Warn("%s", noClientPack)
-	}
-	return src, l, nil
-}
-
-// startLauncherLink is openLinkSource plus the feature choices checked against the build, and
-// the launcher directory the link works in settled.
-func (a *app) startLauncherLink(cmd *cobra.Command, args []string, k *launcherLink, e *launcher.Entry) (*sync.Source, loader.Loader, error) {
-	src, l, err := a.openLinkSource(cmd, args, k.at, k.ls)
-	if err != nil {
-		return nil, l, err
-	}
-	if k.hasFeatures() {
-		b, err := a.builder(cmd.Context(), src.Project)
-		if err != nil {
-			return nil, l, err
-		}
-		if err := k.ff.check(b); err != nil {
-			return nil, l, err
-		}
-	}
 	r, err := a.roots()
 	if err != nil {
-		return nil, l, err
+		return nil, err
 	}
-	if k.launcherDir, err = e.LinkDir(k.launcherDir, r.Instances); err != nil {
-		return nil, l, err
-	}
-	return src, l, nil
+	return &link.Env{Env: se, Instances: r.Instances, MetaURLs: d.metaURLs}, nil
 }
 
 // askLauncherDir asks where a launcher with no default directory is, and off a terminal requires
@@ -350,77 +213,6 @@ func (a *app) askLauncherDir(e *launcher.Entry) (string, error) {
 	return dir, nil
 }
 
-// refuseForeignInstance refuses to link over an instance shulker didn't link, unless --force. An
-// instance shulker linked is a project in its own game directory, and stays one after an unlink;
-// anything else in a folder the launcher names after the instance is the player's own.
-func (a *app) refuseForeignInstance(k *launcherLink, e *launcher.Entry, launcherDir, gameDir, display string) error {
-	if k.force {
-		return nil
-	}
-	_, _, inPlace, err := sync.InPlaceProject(gameDir)
-	if err != nil || inPlace {
-		return err
-	}
-	ok, err := e.LinkedByShulker(launcherDir, gameDir)
-	if err != nil || ok {
-		return err
-	}
-	foreign := out.Errorf("instance-exists", "%s already has an %s %q that shulker didn't link", e.Title, e.Usage.Noun, display)
-	foreign.Help = "pass --name to create a second " + e.Usage.Noun + ", or --force to link this one"
-	return foreign
-}
-
-// clientVersions is what a link hands a launcher to install the locked platform: the versions the
-// project's resolver and loader row can fetch or build.
-type clientVersions struct {
-	a *app
-	p *project.Project
-	l loader.Loader
-}
-
-func (v clientVersions) Vanilla(ctx context.Context) (json.RawMessage, error) {
-	d, err := v.a.deps()
-	if err != nil {
-		return nil, err
-	}
-	return d.meta.Piston.Version(ctx, v.p.Lock.Minecraft)
-}
-
-func (v clientVersions) HasInstaller() bool { return v.l.HasInstaller() }
-
-func (v clientVersions) LoaderProfile(ctx context.Context) (json.RawMessage, error) {
-	d, err := v.a.deps()
-	if err != nil {
-		return nil, err
-	}
-	return d.meta.LoaderProfile(ctx, v.p.Lock.Loader, v.p.Lock.Minecraft)
-}
-
-func (v clientVersions) InstallClient(ctx context.Context, launcherDir string) (string, error) {
-	se, err := v.a.syncEnv()
-	if err != nil {
-		return "", err
-	}
-	src, err := sync.GameSources(se, v.p)
-	if err != nil {
-		return "", err
-	}
-	id, err := game.InstallLoader(ctx, launcherDir, v.p.Lock, src)
-	if err != nil {
-		return "", v.a.keepInstallerOutput(err)
-	}
-	return id, nil
-}
-
-func (v clientVersions) InstallerVersion(ctx context.Context) (json.RawMessage, error) {
-	d, err := v.a.deps()
-	if err != nil {
-		return nil, err
-	}
-	raw, changed, err := v.l.InstallerVersion(ctx, d.Loaders, v.p.Lock)
-	return raw, v.p.SaveIfChanged(changed, err)
-}
-
 // linkAsked is a bare link at a terminal: it asks which launcher, then runs that launcher's own
 // link as if it had been named, so everything after the question is the named command's.
 func (a *app) linkAsked(cmd *cobra.Command) error {
@@ -439,38 +231,6 @@ func (a *app) linkAsked(cmd *cobra.Command) error {
 	sub.SetContext(cmd.Context())
 	a.printer.Command = strings.TrimPrefix(sub.CommandPath(), "shulker ")
 	return sub.RunE(sub, nil)
-}
-
-// noClientPack is what a link says when the pack it is about to follow declares no client. The
-// instance has a client block of its own, so the build goes ahead on the pack's shared mods and
-// overrides; without the line a server-only pack would just give a near-empty instance.
-const noClientPack = "the source declares no client; building one from its shared mods and overrides"
-
-// linkInstance is the half of a link every instanced launcher shares: the project its game
-// directory becomes, the settings this link seeds it with, the registry row that finds it again,
-// and the build that leaves it ready to play.
-func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, src *sync.Source, ls linkSettings) (*project.Project, syncResult, error) {
-	if err := a.checkID(as, row.Dir); err != nil {
-		return nil, syncResult{}, err
-	}
-	instances, err := a.loadInstances()
-	if err != nil {
-		return nil, syncResult{}, err
-	}
-	id := config.InstanceID(instances, as, row.Name, row.Dir)
-	from := src.ForLink()
-	p, linked, err := project.LinkInstance(row.Dir, id, row.Name, from)
-	if err != nil {
-		return nil, syncResult{}, err
-	}
-	src.Name = from.Name
-	if err := ls.save(row.Dir, src.Name, src.At, "client", false, src.Project.Manifest); err != nil {
-		return nil, syncResult{}, err
-	}
-	row.ID, row.Source = id, src.Name
-	a.registerInstance(row)
-	synced, err := a.syncInPlace(cmd, p, "client", syncRequest{Request: sync.Request{Linked: linked}})
-	return p, synced, err
 }
 
 // linkSource is the project a link command works from: the argument when there
@@ -509,11 +269,8 @@ func follows(modpack, source, path string) []out.Row {
 	return []out.Row{{Text: "follows " + modpack + " from " + source}}
 }
 
-// linkSettings are the settings a `link` seeds an instance with: the manifest's hook defaults on a
-// new instance, then a flag's value over them. On a relink only the flags land, because the
-// settings block belongs to whoever edited it once it exists, and no sync rewrites it. The marker
-// is never seeded: an absent settings.marker defers to the manifest, so only --no-marker and
-// --with-marker write one.
+// linkSettings are the flags that seed an instance's settings: the hook switches, the marker, and
+// the Java and wrapper this machine launches with.
 type linkSettings struct {
 	noHooks     bool
 	noPreLaunch bool
@@ -550,36 +307,22 @@ func (ls linkSettings) isSet() bool {
 	return ls.noHooks || ls.noPreLaunch || ls.noPostExit || ls.noMarker || ls.withMarker || ls.java != "" || ls.wrapper != ""
 }
 
-// save writes what a directory syncs from, and the settings this link decided.
-func (ls linkSettings) save(dir, source string, at modpack.At, side string, assumeClient bool, m *manifest.Manifest) error {
-	_, _, inPlace, err := project.InPlace(dir)
-	if err != nil {
-		return err
-	}
-	f, fresh, err := instance.Intent(dir, inPlace, source, at, side, assumeClient)
-	if err != nil {
-		return err
-	}
-	instance.SeedHooks(f, fresh, m.ClientHooks())
-	if ls.noHooks || ls.noPreLaunch {
-		f.Settings.Hooks.PreLaunch = instance.Off()
-	}
-	if ls.noHooks || ls.noPostExit {
-		f.Settings.Hooks.PostExit = instance.Off()
+// settings is the flags as the link module seeds them. The marker is left to the manifest unless a
+// flag decides it.
+func (ls linkSettings) settings() link.Settings {
+	s := link.Settings{
+		NoPreLaunch: ls.noHooks || ls.noPreLaunch,
+		NoPostExit:  ls.noHooks || ls.noPostExit,
+		Java:        ls.java,
+		Wrapper:     strings.Fields(ls.wrapper),
 	}
 	if ls.noMarker {
-		f.Settings.Marker = instance.Off()
+		s.Marker = instance.Off()
 	}
 	if ls.withMarker {
-		f.Settings.Marker = instance.On()
+		s.Marker = instance.On()
 	}
-	if ls.java != "" {
-		f.Settings.Java = ls.java
-	}
-	if w := strings.Fields(ls.wrapper); len(w) > 0 {
-		f.Settings.Wrapper = w
-	}
-	return f.Save(dir)
+	return s
 }
 
 func (a *app) projectSource() (*sync.Source, error) {
@@ -595,18 +338,4 @@ func (a *app) projectSource() (*sync.Source, error) {
 		return nil, err
 	}
 	return &sync.Source{Checkout: &modpack.Checkout{Source: dir, Kind: modpack.Local, Dir: dir}, Name: dir, Project: p}, nil
-}
-
-func (a *app) saveInstanceFeatures(gameDir string, ff featureFlags) error {
-	lf, err := a.loadLocal(gameDir)
-	if err != nil {
-		return err
-	}
-	for _, name := range ff.with {
-		lf.SetFeature(name, true)
-	}
-	for _, name := range ff.without {
-		lf.SetFeature(name, false)
-	}
-	return a.saveLocal(lf, false)
 }
