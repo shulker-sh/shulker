@@ -7,7 +7,6 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -74,12 +73,9 @@ const NoClientPack = "the source declares no client; building one from its share
 // around the project, registry row and build every link shares.
 func Into(ctx context.Context, e *Env, entry *launcher.Entry, src *sync.Source, req Request) (*Report, error) {
 	p := src.Project
-	var row loader.Loader
-	if p.Lock.Loader.Type != "" {
-		var err error
-		if row, err = loader.Require(p.Lock.Loader.Type); err != nil {
-			return nil, err
-		}
+	row, err := sync.LockedLoader(p)
+	if err != nil {
+		return nil, err
 	}
 	if !p.Manifest.HasSide("client") {
 		e.Warn("%s", NoClientPack)
