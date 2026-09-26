@@ -7,9 +7,9 @@ import 'virtual:group-icons.css'
 import './style.css'
 
 export default {
-  extends: DefaultTheme,
-  enhanceApp({ app }) {
-    app.use(TwoslashFloatingVue)
-    app.component('CopyPage', CopyPage)
-  },
+    extends: DefaultTheme,
+    enhanceApp({ app }) {
+        app.use(TwoslashFloatingVue)
+        app.component('CopyPage', CopyPage)
+    },
 } satisfies Theme
