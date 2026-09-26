@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os/exec"
 	"time"
@@ -13,7 +14,6 @@ import (
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/proc"
 	"shulker.sh/shulker/internal/sync"
 )
 
@@ -141,7 +141,10 @@ func (a *app) hookWrapCmd() *cobra.Command {
 				e.Rows = []out.Detail{{Label: "Fix", Text: "shulker instances repair", IsCommand: true}}
 				return e
 			}
-			code, err := a.runGame(f.Settings, java, argv)
+			code, gaveWay, err := game.Run(game.Launch{Java: java, Argv: argv, Wrapper: f.Settings.Wrapper}, a.stdin, a.gameStdout(), a.printer.Stderr)
+			if gaveWay != nil {
+				a.printer.Warn("can't run the wrapper %q, so the game starts with Java alone: %v", f.Settings.Wrapper[0], gaveWay)
+			}
 			if err != nil {
 				if launching {
 					if err := instance.FailLaunch(dir, f.Settings.LaunchKeep(), stamped, runReason(java, err)); err != nil {
@@ -163,31 +166,13 @@ func (a *app) hookWrapCmd() *cobra.Command {
 	}
 }
 
-// runGame runs the game and hands back its exit status. A wrapper that can't be run at all is not
-// worth losing the launch over, so the game starts with Java on its own instead; an error is Java
-// itself never starting, which is the end of the launch.
-func (a *app) runGame(s instance.Settings, java string, argv []string) (int, error) {
-	if w := s.Wrapper; len(w) > 0 {
-		args := append(append(append([]string{}, w[1:]...), java), argv...)
-		code, err := a.runExe(w[0], args)
-		if err == nil {
-			return code, nil
-		}
-		a.printer.Warn("can't run the wrapper %q, so the game starts with Java alone: %v", w[0], err)
-	}
-	return a.runExe(java, argv)
-}
-
-// runExe runs one program to completion. A non-zero status comes back as the code, so only a
-// program that never started at all is an error.
-func (a *app) runExe(exe string, args []string) (int, error) {
-	stdout := a.printer.Stdout
+// gameStdout is where a game run in the foreground writes: stdout, unless that is the JSON
+// envelope's.
+func (a *app) gameStdout() io.Writer {
 	if a.printer.JSON {
-		stdout = a.printer.Stderr
+		return a.printer.Stderr
 	}
-	cmd := exec.Command(exe, args...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = a.stdin, stdout, a.printer.Stderr
-	return proc.ExitCode(cmd.Run())
+	return a.printer.Stdout
 }
 
 // runReason is why a program never started, as one sentence. The operating system repeats the path
