@@ -175,7 +175,9 @@ onUnmounted(() => {
   .menu button::before,
   .trailing,
   .chevron {
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition-property: transform, opacity, background-color, border-color, box-shadow, padding-left, width;
+    transition-duration: 0.2s;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
   .trigger:hover {
     transform: translateY(-1px);
