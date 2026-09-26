@@ -19,17 +19,15 @@ import (
 // InPlaceProject is the project in dir when one of its sides builds into dir itself, which is
 // what makes dir an instance rather than a project that builds elsewhere.
 func InPlaceProject(dir string) (*project.Project, string, bool, error) {
-	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); errors.Is(err, os.ErrNotExist) {
-		return nil, "", false, nil
-	} else if err != nil {
+	_, side, ok, err := project.InPlace(dir)
+	if err != nil || !ok {
 		return nil, "", false, err
 	}
 	p, err := project.Open(dir)
 	if err != nil {
 		return nil, "", false, err
 	}
-	side, ok := p.Manifest.InPlaceSide()
-	return p, side, ok, nil
+	return p, side, true, nil
 }
 
 // InPlace refreshes the modpacks that follow their source, relocks without moving the project's
