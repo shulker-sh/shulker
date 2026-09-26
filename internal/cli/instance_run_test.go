@@ -141,3 +141,15 @@ func TestPlayShowsTheGamesPidAndHowToDumpIt(t *testing.T) {
 		}
 	}
 }
+
+func TestInstanceLogInAProjectReadsItsOneInstance(t *testing.T) {
+	h := newHarness(t)
+	project := h.dir
+	_, gameDir := playHarness(t, h)
+	h.dir = project
+	writeRuns(t, gameDir, instance.Launch{StartedAt: "2026-09-23T00:02:02Z", EndedAt: "2026-09-23T00:03:00Z", Outcome: instance.OutcomeOK, Log: runLog(t, gameDir, "one\n")})
+
+	if got := h.mustRun(t, "instance", "log"); got != "one\n" {
+		t.Fatalf("the project's one instance's log:\n%q", got)
+	}
+}

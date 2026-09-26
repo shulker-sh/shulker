@@ -16,6 +16,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/schema"
 )
 
@@ -359,6 +360,9 @@ func (a *app) instanceDir() (string, error) {
 		return "", err
 	}
 	if _, err := os.Stat(instance.Path(dir)); errors.Is(err, fs.ErrNotExist) {
+		if only, ok := a.onlyInstanceOf(dir); ok {
+			return only, nil
+		}
 		e := out.Errorf("instance-not-found", "%s is not an instance", dir)
 		e.Help = "run this in one, or name one with -i"
 		return "", e
@@ -366,6 +370,19 @@ func (a *app) instanceDir() (string, error) {
 		return "", err
 	}
 	return dir, nil
+}
+
+// onlyInstanceOf is the one instance synced from the project at dir, when it has exactly one.
+func (a *app) onlyInstanceOf(dir string) (string, bool) {
+	p, err := project.Open(dir)
+	if err != nil {
+		return "", false
+	}
+	entries, err := a.syncedFrom(p)
+	if err != nil || len(entries) != 1 {
+		return "", false
+	}
+	return entries[0].Dir, true
 }
 
 func (i *instanceFile) settings() map[string]any {
