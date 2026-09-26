@@ -66,8 +66,7 @@ public final class ShulkerModMenu implements ModMenuApi {
 					ids.add(line);
 				}
 			}
-		} catch (IOException e) {
-			return ids;
+		} catch (IOException ignored) {
 		}
 		return ids;
 	}
