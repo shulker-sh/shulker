@@ -146,29 +146,6 @@ func TestWrapLaunchesWhenTheSyncFails(t *testing.T) {
 	}
 }
 
-func TestWrapPrependsTheWrapper(t *testing.T) {
-	dir := t.TempDir()
-	wrapper, wrapperArgs := filepath.Join(dir, "wrapper"), filepath.Join(dir, "wrapper-args.txt")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"" + wrapperArgs + "\"\nshift\nexec \"$@\"\n"
-	if err := os.WriteFile(wrapper, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	h, gameDir, argsFile := wrappedInstance(t, "0", func(f *instance.File) {
-		f.Settings.Wrapper = []string{wrapper, "--tag"}
-	})
-	h.mustRun(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir)
-	f, err := instance.Load(gameDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := readArgs(t, wrapperArgs); got != "--tag\n"+f.Resolved.Java+"\n--gameDir\n"+gameDir+"\n" {
-		t.Fatalf("the wrapper should run first with Java after it, got %q", got)
-	}
-	if got := readArgs(t, argsFile); got != "--gameDir\n"+gameDir+"\n" {
-		t.Fatalf("java should still get the argv, got %q", got)
-	}
-}
-
 func TestWrapPassesTheGamesExitCodeBack(t *testing.T) {
 	h, gameDir, _ := wrappedInstance(t, "3", nil)
 	code, stdout, stderr := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)

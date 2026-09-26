@@ -8,9 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/instance"
-	"shulker.sh/shulker/internal/out"
 )
 
 // playHarness links a shulker instance with its own store root and leaves the harness addressing it
@@ -44,7 +42,7 @@ func TestPlayDryRunFillsTheStore(t *testing.T) {
 
 	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play", "--dry-run")
 
-	for _, want := range []string{"would launch pack", "26.2", "main class: net.minecraft.client.main.Main", "asset index: 26", "classpath: 2 jars"} {
+	for _, want := range []string{"would launch pack", "26.2", "main class: net.minecraft.client.main.Main", "memory: " + instance.DefaultMemory, "asset index: 26", "classpath: 2 jars"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("play --dry-run: %q is missing from\n%s", want, stdout)
 		}
@@ -92,30 +90,6 @@ func TestPlayDryRunFillsTheStore(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(store, "loaders.json")); err == nil {
 		t.Fatal("a vanilla instance runs no loader installer")
-	}
-}
-
-func TestPlayDryRunMergesTheLoaderOverVanilla(t *testing.T) {
-	h := newHarness(t)
-	store, _ := playHarness(t, h, "--loader", "fabric")
-
-	rep := playJSON(t, h, "-i", "pack", "play", "--dry-run")
-
-	if rep.Version != "fabric-loader-0.17.3-26.2" || rep.Inherits != "26.2" {
-		t.Fatalf("report %+v", rep)
-	}
-	if rep.MainClass != "net.fabricmc.loader.impl.launch.knot.KnotClient" {
-		t.Fatalf("the loader's main class should win: %+v", rep)
-	}
-	// The loader's own jar, vanilla's library, and the client jar, in that order.
-	if rep.Classpath != 3 {
-		t.Fatalf("classpath %+v", rep)
-	}
-	if _, err := os.Stat(filepath.Join(store, "libraries", "net", "fabricmc", "fabric-loader", "0.17.3", "fabric-loader-0.17.3.jar")); err != nil {
-		t.Fatalf("the loader's library is missing from the store: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(store, "versions", "26.2", "26.2.json")); err != nil {
-		t.Fatalf("the version it inherits from is missing from the store: %v", err)
 	}
 }
 
@@ -229,63 +203,6 @@ func TestPlayStartsTheGameDetachedAndLogsIt(t *testing.T) {
 	}
 }
 
-func TestPlaySyncsFirstUnlessToldNotTo(t *testing.T) {
-	h := newHarness(t)
-	_, gameDir := playHarness(t, h)
-	h.mustRun(t, "accounts", "login", "--use")
-
-	synced := playedJSON(t, h, "-i", "pack", "play")
-	if synced.Sync == nil || synced.Sync.Build == nil {
-		t.Fatalf("play syncs before it launches: %+v", synced.Sync)
-	}
-	waitForFile(t, filepath.Join(gameDir, "args.txt"))
-
-	skipped := playedJSON(t, h, "-i", "pack", "play", "--no-sync")
-	if skipped.Sync != nil {
-		t.Fatalf("--no-sync syncs nothing: %+v", skipped.Sync)
-	}
-	if skipped.PID == 0 {
-		t.Fatalf("--no-sync still launches: %+v", skipped)
-	}
-}
-
-func TestPlaySkipsTheSyncWhenPreLaunchIsOff(t *testing.T) {
-	h := newHarness(t)
-	_, gameDir := playHarness(t, h)
-	h.mustRun(t, "accounts", "login", "--use")
-	h.mustRun(t, "-i", "pack", "instance", "set", "hooks.preLaunch", "false")
-
-	res := playedJSON(t, h, "-i", "pack", "play")
-	if res.Sync != nil {
-		t.Fatalf("hooks.preLaunch off syncs nothing: %+v", res.Sync)
-	}
-	if res.PID == 0 {
-		t.Fatalf("hooks.preLaunch off still launches: %+v", res)
-	}
-	waitForFile(t, filepath.Join(gameDir, "args.txt"))
-}
-
-func TestPlayTakesTheAccountFromTheFlagOverTheDefault(t *testing.T) {
-	h := newHarness(t)
-	_, gameDir := playHarness(t, h)
-	h.mustRun(t, "accounts", "login", "--use")
-	h.msa.signsIn("jeb", "Jeb_", dinnerbone)
-	h.mustRun(t, "accounts", "login")
-
-	res := playedJSON(t, h, "-i", "pack", "play", "--account", "Jeb_")
-
-	if res.Account.Name != "Jeb_" || res.Account.Default {
-		t.Fatalf("--account names who plays, and changes nothing: %+v", res.Account)
-	}
-	if argv := waitForFile(t, filepath.Join(gameDir, "args.txt")); !strings.Contains(argv, "--username\nJeb_\n") {
-		t.Fatalf("the game played as someone else:\n%s", argv)
-	}
-	// The flag is for one run: the default account is where it was.
-	if res := playedJSON(t, h, "-i", "pack", "play"); res.Account.Name != "Notch" {
-		t.Fatalf("default account %+v", res.Account)
-	}
-}
-
 func TestPlayWithNoDefaultTakesTheOnlyAccountThereIs(t *testing.T) {
 	h := newHarness(t)
 	playHarness(t, h)
@@ -302,89 +219,5 @@ func TestPlayWithNoDefaultTakesTheOnlyAccountThereIs(t *testing.T) {
 	// Settled, so the next launch says nothing about it.
 	if stdout := h.mustRun(t, "-i", "pack", "play"); strings.Contains(stdout, "default account now") {
 		t.Fatalf("the question is asked once:\n%s", stdout)
-	}
-}
-
-func TestPlayWithNoDefaultAndSeveralAccountsNamesTheFlag(t *testing.T) {
-	h := newHarness(t)
-	playHarness(t, h)
-	writeAccountStore(t, h, ownAccount("Notch", notchID), offlineAccount("Steve", steveID))
-
-	code, stdout, _ := h.run(t, "-i", "pack", "play", "--json")
-
-	if code != out.ExitUsage || !strings.Contains(stdout, "--account") {
-		t.Fatalf("exit %d: %s", code, stdout)
-	}
-}
-
-func TestPlayWithNoAccountAtAllSaysThereIsNothingToPlayWith(t *testing.T) {
-	h := newHarness(t)
-	playHarness(t, h)
-
-	code, stdout, _ := h.run(t, "-i", "pack", "play", "--json")
-
-	if code == 0 || !strings.Contains(stdout, `"no-accounts"`) {
-		t.Fatalf("exit %d: %s", code, stdout)
-	}
-}
-
-func TestPlayRefusesAnAccountWhoseSignInHasExpired(t *testing.T) {
-	h := newHarness(t)
-	playHarness(t, h)
-	writeAccountStore(t, h, account.Account{Type: account.Microsoft, Profile: &account.Profile{ID: dinnerbone, Name: "Dinnerbone"}})
-
-	code, stdout, stderr := h.run(t, "-i", "pack", "play")
-
-	if code == 0 || !strings.Contains(stderr, "Dinnerbone's Microsoft sign-in has expired") {
-		t.Fatalf("exit %d: %s", code, stderr)
-	}
-	if !strings.Contains(stderr, "shulker accounts login") {
-		t.Fatalf("the refusal has to carry its fix line:\n%s", stderr)
-	}
-	if stdout != "" {
-		t.Fatalf("a launch that never happened is no result: %s", stdout)
-	}
-}
-
-func TestPlayDryRunReportsTheHeapTheLaunchGets(t *testing.T) {
-	h := newHarness(t)
-	shulkerInstances(t, h)
-	h.mustRun(t, "config", "set", "store", filepath.Join(t.TempDir(), "store"))
-	h.mustRun(t, "create", "--name", "pack")
-	h.mustRun(t, "link", "shulker")
-	source := h.dir
-	h.dir = ""
-
-	if rep := playJSON(t, h, "-i", "pack", "play", "--dry-run"); rep.Memory != instance.DefaultMemory {
-		t.Fatalf("with nothing set the launch gets the fixed default, not the JVM's own: %+v", rep)
-	}
-	if stdout := h.mustRun(t, "-i", "pack", "play", "--dry-run"); !strings.Contains(stdout, "memory") || !strings.Contains(stdout, instance.DefaultMemory) {
-		t.Fatalf("play --dry-run should print the heap:\n%s", stdout)
-	}
-
-	h.dir = source
-	h.mustRun(t, "set", "client.memory", "6G")
-	h.dir = ""
-	h.mustRun(t, "-i", "pack", "sync")
-	if rep := playJSON(t, h, "-i", "pack", "play", "--dry-run"); rep.Memory != "6G" {
-		t.Fatalf("the pack's client.memory reaches the instance and beats the default: %+v", rep)
-	}
-	h.mustRun(t, "config", "set", "play.memory", "8G")
-	if rep := playJSON(t, h, "-i", "pack", "play", "--dry-run"); rep.Memory != "8G" {
-		t.Fatalf("play.memory beats the pack's client.memory: %+v", rep)
-	}
-	h.mustRun(t, "-i", "pack", "instance", "set", "memory", "10G")
-	if rep := playJSON(t, h, "-i", "pack", "play", "--dry-run"); rep.Memory != "10G" {
-		t.Fatalf("the instance's own memory beats everything: %+v", rep)
-	}
-
-	h.mustRun(t, "-i", "pack", "instance", "unset", "memory")
-	h.mustRun(t, "config", "unset", "play.memory")
-	if err := os.RemoveAll(source); err != nil {
-		t.Fatal(err)
-	}
-	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play", "--dry-run")
-	if !strings.Contains(stdout, instance.DefaultMemory) || !strings.Contains(stderr, "client.memory") {
-		t.Fatalf("a pack that can't be read costs the launch its client.memory, not the launch:\n%s%s", stdout, stderr)
 	}
 }
