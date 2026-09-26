@@ -1,18 +1,33 @@
-# shulker installer for Windows. Downloads a release from GitHub, verifies its SHA256
-# checksum and (when gh is installed) its build provenance, installs shulker.exe, and adds
-# the install directory to the user PATH.
+# Installs shulker on Windows.
 #
 #   irm https://shulker.sh/install.ps1 | iex
 #
-# Environment:
-#   SHULKER_INSTALL_DIR=...            install location (default: %LOCALAPPDATA%\Programs\shulker)
-#   SHULKER_VERSION=v0.0.1             install a specific tag (default: latest)
-#   SHULKER_WITHOUT_ATTESTATION=1      skip the build provenance check
-#   SHULKER_REQUIRE_ATTESTATION=1      fail unless build provenance is verified
-#   SHULKER_NO_MODIFY_PATH=1           don't add the install directory to the user PATH
+# What it does, in order:
+#   1. Picks the latest release of github.com/shulker-sh/shulker, or SHULKER_VERSION.
+#   2. Downloads that release's archive for your CPU, and its checksums.txt.
+#   3. Checks the archive's SHA256 against checksums.txt, and stops on a mismatch.
+#   4. If the GitHub CLI (gh) is installed, checks the archive's build provenance: proof
+#      that GitHub Actions built it in the shulker-sh organization, not someone's laptop.
+#   5. Copies shulker.exe into %LOCALAPPDATA%\Programs\shulker, or SHULKER_INSTALL_DIR.
+#   6. If that directory is not on your user PATH, adds it.
+#
+# It never needs administrator rights. Besides the install directory and your user PATH, it
+# only writes to a temporary directory, which it deletes when it finishes.
+#
+# Options, as environment variables:
+#   SHULKER_WITHOUT_ATTESTATION=1   skip step 4
+#   SHULKER_REQUIRE_ATTESTATION=1   fail when step 4 can't run or fails
+#   SHULKER_NO_MODIFY_PATH=1        skip step 6
+#   SHULKER_INSTALL_DIR=<dir>       install somewhere else
+#   SHULKER_VERSION=v0.0.1          install a specific release
+#
+# Set them in the same session before running it:
+#
+#   $env:SHULKER_NO_MODIFY_PATH = '1'; irm https://shulker.sh/install.ps1 | iex
 
-# iex runs in the caller's session: the script block keeps these settings out of it, and
-# errors throw instead of exiting so the window stays open.
+# iex runs this in your own PowerShell session. Wrapping it in a script block keeps its
+# variables and settings out of that session, and failures throw rather than exit, so an
+# error doesn't close your window.
 & {
   $ErrorActionPreference = 'Stop'
   $ProgressPreference = 'SilentlyContinue'
@@ -22,7 +37,7 @@
   $repo = 'shulker'
   $installDir = if ($env:SHULKER_INSTALL_DIR) { $env:SHULKER_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\shulker' }
 
-  function Note($msg) { Write-Host "==> $msg" }
+  function Write-Note($msg) { Write-Host "==> $msg" }
 
   $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
     'ARM64' { 'arm64' }
@@ -30,9 +45,10 @@
     default { throw "shulker install: unsupported architecture $env:PROCESSOR_ARCHITECTURE" }
   }
 
+  # 1. Pick the release.
   $version = $env:SHULKER_VERSION
   if (-not $version) {
-    Note 'resolving latest release'
+    Write-Note 'resolving latest release'
     $version = (Invoke-RestMethod "https://api.github.com/repos/$owner/$repo/releases/latest").tag_name
     if (-not $version) { throw "shulker install: no release found at https://github.com/$owner/$repo/releases" }
   }
@@ -43,15 +59,17 @@
   $tmp = Join-Path ([IO.Path]::GetTempPath()) ("shulker-install-" + [Guid]::NewGuid())
   New-Item -ItemType Directory -Path $tmp | Out-Null
   try {
+    # 2. Download.
     $archivePath = Join-Path $tmp $archive
-    Note "downloading $archive"
+    Write-Note "downloading $archive"
     try { Invoke-WebRequest -UseBasicParsing -Uri "$base/$archive" -OutFile $archivePath }
     catch { throw "shulker install: download failed: $base/$archive" }
     try { $checksums = (Invoke-WebRequest -UseBasicParsing -Uri "$base/checksums.txt").Content }
     catch { throw "shulker install: could not download $base/checksums.txt" }
     if ($checksums -is [byte[]]) { $checksums = [Text.Encoding]::UTF8.GetString($checksums) }
 
-    Note 'verifying SHA256 checksum'
+    # 3. Checksum.
+    Write-Note 'verifying SHA256 checksum'
     $want = $null
     foreach ($line in $checksums -split "`n") {
       $fields = $line.Trim() -split '\s+'
@@ -61,11 +79,13 @@
     $got = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash.ToLower()
     if ($got -ne $want.ToLower()) { throw "shulker install: checksum mismatch for $archive (want $want, got $got)" }
 
+    # 4. Build provenance. The release workflow publishes a signed attestation for each
+    # archive; gh checks the signature and that it names this archive and the shulker-sh owner.
     $gh = Get-Command gh -ErrorAction SilentlyContinue
     if ($env:SHULKER_WITHOUT_ATTESTATION) {
-      Note 'skipping build provenance check (SHULKER_WITHOUT_ATTESTATION)'
+      Write-Note 'skipping build provenance check (SHULKER_WITHOUT_ATTESTATION)'
     } elseif ($gh) {
-      Note 'verifying build provenance with gh'
+      Write-Note 'verifying build provenance with gh'
       $verified = $false
       try {
         $bundle = Join-Path $tmp 'shulker.attestation.jsonl'
@@ -74,19 +94,20 @@
         $verified = $LASTEXITCODE -eq 0
       } catch {}
       if ($verified) {
-        Note 'build provenance verified'
+        Write-Note 'build provenance verified'
       } elseif ($env:SHULKER_REQUIRE_ATTESTATION) {
         throw 'shulker install: build provenance could not be verified and SHULKER_REQUIRE_ATTESTATION is set'
       } else {
-        Note 'build provenance could not be verified, continuing on the checksum'
+        Write-Note 'build provenance could not be verified, continuing on the checksum'
       }
     } elseif ($env:SHULKER_REQUIRE_ATTESTATION) {
       throw 'shulker install: SHULKER_REQUIRE_ATTESTATION is set but gh is not installed'
     } else {
-      Note 'gh not found, skipping build provenance check'
+      Write-Note 'gh not found, skipping build provenance check'
     }
 
-    Note "installing to $installDir"
+    # 5. Install.
+    Write-Note "installing to $installDir"
     $extract = Join-Path $tmp 'extract'
     Expand-Archive -Path $archivePath -DestinationPath $extract -Force
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
@@ -96,18 +117,24 @@
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
   }
 
-  # The raw registry value keeps %VAR% entries unexpanded; [Environment]::SetEnvironmentVariable
-  # would rewrite the user PATH as REG_SZ with them frozen.
+  # 6. PATH. Your user PATH lives in the registry at HKCU\Environment. It is edited there
+  # directly because [Environment]::SetEnvironmentVariable would expand entries like
+  # %USERPROFILE% into fixed paths as it saves them.
   $envKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
   try {
     $userPath = [string]$envKey.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
     $entries = @($userPath -split ';' | Where-Object { $_ })
     if ($entries -notcontains $installDir) {
       if ($env:SHULKER_NO_MODIFY_PATH) {
-        Note "$installDir is not on your PATH"
+        Write-Note "$installDir is not on your PATH"
       } else {
         $envKey.SetValue('Path', ((@($installDir) + $entries) -join ';'), [Microsoft.Win32.RegistryValueKind]::ExpandString)
-        # Without this broadcast, terminals opened from Explorer keep the old PATH until sign-out.
+        # Tell running programs that the environment changed, the same way the System
+        # Properties dialog does; otherwise terminals opened from Explorer keep the old PATH
+        # until you sign out. Add-Type only declares the Windows function that sends it.
+        $HWND_BROADCAST = [IntPtr]0xffff
+        $WM_SETTINGCHANGE = 0x1A
+        $SMTO_ABORTIFHUNG = 2
         if (-not ('Shulker.Env' -as [type])) {
           Add-Type -Namespace Shulker -Name Env -MemberDefinition @'
 [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
@@ -115,9 +142,9 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wP
 '@
         }
         $result = [UIntPtr]::Zero
-        [Shulker.Env]::SendMessageTimeout([IntPtr]0xffff, 0x1A, [UIntPtr]::Zero, 'Environment', 2, 5000, [ref]$result) | Out-Null
+        [Shulker.Env]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, 'Environment', $SMTO_ABORTIFHUNG, 5000, [ref]$result) | Out-Null
         $env:Path = "$installDir;$env:Path"
-        Note "added $installDir to your user PATH; open a new terminal to use shulker there"
+        Write-Note "added $installDir to your user PATH; open a new terminal to use shulker there"
       }
     }
   } finally {

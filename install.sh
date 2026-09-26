@@ -1,17 +1,31 @@
 #!/bin/sh
-# shulker installer for macOS and Linux. Downloads a release from GitHub, verifies its
-# SHA256 checksum and (when gh is installed) its build provenance, installs the binary,
-# and adds the install directory to PATH.
+# Installs shulker on macOS or Linux.
 #
 #   curl -fsSL https://shulker.sh/install.sh | sh
-#   curl -fsSL https://shulker.sh/install.sh | sh -s -- --no-modify-path
 #
-# Environment / flags:
-#   SHULKER_INSTALL_DIR=~/.local/bin   install location (default)
-#   SHULKER_VERSION=v0.0.1             install a specific tag (default: latest)
-#   --without-attestation              skip the build provenance check
-#   --require-attestation              fail unless build provenance is verified
-#   --no-modify-path                   don't add the install directory to a shell rc file
+# What it does, in order:
+#   1. Picks the latest release of github.com/shulker-sh/shulker, or SHULKER_VERSION.
+#   2. Downloads that release's archive for your OS and CPU, and its checksums.txt.
+#   3. Checks the archive's SHA256 against checksums.txt, and stops on a mismatch.
+#   4. If the GitHub CLI (gh) is installed, checks the archive's build provenance: proof
+#      that GitHub Actions built it in the shulker-sh organization, not someone's laptop.
+#   5. Copies the shulker binary into ~/.local/bin, or SHULKER_INSTALL_DIR.
+#   6. If that directory is not on your PATH, appends one line to your shell's startup
+#      file (~/.zshrc, ~/.bashrc, ...) to add it.
+#
+# It never uses sudo. Besides the install directory and that one startup-file line, it
+# only writes to a temporary directory, which it deletes on exit.
+#
+# Options, as a flag or an environment variable:
+#   --without-attestation   SHULKER_WITHOUT_ATTESTATION=1   skip step 4
+#   --require-attestation   SHULKER_REQUIRE_ATTESTATION=1   fail when step 4 can't run or fails
+#   --no-modify-path        SHULKER_NO_MODIFY_PATH=1        skip step 6
+#                           SHULKER_INSTALL_DIR=<dir>       install somewhere else
+#                           SHULKER_VERSION=v0.0.1          install a specific release
+#
+# Pass flags through sh with -s --:
+#
+#   curl -fsSL https://shulker.sh/install.sh | sh -s -- --no-modify-path
 set -eu
 
 OWNER="shulker-sh"
@@ -48,6 +62,7 @@ if [ "$os" = "darwin" ] && [ "$arch" = "amd64" ] && [ "$(sysctl -n sysctl.proc_t
   arch="arm64"
 fi
 
+# 1. Pick the release. GitHub redirects /releases/latest to /releases/tag/<version>.
 version="${SHULKER_VERSION:-}"
 if [ -z "$version" ]; then
   note "resolving latest release"
@@ -63,10 +78,12 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 
+# 2. Download.
 note "downloading $archive"
 curl -fsSL -o "$archive" "$base/$archive" || err "download failed: $base/$archive"
 curl -fsSL -o checksums.txt "$base/checksums.txt" || err "could not download $base/checksums.txt"
 
+# 3. Checksum.
 note "verifying SHA256 checksum"
 want="$(awk -v f="$archive" '$2 == f { print $1 }' checksums.txt)"
 [ -n "$want" ] || err "no checksum listed for $archive"
@@ -77,6 +94,8 @@ else
 fi
 [ "$want" = "$got" ] || err "checksum mismatch for $archive (want $want, got $got)"
 
+# 4. Build provenance. The release workflow publishes a signed attestation for each
+# archive; gh checks the signature and that it names this archive and the shulker-sh owner.
 verify_attestation() {
   curl -fsSL -o shulker.attestation.jsonl "$base/shulker.attestation.jsonl" 2>/dev/null || return 1
   gh attestation verify "$archive" --bundle shulker.attestation.jsonl --owner "$OWNER" >/dev/null 2>&1
@@ -99,11 +118,13 @@ else
   note "gh not found, skipping build provenance check"
 fi
 
+# 5. Install.
 note "installing to $INSTALL_DIR"
 tar -xzf "$archive" shulker
 mkdir -p "$INSTALL_DIR"
 install -m 0755 shulker "$INSTALL_DIR/shulker"
 
+# 6. PATH. The line is only added once, and is marked so you can find and remove it.
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;
   *)
