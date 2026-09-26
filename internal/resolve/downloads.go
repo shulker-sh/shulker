@@ -26,8 +26,15 @@ type dropped struct {
 	Sha1   string
 }
 
+func (r *Resolver) downloads() string {
+	if r.DownloadsIn != "" {
+		return r.DownloadsIn
+	}
+	return filepath.Join(r.Dir, DownloadsDir)
+}
+
 func (r *Resolver) sweepDownloads() ([]dropped, error) {
-	dir := filepath.Join(r.Dir, DownloadsDir)
+	dir := r.downloads()
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil

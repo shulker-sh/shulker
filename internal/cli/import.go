@@ -115,10 +115,15 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if source != nil {
 		return a.importSource(cmd, dir, source, f)
 	}
+	staged, err := project.Stage(dir)
+	if err != nil {
+		return err
+	}
+	defer staged.Discard()
 	var r *resolve.Resolver
 	var mods *resolve.Imported
 	err = a.awaitingDownloads(ctx, dir, func() error {
-		r, mods, err = a.importPack(ctx, d, arc, dir, f)
+		r, mods, err = a.importPack(ctx, d, arc, staged.Dir, filepath.Join(dir, resolve.DownloadsDir), f)
 		return err
 	})
 	if err != nil {
@@ -129,10 +134,13 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if f.side != "" {
 		mods.Overrides, leftOut = resolve.KeepSide(m, l, mods.Overrides, f.side)
 	}
-	if err := project.WriteIcon(dir, m, arc.Icon); err != nil {
+	if err := project.WriteIcon(staged.Dir, m, arc.Icon); err != nil {
 		return err
 	}
-	if err := project.Create(dir, m, l, mods.Overrides); err != nil {
+	if err := project.Create(staged.Dir, m, l, mods.Overrides); err != nil {
+		return err
+	}
+	if err := staged.Commit(); err != nil {
 		return err
 	}
 	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides), KeptYours: []string{}, LeftOut: leftOut}
@@ -189,8 +197,9 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 
 // importPack reads arc as the project it would make at dir, its local files copied out there,
 // and returns the resolver holding that project's manifest and lock.
-func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir string, f *importFlags) (*resolve.Resolver, *resolve.Imported, error) {
+func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir, downloads string, f *importFlags) (*resolve.Resolver, *resolve.Imported, error) {
 	r := resolve.NewAt(d.Env, dir)
+	r.DownloadsIn = downloads
 	mods, err := r.ImportProject(ctx, arc, resolve.ImportOptions{Name: f.name, IgnoreMarker: f.ignoreShulker, ServerPack: !f.noServerPack})
 	a.warn(r.Warnings)
 	if err != nil {

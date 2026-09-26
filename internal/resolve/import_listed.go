@@ -3,7 +3,6 @@ package resolve
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"slices"
 
 	"shulker.sh/shulker/internal/manifest"
@@ -46,7 +45,7 @@ func (im *importer) listedByID(ctx context.Context) error {
 			}
 			proj, v, err := im.listedFile(ctx, p, found, f)
 			if out.CodeOf(err) == "manual-download" {
-				missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", proj.Slug, v.File.Filename, v.Page, filepath.Join(r.Dir, DownloadsDir)))
+				missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", proj.Slug, v.File.Filename, v.Page, r.downloads()))
 				continue
 			}
 			if err != nil {

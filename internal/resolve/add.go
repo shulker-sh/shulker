@@ -57,6 +57,9 @@ type Resolver struct {
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
 	// file order is arbitrary.
 	keepNewest bool
+	// DownloadsIn is where manual downloads are taken from when it isn't Dir's downloads/: a new
+	// project staged elsewhere reads the ones dropped into the folder it is for.
+	DownloadsIn string
 	// builds are the sides an import judges a pack's sides against, where they aren't the
 	// manifest's own: a modpack's manifest declares none, and the project requiring it builds.
 	builds []string

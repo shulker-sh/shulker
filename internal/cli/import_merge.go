@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -40,7 +41,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 			return err
 		}
 		defer os.RemoveAll(staging)
-		r, imported, err := a.importPack(ctx, d, arc, staging, f)
+		r, imported, err := a.importPack(ctx, d, arc, staging, filepath.Join(p.Dir, resolve.DownloadsDir), f)
 		if err != nil {
 			return err
 		}
