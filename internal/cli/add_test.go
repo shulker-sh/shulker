@@ -38,3 +38,15 @@ func TestAddKeepsTheModsThatValidate(t *testing.T) {
 		t.Fatalf("adding only a failing mod fails as before: exit %d %s", code, stdout)
 	}
 }
+
+func TestAddSuggestsOnlyForWhatItAdded(t *testing.T) {
+	h := newHarness(t)
+	h.jars["sodium"] = makeJarWith(t, "sodium", h.jars["sodium"].filename, "client", `"suggests":{"modmenu":"*"}`)
+	h.mustRun(t, "create", "--loader", "fabric")
+	if stdout := h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "suggests modmenu") {
+		t.Fatalf("add should list what the mod it added suggests: %s", stdout)
+	}
+	if stdout := h.mustRun(t, "resourcepack", "add", "fresh-animations"); strings.Contains(stdout, "modmenu") {
+		t.Fatalf("a later add lists an earlier mod's suggestion: %s", stdout)
+	}
+}

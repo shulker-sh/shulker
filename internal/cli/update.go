@@ -421,7 +421,7 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 		items = append(items, it)
 	}
 	for _, s := range suggestions {
-		if s.Kind != "optional" && s.InstalledAs == "" {
+		if s.Kind != "optional" && s.InstalledAs == "" && slices.ContainsFunc(c.Added, func(m resolve.AddedMod) bool { return m.ID == s.Mod }) {
 			items = append(items, out.Item{Kind: out.Note, Name: s.Mod, Aside: []string{s.Kind + " " + s.On + ", not installed"}})
 		}
 	}
