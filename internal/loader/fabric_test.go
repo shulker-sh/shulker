@@ -143,3 +143,18 @@ func TestFabricServerLauncherIsLockedOnce(t *testing.T) {
 		t.Fatalf("a fresh cache downloads the locked launcher: %+v, %v, %d downloads", res, err, launcher.hits)
 	}
 }
+
+func TestFabricProvidesJarIsOnItsMaven(t *testing.T) {
+	r := fakeRemote(t, FabricMetaURL, map[string]any{
+		"/versions/loader/26.3/0.19.5": map[string]any{"loader": map[string]any{"maven": "net.fabricmc:fabric-loader:0.19.5"}},
+		"/versions/loader/26.3/0.0.0":  map[string]any{"loader": map[string]any{"maven": "nope"}},
+	})
+	r.URLs[FabricMavenURL] = "https://maven.example"
+	url, ok, err := fabric.ProvidesJar(context.Background(), r, "26.3", "0.19.5")
+	if err != nil || !ok || url != "https://maven.example/net/fabricmc/fabric-loader/0.19.5/fabric-loader-0.19.5.jar" {
+		t.Fatalf("url %q, %v, %v", url, ok, err)
+	}
+	if _, _, err := fabric.ProvidesJar(context.Background(), r, "26.3", "0.0.0"); out.CodeOf(err) != "meta-invalid" {
+		t.Fatalf("bad coordinate: %v", err)
+	}
+}

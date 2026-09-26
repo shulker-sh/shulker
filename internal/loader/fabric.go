@@ -6,7 +6,10 @@ import (
 	"fmt"
 )
 
-const FabricMetaURL = "https://meta.fabricmc.net/v2"
+const (
+	FabricMetaURL  = "https://meta.fabricmc.net/v2"
+	FabricMavenURL = "https://maven.fabricmc.net"
+)
 
 var fabric = Loader{
 	Name: "fabric", Title: "Fabric", DependencyID: "fabricloader",
@@ -14,7 +17,7 @@ var fabric = Loader{
 	ServerLaunchJar: "fabric-server-launch.jar",
 	MetadataFiles:   []string{"fabric.mod.json"}, MarkerFile: "fabric.mod.json",
 	DependencyOverrides: "config/fabric_loader_dependencies.json",
-	versions:            fabricVersions, profile: fabricProfile,
+	versions:            fabricVersions, profile: fabricProfile, providesJar: fabricLoaderJarURL,
 	ensureServer: fabricEnsureServer, vanillaServer: fabricVanillaServer,
 }
 
@@ -54,6 +57,24 @@ func fabricProfile(ctx context.Context, r *Remote, game, version string) (json.R
 		return nil, fetchFailed(err, "fabric", "couldn't read the Fabric %s profile for Minecraft %s", version, game)
 	}
 	return raw, nil
+}
+
+// fabricLoaderJarURL points at the loader jar on Fabric's Maven. The loader nests MixinExtras
+// inside it, so a mod that depends on mixinextras finds it there.
+func fabricLoaderJarURL(ctx context.Context, r *Remote, game, version string) (string, error) {
+	var entry struct {
+		Loader struct {
+			Maven string `json:"maven"`
+		} `json:"loader"`
+	}
+	if err := r.Fetch.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s", r.url(FabricMetaURL), game, version), &entry); err != nil {
+		return "", fetchFailed(err, "fabric", "couldn't read Fabric loader %s for Minecraft %s", version, game)
+	}
+	path, err := MavenPath(entry.Loader.Maven)
+	if err != nil {
+		return "", invalid("Fabric's meta gives no Maven coordinate for loader %s on Minecraft %s", version, game)
+	}
+	return r.url(FabricMavenURL) + "/" + path, nil
 }
 
 // installerVersion is the first stable Fabric installer listed, or the first of any when none is stable.
