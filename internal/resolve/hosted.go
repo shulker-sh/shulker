@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -182,14 +183,28 @@ func platformSuffix(game, loaderName string) string {
 	return strings.Join(parts, "")
 }
 
-// outdatedModpacks reports the hosted modpacks a newer version is published for, without changing
-// the lock.
+// outdatedModpacks reports the hosted modpacks a newer version is published for, and the git and
+// URL modpacks whose source has moved on from the pin, without changing the lock.
 func (r *Resolver) outdatedModpacks(ctx context.Context, ids []string) ([]Outdated, error) {
 	var res []Outdated
 	for _, key := range sortedKeys(r.Manifest.Modpacks()) {
 		entry := r.Manifest.Requires[key]
 		locked, ok := r.Lock.Modpacks[key]
-		if !entry.IsHosted() || !ok || locked.Provider == "" || (len(ids) > 0 && !slices.Contains(ids, key)) {
+		if !ok || (len(ids) > 0 && !slices.Contains(ids, key)) {
+			continue
+		}
+		if isRemoteSource(entry) {
+			store := &modpack.Store{Cache: r.Cache, ProjectDir: r.Dir, Fetch: r.Fetch, Log: r.Log}
+			now, err := store.Resolve(ctx, key, entry)
+			if err != nil {
+				return nil, err
+			}
+			if now.Pin.Label() != locked.Label() {
+				res = append(res, Outdated{ID: key, Current: locked.Label(), Latest: now.Pin.Label(), Modpack: true})
+			}
+			continue
+		}
+		if !entry.IsHosted() || locked.Provider == "" {
 			continue
 		}
 		p, err := r.provider(locked.Provider)
@@ -208,10 +223,16 @@ func (r *Resolver) outdatedModpacks(ctx context.Context, ids []string) ([]Outdat
 	return res, nil
 }
 
-// splitHosted takes the hosted modpacks out of a command's arguments.
+func isRemoteSource(entry manifest.Require) bool {
+	kind := modpack.KindOf(entry)
+	return kind == modpack.Git || kind == modpack.URL
+}
+
+// splitHosted takes the hosted modpacks, and those with a git or URL source, out of a command's
+// arguments.
 func (r *Resolver) splitHosted(ids []string) (rest, hosted []string) {
 	for _, id := range ids {
-		if entry, ok := r.Manifest.Requires[id]; ok && entry.IsHosted() {
+		if entry, ok := r.Manifest.Requires[id]; ok && (entry.IsHosted() || isRemoteSource(entry)) {
 			hosted = append(hosted, id)
 			continue
 		}

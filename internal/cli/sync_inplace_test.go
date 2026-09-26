@@ -221,3 +221,23 @@ func TestPreLaunchInPlaceFallsBackToTheLock(t *testing.T) {
 		t.Fatalf("the fallback should build the lock in place: %v", err)
 	}
 }
+
+func TestOutdatedChecksGitModpacks(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	repo, source, first := gitPack(t, "follow", "", "follow.txt")
+	h.mustRun(t, "modpack", "add", source)
+	if stdout := h.mustRun(t, "outdated"); !strings.Contains(stdout, "Everything is up to date") {
+		t.Fatalf("outdated before the pack moved: %s", stdout)
+	}
+	second := bumpPack(t, repo, "follow.txt")
+	if stdout := h.mustRun(t, "outdated"); !strings.Contains(stdout, "follow "+first[:12]+" ⟶ "+second[:12]+" (modpack)") {
+		t.Fatalf("outdated should see the new commit: %s", stdout)
+	}
+	if stdout := h.mustRun(t, "outdated", "follow"); !strings.Contains(stdout, "follow "+first[:12]+" ⟶ "+second[:12]) {
+		t.Fatalf("outdated follow should see the new commit: %s", stdout)
+	}
+}
