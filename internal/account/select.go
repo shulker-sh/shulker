@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 // How a selector matched an account, best first.
@@ -103,4 +105,72 @@ func NormalizeID(s string) string {
 // SameID reports whether two ids name one account, reading each the way it was typed.
 func SameID(a, b string) bool {
 	return a != "" && NormalizeID(a) == NormalizeID(b)
+}
+
+// Picker asks which of several accounts a selector meant; false is a question that was escaped.
+type Picker func(matches []Resolved) (Resolved, bool, error)
+
+// Select resolves what an account argument names. One match is the answer, and so is the closest
+// of several, with a warning; several the input can't tell apart go to the picker, and are
+// ambiguous-account with no picker or an escaped one, since the matches and how to name one
+// without being asked again are what the caller needs either way.
+func Select(accounts []Resolved, query string, warn func(format string, args ...any), pick Picker) (Resolved, error) {
+	if len(accounts) == 0 {
+		return Resolved{}, NoAccounts()
+	}
+	matches, closest := Find(accounts, query)
+	switch {
+	case len(matches) == 0:
+		e := out.Errorf("account-not-found", "no account matches %q", query)
+		e.Candidates, e.Pass, e.Given = Candidates(accounts), Picks(accounts), query
+		return Resolved{}, e
+	case closest:
+		warn("auto-selecting %s (%s), the closest match to %q", matches[0].Name, matches[0].ID, query)
+		return matches[0], nil
+	case len(matches) == 1:
+		return matches[0], nil
+	}
+	ambiguous := func() error {
+		e := out.Errorf("ambiguous-account", "%d accounts match %q", len(matches), query)
+		e.Help = "name one by its qualifier or its id"
+		e.Candidates, e.Pass, e.Given = Candidates(matches), Picks(matches), query
+		return e
+	}
+	if pick == nil {
+		return Resolved{}, ambiguous()
+	}
+	r, ok, err := pick(matches)
+	if err != nil {
+		return Resolved{}, err
+	}
+	if !ok {
+		return Resolved{}, ambiguous()
+	}
+	return r, nil
+}
+
+// NoAccounts is what a command that needs an account says when shulker can see none.
+func NoAccounts() error {
+	e := out.Errorf("no-accounts", "shulker can see no accounts, so there is nothing to play with")
+	e.Nudge = out.Nudge{Lead: "Sign in to Microsoft", Command: "shulker accounts login"}
+	return e
+}
+
+// Candidates names each account the way a selector would: its qualifier, then its id, since two
+// accounts may share a name and only the id always tells them apart.
+func Candidates(accounts []Resolved) []string {
+	names := make([]string, len(accounts))
+	for i, r := range accounts {
+		names[i] = r.Qualifier() + " — " + r.ID
+	}
+	return names
+}
+
+// Picks is the id of each account, which is what an error's pass list offers.
+func Picks(accounts []Resolved) []string {
+	picks := make([]string, len(accounts))
+	for i, r := range accounts {
+		picks[i] = r.ID
+	}
+	return picks
 }

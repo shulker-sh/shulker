@@ -249,7 +249,7 @@ func (a *app) selectOwnAccount(args []string, verb string) (accountRow, error) {
 	}
 	e := out.Errorf("account-not-found", "no default account to %s", verb)
 	e.Help = "name one"
-	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)
+	e.Candidates, e.Pass = account.Candidates(accounts), account.Picks(accounts)
 	if len(accounts) == 0 {
 		e = out.Errorf("no-accounts", "shulker has signed no account in, so there is nothing to %s", verb)
 		e.Nudge = out.Nudge{Lead: "Sign in to Microsoft", Command: "shulker accounts login"}

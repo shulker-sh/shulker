@@ -319,7 +319,7 @@ func (a *app) pinnedAccount(id string) (string, error) {
 		return id, nil
 	}
 	e := out.Errorf("account-not-found", "this instance is pinned to account %s, which shulker can no longer see", id)
-	e.Candidates, e.Pass = accountCandidates(accounts), accountPicks(accounts)
+	e.Candidates, e.Pass = account.Candidates(accounts), account.Picks(accounts)
 	e.Nudge = out.Nudge{Lead: "Play it as the default account instead with", Command: "shulker instance unset account"}
 	return "", e
 }

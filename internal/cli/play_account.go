@@ -62,6 +62,6 @@ func (a *app) adoptDefault(r account.Resolved) error {
 func noDefaultAccount(accounts []account.Resolved) error {
 	e := out.Errorf("usage", "no default account, and shulker has no terminal to ask on")
 	e.Help = "name one with --account"
-	e.Candidates, e.Pass, e.Flag = accountCandidates(accounts), accountPicks(accounts), "--account"
+	e.Candidates, e.Pass, e.Flag = account.Candidates(accounts), account.Picks(accounts), "--account"
 	return e
 }
