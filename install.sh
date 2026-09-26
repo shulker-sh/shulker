@@ -136,9 +136,9 @@ else
 fi
 
 # 5. Install.
-tar -xzf "$archive" shulker
-mkdir -p "$INSTALL_DIR"
-install -m 0755 shulker "$INSTALL_DIR/shulker"
+tar -xzf "$archive" shulker || fail "Couldn't unpack $archive"
+{ mkdir -p "$INSTALL_DIR" && install -m 0755 shulker "$INSTALL_DIR/shulker"; } 2>/dev/null \
+  || fail "Couldn't install to $(tilde "$INSTALL_DIR"); set SHULKER_INSTALL_DIR to a directory you can write to"
 ok "Installed to $(tilde "$INSTALL_DIR/shulker")"
 
 # 6. PATH. The line is only added once, and is marked so you can find and remove it.
@@ -164,8 +164,8 @@ case ":$PATH:" in
       if [ -f "$rc" ] && grep -qF "$line" "$rc"; then
         ok "$(tilde "$rc") already adds $(tilde "$INSTALL_DIR") to PATH"
       else
-        mkdir -p "$(dirname "$rc")"
-        printf '\n# Added by the shulker installer\n%s\n' "$line" >> "$rc"
+        { mkdir -p "$(dirname "$rc")" && printf '\n# Added by the shulker installer\n%s\n' "$line" >> "$rc"; } 2>/dev/null \
+          || fail "Couldn't add $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc"); rerun with --no-modify-path to skip it"
         ok "Added $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc")"
       fi
 

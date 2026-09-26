@@ -126,10 +126,17 @@
 
             # 5. Install.
             $extract = Join-Path $tmp 'extract'
-            Expand-Archive -Path $archivePath -DestinationPath $extract -Force
-            New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+            try { Expand-Archive -Path $archivePath -DestinationPath $extract -Force }
+            catch { throw "Couldn't unpack $archive" }
             $exe = Join-Path $installDir 'shulker.exe'
-            Copy-Item -Path (Join-Path $extract 'shulker.exe') -Destination $exe -Force
+
+            try {
+                New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+                Copy-Item -Path (Join-Path $extract 'shulker.exe') -Destination $exe -Force
+            } catch {
+                throw "Couldn't install to $installDir; set SHULKER_INSTALL_DIR to a directory you can write to"
+            }
+
             Write-Ok "Installed to $exe"
         } finally {
             Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
@@ -150,7 +157,9 @@
                     Write-Skip "$installDir isn't on your PATH"
                     $lead = "Add $installDir to your PATH, then run"
                 } else {
-                    $envKey.SetValue('Path', ((@($installDir) + $entries) -join ';'), [Microsoft.Win32.RegistryValueKind]::ExpandString)
+                    try { $envKey.SetValue('Path', ((@($installDir) + $entries) -join ';'), [Microsoft.Win32.RegistryValueKind]::ExpandString) }
+                    catch { throw "Couldn't add $installDir to your user PATH; set SHULKER_NO_MODIFY_PATH=1 to skip it" }
+
                     # Tell running programs that the environment changed, the same way the System
                     # Properties dialog does; otherwise terminals opened from Explorer keep the old PATH
                     # until you sign out. Add-Type only declares the Windows function that sends it.
