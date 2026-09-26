@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -216,5 +217,24 @@ func TestAnErrorOpeningWithANameKeepsItsCase(t *testing.T) {
 	(&Printer{Stdout: &bytes.Buffer{}, Stderr: &human}).Report(Errorf("mod-not-found", "%s isn't on Modrinth", "sodium"))
 	if !strings.Contains(human.String(), "✘ sodium isn't on Modrinth") {
 		t.Fatalf("got %q", human.String())
+	}
+}
+
+func TestTildeShortensHomePathsButNotLinkTargets(t *testing.T) {
+	dir := home()
+	if dir == "" {
+		t.Skip("no home directory")
+	}
+	sep := string(filepath.Separator)
+	if got := Tilde("synced into " + filepath.Join(dir, "x", "y")); got != "synced into ~"+sep+filepath.Join("x", "y") {
+		t.Fatalf("got %q", got)
+	}
+	if got := Tilde(dir + "-other"); got != dir+"-other" {
+		t.Fatalf("a sibling of home changed: %q", got)
+	}
+	path := filepath.Join(dir, "pack")
+	linked := Theme{HasColor: true, HasLinks: true}.Link(path, path)
+	if got := Tilde(linked); !strings.Contains(got, "file://") || !strings.Contains(got, filepath.ToSlash(path)+"\x1b\\") || !strings.Contains(got, "\x1b\\~"+sep+"pack") {
+		t.Fatalf("got %q", got)
 	}
 }

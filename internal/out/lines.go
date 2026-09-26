@@ -50,7 +50,7 @@ type Item struct {
 	Aside   []string
 }
 
-func (l *Lines) line(s string) { fmt.Fprintln(l.W, gutter+s) }
+func (l *Lines) line(s string) { fmt.Fprintln(l.W, gutter+Tilde(s)) }
 
 func (l *Lines) Blank() { fmt.Fprintln(l.W) }
 
@@ -308,6 +308,14 @@ func (l *Lines) Table(headers []string, rows [][]string, style func(row, col int
 			BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).BorderColumn(false).
 			StyleFunc(cells).Render()
 	}
+	shortened := make([][]string, len(rows))
+	for i, row := range rows {
+		shortened[i] = make([]string, len(row))
+		for col, cell := range row {
+			shortened[i][col] = Tilde(cell)
+		}
+	}
+	rows = shortened
 	rendered := render(rows)
 	if excess := lipgloss.Width(rendered) - (TerminalWidth(l.W) - len(gutter)); excess > 0 {
 		rendered = render(fold(headers, rows, excess))

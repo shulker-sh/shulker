@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -114,15 +113,7 @@ func pathLink(t out.Theme, path string) string {
 	if path == "" {
 		return ""
 	}
-	return t.Link(homeTilde(path), path)
-}
-
-func homeTilde(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" || !strings.HasPrefix(path, home+string(filepath.Separator)) {
-		return path
-	}
-	return "~" + path[len(home):]
+	return t.Link(out.Tilde(path), path)
 }
 
 func describeBuild() selfupdate.Build {

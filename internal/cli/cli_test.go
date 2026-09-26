@@ -120,19 +120,6 @@ func TestVersionShortCommit(t *testing.T) {
 	}
 }
 
-func TestHomeTilde(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Skip(err)
-	}
-	if got := homeTilde(filepath.Join(home, "x", "y")); got != "~"+string(filepath.Separator)+filepath.Join("x", "y") {
-		t.Fatalf("homeTilde = %q", got)
-	}
-	if got := homeTilde(home + "-other"); got != home+"-other" {
-		t.Fatalf("homeTilde = %q", got)
-	}
-}
-
 func TestHelpLinksDocs(t *testing.T) {
 	for args, url := range map[string]string{
 		"--help":              docsURL,

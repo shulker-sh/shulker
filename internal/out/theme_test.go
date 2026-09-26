@@ -236,11 +236,11 @@ func TestTableRulesUnderGreyHeadersAndPadsCells(t *testing.T) {
 
 func TestTableWrapsOnlyItsWidestColumn(t *testing.T) {
 	style := func(row, col int) lipgloss.Style { return lipgloss.NewStyle() }
-	path := "/Users/dev/Library/Application Support/PrismLauncher/instances/survival-1.21.4/minecraft"
+	path := "/Users/alex/Library/Application Support/PrismLauncher/instances/survival-1.21.4/minecraft"
 	lines := render(Theme{}, func(l *Lines) {
 		l.Table([]string{"Instance", "Path"}, [][]string{{"survival-1.21.4", path}, {"creative", "/tmp/creative"}}, style)
 	})
-	if len(lines) < 4 || lines[2] != "  survival-1.21.4  /Users/dev/Library/Application Support/PrismLauncher/" || !strings.HasPrefix(lines[3], "                   instances/") {
+	if len(lines) < 4 || lines[2] != "  survival-1.21.4  /Users/alex/Library/Application Support/PrismLauncher/" || !strings.HasPrefix(lines[3], "                   instances/") {
 		t.Fatalf("the path folds at a separator and the instance column keeps its width:\n%s", strings.Join(lines, "\n"))
 	}
 	for _, line := range lines {

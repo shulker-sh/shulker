@@ -159,7 +159,7 @@ func (s *step) spin(t Theme, w *waits) {
 	start := time.Now()
 	for {
 		room := terminalWidth(s.tty) - len(gutter) - 3
-		text := Sentence(s.text) + slowAside(time.Since(start), w.latest())
+		text := Tilde(Sentence(s.text)) + slowAside(time.Since(start), w.latest())
 		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+s.wheel.View()+" "+t.Grey(ansi.Truncate(text, room, t.Ellipsis())))
 		select {
 		case <-s.stop:
