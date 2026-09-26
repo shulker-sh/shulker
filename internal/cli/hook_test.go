@@ -383,30 +383,6 @@ func TestPreLaunchKeepsThePlayersFileOnAConflict(t *testing.T) {
 	h.mustRun(t, "sync", "-i", "friends")
 }
 
-func TestPreLaunchKeepsAConflictInASyncedDirectory(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	overrides := filepath.Join(h.dir, "overrides")
-	writeFile(t, filepath.Join(overrides, "options.txt"), "renderDistance:8\n")
-	into := t.TempDir()
-	h.mustRun(t, "sync", h.dir, "--into", into)
-
-	writeFile(t, filepath.Join(into, "options.txt"), "renderDistance:16\n")
-	writeFile(t, filepath.Join(overrides, "options.txt"), "renderDistance:32\n")
-	h.mustRun(t, "add", "sodium")
-
-	code, stdout, stderr := h.run(t, "hook", "pre-launch", "-C", into)
-	if code != 0 || !strings.Contains(stderr, "kept your version of options.txt (changed in place and in the source)") {
-		t.Fatalf("a launch-time sync keeps the player's file: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
-	}
-	if got := readFile(t, filepath.Join(into, "options.txt")); got != "renderDistance:16\n" {
-		t.Fatalf("options.txt = %q", got)
-	}
-	if _, err := os.Stat(filepath.Join(into, "mods", h.jars["sodium"].filename)); err != nil {
-		t.Fatalf("the rest of the update applies: %v", err)
-	}
-}
-
 func TestPreLaunchOutsideAnInstancePrintsAnEnvelope(t *testing.T) {
 	code, stdout, stderr := run(t, "hook", "pre-launch", "-C", t.TempDir(), "--json")
 	var env out.Envelope

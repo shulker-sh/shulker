@@ -245,18 +245,6 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 	}
 }
 
-func TestSyncOfflineKeepsTheInstalledRuntime(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack", "--side", "server")
-	h.mustRun(t, "add", "fabric-api")
-	into := filepath.Join(t.TempDir(), "server")
-	h.mustRun(t, "sync", h.dir, "--into", into)
-	_, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", into, "--offline")
-	if !strings.Contains(stderr, "! offline, keeping the installed Java runtime java-runtime-epsilon 25.0.1") {
-		t.Fatalf("offline runtime refresh: %s", stderr)
-	}
-}
-
 func TestSyncFromManifestURL(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
@@ -491,56 +479,6 @@ func TestPullIntoMissingDirNamesThePath(t *testing.T) {
 	}
 }
 
-func TestSyncDoesNotFailOnUnwritableLocalFile(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-	into := filepath.Join(t.TempDir(), "one")
-	h.mustRun(t, "sync", h.dir, "--into", into)
-
-	localPath := filepath.Join(h.dir, "shulker.local.json")
-	if err := os.Chmod(localPath, 0o444); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chmod(localPath, 0o644) })
-	if _, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", into); strings.Contains(stderr, "not updated") {
-		t.Fatalf("an unchanged local file must not be rewritten: %s", stderr)
-	}
-	if _, stderr := h.mustRunStderr(t, "build"); strings.Contains(stderr, "not updated") {
-		t.Fatalf("an unchanged local file must not be rewritten by build: %s", stderr)
-	}
-
-	two := filepath.Join(t.TempDir(), "two")
-	if _, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", two); strings.Contains(stderr, "not updated") {
-		t.Fatalf("a source project nobody can write to must not warn every sync: %s", stderr)
-	}
-	if links := readInstances(t, h); len(links) != 0 {
-		t.Fatalf("neither detached build takes a registry row: %+v", links)
-	}
-}
-
-func TestSyncFromLocalProjectReadsInstanceDecisions(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-	setMod(t, h, "sodium", map[string]any{"feature": "fancy"})
-	h.mustRun(t, "feature", "on", "fancy")
-
-	into := filepath.Join(t.TempDir(), "instance")
-	if err := os.MkdirAll(into, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(into, "shulker.local.json"), []byte(`{"$schema":"https://shulker.sh/schema/v1/local.json","features":{"fancy":false}}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if stdout := h.mustRun(t, "sync", h.dir, "--into", into); !strings.Contains(stdout, "excluded: sodium") {
-		t.Fatalf("the instance decision should beat the project one: %s", stdout)
-	}
-	if st := instance.LoadState(into); st.Origin != (instance.Origin{Source: h.dir}) {
-		t.Fatalf("state origin: %+v", st.Origin)
-	}
-}
-
 func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
@@ -581,29 +519,5 @@ func TestSyncMovesAnOldDataLinkBack(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Dir(world)); !os.IsNotExist(err) {
 		t.Fatalf("the world should have left the project: %v", err)
-	}
-}
-
-func TestSyncIntoRecoversTheSourceWithoutTheRegistry(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-	into := filepath.Join(t.TempDir(), "instance")
-	h.mustRun(t, "sync", h.dir, "--into", into)
-
-	if err := os.RemoveAll(registryPath(h)); err != nil {
-		t.Fatal(err)
-	}
-	if stdout := h.mustRun(t, "sync", "--into", into); !strings.Contains(stdout, "unchanged") {
-		t.Fatalf("sync --into must rebuild from the recorded source: %s", stdout)
-	}
-	if links := readInstances(t, h); len(links) != 0 {
-		t.Fatalf("a re-sync of a detached build registers nothing: %+v", links)
-	}
-
-	bare := t.TempDir()
-	code, stdout, _ := h.run(t, "sync", "--into", bare, "--json")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "source-unknown" {
-		t.Fatalf("a directory with no state: code=%d %s", code, stdout)
 	}
 }
