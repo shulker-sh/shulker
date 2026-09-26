@@ -32,6 +32,8 @@ archives:
         formats: [zip]
     name_template: "shulker_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
+      - LICENSE
+      - README.md
       - CHANGELOG.md
 
 checksum:
