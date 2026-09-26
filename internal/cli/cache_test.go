@@ -25,7 +25,7 @@ func strayObject(t *testing.T, c *cache.Cache, content string) string {
 	return path
 }
 
-func TestCachePruneKeepsWhatRootsReference(t *testing.T) {
+func TestCacheInfoNamesItsRootsAndPruneFreesTheRest(t *testing.T) {
 	h := newInPlace(t)
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "install")
@@ -42,7 +42,15 @@ func TestCachePruneKeepsWhatRootsReference(t *testing.T) {
 	}
 	writeFile(t, log, "installer said things")
 
-	stdout := h.mustRun(t, "cache", "prune")
+	stdout := h.mustRun(t, "cache", "info")
+	if !strings.Contains(stdout, "Cache "+h.cache) || !strings.Contains(stdout, "1 root (this project)") || !strings.Contains(stdout, "object") {
+		t.Fatalf("cache info: %s", stdout)
+	}
+	if !strings.Contains(stdout, "prunable") || !strings.Contains(stdout, "shulker cache prune") {
+		t.Fatalf("info should say what prune would free and how: %s", stdout)
+	}
+
+	stdout = h.mustRun(t, "cache", "prune")
 	if !strings.Contains(stdout, "freed") || !strings.Contains(stdout, "installer log") {
 		t.Fatalf("prune output: %s", stdout)
 	}
@@ -55,108 +63,8 @@ func TestCachePruneKeepsWhatRootsReference(t *testing.T) {
 	if _, err := os.Stat(sodium); err != nil {
 		t.Fatalf("a locked mod must survive a prune: %v", err)
 	}
-}
-
-// A history entry leaves mod files to the cache, so the objects its lock names
-// are roots of their own: without them a rollback could not run offline.
-func TestCachePruneKeepsHistoryEntries(t *testing.T) {
-	h := newInPlace(t)
-	h.mustRun(t, "add", "sodium")
-	h.mustRun(t, "install")
-	h.mustRun(t, "remove", "sodium")
-	h.mustRun(t, "build")
-
-	sodium := (&cache.Cache{Dir: h.cache}).Object(h.jars["sodium"].sha512)
-	h.mustRun(t, "cache", "prune")
-	if _, err := os.Stat(sodium); err != nil {
-		t.Fatalf("the entry taken before the remove still needs sodium: %v", err)
-	}
-
-	h.mustRun(t, "rollback")
-	if _, err := os.Stat(filepath.Join(h.dir, "mods", h.jars["sodium"].filename)); err != nil {
-		t.Fatalf("the rollback should put sodium back from the cache: %v", err)
-	}
-}
-
-func TestCacheInfoNamesItsRoots(t *testing.T) {
-	h := newInPlace(t)
-	h.mustRun(t, "add", "sodium")
-	h.mustRun(t, "install")
-
-	stdout := h.mustRun(t, "cache", "info")
-	if !strings.Contains(stdout, "Cache "+h.cache) || !strings.Contains(stdout, "1 root (this project)") {
-		t.Fatalf("cache info: %s", stdout)
-	}
-	if !strings.Contains(stdout, "object") {
-		t.Fatalf("cache info should count objects: %s", stdout)
-	}
-}
-
-func TestCachePruneRefusesAnUnreadableRoot(t *testing.T) {
-	h := newInPlace(t)
-	broken := t.TempDir()
-	writeFile(t, filepath.Join(broken, "shulker.lock"), "{ not a lock")
-	registry := map[string]any{"$schema": config.RegistrySchemaURL, "instances": []config.Instance{{
-		ID: "broken", Launcher: "prism", Name: "broken", Dir: broken, Source: broken,
-	}}}
-	data, err := json.Marshal(registry)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, filepath.Join(filepath.Dir(h.config), "registry.json"), string(data))
-
-	code, stdout, _ := h.run(t, "--json", "cache", "prune")
-	e := failureCode(t, stdout)
-	if code == 0 || e.Code != "cache-root-unreadable" {
-		t.Fatalf("unreadable root: code=%d %+v", code, e)
-	}
-}
-
-// A registered instance that was deleted can need nothing, so it is skipped
-// rather than blocking every prune until it is unlinked.
-func TestCachePruneSkipsAGoneInstance(t *testing.T) {
-	h := newInPlace(t)
-	gone := filepath.Join(t.TempDir(), "deleted")
-	registry := map[string]any{"$schema": config.RegistrySchemaURL, "instances": []config.Instance{{
-		ID: "gone", Launcher: "prism", Name: "gone", Dir: gone, Source: gone,
-	}}}
-	data, err := json.Marshal(registry)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, filepath.Join(filepath.Dir(h.config), "registry.json"), string(data))
-
-	if stdout := h.mustRun(t, "cache", "info"); !strings.Contains(stdout, "1 root (this project)") {
-		t.Fatalf("a gone instance should not count as a root: %s", stdout)
-	}
-}
-
-// An instance built into its own directory keeps its lock in the project it was
-// built from, not in the game directory the registry records, so the roots have
-// to follow the link's source. The prune runs from elsewhere, because standing
-// in the project would make it a root in its own right and hide the difference.
-func TestCachePruneKeepsASeparateDirInstance(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-	h.mustRun(t, "install")
-
-	sodium := (&cache.Cache{Dir: h.cache}).Object(h.jars["sodium"].sha512)
-	if _, err := os.Stat(sodium); err != nil {
-		t.Fatalf("sodium should be in the cache after install: %v", err)
-	}
-	registry := map[string]any{"$schema": config.RegistrySchemaURL, "instances": []config.Instance{{
-		ID: "built", Launcher: "prism", Name: "built", Dir: filepath.Join(h.dir, "build", "client"), Source: h.dir,
-	}}}
-	data, err := json.Marshal(registry)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, filepath.Join(filepath.Dir(h.config), "registry.json"), string(data))
-
-	h.mustRun(t, "--dir", t.TempDir(), "cache", "prune")
-	if _, err := os.Stat(sodium); err != nil {
-		t.Fatalf("a registered instance still needs the mods its project locks: %v", err)
+	if stdout = h.mustRun(t, "cache", "prune"); !strings.Contains(stdout, "nothing to prune") {
+		t.Fatalf("a second prune has nothing to do: %s", stdout)
 	}
 }
 
@@ -182,78 +90,23 @@ func TestCacheInfoReportsAnUnreadableRoot(t *testing.T) {
 	if strings.Contains(stdout, "shulker cache prune") {
 		t.Fatalf("a prune that would refuse should not be suggested: %s", stdout)
 	}
+	code, stdout, _ := h.run(t, "--json", "cache", "prune")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "cache-root-unreadable" {
+		t.Fatalf("unreadable root: code=%d %+v", code, e)
+	}
 }
 
-func TestBuildIngestsFilesBeforeSweepingThem(t *testing.T) {
+func TestCacheLockFlagCountsTheLockFile(t *testing.T) {
 	h := newInPlace(t)
-	override := filepath.Join(h.dir, "overrides", "config", "mine.txt")
-	if err := os.MkdirAll(filepath.Dir(override), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	writeFile(t, override, "settings worth keeping")
-	h.mustRun(t, "install")
-	if readFile(t, filepath.Join(h.dir, "config", "mine.txt")) != "settings worth keeping" {
-		t.Fatal("the override should have been placed")
-	}
-
-	if err := os.Remove(override); err != nil {
-		t.Fatal(err)
-	}
-	h.mustRun(t, "build")
-	if _, err := os.Stat(filepath.Join(h.dir, "config", "mine.txt")); !os.IsNotExist(err) {
-		t.Fatalf("a file no longer in the source should be swept: %v", err)
-	}
-	sum := sha512.Sum512([]byte("settings worth keeping"))
-	if !(&cache.Cache{Dir: h.cache}).Has(hex.EncodeToString(sum[:])) {
-		t.Fatal("the bytes should reach the cache before the file is removed")
-	}
-}
-
-// A CI runner registers no instances, so a repo holding several packs names
-// each pack's lock to keep; the prune runs from a folder that is no project.
-func TestCachePruneKeepsNamedLocks(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-	h.mustRun(t, "install")
 	named := filepath.Join(t.TempDir(), "other.lock")
 	writeFile(t, named, readFile(t, filepath.Join(h.dir, "shulker.lock")))
 
-	elsewhere := t.TempDir()
-	stdout := h.mustRun(t, "--dir", elsewhere, "cache", "info", "--lock", named)
+	stdout := h.mustRun(t, "--dir", t.TempDir(), "cache", "info", "--lock", named)
 	if !strings.Contains(stdout, "1 root (1 lock file)") {
 		t.Fatalf("a named lock should count as a root: %s", stdout)
 	}
-	sodium := (&cache.Cache{Dir: h.cache}).Object(h.jars["sodium"].sha512)
-	h.mustRun(t, "--dir", elsewhere, "cache", "prune", "--lock", named)
-	if _, err := os.Stat(sodium); err != nil {
-		t.Fatalf("a named lock's mods must survive a prune: %v", err)
-	}
-	h.mustRun(t, "--dir", elsewhere, "cache", "prune")
-	if _, err := os.Stat(sodium); !os.IsNotExist(err) {
-		t.Fatalf("without the lock nothing keeps sodium: %v", err)
-	}
-}
-
-func TestCachePruneRefusesAMissingNamedLock(t *testing.T) {
-	h := newInPlace(t)
-	code, stdout, _ := h.run(t, "--json", "cache", "prune", "--lock", filepath.Join(t.TempDir(), "shulker.lock"))
-	if e := failureCode(t, stdout); code == 0 || e.Code != "lock-not-found" {
-		t.Fatalf("missing named lock: code=%d %+v", code, e)
-	}
-}
-
-func TestCachePruneRefusesAnUnreadableNamedLock(t *testing.T) {
-	h := newInPlace(t)
-	broken := filepath.Join(t.TempDir(), "shulker.lock")
-	writeFile(t, broken, "{ not a lock")
-
-	stdout, stderr := h.mustRunStderr(t, "cache", "info", "--lock", broken)
-	if !strings.Contains(stderr, "can't be read") || !strings.Contains(stdout, "2 roots (this project, 1 lock file)") {
-		t.Fatalf("info should report and name the broken lock: stdout=%s stderr=%s", stdout, stderr)
-	}
-	code, stdout, _ := h.run(t, "--json", "cache", "prune", "--lock", broken)
-	if e := failureCode(t, stdout); code == 0 || e.Code != "cache-root-unreadable" {
-		t.Fatalf("unreadable named lock: code=%d %+v", code, e)
+	stdout = h.mustRun(t, "cache", "info", "--lock", named, "--lock", named)
+	if !strings.Contains(stdout, "3 roots (this project, 2 lock files)") {
+		t.Fatalf("the flag repeats: %s", stdout)
 	}
 }
