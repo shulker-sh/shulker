@@ -105,7 +105,7 @@ func TestLinkGDLauncher(t *testing.T) {
 		t.Fatalf("missing launcher dir: exit %d %s", code, stdout)
 	}
 
-	if stdout := h.mustRun(t, "unlink", "gdlauncher"); !strings.Contains(stdout, "removed its pre-launch sync") || strings.Contains(stdout, "Quit GDLauncher") || strings.Contains(stdout, "--force") {
+	if stdout := h.mustRun(t, "unlink", "gdlauncher"); !strings.Contains(stdout, "Removed its pre-launch sync") || strings.Contains(stdout, "Quit GDLauncher") || strings.Contains(stdout, "--force") {
 		t.Fatalf("unlink output:\n%s", stdout)
 	}
 	after := readGDLInstance(t, instDir)

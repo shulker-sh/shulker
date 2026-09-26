@@ -97,12 +97,11 @@ func forgetMojang(e *Entry, l config.Instance) (Forgotten, error) {
 		return Forgotten{}, err
 	}
 	if n == 0 {
-		return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); it had no launcher profile left.", l.Label(), e.Title)}, nil
+		return unlinked(e, l, "It had no launcher profile left", kept), nil
 	}
-	return Forgotten{
-		Removed: RemovedProfile,
-		Summary: fmt.Sprintf("Unlinked %q (%s): removed its launcher profile; the instance directory and the loader stay.", l.Label(), e.Title),
-	}, nil
+	f := unlinked(e, l, "Removed its launcher profile", "Kept the instance folder, its worlds and the loader")
+	f.Removed = RemovedProfile
+	return f, nil
 }
 
 // mojangName reads the profile rather than the instance: the official launcher keeps no instance of

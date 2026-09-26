@@ -30,7 +30,16 @@ const (
 type Forgotten struct {
 	Removed string
 	Summary string
+	// Details are what the unlink did and kept, a line each under the summary.
+	Details []string
 	Warning string
+}
+
+// kept is the line every unlink that leaves the game's files ends with.
+const kept = "Kept the instance folder and its worlds"
+
+func unlinked(e *Entry, l config.Instance, details ...string) Forgotten {
+	return Forgotten{Summary: fmt.Sprintf("Unlinked %s from %s", l.Label(), e.Title), Details: details}
 }
 
 // InstanceResult is what a link step left in the launcher: the instance folder, its game directory,
@@ -275,28 +284,38 @@ func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 		f.Warning = fmt.Sprintf("%s is open; it may put back the pre-launch sync this removes from %q. Quit it, then check the instance's settings", e.Title, l.Label())
 	}
 	if _, err := os.Stat(e.InstanceDir(l.Dir)); errors.Is(err, os.ErrNotExist) {
-		f.Summary = fmt.Sprintf("Unlinked %q (%s); its instance was already gone.", l.Label(), e.Title)
-		return f, nil
+		gone := unlinked(e, l, "Its instance was already gone")
+		gone.Warning = f.Warning
+		return gone, nil
+	}
+	before, _, err := ReadSlots(e, l)
+	if err != nil {
+		return Forgotten{}, err
 	}
 	tookPreLaunch, tookPostExit, err := ReleaseSlots(e, l)
 	if err != nil {
 		return Forgotten{}, err
 	}
-	if !tookPreLaunch && !tookPostExit {
-		f.Summary = fmt.Sprintf("Unlinked %q (%s); its pre-launch command isn't a shulker sync, so it was kept.", l.Label(), e.Title)
-		return f, nil
-	}
+	warning := f.Warning
+	f = unlinked(e, l)
+	f.Warning = warning
 	// Report the slot that actually went: a pre-launch command shulker never wrote is kept, and then
 	// the post-exit slot is all there was to remove.
-	removed, what := RemovedPreLaunch, "pre-launch sync"
-	if !tookPreLaunch {
-		removed, what = RemovedPostExit, "post-exit command"
+	switch {
+	case tookPreLaunch:
+		f.Removed = RemovedPreLaunch
+		f.Details = append(f.Details, "Removed its pre-launch sync")
+	case tookPostExit:
+		f.Removed = RemovedPostExit
+		f.Details = append(f.Details, "Removed its post-exit command")
 	}
-	f.Removed = removed
-	f.Summary = fmt.Sprintf("Unlinked %q (%s): removed its %s; the instance and its worlds stay.", l.Label(), e.Title, what)
+	if !tookPreLaunch && strings.TrimSpace(before.PreLaunch) != "" {
+		f.Details = append(f.Details, "Kept its pre-launch command, which isn't a shulker sync")
+	}
+	f.Details = append(f.Details, kept)
 	// Unlink warns when the launcher is open, so the restart reminder is only for where it can't tell.
-	if !detectable {
-		f.Summary += "\nRestart the launcher if it is open so the change is picked up."
+	if f.Removed != "" && !detectable {
+		f.Details = append(f.Details, "Restart the launcher if it's open so it picks up the change")
 	}
 	return f, nil
 }

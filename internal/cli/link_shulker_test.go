@@ -76,7 +76,7 @@ func TestLinkShulker(t *testing.T) {
 	}
 	h.dir = project
 
-	if out := h.mustRun(t, "unlink", "pack"); !strings.Contains(out, "the instance directory and its worlds stay") {
+	if out := h.mustRun(t, "unlink", "pack"); !strings.Contains(out, "Kept the instance folder and its worlds") {
 		t.Fatalf("unlink: %s", out)
 	}
 	if len(readInstances(t, h)) != 0 {

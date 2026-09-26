@@ -248,3 +248,15 @@ func TestUnlinkDetachedBuild(t *testing.T) {
 		t.Fatalf("unlinking it again: exit %d %s", code, stdout)
 	}
 }
+
+func TestUnlinkMentionsOnlyAPreLaunchCommandThatExists(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends", "--no-hooks")
+
+	stdout := h.mustRun(t, "unlink", "friends")
+	if strings.Contains(stdout, "pre-launch") || !strings.Contains(stdout, "Unlinked Friends from Prism Launcher") || !strings.Contains(stdout, "Kept the instance folder and its worlds") {
+		t.Fatalf("unlink of an instance with no hooks: %s", stdout)
+	}
+}

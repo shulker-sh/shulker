@@ -56,7 +56,7 @@ func TestShulkerOwnsItsInstances(t *testing.T) {
 		t.Fatalf("Relink = %q in %q, want %q", command, at, want)
 	}
 	f, err := Forget(in)
-	if err != nil || f.Removed != "" || f.Summary != `Unlinked "SMP" (Shulker); the instance directory and its worlds stay.` {
+	if err != nil || f.Removed != "" || f.Summary != "Unlinked SMP from Shulker" || len(f.Details) != 1 || f.Details[0] != "Kept the instance folder and its worlds" {
 		t.Fatalf("Forget = %+v %v", f, err)
 	}
 }

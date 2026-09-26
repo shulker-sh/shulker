@@ -3,7 +3,6 @@ package launcher
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -57,7 +56,7 @@ func relinkShulker(e *Entry, l Linked) (args []string, in string) {
 // forgetShulker has nothing to take away. Shulker runs its own hooks in process, so no slot holds a
 // command and no script was generated; unlinking is the registry row going and nothing else.
 func forgetShulker(e *Entry, l config.Instance) (Forgotten, error) {
-	return Forgotten{Summary: fmt.Sprintf("Unlinked %q (%s); the instance directory and its worlds stay.", l.Label(), e.Title)}, nil
+	return unlinked(e, l, kept), nil
 }
 
 // shulkerName is the display name link recorded, since shulker is the launcher that shows it and a

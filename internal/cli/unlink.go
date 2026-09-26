@@ -2,7 +2,6 @@ package cli
 
 import (
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
@@ -21,6 +20,7 @@ type unlinkResult struct {
 	RelinkIn string     `json:"relinkIn,omitempty"`
 	Error    *out.Error `json:"error,omitempty"`
 	summary  string
+	details  []string
 }
 
 func (a *app) unlinkCmd() *cobra.Command {
@@ -70,11 +70,12 @@ func (a *app) unlinkCmd() *cobra.Command {
 						l.Error(r.Error)
 						continue
 					}
-					summary, rest, _ := strings.Cut(strings.TrimSuffix(r.summary, "."), "\n")
-					l.OK(summary, "")
-					if rest != "" {
-						l.Tree(out.Row{Text: strings.TrimSuffix(rest, ".")})
+					l.OK(r.summary, "")
+					rows := make([]out.Row, len(r.details))
+					for i, d := range r.details {
+						rows[i] = out.Row{Text: d}
 					}
+					l.Tree(rows...)
 					if r.RelinkIn != "" {
 						l.Nudge("To link it again, in "+r.RelinkIn, r.Relink)
 					} else if r.Launcher != "" {
@@ -109,7 +110,7 @@ func (a *app) unlink(configPath string, l project.InstanceEntry) (unlinkResult, 
 	if f.Warning != "" {
 		a.printer.Warn("%s", f.Warning)
 	}
-	r.Removed, r.summary = f.Removed, f.Summary
+	r.Removed, r.summary, r.details = f.Removed, f.Summary, f.Details
 	if inf, err := instance.Load(l.Dir); err == nil {
 		inf.IsUnlinked = true
 		if err := inf.Save(l.Dir); err != nil {
