@@ -35,14 +35,15 @@ NO_MODIFY_PATH="${SHULKER_NO_MODIFY_PATH:-}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   esc="$(printf '\033')"
-  green="$esc[32m" red="$esc[31m" grey="$esc[90m" bold="$esc[1m" reset="$esc[0m"
+  green="$esc[1;32m" red="$esc[1;31m" grey="$esc[38;5;244m" bold="$esc[1m" cmd="$esc[1;36m" reset="$esc[0m"
 else
-  green="" red="" grey="" bold="" reset=""
+  green="" red="" grey="" bold="" cmd="" reset=""
 fi
 
-ok() { printf '%s✔%s %s\n' "$green" "$reset" "$*"; }
-skip() { printf '%s•%s %s\n' "$grey" "$reset" "$*"; }
-fail() { printf '%s✘%s %s\n' "$red" "$reset" "$*" >&2; exit 1; }
+say() { printf '  %s\n' "$*"; }
+ok() { say "${green}✔${reset} $*"; }
+skip() { say "${grey}•${reset} $*"; }
+fail() { say "${red}✘${reset} ${bold}$*${reset}" >&2; exit 1; }
 tilde() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
 
 for arg in "$@"; do
@@ -84,7 +85,8 @@ fi
 base="https://github.com/shulker-sh/shulker/releases/download/$version"
 archive="shulker_${version#v}_${os}_${arch}.tar.gz"
 
-printf '%sInstalling shulker %s for %s (%s)%s\n\n' "$bold" "${version#v}" "$os_name" "$arch" "$reset"
+say "${bold}Installing shulker ${version#v} for $os_name ($arch)$reset"
+echo
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -138,14 +140,14 @@ install -m 0755 shulker "$INSTALL_DIR/shulker"
 ok "Installed to $(tilde "$INSTALL_DIR/shulker")"
 
 # 6. PATH. The line is only added once, and is marked so you can find and remove it.
-next="Run ${bold}shulker --help${reset} to get started."
+next="Run ${cmd}shulker --help${reset} to get started."
 
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;
   *)
     if [ -n "$NO_MODIFY_PATH" ]; then
       skip "$(tilde "$INSTALL_DIR") isn't on your PATH"
-      next="Add $(tilde "$INSTALL_DIR") to your PATH, then run ${bold}shulker --help${reset} to get started."
+      next="Add $(tilde "$INSTALL_DIR") to your PATH, then run ${cmd}shulker --help${reset} to get started."
     else
       case "$(basename "${SHELL:-sh}")" in
         zsh) rc="${ZDOTDIR:-$HOME}/.zshrc"; line="export PATH=\"$INSTALL_DIR:\$PATH\"" ;;
@@ -165,11 +167,11 @@ case ":$PATH:" in
         ok "Added $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc")"
       fi
 
-      next="Open a new terminal, then run ${bold}shulker --help${reset} to get started."
+      next="Open a new terminal, then run ${cmd}shulker --help${reset} to get started."
     fi
     ;;
 esac
 
 echo
-echo "$next"
-echo "Docs: https://shulker.sh/docs/getting-started"
+say "$next"
+say "Docs: https://shulker.sh/docs/getting-started"
