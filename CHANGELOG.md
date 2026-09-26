@@ -6,10 +6,12 @@ All notable changes to shulker are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.0.1] - 2026-09-26
+
 The first release of shulker, a package manager for Minecraft modpacks. A pack is a `shulker.json` you edit and a `shulker.lock` that records exact versions and hashes, so every machine builds the same pack.
 
 ### Added
-- Projects for Fabric, Quilt, NeoForge and Forge, back to Forge 1.12.2: `init`, `add`, `remove`, `update`, `outdated`, `pin` and `lock` manage mods from Modrinth, CurseForge or local files, and `set`, `get` and `unset` edit any manifest field against its [schema](https://shulker.sh/docs/manifest).
+- Projects for Fabric, Quilt, NeoForge and Forge, back to Forge 1.12.2: `create` or `init` start one, and `add`, `remove`, `update`, `outdated`, `pin` and `lock` manage mods from Modrinth, CurseForge or local files, and `set`, `get` and `unset` edit any manifest field against its [schema](https://shulker.sh/docs/manifest).
 - Dependency checks from each jar's own metadata, run for the client and the server separately, with `ignore` to accept a known problem and `check` to fail a CI run on any of them ([GitHub Actions](https://shulker.sh/docs/github-actions)).
 - Client and server builds from one project, with override folders per side and per feature, owned files like `options.txt` and `server.properties` merged per key so in-game edits survive a rebuild, and `diff` and `pull` to bring those edits back.
 - Modpacks layered in from local folders, git repositories, manifest URLs, `.mrpack` and CurseForge zips, or a Modrinth or CurseForge slug.
@@ -23,4 +25,5 @@ The first release of shulker, a package manager for Minecraft modpacks. A pack i
 - `--json` on every command with stable error codes, `docs` for the documentation offline, shell completions, and `self update`.
 - Installers for macOS, Linux and Windows ([Getting Started](https://shulker.sh/docs/getting-started)).
 
-[Unreleased]: https://github.com/shulker-sh/shulker/commits/master
+[Unreleased]: https://github.com/shulker-sh/shulker/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/shulker-sh/shulker/releases/tag/v0.0.1
