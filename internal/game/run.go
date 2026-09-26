@@ -3,6 +3,7 @@ package game
 import (
 	"io"
 	"os/exec"
+	"slices"
 
 	"shulker.sh/shulker/internal/proc"
 )
@@ -13,7 +14,7 @@ import (
 // starting, which is the end of the launch.
 func Run(l Launch, stdin io.Reader, stdout, stderr io.Writer) (code int, gaveWay, err error) {
 	if w := l.Wrapper; len(w) > 0 {
-		args := append(append(append([]string{}, w[1:]...), l.Java), l.Argv...)
+		args := slices.Concat(w[1:], []string{l.Java}, l.Argv)
 		code, err := runExe(w[0], args, stdin, stdout, stderr)
 		if err == nil {
 			return code, nil, nil

@@ -111,9 +111,11 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 	if err := InstallServerLoader(ctx, e, p, rep); err != nil {
 		return Result{}, err
 	}
-	if rt, err := e.recordClientRuntime(ctx, p, side, into); err != nil {
+	rt, err := e.recordClientRuntime(ctx, p, side, into)
+	if err != nil {
 		return Result{}, err
-	} else if rt.Fetched {
+	}
+	if rt.Fetched {
 		fetched = append(fetched, rt.Component+" "+rt.Version)
 	}
 	linked, err := e.linkSaves(into)
