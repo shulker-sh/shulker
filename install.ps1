@@ -33,8 +33,6 @@
   $ProgressPreference = 'SilentlyContinue'
   [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-  $owner = 'shulker-sh'
-  $repo = 'shulker'
   $installDir = if ($env:SHULKER_INSTALL_DIR) { $env:SHULKER_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\shulker' }
 
   function Write-Note($msg) { Write-Host "==> $msg" }
@@ -50,12 +48,12 @@
 
   if (-not $version) {
     Write-Note 'resolving latest release'
-    $version = (Invoke-RestMethod "https://api.github.com/repos/$owner/$repo/releases/latest").tag_name
-    if (-not $version) { throw "shulker install: no release found at https://github.com/$owner/$repo/releases" }
+    $version = (Invoke-RestMethod "https://api.github.com/repos/shulker-sh/shulker/releases/latest").tag_name
+    if (-not $version) { throw "shulker install: no release found at https://github.com/shulker-sh/shulker/releases" }
   }
 
   $plain = $version.TrimStart('v')
-  $base = "https://github.com/$owner/$repo/releases/download/$version"
+  $base = "https://github.com/shulker-sh/shulker/releases/download/$version"
   $archive = "shulker_${plain}_windows_$arch.zip"
 
   $tmp = Join-Path ([IO.Path]::GetTempPath()) ("shulker-install-" + [Guid]::NewGuid())
@@ -97,7 +95,7 @@
       try {
         $bundle = Join-Path $tmp 'shulker.attestation.jsonl'
         Invoke-WebRequest -UseBasicParsing -Uri "$base/shulker.attestation.jsonl" -OutFile $bundle
-        & $gh.Source attestation verify $archivePath --bundle $bundle --owner $owner *> $null
+        & $gh.Source attestation verify $archivePath --bundle $bundle --owner shulker-sh *> $null
         $verified = $LASTEXITCODE -eq 0
       } catch {}
 

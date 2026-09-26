@@ -17,8 +17,6 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public final class ShulkerModMenu implements ModMenuApi {
-	static final String MODS_RESOURCE = "/shulker/mods.txt";
-
 	private static final UpdateInfo NO_UPDATE = new UpdateInfo() {
 		@Override
 		public boolean isUpdateAvailable() {
@@ -57,7 +55,7 @@ public final class ShulkerModMenu implements ModMenuApi {
 	static List<String> managedMods() {
 		List<String> ids = new ArrayList<>();
 
-		try (InputStream in = ShulkerModMenu.class.getResourceAsStream(MODS_RESOURCE)) {
+		try (InputStream in = ShulkerModMenu.class.getResourceAsStream("/shulker/mods.txt")) {
 			if (in == null) {
 				return ids;
 			}

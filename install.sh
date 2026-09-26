@@ -28,8 +28,6 @@
 #   curl -fsSL https://shulker.sh/install.sh | sh -s -- --no-modify-path
 set -eu
 
-OWNER="shulker-sh"
-REPO="shulker"
 INSTALL_DIR="${SHULKER_INSTALL_DIR:-$HOME/.local/bin}"
 WITHOUT_ATTESTATION="${SHULKER_WITHOUT_ATTESTATION:-}"
 REQUIRE_ATTESTATION="${SHULKER_REQUIRE_ATTESTATION:-}"
@@ -69,13 +67,13 @@ version="${SHULKER_VERSION:-}"
 
 if [ -z "$version" ]; then
   note "resolving latest release"
-  latest="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$OWNER/$REPO/releases/latest")" \
+  latest="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/shulker-sh/shulker/releases/latest")" \
     || err "could not reach GitHub to resolve the latest release"
   version="${latest##*/tag/}"
-  [ "$version" != "$latest" ] || err "no release found at https://github.com/$OWNER/$REPO/releases"
+  [ "$version" != "$latest" ] || err "no release found at https://github.com/shulker-sh/shulker/releases"
 fi
 
-base="https://github.com/$OWNER/$REPO/releases/download/$version"
+base="https://github.com/shulker-sh/shulker/releases/download/$version"
 archive="shulker_${version#v}_${os}_${arch}.tar.gz"
 
 tmp="$(mktemp -d)"
@@ -104,7 +102,7 @@ fi
 # archive; gh checks the signature and that it names this archive and the shulker-sh owner.
 verify_attestation() {
   curl -fsSL -o shulker.attestation.jsonl "$base/shulker.attestation.jsonl" 2>/dev/null || return 1
-  gh attestation verify "$archive" --bundle shulker.attestation.jsonl --owner "$OWNER" >/dev/null 2>&1
+  gh attestation verify "$archive" --bundle shulker.attestation.jsonl --owner shulker-sh >/dev/null 2>&1
 }
 
 if [ -n "$WITHOUT_ATTESTATION" ]; then
