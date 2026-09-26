@@ -1,10 +1,12 @@
 package resolve
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
 
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
@@ -38,14 +40,19 @@ func (im *importer) listedByID(ctx context.Context) error {
 			return err
 		}
 		var missing []string
+		var manual []out.Detail
 		for _, f := range byProvider[name] {
 			if f.Optional {
 				rep.Warnings = append(rep.Warnings, fmt.Sprintf("skipped %s project %s file %s: the pack marks it optional", p.Title(), f.Project, f.Version))
 				continue
 			}
 			proj, v, err := im.listedFile(ctx, p, found, f)
+			if out.CodeOf(err) == "manual-download" && r.SkipPending && im.lockPending(p, proj, v, f) {
+				continue
+			}
 			if out.CodeOf(err) == "manual-download" {
 				missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", proj.Slug, v.File.Filename, v.Page, r.downloads()))
+				manual = append(manual, ManualRow(v.File.Filename, v.Page))
 				continue
 			}
 			if err != nil {
@@ -54,7 +61,7 @@ func (im *importer) listedByID(ctx context.Context) error {
 		}
 		if len(missing) > 0 {
 			e := out.Errorf("missing-files", "%s a manual download", out.Count(len(missing), "file needs", "files need"))
-			e.Items = missing
+			e.Items, e.Rows = missing, manual
 			e.Help = "download them, then run the command again"
 			return e
 		}
@@ -174,4 +181,24 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 		return nil, nil, out.Errorf("requires-unsupported", "%s is a %s, which a pack can't carry", proj.Slug, kind)
 	}
 	return proj, v, nil
+}
+
+// lockPending locks a mod whose manual download was skipped without its bytes, by the sha1 the
+// provider gives, so a later install asks for it again. Only a mod with a sha1 can wait that way.
+func (im *importer) lockPending(p provider.Provider, proj *provider.Project, v *provider.Version, f packarchive.File) bool {
+	if (proj.Type != "" && proj.Type != manifest.TypeMod) || v.File.Sha1 == "" {
+		return false
+	}
+	key := proj.Slug
+	if !manifest.IsValidKey(key) {
+		key = nameKey(key)
+	}
+	side := cmp.Or(f.Side, proj.Side, "both")
+	channel := shippedChannel(v)
+	im.r.Lock.Mods[key] = lock.Mod{Provider: p.Name(), Project: proj.ID, Version: v.ID, VersionNumber: v.Number, Filename: v.File.Filename, Page: v.Page, Sha1: v.File.Sha1, Size: v.File.Size, Side: side, SideFrom: sideFromProvider, Channel: channelLabel(channel), RequiredBy: []string{}}
+	entry := manifest.Require{Channel: channel}
+	im.r.setSource(&entry, key, p, proj)
+	im.r.Manifest.Requires[key] = entry
+	im.rep.Pending = append(im.rep.Pending, key)
+	return true
 }

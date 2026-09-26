@@ -49,6 +49,8 @@ type Imported struct {
 	Unmanaged  []string `json:"unmanaged"`
 	// Sides are the mods the index's env widens beyond their provider's side.
 	Sides []SideChoice `json:"sides"`
+	// Pending are the mods locked without their bytes because their manual download was skipped.
+	Pending []string `json:"pending,omitempty"`
 	// ServerPack is what the server files the pack pairs with decided, when it pairs some.
 	ServerPack *ServerPack `json:"serverPack,omitempty"`
 	// Seeded are the files moved out of a seed mod's folder to be seeded, by that folder.

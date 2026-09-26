@@ -41,7 +41,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 			return err
 		}
 		defer os.RemoveAll(staging)
-		r, imported, err := a.importPack(ctx, d, arc, staging, filepath.Join(p.Dir, resolve.DownloadsDir), f)
+		r, imported, err := a.importPack(ctx, d, arc, staging, filepath.Join(p.Dir, resolve.DownloadsDir), false, f)
 		if err != nil {
 			return err
 		}

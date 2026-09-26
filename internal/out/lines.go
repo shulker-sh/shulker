@@ -250,8 +250,9 @@ func (l *Lines) Tree(rows ...Row) {
 		}
 		root.Child(node)
 	}
+	// The tree pads each line of a multi-line row to the row's width.
 	for line := range strings.SplitSeq(root.String(), "\n") {
-		l.line(line)
+		l.line(strings.TrimRight(line, " "))
 	}
 }
 

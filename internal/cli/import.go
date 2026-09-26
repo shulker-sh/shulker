@@ -122,8 +122,8 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	defer staged.Discard()
 	var r *resolve.Resolver
 	var mods *resolve.Imported
-	err = a.awaitingDownloads(ctx, dir, func() error {
-		r, mods, err = a.importPack(ctx, d, arc, staged.Dir, filepath.Join(dir, resolve.DownloadsDir), f)
+	err = a.awaitingDownloads(ctx, dir, func(skip bool) error {
+		r, mods, err = a.importPack(ctx, d, arc, staged.Dir, filepath.Join(dir, resolve.DownloadsDir), skip, f)
 		return err
 	})
 	if err != nil {
@@ -177,6 +177,9 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 	if len(leftOut) > 0 {
 		rows = append(rows, out.Row{Label: "left out for side", Children: leftOut})
 	}
+	if mods != nil && len(mods.Pending) > 0 {
+		rows = append(rows, out.Row{Label: "waiting for a manual download", Children: mods.Pending})
+	}
 	if mods != nil && mods.ServerPack != nil && len(mods.ServerPack.Client)+len(mods.ServerPack.Both) > 0 {
 		sp := mods.ServerPack
 		rows = append(rows, out.Row{Label: "sides from the pack's server files", Text: fmt.Sprintf("%d client-only, %d on both sides", len(sp.Client), len(sp.Both))})
@@ -197,9 +200,9 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 
 // importPack reads arc as the project it would make at dir, its local files copied out there,
 // and returns the resolver holding that project's manifest and lock.
-func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir, downloads string, f *importFlags) (*resolve.Resolver, *resolve.Imported, error) {
+func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive, dir, downloads string, skip bool, f *importFlags) (*resolve.Resolver, *resolve.Imported, error) {
 	r := resolve.NewAt(d.Env, dir)
-	r.DownloadsIn = downloads
+	r.DownloadsIn, r.SkipPending = downloads, skip
 	mods, err := r.ImportProject(ctx, arc, resolve.ImportOptions{Name: f.name, IgnoreMarker: f.ignoreShulker, ServerPack: !f.noServerPack})
 	a.warn(r.Warnings)
 	if err != nil {

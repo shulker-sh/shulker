@@ -56,11 +56,11 @@ func TestInstallWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("install after the file arrives: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
-	if n := strings.Count(stderr, "1 file needs a manual download"); n != 2 {
-		t.Fatalf("the wait lists the files each time they are missing (%d): %s", n, stderr)
+	if !strings.Contains(stderr, "1 file needs a manual download into "+downloads) || !strings.Contains(stderr, "1 file is still missing from "+downloads) {
+		t.Fatalf("the wait lists the files, and says so again while they are missing: %s", stderr)
 	}
-	if !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar from https://www.curseforge.com") || !strings.Contains(stderr, "Press enter") {
-		t.Fatalf("the wait names the folder and each file's page: %s", stderr)
+	if !strings.Contains(stderr, "nodist-1.0.0.jar\n") || !strings.Contains(stderr, "https://www.curseforge.com") || !strings.Contains(stderr, "Press Enter once they're there, or Ctrl-C to skip them") {
+		t.Fatalf("the wait names each file and its page: %s", stderr)
 	}
 	if !strings.Contains(stdout, "Built client") {
 		t.Fatalf("install goes on after the wait: %s", stdout)
@@ -102,7 +102,7 @@ func TestImportWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	})
 
 	code, stdout, stderr := h.run(t, "import", archive, "--dir", dir)
-	if code != 0 || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "Press enter") {
+	if code != 0 || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "Press Enter") {
 		t.Fatalf("import: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 	if _, l := readProject(t, dir); l.Mods["nodist"].Sha512 != h.jars["nodist"].sha512 {
@@ -112,5 +112,53 @@ func TestImportWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	h.tty = false
 	if code, stdout, _ := h.run(t, "--json", "import", archive, "--dir", filepath.Join(t.TempDir(), "again")); code == 0 || failureCode(t, stdout).Code != "missing-files" {
 		t.Fatalf("off a terminal import fails: code=%d %s", code, stdout)
+	}
+}
+
+// ctrlCAfter is a stdin that answers the first wait with ctrl-c, as a terminal in raw mode sends it.
+func ctrlCAfter() readerFunc {
+	return readerFunc(func(p []byte) (int, error) {
+		p[0] = 0x03
+		return 1, nil
+	})
+}
+
+func TestImportSkipsAManualDownloadAndInstallAsksForItAgain(t *testing.T) {
+	h := newHarness(t)
+	archive := filepath.Join(t.TempDir(), "blocked.zip")
+	writeCurseForgeZip(t, archive, importedCurseForgePack(cfPackFile{ProjectID: 300000, FileID: 5100001, Required: true}), map[string][]byte{})
+	dir := filepath.Join(t.TempDir(), "craft-pack")
+	h.tty = true
+	h.stdin = ctrlCAfter()
+
+	code, stdout, stderr := h.run(t, "import", archive, "--dir", dir)
+	if code != 0 {
+		t.Fatalf("ctrl-c skips the file and the import finishes: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "waiting for a manual download") {
+		t.Fatalf("the import names what it left pending: %s", stdout)
+	}
+	m, l := readProject(t, dir)
+	pending := l.Mods["nodist"]
+	if !pending.IsPending() || pending.Sha1 == "" || m.Requires["nodist"].Project == "" {
+		t.Fatalf("nodist stays in the lock as pending: %+v %+v", pending, m.Requires["nodist"])
+	}
+
+	h.tty = false
+	h.dir = dir
+	stdout, stderr = h.mustRunStderr(t, "install")
+	if !strings.Contains(stderr, "nodist is left out until its manual download is in downloads/") {
+		t.Fatalf("off a terminal install builds without the pending mod: %s", stderr)
+	}
+
+	h.tty = true
+	h.stdin = enterAfter(1, func() {
+		os.WriteFile(filepath.Join(dir, "downloads", "any-name.jar"), h.jars["nodist"].data, 0o644)
+	})
+	if code, stdout, stderr := h.run(t, "install"); code != 0 {
+		t.Fatalf("install asks for it again: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if _, l := readProject(t, dir); l.Mods["nodist"].Sha512 != h.jars["nodist"].sha512 {
+		t.Fatalf("the dropped file fills the pending entry: %+v", l.Mods["nodist"])
 	}
 }

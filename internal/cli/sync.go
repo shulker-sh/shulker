@@ -184,6 +184,9 @@ func (a *app) syncEnv() (*sync.Env, error) {
 			return a.askYes(fmt.Sprintf("Unlock %s and resolve its mods for Minecraft %s?", key, minecraft))
 		}
 	}
+	if a.canWait() {
+		a.se.AwaitDownloads = a.awaitDownloads
+	}
 	return a.se, nil
 }
 
