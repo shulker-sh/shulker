@@ -36,18 +36,43 @@ WITHOUT_ATTESTATION="${SHULKER_WITHOUT_ATTESTATION:-}"
 REQUIRE_ATTESTATION="${SHULKER_REQUIRE_ATTESTATION:-}"
 NO_MODIFY_PATH="${SHULKER_NO_MODIFY_PATH:-}"
 
+# Colours and progress lines are only for a terminal; NO_COLOR turns the colours off.
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-  esc="$(printf '\033')"
-  green="$esc[1;32m" red="$esc[1;31m" grey="$esc[38;5;244m" bold="$esc[1m" cmd="$esc[1;36m" reset="$esc[0m"
+  green="$(printf '\033[1;32m')"
+  red="$(printf '\033[1;31m')"
+  grey="$(printf '\033[38;5;244m')"
+  bold="$(printf '\033[1m')"
+  cmd="$(printf '\033[1;36m')"
+  reset="$(printf '\033[0m')"
 else
   green="" red="" grey="" bold="" cmd="" reset=""
 fi
 
-say() { printf '  %s\n' "$*"; }
+if [ -t 1 ]; then
+  clear_line="$(printf '\r\033[K')"
+else
+  clear_line=""
+fi
+
+say() { printf '%s  %s\n' "$clear_line" "$*"; }
 ok() { say "${green}✔${reset} $*"; }
 skip() { say "${grey}•${reset} $*"; }
 fail() { say "${red}✘${reset} ${bold}$*${reset}" >&2; echo >&2; exit 1; }
-tilde() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
+
+# Shows what a slow step is doing; the next line printed replaces it.
+working() {
+  if [ -t 1 ]; then
+    printf '  %s• %s…%s' "$grey" "$*" "$reset"
+  fi
+}
+
+# Shows a path inside your home directory as ~/...
+tilde() {
+  case "$1" in
+    "$HOME"/*) echo "~${1#"$HOME"}" ;;
+    *) echo "$1" ;;
+  esac
+}
 
 echo
 
@@ -81,17 +106,21 @@ fi
 version="${SHULKER_VERSION:-}"
 
 if [ -z "$version" ]; then
+  working "Finding the latest release"
   latest="$(curl -fsLI -o /dev/null -w '%{url_effective}' "https://github.com/shulker-sh/shulker/releases/latest")" || latest=""
-  version="${latest##*/tag/}"
-  [ -n "$latest" ] && [ "$version" != "$latest" ] \
-    || fail "Couldn't get the latest release from https://github.com/shulker-sh/shulker/releases"
+
+  case "$latest" in
+    */tag/*) version="${latest##*/tag/}" ;;
+    *) fail "Couldn't get the latest release from https://github.com/shulker-sh/shulker/releases" ;;
+  esac
 fi
 
-version="v${version#v}"
+number="${version#v}"
+version="v$number"
 base="https://github.com/shulker-sh/shulker/releases/download/$version"
-archive="shulker_${version#v}_${os}_${arch}.tar.gz"
+archive="shulker_${number}_${os}_${arch}.tar.gz"
 
-say "${bold}Installing shulker ${version#v} for $os_name ($arch)$reset"
+say "${bold}Installing shulker $number for $os_name ($arch)$reset"
 echo
 
 tmp="$(mktemp -d)"
@@ -99,13 +128,17 @@ trap 'rm -rf "$tmp"' EXIT
 cd "$tmp"
 
 # 2. Download.
+working "Downloading $archive"
 curl -fsL -o "$archive" "$base/$archive" || fail "Couldn't download $base/$archive"
 curl -fsL -o checksums.txt "$base/checksums.txt" || fail "Couldn't download $base/checksums.txt"
 ok "Downloaded $archive"
 
-# 3. Checksum.
-want="$(awk -v f="$archive" '$2 == f { print $1 }' checksums.txt)"
-[ -n "$want" ] || fail "No checksum listed for $archive in checksums.txt"
+# 3. Checksum. Each line of checksums.txt is "<sha256>  <file name>".
+want="$(awk -v name="$archive" '$2 == name { print $1 }' checksums.txt)"
+
+if [ -z "$want" ]; then
+  fail "No checksum listed for $archive in checksums.txt"
+fi
 
 if command -v sha256sum >/dev/null 2>&1; then
   got="$(sha256sum "$archive" | awk '{ print $1 }')"
@@ -113,7 +146,10 @@ else
   got="$(shasum -a 256 "$archive" | awk '{ print $1 }')"
 fi
 
-[ "$want" = "$got" ] || fail "Checksum mismatch for $archive (expected $want, got $got)"
+if [ "$want" != "$got" ]; then
+  fail "Checksum mismatch for $archive (expected $want, got $got)"
+fi
+
 ok "Checksum matches"
 
 # 4. Build provenance. The release workflow publishes a signed attestation for each
@@ -126,6 +162,8 @@ verify_attestation() {
 if [ -n "$WITHOUT_ATTESTATION" ]; then
   skip "Build provenance not checked (--without-attestation)"
 elif command -v gh >/dev/null 2>&1; then
+  working "Checking build provenance"
+
   if verify_attestation; then
     ok "Build provenance verified"
   elif [ -n "$REQUIRE_ATTESTATION" ]; then
@@ -141,42 +179,59 @@ fi
 
 # 5. Install.
 tar -xzf "$archive" shulker || fail "Couldn't unpack $archive"
-{ mkdir -p "$INSTALL_DIR" && install -m 0755 shulker "$INSTALL_DIR/shulker"; } 2>/dev/null \
-  || fail "Couldn't install to $(tilde "$INSTALL_DIR"); set SHULKER_INSTALL_DIR to a directory you can write to"
-ok "Installed to $(tilde "$INSTALL_DIR/shulker")"
+
+if mkdir -p "$INSTALL_DIR" 2>/dev/null && install -m 0755 shulker "$INSTALL_DIR/shulker" 2>/dev/null; then
+  ok "Installed to $(tilde "$INSTALL_DIR/shulker")"
+else
+  fail "Couldn't install to $(tilde "$INSTALL_DIR"); set SHULKER_INSTALL_DIR to a directory you can write to"
+fi
 
 # 6. PATH. The line is only added once, and is marked so you can find and remove it.
-next="Run ${cmd}shulker --help${reset} to get started."
-
+# Wrapping PATH and the directory in colons makes this match whole entries only.
 case ":$PATH:" in
-  *":$INSTALL_DIR:"*) ;;
-  *)
-    if [ -n "$NO_MODIFY_PATH" ]; then
-      skip "$(tilde "$INSTALL_DIR") isn't on your PATH"
-      next="Add $(tilde "$INSTALL_DIR") to your PATH, then run ${cmd}shulker --help${reset} to get started."
-    else
-      case "$(basename "${SHELL:-sh}")" in
-        zsh) rc="${ZDOTDIR:-$HOME}/.zshrc"; line="export PATH=\"$INSTALL_DIR:\$PATH\"" ;;
-        bash)
-          if [ "$os" = "darwin" ]; then rc="$HOME/.bash_profile"; else rc="$HOME/.bashrc"; fi
-          line="export PATH=\"$INSTALL_DIR:\$PATH\""
-          ;;
-        fish) rc="$HOME/.config/fish/config.fish"; line="fish_add_path \"$INSTALL_DIR\"" ;;
-        *) rc="$HOME/.profile"; line="export PATH=\"$INSTALL_DIR:\$PATH\"" ;;
-      esac
-
-      if [ -f "$rc" ] && grep -qF "$line" "$rc"; then
-        ok "$(tilde "$rc") already adds $(tilde "$INSTALL_DIR") to PATH"
-      else
-        { mkdir -p "$(dirname "$rc")" && printf '\n# Added by the shulker installer\n%s\n' "$line" >> "$rc"; } 2>/dev/null \
-          || fail "Couldn't add $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc"); rerun with --no-modify-path to skip it"
-        ok "Added $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc")"
-      fi
-
-      next="Open a new terminal, then run ${cmd}shulker --help${reset} to get started."
-    fi
-    ;;
+  *":$INSTALL_DIR:"*) on_path=1 ;;
+  *) on_path="" ;;
 esac
+
+if [ -n "$on_path" ]; then
+  next="Run ${cmd}shulker --help${reset} to get started."
+elif [ -n "$NO_MODIFY_PATH" ]; then
+  skip "$(tilde "$INSTALL_DIR") isn't on your PATH"
+  next="Add $(tilde "$INSTALL_DIR") to your PATH, then run ${cmd}shulker --help${reset} to get started."
+else
+  line="export PATH=\"$INSTALL_DIR:\$PATH\""
+
+  case "$(basename "${SHELL:-sh}")" in
+    zsh)
+      rc="${ZDOTDIR:-$HOME}/.zshrc"
+      ;;
+    bash)
+      # macOS Terminal starts bash as a login shell, which reads .bash_profile, not .bashrc.
+      if [ "$os" = "darwin" ]; then
+        rc="$HOME/.bash_profile"
+      else
+        rc="$HOME/.bashrc"
+      fi
+      ;;
+    fish)
+      rc="$HOME/.config/fish/config.fish"
+      line="fish_add_path \"$INSTALL_DIR\""
+      ;;
+    *)
+      rc="$HOME/.profile"
+      ;;
+  esac
+
+  if [ -f "$rc" ] && grep -qF "$line" "$rc"; then
+    ok "$(tilde "$rc") already adds $(tilde "$INSTALL_DIR") to PATH"
+  elif mkdir -p "$(dirname "$rc")" 2>/dev/null && printf '\n# Added by the shulker installer\n%s\n' "$line" 2>/dev/null >> "$rc"; then
+    ok "Added $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc")"
+  else
+    fail "Couldn't add $(tilde "$INSTALL_DIR") to PATH in $(tilde "$rc"); rerun with --no-modify-path to skip it"
+  fi
+
+  next="Open a new terminal, then run ${cmd}shulker --help${reset} to get started."
+fi
 
 echo
 say "$next"
