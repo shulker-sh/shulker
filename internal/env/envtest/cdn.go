@@ -30,6 +30,7 @@ type CDN struct {
 	truncated map[string]bool
 }
 
+// NewCDN starts an empty CDN for the test.
 func NewCDN(t *testing.T) *CDN {
 	t.Helper()
 	c := &CDN{files: map[string][]byte{}, forbidden: map[string]bool{}, truncated: map[string]bool{}}
@@ -53,6 +54,7 @@ func NewCDN(t *testing.T) *CDN {
 	return c
 }
 
+// URL is where the CDN serves.
 func (c *CDN) URL() string { return c.srv.URL }
 
 // Serve publishes data at path and returns its URL.
@@ -63,6 +65,7 @@ func (c *CDN) Serve(path string, data []byte) string {
 	return c.srv.URL + path
 }
 
+// Forbid has the CDN refuse v.
 func (c *CDN) Forbid(v provider.Version) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -76,6 +79,7 @@ func (c *CDN) Truncate(v provider.Version) {
 	c.truncated[PathOf(v)] = true
 }
 
+// Restore serves v whole again after a Truncate.
 func (c *CDN) Restore(v provider.Version) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -89,6 +93,7 @@ func (c *CDN) Bytes(v provider.Version) []byte {
 	return c.files[PathOf(v)]
 }
 
+// PathOf is the path a version's file is published under.
 func PathOf(v provider.Version) string {
 	return "/" + v.ID + "/" + v.File.Filename
 }
@@ -101,6 +106,7 @@ type Host struct {
 	Sha1Only bool
 }
 
+// NewHost is a fake provider called name whose files sit on c.
 func NewHost(c *CDN, name string) *Host {
 	return &Host{Provider: fake.New(name), CDN: c}
 }
@@ -178,11 +184,13 @@ func (h *Host) Republish(id string, data []byte) provider.Version {
 	return v
 }
 
+// Sha1Hex is the hex sha1 of data.
 func Sha1Hex(data []byte) string {
 	sum := sha1.Sum(data)
 	return hex.EncodeToString(sum[:])
 }
 
+// Sha512Hex is the hex sha512 of data.
 func Sha512Hex(data []byte) string {
 	sum := sha512.Sum512(data)
 	return hex.EncodeToString(sum[:])

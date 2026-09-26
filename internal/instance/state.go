@@ -13,8 +13,10 @@ import (
 	"shulker.sh/shulker/schema"
 )
 
+// StateFile is the state file's name under .shulker.
 const StateFile = "state.json"
 
+// StatePath is where dir's state file sits.
 func StatePath(dir string) string {
 	return filepath.Join(dir, Dir, StateFile)
 }
@@ -104,6 +106,7 @@ func LoadState(dir string) State {
 	return s
 }
 
+// WriteState writes s as dir's state file under the current schema.
 func WriteState(dir string, s State) error {
 	if err := os.MkdirAll(filepath.Join(dir, Dir), 0o755); err != nil {
 		return err

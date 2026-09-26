@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/project"
 )
 
+// ServerJavaFix is the fix row a server's runtime-unavailable error carries.
 var ServerJavaFix = out.Detail{Label: "Fix", Text: `set "java" in shulker.json to a JDK path`}
 
 // LinkJavaFix is the fix row for a client runtime a launcher can't get: relink with a Java.

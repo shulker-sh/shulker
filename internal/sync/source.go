@@ -21,6 +21,7 @@ type Source struct {
 	IsAuthor bool
 }
 
+// IsRemote reports whether the source is a checkout of a URL rather than a local directory.
 func (s *Source) IsRemote() bool { return s.Kind != modpack.Local }
 
 // ForLink is the source as the project a link writes takes it.

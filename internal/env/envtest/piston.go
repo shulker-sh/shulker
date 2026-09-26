@@ -37,6 +37,7 @@ type Piston struct {
 	ProfileHits atomic.Int64
 }
 
+// NewPiston starts the fake on a test server.
 func NewPiston(t *testing.T) *Piston {
 	t.Helper()
 	p := &Piston{
@@ -169,6 +170,7 @@ func NewPiston(t *testing.T) *Piston {
 	return p
 }
 
+// URL is where the fake serves.
 func (p *Piston) URL() string { return p.srv.URL }
 
 // Mojang points the given clients at the fake: the version index, the runtime index and the

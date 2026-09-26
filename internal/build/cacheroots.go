@@ -27,6 +27,7 @@ type Roots struct {
 	Unreadable []string
 }
 
+// Count is how many roots there are: the instances, the lock files and the project.
 func (r Roots) Count() int {
 	n := r.Instances + r.LockFiles
 	if r.Project {

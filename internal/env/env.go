@@ -13,6 +13,8 @@ import (
 	"shulker.sh/shulker/internal/provider"
 )
 
+// Env is what one run of shulker reaches: its hosts, cache and Mojang services, and the sinks
+// its log lines, progress and warnings go to.
 type Env struct {
 	Fetch     *fetch.Client
 	Cache     *cache.Cache
@@ -38,6 +40,7 @@ type Env struct {
 	WarnNudge func(n out.Nudge, format string, args ...any)
 }
 
+// WarnEach reports each warning through Warn.
 func (e *Env) WarnEach(warnings []string) {
 	for _, w := range warnings {
 		e.Warn("%s", w)

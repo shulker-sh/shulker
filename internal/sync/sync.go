@@ -17,6 +17,7 @@ import (
 	"shulker.sh/shulker/internal/saves"
 )
 
+// AssumeClientWarning is what a sync says when it builds a client the manifest doesn't declare.
 const AssumeClientWarning = "shulker.json declares no client; building from shared mods and overrides"
 
 // Request is what a sync is asked for beyond its source.

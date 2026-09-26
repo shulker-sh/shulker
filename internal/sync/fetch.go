@@ -165,6 +165,7 @@ func FeatureOverrides(b *build.Builder, with, without []string, decisions map[st
 	return build.FeatureOverrides(decisions, with, without), nil
 }
 
+// FeatureNames is the name of each feature.
 func FeatureNames(features []build.Feature) []string {
 	names := make([]string, 0, len(features))
 	for _, f := range features {
@@ -173,6 +174,7 @@ func FeatureNames(features []build.Feature) []string {
 	return names
 }
 
+// UnknownFeature is what a command says about a feature name nothing in the manifest declares.
 func UnknownFeature(name string, known []string) error {
 	fail := out.Errorf("feature-not-found", "no mod or feature declaration in shulker.json uses feature %q", name)
 	fail.Candidates, fail.Given = known, name
