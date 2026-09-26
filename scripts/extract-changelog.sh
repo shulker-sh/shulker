@@ -8,9 +8,8 @@ set -euo pipefail
 
 version="${1:?usage: extract-changelog.sh <version>}"
 
-# Everything under "## [version] - <date>" up to the next "## " heading or the
-# link-reference block; header excluded; leading/trailing blanks trimmed. Match
-# by literal prefix (index) so this behaves the same across awk implementations.
+# index() matches the heading as a literal prefix; a regex would need the version's
+# dots escaped, and awk implementations disagree on how.
 notes="$(awk -v ver="$version" '
   index($0, "## [" ver "]") == 1 { grab = 1; next }
   grab && (/^## / || /^\[[^]]+\]: /) { exit }
@@ -22,9 +21,8 @@ notes="$(awk -v ver="$version" '
   }
 ' CHANGELOG.md)"
 
-# The version's reference link from the bottom of the changelog. Strip the
-# "[version]:" definition prefix to get the bare URL, then render it as a labeled
-# inline link (a bare definition line would not show in the release body).
+# A bare reference definition does not render in a release body, so the URL is
+# re-emitted as an inline link.
 version_re="$(printf '%s' "$version" | sed 's/\./\\./g')"
 link="$(grep -E "^\[$version_re\]: " CHANGELOG.md || true)"
 url="$(printf '%s' "$link" | sed -E 's/^\[[^]]*\]:[[:space:]]*//')"
