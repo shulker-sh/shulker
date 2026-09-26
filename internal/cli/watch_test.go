@@ -148,7 +148,7 @@ func TestPlayStreamMirrorsTheGameAndStillWritesTheLog(t *testing.T) {
 
 	stdout := h.mustRun(t, "-i", "pack", "play", "--stream")
 
-	if !strings.Contains(stdout, "[Render thread] Setting user: Notch") || !strings.Contains(stdout, "played pack") {
+	if !strings.Contains(stdout, "[Render thread] Setting user: Notch") || !strings.Contains(stdout, "Played pack") {
 		t.Fatalf("play --stream shows the game as it runs, then how it ended:\n%s", stdout)
 	}
 	run := onlyRun(t, gameDir)

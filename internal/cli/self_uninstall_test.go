@@ -37,13 +37,13 @@ func TestSelfUninstallClearsEveryInstanceAndLeavesTheRegistry(t *testing.T) {
 	prismCfg := filepath.Join(prismDir, "instances", "shulker-pack", launcher.PrismInstanceFile)
 
 	stdout := h.mustRun(t, "self", "uninstall")
-	if !strings.Contains(stdout, "unhooked 2 instances") || !strings.Contains(stdout, "removed "+h.exe) {
+	if !strings.Contains(stdout, "Unhooked 2 instances") || !strings.Contains(stdout, "Removed "+h.exe) {
 		t.Fatalf("uninstall output: %s", stdout)
 	}
 	if !strings.Contains(stdout, "• pack (Prism Launcher)") || !strings.Contains(stdout, "• pack (Minecraft Launcher)") {
 		t.Fatalf("every instance is named: %s", stdout)
 	}
-	if !strings.Contains(stdout, "the registry and every instance folder are untouched") || !strings.Contains(stdout, "$ shulker instances repair") {
+	if !strings.Contains(stdout, "The registry and every instance folder are untouched") || !strings.Contains(stdout, "$ shulker instances repair") {
 		t.Fatalf("uninstall says what it left: %s", stdout)
 	}
 	if _, err := os.Stat(h.exe); !os.IsNotExist(err) {
@@ -88,7 +88,7 @@ func TestSelfUninstallClearsEveryInstanceAndLeavesTheRegistry(t *testing.T) {
 func TestSelfUninstallPurgeForgetsTheRegistry(t *testing.T) {
 	h, _, _, into := uninstallHarness(t)
 	stdout := h.mustRun(t, "self", "uninstall", "--purge")
-	if !strings.Contains(stdout, "forgot the registry") || strings.Contains(stdout, "$ shulker instances repair") {
+	if !strings.Contains(stdout, "Forgot the registry") || strings.Contains(stdout, "$ shulker instances repair") {
 		t.Fatalf("purge output: %s", stdout)
 	}
 	// Every row is a launcher's, so a repair finds them all again; the detached build was
@@ -122,7 +122,7 @@ func TestSelfUninstallWarnsAndCarriesOn(t *testing.T) {
 	if !strings.Contains(stderr, "keeps shulker's hooks") {
 		t.Fatalf("an instance that can't be unhooked warns: %s", stderr)
 	}
-	if strings.Contains(stdout, "unhooked") || !strings.Contains(stdout, "removed "+h.exe) {
+	if strings.Contains(stdout, "Unhooked") || !strings.Contains(stdout, "Removed "+h.exe) {
 		t.Fatalf("the binary still goes: %s", stdout)
 	}
 	if _, err := os.Stat(h.exe); !os.IsNotExist(err) {
@@ -140,7 +140,7 @@ func TestSelfUninstallWithNothingLinked(t *testing.T) {
 	if strings.Contains(stdout, "unhooked") {
 		t.Fatalf("nothing was linked, so nothing is named: %s", stdout)
 	}
-	if !strings.Contains(stdout, "removed "+h.exe) || !strings.Contains(stdout, "untouched") {
+	if !strings.Contains(stdout, "Removed "+h.exe) || !strings.Contains(stdout, "untouched") {
 		t.Fatalf("uninstall output: %s", stdout)
 	}
 	code, stdout, _ := h.run(t, "self", "uninstall", "--json")
@@ -166,10 +166,10 @@ func TestSelfUninstallHandsTheBinaryToItsPackageManager(t *testing.T) {
 	prismCfg := filepath.Join(prismDir, "instances", "shulker-pack", launcher.PrismInstanceFile)
 
 	stdout := h.mustRun(t, "self", "uninstall")
-	if !strings.Contains(stdout, "unhooked 2 instances") || strings.Contains(stdout, "removed ") {
+	if !strings.Contains(stdout, "Unhooked 2 instances") || strings.Contains(stdout, "Removed ") {
 		t.Fatalf("the hooks go and the binary stays: %s", stdout)
 	}
-	if !strings.Contains(stdout, "i the binary is Homebrew's to remove") || !strings.HasSuffix(stdout, "\n  Remove it with:\n    $ brew uninstall shulker\n") {
+	if !strings.Contains(stdout, "i The binary is Homebrew's to remove") || !strings.HasSuffix(stdout, "\n  Remove it with:\n    $ brew uninstall shulker\n") {
 		t.Fatalf("the handoff closes the output: %s", stdout)
 	}
 	if !strings.Contains(stdout, "$ shulker instances repair") {

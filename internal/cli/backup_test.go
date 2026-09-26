@@ -37,10 +37,10 @@ func TestBackupZipsAnInstancesSaveGroup(t *testing.T) {
 	t.Cleanup(func() { os.RemoveAll(filepath.Join(data, "backups")) })
 
 	stdout, stderr := h.mustRunStderr(t, "backup")
-	if !strings.Contains(stderr, "zipped creative") || !strings.Contains(stderr, "zipped survival") {
+	if !strings.Contains(stderr, "Zipped creative") || !strings.Contains(stderr, "Zipped survival") {
 		t.Fatalf("a step per world: %s", stderr)
 	}
-	if !regexp.MustCompile(`backed up 2 worlds » .*/backups/default/\d{8}-\d{6}-pack-backup\.zip \(.* in \d+\.\ds\)`).MatchString(stdout) {
+	if !regexp.MustCompile(`Backed up 2 worlds » .*/backups/default/\d{8}-\d{6}-pack-backup\.zip \(.* in \d+\.\ds\)`).MatchString(stdout) {
 		t.Fatalf("backup: %s", stdout)
 	}
 
@@ -78,7 +78,7 @@ func TestBackupKeepsAnInstancesOwnWorldsInItsFolder(t *testing.T) {
 		t.Fatalf("no worlds: %+v", env.Error)
 	}
 	addWorld(t, filepath.Join(gameDir, "saves"), "mine")
-	if stdout := h.mustRun(t, "saves", "-C", gameDir); !strings.Contains(stdout, "no backups yet; shulker backup -C "+gameDir+" takes one") {
+	if stdout := h.mustRun(t, "saves", "-C", gameDir); !strings.Contains(stdout, "No backups yet; shulker backup -C "+gameDir+" takes one") {
 		t.Fatalf("the hint names the backup for this target: %s", stdout)
 	}
 	got := backupOf(t, h, "-C", gameDir)

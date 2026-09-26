@@ -120,9 +120,9 @@ func (a *app) restore(target savesTarget, req restoreRequest) (restoreResult, er
 
 func (res restoreResult) print(l *out.Lines) {
 	if res.Snapshot != nil {
-		l.Done("kept the worlds there as backup " + res.Snapshot.ID)
+		l.Done("Kept the worlds there as backup " + res.Snapshot.ID)
 	}
-	l.OKInto("restored "+plural(len(res.Worlds), "world", "worlds")+" from "+res.From.ID, res.WorldsDir, "")
+	l.OKInto("Restored "+plural(len(res.Worlds), "world", "worlds")+" from "+res.From.ID, res.WorldsDir, "")
 	items := make([]out.Item, 0, len(res.Worlds))
 	for _, w := range res.Worlds {
 		kind := out.Add

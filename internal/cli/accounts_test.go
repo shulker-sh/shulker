@@ -36,7 +36,7 @@ const (
 
 func TestAccountsEmpty(t *testing.T) {
 	h := newHarness(t)
-	if stdout := h.mustRun(t, "accounts"); !strings.Contains(stdout, "no accounts yet") {
+	if stdout := h.mustRun(t, "accounts"); !strings.Contains(stdout, "No accounts yet") {
 		t.Errorf("empty state = %q", stdout)
 	}
 }
@@ -241,7 +241,7 @@ func TestAccountsProviders(t *testing.T) {
 	registerMojang(t, h, t.TempDir())
 	h.mustRun(t, "config", "set", "accounts.stores", "--literal", `["mojang"]`)
 	stdout, stderr := h.mustRunStderr(t, "accounts")
-	if !strings.Contains(stdout, "no accounts yet") {
+	if !strings.Contains(stdout, "No accounts yet") {
 		t.Errorf("without shulker its own accounts are not read:\n%s", stdout)
 	}
 	if strings.TrimSpace(stderr) != "" {

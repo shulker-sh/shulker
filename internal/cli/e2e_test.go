@@ -862,7 +862,7 @@ func TestVerticalSlice(t *testing.T) {
 	h := newHarness(t)
 
 	stdout := h.mustRun(t, "create", "--loader", "fabric")
-	if !strings.Contains(stdout, "created shulker.json (Minecraft 26.2, fabric 0.17.3, Java 25)") {
+	if !strings.Contains(stdout, "Created shulker.json (Minecraft 26.2, fabric 0.17.3, Java 25)") {
 		t.Fatalf("init output: %s", stdout)
 	}
 	var m map[string]any
@@ -913,7 +913,7 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "install")
-	if !strings.Contains(stdout, "built client (4 written") {
+	if !strings.Contains(stdout, "Built client (4 written") {
 		t.Fatalf("install output: %s", stdout)
 	}
 	buildDir := filepath.Join(h.dir, "build", "client")
@@ -932,7 +932,7 @@ func TestVerticalSlice(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built client (4 unchanged)") {
+	if !strings.Contains(stdout, "Built client (4 unchanged)") {
 		t.Fatalf("rebuild output: %s", stdout)
 	}
 
@@ -970,7 +970,7 @@ func TestVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built client (4 unchanged)") {
+	if !strings.Contains(stdout, "Built client (4 unchanged)") {
 		t.Fatalf("removed override should hand options.txt back to client.options: %s", stdout)
 	}
 	if data, _ := os.ReadFile(options); string(data) != "renderDistance:16\nlang:en_us\njoinedFirstServer:true\nonboardAccessibility:false\nskipMultiplayerWarning:true\ntutorialStep:none\n" {
@@ -1117,7 +1117,7 @@ func TestLockOnlyRepicksWhatChanged(t *testing.T) {
 	if out := h.mustRun(t, "lock"); !strings.Contains(out, "~ fabric-api ") || !strings.Contains(out, "(now client only)") {
 		t.Fatalf("lock after a second side change: %s", out)
 	}
-	if out := h.mustRun(t, "lock"); !strings.Contains(out, "already up to date") {
+	if out := h.mustRun(t, "lock"); !strings.Contains(out, "Already up to date") {
 		t.Fatalf("second lock: %s", out)
 	}
 	for _, args := range [][]string{{"add", "sodium", "--pin", "nope"}, {"pin", "sodium", "nope"}} {
@@ -1294,7 +1294,7 @@ func TestValidationFailsAndIgnores(t *testing.T) {
 		t.Fatalf("suggestions: %v", sg)
 	}
 	stdout = h.mustRun(t, "install")
-	if !strings.Contains(stdout, "built client (4 written") {
+	if !strings.Contains(stdout, "Built client (4 written") {
 		t.Fatalf("install: %s", stdout)
 	}
 }
@@ -1304,10 +1304,10 @@ func TestUpdateOutdatedAndPin(t *testing.T) {
 	h.mustRun(t, "create", "--loader", "fabric")
 	h.mustRun(t, "add", "sodium")
 
-	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "all mods are up to date") {
+	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "Everything is up to date") {
 		t.Fatalf("outdated before a new release: %s", out)
 	}
-	if out := h.mustRun(t, "update"); !strings.Contains(out, "already up to date") {
+	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
 		t.Fatalf("update before a new release: %s", out)
 	}
 
@@ -1342,7 +1342,7 @@ func TestUpdateOutdatedAndPin(t *testing.T) {
 	if out := h.mustRun(t, "outdated"); !strings.Contains(out, "sodium 1.0.0+mc26.2 ⟶ 1.1.0+mc26.2 (pinned)") {
 		t.Fatalf("outdated with pin: %s", out)
 	}
-	if out := h.mustRun(t, "update"); !strings.Contains(out, "already up to date") {
+	if out := h.mustRun(t, "update"); !strings.Contains(out, "Already up to date") {
 		t.Fatalf("update must respect the pin: %s", out)
 	}
 
@@ -1405,7 +1405,7 @@ func TestDiffAndPull(t *testing.T) {
 		}
 	}
 	h.mustRun(t, "install")
-	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "no changes in client (the build directory)") {
+	if stdout := h.mustRun(t, "diff"); !strings.Contains(stdout, "No changes in client (the build directory)") {
 		t.Fatalf("clean diff: %s", stdout)
 	}
 
@@ -1454,7 +1454,7 @@ func TestDiffAndPull(t *testing.T) {
 
 	stdout = h.mustRun(t, "pull")
 	for _, line := range []string{
-		"pulled client (1 file, 1 key written to shulker.json, 2 skipped)",
+		"Pulled client (1 file, 1 key written to shulker.json, 2 skipped)",
 		"pulled: config/plain.txt ⟶ overrides/config/plain.txt",
 		"set: options.txt joinedFirstServer=false",
 		"skipped: config/new.txt (not written by shulker; name it to adopt it)",
@@ -1502,7 +1502,7 @@ func TestDiffAndPull(t *testing.T) {
 	if data, _ := os.ReadFile(filepath.Join(overrides, "plain.txt")); string(data) != "a=4\n" {
 		t.Fatalf("pulled conflict should take the build file: %q", data)
 	}
-	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "built client (6 unchanged, 1 kept)") {
+	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "Built client (6 unchanged, 1 kept)") {
 		t.Fatalf("build after conflict pull: %s", stdout)
 	}
 }

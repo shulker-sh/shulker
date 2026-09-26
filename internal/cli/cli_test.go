@@ -357,7 +357,7 @@ func TestAddRejectsBadFlagValues(t *testing.T) {
 
 func TestHumanErrorNamesCode(t *testing.T) {
 	_, _, stderr := run(t, "add", "sodium", "--side", "top")
-	if !strings.HasPrefix(stderr, "  ✘ error: --side takes one of client, server, both, not \"top\" (usage)\n\n  Usage\n") {
+	if !strings.HasPrefix(stderr, "  ✘ --side takes one of client, server, both, not \"top\" (usage)\n\n  Usage\n") {
 		t.Fatalf("stderr = %q", stderr)
 	}
 }
@@ -422,7 +422,7 @@ func TestUnknownCommandPicks(t *testing.T) {
 
 func TestUnknownCommandHuman(t *testing.T) {
 	code, stdout, stderr := run(t, "bogus")
-	if code != out.ExitUsage || stdout != "" || !strings.HasPrefix(stderr, "  ✘ error: ") {
+	if code != out.ExitUsage || stdout != "" || !strings.HasPrefix(stderr, "  ✘ Unknown command") {
 		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 }

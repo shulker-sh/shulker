@@ -41,7 +41,7 @@ func TestAnUnreadableDataVersionLeavesTheLockToTheNextRelock(t *testing.T) {
 	}
 	writeFile(t, filepath.Join(h.dir, "overrides", "v.txt.tmpl"), "${minecraft.dataVersion}")
 	code, _, stderr = h.run(t, "install")
-	if code == 0 || !strings.Contains(stderr, "help: run shulker lock") {
+	if code == 0 || !strings.Contains(stderr, "help: Run shulker lock") {
 		t.Fatalf("an unset data version says how to fill it: %d %s", code, stderr)
 	}
 

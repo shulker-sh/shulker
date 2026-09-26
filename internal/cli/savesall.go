@@ -145,7 +145,7 @@ func eachTarget[T any](a *app, picks []savesPick, failed func(n, of int) *out.Er
 			if slices.Contains(skip, e.Code) {
 				r.Skipped = e.Message
 				if !a.printer.JSON {
-					lines.Info(e.Message)
+					lines.Info(out.Sentence(e.Message))
 				}
 			} else {
 				failures++

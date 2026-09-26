@@ -69,7 +69,7 @@ func TestLinkGDLauncher(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "link", "gdlauncher", "--launcher-dir", launcherDir, "--name", "Friends: SMP")
-	if !strings.Contains(stdout, "updated instance Friends: SMP") || strings.Contains(stdout, "quit GDLauncher") {
+	if !strings.Contains(stdout, "Updated instance Friends: SMP") || strings.Contains(stdout, "quit GDLauncher") {
 		t.Fatalf("relink output:\n%s", stdout)
 	}
 	again := readGDLInstance(t, instDir)

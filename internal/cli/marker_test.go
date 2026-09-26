@@ -80,7 +80,7 @@ func TestClientBuildWritesMarkerJar(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built client (4 unchanged)") {
+	if !strings.Contains(stdout, "Built client (4 unchanged)") {
 		t.Fatalf("rebuild should be a no-op: %s", stdout)
 	}
 	second, _ := os.ReadFile(jarPath)
@@ -241,7 +241,7 @@ func TestMarkerSwitchResolvesTheSameWayOnEveryBuild(t *testing.T) {
 	missing(t, "install", filepath.Join(h.dir, "build", "client"))
 	h.mustRun(t, "build")
 	missing(t, "build", filepath.Join(h.dir, "build", "client"))
-	if stdout := h.mustRun(t, "diff", "client", "--into", into); !strings.Contains(stdout, "no changes") {
+	if stdout := h.mustRun(t, "diff", "client", "--into", into); !strings.Contains(stdout, "No changes") {
 		t.Fatalf("diff sees no drift from a marker nobody asked for: %s", stdout)
 	}
 	h.mustRun(t, "pull", "--into", into)

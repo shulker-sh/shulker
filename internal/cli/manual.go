@@ -44,7 +44,7 @@ func (a *app) awaitDownloads(ctx context.Context, dir string, e *out.Error) erro
 		rows = append(rows, out.Row{Text: item})
 	}
 	l.Tree(append(rows, out.Row{Label: "put them in", Text: downloads})...)
-	l.Muted("press enter once they are there, or ctrl-c to stop")
+	l.Muted("Press enter once they are there, or ctrl-c to stop")
 	answered := make(chan bool, 1)
 	go func() {
 		buf := make([]byte, 1)

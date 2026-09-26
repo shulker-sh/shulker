@@ -146,7 +146,7 @@ func (s syncResult) print(l *out.Lines) {
 	if s.Changes != nil {
 		s.Changes.printItems(l)
 	}
-	l.OKInto("synced "+s.Side, s.Dir, reportAside(s.Build))
+	l.OKInto("Synced "+s.Side, s.Dir, reportAside(s.Build))
 	rows := reportDetailRows(l, s.Build)
 	if row, ok := savesRow(s.Saves); ok {
 		rows = append(rows, row)

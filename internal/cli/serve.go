@@ -152,7 +152,7 @@ func (a *app) serveCmd() *cobra.Command {
 				return e
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OK("server stopped", "")
+				l.OK("Server stopped", "")
 			})
 		},
 	}

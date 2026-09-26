@@ -165,7 +165,7 @@ func TestSavesListsGroupsWorldsAndBackups(t *testing.T) {
 	if len(rows) != 3 || rows[0]["#"] != "1" || rows[0]["Backup"] != "20260918-210000-pack-backup" || rows[0]["Reason"] != "on request" || rows[2]["#"] != "3" || rows[2]["Backup"] != "20260917-101500-pack-sync" || rows[2]["Reason"] != "before sync" {
 		t.Fatalf("saves -i pack: %s", stdout)
 	}
-	if stdout := h.mustRun(t, "saves", "--group", "hardcore"); !strings.Contains(stdout, "no worlds") || !strings.Contains(stdout, "shulker backup --group hardcore") {
+	if stdout := h.mustRun(t, "saves", "--group", "hardcore"); !strings.Contains(stdout, "No worlds") || !strings.Contains(stdout, "shulker backup --group hardcore") {
 		t.Fatalf("saves --group: %s", stdout)
 	}
 	if env := h.runSetting(t, 1, "saves", "--group", "missing"); env.Error == nil || env.Error.Code != "group-not-found" {
@@ -176,7 +176,7 @@ func TestSavesListsGroupsWorldsAndBackups(t *testing.T) {
 		t.Fatalf("prune needs --keep: %+v", env.Error)
 	}
 	stdout = h.mustRun(t, "saves", "prune", "--group", "default", "--keep", "1")
-	if !strings.Contains(stdout, "- 20260918-203015-pack-update") || !strings.Contains(stdout, "- 20260917-101500-pack-sync") || !strings.Contains(stdout, "pruned 2 backups") {
+	if !strings.Contains(stdout, "- 20260918-203015-pack-update") || !strings.Contains(stdout, "- 20260917-101500-pack-sync") || !strings.Contains(stdout, "Pruned 2 backups") {
 		t.Fatalf("prune: %s", stdout)
 	}
 	left, _ := os.ReadDir(backups)

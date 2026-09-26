@@ -273,7 +273,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	}
 	h.mustRun(t, "install")
 
-	if stdout := h.mustRun(t, "outdated"); !strings.Contains(stdout, "all mods are up to date") {
+	if stdout := h.mustRun(t, "outdated"); !strings.Contains(stdout, "Everything is up to date") {
 		t.Fatalf("outdated before a new file: %s", stdout)
 	}
 	h.newer = true
@@ -326,7 +326,7 @@ func TestCurseForgeSwitchAndAbsenceOutput(t *testing.T) {
 	if stdout = h.mustRun(t, "add", "sodium", "--provider", "curseforge"); !strings.Contains(stdout, "modrinth ⟶ curseforge") {
 		t.Fatalf("second switch: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "already up to date") {
+	if stdout = h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "Already up to date") {
 		t.Fatalf("plain add after switch: %s", stdout)
 	}
 

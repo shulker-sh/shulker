@@ -88,7 +88,7 @@ func TestReportPrintsOnlyForHumans(t *testing.T) {
 	var human, machine bytes.Buffer
 	(&Printer{Stdout: &bytes.Buffer{}, Stderr: &human}).Report(Errorf("sync-failed", "friends didn't sync"))
 	(&Printer{JSON: true, Stdout: &machine, Stderr: &machine}).Report(Errorf("sync-failed", "friends didn't sync"))
-	if !bytes.Contains(human.Bytes(), []byte("friends didn't sync")) || machine.Len() != 0 {
+	if !bytes.Contains(human.Bytes(), []byte("Friends didn't sync")) || machine.Len() != 0 {
 		t.Fatalf("human %q, json %q", human.String(), machine.String())
 	}
 }
@@ -175,10 +175,10 @@ func TestOutputIsFramedByBlankLinesOnATerminal(t *testing.T) {
 	var term, pipe bytes.Buffer
 	p := &Printer{Stdout: &pipe, Stderr: &term, Framed: func(w io.Writer) bool { return w == &term }}
 	p.Step("fetched the pack")
-	p.Warn("jei has no build")
+	p.Warn("no build for %s", "jei")
 	_ = p.Emit(nil, func(l *Lines) { l.Raw("value") })
 	p.Finish()
-	if got := term.String(); !strings.HasPrefix(got, "\n  ") || !strings.HasSuffix(got, "jei has no build\n\n") {
+	if got := term.String(); !strings.HasPrefix(got, "\n  ") || !strings.HasSuffix(got, "No build for jei\n\n") {
 		t.Fatalf("the terminal isn't framed: %q", got)
 	}
 	if got := pipe.String(); got != "value\n" {
@@ -192,5 +192,29 @@ func TestAFailedRunIsFramedToo(t *testing.T) {
 	p.Fail(Errorf("lock-not-found", "no shulker.lock"))
 	if got := term.String(); !strings.HasPrefix(got, "\n  ") || !strings.HasSuffix(got, "\n\n") || strings.HasSuffix(got, "\n\n\n") {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestSentenceCapitalizesProseButNotNames(t *testing.T) {
+	for text, want := range map[string]string{
+		"couldn't clone the pack":        "Couldn't clone the pack",
+		"shulker.json declares both":     "shulker.json declares both",
+		"config_manager: side taken":     "config_manager: side taken",
+		"fabric-api is missing":          "fabric-api is missing",
+		"entityculling: taken from x":    "entityculling: taken from x",
+		"`shulker lock` rewrites it":     "`shulker lock` rewrites it",
+		"NeoForge has no release for 26": "NeoForge has no release for 26",
+	} {
+		if got := Sentence(text); got != want {
+			t.Errorf("Sentence(%q) = %q, want %q", text, got, want)
+		}
+	}
+}
+
+func TestAnErrorOpeningWithANameKeepsItsCase(t *testing.T) {
+	var human bytes.Buffer
+	(&Printer{Stdout: &bytes.Buffer{}, Stderr: &human}).Report(Errorf("mod-not-found", "%s isn't on Modrinth", "sodium"))
+	if !strings.Contains(human.String(), "✘ sodium isn't on Modrinth") {
+		t.Fatalf("got %q", human.String())
 	}
 }

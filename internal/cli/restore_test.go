@@ -48,10 +48,10 @@ func TestRestorePutsTheZipsWorldsBackWhole(t *testing.T) {
 	}
 
 	stdout, stderr := h.mustRunStderr(t, "restore")
-	if !strings.Contains(stderr, "unzipped survival") {
+	if !strings.Contains(stderr, "Unzipped survival") {
 		t.Fatalf("a step per world: %s", stderr)
 	}
-	for _, want := range []string{"-pack-restore", "restored 2 worlds from " + first.ID + " » " + group, "~ survival", "+ hardcore"} {
+	for _, want := range []string{"-pack-restore", "Restored 2 worlds from " + first.ID + " » " + group, "~ survival", "+ hardcore"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("restore lacks %q: %s", want, stdout)
 		}
@@ -202,7 +202,7 @@ func TestAWorldOpenInARunningGame(t *testing.T) {
 	if !strings.Contains(stderr, "survival is open in a running game; its backup may be torn") || strings.Contains(stderr, "creative is open") {
 		t.Fatalf("backup warns about only the open world: %s", stderr)
 	}
-	if !strings.Contains(stdout, "backed up 2 worlds") {
+	if !strings.Contains(stdout, "Backed up 2 worlds") {
 		t.Fatalf("backup zips anyway: %s", stdout)
 	}
 

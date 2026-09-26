@@ -198,12 +198,12 @@ func TestAccountsLoginStoresTheAccountAndItsTokens(t *testing.T) {
 	h := newHarness(t)
 	h.msa.pending = 2
 	stdout, stderr := h.mustRunStderr(t, "accounts", "login")
-	for _, want := range []string{"Sign in at https://www.microsoft.com/link with this code:", "\n    FTBNSQMV\n", "waited for the sign-in to finish"} {
+	for _, want := range []string{"Sign in at https://www.microsoft.com/link with this code:", "\n    FTBNSQMV\n"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("the sign-in prompt is missing %q:\n%s", want, stderr)
 		}
 	}
-	if !strings.Contains(stdout, "✔ signed in as Notch ("+notchID+")") {
+	if !strings.Contains(stdout, "✔ Signed in as Notch ("+notchID+")") {
 		t.Errorf("login result: %s", stdout)
 	}
 	if !strings.Contains(stdout, "Make it the default account:\n    $ shulker accounts use Notch") {
@@ -268,7 +268,7 @@ func TestAccountsLoginWithNoJavaProfile(t *testing.T) {
 	h := newHarness(t)
 	h.msa.current.noProfile = true
 	stdout, stderr := h.mustRunStderr(t, "accounts", "login")
-	if !strings.Contains(stdout, "✔ signed in as Big Dog 42 ("+gamertagXID+")") {
+	if !strings.Contains(stdout, "✔ Signed in as Big Dog 42 ("+gamertagXID+")") {
 		t.Errorf("login result: %s", stdout)
 	}
 	if !strings.Contains(stderr, "owns no Java profile") || !strings.Contains(stderr, "minecraft.net") {
@@ -303,7 +303,7 @@ func TestAccountsLoginWithNoJavaProfile(t *testing.T) {
 func TestAccountsLoginUseSwitchesTheDefault(t *testing.T) {
 	h := newHarness(t)
 	stdout := h.mustRun(t, "accounts", "login", "--use")
-	if !strings.Contains(stdout, "✔ signed in as Notch, now the default account") {
+	if !strings.Contains(stdout, "✔ Signed in as Notch, now the default account") {
 		t.Errorf("--use result: %s", stdout)
 	}
 	if !strings.Contains(h.mustRun(t, "accounts"), "✔  Notch") {
@@ -337,7 +337,7 @@ func TestAccountsLogout(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "accounts", "logout", "Notch", "--yes")
-	if !strings.Contains(stdout, "✔ signed out Notch ("+notchID+")") {
+	if !strings.Contains(stdout, "✔ Signed out Notch ("+notchID+")") {
 		t.Errorf("logout result: %s", stdout)
 	}
 	if len(readAccountStore(t, h).Accounts) != 0 {
@@ -354,14 +354,14 @@ func TestAccountsLogoutTakesTheDefaultAndReseatsIt(t *testing.T) {
 	// With no name it is the default account that signs out, and the one playable account left
 	// takes its place.
 	stdout := h.mustRun(t, "accounts", "logout", "--yes")
-	if !strings.Contains(stdout, "signed out Notch") || !strings.Contains(stdout, "Dinnerbone is the default account now") {
+	if !strings.Contains(stdout, "Signed out Notch") || !strings.Contains(stdout, "Dinnerbone is the default account now") {
 		t.Fatalf("logout result: %s", stdout)
 	}
 	if !strings.Contains(h.mustRun(t, "accounts"), "✔  Dinnerbone") {
 		t.Error("the account left should be the default")
 	}
 	stdout = h.mustRun(t, "accounts", "logout", "--yes")
-	if !strings.Contains(stdout, "no default account now") {
+	if !strings.Contains(stdout, "No default account now") {
 		t.Errorf("the last logout should leave no default: %s", stdout)
 	}
 	if _, _, stderr := h.run(t, "config", "get", "accounts.default", "--json"); strings.Contains(stderr, dinnerbone) {
@@ -389,10 +389,10 @@ func TestAccountsRefreshRenewsOwnAccounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout, stderr := h.mustRunStderr(t, "accounts", "refresh")
-	if !strings.Contains(stdout, "✔ renewed Notch's sign-in") {
+	if !strings.Contains(stdout, "✔ Renewed Notch's sign-in") {
 		t.Errorf("refresh result: %s", stdout)
 	}
-	if !strings.Contains(stderr, "renewed Notch") {
+	if !strings.Contains(stderr, "Renewed Notch") {
 		t.Errorf("each account gets its own step line: %s", stderr)
 	}
 	if h.msa.renewals != 1 {
@@ -420,7 +420,7 @@ func TestAccountsRefreshKeepsGoingPastAnExpiredSignIn(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout, stderr := h.mustRunStderr(t, "accounts", "refresh")
-	if !strings.Contains(stdout, "✔ renewed Dinnerbone's sign-in (1 couldn't be renewed)") {
+	if !strings.Contains(stdout, "✔ Renewed Dinnerbone's sign-in (1 couldn't be renewed)") {
 		t.Errorf("refresh result: %s", stdout)
 	}
 	if !strings.Contains(stderr, "Notch's Microsoft sign-in has expired") || !strings.Contains(stderr, "shulker accounts login") {

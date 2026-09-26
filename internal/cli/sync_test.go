@@ -23,7 +23,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 
 	into := filepath.Join(t.TempDir(), "instance", "minecraft")
 	stdout := h.mustRun(t, "sync", h.dir, "--into", into)
-	if !strings.Contains(stdout, "synced client » "+into) {
+	if !strings.Contains(stdout, "Synced client » "+into) {
 		t.Fatalf("sync output: %s", stdout)
 	}
 	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", filepath.Join(instance.Dir, instance.StateFile)} {
@@ -223,11 +223,11 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	want := "offline, using " + source + " at " + good[:12] + " from the last successful sync just now"
+	want := "Offline, using " + source + " at " + good[:12] + " from the last successful sync just now"
 	if res := env.Data; res.Commit != good || !res.Offline || res.LastGoodAt == "" || len(env.Warnings) == 0 || env.Warnings[0] != want {
 		t.Fatalf("offline sync falls back to the last good build, not the broken commit: %+v", res)
 	}
-	if _, stderr := h.mustRunStderr(t, "sync", source, "--into", into, "--ref", good); !strings.Contains(stderr, "offline, using "+source+" at "+good[:12]+", already downloaded") {
+	if _, stderr := h.mustRunStderr(t, "sync", source, "--into", into, "--ref", good); !strings.Contains(stderr, "Offline, using "+source+" at "+good[:12]+", already downloaded") {
 		t.Fatalf("an exported commit works offline: %s", stderr)
 	}
 	for _, args := range [][]string{
@@ -240,7 +240,7 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 		}
 	}
 	_, _, offlineErr := h.run(t, "sync", srv.URL+"/never.git", "--into", into)
-	if !strings.Contains(offlineErr, "couldn't reach "+srv.URL+"/never.git") || !strings.Contains(offlineErr, "git: ") || strings.Contains(offlineErr, "fatal:") || strings.Contains(offlineErr, "cloning") || !strings.Contains(offlineErr, "help: check the address") {
+	if !strings.Contains(offlineErr, "Couldn't reach "+srv.URL+"/never.git") || !strings.Contains(offlineErr, "git: ") || strings.Contains(offlineErr, "fatal:") || strings.Contains(offlineErr, "cloning") || !strings.Contains(offlineErr, "help: Check the address") {
 		t.Fatalf("unreachable git source rows: %s", offlineErr)
 	}
 }
@@ -324,7 +324,7 @@ func TestSyncFromManifestURL(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if res := env.Data; !res.Offline || res.Sha256 != good || !slices.Contains(env.Warnings, "offline, using "+source+" from the last successful sync just now") {
+	if res := env.Data; !res.Offline || res.Sha256 != good || !slices.Contains(env.Warnings, "Offline, using "+source+" from the last successful sync just now") {
 		t.Fatalf("unreachable url falls back to the last good copy: %+v", res)
 	}
 	code, stdout, _ = h.run(t, "sync", srv.URL+"/other/shulker.json", "--into", into, "--json")
@@ -366,7 +366,7 @@ func TestDiffAndPullInto(t *testing.T) {
 	if data, _ := os.ReadFile(filepath.Join(overrides, "plain.txt")); string(data) != "a=2\n" {
 		t.Fatalf("pull --into did not copy the edit back: %q", data)
 	}
-	if stdout := h.mustRun(t, "diff", "client", "--into", into); !strings.Contains(stdout, "no changes") {
+	if stdout := h.mustRun(t, "diff", "client", "--into", into); !strings.Contains(stdout, "No changes") {
 		t.Fatalf("diff after pull: %s", stdout)
 	}
 }

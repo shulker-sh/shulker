@@ -92,7 +92,7 @@ func (a *app) historyListCmd() *cobra.Command {
 			}
 			return a.printer.Emit(rows, func(l *out.Lines) {
 				if len(rows) == 0 {
-					l.Info("no history entries yet; one is taken before an in-place build changes anything")
+					l.Info("No history entries yet; one is taken before an in-place build changes anything")
 					return
 				}
 				t := l.T
@@ -151,7 +151,7 @@ func (a *app) historyShowCmd() *cobra.Command {
 				l.Tree(rows...)
 				l.Blank()
 				if len(changes) == 0 {
-					l.Info("restoring it would change nothing")
+					l.Info("Restoring it would change nothing")
 				} else {
 					l.Text("Restoring it would:")
 					items := make([]out.Item, 0, len(changes))
@@ -201,7 +201,7 @@ func (a *app) historyPruneCmd() *cobra.Command {
 			}
 			return a.printer.Emit(historyPruned{Pruned: pruned, Kept: len(left)}, func(l *out.Lines) {
 				if len(pruned) == 0 {
-					l.Info(fmt.Sprintf("nothing to prune; %s", historyKept(len(left), keep)))
+					l.Info(fmt.Sprintf("Nothing to prune; %s", historyKept(len(left), keep)))
 					return
 				}
 				items := make([]out.Item, 0, len(pruned))
@@ -209,7 +209,7 @@ func (a *app) historyPruneCmd() *cobra.Command {
 					items = append(items, out.Item{Kind: out.Drop, Name: e.ID})
 				}
 				l.Items(items...)
-				l.OK(fmt.Sprintf("pruned %s", plural(len(pruned), "history entry", "history entries")), historyKept(len(left), keep))
+				l.OK(fmt.Sprintf("Pruned %s", plural(len(pruned), "history entry", "history entries")), historyKept(len(left), keep))
 			})
 		},
 	}
@@ -281,12 +281,12 @@ func (a *app) rollbackCmd() *cobra.Command {
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				if res.Snapshot != "" {
-					l.Done("kept this state as history entry " + res.Snapshot)
+					l.Done("Kept this state as history entry " + res.Snapshot)
 				}
 				for _, e := range res.Pruned {
-					l.Done("pruned history entry " + e.ID)
+					l.Done("Pruned history entry " + e.ID)
 				}
-				l.OKInto("rolled back to "+e.ID, p.Dir, "")
+				l.OKInto("Rolled back to "+e.ID, p.Dir, "")
 				printReport(l, rep)
 			})
 		},

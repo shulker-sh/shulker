@@ -85,7 +85,7 @@ func TestBareLinkAsksForTheLauncher(t *testing.T) {
 	if want := []string{"Which launcher?", "Where is MultiMC installed?"}; !slices.Equal(s.asked, want) {
 		t.Fatalf("asked %q, want %q", s.asked, want)
 	}
-	if !strings.Contains(stdout, "created instance pack") || !strings.Contains(stdout, "follows pack from "+h.dir) {
+	if !strings.Contains(stdout, "Created instance pack") || !strings.Contains(stdout, "follows pack from "+h.dir) {
 		t.Fatalf("a bare link reaches link multimc: %s", stdout)
 	}
 	cfg := filepath.Join(dir, "instances", "shulker-pack", launcher.PrismInstanceFile)
@@ -204,7 +204,7 @@ func TestLinkAuthorsTheInstanceOutsideAProject(t *testing.T) {
 	if !slices.Equal(s.asked, want) {
 		t.Fatalf("asked %q, want %q", s.asked, want)
 	}
-	if !strings.Contains(stdout, "created instance fabric-26.2") || strings.Contains(stdout, "follows") {
+	if !strings.Contains(stdout, "Created instance fabric-26.2") || strings.Contains(stdout, "follows") {
 		t.Fatalf("link output: %s", stdout)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "shulker.json")); !os.IsNotExist(err) {

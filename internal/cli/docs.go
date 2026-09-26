@@ -160,7 +160,7 @@ func (a *app) emitDocsSearch(pages []*docs.Page, query string, hits []docs.Hit) 
 	return a.printer.Emit(data, func(l *out.Lines) {
 		t := l.T
 		if len(hits) == 0 {
-			l.Info(fmt.Sprintf("no lines match %q", query))
+			l.Info(fmt.Sprintf("No lines match %q", query))
 			return
 		}
 		l.Info(fmt.Sprintf("%s match %q in %s", plural(len(hits), "line", "lines"), query, plural(len(groups), "section", "sections")))

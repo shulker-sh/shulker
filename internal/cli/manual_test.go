@@ -59,10 +59,10 @@ func TestInstallWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	if n := strings.Count(stderr, "1 file(s) need a manual download"); n != 2 {
 		t.Fatalf("the wait lists the files each time they are missing (%d): %s", n, stderr)
 	}
-	if !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar from https://www.curseforge.com") || !strings.Contains(stderr, "press enter") {
+	if !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar from https://www.curseforge.com") || !strings.Contains(stderr, "Press enter") {
 		t.Fatalf("the wait names the folder and each file's page: %s", stderr)
 	}
-	if !strings.Contains(stdout, "built client") {
+	if !strings.Contains(stdout, "Built client") {
 		t.Fatalf("install goes on after the wait: %s", stdout)
 	}
 }
@@ -102,7 +102,7 @@ func TestImportWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	})
 
 	code, stdout, stderr := h.run(t, "import", archive, "--dir", dir)
-	if code != 0 || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "press enter") {
+	if code != 0 || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "Press enter") {
 		t.Fatalf("import: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 	if _, l := readProject(t, dir); l.Mods["nodist"].Sha512 != h.jars["nodist"].sha512 {

@@ -122,10 +122,10 @@ func TestSelfUpdateReplacesBinary(t *testing.T) {
 	if got := h.binary(t); got != "new binary" {
 		t.Fatalf("binary holds %q", got)
 	}
-	if want := "  ✔ updated shulker 0.0.1 ⟶ 0.0.2 » " + h.exe + "\n"; h.stdout.String() != want {
+	if want := "  ✔ Updated shulker 0.0.1 ⟶ 0.0.2 » " + h.exe + "\n"; h.stdout.String() != want {
 		t.Fatalf("stdout %q, want %q", &h.stdout, want)
 	}
-	for _, line := range []string{"checksum verified", "gh not found, skipping build provenance check"} {
+	for _, line := range []string{"Checksum verified", "GitHub CLI gh not found, skipping build provenance check"} {
 		if !strings.Contains(h.stderr.String(), line) {
 			t.Fatalf("stderr missing %q:\n%s", line, &h.stderr)
 		}
@@ -137,7 +137,7 @@ func TestSelfUpdateUpToDate(t *testing.T) {
 	if code := h.run(); code != 0 {
 		t.Fatalf("exit %d: %s", code, &h.stderr)
 	}
-	if h.stdout.String() != "  ✔ shulker is up to date (0.0.2)\n" || h.binary(t) != "old binary" {
+	if h.stdout.String() != "  ✔ Shulker is up to date (0.0.2)\n" || h.binary(t) != "old binary" {
 		t.Fatalf("stdout %q, binary %q", &h.stdout, h.binary(t))
 	}
 }
@@ -163,11 +163,11 @@ func TestSelfUpdateRefusesABinaryItDidNotInstall(t *testing.T) {
 		build                  selfupdate.Build
 		message, lead, command string
 	}{
-		{selfupdate.Build{Version: "0.0.1", Route: selfupdate.GoInstall}, "this shulker was installed with go install", "Update it with", "go install shulker.sh/shulker@latest"},
-		{selfupdate.Build{Version: "dev", Commit: "d1556f95d232", Route: selfupdate.Source}, "this shulker was built from source at d1556f9", "Rebuild it with", "go build ."},
-		{selfupdate.Build{Version: "dev"}, "this shulker was built from source", "Rebuild it with", "go build ."},
-		{selfupdate.Build{Version: "0.0.1", Route: selfupdate.Homebrew}, "this shulker was installed by Homebrew", "Update it with", "brew upgrade shulker"},
-		{selfupdate.Build{Version: "0.0.1", Route: selfupdate.Scoop}, "this shulker was installed by Scoop", "Update it with", "scoop update shulker"},
+		{selfupdate.Build{Version: "0.0.1", Route: selfupdate.GoInstall}, "This shulker was installed with go install", "Update it with", "go install shulker.sh/shulker@latest"},
+		{selfupdate.Build{Version: "dev", Commit: "d1556f95d232", Route: selfupdate.Source}, "This shulker was built from source at d1556f9", "Rebuild it with", "go build ."},
+		{selfupdate.Build{Version: "dev"}, "This shulker was built from source", "Rebuild it with", "go build ."},
+		{selfupdate.Build{Version: "0.0.1", Route: selfupdate.Homebrew}, "This shulker was installed by Homebrew", "Update it with", "brew upgrade shulker"},
+		{selfupdate.Build{Version: "0.0.1", Route: selfupdate.Scoop}, "This shulker was installed by Scoop", "Update it with", "scoop update shulker"},
 	} {
 		h := newSelfUpdateHarness(t, "0.0.1", "v0.0.2", false)
 		h.app.build = func() selfupdate.Build { return tc.build }
@@ -204,7 +204,7 @@ func TestSelfUpdateCheckWorksOnEveryRoute(t *testing.T) {
 	if code := h.run("--check"); code != 0 {
 		t.Fatalf("exit %d: %s", code, &h.stdout)
 	}
-	if got := h.stdout.String(); got != "  i the latest release is shulker 0.0.2\n\n  Rebuild it with:\n    $ go build .\n" {
+	if got := h.stdout.String(); got != "  i The latest release is shulker 0.0.2\n\n  Rebuild it with:\n    $ go build .\n" {
 		t.Fatalf("source --check: %q", got)
 	}
 	h.stdout.Reset()

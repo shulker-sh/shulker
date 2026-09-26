@@ -104,7 +104,7 @@ func TestSyncHasNoInstanceIDFlags(t *testing.T) {
 	into := filepath.Join(t.TempDir(), "instance")
 	for _, flag := range []string{"--as", "--name"} {
 		code, stdout, stderr := h.run(t, "sync", h.dir, "--into", into, flag, "cozy")
-		if code == 0 || !strings.Contains(stderr, "unknown flag "+flag) {
+		if code == 0 || !strings.Contains(stderr, "Unknown flag "+flag) {
 			t.Fatalf("%s should be gone from sync: exit %d\nstdout: %s\nstderr: %s", flag, code, stdout, stderr)
 		}
 	}
@@ -348,7 +348,7 @@ func TestSyncInstance(t *testing.T) {
 	h.tty = false
 
 	stdout = h.mustRun(t, "sync", "--all")
-	if !strings.Contains(stdout, "  Friends friends client (Prism Launcher)\n  ✔ synced client") || !strings.Contains(stdout, "\n\n  friends friends-2 client (MultiMC)\n") {
+	if !strings.Contains(stdout, "  Friends friends client (Prism Launcher)\n  ✔ Synced client") || !strings.Contains(stdout, "\n\n  friends friends-2 client (MultiMC)\n") {
 		t.Fatalf("sync --all output: %s", stdout)
 	}
 	var all struct {
@@ -418,7 +418,7 @@ func TestSyncWarnsWhenConfigIsUnwritable(t *testing.T) {
 	}
 	h.config = filepath.Join(blocker, "config.json")
 	stdout, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", filepath.Join(t.TempDir(), "one"))
-	if !strings.Contains(stderr, "! registry not updated") || strings.Contains(stdout, "registered") {
+	if !strings.Contains(stderr, "! Registry not updated") || strings.Contains(stdout, "Registered") {
 		t.Fatalf("stdout: %s\nstderr: %s", stdout, stderr)
 	}
 }
@@ -469,7 +469,7 @@ func TestInstancesRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout, stderr := h.mustRunStderr(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
-	if !strings.Contains(stderr, "rebuilt it") || !strings.Contains(stdout, "registered ") {
+	if !strings.Contains(stderr, "rebuilt it") || !strings.Contains(stdout, "Registered ") {
 		t.Fatalf("repair:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
 	instances := readInstances(t, h)
@@ -564,7 +564,7 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir); !strings.Contains(stdout, "registered lost") {
+	if stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir); !strings.Contains(stdout, "Registered lost") {
 		t.Fatalf("repair registers the directory again, under the id it was linked as: %s", stdout)
 	}
 	instances := readInstances(t, h)
@@ -688,7 +688,7 @@ func TestInstancesRepairFollowsARenameInTheLauncher(t *testing.T) {
 	}
 
 	rename("Friends Survival")
-	if stdout := h.mustRun(t, "instances", "repair"); !strings.Contains(stdout, "renamed friends  Friends SMP ⟶ Friends Survival") {
+	if stdout := h.mustRun(t, "instances", "repair"); !strings.Contains(stdout, "Renamed friends  Friends SMP ⟶ Friends Survival") {
 		t.Fatalf("repair prints the rename: %s", stdout)
 	}
 
@@ -855,7 +855,7 @@ func TestInstancesRepairKeepsTheIDALinkChose(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "instances", "repair", "--launcher", "prism", "--launcher-dir", prismDir)
-	if !strings.Contains(stdout, "registered mine") {
+	if !strings.Contains(stdout, "Registered mine") {
 		t.Fatalf("a repair from scratch reads the id back from the manifest, not the folder: %s", stdout)
 	}
 	if in := readInstances(t, h); len(in) != 1 || in[0].ID != "mine" || in[0].Launcher != "prism" {
@@ -873,7 +873,7 @@ func TestInstancesRepairWithoutARegistryFindsShulkersOwnInstances(t *testing.T) 
 	}
 
 	stdout := h.mustRun(t, "instances", "repair")
-	if !strings.Contains(stdout, "registered smp") {
+	if !strings.Contains(stdout, "Registered smp") {
 		t.Fatalf("a bare repair scans the instances root with the launchers: %s", stdout)
 	}
 	if in := readInstances(t, h); len(in) != 1 || in[0].ID != "smp" || in[0].Launcher != "shulker" || in[0].Dir != filepath.Join(root, "smp") {

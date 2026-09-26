@@ -202,7 +202,7 @@ func (a *app) createProject(cmd *cobra.Command, dir string, opts *initOptions) e
 	}
 	res := initResult{Name: m.Name, Minecraft: l.Minecraft, Loader: l.Loader.Type, Version: l.Loader.Version, Java: l.Java.Major, Side: opts.side}
 	return a.printer.Emit(res, func(l *out.Lines) {
-		l.OK("created "+manifest.FileName, fmt.Sprintf("%s, Java %d", resolve.PlatformLabel(res.Minecraft, res.Loader, res.Version), res.Java))
+		l.OK("Created "+manifest.FileName, fmt.Sprintf("%s, Java %d", resolve.PlatformLabel(res.Minecraft, res.Loader, res.Version), res.Java))
 		packItems(l)
 		switch {
 		case res.Loader != "":

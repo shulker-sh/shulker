@@ -15,10 +15,10 @@ func TestBuildTakesASidePositionally(t *testing.T) {
 	twoSided(t, h)
 	h.mustRun(t, "install")
 
-	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "built client") || !strings.Contains(stdout, "built server") {
+	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "Built client") || !strings.Contains(stdout, "Built server") {
 		t.Fatalf("no argument builds every declared side: %s", stdout)
 	}
-	if stdout := h.mustRun(t, "build", "server"); strings.Contains(stdout, "built client") || !strings.Contains(stdout, "built server") {
+	if stdout := h.mustRun(t, "build", "server"); strings.Contains(stdout, "Built client") || !strings.Contains(stdout, "Built server") {
 		t.Fatalf("an argument builds that side alone: %s", stdout)
 	}
 

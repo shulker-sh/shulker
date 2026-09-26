@@ -64,7 +64,7 @@ func (a *app) accountsAddCmd() *cobra.Command {
 			}
 			row := accountRow{ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State, Default: use}
 			return a.printer.Emit(row, func(l *out.Lines) {
-				text := "created the offline account " + r.Name
+				text := "Created the offline account " + r.Name
 				if use {
 					text += ", now the default account"
 				}
@@ -129,12 +129,12 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 			}
 			row := accountRow{ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State}
 			return a.printer.Emit(row, func(l *out.Lines) {
-				l.OK("removed "+r.Name, r.ID)
+				l.OK("Removed "+r.Name, r.ID)
 				switch {
 				case moved != nil:
 					l.Info(moved.Name + " is the default account now")
 				case gone.Default:
-					l.Info("no default account now; `shulker accounts use <name>` picks one")
+					l.Info("No default account now; `shulker accounts use <name>` picks one")
 				}
 			})
 		},

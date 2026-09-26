@@ -48,7 +48,7 @@ func TestInitWithoutAnswersTakesTheDefaults(t *testing.T) {
 		}
 		if first == "" {
 			first, firstManifest = stdout, string(data)
-			if !strings.Contains(stdout, "created shulker.json") {
+			if !strings.Contains(stdout, "Created shulker.json") {
 				t.Fatalf("%v: %s", args, stdout)
 			}
 			if gi, _ := os.ReadFile(filepath.Join(dir, ".gitignore")); string(gi) != "/build/\n/data/\n/downloads/\n/shulker.local.json\n/.shulker/\n" {
@@ -80,11 +80,11 @@ func TestNoInputIsGlobal(t *testing.T) {
 func TestCreateNeverAsks(t *testing.T) {
 	h := newHarness(t)
 	code, stdout, stderr, s := h.runAnswering(t, nil, "create", "--name", "pack")
-	if code != 0 || len(s.asked) != 0 || !strings.Contains(stdout, "created shulker.json") {
+	if code != 0 || len(s.asked) != 0 || !strings.Contains(stdout, "Created shulker.json") {
 		t.Fatalf("create asked %v: exit %d\n%s%s", s.asked, code, stdout, stderr)
 	}
 	code, _, stderr = h.run(t, "init", "--yes", "-C", t.TempDir())
-	if code == 0 || !strings.Contains(stderr, "unknown flag") {
+	if code == 0 || !strings.Contains(stderr, "Unknown flag") {
 		t.Fatalf("init --yes: exit %d, %s", code, stderr)
 	}
 }

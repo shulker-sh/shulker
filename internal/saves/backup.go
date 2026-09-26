@@ -162,7 +162,7 @@ func Auto(src Source, home Home, reason string, keep int, taken map[Home]bool, e
 	}
 	worlds, err := Worlds(src.Dir)
 	if err != nil {
-		return Backup{}, fmt.Sprintf("couldn't back up the worlds in %s before the mods changed: %v", src.Dir, err), nil
+		return Backup{}, fmt.Sprintf("Couldn't back up the worlds in %s before the mods changed: %v", src.Dir, err), nil
 	}
 	if len(worlds) == 0 || keep == 0 {
 		return Backup{}, "", nil
@@ -175,7 +175,7 @@ func Auto(src Source, home Home, reason string, keep int, taken map[Home]bool, e
 		taken[home] = true
 	}
 	if err := TrimAutomatic(home.Dir, keep); err != nil {
-		return b, fmt.Sprintf("couldn't trim the automatic backups in %s: %v", home.Dir, err), nil
+		return b, fmt.Sprintf("Couldn't trim the automatic backups in %s: %v", home.Dir, err), nil
 	}
 	return b, "", nil
 }

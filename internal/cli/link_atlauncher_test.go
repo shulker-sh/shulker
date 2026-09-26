@@ -63,7 +63,7 @@ func TestLinkATLauncher(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Friends SMP")
-	if !strings.Contains(stdout, "updated instance Friends SMP") || !strings.Contains(stdout, "restart ATLauncher if it is open") {
+	if !strings.Contains(stdout, "Updated instance Friends SMP") || !strings.Contains(stdout, "restart ATLauncher if it is open") {
 		t.Fatalf("relink output:\n%s", stdout)
 	}
 	again := readATLInstance(t, instDir)

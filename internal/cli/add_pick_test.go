@@ -109,7 +109,7 @@ func TestAddAsksOnlyForWhatIsMissing(t *testing.T) {
 	}
 	for _, args := range [][]string{{"add", "--no-input"}, {"add", "--json"}, {"modpack", "add"}, {"add", "--type", "modpack"}} {
 		code, stdout, stderr, s := h.runMarking(t, nil, args...)
-		if code == 0 || len(s.asked) != 0 || !strings.Contains(stdout+stderr, "missing at least one argument") {
+		if code == 0 || len(s.asked) != 0 || !strings.Contains(strings.ToLower(stdout+stderr), "missing at least one argument") {
 			t.Errorf("%v should keep the missing-argument error: exit %d, asked %q\n%s\n%s", args, code, s.asked, stdout, stderr)
 		}
 	}

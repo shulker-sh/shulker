@@ -74,7 +74,7 @@ func (a *app) instanceDumpCmd() *cobra.Command {
 						l.Blank()
 					}
 				}
-				l.OK("dumped every thread into the log", "pid "+strconv.Itoa(res.PID))
+				l.OK("Dumped every thread into the log", "pid "+strconv.Itoa(res.PID))
 				l.Tree(out.Row{Label: "log", Text: res.Log})
 			})
 		},

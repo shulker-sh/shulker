@@ -60,7 +60,7 @@ func (a *app) accountsLoginCmd() *cobra.Command {
 			}
 			row := accountRow{ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State, Default: used}
 			return a.printer.Emit(row, func(l *out.Lines) {
-				text := "signed in as " + r.Name
+				text := "Signed in as " + r.Name
 				if used {
 					text += ", now the default account"
 				}
@@ -121,12 +121,12 @@ func (a *app) accountsLogoutCmd() *cobra.Command {
 			}
 			row := accountRow{ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State}
 			return a.printer.Emit(row, func(l *out.Lines) {
-				l.OK("signed out "+r.Name, r.ID)
+				l.OK("Signed out "+r.Name, r.ID)
 				switch {
 				case moved != nil:
 					l.Info(moved.Name + " is the default account now")
 				case r.Default:
-					l.Info("no default account now; `shulker accounts use <name>` picks one")
+					l.Info("No default account now; `shulker accounts use <name>` picks one")
 				}
 			})
 		},
@@ -179,7 +179,7 @@ func (a *app) accountsRefreshCmd() *cobra.Command {
 			}
 			return a.printer.Emit(rows, func(l *out.Lines) {
 				if len(rows) == 0 {
-					l.Info("no account of shulker's own to renew")
+					l.Info("No account of shulker's own to renew")
 					return
 				}
 				aside := ""
@@ -308,7 +308,7 @@ func renewFailed(err error) string {
 
 func renewedText(rows []accountRow) string {
 	if len(rows) == 1 {
-		return "renewed " + rows[0].Name + "'s sign-in"
+		return "Renewed " + rows[0].Name + "'s sign-in"
 	}
-	return fmt.Sprintf("renewed %d sign-ins", len(rows))
+	return fmt.Sprintf("Renewed %d sign-ins", len(rows))
 }

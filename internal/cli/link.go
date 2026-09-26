@@ -27,11 +27,11 @@ type linkReport struct {
 
 func (r *linkReport) print(l *out.Lines) {
 	if r.VersionID != "" {
-		l.OKInto("installed "+r.VersionID, r.VersionDir, "")
+		l.OKInto("Installed "+r.VersionID, r.VersionDir, "")
 	}
-	verb := "created"
+	verb := "Created"
 	if !r.Created {
-		verb = "updated"
+		verb = "Updated"
 	}
 	l.OKInto(verb+" "+r.Noun+" "+r.Shown, r.InstanceDir, "")
 	l.Tree(r.rows...)

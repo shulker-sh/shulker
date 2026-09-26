@@ -126,7 +126,7 @@ func (a *app) unignoreCmd() *cobra.Command {
 				return err
 			}
 			return a.printer.Emit(entry, func(l *out.Lines) {
-				l.OK(fmt.Sprintf("unignored %s on %s", mod, on), strings.TrimSpace(entry.Rule+" "+entry.Declared))
+				l.OK(fmt.Sprintf("Unignored %s on %s", mod, on), strings.TrimSpace(entry.Rule+" "+entry.Declared))
 			})
 		},
 	}

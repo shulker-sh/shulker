@@ -116,7 +116,7 @@ func TestConfigRegistry(t *testing.T) {
 		t.Error("the refused set wrote config.json")
 	}
 
-	want := fmt.Sprintf("  ~ registry (unset) ⟶ %q\n  ✔ created %s\n", moved, moved)
+	want := fmt.Sprintf("  ~ registry (unset) ⟶ %q\n  ✔ Created %s\n", moved, moved)
 	if stdout := h.mustRun(t, "config", "set", "registry", moved, "--force"); stdout != want {
 		t.Errorf("set --force output = %q, want %q", stdout, want)
 	}
@@ -159,7 +159,7 @@ func TestConfigUnsetRegistryCreatesDefault(t *testing.T) {
 	moved := filepath.Join(t.TempDir(), "registry.json")
 	h.mustRun(t, "config", "set", "registry", moved)
 
-	want := fmt.Sprintf("  ~ registry %q ⟶ (unset)\n  ✔ created %s\n", moved, defaultRegistry)
+	want := fmt.Sprintf("  ~ registry %q ⟶ (unset)\n  ✔ Created %s\n", moved, defaultRegistry)
 	if stdout := h.mustRun(t, "config", "unset", "registry"); stdout != want {
 		t.Errorf("unset output = %q, want %q", stdout, want)
 	}

@@ -37,7 +37,7 @@ func TestHistoryRollback(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "rollback")
-	if !strings.Contains(stdout, "rolled back to") || !strings.Contains(stdout, "kept this state as history entry") {
+	if !strings.Contains(stdout, "Rolled back to") || !strings.Contains(stdout, "Kept this state as history entry") {
 		t.Fatalf("rollback output: %s", stdout)
 	}
 	if _, err := os.Stat(jar); err != nil {
@@ -104,7 +104,7 @@ func TestHistoryPruneAndWarning(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "history", "prune")
-	if !strings.Contains(stdout, "pruned 1 history entry") || !strings.Contains(stdout, "1 entry kept") {
+	if !strings.Contains(stdout, "Pruned 1 history entry") || !strings.Contains(stdout, "1 entry kept") {
 		t.Fatalf("prune output: %s", stdout)
 	}
 	if entries, err = build.History(h.dir); err != nil || len(entries) != 1 {

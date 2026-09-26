@@ -94,7 +94,7 @@ func TestBackupAllTakesEachSharedGroupOnce(t *testing.T) {
 	}
 
 	stdout := h.mustRun(t, "backup", "--all")
-	for _, want := range []string{"default save group (pack, pack2)", "Friends friends client (Prism Launcher)", "backed up 1 world", "no worlds in"} {
+	for _, want := range []string{"default save group (pack, pack2)", "Friends friends client (Prism Launcher)", "Backed up 1 world", "No worlds in"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("backup --all lacks %q: %s", want, stdout)
 		}

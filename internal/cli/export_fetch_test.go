@@ -58,7 +58,7 @@ func TestExportFetchesMissingLockedFiles(t *testing.T) {
 	if !strings.Contains(fetched, h.jars["fabric-api"].filename) || strings.Contains(fetched, h.jars["sodium"].filename) {
 		t.Fatalf("a server export fetches fabric-api and not the client-only sodium:\n%s", fetched)
 	}
-	if !strings.Contains(stderr, "fetched 1 file") || strings.Contains(stderr, "sodium") {
+	if !strings.Contains(stderr, "Fetched 1 file") || strings.Contains(stderr, "sodium") {
 		t.Fatalf("the fetch gets its own step, and a mod the export leaves out no warning: %s", stderr)
 	}
 

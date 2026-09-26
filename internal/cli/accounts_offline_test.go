@@ -26,7 +26,7 @@ func TestAccountsAddCreatesAnOfflineAccount(t *testing.T) {
 	h.mustRun(t, "config", "set", "accounts.default", notchID)
 
 	stdout := h.mustRun(t, "accounts", "add", "Steve")
-	if !strings.Contains(stdout, "✔ created the offline account Steve ("+steveOffline+")") {
+	if !strings.Contains(stdout, "✔ Created the offline account Steve ("+steveOffline+")") {
 		t.Errorf("add result: %s", stdout)
 	}
 	if !strings.Contains(stdout, "shulker accounts use Steve") {
@@ -194,7 +194,7 @@ func TestAccountsRemoveDeletesAnOfflineAccount(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "accounts", "remove", "Steve", "--yes")
-	if !strings.Contains(stdout, "✔ removed Steve ("+steveOffline+")") {
+	if !strings.Contains(stdout, "✔ Removed Steve ("+steveOffline+")") {
 		t.Errorf("remove result: %s", stdout)
 	}
 	if store := readAccountStore(t, h); len(store.Accounts) != 1 || store.Accounts[0].Type != account.Microsoft {
@@ -232,7 +232,7 @@ func TestAccountsRemoveNeedsTheOwnerThatCouldRecreateIt(t *testing.T) {
 		t.Errorf("--force should remove it anyway: %+v", store.Accounts)
 	}
 	// Nothing is left to take the default over.
-	if !strings.Contains(stdout, "no default account now") {
+	if !strings.Contains(stdout, "No default account now") {
 		t.Errorf("remove result: %s", stdout)
 	}
 	if cfg, ok := readConfigDoc(t, h.config)["accounts"].(map[string]any); ok && cfg["default"] != nil {

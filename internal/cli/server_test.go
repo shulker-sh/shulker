@@ -23,7 +23,7 @@ func TestServerTargetBuild(t *testing.T) {
 	h.mustRun(t, "config", "set", "eula", "true")
 
 	stdout, stderr := h.mustRunStderr(t, "install")
-	if !strings.Contains(stderr, "downloaded the fabric server launcher") || !strings.Contains(stderr, "downloaded Java runtime") {
+	if !strings.Contains(stderr, "Downloaded the fabric server launcher") || !strings.Contains(stderr, "Downloaded Java runtime") {
 		t.Fatalf("install output: %s\n%s", stdout, stderr)
 	}
 	var l lock.Lock
@@ -58,7 +58,7 @@ func TestServerTargetBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built server (5 unchanged)") {
+	if !strings.Contains(stdout, "Built server (5 unchanged)") {
 		t.Fatalf("rebuild after game rewrite: %s", stdout)
 	}
 	if got := readFile(t, propsPath); got != gameRewritten {
@@ -69,7 +69,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["max-players"] = 12
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built server (1 written") {
+	if !strings.Contains(stdout, "Built server (1 written") {
 		t.Fatalf("rebuild after manifest change: %s", stdout)
 	}
 	if got := readFile(t, propsPath); got != strings.Replace(gameRewritten, "max-players=8", "max-players=12", 1) {
@@ -91,7 +91,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["motd"] = "Changed"
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built server (1 written") || !strings.Contains(stdout, "kept: server.properties online-mode (edited in place)") {
+	if !strings.Contains(stdout, "Built server (1 written") || !strings.Contains(stdout, "kept: server.properties online-mode (edited in place)") {
 		t.Fatalf("manifest change to another key must keep the edit: %s", stdout)
 	}
 	if got := readFile(t, propsPath); !strings.Contains(got, "online-mode=true") || !strings.Contains(got, "motd=Changed") {
@@ -102,7 +102,7 @@ func TestServerTargetBuild(t *testing.T) {
 		m["server"].(map[string]any)["properties"].(map[string]any)["online-mode"] = true
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built server (5 unchanged)") || strings.Contains(stdout, "kept") && strings.Contains(stdout, "online-mode") {
+	if !strings.Contains(stdout, "Built server (5 unchanged)") || strings.Contains(stdout, "kept") && strings.Contains(stdout, "online-mode") {
 		t.Fatalf("manifest catching up to the edit: %s", stdout)
 	}
 
@@ -181,7 +181,7 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built server (3 unchanged)") {
+	if !strings.Contains(stdout, "Built server (3 unchanged)") {
 		t.Fatalf("rebuild after game write: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != gameWritten {
@@ -209,7 +209,7 @@ func TestServerBuildAlwaysWritesProperties(t *testing.T) {
 	if data, _ := os.ReadFile(path); string(data) != "#Minecraft server properties\nmotd=A Minecraft Server\nonline-mode=false\n" {
 		t.Fatalf("file after dropping difficulty: %q", data)
 	}
-	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "built server (3 unchanged)") {
+	if stdout = h.mustRun(t, "build"); !strings.Contains(stdout, "Built server (3 unchanged)") {
 		t.Fatalf("rebuild after drop should be clean: %s", stdout)
 	}
 }

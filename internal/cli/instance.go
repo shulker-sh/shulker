@@ -271,7 +271,7 @@ func (a *app) instanceEditCmd() *cobra.Command {
 			res := instanceEdit{File: path, Changed: !bytes.Equal(before, after)}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				if res.Changed {
-					l.OK("saved "+res.File, "")
+					l.OK("Saved "+res.File, "")
 				} else {
 					l.Info(res.File + " is unchanged")
 				}

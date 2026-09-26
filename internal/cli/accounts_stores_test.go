@@ -227,7 +227,7 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentPrismFile(t *testing.T) {
 			prismAccounts(t, h, c.body)
 			h.mustRun(t, "accounts", "stores", "set", "prism")
 			stdout, stderr := h.mustRunStderr(t, "accounts")
-			if !strings.Contains(stdout, "no accounts yet") {
+			if !strings.Contains(stdout, "No accounts yet") {
 				t.Errorf("stdout = %q", stdout)
 			}
 			if strings.TrimSpace(stderr) != "" {
@@ -401,7 +401,7 @@ func TestAccountsSaysNothingAboutAnEmptyOrAbsentMojangFile(t *testing.T) {
 	mojangAccounts(t, h, map[string]string{launcher.MojangAccountsFile: `{"accounts":{}}`})
 	h.mustRun(t, "accounts", "stores", "set", "mojang")
 	stdout, stderr := h.mustRunStderr(t, "accounts")
-	if !strings.Contains(stdout, "no accounts yet") {
+	if !strings.Contains(stdout, "No accounts yet") {
 		t.Errorf("stdout = %q", stdout)
 	}
 	if strings.TrimSpace(stderr) != "" {

@@ -10,6 +10,8 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -69,6 +71,9 @@ type Error struct {
 	IsSummary bool `json:"-"`
 	// Wrapped is the error this one explains, which errors.Is and errors.As see through to.
 	Wrapped error `json:"-"`
+	// isNamed marks a message that opens with a name, such as a mod's slug, which keeps its case
+	// when the line is capitalized.
+	isNamed bool
 }
 
 // Detail is one row under an error line; Children nest one level beneath it.
@@ -107,8 +112,26 @@ func Errorf(code string, format string, args ...any) *Error {
 	if code == "usage" {
 		exit = ExitUsage
 	}
-	return &Error{Code: code, Message: fmt.Sprintf(format, args...), Exit: exit}
+	return &Error{Code: code, Message: fmt.Sprintf(format, args...), Exit: exit, isNamed: format != "%s" && opensWithValue(format)}
 }
+
+// Sentence capitalizes text's first letter, for a line whose first word is prose. A first word
+// that reads as a name, such as shulker.json, fabric-api or a `name:` label, keeps its case.
+func Sentence(text string) string {
+	r, size := utf8.DecodeRuneInString(text)
+	if !unicode.IsLower(r) {
+		return text
+	}
+	word, _, _ := strings.Cut(text, " ")
+	if strings.ContainsAny(word, "._-/:0123456789") {
+		return text
+	}
+	return string(unicode.ToUpper(r)) + text[size:]
+}
+
+// opensWithValue reports whether a format starts with a substituted value, which keeps its own
+// case: `%s is already in the pack` names a mod.
+func opensWithValue(format string) bool { return strings.HasPrefix(format, "%") }
 
 func CodeOf(err error) string {
 	var e *Error
@@ -127,7 +150,7 @@ func AsError(err error) *Error {
 		}
 		return e
 	}
-	return &Error{Code: "error", Message: err.Error(), Exit: ExitError}
+	return &Error{Code: "error", Message: err.Error(), Exit: ExitError, isNamed: true}
 }
 
 // Recorder is told every warning, error and result a run shows, whether it prints for a person or
@@ -203,6 +226,9 @@ func (p *Printer) warn(format string, args ...any) bool {
 	p.annotate("warning", "", msg)
 	if !p.JSON {
 		text := fmt.Sprintf(format, args...)
+		if !opensWithValue(format) {
+			text = Sentence(text)
+		}
 		if p.WarnPrefix != "" {
 			text = p.ErrTheme.Grey(p.WarnPrefix) + text
 		}

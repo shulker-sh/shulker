@@ -94,7 +94,7 @@ func TestExportCurseForge(t *testing.T) {
 	h := newCurseForgeExport(t)
 	stdout := h.mustRun(t, "export", "curseforge")
 	archive := filepath.Join(h.dir, "build", "pack-1.0.zip")
-	if !strings.Contains(stdout, "wrote Demo Pack 1.0 » "+archive) || !strings.Contains(stdout, "3 mods by file ID") || !strings.Contains(stdout, "matched on CurseForge: fabric-api, sodium") {
+	if !strings.Contains(stdout, "Wrote Demo Pack 1.0 » "+archive) || !strings.Contains(stdout, "3 mods by file ID") || !strings.Contains(stdout, "matched on CurseForge: fabric-api, sodium") {
 		t.Fatalf("export output: %s", stdout)
 	}
 	entries := readArchive(t, archive)

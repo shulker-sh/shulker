@@ -80,7 +80,7 @@ func TestSyncInPlaceFollowsAutoUpdateModpacks(t *testing.T) {
 	if !strings.Contains(stdout, "~ follow "+followFirst[:12]+" ⟶ "+followSecond[:12]+" (modpack)") || strings.Contains(stdout, "held") {
 		t.Fatalf("sync should move only the modpack that follows its source: %s", stdout)
 	}
-	if !strings.Contains(stdout, "synced client") {
+	if !strings.Contains(stdout, "Synced client") {
 		t.Fatalf("sync output: %s", stdout)
 	}
 	if historyCount(t, h.dir) != before+1 {
@@ -97,7 +97,7 @@ func TestSyncInPlaceFollowsAutoUpdateModpacks(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "update")
-	if !strings.Contains(stdout, "~ held "+heldFirst[:12]+" ⟶ "+heldSecond[:12]+" (modpack)") || !strings.Contains(stdout, "synced client") || strings.Contains(stdout, "shulker install") {
+	if !strings.Contains(stdout, "~ held "+heldFirst[:12]+" ⟶ "+heldSecond[:12]+" (modpack)") || !strings.Contains(stdout, "Synced client") || strings.Contains(stdout, "shulker install") {
 		t.Fatalf("update in an instance should move every modpack and build: %s", stdout)
 	}
 	if got := readInPlace(t, h, "config/held.txt"); got != "v2\n" {
@@ -113,7 +113,7 @@ func TestSyncInPlaceThenItsChildren(t *testing.T) {
 	h.mustRun(t, "add", "sodium")
 
 	stdout := h.mustRun(t, "sync")
-	if !strings.Contains(stdout, "synced client") || !strings.Contains(stdout, "child") {
+	if !strings.Contains(stdout, "Synced client") || !strings.Contains(stdout, "Child") {
 		t.Fatalf("sync output: %s", stdout)
 	}
 	for _, dir := range []string{h.dir, child} {
@@ -138,7 +138,7 @@ func TestUpdateInPlaceNudgesAtItsChildren(t *testing.T) {
 	h.mustRun(t, "add", "sodium")
 
 	stdout := h.mustRun(t, "update")
-	synced, nudge := strings.Index(stdout, "synced client"), strings.Index(stdout, "Build the instances synced from here")
+	synced, nudge := strings.Index(stdout, "Synced client"), strings.Index(stdout, "Build the instances synced from here")
 	if synced < 0 || nudge < synced || !strings.Contains(stdout[nudge:], "shulker sync") {
 		t.Fatalf("update should nudge at its children after the synced line: %s", stdout)
 	}
@@ -158,7 +158,7 @@ func TestUpdateInPlaceSucceedsWhenItCantReadTheRegistry(t *testing.T) {
 	h.mustRun(t, "install")
 	h.mustRun(t, "add", "sodium")
 	writeFile(t, registryPath(h), "{")
-	if code, stdout, stderr := h.run(t, "update"); code != 0 || !strings.Contains(stdout, "synced client") {
+	if code, stdout, stderr := h.run(t, "update"); code != 0 || !strings.Contains(stdout, "Synced client") {
 		t.Fatalf("an unreadable registry only costs update its nudge (%d): %s%s", code, stdout, stderr)
 	}
 }
@@ -166,7 +166,7 @@ func TestUpdateInPlaceSucceedsWhenItCantReadTheRegistry(t *testing.T) {
 func TestUpdateWithoutChildrenHasNoSyncNudge(t *testing.T) {
 	h := newInPlace(t)
 	h.mustRun(t, "add", "sodium")
-	if stdout := h.mustRun(t, "update"); !strings.Contains(stdout, "synced client") || strings.Contains(stdout, "shulker sync") {
+	if stdout := h.mustRun(t, "update"); !strings.Contains(stdout, "Synced client") || strings.Contains(stdout, "shulker sync") {
 		t.Fatalf("an instance with no children has nothing to nudge at: %s", stdout)
 	}
 
@@ -214,7 +214,7 @@ func TestPreLaunchInPlaceFallsBackToTheLock(t *testing.T) {
 	}
 
 	code, stdout, stderr := h.run(t, "hook", "pre-launch")
-	if code != 0 || !strings.Contains(stderr, "building what the lock already has") || !strings.Contains(stdout, "synced client") {
+	if code != 0 || !strings.Contains(stderr, "building what the lock already has") || !strings.Contains(stdout, "Synced client") {
 		t.Fatalf("pre-launch must fall back, report the build and exit 0: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(h.dir, "mods", h.jars["sodium"].filename)); err != nil {

@@ -60,10 +60,10 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("serve: %d\n%s\n%s", code, stdout, stderr)
 	}
-	if !strings.Contains(stdout, "[Server] got: say hi") || !strings.Contains(stdout, "server stopped") {
+	if !strings.Contains(stdout, "[Server] got: say hi") || !strings.Contains(stdout, "Server stopped") {
 		t.Fatalf("stdout: %s", stdout)
 	}
-	if !strings.Contains(stderr, "started server in") || !strings.Contains(stderr, "Java 25") {
+	if !strings.Contains(stderr, "Started server in") || !strings.Contains(stderr, "Java 25") {
 		t.Fatalf("stderr: %s", stderr)
 	}
 	args, err := os.ReadFile(filepath.Join(h.dir, "build", "server", "args.txt"))
@@ -119,7 +119,7 @@ func TestServeErrors(t *testing.T) {
 	h.editManifest(t, func(m map[string]any) { m["java"] = crash })
 	h.stdin = strings.NewReader("stop\n")
 	code, _, stderr = h.run(t, "serve")
-	if code != 3 || !strings.Contains(stderr, "server exited with status 3") {
+	if code != 3 || !strings.Contains(stderr, "Server exited with status 3") {
 		t.Fatalf("expected exit 3, got %d: %s", code, stderr)
 	}
 
@@ -183,7 +183,7 @@ func TestManagedJava(t *testing.T) {
 		t.Fatalf("failed refresh replaced the runtime: %v", marker)
 	}
 	h.runtime.corrupt = ""
-	if _, stderr := h.mustRunStderr(t, "install"); !strings.Contains(stderr, "downloaded Java runtime") {
+	if _, stderr := h.mustRunStderr(t, "install"); !strings.Contains(stderr, "Downloaded Java runtime") {
 		t.Fatalf("changed runtime should be refetched: %s", stderr)
 	}
 	if marker := h.readRuntimeMarker(t); marker["version"] != "25.0.2" {
@@ -219,7 +219,7 @@ func TestManagedJava(t *testing.T) {
 	hits := h.runtime.hits
 	h.stdin = strings.NewReader("stop\n")
 	_, stderr = h.mustRunStderr(t, "serve")
-	if h.runtime.hits != hits+2 || !strings.Contains(stderr, "downloaded Java runtime 25.0.2 (2 files") {
+	if h.runtime.hits != hits+2 || !strings.Contains(stderr, "Downloaded Java runtime 25.0.2 (2 files") {
 		t.Fatalf("serve should download a missing runtime: %s", stderr)
 	}
 }
@@ -245,7 +245,7 @@ func TestServeInstallsWhatTheLockNeeds(t *testing.T) {
 	h.editManifest(t, func(m map[string]any) { m["java"] = h.fakeJDK(t, "25.0.1", "0") })
 	h.stdin = strings.NewReader("stop\n")
 	stdout, _ := h.mustRunStderr(t, "serve", "--accept-eula")
-	if !strings.Contains(stdout, "server stopped") {
+	if !strings.Contains(stdout, "Server stopped") {
 		t.Fatalf("serve must fetch the server files itself, not stop at `shulker install`: %s", stdout)
 	}
 }

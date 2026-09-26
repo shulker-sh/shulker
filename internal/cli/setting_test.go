@@ -246,7 +246,7 @@ func TestGetLocked(t *testing.T) {
 	if env := h.runSetting(t, 1, "get", "--locked", "minecraft"); env.Error == nil || env.Error.Code != "lock-not-found" {
 		t.Errorf("get --locked without a lock error = %+v", env.Error)
 	}
-	if code, _, stderr := h.run(t, "get", "--locked"); code != 1 || !strings.Contains(stderr, "no shulker.lock") {
+	if code, _, stderr := h.run(t, "get", "--locked"); code != 1 || !strings.Contains(stderr, "No shulker.lock") {
 		t.Errorf("get --locked without a lock exited %d: %s", code, stderr)
 	}
 }

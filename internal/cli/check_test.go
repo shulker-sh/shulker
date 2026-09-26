@@ -82,7 +82,7 @@ func TestCheckPassesACleanProjectAndWritesNothing(t *testing.T) {
 	before := treeDigest(t, h.dir)
 
 	stdout := h.mustRun(t, "check")
-	if !strings.Contains(stdout, "no problems") {
+	if !strings.Contains(stdout, "No problems") {
 		t.Fatalf("check output: %s", stdout)
 	}
 	code, env := runCheck(t, h)

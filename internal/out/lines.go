@@ -370,7 +370,10 @@ func (l *Lines) Error(e *Error) {
 		code = "error"
 	}
 	message, extra, _ := strings.Cut(e.Message, "\n")
-	l.line(t.paint(t.GlyphError(), sgrRed, sgrBold) + " " + t.paint("error:", sgrRed, sgrBold) + " " + t.Bold(t.Markup(strings.TrimSuffix(message, ":"))) + t.Aside(code))
+	if !e.isNamed {
+		message = Sentence(message)
+	}
+	l.line(t.paint(t.GlyphError(), sgrRed, sgrBold) + " " + t.Bold(t.Markup(strings.TrimSuffix(message, ":"))) + t.Aside(code))
 	rows := l.detailRows(e, extra)
 	if label, picks := e.picks(); len(picks) > 0 {
 		var children []string
@@ -380,7 +383,7 @@ func (l *Lines) Error(e *Error) {
 		rows = append(rows, Row{Label: label, Children: children})
 	}
 	if e.Help != "" {
-		rows = append(rows, Row{Label: "help", Text: e.Help})
+		rows = append(rows, Row{Label: "help", Text: Sentence(e.Help)})
 	}
 	l.Tree(rows...)
 	if e.Nudge.Command != "" {

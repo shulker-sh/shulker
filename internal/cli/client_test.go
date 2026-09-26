@@ -23,7 +23,7 @@ func TestClientBuildMergesOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built client (2 unchanged)") {
+	if !strings.Contains(stdout, "Built client (2 unchanged)") {
 		t.Fatalf("rebuild after game write: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != gameWritten {
@@ -38,7 +38,7 @@ func TestClientBuildMergesOptions(t *testing.T) {
 		}}
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built client (2 written)") {
+	if !strings.Contains(stdout, "Built client (2 written)") {
 		t.Fatalf("rebuild with changed keys: %s", stdout)
 	}
 	want := "version:4325\nfov:0.5\nlastServer:play.example.org:25565\nresourcePacks:[\"fabric\",\"sodium\"]\ntutorialStep:none\n"
@@ -64,7 +64,7 @@ func TestClientBuildMergesIntoGameWrittenOptions(t *testing.T) {
 	if data, _ := os.ReadFile(path); string(data) != want {
 		t.Fatalf("merged into game-written options.txt: %q", data)
 	}
-	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "built client (2 unchanged)") {
+	if stdout := h.mustRun(t, "build"); !strings.Contains(stdout, "Built client (2 unchanged)") {
 		t.Fatalf("rebuild: %s", stdout)
 	}
 }
@@ -83,7 +83,7 @@ func TestClientBuildRestoresDroppedOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built client (1 written, 1 unchanged)") {
+	if !strings.Contains(stdout, "Built client (1 written, 1 unchanged)") {
 		t.Fatalf("rebuild after the game dropped a key: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); string(data) != gameWritten+"key_zoomify.key.zoom:key.keyboard.z\n" {
@@ -97,7 +97,7 @@ func TestClientBuildRestoresDroppedOptions(t *testing.T) {
 		m["client"].(map[string]any)["options"].(map[string]any)["key_zoomify.key.zoom"] = "key.keyboard.v"
 	})
 	stdout = h.mustRun(t, "build")
-	if !strings.Contains(stdout, "built client (2 written)") {
+	if !strings.Contains(stdout, "Built client (2 written)") {
 		t.Fatalf("dropped in build and changed in manifest must just write: %s", stdout)
 	}
 	if data, _ := os.ReadFile(path); !strings.HasSuffix(string(data), "key_zoomify.key.zoom:key.keyboard.v\n") {

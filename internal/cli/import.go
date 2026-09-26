@@ -145,7 +145,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 // how to build the project.
 func (a *app) emitImport(res importResult, rows ...out.Row) error {
 	return a.printer.Emit(res, func(l *out.Lines) {
-		l.OKInto("imported "+res.Name+" "+res.Version, res.Dir, resolve.PlatformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
+		l.OKInto("Imported "+res.Name+" "+res.Version, res.Dir, resolve.PlatformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version))
 		l.Tree(append(rows, importRows(res.Mods, res.KeptYours, res.LeftOut)...)...)
 		l.Nudge("Download and build it", "shulker install")
 	})

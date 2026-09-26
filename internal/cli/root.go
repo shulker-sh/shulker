@@ -218,7 +218,7 @@ func usageError(root *cobra.Command, err error) error {
 	if e, ok := flagError(err); ok {
 		return e
 	}
-	e := out.Errorf("usage", "%s", err)
+	e := &out.Error{Code: "usage", Message: err.Error(), Exit: out.ExitUsage}
 	m := unknownCommand.FindStringSubmatch(err.Error())
 	if m == nil {
 		return e

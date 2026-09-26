@@ -91,7 +91,7 @@ func (a *app) pinCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			pinned := func(l *out.Lines, res lockChanges) { l.OK("pinned "+args[0], res.Pin) }
+			pinned := func(l *out.Lines, res lockChanges) { l.OK("Pinned "+args[0], res.Pin) }
 			return a.relock(cmd, relockPlan{ok: pinned}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				if isURL {
 					return r.PinURL(cmd.Context(), args[0], u)
@@ -109,7 +109,7 @@ func (a *app) unpinCmd() *cobra.Command {
 		Short:       "Remove a mod's pin and re-resolve it",
 		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			unpinned := func(l *out.Lines, _ lockChanges) { l.OK("unpinned "+args[0], "") }
+			unpinned := func(l *out.Lines, _ lockChanges) { l.OK("Unpinned "+args[0], "") }
 			return a.relock(cmd, relockPlan{ok: unpinned}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				return "", r.Unpin(cmd.Context(), args[0])
 			})
@@ -191,7 +191,7 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 			plan.ok(l, res)
 		}
 		if len(res.Reresolved) > 0 {
-			l.Info("re-resolved every mod: " + strings.Join(res.Reresolved, "; "))
+			l.Info("Re-resolved every mod: " + strings.Join(res.Reresolved, "; "))
 		}
 		printLocalFiles(l, local)
 		res.printItems(l)
@@ -199,7 +199,7 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 			optionalNudge(l, optional)
 		}
 		if res.IsEmpty() {
-			printUpToDate(l, "already up to date", local, cmd.Flags().Args())
+			printUpToDate(l, "Already up to date", local, cmd.Flags().Args())
 		}
 		if res.Synced != nil {
 			res.Synced.print(l)
@@ -284,7 +284,7 @@ func (a *app) outdatedCmd() *cobra.Command {
 			return a.printer.Emit(res, func(l *out.Lines) {
 				printLocalFiles(l, local)
 				if len(res) == 0 {
-					printUpToDate(l, "all mods are up to date", local, args)
+					printUpToDate(l, "Everything is up to date", local, args)
 					return
 				}
 				var items []out.Item
@@ -318,7 +318,7 @@ func printUpToDate(l *out.Lines, text string, local, named []string) {
 	case len(local) == 0:
 		l.OK(text, "")
 	case len(local) < len(named):
-		l.OK("the rest are up to date", "")
+		l.OK("The rest are up to date", "")
 	}
 }
 

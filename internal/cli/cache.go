@@ -106,10 +106,10 @@ func (a *app) cachePruneCmd() *cobra.Command {
 			}
 			return a.printer.Emit(pruned, func(l *out.Lines) {
 				if pruned.Empty() {
-					l.Info("nothing to prune; everything in the cache is referenced by " + rootsText(r))
+					l.Info("Nothing to prune; everything in the cache is referenced by " + rootsText(r))
 					return
 				}
-				l.OK("freed "+out.HumanBytes(pruned.Bytes), prunedAside(pruned))
+				l.OK("Freed "+out.HumanBytes(pruned.Bytes), prunedAside(pruned))
 			})
 		},
 	}

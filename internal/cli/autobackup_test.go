@@ -81,7 +81,7 @@ func TestAutomaticBackupWarnsWhenConfigIsUnreadable(t *testing.T) {
 	}
 	h.config = filepath.Join(blocker, "config.json")
 	_, stderr := h.mustRunStderr(t, "sync", h.dir, "--into", gameDir)
-	if !strings.Contains(stderr, "couldn't back up the worlds in "+gameDir+" before the mods changed") {
+	if !strings.Contains(stderr, "Couldn't back up the worlds in "+gameDir+" before the mods changed") {
 		t.Fatalf("stderr: %s", stderr)
 	}
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {

@@ -251,7 +251,7 @@ func (p playResult) print(l *out.Lines) {
 	}
 	switch p.Outcome {
 	case "":
-		l.OK("playing "+p.Instance, p.Version)
+		l.OK("Playing "+p.Instance, p.Version)
 		rows = append(rows, out.Row{Label: "pid", Text: strconv.Itoa(p.PID)})
 	case instance.OutcomeCrashed:
 		l.Warn(p.Instance + " crashed")
@@ -262,11 +262,11 @@ func (p playResult) print(l *out.Lines) {
 			rows = append(rows, out.Row{Label: "crash report", Text: p.CrashReport})
 		}
 	default:
-		l.OK("played "+p.Instance, p.Version)
+		l.OK("Played "+p.Instance, p.Version)
 	}
 	l.Tree(rows...)
 	if p.Outcome == "" {
-		l.Muted("if it hangs, shulker instance dump -i " + p.Instance + " shows where; shulker instance log -i " + p.Instance + " prints its output")
+		l.Muted("If it hangs, shulker instance dump -i " + p.Instance + " shows where; shulker instance log -i " + p.Instance + " prints its output")
 	}
 }
 
@@ -304,7 +304,7 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) e
 		rep.LoaderLibraries, rep.LoaderLibrariesBytes = len(own), pe.Store.Size(own)
 	}
 	return a.printer.Emit(rep, func(l *out.Lines) {
-		l.OK("would launch "+rep.Instance, rep.Version)
+		l.OK("Would launch "+rep.Instance, rep.Version)
 		rows := []out.Row{}
 		if rep.Inherits != "" {
 			rows = append(rows, out.Row{Label: "inherits", Text: rep.Inherits})

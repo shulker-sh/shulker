@@ -51,7 +51,7 @@ func TestCacheInfoNamesItsRootsAndPruneFreesTheRest(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "cache", "prune")
-	if !strings.Contains(stdout, "freed") || !strings.Contains(stdout, "installer log") {
+	if !strings.Contains(stdout, "Freed") || !strings.Contains(stdout, "installer log") {
 		t.Fatalf("prune output: %s", stdout)
 	}
 	if _, err := os.Stat(stray); !os.IsNotExist(err) {
@@ -63,7 +63,7 @@ func TestCacheInfoNamesItsRootsAndPruneFreesTheRest(t *testing.T) {
 	if _, err := os.Stat(sodium); err != nil {
 		t.Fatalf("a locked mod must survive a prune: %v", err)
 	}
-	if stdout = h.mustRun(t, "cache", "prune"); !strings.Contains(stdout, "nothing to prune") {
+	if stdout = h.mustRun(t, "cache", "prune"); !strings.Contains(stdout, "Nothing to prune") {
 		t.Fatalf("a second prune has nothing to do: %s", stdout)
 	}
 }

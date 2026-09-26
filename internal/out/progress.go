@@ -136,7 +136,7 @@ func (pr *Progress) Finish() {
 	if pr.done == 1 {
 		noun = one
 	}
-	pr.l.OK(fmt.Sprintf("%s %d %s", pastTense(pr.verb), pr.done, noun), fmt.Sprintf("%s in %.1fs", humanBytes(pr.bytes), elapsed.Seconds()))
+	pr.l.OK(fmt.Sprintf("%s %d %s", Sentence(pastTense(pr.verb)), pr.done, noun), fmt.Sprintf("%s in %.1fs", humanBytes(pr.bytes), elapsed.Seconds()))
 }
 
 // Abort clears the bar without a summary, for the error that follows.
@@ -286,7 +286,7 @@ func (pr *Progress) render(width int) []string {
 // first and the bar second when the window is too narrow for them.
 func (pr *Progress) head(width, level int, widest bool) string {
 	t := pr.l.T
-	line := gutter + pr.wheel.View() + " " + pr.verb + " "
+	line := gutter + pr.wheel.View() + " " + Sentence(pr.verb) + " "
 	if level == 0 || level == 1 {
 		line += pr.bar.View() + " "
 	}

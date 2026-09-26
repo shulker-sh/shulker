@@ -78,7 +78,7 @@ func Link(dir, root, group string) (Result, error) {
 	case err != nil:
 		return res, err
 	case !info.IsDir():
-		res.Conflict = fmt.Sprintf("a file is in the way of %s; move it and sync again", path)
+		res.Conflict = fmt.Sprintf("A file is in the way of %s; move it and sync again", path)
 		return res, nil
 	default:
 		own, err := Worlds(path)
@@ -100,7 +100,7 @@ func Link(dir, root, group string) (Result, error) {
 				return res, nil
 			}
 			if err := moveInto(path, want); err != nil {
-				res.Conflict = fmt.Sprintf("couldn't move %s into group %s (%v); move it by hand, then sync again", path, group, err)
+				res.Conflict = fmt.Sprintf("Couldn't move %s into group %s (%v); move it by hand, then sync again", path, group, err)
 				res.Worlds = own
 				return res, nil
 			}

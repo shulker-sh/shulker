@@ -16,7 +16,7 @@ import (
 func TestInitWithoutALoader(t *testing.T) {
 	h := newHarness(t)
 	stdout := h.mustRun(t, "create", "--name", "pack")
-	if !strings.Contains(stdout, "created shulker.json (Minecraft 26.2, Java 25)") || !strings.Contains(stdout, "Play it in a launcher") || !strings.Contains(stdout, "$ shulker link <launcher>") || strings.Count(stdout, "$ shulker") != 1 {
+	if !strings.Contains(stdout, "Created shulker.json (Minecraft 26.2, Java 25)") || !strings.Contains(stdout, "Play it in a launcher") || !strings.Contains(stdout, "$ shulker link <launcher>") || strings.Count(stdout, "$ shulker") != 1 {
 		t.Fatalf("init output: %s", stdout)
 	}
 	for _, file := range []string{"shulker.json", "shulker.lock"} {
@@ -124,7 +124,7 @@ func TestLinkWithoutALoader(t *testing.T) {
 
 	mojangDir := t.TempDir()
 	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", mojangDir)
-	if strings.Contains(stdout, "installed") || !strings.Contains(stdout, "created profile pack") {
+	if strings.Contains(stdout, "Installed") || !strings.Contains(stdout, "Created profile pack") {
 		t.Fatalf("link mojang output: %s", stdout)
 	}
 	if _, err := os.Stat(filepath.Join(mojangDir, "versions")); err == nil {

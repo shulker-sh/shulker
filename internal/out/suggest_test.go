@@ -70,7 +70,7 @@ func TestFailShowsPicksAndAnExampleCommand(t *testing.T) {
 	e := Errorf("ambiguous-side", "shulker.json declares both sides; choose one")
 	e.Candidates, e.Flag = []string{"client", "server"}, "--side"
 	p.Fail(e)
-	want := "  ✘ error: shulker.json declares both sides; choose one (ambiguous-side)\n" +
+	want := "  ✘ shulker.json declares both sides; choose one (ambiguous-side)\n" +
 		"    ╰─ pick one:\n" +
 		"         ├─ ‣ client\n" +
 		"         ╰─ ‣ server\n" +

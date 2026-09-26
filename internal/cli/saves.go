@@ -107,7 +107,7 @@ func pruneBackups(target savesTarget, keep int) (savesPruned, error) {
 func (s savesPruned) print(l *out.Lines) {
 	kept := plural(s.Kept, "backup", "backups") + " left"
 	if len(s.Pruned) == 0 {
-		l.Info("nothing to prune; " + kept)
+		l.Info("Nothing to prune; " + kept)
 		return
 	}
 	items := make([]out.Item, 0, len(s.Pruned))
@@ -115,7 +115,7 @@ func (s savesPruned) print(l *out.Lines) {
 		items = append(items, out.Item{Kind: out.Drop, Name: b.ID})
 	}
 	l.Items(items...)
-	l.OK("pruned "+plural(len(s.Pruned), "backup", "backups"), kept)
+	l.OK("Pruned "+plural(len(s.Pruned), "backup", "backups"), kept)
 }
 
 func (a *app) listSaveGroups() error {
@@ -141,7 +141,7 @@ func (a *app) listSaveGroups() error {
 	}
 	return a.printer.Emit(rows, func(l *out.Lines) {
 		if len(rows) == 0 {
-			l.Info("no save groups yet; `shulker link shulker` makes an instance that joins group " + saves.Default)
+			l.Info("No save groups yet; `shulker link shulker` makes an instance that joins group " + saves.Default)
 			return
 		}
 		t := l.T
@@ -183,9 +183,9 @@ func (a *app) printSavesView(view savesView, l *out.Lines) {
 	switch {
 	case len(view.Worlds) > 0:
 	case view.World != "":
-		l.Info("no world " + view.World + " in " + view.WorldsDir)
+		l.Info("No world " + view.World + " in " + view.WorldsDir)
 	default:
-		l.Info("no worlds in " + view.WorldsDir)
+		l.Info("No worlds in " + view.WorldsDir)
 	}
 	for _, w := range view.Worlds {
 		l.Plain(t.Grey(t.GlyphDot()) + " " + t.Bold(w))
@@ -193,7 +193,7 @@ func (a *app) printSavesView(view savesView, l *out.Lines) {
 	l.Blank()
 	l.Heading("Backups")
 	if len(view.Backups) == 0 {
-		l.Info("no backups yet; `" + a.savesCommand(view.savesTarget, "backup") + "` takes one")
+		l.Info("No backups yet; `" + a.savesCommand(view.savesTarget, "backup") + "` takes one")
 		return
 	}
 	rows := make([][]string, len(view.Backups))

@@ -59,7 +59,7 @@ func TestIgnoreCommandWritesAndDropsEntries(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "unignore", "sodium", "fabric-api")
-	if !strings.Contains(stdout, "unignored sodium on fabric-api") {
+	if !strings.Contains(stdout, "Unignored sodium on fabric-api") {
 		t.Fatalf("unignore output: %s", stdout)
 	}
 	m.Ignore = nil

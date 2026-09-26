@@ -127,7 +127,7 @@ func TestNeoForgeLinkMojang(t *testing.T) {
 	})
 
 	stdout := h.mustRun(t, "link", "mojang", "--launcher-dir", launcherDir)
-	if !strings.Contains(stdout, "installed neoforge-26.2.0.87 »") {
+	if !strings.Contains(stdout, "Installed neoforge-26.2.0.87 »") {
 		t.Fatalf("link output:\n%s", stdout)
 	}
 	if len(h.installs) != 1 || strings.Join(h.installs[0], " ") != "--install-client "+launcherDir {

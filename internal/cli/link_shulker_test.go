@@ -28,7 +28,7 @@ func TestLinkShulker(t *testing.T) {
 
 	stdout := h.mustRun(t, "link", "shulker")
 	gameDir := filepath.Join(root, "pack")
-	if !strings.Contains(stdout, "created instance pack") || !strings.Contains(stdout, "follows pack from "+h.dir) {
+	if !strings.Contains(stdout, "Created instance pack") || !strings.Contains(stdout, "follows pack from "+h.dir) {
 		t.Fatalf("link output: %s", stdout)
 	}
 
@@ -100,7 +100,7 @@ func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
 		if _, err := config.WriteInstances(registryPath(h), nil); err != nil {
 			t.Fatal(err)
 		}
-		if stdout := h.mustRun(t, args...); !strings.Contains(stdout, "registered smp") {
+		if stdout := h.mustRun(t, args...); !strings.Contains(stdout, "Registered smp") {
 			t.Fatalf("%v scans the instances root: %s", args, stdout)
 		}
 		in := readInstances(t, h)

@@ -20,7 +20,7 @@ func TestPreLaunchReportsTheSync(t *testing.T) {
 	gameDir := filepath.Join(prismDir, "instances", "shulker-friends", "minecraft")
 
 	code, stdout, stderr := h.run(t, "hook", "pre-launch", "-C", gameDir)
-	if code != 0 || !strings.Contains(stdout, "synced client") {
+	if code != 0 || !strings.Contains(stdout, "Synced client") {
 		t.Fatalf("pre-launch should report its sync: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
@@ -108,7 +108,7 @@ func TestWrapWithoutGameDirOnlyRunsJava(t *testing.T) {
 func TestWrapSyncsThenLaunchesAndKeepsTheArgvToItself(t *testing.T) {
 	h, gameDir, argsFile := wrappedInstance(t, "0", nil)
 	code, stdout, stderr := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)
-	if code != 0 || !strings.Contains(stdout, "synced client") {
+	if code != 0 || !strings.Contains(stdout, "Synced client") {
 		t.Fatalf("wrap should sync before the game: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
 	if got := readArgs(t, argsFile); got != "--gameDir\n"+gameDir+"\n--accessToken\n"+accessToken+"\n" {
@@ -149,7 +149,7 @@ func TestWrapLaunchesWhenTheSyncFails(t *testing.T) {
 func TestWrapPassesTheGamesExitCodeBack(t *testing.T) {
 	h, gameDir, _ := wrappedInstance(t, "3", nil)
 	code, stdout, stderr := h.run(t, "hook", "wrap", "-C", gameDir, "--", "--gameDir", gameDir, "--accessToken", accessToken)
-	if code != 3 || !strings.Contains(stderr, "game exited with status 3") {
+	if code != 3 || !strings.Contains(stderr, "Game exited with status 3") {
 		t.Fatalf("wrap should exit as the game did: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
 	if strings.Contains(stderr, accessToken) {
@@ -188,7 +188,7 @@ func TestWrapFallsBackToJavaWhenTheWrapperCantRun(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("a wrapper that can't run must not fail the launch: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
-	if !strings.Contains(stderr, `can't run the wrapper "shulker-no-such-wrapper", so the game starts with Java alone`) {
+	if !strings.Contains(stderr, `Can't run the wrapper "shulker-no-such-wrapper", so the game starts with Java alone`) {
 		t.Fatalf("the fallback should warn:\n%s", stderr)
 	}
 	if got := readArgs(t, argsFile); got != "--gameDir\n"+gameDir+"\n--accessToken\n"+accessToken+"\n" {
@@ -213,7 +213,7 @@ func TestWrapRecordsALaunchThatNeverStarted(t *testing.T) {
 	if code == 0 {
 		t.Fatalf("no game started, so the launcher needs a non-zero exit to show an error\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
-	if !strings.Contains(stderr, "can't run Java at "+java+", so the game didn't start") {
+	if !strings.Contains(stderr, "Can't run Java at "+java+", so the game didn't start") {
 		t.Fatalf("the failure should name the Java it couldn't run:\n%s", stderr)
 	}
 	if _, err := os.Stat(argsFile); err == nil {
@@ -336,7 +336,7 @@ func TestPreLaunchKeepsThePlayersFileOnAConflict(t *testing.T) {
 	}
 
 	code, stdout, stderr := h.run(t, "hook", "pre-launch", "-C", gameDir)
-	if code != 0 || !strings.Contains(stdout, "synced client") {
+	if code != 0 || !strings.Contains(stdout, "Synced client") {
 		t.Fatalf("a launch-time sync goes on past a conflict: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
 	for _, want := range []string{"options.txt (changed in place and in the source)", "config/extra.json (not written by shulker)", "shulker pull keeps yours", "shulker sync -i friends --force"} {

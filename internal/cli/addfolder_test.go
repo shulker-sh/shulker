@@ -68,7 +68,7 @@ func TestAddFolderFromOutsideIsCopiedIntoFiles(t *testing.T) {
 	writeFolder(t, outside, map[string]string{"shaders/old.fsh": "// old", ".git/HEAD": "ref: refs/heads/main", "shaders/.DS_Store": "junk"})
 	_, stderr := h.mustRunStderr(t, "shader", "add", outside)
 
-	if !strings.Contains(stderr, "copied BSL Shaders/ into files/") {
+	if !strings.Contains(stderr, "Copied BSL Shaders/ into files/") {
 		t.Fatalf("add says where the folder went: %s", stderr)
 	}
 	if got := h.readManifest(t).Requires["bsl-shaders"]; !reflect.DeepEqual(got, manifest.Require{Type: manifest.TypeShader, File: "files/BSL Shaders"}) {

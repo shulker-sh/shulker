@@ -79,7 +79,7 @@ func (a *app) buildCmd() *cobra.Command {
 }
 
 func printReport(l *out.Lines, rep *build.Report) {
-	l.OK("built "+rep.Side, reportAside(rep))
+	l.OK("Built "+rep.Side, reportAside(rep))
 	printReportDetails(l, rep)
 }
 

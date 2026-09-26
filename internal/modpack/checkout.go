@@ -232,7 +232,7 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 	if fullCommit.MatchString(c.Ref) {
 		if dir := s.Cache.PackSource(c.Ref); isOnDisk(dir) {
 			c.Commit, c.Dir = c.Ref, subfolder(dir, c.Path)
-			c.Warning = fmt.Sprintf("%s, using %s at %s, already downloaded", offlineReason(cause), c.Source, c.Ref[:12])
+			c.Warning = out.Sentence(fmt.Sprintf("%s, using %s at %s, already downloaded", offlineReason(cause), c.Source, c.Ref[:12]))
 			return c, nil
 		}
 		return nil, neverSynced(c, cause)
@@ -242,7 +242,7 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 		return nil, neverSynced(c, cause)
 	}
 	c.Commit, c.Dir, c.LastGood = rec.Commit, subfolder(s.Cache.PackSource(rec.Commit), c.Path), rec.At
-	c.Warning = fmt.Sprintf("%s, using %s at %s from the last successful sync %s", offlineReason(cause), c.Source, rec.Commit[:12], out.Ago(rec.At))
+	c.Warning = out.Sentence(fmt.Sprintf("%s, using %s at %s from the last successful sync %s", offlineReason(cause), c.Source, rec.Commit[:12], out.Ago(rec.At)))
 	return c, nil
 }
 
@@ -253,7 +253,7 @@ func (s *Store) urlFallback(c *Checkout, cause error) (*Checkout, error) {
 		return nil, neverSynced(c, cause)
 	}
 	c.Sha256, c.Dir, c.LastGood = rec.Sha256, s.Cache.ProjectCheckout(rec.Sha256), rec.At
-	c.Warning = fmt.Sprintf("%s, using %s from the last successful sync %s", offlineReason(cause), c.Source, out.Ago(rec.At))
+	c.Warning = out.Sentence(fmt.Sprintf("%s, using %s from the last successful sync %s", offlineReason(cause), c.Source, out.Ago(rec.At)))
 	return c, nil
 }
 

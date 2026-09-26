@@ -58,7 +58,7 @@ func TestErrorLine(t *testing.T) {
 	lines := render(coloured(), func(l *Lines) {
 		l.Error(&Error{Code: "lock-stale", Message: "no shulker.lock; run `shulker install` after `shulker init`"})
 	})
-	want := "  ✘ error: no shulker.lock; run shulker install after shulker init (lock-stale)"
+	want := "  ✘ No shulker.lock; run shulker install after shulker init (lock-stale)"
 	if got := sgrSeq.ReplaceAllString(lines[0], ""); got != want {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
@@ -84,7 +84,7 @@ func TestProgressFillsByBytesWhenSizesKnown(t *testing.T) {
 		t.Fatalf("fraction by bytes = %v", got)
 	}
 	got := pr.render(120)
-	want := "  ⣾ fetching ───────────────   0% 0/2 (2.0 MB of 4.0 MB) b.jar"
+	want := "  ⣾ Fetching ───────────────   0% 0/2 (2.0 MB of 4.0 MB) b.jar"
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}
@@ -96,7 +96,7 @@ func TestProgressFillsByBytesWhenSizesKnown(t *testing.T) {
 	if got := pr.fraction(); got != 0.5 {
 		t.Fatalf("fraction by count = %v", got)
 	}
-	if got := pr.render(120)[0]; got != "  ⣾ fetching ───────────────   0% 1/2 (2.0 MB) b.jar" {
+	if got := pr.render(120)[0]; got != "  ⣾ Fetching ───────────────   0% 1/2 (2.0 MB) b.jar" {
 		t.Fatalf("unknown sizes: got %q", got)
 	}
 }
@@ -130,7 +130,7 @@ func TestErrorRowsRenderStructured(t *testing.T) {
 	}}}
 	lines := render(Theme{}, func(l *Lines) { l.Error(e) })
 	want := []string{
-		"  ✘ error: 1 problem(s) in the locked mods (validation-failed)",
+		"  ✘ 1 problem(s) in the locked mods (validation-failed)",
 		"    ╰─ sodium 1.0 requires fabric-api >=2, not installed",
 		"         ├─ the ignore is stale",
 		"         ├─ Fix: shulker add fabric-api",

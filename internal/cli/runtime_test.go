@@ -173,7 +173,7 @@ func TestLinkMojangRecordsTheManagedRuntime(t *testing.T) {
 	managed := filepath.Join(h.managedJavaDir(), filepath.FromSlash(runtimeHome), "bin", "java")
 
 	_, stderr := h.mustRunStderr(t, "link", "mojang", "--launcher-dir", launcherDir)
-	if !strings.Contains(stderr, "downloaded Java runtime 25.0.1") {
+	if !strings.Contains(stderr, "Downloaded Java runtime 25.0.1") {
 		t.Fatalf("link should download the runtime on its own line:\n%s", stderr)
 	}
 	if got := resolvedJava(t, gameDir); got != managed {
@@ -184,7 +184,7 @@ func TestLinkMojangRecordsTheManagedRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, stderr = h.mustRunStderr(t, "sync")
-	if !strings.Contains(stderr, "downloaded Java runtime 25.0.1") {
+	if !strings.Contains(stderr, "Downloaded Java runtime 25.0.1") {
 		t.Fatalf("a sync should ensure the runtime again:\n%s", stderr)
 	}
 	if got := resolvedJava(t, gameDir); got != managed {
@@ -192,7 +192,7 @@ func TestLinkMojangRecordsTheManagedRuntime(t *testing.T) {
 	}
 
 	_, stderr = h.mustRunStderr(t, "sync", "--offline")
-	if !strings.Contains(stderr, "offline, keeping the installed Java runtime java-runtime-epsilon 25.0.1") {
+	if !strings.Contains(stderr, "Offline, keeping the installed Java runtime java-runtime-epsilon 25.0.1") {
 		t.Fatalf("an offline sync should keep the installed runtime:\n%s", stderr)
 	}
 	if got := resolvedJava(t, gameDir); got != managed {

@@ -42,7 +42,7 @@ func TestPlayDryRunFillsTheStore(t *testing.T) {
 
 	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play", "--dry-run")
 
-	for _, want := range []string{"would launch pack", "26.2", "main class: net.minecraft.client.main.Main", "memory: " + instance.DefaultMemory, "asset index: 26", "classpath: 2 jars"} {
+	for _, want := range []string{"Would launch pack", "26.2", "main class: net.minecraft.client.main.Main", "memory: " + instance.DefaultMemory, "asset index: 26", "classpath: 2 jars"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("play --dry-run: %q is missing from\n%s", want, stdout)
 		}
@@ -158,7 +158,7 @@ func TestPlayStartsTheGameDetachedAndLogsIt(t *testing.T) {
 
 	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play")
 
-	for _, want := range []string{"playing pack", "(26.2)", "account: Notch", "log: "} {
+	for _, want := range []string{"Playing pack", "(26.2)", "account: Notch", "log: "} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("play: %q is missing from\n%s", want, stdout)
 		}

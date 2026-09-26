@@ -133,7 +133,7 @@ func TestSearchNeedsWords(t *testing.T) {
 	h.tty = true
 	for _, args := range [][]string{{"search"}, {"search", "--no-input"}} {
 		code, _, stderr := h.run(t, args...)
-		if code == 0 || !strings.Contains(stderr, "missing at least one argument") || !strings.Contains(stderr, "[words...]") {
+		if code == 0 || !strings.Contains(stderr, "Missing at least one argument") || !strings.Contains(stderr, "[words...]") {
 			t.Errorf("%v: exit %d, stderr %s", args, code, stderr)
 		}
 	}

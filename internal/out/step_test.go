@@ -16,7 +16,7 @@ func TestStepsSettleOffTerminal(t *testing.T) {
 	p.Step("installing neoforge 26.2.0.87")
 	p.Step("fetching Minecraft %s", "26.2")
 	p.Out().Text("result")
-	want := "  ✔ fetched Minecraft 26.2\n  ✔ installed neoforge 26.2.0.87\n"
+	want := "  ✔ Fetched Minecraft 26.2\n  ✔ Installed neoforge 26.2.0.87\n"
 	if stderr.String() != want || stdout.String() != "  result\n" {
 		t.Fatalf("stderr %q stdout %q", stderr.String(), stdout.String())
 	}
@@ -27,7 +27,7 @@ func TestDownloadBarSettlesTheRunningStep(t *testing.T) {
 	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
 	p.Step("fetching fabric loader 0.19.5 for 26.2")
 	pr := p.Progress("fetching", []Download{{Name: "a.jar", Size: 1}})
-	if stderr.String() != "  ✔ fetched fabric loader 0.19.5 for 26.2\n" {
+	if stderr.String() != "  ✔ Fetched fabric loader 0.19.5 for 26.2\n" {
 		t.Fatalf("the step must settle before the bar draws: %q", stderr.String())
 	}
 	pr.Advance()
@@ -41,7 +41,7 @@ func TestStepWording(t *testing.T) {
 	p.Step("verifying build provenance with gh")
 	p.Step("checksum verified")
 	p.Settle()
-	want := "  ✔ kept sodium 0.9 already in lock\n  ✔ verified build provenance with gh\n  ✔ checksum verified\n"
+	want := "  ✔ Kept sodium 0.9 already in lock\n  ✔ Verified build provenance with gh\n  ✔ Checksum verified\n"
 	if stderr.String() != want {
 		t.Fatalf("stderr: %q", stderr.String())
 	}
@@ -53,7 +53,7 @@ func TestFailedStepIsNotMarkedDone(t *testing.T) {
 	p.Step("fetching a")
 	p.Step("cloning b")
 	p.Fail(errors.New("boom"))
-	if got := stderr.String(); !strings.HasPrefix(got, "  ✔ fetched a\n") || strings.Contains(got, "cloned b") {
+	if got := stderr.String(); !strings.HasPrefix(got, "  ✔ Fetched a\n") || strings.Contains(got, "Cloned b") {
 		t.Fatalf("stderr: %q", got)
 	}
 }
@@ -63,8 +63,8 @@ func TestDroppedStepLeavesNoLine(t *testing.T) {
 	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
 	p.Step("fetching a")
 	p.Drop()
-	p.Warn("offline, using a")
-	if got := stderr.String(); strings.Contains(got, "fetched a") || !strings.Contains(got, "offline, using a") {
+	p.Warn("Offline, using a")
+	if got := stderr.String(); strings.Contains(got, "Fetched a") || !strings.Contains(got, "Offline, using a") {
 		t.Fatalf("stderr: %q", got)
 	}
 }
@@ -104,7 +104,7 @@ func TestStepCollapsesNewlinesInText(t *testing.T) {
 	p.Step("fetching %s %s", "twilight", "The Twilight\r\n  Forest 4.7")
 	p.Step("fetching %s", "trailing 1.0 ")
 	p.Settle()
-	want := "  ✔ fetched refurbished-furniture MrCrayfish's Furniture Mod: Refurbished 1.0.22\n  ✔ fetched twilight The Twilight Forest 4.7\n  ✔ fetched trailing 1.0\n"
+	want := "  ✔ Fetched refurbished-furniture MrCrayfish's Furniture Mod: Refurbished 1.0.22\n  ✔ Fetched twilight The Twilight Forest 4.7\n  ✔ Fetched trailing 1.0\n"
 	if stderr.String() != want {
 		t.Fatalf("stderr: %q", stderr.String())
 	}

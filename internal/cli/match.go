@@ -69,9 +69,9 @@ func (a *app) matchCmd() *cobra.Command {
 				}
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
-				title := "matched"
+				title := "Matched"
 				if dryRun {
-					title = "would match"
+					title = "Would match"
 				}
 				l.OK(title, fmt.Sprintf("%s, %s kept as overrides", lockedSummary(a.titles(), res.Locked), plural(len(res.Kept), "file", "files")))
 				var rows []out.Row

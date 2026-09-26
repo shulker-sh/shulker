@@ -85,7 +85,7 @@ func TestLinkPrism(t *testing.T) {
 	stdout := h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir)
 	instDir := filepath.Join(launcherDir, "instances", "shulker-my-pack")
 	gameDir := filepath.Join(instDir, "minecraft")
-	if !strings.Contains(stdout, "created instance my-pack » "+instDir) || !strings.Contains(stdout, "the launcher syncs this instance before each launch") {
+	if !strings.Contains(stdout, "Created instance my-pack » "+instDir) || !strings.Contains(stdout, "the launcher syncs this instance before each launch") {
 		t.Fatalf("link output: %s", stdout)
 	}
 	if !strings.Contains(stdout, "follows my-pack from "+h.dir) {

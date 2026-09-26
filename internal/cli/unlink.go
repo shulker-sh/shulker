@@ -71,7 +71,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 						continue
 					}
 					summary, rest, _ := strings.Cut(strings.TrimSuffix(r.summary, "."), "\n")
-					l.OK(strings.ToLower(summary[:1])+summary[1:], "")
+					l.OK(summary, "")
 					if rest != "" {
 						l.Tree(out.Row{Text: strings.TrimSuffix(rest, ".")})
 					}

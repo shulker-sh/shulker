@@ -111,7 +111,7 @@ func TestUnwritableLogWarnsOnceOutsideHooks(t *testing.T) {
 	}
 
 	code, _, stderr := run(t, "instances", "repair")
-	if code != out.ExitOK || strings.Count(stderr, "can't write shulker's log") != 1 {
+	if code != out.ExitOK || strings.Count(stderr, "Can't write shulker's log") != 1 {
 		t.Fatalf("exit %d, stderr %q", code, stderr)
 	}
 	code, _, stderr = run(t, "hook", "post-exit", "-C", t.TempDir())

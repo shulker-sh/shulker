@@ -76,7 +76,7 @@ func (a *app) checkCmd() *cobra.Command {
 				return checkFailed(res)
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
-				l.OK("no problems found", "checked "+strings.Join(scopes, ", "))
+				l.OK("No problems found", "checked "+strings.Join(scopes, ", "))
 			})
 		},
 	}

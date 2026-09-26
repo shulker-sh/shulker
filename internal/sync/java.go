@@ -23,9 +23,9 @@ func LinkJavaFix(launcherName string) out.Detail {
 func RuntimeWarning(err error) string {
 	e := out.AsError(err)
 	if len(e.Rows) == 0 {
-		return e.Message
+		return out.Sentence(e.Message)
 	}
-	return e.Message + "; " + e.Rows[0].Text
+	return out.Sentence(e.Message) + "; " + e.Rows[0].Text
 }
 
 // ManagedJava ensures the lock's runtime component. fix is the Fix row a runtime-unavailable

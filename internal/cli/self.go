@@ -135,7 +135,7 @@ func (a *app) forgetRegistry() error {
 
 func (s selfUninstallResult) print(l *out.Lines) {
 	if len(s.Unhooked) > 0 {
-		l.OK("unhooked "+plural(len(s.Unhooked), "instance", "instances"), "")
+		l.OK("Unhooked "+plural(len(s.Unhooked), "instance", "instances"), "")
 		items := make([]out.Item, 0, len(s.Unhooked))
 		for _, in := range s.Unhooked {
 			items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{launcher.Title(in.Launcher)}})
@@ -144,12 +144,12 @@ func (s selfUninstallResult) print(l *out.Lines) {
 	}
 	route := selfupdate.Route(s.Install)
 	if s.Removed != "" {
-		l.OK("removed "+s.Removed, "")
+		l.OK("Removed "+s.Removed, "")
 	} else {
-		l.Info("the binary is " + route.Owner() + "'s to remove")
+		l.Info("The binary is " + route.Owner() + "'s to remove")
 	}
 	if s.Purged {
-		l.OK("forgot the registry", "")
+		l.OK("Forgot the registry", "")
 		if len(s.Forgotten) > 0 {
 			l.Info(plural(len(s.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`")
 			items := make([]out.Item, 0, len(s.Forgotten))
@@ -159,7 +159,7 @@ func (s selfUninstallResult) print(l *out.Lines) {
 			l.Items(items...)
 		}
 	} else {
-		l.Info("the registry and every instance folder are untouched")
+		l.Info("The registry and every instance folder are untouched")
 		l.Nudge("Reinstall, then", "shulker instances repair")
 	}
 	if s.Renamed != "" {
@@ -216,12 +216,12 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 		res.Available = &available
 	}
 	if res.Available != nil && !*res.Available {
-		return a.printer.Emit(res, func(l *out.Lines) { l.OK("shulker is up to date", b.Version) })
+		return a.printer.Emit(res, func(l *out.Lines) { l.OK("Shulker is up to date", b.Version) })
 	}
 	if check {
 		return a.printer.Emit(res, func(l *out.Lines) {
 			if res.Available == nil {
-				l.Info("the latest release is shulker " + res.Latest)
+				l.Info("The latest release is shulker " + res.Latest)
 			} else {
 				l.Items(out.Item{Kind: out.Change, Name: "shulker", From: b.Version, To: res.Latest, Aside: []string{"update available"}})
 			}
@@ -268,7 +268,7 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 		a.printer.Warn("instances not repaired: %v", err)
 	}
 	return a.printer.Emit(res, func(l *out.Lines) {
-		l.OKInto("updated shulker "+l.T.Bump(b.Version, res.Latest), exe, "")
+		l.OKInto("Updated shulker "+l.T.Bump(b.Version, res.Latest), exe, "")
 	})
 }
 
@@ -281,7 +281,7 @@ func (a *app) checkProvenance(ctx context.Context, r *selfupdate.Releases, tag, 
 		if require {
 			return "", out.Errorf("self-update-provenance", "--require-attestation is set but gh is not installed")
 		}
-		a.printer.Warn("gh not found, skipping build provenance check")
+		a.printer.Warn("GitHub CLI `gh` not found, skipping build provenance check")
 		return "skipped", nil
 	}
 	a.progress("verifying build provenance with gh")

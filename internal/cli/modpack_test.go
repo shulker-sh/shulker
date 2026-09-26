@@ -164,7 +164,7 @@ func TestLocalModpack(t *testing.T) {
 	if !strings.Contains(stdout, "~ base ") || strings.Contains(stderr, "changed since the lock") {
 		t.Fatalf("lock after a local modpack edit: %s\n%s", stdout, stderr)
 	}
-	if stdout = h.mustRun(t, "lock"); !strings.Contains(stdout, "already up to date") {
+	if stdout = h.mustRun(t, "lock"); !strings.Contains(stdout, "Already up to date") {
 		t.Fatalf("second lock: %s", stdout)
 	}
 

@@ -109,7 +109,7 @@ func (p *Printer) Step(format string, args ...any) {
 	p.settleLocked(true)
 	p.open(p.Stderr)
 	if verb, _, _ := strings.Cut(text, " "); !strings.HasSuffix(verb, "ing") {
-		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(text)
+		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(Sentence(text))
 		return
 	}
 	s := &step{text: text}
@@ -148,7 +148,7 @@ func (p *Printer) settleLocked(done bool) {
 		fmt.Fprint(s.tty, "\r\x1b[J")
 	}
 	if done {
-		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(settledText(s.text))
+		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(Sentence(settledText(s.text)))
 	}
 }
 
@@ -159,7 +159,7 @@ func (s *step) spin(t Theme, w *waits) {
 	start := time.Now()
 	for {
 		room := terminalWidth(s.tty) - len(gutter) - 3
-		text := s.text + slowAside(time.Since(start), w.latest())
+		text := Sentence(s.text) + slowAside(time.Since(start), w.latest())
 		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+s.wheel.View()+" "+t.Grey(ansi.Truncate(text, room, t.Ellipsis())))
 		select {
 		case <-s.stop:

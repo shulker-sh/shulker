@@ -46,7 +46,7 @@ func (a *app) listAccounts() error {
 	}
 	return a.printer.Emit(rows, func(l *out.Lines) {
 		if len(rows) == 0 {
-			l.Info("no accounts yet; `shulker accounts login` signs in to Microsoft")
+			l.Info("No accounts yet; `shulker accounts login` signs in to Microsoft")
 			return
 		}
 		writeAccounts(l, grouped, cfg)

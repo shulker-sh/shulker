@@ -145,13 +145,13 @@ func (a *app) warnReplaced(unreadable error, kept string) {
 
 func (r repairResult) print(l *out.Lines) {
 	for _, in := range r.Registered {
-		l.OKInto("registered "+in.ID, in.Dir, launcher.Title(in.Launcher))
+		l.OKInto("Registered "+in.ID, in.Dir, launcher.Title(in.Launcher))
 	}
 	for _, rn := range r.Renamed {
-		l.OK("renamed "+rn.ID+"  "+l.T.Bump(rn.From, rn.To), "")
+		l.OK("Renamed "+rn.ID+"  "+l.T.Bump(rn.From, rn.To), "")
 	}
 	for _, path := range r.Wrote {
-		l.OK("wrote "+path, "")
+		l.OK("Wrote "+path, "")
 	}
 	if len(r.Missing) > 0 {
 		l.Info(plural(len(r.Missing), "instance directory is", "instance directories are") + " missing; they are kept in case the disk holding them is away")

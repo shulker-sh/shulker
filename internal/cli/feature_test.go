@@ -59,7 +59,7 @@ func TestFeatureIntoSyncedDir(t *testing.T) {
 		t.Fatalf("list --into: %q", stdout)
 	}
 
-	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "  ✔ fancy on » "+into+"\n  ✔ synced client » ") {
+	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "  ✔ fancy on » "+into+"\n  ✔ Synced client » ") {
 		t.Fatalf("feature on --sync: %q", stdout)
 	}
 	if _, err := os.Stat(jar); err != nil {
@@ -132,7 +132,7 @@ func TestFeatureChoicesAndOneOffFlags(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.dir, ".gitignore"), []byte("/build/"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, stderr := h.mustRunStderr(t, "feature", "on", "fancy"); !strings.Contains(stderr, "added /shulker.local.json to .gitignore") {
+	if _, stderr := h.mustRunStderr(t, "feature", "on", "fancy"); !strings.Contains(stderr, "Added /shulker.local.json to .gitignore") {
 		t.Fatalf("feature on stderr: %s", stderr)
 	}
 	if data, _ := os.ReadFile(filepath.Join(h.dir, ".gitignore")); string(data) != "/build/\n/shulker.local.json\n" {

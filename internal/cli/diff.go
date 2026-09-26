@@ -86,7 +86,7 @@ func (a *app) diffCmd() *cobra.Command {
 			return a.printer.Emit(reports, func(l *out.Lines) {
 				for _, rep := range reports {
 					if len(rep.Files) == 0 {
-						l.OK("no changes in "+rep.Side, where[rep])
+						l.OK("No changes in "+rep.Side, where[rep])
 						continue
 					}
 					l.Heading(rep.Side + " " + l.T.Grey(fmt.Sprintf("(%s in %s)", plural(len(rep.Files), "file changed", "files changed"), where[rep])))
@@ -172,7 +172,7 @@ func (a *app) pullCmd() *cobra.Command {
 				return err
 			}
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OK("pulled "+rep.Side, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", plural(len(rep.Pulled)+len(rep.Entries), "file", "files"), plural(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
+				l.OK("Pulled "+rep.Side, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", plural(len(rep.Pulled)+len(rep.Entries), "file", "files"), plural(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
 				var rows []out.Row
 				arrow := " " + l.T.ArrowBump() + " "
 				for _, f := range rep.Pulled {
