@@ -84,6 +84,7 @@ if [ -z "$version" ]; then
     || fail "Couldn't get the latest release from https://github.com/shulker-sh/shulker/releases"
 fi
 
+version="v${version#v}"
 base="https://github.com/shulker-sh/shulker/releases/download/$version"
 archive="shulker_${version#v}_${os}_${arch}.tar.gz"
 

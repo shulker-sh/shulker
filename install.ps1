@@ -54,15 +54,24 @@
             default { throw "Unsupported architecture $env:PROCESSOR_ARCHITECTURE" }
         }
 
-        # 1. Pick the release.
+        # 1. Pick the release. GitHub redirects /releases/latest to /releases/tag/<version>.
         $version = $env:SHULKER_VERSION
 
         if (-not $version) {
-            try { $version = (Invoke-RestMethod 'https://api.github.com/repos/shulker-sh/shulker/releases/latest').tag_name } catch {}
-            if (-not $version) { throw "Couldn't get the latest release from https://github.com/shulker-sh/shulker/releases" }
+            try {
+                $request = [Net.WebRequest]::Create('https://github.com/shulker-sh/shulker/releases/latest')
+                $request.Method = 'HEAD'
+                $response = $request.GetResponse()
+                $latest = $response.ResponseUri.AbsoluteUri
+                $response.Close()
+            } catch {}
+
+            if ($latest -notmatch '/tag/([^/]+)$') { throw "Couldn't get the latest release from https://github.com/shulker-sh/shulker/releases" }
+            $version = $Matches[1]
         }
 
         $plain = $version.TrimStart('v')
+        $version = "v$plain"
         $base = "https://github.com/shulker-sh/shulker/releases/download/$version"
         $archive = "shulker_${plain}_windows_$arch.zip"
 
