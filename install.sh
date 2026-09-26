@@ -52,11 +52,13 @@ case "$(uname -s)" in
   Linux) os="linux" ;;
   *) err "unsupported OS $(uname -s); on Windows run: irm https://shulker.sh/install.ps1 | iex" ;;
 esac
+
 case "$(uname -m)" in
   arm64 | aarch64) arch="arm64" ;;
   x86_64 | amd64) arch="amd64" ;;
   *) err "unsupported architecture $(uname -m)" ;;
 esac
+
 # A shell running under Rosetta reports x86_64 on Apple silicon.
 if [ "$os" = "darwin" ] && [ "$arch" = "amd64" ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = "1" ]; then
   arch="arm64"
@@ -64,6 +66,7 @@ fi
 
 # 1. Pick the release. GitHub redirects /releases/latest to /releases/tag/<version>.
 version="${SHULKER_VERSION:-}"
+
 if [ -z "$version" ]; then
   note "resolving latest release"
   latest="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$OWNER/$REPO/releases/latest")" \
@@ -71,6 +74,7 @@ if [ -z "$version" ]; then
   version="${latest##*/tag/}"
   [ "$version" != "$latest" ] || err "no release found at https://github.com/$OWNER/$REPO/releases"
 fi
+
 base="https://github.com/$OWNER/$REPO/releases/download/$version"
 archive="shulker_${version#v}_${os}_${arch}.tar.gz"
 
@@ -87,11 +91,13 @@ curl -fsSL -o checksums.txt "$base/checksums.txt" || err "could not download $ba
 note "verifying SHA256 checksum"
 want="$(awk -v f="$archive" '$2 == f { print $1 }' checksums.txt)"
 [ -n "$want" ] || err "no checksum listed for $archive"
+
 if command -v sha256sum >/dev/null 2>&1; then
   got="$(sha256sum "$archive" | awk '{ print $1 }')"
 else
   got="$(shasum -a 256 "$archive" | awk '{ print $1 }')"
 fi
+
 [ "$want" = "$got" ] || err "checksum mismatch for $archive (want $want, got $got)"
 
 # 4. Build provenance. The release workflow publishes a signed attestation for each
@@ -105,6 +111,7 @@ if [ -n "$WITHOUT_ATTESTATION" ]; then
   note "skipping build provenance check (--without-attestation)"
 elif command -v gh >/dev/null 2>&1; then
   note "verifying build provenance with gh"
+
   if verify_attestation; then
     note "build provenance verified"
   elif [ -n "$REQUIRE_ATTESTATION" ]; then
@@ -140,6 +147,7 @@ case ":$PATH:" in
         fish) rc="$HOME/.config/fish/config.fish"; line="fish_add_path \"$INSTALL_DIR\"" ;;
         *) rc="$HOME/.profile"; line="export PATH=\"$INSTALL_DIR:\$PATH\"" ;;
       esac
+
       if [ -f "$rc" ] && grep -qF "$line" "$rc"; then
         note "$rc already adds $INSTALL_DIR to PATH; open a new terminal to use shulker"
       else

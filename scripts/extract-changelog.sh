@@ -28,6 +28,7 @@ link="$(grep -E "^\[$version_re\]: " CHANGELOG.md || true)"
 url="$(printf '%s' "$link" | sed -E 's/^\[[^]]*\]:[[:space:]]*//')"
 
 printf '%s' "$notes"
+
 if [ -n "$url" ]; then
   printf '\n\n**Changes in v%s:** [v%s](%s)\n' "$version" "$version" "$url"
 fi

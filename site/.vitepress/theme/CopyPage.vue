@@ -35,6 +35,7 @@ onMounted(() => {
     document.addEventListener('click', onClick)
     document.addEventListener('keydown', onKeydown)
 })
+
 onUnmounted(() => {
     document.removeEventListener('click', onClick)
     document.removeEventListener('keydown', onKeydown)
@@ -79,6 +80,7 @@ onUnmounted(() => {
     position: relative;
     flex-shrink: 0;
 }
+
 .trigger {
     display: flex;
     border: 1px solid var(--vp-c-divider);
@@ -86,26 +88,32 @@ onUnmounted(() => {
     overflow: hidden;
     font-size: 14px;
 }
+
 .trigger:hover {
     border-color: var(--vp-c-brand-1);
 }
+
 .trigger button {
     display: flex;
     align-items: center;
     color: var(--vp-c-text-1);
 }
+
 .trigger button:hover {
     background: var(--vp-c-bg-soft);
 }
+
 .copy {
     gap: 8px;
     padding: 6px 12px;
     white-space: nowrap;
 }
+
 .toggle {
     padding: 0 10px;
     border-left: 1px solid var(--vp-c-divider);
 }
+
 .menu {
     position: absolute;
     top: calc(100% + 4px);
@@ -118,6 +126,7 @@ onUnmounted(() => {
     border-radius: 8px;
     box-shadow: var(--vp-shadow-3);
 }
+
 .menu button {
     position: relative;
     display: flex;
@@ -129,6 +138,7 @@ onUnmounted(() => {
     font-size: 14px;
     text-align: left;
 }
+
 .menu button::before {
     content: '';
     position: absolute;
@@ -136,38 +146,47 @@ onUnmounted(() => {
     width: 0;
     background: var(--vp-c-brand-1);
 }
+
 .menu button:hover {
     padding-left: 20px;
     background: var(--vp-c-bg-soft);
 }
+
 .menu button:hover::before {
     width: 3px;
 }
+
 .icon {
     display: inline-flex;
     width: 18px;
     height: 18px;
 }
+
 .icon :deep(svg) {
     width: 100%;
     height: 100%;
 }
+
 .trailing {
     margin-left: auto;
     opacity: 0.6;
 }
+
 .menu button:hover .trailing {
     opacity: 1;
     transform: translateX(2px);
 }
+
 .chevron.open {
     transform: rotate(180deg);
 }
+
 .menu-enter-from,
 .menu-leave-to {
     opacity: 0;
     transform: translateY(-4px);
 }
+
 @media (prefers-reduced-motion: no-preference) {
     .trigger,
     .trigger button,
@@ -179,10 +198,12 @@ onUnmounted(() => {
         transition-duration: 0.2s;
         transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     }
+
     .trigger:hover {
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
+
     .menu-enter-active,
     .menu-leave-active {
         transition: opacity 0.15s, transform 0.15s;

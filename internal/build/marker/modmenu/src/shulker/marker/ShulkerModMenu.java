@@ -46,28 +46,35 @@ public final class ShulkerModMenu implements ModMenuApi {
 	@Override
 	public Map<String, UpdateChecker> getProvidedUpdateCheckers() {
 		Map<String, UpdateChecker> checkers = new HashMap<>();
+
 		for (String id : managedMods()) {
 			checkers.put(id, MANAGED_BY_SHULKER);
 		}
+
 		return checkers;
 	}
 
 	static List<String> managedMods() {
 		List<String> ids = new ArrayList<>();
+
 		try (InputStream in = ShulkerModMenu.class.getResourceAsStream(MODS_RESOURCE)) {
 			if (in == null) {
 				return ids;
 			}
+
 			BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
 			String line;
+
 			while ((line = reader.readLine()) != null) {
 				line = line.trim();
+
 				if (!line.isEmpty()) {
 					ids.add(line);
 				}
 			}
 		} catch (IOException ignored) {
 		}
+
 		return ids;
 	}
 }

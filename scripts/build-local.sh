@@ -4,9 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 key="${SHULKER_CURSEFORGE_KEY:-}"
+
 if [ -z "$key" ]; then
   key="$(security find-generic-password -s shulker-curseforge -w 2>/dev/null || true)"
 fi
+
 if [ -z "$key" ]; then
   echo "error: no CurseForge key; set SHULKER_CURSEFORGE_KEY or store one with:" >&2
   echo "  security add-generic-password -a \"\$USER\" -s shulker-curseforge -w" >&2

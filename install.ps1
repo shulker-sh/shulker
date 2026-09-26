@@ -47,17 +47,20 @@
 
   # 1. Pick the release.
   $version = $env:SHULKER_VERSION
+
   if (-not $version) {
     Write-Note 'resolving latest release'
     $version = (Invoke-RestMethod "https://api.github.com/repos/$owner/$repo/releases/latest").tag_name
     if (-not $version) { throw "shulker install: no release found at https://github.com/$owner/$repo/releases" }
   }
+
   $plain = $version.TrimStart('v')
   $base = "https://github.com/$owner/$repo/releases/download/$version"
   $archive = "shulker_${plain}_windows_$arch.zip"
 
   $tmp = Join-Path ([IO.Path]::GetTempPath()) ("shulker-install-" + [Guid]::NewGuid())
   New-Item -ItemType Directory -Path $tmp | Out-Null
+
   try {
     # 2. Download.
     $archivePath = Join-Path $tmp $archive
@@ -71,10 +74,12 @@
     # 3. Checksum.
     Write-Note 'verifying SHA256 checksum'
     $want = $null
+
     foreach ($line in $checksums -split "`n") {
       $fields = $line.Trim() -split '\s+'
       if ($fields.Count -eq 2 -and $fields[1] -eq $archive) { $want = $fields[0] }
     }
+
     if (-not $want) { throw "shulker install: no checksum listed for $archive" }
     $got = (Get-FileHash -Algorithm SHA256 -Path $archivePath).Hash.ToLower()
     if ($got -ne $want.ToLower()) { throw "shulker install: checksum mismatch for $archive (want $want, got $got)" }
@@ -82,17 +87,20 @@
     # 4. Build provenance. The release workflow publishes a signed attestation for each
     # archive; gh checks the signature and that it names this archive and the shulker-sh owner.
     $gh = Get-Command gh -ErrorAction SilentlyContinue
+
     if ($env:SHULKER_WITHOUT_ATTESTATION) {
       Write-Note 'skipping build provenance check (SHULKER_WITHOUT_ATTESTATION)'
     } elseif ($gh) {
       Write-Note 'verifying build provenance with gh'
       $verified = $false
+
       try {
         $bundle = Join-Path $tmp 'shulker.attestation.jsonl'
         Invoke-WebRequest -UseBasicParsing -Uri "$base/shulker.attestation.jsonl" -OutFile $bundle
         & $gh.Source attestation verify $archivePath --bundle $bundle --owner $owner *> $null
         $verified = $LASTEXITCODE -eq 0
       } catch {}
+
       if ($verified) {
         Write-Note 'build provenance verified'
       } elseif ($env:SHULKER_REQUIRE_ATTESTATION) {
@@ -121,9 +129,11 @@
   # directly because [Environment]::SetEnvironmentVariable would expand entries like
   # %USERPROFILE% into fixed paths as it saves them.
   $envKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $true)
+
   try {
     $userPath = [string]$envKey.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
     $entries = @($userPath -split ';' | Where-Object { $_ })
+
     if ($entries -notcontains $installDir) {
       if ($env:SHULKER_NO_MODIFY_PATH) {
         Write-Note "$installDir is not on your PATH"
@@ -135,12 +145,14 @@
         $HWND_BROADCAST = [IntPtr]0xffff
         $WM_SETTINGCHANGE = 0x1A
         $SMTO_ABORTIFHUNG = 2
+
         if (-not ('Shulker.Env' -as [type])) {
           Add-Type -Namespace Shulker -Name Env -MemberDefinition @'
 [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
 public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
 '@
         }
+
         $result = [UIntPtr]::Zero
         [Shulker.Env]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, 'Environment', $SMTO_ABORTIFHUNG, 5000, [ref]$result) | Out-Null
         $env:Path = "$installDir;$env:Path"

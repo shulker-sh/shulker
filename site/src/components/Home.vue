@@ -30,15 +30,18 @@ import { VPButton } from 'vitepress/theme'
     background: var(--vp-c-bg);
     color: var(--vp-c-text-1);
 }
+
 .hero {
     max-width: 40rem;
     text-align: center;
 }
+
 .logo {
     display: block;
     margin: 0 auto 1.5rem;
     image-rendering: pixelated;
 }
+
 h1 {
     font-size: 4rem;
     font-weight: 800;
@@ -49,24 +52,29 @@ h1 {
     background-clip: text;
     color: transparent;
 }
+
 .tagline {
     margin-top: 1rem;
     font-size: 1.25rem;
     color: var(--vp-c-text-2);
 }
+
 .install {
     margin: 2rem auto;
     width: fit-content;
     max-width: 100%;
     text-align: left;
 }
+
 .install :deep(div[class*='language-']) {
     margin: 0;
     border: 1px solid var(--vp-c-divider);
 }
+
 .install :deep(div[class*='language-'] code) {
     padding-right: 4.5rem;
 }
+
 .actions {
     display: flex;
     justify-content: center;
