@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/termenv"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // ErrPickCancelled is a picker the user escaped out of.
@@ -31,34 +32,162 @@ const pickRows = 10
 // Pick asks which of several things was meant. It draws on stderr, where every prompt goes, and
 // takes its rows already styled, so the picker decides nothing about colour that the theme hasn't.
 func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, error) {
-	t := p.ErrTheme
-	if !t.HasColor {
-		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
-		lipgloss.SetColorProfile(termenv.Ascii)
-	}
-	// huh binds quit to ctrl+c alone, which leaves a picker you can only leave by interrupting.
-	keys := huh.NewDefaultKeyMap()
-	keys.Quit = key.NewBinding(key.WithKeys("esc", "ctrl+c"), key.WithHelp("esc", "cancel"))
-	var chosen string
-	// The field's own height is not enough: a form left to size itself gives every field the
-	// height of its whole content, so a long list prints in full instead of scrolling.
-	rows := min(len(choices), pickRows)
+	m := newPicker(p.ErrTheme, title, choices)
 	p.open(p.Stderr)
-	form := huh.NewForm(huh.NewGroup(
-		huh.NewSelect[string]().
-			Title(gutter + title).
-			Options(options(choices)...).
-			Value(&chosen).
-			Height(rows + 1),
-	)).WithTheme(pickTheme(t)).WithOutput(p.Stderr).WithInput(in).WithHeight(rows + 3).
-		WithKeyMap(keys).WithLayout(gutterLayout{quit: keys.Quit})
-	if err := form.Run(); err != nil {
-		if errors.Is(err, huh.ErrUserAborted) {
-			return "", ErrPickCancelled
-		}
+	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr)).Run(); err != nil {
 		return "", err
 	}
-	return chosen, nil
+	if m.cancelled {
+		return "", ErrPickCancelled
+	}
+	return m.chosen(), nil
+}
+
+// picker is a list with a cursor that moves through rows that stay put: the window scrolls one
+// row at a time, and only once the cursor would leave it. huh's Select jumps the cursor's row to
+// the top as soon as it reaches the last visible one, hiding every row above it.
+type picker struct {
+	theme     Theme
+	title     string
+	choices   []Choice
+	shown     []int
+	cursor    int
+	top       int
+	query     string
+	filtering bool
+	done      bool
+	cancelled bool
+}
+
+func newPicker(t Theme, title string, choices []Choice) *picker {
+	m := &picker{theme: t, title: title, choices: choices}
+	m.refilter()
+	return m
+}
+
+func (m *picker) Init() tea.Cmd { return nil }
+
+func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	k, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return m, nil
+	}
+	if k.Type == tea.KeyCtrlC {
+		m.done, m.cancelled = true, true
+		return m, tea.Quit
+	}
+	if m.filtering {
+		m.filter(k)
+		return m, nil
+	}
+	switch k.String() {
+	case "esc":
+		m.done, m.cancelled = true, true
+		return m, tea.Quit
+	case "enter":
+		if len(m.shown) > 0 {
+			m.done = true
+			return m, tea.Quit
+		}
+	case "/":
+		m.filtering = true
+	case "up", "k":
+		m.move(-1)
+	case "down", "j":
+		m.move(1)
+	case "home", "g":
+		m.move(-m.cursor)
+	case "end", "G":
+		m.move(len(m.shown) - 1 - m.cursor)
+	}
+	return m, nil
+}
+
+func (m *picker) filter(k tea.KeyMsg) {
+	switch k.Type {
+	case tea.KeyEsc:
+		m.filtering, m.query = false, ""
+	case tea.KeyEnter:
+		m.filtering = false
+		return
+	case tea.KeyBackspace:
+		if m.query == "" {
+			m.filtering = false
+			return
+		}
+		r := []rune(m.query)
+		m.query = string(r[:len(r)-1])
+	case tea.KeyRunes, tea.KeySpace:
+		m.query += string(k.Runes)
+	default:
+		return
+	}
+	m.refilter()
+}
+
+func (m *picker) refilter() {
+	m.shown = m.shown[:0]
+	q := strings.ToLower(m.query)
+	for i, c := range m.choices {
+		if strings.Contains(strings.ToLower(ansi.Strip(c.Label)), q) {
+			m.shown = append(m.shown, i)
+		}
+	}
+	m.cursor, m.top = 0, 0
+}
+
+// move wraps past either end, like huh's Select did, and scrolls just far enough to keep the
+// cursor in the window.
+func (m *picker) move(by int) {
+	n := len(m.shown)
+	if n == 0 {
+		return
+	}
+	m.cursor = ((m.cursor+by)%n + n) % n
+	if m.cursor < m.top {
+		m.top = m.cursor
+	}
+	if m.cursor >= m.top+pickRows {
+		m.top = m.cursor - pickRows + 1
+	}
+}
+
+func (m *picker) chosen() string {
+	if len(m.shown) == 0 {
+		return ""
+	}
+	return m.choices[m.shown[m.cursor]].Value
+}
+
+func (m *picker) View() string {
+	if m.done {
+		return ""
+	}
+	t := m.theme
+	var b strings.Builder
+	b.WriteString(gutter + m.title)
+	if m.filtering || m.query != "" {
+		b.WriteString("  " + t.Grey("/") + m.query)
+	}
+	b.WriteString("\n")
+	arrow := t.Cyan(t.ArrowPick()) + " "
+	blank := strings.Repeat(" ", Width(t.ArrowPick())+1)
+	for i := m.top; i < min(len(m.shown), m.top+pickRows); i++ {
+		mark := blank
+		if i == m.cursor {
+			mark = arrow
+		}
+		b.WriteString(gutter + mark + m.choices[m.shown[i]].Label + "\n")
+	}
+	if len(m.shown) == 0 {
+		b.WriteString(gutter + blank + t.Grey("no matches") + "\n")
+	}
+	help := "↑ up • ↓ down • / filter • enter choose • esc cancel"
+	if m.filtering {
+		help = "enter done • esc clear"
+	}
+	b.WriteString("\n" + gutter + t.Grey(help))
+	return b.String()
 }
 
 func options(choices []Choice) []huh.Option[string] {
@@ -72,17 +201,14 @@ func options(choices []Choice) []huh.Option[string] {
 // gutterLayout puts huh's help line in the two-space gutter every other line sits in. huh's own
 // Group.View joins the footer outside any container the theme can reach, so the only way to indent
 // it is to lay the form out here. Every form is one group with no Validate, so its fields and the
-// help line are the whole form: the focused field alone for a picker, or all of group when set.
+// help line are the whole form.
 type gutterLayout struct {
 	quit  key.Binding
 	group *huh.Group
 }
 
 func (l gutterLayout) View(f *huh.Form) string {
-	view := f.GetFocusedField().View()
-	if l.group != nil {
-		view = l.group.Content()
-	}
+	view := l.group.Content()
 	// The field lists only its own keys, and leaving the picker is the one a stuck player needs.
 	help := f.Help().ShortHelpView(append(f.KeyBinds(), l.quit))
 	if help == "" {
