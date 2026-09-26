@@ -12,7 +12,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-//go:embed v1/manifest.json v1/lock.json v1/instance.json v1/registry.json v1/accounts.json v1/state.json v1/local.json v1/config.json
+//go:embed v1/manifest.json v1/lock.json v1/instance.json v1/registry.json v1/accounts.json v1/state.json v1/local.json v1/config.json v1/overrides.json
 var files embed.FS
 
 type Kind string
@@ -26,6 +26,8 @@ const (
 	State    Kind = "v1/state.json"
 	Local    Kind = "v1/local.json"
 	Config   Kind = "v1/config.json"
+	// Overrides is the override folders sidecar an export writes at an archive's root.
+	Overrides Kind = "v1/overrides.json"
 )
 
 type compiled struct {

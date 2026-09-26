@@ -154,6 +154,28 @@ func TestImportMrpackRoundTrip(t *testing.T) {
 	}
 }
 
+func TestImportMrpackPutsAFeaturesOverridesBack(t *testing.T) {
+	h := newHarness(t)
+	h.allowMrpackHost(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "set", "--literal", "features", `{"shaders": {"default": true}}`)
+	writeFile(t, filepath.Join(h.dir, "shaders-overrides", "config", "iris.properties"), "enableShaders=true\n")
+	writeFile(t, filepath.Join(h.dir, "overrides", "config", "x.txt"), "v1\n")
+	h.mustRun(t, "export", "mrpack", "--version", "1.0.0")
+
+	dir := filepath.Join(t.TempDir(), "imported")
+	h.mustRun(t, "import", filepath.Join(h.dir, "build", "pack-1.0.0.mrpack"), "--dir", dir)
+	if _, err := os.Stat(filepath.Join(dir, "shaders-overrides", "config", "iris.properties")); err != nil {
+		t.Fatalf("the feature's file goes back under its folder: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "overrides", "config", "iris.properties")); !os.IsNotExist(err) {
+		t.Fatalf("and not into overrides/: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "overrides", "config", "x.txt")); err != nil {
+		t.Fatalf("a plain override stays in overrides/: %v", err)
+	}
+}
+
 func TestImportMrpackIgnoreShulker(t *testing.T) {
 	h := newHarness(t)
 	h.allowMrpackHost(t)

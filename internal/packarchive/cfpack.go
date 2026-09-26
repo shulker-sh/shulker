@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
@@ -274,9 +273,8 @@ func (cfpack) encode(x *Export) (map[string][]byte, string, error) {
 	}
 	entries[cfManifestName] = append(data, '\n')
 	entries[cfModlistName] = cfModlist(x.Files)
-	if x.Manifest != nil && x.Lock != nil {
-		entries[manifest.FileName] = x.Manifest
-		entries[lock.FileName] = x.Lock
+	if err := x.addIdentity(entries); err != nil {
+		return nil, "", err
 	}
 	return entries, cfManifestName, nil
 }

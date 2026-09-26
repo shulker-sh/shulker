@@ -62,8 +62,10 @@ type exportSide struct {
 	// layers is the override folder each bundled file goes in, by path: its entry's side decides,
 	// not which sides the export happens to have.
 	layers map[string]string
-	mods   map[string]bool
-	packs  map[string]bool
+	// folders is the project's feature folder each override came from, by path.
+	folders map[string]string
+	mods    map[string]bool
+	packs   map[string]bool
 	// datapacks is where the side places each datapack, by key.
 	datapacks map[string]string
 	// seeded are the paths of the side's seeded files, and seedMod the first seed mod it places.
@@ -157,6 +159,7 @@ func (b *Builder) Export(ctx context.Context, opts ExportOptions) (*ExportReport
 		Loader:    packarchive.Loader{Type: b.Lock.Loader.Type, Version: b.Lock.Loader.Version},
 		Files:     files,
 		Overrides: overrides,
+		Folders:   overrideFolders(sides, overrides),
 	}
 	if x.Icon, x.IconName, err = b.exportIcon(); err != nil {
 		return nil, err
@@ -202,7 +205,7 @@ func (b *Builder) exportSides(names []string) ([]*exportSide, error) {
 			continue
 		}
 		seen[name] = true
-		sides = append(sides, &exportSide{side: name, files: map[string][]byte{}, layers: map[string]string{}})
+		sides = append(sides, &exportSide{side: name, files: map[string][]byte{}, layers: map[string]string{}, folders: map[string]string{}})
 	}
 	return sides, nil
 }
@@ -259,6 +262,9 @@ func (b *Builder) exportCollect(t *exportSide, version, osName string, features 
 		}
 		if s.seeded {
 			t.seeded = append(t.seeded, path)
+		}
+		if folder := b.featureFolderOf(s); folder != "" {
+			t.folders[path] = folder
 		}
 		if f := s.owned(); f != nil {
 			data, err := f.render(nil, nil, nil)
@@ -738,6 +744,35 @@ func splitOverrides(sides []*exportSide) []packarchive.Override {
 		overrides = append(overrides, packarchive.Override{Layer: layer, Path: within, Data: entries[rel]})
 	}
 	return overrides
+}
+
+// featureFolderOf is the project's own feature folder a file was laid from, or empty for any other
+// source.
+func (b *Builder) featureFolderOf(s source) string {
+	if s.feature == "" || s.pack != "" {
+		return ""
+	}
+	rel, err := filepath.Rel(b.Dir, s.origin)
+	if err != nil || !filepath.IsLocal(rel) {
+		return ""
+	}
+	folder, _, _ := strings.Cut(filepath.ToSlash(rel), "/")
+	return folder
+}
+
+// overrideFolders keys each feature file's folder by the layer and path it ships at, taking the
+// first side's where the sides share a file.
+func overrideFolders(sides []*exportSide, overrides []packarchive.Override) map[string]string {
+	folders := map[string]string{}
+	for _, o := range overrides {
+		for _, t := range sides {
+			if folder, ok := t.folders[o.Path]; ok {
+				folders[o.Layer+"/"+o.Path] = folder
+				break
+			}
+		}
+	}
+	return folders
 }
 
 func exportSummary(m *manifest.Manifest) string {

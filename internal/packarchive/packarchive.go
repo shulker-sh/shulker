@@ -257,6 +257,9 @@ type Export struct {
 	// imports back as the project it came from; nil leaves them out.
 	Manifest []byte
 	Lock     []byte
+	// Folders is the project folder each override came from, by its layer and path, where that
+	// isn't the layer it ships in. It goes beside the manifest and lock, and only with them.
+	Folders map[string]string
 }
 
 // Read opens a pack archive in whichever format its content is.
@@ -388,7 +391,11 @@ func (z *zipEntries) rootIdentity(file string) (*Marker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return readRootIdentity(file, manifestData, lockData)
+	foldersData, err := z.read(FoldersFile)
+	if err != nil {
+		return nil, err
+	}
+	return readRootIdentity(file, manifestData, lockData, foldersData)
 }
 
 // overridesUnder reads the files under folder in the archive into layer, leaving out the

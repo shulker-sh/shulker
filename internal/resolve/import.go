@@ -228,6 +228,7 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 	mods.Overrides = seedFromSeedMods(m, r.Lock, mods.Overrides, mods)
 	if arc.Marker != nil {
 		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
+		refolder(m, mods.Overrides, arc.Marker.Folders)
 	} else {
 		var warnings []string
 		mods.Overrides, warnings = build.AdoptPackChoices(m, r.Lock, mods.Overrides)
@@ -240,6 +241,23 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 		}
 	}
 	return mods, nil
+}
+
+// refolder puts each override the export recorded a folder for back in it, where that folder is
+// one of m's feature folders.
+func refolder(m *manifest.Manifest, overrides []packarchive.Override, folders map[string]string) {
+	var layers []string
+	for name, f := range m.Features {
+		layers = append(layers, f.Overrides.Both, f.Overrides.Client, f.Overrides.Server)
+		if f.Overrides == (manifest.FeatureOverrides{}) {
+			layers = append(layers, name+"-overrides")
+		}
+	}
+	for i, o := range overrides {
+		if folder := folders[o.Layer+"/"+o.Path]; folder != "" && slices.Contains(layers, folder) {
+			overrides[i].Layer = folder
+		}
+	}
 }
 
 func (r *Resolver) Import(ctx context.Context, a *packarchive.Archive) (*Imported, error) {

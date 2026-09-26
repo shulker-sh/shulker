@@ -1,0 +1,21 @@
+{
+  "$id": "https://shulker.sh/schema/v1/overrides.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shulker export override folders",
+  "description": "Where each override file a shulker export ships came from in the project, kept in shulker.overrides.json at the root of the archive beside shulker.json and shulker.lock. A feature's files ship in overrides/ like any other, and an import reads this to put them back in the feature's folder. Shulker writes this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "folders"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The version of this file, as a published schema URL."
+    },
+    "folders": {
+      "type": "object",
+      "description": "The project folder each override came from, by its path in the archive, such as \"overrides/config/iris.properties\": \"shaders-overrides\". Only files from a folder other than the one they ship in are listed.",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    }
+  }
+}

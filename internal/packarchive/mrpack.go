@@ -6,8 +6,6 @@ import (
 	"sort"
 
 	"shulker.sh/shulker/internal/loader"
-	"shulker.sh/shulker/internal/lock"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -206,9 +204,8 @@ func (mrpack) encode(x *Export) (map[string][]byte, string, error) {
 	if x.Icon != nil {
 		entries[mrpackIconName] = x.Icon
 	}
-	if x.Manifest != nil && x.Lock != nil {
-		entries[manifest.FileName] = x.Manifest
-		entries[lock.FileName] = x.Lock
+	if err := x.addIdentity(entries); err != nil {
+		return nil, "", err
 	}
 	return entries, mrpackIndexName, nil
 }

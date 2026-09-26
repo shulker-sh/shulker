@@ -6,9 +6,12 @@ import (
 	"io"
 	"path"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/schema"
 )
 
 // Marker is the shulker project an export carries, from the archive root or a marker jar. Layer
@@ -18,9 +21,38 @@ type Marker struct {
 	Path     string
 	Manifest *manifest.Manifest
 	Lock     *lock.Lock
+	// Folders is the project folder each override came from, by its layer and path, where the
+	// export recorded one.
+	Folders map[string]string
 }
 
-func readRootIdentity(file string, manifestData, lockData []byte) (*Marker, error) {
+// FoldersFile is where an export records the project folder each override came from, beside the
+// root manifest and lock: a feature's files ship in overrides/ like any other.
+const FoldersFile = "shulker.overrides.json"
+
+type folders struct {
+	Schema  string            `json:"$schema"`
+	Folders map[string]string `json:"folders"`
+}
+
+func (x *Export) addIdentity(entries map[string][]byte) error {
+	if x.Manifest == nil || x.Lock == nil {
+		return nil
+	}
+	entries[manifest.FileName] = x.Manifest
+	entries[lock.FileName] = x.Lock
+	if len(x.Folders) == 0 {
+		return nil
+	}
+	data, err := fsutil.MarshalJSON(folders{Schema: schema.Base + string(schema.Overrides), Folders: x.Folders})
+	if err != nil {
+		return err
+	}
+	entries[FoldersFile] = data
+	return nil
+}
+
+func readRootIdentity(file string, manifestData, lockData, foldersData []byte) (*Marker, error) {
 	if manifestData == nil || lockData == nil {
 		return nil, nil
 	}
@@ -32,7 +64,15 @@ func readRootIdentity(file string, manifestData, lockData []byte) (*Marker, erro
 	if err != nil {
 		return nil, markerInvalid(file, lock.FileName, err)
 	}
-	return &Marker{Path: manifest.FileName, Manifest: m, Lock: l}, nil
+	marker := &Marker{Path: manifest.FileName, Manifest: m, Lock: l}
+	if foldersData != nil {
+		var f folders
+		if err := managed.Decode(schema.Overrides, FoldersFile, foldersData, &f); err != nil {
+			return nil, markerInvalid(file, FoldersFile, err)
+		}
+		marker.Folders = f.Folders
+	}
+	return marker, nil
 }
 
 // readMarker reads the shulker marker jar o is, or gives nil when o is some other file.
