@@ -43,6 +43,8 @@
     function Write-Ok($msg) { Write-Mark 0x2714 Green $msg }
     function Write-Skip($msg) { Write-Mark 0x2022 DarkGray $msg }
 
+    Write-Host ''
+
     try {
         $installDir = if ($env:SHULKER_INSTALL_DIR) { $env:SHULKER_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\shulker' }
 
@@ -181,4 +183,6 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wP
     } catch {
         Write-Mark 0x2718 Red $_.Exception.Message
     }
+
+    Write-Host ''
 }

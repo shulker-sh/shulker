@@ -43,8 +43,10 @@ fi
 say() { printf '  %s\n' "$*"; }
 ok() { say "${green}✔${reset} $*"; }
 skip() { say "${grey}•${reset} $*"; }
-fail() { say "${red}✘${reset} ${bold}$*${reset}" >&2; exit 1; }
+fail() { say "${red}✘${reset} ${bold}$*${reset}" >&2; echo >&2; exit 1; }
 tilde() { case "$1" in "$HOME"/*) printf '~%s' "${1#"$HOME"}" ;; *) printf '%s' "$1" ;; esac; }
+
+echo
 
 for arg in "$@"; do
   case "$arg" in
@@ -175,3 +177,4 @@ esac
 echo
 say "$next"
 say "Docs: https://shulker.sh/docs/getting-started"
+echo
