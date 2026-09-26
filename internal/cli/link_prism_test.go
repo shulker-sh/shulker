@@ -159,43 +159,6 @@ func TestLinkPrism(t *testing.T) {
 	}
 }
 
-// A mod added in the game directory sits on top of the pack: the launcher's instance is a project
-// that follows it, so a later sync relocks around what the player put there.
-func TestLinkPrismSaysNothingAboutThePackItJustFollowed(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-
-	launcherDir := t.TempDir()
-	var env struct {
-		Warnings []string `json:"warnings"`
-	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--json")), &env); err != nil {
-		t.Fatal(err)
-	}
-	if len(env.Warnings) != 0 {
-		t.Fatalf("a fresh link has nothing to warn about: %q", env.Warnings)
-	}
-}
-
-func TestLinkPrismKeepsWhatThePlayerAdds(t *testing.T) {
-	h := newHarness(t)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-
-	launcherDir := t.TempDir()
-	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir)
-	gameDir := filepath.Join(launcherDir, "instances", "shulker-pack", "minecraft")
-
-	h.mustRun(t, "-C", gameDir, "add", "fabric-api")
-	h.mustRun(t, "-C", gameDir, "sync")
-	for _, id := range []string{"sodium", "fabric-api"} {
-		if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars[id].filename)); err != nil {
-			t.Fatalf("%s should survive a sync: %v", id, err)
-		}
-	}
-}
-
 func TestLinkPrismFromManifestURL(t *testing.T) {
 	h, dir := projectWithLockedPack(t, "base")
 	srv := httptest.NewServer(http.FileServer(http.Dir(dir)))

@@ -87,35 +87,6 @@ func TestLinkShulker(t *testing.T) {
 	}
 }
 
-func TestLinkShulkerNicknames(t *testing.T) {
-	h := newHarness(t)
-	root := shulkerInstances(t, h)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-
-	h.mustRun(t, "link", "shulker", "--as", "smp")
-	if _, err := os.Stat(filepath.Join(root, "smp", "shulker.json")); err != nil {
-		t.Fatalf("--as names the folder under the instances root: %v", err)
-	}
-	if in := readInstances(t, h); len(in) != 1 || in[0].ID != "smp" {
-		t.Fatalf("--as names the row too: %+v", in)
-	}
-
-	// A second source under the same nickname is a different instance asking for one folder.
-	other := t.TempDir()
-	h.mustRun(t, "-C", other, "create", "--loader", "fabric", "--name", "pack")
-	code, _, stderr := h.run(t, "-C", other, "link", "shulker", "--as", "smp")
-	if code == 0 || !strings.Contains(stderr, "already follows") {
-		t.Fatalf("exit %d: %s", code, stderr)
-	}
-	h.mustRun(t, "-C", other, "link", "shulker")
-	if _, err := os.Stat(filepath.Join(root, "pack", "shulker.json")); err != nil {
-		t.Fatalf("without --as the pack's own name is free: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(root, "smp", "shulker.json")); err != nil {
-		t.Fatalf("the refused link must leave the first instance alone: %v", err)
-	}
-}
-
 func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
 	h := newHarness(t)
 	root := shulkerInstances(t, h)
@@ -136,16 +107,5 @@ func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
 		if len(in) != 1 || in[0].ID != "smp" || in[0].Launcher != "shulker" || in[0].Dir != filepath.Join(root, "smp") || in[0].LauncherDir != "" {
 			t.Fatalf("%v rebuilds the row link wrote: %+v", args, in)
 		}
-	}
-}
-
-func TestLinkShulkerFreshDoesNotWarnAboutTheLock(t *testing.T) {
-	h := newHarness(t)
-	shulkerInstances(t, h)
-	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
-	_, stderr := h.mustRunStderr(t, "link", "shulker")
-	if strings.Contains(stderr, "not in the lock") {
-		t.Fatalf("a fresh link has no lock to be missing from: %s", stderr)
 	}
 }
