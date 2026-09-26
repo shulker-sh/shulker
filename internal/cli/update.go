@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -253,10 +254,27 @@ func (a *app) relockOpened(cmd *cobra.Command, p *project.Project, opts relockOp
 // lockChangesOf shapes a relock's changes for a command's result and its printing.
 func (a *app) lockChangesOf(p *project.Project, res *resolve.Relocked) *lockChanges {
 	c := &lockChanges{Changes: res.Changes, Reresolved: res.Reresolved, Pin: res.Pin, Suggestions: res.Validation.Recommended()}
+	followed := a.followedModpack(p)
 	c.printItems = func(l *out.Lines) {
-		printChanges(l, c.Changes, res.Validation.Suggestions, p.Manifest.Sides(), res.Placements)
+		shown := *c.Changes
+		shown.Modpacks = slices.DeleteFunc(slices.Clone(shown.Modpacks), func(m resolve.ModpackChange) bool { return m.Name == followed })
+		printChanges(l, &shown, res.Validation.Suggestions, p.Manifest.Sides(), res.Placements)
 	}
 	return c
+}
+
+// followedModpack is the modpack a linked instance follows, whose pin moves with every change to
+// its source: the mods that moved with it are the change worth reading, not the pin.
+func (a *app) followedModpack(p *project.Project) string {
+	instances, err := a.loadInstances()
+	if err != nil {
+		return ""
+	}
+	i, ok := config.FindInstance(instances, p.Dir)
+	if !ok || instances[i].Source == "" {
+		return ""
+	}
+	return project.ModpackKey(p.Manifest, instances[i].Source)
 }
 
 func (a *app) outdatedCmd() *cobra.Command {

@@ -109,3 +109,24 @@ func TestInstancesRepairFindsShulkersOwnInstances(t *testing.T) {
 		}
 	}
 }
+
+func TestLinkAndSyncListModsNotThePackItself(t *testing.T) {
+	h := newHarness(t)
+	shulkerInstances(t, h)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "fabric-api")
+
+	stdout := h.mustRun(t, "link", "shulker")
+	if strings.Contains(stdout, "(modpack)") {
+		t.Fatalf("link lists the pack it links as a change: %s", stdout)
+	}
+
+	h.mustRun(t, "add", "sodium")
+	project := h.dir
+	h.dir = ""
+	stdout = h.mustRun(t, "-i", "pack", "sync")
+	h.dir = project
+	if strings.Contains(stdout, "(modpack)") || !strings.Contains(stdout, "+ sodium") {
+		t.Fatalf("sync should list the mods that changed, not the pack: %s", stdout)
+	}
+}
