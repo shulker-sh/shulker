@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/launcher"
-	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/sync"
 )
 
 type instanceSelection struct {
@@ -227,25 +225,13 @@ func (a *app) pickInstance(entries []project.InstanceEntry) (project.InstanceEnt
 }
 
 func (a *app) syncInstance(cmd *cobra.Command, e project.InstanceEntry, req syncRequest) (syncResult, error) {
-	if l := launcher.Find(e.Launcher); l != nil && l.IsInstanced {
-		if _, err := os.Stat(l.InstanceDir(e.Dir)); errors.Is(err, os.ErrNotExist) {
-			fail := out.Errorf("instance-missing", "the %s instance %q is gone (%s)", launcher.Title(e.Launcher), e.Label(), l.InstanceDir(e.Dir))
-			fail.Help = fmt.Sprintf("`shulker unlink %s` forgets it", e.ID)
-			return syncResult{}, fail
-		}
-	}
-	if p, side, ok, err := a.inPlaceProject(e.Dir); err != nil {
-		return syncResult{}, err
-	} else if ok {
-		return a.syncInPlace(cmd, p, side, req)
-	}
-	src, err := a.openSource(cmd.Context(), e.Source, modpack.At{Ref: e.Ref, Path: e.Path})
+	se, err := a.syncEnv()
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.side, req.into = e.Side, e.Dir
-	req.assumeClient = req.assumeClient || e.AssumesClient
-	return a.sync(cmd.Context(), src, req)
+	req.Reason = cmd.Name()
+	res, err := sync.Instance(cmd.Context(), se, e, req.request())
+	return a.synced(res, req, err)
 }
 
 type syncInstanceResult struct {

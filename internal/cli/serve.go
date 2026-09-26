@@ -20,6 +20,7 @@ import (
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/server"
+	"shulker.sh/shulker/internal/sync"
 )
 
 const eulaURL = "https://aka.ms/MinecraftEULA"
@@ -35,18 +36,11 @@ type serveResult struct {
 }
 
 func (a *app) projectJava(ctx context.Context, p *project.Project) (java.Binary, error) {
-	if p.Manifest.Java != "" {
-		return java.Find(p.Manifest.Java, p.Lock.Java.Major)
-	}
-	rt, err := a.managedJava(ctx, p, false, serverJavaFix)
+	se, err := a.syncEnv()
 	if err != nil {
-		if out.CodeOf(err) != "runtime-unavailable" {
-			return java.Binary{}, err
-		}
-		a.printer.Warn("%s; using java on PATH", runtimeWarning(err))
-		return java.Find("", p.Lock.Java.Major)
+		return java.Binary{}, err
 	}
-	return java.At(rt.Home)
+	return sync.ProjectJava(ctx, se, p)
 }
 
 func (a *app) serveCmd() *cobra.Command {

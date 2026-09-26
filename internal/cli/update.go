@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/sync"
 )
 
 func (a *app) updateCmd() *cobra.Command {
@@ -165,7 +166,7 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 	}
 	hasChildren := false
 	if side, ok := p.Manifest.InPlaceSide(); ok && plan.buildsInPlace {
-		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{side: side, backup: "update"})
+		synced, err := a.buildInPlace(cmd.Context(), p.Dir, syncRequest{Request: sync.Request{Side: side, Backup: "update"}})
 		if err != nil {
 			return err
 		}
@@ -240,18 +241,20 @@ func (a *app) relockOpened(cmd *cobra.Command, p *project.Project, opts relockOp
 		return relocked{}, err
 	}
 	a.warn(res.Warnings)
-	rl := relocked{
-		lockChanges: lockChanges{Changes: res.Changes, Reresolved: res.Reresolved, Pin: res.Pin, Suggestions: res.Validation.Recommended()},
-		validation:  res.Validation,
-		wasSaved:    res.WasSaved,
-	}
-	rl.printItems = func(l *out.Lines) {
-		printChanges(l, rl.Changes, res.Validation.Suggestions, p.Manifest.Sides(), res.Placements)
-	}
+	rl := relocked{lockChanges: *a.lockChangesOf(p, &res), validation: res.Validation, wasSaved: res.WasSaved}
 	if res.WasSaved {
 		a.printer.LockStale = false
 	}
 	return rl, nil
+}
+
+// lockChangesOf shapes a relock's changes for a command's result and its printing.
+func (a *app) lockChangesOf(p *project.Project, res *resolve.Relocked) *lockChanges {
+	c := &lockChanges{Changes: res.Changes, Reresolved: res.Reresolved, Pin: res.Pin, Suggestions: res.Validation.Recommended()}
+	c.printItems = func(l *out.Lines) {
+		printChanges(l, c.Changes, res.Validation.Suggestions, p.Manifest.Sides(), res.Placements)
+	}
+	return c
 }
 
 func (a *app) outdatedCmd() *cobra.Command {

@@ -13,7 +13,6 @@ import (
 	"shulker.sh/shulker/internal/env"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/game"
-	"shulker.sh/shulker/internal/java"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/modpack"
@@ -25,6 +24,7 @@ import (
 	"shulker.sh/shulker/internal/provider/curseforge"
 	"shulker.sh/shulker/internal/provider/modrinth"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/sync"
 	"shulker.sh/shulker/schema"
 )
 
@@ -197,16 +197,11 @@ func (a *app) builder(ctx context.Context, p *project.Project) (*build.Builder, 
 
 // openPacks reads p's modpacks at their pins, once: a later call answers from what the first read.
 func (a *app) openPacks(ctx context.Context, p *project.Project) ([]*modpack.Loaded, error) {
-	store, err := a.packStore(p)
+	d, err := a.deps()
 	if err != nil {
 		return nil, err
 	}
-	packs, warnings, err := resolve.OpenPacks(ctx, store, p, resolve.PackMode{})
-	if err != nil {
-		return nil, err
-	}
-	a.warn(warnings)
-	return packs, nil
+	return resolve.Packs(ctx, d.Env, p)
 }
 
 func (a *app) packStore(p *project.Project) (*modpack.Store, error) {
@@ -215,41 +210,6 @@ func (a *app) packStore(p *project.Project) (*modpack.Store, error) {
 		return nil, err
 	}
 	return resolve.NewStore(d.Env, p), nil
-}
-
-// managedJava ensures the lock's runtime component. fix is the Fix row a runtime-unavailable error
-// carries, which depends on which side needs the Java.
-func (a *app) managedJava(ctx context.Context, p *project.Project, refresh bool, fix out.Detail) (java.Runtime, error) {
-	d, err := a.deps()
-	if err != nil {
-		return java.Runtime{}, err
-	}
-	opts := java.RuntimeOptions{Refresh: refresh, Log: a.progress}
-	rt, err := java.EnsureRuntime(ctx, d.Fetch, d.Runtimes, d.Cache.Dir, p.Lock.Java.Component, opts)
-	switch out.CodeOf(err) {
-	case "runtime-unavailable":
-		out.AsError(err).Rows = []out.Detail{fix}
-	case "rosetta-required":
-		e := out.AsError(err)
-		e.Rows = append(e.Rows, fix)
-	}
-	return rt, err
-}
-
-var serverJavaFix = out.Detail{Label: "Fix", Text: `set "java" in shulker.json to a JDK path`}
-
-func linkJavaFix(launcherName string) out.Detail {
-	return out.Detail{Label: "Fix", Text: "shulker link " + launcherName + " --java <path>", IsCommand: true}
-}
-
-// runtimeWarning is a runtime-unavailable error as one line, for a command that carries on without
-// the managed runtime and so never shows the error's rows.
-func runtimeWarning(err error) string {
-	e := out.AsError(err)
-	if len(e.Rows) == 0 {
-		return e.Message
-	}
-	return e.Message + "; " + e.Rows[0].Text
 }
 
 func (a *app) progress(format string, args ...any) {
@@ -276,16 +236,11 @@ func (a *app) scopeWarnings(name string) (restore func()) {
 }
 
 func (a *app) requireLock(p *project.Project) error {
-	if err := p.RequireLock(); err != nil {
-		return err
-	}
-	a.warnLockDifferences(p)
-	d, err := a.deps()
+	se, err := a.syncEnv()
 	if err != nil {
 		return err
 	}
-	a.warn(p.GoneFiles(d.Cache.Has))
-	return nil
+	return sync.RequireLock(se, p)
 }
 
 func (a *app) warnLockDifferences(p *project.Project) {

@@ -1,12 +1,14 @@
 package cli
 
-const assumeClientWarning = "shulker.json declares no client; building from shared mods and overrides"
+import (
+	"shulker.sh/shulker/internal/sync"
+)
 
 // warnAssumedClient says a client is being built from the shared mods and overrides, when a side
 // choice assumed one.
 func (a *app) warnAssumedClient(assumed bool) {
 	if assumed {
-		a.printer.Warn(assumeClientWarning)
+		a.printer.Warn(sync.AssumeClientWarning)
 	}
 }
 

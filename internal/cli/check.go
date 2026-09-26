@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/sync"
 )
 
 var (
@@ -176,10 +177,10 @@ func (a *app) checkServer(ctx context.Context, p *project.Project, r *resolve.Re
 	if p.Manifest.Java != "" {
 		return errs, nil
 	}
-	_, err = a.freshestJava(ctx, p, serverJavaFix)
+	_, err = a.freshestJava(ctx, p, sync.ServerJavaFix)
 	switch {
 	case out.CodeOf(err) == "runtime-unavailable":
-		warnings = append(warnings, runtimeWarning(err))
+		warnings = append(warnings, sync.RuntimeWarning(err))
 	case err != nil:
 		errs = append(errs, err)
 	}

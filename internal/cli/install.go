@@ -8,6 +8,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/sync"
 )
 
 type installResult struct {
@@ -98,56 +99,13 @@ func (a *app) awaitsALauncher(p *project.Project) bool {
 // fetchLocked puts the locked files the given sides use in the cache, every locked file with no
 // sides, and the server jar and its Java runtime too when wantServer is set.
 func (a *app) fetchLocked(ctx context.Context, p *project.Project, sides []string, wantServer bool) ([]string, error) {
-	r, err := a.resolver(ctx, p)
+	se, err := a.syncEnv()
 	if err != nil {
 		return nil, err
 	}
-	fetched, dropWarnings, err := r.Install(ctx, sides...)
-	a.warn(dropWarnings)
+	fetched, err := sync.FetchLocked(ctx, se, p, sides, wantServer)
 	if err != nil {
 		return nil, a.lastOf(err)
 	}
-	if fetched == nil {
-		fetched = []string{}
-	}
-	if wantServer {
-		d, err := a.deps()
-		if err != nil {
-			return nil, err
-		}
-		jar, err := r.EnsureServerJar(ctx, d.meta)
-		if err != nil {
-			return nil, err
-		}
-		if jar.WasFetched && p.Lock.Loader.Type == "" {
-			fetched = append(fetched, "minecraft-server")
-		} else if jar.WasFetched {
-			fetched = append(fetched, p.Lock.Loader.Type+"-server-launcher")
-		}
-		if jar.ChangedLock {
-			if err := p.Lock.Save(p.LockPath()); err != nil {
-				return nil, err
-			}
-		}
-		if p.Manifest.Java == "" {
-			rt, err := a.freshestJava(ctx, p, serverJavaFix)
-			if err != nil && out.CodeOf(err) != "runtime-unavailable" {
-				return nil, err
-			}
-			if err != nil {
-				a.printer.Warn("%s", runtimeWarning(err))
-			} else if rt.Fetched {
-				fetched = append(fetched, rt.Component+" "+rt.Version)
-			}
-		}
-	}
-	v, err := r.Validate(sides...)
-	if err != nil {
-		return nil, err
-	}
-	if err := v.Err(); err != nil {
-		return nil, err
-	}
-	a.warn(v.Warnings)
 	return fetched, nil
 }

@@ -19,6 +19,7 @@ import (
 
 	"shulker.sh/shulker/internal/java"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/sync"
 )
 
 // playReport is what `play --dry-run` prints: the launch shulker assembled, with nothing derived
@@ -596,7 +597,7 @@ func (a *app) clientJava(ctx context.Context, p *project.Project, dir string) (s
 		}
 		return bin.Path, nil
 	}
-	rt, err := a.freshestJava(ctx, p, linkJavaFix("shulker"))
+	rt, err := a.freshestJava(ctx, p, sync.LinkJavaFix("shulker"))
 	if err != nil {
 		return "", err
 	}

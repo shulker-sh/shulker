@@ -18,6 +18,7 @@ import (
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/sync"
 )
 
 // linkReport is what every link reports: the launcher and where it keeps the instance, the
@@ -156,7 +157,7 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 	if err != nil {
 		return nil, err
 	}
-	p := src.project
+	p := src.Project
 	dir := k.launcherDir
 	if e.HasDir() {
 		if dir, err = e.Locate(dir); err != nil {
@@ -196,7 +197,7 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 	if !e.Usage.Names {
 		second = "--as"
 	}
-	if err := project.CheckAdopt(place.GameDir, src.forLink(), e.Usage.Noun, display, second, k.force); err != nil {
+	if err := project.CheckAdopt(place.GameDir, src.ForLink(), e.Usage.Noun, display, second, k.force); err != nil {
 		return nil, err
 	}
 	if err := a.checkID(k.as, place.GameDir); err != nil {
@@ -214,7 +215,7 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 			return nil, err
 		}
 	}
-	row := config.Instance{Launcher: e.Name, Name: display, Dir: res.GameDir, Source: src.name}
+	row := config.Instance{Launcher: e.Name, Name: display, Dir: res.GameDir, Source: src.Name}
 	if e.HasDir() {
 		row.LauncherDir = dir
 	}
@@ -237,10 +238,10 @@ func (a *app) linkInto(cmd *cobra.Command, args []string, e *launcher.Entry, k *
 		VersionID:   res.Version,
 		GameDir:     res.GameDir,
 		Created:     res.Created,
-		Source:      src.name,
+		Source:      src.Name,
 		Ref:         src.Ref,
 		Path:        src.Path,
-		Modpack:     project.ModpackKey(inst.Manifest, src.name),
+		Modpack:     project.ModpackKey(inst.Manifest, src.Name),
 		Sync:        &synced,
 		noun:        e.Usage.Noun,
 		shown:       display,
@@ -276,7 +277,7 @@ func (a *app) metaURL(d *deps, e *launcher.Entry) string {
 
 // openLinkSource is what every link does first: check the settings, fetch the source, refuse a loader
 // this build doesn't know, and warn when the pack declares no client.
-func (a *app) openLinkSource(cmd *cobra.Command, args []string, at modpack.At, ls linkSettings) (*syncSource, loader.Loader, error) {
+func (a *app) openLinkSource(cmd *cobra.Command, args []string, at modpack.At, ls linkSettings) (*sync.Source, loader.Loader, error) {
 	if err := ls.check(); err != nil {
 		return nil, loader.Loader{}, err
 	}
@@ -284,7 +285,7 @@ func (a *app) openLinkSource(cmd *cobra.Command, args []string, at modpack.At, l
 	if err != nil {
 		return nil, loader.Loader{}, err
 	}
-	p := src.project
+	p := src.Project
 	var l loader.Loader
 	if p.Lock.Loader.Type != "" {
 		if l, err = loader.Require(p.Lock.Loader.Type); err != nil {
@@ -299,13 +300,13 @@ func (a *app) openLinkSource(cmd *cobra.Command, args []string, at modpack.At, l
 
 // startLauncherLink is openLinkSource plus the feature choices checked against the build, and
 // the launcher directory the link works in settled.
-func (a *app) startLauncherLink(cmd *cobra.Command, args []string, k *launcherLink, e *launcher.Entry) (*syncSource, loader.Loader, error) {
+func (a *app) startLauncherLink(cmd *cobra.Command, args []string, k *launcherLink, e *launcher.Entry) (*sync.Source, loader.Loader, error) {
 	src, l, err := a.openLinkSource(cmd, args, k.at, k.ls)
 	if err != nil {
 		return nil, l, err
 	}
 	if k.hasFeatures() {
-		b, err := a.builder(cmd.Context(), src.project)
+		b, err := a.builder(cmd.Context(), src.Project)
 		if err != nil {
 			return nil, l, err
 		}
@@ -356,7 +357,7 @@ func (a *app) refuseForeignInstance(k *launcherLink, e *launcher.Entry, launcher
 	if k.force {
 		return nil
 	}
-	_, _, inPlace, err := a.inPlaceProject(gameDir)
+	_, _, inPlace, err := sync.InPlaceProject(gameDir)
 	if err != nil || inPlace {
 		return err
 	}
@@ -444,7 +445,7 @@ const noClientPack = "the source declares no client; building one from its share
 // linkInstance is the half of a link every instanced launcher shares: the project its game
 // directory becomes, the settings this link seeds it with, the registry row that finds it again,
 // and the build that leaves it ready to play.
-func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, src *syncSource, ls linkSettings) (*project.Project, syncResult, error) {
+func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, src *sync.Source, ls linkSettings) (*project.Project, syncResult, error) {
 	if err := a.checkID(as, row.Dir); err != nil {
 		return nil, syncResult{}, err
 	}
@@ -453,29 +454,24 @@ func (a *app) linkInstance(cmd *cobra.Command, row config.Instance, as string, s
 		return nil, syncResult{}, err
 	}
 	id := config.InstanceID(instances, as, row.Name, row.Dir)
-	from := src.forLink()
+	from := src.ForLink()
 	p, linked, err := project.LinkInstance(row.Dir, id, row.Name, from)
 	if err != nil {
 		return nil, syncResult{}, err
 	}
-	src.name = from.Name
-	if err := ls.save(row.Dir, src.name, src.At, "client", false, src.project.Manifest); err != nil {
+	src.Name = from.Name
+	if err := ls.save(row.Dir, src.Name, src.At, "client", false, src.Project.Manifest); err != nil {
 		return nil, syncResult{}, err
 	}
-	row.ID, row.Source = id, src.name
+	row.ID, row.Source = id, src.Name
 	a.registerInstance(row)
-	synced, err := a.syncInPlace(cmd, p, "client", syncRequest{linked: linked})
+	synced, err := a.syncInPlace(cmd, p, "client", syncRequest{Request: sync.Request{Linked: linked}})
 	return p, synced, err
-}
-
-// forLink is the source as the project a link writes takes it.
-func (s *syncSource) forLink() *project.LinkSource {
-	return &project.LinkSource{Checkout: s.Checkout, Name: s.name, Project: s.project, IsAuthor: s.isAuthor}
 }
 
 // linkSource is the project a link command works from: the argument when there
 // is one, else the project in the current directory.
-func (a *app) linkSource(ctx context.Context, args []string, at modpack.At) (*syncSource, error) {
+func (a *app) linkSource(ctx context.Context, args []string, at modpack.At) (*sync.Source, error) {
 	if len(args) == 1 {
 		return a.openSource(ctx, args[0], at)
 	}
@@ -490,7 +486,7 @@ func (a *app) linkSource(ctx context.Context, args []string, at modpack.At) (*sy
 
 // linkFrom is linkSource for a link command: at a terminal, with nothing to follow, the link
 // authors the instance itself.
-func (a *app) linkFrom(cmd *cobra.Command, args []string, at modpack.At) (*syncSource, error) {
+func (a *app) linkFrom(cmd *cobra.Command, args []string, at modpack.At) (*sync.Source, error) {
 	src, err := a.linkSource(cmd.Context(), args, at)
 	if len(args) > 0 || !errors.Is(err, project.ErrNoManifest) || !a.canPick() {
 		return src, err
@@ -582,7 +578,7 @@ func (ls linkSettings) save(dir, source string, at modpack.At, side string, assu
 	return f.Save(dir)
 }
 
-func (a *app) projectSource() (*syncSource, error) {
+func (a *app) projectSource() (*sync.Source, error) {
 	p, err := a.openProject()
 	if err != nil {
 		return nil, err
@@ -594,7 +590,7 @@ func (a *app) projectSource() (*syncSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &syncSource{Checkout: &modpack.Checkout{Source: dir, Kind: modpack.Local, Dir: dir}, name: dir, project: p}, nil
+	return &sync.Source{Checkout: &modpack.Checkout{Source: dir, Kind: modpack.Local, Dir: dir}, Name: dir, Project: p}, nil
 }
 
 func (a *app) saveInstanceFeatures(gameDir string, ff featureFlags) error {

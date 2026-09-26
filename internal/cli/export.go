@@ -63,8 +63,8 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, for
 	if err != nil {
 		return nil, err
 	}
-	p := src.project
-	if diffs := p.LockDifferences(); len(diffs) > 0 && !src.isRemote() {
+	p := src.Project
+	if diffs := p.LockDifferences(); len(diffs) > 0 && !src.IsRemote() {
 		e := out.Errorf("lock-stale", "shulker.lock does not match shulker.json (%s)", strings.Join(diffs, "; "))
 		e.Help = "run `shulker lock`"
 		e.Items = diffs
@@ -79,12 +79,12 @@ func (a *app) openExport(ctx context.Context, args []string, f *exportFlags, for
 	}
 	if job.output == "" {
 		cwd := a.dir
-		if src.isRemote() && cwd == "" {
+		if src.IsRemote() && cwd == "" {
 			if cwd, err = os.Getwd(); err != nil {
 				return nil, err
 			}
 		}
-		job.output = build.ExportPath(p.Dir, p.Manifest, job.version, format, src.isRemote(), cwd)
+		job.output = build.ExportPath(p.Dir, p.Manifest, job.version, format, src.IsRemote(), cwd)
 	}
 	if job.output, err = filepath.Abs(job.output); err != nil {
 		return nil, err

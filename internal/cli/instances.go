@@ -1,18 +1,16 @@
 package cli
 
 import (
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/instance"
-	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/sync"
 )
 
 // instanceText phrases an entry's status for the instances list.
@@ -172,66 +170,13 @@ func (a *app) registerInstance(in config.Instance) {
 	a.reconcileOrWarn(in)
 }
 
-// reconcileOrWarn brings an instance's hooks in line with its instance.json: a run left open by a
-// watcher that was killed is closed first, which is true of every instance, then a launcher with a
-// slot gets launcher.Reconcile and a warning for each command it adopted. A launcher shulker
-// couldn't set up is worth saying so about, but never worth failing the command that registered it.
 func (a *app) reconcileOrWarn(in config.Instance) {
-	if err := instance.ReconcileRuns(in.Dir); err != nil {
-		a.printer.Warn("%v", err)
-	}
-	e := launcher.Find(in.Launcher)
-	if e == nil || e.Slot == nil {
-		// A plain synced directory has no slot to fill, so it gets no scripts either.
-		return
-	}
-	var adopted []string
-	f, err := instance.Load(in.Dir)
-	if err == nil {
-		var exe string
-		if exe, err = launcher.ShulkerPath(); err == nil {
-			adopted, err = launcher.Reconcile(e, in, f, exe)
-		}
-	}
-	for _, command := range adopted {
-		a.warnUnreproducible(*e.Slot, command)
-	}
+	se, err := a.syncEnv()
 	if err != nil {
 		a.printer.Warn("hooks not set up for %q: %v", in.Label(), err)
+		return
 	}
-}
-
-// warnUnreproducible reports the tokens an adopted command uses that shulker can't reproduce,
-// because they come from the launcher's own Java resolution rather than from the instance.
-func (a *app) warnUnreproducible(slot launcher.Slot, command string) {
-	var named []string
-	for _, token := range slot.Unreproducible {
-		if strings.Contains(command, "$"+token) {
-			named = append(named, "$"+token)
-		}
-	}
-	if len(named) > 0 {
-		a.printer.Warn("the command shulker adopted uses %s, which only the launcher can fill in, so it will be empty when shulker runs it", strings.Join(named, " and "))
-	}
-}
-
-// refreshRegistered refreshes the row for a directory a sync just built. A sync adds no row of its
-// own, so a directory without one is a detached build and gets no hooks either.
-func (a *app) refreshRegistered(in config.Instance) {
-	found := false
-	a.updateInstances(func(instances []config.Instance) []config.Instance {
-		i, ok := config.FindInstance(instances, in.Dir)
-		if !ok {
-			return instances
-		}
-		found = true
-		in = launcher.RefreshRow(instances[i], in)
-		instances[i] = in
-		return instances
-	})
-	if found {
-		a.reconcileOrWarn(in)
-	}
+	sync.Reconcile(se, in)
 }
 
 func (a *app) updateInstances(update func([]config.Instance) []config.Instance) bool {

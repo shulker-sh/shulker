@@ -21,6 +21,7 @@ import (
 	"shulker.sh/shulker/internal/saves"
 	"shulker.sh/shulker/internal/selfupdate"
 	"shulker.sh/shulker/internal/server"
+	"shulker.sh/shulker/internal/sync"
 )
 
 const agentHelp = `Scripts and agents: pass --json. Every command then prints one JSON object on
@@ -36,6 +37,7 @@ type app struct {
 	dir        string
 	instance   string
 	d          *deps
+	se         *sync.Env
 	configPath string
 	releases   *selfupdate.Releases
 	build      func() selfupdate.Build

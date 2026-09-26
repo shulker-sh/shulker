@@ -2,57 +2,24 @@ package cli
 
 import (
 	"context"
-	"errors"
-	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
-	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/sync"
 )
-
-// inPlaceProject is the project in dir when one of its sides builds into dir itself, which is
-// what makes dir an instance rather than a project that builds elsewhere.
-func (a *app) inPlaceProject(dir string) (*project.Project, string, bool, error) {
-	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); errors.Is(err, os.ErrNotExist) {
-		return nil, "", false, nil
-	} else if err != nil {
-		return nil, "", false, err
-	}
-	p, err := a.openProjectAt(dir)
-	if err != nil {
-		return nil, "", false, err
-	}
-	side, ok := p.Manifest.InPlaceSide()
-	return p, side, ok, nil
-}
 
 // syncInPlace refreshes the modpacks that follow their source, relocks without moving the
 // project's own mods, and builds the instance where it stands.
 func (a *app) syncInPlace(cmd *cobra.Command, p *project.Project, side string, req syncRequest) (syncResult, error) {
-	rl, err := a.relockOpened(cmd, p, relockOptions{keepUnchanged: true, linked: req.linked}, func(p *project.Project, r *resolve.Resolver) (string, error) {
-		store, err := a.packStore(p)
-		if err != nil {
-			return "", err
-		}
-		_, err = r.RefreshModpacks(cmd.Context(), store, p, manifest.Require.AutoUpdates, resolve.KeepUnreachable)
-		return "", err
-	})
+	se, err := a.syncEnv()
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.side = side
-	res, err := a.buildInPlace(cmd.Context(), p.Dir, req)
-	if err != nil {
-		return syncResult{}, err
-	}
-	if rl.wasSaved {
-		res.Changes = &rl.lockChanges
-	}
-	return res, nil
+	req.Reason = cmd.Name()
+	res, err := sync.InPlace(cmd.Context(), se, p, side, req.request())
+	return a.synced(res, req, err)
 }
 
 func (a *app) buildInPlace(ctx context.Context, dir string, req syncRequest) (syncResult, error) {
@@ -60,20 +27,8 @@ func (a *app) buildInPlace(ctx context.Context, dir string, req syncRequest) (sy
 	if err != nil {
 		return syncResult{}, err
 	}
-	req.at, req.into = modpack.At{}, ""
+	req.At, req.Into = modpack.At{}, ""
 	return a.sync(ctx, src, req)
-}
-
-// syncInPlaceForLaunch never stands between the player and the game: a refresh that fails falls
-// back to building the lock already there, and a build that fails leaves what is on disk.
-func (a *app) syncInPlaceForLaunch(cmd *cobra.Command, p *project.Project, side string) (syncResult, error) {
-	res, err := a.syncInPlace(cmd, p, side, syncRequest{backup: "sync", keepConflicts: true})
-	if err == nil || errors.Is(cmd.Context().Err(), context.DeadlineExceeded) {
-		return res, err
-	}
-	a.printer.Drop()
-	a.printer.Warn("couldn't update, building what the lock already has: %v", err)
-	return a.buildInPlace(cmd.Context(), p.Dir, syncRequest{side: side, backup: "sync", keepConflicts: true})
 }
 
 // syncTree syncs an instance that is also a source, then every directory built from it, since

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,12 +8,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/instance"
-	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/saves"
+	"shulker.sh/shulker/internal/sync"
 )
 
 type savesGroupRow struct {
@@ -291,72 +287,16 @@ func (a *app) savesTargetOf(group string) (savesTarget, error) {
 	return a.targetOfDir(dir)
 }
 
-// targetOfDir is the saves target of dir, looked up through the registry, the instance file and
-// the manifest that builds dir in place.
 func (a *app) targetOfDir(dir string) (savesTarget, error) {
-	r, err := a.roots()
+	se, err := a.syncEnv()
 	if err != nil {
 		return savesTarget{}, err
 	}
-	in, f, err := a.ownedInstance(dir)
-	if err != nil {
-		return savesTarget{}, err
-	}
-	m, _, inPlace, err := project.InPlace(dir)
-	if err != nil {
-		return savesTarget{}, err
-	}
-	if !inPlace {
-		m = nil
-	}
-	t, err := saves.TargetAt(dir, r.saves(), in, f, m)
+	t, err := sync.TargetOfDir(se, dir)
 	if err != nil {
 		return savesTarget{}, err
 	}
 	return savesTarget{Target: t}, nil
-}
-
-// ownedInstance is dir's registry row when shulker launches the instance there, and its instance
-// file when it has one; any other directory gets nil for both.
-func (a *app) ownedInstance(dir string) (*config.Instance, *instance.File, error) {
-	in, ok := a.registeredInstance(dir)
-	if !ok || !launcher.Shulker.Launches(in) {
-		return nil, nil, nil
-	}
-	f, err := instance.Load(dir)
-	if errors.Is(err, instance.ErrNotFound) {
-		return &in, nil, nil
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	return &in, f, nil
-}
-
-// linkSaves points a shulker instance's saves/ at its save group. Any other directory keeps its
-// own worlds, and gets nil.
-func (a *app) linkSaves(dir string) (*saves.Result, error) {
-	in, f, err := a.ownedInstance(dir)
-	if err != nil {
-		return nil, err
-	}
-	group, owned := saves.GroupOf(in, f)
-	if !owned {
-		return nil, nil
-	}
-	r, err := a.roots()
-	if err != nil {
-		return nil, err
-	}
-	res, err := saves.Link(dir, r.Saves, group)
-	if err != nil {
-		return nil, err
-	}
-	if res.Conflict != "" {
-		a.printer.Drop()
-		a.printer.Warn("%s", res.Conflict)
-	}
-	return &res, nil
 }
 
 // savesRow is the tree row a sync prints when it relinked saves/, naming the worlds the game now

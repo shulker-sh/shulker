@@ -127,7 +127,7 @@ func takeOver(cmd *cobra.Command, args []string, force bool) string {
 // ran one, otherwise the command that rebuilds dir.
 func (a *app) syncTakeOver(req syncRequest, p *project.Project, side, dir string) string {
 	switch {
-	case req.force:
+	case req.Force:
 		return ""
 	case req.rerun != "":
 		return req.rerun

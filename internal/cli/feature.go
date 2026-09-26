@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -15,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/sync"
 )
 
 type featureFlags struct {
@@ -27,40 +26,13 @@ func (f *featureFlags) register(cmd *cobra.Command, scope string) {
 }
 
 func (f featureFlags) check(b *build.Builder) error {
-	for _, name := range f.with {
-		if slices.Contains(f.without, name) {
-			return out.Errorf("usage", "--with and --without both name %s", name)
-		}
-	}
-	known := featureNames(b.Features())
-	for _, name := range append(slices.Clone(f.with), f.without...) {
-		if !slices.Contains(known, name) {
-			return unknownFeature(name, known)
-		}
-	}
-	return nil
+	_, err := sync.FeatureOverrides(b, f.with, f.without, nil)
+	return err
 }
 
 // overrides is the feature decisions a build takes, once the flags name features the build knows.
 func (f featureFlags) overrides(b *build.Builder, decisions map[string]bool) (map[string]bool, error) {
-	if err := f.check(b); err != nil {
-		return nil, err
-	}
-	return build.FeatureOverrides(decisions, f.with, f.without), nil
-}
-
-func featureNames(features []build.Feature) []string {
-	names := make([]string, 0, len(features))
-	for _, f := range features {
-		names = append(names, f.Name)
-	}
-	return names
-}
-
-func unknownFeature(name string, known []string) error {
-	e := out.Errorf("feature-not-found", "no mod or feature declaration in shulker.json uses feature %q", name)
-	e.Candidates, e.Given = known, name
-	return e
+	return sync.FeatureOverrides(b, f.with, f.without, decisions)
 }
 
 func checkOS(name string) error {
@@ -71,30 +43,16 @@ func checkOS(name string) error {
 }
 
 func (a *app) saveLocal(lf *local.File, inProject bool) error {
-	created := !lf.Exists()
-	lf.DetectedOS = build.DetectOS()
-	if err := lf.Save(); err != nil {
+	se, err := a.syncEnv()
+	if err != nil {
 		return err
 	}
-	if !created || !inProject {
-		return nil
-	}
-	added, err := local.AddToGitignore(lf.Dir())
-	if added {
-		a.progress("added /%s to .gitignore", local.FileName)
-	}
-	return err
+	return sync.SaveLocal(se, lf, inProject)
 }
 
-// refreshLocal saves the bookkeeping a build or sync collected. It is best
-// effort: a project nobody can write to (someone else's, synced from) keeps its
-// directories in the links registry instead, so there is nothing to report.
 func (a *app) refreshLocal(lf *local.File, inProject, changed bool) {
-	if !changed && (!lf.Exists() || lf.DetectedOS == build.DetectOS()) {
-		return
-	}
-	if err := a.saveLocal(lf, inProject); err != nil && !errors.Is(err, fs.ErrPermission) {
-		a.printer.Warn("%s not updated: %v", local.FileName, err)
+	if se, err := a.syncEnv(); err == nil {
+		sync.RefreshLocal(se, lf, inProject, changed)
 	}
 }
 
@@ -118,7 +76,7 @@ type featureScope struct {
 	file      *local.File
 	decisions map[string]bool
 	into      string
-	source    *syncSource
+	source    *sync.Source
 	state     instance.State
 }
 
@@ -175,8 +133,12 @@ func (a *app) instanceFeatures(cmd *cobra.Command, into string, withSource bool)
 	if sc.source, err = a.openSource(cmd.Context(), sc.state.Source, modpack.At{Ref: sc.state.Ref, Path: sc.state.Path}); err != nil {
 		return nil, err
 	}
-	sc.project = sc.source.project
-	proj, _, err := a.sourceLocalFiles(sc.source, dir)
+	sc.project = sc.source.Project
+	se, err := a.syncEnv()
+	if err != nil {
+		return nil, err
+	}
+	proj, _, err := sync.SourceLocalFiles(se, sc.source, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +155,7 @@ func (a *app) resync(cmd *cobra.Command, sc *featureScope) (*syncResult, error) 
 	}
 	intent, err := instance.Load(sc.into)
 	assume := err == nil && intent.AssumesClient
-	res, err := a.sync(cmd.Context(), sc.source, syncRequest{side: sc.state.Side, into: sc.into, assumeClient: assume})
+	res, err := a.sync(cmd.Context(), sc.source, syncRequest{Request: sync.Request{Side: sc.state.Side, Into: sc.into, AssumeClient: assume}})
 	return &res, err
 }
 
@@ -297,8 +259,8 @@ func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if known := featureNames(b.Features()); !slices.Contains(known, name) {
-				return unknownFeature(name, known)
+			if known := sync.FeatureNames(b.Features()); !slices.Contains(known, name) {
+				return sync.UnknownFeature(name, known)
 			}
 			sc.file.SetFeature(name, on)
 			if err := a.saveLocal(sc.file, into == ""); err != nil {

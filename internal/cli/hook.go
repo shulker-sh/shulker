@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/proc"
+	"shulker.sh/shulker/internal/sync"
 )
 
 // hookCmd is what the generated scripts run. It is hidden: nothing should be typed by hand here, and
@@ -206,15 +207,12 @@ func runReason(exe string, err error) string {
 }
 
 func (a *app) syncForLaunch(cmd *cobra.Command, dir string) (syncResult, error) {
-	p, side, inPlace, err := a.inPlaceProject(dir)
-	switch {
-	case err != nil:
+	se, err := a.syncEnv()
+	if err != nil {
 		return syncResult{}, err
-	case inPlace:
-		return a.syncInPlaceForLaunch(cmd, p, side)
-	default:
-		return a.syncRecorded(cmd, syncRequest{into: dir, backup: "sync", keepConflicts: true})
 	}
+	res, err := sync.ForLaunch(cmd.Context(), se, dir, cmd.Name())
+	return a.synced(res, syncRequest{Request: sync.Request{Into: dir}}, err)
 }
 
 // hookInstance is the directory the script named and the intent it records. Its callers decide what
@@ -252,8 +250,11 @@ func (a *app) stampLaunch(dir string, s instance.Settings) {
 // instanceID is the id `-i` takes for a directory, for the message that names it. Empty when the
 // registry can't be read, which only costs the message its command.
 func (a *app) instanceID(dir string) string {
-	in, _ := a.registeredInstance(dir)
-	return in.ID
+	se, err := a.syncEnv()
+	if err != nil {
+		return ""
+	}
+	return sync.InstanceID(se, dir)
 }
 
 // registeredInstance is the registry row for a directory, when there is one.

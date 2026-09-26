@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/sync"
 )
 
 func (a *app) playerCmd() *cobra.Command {
@@ -83,29 +84,11 @@ func describePlayer(r player.Result) out.Item {
 }
 
 func (a *app) syncPlayers(ctx context.Context, p *project.Project, mode player.Mode, acceptChange, persist bool) error {
-	refs := player.RefsOf(p.Manifest)
-	if len(refs) == 0 && len(p.Lock.Players) == 0 {
-		return nil
-	}
-	d, err := a.deps()
+	se, err := a.syncEnv()
 	if err != nil {
 		return err
 	}
-	results, err := d.Players.Sync(ctx, refs, p.Lock.Players, mode)
-	if err != nil {
-		return err
-	}
-	warnings, err := player.Policy(results, acceptChange)
-	a.warn(warnings)
-	if err != nil {
-		return err
-	}
-	next := player.Apply(results, p.Lock.Players, acceptChange)
-	if !persist {
-		p.Lock.Players = next
-		return nil
-	}
-	return a.savePlayers(p, next)
+	return sync.Players(ctx, se, p, mode, acceptChange, persist)
 }
 
 func (a *app) savePlayers(p *project.Project, next []lock.Player) error {

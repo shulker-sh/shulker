@@ -6,9 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
-	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/saves"
+	"shulker.sh/shulker/internal/sync"
 )
 
 type backupResult struct {
@@ -68,23 +68,12 @@ func (b backupResult) print(l *out.Lines) {
 	l.OKInto("backed up "+plural(b.Worlds, "world", "worlds"), b.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(b.Size), b.elapsed.Seconds()))
 }
 
-// backupSource is where target's worlds are, and what the zip comment records about them: the
-// instance registered at its directory and the platform its last build installed, when there are
-// any. A build backs up before it records its own platform, so this is what the worlds were played on.
 func (a *app) backupSource(target savesTarget) saves.Source {
-	src := saves.Source{Dir: target.WorldsDir}
-	if target.World != "" {
-		src.Only = []string{target.World}
+	se, err := a.syncEnv()
+	if err != nil {
+		return saves.Source{Dir: target.WorldsDir}
 	}
-	if target.Dir == "" {
-		return src
-	}
-	if in, ok := a.registeredInstance(target.Dir); ok {
-		src.Instance = in.ID
-	}
-	state := instance.LoadState(target.Dir)
-	src.Minecraft, src.Loader, src.LoaderVersion = state.Minecraft, state.Loader, state.LoaderVersion
-	return src
+	return sync.BackupSource(se, target.Target)
 }
 
 // zipping is the step line saves.Take shows for each world, under a warning when a running game
@@ -95,40 +84,6 @@ func (a *app) zipping(verb string) func(world string, open bool) {
 			a.printer.Warn("%s is open in a running game; its backup may be torn", world)
 		}
 		a.printer.Step("%s %s", verb, world)
-	}
-}
-
-// beforeModChange is what a build runs before it changes dir's mod set: the automatic backup of
-// its worlds, found through the saves target the directory belongs to and kept to
-// play.saveBackups. A target that can't be found is a warning, not a failed build.
-func (a *app) beforeModChange(reason, dir string) func() error {
-	if reason == "" {
-		return nil
-	}
-	return func() error {
-		skip := func(err error) error {
-			a.printer.Warn("couldn't back up the worlds in %s before the mods changed: %v", dir, err)
-			return nil
-		}
-		if _, err := a.loadInstances(); err != nil {
-			return skip(err)
-		}
-		target, err := a.targetOfDir(dir)
-		if err != nil {
-			return skip(err)
-		}
-		keep, err := a.saveBackups()
-		if err != nil {
-			a.printer.Warn("couldn't read play.saveBackups, keeping %d automatic backups: %v", keep, err)
-		}
-		if a.backedUp == nil {
-			a.backedUp = map[saves.Home]bool{}
-		}
-		_, warning, err := saves.Auto(a.backupSource(target), target.Home(), reason, keep, a.backedUp, a.zipping("backing up"))
-		if warning != "" {
-			a.printer.Warn("%s", warning)
-		}
-		return err
 	}
 }
 
