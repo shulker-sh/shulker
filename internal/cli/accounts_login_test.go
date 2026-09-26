@@ -390,8 +390,8 @@ func TestAccountsRefreshRenewsOwnAccounts(t *testing.T) {
 	if !strings.Contains(stdout, "✔ Renewed Notch's sign-in") {
 		t.Errorf("refresh result: %s", stdout)
 	}
-	if !strings.Contains(stderr, "Renewed Notch") {
-		t.Errorf("each account gets its own step line: %s", stderr)
+	if strings.Contains(stderr, "Renewed Notch") {
+		t.Errorf("the renewal says so once, in the result: %s", stderr)
 	}
 	if h.msa.renewals != 1 {
 		t.Errorf("renewals = %d", h.msa.renewals)

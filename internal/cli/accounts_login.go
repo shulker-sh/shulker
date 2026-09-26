@@ -156,7 +156,7 @@ func (a *app) accountsRefreshCmd() *cobra.Command {
 			}
 			rows, failures := []accountRow{}, []error{}
 			for _, r := range chosen {
-				a.progress("renewing %s", r.Name)
+				a.printer.Working("renewing %s", r.Name)
 				renewed, err := d.signin.Renew(cmd.Context(), r.Account)
 				if err != nil {
 					failures = append(failures, err)

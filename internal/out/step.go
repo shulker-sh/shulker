@@ -21,7 +21,9 @@ type stepState struct {
 }
 
 type step struct {
-	text    string
+	text string
+	// clears ends the step without a done line, for work whose result says what it did.
+	clears  bool
 	tty     *os.File
 	wheel   spinner.Model
 	stop    chan struct{}
@@ -96,10 +98,21 @@ func slowAside(elapsed time.Duration, host string) string {
 // output, then settles into a grey ok line in the past tense; off a terminal only that line prints.
 // A step already shown in this run is skipped.
 func (p *Printer) Step(format string, args ...any) {
+	text := OneLine(fmt.Sprintf(format, args...))
+	verb, _, _ := strings.Cut(text, " ")
+	p.step(text, p.ClearFetches && verb == "fetching")
+}
+
+// Working shows a piece of work under way on a terminal, like Step, and clears it when it ends:
+// the result that follows says what it did. Off a terminal it prints nothing.
+func (p *Printer) Working(format string, args ...any) {
+	p.step(OneLine(fmt.Sprintf(format, args...)), true)
+}
+
+func (p *Printer) step(text string, clears bool) {
 	if p.JSON {
 		return
 	}
-	text := OneLine(fmt.Sprintf(format, args...))
 	p.steps.mu.Lock()
 	defer p.steps.mu.Unlock()
 	if slices.Contains(p.steps.shown, text) {
@@ -110,7 +123,7 @@ func (p *Printer) Step(format string, args ...any) {
 	verb, _, _ := strings.Cut(text, " ")
 	f, isTTY := p.Stderr.(*os.File)
 	isTTY = isTTY && IsTerminal(f)
-	if p.ClearFetches && !isTTY && verb == "fetching" {
+	if clears && !isTTY {
 		return
 	}
 	p.open(p.Stderr)
@@ -118,7 +131,7 @@ func (p *Printer) Step(format string, args ...any) {
 		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(Sentence(text))
 		return
 	}
-	s := &step{text: text}
+	s := &step{text: text, clears: clears}
 	if isTTY {
 		s.tty = f
 		s.wheel = newSpinner(p.ErrTheme)
@@ -153,7 +166,7 @@ func (p *Printer) settleLocked(done bool) {
 		<-s.stopped
 		fmt.Fprint(s.tty, "\r\x1b[J")
 	}
-	if done && !(p.ClearFetches && strings.HasPrefix(s.text, "fetching ")) {
+	if done && !s.clears {
 		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(Sentence(settledText(s.text)))
 	}
 }
