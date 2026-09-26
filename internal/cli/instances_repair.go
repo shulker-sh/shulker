@@ -154,7 +154,7 @@ func (r repairResult) print(l *out.Lines) {
 		l.OK("Wrote "+path, "")
 	}
 	if len(r.Missing) > 0 {
-		l.Info(plural(len(r.Missing), "instance directory is", "instance directories are") + " missing; they are kept in case the disk holding them is away")
+		l.Info(out.Count(len(r.Missing), "instance directory is", "instance directories are") + " missing; they are kept in case the disk holding them is away")
 		for _, dir := range r.Missing {
 			l.Tree(out.Row{Text: dir})
 		}

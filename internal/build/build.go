@@ -419,7 +419,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		}
 	}
 	if len(report.Conflicts) > 0 {
-		e := out.Errorf("build-conflict", "%s: %d file(s) changed in the output directory and in the source", side, len(report.Conflicts))
+		e := out.Errorf("build-conflict", "%s: %s in the output directory and in the source", side, out.Count(len(report.Conflicts), "file changed", "files changed"))
 		e.Help = "run `shulker diff`, or `shulker build --force` to overwrite, which also resets seeded files"
 		e.Items = report.Conflicts
 		return report, e
@@ -821,7 +821,7 @@ func (b *Builder) checkProperties(props properties, report *Report) error {
 	check := server.CheckProperties(props, mc)
 	report.Warnings = append(report.Warnings, check.Warnings...)
 	if len(check.Problems) > 0 {
-		e := out.Errorf("properties-invalid", "%d server.properties key(s) are not valid for Minecraft %s", len(check.Problems), b.Lock.Minecraft)
+		e := out.Errorf("properties-invalid", "%s not valid for Minecraft %s", out.Count(len(check.Problems), "server.properties key is", "server.properties keys are"), b.Lock.Minecraft)
 		e.Items = check.Problems
 		return e
 	}

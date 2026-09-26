@@ -111,7 +111,7 @@ func (a *app) emitDocsMatches(pages []*docs.Page, query string, sections []*docs
 	}{matches}
 	return a.printer.Emit(data, func(l *out.Lines) {
 		t := l.T
-		l.Info(fmt.Sprintf("%s matches %s", query, plural(len(matches), "section", "sections")))
+		l.Info(fmt.Sprintf("%s matches %s", query, out.Count(len(matches), "section", "sections")))
 		width := 0
 		for _, m := range matches {
 			width = max(width, out.Width(m.Command))
@@ -163,7 +163,7 @@ func (a *app) emitDocsSearch(pages []*docs.Page, query string, hits []docs.Hit) 
 			l.Info(fmt.Sprintf("No lines match %q", query))
 			return
 		}
-		l.Info(fmt.Sprintf("%s match %q in %s", plural(len(hits), "line", "lines"), query, plural(len(groups), "section", "sections")))
+		l.Info(fmt.Sprintf("%s match %q in %s", out.Count(len(hits), "line", "lines"), query, out.Count(len(groups), "section", "sections")))
 		l.Blank()
 		shown := 0
 		for i, g := range groups {

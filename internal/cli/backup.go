@@ -65,7 +65,7 @@ func (a *app) backup(target savesTarget, only []string) (backupResult, error) {
 }
 
 func (b backupResult) print(l *out.Lines) {
-	l.OKInto("Backed up "+plural(b.Worlds, "world", "worlds"), b.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(b.Size), b.elapsed.Seconds()))
+	l.OKInto("Backed up "+out.Count(b.Worlds, "world", "worlds"), b.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(b.Size), b.elapsed.Seconds()))
 }
 
 func (a *app) backupSource(target savesTarget) saves.Source {

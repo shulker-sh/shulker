@@ -54,7 +54,7 @@ func (im *importer) listedByID(ctx context.Context) error {
 			}
 		}
 		if len(missing) > 0 {
-			e := out.Errorf("missing-files", "%d file(s) need a manual download", len(missing))
+			e := out.Errorf("missing-files", "%s a manual download", out.Count(len(missing), "file needs", "files need"))
 			e.Items = missing
 			e.Help = "download them, then run the command again"
 			return e

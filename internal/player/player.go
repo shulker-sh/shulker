@@ -223,12 +223,12 @@ func Policy(results []Result, acceptChange bool) ([]string, error) {
 		}
 	}
 	if len(unknown) > 0 {
-		e := out.Errorf("player-unknown", "%d player(s) do not exist at Mojang", len(unknown))
+		e := out.Errorf("player-unknown", "%s at Mojang", out.Count(len(unknown), "player doesn't exist", "players don't exist"))
 		e.Items = unknown
 		return warnings, e
 	}
 	if len(reassigned) > 0 {
-		e := out.Errorf("player-reassigned", "%d player name(s) now belong to a different account", len(reassigned))
+		e := out.Errorf("player-reassigned", "%s to a different account", out.Count(len(reassigned), "player name now belongs", "player names now belong"))
 		e.Help = "pass `--accept-player-change` to relock them"
 		e.Items = reassigned
 		return warnings, e

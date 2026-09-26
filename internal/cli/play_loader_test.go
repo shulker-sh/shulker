@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestPlayLaunchesAModdedInstance(t *testing.T) {
@@ -34,7 +36,7 @@ func TestPlayLaunchesAModdedInstance(t *testing.T) {
 				t.Fatalf("classpath %+v", rep)
 			}
 			stdout := h.mustRun(t, "-i", "pack", "play", "--dry-run")
-			for _, want := range []string{"Would launch pack", tc.version, "inherits: 26.2", "loader libraries: " + plural(tc.libraries, "jar", "jars")} {
+			for _, want := range []string{"Would launch pack", tc.version, "inherits: 26.2", "loader libraries: " + out.Count(tc.libraries, "jar", "jars")} {
 				if !strings.Contains(stdout, want) {
 					t.Fatalf("play --dry-run: %q is missing from\n%s", want, stdout)
 				}

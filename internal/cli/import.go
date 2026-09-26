@@ -137,7 +137,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides), KeptYours: []string{}, LeftOut: leftOut}
 	return a.emitImport(res,
 		out.Row{Text: importedSummary(a.titles(), mods, res.Marker)},
-		out.Row{Text: fmt.Sprintf("%s, %s", plural(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), plural(len(res.Overrides), "override file", "override files"))},
+		out.Row{Text: fmt.Sprintf("%s, %s", out.Count(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), out.Count(len(res.Overrides), "override file", "override files"))},
 	)
 }
 
@@ -177,7 +177,7 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 	}
 	if mods != nil {
 		for _, folder := range slices.Sorted(maps.Keys(mods.Seeded)) {
-			rows = append(rows, out.Row{Text: plural(len(mods.Seeded[folder]), "seeded file", "seeded files") + " from " + folder})
+			rows = append(rows, out.Row{Text: out.Count(len(mods.Seeded[folder]), "seeded file", "seeded files") + " from " + folder})
 		}
 	}
 	if mods != nil && len(mods.Duplicates) > 0 {
@@ -325,7 +325,7 @@ func (a *app) importSource(cmd *cobra.Command, dir string, c *modpack.Checkout, 
 	}
 	slices.Sort(leftOut)
 	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: c.Source, Sides: m.Sides(), KeptYours: []string{}, LeftOut: leftOut, Overrides: []string{}}
-	return a.emitImport(res, out.Row{Text: fmt.Sprintf("%s copied from %s", plural(len(m.Requires), "entry", "entries"), c.Source)})
+	return a.emitImport(res, out.Row{Text: fmt.Sprintf("%s copied from %s", out.Count(len(m.Requires), "entry", "entries"), c.Source)})
 }
 
 // readImportArchive reads a modpack archive by its content, refusing one that isn't the format
@@ -345,7 +345,7 @@ func readImportArchive(file, typ string) (*packarchive.Archive, error) {
 // files came from more than one, or the one provider after them all when they didn't.
 func lockedSummary(providers provider.Providers, files []resolve.LockedFile) string {
 	if len(files) == 0 {
-		return plural(0, "file", "files") + " locked"
+		return out.Count(0, "file", "files") + " locked"
 	}
 	byType := map[string]map[string]int{}
 	hosts := map[string]bool{}
@@ -377,7 +377,7 @@ func lockedSummary(providers provider.Providers, files []resolve.LockedFile) str
 			}
 		}
 		one, many := manifest.TypeNouns(kind)
-		part := plural(total, one, many)
+		part := out.Count(total, one, many)
 		if len(hosts) > 1 {
 			part += " (" + strings.Join(from, ", ") + ")"
 		}

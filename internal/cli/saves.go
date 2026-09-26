@@ -105,7 +105,7 @@ func pruneBackups(target savesTarget, keep int) (savesPruned, error) {
 }
 
 func (s savesPruned) print(l *out.Lines) {
-	kept := plural(s.Kept, "backup", "backups") + " left"
+	kept := out.Count(s.Kept, "backup", "backups") + " left"
 	if len(s.Pruned) == 0 {
 		l.Info("Nothing to prune; " + kept)
 		return
@@ -115,7 +115,7 @@ func (s savesPruned) print(l *out.Lines) {
 		items = append(items, out.Item{Kind: out.Drop, Name: b.ID})
 	}
 	l.Items(items...)
-	l.OK("Pruned "+plural(len(s.Pruned), "backup", "backups"), kept)
+	l.OK("Pruned "+out.Count(len(s.Pruned), "backup", "backups"), kept)
 }
 
 func (a *app) listSaveGroups() error {
@@ -259,7 +259,7 @@ func worldCount(n int) string {
 	if n == 0 {
 		return "no worlds"
 	}
-	return plural(n, "world", "worlds")
+	return out.Count(n, "world", "worlds")
 }
 
 // savesTargetOf resolves --group, or else the directory -i, -C or the current directory names. A

@@ -138,7 +138,7 @@ func (e exportTally) rows() []out.Row {
 		if len(items) == 0 {
 			return
 		}
-		text := plural(len(items), one, many)
+		text := out.Count(len(items), one, many)
 		if how != "" {
 			text += " " + how
 		}

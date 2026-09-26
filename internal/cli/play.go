@@ -311,7 +311,7 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) e
 		}
 		rows = append(rows, out.Row{Label: "main class", Text: rep.MainClass})
 		if rep.Inherits != "" {
-			rows = append(rows, out.Row{Label: "loader libraries", Text: plural(rep.LoaderLibraries, "jar", "jars") + ", " + out.HumanBytes(rep.LoaderLibrariesBytes)})
+			rows = append(rows, out.Row{Label: "loader libraries", Text: out.Count(rep.LoaderLibraries, "jar", "jars") + ", " + out.HumanBytes(rep.LoaderLibrariesBytes)})
 		}
 		rows = append(rows,
 			out.Row{Label: "java", Text: rep.Java},
@@ -322,7 +322,7 @@ func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) e
 		if rep.AssetIndex != "" {
 			rows = append(rows, out.Row{Label: "asset index", Text: rep.AssetIndex})
 		}
-		rows = append(rows, out.Row{Label: "classpath", Text: plural(rep.Classpath, "jar", "jars") + ", " + out.HumanBytes(rep.ClasspathBytes)})
+		rows = append(rows, out.Row{Label: "classpath", Text: out.Count(rep.Classpath, "jar", "jars") + ", " + out.HumanBytes(rep.ClasspathBytes)})
 		l.Tree(rows...)
 	})
 }

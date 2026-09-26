@@ -209,7 +209,7 @@ func (a *app) historyPruneCmd() *cobra.Command {
 					items = append(items, out.Item{Kind: out.Drop, Name: e.ID})
 				}
 				l.Items(items...)
-				l.OK(fmt.Sprintf("Pruned %s", plural(len(pruned), "history entry", "history entries")), historyKept(len(left), keep))
+				l.OK(fmt.Sprintf("Pruned %s", out.Count(len(pruned), "history entry", "history entries")), historyKept(len(left), keep))
 			})
 		},
 	}
@@ -296,15 +296,15 @@ func (a *app) rollbackCmd() *cobra.Command {
 }
 
 func historyContents(e build.HistoryEntry) string {
-	parts := []string{plural(e.Mods, "mod", "mods")}
+	parts := []string{out.Count(e.Mods, "mod", "mods")}
 	if e.ResourcePacks > 0 {
-		parts = append(parts, plural(e.ResourcePacks, "resource pack", "resource packs"))
+		parts = append(parts, out.Count(e.ResourcePacks, "resource pack", "resource packs"))
 	}
 	if e.Shaders > 0 {
-		parts = append(parts, plural(e.Shaders, "shader", "shaders"))
+		parts = append(parts, out.Count(e.Shaders, "shader", "shaders"))
 	}
 	if e.Datapacks > 0 {
-		parts = append(parts, plural(e.Datapacks, "datapack", "datapacks"))
+		parts = append(parts, out.Count(e.Datapacks, "datapack", "datapacks"))
 	}
 	return strings.Join(parts, ", ")
 }
@@ -344,7 +344,7 @@ func historyPlatform(e build.HistoryEntry) string {
 
 func historyKept(left, keep int) string {
 	if keep < 0 {
-		return plural(left, "entry", "entries") + " kept, every one"
+		return out.Count(left, "entry", "entries") + " kept, every one"
 	}
-	return plural(left, "entry", "entries") + " kept"
+	return out.Count(left, "entry", "entries") + " kept"
 }

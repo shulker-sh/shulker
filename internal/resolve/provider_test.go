@@ -95,7 +95,7 @@ func TestIdentifyAsksEachProviderInManifestOrder(t *testing.T) {
 	if len(im.found) != 1 || !ok || h.p.Name() != "beta" || h.v.ID != "v1" {
 		t.Errorf("found %+v", im.found)
 	}
-	if len(im.rep.Warnings) != 1 || !strings.Contains(im.rep.Warnings[0], "2 file(s) weren't looked up on Alpha (alpha needs a key)") {
+	if len(im.rep.Warnings) != 1 || !strings.Contains(im.rep.Warnings[0], "2 files weren't looked up on Alpha (alpha needs a key)") {
 		t.Errorf("warnings %v", im.rep.Warnings)
 	}
 }

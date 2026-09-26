@@ -495,7 +495,7 @@ func (v *Validation) Err() error {
 	var b strings.Builder
 	var items []string
 	var rows []out.Detail
-	fmt.Fprintf(&b, "%d problem(s) in the locked mods:", len(v.Problems))
+	fmt.Fprintf(&b, "%s in the locked mods:", out.Count(len(v.Problems), "problem", "problems"))
 	for i, p := range v.Problems {
 		line := p.line()
 		items = append(items, line)

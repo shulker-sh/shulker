@@ -786,7 +786,7 @@ func (r *Resolver) install(ctx context.Context, locked []downloadable, sides []s
 		errs = append(errs, downloadsFailed(failed))
 	}
 	if len(missing) > 0 {
-		e := out.Errorf("missing-files", "%d file(s) need a manual download", len(missing))
+		e := out.Errorf("missing-files", "%s a manual download", out.Count(len(missing), "file needs", "files need"))
 		e.Items = missing
 		errs = append(errs, e)
 	}

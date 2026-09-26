@@ -286,7 +286,7 @@ func TestImportTakesAModsSideFromThePackOnlyWhereItAddsABuiltSide(t *testing.T) 
 		t.Fatalf("sides: %+v", res.Sides)
 	}
 	sideWarnings := slices.DeleteFunc(slices.Clone(res.Warnings), func(w string) bool { return !strings.Contains(w, "take their side") })
-	if len(sideWarnings) != 1 || !strings.Contains(sideWarnings[0], "2 mod(s)") || !strings.Contains(sideWarnings[0], "config_manager (server → both), server_tweaks (server → both)") {
+	if len(sideWarnings) != 1 || !strings.Contains(sideWarnings[0], "2 mods") || !strings.Contains(sideWarnings[0], "config_manager (server → both), server_tweaks (server → both)") {
 		t.Fatalf("warnings: %v", res.Warnings)
 	}
 	m, l := h.r.Manifest, h.r.Lock

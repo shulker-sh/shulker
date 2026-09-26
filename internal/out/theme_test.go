@@ -122,7 +122,7 @@ func TestProgressBarEasesTowardTheCount(t *testing.T) {
 }
 
 func TestErrorRowsRenderStructured(t *testing.T) {
-	e := &Error{Code: "validation-failed", Message: "1 problem(s) in the locked mods:\n  Problem 1\n    - ignored text", Items: []string{"ignored text"}}
+	e := &Error{Code: "validation-failed", Message: "1 problem in the locked mods:\n  Problem 1\n    - ignored text", Items: []string{"ignored text"}}
 	e.Rows = []Detail{{Text: "sodium 1.0 requires fabric-api >=2, not installed", Children: []Detail{
 		{Text: "the ignore is stale"},
 		{Label: "Fix", Text: "shulker add fabric-api", IsCommand: true},
@@ -130,7 +130,7 @@ func TestErrorRowsRenderStructured(t *testing.T) {
 	}}}
 	lines := render(Theme{}, func(l *Lines) { l.Error(e) })
 	want := []string{
-		"  ✘ 1 problem(s) in the locked mods (validation-failed)",
+		"  ✘ 1 problem in the locked mods (validation-failed)",
 		"    ╰─ sodium 1.0 requires fabric-api >=2, not installed",
 		"         ├─ the ignore is stale",
 		"         ├─ Fix: shulker add fabric-api",

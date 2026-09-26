@@ -61,7 +61,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.Heading("Cache " + usage.Dir)
 				rows := []out.Row{
-					{Text: out.HumanBytes(usage.Bytes) + ", " + plural(usage.Objects, "object", "objects")},
+					{Text: out.HumanBytes(usage.Bytes) + ", " + out.Count(usage.Objects, "object", "objects")},
 					{Text: rootsText(r)},
 				}
 				if would.Empty() {
@@ -138,18 +138,18 @@ func (a *app) cacheRoots(named []string) (build.Roots, error) {
 func rootsText(r build.Roots) string {
 	var parts []string
 	if r.Instances > 0 {
-		parts = append(parts, plural(r.Instances, "instance", "instances"))
+		parts = append(parts, out.Count(r.Instances, "instance", "instances"))
 	}
 	if r.Project {
 		parts = append(parts, "this project")
 	}
 	if r.LockFiles > 0 {
-		parts = append(parts, plural(r.LockFiles, "lock file", "lock files"))
+		parts = append(parts, out.Count(r.LockFiles, "lock file", "lock files"))
 	}
 	if len(parts) == 0 {
 		return "no roots: no instance is registered and this is not a project"
 	}
-	return plural(r.Count(), "root", "roots") + " (" + strings.Join(parts, ", ") + ")"
+	return out.Count(r.Count(), "root", "roots") + " (" + strings.Join(parts, ", ") + ")"
 }
 
 func prunedAside(p cache.Pruned) string {
@@ -165,7 +165,7 @@ func prunedAside(p cache.Pruned) string {
 		{p.Temp, "leftover file", "leftover files"},
 	} {
 		if kind.n > 0 {
-			parts = append(parts, plural(kind.n, kind.one, kind.many))
+			parts = append(parts, out.Count(kind.n, kind.one, kind.many))
 		}
 	}
 	return strings.Join(parts, ", ")

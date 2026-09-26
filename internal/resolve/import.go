@@ -109,7 +109,7 @@ func (rep *Imported) warnSides() {
 	for i, s := range rep.Sides {
 		mods[i] = fmt.Sprintf("%s (%s → %s)", s.ID, s.Provider, s.Pack)
 	}
-	rep.Warnings = append(rep.Warnings, fmt.Sprintf("%d mod(s) take their side from the pack rather than their provider: %s", len(rep.Sides), strings.Join(mods, ", ")))
+	rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s take their side from the pack rather than their provider: %s", out.Count(len(rep.Sides), "mod", "mods"), strings.Join(mods, ", ")))
 }
 
 type importer struct {
@@ -428,13 +428,13 @@ func (im *importer) identify(ctx context.Context) error {
 		}
 		p, err := im.r.Providers.Get(name)
 		if err != nil {
-			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%d file(s) weren't looked up on %s (%s); kept as overrides", len(files), im.r.Providers.Title(name), out.AsError(err).Message))
+			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s weren't looked up on %s (%s); kept as overrides", out.Count(len(files), "file", "files"), im.r.Providers.Title(name), out.AsError(err).Message))
 			continue
 		}
-		im.r.log("looking up %d file(s) on %s", len(files), p.Title())
+		im.r.log("looking up %s on %s", out.Count(len(files), "file", "files"), p.Title())
 		found, err := p.Identify(ctx, files)
 		if err != nil {
-			return lookupFailed(p, fmt.Sprintf("%d file(s)", len(files)), err)
+			return lookupFailed(p, out.Count(len(files), "file", "files"), err)
 		}
 		for key, h := range found {
 			proj, v := h.Project, h.Version

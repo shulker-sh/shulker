@@ -92,7 +92,7 @@ func (a *app) restore(target savesTarget, req restoreRequest) (restoreResult, er
 		return restoreResult{}, err
 	}
 	if len(open) > 0 {
-		e := out.Errorf("world-in-use", "%s open in a running game", plural(len(open), "world is", "worlds are"))
+		e := out.Errorf("world-in-use", "%s open in a running game", out.Count(len(open), "world is", "worlds are"))
 		e.Items = open
 		e.Help = "save and quit to the title screen, or stop the server, then restore again"
 		return restoreResult{}, e
@@ -122,7 +122,7 @@ func (res restoreResult) print(l *out.Lines) {
 	if res.Snapshot != nil {
 		l.Done("Kept the worlds there as backup " + res.Snapshot.ID)
 	}
-	l.OKInto("Restored "+plural(len(res.Worlds), "world", "worlds")+" from "+res.From.ID, res.WorldsDir, "")
+	l.OKInto("Restored "+out.Count(len(res.Worlds), "world", "worlds")+" from "+res.From.ID, res.WorldsDir, "")
 	items := make([]out.Item, 0, len(res.Worlds))
 	for _, w := range res.Worlds {
 		kind := out.Add

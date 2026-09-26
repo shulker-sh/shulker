@@ -350,3 +350,11 @@ func (p *Printer) encode(v any) error {
 	enc.SetIndent("", "  ")
 	return enc.Encode(v)
 }
+
+// Count writes n with the noun that agrees with it: "1 file", "2 files".
+func Count(n int, one, many string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, one)
+	}
+	return fmt.Sprintf("%d %s", n, many)
+}

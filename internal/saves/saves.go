@@ -365,14 +365,7 @@ func PickBackup(t Target, n int, named string) (Backup, error) {
 		return Backup{}, out.Errorf("backups-empty", "%s has no backups yet", t.WorldsDir)
 	}
 	if n > len(backups) {
-		return Backup{}, out.Errorf("backup-missing", "there is no backup %d; %s has %s", n, t.WorldsDir, plural(len(backups), "backup", "backups"))
+		return Backup{}, out.Errorf("backup-missing", "there is no backup %d; %s has %s", n, t.WorldsDir, out.Count(len(backups), "backup", "backups"))
 	}
 	return backups[n-1], nil
-}
-
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return fmt.Sprintf("%d %s", n, one)
-	}
-	return fmt.Sprintf("%d %s", n, many)
 }

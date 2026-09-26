@@ -66,5 +66,5 @@ func (a *app) inlineImport(cmd *cobra.Command, p *project.Project, key string, f
 		return err
 	}
 	res := importResult{Dir: p.Dir, Name: name, Version: version, Minecraft: p.Lock.Minecraft, Loader: p.Lock.Loader, Source: key, Sides: p.Manifest.Sides(), Overrides: []string{}, Merged: true, KeptYours: rep.KeptYours, LeftOut: rep.LeftOut}
-	return a.emitImport(res, out.Row{Text: plural(len(rep.Entries), "entry", "entries") + " now the project's own"}, overrideRow(rep))
+	return a.emitImport(res, out.Row{Text: out.Count(len(rep.Entries), "entry", "entries") + " now the project's own"}, overrideRow(rep))
 }

@@ -56,7 +56,7 @@ func TestInstallWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("install after the file arrives: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
-	if n := strings.Count(stderr, "1 file(s) need a manual download"); n != 2 {
+	if n := strings.Count(stderr, "1 file needs a manual download"); n != 2 {
 		t.Fatalf("the wait lists the files each time they are missing (%d): %s", n, stderr)
 	}
 	if !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar from https://www.curseforge.com") || !strings.Contains(stderr, "Press enter") {

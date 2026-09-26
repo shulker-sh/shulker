@@ -89,7 +89,7 @@ func (a *app) diffCmd() *cobra.Command {
 						l.OK("No changes in "+rep.Side, where[rep])
 						continue
 					}
-					l.Heading(rep.Side + " " + l.T.Grey(fmt.Sprintf("(%s in %s)", plural(len(rep.Files), "file changed", "files changed"), where[rep])))
+					l.Heading(rep.Side + " " + l.T.Grey(fmt.Sprintf("(%s in %s)", out.Count(len(rep.Files), "file changed", "files changed"), where[rep])))
 					for i, f := range rep.Files {
 						if i > 0 {
 							l.Blank()
@@ -172,7 +172,7 @@ func (a *app) pullCmd() *cobra.Command {
 				return err
 			}
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OK("Pulled "+rep.Side, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", plural(len(rep.Pulled)+len(rep.Entries), "file", "files"), plural(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
+				l.OK("Pulled "+rep.Side, fmt.Sprintf("%s, %s written to shulker.json, %d skipped", out.Count(len(rep.Pulled)+len(rep.Entries), "file", "files"), out.Count(len(rep.Keys), "key", "keys"), len(rep.Skipped)))
 				var rows []out.Row
 				arrow := " " + l.T.ArrowBump() + " "
 				for _, f := range rep.Pulled {
@@ -269,11 +269,4 @@ func diffKind(state string) out.Kind {
 		return out.Drop
 	}
 	return out.Change
-}
-
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return fmt.Sprintf("%d %s", n, one)
-	}
-	return fmt.Sprintf("%d %s", n, many)
 }

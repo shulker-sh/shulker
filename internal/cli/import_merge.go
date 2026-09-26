@@ -63,7 +63,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 	if source != nil {
 		res.Source = source.Source
 	}
-	summary := plural(len(rep.Entries), "entry", "entries") + " merged"
+	summary := out.Count(len(rep.Entries), "entry", "entries") + " merged"
 	if mods != nil {
 		locked := slices.DeleteFunc(slices.Clone(mods.Locked), func(f resolve.LockedFile) bool { return !slices.Contains(rep.Entries, f.ID) })
 		summary = lockedSummary(d.Providers, locked)
@@ -72,7 +72,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 }
 
 func overrideRow(rep *resolve.Merged) out.Row {
-	return out.Row{Text: fmt.Sprintf("%s copied, %d kept", plural(rep.Copied, "override file", "override files"), rep.Kept)}
+	return out.Row{Text: fmt.Sprintf("%s copied, %d kept", out.Count(rep.Copied, "override file", "override files"), rep.Kept)}
 }
 
 // mergeSides are the sides a merge into m takes: the ones it declares, or the one --side names.

@@ -68,7 +68,7 @@ func (a *app) checkCmd() *cobra.Command {
 			}
 			a.warn(warnings)
 			if strict && len(warnings) > 0 {
-				e := out.Errorf("strict-warnings", "%d warning(s), and --strict fails on any", len(warnings))
+				e := out.Errorf("strict-warnings", "%s, and --strict fails on any", out.Count(len(warnings), "warning", "warnings"))
 				e.Items = warnings
 				problem(e)
 			}
@@ -190,7 +190,7 @@ func (a *app) checkServer(ctx context.Context, p *project.Project, r *resolve.Re
 // checkFailed is the run's error: one row per problem found, each already reported in full above
 // it, with every problem's own items listed together for CI to annotate.
 func checkFailed(res checkResult) error {
-	e := out.Errorf("check-failed", "%d problem(s) found", len(res.Problems))
+	e := out.Errorf("check-failed", "%s found", out.Count(len(res.Problems), "problem", "problems"))
 	e.Data, e.IsSummary = res, true
 	for _, p := range res.Problems {
 		headline := p.Headline()

@@ -135,7 +135,7 @@ func (a *app) forgetRegistry() error {
 
 func (s selfUninstallResult) print(l *out.Lines) {
 	if len(s.Unhooked) > 0 {
-		l.OK("Unhooked "+plural(len(s.Unhooked), "instance", "instances"), "")
+		l.OK("Unhooked "+out.Count(len(s.Unhooked), "instance", "instances"), "")
 		items := make([]out.Item, 0, len(s.Unhooked))
 		for _, in := range s.Unhooked {
 			items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{launcher.Title(in.Launcher)}})
@@ -151,7 +151,7 @@ func (s selfUninstallResult) print(l *out.Lines) {
 	if s.Purged {
 		l.OK("Forgot the registry", "")
 		if len(s.Forgotten) > 0 {
-			l.Info(plural(len(s.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`")
+			l.Info(out.Count(len(s.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`")
 			items := make([]out.Item, 0, len(s.Forgotten))
 			for _, in := range s.Forgotten {
 				items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{in.Dir}})
