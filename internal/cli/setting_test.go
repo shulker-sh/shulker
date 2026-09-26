@@ -250,3 +250,12 @@ func TestGetLocked(t *testing.T) {
 		t.Errorf("get --locked without a lock exited %d: %s", code, stderr)
 	}
 }
+
+func TestSetToTheSameValueSaysSo(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	h.mustRun(t, "set", "description", "cozy")
+	if stdout := h.mustRun(t, "set", "description", "cozy"); !strings.Contains(stdout, `description is already "cozy"`) || strings.Contains(stdout, "⟶") {
+		t.Fatalf("set to the same value: %s", stdout)
+	}
+}

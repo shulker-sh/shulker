@@ -310,7 +310,7 @@ func (a *app) runEditor(path string) error {
 
 func (a *app) emitSettingChange(change settingChange) error {
 	return a.printer.Emit(change, func(l *out.Lines) {
-		l.Items(out.Item{Kind: out.Change, Name: change.Path, From: settingText(change.From), To: settingText(change.To)})
+		printSettingChange(l, change.Path, change.From, change.To)
 	})
 }
 

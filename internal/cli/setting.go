@@ -118,6 +118,14 @@ func (a *app) getCmd() *cobra.Command {
 	return cmd
 }
 
+func printSettingChange(l *out.Lines, path string, from, to any) {
+	if from != nil && settingText(from) == settingText(to) {
+		l.Info(fmt.Sprintf("%s is already %s", path, settingText(to)))
+		return
+	}
+	l.Items(out.Item{Kind: out.Change, Name: path, From: settingText(from), To: settingText(to)})
+}
+
 func settingText(v any) string {
 	if v == nil {
 		return "(unset)"
@@ -211,7 +219,7 @@ func (a *app) saveSettings(p *project.Project, doc map[string]any, field *schema
 		a.warnLockDifferences(p)
 	}
 	return a.printer.Emit(change, func(l *out.Lines) {
-		l.Items(out.Item{Kind: out.Change, Name: change.Path, From: settingText(change.From), To: settingText(change.To)})
+		printSettingChange(l, change.Path, change.From, change.To)
 	})
 }
 

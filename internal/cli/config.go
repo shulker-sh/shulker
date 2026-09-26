@@ -269,7 +269,7 @@ func (a *app) emitConfigChange(change configChange) error {
 		}
 	}
 	return a.printer.Emit(change, func(l *out.Lines) {
-		l.Items(out.Item{Kind: out.Change, Name: change.Path, From: settingText(change.From), To: settingText(change.To)})
+		printSettingChange(l, change.Path, change.From, change.To)
 		if change.Created != "" {
 			l.OK("Created "+change.Created, "")
 		}
