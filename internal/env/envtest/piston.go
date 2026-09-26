@@ -24,23 +24,27 @@ exit 0
 
 // Piston is a fake of Mojang's index and download hosts for one version, 26.2, with one library,
 // one asset index naming two assets, a client and a server jar, and a Java runtime index with one
-// component, java-runtime-epsilon. Hits counts every download served.
+// component, java-runtime-epsilon. Hits counts every download served. Profiles is the profile
+// service's players, name to uuid, empty until a test adds some; ProfileHits counts its lookups.
 type Piston struct {
-	srv    *httptest.Server
-	Hits   atomic.Int64
-	Client []byte
-	Server []byte
-	Lib    []byte
-	Assets map[string]string
+	srv         *httptest.Server
+	Hits        atomic.Int64
+	Client      []byte
+	Server      []byte
+	Lib         []byte
+	Assets      map[string]string
+	Profiles    map[string]string
+	ProfileHits atomic.Int64
 }
 
 func NewPiston(t *testing.T) *Piston {
 	t.Helper()
 	p := &Piston{
-		Client: []byte("client jar"),
-		Server: []byte("server jar"),
-		Lib:    []byte("brigadier"),
-		Assets: map[string]string{"icons/icon_16x16.png": "icon", "sounds/click.ogg": "click"},
+		Client:   []byte("client jar"),
+		Server:   []byte("server jar"),
+		Lib:      []byte("brigadier"),
+		Assets:   map[string]string{"icons/icon_16x16.png": "icon", "sounds/click.ogg": "click"},
+		Profiles: map[string]string{},
 	}
 	objects := map[string]any{}
 	for name, body := range p.Assets {
@@ -134,6 +138,31 @@ func NewPiston(t *testing.T) *Piston {
 		}
 		http.NotFound(w, r)
 	})
+	mux.HandleFunc("/mojang/profiles/minecraft", func(w http.ResponseWriter, r *http.Request) {
+		p.ProfileHits.Add(1)
+		var names []string
+		_ = json.NewDecoder(r.Body).Decode(&names)
+		profiles := []map[string]string{}
+		for _, n := range names {
+			for name, id := range p.Profiles {
+				if strings.EqualFold(name, n) {
+					profiles = append(profiles, map[string]string{"id": strings.ReplaceAll(id, "-", ""), "name": name})
+				}
+			}
+		}
+		json.NewEncoder(w).Encode(profiles)
+	})
+	mux.HandleFunc("/session/session/minecraft/profile/", func(w http.ResponseWriter, r *http.Request) {
+		p.ProfileHits.Add(1)
+		want := strings.TrimPrefix(r.URL.Path, "/session/session/minecraft/profile/")
+		for name, id := range p.Profiles {
+			if strings.ReplaceAll(id, "-", "") == want {
+				json.NewEncoder(w).Encode(map[string]string{"id": want, "name": name})
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 	p.srv = httptest.NewServer(mux)
 	t.Cleanup(p.srv.Close)
 	base = p.srv.URL
@@ -142,8 +171,8 @@ func NewPiston(t *testing.T) *Piston {
 
 func (p *Piston) URL() string { return p.srv.URL }
 
-// Mojang points the given clients at the fake: the version index, the runtime index and a
-// profile service that knows nobody.
+// Mojang points the given clients at the fake: the version index, the runtime index and the
+// profile service.
 func (p *Piston) Mojang(piston *mojang.Piston, runtimes *mojang.Runtimes, profiles *mojang.Profiles) {
 	piston.ManifestURL = p.srv.URL + "/manifest.json"
 	runtimes.IndexURL = p.srv.URL + "/jrt/all.json"
