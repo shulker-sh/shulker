@@ -470,6 +470,34 @@ func TestImportCreatesTheProjectInTheCurrentFolder(t *testing.T) {
 	}
 }
 
+func TestImportReadsAPathOnlyWhenItLooksLikeOne(t *testing.T) {
+	h := newHarness(t)
+	h.dir = ""
+	here := t.TempDir()
+	t.Chdir(here)
+	data, err := os.ReadFile(writeEmptyMrpack(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(here, "feat", "build", "feat-1.0.zip"), string(data))
+
+	h.mustRun(t, "-C", "imp", "import", "feat/build/feat-1.0.zip")
+	if _, err := os.Stat(filepath.Join(here, "imp", manifest.FileName)); err != nil {
+		t.Fatalf("a relative path is read from the current folder, not -C: %v", err)
+	}
+
+	if code, stdout, _ := h.run(t, "--json", "-C", "other", "import", "feat/missing.zip"); code == 0 || failureCode(t, stdout).Code != "file-not-found" {
+		t.Fatalf("a path that isn't there is not a slug: exit %d: %s", code, stdout)
+	}
+	code, stdout, _ := h.run(t, "--json", "-C", "imp", "import", "./imp")
+	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || e.Message != "can't import imp into itself" {
+		t.Fatalf("importing the -C folder into itself: exit %d: %s", code, stdout)
+	}
+	if code, stdout, _ := h.run(t, "--json", "-C", "imp2", "import", "imp"); code == 0 || failureCode(t, stdout).Code != "mod-not-found" {
+		t.Fatalf("a bare word is a slug even with a folder of that name: exit %d: %s", code, stdout)
+	}
+}
+
 func TestImportDetectsACurseForgePack(t *testing.T) {
 	h := newHarness(t)
 	h.dir = ""

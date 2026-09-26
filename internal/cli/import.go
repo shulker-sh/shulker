@@ -206,18 +206,27 @@ func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive,
 // returns the archive, or the source's checkout.
 func (a *app) findImport(ctx context.Context, d *deps, dir string, target *project.Project, arg string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, error) {
 	if !isImportURL(arg) {
-		path := a.localPath(arg)
+		if !looksLikePath(arg) {
+			return a.importHosted(ctx, d, dir, target, arg, f)
+		}
+		path, err := importPath(arg)
+		if err != nil {
+			return nil, nil, err
+		}
+		if path == dir {
+			return nil, nil, out.Errorf("usage", "can't import %s into itself", filepath.Base(dir))
+		}
 		if resolve.IsLocalFolder(path) {
 			return a.importCheckout(ctx, d, dir, path, f)
 		}
-		if _, err := os.Stat(path); err == nil {
-			if err := refuseImportFlags(f, modpack.File); err != nil {
-				return nil, nil, err
-			}
-			arc, err := readImportArchive(path, f.typ)
-			return arc, nil, err
+		if _, err := os.Stat(path); err != nil {
+			return nil, nil, out.Errorf("file-not-found", "%s isn't there", arg)
 		}
-		return a.importHosted(ctx, d, dir, target, arg, f)
+		if err := refuseImportFlags(f, modpack.File); err != nil {
+			return nil, nil, err
+		}
+		arc, err := readImportArchive(path, f.typ)
+		return arc, nil, err
 	}
 	if (strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")) && modpack.Classify(arg) == modpack.Git {
 		store := &modpack.Store{Cache: d.Cache, Fetch: d.Fetch, Log: a.progress}
@@ -234,6 +243,30 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 		}
 	}
 	return a.importCheckout(ctx, d, dir, arg, f)
+}
+
+// looksLikePath reports whether import reads arg as a path rather than a modpack slug. A bare word
+// is a slug even where a folder of that name exists, which the -C folder of an earlier import often
+// is.
+func looksLikePath(arg string) bool {
+	if strings.ContainsAny(arg, `/\`) || strings.HasPrefix(arg, ".") || strings.HasPrefix(arg, "~") {
+		return true
+	}
+	ext := strings.ToLower(filepath.Ext(arg))
+	return ext == ".zip" || ext == ".mrpack"
+}
+
+// importPath is arg as an absolute path. A relative one is read from the current folder, never -C,
+// which names where the import goes.
+func importPath(arg string) (string, error) {
+	if rest, ok := strings.CutPrefix(arg, "~"); ok && (rest == "" || rest[0] == '/' || rest[0] == filepath.Separator) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		arg = filepath.Join(home, rest)
+	}
+	return filepath.Abs(arg)
 }
 
 func isImportURL(arg string) bool {
