@@ -90,7 +90,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			); err != nil {
 				return err
 			}
-			return a.relock(cmd, relockPlan{isFetched: true}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+			return a.relock(cmd, relockPlan{isFetched: true, dropsFailing: true}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				for _, arg := range args {
 					add, slug := opts, arg
 					if name, ok := from[arg]; ok {

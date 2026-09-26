@@ -131,6 +131,7 @@ type relocked struct {
 	lockChanges
 	validation *resolve.Validation
 	wasSaved   bool
+	dropped    error
 }
 
 // relockPlan is what a lock-changing command asks of relock beyond its run.
@@ -145,6 +146,8 @@ type relockPlan struct {
 	ok func(l *out.Lines, res lockChanges)
 	// isFetched marks a command that already fetched what it added, so no install nudge follows.
 	isFetched bool
+	// dropsFailing keeps what validates of what the command added, and fails with the rest.
+	dropsFailing bool
 }
 
 func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
@@ -156,7 +159,7 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 	if err != nil {
 		return err
 	}
-	rl, err := a.relockOpened(cmd, p, relockOptions{}, run)
+	rl, err := a.relockOpened(cmd, p, relockOptions{dropsFailing: plan.dropsFailing}, run)
 	if err != nil {
 		return err
 	}
@@ -189,7 +192,12 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 			optional++
 		}
 	}
-	return a.printer.Emit(res, func(l *out.Lines) {
+	if rl.dropped != nil && a.printer.JSON {
+		e := out.AsError(rl.dropped)
+		e.Data = res
+		return e
+	}
+	err = a.printer.Emit(res, func(l *out.Lines) {
 		if plan.ok != nil {
 			plan.ok(l, res)
 		}
@@ -215,6 +223,10 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 			l.Nudge("Download and build what changed", "shulker install")
 		}
 	})
+	if err != nil {
+		return err
+	}
+	return rl.dropped
 }
 
 // relockOptions shape a relock. With keepUnchanged, a relock that changes nothing writes nothing,
@@ -223,6 +235,7 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 type relockOptions struct {
 	keepUnchanged bool
 	linked        string
+	dropsFailing  bool
 }
 
 // relockOpened relocks the project a command has already opened, prints what the relock warned
@@ -239,12 +252,12 @@ func (a *app) relockOpened(cmd *cobra.Command, p *project.Project, opts relockOp
 	if err != nil {
 		return relocked{}, err
 	}
-	res, err := r.Relock(cmd.Context(), store, p, run, resolve.RelockOptions{KeepUnchanged: opts.keepUnchanged, Reason: cmd.Name()})
+	res, err := r.Relock(cmd.Context(), store, p, run, resolve.RelockOptions{KeepUnchanged: opts.keepUnchanged, Reason: cmd.Name(), DropsFailing: opts.dropsFailing})
 	if err != nil {
 		return relocked{}, err
 	}
 	a.warn(res.Warnings)
-	rl := relocked{lockChanges: *a.lockChangesOf(p, &res), validation: res.Validation, wasSaved: res.WasSaved}
+	rl := relocked{lockChanges: *a.lockChangesOf(p, &res), validation: res.Validation, wasSaved: res.WasSaved, dropped: res.Dropped}
 	if res.WasSaved {
 		a.printer.LockStale = false
 	}

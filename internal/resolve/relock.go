@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
+	"slices"
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/modpack"
@@ -16,6 +18,9 @@ import (
 type RelockOptions struct {
 	KeepUnchanged bool
 	Reason        string
+	// DropsFailing keeps the entries run added that validate: those a validation problem traces
+	// back to come out again, and their problems are Relocked.Dropped.
+	DropsFailing bool
 }
 
 // Relocked is what a relock changed, and what it found on the way.
@@ -32,6 +37,8 @@ type Relocked struct {
 	// WasSaved reports whether the manifest and lock were written; a relock that keeps an
 	// unchanged lock writes nothing.
 	WasSaved bool
+	// Dropped is the validation error of the entries a DropsFailing relock took out again.
+	Dropped error
 }
 
 // Relock re-resolves p's lock with run and saves it: a modpack whose ref or path moved is resolved
@@ -59,6 +66,7 @@ func (r *Resolver) Relock(ctx context.Context, store *modpack.Store, p *project.
 	if reresolved == nil {
 		reresolved = []string{}
 	}
+	had := maps.Clone(r.Manifest.Requires)
 	pin, err := run(p, r)
 	if err != nil {
 		return Relocked{}, err
@@ -70,11 +78,17 @@ func (r *Resolver) Relock(ctx context.Context, store *modpack.Store, p *project.
 	if err != nil {
 		return Relocked{}, err
 	}
+	var dropped error
 	if err := v.Err(); err != nil {
-		return Relocked{}, err
+		if !opts.DropsFailing {
+			return Relocked{}, err
+		}
+		if v, dropped, err = r.dropFailing(ctx, v, addedKeys(had, r.Manifest.Requires)); err != nil {
+			return Relocked{}, err
+		}
 	}
 	placements := (&build.Builder{Manifest: r.Manifest, Lock: r.Lock, Packs: r.Packs}).Placements()
-	rl := Relocked{Changes: r.Changes(before), Reresolved: reresolved, Pin: pin, Validation: v, Placements: placements}
+	rl := Relocked{Changes: r.Changes(before), Reresolved: reresolved, Pin: pin, Validation: v, Placements: placements, Dropped: dropped}
 	rl.Warnings = append(rl.Warnings, r.Warnings...)
 	rl.Warnings = append(rl.Warnings, v.Warnings...)
 	rl.Warnings = append(rl.Warnings, rl.Changes.Unshipped(p.Manifest.Sides(), r.Lock.Mods, placements)...)
@@ -128,4 +142,66 @@ func (r *Resolver) resolveMovedRefs(ctx context.Context, store *modpack.Store) e
 		r.Packs[i] = loaded
 	}
 	return nil
+}
+
+func addedKeys[V any](before, after map[string]V) []string {
+	var added []string
+	for key := range after {
+		if _, had := before[key]; !had {
+			added = append(added, key)
+		}
+	}
+	slices.Sort(added)
+	return added
+}
+
+// dropFailing takes out the added entries v's problems trace back to, through the mods that
+// require each other, and validates what is left. It returns v's problems as they were when a
+// problem traces to nothing added, when every added entry fails, or when what is left still
+// fails; otherwise the validation of what is left, and v's problems as the dropped error.
+func (r *Resolver) dropFailing(ctx context.Context, v *Validation, added []string) (rest *Validation, dropped, err error) {
+	failed := map[string]bool{}
+	for _, p := range v.Problems {
+		key, ok := r.addedAncestor(p.Mod, added)
+		if !ok {
+			return nil, nil, v.Err()
+		}
+		failed[key] = true
+	}
+	if len(failed) == len(added) {
+		return nil, nil, v.Err()
+	}
+	if err := r.Remove(slices.Sorted(maps.Keys(failed))); err != nil {
+		return nil, nil, err
+	}
+	if _, err := r.Reconcile(ctx); err != nil {
+		return nil, nil, err
+	}
+	if rest, err = r.Validate(); err != nil {
+		return nil, nil, err
+	}
+	if rest.Err() != nil {
+		return nil, nil, v.Err()
+	}
+	return rest, v.Err(), nil
+}
+
+// addedAncestor is the added entry id is, or the first one found among the mods that require it.
+func (r *Resolver) addedAncestor(id string, added []string) (string, bool) {
+	seen := map[string]bool{}
+	queue := []string{id}
+	for len(queue) > 0 {
+		id, queue = queue[0], queue[1:]
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if slices.Contains(added, id) {
+			return id, true
+		}
+		if m, ok := r.Lock.Mods[id]; ok {
+			queue = append(queue, m.RequiredBy...)
+		}
+	}
+	return "", false
 }
