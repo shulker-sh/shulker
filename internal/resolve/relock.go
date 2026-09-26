@@ -92,7 +92,6 @@ func (r *Resolver) Relock(ctx context.Context, store *modpack.Store, p *project.
 	rl.Warnings = append(rl.Warnings, r.Warnings...)
 	rl.Warnings = append(rl.Warnings, v.Warnings...)
 	rl.Warnings = append(rl.Warnings, rl.Changes.Unshipped(p.Manifest.Sides(), r.Lock.Mods, placements)...)
-	rl.Warnings = append(rl.Warnings, rl.Changes.DependencySides(r.Lock.Mods)...)
 	if opts.KeepUnchanged && !stale {
 		now, err := json.Marshal(p.Lock)
 		if err != nil {

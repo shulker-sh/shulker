@@ -239,7 +239,6 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 			mods.Warnings = append(mods.Warnings, fmt.Sprintf("the pack's server files weren't read (%v); each mod's side comes from its own metadata", err))
 		}
 	}
-	mods.Warnings = append(mods.Warnings, dependencySideNotes(r.Lock.Mods, slices.Sorted(maps.Keys(r.Lock.Mods)))...)
 	return mods, nil
 }
 
