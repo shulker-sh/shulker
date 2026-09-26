@@ -113,7 +113,7 @@ func TestExportMrpack(t *testing.T) {
 	h.allowMrpackHost(t)
 	stdout = h.mustRun(t, "export", "mrpack")
 	archive := filepath.Join(h.dir, "build", "pack-1.0.mrpack")
-	if !strings.Contains(stdout, "Wrote Demo Pack 1.0 » "+archive) || !strings.Contains(stdout, "2 mods by download") || !strings.Contains(stdout, "7 override files") {
+	if !strings.Contains(stdout, "Wrote Demo Pack 1.0 (client and server)\n    ├─ "+archive) || !strings.Contains(stdout, "2 mods by download") || !strings.Contains(stdout, "7 override files") {
 		t.Fatalf("export output: %s", stdout)
 	}
 	index, entries := readMrpack(t, archive)

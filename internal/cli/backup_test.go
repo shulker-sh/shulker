@@ -40,7 +40,7 @@ func TestBackupZipsAnInstancesSaveGroup(t *testing.T) {
 	if !strings.Contains(stderr, "Zipped creative") || !strings.Contains(stderr, "Zipped survival") {
 		t.Fatalf("a step per world: %s", stderr)
 	}
-	if !regexp.MustCompile(`Backed up 2 worlds » .*/backups/default/\d{8}-\d{6}-pack-backup\.zip \(.* in \d+\.\ds\)`).MatchString(stdout) {
+	if !regexp.MustCompile(`Backed up 2 worlds \(.* in \d+\.\ds\)\n    ╰─ .*/backups/default/\d{8}-\d{6}-pack-backup\.zip`).MatchString(stdout) {
 		t.Fatalf("backup: %s", stdout)
 	}
 

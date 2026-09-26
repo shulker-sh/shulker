@@ -44,13 +44,19 @@ func luminance(rgb [3]float64) float64 {
 // TerminalWidth is w's column count, or 80 when w isn't a terminal. A result stream settles the
 // running step before each write, and that wrapper is looked through.
 func TerminalWidth(w io.Writer) int {
-	if s, ok := w.(settling); ok {
-		w = s.w
-	}
+	w = unwrap(w)
 	if f, ok := w.(*os.File); ok && IsTerminal(w) {
 		return terminalWidth(f)
 	}
 	return 80
+}
+
+// unwrap looks through the settling wrapper to the stream it writes to.
+func unwrap(w io.Writer) io.Writer {
+	if s, ok := w.(settling); ok {
+		return s.w
+	}
+	return w
 }
 
 func terminalWidth(f *os.File) int {

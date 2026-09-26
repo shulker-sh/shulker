@@ -186,12 +186,11 @@ func (a *app) exportFormatCmd(f packarchive.Format) *cobra.Command {
 			}
 			a.warn(rep.Warnings)
 			return a.printer.Emit(rep, func(l *out.Lines) {
-				l.OKInto("Wrote "+rep.Name+" "+rep.Version, rep.Path, strings.Join(rep.Sides, " and "))
 				rows := exportTally{how: usage.Listed, mods: rep.Mods, resourcePacks: rep.ResourcePacks, shaders: rep.Shaders, datapacks: rep.Datapacks, bundledMods: rep.BundledMods, bundledResourcePacks: rep.BundledResourcePacks, bundledShaders: rep.BundledShaders, bundledDatapacks: rep.BundledDatapacks, overrides: rep.Overrides}.rows()
 				if len(rep.Matched) > 0 {
 					rows = append(rows, out.Row{Label: "matched on " + f.Title(), Text: strings.Join(rep.Matched, ", ")})
 				}
-				l.Tree(rows...)
+				l.OKInto("Wrote "+rep.Name+" "+rep.Version, rep.Path, strings.Join(rep.Sides, " and "), rows...)
 			})
 		},
 	}

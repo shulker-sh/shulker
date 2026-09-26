@@ -122,7 +122,7 @@ func TestSelfUpdateReplacesBinary(t *testing.T) {
 	if got := h.binary(t); got != "new binary" {
 		t.Fatalf("binary holds %q", got)
 	}
-	if want := "  ✔ Updated shulker 0.0.1 ⟶ 0.0.2 » " + h.exe + "\n"; h.stdout.String() != want {
+	if want := "  ✔ Updated shulker 0.0.1 ⟶ 0.0.2\n    ╰─ " + h.exe + "\n"; h.stdout.String() != want {
 		t.Fatalf("stdout %q, want %q", &h.stdout, want)
 	}
 	for _, line := range []string{"Checksum verified", "GitHub CLI gh not found, skipping build provenance check"} {

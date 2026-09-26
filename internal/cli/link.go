@@ -33,8 +33,7 @@ func (r *linkReport) print(l *out.Lines) {
 	if !r.Created {
 		verb = "Updated"
 	}
-	l.OKInto(verb+" "+r.Noun+" "+r.Shown, r.InstanceDir, "")
-	l.Tree(r.rows...)
+	l.OKInto(verb+" "+r.Noun+" "+r.Shown, r.InstanceDir, "", r.rows...)
 	r.Sync.print(l)
 }
 

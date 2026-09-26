@@ -43,7 +43,7 @@ func TestFeatureIntoSyncedDir(t *testing.T) {
 	h.mustRun(t, "sync", h.dir, "--into", into)
 
 	stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into)
-	if stdout != "  ✔ fancy on » "+into+" (takes effect on the next sync; a linked Prism instance syncs on launch)\n" {
+	if stdout != "  ✔ fancy on (takes effect on the next sync; a linked Prism instance syncs on launch)\n    ╰─ "+into+"\n" {
 		t.Fatalf("feature on --into: %q", stdout)
 	}
 	if lf := readLocal(t, into); !lf.Features["fancy"] {
@@ -59,7 +59,7 @@ func TestFeatureIntoSyncedDir(t *testing.T) {
 		t.Fatalf("list --into: %q", stdout)
 	}
 
-	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "  ✔ fancy on » "+into+"\n  ✔ Synced client » ") {
+	if stdout := h.mustRun(t, "feature", "on", "fancy", "--into", into, "--sync"); !strings.HasPrefix(stdout, "  ✔ fancy on\n    ╰─ "+into+"\n  ✔ Synced client") {
 		t.Fatalf("feature on --sync: %q", stdout)
 	}
 	if _, err := os.Stat(jar); err != nil {

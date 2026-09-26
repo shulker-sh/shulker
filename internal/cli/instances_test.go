@@ -388,7 +388,7 @@ func TestFeatureInstance(t *testing.T) {
 		t.Fatalf("sodium is gated off by default: %v", err)
 	}
 
-	if stdout := h.mustRun(t, "feature", "on", "fancy", "-i", "friends", "--launcher", "prism", "--sync"); !strings.Contains(stdout, "fancy on » "+gameDir) {
+	if stdout := h.mustRun(t, "feature", "on", "fancy", "-i", "friends", "--launcher", "prism", "--sync"); !strings.Contains(stdout, "fancy on\n    ╰─ "+gameDir) {
 		t.Fatalf("feature on -i: %s", stdout)
 	}
 	if _, err := os.Stat(sodium); err != nil {

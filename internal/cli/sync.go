@@ -146,12 +146,11 @@ func (s syncResult) print(l *out.Lines) {
 	if s.Changes != nil {
 		s.Changes.printItems(l)
 	}
-	l.OKInto("Synced "+s.Side, s.Dir, reportAside(s.Build))
 	rows := reportDetailRows(l, s.Build)
 	if row, ok := savesRow(s.Saves); ok {
 		rows = append(rows, row)
 	}
-	l.Tree(rows...)
+	l.OKInto("Synced "+s.Side, s.Dir, reportAside(s.Build), rows...)
 }
 
 // syncEnv is the sync module's env for this run, built once so its backups happen once.

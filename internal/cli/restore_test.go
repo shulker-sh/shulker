@@ -51,7 +51,7 @@ func TestRestorePutsTheZipsWorldsBackWhole(t *testing.T) {
 	if !strings.Contains(stderr, "Unzipped survival") {
 		t.Fatalf("a step per world: %s", stderr)
 	}
-	for _, want := range []string{"-pack-restore", "Restored 2 worlds from " + first.ID + " » " + group, "~ survival", "+ hardcore"} {
+	for _, want := range []string{"-pack-restore", "Restored 2 worlds from " + first.ID + "\n    ╰─ " + group, "~ survival", "+ hardcore"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("restore lacks %q: %s", want, stdout)
 		}

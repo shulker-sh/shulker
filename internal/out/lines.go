@@ -201,22 +201,24 @@ func (t Theme) Sides(names []string, of int) string {
 }
 
 func (l *Lines) OK(text string, aside string) {
-	l.line(l.T.paint(l.T.GlyphOK(), sgrGreen, sgrBold) + " " + l.T.Markup(text) + l.T.Aside(aside))
+	l.prose(l.T.paint(l.T.GlyphOK(), sgrGreen, sgrBold), l.T.Markup(text)+l.T.Aside(aside))
 }
 
-// OKInto is an ok line with a destination path after ».
-func (l *Lines) OKInto(text, dest, aside string) {
+// OKInto is an ok line whose destination path is the first row of the tree under it, since a
+// path never shares a line with prose; rows follow it.
+func (l *Lines) OKInto(text, dest, aside string, rows ...Row) {
 	t := l.T
-	l.line(t.paint(t.GlyphOK(), sgrGreen, sgrBold) + " " + t.Markup(text) + " " + t.Grey(t.ArrowInto()) + " " + t.Link(t.Grey(dest), dest) + t.Aside(aside))
+	l.OK(text, aside)
+	l.Tree(append([]Row{{Text: t.Link(t.Grey(dest), dest)}}, rows...)...)
 }
 
 func (l *Lines) Warn(text string) {
-	l.line(l.T.paint("!", sgrYellow, sgrBold) + " " + l.T.Markup(text))
+	l.prose(l.T.paint("!", sgrYellow, sgrBold), l.T.Markup(text))
 }
 
 // Info is the empty state or a passing remark: a cyan i and the message.
 func (l *Lines) Info(text string) {
-	l.line(l.T.paint("i", sgrCyan, sgrBold) + " " + l.T.Markup(text))
+	l.prose(l.T.paint("i", sgrCyan, sgrBold), l.T.Markup(text))
 }
 
 // Muted is a whole line in grey, for progress notes that carry no result.
@@ -381,7 +383,7 @@ func (l *Lines) Error(e *Error) {
 	if !e.isNamed {
 		message = Sentence(message)
 	}
-	l.line(t.paint(t.GlyphError(), sgrRed, sgrBold) + " " + t.Bold(t.Markup(strings.TrimSuffix(message, ":"))) + t.Aside(code))
+	l.prose(t.paint(t.GlyphError(), sgrRed, sgrBold), t.Bold(t.Markup(strings.TrimSuffix(message, ":")))+t.Aside(code))
 	rows := l.detailRows(e, extra)
 	if label, picks := e.picks(); len(picks) > 0 {
 		var children []string

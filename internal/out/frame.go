@@ -17,9 +17,7 @@ type frame struct {
 
 // open writes the blank line above the output if w is the first terminal stream written to.
 func (p *Printer) open(w io.Writer) {
-	if s, ok := w.(settling); ok {
-		w = s.w
-	}
+	w = unwrap(w)
 	if p.JSON || !p.isFramed(w) {
 		return
 	}

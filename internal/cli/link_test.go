@@ -71,7 +71,7 @@ func TestLinkMojang(t *testing.T) {
 	launcherDir := mojangLauncherDir(t)
 	stdout := h.mustRun(t, "link", "vanilla", "--launcher-dir", launcherDir)
 	gameDir := filepath.Join(launcherDir, "shulker", "pack")
-	if !strings.Contains(stdout, "Installed fabric-loader-0.17.3-26.2 »") {
+	if !strings.Contains(stdout, "Installed fabric-loader-0.17.3-26.2\n    ╰─ ") {
 		t.Fatalf("link output: %s", stdout)
 	}
 	if !strings.Contains(stdout, "follows pack from "+h.dir) {

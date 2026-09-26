@@ -23,7 +23,7 @@ func TestSyncIntoDirectory(t *testing.T) {
 
 	into := filepath.Join(t.TempDir(), "instance", "minecraft")
 	stdout := h.mustRun(t, "sync", h.dir, "--into", into)
-	if !strings.Contains(stdout, "Synced client » "+into) {
+	if !strings.Contains(stdout, "Synced client (4 written)\n    ╰─ "+into) {
 		t.Fatalf("sync output: %s", stdout)
 	}
 	for _, rel := range []string{"mods/" + h.jars["sodium"].filename, "mods/" + h.jars["fabric-api"].filename, "options.txt", filepath.Join(instance.Dir, instance.StateFile)} {
