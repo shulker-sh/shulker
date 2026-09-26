@@ -137,7 +137,7 @@ func Assemble(v Version, p Platform, features map[string]bool) (Assembly, error)
 		}
 		f, err := l.File(p)
 		if err != nil {
-			return Assembly{}, out.Errorf("store-incomplete", "minecraft %s names a library shulker can't place", v.ID).WithCause("library", err)
+			return Assembly{}, out.Errorf("store-incomplete", "Minecraft %s names a library shulker can't place", v.ID).WithCause("library", err)
 		}
 		if seen[f.Path] {
 			continue
@@ -160,7 +160,7 @@ func Assemble(v Version, p Platform, features map[string]bool) (Assembly, error)
 func ClientJar(v Version) (File, error) {
 	client, ok := v.Downloads["client"]
 	if !ok {
-		return File{}, out.Errorf("store-incomplete", "minecraft %s has no client download", v.ID)
+		return File{}, out.Errorf("store-incomplete", "Minecraft %s has no client download", v.ID)
 	}
 	return File{Path: clientPath(v.ClientID), URL: client.URL, Sha1: client.Sha1, Size: client.Size}, nil
 }

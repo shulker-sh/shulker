@@ -19,6 +19,7 @@ import (
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
@@ -472,9 +473,9 @@ func sha256hex(data []byte) string {
 // Compatible checks a modpack against the project's platform. A locked modpack
 // contributes exact versions, so its own lock has to match; a floating one is
 // resolved here and only has to admit the project's versions in its ranges.
-func Compatible(l *Loaded, mc string, loader lock.Loader) error {
+func Compatible(l *Loaded, mc string, locked lock.Loader) error {
 	if l.UsesLock {
-		return compatibleLocked(l, mc, loader)
+		return compatibleLocked(l, mc, locked)
 	}
 	pm := l.Manifest
 	game, err := minecraft.Parse(mc)
@@ -486,31 +487,31 @@ func Compatible(l *Loaded, mc string, loader lock.Loader) error {
 		return rangeInvalid(l.Name, "minecraft", err)
 	}
 	if !rng.Matches(game) {
-		return out.Errorf("modpack-mismatch", "modpack %s wants mc %s; this project locked %s", l.Name, pm.Minecraft, mc)
+		return out.Errorf("modpack-mismatch", "modpack %s wants Minecraft %s; this project locked %s", l.Name, pm.Minecraft, mc)
 	}
-	if pm.Loader.Type != loader.Type {
-		return out.Errorf("modpack-mismatch", "modpack %s uses %s; this project uses %s", l.Name, describeLoader(pm.Loader.Type), describeLoader(loader.Type))
+	if pm.Loader.Type != locked.Type {
+		return out.Errorf("modpack-mismatch", "modpack %s uses %s; this project uses %s", l.Name, describeLoader(pm.Loader.Type), describeLoader(locked.Type))
 	}
-	if loader.Type == "" {
+	if locked.Type == "" {
 		return nil
 	}
 	lrng, err := dotted.ParseRange(pm.Loader.Version)
 	if err != nil {
 		return rangeInvalid(l.Name, "loader", err)
 	}
-	lv, err := dotted.Parse(loader.Version)
+	lv, err := dotted.Parse(locked.Version)
 	if err != nil {
 		return err
 	}
 	if !lrng.Matches(lv) {
-		return out.Errorf("modpack-mismatch", "modpack %s wants %s %s; this project locked %s", l.Name, pm.Loader.Type, pm.Loader.Version, loader.Version)
+		return out.Errorf("modpack-mismatch", "modpack %s wants %s %s; this project locked %s", l.Name, loader.Title(pm.Loader.Type), pm.Loader.Version, locked.Version)
 	}
 	return nil
 }
 
 func compatibleLocked(l *Loaded, minecraft string, loader lock.Loader) error {
 	if l.Lock.Minecraft != minecraft {
-		return lockedMismatch(l.Name, "minecraft "+l.Lock.Minecraft, minecraft)
+		return lockedMismatch(l.Name, "Minecraft "+l.Lock.Minecraft, minecraft)
 	}
 	if l.Lock.Loader.Type != loader.Type || l.Lock.Loader.Version != loader.Version {
 		return lockedMismatch(l.Name, lockedLoaderLabel(l.Lock.Loader), lockedLoaderLabel(loader))
@@ -549,14 +550,14 @@ func lockedLoaderLabel(l lock.Loader) string {
 	if l.Type == "" {
 		return "no loader"
 	}
-	return l.Type + " " + l.Version
+	return loader.Title(l.Type) + " " + l.Version
 }
 
 func describeLoader(name string) string {
 	if name == "" {
 		return "no loader"
 	}
-	return name
+	return loader.Title(name)
 }
 
 func dirSha256(dir string, m *manifest.Manifest) (string, error) {

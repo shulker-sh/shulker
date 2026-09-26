@@ -160,11 +160,11 @@ func TestCompatibleNamesLoadersAndRanges(t *testing.T) {
 		code string
 		msg  string
 	}{
-		{"no loader vs fabric", &Loaded{Name: "fo", Manifest: &manifest.Manifest{Minecraft: "26.2"}}, "modpack-mismatch", "modpack fo uses no loader; this project uses fabric"},
+		{"no loader vs fabric", &Loaded{Name: "fo", Manifest: &manifest.Manifest{Minecraft: "26.2"}}, "modpack-mismatch", "modpack fo uses no loader; this project uses Fabric"},
 		{"unreadable minecraft range", &Loaded{Name: "fo", Manifest: &manifest.Manifest{Minecraft: "not a range"}}, "manifest-invalid", "modpack fo has a minecraft range shulker can't read"},
 		{"unreadable loader range", &Loaded{Name: "fo", Manifest: &manifest.Manifest{Minecraft: "26.2", Loader: manifest.Loader{Type: "fabric", Version: "not a range"}}}, "manifest-invalid", "modpack fo has a loader range shulker can't read"},
-		{"locked for no loader", &Loaded{Name: "fo", UsesLock: true, Lock: &lock.Lock{Minecraft: "26.2"}}, "modpack-mismatch", "locked modpack fo is built for no loader; this project locked fabric 0.17.3"},
-		{"locked for another version", &Loaded{Name: "fo", UsesLock: true, Lock: &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "fabric", Version: "0.17.0"}}}, "modpack-mismatch", "locked modpack fo is built for fabric 0.17.0; this project locked fabric 0.17.3"},
+		{"locked for no loader", &Loaded{Name: "fo", UsesLock: true, Lock: &lock.Lock{Minecraft: "26.2"}}, "modpack-mismatch", "locked modpack fo is built for no loader; this project locked Fabric 0.17.3"},
+		{"locked for another version", &Loaded{Name: "fo", UsesLock: true, Lock: &lock.Lock{Minecraft: "26.2", Loader: lock.Loader{Type: "fabric", Version: "0.17.0"}}}, "modpack-mismatch", "locked modpack fo is built for Fabric 0.17.0; this project locked Fabric 0.17.3"},
 		{"locked and matching", &Loaded{Name: "fo", UsesLock: true, Lock: &lock.Lock{Minecraft: "26.2", Loader: fabric}}, "", ""},
 	}
 	for _, c := range cases {

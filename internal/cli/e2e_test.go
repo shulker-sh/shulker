@@ -862,7 +862,7 @@ func TestVerticalSlice(t *testing.T) {
 	h := newHarness(t)
 
 	stdout := h.mustRun(t, "create", "--loader", "fabric")
-	if !strings.Contains(stdout, "Created shulker.json (Minecraft 26.2, fabric 0.17.3, Java 25)") {
+	if !strings.Contains(stdout, "Created shulker.json (Minecraft 26.2, Fabric 0.17.3, Java 25)") {
 		t.Fatalf("init output: %s", stdout)
 	}
 	var m map[string]any

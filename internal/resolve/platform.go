@@ -129,7 +129,7 @@ func ResolvingLine(minecraft string, l manifest.Loader) string {
 	if l.Type == "" {
 		return "resolving Minecraft " + minecraft
 	}
-	return fmt.Sprintf("resolving Minecraft %s with %s %s", minecraft, l.Type, l.Version)
+	return fmt.Sprintf("resolving Minecraft %s with %s %s", minecraft, loader.Title(l.Type), l.Version)
 }
 
 // NewLock starts a new project's lock from the exact platform m names: Minecraft, loader, Java
@@ -168,7 +168,7 @@ func PlatformLabel(minecraft, loaderType, loaderVersion string) string {
 	if loaderType == "" {
 		return "Minecraft " + minecraft
 	}
-	return fmt.Sprintf("Minecraft %s, %s %s", minecraft, loaderType, loaderVersion)
+	return fmt.Sprintf("Minecraft %s, %s %s", minecraft, loader.Title(loaderType), loaderVersion)
 }
 
 // inheritedDifferences reports a platform the locked modpacks supply that the lock
@@ -200,7 +200,7 @@ func inheritedPlatform(m *manifest.Manifest, packs []*modpack.Loaded) (*Platform
 		}
 		if m.Minecraft == "" {
 			if minecraftFrom != "" && l.Lock.Minecraft != p.Minecraft {
-				e := out.Errorf("modpack-platform", "locked modpacks %s and %s are built for minecraft %s and %s, and this project sets none", minecraftFrom, l.Name, p.Minecraft, l.Lock.Minecraft)
+				e := out.Errorf("modpack-platform", "locked modpacks %s and %s are built for Minecraft %s and %s, and this project sets none", minecraftFrom, l.Name, p.Minecraft, l.Lock.Minecraft)
 				e.Help = "set minecraft in shulker.json, or unlock one"
 				return nil, e
 			}
@@ -244,7 +244,7 @@ func (mt *Meta) loaderVersion(ctx context.Context, row loader.Loader, rng, game 
 	}
 	v, ok := dotted.Newest(candidates, r)
 	if !ok {
-		return "", out.Errorf("platform-not-found", "no %s loader version matches %q for minecraft %s", row.Name, rng, game)
+		return "", out.Errorf("platform-not-found", "no %s loader version matches %q for Minecraft %s", row.Name, rng, game)
 	}
 	return v.ID, nil
 }

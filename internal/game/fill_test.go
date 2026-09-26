@@ -89,7 +89,7 @@ func TestFillPutsAVanillaVersionAndEverythingItNamesInTheStore(t *testing.T) {
 			t.Fatalf("the store is missing %s: %v", rel, err)
 		}
 	}
-	for _, want := range []string{"Fetched the minecraft 26.2 version json", "Fetched 1 client jar", "Fetched 1 library", "Fetched 1 asset index", "Fetched 2 assets"} {
+	for _, want := range []string{"Fetched the Minecraft 26.2 version json", "Fetched 1 client jar", "Fetched 1 library", "Fetched 1 asset index", "Fetched 2 assets"} {
 		if !strings.Contains(h.stderr.String(), want) {
 			t.Fatalf("each stage reports itself; %q is missing from\n%s", want, h.stderr.String())
 		}
@@ -122,7 +122,7 @@ func TestFillSavesALoaderProfileAndRemembersIt(t *testing.T) {
 	if id, ok := h.store.InstalledLoader("fabric-1.0.0-26.2"); !ok || id != l.ID {
 		t.Fatalf("the store remembers the loader's version id: %q %v", id, ok)
 	}
-	if !strings.Contains(h.stderr.String(), "Fetched fabric loader 1.0.0 for 26.2") {
+	if !strings.Contains(h.stderr.String(), "Fetched Fabric loader 1.0.0 for 26.2") {
 		t.Fatalf("the profile fetch reports itself:\n%s", h.stderr.String())
 	}
 

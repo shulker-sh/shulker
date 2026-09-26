@@ -100,7 +100,7 @@ func (s Store) fillVersion(ctx context.Context, lk *lock.Lock, src Sources) (str
 		}
 		id, err = InstallLoader(ctx, s.Root, lk, src)
 	} else {
-		src.log("fetching %s loader %s for %s", lk.Loader.Type, lk.Loader.Version, lk.Minecraft)
+		src.log("fetching %s loader %s for %s", loader.Title(lk.Loader.Type), lk.Loader.Version, lk.Minecraft)
 		var profile []byte
 		if profile, err = src.Loader.Profile(ctx, src.Loaders, lk.Minecraft, lk.Loader.Version); err == nil {
 			id, err = s.SaveVersion(profile)
@@ -116,7 +116,7 @@ func (s Store) fillVanillaVersion(ctx context.Context, src Sources, minecraft st
 	if s.HasVersion(minecraft) {
 		return nil
 	}
-	src.log("fetching the minecraft %s version json", minecraft)
+	src.log("fetching the Minecraft %s version json", minecraft)
 	raw, err := src.Piston.Version(ctx, minecraft)
 	if err != nil {
 		return err

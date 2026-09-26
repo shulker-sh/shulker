@@ -301,6 +301,15 @@ func compareBuilds(a, b string) int {
 	return 0
 }
 
+// Title is the name a player reads for the loader called name, or name itself for one shulker
+// doesn't know.
+func Title(name string) string {
+	if l, ok := Lookup(name); ok {
+		return l.Title
+	}
+	return name
+}
+
 func Lookup(name string) (Loader, bool) {
 	for _, l := range All {
 		if l.Name == name {

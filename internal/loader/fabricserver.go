@@ -17,7 +17,7 @@ func fabricEnsureServer(ctx context.Context, _ Loader, r *Remote, lk *lock.Lock)
 		if err != nil {
 			return res, err
 		}
-		r.log("downloading the fabric server launcher %s", installer)
+		r.log("downloading the Fabric server launcher %s", installer)
 		url := f.serverJarURL(lk.Minecraft, l.Version, installer)
 		sha, err := r.Cache.Fetch(ctx, r.Fetch, url)
 		if err != nil {
@@ -34,7 +34,7 @@ func fabricEnsureServer(ctx context.Context, _ Loader, r *Remote, lk *lock.Lock)
 	if r.Cache.Has(l.Server.Sha512) {
 		return res, nil
 	}
-	r.log("downloading the fabric server launcher %s", l.Server.Installer)
+	r.log("downloading the Fabric server launcher %s", l.Server.Installer)
 	if _, err := r.Cache.Ensure(ctx, r.Fetch, l.Server.URL, l.Server.Sha512); err != nil {
 		return res, err
 	}

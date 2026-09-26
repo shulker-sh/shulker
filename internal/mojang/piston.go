@@ -72,7 +72,7 @@ func (p *Piston) ServerDownload(ctx context.Context, game string) (Download, err
 		return Download{}, err
 	}
 	if dl.URL == "" || dl.Sha1 == "" {
-		return Download{}, invalid("minecraft %s has no server download", game)
+		return Download{}, invalid("Minecraft %s has no server download", game)
 	}
 	return dl, nil
 }
@@ -149,7 +149,7 @@ func (p *Piston) DataVersion(ctx context.Context, game string) (int, error) {
 }
 
 func dataVersionFailed(err error, game string) error {
-	return fetchFailed(err, "mojang", "couldn't read the minecraft %s data version from its server jar", game)
+	return fetchFailed(err, "mojang", "couldn't read the Minecraft %s data version from its server jar", game)
 }
 
 // Java is the runtime component and major version Mojang names for a game version.
@@ -161,15 +161,15 @@ func (p *Piston) Java(ctx context.Context, v GameVersion) (JavaRuntime, error) {
 		return JavaRuntime{}, versionFetchFailed(err, v.ID)
 	}
 	if detail.JavaVersion.Component == "" {
-		return JavaRuntime{}, invalid("minecraft %s names no Java runtime", v.ID)
+		return JavaRuntime{}, invalid("Minecraft %s names no Java runtime", v.ID)
 	}
 	return detail.JavaVersion, nil
 }
 
 func notListed(game string) error {
-	return invalid("minecraft %s is not in Mojang's version list", game)
+	return invalid("Minecraft %s is not in Mojang's version list", game)
 }
 
 func versionFetchFailed(err error, game string) error {
-	return fetchFailed(err, "mojang", "couldn't read the minecraft %s version JSON", game)
+	return fetchFailed(err, "mojang", "couldn't read the Minecraft %s version JSON", game)
 }

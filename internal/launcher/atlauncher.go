@@ -150,7 +150,7 @@ func atlauncherVersion(ctx context.Context, req *Link, atl *ATLauncher) (json.Ra
 		return vanilla, nil
 	}
 	if !req.Versions.HasInstaller() {
-		req.Log("fetching %s loader %s for %s", req.LoaderType, req.LoaderVersion, req.Minecraft)
+		req.Log("fetching %s loader %s for %s", loader.Title(req.LoaderType), req.LoaderVersion, req.Minecraft)
 		loaderVersion, err := req.Versions.LoaderProfile(ctx)
 		if err != nil {
 			return nil, err

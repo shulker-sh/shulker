@@ -37,7 +37,7 @@ func fabricVersions(ctx context.Context, r *Remote, game string) ([]Version, err
 		} `json:"loader"`
 	}
 	if err := f.r.Fetch.GetJSON(ctx, f.baseURL+"/versions/loader/"+game, &entries); err != nil {
-		return nil, fetchFailed(err, "fabric", "couldn't read the Fabric loaders for minecraft %s", game)
+		return nil, fetchFailed(err, "fabric", "couldn't read the Fabric loaders for Minecraft %s", game)
 	}
 	versions := make([]Version, 0, len(entries))
 	for _, e := range entries {
@@ -51,7 +51,7 @@ func fabricProfile(ctx context.Context, r *Remote, game, version string) (json.R
 	var raw json.RawMessage
 	url := fmt.Sprintf("%s/versions/loader/%s/%s/profile/json", f.baseURL, game, version)
 	if err := f.r.Fetch.GetJSON(ctx, url, &raw); err != nil {
-		return nil, fetchFailed(err, "fabric", "couldn't read the Fabric %s profile for minecraft %s", version, game)
+		return nil, fetchFailed(err, "fabric", "couldn't read the Fabric %s profile for Minecraft %s", version, game)
 	}
 	return raw, nil
 }

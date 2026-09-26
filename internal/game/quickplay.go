@@ -25,7 +25,7 @@ func (q QuickPlay) Check(v Version, minecraft string) error {
 	if q.World == "" || v.Declares("is_quick_play_singleplayer") {
 		return nil
 	}
-	return out.Errorf("unsupported-quickplay", "minecraft %s has no quick play, so --world needs %s or later", minecraft, quickPlayFloor)
+	return out.Errorf("unsupported-quickplay", "Minecraft %s has no quick play, so --world needs %s or later", minecraft, quickPlayFloor)
 }
 
 // Apply turns the target on through the arguments the version declares for it. A server on a

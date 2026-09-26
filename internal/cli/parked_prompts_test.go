@@ -91,7 +91,7 @@ func TestDecliningTheUnlockKeepsTheMismatch(t *testing.T) {
 
 	code, _, stderr, _ := h.runAnswering(t, map[string]string{"Unlock base and resolve its mods for Minecraft 26.2?": "no"}, "modpack", "add", "./base")
 
-	if code == 0 || !strings.Contains(stderr, "Locked modpack base is built for minecraft 26.1") {
+	if code == 0 || !strings.Contains(stderr, "Locked modpack base is built for Minecraft 26.1") {
 		t.Fatalf("no should end on the modpack-mismatch refusal: exit %d\n%s", code, stderr)
 	}
 	var m struct {

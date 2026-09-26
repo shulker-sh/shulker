@@ -44,7 +44,7 @@ func quiltVersions(ctx context.Context, r *Remote, game string) ([]Version, erro
 		} `json:"loader"`
 	}
 	if err := q.r.Fetch.GetJSON(ctx, q.baseURL+"/versions/loader/"+game, &entries); err != nil {
-		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt loaders for minecraft %s", game)
+		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt loaders for Minecraft %s", game)
 	}
 	versions := make([]Version, 0, len(entries))
 	for _, e := range entries {
@@ -57,7 +57,7 @@ func quiltProfile(ctx context.Context, r *Remote, game, version string) (json.Ra
 	q := newQuiltMeta(r)
 	var raw json.RawMessage
 	if err := q.r.Fetch.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s/profile/json", q.baseURL, game, version), &raw); err != nil {
-		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt %s profile for minecraft %s", version, game)
+		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt %s profile for Minecraft %s", version, game)
 	}
 	return raw, nil
 }
@@ -72,11 +72,11 @@ func quiltLoaderJarURL(ctx context.Context, r *Remote, game, version string) (st
 		} `json:"loader"`
 	}
 	if err := q.r.Fetch.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s", q.baseURL, game, version), &entry); err != nil {
-		return "", fetchFailed(err, "quilt", "couldn't read Quilt loader %s for minecraft %s", version, game)
+		return "", fetchFailed(err, "quilt", "couldn't read Quilt loader %s for Minecraft %s", version, game)
 	}
 	path, err := MavenPath(entry.Loader.Maven)
 	if err != nil {
-		return "", invalid("Quilt's meta gives no Maven coordinate for loader %s on minecraft %s", version, game)
+		return "", invalid("Quilt's meta gives no Maven coordinate for loader %s on Minecraft %s", version, game)
 	}
 	return q.mavenURL + "/" + path, nil
 }
@@ -104,10 +104,10 @@ type quiltServerProfile struct {
 func (q quiltMeta) serverProfile(ctx context.Context, game, version string) (*quiltServerProfile, error) {
 	var p quiltServerProfile
 	if err := q.r.Fetch.GetJSON(ctx, fmt.Sprintf("%s/versions/loader/%s/%s/server/json", q.baseURL, game, version), &p); err != nil {
-		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt %s server profile for minecraft %s", version, game)
+		return nil, fetchFailed(err, "quilt", "couldn't read the Quilt %s server profile for Minecraft %s", version, game)
 	}
 	if p.MainClass == "" || p.LauncherMainClass == "" || len(p.Libraries) == 0 {
-		return nil, invalid("the Quilt %s server profile for minecraft %s is incomplete", version, game)
+		return nil, invalid("the Quilt %s server profile for Minecraft %s is incomplete", version, game)
 	}
 	return &p, nil
 }

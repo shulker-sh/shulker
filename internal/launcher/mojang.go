@@ -16,6 +16,7 @@ import (
 
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/fsutil"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -186,7 +187,7 @@ func mojangVersion(ctx context.Context, m *Mojang, req *Link) (string, error) {
 	case req.Versions.HasInstaller():
 		return req.Versions.InstallClient(ctx, m.Dir)
 	}
-	req.Log("fetching %s loader %s for %s", req.LoaderType, req.LoaderVersion, req.Minecraft)
+	req.Log("fetching %s loader %s for %s", loader.Title(req.LoaderType), req.LoaderVersion, req.Minecraft)
 	profile, err := req.Versions.LoaderProfile(ctx)
 	if err != nil {
 		return "", err
