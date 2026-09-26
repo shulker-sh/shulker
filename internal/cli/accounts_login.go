@@ -52,7 +52,7 @@ func (a *app) accountsLoginCmd() *cobra.Command {
 			switch {
 			case r.State == account.NoProfile:
 				a.printer.Warn("%s owns no Java profile, so it can't launch or be the default account; Minecraft: Java Edition is at minecraft.net", r.Name)
-			case use && !used:
+			case (use || cfg.Accounts.Default == "") && !used:
 				if _, err := a.changeDefault(r.ID); err != nil {
 					return err
 				}

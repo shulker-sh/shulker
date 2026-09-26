@@ -203,11 +203,8 @@ func TestAccountsLoginStoresTheAccountAndItsTokens(t *testing.T) {
 			t.Errorf("the sign-in prompt is missing %q:\n%s", want, stderr)
 		}
 	}
-	if !strings.Contains(stdout, "✔ Signed in as Notch ("+notchID+")") {
-		t.Errorf("login result: %s", stdout)
-	}
-	if !strings.Contains(stdout, "Make it the default account:\n    $ shulker accounts use Notch") {
-		t.Errorf("login should leave the default alone and hint at it: %s", stdout)
+	if !strings.Contains(stdout, "✔ Signed in as Notch, now the default account ("+notchID+")") || strings.Contains(stdout, "accounts use") {
+		t.Errorf("the first account signed in becomes the default: %s", stdout)
 	}
 	// The scope is the whole of what shulker asks for: an email address would cost a consent
 	// screen to name what the gamertag names for free.
@@ -236,13 +233,14 @@ func TestAccountsLoginStoresTheAccountAndItsTokens(t *testing.T) {
 	if a.Xbox.Token != "user-notch" || a.Xbox.UserHash != "uhs-notch" {
 		t.Errorf("xbox = %+v", a.Xbox)
 	}
-	// Nothing is the default until the player says so.
-	if stdout := h.mustRun(t, "config", "get", "--json"); strings.Contains(stdout, "default") {
-		t.Errorf("login set a default account: %s", stdout)
-	}
-	// A second run signs a second account in beside the first.
+	// A second run signs a second account in beside the first, and leaves the default alone.
 	h.msa.signsIn("dinnerbone", "Dinnerbone", dinnerbone)
-	h.mustRun(t, "accounts", "login")
+	if stdout := h.mustRun(t, "accounts", "login"); !strings.Contains(stdout, "shulker accounts use Dinnerbone") {
+		t.Errorf("a login with a default set hints at switching: %s", stdout)
+	}
+	if readConfigDoc(t, h.config)["accounts"].(map[string]any)["default"] != notchID {
+		t.Error("the first account signed in stays the default")
+	}
 	if store := readAccountStore(t, h); len(store.Accounts) != 2 {
 		t.Fatalf("a second login should add an account: %+v", store.Accounts)
 	}

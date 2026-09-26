@@ -207,6 +207,7 @@ func TestPlayWithNoDefaultTakesTheOnlyAccountThereIs(t *testing.T) {
 	h := newHarness(t)
 	playHarness(t, h)
 	h.mustRun(t, "accounts", "login")
+	h.mustRun(t, "config", "unset", "accounts.default")
 
 	stdout := h.mustRun(t, "-i", "pack", "play")
 

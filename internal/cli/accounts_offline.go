@@ -37,10 +37,11 @@ func (a *app) accountsAddCmd() *cobra.Command {
 				}
 				id = mojang.Dashed(uuid)
 			}
-			accounts, _, err := a.accounts()
+			accounts, cfg, err := a.accounts()
 			if err != nil {
 				return err
 			}
+			use = use || cfg.Accounts.Default == ""
 			if !account.OwnsTheGame(accounts) {
 				return unprovenOwnership("create an offline one", out.Nudge{Lead: "Sign in to Microsoft", Command: "shulker accounts login"})
 			}

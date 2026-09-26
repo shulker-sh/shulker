@@ -63,6 +63,17 @@ func TestAccountsAddUseSwitchesTheDefault(t *testing.T) {
 	}
 }
 
+func TestAccountsAddBecomesTheDefaultWhenNoneIsSet(t *testing.T) {
+	h := withOwner(t)
+	stdout := h.mustRun(t, "accounts", "add", "Steve")
+	if !strings.Contains(stdout, "now the default account") || strings.Contains(stdout, "accounts use") {
+		t.Errorf("with no default the account becomes it: %s", stdout)
+	}
+	if readConfigDoc(t, h.config)["accounts"].(map[string]any)["default"] != steveOffline {
+		t.Error("the created account should be the default")
+	}
+}
+
 func TestAccountsAddUUIDPinsAnotherAndNeverWarns(t *testing.T) {
 	h := withOwner(t)
 	stdout, stderr := h.mustRunStderr(t, "accounts", "add", "Steve", "--uuid", strings.ToUpper(strings.ReplaceAll(steveID, "-", "")))
