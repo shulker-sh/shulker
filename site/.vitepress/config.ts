@@ -17,7 +17,7 @@ function serveInstallers(): Plugin {
     name: 'shulker-installers',
     configureServer(server) {
       for (const name of installers) {
-        server.middlewares.use(`/${name}`, (req, res) => {
+        server.middlewares.use(`/${name}`, (_req, res) => {
           res.setHeader('Content-Type', 'text/plain; charset=utf-8')
           createReadStream(join(repoRoot, name)).pipe(res)
         })
