@@ -57,6 +57,9 @@ type Resolver struct {
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
 	// file order is arbitrary.
 	keepNewest bool
+	// builds are the sides an import judges a pack's sides against, where they aren't the
+	// manifest's own: a modpack's manifest declares none, and the project requiring it builds.
+	builds []string
 }
 
 // readJar reads a jar's metadata the way the locked loader would.

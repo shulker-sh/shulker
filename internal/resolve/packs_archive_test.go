@@ -15,6 +15,7 @@ import (
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
+	"shulker.sh/shulker/internal/provider"
 )
 
 var craftFiles = []cfPackFile{
@@ -148,5 +149,30 @@ func TestConsumeArchiveLeavesTheExportersMarkerOut(t *testing.T) {
 	}
 	if u := h.r.Lock.Modpacks["craft"].Unmanaged; len(u) != 0 {
 		t.Fatalf("the exporter's marker is not the pack's to lay: %v", u)
+	}
+}
+
+func TestConsumeArchiveTakesAModsSideFromThePackWhereItAddsABuiltSide(t *testing.T) {
+	cf := curseForgeHost(t)
+	configManager := cf.Publish(mod("800000", "config-manager"), provider.Version{ID: "5600001", Number: "1.0.0", File: provider.File{Filename: "config_manager-1.0.0.jar"}}, modJar(t, "config_manager", "1.0.0", "server"))
+	h := newHarness(t, envtest.NewHost(cf.CDN, "modrinth"), cf)
+	h.r.Manifest.Client = &manifest.Client{}
+	listed := listedByDownload(cf.CDN, configManager)
+	listed.Env = map[string]string{"client": "required", "server": "required"}
+	path := filepath.Join(h.r.Dir, "packs", "fo.mrpack")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeMrpack(t, path, []mrpackFile{listed}, map[string]string{})
+	arc, err := packarchive.Read(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := &modpack.Loaded{Name: "fo", Source: "packs/fo.mrpack", Kind: modpack.File, Archive: arc, Pin: lock.Modpack{File: "packs/fo.mrpack"}}
+	if err := h.r.ConsumeArchive(context.Background(), l); err != nil {
+		t.Fatal(err)
+	}
+	if got := l.Lock.Mods["config_manager"].Side; got != "both" {
+		t.Fatalf("config_manager side %q, want the pack's both so the client project ships it", got)
 	}
 }

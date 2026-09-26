@@ -653,7 +653,11 @@ func (im *importer) duplicate(id string, prior *lock.Mod, project, filename stri
 
 func (im *importer) addsBuiltSide(packSide, providerSide string) bool {
 	covers := func(side, built string) bool { return side == "both" || side == built }
-	return slices.ContainsFunc(im.r.Manifest.Sides(), func(built string) bool {
+	sides := im.r.builds
+	if sides == nil {
+		sides = im.r.Manifest.Sides()
+	}
+	return slices.ContainsFunc(sides, func(built string) bool {
 		return covers(packSide, built) && !covers(providerSide, built)
 	})
 }
@@ -991,7 +995,7 @@ func (r *Resolver) ConsumeArchive(ctx context.Context, l *modpack.Loaded) error 
 	m := &manifest.Manifest{Name: l.Name, Minecraft: a.Minecraft, Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}, Providers: r.Manifest.Providers}
 	pl := lock.New()
 	pl.Minecraft, pl.Loader = a.Minecraft, lock.Loader{Type: typ, Version: version}
-	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log}
+	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log, builds: r.Manifest.Sides()}
 	byID := a.Format.Provider() != ""
 	if byID && r.Fetch != nil && r.Fetch.Offline {
 		return archiveOffline(l.Name, a.Format, nil)
