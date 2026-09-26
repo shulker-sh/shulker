@@ -5,6 +5,7 @@ project_name: shulker
 before:
   hooks:
     - go mod tidy
+    - scripts/third-party-licenses.sh
 
 builds:
   - id: shulker
@@ -33,6 +34,7 @@ archives:
     name_template: "shulker_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
+      - THIRD_PARTY_LICENSES
       - README.md
       - CHANGELOG.md
 

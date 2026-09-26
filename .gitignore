@@ -1,5 +1,6 @@
 /shulker
 /dist/
+/THIRD_PARTY_LICENSES
 .DS_Store
 *.local.json
 /playground/
