@@ -13,8 +13,8 @@ import (
 func gatedProject(t *testing.T) *testProject {
 	t.Helper()
 	p := newProject(t)
-	p.lockMod("sodium", p.modrinth, p.modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "m-sodium-1", Number: "0.9.2", File: provider.File{Filename: "sodium-0.9.2.jar"}}, modJar(t, "sodium", "0.9.2")))
-	p.lockDependency("fabric-api", p.modrinth, p.modrinth.publish(mod("P7dR8mSH", "fabric-api"), provider.Version{ID: "m-api-1", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0.jar"}}, modJar(t, "fabric-api", "0.130.0")), "sodium")
+	p.lockMod("sodium", p.modrinth, p.modrinth.Publish(mod("AANobbMI", "sodium"), provider.Version{ID: "m-sodium-1", Number: "0.9.2", File: provider.File{Filename: "sodium-0.9.2.jar"}}, modJar(t, "sodium", "0.9.2")))
+	p.lockDependency("fabric-api", p.modrinth, p.modrinth.Publish(mod("P7dR8mSH", "fabric-api"), provider.Version{ID: "m-api-1", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0.jar"}}, modJar(t, "fabric-api", "0.130.0")), "sodium")
 	p.b.Manifest.Features = map[string]manifest.Feature{"fancy": {}, "shaders": {}, "api": {}}
 	return p
 }

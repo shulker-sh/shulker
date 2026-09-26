@@ -5,25 +5,26 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
 
 // heldProject locks fabric-api at 1.0.0 and only then lets a newer one exist, so anything that
 // moves it has to be the add under test. needsNewAPI is whether sodium's jar wants the newer one.
-func heldProject(t *testing.T, needsNewAPI bool) (*host, *harness) {
+func heldProject(t *testing.T, needsNewAPI bool) (*envtest.Host, *harness) {
 	t.Helper()
-	alpha := newHost(newCDN(t), "alpha")
-	alpha.publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "1.0.0", File: provider.File{Filename: "fabric-api-1.0.0.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
+	alpha := envtest.NewHost(envtest.NewCDN(t), "alpha")
+	alpha.Publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "1.0.0", File: provider.File{Filename: "fabric-api-1.0.0.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
 	h := newHarness(t, alpha)
 	h.mustAdd("fabric-api", AddOptions{})
-	alpha.publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "2.0.0", File: provider.File{Filename: "fabric-api-2.0.0.jar"}}, modJar(t, "fabric-api", "2.0.0", "*"))
+	alpha.Publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "2.0.0", File: provider.File{Filename: "fabric-api-2.0.0.jar"}}, modJar(t, "fabric-api", "2.0.0", "*"))
 	wants := "*"
 	if needsNewAPI {
 		wants = ">=2.0.0"
 	}
 	jar := fabricJar(t, `{"id":"sodium","version":"0.9.2","environment":"client","depends":{"fabricloader":">=0.17","fabric-api":"`+wants+`"}}`, nil)
-	alpha.publish(mod("a-sodium", "sodium"), provider.Version{Number: "0.9.2", File: provider.File{Filename: "sodium-0.9.2.jar"}, Dependencies: []provider.Dependency{dependsOn("a-fapi")}}, jar)
+	alpha.Publish(mod("a-sodium", "sodium"), provider.Version{Number: "0.9.2", File: provider.File{Filename: "sodium-0.9.2.jar"}, Dependencies: []provider.Dependency{dependsOn("a-fapi")}}, jar)
 	return alpha, h
 }
 
@@ -78,8 +79,8 @@ func TestUpdateKeepsAPinnedDirectDependency(t *testing.T) {
 	if _, err := h.r.Pin(ctx, "fabric-api", ""); err != nil {
 		t.Fatal(err)
 	}
-	alpha.publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "2.0.0", File: provider.File{Filename: "fabric-api-2.0.0.jar"}}, modJar(t, "fabric-api", "2.0.0", "*"))
-	alpha.publish(mod("a-sodium", "sodium"), provider.Version{Number: "1.1.0", File: provider.File{Filename: "sodium-1.1.0.jar"}, Dependencies: []provider.Dependency{dependsOn("a-fapi")}}, modJar(t, "sodium", "1.1.0", "client"))
+	alpha.Publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "2.0.0", File: provider.File{Filename: "fabric-api-2.0.0.jar"}}, modJar(t, "fabric-api", "2.0.0", "*"))
+	alpha.Publish(mod("a-sodium", "sodium"), provider.Version{Number: "1.1.0", File: provider.File{Filename: "sodium-1.1.0.jar"}, Dependencies: []provider.Dependency{dependsOn("a-fapi")}}, modJar(t, "sodium", "1.1.0", "client"))
 
 	before := h.r.Snapshot()
 	if err := h.r.Update(ctx, []string{"sodium"}); err != nil {

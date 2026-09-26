@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
@@ -16,16 +17,16 @@ import (
 
 // twoHosts is a first provider with sodium and fabric-api, and a sha1-only second one with jei,
 // sodium and fabric-api, the way Modrinth and CurseForge overlap.
-func twoHosts(t *testing.T) (*host, *host, *harness) {
+func twoHosts(t *testing.T) (*envtest.Host, *envtest.Host, *harness) {
 	t.Helper()
-	c := newCDN(t)
-	alpha, beta := newHost(c, "alpha"), newHost(c, "beta")
-	beta.likeCurseForge()
-	alpha.publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
-	alpha.publish(mod("a-sodium", "sodium"), provider.Version{Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}, Dependencies: []provider.Dependency{dependsOn("a-fapi")}}, modJar(t, "sodium", "1.0.0", "client"))
-	beta.publish(mod("306612", "fabric-api"), provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
-	beta.publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "sodium", "1.0.0", "client"))
-	beta.publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "jei", "1.0.0", "*"))
+	c := envtest.NewCDN(t)
+	alpha, beta := envtest.NewHost(c, "alpha"), envtest.NewHost(c, "beta")
+	beta.LikeCurseForge()
+	alpha.Publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
+	alpha.Publish(mod("a-sodium", "sodium"), provider.Version{Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}, Dependencies: []provider.Dependency{dependsOn("a-fapi")}}, modJar(t, "sodium", "1.0.0", "client"))
+	beta.Publish(mod("306612", "fabric-api"), provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
+	beta.Publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "sodium", "1.0.0", "client"))
+	beta.Publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "jei", "1.0.0", "*"))
 	return alpha, beta, newHarness(t, alpha, beta)
 }
 
@@ -34,7 +35,7 @@ func TestAddFallsThroughToTheNextProvider(t *testing.T) {
 	h.mustAdd("jei", AddOptions{})
 
 	jei := h.mod("jei")
-	jar := h.cdn.bytes(beta.Files[2])
+	jar := h.cdn.Bytes(beta.Files[2])
 	if jei.Provider != "beta" || jei.Project != "238222" || jei.Version != "5000001" || jei.Sha512 != sha512Hex(jar) || jei.Size != int64(len(jar)) || jei.URL == nil || jei.Page != "" || jei.Side != "both" {
 		t.Fatalf("jei lock entry: %+v", jei)
 	}
@@ -67,7 +68,7 @@ func TestOutdatedUpdateAndPin(t *testing.T) {
 	if got, err := h.r.Outdated(ctx, nil); err != nil || len(got) != 0 {
 		t.Fatalf("outdated before a new file: %v %v", got, err)
 	}
-	beta.publish(mod("238222", "jei"), provider.Version{ID: "5000002", Number: "1.1.0", File: provider.File{Filename: "jei-26.2-fabric-1.1.0.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "jei", "1.1.0", "*"))
+	beta.Publish(mod("238222", "jei"), provider.Version{ID: "5000002", Number: "1.1.0", File: provider.File{Filename: "jei-26.2-fabric-1.1.0.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "jei", "1.1.0", "*"))
 	got, err := h.r.Outdated(ctx, nil)
 	if err != nil || len(got) != 1 || got[0] != (Outdated{ID: "jei", Current: "1.0.0", Latest: "1.1.0"}) {
 		t.Fatalf("outdated: %+v %v", got, err)
@@ -152,10 +153,10 @@ func TestAddNamesAProviderItCannotReach(t *testing.T) {
 }
 
 func TestAddTakesAManualDownloadFromTheDownloadsFolder(t *testing.T) {
-	c := newCDN(t)
-	cf := newHost(c, "curse").likeCurseForge()
+	c := envtest.NewCDN(t)
+	cf := envtest.NewHost(c, "curse").LikeCurseForge()
 	nodist := modJar(t, "nodist", "1.0.0", "client")
-	v := cf.publishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, nodist)
+	v := cf.PublishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, nodist)
 	h := newHarness(t, cf)
 
 	err := h.add("nodist", AddOptions{})
@@ -172,11 +173,11 @@ func TestAddTakesAManualDownloadFromTheDownloadsFolder(t *testing.T) {
 }
 
 func TestAddTreatsAForbiddenDownloadAsManual(t *testing.T) {
-	c := newCDN(t)
-	cf := newHost(c, "curse").likeCurseForge()
+	c := envtest.NewCDN(t)
+	cf := envtest.NewHost(c, "curse").LikeCurseForge()
 	locked := modJar(t, "locked", "1.0.0", "*")
-	v := cf.publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, locked)
-	c.forbid(v)
+	v := cf.Publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, locked)
+	c.Forbid(v)
 	h := newHarness(t, cf)
 
 	err := h.add("locked", AddOptions{})
@@ -194,12 +195,12 @@ func TestAddTreatsAForbiddenDownloadAsManual(t *testing.T) {
 }
 
 func TestInstallWarnsOfStrayDownloadsAndListsMissingFiles(t *testing.T) {
-	c := newCDN(t)
-	cf := newHost(c, "curse").likeCurseForge()
+	c := envtest.NewCDN(t)
+	cf := envtest.NewHost(c, "curse").LikeCurseForge()
 	nodist, locked := modJar(t, "nodist", "1.0.0", "client"), modJar(t, "locked", "1.0.0", "*")
-	cf.publishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, nodist)
-	forbidden := cf.publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, locked)
-	c.forbid(forbidden)
+	cf.PublishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, nodist)
+	forbidden := cf.Publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, locked)
+	c.Forbid(forbidden)
 	h := newHarness(t, cf)
 	h.drop("nodist-1.0.0.jar", nodist)
 	h.drop("locked-1.0.0.jar", locked)
@@ -232,16 +233,16 @@ func TestInstallWarnsOfStrayDownloadsAndListsMissingFiles(t *testing.T) {
 
 // betaDependency gives a host a library with only beta files, older one first, and a release mod
 // that requires it, the shape Framework and Goblin Traders have.
-func betaDependency(t *testing.T, cf *host) {
+func betaDependency(t *testing.T, cf *envtest.Host) {
 	t.Helper()
 	framework := mod("667391", "framework-fabric")
-	cf.publish(framework, provider.Version{ID: "5600002", Number: "0.6.17", Channel: "beta", Published: day(10), File: provider.File{Filename: "framework-fabric-0.6.17.jar"}}, modJar(t, "framework", "0.6.17", "*"))
-	cf.publish(framework, provider.Version{ID: "5600001", Number: "0.6.16", Channel: "beta", Published: day(1), File: provider.File{Filename: "framework-fabric-0.6.16.jar"}}, modJar(t, "framework", "0.6.16", "*"))
-	cf.publish(mod("667389", "goblin-traders-fabric"), provider.Version{ID: "5600011", Number: "1.9.3", File: provider.File{Filename: "goblintraders-fabric-1.9.3.jar"}, Dependencies: []provider.Dependency{dependsOn("667391")}}, modJar(t, "goblintraders", "1.9.3", "*"))
+	cf.Publish(framework, provider.Version{ID: "5600002", Number: "0.6.17", Channel: "beta", Published: day(10), File: provider.File{Filename: "framework-fabric-0.6.17.jar"}}, modJar(t, "framework", "0.6.17", "*"))
+	cf.Publish(framework, provider.Version{ID: "5600001", Number: "0.6.16", Channel: "beta", Published: day(1), File: provider.File{Filename: "framework-fabric-0.6.16.jar"}}, modJar(t, "framework", "0.6.16", "*"))
+	cf.Publish(mod("667389", "goblin-traders-fabric"), provider.Version{ID: "5600011", Number: "1.9.3", File: provider.File{Filename: "goblintraders-fabric-1.9.3.jar"}, Dependencies: []provider.Dependency{dependsOn("667391")}}, modJar(t, "goblintraders", "1.9.3", "*"))
 }
 
 func TestPinningABetaFileAcceptsBeta(t *testing.T) {
-	cf := newHost(newCDN(t), "curse").likeCurseForge()
+	cf := envtest.NewHost(envtest.NewCDN(t), "curse").LikeCurseForge()
 	betaDependency(t, cf)
 	h := newHarness(t, cf)
 
@@ -266,7 +267,7 @@ func TestPinningABetaFileAcceptsBeta(t *testing.T) {
 
 func TestPinWidensTheChannel(t *testing.T) {
 	_, beta, h := twoHosts(t)
-	beta.publish(mod("238222", "jei"), provider.Version{ID: "5000003", Number: "1.0.1-beta", Channel: "beta", File: provider.File{Filename: "jei-26.2-fabric-1.0.1-beta.jar"}}, modJar(t, "jei", "1.0.1-beta", "*"))
+	beta.Publish(mod("238222", "jei"), provider.Version{ID: "5000003", Number: "1.0.1-beta", Channel: "beta", File: provider.File{Filename: "jei-26.2-fabric-1.0.1-beta.jar"}}, modJar(t, "jei", "1.0.1-beta", "*"))
 	h.mustAdd("jei", AddOptions{})
 	if v := h.mod("jei").Version; v != "5000001" {
 		t.Fatalf("a plain add should skip the beta: %s", v)
@@ -287,7 +288,7 @@ func TestPinWidensTheChannel(t *testing.T) {
 }
 
 func TestADependencyAlreadyLockedKeepsItsVersion(t *testing.T) {
-	cf := newHost(newCDN(t), "curse").likeCurseForge()
+	cf := envtest.NewHost(envtest.NewCDN(t), "curse").LikeCurseForge()
 	betaDependency(t, cf)
 	h := newHarness(t, cf)
 	h.mustAdd("667391", AddOptions{Pin: "5600001"})
@@ -304,7 +305,7 @@ func TestADependencyAlreadyLockedKeepsItsVersion(t *testing.T) {
 }
 
 func TestAddRefusesAVersionOffTheChannel(t *testing.T) {
-	cf := newHost(newCDN(t), "curse").likeCurseForge()
+	cf := envtest.NewHost(envtest.NewCDN(t), "curse").LikeCurseForge()
 	betaDependency(t, cf)
 	h := newHarness(t, cf)
 
@@ -326,7 +327,7 @@ func TestAddRefusesAVersionOffTheChannel(t *testing.T) {
 func TestPinningABetaPackFileAcceptsBeta(t *testing.T) {
 	cf := curseForgeHost(t)
 	fresh := cf.Known[3]
-	cf.publish(fresh, provider.Version{ID: "5300002", Number: "1.9.5", Channel: "beta", Published: day(10), Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.5.zip"}}, cf.cdn.bytes(cf.Files[3]))
+	cf.Publish(fresh, provider.Version{ID: "5300002", Number: "1.9.5", Channel: "beta", Published: day(10), Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.5.zip"}}, cf.CDN.Bytes(cf.Files[3]))
 	h := newHarness(t, cf)
 
 	h.mustAdd("600000", AddOptions{Pin: "5300002"})
@@ -343,9 +344,9 @@ func TestPinningABetaPackFileAcceptsBeta(t *testing.T) {
 }
 
 func TestASlugTheProviderLacksCarriesItsHelp(t *testing.T) {
-	cf := newHost(newCDN(t), "curseforge").likeCurseForge()
+	cf := envtest.NewHost(envtest.NewCDN(t), "curseforge").LikeCurseForge()
 	cf.Help = "add one its search misses by its project id"
-	cf.publish(mod("500525", "balm-fabric"), provider.Version{ID: "5700001", Number: "7.3.9", File: provider.File{Filename: "balm-fabric-7.3.9.jar"}}, modJar(t, "balm", "7.3.9", "*"))
+	cf.Publish(mod("500525", "balm-fabric"), provider.Version{ID: "5700001", Number: "7.3.9", File: provider.File{Filename: "balm-fabric-7.3.9.jar"}}, modJar(t, "balm", "7.3.9", "*"))
 	h := newHarness(t, cf)
 
 	for _, opts := range []AddOptions{{Provider: "curseforge"}, {}} {
@@ -361,12 +362,12 @@ func TestASlugTheProviderLacksCarriesItsHelp(t *testing.T) {
 }
 
 func TestAddLocksABlockedFileFromAnotherProviderHostingItsBytes(t *testing.T) {
-	c := newCDN(t)
-	alpha := newHost(c, "alpha")
-	cf := newHost(c, "curse").likeCurseForge()
+	c := envtest.NewCDN(t)
+	alpha := envtest.NewHost(c, "alpha")
+	cf := envtest.NewHost(c, "curse").LikeCurseForge()
 	iris := modJar(t, "iris", "1.0.0", "client")
-	mirrored := alpha.publish(mod("YL57", "irisshaders"), provider.Version{ID: "v1", Number: "1.0.0", File: provider.File{Filename: "iris-1.0.0.jar"}}, iris)
-	cf.publishManual(mod("300002", "iris-cf"), provider.Version{ID: "5100002", Number: "1.0.0", File: provider.File{Filename: "iris-1.0.0.jar"}}, iris)
+	mirrored := alpha.Publish(mod("YL57", "irisshaders"), provider.Version{ID: "v1", Number: "1.0.0", File: provider.File{Filename: "iris-1.0.0.jar"}}, iris)
+	cf.PublishManual(mod("300002", "iris-cf"), provider.Version{ID: "5100002", Number: "1.0.0", File: provider.File{Filename: "iris-1.0.0.jar"}}, iris)
 	h := newHarness(t, alpha, cf)
 
 	h.mustAdd("iris-cf", AddOptions{Provider: "curse"})

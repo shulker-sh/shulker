@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/packarchive"
@@ -56,19 +57,19 @@ func overrideFiles(t *testing.T, dir string, files map[string][]byte) []packarch
 
 func TestMatchOverridesLocksTheFilesProvidersHost(t *testing.T) {
 	cf := curseForgeHost(t)
-	iris := cf.publish(mod("455508", "irisshaders"), provider.Version{ID: "5000030", Number: "1.8.0", File: provider.File{Filename: "iris-fabric-1.8.0+mc26.2.jar"}}, modJar(t, "iris", "1.8.0", "client"))
-	modrinth := newHost(cf.cdn, "modrinth")
-	sodium := modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "1.0.0", "client"))
-	fresh := modrinth.publish(provider.Project{ID: "fresh", Slug: "fresh-animations", Type: manifest.TypeResourcePack}, provider.Version{Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "fresh-animations-1.9.4.zip"}}, zipFiles(t, map[string]string{"pack.mcmeta": `{"pack":{"pack_format":34,"description":"fresh"}}`}))
+	iris := cf.Publish(mod("455508", "irisshaders"), provider.Version{ID: "5000030", Number: "1.8.0", File: provider.File{Filename: "iris-fabric-1.8.0+mc26.2.jar"}}, modJar(t, "iris", "1.8.0", "client"))
+	modrinth := envtest.NewHost(cf.CDN, "modrinth")
+	sodium := modrinth.Publish(mod("AANobbMI", "sodium"), provider.Version{Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "1.0.0", "client"))
+	fresh := modrinth.Publish(provider.Project{ID: "fresh", Slug: "fresh-animations", Type: manifest.TypeResourcePack}, provider.Version{Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "fresh-animations-1.9.4.zip"}}, zipFiles(t, map[string]string{"pack.mcmeta": `{"pack":{"pack_format":34,"description":"fresh"}}`}))
 	h := newHarness(t, modrinth, cf)
 	jei, nodist := cf.Files[1], cf.Files[4]
 	files := overrideFiles(t, h.r.Dir, map[string][]byte{
-		"overrides/mods/" + sodium.File.Filename:              cf.cdn.bytes(sodium),
-		"overrides/mods/" + jei.File.Filename:                 cf.cdn.bytes(jei),
-		"client-overrides/mods/" + iris.File.Filename:         cf.cdn.bytes(iris),
-		"overrides/mods/" + nodist.File.Filename:              cf.cdn.bytes(nodist),
+		"overrides/mods/" + sodium.File.Filename:              cf.CDN.Bytes(sodium),
+		"overrides/mods/" + jei.File.Filename:                 cf.CDN.Bytes(jei),
+		"client-overrides/mods/" + iris.File.Filename:         cf.CDN.Bytes(iris),
+		"overrides/mods/" + nodist.File.Filename:              cf.CDN.Bytes(nodist),
 		"overrides/mods/unknown-1.0.jar":                      []byte("not on any provider"),
-		"client-overrides/resourcepacks/Fresh Animations.zip": cf.cdn.bytes(fresh),
+		"client-overrides/resourcepacks/Fresh Animations.zip": cf.CDN.Bytes(fresh),
 	})
 
 	res, err := h.r.MatchOverrides(context.Background(), files)

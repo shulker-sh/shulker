@@ -4,19 +4,20 @@ import (
 	"slices"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/provider"
 )
 
 func TestTheLockRecordsWhereAModsSideCameFrom(t *testing.T) {
-	c := newCDN(t)
-	alpha := newHost(c, "alpha")
-	alpha.publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "1.0.0", File: provider.File{Filename: "fabric-api.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
-	alpha.publish(mod("a-sodium", "sodium"), provider.Version{Number: "1.0.0", File: provider.File{Filename: "sodium.jar"}}, modJar(t, "sodium", "1.0.0", "client"))
+	c := envtest.NewCDN(t)
+	alpha := envtest.NewHost(c, "alpha")
+	alpha.Publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "1.0.0", File: provider.File{Filename: "fabric-api.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
+	alpha.Publish(mod("a-sodium", "sodium"), provider.Version{Number: "1.0.0", File: provider.File{Filename: "sodium.jar"}}, modJar(t, "sodium", "1.0.0", "client"))
 	sided := mod("a-lith", "lithium")
 	sided.Side = "server"
-	alpha.publish(sided, provider.Version{Number: "1.0.0", File: provider.File{Filename: "lithium.jar"}}, modJar(t, "lithium", "1.0.0", "*"))
-	alpha.publish(mod("a-zoom", "zoom"), provider.Version{Number: "1.0.0", File: provider.File{Filename: "zoom.jar"}}, modJar(t, "zoom", "1.0.0", "client"))
+	alpha.Publish(sided, provider.Version{Number: "1.0.0", File: provider.File{Filename: "lithium.jar"}}, modJar(t, "lithium", "1.0.0", "*"))
+	alpha.Publish(mod("a-zoom", "zoom"), provider.Version{Number: "1.0.0", File: provider.File{Filename: "zoom.jar"}}, modJar(t, "zoom", "1.0.0", "client"))
 	h := newHarness(t, alpha)
 	before := h.r.Snapshot()
 	for _, slug := range []string{"fabric-api", "sodium", "lithium"} {

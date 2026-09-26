@@ -4,136 +4,25 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
-	"crypto/sha1"
-	"crypto/sha512"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"maps"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
-	"shulker.sh/shulker/internal/provider/fake"
 )
 
-// cdn serves the files the fake providers publish, by path. A path can be refused.
-type cdn struct {
-	srv       *httptest.Server
-	mu        sync.Mutex
-	files     map[string][]byte
-	forbidden map[string]bool
-}
-
-func newCDN(t *testing.T) *cdn {
-	t.Helper()
-	c := &cdn{files: map[string][]byte{}, forbidden: map[string]bool{}}
-	c.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		data, ok := c.files[r.URL.Path]
-		switch {
-		case !ok:
-			http.NotFound(w, r)
-		case c.forbidden[r.URL.Path]:
-			w.WriteHeader(http.StatusForbidden)
-		default:
-			w.Write(data)
-		}
-	}))
-	t.Cleanup(c.srv.Close)
-	return c
-}
-
-func (c *cdn) serve(path string, data []byte) string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.files[path] = data
-	return c.srv.URL + path
-}
-
-func (c *cdn) forbid(v provider.Version) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.forbidden[pathOf(v)] = true
-}
-
-func pathOf(v provider.Version) string {
-	return "/" + v.ID + "/" + v.File.Filename
-}
-
-// host is a fake provider whose files sit on the test's cdn.
-type host struct {
-	*fake.Provider
-	cdn *cdn
-}
-
-func newHost(c *cdn, name string) *host {
-	return &host{Provider: fake.New(name), cdn: c}
-}
-
-// publish adds v to proj with data as its file, served by the cdn, and returns v as published.
-func (h *host) publish(proj provider.Project, v provider.Version, data []byte) provider.Version {
-	if proj.Type == "" {
-		proj.Type = manifest.TypeMod
-	}
-	if proj.Title == "" {
-		proj.Title = proj.Slug
-	}
-	if proj.Page == "" {
-		proj.Page = h.ProjectPage(proj.Type, proj.Slug)
-	}
-	if !slices.ContainsFunc(h.Known, func(p provider.Project) bool { return p.ID == proj.ID }) {
-		h.Known = append(h.Known, proj)
-	}
-	v.ProjectID = proj.ID
-	if v.Channel == "" {
-		v.Channel = "release"
-	}
-	if v.GameVersions == nil {
-		v.GameVersions = []string{"26.2"}
-	}
-	if v.Loaders == nil && proj.Type == manifest.TypeMod {
-		v.Loaders = []string{"fabric"}
-	}
-	sum := sha1.Sum(data)
-	v.File.Sha1 = hex.EncodeToString(sum[:])
-	v.File.Sha512 = sha512Hex(data)
-	v.File.Size = int64(len(data))
-	v.File.URL = h.cdn.serve(pathOf(v), data)
-	h.Files = append(h.Files, v)
-	return v
-}
-
-// republish swaps the bytes behind the version with the given id, as a host does when the
-// upload differs from what another host has.
-func (h *host) republish(id string, data []byte) provider.Version {
-	i := slices.IndexFunc(h.Files, func(v provider.Version) bool { return v.ID == id })
-	v := h.Files[i]
-	sum := sha1.Sum(data)
-	v.File.Sha1 = hex.EncodeToString(sum[:])
-	v.File.Sha512 = sha512Hex(data)
-	v.File.Size = int64(len(data))
-	v.File.URL = h.cdn.serve(pathOf(v), data)
-	h.Files[i] = v
-	return v
-}
-
-func sha512Hex(data []byte) string {
-	sum := sha512.Sum512(data)
-	return hex.EncodeToString(sum[:])
-}
+func sha512Hex(data []byte) string { return envtest.Sha512Hex(data) }
 
 func mod(id, slug string) provider.Project {
 	return provider.Project{ID: id, Slug: slug, Type: manifest.TypeMod}
@@ -218,17 +107,17 @@ func unzip(t *testing.T, data []byte) map[string]string {
 type testProject struct {
 	t        *testing.T
 	b        *Builder
-	cdn      *cdn
-	modrinth *host
-	cf       *host
+	cdn      *envtest.CDN
+	modrinth *envtest.Host
+	cf       *envtest.Host
 	log      []string
 }
 
 func newProject(t *testing.T) *testProject {
 	t.Helper()
-	p := &testProject{t: t, cdn: newCDN(t)}
-	p.modrinth = newHost(p.cdn, "modrinth")
-	p.cf = newHost(p.cdn, "curseforge")
+	p := &testProject{t: t, cdn: envtest.NewCDN(t)}
+	p.modrinth = envtest.NewHost(p.cdn, "modrinth")
+	p.cf = envtest.NewHost(p.cdn, "curseforge")
 	p.cf.Label, p.cf.KeyedByID = "CurseForge", true
 	dir := t.TempDir()
 	p.b = &Builder{
@@ -255,7 +144,7 @@ func newProject(t *testing.T) *testProject {
 }
 
 // lockMod locks the version from h as key, with its file in the cache.
-func (p *testProject) lockMod(key string, h *host, v provider.Version) {
+func (p *testProject) lockMod(key string, h *envtest.Host, v provider.Version) {
 	p.t.Helper()
 	p.b.Manifest.Requires[key] = manifest.Require{Provider: h.Name()}
 	p.b.Lock.Mods[key] = lock.Mod{
@@ -268,7 +157,7 @@ func (p *testProject) lockMod(key string, h *host, v provider.Version) {
 
 // lockPack locks the version from h as key of the given kind, placed under the key's name with
 // the zip extension, the way an add names a pack.
-func (p *testProject) lockPack(kind, key string, h *host, v provider.Version, loaders ...string) {
+func (p *testProject) lockPack(kind, key string, h *envtest.Host, v provider.Version, loaders ...string) {
 	p.t.Helper()
 	p.b.Manifest.Requires[key] = manifest.Require{Type: kind, Provider: h.Name()}
 	p.b.Lock.Packs(kind)[key] = lock.Pack{
@@ -281,9 +170,7 @@ func (p *testProject) lockPack(kind, key string, h *host, v provider.Version, lo
 
 func (p *testProject) cacheFile(v provider.Version) {
 	p.t.Helper()
-	p.cdn.mu.Lock()
-	data := p.cdn.files[pathOf(v)]
-	p.cdn.mu.Unlock()
+	data := p.cdn.Bytes(v)
 	path := p.b.Cache.Object(v.File.Sha512)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		p.t.Fatal(err)

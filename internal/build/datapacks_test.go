@@ -14,7 +14,7 @@ const datapackMcmeta = `{"pack":{"pack_format":48,"description":"a datapack"}}`
 func (p *testProject) lockDatapack(key, side string, entries map[string]string) string {
 	p.t.Helper()
 	data := zipOf(p.t, entries)
-	p.lockPack(manifest.TypeDatapack, key, p.modrinth, p.modrinth.publish(mod("dp-"+key, key), provider.Version{ID: "m-" + key + "-1", Number: "1.0", File: provider.File{Filename: key + "-1.0.zip"}}, data))
+	p.lockPack(manifest.TypeDatapack, key, p.modrinth, p.modrinth.Publish(mod("dp-"+key, key), provider.Version{ID: "m-" + key + "-1", Number: "1.0", File: provider.File{Filename: key + "-1.0.zip"}}, data))
 	dp := p.b.Lock.Datapacks[key]
 	dp.Side = side
 	p.b.Lock.Datapacks[key] = dp
@@ -33,7 +33,7 @@ func TestClientBuildPlacesDatapacks(t *testing.T) {
 		t.Fatal("the datapack goes to datapacks/ without a global datapack mod")
 	}
 
-	p.lockMod("paxi", p.modrinth, p.modrinth.publish(mod("paxi-id", "paxi"), provider.Version{ID: "m-paxi-1", Number: "5.1", File: provider.File{Filename: "Paxi-26.2-Fabric-5.1.jar"}}, modJar(t, "paxi", "5.1")))
+	p.lockMod("paxi", p.modrinth, p.modrinth.Publish(mod("paxi-id", "paxi"), provider.Version{ID: "m-paxi-1", Number: "5.1", File: provider.File{Filename: "Paxi-26.2-Fabric-5.1.jar"}}, modJar(t, "paxi", "5.1")))
 	report = p.mustBuild("client", Options{})
 	if contains(report.Warnings, "global datapack mods") {
 		t.Fatalf("Paxi loads it, so nothing to warn about: %q", report.Warnings)

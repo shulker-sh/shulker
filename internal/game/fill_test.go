@@ -3,8 +3,6 @@ package game
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,83 +10,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
 )
-
-func sha1Hex(data []byte) string {
-	sum := sha1.Sum(data)
-	return hex.EncodeToString(sum[:])
-}
-
-// piston is a fake of Mojang's index and download hosts for one version, 26.2, with one library,
-// one asset index naming two assets, and a client jar. hits counts every download served.
-type piston struct {
-	srv    *httptest.Server
-	hits   atomic.Int64
-	client []byte
-	lib    []byte
-	assets map[string]string
-}
-
-func newPiston(t *testing.T) *piston {
-	t.Helper()
-	p := &piston{
-		client: []byte("client jar"),
-		lib:    []byte("brigadier"),
-		assets: map[string]string{"icons/icon_16x16.png": "icon", "sounds/click.ogg": "click"},
-	}
-	objects := map[string]any{}
-	for name, body := range p.assets {
-		objects[name] = map[string]any{"hash": sha1Hex([]byte(body)), "size": len(body)}
-	}
-	index, _ := json.Marshal(map[string]any{"objects": objects})
-	mux := http.NewServeMux()
-	var base string
-	mux.HandleFunc("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{"versions": []map[string]string{{"id": "26.2", "url": base + "/26.2.json"}}})
-	})
-	mux.HandleFunc("/26.2.json", func(w http.ResponseWriter, r *http.Request) {
-		p.hits.Add(1)
-		json.NewEncoder(w).Encode(map[string]any{
-			"id":         "26.2",
-			"mainClass":  "net.minecraft.client.main.Main",
-			"libraries":  []map[string]any{{"name": "com.mojang:brigadier:1.3.10", "downloads": map[string]any{"artifact": map[string]any{"path": "com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar", "url": base + "/brigadier.jar", "sha1": sha1Hex(p.lib), "size": len(p.lib)}}}},
-			"assetIndex": map[string]any{"id": "26", "url": base + "/assets/26.json", "sha1": sha1Hex(index), "size": len(index)},
-			"downloads":  map[string]any{"client": map[string]any{"url": base + "/client.jar", "sha1": sha1Hex(p.client), "size": len(p.client)}},
-		})
-	})
-	serve := func(path string, body []byte) {
-		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-			p.hits.Add(1)
-			w.Write(body)
-		})
-	}
-	serve("/client.jar", p.client)
-	serve("/brigadier.jar", p.lib)
-	serve("/assets/26.json", index)
-	mux.HandleFunc("/resources/", func(w http.ResponseWriter, r *http.Request) {
-		p.hits.Add(1)
-		for _, body := range p.assets {
-			if strings.HasSuffix(r.URL.Path, sha1Hex([]byte(body))) {
-				w.Write([]byte(body))
-				return
-			}
-		}
-		http.NotFound(w, r)
-	})
-	p.srv = httptest.NewServer(mux)
-	t.Cleanup(p.srv.Close)
-	base = p.srv.URL
-	return p
-}
 
 // fillHarness is a store with sources pointed at the fake piston, its progress written to stderr.
 type fillHarness struct {
@@ -99,12 +30,12 @@ type fillHarness struct {
 	saved   int
 }
 
-func newFillHarness(t *testing.T, p *piston, row loader.Loader, remote *loader.Remote) *fillHarness {
+func newFillHarness(t *testing.T, p *envtest.Piston, row loader.Loader, remote *loader.Remote) *fillHarness {
 	t.Helper()
 	f := fetch.New("test")
 	piston := mojang.NewPiston(f)
-	piston.ManifestURL = p.srv.URL + "/manifest.json"
-	h := &fillHarness{store: Store{Root: t.TempDir(), Resources: p.srv.URL + "/resources"}, lock: &lock.Lock{Minecraft: "26.2"}}
+	piston.ManifestURL = p.URL() + "/manifest.json"
+	h := &fillHarness{store: Store{Root: t.TempDir(), Resources: p.URL() + "/resources"}, lock: &lock.Lock{Minecraft: "26.2"}}
 	if row.Name != "" {
 		h.lock.Loader = lock.Loader{Type: row.Name, Version: "1.0.0"}
 	}
@@ -135,7 +66,7 @@ func (h *fillHarness) fill(t *testing.T) Launchable {
 }
 
 func TestFillPutsAVanillaVersionAndEverythingItNamesInTheStore(t *testing.T) {
-	p := newPiston(t)
+	p := envtest.NewPiston(t)
 	h := newFillHarness(t, p, loader.Loader{}, nil)
 
 	l := h.fill(t)
@@ -146,7 +77,7 @@ func TestFillPutsAVanillaVersionAndEverythingItNamesInTheStore(t *testing.T) {
 	if len(l.Assembly.Libraries) != 1 || l.Assembly.Client.Path != "versions/26.2/26.2.jar" {
 		t.Fatalf("assembly %+v", l.Assembly)
 	}
-	icon := sha1Hex([]byte(p.assets["icons/icon_16x16.png"]))
+	icon := envtest.Sha1Hex([]byte(p.Assets["icons/icon_16x16.png"]))
 	for _, rel := range []string{
 		"versions/26.2/26.2.json",
 		"versions/26.2/26.2.jar",
@@ -167,16 +98,16 @@ func TestFillPutsAVanillaVersionAndEverythingItNamesInTheStore(t *testing.T) {
 		t.Fatal("a vanilla version installs no loader")
 	}
 
-	before := p.hits.Load()
+	before := p.Hits.Load()
 	h.fill(t)
-	if p.hits.Load() != before {
-		t.Fatalf("a second fill downloaded %d files", p.hits.Load()-before)
+	if p.Hits.Load() != before {
+		t.Fatalf("a second fill downloaded %d files", p.Hits.Load()-before)
 	}
 }
 
 func TestFillSavesALoaderProfileAndRemembersIt(t *testing.T) {
-	p := newPiston(t)
-	profile := []byte(`{"id":"fabric-loader-1.0.0-26.2","inheritsFrom":"26.2","mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient","libraries":[{"name":"net.fabricmc:fabric-loader:1.0.0","downloads":{"artifact":{"path":"net/fabricmc/fabric-loader/1.0.0/fabric-loader-1.0.0.jar","url":"` + p.srv.URL + `/brigadier.jar","sha1":"` + sha1Hex(p.lib) + `","size":` + fmt.Sprint(len(p.lib)) + `}}}]}`)
+	p := envtest.NewPiston(t)
+	profile := []byte(`{"id":"fabric-loader-1.0.0-26.2","inheritsFrom":"26.2","mainClass":"net.fabricmc.loader.impl.launch.knot.KnotClient","libraries":[{"name":"net.fabricmc:fabric-loader:1.0.0","downloads":{"artifact":{"path":"net/fabricmc/fabric-loader/1.0.0/fabric-loader-1.0.0.jar","url":"` + p.URL() + `/brigadier.jar","sha1":"` + envtest.Sha1Hex(p.Lib) + `","size":` + fmt.Sprint(len(p.Lib)) + `}}}]}`)
 	row := loader.Fake{Name: "fabric", Profile: profile}.Row()
 	h := newFillHarness(t, p, row, &loader.Remote{})
 
@@ -205,7 +136,7 @@ func TestFillSavesALoaderProfileAndRemembersIt(t *testing.T) {
 }
 
 func TestFillRunsALoaderInstallerOnceWithTheClientJarInPlace(t *testing.T) {
-	p := newPiston(t)
+	p := envtest.NewPiston(t)
 	installer := []byte("installer jar")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/installer.jar", func(w http.ResponseWriter, r *http.Request) { w.Write(installer) })

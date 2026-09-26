@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
@@ -64,7 +65,7 @@ func (h *harness) consume(l *modpack.Loaded) error {
 
 func TestConsumeArchiveLocksAListedPackAsTheModpacksOwn(t *testing.T) {
 	cf := curseForgeHost(t)
-	h := newHarness(t, newHost(cf.cdn, "modrinth"), cf)
+	h := newHarness(t, envtest.NewHost(cf.CDN, "modrinth"), cf)
 	l := craftArchive(t, h, "packs/craft.zip", craftFiles, craftExtras())
 
 	if err := h.consume(l); err != nil {
@@ -85,7 +86,7 @@ func TestConsumeArchiveLocksAListedPackAsTheModpacksOwn(t *testing.T) {
 			t.Fatalf("%s is tagged to the pack: %+v", id, m)
 		}
 	}
-	if p := h.r.Lock.ResourcePacks["fresh-animations"]; p.Modpack != "craft" || p.Sha512 != sha512Hex(cf.cdn.bytes(cf.Files[3])) {
+	if p := h.r.Lock.ResourcePacks["fresh-animations"]; p.Modpack != "craft" || p.Sha512 != sha512Hex(cf.CDN.Bytes(cf.Files[3])) {
 		t.Fatalf("fresh-animations is tagged to the pack: %+v", p)
 	}
 	if len(h.r.Manifest.Mods()) != 0 {
@@ -95,7 +96,7 @@ func TestConsumeArchiveLocksAListedPackAsTheModpacksOwn(t *testing.T) {
 
 func TestConsumeArchiveListsAManualDownloadUntilItIsDropped(t *testing.T) {
 	cf := curseForgeHost(t)
-	h := newHarness(t, newHost(cf.cdn, "modrinth"), cf)
+	h := newHarness(t, envtest.NewHost(cf.CDN, "modrinth"), cf)
 	files := []cfPackFile{{ProjectID: 238222, FileID: 5000001, Required: true}, {ProjectID: 300000, FileID: 5100001, Required: true}}
 	l := craftArchive(t, h, "packs/craft.zip", files, craftExtras())
 
@@ -104,19 +105,19 @@ func TestConsumeArchiveListsAManualDownloadUntilItIsDropped(t *testing.T) {
 		t.Fatalf("expected missing-files, got %v", err)
 	}
 
-	h.drop("nodist-1.0.0.jar", cf.cdn.bytes(cf.Files[4]))
+	h.drop("nodist-1.0.0.jar", cf.CDN.Bytes(cf.Files[4]))
 	if err := h.consume(l); err != nil {
 		t.Fatal(err)
 	}
 	nodist := h.mod("nodist")
-	if nodist.URL != nil || !strings.Contains(nodist.Page, "nodist/files/5100001") || nodist.Modpack != "craft" || nodist.Sha512 != sha512Hex(cf.cdn.bytes(cf.Files[4])) {
+	if nodist.URL != nil || !strings.Contains(nodist.Page, "nodist/files/5100001") || nodist.Modpack != "craft" || nodist.Sha512 != sha512Hex(cf.CDN.Bytes(cf.Files[4])) {
 		t.Fatalf("nodist lock entry: %+v", nodist)
 	}
 }
 
 func TestConsumeArchiveNeverResolvesOffline(t *testing.T) {
 	cf := curseForgeHost(t)
-	h := newHarness(t, newHost(cf.cdn, "modrinth"), cf)
+	h := newHarness(t, envtest.NewHost(cf.CDN, "modrinth"), cf)
 	l := craftArchive(t, h, "packs/craft.zip", craftFiles, craftExtras())
 	h.r.Fetch.Offline = true
 
@@ -128,7 +129,7 @@ func TestConsumeArchiveNeverResolvesOffline(t *testing.T) {
 
 func TestConsumeArchiveLeavesTheExportersMarkerOut(t *testing.T) {
 	cf := curseForgeHost(t)
-	h := newHarness(t, newHost(cf.cdn, "modrinth"), cf)
+	h := newHarness(t, envtest.NewHost(cf.CDN, "modrinth"), cf)
 	h.r.Lock.Java = lock.Java{Major: 21, Component: "java-runtime-delta"}
 	h.r.Manifest.Schema, h.r.Manifest.Client = manifest.SchemaURL, &manifest.Client{}
 	manifestData, err := h.r.Manifest.Encode()

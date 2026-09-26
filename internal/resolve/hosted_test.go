@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
@@ -15,7 +16,7 @@ import (
 )
 
 // hostedCraftPack publishes the craft pack on cf as the modpack craftpack, with one beta file.
-func hostedCraftPack(t *testing.T, cf *host) provider.Version {
+func hostedCraftPack(t *testing.T, cf *envtest.Host) provider.Version {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "craft-1.1.zip")
 	writeCurseForgeZip(t, path, craftFiles, map[string]string{})
@@ -24,7 +25,7 @@ func hostedCraftPack(t *testing.T, cf *host) provider.Version {
 		t.Fatal(err)
 	}
 	craftpack := provider.Project{ID: "800000", Slug: "craftpack", Title: "Craft Pack", Type: manifest.TypeModpack}
-	return cf.publish(craftpack, provider.Version{ID: "7000002", Number: "1.1", Channel: "beta", Published: day(10), Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.1.zip"}}, data)
+	return cf.Publish(craftpack, provider.Version{ID: "7000002", Number: "1.1", Channel: "beta", Published: day(10), Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.1.zip"}}, data)
 }
 
 func TestPinningABetaModpackFileAcceptsBeta(t *testing.T) {
@@ -41,7 +42,7 @@ func TestPinningABetaModpackFileAcceptsBeta(t *testing.T) {
 	if !slices.ContainsFunc(h.r.Warnings, func(w string) bool { return strings.Contains(w, "is a beta; accepting beta for it") }) {
 		t.Fatalf("the pin should widen the channel: %v", h.r.Warnings)
 	}
-	if pin.Channel != "beta" || pin.Version != "7000002" || pin.Provider != "curseforge" || pin.Sha512 != sha512Hex(cf.cdn.bytes(beta)) || !h.r.Cache.Has(pin.Sha512) {
+	if pin.Channel != "beta" || pin.Version != "7000002" || pin.Provider != "curseforge" || pin.Sha512 != sha512Hex(cf.CDN.Bytes(beta)) || !h.r.Cache.Has(pin.Sha512) {
 		t.Fatalf("modpack pin: %+v", pin)
 	}
 	if got := h.r.Manifest.Requires["craftpack"].Channel; got != "beta" {
@@ -50,7 +51,7 @@ func TestPinningABetaModpackFileAcceptsBeta(t *testing.T) {
 }
 
 func TestAModpackMemberPinnedToABetaFileLocksBeta(t *testing.T) {
-	cf := newHost(newCDN(t), "curseforge").likeCurseForge()
+	cf := envtest.NewHost(envtest.NewCDN(t), "curseforge").LikeCurseForge()
 	betaDependency(t, cf)
 	h := newHarness(t, cf)
 	base := &modpack.Loaded{Name: "base", Kind: modpack.Local, Manifest: &manifest.Manifest{
@@ -78,7 +79,7 @@ func TestObtainModpackLocksAHostedCurseForgePack(t *testing.T) {
 		t.Fatal(err)
 	}
 	craftpack := provider.Project{ID: "800000", Slug: "craftpack", Title: "Craft Pack", Type: manifest.TypeModpack}
-	release := cf.publish(craftpack, provider.Version{ID: "7000001", Number: "1.0", Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, data)
+	release := cf.Publish(craftpack, provider.Version{ID: "7000001", Number: "1.0", Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, data)
 	h := newHarness(t, cf)
 
 	pin, err := h.r.ObtainModpack(context.Background(), "craftpack", manifest.Require{Type: manifest.TypeModpack})
@@ -99,7 +100,7 @@ func TestObtainModpackTakesAnUndistributedPackFromTheDownloadsFolder(t *testing.
 		t.Fatal(err)
 	}
 	craftpack := provider.Project{ID: "800000", Slug: "craftpack", Title: "Craft Pack", Type: manifest.TypeModpack}
-	manual := cf.publishManual(craftpack, provider.Version{ID: "7000001", Number: "1.0", Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, data)
+	manual := cf.PublishManual(craftpack, provider.Version{ID: "7000001", Number: "1.0", Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, data)
 	h := newHarness(t, cf)
 	entry := manifest.Require{Type: manifest.TypeModpack}
 

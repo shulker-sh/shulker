@@ -216,12 +216,12 @@ func TestHistoryChangesReadAsWhatRestoringWouldDo(t *testing.T) {
 	p := inPlaceProject(t)
 	lockVersioned := func(key, version string) {
 		v := provider.Version{ID: "m-" + key + "-" + version, Number: version, File: provider.File{Filename: key + "-" + version + ".jar"}}
-		p.lockMod(key, p.modrinth, p.modrinth.publish(mod(key+"-id", key), v, modJar(t, key, version)))
+		p.lockMod(key, p.modrinth, p.modrinth.Publish(mod(key+"-id", key), v, modJar(t, key, version)))
 	}
 	lockVersioned("sodium", "0.9")
 	lockVersioned("iris", "3.0")
 	bsl := provider.Version{ID: "m-bsl-8", Number: "8", File: provider.File{Filename: "bsl-8.zip"}}
-	p.lockPack(manifest.TypeShader, "bsl", p.modrinth, p.modrinth.publish(mod("bsl-id", "bsl"), bsl, packZip(t, "bsl")))
+	p.lockPack(manifest.TypeShader, "bsl", p.modrinth, p.modrinth.Publish(mod("bsl-id", "bsl"), bsl, packZip(t, "bsl")))
 	p.save()
 	e, err := TakeHistory(p.b.Dir, 5, HistoryEntry{Side: "client", Reason: "update"})
 	if err != nil {

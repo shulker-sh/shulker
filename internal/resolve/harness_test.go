@@ -1,177 +1,27 @@
 package resolve
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha1"
-	"crypto/sha512"
-	"encoding/hex"
 	"fmt"
 	"maps"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/provider"
-	"shulker.sh/shulker/internal/provider/fake"
 )
 
-// cdn serves the files the fake providers publish, by path. A path can be refused or cut short.
-type cdn struct {
-	srv       *httptest.Server
-	mu        sync.Mutex
-	files     map[string][]byte
-	forbidden map[string]bool
-	truncated map[string]bool
-}
+func day(n int) time.Time { return envtest.Day(n) }
 
-func newCDN(t *testing.T) *cdn {
-	t.Helper()
-	c := &cdn{files: map[string][]byte{}, forbidden: map[string]bool{}, truncated: map[string]bool{}}
-	c.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		data, ok := c.files[r.URL.Path]
-		switch {
-		case !ok:
-			http.NotFound(w, r)
-		case c.forbidden[r.URL.Path]:
-			w.WriteHeader(http.StatusForbidden)
-		case c.truncated[r.URL.Path]:
-			w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-			w.Write(data[:len(data)/2])
-		default:
-			http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
-		}
-	}))
-	t.Cleanup(c.srv.Close)
-	return c
-}
-
-func (c *cdn) serve(path string, data []byte) string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.files[path] = data
-	return c.srv.URL + path
-}
-
-func (c *cdn) forbid(v provider.Version) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.forbidden[pathOf(v)] = true
-}
-
-// truncate has the cdn cut v's bytes short, and restore serves them whole again.
-func (c *cdn) truncate(v provider.Version) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.truncated[pathOf(v)] = true
-}
-
-func (c *cdn) restore(v provider.Version) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	delete(c.truncated, pathOf(v))
-}
-
-// bytes is the file published at v.
-func (c *cdn) bytes(v provider.Version) []byte {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.files[pathOf(v)]
-}
-
-func pathOf(v provider.Version) string {
-	return "/" + v.ID + "/" + v.File.Filename
-}
-
-// host is a fake provider whose files sit on the test's cdn. sha1Only publishes files the way
-// CurseForge does, with a sha1 and no sha512.
-type host struct {
-	*fake.Provider
-	cdn      *cdn
-	sha1Only bool
-}
-
-// likeCurseForge has the host publish sha1-only files and key projects by id.
-func (h *host) likeCurseForge() *host {
-	h.sha1Only, h.KeyedByID = true, true
-	return h
-}
-
-func newHost(c *cdn, name string) *host {
-	return &host{Provider: fake.New(name), cdn: c}
-}
-
-// publish adds v to proj with jar as its file, served by the cdn. A version with no ID takes the
-// next free one; a project not yet known is added.
-func (h *host) publish(proj provider.Project, v provider.Version, jar []byte) provider.Version {
-	if proj.Type == "" {
-		proj.Type = manifest.TypeMod
-	}
-	if !slices.ContainsFunc(h.Known, func(p provider.Project) bool { return p.ID == proj.ID }) {
-		h.Known = append(h.Known, proj)
-	}
-	v.ProjectID = proj.ID
-	if v.ID == "" {
-		v.ID = fmt.Sprintf("%s-%d", proj.ID, len(h.Files)+1)
-	}
-	if v.Channel == "" {
-		v.Channel = "release"
-	}
-	if v.Published.IsZero() {
-		v.Published = day(1).Add(time.Duration(len(h.Files)) * time.Hour)
-	}
-	if v.GameVersions == nil {
-		v.GameVersions = []string{"26.2"}
-	}
-	if v.Loaders == nil && proj.Type == manifest.TypeMod {
-		v.Loaders = []string{"fabric"}
-	}
-	if v.Page == "" {
-		v.Page = h.ProjectPage(proj.Type, proj.Slug) + "/files/" + v.ID
-	}
-	sum1 := sha1.Sum(jar)
-	v.File.Sha1 = hex.EncodeToString(sum1[:])
-	v.File.Size = int64(len(jar))
-	if !h.sha1Only {
-		v.File.Sha512 = sha512Hex(jar)
-	}
-	if v.File.URL == "" {
-		v.File.URL = h.cdn.serve(pathOf(v), jar)
-	}
-	h.Files = append(h.Files, v)
-	return v
-}
-
-// publishManual adds v to proj with no URL, as a file whose project opted out of distribution.
-func (h *host) publishManual(proj provider.Project, v provider.Version, jar []byte) provider.Version {
-	v = h.publish(proj, v, jar)
-	v.File.URL = ""
-	h.Files[len(h.Files)-1] = v
-	return v
-}
-
-func sha512Hex(data []byte) string {
-	sum := sha512.Sum512(data)
-	return hex.EncodeToString(sum[:])
-}
-
-// day is a publication date in September 2026.
-func day(n int) time.Time {
-	return time.Date(2026, 9, n, 0, 0, 0, 0, time.UTC)
-}
+func sha512Hex(data []byte) string { return envtest.Sha512Hex(data) }
 
 func mod(id, slug string) provider.Project {
 	return provider.Project{ID: id, Slug: slug, Title: slug, Type: manifest.TypeMod}
@@ -191,15 +41,15 @@ func dependsOn(projectID string) provider.Dependency {
 type harness struct {
 	t   *testing.T
 	r   *Resolver
-	cdn *cdn
+	cdn *envtest.CDN
 	log []string
 }
 
-func newHarness(t *testing.T, providers ...*host) *harness {
+func newHarness(t *testing.T, providers ...*envtest.Host) *harness {
 	t.Helper()
 	h := &harness{t: t}
 	if len(providers) > 0 {
-		h.cdn = providers[0].cdn
+		h.cdn = providers[0].CDN
 	}
 	h.r = &Resolver{
 		Dir:       t.TempDir(),

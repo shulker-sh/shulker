@@ -1,0 +1,194 @@
+// Package envtest is an env.Env on fakes: providers that publish to a test's own CDN, a Piston
+// for Minecraft 26.2 with a Java runtime index, and loader rows that answer offline.
+package envtest
+
+import (
+	"bytes"
+	"crypto/sha1"
+	"crypto/sha512"
+	"encoding/hex"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"slices"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
+
+	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/provider/fake"
+)
+
+// CDN serves the files the fake providers publish, by path. A path can be refused or cut short.
+type CDN struct {
+	srv       *httptest.Server
+	mu        sync.Mutex
+	files     map[string][]byte
+	forbidden map[string]bool
+	truncated map[string]bool
+}
+
+func NewCDN(t *testing.T) *CDN {
+	t.Helper()
+	c := &CDN{files: map[string][]byte{}, forbidden: map[string]bool{}, truncated: map[string]bool{}}
+	c.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		data, ok := c.files[r.URL.Path]
+		switch {
+		case !ok:
+			http.NotFound(w, r)
+		case c.forbidden[r.URL.Path]:
+			w.WriteHeader(http.StatusForbidden)
+		case c.truncated[r.URL.Path]:
+			w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+			w.Write(data[:len(data)/2])
+		default:
+			http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(data))
+		}
+	}))
+	t.Cleanup(c.srv.Close)
+	return c
+}
+
+func (c *CDN) URL() string { return c.srv.URL }
+
+// Serve publishes data at path and returns its URL.
+func (c *CDN) Serve(path string, data []byte) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.files[path] = data
+	return c.srv.URL + path
+}
+
+func (c *CDN) Forbid(v provider.Version) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.forbidden[PathOf(v)] = true
+}
+
+// Truncate has the CDN cut v's bytes short, and Restore serves them whole again.
+func (c *CDN) Truncate(v provider.Version) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.truncated[PathOf(v)] = true
+}
+
+func (c *CDN) Restore(v provider.Version) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.truncated, PathOf(v))
+}
+
+// Bytes is the file published at v.
+func (c *CDN) Bytes(v provider.Version) []byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.files[PathOf(v)]
+}
+
+func PathOf(v provider.Version) string {
+	return "/" + v.ID + "/" + v.File.Filename
+}
+
+// Host is a fake provider whose files sit on the test's CDN. Sha1Only publishes files the way
+// CurseForge does, with a sha1 and no sha512.
+type Host struct {
+	*fake.Provider
+	CDN      *CDN
+	Sha1Only bool
+}
+
+func NewHost(c *CDN, name string) *Host {
+	return &Host{Provider: fake.New(name), CDN: c}
+}
+
+// LikeCurseForge has the host publish sha1-only files and key projects by id.
+func (h *Host) LikeCurseForge() *Host {
+	h.Sha1Only, h.KeyedByID = true, true
+	return h
+}
+
+// Publish adds v to proj with data as its file, served by the CDN, and returns v as published. A
+// version with no ID takes the next free one; a project not yet known is added.
+func (h *Host) Publish(proj provider.Project, v provider.Version, data []byte) provider.Version {
+	if proj.Type == "" {
+		proj.Type = manifest.TypeMod
+	}
+	if proj.Title == "" {
+		proj.Title = proj.Slug
+	}
+	if proj.Page == "" {
+		proj.Page = h.ProjectPage(proj.Type, proj.Slug)
+	}
+	if !slices.ContainsFunc(h.Known, func(p provider.Project) bool { return p.ID == proj.ID }) {
+		h.Known = append(h.Known, proj)
+	}
+	v.ProjectID = proj.ID
+	if v.ID == "" {
+		v.ID = fmt.Sprintf("%s-%d", proj.ID, len(h.Files)+1)
+	}
+	if v.Channel == "" {
+		v.Channel = "release"
+	}
+	if v.Published.IsZero() {
+		v.Published = Day(1).Add(time.Duration(len(h.Files)) * time.Hour)
+	}
+	if v.GameVersions == nil {
+		v.GameVersions = []string{"26.2"}
+	}
+	if v.Loaders == nil && proj.Type == manifest.TypeMod {
+		v.Loaders = []string{"fabric"}
+	}
+	if v.Page == "" {
+		v.Page = h.ProjectPage(proj.Type, proj.Slug) + "/files/" + v.ID
+	}
+	v.File.Sha1 = Sha1Hex(data)
+	v.File.Size = int64(len(data))
+	if !h.Sha1Only {
+		v.File.Sha512 = Sha512Hex(data)
+	}
+	if v.File.URL == "" {
+		v.File.URL = h.CDN.Serve(PathOf(v), data)
+	}
+	h.Files = append(h.Files, v)
+	return v
+}
+
+// PublishManual adds v to proj with no URL, as a file whose project opted out of distribution.
+func (h *Host) PublishManual(proj provider.Project, v provider.Version, data []byte) provider.Version {
+	v = h.Publish(proj, v, data)
+	v.File.URL = ""
+	h.Files[len(h.Files)-1] = v
+	return v
+}
+
+// Republish swaps the bytes behind the version with the given id, as a host does when the
+// upload differs from what another host has.
+func (h *Host) Republish(id string, data []byte) provider.Version {
+	i := slices.IndexFunc(h.Files, func(v provider.Version) bool { return v.ID == id })
+	v := h.Files[i]
+	v.File.Sha1 = Sha1Hex(data)
+	v.File.Sha512 = Sha512Hex(data)
+	v.File.Size = int64(len(data))
+	v.File.URL = h.CDN.Serve(PathOf(v), data)
+	h.Files[i] = v
+	return v
+}
+
+func Sha1Hex(data []byte) string {
+	sum := sha1.Sum(data)
+	return hex.EncodeToString(sum[:])
+}
+
+func Sha512Hex(data []byte) string {
+	sum := sha512.Sum512(data)
+	return hex.EncodeToString(sum[:])
+}
+
+// Day is a publication date in September 2026.
+func Day(n int) time.Time {
+	return time.Date(2026, 9, n, 0, 0, 0, 0, time.UTC)
+}

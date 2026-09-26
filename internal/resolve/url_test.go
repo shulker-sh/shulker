@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
@@ -11,17 +12,17 @@ import (
 
 // urlHosts is a Modrinth with sodium and fresh-animations beside a CurseForge with jei at two
 // files, the newer one current.
-func urlHosts(t *testing.T) (modrinth, cf *host) {
+func urlHosts(t *testing.T) (modrinth, cf *envtest.Host) {
 	t.Helper()
-	c := newCDN(t)
-	modrinth = newHost(c, "modrinth")
-	modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "1.0.0+mc26.2", File: provider.File{Filename: "sodium-1.0.0.jar"}}, modJar(t, "sodium", "1.0.0", "client"))
+	c := envtest.NewCDN(t)
+	modrinth = envtest.NewHost(c, "modrinth")
+	modrinth.Publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "1.0.0+mc26.2", File: provider.File{Filename: "sodium-1.0.0.jar"}}, modJar(t, "sodium", "1.0.0", "client"))
 	fresh := provider.Project{ID: "50dA9Sha", Slug: "fresh-animations", Type: manifest.TypeResourcePack}
-	modrinth.publish(fresh, provider.Version{ID: "FreshV194", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_v1.9.4.zip"}}, zipFiles(t, map[string]string{"pack.mcmeta": `{"pack":{"pack_format":34,"description":"fresh"}}`}))
-	cf = newHost(c, "curseforge").likeCurseForge()
-	cf.publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "0.9.2", "client"))
-	cf.publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", Published: day(1), File: provider.File{Filename: "jei-1.0.0.jar"}}, modJar(t, "jei", "1.0.0", "*"))
-	cf.publish(mod("238222", "jei"), provider.Version{ID: "5000002", Number: "1.1.0", Published: day(5), File: provider.File{Filename: "jei-1.1.0.jar"}}, modJar(t, "jei", "1.1.0", "*"))
+	modrinth.Publish(fresh, provider.Version{ID: "FreshV194", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_v1.9.4.zip"}}, zipFiles(t, map[string]string{"pack.mcmeta": `{"pack":{"pack_format":34,"description":"fresh"}}`}))
+	cf = envtest.NewHost(c, "curseforge").LikeCurseForge()
+	cf.Publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "0.9.2", "client"))
+	cf.Publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", Published: day(1), File: provider.File{Filename: "jei-1.0.0.jar"}}, modJar(t, "jei", "1.0.0", "*"))
+	cf.Publish(mod("238222", "jei"), provider.Version{ID: "5000002", Number: "1.1.0", Published: day(5), File: provider.File{Filename: "jei-1.1.0.jar"}}, modJar(t, "jei", "1.1.0", "*"))
 	return modrinth, cf
 }
 

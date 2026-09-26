@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -39,8 +40,8 @@ func packZip(t *testing.T, description string) []byte {
 // mod depending on fabric-api, which only the provider has. The project is not locked yet.
 func localFiles(t *testing.T) (*harness, []byte) {
 	t.Helper()
-	alpha := newHost(newCDN(t), "alpha")
-	alpha.publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
+	alpha := envtest.NewHost(envtest.NewCDN(t), "alpha")
+	alpha.Publish(mod("a-fapi", "fabric-api"), provider.Version{Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
 	h := newHarness(t, alpha)
 	jar := privateModJar(t, "1.4.0")
 	h.writeProjectFile("files/private-mod-1.4.jar", jar)

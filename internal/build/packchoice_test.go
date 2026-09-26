@@ -16,14 +16,14 @@ func shaderProject(t *testing.T) *testProject {
 	t.Helper()
 	p := newProject(t)
 	iris := provider.Project{ID: "iris-id", Slug: "iris", Title: "Iris", Type: manifest.TypeMod}
-	p.lockMod("iris", p.modrinth, p.modrinth.publish(iris, provider.Version{ID: "v-iris", Number: "1.8", File: provider.File{Filename: "iris.jar"}}, modJar(t, "iris", "1.8")))
+	p.lockMod("iris", p.modrinth, p.modrinth.Publish(iris, provider.Version{ID: "v-iris", Number: "1.8", File: provider.File{Filename: "iris.jar"}}, modJar(t, "iris", "1.8")))
 	for _, key := range []string{"bsl", "complementary"} {
 		sp := provider.Project{ID: key + "-id", Slug: key, Title: key, Type: manifest.TypeShader}
-		p.lockPack(manifest.TypeShader, key, p.modrinth, p.modrinth.publish(sp, provider.Version{ID: "v-" + key, Number: "1", Loaders: []string{}, File: provider.File{Filename: key + "-1.zip"}}, packZip(t, key)), "iris")
+		p.lockPack(manifest.TypeShader, key, p.modrinth, p.modrinth.Publish(sp, provider.Version{ID: "v-" + key, Number: "1", Loaders: []string{}, File: provider.File{Filename: key + "-1.zip"}}, packZip(t, key)), "iris")
 	}
 	for _, key := range []string{"faithful", "fresh"} {
 		rp := provider.Project{ID: key + "-id", Slug: key, Title: key, Type: manifest.TypeResourcePack}
-		p.lockPack(manifest.TypeResourcePack, key, p.modrinth, p.modrinth.publish(rp, provider.Version{ID: "v-" + key, Number: "1", Loaders: []string{}, File: provider.File{Filename: key + "-1.zip"}}, packZip(t, key)))
+		p.lockPack(manifest.TypeResourcePack, key, p.modrinth, p.modrinth.Publish(rp, provider.Version{ID: "v-" + key, Number: "1", Loaders: []string{}, File: provider.File{Filename: key + "-1.zip"}}, packZip(t, key)))
 	}
 	return p
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
@@ -45,31 +46,31 @@ func writeCurseForgeZip(t *testing.T, path string, files []cfPackFile, entries m
 
 // curseForgeHost is a fake CurseForge: jei requiring fabric-api, sodium, a resource pack and two
 // files that need a manual download, one undistributed and one forbidden.
-func curseForgeHost(t *testing.T) *host {
+func curseForgeHost(t *testing.T) *envtest.Host {
 	t.Helper()
-	c := newCDN(t)
-	cf := newHost(c, "curseforge").likeCurseForge()
+	c := envtest.NewCDN(t)
+	cf := envtest.NewHost(c, "curseforge").LikeCurseForge()
 	cf.Label = "CurseForge"
-	cf.publish(mod("306612", "fabric-api"), provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
-	cf.publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "jei", "1.0.0", "*"))
-	cf.publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "sodium", "1.0.0", "client"))
+	cf.Publish(mod("306612", "fabric-api"), provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, modJar(t, "fabric-api", "1.0.0", "*"))
+	cf.Publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "jei", "1.0.0", "*"))
+	cf.Publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}, Dependencies: []provider.Dependency{dependsOn("306612")}}, modJar(t, "sodium", "1.0.0", "client"))
 	fresh := provider.Project{ID: "600000", Slug: "fresh-animations", Title: "Fresh Animations", Type: manifest.TypeResourcePack}
-	cf.publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, zipFiles(t, map[string]string{"pack.mcmeta": `{"pack":{"pack_format":34,"description":"fresh"}}`}))
-	cf.publishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, modJar(t, "nodist", "1.0.0", "client"))
-	c.forbid(cf.publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, modJar(t, "locked", "1.0.0", "*")))
+	cf.Publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, zipFiles(t, map[string]string{"pack.mcmeta": `{"pack":{"pack_format":34,"description":"fresh"}}`}))
+	cf.PublishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, modJar(t, "nodist", "1.0.0", "client"))
+	c.Forbid(cf.Publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, modJar(t, "locked", "1.0.0", "*")))
 	return cf
 }
 
 // importInto reads the archive and imports it into a fresh project in dir, the way the import
 // command does for a new project, with an empty Modrinth beside cf for the overrides to be
 // looked up on.
-func importInto(t *testing.T, cf *host, dir, archive string) (*harness, *Imported, error) {
+func importInto(t *testing.T, cf *envtest.Host, dir, archive string) (*harness, *Imported, error) {
 	t.Helper()
 	arc, err := packarchive.Read(archive)
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := newHarness(t, newHost(cf.cdn, "modrinth"), cf)
+	h := newHarness(t, envtest.NewHost(cf.CDN, "modrinth"), cf)
 	h.r.Dir = dir
 	m, _ := arc.Manifest("craft-pack")
 	h.r.Manifest = m
@@ -122,10 +123,10 @@ func TestImportLocksListedFilesAndSkipsOptionalOnes(t *testing.T) {
 		t.Fatalf("a listed dependency is a manifest entry of its own: %+v", api)
 	}
 	jei := h.mod("jei")
-	if jei.Provider != "curseforge" || jei.Version != "5000001" || jei.Sha512 != sha512Hex(h.cdn.bytes(cf.Files[1])) || jei.URL == nil {
+	if jei.Provider != "curseforge" || jei.Version != "5000001" || jei.Sha512 != sha512Hex(h.cdn.Bytes(cf.Files[1])) || jei.URL == nil {
 		t.Fatalf("jei lock entry: %+v", jei)
 	}
-	if pack := l.ResourcePacks["fresh-animations"]; pack.Version != "5300001" || pack.Sha512 != sha512Hex(h.cdn.bytes(cf.Files[3])) || pack.Provider != "curseforge" || pack.Filename != "FreshAnimations_CF_v1.9.4.zip" {
+	if pack := l.ResourcePacks["fresh-animations"]; pack.Version != "5300001" || pack.Sha512 != sha512Hex(h.cdn.Bytes(cf.Files[3])) || pack.Provider != "curseforge" || pack.Filename != "FreshAnimations_CF_v1.9.4.zip" {
 		t.Fatalf("fresh-animations lock entry: %+v", pack)
 	}
 	if _, ok := l.Mods["sodium"]; ok {
@@ -138,8 +139,8 @@ func TestImportKeepsTheNewestOfTwoProjectsWithOneModID(t *testing.T) {
 	newer := cfPackFile{ProjectID: 1676502, FileID: 6000002, Required: true}
 	for _, order := range [][]cfPackFile{{older, newer}, {newer, older}} {
 		cf := curseForgeHost(t)
-		cf.publish(mod("282001", "cc-tweaked"), provider.Version{ID: "6000001", Number: "1.113.1", File: provider.File{Filename: "cc-tweaked-1.113.1.jar"}}, modJar(t, "computercraft", "1.113.1", "*"))
-		cf.publish(mod("1676502", "cc-tweaked-compat"), provider.Version{ID: "6000002", Number: "1.120.2", File: provider.File{Filename: "cc-tweaked-1.120.2.jar"}}, modJar(t, "computercraft", "1.120.2", "*"))
+		cf.Publish(mod("282001", "cc-tweaked"), provider.Version{ID: "6000001", Number: "1.113.1", File: provider.File{Filename: "cc-tweaked-1.113.1.jar"}}, modJar(t, "computercraft", "1.113.1", "*"))
+		cf.Publish(mod("1676502", "cc-tweaked-compat"), provider.Version{ID: "6000002", Number: "1.120.2", File: provider.File{Filename: "cc-tweaked-1.120.2.jar"}}, modJar(t, "computercraft", "1.120.2", "*"))
 		archive := filepath.Join(t.TempDir(), "craft.zip")
 		writeCurseForgeZip(t, archive, order, map[string]string{})
 
@@ -185,13 +186,13 @@ func TestImportListsEveryManualDownload(t *testing.T) {
 	}
 
 	dropped := &harness{t: t, r: &Resolver{Dir: dir}}
-	dropped.drop("nodist-1.0.0.jar", cf.cdn.bytes(nodist))
-	dropped.drop("locked-1.0.0.jar", cf.cdn.bytes(locked))
+	dropped.drop("nodist-1.0.0.jar", cf.CDN.Bytes(nodist))
+	dropped.drop("locked-1.0.0.jar", cf.CDN.Bytes(locked))
 	h, _, err := importInto(t, cf, dir, archive)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := h.mod("nodist"); got.URL != nil || got.Page != nodist.Page || got.Sha512 != sha512Hex(cf.cdn.bytes(nodist)) {
+	if got := h.mod("nodist"); got.URL != nil || got.Page != nodist.Page || got.Sha512 != sha512Hex(cf.CDN.Bytes(nodist)) {
 		t.Fatalf("nodist lock entry: %+v", got)
 	}
 	if got := h.mod("locked"); got.URL != nil || got.Page != locked.Page {
@@ -206,7 +207,7 @@ func TestImportNamesAListedFileItCouldNotDownload(t *testing.T) {
 	cf := curseForgeHost(t)
 	archive := filepath.Join(t.TempDir(), "craft.zip")
 	writeCurseForgeZip(t, archive, []cfPackFile{{ProjectID: 394468, FileID: 5000020, Required: true}}, map[string]string{})
-	cf.cdn.truncate(cf.Files[2])
+	cf.CDN.Truncate(cf.Files[2])
 
 	_, _, err := importInto(t, cf, t.TempDir(), archive)
 	e := out.AsError(err)
@@ -217,9 +218,9 @@ func TestImportNamesAListedFileItCouldNotDownload(t *testing.T) {
 
 func TestImportKeepsTheChannelOfEachListedFile(t *testing.T) {
 	cf := curseForgeHost(t)
-	cf.publish(mod("272515", "better-advancements"), provider.Version{ID: "5700001", Number: "0.4.3.21", Channel: "beta", File: provider.File{Filename: "BetterAdvancements-0.4.3.21.jar"}}, modJar(t, "betteradvancements", "0.4.3.21", "client"))
+	cf.Publish(mod("272515", "better-advancements"), provider.Version{ID: "5700001", Number: "0.4.3.21", Channel: "beta", File: provider.File{Filename: "BetterAdvancements-0.4.3.21.jar"}}, modJar(t, "betteradvancements", "0.4.3.21", "client"))
 	shaders := provider.Project{ID: "700000", Slug: "complementary-reimagined", Title: "Complementary Reimagined", Type: manifest.TypeShader}
-	cf.publish(shaders, provider.Version{ID: "5800001", Number: "r5.5", Channel: "alpha", Loaders: []string{"iris"}, File: provider.File{Filename: "ComplementaryReimagined_r5.5.zip"}}, zipFiles(t, map[string]string{"shaders/composite.fsh": "x"}))
+	cf.Publish(shaders, provider.Version{ID: "5800001", Number: "r5.5", Channel: "alpha", Loaders: []string{"iris"}, File: provider.File{Filename: "ComplementaryReimagined_r5.5.zip"}}, zipFiles(t, map[string]string{"shaders/composite.fsh": "x"}))
 	archive := filepath.Join(t.TempDir(), "craft.zip")
 	writeCurseForgeZip(t, archive, []cfPackFile{
 		{ProjectID: 238222, FileID: 5000001, Required: true},

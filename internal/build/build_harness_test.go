@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/build/marker"
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/provider"
 )
@@ -46,7 +47,7 @@ func (p *testProject) project(rel string) string {
 
 // lockDependency locks the version from h as key, required by the given mods rather than listed
 // in the manifest.
-func (p *testProject) lockDependency(key string, h *host, v provider.Version, requiredBy ...string) {
+func (p *testProject) lockDependency(key string, h *envtest.Host, v provider.Version, requiredBy ...string) {
 	p.t.Helper()
 	p.lockMod(key, h, v)
 	delete(p.b.Manifest.Requires, key)

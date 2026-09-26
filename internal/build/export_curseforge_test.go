@@ -23,11 +23,11 @@ func newCurseForgeExport(t *testing.T) *curseForgeExport {
 	t.Helper()
 	x := &curseForgeExport{testProject: newProject(t)}
 	sodium, api, jei := modJar(t, "sodium", "1.0.0"), modJar(t, "fabric-api", "1.0.0"), modJar(t, "jei", "1.0.0")
-	x.lockMod("sodium", x.modrinth, x.modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "m-sodium-1", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodium))
-	x.lockMod("fabric-api", x.modrinth, x.modrinth.publish(mod("P7dR8mSH", "fabric-api"), provider.Version{ID: "m-api-1", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, api))
-	x.fabricAPI = x.cf.publish(provider.Project{ID: "306612", Slug: "fabric-api", Title: "Fabric API", Author: "modmuss50"}, provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, api)
-	x.jei = x.cf.publish(provider.Project{ID: "238222", Slug: "jei", Title: "JEI", Author: "jei-dev"}, provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}}, jei)
-	x.sodium = x.cf.publish(provider.Project{ID: "394468", Slug: "sodium", Title: "Sodium", Author: "jellysquid3"}, provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodium)
+	x.lockMod("sodium", x.modrinth, x.modrinth.Publish(mod("AANobbMI", "sodium"), provider.Version{ID: "m-sodium-1", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodium))
+	x.lockMod("fabric-api", x.modrinth, x.modrinth.Publish(mod("P7dR8mSH", "fabric-api"), provider.Version{ID: "m-api-1", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, api))
+	x.fabricAPI = x.cf.Publish(provider.Project{ID: "306612", Slug: "fabric-api", Title: "Fabric API", Author: "modmuss50"}, provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, api)
+	x.jei = x.cf.Publish(provider.Project{ID: "238222", Slug: "jei", Title: "JEI", Author: "jei-dev"}, provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}}, jei)
+	x.sodium = x.cf.Publish(provider.Project{ID: "394468", Slug: "sodium", Title: "Sodium", Author: "jellysquid3"}, provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodium)
 	x.lockMod("jei", x.cf, x.jei)
 	x.override("options.txt", "lang:en_us\n")
 	return x
@@ -77,7 +77,7 @@ func TestExportRefusesAModCurseForgeLacksUnlessBundled(t *testing.T) {
 	x.cf.Known = slices.DeleteFunc(x.cf.Known, func(p provider.Project) bool { return p.ID == "394468" })
 
 	e := failure(t, mustFail(x.exportCurseForge(false)))
-	if e.Code != "curseforge-not-found" || len(e.Items) != 1 || e.Items[0] != "sodium (modrinth, "+strings.TrimPrefix(x.cdn.srv.URL, "http://")+")" || e.Nudge.Command != "shulker export curseforge --bundle" {
+	if e.Code != "curseforge-not-found" || len(e.Items) != 1 || e.Items[0] != "sodium (modrinth, "+strings.TrimPrefix(x.cdn.URL(), "http://")+")" || e.Nudge.Command != "shulker export curseforge --bundle" {
 		t.Fatalf("unmatched mod: %+v", e)
 	}
 
@@ -102,7 +102,7 @@ func TestExportMatchesARezippedUploadByContents(t *testing.T) {
 	if bytes.Equal(rezipped, locked) {
 		t.Fatal("the rezipped jar should differ from the Modrinth one")
 	}
-	x.cf.republish("5000020", rezipped)
+	x.cf.Republish("5000020", rezipped)
 
 	report, err := x.exportCurseForge(false)
 	if err != nil {
@@ -131,7 +131,7 @@ func TestExportRejectsALookalikeWithOtherContents(t *testing.T) {
 	if len(other) != len(locked) {
 		t.Fatal("the lookalike should keep the locked file's size")
 	}
-	x.cf.republish("5000020", other)
+	x.cf.Republish("5000020", other)
 
 	e := failure(t, mustFail(x.exportCurseForge(false)))
 	if e.Code != "curseforge-not-found" || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "sodium (modrinth") {
@@ -141,8 +141,8 @@ func TestExportRejectsALookalikeWithOtherContents(t *testing.T) {
 
 func TestExportLeavesALookalikeItCannotDownload(t *testing.T) {
 	x := newCurseForgeExport(t)
-	v := x.cf.republish("5000020", rezip(t, modJar(t, "sodium", "1.0.0"), func(_, content string) string { return content }))
-	x.cdn.forbid(v)
+	v := x.cf.Republish("5000020", rezip(t, modJar(t, "sodium", "1.0.0"), func(_, content string) string { return content }))
+	x.cdn.Forbid(v)
 
 	e := failure(t, mustFail(x.exportCurseForge(false)))
 	if e.Code != "curseforge-not-found" || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "sodium (modrinth") {
@@ -197,9 +197,9 @@ func TestExportOfModsLockedFromCurseForgeNeedsNoLookup(t *testing.T) {
 
 func TestExportListsPacksLockedFromCurseForgeByID(t *testing.T) {
 	x := newProject(t)
-	x.lockMod("jei", x.cf, x.cf.publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}}, modJar(t, "jei", "1.0.0")))
+	x.lockMod("jei", x.cf, x.cf.Publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}}, modJar(t, "jei", "1.0.0")))
 	fresh := provider.Project{ID: "600000", Slug: "fresh-animations", Title: "Fresh Animations", Type: "resourcepack"}
-	x.lockPack("resourcepack", "fresh-animations", x.cf, x.cf.publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, packZip(t, "fresh")))
+	x.lockPack("resourcepack", "fresh-animations", x.cf, x.cf.Publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, packZip(t, "fresh")))
 
 	report, err := x.exportCurseForge(false)
 	if err != nil {
@@ -221,12 +221,12 @@ func TestExportListsPacksLockedFromCurseForgeByID(t *testing.T) {
 func TestExportEnablesPacksByTheirCurseForgeNames(t *testing.T) {
 	x := newProject(t)
 	fresh := provider.Project{ID: "600000", Slug: "fresh-animations", Title: "Fresh Animations", Type: "resourcepack"}
-	x.lockPack("resourcepack", "fresh-animations", x.cf, x.cf.publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, packZip(t, "fresh")))
+	x.lockPack("resourcepack", "fresh-animations", x.cf, x.cf.Publish(fresh, provider.Version{ID: "5300001", Number: "1.9.4", Loaders: []string{}, File: provider.File{Filename: "FreshAnimations_CF_v1.9.4.zip"}}, packZip(t, "fresh")))
 	shader := packZip(t, "complementary")
 	complementary := provider.Project{ID: "kPHBmpnE", Slug: "complementary-reimagined", Type: "shader"}
-	x.lockPack("shader", "complementary-reimagined", x.modrinth, x.modrinth.publish(complementary, provider.Version{ID: "m-cr-1", Number: "r5.5.1", Loaders: []string{"iris"}, File: provider.File{Filename: "ComplementaryReimagined_r5.5.1.zip"}}, shader), "iris")
-	x.cf.publish(provider.Project{ID: "455508", Slug: "complementary-reimagined", Type: "shader"}, provider.Version{ID: "5400001", Number: "r5.5.1", Loaders: []string{"iris"}, File: provider.File{Filename: "ComplementaryReimagined_r5.5.1.zip"}}, shader)
-	x.lockMod("irisshaders", x.cf, x.cf.publish(mod("455508", "irisshaders"), provider.Version{ID: "5000030", Number: "1.8.0", File: provider.File{Filename: "iris-fabric-1.8.0+mc26.2.jar"}}, modJar(t, "iris", "1.8.0")))
+	x.lockPack("shader", "complementary-reimagined", x.modrinth, x.modrinth.Publish(complementary, provider.Version{ID: "m-cr-1", Number: "r5.5.1", Loaders: []string{"iris"}, File: provider.File{Filename: "ComplementaryReimagined_r5.5.1.zip"}}, shader), "iris")
+	x.cf.Publish(provider.Project{ID: "455508", Slug: "complementary-reimagined", Type: "shader"}, provider.Version{ID: "5400001", Number: "r5.5.1", Loaders: []string{"iris"}, File: provider.File{Filename: "ComplementaryReimagined_r5.5.1.zip"}}, shader)
+	x.lockMod("irisshaders", x.cf, x.cf.Publish(mod("455508", "irisshaders"), provider.Version{ID: "5000030", Number: "1.8.0", File: provider.File{Filename: "iris-fabric-1.8.0+mc26.2.jar"}}, modJar(t, "iris", "1.8.0")))
 	iris := x.b.Lock.Mods["irisshaders"]
 	iris.ModID = "iris"
 	x.b.Lock.Mods["irisshaders"] = iris
@@ -281,7 +281,7 @@ func TestExportBundlesAHybridDatapacksResourcePackCopyOrRefuses(t *testing.T) {
 	p := newProject(t)
 	p.b.Manifest.Server = nil
 	hybrid := datapackZip(t, true)
-	terralith := p.modrinth.publish(provider.Project{ID: "8oi3bsk5", Slug: "terralith", Type: manifest.TypeDatapack}, provider.Version{ID: "TerraV264", Number: "2.6.4", Loaders: []string{"datapack"}, File: provider.File{Filename: "Terralith_26.2_v2.6.4.zip"}}, hybrid)
+	terralith := p.modrinth.Publish(provider.Project{ID: "8oi3bsk5", Slug: "terralith", Type: manifest.TypeDatapack}, provider.Version{ID: "TerraV264", Number: "2.6.4", Loaders: []string{"datapack"}, File: provider.File{Filename: "Terralith_26.2_v2.6.4.zip"}}, hybrid)
 	p.lockPack(manifest.TypeDatapack, "terralith", p.modrinth, terralith)
 	entry := p.b.Manifest.Requires["terralith"]
 	entry.ResourcePack = true

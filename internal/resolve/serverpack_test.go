@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/provider"
@@ -31,13 +32,13 @@ func zipOf(t *testing.T, names ...string) []byte {
 // and the server files it pairs with, which list server.
 func serverPackHarness(t *testing.T, server []byte, unhashed ...string) (*harness, []byte) {
 	t.Helper()
-	c := newCDN(t)
-	alpha := newHost(c, "alpha")
+	c := envtest.NewCDN(t)
+	alpha := envtest.NewHost(c, "alpha")
 	alpha.UnhashedTypes = unhashed
 	pack := zipOf(t, "manifest.json")
 	atm := provider.Project{ID: "p-atm", Slug: "atm", Title: "All the Mods", Type: manifest.TypeModpack}
-	files := alpha.publish(atm, provider.Version{ID: "server-1", Number: "8.2 server"}, server)
-	alpha.publish(atm, provider.Version{Number: "8.2", ServerPack: files.ID}, pack)
+	files := alpha.Publish(atm, provider.Version{ID: "server-1", Number: "8.2 server"}, server)
+	alpha.Publish(atm, provider.Version{Number: "8.2", ServerPack: files.ID}, pack)
 	h := newHarness(t, alpha)
 	for id, m := range map[string]lock.Mod{
 		"sodium": {Filename: "sodium.jar", Side: "both"},

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/packarchive"
@@ -20,16 +21,16 @@ import (
 // feature and fabric-api from Modrinth, both listed by the CurseForge ids their fingerprints
 // matched, jei from CurseForge under the key recipes, and a private jar bundled as an override.
 // modrinth and cf share one cdn.
-func shulkerExport(t *testing.T, dir string) (archive string, modrinth, cf *host) {
+func shulkerExport(t *testing.T, dir string) (archive string, modrinth, cf *envtest.Host) {
 	t.Helper()
-	c := newCDN(t)
-	modrinth, cf = newHost(c, "modrinth"), newHost(c, "curseforge").likeCurseForge()
+	c := envtest.NewCDN(t)
+	modrinth, cf = envtest.NewHost(c, "modrinth"), envtest.NewHost(c, "curseforge").LikeCurseForge()
 	sodiumJar, apiJar, jeiJar := modJar(t, "sodium", "1.0.0", "client"), modJar(t, "fabric-api", "1.0.0", "*"), modJar(t, "jei", "1.0.0", "*")
-	sodium := modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "1.0.0", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodiumJar)
-	api := modrinth.publish(mod("P7dR8mSH", "fabric-api"), provider.Version{ID: "QP7dR8mSH", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, apiJar)
-	cf.publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodiumJar)
-	cf.publish(mod("306612", "fabric-api"), provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, apiJar)
-	jei := cf.publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}}, jeiJar)
+	sodium := modrinth.Publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "1.0.0", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodiumJar)
+	api := modrinth.Publish(mod("P7dR8mSH", "fabric-api"), provider.Version{ID: "QP7dR8mSH", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, apiJar)
+	cf.Publish(mod("394468", "sodium"), provider.Version{ID: "5000020", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, sodiumJar)
+	cf.Publish(mod("306612", "fabric-api"), provider.Version{ID: "5000010", Number: "0.130.0", File: provider.File{Filename: "fabric-api-0.130.0+26.2.jar"}}, apiJar)
+	jei := cf.Publish(mod("238222", "jei"), provider.Version{ID: "5000001", Number: "1.0.0", File: provider.File{Filename: "jei-26.2-fabric-1.0.0.jar"}}, jeiJar)
 	private := modJar(t, "private-mod", "1.4", "client")
 
 	m := &manifest.Manifest{
@@ -44,8 +45,8 @@ func shulkerExport(t *testing.T, dir string) (archive string, modrinth, cf *host
 		},
 		Client: &manifest.Client{}, Server: &manifest.Server{},
 	}
-	locked := func(h *host, v provider.Version, side string) lock.Mod {
-		return lock.Mod{Provider: h.Name(), Project: v.ProjectID, Version: v.ID, VersionNumber: v.Number, Filename: v.File.Filename, URL: &v.File.URL, Sha512: sha512Hex(c.bytes(v)), Size: v.File.Size, Side: side, Channel: "release", RequiredBy: []string{}, Aliases: lock.Aliases{}}
+	locked := func(h *envtest.Host, v provider.Version, side string) lock.Mod {
+		return lock.Mod{Provider: h.Name(), Project: v.ProjectID, Version: v.ID, VersionNumber: v.Number, Filename: v.File.Filename, URL: &v.File.URL, Sha512: sha512Hex(c.Bytes(v)), Size: v.File.Size, Side: side, Channel: "release", RequiredBy: []string{}, Aliases: lock.Aliases{}}
 	}
 	l := lock.New()
 	l.Minecraft, l.Loader, l.Java = "26.2", lock.Loader{Type: "fabric", Version: "0.17.3"}, lock.Java{Major: 21, Component: "java-runtime-delta"}
@@ -81,7 +82,7 @@ func shulkerExport(t *testing.T, dir string) (archive string, modrinth, cf *host
 
 // importArchive reads archive and imports it into a fresh project in dir on the providers given,
 // with the archive's own manifest as the project's.
-func importArchive(t *testing.T, dir, archive string, ignoreMarker bool, providers ...*host) (*harness, *Imported, error) {
+func importArchive(t *testing.T, dir, archive string, ignoreMarker bool, providers ...*envtest.Host) (*harness, *Imported, error) {
 	t.Helper()
 	arc, err := packarchive.Read(archive)
 	if err != nil {
@@ -176,21 +177,21 @@ func writeMrpack(t *testing.T, path string, files []mrpackFile, entries map[stri
 
 // listedByDownload lists v the way an mrpack does, by hashes and a download of its own, for both
 // sides.
-func listedByDownload(c *cdn, v provider.Version) mrpackFile {
-	data := c.bytes(v)
-	url := c.serve("/mrpack/"+v.File.Filename, data)
+func listedByDownload(c *envtest.CDN, v provider.Version) mrpackFile {
+	data := c.Bytes(v)
+	url := c.Serve("/mrpack/"+v.File.Filename, data)
 	return mrpackFile{Path: "mods/" + v.File.Filename, Hashes: map[string]string{"sha1": v.File.Sha1, "sha512": sha512Hex(data)}, Env: map[string]string{"client": "required", "server": "required"}, Downloads: []string{url}, FileSize: int64(len(data))}
 }
 
 func TestImportIdentifiesTheFilesItCannotLockByHashOnCurseForge(t *testing.T) {
 	cf := curseForgeHost(t)
-	modrinth := newHost(cf.cdn, "modrinth")
-	sodium := modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "0.9.2", "client"))
+	modrinth := envtest.NewHost(cf.CDN, "modrinth")
+	sodium := modrinth.Publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "0.9.2", "client"))
 	jei, nodist := cf.Files[1], cf.Files[4]
-	iris := cf.publish(mod("455508", "irisshaders"), provider.Version{ID: "5500001", Number: "1.11.3", File: provider.File{Filename: "iris-fabric-1.11.3+mc26.2.jar"}}, modJar(t, "iris", "1.11.3", "client"))
+	iris := cf.Publish(mod("455508", "irisshaders"), provider.Version{ID: "5500001", Number: "1.11.3", File: provider.File{Filename: "iris-fabric-1.11.3+mc26.2.jar"}}, modJar(t, "iris", "1.11.3", "client"))
 	archive := filepath.Join(t.TempDir(), "mixed.mrpack")
-	writeMrpack(t, archive, []mrpackFile{listedByDownload(cf.cdn, jei), listedByDownload(cf.cdn, nodist), listedByDownload(cf.cdn, sodium)}, map[string]string{
-		"client-overrides/mods/" + iris.File.Filename: string(cf.cdn.bytes(iris)),
+	writeMrpack(t, archive, []mrpackFile{listedByDownload(cf.CDN, jei), listedByDownload(cf.CDN, nodist), listedByDownload(cf.CDN, sodium)}, map[string]string{
+		"client-overrides/mods/" + iris.File.Filename: string(cf.CDN.Bytes(iris)),
 		"overrides/mods/unknown-1.0.jar":              "not on any provider",
 	})
 	importMixed := func(t *testing.T) (*harness, *Imported) {
@@ -202,7 +203,7 @@ func TestImportIdentifiesTheFilesItCannotLockByHashOnCurseForge(t *testing.T) {
 		return h, res
 	}
 
-	cf.cdn.truncate(iris)
+	cf.CDN.Truncate(iris)
 	cf.Requests, modrinth.Requests = map[string]int{}, map[string]int{}
 	h, res := importMixed(t)
 	if modrinth.Requests["Identify"] != 1 || cf.Requests["Identify"] != 1 {
@@ -227,7 +228,7 @@ func TestImportIdentifiesTheFilesItCannotLockByHashOnCurseForge(t *testing.T) {
 		t.Fatalf("a jar whose download failed is kept as an override: %+v", res.Overrides)
 	}
 
-	cf.cdn.restore(iris)
+	cf.CDN.Restore(iris)
 	h, res = importMixed(t)
 	if strings.Join(res.LockedIDs(), ",") != "iris,jei,sodium" || h.mod("iris").Side != "client" {
 		t.Fatalf("import once CurseForge serves iris: %+v", res)
@@ -248,13 +249,13 @@ func TestImportIdentifiesTheFilesItCannotLockByHashOnCurseForge(t *testing.T) {
 
 func TestImportTakesAModsSideFromThePackOnlyWhereItAddsABuiltSide(t *testing.T) {
 	cf := curseForgeHost(t)
-	modrinth := newHost(cf.cdn, "modrinth")
-	sodium := modrinth.publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "0.9.2", "client"))
-	configManager := cf.publish(mod("800000", "config-manager"), provider.Version{ID: "5600001", Number: "1.0.0", File: provider.File{Filename: "config_manager-1.0.0.jar"}}, modJar(t, "config_manager", "1.0.0", "server"))
-	serverTweaks := cf.publish(mod("800001", "server-tweaks"), provider.Version{ID: "5600002", Number: "1.0.0", File: provider.File{Filename: "server_tweaks-1.0.0.jar"}}, modJar(t, "server_tweaks", "1.0.0", "server"))
+	modrinth := envtest.NewHost(cf.CDN, "modrinth")
+	sodium := modrinth.Publish(mod("AANobbMI", "sodium"), provider.Version{ID: "QANobbMI", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "0.9.2", "client"))
+	configManager := cf.Publish(mod("800000", "config-manager"), provider.Version{ID: "5600001", Number: "1.0.0", File: provider.File{Filename: "config_manager-1.0.0.jar"}}, modJar(t, "config_manager", "1.0.0", "server"))
+	serverTweaks := cf.Publish(mod("800001", "server-tweaks"), provider.Version{ID: "5600002", Number: "1.0.0", File: provider.File{Filename: "server_tweaks-1.0.0.jar"}}, modJar(t, "server_tweaks", "1.0.0", "server"))
 	jei, api := cf.Files[1], cf.Files[0]
 	listed := func(v provider.Version, env map[string]string) mrpackFile {
-		f := listedByDownload(cf.cdn, v)
+		f := listedByDownload(cf.CDN, v)
 		f.Env = env
 		return f
 	}
