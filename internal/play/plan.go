@@ -9,7 +9,6 @@ import (
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/java"
-	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/sync"
@@ -87,7 +86,7 @@ func Assemble(ctx context.Context, e *Env, in config.Instance, req Request) (*Pl
 	}
 	// The platform decides which natives are fetched, so the Java is chosen before the fill.
 	plan.Platform = game.ForJava(plan.Java)
-	src, err := Sources(e, p)
+	src, err := sync.GameSources(e.Env, p)
 	if err != nil {
 		return nil, err
 	}
@@ -136,31 +135,6 @@ func clientJava(ctx context.Context, e *Env, p *project.Project, s instance.Sett
 		return "", err
 	}
 	return java.Bin(rt.Home), nil
-}
-
-// Sources is what the store fills a launch of p from: every client the env holds, the row the lock
-// names, and the Java its installer would run with.
-func Sources(e *Env, p *project.Project) (game.Sources, error) {
-	var row loader.Loader
-	if p.Lock.Loader.Type != "" {
-		var err error
-		if row, err = loader.Require(p.Lock.Loader.Type); err != nil {
-			return game.Sources{}, err
-		}
-	}
-	return game.Sources{
-		Fetch:   e.Fetch,
-		Piston:  e.Piston,
-		Loader:  row,
-		Loaders: e.Loaders,
-		InstallerJava: func(ctx context.Context) (string, error) {
-			java, err := sync.ProjectJava(ctx, e.Env, p)
-			return java.Path, err
-		},
-		SaveLock: func() error { return p.Lock.Save(p.LockPath()) },
-		Log:      e.Log,
-		Progress: e.Progress,
-	}, nil
 }
 
 // Launch is the plan with an account templated in: the launch the watcher starts, or a foreground

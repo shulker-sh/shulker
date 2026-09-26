@@ -17,7 +17,6 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/play"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/sync"
 )
@@ -398,11 +397,11 @@ func (v clientVersions) LoaderProfile(ctx context.Context) (json.RawMessage, err
 }
 
 func (v clientVersions) InstallClient(ctx context.Context, launcherDir string) (string, error) {
-	pe, err := v.a.playEnv()
+	se, err := v.a.syncEnv()
 	if err != nil {
 		return "", err
 	}
-	src, err := play.Sources(pe, v.p)
+	src, err := sync.GameSources(se, v.p)
 	if err != nil {
 		return "", err
 	}
