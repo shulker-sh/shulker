@@ -22,6 +22,17 @@ func TestStepsSettleOffTerminal(t *testing.T) {
 	}
 }
 
+func TestClearedStepsLeaveOnlyWhatWasDone(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	p := &Printer{Stdout: &stdout, Stderr: &stderr, ClearFetches: true}
+	p.Step("fetching sodium 0.6.0")
+	p.Step("copying BSL Shaders/ into files/")
+	p.Out().Text("+ sodium")
+	if stderr.String() != "  ✔ Copied BSL Shaders/ into files/\n" || stdout.String() != "  + sodium\n" {
+		t.Fatalf("stderr %q stdout %q", stderr.String(), stdout.String())
+	}
+}
+
 func TestDownloadBarSettlesTheRunningStep(t *testing.T) {
 	var stderr bytes.Buffer
 	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}

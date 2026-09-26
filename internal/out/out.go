@@ -183,9 +183,12 @@ type Printer struct {
 	Annotate bool
 	// Framed decides which streams get the blank lines around a run's output; unset, every
 	// terminal does.
-	Framed   func(io.Writer) bool
-	frame    frame
-	warnings []string
+	Framed func(io.Writer) bool
+	// ClearFetches makes a fetching step a line that clears when it ends instead of settling, for a
+	// command whose result rows already say what it fetched.
+	ClearFetches bool
+	frame        frame
+	warnings     []string
 	// printed is whether stdout already holds the run's output: an envelope, or what a Raw command
 	// wrote itself.
 	printed  bool

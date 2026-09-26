@@ -107,13 +107,19 @@ func (p *Printer) Step(format string, args ...any) {
 	}
 	p.steps.shown = append(p.steps.shown, text)
 	p.settleLocked(true)
+	verb, _, _ := strings.Cut(text, " ")
+	f, isTTY := p.Stderr.(*os.File)
+	isTTY = isTTY && IsTerminal(f)
+	if p.ClearFetches && !isTTY && verb == "fetching" {
+		return
+	}
 	p.open(p.Stderr)
-	if verb, _, _ := strings.Cut(text, " "); !strings.HasSuffix(verb, "ing") {
+	if !strings.HasSuffix(verb, "ing") {
 		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(Sentence(text))
 		return
 	}
 	s := &step{text: text}
-	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
+	if isTTY {
 		s.tty = f
 		s.wheel = newSpinner(p.ErrTheme)
 		s.stop, s.stopped = make(chan struct{}), make(chan struct{})
@@ -147,7 +153,7 @@ func (p *Printer) settleLocked(done bool) {
 		<-s.stopped
 		fmt.Fprint(s.tty, "\r\x1b[J")
 	}
-	if done {
+	if done && !(p.ClearFetches && strings.HasPrefix(s.text, "fetching ")) {
 		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(Sentence(settledText(s.text)))
 	}
 }

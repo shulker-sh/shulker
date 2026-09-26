@@ -33,6 +33,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			return minimumArgs(1)(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			a.printer.ClearFetches = true
 			urls, err := a.providerURLs(args)
 			if err != nil {
 				return err

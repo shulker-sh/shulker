@@ -54,6 +54,7 @@ func (a *app) importCmd() *cobra.Command {
 		Short:       "Create a project from a modpack file, URL, slug or shulker source",
 		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			a.printer.ClearFetches = true
 			return a.runImport(cmd, args[0], &f)
 		},
 	}
