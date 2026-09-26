@@ -125,7 +125,7 @@ func (h *harness) mustLink(entry *launcher.Entry, dir string, req Request) *Repo
 	h.t.Helper()
 	rep, err := h.link(entry, dir, req)
 	if err != nil {
-		h.t.Fatalf("link %s: %v\nlog: %v\nwarnings: %v", entry.Name, err, h.env.Log, h.env.Warnings)
+		h.t.Fatalf("link %s: %v\nlog: %v\nwarnings: %v", entry.Name, err, h.env.Logged, h.env.Warnings)
 	}
 	return rep
 }

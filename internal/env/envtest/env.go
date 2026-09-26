@@ -23,7 +23,7 @@ type Env struct {
 	Piston     *Piston
 	Modrinth   *Host
 	CurseForge *Host
-	Log        []string
+	Logged     []string
 	Warnings   []string
 }
 
@@ -40,7 +40,7 @@ func New(t *testing.T) *Env {
 	c := &cache.Cache{Dir: t.TempDir()}
 	piston, runtimes, profiles := mojang.NewPiston(f), mojang.NewRuntimes(f), mojang.NewProfiles(f)
 	e.Piston.Mojang(piston, runtimes, profiles)
-	log := func(format string, args ...any) { e.Log = append(e.Log, fmt.Sprintf(format, args...)) }
+	log := func(format string, args ...any) { e.Logged = append(e.Logged, fmt.Sprintf(format, args...)) }
 	e.Env = &env.Env{
 		Fetch:     f,
 		Cache:     c,

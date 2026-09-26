@@ -132,7 +132,7 @@ func (h *harness) mustSync(into string, req Request) Result {
 	h.t.Helper()
 	res, err := h.sync(into, req)
 	if err != nil {
-		h.t.Fatalf("sync into %s: %v\nlog: %v\nwarnings: %v", into, err, h.env.Log, h.env.Warnings)
+		h.t.Fatalf("sync into %s: %v\nlog: %v\nwarnings: %v", into, err, h.env.Logged, h.env.Warnings)
 	}
 	return res
 }

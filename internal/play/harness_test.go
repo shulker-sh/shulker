@@ -84,7 +84,7 @@ func (h *harness) mustAssemble(req Request) *Plan {
 	h.t.Helper()
 	plan, err := h.assemble(req)
 	if err != nil {
-		h.t.Fatalf("assemble: %v\nlog: %v\nwarnings: %v", err, h.env.Log, h.env.Warnings)
+		h.t.Fatalf("assemble: %v\nlog: %v\nwarnings: %v", err, h.env.Logged, h.env.Warnings)
 	}
 	return plan
 }
