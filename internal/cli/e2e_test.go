@@ -26,6 +26,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/env"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/loader"
@@ -147,7 +148,7 @@ type harness struct {
 // watch stands in for the watcher process, because a test binary re-execed is a test binary and not
 // shulker. The run is watched here instead, on a goroutine that outlives the command that started
 // it exactly as the watcher outlives it.
-func (h *harness) watch(req watchRequest) (int, error) {
+func (h *harness) watch(req game.Launch) (int, error) {
 	started := make(chan watchReply, 1)
 	h.watching.Add(1)
 	go func() {

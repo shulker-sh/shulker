@@ -101,12 +101,12 @@ func LaunchArgv(v Version, p Platform, vars map[string]string, memory string, jv
 // Launch is one start of the game: the java that runs it, the argv it runs with, the directory it
 // runs in, and the file every byte it writes goes to.
 type Launch struct {
-	Java string
-	Argv []string
-	Dir  string
-	Log  string
+	Java string   `json:"java"`
+	Argv []string `json:"argv"`
+	Dir  string   `json:"dir"`
+	Log  string   `json:"log"`
 	// Wrapper is a command the launch runs through, handed java and its argv as its own arguments.
-	Wrapper []string
+	Wrapper []string `json:"wrapper,omitempty"`
 }
 
 // Program is what a launch execs: its wrapper when it has one, else java.

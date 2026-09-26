@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 	"shulker.sh/shulker/internal/auditlog"
+	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/play"
@@ -45,7 +46,7 @@ type app struct {
 	build      func() selfupdate.Build
 	exe        func() (string, error)
 	installer  func(ctx context.Context, java, jar string, args []string) error
-	watcher    func(req watchRequest) (int, error)
+	watcher    func(req game.Launch) (int, error)
 	isRunning  bool
 	backedUp   map[saves.Home]bool
 	log        *auditlog.Log

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/project"
 )
@@ -259,7 +260,7 @@ func TestAWatchedLaunchThatNeverStartedReachesTheInstanceList(t *testing.T) {
 	a := h.newApp(os.Stderr, os.Stderr)
 
 	var reply watchReply
-	rec := a.watchRun(watchRequest{Dir: gameDir, Java: missing, Log: filepath.Join(gameDir, instance.Dir, "logs", "x.log")}, nil, func(r watchReply) { reply = r })
+	rec := a.watchRun(game.Launch{Dir: gameDir, Java: missing, Log: filepath.Join(gameDir, instance.Dir, "logs", "x.log")}, nil, func(r watchReply) { reply = r })
 
 	if reply.PID != 0 || !strings.HasPrefix(reply.Error, "run "+missing+": ") {
 		t.Fatalf("the watcher answers with why nothing started: %+v", reply)
@@ -290,7 +291,7 @@ func TestTheWatcherReadsItsLaunchFromStdinAndAnswersWithOneLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, _ := json.Marshal(watchRequest{Dir: gameDir, Java: filepath.Join(f.Settings.Java, "bin", "java"), Argv: []string{"--accessToken", "mc-secret"}, Log: filepath.Join(gameDir, instance.Dir, "logs", "w.log")})
+	req, _ := json.Marshal(game.Launch{Dir: gameDir, Java: filepath.Join(f.Settings.Java, "bin", "java"), Argv: []string{"--accessToken", "mc-secret"}, Log: filepath.Join(gameDir, instance.Dir, "logs", "w.log")})
 	h.stdin = strings.NewReader(string(req))
 
 	code, stdout, stderr := h.run(t, "watch")
