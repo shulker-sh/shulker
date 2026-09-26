@@ -42,8 +42,8 @@ type Item struct {
 	// From and To print as a version change, the old grey and the new yellow.
 	From, To string
 	// Sides lists the sides the item lands on; OfSides is how many sides the
-	// manifest declares. The list prints after » when OfSides is set: "all
-	// sides" when every side, grey "no sides" when none.
+	// manifest declares. The list prints after » only when the item skips one
+	// of them: grey "no sides" when it lands on none.
 	Sides   []string
 	OfSides int
 	Text    string
@@ -88,7 +88,7 @@ func (l *Lines) Items(items ...Item) {
 	}
 	nameWidth, versionWidth := 0, 0
 	for _, it := range items {
-		if it.Version != "" || it.From != "" || it.Text != "" || it.OfSides > 0 {
+		if it.Version != "" || it.From != "" || it.Text != "" || it.skipsASide() {
 			nameWidth = max(nameWidth, Width(it.Name))
 		}
 		if afterVersion(it) {
@@ -114,8 +114,8 @@ func (l *Lines) item(it Item, nameWidth, versionWidth int) string {
 	if it.From != "" || it.To != "" {
 		rest = append(rest, t.Bump(it.From, it.To))
 	}
-	if it.OfSides > 0 {
-		rest = append(rest, t.Grey(t.ArrowInto())+" "+t.Sides(it.Sides, it.OfSides))
+	if it.skipsASide() {
+		rest = append(rest, t.Grey(t.ArrowInto())+" "+t.Sides(it.Sides))
 	}
 	if it.Text != "" {
 		rest = append(rest, t.Markup(it.Text))
@@ -155,8 +155,10 @@ func OneLine(s string) string {
 }
 
 func afterVersion(it Item) bool {
-	return it.From != "" || it.To != "" || it.OfSides > 0 || it.Text != ""
+	return it.From != "" || it.To != "" || it.skipsASide() || it.Text != ""
 }
+
+func (it Item) skipsASide() bool { return it.OfSides > 0 && len(it.Sides) < it.OfSides }
 
 func (l *Lines) glyph(k Kind) string {
 	t := l.T
@@ -185,13 +187,10 @@ func (t Theme) Bump(from, to string) string {
 	return t.Grey(from) + " " + t.Grey(t.ArrowBump()) + " " + t.Yellow(to)
 }
 
-// Sides lists the sides something lands on, of the of sides the manifest declares.
-func (t Theme) Sides(names []string, of int) string {
-	switch {
-	case len(names) == 0:
+// Sides lists the sides something lands on.
+func (t Theme) Sides(names []string) string {
+	if len(names) == 0 {
 		return t.Grey("no sides")
-	case len(names) >= of:
-		return t.Cyan("all sides")
 	}
 	parts := make([]string, len(names))
 	for i, n := range names {

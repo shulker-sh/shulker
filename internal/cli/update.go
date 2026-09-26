@@ -344,9 +344,6 @@ func printChanges(l *out.Lines, c *resolve.Changes, suggestions []resolve.Sugges
 	for _, m := range c.Added {
 		place := placements[m.ID]
 		it := out.Item{Kind: out.Add, Name: m.ID, Version: m.VersionNumber, Sides: place.Sides, OfSides: len(sides)}
-		if m.Side != "" && m.Side != "both" {
-			it.Aside = append(it.Aside, m.Side+" only")
-		}
 		if text := conditionText("os", place.OS); text != "" {
 			it.Aside = append(it.Aside, text)
 		}

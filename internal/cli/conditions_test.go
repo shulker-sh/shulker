@@ -200,7 +200,7 @@ func TestLockShowsWhereGatedModsLand(t *testing.T) {
 	setFeatures(t, h, []string{"fancy"})
 	setMod(t, h, "sodium", map[string]any{"feature": []string{"fancy", "!lowend"}})
 	stdout = h.mustRun(t, "lock")
-	if !strings.Contains(stdout, "» all sides (") || !strings.Contains(stdout, "feature: fancy and not lowend)") || strings.Contains(stdout, "off on every side") {
+	if strings.Contains(stdout, "» all sides") || !strings.Contains(stdout, "feature: fancy and not lowend)") || strings.Contains(stdout, "off on every side") {
 		t.Fatalf("feature on by its declared default: %s", stdout)
 	}
 }

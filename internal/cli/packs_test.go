@@ -29,9 +29,8 @@ func TestResourcePacksAndShaders(t *testing.T) {
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 
 	// No --type: the provider's own project type settles what each one is.
-	// Packs are placed on the client side, so the add line names them rather
-	// than reading as if the pack went nowhere.
-	if stdout := h.mustRun(t, "add", "fresh-animations"); !strings.Contains(stdout, "» all sides") || !strings.Contains(stdout, "client only") {
+	// The project declares only a client, so a pack skips no side and gets no tag.
+	if stdout := h.mustRun(t, "add", "fresh-animations"); strings.Contains(stdout, "»") || strings.Contains(stdout, "client only") {
 		t.Fatalf("a pack should name the sides it reaches: %s", stdout)
 	}
 	h.mustRun(t, "shader", "add", "complementary-reimagined")

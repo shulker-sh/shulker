@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -46,7 +47,7 @@ func (a *app) listCmdFor(kind string) *cobra.Command {
 					l.Info(emptyListText(chosen))
 					return
 				}
-				printList(l, res)
+				printList(l, res, p.Manifest.Sides())
 			})
 		},
 	}
@@ -73,7 +74,7 @@ func emptyListText(kind string) string {
 	return "Nothing in requires yet; add a mod with `shulker add <mod>`."
 }
 
-func printList(l *out.Lines, res []project.ListEntry) {
+func printList(l *out.Lines, res []project.ListEntry, sides []string) {
 	blocks := []struct{ heading, kind string }{
 		{"Modpacks", manifest.TypeModpack},
 		{"Mods", manifest.TypeMod},
@@ -85,7 +86,7 @@ func printList(l *out.Lines, res []project.ListEntry) {
 		var items []out.Item
 		for _, e := range res {
 			if e.Type == b.kind {
-				items = append(items, listItem(l, e))
+				items = append(items, listItem(l, e, sides))
 			}
 		}
 		if len(items) == 0 {
@@ -100,7 +101,7 @@ func printList(l *out.Lines, res []project.ListEntry) {
 	}
 }
 
-func listItem(l *out.Lines, e project.ListEntry) out.Item {
+func listItem(l *out.Lines, e project.ListEntry, sides []string) out.Item {
 	if e.Kind == modpack.Hosted {
 		it := out.Item{Kind: out.Note, Name: e.Key, Version: e.Version, Aside: []string{"modpack"}}
 		if e.Version == "" {
@@ -135,9 +136,7 @@ func listItem(l *out.Lines, e project.ListEntry) out.Item {
 	case e.Version == "":
 		it.Aside = append(it.Aside, "not locked")
 	}
-	if e.Side != "" && e.Side != "both" {
-		it.Aside = append(it.Aside, e.Side+" only")
-	}
+	it.Sides, it.OfSides = landsOn(e.Side, sides), len(sides)
 	if text := conditionText("os", e.OS); text != "" {
 		it.Aside = append(it.Aside, text)
 	}
@@ -157,4 +156,15 @@ func listItem(l *out.Lines, e project.ListEntry) out.Item {
 		it.Aside = append(it.Aside, "required by "+strings.Join(e.RequiredBy, ", "))
 	}
 	return it
+}
+
+// landsOn is which of the declared sides an entry with side ships on.
+func landsOn(side string, declared []string) []string {
+	if side == "" || side == "both" {
+		return declared
+	}
+	if slices.Contains(declared, side) {
+		return []string{side}
+	}
+	return nil
 }
