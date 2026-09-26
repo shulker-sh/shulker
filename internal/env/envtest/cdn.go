@@ -111,9 +111,9 @@ func NewHost(c *CDN, name string) *Host {
 	return &Host{Provider: fake.New(name), CDN: c}
 }
 
-// LikeCurseForge has the host publish sha1-only files and key projects by id.
+// LikeCurseForge has the host publish sha1-only files, key projects by id and name its versions.
 func (h *Host) LikeCurseForge() *Host {
-	h.Sha1Only, h.KeyedByID = true, true
+	h.Sha1Only, h.KeyedByID, h.NamedVersions = true, true, true
 	return h
 }
 

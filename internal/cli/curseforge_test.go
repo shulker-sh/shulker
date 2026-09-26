@@ -256,7 +256,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	h.mustRun(t, "create", "--loader", "fabric")
 
 	stdout := h.mustRun(t, "add", "jei")
-	if !strings.Contains(stdout, "+ jei ") || strings.Contains(stdout, "»") || !strings.Contains(stdout, "+ fabric-api fabric-api-0.130.0+26.2 (required by jei)") {
+	if !strings.Contains(stdout, "+ jei ") || strings.Contains(stdout, "»") || !strings.Contains(stdout, "+ fabric-api 1.0.0 (required by jei)") {
 		t.Fatalf("add: %s", stdout)
 	}
 	l := h.readLock(t)

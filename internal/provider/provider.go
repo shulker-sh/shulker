@@ -102,6 +102,9 @@ type Provider interface {
 	// manifest may name a project by its key alone. CurseForge finds slugs through its search,
 	// which misses some projects.
 	KeysBySlug() bool
+	// NamesVersions reports whether a version's Number is a name its author typed rather than
+	// the version its file declares. CurseForge's display names are often the filename.
+	NamesVersions() bool
 	// NotFoundHelp is what to try when a slug lookup misses; empty when a miss is final.
 	NotFoundHelp() string
 	// PackTags are the loader tags the provider files versions of a pack kind under, to ask

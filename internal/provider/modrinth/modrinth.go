@@ -109,6 +109,8 @@ func (m *Modrinth) Available() error { return nil }
 // Modrinth reads a slug straight, so a slug finds its project as surely as its id.
 func (m *Modrinth) KeysBySlug() bool { return true }
 
+func (m *Modrinth) NamesVersions() bool { return false }
+
 func (m *Modrinth) NotFoundHelp() string { return "" }
 
 // PackTags are the loader tags Modrinth files each pack kind's versions under: resource packs

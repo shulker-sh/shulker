@@ -30,6 +30,8 @@ type Provider struct {
 	// KeyedByID says a slug is no sure key on this provider, as on CurseForge, so an entry
 	// records the project id.
 	KeyedByID bool
+	// NamedVersions says a version's number is a typed name, as on CurseForge.
+	NamedVersions bool
 	// UnhashedTypes are the project types Identify never finds, as CurseForge's fingerprints
 	// leave modpacks out.
 	UnhashedTypes []string
@@ -55,6 +57,8 @@ func (p *Provider) Title() string {
 func (p *Provider) Available() error { return p.Unavailable }
 
 func (p *Provider) KeysBySlug() bool { return !p.KeyedByID }
+
+func (p *Provider) NamesVersions() bool { return p.NamedVersions }
 
 func (p *Provider) NotFoundHelp() string { return p.Help }
 

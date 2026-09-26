@@ -177,6 +177,8 @@ func (c *CurseForge) Available() error {
 // names a project by its id.
 func (c *CurseForge) KeysBySlug() bool { return false }
 
+func (c *CurseForge) NamesVersions() bool { return true }
+
 func (c *CurseForge) NotFoundHelp() string {
 	return "CurseForge's search doesn't list every project; add one it misses by a file URL (" + siteURL + "/minecraft/mc-mods/<slug>/files/<file id>), by " + siteURL + "/projects/<project id>, or by its project id, shown on its CurseForge page under About Project, with `--provider curseforge`"
 }

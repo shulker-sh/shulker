@@ -556,7 +556,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		Provider:      p.Name(),
 		Project:       proj.ID,
 		Version:       v.ID,
-		VersionNumber: v.Number,
+		VersionNumber: versionNumber(p, v, info),
 		Filename:      v.File.Filename,
 		URL:           got.url,
 		Page:          got.page,
@@ -882,4 +882,13 @@ func (r *Resolver) pageFor(m lock.Mod) string {
 		return ""
 	}
 	return *m.URL
+}
+
+// versionNumber is the version a mod is shown at: the one its jar declares where the provider's
+// number is only a name, unless the jar declares none.
+func versionNumber(p provider.Provider, v *provider.Version, info *jarmeta.Info) string {
+	if !p.NamesVersions() || info.Version == "" || info.Version == "0.0NONE" || strings.Contains(info.Version, "${") {
+		return v.Number
+	}
+	return info.Version
 }

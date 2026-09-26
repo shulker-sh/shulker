@@ -385,3 +385,14 @@ func TestAddLocksABlockedFileFromAnotherProviderHostingItsBytes(t *testing.T) {
 		t.Fatalf("the blocking provider isn't asked for its own file: %v %v", alpha.Requests, cf.Requests)
 	}
 }
+
+func TestANamedVersionIsLockedAsTheJarsOwn(t *testing.T) {
+	c := envtest.NewCDN(t)
+	alpha := envtest.NewHost(c, "alpha").LikeCurseForge()
+	alpha.Publish(mod("a-apple", "appleskin"), provider.Version{Number: "appleskin-neoforge-mc1.21-3.0.9.jar", File: provider.File{Filename: "appleskin.jar"}}, modJar(t, "appleskin", "3.0.9", "*"))
+	h := newHarness(t, alpha)
+	h.mustAdd("a-apple", AddOptions{})
+	if got := h.mod("appleskin").VersionNumber; got != "3.0.9" {
+		t.Fatalf("version %q, want the jar's 3.0.9", got)
+	}
+}
