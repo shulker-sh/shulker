@@ -489,6 +489,10 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if !sel.included[id] || !m.PlacedOn(side) {
 			continue
 		}
+		if m.IsPending() {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s is left out until its manual download is in downloads/; `shulker install` asks for it", id))
+			continue
+		}
 		if !b.Cache.Has(m.Sha512) {
 			return nil, nil, notInstalled(id)
 		}

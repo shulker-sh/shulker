@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/env"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/saves"
@@ -28,6 +29,10 @@ type Env struct {
 	// AskUnlock is asked whether to unlock a modpack built for another Minecraft than the
 	// project's; nil keeps the refusal.
 	AskUnlock func(key, minecraft string) (bool, error)
+	// AwaitDownloads is shown the files a fetch needs downloaded by hand into downloads, and
+	// waits for them: skip carries on without the ones the lock can hold pending. Nil has nobody
+	// to ask, so mods already pending stay left out and any other missing file fails the fetch.
+	AwaitDownloads func(ctx context.Context, downloads string, missing *out.Error) (skip bool, err error)
 	// backedUp is the save groups this run already backed up, so each is zipped once however
 	// many syncs touch it.
 	backedUp map[saves.Home]bool

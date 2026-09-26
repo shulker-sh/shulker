@@ -197,6 +197,8 @@
       "type": "object",
       "required": ["filename", "sha512", "side", "requiredBy", "aliases"],
       "additionalProperties": false,
+      "if": { "properties": { "sha512": { "const": "" } } },
+      "then": { "required": ["sha1"] },
       "properties": {
         "file": { "$ref": "#/$defs/relativePath", "description": "A local file: the path shulker.json gives it. Such an entry names no provider, and its sha512 is its identity." },
         "provider": { "type": "string", "enum": ["modrinth", "curseforge"] },
@@ -214,7 +216,8 @@
           "format": "uri",
           "description": "Provider file page for manual download. Present only when url is null."
         },
-        "sha512": { "$ref": "#/$defs/sha512", "description": "Cache key and install verification hash." },
+        "sha512": { "anyOf": [{ "$ref": "#/$defs/sha512" }, { "const": "" }], "description": "Cache key and install verification hash. Empty while the mod waits for a manual download, which sha1 then identifies." },
+        "sha1": { "$ref": "#/$defs/sha1", "description": "The provider's sha1 of a mod the lock holds without its bytes, because its manual download was skipped. The file dropped into downloads/ is matched by it, and fills in sha512." },
         "size": { "type": "integer", "minimum": 1, "description": "Jar size in bytes as the provider reports it, for the download bar; for a local file, its length, compared before rehashing it. Absent on entries locked before shulker recorded sizes; filled in when the mod is next resolved." },
         "side": { "type": "string", "enum": ["client", "server", "both"], "description": "Effective side after any manifest override." },
         "sideFrom": { "type": "string", "enum": ["requires", "provider", "jar", "dependencies"], "description": "Where side came from: the manifest's requires entry, the provider's project data, the jar's own metadata, or a mods.toml whose every dependency is CLIENT. Absent for the default both." },

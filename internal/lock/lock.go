@@ -108,25 +108,31 @@ func (p Modpack) Label() string {
 // Mod is a locked mod jar. One with File is a local file: it names no provider, so every
 // provider-shaped field stays empty and url is left out rather than written null.
 type Mod struct {
-	File          string   `json:"file,omitempty"`
-	Provider      string   `json:"provider,omitempty"`
-	Project       string   `json:"project,omitempty"`
-	Version       string   `json:"version,omitempty"`
-	VersionNumber string   `json:"versionNumber,omitempty"`
-	Filename      string   `json:"filename"`
-	URL           *string  `json:"url"`
-	Page          string   `json:"page,omitempty"`
-	Sha512        string   `json:"sha512"`
-	Size          int64    `json:"size,omitempty"`
-	Side          string   `json:"side"`
-	SideFrom      string   `json:"sideFrom,omitempty"`
-	Channel       string   `json:"channel,omitempty"`
-	Modpack       string   `json:"modpack,omitempty"`
-	ModID         string   `json:"modId,omitempty"`
-	Slug          string   `json:"slug,omitempty"`
-	RequiredBy    []string `json:"requiredBy"`
-	Aliases       Aliases  `json:"aliases"`
+	File          string  `json:"file,omitempty"`
+	Provider      string  `json:"provider,omitempty"`
+	Project       string  `json:"project,omitempty"`
+	Version       string  `json:"version,omitempty"`
+	VersionNumber string  `json:"versionNumber,omitempty"`
+	Filename      string  `json:"filename"`
+	URL           *string `json:"url"`
+	Page          string  `json:"page,omitempty"`
+	Sha512        string  `json:"sha512"`
+	// Sha1 is the provider's sha1 of a file the lock holds without its bytes: one a manual
+	// download was skipped for, which the file dropped into downloads/ is matched by.
+	Sha1       string   `json:"sha1,omitempty"`
+	Size       int64    `json:"size,omitempty"`
+	Side       string   `json:"side"`
+	SideFrom   string   `json:"sideFrom,omitempty"`
+	Channel    string   `json:"channel,omitempty"`
+	Modpack    string   `json:"modpack,omitempty"`
+	ModID      string   `json:"modId,omitempty"`
+	Slug       string   `json:"slug,omitempty"`
+	RequiredBy []string `json:"requiredBy"`
+	Aliases    Aliases  `json:"aliases"`
 }
+
+// IsPending reports whether the lock holds the mod without its bytes, waiting for a manual download.
+func (m Mod) IsPending() bool { return m.Sha512 == "" }
 
 // Aliases are the same mod's project ids on the other providers, by provider name.
 type Aliases map[string]string

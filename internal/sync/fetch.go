@@ -28,8 +28,25 @@ func FetchLocked(ctx context.Context, e *Env, p *project.Project, sides []string
 	if err != nil {
 		return nil, err
 	}
-	fetched, dropWarnings, err := r.Install(ctx, sides...)
+	r.SkipPending = e.AwaitDownloads == nil
+	var fetched, dropWarnings []string
+	for {
+		fetched, dropWarnings, err = r.Install(ctx, sides...)
+		if out.CodeOf(err) != "missing-files" || e.AwaitDownloads == nil || r.SkipPending {
+			break
+		}
+		skip, waitErr := e.AwaitDownloads(ctx, filepath.Join(p.Dir, resolve.DownloadsDir), out.AsError(err))
+		if waitErr != nil {
+			return nil, waitErr
+		}
+		r.SkipPending = skip
+	}
 	e.WarnEach(dropWarnings)
+	if len(r.Adopted()) > 0 {
+		if err := p.Lock.Save(p.LockPath()); err != nil {
+			return nil, err
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -31,6 +31,9 @@ func Open() (*Cache, error) {
 }
 
 func (c *Cache) Has(sha string) bool {
+	if sha == "" {
+		return false
+	}
 	_, err := os.Stat(c.Object(sha))
 	return err == nil
 }

@@ -104,7 +104,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	for _, id := range r.lockIDs() {
 		m := r.Lock.Mods[id]
 		if !r.Cache.Has(m.Sha512) {
-			if usedBy(m.Side, sides) {
+			if usedBy(m.Side, sides) && !m.IsPending() {
 				w := fmt.Sprintf("%s is not downloaded; its metadata was not checked", id)
 				v.Warnings, v.Undownloaded = append(v.Warnings, w), append(v.Undownloaded, w)
 			}

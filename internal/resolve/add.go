@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -57,6 +58,12 @@ type Resolver struct {
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
 	// file order is arbitrary.
 	keepNewest bool
+	// adopted are the pending mods install filled from downloads/.
+	adopted []string
+	// SkipPending goes on without the files waiting for a manual download rather than naming them
+	// as missing: install leaves out the mods pending in the lock, and an import locks the mods it
+	// can't download pending. A build leaves pending mods out.
+	SkipPending bool
 	// DownloadsIn is where manual downloads are taken from when it isn't Dir's downloads/: a new
 	// project staged elsewhere reads the ones dropped into the folder it is for.
 	DownloadsIn string
@@ -562,7 +569,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		Provider:      p.Name(),
 		Project:       proj.ID,
 		Version:       v.ID,
-		VersionNumber: versionNumber(p, v, info),
+		VersionNumber: versionNumber(p, v.Number, info),
 		Filename:      v.File.Filename,
 		URL:           got.url,
 		Page:          got.page,
@@ -711,19 +718,26 @@ func contains(list []string, s string) bool {
 // given, it leaves out files that none of them use. A download the host fails goes on to the next
 // file unless FailFast, and the error joins the failed downloads' and the missing files'.
 func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []string, error) {
-	return r.install(ctx, r.lockFiles(), sides)
+	return r.install(ctx, r.lockFiles, sides)
 }
 
 // InstallMods is Install for the locked mods alone, the jars Validate reads.
 func (r *Resolver) InstallMods(ctx context.Context) ([]string, []string, error) {
-	return r.install(ctx, r.modFiles(), nil)
+	return r.install(ctx, r.modFiles, nil)
 }
 
-func (r *Resolver) install(ctx context.Context, locked []downloadable, sides []string) ([]string, []string, error) {
+// Adopted are the pending mods an install filled from downloads/, which changed the lock.
+func (r *Resolver) Adopted() []string { return r.adopted }
+
+func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadable, sides []string) ([]string, []string, error) {
 	files, err := r.sweepDownloads()
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := r.adoptPending(files); err != nil {
+		return nil, nil, err
+	}
+	locked := lockedFiles()
 	var warnings []string
 	for _, f := range files {
 		if !r.lockHas(f.Sha512) {
@@ -732,6 +746,7 @@ func (r *Resolver) install(ctx context.Context, locked []downloadable, sides []s
 	}
 	var fetched []string
 	var missing []string
+	var manual []out.Detail
 	var wanted []string
 	var downloads []out.Download
 	byID := map[string]downloadable{}
@@ -745,8 +760,12 @@ func (r *Resolver) install(ctx context.Context, locked []downloadable, sides []s
 			}
 			continue
 		}
+		if f.url == nil && f.sha512 == "" && r.SkipPending {
+			continue
+		}
 		if f.url == nil {
 			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", f.id, f.filename, f.page, DownloadsDir))
+			manual = append(manual, ManualRow(f.filename, f.page))
 			continue
 		}
 		byID[f.id] = f
@@ -767,6 +786,7 @@ func (r *Resolver) install(ctx context.Context, locked []downloadable, sides []s
 		_, err := r.Cache.Ensure(ctx, r.Fetch, *f.url, f.sha512)
 		if errors.Is(err, fetch.ErrForbidden) {
 			missing = append(missing, fmt.Sprintf("%s: download forbidden; download %s from %s and place it in %s/", id, f.filename, f.page, DownloadsDir))
+			manual = append(manual, ManualRow(f.filename, f.page))
 			continue
 		}
 		if err != nil {
@@ -794,6 +814,9 @@ func (r *Resolver) install(ctx context.Context, locked []downloadable, sides []s
 	if len(missing) > 0 {
 		e := out.Errorf("missing-files", "%s a manual download", out.Count(len(missing), "file needs", "files need"))
 		e.Items = missing
+		if len(manual) == len(missing) {
+			e.Rows = manual
+		}
 		errs = append(errs, e)
 	}
 	return fetched, warnings, errors.Join(errs...)
@@ -892,9 +915,49 @@ func (r *Resolver) pageFor(m lock.Mod) string {
 
 // versionNumber is the version a mod is shown at: the one its jar declares where the provider's
 // number is only a name, unless the jar declares none.
-func versionNumber(p provider.Provider, v *provider.Version, info *jarmeta.Info) string {
+func versionNumber(p provider.Provider, number string, info *jarmeta.Info) string {
 	if !p.NamesVersions() || info.Version == "" || info.Version == "0.0NONE" || strings.Contains(info.Version, "${") {
-		return v.Number
+		return number
 	}
 	return info.Version
+}
+
+// adoptPending fills each pending mod a file in downloads/ matches by sha1: its sha512 and size
+// from the file, and its mod id and version from the jar.
+func (r *Resolver) adoptPending(files []dropped) error {
+	for _, id := range r.lockIDs() {
+		m := r.Lock.Mods[id]
+		if !m.IsPending() {
+			continue
+		}
+		i := slices.IndexFunc(files, func(f dropped) bool { return f.Sha1 == m.Sha1 })
+		if i < 0 {
+			continue
+		}
+		path := r.Cache.Object(files[i].Sha512)
+		info, err := r.readJar(path, m.Filename)
+		if err != nil {
+			return prefixed("mod "+id, err)
+		}
+		st, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		m.Sha512, m.Sha1, m.Size = files[i].Sha512, "", st.Size()
+		if info.ID != "" && info.ID != id {
+			m.ModID = info.ID
+		}
+		if p, err := r.provider(m.Provider); err == nil {
+			m.VersionNumber = versionNumber(p, m.VersionNumber, info)
+		}
+		r.Lock.Mods[id] = m
+		r.adopted = append(r.adopted, id)
+	}
+	return nil
+}
+
+// ManualRow is how a file to download by hand shows under a missing-files error: its name, and
+// the page it comes from on the line beneath.
+func ManualRow(filename, page string) out.Detail {
+	return out.Detail{Text: filename, Children: []out.Detail{{Text: page}}}
 }

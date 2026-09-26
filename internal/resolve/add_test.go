@@ -2,6 +2,8 @@ package resolve
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,6 +12,7 @@ import (
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/env/envtest"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
@@ -394,5 +397,31 @@ func TestANamedVersionIsLockedAsTheJarsOwn(t *testing.T) {
 	h.mustAdd("a-apple", AddOptions{})
 	if got := h.mod("appleskin").VersionNumber; got != "3.0.9" {
 		t.Fatalf("version %q, want the jar's 3.0.9", got)
+	}
+}
+
+func TestInstallAdoptsAPendingDownloadBySha1(t *testing.T) {
+	c := envtest.NewCDN(t)
+	alpha := envtest.NewHost(c, "alpha")
+	jar := modJar(t, "rtg", "1.0.0", "*")
+	h := newHarness(t, alpha)
+	sum := sha1.Sum(jar)
+	h.r.Lock.Mods["rtg"] = lock.Mod{Provider: "alpha", Project: "a-rtg", Version: "v1", VersionNumber: "1.0.0", Filename: "rtg.jar", Page: "https://example.com/rtg", Sha1: hex.EncodeToString(sum[:]), Side: "both", RequiredBy: []string{}}
+	if !h.mod("rtg").IsPending() {
+		t.Fatal("a mod locked without its bytes is pending")
+	}
+	if _, _, err := h.install(); out.CodeOf(err) != "missing-files" {
+		t.Fatalf("a pending mod is a manual download: %v", err)
+	}
+	h.drop("RTG-1.0.0-renamed.jar", jar)
+	if _, _, err := h.install(); err != nil {
+		t.Fatal(err)
+	}
+	m := h.mod("rtg")
+	if m.IsPending() || m.Sha512 != sha512Hex(jar) || m.Size != int64(len(jar)) || !h.r.Cache.Has(m.Sha512) {
+		t.Fatalf("the dropped file fills the pending entry: %+v", m)
+	}
+	if h.r.Adopted() == nil {
+		t.Fatal("the resolver reports that it changed the lock")
 	}
 }
