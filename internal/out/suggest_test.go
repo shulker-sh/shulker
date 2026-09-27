@@ -81,3 +81,21 @@ func TestFailShowsPicksAndAnExampleCommand(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", stderr.String(), want)
 	}
 }
+
+func TestALongPickListShowsTheFirstFiveAndCountsTheRest(t *testing.T) {
+	var stderr strings.Builder
+	p := &Printer{Stdout: io.Discard, Stderr: &stderr, Args: []string{"add", "sodium"}}
+	e := Errorf("no-compatible-version", "sodium has no release version for Minecraft 26.3")
+	e.Candidates = []string{"0.8 (beta)", "0.7 (beta)", "0.6 (beta)", "0.5 (beta)", "0.4 (beta)", "0.3 (beta)", "0.2 (alpha)"}
+	e.Pass, e.Flag = []string{"beta", "beta", "beta", "beta", "beta", "beta", "alpha"}, "--channel"
+	p.Fail(e)
+	got := stderr.String()
+	for _, want := range []string{"‣ 0.4 (beta)\n", "…and 2 more\n", "$ shulker add sodium --channel beta\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "0.3 (beta)") {
+		t.Errorf("only the first five are listed:\n%s", got)
+	}
+}

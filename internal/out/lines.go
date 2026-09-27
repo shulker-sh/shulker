@@ -367,6 +367,9 @@ func (l *Lines) Nudge(lead, command string) {
 	l.line(gutter + l.T.Grey("$") + " " + l.T.Command(command))
 }
 
+// shownPicks is how many of an error's candidates it lists before counting the rest.
+const shownPicks = 5
+
 // Error renders the error tree: the red line with its code, then the items,
 // candidates, and help underneath.
 func (l *Lines) Error(e *Error) {
@@ -387,8 +390,11 @@ func (l *Lines) Error(e *Error) {
 	rows := l.detailRows(e, extra)
 	if label, picks := e.picks(); len(picks) > 0 {
 		var children []string
-		for _, p := range picks {
+		for _, p := range picks[:min(len(picks), shownPicks)] {
 			children = append(children, t.Grey(t.ArrowPick())+" "+t.Cyan(p.Show))
+		}
+		if more := len(picks) - shownPicks; more > 0 {
+			children = append(children, t.Grey(fmt.Sprintf("…and %d more", more)))
 		}
 		rows = append(rows, Row{Label: label, Children: children})
 	}
