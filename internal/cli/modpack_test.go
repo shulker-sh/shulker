@@ -109,7 +109,7 @@ func TestLocalModpack(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "list")
-	for _, want := range []string{"Modpacks\n", "• base ./base (local, ok", "Mods\n", "• sodium", "fabric-api", "from base"} {
+	for _, want := range []string{"Modpacks\n", "• base ./base (local, ", "Mods\n", "• sodium", "fabric-api", "from base"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("list output has no %q: %s", want, stdout)
 		}
@@ -150,7 +150,7 @@ func TestLocalModpack(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.dir, "base", "overrides", "config", "base.txt"), []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if stdout = h.mustRun(t, "modpack", "list"); !strings.HasPrefix(stdout, "  Modpacks\n  • base ./base (local, changed, pinned "+l.Packs["base"]["dirSha256"][:12]+")\n") {
+	if stdout = h.mustRun(t, "modpack", "list"); !strings.HasPrefix(stdout, "  Modpacks\n  • base ./base (local, "+l.Packs["base"]["dirSha256"][:12]+", changed)\n") {
 		t.Fatalf("modpack list after edit: %s", stdout)
 	}
 	_, stderr := h.mustRunStderr(t, "build")
@@ -321,7 +321,7 @@ func TestGitModpack(t *testing.T) {
 	if !strings.Contains(stdout, "+ shared-pack "+first[:12]+" (modpack)") {
 		t.Fatalf("modpack add output: %s", stdout)
 	}
-	if stdout = h.mustRun(t, "modpack", "list"); stdout != "  Modpacks\n  • shared-pack "+source+" (git, ok, pinned "+first[:12]+", ref main)\n" {
+	if stdout = h.mustRun(t, "modpack", "list"); stdout != "  Modpacks\n  • shared-pack "+source+" (git, ref main, "+first[:7]+")\n" {
 		t.Fatalf("modpack list: %s", stdout)
 	}
 	l := readLock(t, h)

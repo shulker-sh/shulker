@@ -53,7 +53,7 @@ func TestLocalModpackIgnoresSkippedFiles(t *testing.T) {
 	h.mustRun(t, "modpack", "add", "./base")
 
 	writeFile(t, filepath.Join(h.dir, "base", "overrides", "config", ".DS_Store"), "junk")
-	if stdout := h.mustRun(t, "modpack", "list"); !strings.Contains(stdout, "(local, ok") {
+	if stdout := h.mustRun(t, "modpack", "list"); strings.Contains(stdout, "changed") {
 		t.Fatalf("a .DS_Store should not change a local pack: %s", stdout)
 	}
 	h.mustRun(t, "build")

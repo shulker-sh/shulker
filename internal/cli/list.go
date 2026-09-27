@@ -130,15 +130,22 @@ func listItem(l *out.Lines, e project.ListEntry, sides []string) out.Item {
 		return it
 	}
 	if e.Type == manifest.TypeModpack {
-		aside := []string{string(e.Kind), e.State}
-		if e.Version != "" {
-			aside = append(aside, "pinned "+e.Version)
-		}
+		aside := []string{string(e.Kind)}
 		if e.Ref != "" {
 			aside = append(aside, "ref "+e.Ref)
 		}
 		if e.Path != "" {
 			aside = append(aside, "path "+e.Path)
+		}
+		if e.Version != "" {
+			pin := e.Version
+			if e.Kind == modpack.Git {
+				pin = pin[:min(len(pin), 7)]
+			}
+			aside = append(aside, pin)
+		}
+		if e.State != "ok" {
+			aside = append(aside, e.State)
 		}
 		return out.Item{Kind: out.Note, Name: e.Key, Text: l.T.Grey(e.Source), Aside: aside}
 	}

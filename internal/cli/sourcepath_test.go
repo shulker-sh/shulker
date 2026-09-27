@@ -82,7 +82,7 @@ func TestGitModpackSubfolder(t *testing.T) {
 	h.mustRun(t, "create", "--loader", "fabric")
 
 	h.mustRun(t, "modpack", "add", source, "--path", "packs/alpha", "--as", "alpha")
-	if stdout := h.mustRun(t, "modpack", "list"); stdout != "  Modpacks\n  • alpha "+source+" (git, ok, pinned "+commit[:12]+", path packs/alpha)\n" {
+	if stdout := h.mustRun(t, "modpack", "list"); stdout != "  Modpacks\n  • alpha "+source+" (git, path packs/alpha, "+commit[:7]+")\n" {
 		t.Fatalf("modpack list: %s", stdout)
 	}
 	var lk map[string]any
