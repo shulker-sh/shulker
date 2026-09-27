@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
@@ -14,7 +11,6 @@ import (
 type backupResult struct {
 	savesTarget
 	saves.Backup
-	elapsed time.Duration
 }
 
 func (a *app) backupCmd() *cobra.Command {
@@ -50,8 +46,7 @@ func (a *app) backup(target savesTarget, only []string) (backupResult, error) {
 			return backupResult{}, err
 		}
 	}
-	start := time.Now()
-	taken, err := saves.Take(src, target.Home(), "backup", a.zipping("zipping"))
+	taken, err := saves.Take(src, target.Home(), "backup", a.zipping(a.printer.Working))
 	if err != nil {
 		return backupResult{}, err
 	}
@@ -61,11 +56,15 @@ func (a *app) backup(target savesTarget, only []string) (backupResult, error) {
 		}
 		return backupResult{}, out.Errorf("no-worlds", "no worlds in %s to back up", target.WorldsDir)
 	}
-	return backupResult{savesTarget: target, Backup: taken, elapsed: time.Since(start)}, nil
+	return backupResult{savesTarget: target, Backup: taken}, nil
 }
 
 func (b backupResult) print(l *out.Lines) {
-	l.OKInto("Backed up "+out.Count(b.Worlds, "world", "worlds"), b.Path, fmt.Sprintf("%s in %.1fs", out.HumanBytes(b.Size), b.elapsed.Seconds()))
+	what := out.Count(b.Worlds, "world", "worlds")
+	if b.Worlds == 1 && len(b.Names) == 1 {
+		what = b.Names[0]
+	}
+	l.OKInto("Backed up "+what, b.Path, out.HumanBytes(b.Size))
 }
 
 func (a *app) backupSource(target savesTarget) saves.Source {
@@ -76,14 +75,14 @@ func (a *app) backupSource(target savesTarget) saves.Source {
 	return sync.BackupSource(se, target.Target)
 }
 
-// zipping is the step line saves.Take shows for each world, under a warning when a running game
-// has the world open.
-func (a *app) zipping(verb string) func(world string, open bool) {
+// zipping is the line saves.Take shows for each world through step, under a warning when a
+// running game has the world open.
+func (a *app) zipping(step func(format string, args ...any)) func(world string, open bool) {
 	return func(world string, open bool) {
 		if open {
 			a.printer.Warn("%s is open in a running game; its backup may be torn", world)
 		}
-		a.printer.Step("%s %s", verb, world)
+		step("zipping %s", world)
 	}
 }
 

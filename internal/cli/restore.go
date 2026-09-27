@@ -98,7 +98,7 @@ func (a *app) restore(target savesTarget, req restoreRequest) (restoreResult, er
 		return restoreResult{}, e
 	}
 	res := restoreResult{savesTarget: target, From: from}
-	snapshot, err := saves.Take(a.backupSource(target), target.Home(), "restore", a.zipping("zipping"))
+	snapshot, err := saves.Take(a.backupSource(target), target.Home(), "restore", a.zipping(a.printer.Step))
 	if err != nil {
 		return restoreResult{}, err
 	}

@@ -97,7 +97,7 @@ func (e *Env) beforeModChange(reason, dir string) func() error {
 		if e.backedUp == nil {
 			e.backedUp = map[saves.Home]bool{}
 		}
-		_, warning, err := saves.Auto(BackupSource(e, target), target.Home(), reason, e.SaveBackups, e.backedUp, e.zipping("backing up"))
+		_, warning, err := saves.Auto(BackupSource(e, target), target.Home(), reason, e.SaveBackups, e.backedUp, e.zipping("backing up world"))
 		if warning != "" {
 			e.Warn("%s", warning)
 		}
