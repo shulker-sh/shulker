@@ -57,6 +57,8 @@ type Link struct {
 	// warning or nothing.
 	Working func(format string, args ...any)
 	Warn    func(format string, args ...any)
+	// WarnNudge is Warn with the command that deals with the warning beneath it.
+	WarnNudge func(n out.Nudge, format string, args ...any)
 }
 
 // ClientVersions is what a link needs from the loader side to make a launcher start the locked

@@ -118,6 +118,7 @@ func Into(ctx context.Context, e *Env, entry *launcher.Entry, src *sync.Source, 
 		Log:           e.Log,
 		Working:       e.Working,
 		Warn:          e.Warn,
+		WarnNudge:     e.WarnNudge,
 	}
 	place, err := entry.Place(lreq)
 	if err != nil {

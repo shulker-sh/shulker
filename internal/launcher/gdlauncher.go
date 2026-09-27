@@ -179,7 +179,7 @@ func linkGDLauncher(ctx context.Context, _ *Entry, req *Link, _ Placement) (Inst
 		return InstanceResult{}, err
 	}
 	if running, _ := GDLauncherRunning(); running {
-		req.Warn("GDLauncher is open; it may overwrite this instance's changes. Quit it and run this link again")
+		req.WarnNudge(out.Nudge{Lead: "Quit it, then link again", Command: "shulker link gdlauncher"}, "GDLauncher is open and may overwrite this instance")
 	}
 	g := &GDLauncher{Dir: req.LauncherDir}
 	return g.WriteInstance(GDLauncherInstance{
