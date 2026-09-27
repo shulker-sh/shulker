@@ -206,7 +206,7 @@ func gdlauncherLoaderVersion(ctx context.Context, req *Link) (string, error) {
 		return "", nil
 	}
 	want := GDLauncherLoaderVersion(req.Minecraft, req.LoaderType, req.LoaderVersion)
-	req.Log("checking which %s versions GDLauncher can install", req.LoaderType)
+	req.Working("checking which %s versions GDLauncher can install", req.LoaderType)
 	meta := &GDLauncherMeta{Client: req.Fetch, BaseURL: req.MetaURL}
 	listed, err := meta.LoaderVersions(ctx, req.LoaderType, req.Minecraft)
 	switch {

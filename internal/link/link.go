@@ -116,6 +116,7 @@ func Into(ctx context.Context, e *Env, entry *launcher.Entry, src *sync.Source, 
 		MetaURL:       e.metaURL(entry),
 		Versions:      versions{e: e, p: p, row: row},
 		Log:           e.Log,
+		Working:       e.Working,
 		Warn:          e.Warn,
 	}
 	place, err := entry.Place(lreq)

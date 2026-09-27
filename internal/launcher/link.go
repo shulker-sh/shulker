@@ -53,7 +53,10 @@ type Link struct {
 	MetaURL  string
 	Versions ClientVersions
 	Log      func(format string, args ...any)
-	Warn     func(format string, args ...any)
+	// Working shows work under way that clears when it ends, for a check whose outcome is a
+	// warning or nothing.
+	Working func(format string, args ...any)
+	Warn    func(format string, args ...any)
 }
 
 // ClientVersions is what a link needs from the loader side to make a launcher start the locked

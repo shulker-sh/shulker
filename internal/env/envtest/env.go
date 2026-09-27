@@ -50,6 +50,7 @@ func New(t *testing.T) *Env {
 		Runtimes:  runtimes,
 		Players:   player.NewResolver(profiles),
 		Log:       log,
+		Working:   log,
 		Warn:      func(format string, args ...any) { e.Warnings = append(e.Warnings, fmt.Sprintf(format, args...)) },
 		WarnNudge: func(n out.Nudge, format string, args ...any) {
 			e.Warnings = append(e.Warnings, fmt.Sprintf(format, args...))
