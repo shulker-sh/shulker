@@ -36,24 +36,25 @@ type app struct {
 	stdin   io.Reader
 	tty     func() bool
 	// waits counts the manual-download waits this run has shown, so a repeat says what is still missing.
-	waits      int
-	asker      asker
-	dir        string
-	instance   string
-	d          *deps
-	se         *sync.Env
-	pe         *play.Env
-	configPath string
-	releases   *selfupdate.Releases
-	build      func() selfupdate.Build
-	exe        func() (string, error)
-	installer  func(ctx context.Context, java, jar string, args []string) error
-	watcher    func(req game.Launch) (int, error)
-	isRunning  bool
-	backedUp   map[saves.Home]bool
-	log        *auditlog.Log
-	logState   logState
-	failFast   bool
+	waits       int
+	asker       asker
+	dir         string
+	instance    string
+	d           *deps
+	se          *sync.Env
+	pe          *play.Env
+	configPath  string
+	releases    *selfupdate.Releases
+	build       func() selfupdate.Build
+	exe         func() (string, error)
+	installer   func(ctx context.Context, java, jar string, args []string) error
+	watcher     func(req game.Launch) (int, error)
+	isRunning   bool
+	backedUp    map[saves.Home]bool
+	log         *auditlog.Log
+	logState    logState
+	failFast    bool
+	warnsRawURL bool
 }
 
 // Execute runs shulker with args and returns the process exit code.

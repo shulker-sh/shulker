@@ -50,6 +50,7 @@ func (a *app) linkCmd() *cobra.Command {
 				return cmd.Help()
 			}
 			a.logActing()
+			a.warnRawURLs()
 			return a.linkAsked(cmd)
 		},
 	}
@@ -113,6 +114,7 @@ func (a *app) launcherLinkCmd(e *launcher.Entry) *cobra.Command {
 		Short:       e.Usage.Short,
 		Args:        maximumArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			a.warnRawURLs()
 			rep, err := a.linkInto(cmd, args, e, &k)
 			if err != nil {
 				return err

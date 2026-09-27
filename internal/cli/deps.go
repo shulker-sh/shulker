@@ -101,7 +101,17 @@ func (a *app) newDeps(e *env.Env) *deps {
 	e.Progress = a.printer.Progress
 	e.Warn = a.printer.Warn
 	e.WarnNudge = a.printer.WarnNudge
+	e.WarnsRawURL = a.warnsRawURL
 	return &deps{Env: e, meta: &resolve.Meta{Piston: e.Piston, Loaders: e.Loaders}}
+}
+
+// warnRawURLs has this run warn that a raw manifest URL brings no overrides, for a command that
+// adds or links a source.
+func (a *app) warnRawURLs() {
+	a.warnsRawURL = true
+	if a.d != nil {
+		a.d.WarnsRawURL = true
+	}
 }
 
 func (a *app) openProject() (*project.Project, error) {

@@ -65,6 +65,9 @@ type Store struct {
 	Fetch      *fetch.Client
 	Log        func(format string, args ...any)
 	Warn       func(format string, args ...any)
+	// WarnsRawURL has a raw manifest URL warn that its overrides don't come with it: a command
+	// that adds or links a source says so once, and the syncs after it stay quiet.
+	WarnsRawURL bool
 	// Lock is the project's lock, which an archive's entries are rebuilt from.
 	Lock *lock.Lock
 	// Consume locks what a File modpack's archive holds into its Lock and Manifest, and records
@@ -161,7 +164,7 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		if err := refuseFiles(name, l.Manifest); err != nil {
 			return nil, err
 		}
-		s.warnRawURL(p.Source, l.Manifest)
+		s.warnRawURL(name, l.Manifest)
 		if l.Pin.Sha256, err = s.storeManifest(data); err != nil {
 			return nil, err
 		}
@@ -380,23 +383,23 @@ func localFile(m *manifest.Manifest) (key, file string, ok bool) {
 // since the lock it writes still takes the modpack from there.
 func (s *Store) WarnRawURL(l *Loaded) {
 	if l.Kind == URL {
-		s.warnRawURL(l.Source, l.Manifest)
+		s.warnRawURL(l.Name, l.Manifest)
 	}
 }
 
-// warnRawURL is the one warning every command reading a raw manifest URL gives: only the manifest
-// and its lock come from there, so the pack's override folders and files never arrive. It names
-// the ones the manifest itself points at. The printer drops a repeat, so a command that reads the
-// same source twice still says it once.
-func (s *Store) warnRawURL(source string, m *manifest.Manifest) {
-	if s.Warn == nil {
+// warnRawURL is the one warning every command adding or linking a raw manifest URL gives: only
+// the manifest and its lock come from there, so the pack's override folders and files never
+// arrive. It names the ones the manifest itself points at. The printer drops a repeat, so a
+// command that reads the same source twice still says it once.
+func (s *Store) warnRawURL(name string, m *manifest.Manifest) {
+	if s.Warn == nil || !s.WarnsRawURL {
 		return
 	}
-	including := ""
+	rows := ""
 	if missing := pointedAt(m); len(missing) > 0 {
-		including = ", including " + strings.Join(missing, " and ")
+		rows = "\nNor are " + strings.Join(missing, " and ")
 	}
-	s.Warn("%s is a raw manifest URL: its overrides and local files aren't fetched%s; use the repository's git URL, with path for a pack in a subfolder, to get them", source, including)
+	s.Warn("%s is a raw manifest URL, so its overrides aren't included%s\nUse its git URL instead, with path for a pack in a subfolder", name, rows)
 }
 
 // pointedAt is what a manifest names in its own directory, beyond the default override folders

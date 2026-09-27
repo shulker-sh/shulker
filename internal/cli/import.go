@@ -332,7 +332,7 @@ func (a *app) importCheckout(ctx context.Context, d *deps, dir, source string, f
 	if want, ok := packarchive.Lookup(f.typ); ok {
 		return nil, nil, out.Errorf("usage", "%s is a shulker source, not a %s modpack", source, want.Title())
 	}
-	store := &modpack.Store{Cache: d.Cache, ProjectDir: dir, Fetch: d.Fetch, Log: a.progress, Warn: a.printer.Warn}
+	store := &modpack.Store{Cache: d.Cache, ProjectDir: dir, Fetch: d.Fetch, Log: a.progress, Warn: a.printer.Warn, WarnsRawURL: true}
 	c, err := store.Checkout(ctx, source, f.at)
 	return nil, c, err
 }

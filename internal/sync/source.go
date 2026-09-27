@@ -31,7 +31,7 @@ func (s *Source) ForLink() *project.LinkSource {
 
 // Store is the checkout store every source comes through.
 func (e *Env) Store() *modpack.Store {
-	return &modpack.Store{Cache: e.Cache, Fetch: e.Fetch, Log: e.Log, Warn: e.Warn}
+	return &modpack.Store{Cache: e.Cache, Fetch: e.Fetch, Log: e.Log, Warn: e.Warn, WarnsRawURL: e.WarnsRawURL}
 }
 
 // Open checks out from at at and opens the project there, which has to hold a lock.

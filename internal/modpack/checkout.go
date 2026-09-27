@@ -87,12 +87,10 @@ func (s *Store) Checkout(ctx context.Context, source string, at At) (*Checkout, 
 }
 
 // checkRawURL fails a project fetched from a raw manifest URL that names a local file, which
-// can't have come with it, and otherwise warns that its overrides didn't either. A manifest that
-// doesn't load is left for opening the project to report.
+// can't have come with it. A manifest that doesn't load is left for opening the project to report.
 func (s *Store) checkRawURL(c *Checkout) error {
 	m, err := manifest.Load(filepath.Join(c.Dir, manifest.FileName))
 	if err != nil {
-		s.warnRawURL(c.Source, nil)
 		return nil
 	}
 	if key, file, ok := localFile(m); ok {
@@ -100,7 +98,6 @@ func (s *Store) checkRawURL(c *Checkout) error {
 		e.Help = "sync from the repository's git URL instead, with --path for a pack in a subfolder"
 		return e
 	}
-	s.warnRawURL(c.Source, m)
 	return nil
 }
 

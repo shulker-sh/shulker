@@ -56,7 +56,7 @@ func NewStore(e *env.Env, p *project.Project) *modpack.Store {
 		e.WarnEach(r.Warnings)
 		return pin, err
 	}
-	return &modpack.Store{Cache: e.Cache, ProjectDir: p.Dir, Fetch: e.Fetch, Log: e.Log, Warn: e.Warn, Lock: p.Lock, Consume: consume, Obtain: obtain}
+	return &modpack.Store{Cache: e.Cache, ProjectDir: p.Dir, Fetch: e.Fetch, Log: e.Log, Warn: e.Warn, WarnsRawURL: e.WarnsRawURL, Lock: p.Lock, Consume: consume, Obtain: obtain}
 }
 
 // Packs reads p's modpacks at their pins, once: a later call answers from what the first read.

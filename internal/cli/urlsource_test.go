@@ -37,6 +37,7 @@ func rawURLWarnings(warnings []string) []string {
 
 func TestRawURLSourceWarnsItCarriesNoOverrides(t *testing.T) {
 	h := newHarness(t)
+	shulkerInstances(t, h)
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	source := servePack(t, h.dir)
@@ -45,12 +46,18 @@ func TestRawURLSourceWarnsItCarriesNoOverrides(t *testing.T) {
 	var env struct {
 		Warnings []string `json:"warnings"`
 	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "link", "shulker", source, "--as", "raw", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	want := "pack is a raw manifest URL, so its overrides aren't included\nUse its git URL instead, with path for a pack in a subfolder"
+	if got := rawURLWarnings(env.Warnings); len(got) != 1 || got[0] != want {
+		t.Fatalf("a link to a raw URL warns once: %q", env.Warnings)
+	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	want := source + " is a raw manifest URL: its overrides and local files aren't fetched; use the repository's git URL, with path for a pack in a subfolder, to get them"
-	if got := rawURLWarnings(env.Warnings); len(got) != 1 || got[0] != want {
-		t.Fatalf("sync from a raw URL warns once: %q", env.Warnings)
+	if got := rawURLWarnings(env.Warnings); len(got) != 0 {
+		t.Fatalf("a sync after the link stays quiet: %q", env.Warnings)
 	}
 
 	h.editManifest(t, func(m map[string]any) {
@@ -59,10 +66,10 @@ func TestRawURLSourceWarnsItCarriesNoOverrides(t *testing.T) {
 	})
 	writeFile(t, filepath.Join(h.dir, "assets", "icon.png"), "png")
 	h.mustRun(t, "lock")
-	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", source, "--into", into, "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "link", "shulker", source, "--as", "raw-2", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if got := rawURLWarnings(env.Warnings); len(got) != 1 || !strings.Contains(got[0], "aren't fetched, including the feature overrides shader-overrides and the icon assets/icon.png;") {
+	if got := rawURLWarnings(env.Warnings); len(got) != 1 || !strings.Contains(got[0], "\nNor are the feature overrides shader-overrides and the icon assets/icon.png\n") {
 		t.Fatalf("the warning names what the manifest points at: %q", env.Warnings)
 	}
 
@@ -92,17 +99,13 @@ func TestRawURLModpackWarnsOncePerCommand(t *testing.T) {
 	if got := rawURLWarnings(env.Warnings); len(got) != 1 {
 		t.Fatalf("modpack add warns once: %q", env.Warnings)
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "update", "--json")), &env); err != nil {
-		t.Fatal(err)
-	}
-	if got := rawURLWarnings(env.Warnings); len(got) != 1 {
-		t.Fatalf("update warns once: %q", env.Warnings)
-	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env); err != nil {
-		t.Fatal(err)
-	}
-	if got := rawURLWarnings(env.Warnings); len(got) != 1 {
-		t.Fatalf("lock warns once, holding the modpack at its pin: %q", env.Warnings)
+	for _, command := range []string{"update", "lock"} {
+		if err := json.Unmarshal([]byte(h.mustRun(t, command, "--json")), &env); err != nil {
+			t.Fatal(err)
+		}
+		if got := rawURLWarnings(env.Warnings); len(got) != 0 {
+			t.Fatalf("%s after the add stays quiet: %q", command, env.Warnings)
+		}
 	}
 	if err := json.Unmarshal([]byte(h.mustRun(t, "build", "--json")), &env); err != nil {
 		t.Fatal(err)
