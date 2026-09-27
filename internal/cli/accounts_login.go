@@ -30,7 +30,7 @@ func (a *app) accountsLoginCmd() *cobra.Command {
 				return err
 			}
 			a.showDeviceCode(device)
-			a.progress("waiting for the sign-in to finish")
+			a.printer.Working("waiting for the sign-in to finish")
 			tokens, err := d.signin.Wait(ctx, device)
 			if err != nil {
 				return err
@@ -126,7 +126,8 @@ func (a *app) accountsLogoutCmd() *cobra.Command {
 				case moved != nil:
 					l.Info(moved.Name + " is the default account now")
 				case r.Default:
-					l.Info("No default account now; `shulker accounts use <name>` picks one")
+					l.Info("No default account")
+					l.Nudge("Pick one", "shulker accounts use <name>")
 				}
 			})
 		},

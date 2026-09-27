@@ -43,7 +43,7 @@ func (a *app) accountsAddCmd() *cobra.Command {
 			}
 			use = use || cfg.Accounts.Default == ""
 			if !account.OwnsTheGame(accounts) {
-				return unprovenOwnership("create an offline one", out.Nudge{Lead: "Sign in to Microsoft", Command: "shulker accounts login"})
+				return unprovenOwnership("No signed-in account owns Minecraft: Java Edition", out.Nudge{Lead: "Sign in to Microsoft", Command: "shulker accounts login"})
 			}
 			path, store, err := a.accountStore()
 			if err != nil {
@@ -65,11 +65,11 @@ func (a *app) accountsAddCmd() *cobra.Command {
 			}
 			row := accountRow{ID: r.ID, Name: r.Name, Source: r.Source, Group: r.Group, State: r.State, Default: use}
 			return a.printer.Emit(row, func(l *out.Lines) {
-				text := "Created the offline account " + r.Name
+				text := "Created offline account " + r.Name
 				if use {
 					text += ", now the default account"
 				}
-				l.OK(text, r.ID)
+				l.OK(text, "")
 				if !use {
 					l.Nudge("Make it the default account", "shulker accounts use "+accountSelector(r))
 				}
@@ -103,7 +103,7 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 				return err
 			}
 			if !force && !account.OwnsTheGame(accounts) {
-				return unprovenOwnership("delete an offline one it couldn't create again",
+				return unprovenOwnership(r.Name+" can't be re-created without an account that owns Minecraft",
 					out.Nudge{Lead: "Remove it anyway", Command: "shulker accounts remove " + accountSelector(r) + " --force"})
 			}
 			if !yes {
@@ -135,7 +135,8 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 				case moved != nil:
 					l.Info(moved.Name + " is the default account now")
 				case gone.Default:
-					l.Info("No default account now; `shulker accounts use <name>` picks one")
+					l.Info("No default account")
+					l.Nudge("Pick one", "shulker accounts use <name>")
 				}
 			})
 		},
@@ -145,8 +146,8 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 	return cmd
 }
 
-func unprovenOwnership(what string, nudge out.Nudge) error {
-	e := out.Errorf("ownership-unproven", "shulker can see no account that owns Minecraft: Java Edition, so it won't %s", what)
+func unprovenOwnership(message string, nudge out.Nudge) error {
+	e := out.Errorf("ownership-unproven", "%s", message)
 	e.Nudge = nudge
 	return e
 }

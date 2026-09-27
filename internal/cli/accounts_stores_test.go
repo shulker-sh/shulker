@@ -51,16 +51,16 @@ const prismNotch = `{
 
 func TestProvidersList(t *testing.T) {
 	h := newHarness(t)
-	if stdout := h.mustRun(t, "accounts", "stores"); !strings.Contains(stdout, "• shulker Shulker\n") {
+	if stdout := h.mustRun(t, "accounts", "stores"); !strings.Contains(stdout, "• shulker (built in)\n") {
 		t.Errorf("the default list = %q", stdout)
 	}
 	h.mustRun(t, "accounts", "stores", "set", "prism", "mojang", "shulker")
 
 	stdout := h.mustRun(t, "accounts", "stores")
 	for _, want := range []string{
-		"• prism   Prism Launcher\n",
-		"• mojang  Minecraft Launcher\n",
-		"• shulker Shulker\n",
+		"• prism  Prism Launcher\n",
+		"• mojang Minecraft Launcher\n",
+		"• shulker (built in)\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("providers is missing %q:\n%s", want, stdout)
@@ -158,11 +158,11 @@ func TestAccountsReadsFromPrism(t *testing.T) {
 
 	stdout := h.mustRun(t, "accounts")
 	for _, want := range []string{
-		"    Account     UUID                      Group     State\n",
-		"    Dinnerbone  0e05d36c-9cbd-4b0a-ae4e-  own       playable\n                7b2e2b7eb1f4\n",
-		"    Jeb_        853c80ef-3c37-49fd-aa49-  launcher  token expired ",
-		"    Notch       069a79f4-44e9-4726-a5be-  launcher  playable\n",
-		"    Steve       5627dd98-e6be-3c21-b8a8-  launcher  offline\n",
+		"  Account     UUID                 Launcher        State\n",
+		"  Dinnerbone  0e05d36c-9cbd-4b0a-  Shulker         playable\n              ae4e-7b2e2b7eb1f4\n",
+		"  Jeb_        853c80ef-3c37-49fd-  Prism Launcher  token expired ",
+		"  Notch       069a79f4-44e9-4726-  Prism Launcher  playable\n",
+		"  Steve       5627dd98-e6be-3c21-  Prism Launcher  offline\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)
@@ -192,12 +192,12 @@ func TestAccountsDedupeKeepsTheEarliestProvider(t *testing.T) {
 
 	h.mustRun(t, "accounts", "stores", "set", "shulker", "prism")
 	stdout := h.mustRun(t, "accounts")
-	if !strings.Contains(stdout, "  own  ") || strings.Count(stdout, notchID[:19]) != 1 {
+	if !strings.Contains(stdout, "  Shulker  ") || strings.Count(stdout, notchID[:19]) != 1 {
 		t.Errorf("shulker comes first, so its own Notch is the only one:\n%s", stdout)
 	}
 	h.mustRun(t, "accounts", "stores", "set", "prism", "shulker")
 	stdout = h.mustRun(t, "accounts")
-	if strings.Contains(stdout, "  own  ") || strings.Count(stdout, notchID[:19]) != 1 {
+	if strings.Contains(stdout, "  Shulker  ") || strings.Count(stdout, notchID[:19]) != 1 {
 		t.Errorf("prism comes first, so its Notch is the only one:\n%s", stdout)
 	}
 }
@@ -330,10 +330,10 @@ func TestAccountsReadsFromMojang(t *testing.T) {
 		t.Errorf("reading the launcher's own files says nothing: %q", stderr)
 	}
 	for _, want := range []string{
-		"    Account     UUID                      Group     State\n",
-		"    Dinnerbone  " + dinnerbone[:24] + "  launcher  playable\n                " + dinnerbone[24:] + "\n",
-		"    Notch       " + notchID[:24] + "  launcher  playable\n                " + notchID[24:] + "\n",
-		"    Steve       " + steveID[:24] + "  launcher  token expired ",
+		"  Account     UUID            Launcher            State",
+		"  Dinnerbone  " + dinnerbone[:14] + "  Minecraft Launcher  playable",
+		"  Notch       " + notchID[:14] + "  Minecraft Launcher  playable",
+		"  Steve       " + steveID[:14] + "  Minecraft Launcher  token expired ",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)

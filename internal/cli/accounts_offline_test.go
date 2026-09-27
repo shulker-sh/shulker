@@ -26,7 +26,7 @@ func TestAccountsAddCreatesAnOfflineAccount(t *testing.T) {
 	h.mustRun(t, "config", "set", "accounts.default", notchID)
 
 	stdout := h.mustRun(t, "accounts", "add", "Steve")
-	if !strings.Contains(stdout, "✔ Created the offline account Steve ("+steveOffline+")") {
+	if !strings.Contains(stdout, "✔ Created offline account Steve\n") {
 		t.Errorf("add result: %s", stdout)
 	}
 	if !strings.Contains(stdout, "shulker accounts use Steve") {
@@ -44,7 +44,7 @@ func TestAccountsAddCreatesAnOfflineAccount(t *testing.T) {
 	if created.RefreshToken != "" || created.Minecraft != nil {
 		t.Errorf("an offline account holds no token: %+v", created)
 	}
-	if !strings.Contains(h.mustRun(t, "accounts"), "Steve    "+steveOffline+"  offline  offline") {
+	if !strings.Contains(h.mustRun(t, "accounts"), "Steve    "+steveOffline+"  offline") {
 		t.Error("the account should list under Offline")
 	}
 	if readConfigDoc(t, h.config)["accounts"].(map[string]any)["default"] != notchID {
@@ -77,7 +77,7 @@ func TestAccountsAddBecomesTheDefaultWhenNoneIsSet(t *testing.T) {
 func TestAccountsAddUUIDPinsAnotherAndNeverWarns(t *testing.T) {
 	h := withOwner(t)
 	stdout, stderr := h.mustRunStderr(t, "accounts", "add", "Steve", "--uuid", strings.ToUpper(strings.ReplaceAll(steveID, "-", "")))
-	if !strings.Contains(stdout, steveID) {
+	if store := readAccountStore(t, h); len(store.Accounts) != 2 || store.Accounts[1].Profile.ID != steveID {
 		t.Errorf("a uuid reads undashed and in any case: %s", stdout)
 	}
 	if strings.Contains(stderr, "warning") {
@@ -243,7 +243,7 @@ func TestAccountsRemoveNeedsTheOwnerThatCouldRecreateIt(t *testing.T) {
 		t.Errorf("--force should remove it anyway: %+v", store.Accounts)
 	}
 	// Nothing is left to take the default over.
-	if !strings.Contains(stdout, "No default account now") {
+	if !strings.Contains(stdout, "No default account\n") {
 		t.Errorf("remove result: %s", stdout)
 	}
 	if cfg, ok := readConfigDoc(t, h.config)["accounts"].(map[string]any); ok && cfg["default"] != nil {

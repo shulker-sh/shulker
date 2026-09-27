@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"slices"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/play"
 )
@@ -46,7 +49,8 @@ func (a *app) listAccounts() error {
 	}
 	return a.printer.Emit(rows, func(l *out.Lines) {
 		if len(rows) == 0 {
-			l.Info("No accounts yet; `shulker accounts login` signs in to Microsoft")
+			l.Info("No accounts yet")
+			l.Nudge("Sign in to Microsoft", "shulker accounts login")
 			return
 		}
 		writeAccounts(l, grouped, cfg)
@@ -78,21 +82,55 @@ func groupAccounts(accounts []account.Resolved) []accountGroup {
 
 // writeAccounts prints one table for every account: the default's row takes the green ok glyph
 // in the first column and carries no aside, since the mark is the whole message. The id column is
-// UUID whatever kind of id the account has.
+// UUID whatever kind of id the account has. The mark column shows only when an account is the
+// default, and the Launcher column only when an account comes from outside shulker.
 func writeAccounts(l *out.Lines, groups []accountGroup, cfg config.Config) {
 	t := l.T
 	now := time.Now()
-	var rows [][]string
+	var accounts []account.Resolved
 	for _, g := range groups {
-		for _, r := range g.accounts {
+		accounts = append(accounts, g.accounts...)
+	}
+	marks := slices.ContainsFunc(accounts, func(r account.Resolved) bool { return r.IsDefault(cfg.Accounts.Default) })
+	launchers := slices.ContainsFunc(accounts, func(r account.Resolved) bool { return accountLauncher(r) != launcher.Title(account.SourceShulker) })
+	headers := []string{"Account", "UUID"}
+	styles := []lipgloss.Style{t.StyleBold(), t.StyleGrey()}
+	if marks {
+		headers = append([]string{""}, headers...)
+		styles = append([]lipgloss.Style{t.StyleGreen().Bold(true)}, styles...)
+	}
+	if launchers {
+		headers = append(headers, "Launcher")
+		styles = append(styles, t.StyleGrey())
+	}
+	headers = append(headers, "State")
+	styles = append(styles, t.Style())
+	var rows [][]string
+	for _, r := range accounts {
+		var row []string
+		if marks {
 			mark := ""
 			if r.IsDefault(cfg.Accounts.Default) {
 				mark = t.GlyphOK()
 			}
-			rows = append(rows, []string{mark, r.Name, r.ID, string(r.Group), r.State.Text(r.Expired, now)})
+			row = append(row, mark)
 		}
+		row = append(row, r.Name, r.ID)
+		if launchers {
+			row = append(row, accountLauncher(r))
+		}
+		rows = append(rows, append(row, r.State.Text(r.Expired, now)))
 	}
-	l.Table([]string{"", "Account", "UUID", "Group", "State"}, rows, out.Columns(t.StyleGreen().Bold(true), t.StyleBold(), t.StyleGrey(), t.StyleGrey(), t.Style()))
+	l.Table(headers, rows, out.Columns(styles...))
+}
+
+// accountLauncher names the launcher an account is read from; shulker's own and offline accounts
+// both live in shulker.
+func accountLauncher(r account.Resolved) string {
+	if r.Source == account.SourceOffline {
+		return launcher.Title(account.SourceShulker)
+	}
+	return launcher.Title(r.Source)
 }
 
 // rowFor is one account as a command prints it, and as --json carries it.

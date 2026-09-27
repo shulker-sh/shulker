@@ -359,7 +359,7 @@ func TestAccountsLogoutTakesTheDefaultAndReseatsIt(t *testing.T) {
 		t.Error("the account left should be the default")
 	}
 	stdout = h.mustRun(t, "accounts", "logout", "--yes")
-	if !strings.Contains(stdout, "No default account now") {
+	if !strings.Contains(stdout, "No default account\n") || !strings.Contains(stdout, "shulker accounts use <name>") {
 		t.Errorf("the last logout should leave no default: %s", stdout)
 	}
 	if _, _, stderr := h.run(t, "config", "get", "accounts.default", "--json"); strings.Contains(stderr, dinnerbone) {

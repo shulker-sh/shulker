@@ -55,18 +55,18 @@ func TestAccountsListsEachGroupWithItsState(t *testing.T) {
 	// while every other column keeps its width.
 	stdout := h.mustRun(t, "accounts")
 	for _, want := range []string{
-		"     Account     UUID                 Group    State\n",
-		"     Big Dog 42  " + gamertagXID + "     own      not playable (no Java profile)\n",
-		"     Dinnerbone  " + dinnerbone[:19] + "  own      sign-in expired\n                 " + dinnerbone[19:] + "\n",
-		"  ✔  Notch       " + notchID[:19] + "  own      playable\n                 " + notchID[19:] + "\n",
-		"     Steve       " + steveID[:19] + "  offline  offline\n                 " + steveID[19:] + "\n",
+		"     Account     UUID                      State\n",
+		"     Big Dog 42  " + gamertagXID + "          not playable (no Java profile)\n",
+		"     Dinnerbone  " + dinnerbone[:24] + "  sign-in expired\n                 " + dinnerbone[24:] + "\n",
+		"  ✔  Notch       " + notchID[:24] + "  playable\n                 " + notchID[24:] + "\n",
+		"     Steve       " + steveID[:24] + "  offline\n                 " + steveID[24:] + "\n",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("accounts is missing %q:\n%s", want, stdout)
 		}
 	}
-	if strings.Contains(stdout, "launcher") {
-		t.Errorf("no launcher accounts without a store for one:\n%s", stdout)
+	if strings.Contains(stdout, "Launcher") {
+		t.Errorf("no Launcher column when every account is shulker's:\n%s", stdout)
 	}
 }
 

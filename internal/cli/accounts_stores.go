@@ -33,6 +33,9 @@ func (a *app) listStores() error {
 		items := make([]out.Item, len(stores))
 		for i, name := range stores {
 			items[i] = out.Item{Kind: out.Note, Name: name, Version: launcher.Title(name)}
+			if name == account.SourceShulker {
+				items[i] = out.Item{Kind: out.Note, Name: name, Aside: []string{"built in"}}
+			}
 		}
 		l.Items(items...)
 	})
