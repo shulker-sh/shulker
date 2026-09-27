@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/resolve"
@@ -72,9 +70,6 @@ func (a *app) suggestsCmd() *cobra.Command {
 }
 
 func optionalNudge(l *out.Lines, n int) {
-	noun := "integrations"
-	if n == 1 {
-		noun = "integration"
-	}
-	l.Nudge(fmt.Sprintf("%d optional %s to see", n, noun), "shulker suggests --optional")
+	l.Info(out.Count(n, "optional integration", "optional integrations"))
+	l.Nudge("See them", "shulker suggests --optional")
 }

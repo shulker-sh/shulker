@@ -18,7 +18,7 @@ func TestSuggestsKeepsOptionalIntegrationsBehindAFlag(t *testing.T) {
 	h.mustRun(t, "create", "--loader", "quilt")
 
 	stdout := h.mustRun(t, "add", "sodium", "fabric-api")
-	if !strings.Contains(stdout, "• fabric-api (recommends indium, not installed)") || !strings.Contains(stdout, "2 optional integrations to see:\n    $ shulker suggests --optional") {
+	if !strings.Contains(stdout, "• fabric-api (recommends indium, not installed)") || !strings.Contains(stdout, "i 2 optional integrations\n\n  See them:\n    $ shulker suggests --optional") {
 		t.Fatalf("add output:\n%s", stdout)
 	}
 
@@ -48,7 +48,7 @@ func TestSuggestsKeepsOptionalIntegrationsBehindAFlag(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "suggests")
-	if want := "  • fabric-api (recommends indium)\n\n  2 optional integrations to see:\n    $ shulker suggests --optional\n"; stdout != want {
+	if want := "  • fabric-api (recommends indium)\n  i 2 optional integrations\n\n  See them:\n    $ shulker suggests --optional\n"; stdout != want {
 		t.Fatalf("suggests text:\n%s", stdout)
 	}
 	stdout = h.mustRun(t, "suggests", "--optional")
