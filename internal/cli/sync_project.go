@@ -52,7 +52,7 @@ func (a *app) projectEntries(p *project.Project, s instanceSelection) ([]project
 	}
 	if len(all) == 0 {
 		e := out.Errorf("no-instances", "nothing is synced from %s yet", dir)
-		e.Help = "`shulker link prism` adds an instance and `shulker sync --into <dir>` a detached build, and `shulker sync --all` syncs every instance"
+		e.Nudge = out.Nudge{Lead: "Link it first", Command: "shulker link <launcher>"}
 		return nil, e
 	}
 	project.SortInstances(all)

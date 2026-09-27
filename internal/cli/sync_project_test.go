@@ -68,6 +68,9 @@ func TestBareSyncInProjectSyncsItsOwnEntries(t *testing.T) {
 	if e := failureCode(t, stdout); code == 0 || e.Code != "no-instances" {
 		t.Fatalf("a project with nothing synced: %d %s", code, stdout)
 	}
+	if _, _, stderr := h.run(t, "sync", "-C", empty); !strings.Contains(stderr, "Link it first:\n    $ shulker link <launcher>") {
+		t.Fatalf("nothing synced points at link: %s", stderr)
+	}
 }
 
 func TestProjectSyncGivesADetachedBuildItsDirectorysID(t *testing.T) {
