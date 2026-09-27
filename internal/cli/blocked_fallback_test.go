@@ -16,8 +16,8 @@ func TestImportLocksABlockedCurseForgeFileFromModrinth(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("import: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
-	if !strings.Contains(stderr, "iris-cf: CurseForge doesn't allow third-party downloads of "+h.jars["irisshaders"].filename+"; locked from Modrinth as irisshaders instead") {
-		t.Fatalf("the fallback warns naming both projects: %s", stderr)
+	if !strings.Contains(stderr, "iris-cf: taken from Modrinth (CurseForge blocks third-party downloads)") {
+		t.Fatalf("the fallback warns naming both providers: %s", stderr)
 	}
 	m, l := readProject(t, dir)
 	if entry := m.Requires["iris"]; entry.Provider != "" || entry.Project != "YL57xq9U" {
@@ -33,8 +33,8 @@ func TestAddLocksABlockedCurseForgeFileFromModrinth(t *testing.T) {
 	h.mustRun(t, "create", "--loader", "fabric")
 
 	stdout, stderr := h.mustRunStderr(t, "add", "iris-cf", "--provider", "curseforge")
-	if !strings.Contains(stderr, "iris-cf: CurseForge doesn't allow third-party downloads of "+h.jars["irisshaders"].filename+"; locked from Modrinth as irisshaders instead") {
-		t.Fatalf("the fallback warns naming both projects: %s\n%s", stderr, stdout)
+	if !strings.Contains(stderr, "iris-cf: taken from Modrinth (CurseForge blocks third-party downloads)") {
+		t.Fatalf("the fallback warns naming both providers: %s\n%s", stderr, stdout)
 	}
 	if entry := h.readManifest(t).Requires["iris"]; entry.Provider != "" || entry.Project != "YL57xq9U" {
 		t.Fatalf("manifest entry: %+v", entry)

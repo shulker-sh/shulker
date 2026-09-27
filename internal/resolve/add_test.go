@@ -381,7 +381,7 @@ func TestAddLocksABlockedFileFromAnotherProviderHostingItsBytes(t *testing.T) {
 	if entry := h.r.Manifest.Requires["iris"]; entry.Provider != "" || entry.Project != "YL57" {
 		t.Fatalf("iris manifest entry: %+v", entry)
 	}
-	if !slices.Contains(h.r.Warnings, "iris-cf: Curse doesn't allow third-party downloads of iris-1.0.0.jar; locked from Alpha as irisshaders instead") {
+	if !slices.Contains(h.r.Warnings, "iris-cf: taken from Alpha (Curse blocks third-party downloads)") {
 		t.Fatalf("add should say where the file was locked from: %v", h.r.Warnings)
 	}
 	if alpha.Requests["IdentifySHA1"] != 1 || cf.Requests["IdentifySHA1"] != 0 {

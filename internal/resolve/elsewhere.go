@@ -48,7 +48,7 @@ func (r *Resolver) placeAnywhere(ctx context.Context, h hosted, key, requiredBy,
 	if elsewhere == nil {
 		return h, id, prior, err
 	}
-	warn(fmt.Sprintf("%s: %s doesn't allow third-party downloads of %s; locked from %s as %s instead", h.proj.Slug, h.p.Title(), h.v.File.Filename, elsewhere.p.Title(), elsewhere.proj.Slug))
+	warn(fmt.Sprintf("%s: taken from %s (%s blocks third-party downloads)", h.proj.Slug, elsewhere.p.Title(), h.p.Title()))
 	id, prior, err = r.place(ctx, elsewhere.p, elsewhere.proj, elsewhere.v, key, requiredBy, side, channel, replace)
 	return *elsewhere, id, prior, err
 }
