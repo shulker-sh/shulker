@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -161,6 +163,8 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 	if err != nil {
 		return err
 	}
+	_, statErr := os.Stat(p.LockPath())
+	created := errors.Is(statErr, os.ErrNotExist)
 	rl, err := a.relockOpened(cmd, p, relockOptions{dropsFailing: plan.dropsFailing}, run)
 	if err != nil {
 		return err
@@ -203,7 +207,10 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 		if plan.ok != nil {
 			plan.ok(l, res)
 		}
-		if len(res.Reresolved) > 0 {
+		switch {
+		case created:
+			l.OK("Created shulker.lock", "")
+		case len(res.Reresolved) > 0:
 			l.Info("Re-resolved every mod: " + strings.Join(res.Reresolved, "; "))
 		}
 		printLocalFiles(l, local)

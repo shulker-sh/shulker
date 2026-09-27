@@ -1178,6 +1178,12 @@ func TestLockRecreatesADeletedLock(t *testing.T) {
 	if l := h.readLock(t); l.Minecraft != "26.2" || len(l.Mods) != 2 {
 		t.Fatalf("recreated lock: %+v", l)
 	}
+	if err := os.Remove(filepath.Join(h.dir, "shulker.lock")); err != nil {
+		t.Fatal(err)
+	}
+	if stdout := h.mustRun(t, "lock"); !strings.Contains(stdout, "Created shulker.lock") || strings.Contains(stdout, "Re-resolved") {
+		t.Fatalf("a lock from scratch says it created one: %s", stdout)
+	}
 }
 
 func TestRemoveValidatesBeforeSaving(t *testing.T) {
