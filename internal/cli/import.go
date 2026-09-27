@@ -144,10 +144,22 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 		return err
 	}
 	res := importResult{Dir: dir, Name: m.Name, Version: m.Version, Minecraft: l.Minecraft, Loader: l.Loader, Marker: arc.Marker != nil, Sides: m.Sides(), Mods: mods, Overrides: overridePaths(mods.Overrides), KeptYours: []string{}, LeftOut: leftOut}
-	return a.emitImport(res,
-		out.Row{Text: importedSummary(a.titles(), mods, res.Marker)},
-		out.Row{Text: fmt.Sprintf("%s, %s", out.Count(len(mods.Unmanaged), "unmanaged file", "unmanaged files"), out.Count(len(res.Overrides), "override file", "override files"))},
-	)
+	return a.emitImport(res, importedRows(a.titles(), mods, len(res.Overrides))...)
+}
+
+// importedRows count what an import locked and kept as files, leaving out what it has none of.
+func importedRows(providers provider.Providers, mods *resolve.Imported, overrides int) []out.Row {
+	var rows []out.Row
+	if len(mods.Locked) > 0 {
+		rows = append(rows, out.Row{Text: lockedCounts(providers, mods.Locked)})
+	}
+	if len(mods.Unmanaged) > 0 {
+		rows = append(rows, out.Row{Text: out.Count(len(mods.Unmanaged), "unmanaged file", "unmanaged files")})
+	}
+	if overrides > 0 {
+		rows = append(rows, out.Row{Text: out.Count(overrides, "override file", "override files")})
+	}
+	return rows
 }
 
 // emitImport reports an import: the result line, rows, then the rows every import ends with, and
@@ -157,15 +169,6 @@ func (a *app) emitImport(res importResult, rows ...out.Row) error {
 		l.OKInto("Imported "+res.Name+" "+res.Version, res.Dir, resolve.PlatformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version), append(rows, importRows(res.Mods, res.KeptYours, res.LeftOut)...)...)
 		l.Nudge("Play it in a launcher", "shulker link <launcher>")
 	})
-}
-
-// importedSummary counts what an import locked, and what it reused from a shulker marker.
-func importedSummary(providers provider.Providers, mods *resolve.Imported, marker bool) string {
-	locked := lockedSummary(providers, mods.Locked)
-	if marker {
-		locked += fmt.Sprintf(", %d reused from the shulker marker", len(mods.Reused))
-	}
-	return locked
 }
 
 // importRows are the rows an import's report ends with, each only when it has something to say.
@@ -185,7 +188,7 @@ func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 		rows = append(rows, out.Row{Label: "sides from the pack's server files", Text: fmt.Sprintf("%d client-only, %d on both sides", len(sp.Client), len(sp.Both))})
 	}
 	if mods != nil && len(mods.Dropped) > 0 {
-		rows = append(rows, out.Row{Label: "dropped from the marker, not in the pack", Text: strings.Join(mods.Dropped, ", ")})
+		rows = append(rows, out.Row{Label: "dropped, no longer in the pack", Text: strings.Join(mods.Dropped, ", ")})
 	}
 	if mods != nil {
 		for _, folder := range slices.Sorted(maps.Keys(mods.Seeded)) {
@@ -393,6 +396,19 @@ func lockedSummary(providers provider.Providers, files []resolve.LockedFile) str
 	if len(files) == 0 {
 		return out.Count(0, "file", "files") + " locked"
 	}
+	counts, host := countLocked(providers, files)
+	return counts + " locked" + host
+}
+
+// lockedCounts counts files by type the way lockedSummary does, without saying they were locked.
+func lockedCounts(providers provider.Providers, files []resolve.LockedFile) string {
+	counts, host := countLocked(providers, files)
+	return counts + host
+}
+
+// countLocked counts files by type, naming each type's providers when there are several, and
+// returns the one provider as a " from <provider>" suffix when there is one.
+func countLocked(providers provider.Providers, files []resolve.LockedFile) (counts, host string) {
 	byType := map[string]map[string]int{}
 	hosts := map[string]bool{}
 	for _, f := range files {
@@ -429,11 +445,10 @@ func lockedSummary(providers provider.Providers, files []resolve.LockedFile) str
 		}
 		parts = append(parts, part)
 	}
-	summary := strings.Join(parts, ", ") + " locked"
 	if len(hosts) == 1 {
-		summary += " from " + providers.Title(files[0].Provider)
+		host = " from " + providers.Title(files[0].Provider)
 	}
-	return summary
+	return strings.Join(parts, ", "), host
 }
 
 func overridePaths(overrides []packarchive.Override) []string {

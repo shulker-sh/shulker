@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"slices"
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
@@ -42,5 +43,17 @@ func TestLockedSummary(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestImportedRowsLeaveOutWhatThereIsNoneOf(t *testing.T) {
+	providers := provider.Providers{"modrinth": modrinth.New(fetch.New("test"))}
+	mods := &resolve.Imported{Locked: []resolve.LockedFile{{Type: "mod", Provider: "modrinth"}, {Type: "mod", Provider: "modrinth"}}}
+	var got []string
+	for _, row := range importedRows(providers, mods, 1) {
+		got = append(got, row.Text)
+	}
+	if want := []string{"2 mods from Modrinth", "1 override file"}; !slices.Equal(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
 	}
 }
