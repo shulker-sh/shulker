@@ -44,7 +44,7 @@ func (a *app) listCmdFor(kind string) *cobra.Command {
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				if len(res) == 0 {
-					l.Info(emptyListText(chosen))
+					printEmptyList(l, chosen)
 					return
 				}
 				printList(l, res, p.Manifest.Sides())
@@ -67,11 +67,25 @@ func listShort(kind string) string {
 	return "List the project's " + kind + "s with their locked versions"
 }
 
-func emptyListText(kind string) string {
-	if kind == manifest.TypeModpack {
-		return "No modpacks yet; add one with `shulker modpack add <source>`."
+// printEmptyList is the empty state for kind, with the command that adds the first of it.
+func printEmptyList(l *out.Lines, kind string) {
+	switch kind {
+	case manifest.TypeModpack:
+		l.Info("No modpacks yet")
+		l.Nudge("Add a modpack", "shulker modpack add <source>")
+	case manifest.TypeResourcePack:
+		l.Info("No resource packs yet")
+		l.Nudge("Add a resource pack", "shulker resourcepack add <pack>")
+	case manifest.TypeShader:
+		l.Info("No shaders yet")
+		l.Nudge("Add a shader", "shulker shader add <shader>")
+	case manifest.TypeDatapack:
+		l.Info("No datapacks yet")
+		l.Nudge("Add a datapack", "shulker datapack add <datapack>")
+	default:
+		l.Info("No mods yet")
+		l.Nudge("Add a mod", "shulker add <mod>")
 	}
-	return "Nothing in requires yet; add a mod with `shulker add <mod>`."
 }
 
 func printList(l *out.Lines, res []project.ListEntry, sides []string) {
