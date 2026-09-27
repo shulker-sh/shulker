@@ -49,7 +49,7 @@ func TestBackupZipsAnInstancesSaveGroup(t *testing.T) {
 	stdout = h.mustRun(t, "saves", "-i", "pack")
 	h.dir = project
 	rows := tableRows(stdout)
-	if len(rows) != 1 || !strings.HasSuffix(rows[0]["Backup"], "-pack-backup") || rows[0]["Reason"] != "on request" || rows[0]["Worlds"] != "2" || rows[0]["Game"] != "26.2 fabric 0.17.3" {
+	if len(rows) != 1 || !strings.HasSuffix(rows[0]["Backup"], "-pack-backup") || rows[0]["Reason"] != "on request" || rows[0]["Worlds"] != "2" || rows[0]["Game"] != "26.2, Fabric 0.17.3" {
 		t.Fatalf("saves -i pack: %s", stdout)
 	}
 
@@ -131,7 +131,7 @@ func TestBackupOfAStateWithoutAPlatformNamesNone(t *testing.T) {
 
 func TestBackupGameNamesTheLoaderWithoutAVersion(t *testing.T) {
 	b := saves.Backup{Reason: "sync", Worlds: 1, Minecraft: "26.2", Loader: "fabric"}
-	if got := backupGame(b); got != "26.2 fabric" {
+	if got := backupGame(b); got != "26.2, Fabric" {
 		t.Fatalf("game: %s", got)
 	}
 	if got := backupReason(b); got != "before sync" {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/saves"
 	"shulker.sh/shulker/internal/sync"
@@ -243,16 +244,17 @@ func backupReason(b saves.Backup) string {
 	return "before " + b.Reason
 }
 
-// backupGame is the Minecraft version, then the loader with its version when the backup recorded them.
+// backupGame is the Minecraft version, then the loader with its version when the backup recorded them:
+// "26.3, Fabric 0.19.5".
 func backupGame(b saves.Backup) string {
 	parts := []string{}
 	if b.Minecraft != "" {
 		parts = append(parts, b.Minecraft)
 	}
 	if b.Loader != "" {
-		parts = append(parts, strings.TrimSpace(b.Loader+" "+b.LoaderVersion))
+		parts = append(parts, strings.TrimSpace(loader.Title(b.Loader)+" "+b.LoaderVersion))
 	}
-	return strings.Join(parts, " ")
+	return strings.Join(parts, ", ")
 }
 
 func worldCount(n int) string {
