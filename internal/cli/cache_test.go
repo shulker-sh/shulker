@@ -43,7 +43,7 @@ func TestCacheInfoNamesItsRootsAndPruneFreesTheRest(t *testing.T) {
 	writeFile(t, log, "installer said things")
 
 	stdout := h.mustRun(t, "cache", "info")
-	if !strings.Contains(stdout, "Cache "+h.cache) || !strings.Contains(stdout, "1 root (this project)") || !strings.Contains(stdout, "object") {
+	if !strings.Contains(stdout, "Cache "+h.cache) || !strings.Contains(stdout, "Used by this project") || !strings.Contains(stdout, "object") {
 		t.Fatalf("cache info: %s", stdout)
 	}
 	if !strings.Contains(stdout, "prunable") || !strings.Contains(stdout, "shulker cache prune") {
@@ -51,7 +51,7 @@ func TestCacheInfoNamesItsRootsAndPruneFreesTheRest(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "cache", "prune")
-	if !strings.Contains(stdout, "Freed") || !strings.Contains(stdout, "installer log") {
+	if !strings.Contains(stdout, "Freed") || !strings.Contains(stdout, " left") {
 		t.Fatalf("prune output: %s", stdout)
 	}
 	if _, err := os.Stat(stray); !os.IsNotExist(err) {
@@ -102,11 +102,11 @@ func TestCacheLockFlagCountsTheLockFile(t *testing.T) {
 	writeFile(t, named, readFile(t, filepath.Join(h.dir, "shulker.lock")))
 
 	stdout := h.mustRun(t, "--dir", t.TempDir(), "cache", "info", "--lock", named)
-	if !strings.Contains(stdout, "1 root (1 lock file)") {
+	if !strings.Contains(stdout, "Used by 1 lock file") {
 		t.Fatalf("a named lock should count as a root: %s", stdout)
 	}
 	stdout = h.mustRun(t, "cache", "info", "--lock", named, "--lock", named)
-	if !strings.Contains(stdout, "3 roots (this project, 2 lock files)") {
+	if !strings.Contains(stdout, "Used by this project and 2 lock files") {
 		t.Fatalf("the flag repeats: %s", stdout)
 	}
 }

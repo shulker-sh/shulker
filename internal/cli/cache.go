@@ -62,7 +62,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 				l.Heading("Cache " + usage.Dir)
 				rows := []out.Row{
 					{Text: out.HumanBytes(usage.Bytes) + ", " + out.Count(usage.Objects, "object", "objects")},
-					{Text: rootsText(r)},
+					{Text: out.Sentence(rootsText(r))},
 				}
 				if would.Empty() {
 					rows = append(rows, out.Row{Text: "nothing to prune"})
@@ -104,12 +104,23 @@ func (a *app) cachePruneCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			left, err := d.Cache.Usage()
+			if err != nil {
+				return err
+			}
 			return a.printer.Emit(pruned, func(l *out.Lines) {
-				if pruned.Empty() {
-					l.Info("Nothing to prune; everything in the cache is referenced by " + rootsText(r))
+				switch {
+				case pruned.Empty() && r.Count() == 0:
+					l.Info("Nothing to prune")
+					return
+				case pruned.Empty():
+					l.Info("Nothing to prune; everything in the cache is " + rootsText(r))
 					return
 				}
-				l.OK("Freed "+out.HumanBytes(pruned.Bytes), prunedAside(pruned))
+				l.OK("Freed "+out.HumanBytes(pruned.Bytes), "")
+				if left.Bytes > 0 {
+					l.Tree(out.Row{Text: out.HumanBytes(left.Bytes) + " left"})
+				}
 			})
 		},
 	}
@@ -135,6 +146,7 @@ func (a *app) cacheRoots(named []string) (build.Roots, error) {
 	return build.CacheRoots(d.Cache, entries, dir, named)
 }
 
+// rootsText says what keeps the cache's files: "used by 36 instances and this project".
 func rootsText(r build.Roots) string {
 	var parts []string
 	if r.Instances > 0 {
@@ -146,10 +158,13 @@ func rootsText(r build.Roots) string {
 	if r.LockFiles > 0 {
 		parts = append(parts, out.Count(r.LockFiles, "lock file", "lock files"))
 	}
-	if len(parts) == 0 {
-		return "no roots: no instance is registered and this is not a project"
+	switch len(parts) {
+	case 0:
+		return "used by nothing: no instance is registered and this is not a project"
+	case 1:
+		return "used by " + parts[0]
 	}
-	return out.Count(r.Count(), "root", "roots") + " (" + strings.Join(parts, ", ") + ")"
+	return "used by " + strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
 }
 
 func prunedAside(p cache.Pruned) string {
