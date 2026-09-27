@@ -58,9 +58,18 @@ func (a *app) savesCmd() *cobra.Command {
 			if where.group == "" && a.instance == "" && !cmd.Flags().Changed("dir") && !where.sel.all && !where.sel.narrows() {
 				return a.listSaveGroups()
 			}
-			return onSaves(a, where, func(n, of int) *out.Error {
-				return out.Errorf("saves-failed", "%d of %d targets failed to read their saves", n, of)
-			}, a.savesView, a.printSavesView)
+			if where.sel.all {
+				return a.savesAll(where)
+			}
+			target, err := a.savesTargetFor(where)
+			if err != nil {
+				return err
+			}
+			view, err := a.savesView(target)
+			if err != nil {
+				return err
+			}
+			return a.printer.Emit(view, func(l *out.Lines) { a.printSavesView(view, l) })
 		},
 	}
 	where.register(cmd, "show this save group rather than an instance", "show every instance's worlds and backups")
@@ -197,6 +206,94 @@ func (a *app) printSavesView(view savesView, l *out.Lines) {
 		l.Info("No backups yet; `" + a.savesCommand(view.savesTarget, "backup") + "` takes one")
 		return
 	}
+	printBackupsTable(view, l)
+	l.Nudge("Restore one", a.savesCommand(view.savesTarget, "restore <n>"))
+}
+
+// savesAll shows every target --all reaches as one section of worlds and backups, and names the
+// targets with neither on one line after them.
+func (a *app) savesAll(w savesWhere) error {
+	picks, err := a.savesPicks(w)
+	if err != nil {
+		return err
+	}
+	runs := []savesRun[savesView]{}
+	failures := 0
+	for _, p := range picks {
+		r := savesRun[savesView]{savesTarget: p.savesTarget, Instances: instanceIDs(p.rows), OK: true}
+		err := p.err
+		if err == nil {
+			var view savesView
+			if view, err = a.savesView(p.savesTarget); err == nil {
+				r.Result = &view
+			}
+		}
+		if err != nil {
+			failures++
+			r.OK, r.Error = false, out.AsError(err)
+			a.printer.Report(r.Error)
+		}
+		runs = append(runs, r)
+	}
+	if failures > 0 {
+		e := out.Errorf("saves-failed", "%d of %d targets failed to read their saves", failures, len(picks))
+		e.Data = runs
+		return e
+	}
+	return a.printer.Emit(runs, func(l *out.Lines) {
+		var empty []string
+		first := true
+		for i, r := range runs {
+			view := r.Result
+			if len(view.Worlds) == 0 && len(view.Backups) == 0 {
+				empty = append(empty, pickLabel(picks[i]))
+				continue
+			}
+			if !first {
+				l.Blank()
+			}
+			first = false
+			l.Heading(savesHeading(l.T, picks[i]))
+			a.printSavesSection(*view, l)
+		}
+		if len(empty) > 0 {
+			if !first {
+				l.Blank()
+			}
+			l.Info("No worlds or backups: " + strings.Join(empty, ", "))
+		}
+	})
+}
+
+// savesHeading names a save group by how many instances share it, and one instance by its label
+// and launcher.
+func savesHeading(t out.Theme, p savesPick) string {
+	if len(p.rows) == 1 {
+		return t.Bold(p.rows[0].Label()) + instanceAside(t, p.rows[0])
+	}
+	return t.Bold(p.Group) + " " + t.Grey("save group") + t.Aside(out.Count(len(p.rows), "instance", "instances"))
+}
+
+// printSavesSection is one target's worlds and backups under its saves --all heading.
+func (a *app) printSavesSection(view savesView, l *out.Lines) {
+	t := l.T
+	if len(view.Worlds) == 0 {
+		l.Info("No worlds")
+	}
+	for _, w := range view.Worlds {
+		l.Plain(t.Grey(t.GlyphDot()) + " " + t.Bold(w))
+	}
+	l.Blank()
+	if len(view.Backups) == 0 {
+		l.Info("No backups yet")
+		return
+	}
+	printBackupsTable(view, l)
+	l.Nudge("Restore one", a.savesCommand(view.savesTarget, "restore <n>"))
+}
+
+func printBackupsTable(view savesView, l *out.Lines) {
+	t := l.T
 	rows := make([][]string, len(view.Backups))
 	for i, b := range view.Backups {
 		worlds := ""
@@ -206,7 +303,6 @@ func (a *app) printSavesView(view savesView, l *out.Lines) {
 		rows[i] = []string{strconv.Itoa(b.N), b.ID, b.Taken.Format("2006-01-02 15:04"), backupReason(b.Backup), worlds, out.HumanBytes(b.Size), backupGame(b.Backup)}
 	}
 	l.Table([]string{"#", "Backup", "Taken", "Reason", "Worlds", "Size", "Game"}, rows, out.Columns(t.StyleCyan(), t.StyleBold(), t.StyleGrey(), t.Style(), t.StyleGrey()))
-	l.Nudge("Restore one", a.savesCommand(view.savesTarget, "restore <n>"))
 }
 
 // savesCommand is command, with any arguments, run on the target saves shows, selected the way
