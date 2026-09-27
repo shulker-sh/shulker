@@ -243,6 +243,9 @@ func (mt *Meta) loaderVersion(ctx context.Context, row loader.Loader, rng, game 
 		}
 	}
 	v, ok := dotted.Newest(candidates, r)
+	if !ok && r.IsAny() {
+		return "", out.Errorf("platform-not-found", "%s has no release for Minecraft %s yet", loader.Title(row.Name), game)
+	}
 	if !ok {
 		return "", out.Errorf("platform-not-found", "no %s loader version matches %q for Minecraft %s", row.Name, rng, game)
 	}

@@ -62,6 +62,14 @@ func TestLoaderVersionRanges(t *testing.T) {
 	}
 }
 
+func TestNoLoaderReleaseSaysSo(t *testing.T) {
+	neoforge := loader.Fake{Name: "neoforge", Versions: versions("26.3.0.1-beta")}.Row()
+	_, err := (&Meta{}).loaderVersion(context.Background(), neoforge, "*", "26.3")
+	if err == nil || err.Error() != "NeoForge has no release for Minecraft 26.3 yet" {
+		t.Errorf("err = %v", err)
+	}
+}
+
 func zipBytes(t *testing.T, name, content string) []byte {
 	t.Helper()
 	var buf bytes.Buffer

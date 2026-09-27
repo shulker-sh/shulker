@@ -174,7 +174,7 @@ func (a *app) createProject(cmd *cobra.Command, dir string, opts *initOptions) e
 	if err != nil {
 		return err
 	}
-	a.progress("%s", resolve.ResolvingLine(m.Minecraft, projectLoader))
+	a.printer.Working("%s", resolve.ResolvingLine(m.Minecraft, projectLoader))
 	l, warning, err := d.meta.NewLock(cmd.Context(), m)
 	if err != nil {
 		return err
