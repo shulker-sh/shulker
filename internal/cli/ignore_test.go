@@ -29,7 +29,7 @@ func TestIgnoreCommandWritesAndDropsEntries(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "ignore", "sodium", "fabric-api", "--rule", "depends", "--declared", ">=2.0.0", "--note", "works on 1.x")
-	if !strings.Contains(stdout, "ignored sodium on fabric-api") || !strings.Contains(stdout, "depends >=2.0.0") {
+	if !strings.Contains(stdout, "✔ Ignoring sodium's fabric-api dependency (>=2.0.0)") {
 		t.Fatalf("ignore output: %s", stdout)
 	}
 	var m struct {
@@ -49,7 +49,7 @@ func TestIgnoreCommandWritesAndDropsEntries(t *testing.T) {
 		t.Fatalf("second ignore without --force: exit %d %s", code, stdout)
 	}
 	stdout = h.mustRun(t, "ignore", "sodium", "fabric-api", "--force", "--note", "still fine")
-	if !strings.Contains(stdout, "replaced ignore for sodium on fabric-api") {
+	if !strings.Contains(stdout, "replacing the earlier ignore") {
 		t.Fatalf("forced ignore output: %s", stdout)
 	}
 	m.Ignore = nil

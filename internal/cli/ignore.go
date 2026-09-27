@@ -85,11 +85,15 @@ func (a *app) ignoreCmd() *cobra.Command {
 			}
 			res := ignoreResult{Ignore: entry, Replaced: existing >= 0}
 			return a.printer.Emit(res, func(l *out.Lines) {
-				verb := "ignored"
-				if res.Replaced {
-					verb = "replaced ignore for"
+				relation := "dependency"
+				if entry.Rule == "breaks" {
+					relation = "break"
 				}
-				l.OK(fmt.Sprintf("%s %s on %s", verb, mod, on), entry.Rule+" "+entry.Declared)
+				aside := entry.Declared
+				if res.Replaced {
+					aside = strings.TrimPrefix(aside+", replacing the earlier ignore", ", ")
+				}
+				l.OK(fmt.Sprintf("Ignoring %s's %s %s", mod, on, relation), aside)
 			})
 		},
 	}
