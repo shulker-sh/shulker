@@ -2075,7 +2075,7 @@ Without `--json`, the error line ends with its code, like `✘ error: sodium is 
 | `saves-failed` | `saves --all` or `saves prune --all` failed for some targets; `data` has each target's result |
 | `schema-newer` | `shulker.json`, `shulker.lock`, `.shulker/instance.json`, `registry.json`, `config.json` or `accounts.json` was written by a newer shulker, and this one can't read it; the message names both schema versions, and `shulker self update` catches up. A newer `shulker.local.json` or `.shulker/state.json` warns instead, with the same fix |
 | `self-uninstall` | The shulker binary couldn't be removed |
-| `self-update-check` | Checking for a release failed, or none is published |
+| `self-update-check` | Checking for a release failed, or none is published for an update (`--check` says so and exits 0) |
 | `self-update-checksum` | The download doesn't match its checksum |
 | `self-update-download` | The download failed |
 | `self-update-install` | The running binary couldn't be replaced |

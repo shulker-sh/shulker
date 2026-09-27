@@ -241,3 +241,14 @@ func TestSelfUpdateRequireAttestationWithoutGh(t *testing.T) {
 		t.Fatalf("stdout %s, binary %q", &h.stdout, h.binary(t))
 	}
 }
+
+func TestSelfUpdateCheckWithNoReleaseSaysSo(t *testing.T) {
+	h := newSelfUpdateHarness(t, "0.0.1", "v0.0.2", false)
+	h.app.releases.LatestURL += "-missing"
+	if code := h.run("--check"); code != 0 || h.stdout.String() != "  i No release published yet\n" {
+		t.Fatalf("exit %d\nstdout: %q\nstderr: %s", code, &h.stdout, &h.stderr)
+	}
+	if code := h.run(); code == 0 {
+		t.Fatalf("an update with no release still fails: %s", &h.stdout)
+	}
+}

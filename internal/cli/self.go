@@ -202,6 +202,10 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	}
 	tag, err := r.Latest(ctx)
 	switch {
+	case errors.Is(err, fetch.ErrNotFound) && check:
+		b := a.build()
+		res := selfUpdateResult{Current: b.Version, Install: string(b.Route)}
+		return a.printer.Emit(res, func(l *out.Lines) { l.Info("No release published yet") })
 	case errors.Is(err, fetch.ErrNotFound):
 		return out.Errorf("self-update-check", "no shulker release has been published yet")
 	case fetch.IsNetwork(err):
