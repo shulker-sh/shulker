@@ -448,7 +448,7 @@ func (b *Builder) identifyOn(ctx context.Context, f packarchive.Format, lookup [
 		for _, key := range lookup {
 			files[key] = blobs[key]
 		}
-		b.log("looking up %s on %s", countOf(len(files), "file", "files"), p.Title())
+		b.working("looking up %s on %s", countOf(len(files), "file", "files"), p.Title())
 		found, err = p.Identify(ctx, files)
 	}
 	switch {
@@ -558,7 +558,7 @@ func (b *Builder) describeListed(ctx context.Context, f packarchive.Format, file
 	p, err := b.Providers.Get(f.Provider())
 	var projects map[string]provider.Project
 	if err == nil {
-		b.log("looking up %s for the pack's listing", countOf(len(ids), f.Title()+" project", f.Title()+" projects"))
+		b.working("looking up %s for the pack's listing", countOf(len(ids), f.Title()+" project", f.Title()+" projects"))
 		projects, err = p.Projects(ctx, ids)
 	}
 	if err != nil {
@@ -806,5 +806,11 @@ func countOf(n int, one, many string) string {
 func (b *Builder) log(format string, args ...any) {
 	if b.Log != nil {
 		b.Log(format, args...)
+	}
+}
+
+func (b *Builder) working(format string, args ...any) {
+	if b.Working != nil {
+		b.Working(format, args...)
 	}
 }

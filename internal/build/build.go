@@ -138,6 +138,8 @@ type Builder struct {
 	Providers provider.Providers
 	Fetch     *fetch.Client
 	Log       func(format string, args ...any)
+	// Working shows work under way that clears when it ends, for a lookup the result reports.
+	Working func(format string, args ...any)
 	// EULA is whether this user accepted the Minecraft EULA in config.json, which a server build
 	// writes to eula.txt unless the player wrote one there themselves. A manifest can't accept it on
 	// anyone's behalf.
