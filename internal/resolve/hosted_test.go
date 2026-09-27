@@ -105,7 +105,7 @@ func TestObtainModpackTakesAnUndistributedPackFromTheDownloadsFolder(t *testing.
 	entry := manifest.Require{Type: manifest.TypeModpack}
 
 	_, err = h.r.ObtainModpack(context.Background(), "craftpack", entry)
-	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !strings.Contains(e.Help, manual.Page) || !strings.Contains(e.Help, "craft-1.0.zip") {
+	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !slices.Contains(e.Items, manual.Page) || !strings.Contains(e.Message, "craft-1.0.zip") {
 		t.Fatalf("an undistributed pack asks for a manual download: %v", err)
 	}
 

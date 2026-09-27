@@ -454,8 +454,9 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 			return obtained{path: r.Cache.Object(f.Sha512), sha512: f.Sha512, page: v.Page}, nil
 		}
 	}
-	e := out.Errorf("manual-download", "%s %s is not distributed by its provider", proj.Slug, v.Number)
-	e.Help = fmt.Sprintf("download %s from %s into %s/ and run the command again", v.File.Filename, v.Page, DownloadsDir)
+	e := out.Errorf("manual-download", "%s can't be downloaded automatically", v.File.Filename)
+	e.Items = []string{v.Page}
+	e.Rows = []out.Detail{{Text: fmt.Sprintf("Download it into %s/ and run the command again:", DownloadsDir), Children: []out.Detail{{Text: v.Page}}}}
 	return obtained{}, e
 }
 

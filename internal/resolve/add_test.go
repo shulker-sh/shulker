@@ -163,7 +163,7 @@ func TestAddTakesAManualDownloadFromTheDownloadsFolder(t *testing.T) {
 	h := newHarness(t, cf)
 
 	err := h.add("nodist", AddOptions{})
-	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !strings.Contains(e.Help, v.Page) || !strings.Contains(e.Help, "nodist-1.0.0.jar") || !strings.Contains(e.Help, DownloadsDir+"/") {
+	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !slices.Contains(e.Items, v.Page) || !strings.Contains(e.Message, "nodist-1.0.0.jar") || !strings.Contains(e.Rows[0].Text, DownloadsDir+"/") {
 		t.Fatalf("expected manual-download, got %v", err)
 	}
 
@@ -184,7 +184,7 @@ func TestAddTreatsAForbiddenDownloadAsManual(t *testing.T) {
 	h := newHarness(t, cf)
 
 	err := h.add("locked", AddOptions{})
-	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !strings.Contains(e.Help, v.Page) {
+	if e := out.AsError(err); e == nil || e.Code != "manual-download" || !slices.Contains(e.Items, v.Page) {
 		t.Fatalf("expected manual-download after 403, got %v", err)
 	}
 	if !h.logged("treating locked 1.0.0 as distribution-disabled: download forbidden") {
