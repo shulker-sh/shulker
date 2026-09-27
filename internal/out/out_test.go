@@ -250,3 +250,13 @@ func TestWrapProseKeepsPathsWhole(t *testing.T) {
 		t.Fatalf("a limit of 0 wraps: %q", got)
 	}
 }
+
+func TestWarningLinesAfterTheFirstAreTreeRows(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: io.Discard, Stderr: &stderr}
+	p.Warn("dropped 2 defaults\n%s\n%s", "options.txt", "config/a.toml")
+	want := "  ! Dropped 2 defaults\n    ├─ options.txt\n    ╰─ config/a.toml\n"
+	if stderr.String() != want {
+		t.Fatalf("warning:\n%q\nwant\n%q", stderr.String(), want)
+	}
+}

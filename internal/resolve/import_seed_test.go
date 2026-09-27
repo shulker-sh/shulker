@@ -54,7 +54,7 @@ func TestSeedModFoldersImportAsSeededFiles(t *testing.T) {
 			mods:      []string{"config_manager"},
 			overrides: []string{"overrides/config/modpack_defaults/options.txt", "overrides/options.txt"},
 			want:      []string{"overrides/options.txt"},
-			warning:   "overrides/config/modpack_defaults/options.txt: dropped, since the pack also ships options.txt, which a launcher extracts before Config Manager could seed it",
+			warning:   "Dropped 1 default in config/modpack_defaults that the pack also ships\noptions.txt",
 		},
 		{
 			name:      "two seed mods at one path",

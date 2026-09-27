@@ -285,8 +285,8 @@ func TestImportTakesAModsSideFromThePackOnlyWhereItAddsABuiltSide(t *testing.T) 
 	if want := []SideChoice{{ID: "config_manager", Pack: "both", Provider: "server"}, {ID: "server_tweaks", Pack: "both", Provider: "server"}}; !slices.Equal(res.Sides, want) {
 		t.Fatalf("sides: %+v", res.Sides)
 	}
-	sideWarnings := slices.DeleteFunc(slices.Clone(res.Warnings), func(w string) bool { return !strings.Contains(w, "take their side") })
-	if len(sideWarnings) != 1 || !strings.Contains(sideWarnings[0], "2 mods") || !strings.Contains(sideWarnings[0], "config_manager (server → both), server_tweaks (server → both)") {
+	sideWarnings := slices.DeleteFunc(slices.Clone(res.Warnings), func(w string) bool { return !strings.Contains(w, "side taken from the pack") })
+	if !slices.Equal(sideWarnings, []string{"config_manager: side taken from the pack (server → both)", "server_tweaks: side taken from the pack (server → both)"}) {
 		t.Fatalf("warnings: %v", res.Warnings)
 	}
 	m, l := h.r.Manifest, h.r.Lock

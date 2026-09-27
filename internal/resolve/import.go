@@ -102,16 +102,11 @@ func (rep *Imported) sort() {
 	slices.SortFunc(rep.Sides, func(a, b SideChoice) int { return strings.Compare(a.ID, b.ID) })
 }
 
-// warnSides warns once for every mod that takes its side from the pack rather than its provider.
+// warnSides warns for every mod that takes its side from the pack rather than its provider.
 func (rep *Imported) warnSides() {
-	if len(rep.Sides) == 0 {
-		return
+	for _, s := range rep.Sides {
+		rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s: side taken from the pack (%s → %s)", s.ID, s.Provider, s.Pack))
 	}
-	mods := make([]string, len(rep.Sides))
-	for i, s := range rep.Sides {
-		mods[i] = fmt.Sprintf("%s (%s → %s)", s.ID, s.Provider, s.Pack)
-	}
-	rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s take their side from the pack rather than their provider: %s", out.Count(len(rep.Sides), "mod", "mods"), strings.Join(mods, ", ")))
 }
 
 type importer struct {

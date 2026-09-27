@@ -454,7 +454,7 @@ func TestImportMrpackRecordsAnOverrideLayersSideQuietly(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "import", archive, "--dir", dir, "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if len(env.Data.Mods.Sides) != 0 || slices.ContainsFunc(env.Warnings, func(w string) bool { return strings.Contains(w, "take their side") }) {
+	if len(env.Data.Mods.Sides) != 0 || slices.ContainsFunc(env.Warnings, func(w string) bool { return strings.Contains(w, "side taken from the pack") }) {
 		t.Fatalf("sides %+v, warnings %v", env.Data.Mods.Sides, env.Warnings)
 	}
 	m, l := readProject(t, dir)

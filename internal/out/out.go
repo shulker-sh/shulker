@@ -216,7 +216,8 @@ func (p *Printer) WarnNudge(n Nudge, format string, args ...any) {
 	}
 }
 
-// warn reports whether the warning was new; a repeat is dropped.
+// warn reports whether the warning was new; a repeat is dropped. Each line after a warning's first
+// is a row of the tree under it.
 func (p *Printer) warn(format string, args ...any) bool {
 	msg := p.WarnPrefix + fmt.Sprintf(format, args...)
 	if slices.Contains(p.warnings, msg) {
@@ -235,7 +236,16 @@ func (p *Printer) warn(format string, args ...any) bool {
 		if p.WarnPrefix != "" {
 			text = p.ErrTheme.Grey(p.WarnPrefix) + text
 		}
-		p.Err().Warn(text)
+		text, children, _ := strings.Cut(text, "\n")
+		l := p.Err()
+		l.Warn(text)
+		if children != "" {
+			var rows []Row
+			for child := range strings.SplitSeq(children, "\n") {
+				rows = append(rows, Row{Text: child})
+			}
+			l.Tree(rows...)
+		}
 	}
 	return true
 }

@@ -8,6 +8,7 @@ import (
 	"shulker.sh/shulker/internal/integrations"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
 )
 
@@ -28,6 +29,8 @@ func seedFromSeedMods(m *manifest.Manifest, l *lock.Lock, overrides []packarchiv
 		taken[o.Layer+"/"+o.Path] = o.Path
 	}
 	kept := overrides[:0]
+	shadowed := map[string][]string{}
+	var folders []string
 	for _, o := range overrides {
 		mod, rel, ok := underSeedMod(o.Path, present)
 		if !ok {
@@ -38,12 +41,15 @@ func seedFromSeedMods(m *manifest.Manifest, l *lock.Lock, overrides []packarchiv
 		if !ok {
 			by, ok = taken[shared+"/"+rel]
 		}
-		if ok {
-			reason := fmt.Sprintf("the pack also ships %s, which a launcher extracts before %s could seed it", rel, mod.Name)
-			if by != rel {
-				reason = fmt.Sprintf("%s already seeds %s", by, rel)
+		if ok && by == rel {
+			if _, seen := shadowed[mod.Folder]; !seen {
+				folders = append(folders, mod.Folder)
 			}
-			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s/%s: dropped, since %s", o.Layer, o.Path, reason))
+			shadowed[mod.Folder] = append(shadowed[mod.Folder], rel)
+			continue
+		}
+		if ok {
+			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s/%s: dropped, since %s already seeds %s", o.Layer, o.Path, by, rel))
 			continue
 		}
 		taken[o.Layer+"/"+rel] = o.Path
@@ -56,6 +62,12 @@ func seedFromSeedMods(m *manifest.Manifest, l *lock.Lock, overrides []packarchiv
 			rep.Seeded = map[string][]string{}
 		}
 		rep.Seeded[mod.Folder] = append(rep.Seeded[mod.Folder], rel)
+	}
+	// The pack's own copy is extracted before the mod could seed its default, so each dropped
+	// default is one row under its folder's warning.
+	for _, folder := range folders {
+		files := shadowed[folder]
+		rep.Warnings = append(rep.Warnings, fmt.Sprintf("Dropped %s in %s that the pack also ships\n%s", out.Count(len(files), "default", "defaults"), folder, strings.Join(files, "\n")))
 	}
 	for folder := range rep.Seeded {
 		slices.Sort(rep.Seeded[folder])
