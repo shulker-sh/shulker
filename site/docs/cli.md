@@ -1302,23 +1302,23 @@ A file changed both in the directory and in the source fails the sync with `buil
 
 ### `shulker instances`
 
-List the instances shulker keeps in sync, grouped by launcher. Each row leads with the instance's id, which is what `-i` takes, and shows its side, when it was last synced, its directory, and the name and source it syncs from. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`. When the last sync failed, the row says so and names why, beside the time of the sync that built what is on disk. When the last launch never got as far as running the game, a line under the row says so and names the reason.
+List the instances shulker keeps in sync in one table, sorted by launcher and then name. Each row leads with the instance's id, which is what `-i` takes, and shows its launcher, its side and when it was last synced. A directory that is gone or can't be read is flagged, and so is one missing its `.shulker/instance.json`. When the last sync failed, the row says so and names why. When the last launch never got as far as running the game, a line under the status says so and names the reason. `--verbose` adds each instance's directory, source and ref.
 
 ```sh
 shulker instances
+shulker instances -v
 ```
 
 ```
-Prism Launcher
-  friends-smp (client), synced 2026-09-11 14:02
-    ~/Library/Application Support/PrismLauncher/instances/shulker-friends-smp/minecraft
-    Friends SMP, from https://github.com/shulker-sh/base-pack.git, side client
-
-Minecraft Launcher
-  my-pack (client), synced 2026-09-10 21:40
-    ~/Library/Application Support/minecraft/shulker/my-pack
-    My Pack, from https://github.com/shulker-sh/base-pack.git, ref v3, side client
+     Instance     Launcher            Side    Status
+  ────────────────────────────────────────────────────────────
+  •  friends-smp  Prism Launcher      client  synced 5 minutes ago
+  •  my-pack      Minecraft Launcher  client  synced 2 days ago
 ```
+
+| Flag | Description |
+| --- | --- |
+| `-v, --verbose` | Also print each instance's path, source and ref |
 
 ### `shulker instances repair`
 

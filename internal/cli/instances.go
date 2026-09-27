@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/sync"
@@ -16,6 +17,7 @@ import (
 type instanceText struct{ project.InstanceEntry }
 
 func (a *app) instancesCmd() *cobra.Command {
+	var verbose bool
 	cmd := &cobra.Command{
 		Use:         "instances",
 		Annotations: reads(),
@@ -32,9 +34,10 @@ func (a *app) instancesCmd() *cobra.Command {
 				return err
 			}
 			project.SortInstances(entries)
-			return a.printer.Emit(entries, func(l *out.Lines) { printInstanceEntries(l, entries) })
+			return a.printer.Emit(entries, func(l *out.Lines) { printInstanceEntries(l, entries, verbose) })
 		},
 	}
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also print each instance's path, source and ref")
 	cmd.AddCommand(a.instancesRepairCmd())
 	return cmd
 }
@@ -60,18 +63,26 @@ func (a *app) loadInstanceEntries() ([]project.InstanceEntry, error) {
 }
 
 // printInstanceEntries is one table across launchers: the sync dot, the id bold, the launcher,
-// side and status, then the full directory so it copies, wrapped in a link. A launch that never
-// started puts its reason on the status cell's second line. Source and ref are left to --json.
-func printInstanceEntries(l *out.Lines, entries []project.InstanceEntry) {
+// side and status. A launch that never started puts its reason on the status cell's second line.
+// Verbose adds the directory, wrapped in a link so it copies, and the source and ref.
+func printInstanceEntries(l *out.Lines, entries []project.InstanceEntry, verbose bool) {
 	if len(entries) == 0 {
-		l.Info("Nothing is linked yet; `shulker link prism` adds an instance.")
+		l.Info("Nothing is linked yet")
+		l.Nudge("Link a pack into a launcher", "shulker link <launcher>")
 		return
 	}
 	t := l.T
+	headers := []string{"", "Instance", "Launcher", "Side", "Status"}
+	if verbose {
+		headers = append(headers, "Path", "Source", "Ref")
+	}
 	rows := make([][]string, len(entries))
 	statusWidth := 0
 	for i, e := range entries {
-		rows[i] = []string{t.GlyphDot(), e.ID, e.Launcher, e.Side, instanceText{e}.statusText(), t.Link(e.Dir, e.Dir)}
+		rows[i] = []string{t.GlyphDot(), e.ID, launcher.Title(e.Launcher), e.Side, instanceText{e}.statusText()}
+		if verbose {
+			rows[i] = append(rows[i], t.Link(out.Tilde(e.Dir), e.Dir), out.Tilde(e.Source), e.Ref)
+		}
 		statusWidth = max(statusWidth, out.Width(rows[i][4]))
 	}
 	// The note folds to the statuses' own width, so the path stays the column that gives way.
@@ -80,19 +91,19 @@ func printInstanceEntries(l *out.Lines, entries []project.InstanceEntry) {
 			rows[i][4] += "\n" + t.Grey(ansi.Wrap(note, statusWidth, "/-"))
 		}
 	}
-	l.Table([]string{"", "Instance", "Launcher", "Side", "Status", "Path"}, rows, func(row, col int) lipgloss.Style {
+	l.Table(headers, rows, func(row, col int) lipgloss.Style {
 		e := entries[row]
-		switch col {
-		case 0:
+		switch {
+		case col == 0:
 			if e.Status == project.StatusSynced && e.LastError == "" && e.LaunchError == "" {
 				return t.StyleGreen().Bold(true)
 			}
 			return t.StyleYellow().Bold(true)
-		case 1:
+		case col == 1:
 			return t.StyleBold()
-		case 2, 5:
+		case col == 2 || col > 4:
 			return t.StyleGrey()
-		case 3:
+		case col == 3:
 			return t.StyleCyan()
 		}
 		return t.Style()
@@ -130,7 +141,7 @@ func (i instanceText) syncedText() string {
 		return i.Problem
 	}
 	if t, err := time.Parse(time.RFC3339, i.SyncedAt); err == nil {
-		return "synced " + t.Local().Format("2006-01-02 15:04")
+		return "synced " + out.Ago(t)
 	}
 	return "synced"
 }

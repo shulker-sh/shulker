@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -261,11 +262,11 @@ func TestInstancesList(t *testing.T) {
 		t.Fatalf("instances is one table across launchers:\n%s", stdout)
 	}
 	for i, want := range []map[string]string{
-		{"": "•", "Instance": "alpha", "Launcher": "prism", "Side": "client", "Status": "synced "},
-		{"": "•", "Instance": "gone", "Launcher": "prism", "Side": "", "Status": "directory is missing"},
-		{"": "•", "Instance": "locked", "Launcher": "prism", "Side": "", "Status": "can't read the directory"},
-		{"": "•", "Instance": "zed", "Launcher": "prism", "Side": "client", "Status": "synced ", "Path": filepath.Join(prismDir, "instances", "shulker-zed", "minecraft")},
-		{"": "•", "Instance": "pack", "Launcher": "mojang", "Side": "client", "Status": "synced "},
+		{"": "•", "Instance": "alpha", "Launcher": "Prism Launcher", "Side": "client", "Status": "synced "},
+		{"": "•", "Instance": "gone", "Launcher": "Prism Launcher", "Side": "", "Status": "directory is missing"},
+		{"": "•", "Instance": "locked", "Launcher": "Prism Launcher", "Side": "", "Status": "can't read the directory"},
+		{"": "•", "Instance": "zed", "Launcher": "Prism Launcher", "Side": "client", "Status": "synced "},
+		{"": "•", "Instance": "pack", "Launcher": "Minecraft Launcher", "Side": "client", "Status": "synced "},
 	} {
 		for header, value := range want {
 			if got := rows[i][header]; !strings.HasPrefix(got, value) {
@@ -273,8 +274,15 @@ func TestInstancesList(t *testing.T) {
 			}
 		}
 	}
-	if strings.Contains(stdout, "Zed, from") || strings.Contains(stdout, "ref ") {
-		t.Fatalf("the source and ref are left to --json:\n%s", stdout)
+	if strings.Contains(stdout, "Path") || strings.Contains(stdout, "Source") {
+		t.Fatalf("the path, source and ref are left to --verbose:\n%s", stdout)
+	}
+	if rows[0]["Status"] != "synced just now" {
+		t.Fatalf("a sync is dated relative to now:\n%s", stdout)
+	}
+	verbose := h.mustRun(t, "instances", "-v")
+	if rows := tableRows(verbose); len(rows) != 5 || squash(rows[3]["Path"]) != squash(out.Tilde(filepath.Join(prismDir, "instances", "shulker-zed", "minecraft"))) {
+		t.Fatalf("--verbose adds the path:\n%s", verbose)
 	}
 }
 
@@ -444,7 +452,7 @@ func TestSyncDetectsAPrismInstance(t *testing.T) {
 	if len(instances) != 1 || instances[0].Launcher != "prism" || instances[0].LauncherDir != prismDir {
 		t.Fatalf("a sync into a Prism instance records the launcher: %+v", instances)
 	}
-	if rows := tableRows(h.mustRun(t, "instances")); len(rows) != 1 || rows[0]["Launcher"] != "prism" {
+	if rows := tableRows(h.mustRun(t, "instances")); len(rows) != 1 || rows[0]["Launcher"] != "Prism Launcher" {
 		t.Fatalf("instances names its launcher: %+v", rows)
 	}
 }
@@ -598,7 +606,7 @@ func TestInstancesRepairRecognisesAnInPlaceProject(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(gameDir, instance.Dir, "pre-launch")); !os.IsNotExist(err) {
 		t.Fatalf("repair generates no hook script: %v", err)
 	}
-	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "shulker-lost") {
+	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "lost") {
 		t.Fatalf("instances lists it: %s", stdout)
 	}
 	h.mustRun(t, "sync", "-i", "lost")
@@ -779,7 +787,7 @@ func TestSyncStampsTheInstanceAndTheRow(t *testing.T) {
 	if f := readIntent(t, gameDir); f.Resolved.LastResult != instance.ResultFailed || f.Resolved.LastSyncAt != good.LastSync {
 		t.Fatalf("instance file after a failure: %+v", f.Resolved)
 	}
-	if stdout := h.mustRun(t, "instances"); !strings.Contains(stdout, "last sync failed: "+failed.LastError) {
+	if stdout := h.mustRun(t, "instances"); !strings.Contains(squash(stdout), squash("last sync failed: "+failed.LastError)) {
 		t.Fatalf("instances should show the failure: %s", stdout)
 	}
 
