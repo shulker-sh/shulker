@@ -98,6 +98,7 @@ func (a *app) deps() (*deps, error) {
 func (a *app) newDeps(e *env.Env) *deps {
 	e.FailFast = a.failFast
 	e.Log = a.progress
+	e.Working = a.printer.Working
 	e.Progress = a.printer.Progress
 	e.Warn = a.printer.Warn
 	e.WarnNudge = a.printer.WarnNudge

@@ -65,6 +65,9 @@ type Store struct {
 	Fetch      *fetch.Client
 	Log        func(format string, args ...any)
 	Warn       func(format string, args ...any)
+	// Working shows work under way that clears when it ends, for a step whose outcome is its
+	// own line.
+	Working func(format string, args ...any)
 	// WarnsRawURL has a raw manifest URL warn that its overrides don't come with it: a command
 	// that adds or links a source says so once, and the syncs after it stay quiet.
 	WarnsRawURL bool
@@ -76,6 +79,9 @@ type Store struct {
 	// Obtain picks a Hosted modpack's provider version and puts its archive in the cache,
 	// returning the pin that names both.
 	Obtain func(ctx context.Context, name string, p manifest.Require) (lock.Modpack, error)
+
+	// mirrored are the git mirrors this run already brought up to date.
+	mirrored map[string]bool
 }
 
 func (s *Store) isOffline() bool { return s.Fetch != nil && s.Fetch.Offline }
@@ -83,6 +89,12 @@ func (s *Store) isOffline() bool { return s.Fetch != nil && s.Fetch.Offline }
 func (s *Store) log(format string, args ...any) {
 	if s.Log != nil {
 		s.Log(format, args...)
+	}
+}
+
+func (s *Store) working(format string, args ...any) {
+	if s.Working != nil {
+		s.Working(format, args...)
 	}
 }
 

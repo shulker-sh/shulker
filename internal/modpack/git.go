@@ -3,6 +3,7 @@ package modpack
 import (
 	"archive/tar"
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -46,11 +47,23 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 		return "", fmt.Errorf("%s: %s: %w", what.label, source, fetch.ErrOffline)
 	}
 	dir := s.Cache.PackMirror(source)
+	if s.mirrored[dir] {
+		return dir, nil
+	}
+	name := cmp.Or(what.name, source)
 	if _, err := os.Stat(dir); err == nil {
-		s.log("fetching %s", source)
+		s.working("checking %s for updates", name)
+		before, _ := s.git(ctx, "--git-dir="+dir, "for-each-ref")
 		if _, err := s.git(ctx, "--git-dir="+dir, "fetch", "--quiet", "origin"); err != nil {
 			return "", mirrorFailure(err, what, source, "fetching")
 		}
+		after, _ := s.git(ctx, "--git-dir="+dir, "for-each-ref")
+		if bytes.Equal(before, after) {
+			s.log("checked %s for updates", name)
+		} else {
+			s.log("updated %s", name)
+		}
+		s.markMirrored(dir)
 		return dir, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
@@ -64,7 +77,17 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 		}
 		return "", mirrorFailure(err, what, source, "cloning")
 	}
+	s.markMirrored(dir)
 	return dir, nil
+}
+
+// markMirrored notes a mirror this run already cloned or fetched, so reading the same source again
+// doesn't fetch it twice.
+func (s *Store) markMirrored(dir string) {
+	if s.mirrored == nil {
+		s.mirrored = map[string]bool{}
+	}
+	s.mirrored[dir] = true
 }
 
 var gitNetworkErrors = []string{
@@ -179,9 +202,13 @@ func untar(r io.Reader, dst string) error {
 type origin struct {
 	label string
 	code  string
+	// name is what a step calls the source; empty names it by its URL.
+	name string
 }
 
-func packOrigin(name string) origin { return origin{label: "modpack " + name, code: "modpack-fetch"} }
+func packOrigin(name string) origin {
+	return origin{label: "modpack " + name, code: "modpack-fetch", name: name}
+}
 
 // mirrorFailure is a fetch or clone that failed. When the network is why, the headline names the
 // source once and git's own reason goes in a row, without the "fatal:" and repeated URL around it.

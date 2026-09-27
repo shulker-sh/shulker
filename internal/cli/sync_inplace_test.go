@@ -241,3 +241,19 @@ func TestOutdatedChecksGitModpacks(t *testing.T) {
 		t.Fatalf("outdated follow should see the new commit: %s", stdout)
 	}
 }
+
+func TestGitModpackStepsSayWhetherItChanged(t *testing.T) {
+	h := newInPlace(t)
+	repo, source, _ := gitPack(t, "follow", "", "follow.txt")
+	_, stderr := h.mustRunStderr(t, "modpack", "add", source)
+	if !strings.Contains(stderr, "Cloned "+source) || strings.Contains(stderr, "Fetched "+source) || strings.Contains(stderr, "for updates") {
+		t.Fatalf("an add clones once and fetches nothing after:\n%s", stderr)
+	}
+	if _, stderr = h.mustRunStderr(t, "sync"); !strings.Contains(stderr, "✔ Checked follow for updates\n") {
+		t.Fatalf("a sync with nothing new:\n%s", stderr)
+	}
+	bumpPack(t, repo, "follow.txt")
+	if _, stderr = h.mustRunStderr(t, "sync"); !strings.Contains(stderr, "✔ Updated follow\n") || strings.Contains(stderr, "Checked follow") {
+		t.Fatalf("a sync that pulled a commit:\n%s", stderr)
+	}
+}

@@ -32,6 +32,9 @@ type Env struct {
 	FailFast bool
 	// Log reports each download and install as its own step line.
 	Log func(format string, args ...any)
+	// Working shows work under way that clears when it ends, for a step whose outcome is its
+	// own line.
+	Working func(format string, args ...any)
 	// Progress starts a download bar for the named files.
 	Progress func(verb string, files []out.Download) *out.Progress
 	// Warn reports a warning where it happens; the printer drops a repeat.

@@ -241,7 +241,7 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 		return arc, nil, err
 	}
 	if (strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")) && modpack.Classify(arg) == modpack.Git {
-		store := &modpack.Store{Cache: d.Cache, Fetch: d.Fetch, Log: a.progress}
+		store := &modpack.Store{Cache: d.Cache, Fetch: d.Fetch, Log: a.progress, Working: a.printer.Working}
 		path, err := store.FetchArchive(ctx, arg)
 		if err != nil {
 			return nil, nil, err
@@ -332,7 +332,7 @@ func (a *app) importCheckout(ctx context.Context, d *deps, dir, source string, f
 	if want, ok := packarchive.Lookup(f.typ); ok {
 		return nil, nil, out.Errorf("usage", "%s is a shulker source, not a %s modpack", source, want.Title())
 	}
-	store := &modpack.Store{Cache: d.Cache, ProjectDir: dir, Fetch: d.Fetch, Log: a.progress, Warn: a.printer.Warn, WarnsRawURL: true}
+	store := &modpack.Store{Cache: d.Cache, ProjectDir: dir, Fetch: d.Fetch, Log: a.progress, Working: a.printer.Working, Warn: a.printer.Warn, WarnsRawURL: true}
 	c, err := store.Checkout(ctx, source, f.at)
 	return nil, c, err
 }
