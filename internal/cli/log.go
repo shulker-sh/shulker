@@ -35,6 +35,9 @@ type logReport struct {
 	Matched  int               `json:"matched"`
 	Redacted bool              `json:"redacted"`
 	Entries  []auditlog.Entry  `json:"entries"`
+	// labels names each entry's instance as the instances table does, or is empty for an entry
+	// whose instance is no longer registered.
+	labels []string
 }
 
 type logFlags struct {
@@ -92,6 +95,7 @@ func (a *app) logCmd() *cobra.Command {
 				}
 			}
 			r.Matched = len(r.Entries)
+			r.labels = a.instanceLabels(r.Entries)
 			if !f.unredacted {
 				redact(&r, logRedaction())
 			}
@@ -177,7 +181,7 @@ func printLog(l *out.Lines, r logReport, isWidest bool) {
 	l.Plain(described + " " + t.Grey(fmt.Sprintf("(%d of %d entries)", r.Matched, r.Read)))
 	if len(r.Entries) > 0 {
 		l.Blank()
-		printLogEntries(l, r.Entries)
+		printLogEntries(l, r.Entries, r.labels)
 	}
 	if !isWidest {
 		l.Nudge("Widen with", "shulker log --since "+strconv.Itoa(r.KeepDays)+"d")
@@ -187,7 +191,7 @@ func printLog(l *out.Lines, r logReport, isWidest bool) {
 // printLogEntries is the table of entries: the level glyph in the first column, time, command and
 // instance grey, then the event. An error's code is red with its message as the cell's second line.
 // The instance column is left out when no entry names one.
-func printLogEntries(l *out.Lines, entries []auditlog.Entry) {
+func printLogEntries(l *out.Lines, entries []auditlog.Entry, labels []string) {
 	t := l.T
 	stamp := "15:04:05"
 	today := time.Now().Format(time.DateOnly)
@@ -215,7 +219,7 @@ func printLogEntries(l *out.Lines, entries []auditlog.Entry) {
 		case auditlog.LevelWarn:
 			mark, event = "!", e.Msg
 		}
-		rows[i] = []string{mark, at, logCmdName(e), e.Instance, event}
+		rows[i] = []string{mark, at, logCmdName(e), cmp.Or(labels[i], e.Instance), event}
 		if !named {
 			rows[i] = slices.Delete(rows[i], 3, 4)
 		}
@@ -234,6 +238,29 @@ func printLogEntries(l *out.Lines, entries []auditlog.Entry) {
 		}
 		return t.Style()
 	})
+}
+
+// instanceLabels names the instance each entry acted on: a run logs the folder it started in, and
+// the entries after it the instance's id, and both read as the instance's label.
+func (a *app) instanceLabels(entries []auditlog.Entry) []string {
+	labels := make([]string, len(entries))
+	instances, err := a.loadInstances()
+	if err != nil {
+		return labels
+	}
+	for i, e := range entries {
+		if e.Instance == "" {
+			continue
+		}
+		n, ok := config.FindID(instances, e.Instance)
+		if !ok {
+			n, ok = config.FindInstance(instances, e.Instance)
+		}
+		if ok {
+			labels[i] = instances[n].Label()
+		}
+	}
+	return labels
 }
 
 // logCmdName is the command an entry names. The root's own runs, like a bare `shulker`, have none.

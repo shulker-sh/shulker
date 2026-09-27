@@ -106,6 +106,9 @@ func TestLogShowsTheLastDayWithItsPreamble(t *testing.T) {
 	if len(rows) != 3 || rows[1][""] != "✘" || rows[1]["Command"] != "hook wrap" || squash(rows[1]["Event"]) != "launch-not-startedcan'trunJavaat/x/java:nosuchfile" {
 		t.Errorf("an error is marked in the first column, its code over its message in the event cell:\n%s", stdout)
 	}
+	if squash(rows[0]["Instance"]) != "FriendsSMP" || squash(rows[1]["Instance"]) != "FriendsSMP" {
+		t.Errorf("an entry names its instance by label, whether it logged the id or the folder:\n%s", stdout)
+	}
 	lines := strings.Split(stdout, "\n")
 	for i, line := range lines {
 		if strings.Contains(line, "launch-not-started") {
