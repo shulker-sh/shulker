@@ -1913,7 +1913,7 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 
 ### Error codes
 
-Without `--json`, the error line ends with its code, like `✘ error: sodium is not in the manifest (mod-not-found)`, with the items and candidates in a tree underneath.
+Without `--json`, the error line ends with its code, like `✘ sodium is not in the manifest (mod-not-found)`, with the items and candidates in a tree underneath.
 
 | Code | Meaning |
 | --- | --- |

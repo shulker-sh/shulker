@@ -99,7 +99,7 @@ Offline accounts need a Microsoft account too. Shulker refuses to create one unt
 
 ```console
 ❯ shulker accounts add Alex
-✘ error: shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline one (ownership-unproven)
+✘ No signed-in account owns Minecraft: Java Edition (ownership-unproven)
 
 Sign in to Microsoft:
   $ shulker accounts login
