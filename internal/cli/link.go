@@ -34,7 +34,7 @@ func (r *linkReport) print(l *out.Lines) {
 		verb = "Updated"
 	}
 	l.OKInto(verb+" "+r.Noun+" "+r.Shown, r.InstanceDir, "", r.rows...)
-	r.Sync.print(l)
+	r.Sync.printInto(l)
 }
 
 func (a *app) linkCmd() *cobra.Command {

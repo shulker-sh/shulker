@@ -305,15 +305,17 @@ func savesRow(res *saves.Result) (out.Row, bool) {
 	if res == nil || !res.Changed {
 		return out.Row{}, false
 	}
-	text := "group " + res.Group
-	if res.Group == saves.None {
-		text = "kept in the instance"
+	into := "the shared saves"
+	if res.Group != saves.Default {
+		into = "save group " + strconv.Quote(res.Group)
 	}
-	if res.Moved {
-		text += ", moved the instance's worlds in"
+	switch {
+	case res.Group == saves.None:
+		return out.Row{Text: "Worlds kept in the instance"}, true
+	case res.Moved:
+		return out.Row{Text: "Moved " + out.Count(len(res.Worlds), "world", "worlds") + " into " + into}, true
+	case res.Group != saves.Default:
+		return out.Row{Text: "Worlds from " + into}, true
 	}
-	if len(res.Worlds) == 0 {
-		return out.Row{Label: "saves", Text: text + ", no worlds yet"}, true
-	}
-	return out.Row{Label: "saves", Text: text + ", showing " + strings.Join(res.Worlds, ", ")}, true
+	return out.Row{}, false
 }

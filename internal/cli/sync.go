@@ -146,11 +146,26 @@ func (s syncResult) print(l *out.Lines) {
 	if s.Changes != nil {
 		s.Changes.printItems(l)
 	}
+	l.OKInto("Synced "+s.Side, s.Dir, reportAside(s.Build), s.rows(l)...)
+}
+
+// printInto is the sync under a line that already named the folder: how many files it placed,
+// with no path.
+func (s syncResult) printInto(l *out.Lines) {
+	if s.Changes != nil {
+		s.Changes.printItems(l)
+	}
+	files := s.Build.Unchanged + len(s.Build.Written) + len(s.Build.Linked)
+	l.OK("Synced "+out.Count(files, "file", "files"), "")
+	l.Tree(s.rows(l)...)
+}
+
+func (s syncResult) rows(l *out.Lines) []out.Row {
 	rows := reportDetailRows(l, s.Build)
 	if row, ok := savesRow(s.Saves); ok {
 		rows = append(rows, row)
 	}
-	l.OKInto("Synced "+s.Side, s.Dir, reportAside(s.Build), rows...)
+	return rows
 }
 
 // syncEnv is the sync module's env for this run, built once so its backups happen once.

@@ -44,8 +44,8 @@ func linkShulkerPack(t *testing.T, h *harness) string {
 	root := shulkerInstances(t, h)
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	stdout := h.mustRun(t, "link", "shulker")
-	if !strings.Contains(stdout, "saves: group default") {
-		t.Fatalf("link reports the group it joined: %s", stdout)
+	if !strings.Contains(stdout, "✔ Synced ") || strings.Contains(stdout, "saves") {
+		t.Fatalf("joining the default group with nothing to move says nothing of saves: %s", stdout)
 	}
 	h.dir = filepath.Join(root, "pack")
 	return h.dir
@@ -75,7 +75,7 @@ func TestSavesGroupRelinksOnSync(t *testing.T) {
 		t.Fatalf("setting the group waits for the next sync: %s", got)
 	}
 	stdout := h.mustRun(t, "sync")
-	if !strings.Contains(stdout, "saves: group hardcore") || !strings.Contains(stdout, "one-life") {
+	if !strings.Contains(stdout, `Worlds from save group "hardcore"`) {
 		t.Fatalf("sync reports the worlds now visible: %s", stdout)
 	}
 	if got := savesLink(t, gameDir); got != filepath.Join(root, "hardcore") {
