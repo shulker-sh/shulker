@@ -1,9 +1,14 @@
 package cli
 
 import (
+	"cmp"
 	"errors"
+	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
@@ -144,8 +149,13 @@ func (a *app) warnReplaced(unreadable error, kept string) {
 }
 
 func (r repairResult) print(l *out.Lines) {
-	for _, in := range r.Registered {
+	switch len(r.Registered) {
+	case 0:
+	case 1:
+		in := r.Registered[0]
 		l.OKInto("Registered "+in.ID, in.Dir, launcher.Title(in.Launcher))
+	default:
+		l.OK("Registered "+out.Count(len(r.Registered), "instance", "instances"), registeredByLauncher(r.Registered))
 	}
 	for _, rn := range r.Renamed {
 		l.OK("Renamed "+rn.ID+"  "+l.T.Bump(rn.From, rn.To), "")
@@ -166,4 +176,19 @@ func (r repairResult) print(l *out.Lines) {
 	case len(r.Registered) == 0 && len(r.Renamed) == 0 && len(r.Wrote) == 0 && len(r.Missing) == 0:
 		l.Info("Every instance is registered and has its instance file.")
 	}
+}
+
+// registeredByLauncher counts instances by launcher, the most first: "27 Shulker, 3 Prism Launcher".
+func registeredByLauncher(registered []config.Instance) string {
+	counts := map[string]int{}
+	for _, in := range registered {
+		counts[launcher.Title(in.Launcher)]++
+	}
+	titles := slices.Collect(maps.Keys(counts))
+	slices.SortFunc(titles, func(a, b string) int { return cmp.Or(cmp.Compare(counts[b], counts[a]), cmp.Compare(a, b)) })
+	parts := make([]string, len(titles))
+	for i, title := range titles {
+		parts[i] = fmt.Sprintf("%d %s", counts[title], title)
+	}
+	return strings.Join(parts, ", ")
 }

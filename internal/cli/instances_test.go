@@ -888,3 +888,10 @@ func TestInstancesRepairWithoutARegistryFindsShulkersOwnInstances(t *testing.T) 
 		t.Fatalf("rebuilt row: %+v", in)
 	}
 }
+
+func TestRepairCountsRegisteredInstancesByLauncher(t *testing.T) {
+	got := registeredByLauncher([]config.Instance{{Launcher: "prism"}, {Launcher: "shulker"}, {Launcher: "shulker"}, {Launcher: "atlauncher"}})
+	if want := "2 Shulker, 1 ATLauncher, 1 Prism Launcher"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
