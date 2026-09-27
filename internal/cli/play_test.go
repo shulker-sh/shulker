@@ -158,10 +158,16 @@ func TestPlayStartsTheGameDetachedAndLogsIt(t *testing.T) {
 
 	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play")
 
-	for _, want := range []string{"Playing pack", "(26.2)", "account: Notch", "log: "} {
+	for _, want := range []string{"Playing pack", "(26.2)", "log: "} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("play: %q is missing from\n%s", want, stdout)
 		}
+	}
+	if !strings.Contains(stderr, "Started pack as Notch") || strings.Contains(stdout, "account:") {
+		t.Fatalf("the started line names the account, and no row repeats it:\n%s%s", stderr, stdout)
+	}
+	if strings.Contains(stdout, "Synced") {
+		t.Fatalf("a sync that changed nothing says nothing:\n%s", stdout)
 	}
 	// The game ran with the account templated into its own arguments, and in the game directory.
 	argv := waitForFile(t, filepath.Join(gameDir, "args.txt"))

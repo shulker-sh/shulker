@@ -178,7 +178,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		if linked != nil {
 			linked.print(l)
 		}
-		if synced != nil {
+		if synced != nil && !synced.isIdle(l) {
 			synced.print(l)
 		}
 		if adopted {
@@ -245,10 +245,7 @@ func (a *app) playWaited(launch game.Launch, stream bool) (int, instance.Launch,
 // is all it knows; a run this command waited for says how it went instead, and a crash is reported
 // rather than raised — the game ran, so shulker did its job.
 func (p playResult) print(l *out.Lines) {
-	rows := []out.Row{
-		{Label: "account", Text: p.Account.Name},
-		{Label: "log", Text: p.Log},
-	}
+	rows := []out.Row{{Label: "log", Text: p.Log}}
 	switch p.Outcome {
 	case "":
 		l.OK("Playing "+p.Instance, p.Version)
@@ -262,11 +259,11 @@ func (p playResult) print(l *out.Lines) {
 			rows = append(rows, out.Row{Label: "crash report", Text: p.CrashReport})
 		}
 	default:
-		l.OK("Played "+p.Instance, p.Version)
+		l.OK("Played "+p.Instance, "")
 	}
 	l.Tree(rows...)
 	if p.Outcome == "" {
-		l.Muted("If it hangs, shulker instance dump -i " + p.Instance + " shows where; shulker instance log -i " + p.Instance + " prints its output")
+		l.Nudge("If it hangs", "shulker instance dump -i "+p.Instance)
 	}
 }
 

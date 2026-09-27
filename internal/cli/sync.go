@@ -160,6 +160,16 @@ func (s syncResult) printInto(l *out.Lines) {
 	l.Tree(s.rows(l)...)
 }
 
+// isIdle is a sync that changed nothing: no lock change, no file placed or taken away, no saves
+// moved.
+func (s syncResult) isIdle(l *out.Lines) bool {
+	b := s.Build
+	if s.Changes != nil && s.Changes.Changes != nil && !s.Changes.IsEmpty() {
+		return false
+	}
+	return len(b.Written)+len(b.Removed)+len(b.Linked) == 0 && len(s.rows(l)) == 0
+}
+
 func (s syncResult) rows(l *out.Lines) []out.Row {
 	rows := reportDetailRows(l, s.Build)
 	if row, ok := savesRow(s.Saves); ok {
