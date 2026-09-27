@@ -51,7 +51,8 @@ func (a *app) instanceCmd() *cobra.Command {
 }
 
 func (a *app) instanceGetCmd() *cobra.Command {
-	return &cobra.Command{
+	var verbose bool
+	cmd := &cobra.Command{
 		Use:         "get [path]",
 		Annotations: reads(),
 		Short:       "Print a setting in effect and the default behind it, or every setting",
@@ -107,10 +108,14 @@ func (a *app) instanceGetCmd() *cobra.Command {
 			}
 			return a.printer.Emit(got, func(l *out.Lines) {
 				writeValue(l.W, got.Value)
-				l.Muted(settingOrigin(got, global))
+				if verbose {
+					l.Muted(settingOrigin(got, global))
+				}
 			})
 		},
 	}
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also say where the value comes from")
+	return cmd
 }
 
 // settingOrigin says where the value `instance get` printed came from, and for one the instance

@@ -41,8 +41,11 @@ func TestInstanceGetShowsTheValueAndTheDefaultBehindIt(t *testing.T) {
 	if got := instanceSettingJSON(t, h, "instance", "get", "memory"); got.Value != "6G" || got.From != "config" || got.Default != "6G" {
 		t.Fatalf("an instance with no memory of its own inherits play.memory: %+v", got)
 	}
-	if stdout := h.mustRun(t, "instance", "get", "memory"); !strings.HasPrefix(stdout, "6G\n") || !strings.Contains(stdout, "from play.memory") {
-		t.Fatalf("get prints the value, then where it came from:\n%s", stdout)
+	if stdout := h.mustRun(t, "instance", "get", "memory"); stdout != "6G\n" {
+		t.Fatalf("get prints just the value:\n%s", stdout)
+	}
+	if stdout := h.mustRun(t, "instance", "get", "memory", "-v"); !strings.HasPrefix(stdout, "6G\n") || !strings.Contains(stdout, "from play.memory") {
+		t.Fatalf("get -v prints the value, then where it came from:\n%s", stdout)
 	}
 
 	h.mustRun(t, "instance", "set", "memory", "8G")
@@ -52,7 +55,7 @@ func TestInstanceGetShowsTheValueAndTheDefaultBehindIt(t *testing.T) {
 	if got := instanceSettingJSON(t, h, "instance", "get", "memory"); got.Value != "8G" || got.From != "instance" || got.Default != "6G" {
 		t.Fatalf("the instance's own key wins, and the default is still shown: %+v", got)
 	}
-	if stdout := h.mustRun(t, "instance", "get", "memory"); !strings.HasPrefix(stdout, "8G\n") || !strings.Contains(stdout, "play.memory is 6G") {
+	if stdout := h.mustRun(t, "instance", "get", "memory", "-v"); !strings.HasPrefix(stdout, "8G\n") || !strings.Contains(stdout, "play.memory is 6G") {
 		t.Fatalf("get names the default an unset would return to:\n%s", stdout)
 	}
 

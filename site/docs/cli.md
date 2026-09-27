@@ -1364,13 +1364,17 @@ A path is relative to the file's `settings` block and dotted the way `shulker se
 
 ### `shulker instance get`
 
-Print a setting as it is in effect, then where it came from: set in this instance, with the default it would return to; its `play.` default; or the setting's own default. A setting neither the instance nor `config.json` sets fails with `path-not-set`. With no path, print every setting the instance has, with the `play.` defaults it inherits filled in.
+Print a setting as it is in effect. `--verbose` adds where it came from: set in this instance, with the default it would return to; its `play.` default; or the setting's own default. A setting neither the instance nor `config.json` sets fails with `path-not-set`. With no path, print every setting the instance has, with the `play.` defaults it inherits filled in.
 
 ```sh
 shulker instance get memory
 shulker -i smp instance get window
 shulker instance get
 ```
+
+| Flag | Description |
+| --- | --- |
+| `-v`, `--verbose` | Also say where the value comes from |
 
 With `--json`, the data is `{ "path", "value", "from", "default" }`, where `from` is `instance`, `config` or `default`, and `default` is what `instance unset` returns the setting to, absent when there is nothing to return to. With no path it is the settings object.
 
