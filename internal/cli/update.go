@@ -148,6 +148,8 @@ type relockPlan struct {
 	isFetched bool
 	// dropsFailing keeps what validates of what the command added, and fails with the rest.
 	dropsFailing bool
+	// upToDate says why nothing changed; nil says the project is already up to date.
+	upToDate func(l *out.Lines)
 }
 
 func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Project, *resolve.Resolver) (pin string, err error)) error {
@@ -209,7 +211,10 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 		if optional > 0 {
 			optionalNudge(l, optional)
 		}
-		if res.IsEmpty() {
+		switch {
+		case res.IsEmpty() && plan.upToDate != nil:
+			plan.upToDate(l)
+		case res.IsEmpty():
 			printUpToDate(l, "Already up to date", local, cmd.Flags().Args())
 		}
 		if res.Synced != nil {

@@ -50,3 +50,12 @@ func TestAddSuggestsOnlyForWhatItAdded(t *testing.T) {
 		t.Fatalf("a later add lists an earlier mod's suggestion: %s", stdout)
 	}
 }
+
+func TestAddOfAModAlreadyInThePackSaysSo(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	h.mustRun(t, "add", "sodium")
+	if stdout := h.mustRun(t, "add", "sodium"); !strings.Contains(stdout, "i sodium is already in the pack\n") {
+		t.Errorf("add again: %s", stdout)
+	}
+}

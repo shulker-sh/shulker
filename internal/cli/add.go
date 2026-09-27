@@ -78,6 +78,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 				return out.Errorf("usage", "--as applies to a single mod")
 			}
 			opts.As, opts.Type = as, chosen
+			named := slices.Clone(args)
 			for i, arg := range args {
 				if _, ok := urls[arg]; !ok {
 					args[i] = a.localPath(arg)
@@ -90,7 +91,12 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			); err != nil {
 				return err
 			}
-			return a.relock(cmd, relockPlan{isFetched: true, dropsFailing: true}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
+			upToDate := func(l *out.Lines) {
+				for _, name := range named {
+					l.Info(name + " is already in the pack")
+				}
+			}
+			return a.relock(cmd, relockPlan{isFetched: true, dropsFailing: true, upToDate: upToDate}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
 				for _, arg := range args {
 					add, slug := opts, arg
 					if name, ok := from[arg]; ok {
