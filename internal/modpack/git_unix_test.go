@@ -45,3 +45,17 @@ func TestGitGivesUpOnAStalledTransfer(t *testing.T) {
 		t.Fatal("a stalled transfer should read as a network failure")
 	}
 }
+
+func TestCloneRefusedForCredentialsSaysPrivateOrMissing(t *testing.T) {
+	bin := t.TempDir()
+	script := "#!/bin/sh\necho \"fatal: could not read Username for 'https://github.com': terminal prompts disabled\" >&2\nexit 128\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	s, _ := newHostedStore(t)
+	_, err := s.ensureMirror(context.Background(), projectOrigin, "https://github.com/org/secret.git")
+	if err == nil || err.Error() != "Couldn't clone https://github.com/org/secret.git: it's private or doesn't exist" {
+		t.Fatalf("err = %v", err)
+	}
+}

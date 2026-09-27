@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -58,6 +59,9 @@ func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (s
 	s.log("cloning %s", source)
 	if _, err := s.git(ctx, "clone", "--quiet", "--mirror", source, dir); err != nil {
 		os.RemoveAll(dir)
+		if isGitAuthError(err.Error()) {
+			return "", out.Errorf(what.code, "Couldn't clone %s: it's private or doesn't exist", source)
+		}
 		return "", mirrorFailure(err, what, source, "cloning")
 	}
 	return dir, nil
@@ -189,6 +193,20 @@ func mirrorFailure(err error, what origin, source, verb string) error {
 		return fetch.Unreachable(e)
 	}
 	return gitFailure(err, what.code, "%s: %s %s failed", what.label, verb, source)
+}
+
+// gitAuthErrors are what git says when a host asks for credentials it wasn't given, which is also
+// how GitHub and others answer for a repository that doesn't exist.
+var gitAuthErrors = []string{
+	"could not read username",
+	"authentication failed",
+	"repository not found",
+	"permission denied (publickey)",
+}
+
+func isGitAuthError(msg string) bool {
+	msg = strings.ToLower(msg)
+	return slices.ContainsFunc(gitAuthErrors, func(s string) bool { return strings.Contains(msg, s) })
 }
 
 const unreachableHelp = "check the address and that the server is running, then try again"
