@@ -63,7 +63,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if !strings.Contains(stdout, "[Server] got: say hi") || !strings.Contains(stdout, "Server stopped") {
 		t.Fatalf("stdout: %s", stdout)
 	}
-	if !strings.Contains(stderr, "Started server in") || !strings.Contains(stderr, "Java 25") {
+	if !strings.Contains(stderr, "✔ Built server (") || !strings.Contains(stderr, "✔ Started server with Java 25\n") {
 		t.Fatalf("stderr: %s", stderr)
 	}
 	args, err := os.ReadFile(filepath.Join(h.dir, "build", "server", "args.txt"))

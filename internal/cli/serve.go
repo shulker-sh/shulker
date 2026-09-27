@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -104,14 +105,13 @@ func (a *app) serveCmd() *cobra.Command {
 			if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 				return err
 			}
-			a.printer.Err().Muted(rep.Summary())
+			a.printer.Err().OK("Built server", reportAside(rep))
 			if err := cmd.Context().Err(); err != nil {
 				return err
 			}
 			dir := rep.Dir
 			launchArgs := server.Command(jvm, build.LaunchArgs(p.Lock))
-			a.progress("starting server in %s with %s", dir, java)
-			a.printer.Settle()
+			a.printer.Err().OKInto("Started server with Java "+strconv.Itoa(java.Major), dir, "")
 
 			interrupt := make(chan os.Signal, 2)
 			signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)

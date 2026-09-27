@@ -1053,20 +1053,6 @@ func sha256Hex(data []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func (r *Report) Summary() string {
-	s := fmt.Sprintf("%s: %d written, %d unchanged, %d kept, %d removed", r.Side, len(r.Written), r.Unchanged, len(r.Kept), len(r.Removed))
-	if len(r.Linked) > 0 {
-		s += fmt.Sprintf(", %d linked", len(r.Linked))
-	}
-	if len(r.Moved) > 0 {
-		s += fmt.Sprintf(", %d moved", len(r.Moved))
-	}
-	if len(r.Excluded) > 0 {
-		s += fmt.Sprintf(", %d excluded", len(r.Excluded))
-	}
-	return s
-}
-
 func notInstalled(what string) *out.Error {
 	e := out.Errorf("not-installed", "%s is not in the cache", what)
 	e.Help = "run `shulker install`"
