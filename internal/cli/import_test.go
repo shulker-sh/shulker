@@ -603,3 +603,31 @@ func TestImportNamesAMarkedPack(t *testing.T) {
 		})
 	}
 }
+
+func TestImportSettlesEachPhaseIntoOneLine(t *testing.T) {
+	h := newHarness(t)
+	sodium, fabricAPI := h.jars["sodium"], h.jars["fabric-api"]
+	file := func(jar fakeJar) mrpackIndexFile {
+		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+	}
+	index := mrpackIndex{
+		FormatVersion: 1, Game: "minecraft", VersionID: "2.0", Name: "Phases",
+		Files:        []mrpackIndexFile{file(sodium), file(fabricAPI)},
+		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
+	}
+	archive := filepath.Join(t.TempDir(), "phases.mrpack")
+	writeMrpack(t, archive, index, nil)
+
+	h.dir = t.TempDir()
+	_, stderr := h.mustRunStderr(t, "import", archive, "--dir", filepath.Join(h.dir, "phases"))
+	for _, want := range []string{"✔ Fetched 2 pack files", "✔ Matched 2 on Modrinth\n"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr is missing %q:\n%s", want, stderr)
+		}
+	}
+	for _, unwanted := range []string{"etching mods/", "ooked up"} {
+		if strings.Contains(stderr, unwanted) {
+			t.Errorf("a phase prints no line per file: %q in\n%s", unwanted, stderr)
+		}
+	}
+}

@@ -100,7 +100,7 @@ func slowAside(elapsed time.Duration, host string) string {
 func (p *Printer) Step(format string, args ...any) {
 	text := OneLine(fmt.Sprintf(format, args...))
 	verb, _, _ := strings.Cut(text, " ")
-	p.step(text, p.ClearFetches && verb == "fetching")
+	p.step(text, p.ClearFetches && (verb == "fetching" || verb == "looking"))
 }
 
 // Working shows a piece of work under way on a terminal, like Step, and clears it when it ends:

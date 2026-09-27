@@ -143,6 +143,8 @@ type importer struct {
 	// inProject marks the files as a project's own overrides rather than a pack's: one whose key
 	// requires already holds stays an override instead of being dropped as a duplicate.
 	inProject bool
+	// progress is the bar over the files the pack lists by download, while they are fetched.
+	progress *out.Progress
 }
 
 // hybridCopy is a hybrid datapack's copy under resourcepacks/, an index file or an override.
@@ -278,14 +280,17 @@ func (r *Resolver) importArchive(ctx context.Context, a *packarchive.Archive, re
 	if err := im.listedByID(ctx); err != nil {
 		return nil, err
 	}
+	im.startFetching(a.Files)
 	for _, f := range a.Files {
 		if f.Provider != "" {
 			continue
 		}
 		if err := im.listedByDownload(ctx, f); err != nil {
+			im.progress.Abort()
 			return nil, err
 		}
 	}
+	im.finishFetching()
 	for _, o := range a.Overrides {
 		if err := im.override(ctx, o); err != nil {
 			return nil, err
@@ -304,6 +309,40 @@ func (r *Resolver) importArchive(ctx context.Context, a *packarchive.Archive, re
 	im.rep.sort()
 	im.rep.warnSides()
 	return im.rep, nil
+}
+
+// startFetching puts the files the pack lists by download, and the project doesn't already hold,
+// under one bar that settles into a count of them.
+func (im *importer) startFetching(files []packarchive.File) {
+	var downloads []out.Download
+	for _, f := range files {
+		sum := f.Hashes["sha512"]
+		if _, ok := im.bySha[sum]; ok || f.Provider != "" {
+			continue
+		}
+		if _, ok := im.packBySha[sum]; ok {
+			continue
+		}
+		downloads = append(downloads, out.Download{Name: path.Base(f.Path), Size: f.Size})
+	}
+	if im.r.Progress == nil || len(downloads) == 0 {
+		return
+	}
+	im.progress = im.r.Progress("fetching", downloads).Counts("pack file", "pack files")
+	if im.r.Fetch != nil {
+		im.r.Fetch.Progress = im.progress.Bytes
+	}
+}
+
+func (im *importer) finishFetching() {
+	if im.progress == nil {
+		return
+	}
+	im.progress.Finish()
+	im.progress = nil
+	if im.r.Fetch != nil {
+		im.r.Fetch.Progress = nil
+	}
 }
 
 // listedByDownload takes a file the archive lists by hash and download URL.
@@ -441,6 +480,12 @@ func (im *importer) identify(ctx context.Context) error {
 	for _, o := range im.unmatched {
 		files[o.Layer+"/"+o.Path] = o.Data
 	}
+	var matched []string
+	defer func() {
+		if len(matched) > 0 {
+			im.r.log("matched %s", strings.Join(matched, ", "))
+		}
+	}()
 	for _, name := range im.r.Manifest.ProviderOrder() {
 		if len(files) == 0 {
 			return nil
@@ -454,6 +499,9 @@ func (im *importer) identify(ctx context.Context) error {
 		found, err := p.Identify(ctx, files)
 		if err != nil {
 			return lookupFailed(p, out.Count(len(files), "file", "files"), err)
+		}
+		if len(found) > 0 {
+			matched = append(matched, fmt.Sprintf("%d on %s", len(found), p.Title()))
 		}
 		for key, h := range found {
 			proj, v := h.Project, h.Version
@@ -761,7 +809,11 @@ func (im *importer) unmanagedDownload(ctx context.Context, f packarchive.File) e
 // than the cache: a file identified on a provider is fetched from the provider when it is locked,
 // which proves the provider serves it, unless the URL that served it was the provider's own.
 func (im *importer) download(ctx context.Context, f packarchive.File) (packarchive.Override, error) {
-	im.r.log("fetching %s", f.Path)
+	if im.progress == nil {
+		im.r.log("fetching %s", f.Path)
+	}
+	im.progress.File(path.Base(f.Path))
+	defer im.progress.Advance()
 	o := packarchive.Override{Layer: packarchive.LayerFor(f.Side), Path: f.Path}
 	want := f.Hashes["sha512"]
 	if im.r.Cache.Has(want) {
