@@ -280,15 +280,15 @@ func TestGroupCommandsReportUnknownSubcommands(t *testing.T) {
 	}
 }
 
-func TestUsageErrorsShowUsageAndFlags(t *testing.T) {
+func TestUsageErrorsShowUsageAndPointAtHelp(t *testing.T) {
 	_, _, stderr := run(t, "add")
-	if !strings.Contains(stderr, "\n\n  Usage\n    $ shulker add <mod|source>... [flags]\n\n  Flags\n") {
+	if !strings.Contains(stderr, "\n\n  Usage\n    $ shulker add <mod|source>... [flags]\n\n  See every flag:\n    $ shulker add --help") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
-	if strings.Contains(stderr, "Global flags") || strings.Contains(stderr, "Examples") || strings.HasSuffix(stderr, "\n\n") {
+	if strings.Contains(stderr, "Flags") || strings.Contains(stderr, "Examples") || strings.HasSuffix(stderr, "\n\n") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
-	if _, _, stderr := run(t, "player"); !strings.Contains(stderr, "$ shulker player") || !strings.Contains(stderr, "--all") {
+	if _, _, stderr := run(t, "player"); !strings.Contains(stderr, "$ shulker player [name|uuid]") || !strings.Contains(stderr, "$ shulker player --help") {
 		t.Fatalf("player stderr:\n%s", stderr)
 	}
 	if _, stdout, stderr := run(t, "add", "--json"); stderr != "" || strings.Contains(stdout, "Usage") {

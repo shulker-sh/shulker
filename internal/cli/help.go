@@ -301,9 +301,8 @@ type helpFlag struct {
 func helpUsage(l *out.Lines, cmd *cobra.Command) {
 	l.Blank()
 	helpUsageLine(l, cmd)
-	if rows := flagRows(l.T, cmd.NonInheritedFlags()); cmd.HasParent() && len(rows) > 0 {
-		l.Blank()
-		printFlagRows(l, "Flags", rows)
+	if cmd.HasParent() {
+		l.Nudge("See every flag", cmd.CommandPath()+" --help")
 	}
 }
 
