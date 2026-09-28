@@ -122,7 +122,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	defer staged.Discard()
 	var r *resolve.Resolver
 	var mods *resolve.Imported
-	err = a.awaitingDownloads(ctx, dir, func(skip bool) error {
+	err = a.awaitingDownloads(ctx, func() string { return dir }, true, func(skip bool) error {
 		r, mods, err = a.importPack(ctx, d, arc, staged.Dir, filepath.Join(dir, resolve.DownloadsDir), skip, f)
 		return err
 	})

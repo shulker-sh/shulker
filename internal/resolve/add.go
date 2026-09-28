@@ -458,6 +458,7 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	e := out.Errorf("manual-download", "%s can't be downloaded automatically", v.File.Filename)
 	e.Items = []string{v.Page}
 	e.Rows = []out.Detail{{Text: fmt.Sprintf("Download it into %s/ and run the command again:", DownloadsDir), Children: []out.Detail{{Text: v.Page}}}}
+	manual.Attach(e, []manual.File{{Name: v.File.Filename, Page: v.Page, Sha1: v.File.Sha1, Sha512: v.File.Sha512}})
 	return obtained{}, e
 }
 

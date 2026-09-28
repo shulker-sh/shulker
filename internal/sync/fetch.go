@@ -24,22 +24,27 @@ import (
 // sides, and the server jar and its Java runtime too when wantServer is set. It returns the names
 // of what it fetched; a failed download is one of several joined errors unless the env fails fast.
 func FetchLocked(ctx context.Context, e *Env, p *project.Project, sides []string, wantServer bool) ([]string, error) {
-	r, err := e.resolver(ctx, p, resolve.PackMode{})
-	if err != nil {
-		return nil, err
-	}
-	r.SkipPending = e.AwaitDownloads == nil
+	var r *resolve.Resolver
 	var fetched, dropWarnings []string
+	var err error
+	skip := e.AwaitDownloads == nil
 	for {
-		fetched, dropWarnings, err = r.Install(ctx, sides...)
-		if out.CodeOf(err) != "missing-files" || e.AwaitDownloads == nil || r.SkipPending {
+		// A modpack archive its author won't let shulker download is missing when the resolver
+		// opens the project's modpacks, before any locked file is.
+		if r, err = e.resolver(ctx, p, resolve.PackMode{}); err == nil {
+			r.SkipPending = skip
+			fetched, dropWarnings, err = r.Install(ctx, sides...)
+		}
+		if out.CodeOf(err) != "missing-files" || e.AwaitDownloads == nil || skip {
 			break
 		}
-		skip, waitErr := e.AwaitDownloads(ctx, filepath.Join(p.Dir, resolve.DownloadsDir), out.AsError(err))
-		if waitErr != nil {
+		var waitErr error
+		if skip, waitErr = e.AwaitDownloads(ctx, filepath.Join(p.Dir, resolve.DownloadsDir), out.AsError(err)); waitErr != nil {
 			return nil, waitErr
 		}
-		r.SkipPending = skip
+	}
+	if r == nil {
+		return nil, err
 	}
 	e.WarnEach(dropWarnings)
 	if len(r.Adopted()) > 0 {

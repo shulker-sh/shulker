@@ -148,3 +148,13 @@ func TestCheckLeavesANameMatchWithOtherBytesAndSaysSo(t *testing.T) {
 		t.Fatalf("nothing lands: %v", err)
 	}
 }
+
+func TestCheckFindsAFileByItsOwnExtension(t *testing.T) {
+	downloads := t.TempDir()
+	_, s512 := sums("pack")
+	w := NewWait(downloads, nil, []File{{Name: "pack-1.0.mrpack", Sha512: s512}})
+	os.WriteFile(filepath.Join(downloads, "renamed.mrpack"), []byte("pack"), 0o644)
+	if found, err := w.Check(); err != nil || !found[0].Found {
+		t.Fatalf("a modpack's .mrpack is a candidate: %+v %v", found, err)
+	}
+}

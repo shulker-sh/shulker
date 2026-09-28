@@ -97,23 +97,27 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 					l.Info(name + " is already in the pack")
 				}
 			}
-			return a.relock(cmd, relockPlan{isFetched: true, dropsFailing: true, upToDate: upToDate}, func(_ *project.Project, r *resolve.Resolver) (string, error) {
-				for _, arg := range args {
-					add, slug := opts, arg
-					if name, ok := from[arg]; ok {
-						add.Provider = name
-					}
-					if u, ok := urls[arg]; ok {
-						var err error
-						if slug, add, err = r.FromURL(cmd.Context(), u, add); err != nil {
+			var dir string
+			return a.retryingDownloads(cmd.Context(), func() string { return dir }, func() error {
+				return a.relock(cmd, relockPlan{isFetched: true, dropsFailing: true, upToDate: upToDate}, func(p *project.Project, r *resolve.Resolver) (string, error) {
+					dir = p.Dir
+					for _, arg := range args {
+						add, slug := opts, arg
+						if name, ok := from[arg]; ok {
+							add.Provider = name
+						}
+						if u, ok := urls[arg]; ok {
+							var err error
+							if slug, add, err = r.FromURL(cmd.Context(), u, add); err != nil {
+								return "", err
+							}
+						}
+						if err := a.addAsking(cmd.Context(), r, slug, add); err != nil {
 							return "", err
 						}
 					}
-					if err := a.addAsking(cmd.Context(), r, slug, add); err != nil {
-						return "", err
-					}
-				}
-				return "", nil
+					return "", nil
+				})
 			})
 		},
 	}

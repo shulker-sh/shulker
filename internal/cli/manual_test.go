@@ -187,3 +187,32 @@ func TestInstallTakesAManualDownloadFromAWatchedFolder(t *testing.T) {
 		t.Fatalf("a name match with other bytes is noted, and the duplicate that matches is taken: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 }
+
+func TestAddWaitsForAManualDownloadAtATerminal(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	downloads := filepath.Join(h.dir, "downloads")
+	h.tty = true
+	h.stdin = keysOnceWaiting(t, downloads, func() {
+		os.WriteFile(filepath.Join(downloads, "nodist.jar"), h.jars["nodist"].data, 0o644)
+	}, "\r")
+	code, stdout, stderr := h.run(t, "add", "nodist")
+	if code != 0 || !strings.Contains(stderr, "1 file needs a manual download into "+downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar") {
+		t.Fatalf("add waits for the file and goes on: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if _, l := readProject(t, h.dir); l.Mods["nodist"].Sha512 != h.jars["nodist"].sha512 {
+		t.Fatalf("nodist locks from downloads/: %+v", l.Mods)
+	}
+
+	h = newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	h.tty = true
+	h.stdin = keysOnceWaiting(t, filepath.Join(h.dir, "downloads"), func() {}, "\x1b")
+	if code, stdout, _ := h.run(t, "--json", "add", "nodist"); code == 0 || failureCode(t, stdout).Code != "manual-download" {
+		t.Fatalf("with --json, add fails without waiting: code=%d %s", code, stdout)
+	}
+	code, stdout, stderr = h.run(t, "add", "nodist")
+	if code == 0 || !strings.Contains(stderr, "manual-download") || !strings.Contains(stderr, "○ nodist-1.0.0.jar") {
+		t.Fatalf("esc ends the wait and add fails as off a terminal: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+}

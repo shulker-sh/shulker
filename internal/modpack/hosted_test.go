@@ -15,6 +15,7 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/manual"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -106,6 +107,9 @@ func TestFetchHostedAsksForAManualDownload(t *testing.T) {
 	}
 	if len(e.Items) != 1 || !strings.Contains(e.Items[0], "fo-1.0.mrpack") || !strings.Contains(e.Items[0], "https://example.test/fo") || !strings.Contains(e.Items[0], DownloadsDir+"/") {
 		t.Errorf("items = %q, want the file, its page and the downloads folder", e.Items)
+	}
+	if files := manual.Of(err); len(files) != 1 || files[0].Name != "fo-1.0.mrpack" || files[0].Sha512 != l.Pin.Sha512 {
+		t.Errorf("files = %+v, want the archive by its hash for a download wait", files)
 	}
 }
 

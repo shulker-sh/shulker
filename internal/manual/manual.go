@@ -76,6 +76,7 @@ type Wait struct {
 	started   time.Time
 	before    map[string]bool
 	seen      map[string]seen
+	kinds     []string
 }
 
 type hashes struct{ sha1, sha512 string }
@@ -95,7 +96,12 @@ type candidate struct {
 }
 
 func NewWait(downloads string, watch []string, list []File) *Wait {
-	w := &Wait{downloads: downloads, files: list, status: make([]Status, len(list)), started: time.Now(), before: map[string]bool{}, seen: map[string]seen{}}
+	w := &Wait{downloads: downloads, files: list, status: make([]Status, len(list)), started: time.Now(), before: map[string]bool{}, seen: map[string]seen{}, kinds: slices.Clone(Kinds)}
+	for _, f := range list {
+		if ext := strings.ToLower(filepath.Ext(f.Name)); ext != "" && !slices.Contains(w.kinds, ext) {
+			w.kinds = append(w.kinds, ext)
+		}
+	}
 	for _, dir := range watch {
 		if filepath.Clean(dir) == filepath.Clean(downloads) || slices.Contains(w.watch, dir) {
 			continue
@@ -112,7 +118,7 @@ func NewWait(downloads string, watch []string, list []File) *Wait {
 // Check looks in the downloads folder and every watched folder again and says where each file
 // stands. A file once found stays found.
 func (w *Wait) Check() ([]Status, error) {
-	entries, err := readKinds(w.downloads)
+	entries, err := w.read(w.downloads)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +147,7 @@ func (w *Wait) Check() ([]Status, error) {
 // checkWatched looks through one watched folder. A folder or file it can't read, such as a
 // Downloads folder the OS keeps from the terminal, is passed over rather than ending the wait.
 func (w *Wait) checkWatched(dir string) error {
-	entries, err := readKinds(dir)
+	entries, err := w.read(dir)
 	if err != nil {
 		return nil
 	}
@@ -223,8 +229,9 @@ func (w *Wait) take(c candidate, f File) error {
 	return os.Remove(c.path)
 }
 
-// readKinds lists the files in dir a provider could have served, none when dir doesn't exist.
-func readKinds(dir string) ([]os.DirEntry, error) {
+// read lists the files in dir a provider could have served, or with the extension of a file the
+// wait wants, such as a modpack's .mrpack; none when dir doesn't exist.
+func (w *Wait) read(dir string) ([]os.DirEntry, error) {
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
@@ -233,7 +240,7 @@ func readKinds(dir string) ([]os.DirEntry, error) {
 		return nil, err
 	}
 	return slices.DeleteFunc(entries, func(e os.DirEntry) bool {
-		return !e.Type().IsRegular() || strings.HasPrefix(e.Name(), ".") || !slices.Contains(Kinds, strings.ToLower(filepath.Ext(e.Name())))
+		return !e.Type().IsRegular() || strings.HasPrefix(e.Name(), ".") || !slices.Contains(w.kinds, strings.ToLower(filepath.Ext(e.Name())))
 	}), nil
 }
 

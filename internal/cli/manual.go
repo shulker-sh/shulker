@@ -16,20 +16,26 @@ import (
 // downloadCheckEvery is how often the download checklist looks for its files unasked.
 const downloadCheckEvery = 5 * time.Second
 
-// awaitingDownloads runs work and, when it fails missing-files at a terminal, waits for the files
-// to be downloaded by hand, then runs work again: skipping them when the wait was skipped. Off a
-// terminal, or with --no-input or --json, the failure stands, so nothing scripted or launched
-// hangs on a prompt.
-func (a *app) awaitingDownloads(ctx context.Context, dir string, work func(skip bool) error) error {
+// awaitingDownloads runs work and, when it fails for files to download by hand at a terminal,
+// waits for them and runs work again. A skipped wait runs work once more with skip set when work
+// is skippable, and leaves the failure standing when it isn't. Off a terminal, or with --no-input
+// or --json, the failure stands, so nothing scripted or launched hangs on a prompt. dir is the
+// project's, read once work has opened it.
+func (a *app) awaitingDownloads(ctx context.Context, dir func() string, skippable bool, work func(skip bool) error) error {
 	skip := false
 	for {
 		err := work(skip)
-		if out.CodeOf(err) != "missing-files" || !a.canWait() || skip {
+		if len(manual.Of(err)) == 0 || !a.canWait() || skip {
 			return err
 		}
-		if skip, err = a.awaitDownloads(ctx, filepath.Join(dir, resolve.DownloadsDir), out.AsError(err)); err != nil {
+		skipped, waitErr := a.awaitDownloads(ctx, filepath.Join(dir(), resolve.DownloadsDir), out.AsError(err))
+		if waitErr != nil {
+			return waitErr
+		}
+		if skipped && !skippable {
 			return err
 		}
+		skip = skipped
 	}
 }
 
@@ -55,7 +61,7 @@ func (a *app) awaitDownloads(ctx context.Context, downloads string, e *out.Error
 		rows[i] = out.WaitFile{Name: f.Name, Page: f.Page}
 	}
 	skip, err = a.printer.AwaitDownloads(ctx, out.DownloadWait{
-		Title: fmt.Sprintf("%s into %s", e.Message, downloads),
+		Title: fmt.Sprintf("%s a manual download into %s", out.Count(len(files), "file needs", "files need"), downloads),
 		Files: rows,
 		Check: func() ([]out.WaitFile, error) {
 			status, err := w.Check()
