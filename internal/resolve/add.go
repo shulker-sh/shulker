@@ -298,13 +298,16 @@ type versionQuery struct {
 	game   string
 	tags   []string
 	loader string
+	// untagged has a version that names no loader at all fit too, as a CurseForge modpack file
+	// often does: RLCraft 2.9.3 is tagged 1.12.2 alone.
+	untagged bool
 }
 
 func (r *Resolver) queryFor(kind, providerName string) versionQuery {
 	switch {
 	case kind == manifest.TypeModpack:
 		game, loaderName := r.modpackPlatform()
-		return versionQuery{kind: kind, game: game, tags: modpackLoaders(loaderName), loader: loaderName}
+		return versionQuery{kind: kind, game: game, tags: modpackLoaders(loaderName), loader: loaderName, untagged: true}
 	case manifest.IsPackKind(kind):
 		q := versionQuery{kind: kind, game: r.Lock.Minecraft}
 		if p, ok := r.Providers[providerName]; ok {
@@ -320,9 +323,18 @@ func pickVersion(ctx context.Context, p provider.Provider, proj *provider.Projec
 	if pin != "" {
 		return pinnedVersion(ctx, p, proj, q.kind, pin)
 	}
-	versions, err := p.Versions(ctx, proj.ID, q.game, q.tags)
+	tags := q.tags
+	if q.untagged {
+		tags = nil
+	}
+	versions, err := p.Versions(ctx, proj.ID, q.game, tags)
 	if err != nil {
 		return nil, err
+	}
+	if q.untagged && len(q.tags) > 0 {
+		versions = slices.DeleteFunc(versions, func(v provider.Version) bool {
+			return len(v.Loaders) > 0 && !slices.ContainsFunc(v.Loaders, func(l string) bool { return slices.Contains(q.tags, l) })
+		})
 	}
 	v, ok := provider.Newest(versions, channel, q.loader)
 	if !ok {

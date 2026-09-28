@@ -1,0 +1,86 @@
+{
+  "data": [
+    {
+      "id": 4612979,
+      "modId": 285109,
+      "displayName": "RLCraft 1.12.2 - Release v2.9.3.zip",
+      "fileName": "RLCraft 1.12.2 - Release v2.9.3.zip",
+      "releaseType": 1,
+      "fileDate": "2023-06-27T23:31:57.797Z",
+      "downloadUrl": "https://edge.forgecdn.net/files/4612/979/RLCraft%201.12.2%20-%20Release%20v2.9.3.zip",
+      "fileLength": 51324367,
+      "isAvailable": true,
+      "gameVersions": [
+        "1.12.2"
+      ],
+      "serverPackFileId": 4612990,
+      "hashes": [
+        {
+          "value": "11b0261e4dde9169173b24b88cbc1622859f4a68",
+          "algo": 1
+        },
+        {
+          "value": "1311977c2d75ec837a3e255a1ee75b98",
+          "algo": 2
+        }
+      ]
+    },
+    {
+      "id": 4487646,
+      "modId": 285109,
+      "displayName": "RLCraft 1.12.2 - Release v2.9.2d.zip",
+      "fileName": "RLCraft 1.12.2 - Release v2.9.2d.zip",
+      "releaseType": 1,
+      "fileDate": "2023-04-12T21:45:11.603Z",
+      "downloadUrl": "https://edge.forgecdn.net/files/4487/646/RLCraft%201.12.2%20-%20Release%20v2.9.2d.zip",
+      "fileLength": 51345522,
+      "isAvailable": true,
+      "gameVersions": [
+        "Forge",
+        "1.12.2"
+      ],
+      "serverPackFileId": 4487650,
+      "hashes": [
+        {
+          "value": "3517e6e5eed0bd65ecd35a9b2fc875ff3c2fddec",
+          "algo": 1
+        },
+        {
+          "value": "2d2222865fd3a230a820830457bb99a2",
+          "algo": 2
+        }
+      ]
+    },
+    {
+      "id": 3655670,
+      "modId": 285109,
+      "displayName": "RLCraft 1.12.2 - Release v2.9.1c.zip",
+      "fileName": "RLCraft 1.12.2 - Release v2.9.1c.zip",
+      "releaseType": 1,
+      "fileDate": "2022-02-21T02:23:38.76Z",
+      "downloadUrl": "https://edge.forgecdn.net/files/3655/670/RLCraft%201.12.2%20-%20Release%20v2.9.1c.zip",
+      "fileLength": 50308819,
+      "isAvailable": true,
+      "gameVersions": [
+        "Forge",
+        "1.12.2"
+      ],
+      "serverPackFileId": 3655676,
+      "hashes": [
+        {
+          "value": "dcf2fd7593766931f34d7ca422e0eae741bd2729",
+          "algo": 1
+        },
+        {
+          "value": "d04f9ce4638344b3366ce1e6f524b1d6",
+          "algo": 2
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "index": 0,
+    "resultCount": 3,
+    "totalCount": 3
+  }
+}

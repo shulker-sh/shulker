@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -418,5 +420,32 @@ func TestConvertFileNamesShaderModsByIntegration(t *testing.T) {
 		if !slices.Equal(v.Loaders, c.loaders) || !slices.Equal(v.GameVersions, c.game) {
 			t.Errorf("%v became loaders %v and game versions %v", c.gameVersions, v.Loaders, v.GameVersions)
 		}
+	}
+}
+
+func TestAModpackFileTaggedWithNoLoaderIsListed(t *testing.T) {
+	files, err := os.ReadFile(filepath.Join("testdata", "rlcraft-files.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/mods/285109" {
+			json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"id": 285109, "name": "RLCraft", "slug": "rlcraft", "classId": 4471}})
+			return
+		}
+		w.Write(files)
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+
+	versions, err := c.Versions(context.Background(), "285109", "1.12.2", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newest, ok := provider.Newest(versions, "release", "")
+	if !ok || newest.ID != "4612979" || len(newest.Loaders) != 0 {
+		t.Fatalf("RLCraft 2.9.3 is tagged 1.12.2 alone and still the newest release: %+v", newest)
 	}
 }

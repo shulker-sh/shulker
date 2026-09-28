@@ -118,3 +118,22 @@ func TestObtainModpackTakesAnUndistributedPackFromTheDownloadsFolder(t *testing.
 		t.Fatalf("modpack pin: %+v", pin)
 	}
 }
+
+func TestAModpackFileTaggedWithNoLoaderFitsAnyLoader(t *testing.T) {
+	cf := curseForgeHost(t)
+	craftpack := provider.Project{ID: "800000", Slug: "craftpack", Title: "Craft Pack", Type: manifest.TypeModpack}
+	cf.Publish(craftpack, provider.Version{ID: "7000001", Number: "1.0", Published: day(1), Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, []byte("1.0"))
+	cf.Publish(craftpack, provider.Version{ID: "7000002", Number: "1.1", Published: day(2), Loaders: []string{}, File: provider.File{Filename: "craft-1.1.zip"}}, []byte("1.1"))
+	cf.Publish(craftpack, provider.Version{ID: "7000003", Number: "1.2", Published: day(3), Loaders: []string{"neoforge"}, File: provider.File{Filename: "craft-1.2.zip"}}, []byte("1.2"))
+	cf.Publish(craftpack, provider.Version{ID: "7000004", Number: "2.0", Published: day(4), GameVersions: []string{"26.3"}, File: provider.File{Filename: "craft-2.0.zip"}}, []byte("2.0"))
+	h := newHarness(t, cf)
+
+	pin, err := h.r.ObtainModpack(context.Background(), "craftpack", manifest.Require{Type: manifest.TypeModpack})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pin.VersionNumber != "1.1" {
+		t.Fatalf("the newest fabric or untagged release for Minecraft 26.2 is 1.1, got %s", pin.VersionNumber)
+	}
+}
