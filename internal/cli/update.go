@@ -220,11 +220,12 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 		if optional > 0 {
 			optionalNudge(l, optional)
 		}
-		switch {
-		case res.IsEmpty() && plan.upToDate != nil:
-			plan.upToDate(l)
-		case res.IsEmpty():
-			printUpToDate(l, "Already up to date", local, cmd.Flags().Args())
+		if !created && res.IsEmpty() {
+			if plan.upToDate != nil {
+				plan.upToDate(l)
+			} else {
+				printUpToDate(l, "Already up to date", local, cmd.Flags().Args())
+			}
 		}
 		if res.Synced != nil {
 			res.Synced.print(l)
