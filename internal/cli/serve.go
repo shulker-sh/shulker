@@ -111,7 +111,9 @@ func (a *app) serveCmd() *cobra.Command {
 			}
 			dir := rep.Dir
 			launchArgs := server.Command(jvm, build.LaunchArgs(p.Lock))
-			a.printer.Err().OKInto("Started server with Java "+strconv.Itoa(java.Major), dir, "")
+			l := a.printer.Err()
+			l.OKInto("Started server with Java "+strconv.Itoa(java.Major), dir, "")
+			l.Blank()
 
 			interrupt := make(chan os.Signal, 2)
 			signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
@@ -152,6 +154,7 @@ func (a *app) serveCmd() *cobra.Command {
 				return e
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
+				l.Blank()
 				l.OK("Server stopped", "")
 			})
 		},
