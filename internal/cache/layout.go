@@ -21,12 +21,17 @@ import (
 //	projects/last-good/<sha>.json  the last sync from a source that built
 //	atlauncher/<loader>-<version>/ a loader installer's client install, whose libraries ATLauncher gets
 //	game/                          the store a direct launch assembles from: versions/, libraries/, assets/
+//	index/listings.json            the listing index: proven pairs of two providers' listings of one item
 //
 // Paths are built here and nowhere else.
 
 // Game is the default store root, which config.json's `store` key moves.
 func (c *Cache) Game() string {
 	return filepath.Join(c.Dir, "game")
+}
+
+func (c *Cache) ListingIndex() string {
+	return filepath.Join(c.Dir, "index", "listings.json")
 }
 
 func (c *Cache) ATLauncherInstall(loader, version string) string {

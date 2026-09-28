@@ -29,17 +29,19 @@ type Pruned struct {
 	Installs  int   `json:"installs"`
 	Logs      int   `json:"logs"`
 	Temp      int   `json:"temp"`
+	Listings  int   `json:"listings"`
 	Bytes     int64 `json:"bytes"`
 }
 
 func (p Pruned) Empty() bool {
-	return p.Files+p.Checkouts+p.Installs+p.Logs+p.Temp == 0
+	return p.Files+p.Checkouts+p.Installs+p.Logs+p.Temp+p.Listings == 0
 }
 
 type Usage struct {
-	Dir     string `json:"dir"`
-	Bytes   int64  `json:"bytes"`
-	Objects int    `json:"objects"`
+	Dir      string `json:"dir"`
+	Bytes    int64  `json:"bytes"`
+	Objects  int    `json:"objects"`
+	Listings int    `json:"listings"`
 }
 
 func (c *Cache) Usage() (Usage, error) {
@@ -52,13 +54,18 @@ func (c *Cache) Usage() (Usage, error) {
 	if err != nil {
 		return Usage{}, err
 	}
-	u.Bytes, u.Objects = size, len(objects)
+	ix, err := c.ReadListings()
+	if err != nil {
+		return Usage{}, err
+	}
+	u.Bytes, u.Objects, u.Listings = size, len(objects), len(ix.Pairs)
 	return u, nil
 }
 
-// Prune removes everything the roots don't reference. It walks only the trees
-// listed here, so the managed Java runtimes and the shared CurseForge key are
-// never candidates; a dry run reports what would go and removes nothing.
+// Prune removes everything the roots don't reference, and the listing index's
+// pairs unused for 90 days. It walks only the trees listed here, so the managed
+// Java runtimes and the shared CurseForge key are never candidates; a dry run
+// reports what would go and removes nothing.
 func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
 	keep := c.keep(roots)
 	var p Pruned
@@ -102,6 +109,11 @@ func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
 			p.Bytes += size
 		}
 	}
+	listings, err := c.pruneListings(dryRun)
+	if err != nil {
+		return Pruned{}, err
+	}
+	p.Listings = listings
 	return p, nil
 }
 
