@@ -105,7 +105,6 @@ func TestProvidersRejectWhatTheListCannotHold(t *testing.T) {
 	}{
 		{"unknown launcher", "can't read accounts from technic", []string{"add", "technic"}},
 		{"unknown in a set", "can't read accounts from technic", []string{"set", "shulker", "technic"}},
-		{"already in the list", "already reads accounts from shulker", []string{"add", "shulker"}},
 		{"repeated in a set", "names prism twice", []string{"set", "prism", "prism"}},
 		{"not in the list", "does not read accounts from prism", []string{"remove", "prism"}},
 		{"emptied", "can't be empty", []string{"remove", "shulker"}},
@@ -124,6 +123,17 @@ func TestProvidersRejectWhatTheListCannotHold(t *testing.T) {
 	}
 	if _, err := os.Stat(h.config); !os.IsNotExist(err) {
 		t.Errorf("a refused change must not be written: %v", err)
+	}
+}
+
+func TestProvidersAddNotesALauncherAlreadyInTheList(t *testing.T) {
+	h := newHarness(t)
+	code, stdout, stderr := h.run(t, "accounts", "stores", "add", "shulker")
+	if code != 0 || !strings.Contains(stdout+stderr, "i accounts.stores already reads accounts from shulker") {
+		t.Fatalf("exit %d:\n%s%s", code, stdout, stderr)
+	}
+	if _, err := os.Stat(h.config); !os.IsNotExist(err) {
+		t.Errorf("a store already there changes nothing: %v", err)
 	}
 }
 

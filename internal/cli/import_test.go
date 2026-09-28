@@ -512,7 +512,7 @@ func TestImportReadsAPathOnlyWhenItLooksLikeOne(t *testing.T) {
 		t.Fatalf("a path that isn't there is not a slug: exit %d: %s", code, stdout)
 	}
 	code, stdout, _ := h.run(t, "--json", "-C", "imp", "import", "./imp")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "usage" || e.Message != "can't import imp into itself" {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "import-into-self" || e.Message != "can't import imp into itself" {
 		t.Fatalf("importing the -C folder into itself: exit %d: %s", code, stdout)
 	}
 	if code, stdout, _ := h.run(t, "--json", "-C", "imp2", "import", "imp"); code == 0 || failureCode(t, stdout).Code != "mod-not-found" {

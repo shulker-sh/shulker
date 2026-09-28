@@ -154,7 +154,7 @@ func unprovenOwnership(message string, nudge out.Nudge) error {
 // verb that does act on it.
 func notOfflineAccount(r account.Resolved) error {
 	if r.Source == account.SourceShulker {
-		e := out.Errorf("usage", "%s is a Microsoft account, so it is signed out rather than deleted", r.Name)
+		e := out.Errorf("microsoft-account", "%s is a Microsoft account, so it is signed out rather than deleted", r.Name)
 		e.Help = fmt.Sprintf("`shulker accounts logout %s` does that", accountSelector(r))
 		return e
 	}

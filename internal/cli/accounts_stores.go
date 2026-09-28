@@ -53,7 +53,9 @@ func (a *app) storesAddCmd() *cobra.Command {
 				return err
 			}
 			if slices.Contains(from, args[0]) {
-				return out.Errorf("usage", "%s already reads accounts from %s", config.AccountsStoresKey, args[0])
+				return a.printer.Emit(configChange{Path: config.AccountsStoresKey, From: from, To: from}, func(l *out.Lines) {
+					l.Info(config.AccountsStoresKey + " already reads accounts from " + args[0])
+				})
 			}
 			return a.changeStores(from, append(slices.Clone(from), args[0]))
 		},

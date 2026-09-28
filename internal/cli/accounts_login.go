@@ -263,11 +263,11 @@ func checkOwn(r account.Resolved, verb string) error {
 // naming the verb that does work on them.
 func notOwnAccount(r account.Resolved, verb string) error {
 	if r.Source == account.SourceOffline {
-		e := out.Errorf("usage", "%s is an offline account, so there is no sign-in to %s", r.Name, verb)
+		e := out.Errorf("offline-account", "%s is an offline account, so there is no sign-in to %s", r.Name, verb)
 		e.Help = fmt.Sprintf("`shulker accounts remove %s` deletes it", accountSelector(r))
 		return e
 	}
-	return out.Errorf("usage", "%s belongs to %s, so only %s can %s it", r.Name, r.Source, r.Source, verb)
+	return out.Errorf("launcher-account", "%s belongs to %s, so only %s can %s it", r.Name, r.Source, r.Source, verb)
 }
 
 // reseatDefault keeps accounts.default pointing at an account that is still there, handing it to

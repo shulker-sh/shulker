@@ -372,7 +372,7 @@ func TestAccountsLogoutNamesRemoveForAnOfflineAccount(t *testing.T) {
 	writeAccountStore(t, h, offlineAccount("Steve", steveID))
 	code, stdout, _ := h.run(t, "accounts", "logout", "Steve", "--yes", "--json")
 	e := failureCode(t, stdout)
-	if code != out.ExitUsage || e.Code != "usage" || !strings.Contains(e.Help, "accounts remove Steve") {
+	if code != 1 || e.Code != "offline-account" || !strings.Contains(e.Help, "accounts remove Steve") {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
 }
@@ -465,7 +465,7 @@ func TestAccountsRefreshRejectsAnAccountItDidNotSignIn(t *testing.T) {
 	h := newHarness(t)
 	writeAccountStore(t, h, offlineAccount("Steve", steveID))
 	code, stdout, _ := h.run(t, "accounts", "refresh", "Steve", "--json")
-	if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" {
+	if e := failureCode(t, stdout); code != 1 || e.Code != "offline-account" {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
 }

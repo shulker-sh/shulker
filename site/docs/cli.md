@@ -939,7 +939,7 @@ shulker accounts stores add prism
 shulker accounts stores remove shulker
 ```
 
-Both print the list before and after. A launcher shulker can't read accounts from, one already in the list, one that isn't in it, and a change that would leave the list empty are all usage errors — unset `accounts.stores` to go back to the default instead of emptying it. Adding a launcher that isn't installed warns once, naming the directory that was checked; it is not an error, and nothing says it again afterwards.
+Both print the list before and after. Adding a launcher already in the list changes nothing and says so. A launcher shulker can't read accounts from, one that isn't in the list, and a change that would leave the list empty are all usage errors — unset `accounts.stores` to go back to the default instead of emptying it. Adding a launcher that isn't installed warns once, naming the directory that was checked; it is not an error, and nothing says it again afterwards.
 
 ### `shulker accounts stores set`
 
@@ -1969,6 +1969,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `history-empty` | The instance has no history entries yet; one is taken before an in-place build changes anything |
 | `history-invalid` | A history entry's own record or its lock is unreadable; the message names the entry to delete |
 | `history-missing` | There is no history entry with that number; `shulker history` lists the ones kept |
+| `import-into-self` | `import` was given the project's own folder |
 | `import-mismatch` | `import` into a project whose Minecraft version, loader or loader version, set or inherited, differs from the pack's; import it into a new folder with `-C` |
 | `installer-failed` | NeoForge's or Forge's own installer failed while setting up a server dir or a launcher; the message shows its last output and names the log in shulker's cache that holds all of it |
 | `instance-exists` | An instance already follows a different modpack, or is an ATLauncher or GDLauncher instance shulker didn't link; pass `--name` (`--as` for `link shulker`) for a second one, or `--force` |
@@ -1988,6 +1989,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `jvm-flags` | Unknown `jvmFlags` preset |
 | `key-not-found` | A `--key` isn't in the file. `candidates`: its keys |
 | `launch-not-started` | Shulker never got as far as running the game: for `hook wrap`, the instance file couldn't be read, no Java is recorded, or the recorded Java wouldn't start; for `play`, the Java it assembled wouldn't start, or the watcher it hands a detached launch to couldn't be started or stopped before it answered. Under a launcher the exit is what makes it show an error, since no window appears |
+| `launcher-account` | The account belongs to another launcher, so only that launcher can sign it out, renew it or remove it |
 | `launcher-dir-required` | MultiMC needs `--launcher-dir` |
 | `launcher-file-invalid` | A launcher file shulker reads or rewrites (an instance's JSON, `launcher_profiles.json`, `mmc-pack.json`) isn't valid JSON, or not the shape shulker expects. A row carries the parser's own error |
 | `launcher-not-found` | No launcher directory where shulker looked |
@@ -2008,6 +2010,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `memory` | Server memory isn't a whole number of M or G |
 | `meta-fetch` | Version metadata couldn't be read from Mojang, a loader's meta or Maven, or GDLauncher's meta. The row names the service and what went wrong |
 | `meta-invalid` | Version metadata was read but lacks what shulker needs, like a Minecraft version Mojang doesn't list, a Java runtime manifest with no java in it, or a loader installer whose files won't parse |
+| `microsoft-account` | `accounts remove` was given a Microsoft account, which is signed out with `accounts logout` rather than deleted |
 | `minecraft-required` | `shulker.json` sets no `minecraft` and no locked modpack supplies one; set it with `shulker set minecraft <version>` |
 | `missing-files` | Files that need a manual download are missing, at `install`, or files a CurseForge modpack names at `import` (both wait for them at a terminal instead, as `install` does for a hosted modpack's archive) or when a modpack's CurseForge zip is read, or a hosted modpack's archive when its author turned off third-party downloads; also a local `file` entry whose file is gone or changed when the cache has no copy either. Only `.jar` and `.zip` files in `downloads/` are read, since Minecraft keeps its own files in an instance's `downloads/`. `items`: what to download or restore |
 | `mod-not-found` | The mod isn't on any provider, or isn't in `shulker.json`. `candidates`: the mods in `shulker.json`, where relevant |
@@ -2047,6 +2050,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `not-pinned` | The mod has no pin |
 | `not-shulker` | The instance belongs to another launcher, which starts it itself |
 | `not-synced` | The directory has no record of the source it was synced from |
+| `offline-account` | `accounts logout` or `accounts refresh` was given an offline account, which has no sign-in; `accounts remove` deletes it |
 | `override-path` | A path named to `match` isn't a jar in `mods/` or a zip in `resourcepacks/`, `shaderpacks/` or a datapack folder of `overrides/`, `client-overrides/` or `server-overrides/` |
 | `overrides-invalid` | The `shulker.overrides.json` at a modpack archive's root, where an export records which folder each override came from, isn't valid; it reaches you as `mrpack-marker` |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |

@@ -217,7 +217,7 @@ func TestAccountsRemoveNamesLogoutForAMicrosoftAccount(t *testing.T) {
 	h := withOwner(t)
 	code, stdout, _ := h.run(t, "accounts", "remove", "Notch", "--yes", "--json")
 	e := failureCode(t, stdout)
-	if code != out.ExitUsage || e.Code != "usage" || !strings.Contains(e.Help, "accounts logout Notch") {
+	if code != 1 || e.Code != "microsoft-account" || !strings.Contains(e.Help, "accounts logout Notch") {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
 	if len(readAccountStore(t, h).Accounts) != 1 {

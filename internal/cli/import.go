@@ -243,7 +243,7 @@ func (a *app) findImport(ctx context.Context, d *deps, dir string, target *proje
 			return nil, nil, nil, err
 		}
 		if path == dir {
-			return nil, nil, nil, out.Errorf("usage", "can't import %s into itself", filepath.Base(dir))
+			return nil, nil, nil, out.Errorf("import-into-self", "can't import %s into itself", filepath.Base(dir))
 		}
 		if resolve.IsLocalFolder(path) {
 			arc, c, err := a.importCheckout(ctx, d, dir, path, f)
