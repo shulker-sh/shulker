@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
@@ -141,15 +144,49 @@ func (a *app) searchProject() *project.Project {
 }
 
 // searchMerge folds each listing found on several providers into one row, pairing too the hits
-// p's lock holds as one mod's aliases. It reads p once, so the live search can call it off the
-// drawing loop.
+// p's lock holds as one mod's aliases and those the listing index proved. It reads p and the index
+// once, so the live search can call it off the drawing loop.
 func (a *app) searchMerge(p *project.Project) func([]provider.Hit) []provider.Result {
-	var pairs func(x, y provider.Hit) bool
-	if p != nil && p.Lock != nil {
-		l := p.Lock
-		pairs = func(x, y provider.Hit) bool { return l.Aliased(x.Provider, x.ID, y.Provider, y.ID) }
+	var l *lock.Lock
+	if p != nil {
+		l = p.Lock
 	}
-	return func(hits []provider.Hit) []provider.Result { return provider.Merge(hits, pairs) }
+	d, err := a.deps()
+	if err != nil {
+		return func(hits []provider.Hit) []provider.Result { return provider.Merge(hits, nil) }
+	}
+	ix, err := d.Cache.ReadListings()
+	if err != nil {
+		a.printer.Warn("the listing index wasn't read (%s)", err)
+	}
+	var mu sync.Mutex
+	touched := map[[2]cache.Listing]bool{}
+	return func(hits []provider.Hit) []provider.Result {
+		mu.Lock()
+		defer mu.Unlock()
+		var used [][2]cache.Listing
+		paired := func(x, y provider.Hit) bool {
+			if l != nil && l.Aliased(x.Provider, x.ID, y.Provider, y.ID) {
+				return true
+			}
+			pair := [2]cache.Listing{{Provider: x.Provider, ID: x.ID}, {Provider: y.Provider, ID: y.ID}}
+			if !ix.Paired(pair[0], pair[1]) {
+				return false
+			}
+			if !touched[pair] && ix.Stale(pair[0], pair[1]) {
+				touched[pair] = true
+				used = append(used, pair)
+			}
+			return true
+		}
+		results := provider.Merge(hits, paired)
+		// A pair whose use isn't recorded is pruned sooner, which costs one jar fetch later: not
+		// worth failing or interrupting a search over.
+		if len(used) > 0 {
+			_ = d.Cache.UseListings(used...)
+		}
+		return results
+	}
 }
 
 // searchUnmerged is each provider's hit as a row of its own.

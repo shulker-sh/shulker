@@ -6,6 +6,10 @@ All notable changes to shulker are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- A listing index in the cache remembers each Modrinth and CurseForge listing that `add`, `lock` or `import` proved to be the same, by a jar's mod id or a file's hash. `search` shows such a pair as one row, and adding the other listing of a locked mod no longer downloads its jar again. `cache info` counts the pairs and `cache prune` drops those unused for 90 days.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.

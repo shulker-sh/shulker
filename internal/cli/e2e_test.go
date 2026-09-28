@@ -460,7 +460,7 @@ func newHarness(t *testing.T) *harness {
 		q := r.URL.Query()
 		limit, _ := strconv.Atoi(q.Get("limit"))
 		hits := []map[string]any{}
-		for _, slug := range []string{"fabric-api", "sodium", "fresh-animations", "complementary-reimagined"} {
+		for _, slug := range []string{"fabric-api", "sodium", "fresh-animations", "complementary-reimagined", "irisshaders"} {
 			p := projects[slug]
 			kind, _ := p["project_type"].(string)
 			if kind == "" {
@@ -742,6 +742,7 @@ var searchDownloads = map[string]int64{
 	"sodium":                   228_124_617,
 	"fresh-animations":         5_000_000,
 	"complementary-reimagined": 3_000,
+	"irisshaders":              70_000_000,
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

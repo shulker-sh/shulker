@@ -64,9 +64,15 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 					{Text: out.HumanBytes(usage.Bytes) + ", " + out.Count(usage.Objects, "object", "objects")},
 					{Text: out.Sentence(rootsText(r))},
 				}
-				if would.Empty() {
+				if usage.Listings > 0 {
+					rows = append(rows, out.Row{Text: out.Count(usage.Listings, "listing pair", "listing pairs") + " in the listing index"})
+				}
+				switch {
+				case would.Empty():
 					rows = append(rows, out.Row{Text: "nothing to prune"})
-				} else {
+				case would.Bytes == 0:
+					rows = append(rows, out.Row{Text: prunedAside(would) + " prunable"})
+				default:
 					rows = append(rows, out.Row{Text: out.HumanBytes(would.Bytes) + " prunable (" + prunedAside(would) + ")"})
 				}
 				l.Tree(rows...)
@@ -115,6 +121,10 @@ func (a *app) cachePruneCmd() *cobra.Command {
 					return
 				case pruned.Empty():
 					l.Info("Nothing to prune; everything in the cache is " + rootsText(r))
+					return
+				}
+				if pruned.Bytes == 0 {
+					l.OK("Dropped "+prunedAside(pruned), "")
 					return
 				}
 				l.OK("Freed "+out.HumanBytes(pruned.Bytes), "")
@@ -178,6 +188,7 @@ func prunedAside(p cache.Pruned) string {
 		{p.Installs, "loader install", "loader installs"},
 		{p.Logs, "installer log", "installer logs"},
 		{p.Temp, "leftover file", "leftover files"},
+		{p.Listings, "unused listing pair", "unused listing pairs"},
 	} {
 		if kind.n > 0 {
 			parts = append(parts, out.Count(kind.n, kind.one, kind.many))
