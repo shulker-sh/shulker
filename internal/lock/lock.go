@@ -32,6 +32,16 @@ type Lock struct {
 	Shaders       map[string]Pack    `json:"shaders"`
 	Datapacks     map[string]Pack    `json:"datapacks"`
 	Players       []Player           `json:"players"`
+	Imported      *Imported          `json:"imported,omitempty"`
+}
+
+// Imported names the modpack archive the project was last imported from. A re-import of the same
+// pack opens it again to tell what that import wrote, still untouched, from what the user changed.
+type Imported struct {
+	Provider string `json:"provider,omitempty"`
+	Project  string `json:"project,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Sha512   string `json:"sha512"`
 }
 
 type Loader struct {

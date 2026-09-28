@@ -105,12 +105,18 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 	if err != nil {
 		return err
 	}
-	arc, source, err := a.findImport(ctx, d, dir, target, arg, f)
+	arc, source, hosted, err := a.findImport(ctx, d, dir, target, arg, f)
 	if err != nil {
 		return err
 	}
+	var record *lock.Imported
+	if arc != nil {
+		if record, err = resolve.ImportRecord(d.Cache, arc, hosted); err != nil {
+			return err
+		}
+	}
 	if target != nil {
-		return a.mergeImport(cmd, d, target, arc, source, f)
+		return a.mergeImport(cmd, d, target, arc, source, record, f)
 	}
 	if source != nil {
 		return a.importSource(cmd, dir, source, f)
@@ -130,6 +136,7 @@ func (a *app) runImport(cmd *cobra.Command, arg string, f *importFlags) error {
 		return err
 	}
 	m, l := r.Manifest, r.Lock
+	l.Imported = record
 	leftOut := []string{}
 	if f.side != "" {
 		mods.Overrides, leftOut = resolve.KeepSide(m, l, mods.Overrides, f.side)
@@ -226,45 +233,47 @@ func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive,
 // as a source; a URL as an archive by its content, else a git or manifest source; and anything
 // else as a modpack slug, fitting target's platform when there is a target to merge into. It
 // returns the archive, or the source's checkout.
-func (a *app) findImport(ctx context.Context, d *deps, dir string, target *project.Project, arg string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, error) {
+func (a *app) findImport(ctx context.Context, d *deps, dir string, target *project.Project, arg string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, *lock.Modpack, error) {
 	if !isImportURL(arg) {
 		if !looksLikePath(arg) {
 			return a.importHosted(ctx, d, dir, target, arg, f)
 		}
 		path, err := importPath(arg)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if path == dir {
-			return nil, nil, out.Errorf("usage", "can't import %s into itself", filepath.Base(dir))
+			return nil, nil, nil, out.Errorf("usage", "can't import %s into itself", filepath.Base(dir))
 		}
 		if resolve.IsLocalFolder(path) {
-			return a.importCheckout(ctx, d, dir, path, f)
+			arc, c, err := a.importCheckout(ctx, d, dir, path, f)
+			return arc, c, nil, err
 		}
 		if _, err := os.Stat(path); err != nil {
-			return nil, nil, out.Errorf("file-not-found", "%s isn't there", arg)
+			return nil, nil, nil, out.Errorf("file-not-found", "%s isn't there", arg)
 		}
 		if err := refuseImportFlags(f, modpack.File); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		arc, err := readImportArchive(path, f.typ)
-		return arc, nil, err
+		return arc, nil, nil, err
 	}
 	if (strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://")) && modpack.Classify(arg) == modpack.Git {
 		store := &modpack.Store{Cache: d.Cache, Fetch: d.Fetch, Log: a.progress, Working: a.printer.Working}
 		path, err := store.FetchArchive(ctx, arg)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if path != "" {
 			if err := refuseImportFlags(f, modpack.File); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			arc, err := readImportArchive(path, f.typ)
-			return arc, nil, err
+			return arc, nil, nil, err
 		}
 	}
-	return a.importCheckout(ctx, d, dir, arg, f)
+	arc, c, err := a.importCheckout(ctx, d, dir, arg, f)
+	return arc, c, nil, err
 }
 
 // looksLikePath reports whether import reads arg as a path rather than a modpack slug. A bare word
@@ -315,22 +324,23 @@ func refuseImportFlags(f *importFlags, kind modpack.Kind) error {
 
 // importHosted picks a hosted modpack's newest release that fits target's platform, or any
 // platform without a target, and reads its archive from the cache.
-func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *project.Project, slug string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, error) {
+func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *project.Project, slug string, f *importFlags) (*packarchive.Archive, *modpack.Checkout, *lock.Modpack, error) {
 	if err := refuseImportFlags(f, modpack.Hosted); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	r := resolve.NewAt(d.Env, dir)
 	r.Manifest = &manifest.Manifest{}
+	var was *lock.Imported
 	if target != nil {
-		r.Manifest, r.Lock = target.Manifest, target.Lock
+		r.Manifest, r.Lock, was = target.Manifest, target.Lock, target.Lock.Imported
 	}
-	pin, err := r.ObtainModpack(ctx, slug, manifest.Require{Type: manifest.TypeModpack, Provider: f.provider})
+	pin, err := r.ObtainImport(ctx, slug, manifest.Require{Type: manifest.TypeModpack, Provider: f.provider}, was)
 	a.warn(r.Warnings)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	arc, err := readImportArchive(d.Cache.Object(pin.Sha512), f.typ)
-	return arc, nil, err
+	return arc, nil, &pin, err
 }
 
 // importCheckout fetches a shulker source for an import to copy.

@@ -105,6 +105,16 @@ func unlockedModpack(key string) *out.Error {
 // returning the lock entry that names both. A CurseForge archive's sha512 is only known once it is
 // downloaded, as a CurseForge mod's is.
 func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifest.Require) (lock.Modpack, error) {
+	return r.obtainModpack(ctx, name, entry, nil)
+}
+
+// ObtainImport is ObtainModpack for an import, which never goes back past the version the project
+// was last imported from when that was the same pack.
+func (r *Resolver) ObtainImport(ctx context.Context, name string, entry manifest.Require, was *lock.Imported) (lock.Modpack, error) {
+	return r.obtainModpack(ctx, name, entry, was)
+}
+
+func (r *Resolver) obtainModpack(ctx context.Context, name string, entry manifest.Require, was *lock.Imported) (lock.Modpack, error) {
 	slug := name
 	if entry.Project != "" {
 		slug = entry.Project
@@ -121,6 +131,11 @@ func (r *Resolver) ObtainModpack(ctx context.Context, name string, entry manifes
 	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeModpack, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
 		return lock.Modpack{}, channelSetting(err, name)
+	}
+	if was != nil && entry.Pin == "" && was.Provider == p.Name() && was.Project == proj.ID && was.Version != "" && was.Version != v.ID {
+		if last, err := p.Version(ctx, was.Version); err == nil && last.Published.After(v.Published) {
+			v = last
+		}
 	}
 	channel := r.relistedChannel(name, entry, v)
 	r.log("fetching modpack %s %s", proj.Slug, v.Number)

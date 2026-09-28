@@ -198,3 +198,57 @@ func TestImportMergeTakesTheSlugsVersionForTheProjectsLoader(t *testing.T) {
 		t.Fatalf("override: %q %v", data, err)
 	}
 }
+
+// reimportCozy imports cozy 1.0.0 into a fabric project, then publishes 2.0.0 for the next import.
+func reimportCozy(t *testing.T) *harness {
+	t.Helper()
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	older := hostedMrpack(t, h, "cozy-1.0.0.mrpack", "1.0.0")
+	pack := &modrinthPack{slug: "cozy", versions: []modrinthPackVersion{{id: "cozyV100", number: "1.0.0", published: "2026-09-01T00:00:00Z", archive: older}}}
+	h.modrinthPacks = map[string]*modrinthPack{"COZYpack": pack}
+	importMerge(t, h, "cozy")
+	data, err := os.ReadFile(filepath.Join(h.dir, "shulker.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var l struct {
+		Imported struct{ Provider, Project, Version, Sha512 string } `json:"imported"`
+	}
+	if err := json.Unmarshal(data, &l); err != nil || l.Imported.Project != "COZYpack" || l.Imported.Version != "cozyV100" || l.Imported.Sha512 != older.sha512 {
+		t.Fatalf("the lock records the archive imported: %+v %v", l.Imported, err)
+	}
+	newer := hostedMrpack(t, h, "cozy-2.0.0.mrpack", "2.0.0")
+	pack.versions = append(pack.versions, modrinthPackVersion{id: "cozyV200", number: "2.0.0", published: "2026-09-05T00:00:00Z", archive: newer})
+	return h
+}
+
+func TestAReimportReplacesTheFilesTheEarlierImportWrote(t *testing.T) {
+	h := reimportCozy(t)
+
+	res := importMerge(t, h, "cozy")
+
+	if data, err := os.ReadFile(filepath.Join(h.dir, "overrides", "config", "cozy.txt")); err != nil || string(data) != "cozy 2.0.0\n" {
+		t.Fatalf("override: %q %v", data, err)
+	}
+	if len(res.Data.KeptYours) != 0 {
+		t.Fatalf("nothing was changed since the last import, so nothing is kept: %q", res.Data.KeptYours)
+	}
+}
+
+func TestAReimportKeepsAFileTheUserChanged(t *testing.T) {
+	h := reimportCozy(t)
+	cozy := filepath.Join(h.dir, "overrides", "config", "cozy.txt")
+	if err := os.WriteFile(cozy, []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	res := importMerge(t, h, "cozy")
+
+	if data, err := os.ReadFile(cozy); err != nil || string(data) != "mine\n" {
+		t.Fatalf("override: %q %v", data, err)
+	}
+	if !slices.Equal(res.Data.KeptYours, []string{"overrides/config/cozy.txt"}) {
+		t.Fatalf("kept yours: %q", res.Data.KeptYours)
+	}
+}

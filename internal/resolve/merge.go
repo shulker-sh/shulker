@@ -24,6 +24,9 @@ type Incoming struct {
 	Overrides []packarchive.Override
 	Dir       string
 	HasBlocks bool
+	// Earlier is what an earlier import of the same pack wrote, which the merge replaces where
+	// the project still holds it; nil keeps everything the project has.
+	Earlier *Earlier
 }
 
 // Merged is what a merge brought in and what it left alone.
@@ -35,13 +38,33 @@ type Merged struct {
 	Kept      int
 	// Created are the files and folders the merge wrote, which a failed relock takes away again.
 	Created []string
+	// replaced are the files the merge wrote over, with what they held, for Undo to put back.
+	replaced []replacedFile
 }
 
-// Undo removes what the merge wrote, newest first.
+type replacedFile struct {
+	path string
+	data []byte
+}
+
+// Undo removes what the merge wrote, newest first, and puts back the files it wrote over.
 func (m *Merged) Undo() {
 	for _, path := range slices.Backward(m.Created) {
 		os.RemoveAll(path)
 	}
+	for _, f := range m.replaced {
+		fsutil.Write(f.path, f.data)
+	}
+}
+
+// replace writes data over the file at path, keeping what it held for Undo.
+func (m *Merged) replace(path string, data []byte) error {
+	was, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	m.replaced = append(m.replaced, replacedFile{path, was})
+	return fsutil.Write(path, data)
 }
 
 // IncomingFromSource reads a shulker source for a merge: its manifest, its lock, and the files in
@@ -146,14 +169,35 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 			p.Manifest.SeedFiles = append(p.Manifest.SeedFiles, pattern)
 		}
 	}
-	projectJars := map[string]bool{}
+	projectJars := map[string]string{}
 	for key := range p.Lock.Mods {
-		projectJars[p.Lock.JarID(key)] = true
+		projectJars[p.Lock.JarID(key)] = key
 	}
 	kept := map[string]bool{}
+	requiredBy := map[string][]string{}
+	replacedFiles := map[string]bool{}
 	for _, key := range slices.Sorted(maps.Keys(pm.Requires)) {
 		_, isMod := pl.Mods[key]
-		if _, listed := p.Manifest.Requires[key]; listed || (isMod && projectJars[pl.JarID(key)]) {
+		mine := ""
+		if _, listed := p.Manifest.Requires[key]; listed {
+			mine = key
+		} else if isMod {
+			mine = projectJars[pl.JarID(key)]
+		}
+		if mine != "" && inc.Earlier.wroteEntry(p.Lock, mine) {
+			if m, ok := p.Lock.Mods[mine]; ok {
+				requiredBy[key] = m.RequiredBy
+				delete(projectJars, p.Lock.JarID(mine))
+			}
+			if file := dropEntry(p, mine); file != "" {
+				replacedFiles[file] = true
+			}
+			if mine != key {
+				renameRequiredBy(p.Lock, mine, key)
+			}
+			mine = ""
+		}
+		if mine != "" {
 			rep.KeptYours = append(rep.KeptYours, key)
 			kept[key] = true
 			continue
@@ -166,8 +210,13 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 	var files []string
 	for _, key := range slices.Sorted(maps.Keys(pl.Mods)) {
 		mod := pl.Mods[key]
-		if _, held := p.Lock.Mods[key]; held || kept[key] || kept[mod.Modpack] || projectJars[pl.JarID(key)] {
+		if _, held := p.Lock.Mods[key]; held || kept[key] || kept[mod.Modpack] || projectJars[pl.JarID(key)] != "" {
 			continue
+		}
+		for _, by := range requiredBy[key] {
+			if !slices.Contains(mod.RequiredBy, by) {
+				mod.RequiredBy = append(slices.Clone(mod.RequiredBy), by)
+			}
 		}
 		p.Lock.Mods[key] = mod
 		files = append(files, mod.File)
@@ -193,11 +242,22 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 			continue
 		}
 		from, to := filepath.Join(inc.Dir, filepath.FromSlash(rel)), filepath.Join(p.Dir, filepath.FromSlash(rel))
-		if _, err := os.Lstat(to); err == nil {
+		_, err := os.Lstat(to)
+		if err == nil && !replacedFiles[rel] {
 			continue
 		}
 		if _, err := os.Stat(from); inc.Dir == "" || err != nil {
 			return rep, modpack.FileMissing(inc.Manifest.Name, rel)
+		}
+		if err == nil {
+			data, err := os.ReadFile(from)
+			if err != nil {
+				return rep, err
+			}
+			if err := rep.replace(to, data); err != nil {
+				return rep, err
+			}
+			continue
 		}
 		rep.Created = append(rep.Created, to)
 		if err := fsutil.CopyPath(from, to); err != nil {
@@ -207,6 +267,13 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 	for _, o := range overrides {
 		to := filepath.Join(p.Dir, filepath.FromSlash(o.Layer), filepath.FromSlash(o.Path))
 		if _, err := os.Lstat(to); err == nil {
+			if data, err := os.ReadFile(to); err == nil && inc.Earlier.wroteOverride(o.Layer+"/"+o.Path, data) {
+				if err := rep.replace(to, o.Data); err != nil {
+					return rep, err
+				}
+				rep.Copied++
+				continue
+			}
 			rep.KeptYours = append(rep.KeptYours, o.Layer+"/"+o.Path)
 			rep.Kept++
 			continue

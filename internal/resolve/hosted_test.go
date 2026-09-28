@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/env/envtest"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
@@ -135,5 +136,23 @@ func TestAModpackFileTaggedWithNoLoaderFitsAnyLoader(t *testing.T) {
 
 	if pin.VersionNumber != "1.1" {
 		t.Fatalf("the newest fabric or untagged release for Minecraft 26.2 is 1.1, got %s", pin.VersionNumber)
+	}
+}
+
+func TestAReimportNeverGoesBackPastTheVersionLastImported(t *testing.T) {
+	cf := curseForgeHost(t)
+	craftpack := provider.Project{ID: "800000", Slug: "craftpack", Title: "Craft Pack", Type: manifest.TypeModpack}
+	cf.Publish(craftpack, provider.Version{ID: "7000001", Number: "1.0", Published: day(1), Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.0.zip"}}, []byte("1.0"))
+	cf.Publish(craftpack, provider.Version{ID: "7000002", Number: "1.1-beta", Channel: "beta", Published: day(2), Loaders: []string{"fabric"}, File: provider.File{Filename: "craft-1.1.zip"}}, []byte("1.1"))
+	h := newHarness(t, cf)
+	was := &lock.Imported{Provider: "curseforge", Project: "800000", Version: "7000002", Sha512: sha512Hex([]byte("1.1"))}
+
+	pin, err := h.r.ObtainImport(context.Background(), "craftpack", manifest.Require{Type: manifest.TypeModpack}, was)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pin.VersionNumber != "1.1-beta" {
+		t.Fatalf("the project last imported 1.1-beta, so a re-import keeps it over the older release, got %s", pin.VersionNumber)
 	}
 }

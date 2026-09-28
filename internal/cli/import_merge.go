@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
@@ -16,7 +17,7 @@ import (
 )
 
 // mergeImport merges a modpack into the project p, the project winning on every clash.
-func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *packarchive.Archive, source *modpack.Checkout, f *importFlags) error {
+func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *packarchive.Archive, source *modpack.Checkout, record *lock.Imported, f *importFlags) error {
 	ctx := cmd.Context()
 	dir := p.Dir
 	sides, err := mergeSides(p.Manifest, f.side)
@@ -47,11 +48,15 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 		}
 		mods = imported
 		inc = &resolve.Incoming{Manifest: r.Manifest, Lock: r.Lock, Overrides: mods.Overrides, Dir: staging, HasBlocks: arc.Marker != nil}
+		inc.Earlier = resolve.NewAt(d.Env, dir).ReadEarlier(ctx, p.Lock.Imported, record)
 	}
 	name, version := inc.Manifest.Name, inc.Manifest.Version
 	var rep *resolve.Merged
 	run := func(p *project.Project, _ *resolve.Resolver) (string, error) {
 		rep, err = resolve.Merge(p, inc, sides)
+		if err == nil && record != nil {
+			p.Lock.Imported = record
+		}
 		return "", err
 	}
 	if _, err := a.relockOpened(cmd, p, relockOptions{}, run); err != nil {

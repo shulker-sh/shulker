@@ -6,6 +6,10 @@ All notable changes to shulker are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- Importing a pack again replaces the entries and override files the earlier import wrote and you haven't changed, keeps only yours, and never goes back to an older version. RLCraft re-imported as 2.9.2d after 2.9.3, since CurseForge tags 2.9.3 with no loader.
+
 ## [0.0.1] - 2026-09-26
 
 The first release of shulker, a package manager for Minecraft modpacks. A pack is a `shulker.json` you edit and a `shulker.lock` that records exact versions and hashes, so every machine builds the same pack.

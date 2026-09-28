@@ -104,6 +104,18 @@
       "type": "array",
       "items": { "$ref": "#/$defs/player" },
       "description": "Every player referenced anywhere in the manifest, fully resolved. uuid is the identity across renames."
+    },
+    "imported": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha512"],
+      "properties": {
+        "provider": { "type": "string", "enum": ["modrinth", "curseforge"], "description": "The provider the archive was fetched from. Absent for an archive imported from a file or URL." },
+        "project": { "$ref": "#/$defs/providerId", "description": "Provider project id of the modpack." },
+        "version": { "$ref": "#/$defs/providerId", "description": "Provider version id (Modrinth) or file id (CurseForge) of the archive." },
+        "sha512": { "$ref": "#/$defs/sha512", "description": "The archive's hash, which finds it in the cache." }
+      },
+      "description": "The modpack archive the project was last imported from. Importing the same pack again reads it to replace the entries and override files that still match it, keeping only the ones the user changed. Absent when nothing was imported."
     }
   },
   "$defs": {
