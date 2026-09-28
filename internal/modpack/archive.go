@@ -13,6 +13,7 @@ import (
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/manual"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
 )
@@ -147,6 +148,7 @@ func (s *Store) fetchHosted(ctx context.Context, l *Loaded) error {
 	}
 	e := out.Errorf("missing-files", "modpack %s %s needs a manual download", l.Name, l.Pin.VersionNumber)
 	e.Items = []string{fmt.Sprintf("%s: download %s from %s and place it in %s/", l.Name, l.Pin.Filename, l.Pin.Page, DownloadsDir)}
+	manual.Attach(e, []manual.File{{Name: l.Pin.Filename, Page: l.Pin.Page, Sha512: l.Pin.Sha512}})
 	return e
 }
 

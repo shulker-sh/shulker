@@ -11,14 +11,11 @@ import (
 	"sort"
 	"strings"
 
+	"shulker.sh/shulker/internal/manual"
 	"shulker.sh/shulker/internal/modpack"
 )
 
 const DownloadsDir = modpack.DownloadsDir
-
-// manualKinds are the extensions a file a provider serves can have. Minecraft keeps its own files
-// in a game dir's downloads/, which is an in-place instance's DownloadsDir: log.json, for one.
-var manualKinds = []string{".jar", ".zip"}
 
 type dropped struct {
 	Name   string
@@ -44,7 +41,7 @@ func (r *Resolver) sweepDownloads() ([]dropped, error) {
 	}
 	var files []dropped
 	for _, e := range entries {
-		if !e.Type().IsRegular() || e.Name()[0] == '.' || !slices.Contains(manualKinds, strings.ToLower(filepath.Ext(e.Name()))) {
+		if !e.Type().IsRegular() || e.Name()[0] == '.' || !slices.Contains(manual.Kinds, strings.ToLower(filepath.Ext(e.Name()))) {
 			continue
 		}
 		f, err := os.Open(filepath.Join(dir, e.Name()))

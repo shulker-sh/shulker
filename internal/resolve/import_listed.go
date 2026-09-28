@@ -8,6 +8,7 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/manual"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
@@ -40,7 +41,8 @@ func (im *importer) listedByID(ctx context.Context) error {
 			return err
 		}
 		var missing []string
-		var manual []out.Detail
+		var rows []out.Detail
+		var byHand []manual.File
 		for _, f := range byProvider[name] {
 			if f.Optional {
 				rep.Warnings = append(rep.Warnings, fmt.Sprintf("skipped %s project %s file %s: the pack marks it optional", p.Title(), f.Project, f.Version))
@@ -52,7 +54,8 @@ func (im *importer) listedByID(ctx context.Context) error {
 			}
 			if out.CodeOf(err) == "manual-download" {
 				missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", proj.Slug, v.File.Filename, v.Page, r.downloads()))
-				manual = append(manual, ManualRow(v.File.Filename, v.Page))
+				rows = append(rows, ManualRow(v.File.Filename, v.Page))
+				byHand = append(byHand, manual.File{Name: v.File.Filename, Page: v.Page, Sha1: v.File.Sha1, Sha512: v.File.Sha512})
 				continue
 			}
 			if err != nil {
@@ -61,7 +64,8 @@ func (im *importer) listedByID(ctx context.Context) error {
 		}
 		if len(missing) > 0 {
 			e := out.Errorf("missing-files", "%s a manual download", out.Count(len(missing), "file needs", "files need"))
-			e.Items, e.Rows = missing, manual
+			e.Items, e.Rows = missing, rows
+			manual.Attach(e, byHand)
 			e.Help = "download them, then run the command again"
 			return e
 		}

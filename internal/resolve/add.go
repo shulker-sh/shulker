@@ -20,6 +20,7 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/manual"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
@@ -747,7 +748,8 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 	}
 	var fetched []string
 	var missing []string
-	var manual []out.Detail
+	var rows []out.Detail
+	var byHand []manual.File
 	var wanted []string
 	var downloads []out.Download
 	byID := map[string]downloadable{}
@@ -766,7 +768,7 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 		}
 		if f.url == nil {
 			missing = append(missing, fmt.Sprintf("%s: download %s from %s and place it in %s/", f.id, f.filename, f.page, DownloadsDir))
-			manual = append(manual, ManualRow(f.filename, f.page))
+			rows, byHand = append(rows, ManualRow(f.filename, f.page)), append(byHand, f.byHand())
 			continue
 		}
 		byID[f.id] = f
@@ -787,7 +789,7 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 		_, err := r.Cache.Ensure(ctx, r.Fetch, *f.url, f.sha512)
 		if errors.Is(err, fetch.ErrForbidden) {
 			missing = append(missing, fmt.Sprintf("%s: download forbidden; download %s from %s and place it in %s/", id, f.filename, f.page, DownloadsDir))
-			manual = append(manual, ManualRow(f.filename, f.page))
+			rows, byHand = append(rows, ManualRow(f.filename, f.page)), append(byHand, f.byHand())
 			continue
 		}
 		if err != nil {
@@ -815,12 +817,18 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 	if len(missing) > 0 {
 		e := out.Errorf("missing-files", "%s a manual download", out.Count(len(missing), "file needs", "files need"))
 		e.Items = missing
-		if len(manual) == len(missing) {
-			e.Rows = manual
+		if len(rows) == len(missing) {
+			e.Rows = rows
+			manual.Attach(e, byHand)
 		}
 		errs = append(errs, e)
 	}
 	return fetched, warnings, errors.Join(errs...)
+}
+
+// byHand is the file to download by hand in place of f.
+func (f downloadable) byHand() manual.File {
+	return manual.File{Name: f.filename, Page: f.page, Sha1: f.sha1, Sha512: f.sha512}
 }
 
 // downloadsFailed is the error for the locked files whose downloads failed: the one file's own

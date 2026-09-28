@@ -31,12 +31,10 @@ stdout, errors included. Act on error.code rather than the message, and run
 "shulker lock" when lockStale is true.`
 
 type app struct {
-	printer *out.Printer
-	style   out.Options
-	stdin   io.Reader
-	tty     func() bool
-	// waits counts the manual-download waits this run has shown, so a repeat says what is still missing.
-	waits       int
+	printer     *out.Printer
+	style       out.Options
+	stdin       io.Reader
+	tty         func() bool
 	asker       asker
 	dir         string
 	instance    string

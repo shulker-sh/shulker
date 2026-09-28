@@ -5,25 +5,27 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
-// readerFunc is a stdin that acts when read, so a test can drop a file into downloads/ at the
-// moment the run waits for one.
-type readerFunc func(p []byte) (int, error)
-
-func (f readerFunc) Read(p []byte) (int, error) { return f(p) }
-
-// enterAfter answers enter each time it is read, running then before the nth answer.
-func enterAfter(n int, then func()) readerFunc {
-	reads := 0
-	return func(p []byte) (int, error) {
-		reads++
-		if reads == n {
-			then()
-		}
-		p[0] = '\n'
-		return 1, nil
+// keysOnceWaiting is a stdin that, once the wait has created downloads, runs then and types keys.
+func keysOnceWaiting(t *testing.T, downloads string, then func(), keys string) *os.File {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
 	}
+	t.Cleanup(func() { r.Close(); w.Close() })
+	go func() {
+		for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+			if _, err := os.Stat(downloads); err == nil {
+				break
+			}
+		}
+		then()
+		w.WriteString(keys)
+	}()
+	return r
 }
 
 // lockedManualDownload is a project with nodist locked, its jar gone from downloads/ and the
@@ -45,21 +47,15 @@ func TestInstallWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	h := lockedManualDownload(t)
 	downloads := filepath.Join(h.dir, "downloads")
 	h.tty = true
-	h.stdin = enterAfter(2, func() {
-		if _, err := os.Stat(downloads); err != nil {
-			t.Errorf("downloads/ is created before the wait: %v", err)
-		}
-		os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
-	})
+	h.stdin = keysOnceWaiting(t, downloads, func() {
+		os.WriteFile(filepath.Join(downloads, "renamed.jar"), h.jars["nodist"].data, 0o644)
+	}, "\r")
 
 	code, stdout, stderr := h.run(t, "install")
 	if code != 0 {
 		t.Fatalf("install after the file arrives: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
-	if !strings.Contains(stderr, "1 file needs a manual download into "+downloads) || !strings.Contains(stderr, "1 file is still missing from "+downloads) {
-		t.Fatalf("the wait lists the files, and says so again while they are missing: %s", stderr)
-	}
-	if !strings.Contains(stderr, "nodist-1.0.0.jar\n") || !strings.Contains(stderr, "https://www.curseforge.com") || !strings.Contains(stderr, "Press Enter once they're there, or Ctrl-C to skip them") {
+	if !strings.Contains(stderr, "1 file needs a manual download into "+downloads) || !strings.Contains(stderr, "nodist-1.0.0.jar") || !strings.Contains(stderr, "https://www.curseforge.com") {
 		t.Fatalf("the wait names each file and its page: %s", stderr)
 	}
 	if !strings.Contains(stdout, "Built client") {
@@ -69,8 +65,13 @@ func TestInstallWaitsForAManualDownloadAtATerminal(t *testing.T) {
 
 func TestInstallFailsMissingFilesWhereItCantWait(t *testing.T) {
 	h := lockedManualDownload(t)
-	answered := false
-	h.stdin = readerFunc(func(p []byte) (int, error) { answered = true; p[0] = '\n'; return 1, nil })
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	w.Close()
+	h.stdin = r
 	for _, c := range []struct {
 		tty  bool
 		args []string
@@ -81,7 +82,7 @@ func TestInstallFailsMissingFilesWhereItCantWait(t *testing.T) {
 	} {
 		h.tty = c.tty
 		code, stdout, stderr := h.run(t, c.args...)
-		if code == 0 || !strings.Contains(stdout+stderr, "missing-files") || answered {
+		if code == 0 || !strings.Contains(stdout+stderr, "missing-files") || strings.Contains(stderr, "Press Enter") {
 			t.Fatalf("%v tty=%v: code=%d stdout=%s stderr=%s", c.args, c.tty, code, stdout, stderr)
 		}
 	}
@@ -94,15 +95,12 @@ func TestImportWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "craft-pack")
 	downloads := filepath.Join(dir, "downloads")
 	h.tty = true
-	h.stdin = enterAfter(1, func() {
-		if _, err := os.Stat(downloads); err != nil {
-			t.Errorf("downloads/ is created before the wait: %v", err)
-		}
+	h.stdin = keysOnceWaiting(t, downloads, func() {
 		os.WriteFile(filepath.Join(downloads, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
-	})
+	}, "\r")
 
 	code, stdout, stderr := h.run(t, "import", archive, "--dir", dir)
-	if code != 0 || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "Press Enter") {
+	if code != 0 || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "✔ nodist-1.0.0.jar") {
 		t.Fatalf("import: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 	if _, l := readProject(t, dir); l.Mods["nodist"].Sha512 != h.jars["nodist"].sha512 {
@@ -115,25 +113,17 @@ func TestImportWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	}
 }
 
-// ctrlCAfter is a stdin that answers the first wait with ctrl-c, as a terminal in raw mode sends it.
-func ctrlCAfter() readerFunc {
-	return readerFunc(func(p []byte) (int, error) {
-		p[0] = 0x03
-		return 1, nil
-	})
-}
-
 func TestImportSkipsAManualDownloadAndInstallAsksForItAgain(t *testing.T) {
 	h := newHarness(t)
 	archive := filepath.Join(t.TempDir(), "blocked.zip")
 	writeCurseForgeZip(t, archive, importedCurseForgePack(cfPackFile{ProjectID: 300000, FileID: 5100001, Required: true}), map[string][]byte{})
 	dir := filepath.Join(t.TempDir(), "craft-pack")
 	h.tty = true
-	h.stdin = ctrlCAfter()
+	h.stdin = keysOnceWaiting(t, filepath.Join(dir, "downloads"), func() {}, "\x1b")
 
 	code, stdout, stderr := h.run(t, "import", archive, "--dir", dir)
 	if code != 0 {
-		t.Fatalf("ctrl-c skips the file and the import finishes: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+		t.Fatalf("esc skips the file and the import finishes: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 	if !strings.Contains(stdout, "waiting for a manual download") {
 		t.Fatalf("the import names what it left pending: %s", stdout)
@@ -152,9 +142,9 @@ func TestImportSkipsAManualDownloadAndInstallAsksForItAgain(t *testing.T) {
 	}
 
 	h.tty = true
-	h.stdin = enterAfter(1, func() {
+	h.stdin = keysOnceWaiting(t, filepath.Join(dir, "downloads"), func() {
 		os.WriteFile(filepath.Join(dir, "downloads", "any-name.jar"), h.jars["nodist"].data, 0o644)
-	})
+	}, "")
 	if code, stdout, stderr := h.run(t, "install"); code != 0 {
 		t.Fatalf("install asks for it again: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}

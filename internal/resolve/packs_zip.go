@@ -351,10 +351,12 @@ type downloadable struct {
 	// host is the provider's title, for messages about its downloads.
 	host   string
 	sha512 string
-	url    *string
-	page   string
-	size   int64
-	side   string
+	// sha1 is a pending mod's one hash, until its manual download fills in the rest.
+	sha1 string
+	url  *string
+	page string
+	size int64
+	side string
 }
 
 // lockFiles is everything install has to put in the cache, mods first and then
@@ -376,7 +378,7 @@ func (r *Resolver) modFiles() []downloadable {
 	var files []downloadable
 	for _, id := range sortedKeys(r.Lock.Mods) {
 		m := r.Lock.Mods[id]
-		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, provider: m.Provider, sha512: m.Sha512, url: m.URL, page: r.pageFor(m), host: r.Providers.Title(m.Provider), size: m.Size, side: m.Side})
+		files = append(files, downloadable{id: id, file: m.File, modpack: m.Modpack, filename: m.Filename, provider: m.Provider, sha512: m.Sha512, sha1: m.Sha1, url: m.URL, page: r.pageFor(m), host: r.Providers.Title(m.Provider), size: m.Size, side: m.Side})
 	}
 	return files
 }
