@@ -293,6 +293,7 @@ A CurseForge file URL is resolved by its file id, so it reaches a project the sl
 | `--unlocked` | Resolve a modpack's mods here instead of copying the versions its lock pins |
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack. On a terminal, an add without it prints what would have to move and asks `Move it?` (`Move them?` for several), and yes does the same |
+| `--skip-missing` | Add what resolves and skip each name that isn't found or has no compatible version, with a warning for each. Without it, `add` looks every name up first and, when any misses, adds nothing: the error lists each name that missed and gives the command that adds the rest. A provider it can't reach still fails the whole command, since the name may be there |
 
 An argument that names an existing file, or ends in `.jar`, `.zip` or `.mrpack`, is a local file rather than a slug, and is locked in the same run. A file inside the project is referenced where it lies. One outside it is copied into `files/`, and so is one in `downloads/`, an overrides folder or a folder a side builds into, since those files aren't the project's to keep. Adding the same file again refreshes its copy and relocks it, which is how a rebuilt jar gets in; a different file already in `files/` under the same name is never replaced. The key is a jar's mod id or, for a pack, its file name without the extension, lowercased with anything a key can't hold turned into dashes, and `--as` overrides either. A jar is a mod, and a bare `add` reads a zip's type from what it holds: a resource pack holds `pack.mcmeta`, a datapack `pack.mcmeta` and `data/` without `assets/`, a shader `shaders/`. One with both `data/` and `assets/` needs `--type`. `--pin`, `--channel` and `--provider` don't apply to a local file.
 
@@ -1602,7 +1603,7 @@ The watcher a detached [`play`](#shulker-play) leaves behind, and not something 
 
 ### `shulker mod add|remove|list`
 
-`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--with-deps`.
+`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--with-deps`, `--skip-missing`.
 
 ```sh
 shulker mod add sodium
@@ -1629,7 +1630,7 @@ shulker modpack remove base-pack
 
 ### `shulker resourcepack add|remove|list`
 
-`shulker resourcepack add fresh-animations` is `shulker add fresh-animations --type resourcepack`, and the same for `remove` and `list`. The provider's own project type decides what an entry is, so the plain `shulker add` usually needs no `--type` at all. `add` records the provider's file name as the entry's `filename`, so the pack is placed as `resourcepacks/<that name>` under the name other packs' `options.txt` already enable, and it keeps that name when it updates, so a pack you enabled in game stays enabled. An entry with no `filename` is placed as `resourcepacks/<key>.zip`. Flags: `--channel`, `--pin`, `--provider`, `--as`.
+`shulker resourcepack add fresh-animations` is `shulker add fresh-animations --type resourcepack`, and the same for `remove` and `list`. The provider's own project type decides what an entry is, so the plain `shulker add` usually needs no `--type` at all. `add` records the provider's file name as the entry's `filename`, so the pack is placed as `resourcepacks/<that name>` under the name other packs' `options.txt` already enable, and it keeps that name when it updates, so a pack you enabled in game stays enabled. An entry with no `filename` is placed as `resourcepacks/<key>.zip`. Flags: `--channel`, `--pin`, `--provider`, `--as`, `--skip-missing`.
 
 ```sh
 shulker resourcepack add fresh-animations
@@ -1638,7 +1639,7 @@ shulker resourcepack list
 
 ### `shulker shader add|remove|list`
 
-`shulker shader add complementary-reimagined` is `shulker add complementary-reimagined --type shader`, and the same for `remove` and `list`. A shader is placed under its entry's `filename`, which `add` sets to the provider's file name, or as `shaderpacks/<key>.zip` without one, and enabled through its shader mod's own config: `config/iris.properties`, or `config/oculus.properties` on Forge. One that ships vanilla core shaders needs no shader mod at all, so it is placed in `resourcepacks/` and enabled like a resource pack. Flags: `--channel`, `--pin`, `--provider`, `--as`.
+`shulker shader add complementary-reimagined` is `shulker add complementary-reimagined --type shader`, and the same for `remove` and `list`. A shader is placed under its entry's `filename`, which `add` sets to the provider's file name, or as `shaderpacks/<key>.zip` without one, and enabled through its shader mod's own config: `config/iris.properties`, or `config/oculus.properties` on Forge. One that ships vanilla core shaders needs no shader mod at all, so it is placed in `resourcepacks/` and enabled like a resource pack. Flags: `--channel`, `--pin`, `--provider`, `--as`, `--skip-missing`.
 
 ```sh
 shulker shader add complementary-reimagined
@@ -1647,7 +1648,7 @@ shulker shader list
 
 ### `shulker datapack add|remove|list`
 
-`shulker datapack add terralith` is `shulker add terralith --type datapack`, and the same for `remove` and `list`. Modrinth files datapacks as mods, so a project whose only files are datapacks adds as one without `--type`, and one that ships both a mod and a datapack, like Terralith, adds as the mod unless `--type datapack` asks for its datapack files. A datapack is placed on both sides under its entry's `filename`, which `add` sets to the provider's file name, or as `<key>.zip` without one, in the folder of a global datapack mod the side places: `config/paxi/datapacks/` for Paxi, and `config/openloader/data/` before Minecraft 1.21 or `config/openloader/packs/` from it for Open Loader. With neither, a server places it in its world's `datapacks/` folder, named by `level-name`, which the game loads without a mod; a client places it in `datapacks/` and warns, since only some global datapack mods read that folder. `--side` narrows it to one side. A hybrid, a datapack that carries `assets/` as well, loads its assets only as a resource pack: `--resourcepack` records `"resourcepack": true`, which also places the same zip under the same name in the client's `resourcepacks/`, so one entry keeps both copies on one version. A local zip holding both `data/` and `assets/` needs `--type` or `--resourcepack`, which implies `--type datapack`. Load order isn't managed: ship Paxi's `datapack_load_order.json` as an override. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--resourcepack`.
+`shulker datapack add terralith` is `shulker add terralith --type datapack`, and the same for `remove` and `list`. Modrinth files datapacks as mods, so a project whose only files are datapacks adds as one without `--type`, and one that ships both a mod and a datapack, like Terralith, adds as the mod unless `--type datapack` asks for its datapack files. A datapack is placed on both sides under its entry's `filename`, which `add` sets to the provider's file name, or as `<key>.zip` without one, in the folder of a global datapack mod the side places: `config/paxi/datapacks/` for Paxi, and `config/openloader/data/` before Minecraft 1.21 or `config/openloader/packs/` from it for Open Loader. With neither, a server places it in its world's `datapacks/` folder, named by `level-name`, which the game loads without a mod; a client places it in `datapacks/` and warns, since only some global datapack mods read that folder. `--side` narrows it to one side. A hybrid, a datapack that carries `assets/` as well, loads its assets only as a resource pack: `--resourcepack` records `"resourcepack": true`, which also places the same zip under the same name in the client's `resourcepacks/`, so one entry keeps both copies on one version. A local zip holding both `data/` and `assets/` needs `--type` or `--resourcepack`, which implies `--type datapack`. Load order isn't managed: ship Paxi's `datapack_load_order.json` as an override. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--resourcepack`, `--skip-missing`.
 
 ```sh
 shulker datapack add terralith

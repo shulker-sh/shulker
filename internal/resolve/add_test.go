@@ -484,3 +484,21 @@ func TestInstallAdoptsAPendingDownloadBySha1(t *testing.T) {
 		t.Fatal("the resolver reports that it changed the lock")
 	}
 }
+
+func TestAnAddThatMissesBeforeChangingAnythingIsSkippable(t *testing.T) {
+	host := envtest.NewHost(envtest.NewCDN(t), "alpha")
+	host.Publish(mod("a-old", "old"), provider.Version{Number: "1.0", GameVersions: []string{"26.3"}, File: provider.File{Filename: "old-1.0.jar"}}, modJar(t, "old", "1.0", "*"))
+	host.Publish(mod("a-parent", "parent"), provider.Version{Number: "1.0", File: provider.File{Filename: "parent-1.0.jar"}, Dependencies: []provider.Dependency{dependsOn("a-old")}}, modJar(t, "parent", "1.0", "*"))
+	h := newHarness(t, host)
+
+	for _, slug := range []string{"nope", "old"} {
+		before := h.r.Snapshot()
+		if err := h.add(slug, AddOptions{}); !h.r.Missed(before, err) {
+			t.Errorf("%s: %v should be skippable", slug, err)
+		}
+	}
+	before := h.r.Snapshot()
+	if err := h.add("parent", AddOptions{}); err == nil || h.r.Missed(before, err) {
+		t.Errorf("parent's dependency failed after parent was locked, which isn't skippable: %v", err)
+	}
+}

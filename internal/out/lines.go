@@ -417,6 +417,10 @@ func (l *Lines) Error(e *Error) {
 	if e.Nudge.Command != "" {
 		l.Nudge(e.Nudge.Lead, e.Nudge.Command)
 	}
+	if e.Nudge.After != "" {
+		l.Blank()
+		l.line(l.T.Grey(e.Nudge.After))
+	}
 }
 
 // plainError renders an error as dialog body text. A launcher hook's stderr is shown to the player

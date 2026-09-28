@@ -180,6 +180,24 @@ func (r *Resolver) lookup(ctx context.Context, slug, providerName, kind string) 
 	return nil, nil, notFound(slug, missed, skipped)
 }
 
+// Missed reports whether an add that failed with err failed only because its name isn't there to
+// add, before it changed anything since before: not found on every provider it asked, or with no
+// version that fits. Anything else, a provider it couldn't reach included, may hide a name that
+// exists, and fails the whole command.
+func (r *Resolver) Missed(before Snapshot, err error) bool {
+	e, ok := errors.AsType[*out.Error](err)
+	if !ok || !r.Changes(before).IsEmpty() {
+		return false
+	}
+	switch e.Code {
+	case "mod-not-found":
+		return len(e.Items) == 0
+	case "no-compatible-version":
+		return true
+	}
+	return false
+}
+
 // notFound names the providers that missed slug, with the first help a provider offers for a
 // slug its lookup can miss.
 func notFound(slug string, missed []provider.Provider, skipped []*out.Error) *out.Error {

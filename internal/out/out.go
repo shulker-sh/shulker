@@ -88,6 +88,8 @@ type Detail struct {
 type Nudge struct {
 	Lead    string
 	Command string
+	// After is a line under the command, for a second way on.
+	After string
 }
 
 func (e *Error) Error() string { return e.Message }

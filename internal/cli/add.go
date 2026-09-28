@@ -21,7 +21,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	var opts resolve.AddOptions
 	var typ, as string
 	var at modpack.At
-	var unlocked, noAutoUpdate bool
+	var unlocked, noAutoUpdate, skipMissing bool
 	cmd := &cobra.Command{
 		Use:         "add " + addArgs(kind),
 		Annotations: acts(),
@@ -92,16 +92,19 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			); err != nil {
 				return err
 			}
+			resolved := named
 			upToDate := func(l *out.Lines) {
-				for _, name := range named {
+				for _, name := range resolved {
 					l.Info(name + " is already in the pack")
 				}
 			}
 			var dir string
-			return a.retryingDownloads(cmd.Context(), func() string { return dir }, func() error {
+			return a.awaitingDownloads(cmd.Context(), func() string { return dir }, false, func(bool) error {
 				return a.relock(cmd, relockPlan{isFetched: true, dropsFailing: true, upToDate: upToDate}, func(p *project.Project, r *resolve.Resolver) (string, error) {
 					dir = p.Dir
-					for _, arg := range args {
+					resolved = nil
+					var missed []missedName
+					for i, arg := range args {
 						add, slug := opts, arg
 						if name, ok := from[arg]; ok {
 							add.Provider = name
@@ -112,9 +115,24 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 								return "", err
 							}
 						}
+						before := r.Snapshot()
 						if err := a.addAsking(cmd.Context(), r, slug, add); err != nil {
-							return "", err
+							if !r.Missed(before, err) {
+								return "", err
+							}
+							missed = append(missed, missedName{named[i], out.AsError(err)})
+							continue
 						}
+						resolved = append(resolved, named[i])
+					}
+					if len(missed) > 0 && !skipMissing {
+						if len(args) == 1 {
+							return "", missed[0].err
+						}
+						return "", nothingAdded(missed, addAgain(cmd, typ, opts.Provider, resolved), chosen)
+					}
+					for _, m := range missed {
+						r.Warnings = append(r.Warnings, m.err.Message+", skipped")
 					}
 					return "", nil
 				})
@@ -129,6 +147,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	}
 	if applies(kind, "resourcepack") {
 		cmd.Flags().BoolVar(&opts.ResourcePack, "resourcepack", false, "also place the datapack in resourcepacks/, for one that carries assets/")
+	}
+	if applies(kind, "skip-missing") {
+		cmd.Flags().BoolVar(&skipMissing, "skip-missing", false, "add what resolves and skip each name that isn't found or has no compatible version, instead of adding nothing")
 	}
 	if applies(kind, "channel") {
 		cmd.Flags().StringVar(&opts.Channel, "channel", "", "least stable channel accepted: release, beta, alpha")
@@ -245,4 +266,73 @@ func addShort(kind string) string {
 		return "Add mods or modpacks to the manifest and lock"
 	}
 	return "Add " + kind + "s to the manifest and lock"
+}
+
+// missedName is an add argument, as typed, that isn't there to add.
+type missedName struct {
+	name string
+	err  *out.Error
+}
+
+// nothingAdded is the error for an add whose names missed: nothing was written, each missed name
+// is listed, and again, when some resolved, is the command that adds only those.
+func nothingAdded(missed []missedName, again, kind string) *out.Error {
+	one, many := manifest.TypeNouns(kind)
+	code := missed[0].err.Code
+	var items []string
+	for _, m := range missed {
+		if m.err.Code != code {
+			code = ""
+		}
+		if m.err.Code == "mod-not-found" {
+			items = append(items, m.name)
+		} else {
+			items = append(items, m.err.Message)
+		}
+	}
+	count := out.Count(len(missed), one, many)
+	var e *out.Error
+	switch code {
+	case "mod-not-found":
+		e = out.Errorf(code, "Nothing was added: %s %s not found", count, wasOrWere(len(missed)))
+	case "no-compatible-version":
+		e = out.Errorf(code, "Nothing was added: %s %s no compatible version", count, hasOrHave(len(missed)))
+	default:
+		e = out.Errorf(missed[0].err.Code, "Nothing was added: %s %s not found or %s no compatible version", count, wasOrWere(len(missed)), hasOrHave(len(missed)))
+	}
+	e.Items = items
+	if again != "" {
+		e.Nudge = out.Nudge{Lead: "Add the rest", Command: again, After: "Or skip the ones not found by adding --skip-missing"}
+	}
+	return e
+}
+
+func wasOrWere(n int) string {
+	if n == 1 {
+		return "was"
+	}
+	return "were"
+}
+
+func hasOrHave(n int) string {
+	if n == 1 {
+		return "has"
+	}
+	return "have"
+}
+
+// addAgain is the add command for only the names that resolved, with the --type and --provider
+// that found them; empty when none did.
+func addAgain(cmd *cobra.Command, typ, providerName string, names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	parts := []string{cmd.CommandPath()}
+	if typ != "" {
+		parts = append(parts, "--type", typ)
+	}
+	if providerName != "" {
+		parts = append(parts, "--provider", providerName)
+	}
+	return strings.Join(append(parts, names...), " ")
 }
