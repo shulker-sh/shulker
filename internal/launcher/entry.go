@@ -39,7 +39,8 @@ type Forgotten struct {
 const kept = "Kept the instance folder and its worlds"
 
 func unlinked(e *Entry, l config.Instance, details ...string) Forgotten {
-	return Forgotten{Summary: fmt.Sprintf("Unlinked %s from %s", l.Label(), e.Title), Details: details}
+	// Find reaches the table this entry is in, so the title comes from e rather than InstanceAside.
+	return Forgotten{Summary: "Unlinked " + named(l, instanceAside(l, e.Title)), Details: details}
 }
 
 // InstanceResult is what a link step left in the launcher: the instance folder, its game directory,
@@ -190,6 +191,10 @@ func InstanceAside(in config.Instance) string {
 	if e := Find(in.Launcher); e != nil {
 		title = e.Title
 	}
+	return instanceAside(in, title)
+}
+
+func instanceAside(in config.Instance, title string) string {
 	switch {
 	case in.Name == "" || strings.EqualFold(in.Name, in.ID):
 		return title
@@ -201,10 +206,14 @@ func InstanceAside(in config.Instance) string {
 
 // Named is an instance as a line of output names it: its id, then InstanceAside in brackets.
 func Named(in config.Instance) string {
-	if aside := InstanceAside(in); aside != "" {
-		return in.ID + " (" + aside + ")"
+	return named(in, InstanceAside(in))
+}
+
+func named(in config.Instance, aside string) string {
+	if aside == "" {
+		return in.ID
 	}
-	return in.ID
+	return in.ID + " (" + aside + ")"
 }
 
 // Rank orders entries for display: known launchers in table order, then
@@ -270,7 +279,7 @@ func Relink(l Linked) (command, in string) {
 func Forget(l config.Instance) (Forgotten, error) {
 	e := Find(l.Launcher)
 	if e == nil {
-		return Forgotten{Summary: fmt.Sprintf("Forgot %q (%s); its files stay.", l.Label(), l.Dir)}, nil
+		return Forgotten{Summary: fmt.Sprintf("Forgot %s; its files stay in %s.", Named(l), l.Dir)}, nil
 	}
 	return e.forget(e, l)
 }
@@ -307,7 +316,7 @@ func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 	f := Forgotten{}
 	running, detectable := e.IsRunning()
 	if running {
-		f.Warning = fmt.Sprintf("%s is open; it may put back the pre-launch sync this removes from %q. Quit it, then check the instance's settings", e.Title, l.Label())
+		f.Warning = fmt.Sprintf("%s is open; it may put back the pre-launch sync this removes from %s. Quit it, then check the instance's settings", e.Title, l.ID)
 	}
 	if _, err := os.Stat(e.InstanceDir(l.Dir)); errors.Is(err, os.ErrNotExist) {
 		gone := unlinked(e, l, "Its instance was already gone")

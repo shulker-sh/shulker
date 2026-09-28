@@ -18,13 +18,13 @@ func TestAnEntryWithNoLauncherFallsBackToADirectory(t *testing.T) {
 	if Rank("") <= Rank("gdlauncher") {
 		t.Fatalf("a plain directory sorts after every launcher: %d", Rank(""))
 	}
-	l := Linked{Instance: config.Instance{Name: "Server Copy", Dir: "/srv/mc", Source: "/packs/smp"}, Side: "server"}
+	l := Linked{Instance: config.Instance{ID: "server-copy", Name: "Server Copy", Dir: "/srv/mc", Source: "/packs/smp"}, Side: "server"}
 	command, in := Relink(l)
 	if want := "shulker sync /packs/smp --side server --into /srv/mc"; command != want || in != "" {
 		t.Fatalf("Relink = %q in %q, want %q", command, in, want)
 	}
 	f, err := Forget(l.Instance)
-	if err != nil || f.Summary != `Forgot "Server Copy" (/srv/mc); its files stay.` {
+	if err != nil || f.Summary != "Forgot server-copy (Server Copy); its files stay in /srv/mc." {
 		t.Fatalf("Forget = %+v %v", f, err)
 	}
 }
@@ -56,7 +56,7 @@ func TestShulkerOwnsItsInstances(t *testing.T) {
 		t.Fatalf("Relink = %q in %q, want %q", command, at, want)
 	}
 	f, err := Forget(in)
-	if err != nil || f.Removed != "" || f.Summary != "Unlinked SMP from Shulker" || len(f.Details) != 1 || f.Details[0] != "Kept the instance folder and its worlds" {
+	if err != nil || f.Removed != "" || f.Summary != "Unlinked smp (Shulker)" || len(f.Details) != 1 || f.Details[0] != "Kept the instance folder and its worlds" {
 		t.Fatalf("Forget = %+v %v", f, err)
 	}
 }
@@ -108,5 +108,22 @@ func TestLaunchesIsWhetherTheRowNamesThisLauncher(t *testing.T) {
 	}
 	if !prismEntry.Launches(config.Instance{Launcher: "prism"}) {
 		t.Fatal("prism launches its rows")
+	}
+}
+
+func TestNamedPutsTheIDFirstAndALauncherNameThatDiffersAside(t *testing.T) {
+	for _, tc := range []struct {
+		in   config.Instance
+		want string
+	}{
+		{config.Instance{ID: "gt-prism", Name: "My SMP", Launcher: "prism"}, "gt-prism (Prism Launcher: My SMP)"},
+		{config.Instance{ID: "friends", Name: "Friends", Launcher: "prism"}, "friends (Prism Launcher)"},
+		{config.Instance{ID: "copy", Launcher: "prism"}, "copy (Prism Launcher)"},
+		{config.Instance{ID: "server-copy", Name: "Server Copy"}, "server-copy (Server Copy)"},
+		{config.Instance{ID: "plain"}, "plain"},
+	} {
+		if got := Named(tc.in); got != tc.want {
+			t.Errorf("Named(%+v) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }

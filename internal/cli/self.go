@@ -90,7 +90,7 @@ func (a *app) selfUninstall(purge bool) error {
 		// scripts go, and a Mojang profile gets its own Java back. The row's launcherDir is what
 		// reaches the profile of an instance whose folder is gone.
 		if _, _, err := launcher.ReleaseSlots(e, in); err != nil {
-			a.printer.Warn("%s (%s) keeps shulker's hooks: %v", in.Label(), e.Title, err)
+			a.printer.Warn("%s keeps shulker's hooks: %v", launcher.Named(in), err)
 			continue
 		}
 		res.Unhooked = append(res.Unhooked, in)
@@ -138,7 +138,7 @@ func (s selfUninstallResult) print(l *out.Lines) {
 		l.OK("Unhooked "+out.Count(len(s.Unhooked), "instance", "instances"), "")
 		items := make([]out.Item, 0, len(s.Unhooked))
 		for _, in := range s.Unhooked {
-			items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{launcher.Title(in.Launcher)}})
+			items = append(items, out.Item{Kind: out.Note, Name: in.ID, Aside: []string{launcher.InstanceAside(in)}})
 		}
 		l.Items(items...)
 	}
@@ -154,7 +154,7 @@ func (s selfUninstallResult) print(l *out.Lines) {
 			l.Info(out.Count(len(s.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`")
 			items := make([]out.Item, 0, len(s.Forgotten))
 			for _, in := range s.Forgotten {
-				items = append(items, out.Item{Kind: out.Note, Name: in.Label(), Aside: []string{in.Dir}})
+				items = append(items, out.Item{Kind: out.Note, Name: in.ID, Aside: []string{in.Dir}})
 			}
 			l.Items(items...)
 		}

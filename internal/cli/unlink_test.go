@@ -256,7 +256,7 @@ func TestUnlinkMentionsOnlyAPreLaunchCommandThatExists(t *testing.T) {
 	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends", "--no-hooks")
 
 	stdout := h.mustRun(t, "unlink", "friends")
-	if strings.Contains(stdout, "pre-launch") || !strings.Contains(stdout, "Unlinked Friends from Prism Launcher") || !strings.Contains(stdout, "Kept the instance folder and its worlds") {
+	if strings.Contains(stdout, "pre-launch") || !strings.Contains(stdout, "Unlinked friends (Prism Launcher)") || !strings.Contains(stdout, "Kept the instance folder and its worlds") {
 		t.Fatalf("unlink of an instance with no hooks: %s", stdout)
 	}
 }

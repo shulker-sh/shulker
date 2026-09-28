@@ -35,12 +35,18 @@ func TestSelfUninstallClearsEveryInstanceAndLeavesTheRegistry(t *testing.T) {
 	// A folder that moved away is still unhooked, from what the registry records about it.
 	moved := filepath.Join(prismDir, "instances", "shulker-pack", "minecraft")
 	prismCfg := filepath.Join(prismDir, "instances", "shulker-pack", launcher.PrismInstanceFile)
+	// A hook some other shulker binary wrote is released all the same.
+	f := readIntent(t, moved)
+	f.Settings.Shulker = "/elsewhere/shulker"
+	if err := f.Save(moved); err != nil {
+		t.Fatal(err)
+	}
 
 	stdout := h.mustRun(t, "self", "uninstall")
 	if !strings.Contains(stdout, "Unhooked 2 instances") || !strings.Contains(stdout, "Removed "+h.exe) {
 		t.Fatalf("uninstall output: %s", stdout)
 	}
-	if !strings.Contains(stdout, "• pack (Prism Launcher)") || !strings.Contains(stdout, "• pack (Minecraft Launcher)") {
+	if !strings.Contains(stdout, "• pack (Prism Launcher)") || !strings.Contains(stdout, "• pack-2 (Minecraft Launcher: pack)") {
 		t.Fatalf("every instance is named: %s", stdout)
 	}
 	if !strings.Contains(stdout, "The registry and every instance folder are untouched") || !strings.Contains(stdout, "$ shulker instances repair") {
@@ -76,7 +82,10 @@ func TestSelfUninstallClearsEveryInstanceAndLeavesTheRegistry(t *testing.T) {
 	if err := os.WriteFile(h.exe, []byte("binary"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	h.mustRun(t, "instances", "repair")
+	stdout = h.mustRun(t, "instances", "repair")
+	if !strings.Contains(stdout, "Rehooked 2 instances") || !strings.Contains(stdout, "• pack (Prism Launcher)") || strings.Contains(stdout, "Every instance is registered") {
+		t.Fatalf("repair reports what it hooked again: %s", stdout)
+	}
 	if cfg := readINIFile(t, prismCfg); cfg["PreLaunchCommand"] == "" {
 		t.Fatalf("a repair after reinstalling hooks the instance again: %+v", cfg)
 	}
@@ -155,7 +164,7 @@ func TestSelfUninstallPurgeLeavesShulkersOwnInstancesFindable(t *testing.T) {
 	h.mustRun(t, "link", "shulker", "--as", "smp")
 
 	stdout := h.mustRun(t, "self", "uninstall", "--purge")
-	if !strings.Contains(stdout, "pack (Shulker)") || strings.Contains(stdout, "can't be found again") {
+	if !strings.Contains(stdout, "smp (Shulker: pack)") || strings.Contains(stdout, "can't be found again") {
 		t.Fatalf("a shulker instance is unhooked with the rest and found again by a repair of the instances root: %s", stdout)
 	}
 }

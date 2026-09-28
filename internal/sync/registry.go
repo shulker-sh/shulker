@@ -101,6 +101,6 @@ func (e *Env) syncLauncherImage(dir string, b *build.Builder) {
 		}
 	}
 	if err != nil {
-		e.Warn("launcher image not updated for %q: %v", in.Label(), err)
+		e.Warn("launcher image not updated for %s: %v", launcher.Named(in), err)
 	}
 }
