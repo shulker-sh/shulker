@@ -129,6 +129,7 @@ type project struct {
 	ID          string   `json:"id"`
 	Slug        string   `json:"slug"`
 	Title       string   `json:"title"`
+	Description string   `json:"description"`
 	ClientSide  string   `json:"client_side"`
 	ServerSide  string   `json:"server_side"`
 	ProjectType string   `json:"project_type"`
@@ -207,7 +208,7 @@ func convertProject(p project) provider.Project {
 	if kind == "mod" && len(p.Loaders) > 0 && !slices.ContainsFunc(p.Loaders, func(l string) bool { return l != provider.DatapackLoader }) {
 		kind = provider.DatapackLoader
 	}
-	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Side: side(p.ClientSide, p.ServerSide), Type: kind, Datapack: slices.Contains(p.Loaders, provider.DatapackLoader), Downloads: p.Downloads, Page: projectPage(p.ProjectType, p.Slug)}
+	return provider.Project{ID: p.ID, Slug: p.Slug, Title: p.Title, Summary: p.Description, Side: side(p.ClientSide, p.ServerSide), Type: kind, Datapack: slices.Contains(p.Loaders, provider.DatapackLoader), Downloads: p.Downloads, Page: projectPage(p.ProjectType, p.Slug)}
 }
 
 func (m *Modrinth) Versions(ctx context.Context, projectID, game string, loaders []string) ([]provider.Version, error) {

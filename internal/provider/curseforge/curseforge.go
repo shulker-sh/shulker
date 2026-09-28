@@ -196,6 +196,7 @@ type mod struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	Slug      string `json:"slug"`
+	Summary   string `json:"summary"`
 	ClassID   int    `json:"classId"`
 	Downloads int64  `json:"downloadCount"`
 	Links     struct {
@@ -681,7 +682,7 @@ func filePage(slug, fileID string, class int) string {
 }
 
 func convertMod(m mod) *provider.Project {
-	p := &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Type: classTypes[m.ClassID], Datapack: m.ClassID == 6945, Downloads: m.Downloads, Page: m.Links.WebsiteURL}
+	p := &provider.Project{ID: strconv.Itoa(m.ID), Slug: m.Slug, Title: m.Name, Summary: m.Summary, Type: classTypes[m.ClassID], Datapack: m.ClassID == 6945, Downloads: m.Downloads, Page: m.Links.WebsiteURL}
 	if len(m.Authors) > 0 {
 		p.Author = m.Authors[0].Name
 	}

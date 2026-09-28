@@ -39,6 +39,8 @@ type Project struct {
 	Downloads int64
 	// Author is the project's first author, where the provider lists one.
 	Author string
+	// Summary is the project's one-line description.
+	Summary string
 	// Page is the project's page on the provider's site.
 	Page string
 }

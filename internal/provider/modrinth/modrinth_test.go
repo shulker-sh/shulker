@@ -37,7 +37,7 @@ func TestSearchAsksForTheTypeAsAFacet(t *testing.T) {
 	var got url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got = r.URL.Query()
-		w.Write([]byte(`{"hits":[{"project_id":"AANobbMI","slug":"sodium","title":"Sodium","project_type":"mod","downloads":228124617,"client_side":"required","server_side":"unsupported"}]}`))
+		w.Write([]byte(`{"hits":[{"project_id":"AANobbMI","slug":"sodium","title":"Sodium","description":"The fastest rendering mod","project_type":"mod","downloads":228124617,"client_side":"required","server_side":"unsupported"}]}`))
 	}))
 	defer srv.Close()
 	m := New(fetch.New("test"))
@@ -49,7 +49,7 @@ func TestSearchAsksForTheTypeAsAFacet(t *testing.T) {
 	if got.Get("query") != "sodium" || got.Get("limit") != "5" || got.Get("facets") != `[["project_type:mod"]]` {
 		t.Errorf("search asked for %v", got)
 	}
-	want := provider.Project{ID: "AANobbMI", Slug: "sodium", Title: "Sodium", Side: "client", Type: "mod", Downloads: 228124617, Page: "https://modrinth.com/mod/sodium"}
+	want := provider.Project{ID: "AANobbMI", Slug: "sodium", Title: "Sodium", Summary: "The fastest rendering mod", Side: "client", Type: "mod", Downloads: 228124617, Page: "https://modrinth.com/mod/sodium"}
 	if len(projects) != 1 || projects[0] != want {
 		t.Errorf("projects %+v, want %+v", projects, want)
 	}

@@ -145,7 +145,7 @@ func TestSearchSortsByPopularityAndKeepsClassesShulkerCanAdd(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got = r.URL.Query()
 		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{
-			{"id": 394468, "name": "Sodium", "slug": "sodium", "classId": 6, "downloadCount": 151434981},
+			{"id": 394468, "name": "Sodium", "slug": "sodium", "summary": "The fastest rendering mod", "classId": 6, "downloadCount": 151434981},
 			{"id": 900000, "name": "Sodium World", "slug": "sodium-world", "classId": 17, "downloadCount": 12},
 		}})
 	}))
@@ -159,7 +159,7 @@ func TestSearchSortsByPopularityAndKeepsClassesShulkerCanAdd(t *testing.T) {
 	if got.Get("gameId") != "432" || got.Get("searchFilter") != "sodium" || got.Get("sortField") != "2" || got.Get("sortOrder") != "desc" || got.Get("pageSize") != "50" || got.Has("classId") {
 		t.Errorf("search asked for %v", got)
 	}
-	want := provider.Project{ID: "394468", Slug: "sodium", Title: "Sodium", Type: "mod", Downloads: 151434981}
+	want := provider.Project{ID: "394468", Slug: "sodium", Title: "Sodium", Summary: "The fastest rendering mod", Type: "mod", Downloads: 151434981}
 	if len(projects) != 1 || projects[0] != want {
 		t.Errorf("projects %+v, want %+v", projects, want)
 	}

@@ -75,6 +75,15 @@ func (r Result) Author() string {
 	return ""
 }
 
+func (r Result) Summary() string {
+	for _, h := range r.Hits {
+		if h.Summary != "" {
+			return h.Summary
+		}
+	}
+	return ""
+}
+
 func (r Result) Downloads() int64 {
 	var n int64
 	for _, h := range r.Hits {
