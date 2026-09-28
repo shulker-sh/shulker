@@ -28,7 +28,7 @@ func TestArgumentErrorsListWhatIsWrong(t *testing.T) {
 		}
 	}
 	_, _, stderr := run(t, "config", "set")
-	if !strings.HasPrefix(stderr, "  ✘ Missing 2 arguments (usage)\n    ├─ <key>\n    ╰─ <value>\n\n  Usage\n") {
+	if !strings.HasPrefix(stderr, "  ✘ Missing 2 arguments (usage)\n    ├─ <key>\n    ├─ <value>\n    ├─ usage: shulker config set <key> <value> [flags]\n") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
 }

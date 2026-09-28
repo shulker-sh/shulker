@@ -296,16 +296,6 @@ type helpFlag struct {
 	width              int
 }
 
-// helpUsage is what a usage error prints under itself: the usage line and the
-// command's own flags, with no trailing blank line.
-func helpUsage(l *out.Lines, cmd *cobra.Command) {
-	l.Blank()
-	helpUsageLine(l, cmd)
-	if cmd.HasParent() {
-		l.Nudge("See every flag", cmd.CommandPath()+" --help")
-	}
-}
-
 func helpUsageLine(l *out.Lines, cmd *cobra.Command) {
 	t := l.T
 	l.Heading("Usage")

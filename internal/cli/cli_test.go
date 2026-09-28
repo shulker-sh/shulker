@@ -282,13 +282,13 @@ func TestGroupCommandsReportUnknownSubcommands(t *testing.T) {
 
 func TestUsageErrorsShowUsageAndPointAtHelp(t *testing.T) {
 	_, _, stderr := run(t, "add")
-	if !strings.Contains(stderr, "\n\n  Usage\n    $ shulker add <mod|source>... [flags]\n\n  See every flag:\n    $ shulker add --help") {
+	if !strings.HasSuffix(stderr, "\n    ├─ usage: shulker add <mod|source>... [flags]\n    ╰─ help: shulker add --help lists every flag\n") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
 	if strings.Contains(stderr, "Flags") || strings.Contains(stderr, "Examples") || strings.HasSuffix(stderr, "\n\n") {
 		t.Fatalf("stderr:\n%s", stderr)
 	}
-	if _, _, stderr := run(t, "player"); !strings.Contains(stderr, "$ shulker player [name|uuid]") || !strings.Contains(stderr, "$ shulker player --help") {
+	if _, _, stderr := run(t, "player"); !strings.Contains(stderr, "usage: shulker player [name|uuid]") || !strings.Contains(stderr, "help: shulker player --help") {
 		t.Fatalf("player stderr:\n%s", stderr)
 	}
 	if _, stdout, stderr := run(t, "add", "--json"); stderr != "" || strings.Contains(stdout, "Usage") {
@@ -344,7 +344,7 @@ func TestAddRejectsBadFlagValues(t *testing.T) {
 
 func TestHumanErrorNamesCode(t *testing.T) {
 	_, _, stderr := run(t, "add", "sodium", "--side", "top")
-	if !strings.HasPrefix(stderr, "  ✘ --side takes one of client, server, both, not \"top\" (usage)\n\n  Usage\n") {
+	if !strings.HasPrefix(stderr, "  ✘ --side takes one of client, server, both, not \"top\" (usage)\n    ├─ usage: shulker add") {
 		t.Fatalf("stderr = %q", stderr)
 	}
 }

@@ -2108,7 +2108,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `unsupported-loader` | shulker doesn't support the loader yet |
 | `unsupported-quickplay` | `play --world` on a Minecraft before 1.20, which has no quick play to boot into a save with; nothing is launched |
 | `update-paused` | The pre-launch hook stopped a GDLauncher update at four minutes so it could explain itself; the launch is aborted, and launching again resumes it. Shown in GDLauncher's own dialog, so it prints without shulker's usual error decoration |
-| `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
+| `usage` | An unknown command or flag, wrong arguments, or a flag value that isn't allowed. The human error folds the command's usage line and its `--help` into its tree as `usage:` and `help:` rows. `items`: the missing or unexpected arguments, when that's the problem. Exits 2 |
 | `validation-failed` | The locked mods have dependency problems, checked for each side against the mods its build places; each prints the `shulker ignore` command that would accept it, and a problem only some sides have names them. `items`: the problems |
 | `version-no-file` | The provider's version has no file shulker can download, or no hash to check it against |
 | `version-not-found` | The provider has no version with the id given to `add --pin` or `pin`, or the one a Modrinth or CurseForge URL names, or no file with an id a CurseForge modpack names; for a pin its help links the project's versions page |

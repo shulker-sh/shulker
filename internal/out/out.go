@@ -64,8 +64,12 @@ type Error struct {
 	// Rows are the human-only tree rows under the error line. Without them the
 	// items show, and without those the message's remaining lines.
 	Rows []Detail `json:"-"`
-	// Usage prints under a human error that suggests nothing else to run.
-	Usage func(l *Lines) `json:"-"`
+	// Usage is the command's usage line, a "usage:" row under a human error that suggests nothing
+	// else to run.
+	Usage string `json:"-"`
+	// UsageCommand is the command whose --help lists every flag, the help row under Usage when Help
+	// says nothing else. The root has none: its --help is the whole command list.
+	UsageCommand string `json:"-"`
 	// IsSummary marks an error whose items repeat errors the run already reported, so it adds no
 	// annotations of its own.
 	IsSummary bool `json:"-"`
@@ -337,10 +341,10 @@ func (p *Printer) Fail(err error) int {
 			}
 		}
 	}
-	p.Err().Error(e)
-	if e.Usage != nil && !picked && e.Nudge.Command == "" {
-		e.Usage(p.Err())
+	if picked || e.Nudge.Command != "" {
+		e.Usage, e.UsageCommand = "", ""
 	}
+	p.Err().Error(e)
 	p.close()
 	return e.Exit
 }

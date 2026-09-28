@@ -410,8 +410,14 @@ func (l *Lines) Error(e *Error) {
 		}
 		rows = append(rows, Row{Label: label, Children: children})
 	}
-	if e.Help != "" {
+	if e.Usage != "" {
+		rows = append(rows, Row{Label: "usage", Text: t.Command(e.Usage)})
+	}
+	switch {
+	case e.Help != "":
 		rows = append(rows, Row{Label: "help", Text: Sentence(e.Help)})
+	case e.UsageCommand != "":
+		rows = append(rows, Row{Label: "help", Text: t.Command(e.UsageCommand+" --help") + " lists every flag"})
 	}
 	l.Tree(rows...)
 	if e.Nudge.Command != "" {

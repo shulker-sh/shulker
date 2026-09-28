@@ -102,7 +102,11 @@ func (a *app) run(ctx context.Context, args []string) int {
 			err = usageError(root, err)
 		}
 		if out.CodeOf(err) == "usage" && cmd != nil {
-			out.AsError(err).Usage = func(l *out.Lines) { helpUsage(l, cmd) }
+			e := out.AsError(err)
+			e.Usage = helpUsageText(cmd)
+			if cmd.HasParent() {
+				e.UsageCommand = cmd.CommandPath()
+			}
 		}
 		if e := out.AsError(err); e.Flag != "" && cmd != nil && cmd.Flags().Lookup(strings.TrimPrefix(e.Flag, "--")) == nil {
 			e.Flag = ""
