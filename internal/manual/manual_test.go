@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"shulker.sh/shulker/internal/out"
 )
@@ -33,7 +34,7 @@ func TestCheckFindsAFileDroppedUnderAnyNameByEitherHash(t *testing.T) {
 	downloads := t.TempDir()
 	s1, _ := sums("one")
 	_, s512 := sums("two")
-	w := NewWait(downloads, []File{{Name: "one.jar", Sha1: s1}, {Name: "two.jar", Sha512: s512}})
+	w := NewWait(downloads, nil, []File{{Name: "one.jar", Sha1: s1}, {Name: "two.jar", Sha512: s512}})
 
 	found, err := w.Check()
 	if err != nil || found[0].Found || found[1].Found {
@@ -46,17 +47,104 @@ func TestCheckFindsAFileDroppedUnderAnyNameByEitherHash(t *testing.T) {
 		t.Fatalf("a jar matches by sha1 under any name, and a .txt is never a candidate: %+v %v", found, err)
 	}
 	os.WriteFile(filepath.Join(downloads, "two.jar"), []byte("two"), 0o644)
-	if found, err = w.Check(); err != nil || !found[1].Found {
-		t.Fatalf("a jar matches by sha512: %+v %v", found, err)
-	}
-	if !w.Done() {
-		t.Fatal("every file is found")
+	if found, err = w.Check(); err != nil || !found[0].Found || !found[1].Found {
+		t.Fatalf("a jar matches by sha512, and a file once found stays found: %+v %v", found, err)
 	}
 }
 
 func TestCheckWithoutADownloadsFolderFindsNothing(t *testing.T) {
-	w := NewWait(filepath.Join(t.TempDir(), "downloads"), []File{{Name: "a.jar", Sha1: "aa"}})
+	w := NewWait(filepath.Join(t.TempDir(), "downloads"), []string{filepath.Join(t.TempDir(), "gone")}, []File{{Name: "a.jar", Sha1: "aa"}})
 	if found, err := w.Check(); err != nil || found[0].Found {
 		t.Fatalf("%+v %v", found, err)
+	}
+}
+
+// watched is a project's downloads folder and a watched folder beside it, with the file the wait
+// wants, a.jar, published with the bytes "right".
+func watched(t *testing.T) (downloads, folder string, file File) {
+	t.Helper()
+	s1, _ := sums("right")
+	return filepath.Join(t.TempDir(), "downloads"), t.TempDir(), File{Name: "a.jar", Page: "https://a", Sha1: s1}
+}
+
+func write(t *testing.T, path, data string, age time.Duration) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().Add(-age)
+	os.Chtimes(path, at, at)
+}
+
+func landed(t *testing.T, downloads string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(downloads, "a.jar"))
+	if err != nil {
+		t.Fatalf("nothing landed in downloads/: %v", err)
+	}
+	return string(data)
+}
+
+func TestCheckCopiesANameMatchThatWasAlreadyInAWatchedFolder(t *testing.T) {
+	downloads, folder, file := watched(t)
+	write(t, filepath.Join(folder, "a.jar"), "right", time.Hour)
+	w := NewWait(downloads, []string{folder}, []File{file})
+	if found, err := w.Check(); err != nil || !found[0].Found {
+		t.Fatalf("%+v %v", found, err)
+	}
+	if landed(t, downloads) != "right" {
+		t.Fatal("the file lands in downloads/")
+	}
+	if _, err := os.Stat(filepath.Join(folder, "a.jar")); err != nil {
+		t.Fatalf("a file that predates the wait is copied, not moved: %v", err)
+	}
+}
+
+func TestCheckTakesTheNewestBrowserDuplicateThatMatches(t *testing.T) {
+	downloads, folder, file := watched(t)
+	write(t, filepath.Join(folder, "a.jar"), "wrong", 3*time.Hour)
+	write(t, filepath.Join(folder, "a (1).jar"), "right", 2*time.Hour)
+	write(t, filepath.Join(folder, "a (2).jar"), "also wrong", time.Hour)
+	w := NewWait(downloads, []string{folder}, []File{file})
+	if found, err := w.Check(); err != nil || !found[0].Found || found[0].Note != "" {
+		t.Fatalf("%+v %v", found, err)
+	}
+	if landed(t, downloads) != "right" {
+		t.Fatal("the duplicate that matches lands under the expected name")
+	}
+}
+
+func TestCheckTakesAnyOtherFileOnlyOnceTheWaitHasStarted(t *testing.T) {
+	downloads, folder, file := watched(t)
+	write(t, filepath.Join(folder, "renamed.jar"), "right", time.Hour)
+	w := NewWait(downloads, []string{folder}, []File{file})
+	if found, _ := w.Check(); found[0].Found {
+		t.Fatal("a file under another name that was there before the wait isn't a candidate")
+	}
+	write(t, filepath.Join(folder, "renamed-later.jar"), "right", 0)
+	if found, err := w.Check(); err != nil || !found[0].Found {
+		t.Fatalf("one that arrives during the wait is: %+v %v", found, err)
+	}
+	if landed(t, downloads) != "right" {
+		t.Fatal("it lands under the expected name")
+	}
+	if _, err := os.Stat(filepath.Join(folder, "renamed-later.jar")); !os.IsNotExist(err) {
+		t.Fatalf("a file that arrived during the wait is moved: %v", err)
+	}
+}
+
+func TestCheckLeavesANameMatchWithOtherBytesAndSaysSo(t *testing.T) {
+	downloads, folder, file := watched(t)
+	write(t, filepath.Join(folder, "a.jar"), "wrong", time.Hour)
+	w := NewWait(downloads, []string{folder}, []File{file})
+	found, err := w.Check()
+	if err != nil || found[0].Found || found[0].Note != "a.jar in "+folder+" isn't the expected file" {
+		t.Fatalf("%+v %v", found, err)
+	}
+	if _, err := os.Stat(filepath.Join(folder, "a.jar")); err != nil {
+		t.Fatalf("the file stays where it is: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(downloads, "a.jar")); !os.IsNotExist(err) {
+		t.Fatalf("nothing lands: %v", err)
 	}
 }

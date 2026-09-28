@@ -281,3 +281,18 @@ func TestRecordSyncKeepsTheLastGoodStampOnFailure(t *testing.T) {
 		t.Fatalf("recovered = %+v", in)
 	}
 }
+
+func TestDownloadsWatchedReadsTildeAsHome(t *testing.T) {
+	home := filepath.FromSlash("/home/steve")
+	if got := (Downloads{}).Watched(home); !slices.Equal(got, []string{filepath.Join(home, "Downloads")}) {
+		t.Fatalf("unset = %v", got)
+	}
+	if got := (Downloads{Watch: &[]string{}}).Watched(home); len(got) != 0 {
+		t.Fatalf("[] watches nothing: %v", got)
+	}
+	list := []string{"~", "~/Mods", "/srv/drop", "~steve"}
+	want := []string{home, home + "/Mods", "/srv/drop", "~steve"}
+	if got := (Downloads{Watch: &list}).Watched(home); !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}

@@ -40,6 +40,19 @@
         }
       }
     },
+    "downloads": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "watch": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 },
+          "default": ["~/Downloads"],
+          "description": "Folders a wait for manual downloads also looks in, beside the project's downloads/. A leading ~ is the home folder. An empty list looks only in downloads/."
+        }
+      }
+    },
     "eula": {
       "type": "boolean",
       "default": false,

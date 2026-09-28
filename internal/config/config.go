@@ -32,7 +32,7 @@ const (
 )
 
 // Keys are the config.json keys `shulker config` reads and sets.
-var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
+var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "downloads.watch", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
 
 // Secrets are the keys whose values `shulker config` masks unless asked to reveal them.
 var Secrets = []string{"curseforge.key"}
@@ -70,6 +70,7 @@ func Redact(doc map[string]any, mask func(string) string) map[string]any {
 type Config struct {
 	Accounts   Accounts   `json:"accounts"`
 	CurseForge CurseForge `json:"curseforge"`
+	Downloads  Downloads  `json:"downloads"`
 	EULA       bool       `json:"eula,omitempty"`
 	Instances  string     `json:"instances,omitempty"`
 	Log        Log        `json:"log"`
@@ -112,6 +113,27 @@ func (l Log) Days() int {
 		return DefaultLogKeepDays
 	}
 	return *l.KeepDays
+}
+
+// Downloads is where a wait for manual downloads looks besides a project's downloads/.
+type Downloads struct {
+	// Watch is nil when unset, which watches the home folder's Downloads, and empty to watch none.
+	Watch *[]string `json:"watch,omitempty"`
+}
+
+// Watched is every folder to watch, with a leading ~ read as home.
+func (d Downloads) Watched(home string) []string {
+	if d.Watch == nil {
+		return []string{filepath.Join(home, "Downloads")}
+	}
+	dirs := make([]string, 0, len(*d.Watch))
+	for _, dir := range *d.Watch {
+		if rest, ok := strings.CutPrefix(dir, "~"); ok && (rest == "" || os.IsPathSeparator(rest[0])) {
+			dir = home + rest
+		}
+		dirs = append(dirs, dir)
+	}
+	return dirs
 }
 
 type CurseForge struct {

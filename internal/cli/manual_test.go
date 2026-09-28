@@ -152,3 +152,38 @@ func TestImportSkipsAManualDownloadAndInstallAsksForItAgain(t *testing.T) {
 		t.Fatalf("the dropped file fills the pending entry: %+v", l.Mods["nodist"])
 	}
 }
+
+func TestInstallTakesAManualDownloadFromAWatchedFolder(t *testing.T) {
+	h := lockedManualDownload(t)
+	h.tty = true
+	if got := h.mustRun(t, "config", "get", "downloads.watch"); !strings.Contains(got, `"~/Downloads"`) {
+		t.Fatalf("unset, downloads.watch is the home folder's Downloads: %s", got)
+	}
+	browser := filepath.Join(h.home, "Downloads")
+	os.MkdirAll(browser, 0o755)
+	os.WriteFile(filepath.Join(browser, "nodist-1.0.0.jar"), h.jars["nodist"].data, 0o644)
+	h.stdin = keysOnceWaiting(t, filepath.Join(h.dir, "downloads"), func() {}, "")
+
+	code, stdout, stderr := h.run(t, "install")
+	if code != 0 || !strings.Contains(stdout, "Built client") {
+		t.Fatalf("the wait finds the file in ~/Downloads and goes on by itself: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(browser, "nodist-1.0.0.jar")); err != nil {
+		t.Fatalf("a file already in ~/Downloads is copied, not moved: %v", err)
+	}
+
+	h = lockedManualDownload(t)
+	h.tty = true
+	h.mustRun(t, "config", "set", "downloads.watch", "--literal", `["~/elsewhere"]`)
+	elsewhere := filepath.Join(h.home, "elsewhere")
+	os.MkdirAll(elsewhere, 0o755)
+	os.WriteFile(filepath.Join(elsewhere, "nodist-1.0.0.jar"), []byte("not the jar"), 0o644)
+	h.stdin = keysOnceWaiting(t, filepath.Join(h.dir, "downloads"), func() {
+		time.Sleep(100 * time.Millisecond)
+		os.WriteFile(filepath.Join(elsewhere, "nodist-1.0.0 (1).jar"), h.jars["nodist"].data, 0o644)
+	}, "\r")
+	code, stdout, stderr = h.run(t, "install")
+	if code != 0 || !strings.Contains(stderr, "nodist-1.0.0.jar in "+elsewhere+" isn't the expected file") {
+		t.Fatalf("a name match with other bytes is noted, and the duplicate that matches is taken: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+}

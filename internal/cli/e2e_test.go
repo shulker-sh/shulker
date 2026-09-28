@@ -93,6 +93,7 @@ type harness struct {
 	dir            string
 	cache          string
 	config         string
+	home           string
 	newer          bool
 	sodiumBeta     bool
 	newerAPI       bool
@@ -172,7 +173,7 @@ func (h *harness) hit(counter *int) {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	h := &harness{dir: t.TempDir(), cache: t.TempDir(), config: filepath.Join(t.TempDir(), "config.json"), jars: map[string]fakeJar{}, runtime: newFakeRuntime()}
+	h := &harness{dir: t.TempDir(), cache: t.TempDir(), config: filepath.Join(t.TempDir(), "config.json"), home: t.TempDir(), jars: map[string]fakeJar{}, runtime: newFakeRuntime()}
 	// A watcher writes its record after the command that spawned it has returned, so the test waits
 	// for it before its directories go.
 	t.Cleanup(h.watching.Wait)
@@ -773,6 +774,7 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	a := newApp(stdout, stderr)
 	a.dir = h.dir
 	a.configPath = h.config
+	a.home = h.home
 	a.stdin = h.stdin
 	a.tty = func() bool { return h.tty }
 	a.installer = h.fakeInstaller

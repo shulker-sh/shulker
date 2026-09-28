@@ -129,7 +129,7 @@ func TestDownloadWaitInAPty(t *testing.T) {
 		home := t.TempDir()
 		cmd := exec.Command(bin, "install")
 		cmd.Dir = dir
-		cmd.Env = append(os.Environ(), "TERM=xterm-256color",
+		cmd.Env = append(os.Environ(), "TERM=xterm-256color", "HOME="+home,
 			"SHULKER_CONFIG="+filepath.Join(home, "config.json"), "SHULKER_CACHE="+filepath.Join(home, "cache"), "SHULKER_DATA="+filepath.Join(home, "data"))
 		f, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 40, Cols: 120})
 		if err != nil {

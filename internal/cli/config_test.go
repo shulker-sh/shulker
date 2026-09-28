@@ -349,7 +349,7 @@ func TestConfigSetDefaultAccountMustExist(t *testing.T) {
 
 func TestConfigKeysAreTheSchemaLeaves(t *testing.T) {
 	var leaves []string
-	for _, key := range []string{"accounts", "curseforge", "log", "play"} {
+	for _, key := range []string{"accounts", "curseforge", "downloads", "log", "play"} {
 		s, err := schema.Fields(schema.Config, config.FileName, key)
 		if err != nil {
 			t.Fatal(err)

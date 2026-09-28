@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/manual"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/resolve"
@@ -48,7 +49,7 @@ func (a *app) awaitDownloads(ctx context.Context, downloads string, e *out.Error
 		return false, err
 	}
 	a.printer.Settle()
-	w := manual.NewWait(downloads, files)
+	w := manual.NewWait(downloads, a.watchedFolders(), files)
 	rows := make([]out.WaitFile, len(files))
 	for i, f := range files {
 		rows[i] = out.WaitFile{Name: f.Name, Page: f.Page}
@@ -63,11 +64,29 @@ func (a *app) awaitDownloads(ctx context.Context, downloads string, e *out.Error
 			}
 			checked := make([]out.WaitFile, len(status))
 			for i, s := range status {
-				checked[i] = out.WaitFile{Found: s.Found}
+				checked[i] = out.WaitFile{Found: s.Found, Note: s.Note}
 			}
 			return checked, nil
 		},
 		Every: downloadCheckEvery,
 	}, a.stdin)
 	return skip, escaped(err)
+}
+
+// watchedFolders are the folders downloads.watch names, besides the project's downloads/. A
+// config.json that can't be read watches none of them, with a warning.
+func (a *app) watchedFolders() []string {
+	home := a.home
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
+	path, err := a.configFile()
+	if err == nil {
+		var cfg config.Config
+		if cfg, err = config.LoadFile(path); err == nil {
+			return cfg.Downloads.Watched(home)
+		}
+	}
+	a.printer.Warn("couldn't read downloads.watch, looking only in downloads/: %v", err)
+	return nil
 }

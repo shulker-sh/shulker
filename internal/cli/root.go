@@ -42,6 +42,7 @@ type app struct {
 	se          *sync.Env
 	pe          *play.Env
 	configPath  string
+	home        string
 	releases    *selfupdate.Releases
 	build       func() selfupdate.Build
 	exe         func() (string, error)
