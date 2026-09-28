@@ -2,9 +2,11 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -12,6 +14,8 @@ import (
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/play"
 	"shulker.sh/shulker/internal/project"
@@ -55,6 +59,10 @@ type playResult struct {
 	ExitCode    int         `json:"exitCode,omitempty"`
 	CrashReport string      `json:"crashReport,omitempty"`
 	Sync        *syncResult `json:"sync,omitempty"`
+	// game is the Minecraft and loader the launch runs, "Minecraft 26.3, Fabric 0.19.5", and lasted
+	// how long a waited run took.
+	game   string
+	lasted time.Duration
 }
 
 func (a *app) playCmd() *cobra.Command {
@@ -164,14 +172,17 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 		GameDir:  in.Dir,
 		Log:      launch.Log,
 		Sync:     synced,
+		game:     launchGame(plan.Project.Lock),
 	}
-	a.progress("starting %s as %s", in.ID, who.Name)
+	a.printer.Working("launching %s as %s", in.ID, who.Name)
 	if opts.waits() {
 		var rec instance.Launch
-		if res.PID, rec, err = a.playWaited(launch, opts.stream); err != nil {
+		began := time.Now()
+		if res.PID, rec, err = a.playWaited(launch, opts.stream, res.launched()); err != nil {
 			return err
 		}
 		res.Outcome, res.ExitCode, res.CrashReport = rec.Outcome, rec.ExitCode, rec.CrashReport
+		res.lasted = time.Since(began)
 	} else if res.PID, err = a.startWatcher(launch); err != nil {
 		return err
 	}
@@ -225,7 +236,7 @@ func (a *app) playEnv() (*play.Env, error) {
 // playWaited keeps the launch in the foreground: this command starts the game, waits for it, and
 // closes the record itself, so no watcher is spawned and nothing is left running behind it. It hands
 // back the game's pid and the record of how the run ended.
-func (a *app) playWaited(launch game.Launch, stream bool) (int, instance.Launch, error) {
+func (a *app) playWaited(launch game.Launch, stream bool, launched string) (int, instance.Launch, error) {
 	var mirror io.Writer
 	if stream {
 		mirror = a.printer.Stdout
@@ -235,37 +246,71 @@ func (a *app) playWaited(launch game.Launch, stream bool) (int, instance.Launch,
 	}
 	a.printer.Settle()
 	var pid int
-	rec := a.watchRun(launch, mirror, func(r watchReply) { pid = r.PID })
+	rec := a.watchRun(launch, mirror, func(r watchReply) {
+		pid = r.PID
+		if pid != 0 && !a.printer.JSON {
+			l := a.printer.Err()
+			l.OK(launched, "")
+			l.Pending("Waiting for Minecraft to close")
+		}
+	})
 	if rec.Outcome == instance.OutcomeNotStarted {
 		return 0, rec, notStarted(rec.Error)
 	}
 	return pid, rec, nil
 }
 
-// print is the launch as a player reads it. A detached launch says the game is playing, because that
-// is all it knows; a run this command waited for says how it went instead, and a crash is reported
-// rather than raised — the game ran, so shulker did its job.
+// print is the launch as a player reads it. A detached launch says the game launched, because that
+// is all it knows; a run this command waited for already said so, and says how it went instead. A
+// crash is reported rather than raised: the game ran, so shulker did its job.
 func (p playResult) print(l *out.Lines) {
 	rows := []out.Row{{Label: "log", Text: p.Log}}
 	switch p.Outcome {
 	case "":
-		l.OK("Playing "+p.Instance, p.Version)
+		l.OK(p.launched(), "")
 		rows = append(rows, out.Row{Label: "pid", Text: strconv.Itoa(p.PID)})
 	case instance.OutcomeCrashed:
-		l.Warn(p.Instance + " crashed")
+		crashed := "Minecraft crashed"
 		if p.ExitCode != 0 {
-			rows = append(rows, out.Row{Label: "status", Text: strconv.Itoa(p.ExitCode)})
+			crashed += fmt.Sprintf(" (exit code %d)", p.ExitCode)
 		}
+		l.Failed(crashed)
 		if p.CrashReport != "" {
 			rows = append(rows, out.Row{Label: "crash report", Text: p.CrashReport})
 		}
 	default:
-		l.OK("Played "+p.Instance, "")
+		l.OK("Minecraft closed after "+runLength(p.lasted), "")
 	}
 	l.Tree(rows...)
 	if p.Outcome == "" {
-		l.Nudge("If it hangs", "shulker instance dump -i "+p.Instance)
+		l.Nudge("If Minecraft freezes while it's running, dump its threads", "shulker instance dump -i "+p.Instance)
 	}
+}
+
+func (p playResult) launched() string {
+	return fmt.Sprintf("Launched %s as %s (%s)", p.Instance, p.Account.Name, p.game)
+}
+
+// launchGame is the Minecraft version, then the loader with its version when there is one:
+// "Minecraft 26.3, Fabric 0.19.5".
+func launchGame(l *lock.Lock) string {
+	game := "Minecraft " + l.Minecraft
+	if l.Loader.Type != "" {
+		game += ", " + strings.TrimSpace(loader.Title(l.Loader.Type)+" "+l.Loader.Version)
+	}
+	return game
+}
+
+// runLength is how long a run took, to the second: "4s", "12m 4s", "1h 3m".
+func runLength(d time.Duration) string {
+	d = d.Round(time.Second)
+	switch {
+	case d >= time.Hour:
+		return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+	case d >= time.Minute:
+		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%ds", int(d.Seconds()))
 }
 
 func (a *app) dryRun(cmd *cobra.Command, args []string, target game.QuickPlay) error {

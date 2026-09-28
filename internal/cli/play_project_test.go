@@ -56,7 +56,7 @@ func TestPlayInAProjectWithNoInstanceOffersToCreateOne(t *testing.T) {
 		t.Fatalf("asked %v", s.asked)
 	}
 	gameDir := filepath.Join(root, "pack")
-	if !strings.Contains(stdout, "Created instance pack") || !strings.Contains(stdout, "Playing pack") {
+	if !strings.Contains(stdout, "Created instance pack") || !strings.Contains(stdout, "Launched pack as Notch") {
 		t.Fatalf("play creates the instance and launches it:\n%s", stdout)
 	}
 	waitForFile(t, filepath.Join(gameDir, "args.txt"))

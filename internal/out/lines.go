@@ -215,6 +215,16 @@ func (l *Lines) Warn(text string) {
 	l.prose(l.T.paint("!", sgrYellow, sgrBold), l.T.Markup(text))
 }
 
+// Failed is a result that went wrong without failing the run, like a game that crashed after it
+// launched: the error glyph in red and the message.
+func (l *Lines) Failed(text string) {
+	l.prose(l.T.paint(l.T.GlyphError(), sgrRed, sgrBold), l.T.Markup(text))
+}
+
+// Pending is something waited on, with no spinner and no timer: the pending mark and the text, all
+// grey.
+func (l *Lines) Pending(text string) { l.line(l.T.Grey(l.T.GlyphPending() + " " + text)) }
+
 // Info is the empty state or a passing remark: a cyan i and the message.
 func (l *Lines) Info(text string) {
 	l.prose(l.T.paint("i", sgrCyan, sgrBold), l.T.Markup(text))

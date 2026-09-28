@@ -116,10 +116,13 @@ func TestPlayWaitRecordsTheRunBeforeItReturns(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d:\n%s%s", code, stdout, stderr)
 	}
-	for _, want := range []string{"pack crashed", "status: 5", "crash report: " + filepath.Join(gameDir, "crash-reports", "crash-client.txt")} {
+	for _, want := range []string{"Minecraft crashed (exit code 5)", "crash report: " + filepath.Join(gameDir, "crash-reports", "crash-client.txt")} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("play --wait: %q is missing from\n%s", want, stdout)
 		}
+	}
+	if !strings.Contains(stderr, "✔ Launched pack as Notch (Minecraft 26.2)\n  ○ Waiting for Minecraft to close\n") {
+		t.Fatalf("play --wait says it launched, then that it waits, on stderr:\n%s", stderr)
 	}
 	// The command waited, so the record is closed already and no watcher was left behind to close it.
 	if run := onlyRun(t, gameDir); run.Outcome != instance.OutcomeCrashed || run.ExitCode != 5 || run.EndedAt == "" {
@@ -148,7 +151,7 @@ func TestPlayStreamMirrorsTheGameAndStillWritesTheLog(t *testing.T) {
 
 	stdout := h.mustRun(t, "-i", "pack", "play", "--stream")
 
-	if !strings.Contains(stdout, "[Render thread] Setting user: Notch") || !strings.Contains(stdout, "Played pack") {
+	if !strings.Contains(stdout, "[Render thread] Setting user: Notch") || !strings.Contains(stdout, "Minecraft closed after") {
 		t.Fatalf("play --stream shows the game as it runs, then how it ended:\n%s", stdout)
 	}
 	run := onlyRun(t, gameDir)

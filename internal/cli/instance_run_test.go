@@ -135,7 +135,7 @@ func TestPlayShowsTheGamesPidAndHowToDumpIt(t *testing.T) {
 	if !regexp.MustCompile(`pid: [1-9][0-9]*\n`).MatchString(stdout) {
 		t.Fatalf("a detached launch shows the game's pid:\n%s", stdout)
 	}
-	for _, want := range []string{"If it hangs:", "$ shulker instance dump -i pack"} {
+	for _, want := range []string{"If Minecraft freezes while it's running, dump its threads:", "$ shulker instance dump -i pack"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("a detached launch shows %q:\n%s", want, stdout)
 		}

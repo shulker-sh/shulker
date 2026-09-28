@@ -158,13 +158,13 @@ func TestPlayStartsTheGameDetachedAndLogsIt(t *testing.T) {
 
 	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play")
 
-	for _, want := range []string{"Playing pack", "(26.2)", "log: "} {
+	for _, want := range []string{"Launched pack as Notch (Minecraft 26.2)", "log: "} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("play: %q is missing from\n%s", want, stdout)
 		}
 	}
-	if !strings.Contains(stderr, "Started pack as Notch") || strings.Contains(stdout, "account:") {
-		t.Fatalf("the started line names the account, and no row repeats it:\n%s%s", stderr, stdout)
+	if strings.Contains(stderr, "Started") || strings.Contains(stdout, "account:") {
+		t.Fatalf("the launched line names the account, and no other line or row repeats it:\n%s%s", stderr, stdout)
 	}
 	if strings.Contains(stdout, "Synced") {
 		t.Fatalf("a sync that changed nothing says nothing:\n%s", stdout)
