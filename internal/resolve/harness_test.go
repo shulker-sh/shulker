@@ -80,6 +80,13 @@ func (h *harness) mustAdd(slug string, opts AddOptions) {
 	}
 }
 
+// nextCommand is a new resolver over the same project, lock and hosts, as the next command has.
+func (h *harness) nextCommand() {
+	next := *h.r
+	next.locked = nil
+	h.r = &next
+}
+
 func (h *harness) reconcile() ([]string, error) {
 	return h.r.Reconcile(context.Background())
 }

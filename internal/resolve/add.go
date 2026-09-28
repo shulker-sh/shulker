@@ -61,6 +61,8 @@ type Resolver struct {
 	keepNewest bool
 	// adopted are the pending mods install filled from downloads/.
 	adopted []string
+	// locked are the mods this resolver locked, which keeping one again doesn't report.
+	locked map[string]bool
 	// SkipPending goes on without the files waiting for a manual download rather than naming them
 	// as missing: install leaves out the mods pending in the lock, and an import locks the mods it
 	// can't download pending. A build leaves pending mods out.
@@ -545,7 +547,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 				return "", nil, err
 			}
 			if !newer {
-				r.log("keeping %s %s already in lock", id, existing.VersionNumber)
+				r.logKept(id, existing)
 				return id, prior, nil
 			}
 			replacesProject = true
@@ -558,7 +560,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			r.log("keeping %s %s from %s (%s project %s recorded as an alias)", id, existing.VersionNumber, existing.Provider, p.Name(), proj.ID)
 			return id, prior, nil
 		case existing.Version != v.ID:
-			r.log("keeping %s %s already in lock", id, existing.VersionNumber)
+			r.logKept(id, existing)
 			return id, prior, nil
 		default:
 			return id, prior, nil
@@ -610,7 +612,19 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		r.log("%s %s now identifies itself as %s", id, v.Number, info.ID)
 	}
 	r.Lock.Mods[id] = entry
+	if r.locked == nil {
+		r.locked = map[string]bool{}
+	}
+	r.locked[id] = true
 	return id, prior, nil
+}
+
+// logKept reports keeping a mod's locked file over the one asked for, unless this resolver locked
+// it: that is the same command settling on one file, not an entry the user had.
+func (r *Resolver) logKept(id string, existing lock.Mod) {
+	if !r.locked[id] {
+		r.log("keeping %s %s already in lock", id, existing.VersionNumber)
+	}
 }
 
 // newerThanLocked reports whether info's jar is newer than the one the entry locks. An entry whose

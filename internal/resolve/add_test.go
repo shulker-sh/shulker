@@ -307,6 +307,42 @@ func TestADependencyAlreadyLockedKeepsItsVersion(t *testing.T) {
 	}
 }
 
+// pinnedSodium is a host with sodium 0.9.2 and 0.9.3, and iris depending on sodium 0.9.2's file.
+func pinnedSodium(t *testing.T) *harness {
+	t.Helper()
+	host := envtest.NewHost(envtest.NewCDN(t), "alpha")
+	host.Publish(mod("a-sodium", "sodium"), provider.Version{ID: "s-092", Number: "0.9.2", Published: day(1), File: provider.File{Filename: "sodium-0.9.2.jar"}}, modJar(t, "sodium", "0.9.2", "client"))
+	host.Publish(mod("a-sodium", "sodium"), provider.Version{ID: "s-093", Number: "0.9.3", Published: day(2), File: provider.File{Filename: "sodium-0.9.3.jar"}}, modJar(t, "sodium", "0.9.3", "client"))
+	host.Publish(mod("a-iris", "iris"), provider.Version{ID: "i-100", Number: "1.0.0", Published: day(1), File: provider.File{Filename: "iris-1.0.0.jar"}, Dependencies: []provider.Dependency{{VersionID: "s-092", Type: "required"}}}, modJar(t, "iris", "1.0.0", "client"))
+	return newHarness(t, host)
+}
+
+func TestKeepingAModThisCommandLockedIsSilent(t *testing.T) {
+	h := pinnedSodium(t)
+
+	h.mustAdd("sodium", AddOptions{})
+	h.mustAdd("iris", AddOptions{})
+
+	if h.logged("keeping sodium") {
+		t.Fatalf("sodium was locked by this command, so keeping it says nothing: %q", h.log)
+	}
+	if got := h.mod("sodium").VersionNumber; got != "0.9.3" {
+		t.Fatalf("sodium = %s, want 0.9.3 kept", got)
+	}
+}
+
+func TestKeepingAModLockedBeforeTheCommandSaysSo(t *testing.T) {
+	h := pinnedSodium(t)
+	h.mustAdd("sodium", AddOptions{})
+
+	h.nextCommand()
+	h.mustAdd("iris", AddOptions{})
+
+	if !h.logged("keeping sodium 0.9.3 already in lock") {
+		t.Fatalf("sodium was locked before this command, so keeping it is logged: %q", h.log)
+	}
+}
+
 func TestAddRefusesAVersionOffTheChannel(t *testing.T) {
 	cf := envtest.NewHost(envtest.NewCDN(t), "curse").LikeCurseForge()
 	betaDependency(t, cf)
