@@ -36,10 +36,11 @@ func (a *app) confirm(question, flag string) (bool, error) {
 	return a.askYes(question)
 }
 
-// askYes puts a yes-or-no question with "no" preselected, so a stray enter declines.
+// askYes puts a yes-or-no question with No preselected, so a stray enter declines.
 func (a *app) askYes(question string) (bool, error) {
-	answer, err := a.ask(question, []out.Choice{{Label: "no", Value: "no"}, {Label: "yes", Value: "yes"}})
-	return answer == "yes", err
+	a.printer.Settle()
+	yes, err := a.questions().Confirm(question, a.stdin)
+	return yes, escaped(err)
 }
 
 // escaped is what leaving a wizard half-answered means: the run ends where ctrl-c would leave

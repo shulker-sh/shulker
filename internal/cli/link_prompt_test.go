@@ -48,6 +48,15 @@ func (s *scripted) Ask(title, _, placeholder string, _ io.Reader) (string, error
 	return answer, nil
 }
 
+func (s *scripted) Confirm(question string, _ io.Reader) (bool, error) {
+	s.asked = append(s.asked, question)
+	answer, ok := s.answers[question]
+	if !ok || (answer != "yes" && answer != "no") {
+		return false, fmt.Errorf("unexpected question %q", question)
+	}
+	return answer == "yes", nil
+}
+
 // runAnswering runs at a terminal, answering from answers.
 func (h *harness) runAnswering(t *testing.T, answers map[string]string, args ...string) (int, string, string, *scripted) {
 	t.Helper()
@@ -124,6 +133,10 @@ func (o offering) Pick(_ string, choices []out.Choice, _ io.Reader) (string, err
 
 func (o offering) Ask(string, string, string, io.Reader) (string, error) {
 	return "", out.ErrPickCancelled
+}
+
+func (o offering) Confirm(string, io.Reader) (bool, error) {
+	return false, out.ErrPickCancelled
 }
 
 func (o offering) BrowseMarks(string, string, out.BrowseSource, io.Reader) ([]string, error) {
