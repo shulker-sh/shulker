@@ -84,6 +84,9 @@ func (b *Builder) collectPacks(cond conditions, desired map[string]source, repor
 				continue
 			}
 		}
+		if b.awaitsDownload(ref.key, ref.pack.Sha512, ref.pack.URL, ref.pack.File, report) {
+			continue
+		}
 		if !b.Cache.Has(ref.pack.Sha512) {
 			return notInstalled(ref.key)
 		}
@@ -550,6 +553,9 @@ func (b *Builder) collectDatapacks(side, levelName string, cond conditions, desi
 				report.Excluded = append(report.Excluded, key+" ("+why+")")
 				continue
 			}
+		}
+		if b.awaitsDownload(key, p.Sha512, p.URL, p.File, report) {
+			continue
 		}
 		if !b.Cache.Has(p.Sha512) {
 			return notInstalled(key)

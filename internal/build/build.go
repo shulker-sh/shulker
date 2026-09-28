@@ -491,8 +491,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if !sel.included[id] || !m.PlacedOn(side) {
 			continue
 		}
-		if m.IsPending() {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("%s is left out until its manual download is in downloads/; `shulker install` asks for it", id))
+		if b.awaitsDownload(id, m.Sha512, m.URL, m.File, report) {
 			continue
 		}
 		if !b.Cache.Has(m.Sha512) {
@@ -1053,6 +1052,17 @@ func fileSha256(path string) (string, bool, error) {
 func sha256Hex(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
+}
+
+// awaitsDownload reports, with a warning, a locked file the build leaves out until it is downloaded
+// by hand: a pending mod, or a file a provider won't serve that the cache lacks, which install
+// only lets through once its download wait was skipped.
+func (b *Builder) awaitsDownload(key, sha512 string, url *string, file string, report *Report) bool {
+	if sha512 != "" && (url != nil || file != "" || b.Cache.Has(sha512)) {
+		return false
+	}
+	report.Warnings = append(report.Warnings, fmt.Sprintf("%s is left out until its manual download is in downloads/; `shulker install` asks for it", key))
+	return true
 }
 
 func notInstalled(what string) *out.Error {

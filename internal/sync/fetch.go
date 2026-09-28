@@ -27,19 +27,19 @@ func FetchLocked(ctx context.Context, e *Env, p *project.Project, sides []string
 	var r *resolve.Resolver
 	var fetched, dropWarnings []string
 	var err error
-	skip := e.AwaitDownloads == nil
+	skipped := false
 	for {
 		// A modpack archive its author won't let shulker download is missing when the resolver
 		// opens the project's modpacks, before any locked file is.
 		if r, err = e.resolver(ctx, p, resolve.PackMode{}); err == nil {
-			r.SkipPending = skip
+			r.SkipPending, r.SkipManual = e.AwaitDownloads == nil || skipped, skipped
 			fetched, dropWarnings, err = r.Install(ctx, sides...)
 		}
-		if out.CodeOf(err) != "missing-files" || e.AwaitDownloads == nil || skip {
+		if out.CodeOf(err) != "missing-files" || e.AwaitDownloads == nil || skipped {
 			break
 		}
 		var waitErr error
-		if skip, waitErr = e.AwaitDownloads(ctx, filepath.Join(p.Dir, resolve.DownloadsDir), out.AsError(err)); waitErr != nil {
+		if skipped, waitErr = e.AwaitDownloads(ctx, filepath.Join(p.Dir, resolve.DownloadsDir), out.AsError(err)); waitErr != nil {
 			return nil, waitErr
 		}
 	}

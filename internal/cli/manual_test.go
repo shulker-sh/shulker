@@ -216,3 +216,16 @@ func TestAddWaitsForAManualDownloadAtATerminal(t *testing.T) {
 		t.Fatalf("esc ends the wait and add fails as off a terminal: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 }
+
+func TestInstallSkipsAMissingLockedFileOnEsc(t *testing.T) {
+	h := lockedManualDownload(t)
+	h.tty = true
+	h.stdin = keysOnceWaiting(t, filepath.Join(h.dir, "downloads"), func() {}, "\x1b")
+	code, stdout, stderr := h.run(t, "install")
+	if code != 0 || !strings.Contains(stderr, "nodist is left out until its manual download is in downloads/") || !strings.Contains(stdout, "Built client") {
+		t.Fatalf("esc builds without the file: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if _, l := readProject(t, h.dir); l.Mods["nodist"].Sha512 != h.jars["nodist"].sha512 {
+		t.Fatalf("the lock keeps the file's hash for the next install: %+v", l.Mods["nodist"])
+	}
+}

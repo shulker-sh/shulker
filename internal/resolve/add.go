@@ -65,6 +65,9 @@ type Resolver struct {
 	// as missing: install leaves out the mods pending in the lock, and an import locks the mods it
 	// can't download pending. A build leaves pending mods out.
 	SkipPending bool
+	// SkipManual is SkipPending for every locked file a provider won't serve that the cache lacks,
+	// pending or not, once a download wait was skipped. A build leaves those out too.
+	SkipManual bool
 	// DownloadsIn is where manual downloads are taken from when it isn't Dir's downloads/: a new
 	// project staged elsewhere reads the ones dropped into the folder it is for.
 	DownloadsIn string
@@ -764,7 +767,7 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 			}
 			continue
 		}
-		if f.url == nil && f.sha512 == "" && r.SkipPending {
+		if f.url == nil && (r.SkipManual || f.sha512 == "" && r.SkipPending) {
 			continue
 		}
 		if f.url == nil {
