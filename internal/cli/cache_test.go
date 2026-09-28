@@ -51,7 +51,7 @@ func TestCacheInfoNamesItsRootsAndPruneFreesTheRest(t *testing.T) {
 	}
 
 	stdout = h.mustRun(t, "cache", "prune")
-	if !strings.Contains(stdout, "Freed") || !strings.Contains(stdout, " left") {
+	if !strings.Contains(stdout, " of unused cache data") || !strings.Contains(stdout, " of cache data left") {
 		t.Fatalf("prune output: %s", stdout)
 	}
 	if _, err := os.Stat(stray); !os.IsNotExist(err) {

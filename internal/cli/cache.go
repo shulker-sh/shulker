@@ -127,9 +127,9 @@ func (a *app) cachePruneCmd() *cobra.Command {
 					l.OK("Dropped "+prunedAside(pruned), "")
 					return
 				}
-				l.OK("Freed "+out.HumanBytes(pruned.Bytes), "")
+				l.OK("Freed "+out.HumanBytes(pruned.Bytes)+" of unused cache data", "")
 				if left.Bytes > 0 {
-					l.Tree(out.Row{Text: out.HumanBytes(left.Bytes) + " left"})
+					l.Tree(out.Row{Text: out.HumanBytes(left.Bytes) + " of cache data left"})
 				}
 			})
 		},
