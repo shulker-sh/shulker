@@ -306,7 +306,7 @@ shulker resourcepack add "./Resource Packs/Mod Menu Helper"
 
 ### `shulker search`
 
-Search every provider shulker has set up for projects matching the words, and print the ids to add them by. Results come in a block per provider, most downloaded first, and the command writes nothing: `shulker.json` and the lock only change through `add`. Projects CurseForge classes as something shulker has no entry type for, worlds and plugins among them, are left out. A `modpack` row is a provider modpack, which `add` takes by its slug.
+Search every provider shulker has set up for projects matching the words, and print them as one table, most downloaded first, with the slug to add each by. A Modrinth and a CurseForge result are one row when their slug and type match and so do their names, once tags like `(Fabric)` or ` - DISCONTINUED` and punctuation are dropped, or their authors; the current project's lock pairs any others it holds as one mod. Source says which provider a row was found on, or `both`, and goes under `--provider`; Downloads is the sum. The command writes nothing: `shulker.json` and the lock only change through `add`. Projects CurseForge classes as something shulker has no entry type for, worlds and plugins among them, are left out. A `modpack` row is a provider modpack, which `add` takes by its slug.
 
 With no words, `shulker search` opens a search box over a list of results that follows it as you type, searching once you pause for a quarter of a second and have typed at least two characters. Tab moves into the list to scroll it and shift+tab back to the box; enter does nothing, since nothing is chosen here. Esc or ctrl-c leaves and prints the results on screen, as `shulker search` with those words would. A query that fails keeps the last results on screen, with the error under the box. Off a terminal, or with `--no-input` or `--json`, the words are required.
 
@@ -322,8 +322,9 @@ shulker search jei --provider curseforge --limit 5
 | `--type <type>` | Only projects of one type: `mod`, `modpack`, `resourcepack`, `shader`, `datapack` |
 | `--provider <provider>` | Search one provider instead of every available one: `modrinth` or `curseforge` |
 | `--limit <n>` | Results to print per provider (default 10, as many as each provider answers with: at most 100 from Modrinth, 50 from CurseForge) |
+| `-v, --verbose` | Also print each provider's id, and its downloads in place of the sum |
 
-With `--json`, `data.results` lists each hit as `{ "provider", "id", "slug", "title", "type", "side", "downloads" }`, and `data.query` is the words as one string.
+With `--json`, `data.results` lists each row as `{ "slug", "title", "type", "side", "author", "downloads", "providers" }`, where `providers` holds its hit on each provider as `{ "provider", "id", "title", "downloads", "page" }`, and `data.query` is the words as one string.
 
 ### `shulker remove`
 

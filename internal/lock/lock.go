@@ -345,6 +345,20 @@ func Parse(data []byte) (*Lock, error) {
 	return l, nil
 }
 
+// Aliased reports whether the lock holds one mod as id on provider and otherID on otherProvider,
+// whichever of the two it was locked from.
+func (l *Lock) Aliased(provider, id, otherProvider, otherID string) bool {
+	for _, m := range l.Mods {
+		if m.Provider == provider && m.Project == id && m.Aliases[otherProvider] == otherID {
+			return true
+		}
+		if m.Provider == otherProvider && m.Project == otherID && m.Aliases[provider] == id {
+			return true
+		}
+	}
+	return false
+}
+
 func (l *Lock) Encode() ([]byte, error) {
 	l.normalize()
 	return fsutil.MarshalJSON(l)

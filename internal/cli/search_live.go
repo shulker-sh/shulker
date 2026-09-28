@@ -27,7 +27,7 @@ func (a *app) browseSearch(cmd *cobra.Command, kind string, names []string, limi
 	a.printer.Settle()
 	ctx := cmd.Context()
 	s := newLiveSearch(a.printer.ErrTheme, a.titles(), func(query string) (searchReply, error) {
-		return a.search(ctx, query, kind, names, limit, false)
+		return a.search(ctx, query, kind, names, limit, false, true)
 	})
 	if err := a.printer.Browse(a.searchTitle(names), s, a.stdin); err != nil {
 		return err
@@ -37,7 +37,7 @@ func (a *app) browseSearch(cmd *cobra.Command, kind string, names []string, limi
 		return nil
 	}
 	a.warn(reply.warnings)
-	return a.printSearch(reply)
+	return a.printSearch(reply, false)
 }
 
 func (a *app) searchTitle(names []string) string {
@@ -135,11 +135,18 @@ func (l *liveSearch) Rows() []out.Choice {
 	}
 	t := l.theme
 	var rows []out.Choice
-	for _, hit := range l.shown.reply.results.Results {
-		aside := append([]string{l.titles.Title(hit.Provider)}, searchAside(hit)...)
+	for _, r := range l.shown.reply.results.Results {
+		var aside []string
+		for _, h := range r.Providers {
+			aside = append(aside, l.titles.Title(h.Provider))
+		}
+		aside = append(aside, r.Type)
+		if r.Downloads > 0 {
+			aside = append(aside, downloadCount(r.Downloads)+" downloads")
+		}
 		rows = append(rows, out.Choice{
-			Label: t.Bold(hit.Title) + " " + t.Grey(hit.ID) + t.Aside(strings.Join(aside, ", ")),
-			Value: hit.Provider + ":" + hit.ID,
+			Label: t.Bold(r.Title) + " " + t.Grey(r.Slug) + t.Aside(strings.Join(aside, ", ")),
+			Value: r.Providers[0].Provider + ":" + r.Providers[0].ID,
 		})
 	}
 	return rows

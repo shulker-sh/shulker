@@ -24,16 +24,25 @@ func searchJSON(t *testing.T, h *harness, args ...string) map[string]any {
 	return env.Data.(map[string]any)
 }
 
-func TestSearchListsEveryProvider(t *testing.T) {
+func TestSearchMergesProvidersIntoOneTable(t *testing.T) {
 	h := newHarness(t)
 	stdout := h.mustRun(t, "search", "sodium")
 	for _, want := range []string{
-		"Modrinth", "• Sodium", "AANobbMI", "(mod, client only, 228.1M downloads)",
-		"CurseForge", "• SODIUM", "394468", "(mod, 151.4M downloads)",
-		"Add one:", "$ shulker add <id>",
+		"Name", "Slug", "Type", "Side", "Source", "Downloads",
+		"Sodium", "sodium", "mod", "client", "both", "379.6M",
+		"Add one:", "$ shulker add <slug>",
 	} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("missing %q in:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "AANobbMI") || strings.Contains(stdout, "SODIUM") {
+		t.Errorf("a merged row printed its ids or its second name:\n%s", stdout)
+	}
+	verbose := h.mustRun(t, "search", "sodium", "-v")
+	for _, want := range []string{"Modrinth ID", "CurseForge Downloads", "AANobbMI", "394468", "228.1M", "151.4M"} {
+		if !strings.Contains(verbose, want) {
+			t.Errorf("-v: missing %q in:\n%s", want, verbose)
 		}
 	}
 }
@@ -45,16 +54,23 @@ func TestSearchJSONCarriesEveryHit(t *testing.T) {
 		t.Errorf("query %v", data["query"])
 	}
 	results := data["results"].([]any)
-	if len(results) != 2 {
+	if len(results) != 1 {
 		t.Fatalf("results %v", results)
 	}
-	first, second := results[0].(map[string]any), results[1].(map[string]any)
-	if first["provider"] != "modrinth" || first["id"] != "50dA9Sha" || first["slug"] != "fresh-animations" ||
-		first["title"] != "Fresh Animations" || first["type"] != "resourcepack" || first["side"] != "client" ||
-		first["downloads"].(float64) != 5_000_000 {
+	r := results[0].(map[string]any)
+	if r["slug"] != "fresh-animations" || r["title"] != "Fresh Animations" || r["type"] != "resourcepack" ||
+		r["side"] != "client" || r["downloads"].(float64) != 9_000_000 {
+		t.Errorf("result %v", r)
+	}
+	hits := r["providers"].([]any)
+	if len(hits) != 2 {
+		t.Fatalf("providers %v", hits)
+	}
+	first, second := hits[0].(map[string]any), hits[1].(map[string]any)
+	if first["provider"] != "modrinth" || first["id"] != "50dA9Sha" || first["downloads"].(float64) != 5_000_000 {
 		t.Errorf("modrinth hit %v", first)
 	}
-	if second["provider"] != "curseforge" || second["id"] != "600000" || second["type"] != "resourcepack" || second["side"] != nil {
+	if second["provider"] != "curseforge" || second["id"] != "600000" || second["title"] != "FRESH-ANIMATIONS" {
 		t.Errorf("curseforge hit %v", second)
 	}
 }
@@ -66,20 +82,18 @@ func TestSearchNarrowsByTypeAndLimit(t *testing.T) {
 		t.Errorf("--type resourcepack: %s", stdout)
 	}
 	results := searchJSON(t, h, "a", "--limit", "1")["results"].([]any)
-	if len(results) != 2 {
+	if len(results) != 1 {
 		t.Fatalf("--limit 1 over two providers: %v", results)
 	}
-	for _, r := range results {
-		if hit := r.(map[string]any); hit["slug"] != "fabric-api" {
-			t.Errorf("--limit 1 kept %v, want the provider's first result", hit)
-		}
+	if r := results[0].(map[string]any); r["slug"] != "fabric-api" || len(r["providers"].([]any)) != 2 {
+		t.Errorf("--limit 1 kept %v, want each provider's first result, merged", r)
 	}
 }
 
 func TestSearchOneProvider(t *testing.T) {
 	h := newHarness(t)
-	stdout := h.mustRun(t, "search", "sodium", "--provider", "modrinth")
-	if !strings.Contains(stdout, "AANobbMI") || strings.Contains(stdout, "CurseForge") {
+	stdout := h.mustRun(t, "search", "sodium", "--provider", "modrinth", "-v")
+	if !strings.Contains(stdout, "AANobbMI") || strings.Contains(stdout, "Source") || strings.Contains(stdout, "CurseForge") {
 		t.Errorf("--provider modrinth: %s", stdout)
 	}
 	code, _, stderr := h.run(t, "search", "sodium", "--provider", "nope")
@@ -91,7 +105,7 @@ func TestSearchOneProvider(t *testing.T) {
 func TestSearchWithoutCurseForge(t *testing.T) {
 	h := newHarness(t)
 	h.noCurseForge = true
-	stdout := h.mustRun(t, "search", "sodium")
+	stdout := h.mustRun(t, "search", "sodium", "-v")
 	if !strings.Contains(stdout, "AANobbMI") || strings.Contains(stdout, "CurseForge") {
 		t.Errorf("search with no key: %s", stdout)
 	}
@@ -104,7 +118,7 @@ func TestSearchWithoutCurseForge(t *testing.T) {
 func TestSearchWarnsWhenOneProviderFails(t *testing.T) {
 	h := newHarness(t)
 	h.cfSearchFails = true
-	stdout, stderr := h.mustRunStderr(t, "search", "sodium")
+	stdout, stderr := h.mustRunStderr(t, "search", "sodium", "-v")
 	if !strings.Contains(stdout, "AANobbMI") || strings.Contains(stdout, "CurseForge") {
 		t.Errorf("stdout %s", stdout)
 	}

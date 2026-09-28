@@ -220,3 +220,13 @@ func TestDatapackFolder(t *testing.T) {
 		}
 	}
 }
+
+func TestAliasedEitherWay(t *testing.T) {
+	l := &Lock{Mods: map[string]Mod{"jei": {Provider: "curseforge", Project: "238222", Aliases: Aliases{"modrinth": "u6dRKJwZ"}}}}
+	if !l.Aliased("modrinth", "u6dRKJwZ", "curseforge", "238222") || !l.Aliased("curseforge", "238222", "modrinth", "u6dRKJwZ") {
+		t.Error("the alias pair is not aliased")
+	}
+	if l.Aliased("modrinth", "other", "curseforge", "238222") {
+		t.Error("an unaliased id is aliased")
+	}
+}

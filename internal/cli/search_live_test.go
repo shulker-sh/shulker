@@ -31,7 +31,9 @@ func newFakeSearches() *fakeSearches {
 			return searchReply{}, errors.New("curseforge search " + query + ": 503 Service Unavailable")
 		}
 		return searchReply{
-			results:  searchResults{Query: query, Results: []searchHit{{Provider: "modrinth", ID: "id-" + query, Title: "Title " + query}}},
+			results: searchResults{Query: query, Results: []searchResult{{
+				Slug: query, Title: "Title " + query, Providers: []searchHit{{Provider: "modrinth", ID: "id-" + query}},
+			}}},
 			searched: []string{"modrinth"},
 		}, nil
 	})
