@@ -165,13 +165,13 @@ func (a *app) registryFile() (string, error) {
 	return config.RegistryPath(path, cfg), nil
 }
 
-func (a *app) reconcileOrWarn(in config.Instance) {
+func (a *app) reconcileOrWarn(in config.Instance) (rehooked bool) {
 	se, err := a.syncEnv()
 	if err != nil {
-		a.printer.Warn("hooks not set up for %q: %v", in.Label(), err)
-		return
+		a.printer.Warn("hooks not set up for %s: %v", launcher.Named(in), err)
+		return false
 	}
-	sync.Reconcile(se, in)
+	return sync.Reconcile(se, in)
 }
 
 func (a *app) updateInstances(update func([]config.Instance) []config.Instance) bool {

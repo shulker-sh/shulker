@@ -34,7 +34,7 @@ var prismEntry = &Entry{
 	},
 	Accounts: prismAccounts,
 	relink:   relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,
-	readSlots: readPrismSlots, writeSlots: writePrismSlots,
+	readSlots: readPrismSlots, writeSlots: writePrismSlots, slotFile: instanceFileIn(PrismInstanceFile),
 	place: placePrism, link: linkPrism, after: restartIfUpdated,
 }
 

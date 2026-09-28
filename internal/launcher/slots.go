@@ -137,6 +137,24 @@ func ReadSlots(e *Entry, in config.Instance) (Slots, bool, error) {
 	return e.readSlots(e, in)
 }
 
+// SlotFile is the launcher file that holds an instance's slots, empty for a launcher with none.
+func SlotFile(e *Entry, in config.Instance) string {
+	if e.slotFile == nil {
+		return ""
+	}
+	return e.slotFile(e, in)
+}
+
+func instanceFileIn(name string) func(e *Entry, in config.Instance) string {
+	return func(e *Entry, in config.Instance) string {
+		return filepath.Join(e.InstanceDir(in.Dir), name)
+	}
+}
+
+func mojangSlotFile(_ *Entry, in config.Instance) string {
+	return filepath.Join(in.LauncherDir, ProfilesFile)
+}
+
 func readPrismSlots(e *Entry, in config.Instance) (Slots, bool, error) {
 	values, err := readINI(filepath.Join(e.InstanceDir(in.Dir), PrismInstanceFile), prismUnescape)
 	if errors.Is(err, os.ErrNotExist) {

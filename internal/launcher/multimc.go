@@ -34,7 +34,7 @@ var multimcEntry = &Entry{
 		Force:     "repoint the modpack an instance already follows",
 	},
 	relink: relinkLauncher, forget: forgetInstance, name: multimcName, gameDirs: multimcGameDirs,
-	readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots,
+	readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots, slotFile: instanceFileIn(MultiMCInstanceFile),
 	place: placeMultiMC, link: linkMultiMC, after: restartIfUpdated,
 	Accounts: prismAccounts,
 }

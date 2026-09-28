@@ -43,7 +43,7 @@ var atlauncherEntry = &Entry{
 		Force: "repoint the modpack an instance already follows, or link over one shulker didn't link",
 	},
 	relink: relinkLauncher, forget: forgetInstance, name: atlauncherName, gameDirs: atlauncherGameDirs,
-	readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots,
+	readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots, slotFile: instanceFileIn(ATLauncherInstanceFile),
 	place: placeATLauncher, link: linkATLauncher,
 	Accounts: atlauncherAccounts,
 	after: func(e *Entry, _ InstanceResult) string {

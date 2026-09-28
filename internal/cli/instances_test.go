@@ -895,3 +895,52 @@ func TestRepairCountsRegisteredInstancesByLauncher(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestInstancesRepairRehooksWhatLostItsHook(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	prismDir := t.TempDir()
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Friends")
+	h.mustRun(t, "link", "prism", h.dir, "--launcher-dir", prismDir, "--name", "Quiet", "--no-hooks")
+	friends := filepath.Join(prismDir, "instances", "shulker-friends")
+	quiet := filepath.Join(prismDir, "instances", "shulker-quiet")
+
+	if stdout := h.mustRun(t, "instances", "repair"); strings.Contains(stdout, "Rehooked") || !strings.Contains(stdout, "Every instance is registered") {
+		t.Fatalf("repair with every hook in place: %s", stdout)
+	}
+
+	writeFile(t, filepath.Join(friends, launcher.PrismInstanceFile), "[General]\nname=Friends\n")
+	stdout := h.mustRun(t, "instances", "repair")
+	if !strings.Contains(stdout, "Rehooked 1 instance") || !strings.Contains(stdout, "• friends (Prism Launcher)") || strings.Contains(stdout, "Every instance is registered") {
+		t.Fatalf("repair reports the instance it hooked again: %s", stdout)
+	}
+	if cfg := readINIFile(t, filepath.Join(friends, launcher.PrismInstanceFile)); !launcher.IsShulkerSlot(cfg["PreLaunchCommand"]) {
+		t.Fatalf("the pre-launch command is back: %+v", cfg)
+	}
+	if cfg := readINIFile(t, filepath.Join(quiet, launcher.PrismInstanceFile)); cfg["PreLaunchCommand"] != "" {
+		t.Fatalf("an instance linked with --no-hooks stays unhooked: %+v", cfg)
+	}
+
+	// A hook left pointing at another binary is taken over by the one running the repair.
+	gameDir := filepath.Join(friends, "minecraft")
+	f := readIntent(t, gameDir)
+	f.Settings.Shulker = "/elsewhere/shulker"
+	if err := f.Save(gameDir); err != nil {
+		t.Fatal(err)
+	}
+	if stdout := h.mustRun(t, "instances", "repair"); !strings.Contains(stdout, "Rehooked 1 instance") {
+		t.Fatalf("a hook on another binary is rehooked: %s", stdout)
+	}
+	if f := readIntent(t, gameDir); f.Settings.Shulker == "/elsewhere/shulker" {
+		t.Fatalf("settings.shulker names the running binary: %q", f.Settings.Shulker)
+	}
+
+	// One it can't rehook is a warning naming the launcher file, and the rest of the repair goes on.
+	if err := os.Remove(filepath.Join(friends, launcher.PrismInstanceFile)); err != nil {
+		t.Fatal(err)
+	}
+	stdout, stderr := h.mustRunStderr(t, "instances", "repair")
+	if !strings.Contains(stderr, "friends") || !strings.Contains(stderr, filepath.Join(friends, launcher.PrismInstanceFile)) || strings.Contains(stdout, "Rehooked") {
+		t.Fatalf("an instance that can't be rehooked:\nstdout: %s\nstderr: %s", stdout, stderr)
+	}
+}

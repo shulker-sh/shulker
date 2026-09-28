@@ -92,6 +92,8 @@ type Entry struct {
 	gameDirs   func(e *Entry, launcherDir string) []string
 	readSlots  func(e *Entry, in config.Instance) (Slots, bool, error)
 	writeSlots func(e *Entry, in config.Instance, s Slots) error
+	// slotFile is the launcher file holding an instance's slots, for a message about them.
+	slotFile func(e *Entry, in config.Instance) string
 	// locate settles the launcher directory a link works in, for a launcher that reaches its own
 	// files through a resolved path; nil means the directory as given.
 	locate func(dir string) (string, error)
@@ -179,6 +181,30 @@ func Title(name string) string {
 		return e.Title
 	}
 	return name
+}
+
+// InstanceAside is what follows an instance's id wherever output names one: its launcher, then the
+// launcher's own name for it when that is more than the id in other letters.
+func InstanceAside(in config.Instance) string {
+	title := ""
+	if e := Find(in.Launcher); e != nil {
+		title = e.Title
+	}
+	switch {
+	case in.Name == "" || strings.EqualFold(in.Name, in.ID):
+		return title
+	case title == "":
+		return in.Name
+	}
+	return title + ": " + in.Name
+}
+
+// Named is an instance as a line of output names it: its id, then InstanceAside in brackets.
+func Named(in config.Instance) string {
+	if aside := InstanceAside(in); aside != "" {
+		return in.ID + " (" + aside + ")"
+	}
+	return in.ID
 }
 
 // Rank orders entries for display: known launchers in table order, then

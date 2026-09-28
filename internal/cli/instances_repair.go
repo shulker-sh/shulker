@@ -22,6 +22,7 @@ type repairResult struct {
 	Rebuilt    bool              `json:"rebuilt"`
 	Registered []config.Instance `json:"registered"`
 	Renamed    []repairRename    `json:"renamed"`
+	Rehooked   []config.Instance `json:"rehooked"`
 	Wrote      []string          `json:"wrote"`
 	Missing    []string          `json:"missing"`
 	total      int
@@ -72,7 +73,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 	if err != nil {
 		return repairResult{}, err
 	}
-	res := repairResult{Registered: []config.Instance{}, Renamed: []repairRename{}, Wrote: []string{}, Missing: []string{}}
+	res := repairResult{Registered: []config.Instance{}, Renamed: []repairRename{}, Rehooked: []config.Instance{}, Wrote: []string{}, Missing: []string{}}
 	instances, loadErr := config.LoadInstances(path)
 	if loadErr != nil {
 		instances, res.Rebuilt = nil, true
@@ -109,7 +110,9 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 		if rep.Wrote {
 			res.Wrote = append(res.Wrote, instance.Path(in.Dir))
 		}
-		a.reconcileOrWarn(*in)
+		if a.reconcileOrWarn(*in) {
+			res.Rehooked = append(res.Rehooked, *in)
+		}
 	}
 	for _, found := range launcher.Scan(launcherName, launcherDir, r.Instances, project.InstanceAt) {
 		if registered[filepath.Clean(found.Dir)] {
@@ -160,6 +163,14 @@ func (r repairResult) print(l *out.Lines) {
 	for _, rn := range r.Renamed {
 		l.OK("Renamed "+rn.ID+"  "+l.T.Bump(rn.From, rn.To), "")
 	}
+	if len(r.Rehooked) > 0 {
+		l.OK("Rehooked "+out.Count(len(r.Rehooked), "instance", "instances"), "")
+		items := make([]out.Item, 0, len(r.Rehooked))
+		for _, in := range r.Rehooked {
+			items = append(items, out.Item{Kind: out.Note, Name: in.ID, Aside: []string{launcher.InstanceAside(in)}})
+		}
+		l.Items(items...)
+	}
 	for _, path := range r.Wrote {
 		l.OK("Wrote "+path, "")
 	}
@@ -173,7 +184,7 @@ func (r repairResult) print(l *out.Lines) {
 	switch {
 	case r.total == 0:
 		l.Info("Nothing is linked yet; `shulker link prism` adds an instance.")
-	case len(r.Registered) == 0 && len(r.Renamed) == 0 && len(r.Wrote) == 0 && len(r.Missing) == 0:
+	case len(r.Registered) == 0 && len(r.Renamed) == 0 && len(r.Rehooked) == 0 && len(r.Wrote) == 0 && len(r.Missing) == 0:
 		l.Info("Every instance is registered and has its instance file.")
 	}
 }

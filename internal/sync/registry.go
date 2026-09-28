@@ -20,29 +20,32 @@ func InstanceID(e *Env, dir string) string {
 // watcher that was killed is closed first, which is true of every instance, then a launcher with
 // a slot gets launcher.Reconcile and a warning for each command it adopted. A launcher shulker
 // couldn't set up is worth saying so about, but never worth failing the command that registered it.
-func Reconcile(e *Env, in config.Instance) {
+// rehooked says a hook that is on was missing or pointed at another binary, and is back.
+func Reconcile(e *Env, in config.Instance) (rehooked bool) {
 	if err := instance.ReconcileRuns(in.Dir); err != nil {
 		e.Warn("%v", err)
 	}
 	entry := launcher.Find(in.Launcher)
 	if entry == nil || entry.Slot == nil {
 		// A plain synced directory has no slot to fill, so it gets no scripts either.
-		return
+		return false
 	}
 	var adopted []string
 	f, err := instance.Load(in.Dir)
 	if err == nil {
 		var exe string
 		if exe, err = launcher.ShulkerPath(); err == nil {
-			adopted, err = launcher.Reconcile(entry, in, f, exe)
+			adopted, rehooked, err = launcher.Reconcile(entry, in, f, exe)
 		}
 	}
 	for _, command := range adopted {
 		e.warnUnreproducible(*entry.Slot, command)
 	}
 	if err != nil {
-		e.Warn("hooks not set up for %q: %v", in.Label(), err)
+		e.Warn("hooks not set up for %s: %v", launcher.Named(in), err)
+		return false
 	}
+	return rehooked
 }
 
 // warnUnreproducible reports the tokens an adopted command uses that shulker can't reproduce,

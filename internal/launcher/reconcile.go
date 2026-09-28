@@ -1,6 +1,9 @@
 package launcher
 
 import (
+	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	"shulker.sh/shulker/internal/config"
@@ -13,17 +16,22 @@ import (
 // registering sync and `instances repair` can all call it, and a hand-edited switch takes effect
 // through the same path that first set it. A launcher with no slot fills none and gets no scripts.
 // adopted is each foreign command the launcher's slots held, moved into f's own settings so the
-// generated script keeps running it instead of destroying it.
-func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (adopted []string, err error) {
+// generated script keeps running it instead of destroying it. rehooked says a hook that is on was
+// missing or pointed at another binary before this call put it back.
+func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (adopted []string, rehooked bool, err error) {
 	if e == nil || e.Slot == nil {
-		return nil, nil
+		return nil, false, nil
 	}
 	slot := *e.Slot
 	instanceDir := e.InstanceDir(in.Dir)
 	current, found, err := ReadSlots(e, in)
-	if err != nil || !found {
-		return nil, err
+	if err != nil {
+		return nil, false, err
 	}
+	if !found {
+		return nil, false, noSlots(e, in)
+	}
+	rehooked = (f.Settings.PreLaunch() || f.Settings.PostExit()) && !hooksInPlace(slot, in, f, current, exe)
 	f.Settings.Shulker = exe
 	adopted = adoptSlots(f, current)
 	if slot.UsesShim {
@@ -43,11 +51,11 @@ func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (adop
 			h.Adopted = f.Settings.Commands.PreLaunch
 		}
 		if err := WriteHook(h); err != nil {
-			return adopted, err
+			return adopted, false, err
 		}
 		want.PreLaunch = slotCommandOf(slot, in, HookPreLaunch)
 	} else if err := RemoveHook(in.Dir, HookPreLaunch); err != nil {
-		return adopted, err
+		return adopted, false, err
 	}
 	if f.Settings.PostExit() {
 		h := Hook{
@@ -60,24 +68,60 @@ func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (adop
 			h.Adopted = f.Settings.Commands.PostExit
 		}
 		if err := WriteHook(h); err != nil {
-			return adopted, err
+			return adopted, false, err
 		}
 		want.PostExit = slotCommandOf(slot, in, HookPostExit)
 	} else if err := RemoveHook(in.Dir, HookPostExit); err != nil {
-		return adopted, err
+		return adopted, false, err
 	}
 	if slot.UsesShim {
 		if want.Java, err = reconcileShim(in, f, exe); err != nil {
-			return adopted, err
+			return adopted, false, err
 		}
 	} else {
 		// The shim prepends the wrapper itself; every other launcher has a slot of its own for it.
 		want.Wrapper = WrapperCommand(in.Launcher, f.Settings.Wrapper)
 	}
 	if err := WriteSlots(e, in, want); err != nil {
-		return adopted, err
+		return adopted, false, err
 	}
-	return adopted, f.Save(in.Dir)
+	if err := f.Save(in.Dir); err != nil {
+		return adopted, false, err
+	}
+	return adopted, rehooked, nil
+}
+
+// noSlots is the error for a launcher file that is gone or no longer holds the instance.
+func noSlots(e *Entry, in config.Instance) error {
+	path := SlotFile(e, in)
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("%s is missing", path)
+	}
+	return fmt.Errorf("%s no longer holds this instance", path)
+}
+
+// hooksInPlace says every hook that is on is where the launcher runs it, running exe.
+func hooksInPlace(slot Slot, in config.Instance, f *instance.File, current Slots, exe string) bool {
+	if f.Settings.Shulker != exe {
+		return false
+	}
+	if slot.UsesShim {
+		return IsShulkerShim(current.Java) && fileExists(ShimPath(in.Dir))
+	}
+	hooks := []struct {
+		on      bool
+		command string
+		kind    HookKind
+	}{
+		{f.Settings.PreLaunch(), current.PreLaunch, HookPreLaunch},
+		{f.Settings.PostExit(), current.PostExit, HookPostExit},
+	}
+	for _, h := range hooks {
+		if h.on && (!IsShulkerSlot(h.command) || !fileExists(HookPath(in.Dir, h.kind))) {
+			return false
+		}
+	}
+	return true
 }
 
 // slotCommandOf is what the launcher's own slot holds. A launcher with no command slots keeps them

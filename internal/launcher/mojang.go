@@ -47,7 +47,7 @@ var mojangEntry = &Entry{
 	},
 	Accounts: mojangAccounts,
 	relink:   relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,
-	readSlots: readMojangSlots, writeSlots: writeMojangSlots,
+	readSlots: readMojangSlots, writeSlots: writeMojangSlots, slotFile: mojangSlotFile,
 	place: placeMojang, link: linkMojang,
 }
 
