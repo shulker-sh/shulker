@@ -50,7 +50,7 @@ func (a *app) titles() provider.Providers {
 
 func (a *app) deps() (*deps, error) {
 	if a.d != nil {
-		a.d.FailFast = a.failFast
+		a.d.FailFast, a.d.EveryFetch = a.failFast, a.everyFetch
 		return a.d, nil
 	}
 	c, err := cache.Open()
@@ -96,7 +96,7 @@ func (a *app) deps() (*deps, error) {
 
 // newDeps completes e with the app's own sinks and flags and wraps it as the app's deps.
 func (a *app) newDeps(e *env.Env) *deps {
-	e.FailFast = a.failFast
+	e.FailFast, e.EveryFetch = a.failFast, a.everyFetch
 	e.Log = a.progress
 	e.Working = a.printer.Working
 	e.Progress = a.printer.Progress

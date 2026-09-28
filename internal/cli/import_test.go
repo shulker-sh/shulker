@@ -620,14 +620,28 @@ func TestImportSettlesEachPhaseIntoOneLine(t *testing.T) {
 
 	h.dir = t.TempDir()
 	_, stderr := h.mustRunStderr(t, "import", archive, "--dir", filepath.Join(h.dir, "phases"))
-	for _, want := range []string{"✔ Fetched 2 pack files", "✔ Matched 2 on Modrinth\n"} {
+	for _, want := range []string{"✔ Fetched 2 pack files", "✔ Matched 2 on Modrinth\n", "✔ Fetched 2 mods"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("stderr is missing %q:\n%s", want, stderr)
 		}
 	}
-	for _, unwanted := range []string{"etching mods/", "ooked up"} {
+	for _, unwanted := range []string{"etching mods/", "ooked up", "Fetched sodium", "Fetched fabric-api"} {
 		if strings.Contains(stderr, unwanted) {
 			t.Errorf("a phase prints no line per file: %q in\n%s", unwanted, stderr)
 		}
+	}
+
+	_, stderr = h.mustRunStderr(t, "import", archive, "--dir", filepath.Join(h.dir, "every"), "-v")
+	for _, want := range []string{"✔ Fetched mods/" + sodium.filename, "✔ Fetched sodium "} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("-v keeps a line per fetch, but %q is missing:\n%s", want, stderr)
+		}
+	}
+
+	h.dir = t.TempDir()
+	h.mustRun(t, "create", "--loader", "fabric", "--minecraft", "26.2")
+	_, stderr = h.mustRunStderr(t, "modpack", "add", archive)
+	if !strings.Contains(stderr, "✔ Fetched 2 mods") || strings.Contains(stderr, "etching mods/") || strings.Contains(stderr, "Fetched sodium") {
+		t.Errorf("a modpack archive's files and mods settle into a line each:\n%s", stderr)
 	}
 }

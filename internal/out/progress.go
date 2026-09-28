@@ -41,7 +41,6 @@ type Progress struct {
 	wheel   spinner.Model
 	bar     progress.Model
 	pending tea.Cmd
-	start   time.Time
 	stop    chan struct{}
 	stopped chan struct{}
 }
@@ -70,7 +69,7 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 }
 
 func newProgress(l *Lines, verb string, files []Download) *Progress {
-	pr := &Progress{l: l, verb: verb, total: len(files), sizes: map[string]int64{}, start: time.Now(), wheel: newSpinner(l.T), bar: newBar(l.T)}
+	pr := &Progress{l: l, verb: verb, total: len(files), sizes: map[string]int64{}, wheel: newSpinner(l.T), bar: newBar(l.T)}
 	known := true
 	for _, f := range files {
 		pr.longest = max(pr.longest, Width(f.Name))
@@ -122,13 +121,16 @@ func (pr *Progress) Advance() {
 	pr.redraw()
 }
 
-// Finish clears the bar and prints the ok line with the byte count and time.
+// Finish clears the bar and prints the ok line with the byte count, or clears it alone when
+// nothing was fetched.
 func (pr *Progress) Finish() {
 	if pr == nil {
 		return
 	}
 	pr.halt()
-	elapsed := time.Since(pr.start)
+	if pr.done == 0 {
+		return
+	}
 	noun, one := "files", "file"
 	if pr.many != "" {
 		noun, one = pr.many, pr.one
@@ -136,7 +138,11 @@ func (pr *Progress) Finish() {
 	if pr.done == 1 {
 		noun = one
 	}
-	pr.l.OK(fmt.Sprintf("%s %d %s", Sentence(pastTense(pr.verb)), pr.done, noun), fmt.Sprintf("%s in %.1fs", humanBytes(pr.bytes), elapsed.Seconds()))
+	aside := ""
+	if pr.bytes > 0 {
+		aside = humanBytes(pr.bytes)
+	}
+	pr.l.OK(fmt.Sprintf("%s %d %s", Sentence(pastTense(pr.verb)), pr.done, noun), aside)
 }
 
 // Abort clears the bar without a summary, for the error that follows.
@@ -287,6 +293,9 @@ func (pr *Progress) render(width int) []string {
 func (pr *Progress) head(width, level int, widest bool) string {
 	t := pr.l.T
 	line := gutter + pr.wheel.View() + " " + Sentence(pr.verb) + " "
+	if pr.many != "" {
+		line += pr.many + " "
+	}
 	if level == 0 || level == 1 {
 		line += pr.bar.View() + " "
 	}

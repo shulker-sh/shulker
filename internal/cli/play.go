@@ -99,6 +99,7 @@ func (a *app) playCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.window, "window", "", "open the game at this size for this run, like 1280x720")
 	cmd.Flags().StringVar(&opts.world, "world", "", "boot straight into this save, named by its folder in saves/")
 	cmd.Flags().StringVar(&opts.server, "server", "", "join this server straight away, as <address>[:<port>]")
+	a.registerEveryFetch(cmd)
 	return cmd
 }
 

@@ -30,6 +30,9 @@ type Env struct {
 	// FailFast stops an install at the first download that fails, rather than trying every file
 	// and failing with them all.
 	FailFast bool
+	// EveryFetch keeps a step line for each fetch in a run of them, where the run would otherwise
+	// draw on one live line that settles into a count.
+	EveryFetch bool
 	// Log reports each download and install as its own step line.
 	Log func(format string, args ...any)
 	// Working shows work under way that clears when it ends, for a step whose outcome is its

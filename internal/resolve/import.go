@@ -320,7 +320,7 @@ func (im *importer) startFetching(files []packarchive.File) {
 		}
 		downloads = append(downloads, out.Download{Name: path.Base(f.Path), Size: f.Size})
 	}
-	if im.r.Progress == nil || len(downloads) == 0 {
+	if im.r.Progress == nil || im.r.EveryFetch || len(downloads) == 0 {
 		return
 	}
 	im.progress = im.r.Progress("fetching", downloads).Counts("pack file", "pack files")
@@ -510,9 +510,17 @@ func (im *importer) identify(ctx context.Context) error {
 // lockIdentified locks each queued file its provider hosts, and keeps the rest as overrides: one
 // no provider found, one whose key requires already holds, one its author doesn't let third
 // parties download, and one the provider fails to serve.
-func (im *importer) lockIdentified(ctx context.Context) error {
+func (im *importer) lockIdentified(ctx context.Context) (err error) {
 	queued := im.unmatched
 	im.unmatched = nil
+	var fetches []string
+	for _, o := range queued {
+		if h, ok := im.found[o.Layer+"/"+o.Path]; ok && h.v.File.URL != "" {
+			fetches = append(fetches, o.Path)
+		}
+	}
+	end := im.r.startGroup(fetches)
+	defer func() { end(err != nil) }()
 	for _, o := range queued {
 		file := o.Layer + "/" + o.Path
 		h, ok := im.found[file]
@@ -1062,7 +1070,7 @@ func (r *Resolver) ConsumeArchive(ctx context.Context, l *modpack.Loaded) error 
 	m := &manifest.Manifest{Name: l.Name, Minecraft: a.Minecraft, Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}, Providers: r.Manifest.Providers}
 	pl := lock.New()
 	pl.Minecraft, pl.Loader = a.Minecraft, lock.Loader{Type: typ, Version: version}
-	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log, builds: r.Manifest.Sides()}
+	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log, Progress: r.Progress, EveryFetch: r.EveryFetch, builds: r.Manifest.Sides()}
 	byID := a.Format.Provider() != ""
 	if byID && r.Fetch != nil && r.Fetch.Offline {
 		return archiveOffline(l.Name, a.Format, nil)

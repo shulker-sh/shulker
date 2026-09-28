@@ -9,6 +9,7 @@ import (
 	"maps"
 	"net/url"
 	"os"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,6 +44,8 @@ type Resolver struct {
 	// FailFast stops Install at the first download that fails, rather than trying every file and
 	// failing with them all.
 	FailFast bool
+	// EveryFetch keeps a step for each fetch of a group; see startGroup.
+	EveryFetch bool
 	// Progress starts a download bar for the named files.
 	Progress func(verb string, files []out.Download) *out.Progress
 	// AskMove is shown the deps-held refusal before an add without --with-deps gives up;
@@ -59,6 +62,8 @@ type Resolver struct {
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
 	// file order is arbitrary.
 	keepNewest bool
+	// group is the live line a run of fetches draws on in place of a step each; see startGroup.
+	group *out.Progress
 	// listings is the listing index, read once the first add asks it.
 	listings *cache.ListingIndex
 	// adopted are the pending mods install filled from downloads/.
@@ -111,8 +116,64 @@ type AddOptions struct {
 	IsFromURL bool
 }
 
+// startGroup puts a loop's fetches on one live line that settles into a count of them, "✔ Fetched
+// 60 mods", rather than a step each; paths are the files the loop may fetch. end settles the line,
+// or clears it for the error that follows when failed. Without a bar, as under --json, off a
+// terminal for the steps or with --verbose, each fetch keeps its own step.
+func (r *Resolver) startGroup(paths []string) (end func(failed bool)) {
+	if r.Progress == nil || r.EveryFetch || r.group != nil || len(paths) == 0 {
+		return func(bool) {}
+	}
+	mods := 0
+	downloads := make([]out.Download, len(paths))
+	for i, p := range paths {
+		downloads[i] = out.Download{Name: path.Base(p)}
+		if strings.HasPrefix(p, "mods/") || strings.Contains(p, "/mods/") {
+			mods++
+		}
+	}
+	one, many := "file", "mods and packs"
+	switch mods {
+	case len(paths):
+		one, many = "mod", "mods"
+	case 0:
+		one, many = "pack", "packs"
+	}
+	g := r.Progress("fetching", downloads).Counts(one, many)
+	if g == nil {
+		return func(bool) {}
+	}
+	r.group = g
+	if r.Fetch != nil {
+		r.Fetch.Progress = g.Bytes
+	}
+	return func(failed bool) {
+		r.group = nil
+		if r.Fetch != nil {
+			r.Fetch.Progress = nil
+		}
+		if failed {
+			g.Abort()
+			return
+		}
+		g.Finish()
+	}
+}
+
+// fetching is one fetch of slug at version: a count on the group's line when one is open, else a
+// step of its own.
+func (r *Resolver) fetching(slug, version string) {
+	if r.group != nil {
+		r.group.File(slug)
+		r.group.Advance()
+		return
+	}
+	r.log("fetching %s %s", slug, version)
+}
+
 func (r *Resolver) log(format string, args ...any) {
-	if r.Log != nil {
+	// A step would draw over the group's live line, which stands for everything its loop does.
+	if r.Log != nil && r.group == nil {
 		r.Log(format, args...)
 	}
 }
@@ -543,7 +604,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			return id, prior, err
 		}
 	}
-	r.log("fetching %s %s", proj.Slug, v.Number)
+	r.fetching(proj.Slug, v.Number)
 	got, err := r.obtainFrom(ctx, p, proj, v)
 	if err != nil {
 		return "", nil, err
@@ -841,7 +902,7 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 		wanted, downloads = append(wanted, f.id), append(downloads, out.Download{Name: f.filename, Size: f.size})
 	}
 	var progress *out.Progress
-	if r.Progress != nil && len(wanted) > 0 {
+	if r.Progress != nil && !r.EveryFetch && len(wanted) > 0 {
 		progress = r.Progress("fetching", downloads)
 		if r.Fetch != nil {
 			r.Fetch.Progress = progress.Bytes
@@ -851,6 +912,9 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 	var failed []*out.Error
 	for i, id := range wanted {
 		f := byID[id]
+		if progress == nil {
+			r.log("fetching %s", downloads[i].Name)
+		}
 		progress.File(downloads[i].Name)
 		_, err := r.Cache.Ensure(ctx, r.Fetch, *f.url, f.sha512)
 		if errors.Is(err, fetch.ErrForbidden) {

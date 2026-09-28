@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -38,5 +39,23 @@ func TestDownloadFailure(t *testing.T) {
 		if fault, failed := downloadFailure(c.err, "Modrinth"); fault.why != c.why || failed != c.failed {
 			t.Errorf("downloadFailure(%v) = %q, %v; want %q, %v", c.err, fault.why, failed, c.why, c.failed)
 		}
+	}
+}
+
+func TestAGroupHoldsTheStepsItsLoopLogs(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &out.Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	var steps []string
+	r := &Resolver{Progress: p.Progress, Log: func(format string, args ...any) { steps = append(steps, fmt.Sprintf(format, args...)) }}
+	end := r.startGroup([]string{"mods/sodium.jar", "mods/iris.jar"})
+	r.fetching("sodium", "0.9")
+	r.log("keeping iris 1.8 already in lock")
+	end(false)
+	r.fetching("lithium", "0.15")
+	if len(steps) != 1 || steps[0] != "fetching lithium 0.15" {
+		t.Errorf("steps %q: only the fetch after the group is its own step", steps)
+	}
+	if stderr.String() != "  ✔ Fetched 1 mod\n" {
+		t.Errorf("stderr %q", stderr.String())
 	}
 }

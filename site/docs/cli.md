@@ -200,6 +200,7 @@ shulker import https://github.com/friends/pack.git --ref v2 --path packs/surviva
 | `--side <side>` | Take one side only: `client` or `server` (default: every side the pack declares) |
 | `--ignore-shulker` | Ignore the shulker manifest and lock inside the modpack and import it as any other one |
 | `--no-server-pack` | Don't read the server files the pack pairs with for which mods are client-only |
+| `-v, --verbose` | Print a line for every file fetched, rather than one count per group |
 
 ### `shulker export mrpack`
 
@@ -295,6 +296,7 @@ A CurseForge file URL is resolved by its file id, so it reaches a project the sl
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack. On a terminal, an add without it prints what would have to move and asks `Move it?` (`Move them?` for several), and yes does the same |
 | `--skip-missing` | Add what resolves and skip each name that isn't found or has no compatible version, with a warning for each. Without it, `add` looks every name up first and, when any misses, adds nothing: the error lists each name that missed and gives the command that adds the rest. A provider it can't reach still fails the whole command, since the name may be there |
 | `-y, --yes` | Answer Yes to what `add` asks: moving a version the lock holds, as `--with-deps` does, and unlocking a modpack built for another Minecraft |
+| `-v, --verbose` | Print a line for every file fetched, rather than one count per group |
 
 An argument that names an existing file, or ends in `.jar`, `.zip` or `.mrpack`, is a local file rather than a slug, and is locked in the same run. A file inside the project is referenced where it lies. One outside it is copied into `files/`, and so is one in `downloads/`, an overrides folder or a folder a side builds into, since those files aren't the project's to keep. Adding the same file again refreshes its copy and relocks it, which is how a rebuilt jar gets in; a different file already in `files/` under the same name is never replaced. The key is a jar's mod id or, for a pack, its file name without the extension, lowercased with anything a key can't hold turned into dashes, and `--as` overrides either. A jar is a mod, and a bare `add` reads a zip's type from what it holds: a resource pack holds `pack.mcmeta`, a datapack `pack.mcmeta` and `data/` without `assets/`, a shader `shaders/`. One with both `data/` and `assets/` needs `--type`. `--pin`, `--channel` and `--provider` don't apply to a local file.
 
@@ -415,6 +417,10 @@ Re-resolve mods to the newest compatible versions. With no arguments, fetches ev
 shulker update
 shulker update sodium iris
 ```
+
+| Flag | Description |
+| --- | --- |
+| `-v, --verbose` | Print a line for every file fetched, rather than one count per group |
 
 ### `shulker outdated`
 
@@ -696,6 +702,7 @@ shulker install
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
 | `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
+| `-v, --verbose` | Print a line for every file fetched, rather than one count per group |
 
 ### `shulker build`
 
@@ -1009,6 +1016,7 @@ shulker play smp --dry-run
 | `--stream` | Wait for the game and show its output as it runs; the log is still written |
 | `--dry-run` | Assemble the launch and print it instead of starting the game |
 | `-y, --yes` | Create a shulker instance for a project that has none without being asked first |
+| `-v, --verbose` | Print a line for every file fetched, rather than one count per group |
 
 With `--json`, the data is `{ "instance", "version", "account", "pid", "gameDir", "log", "outcome", "exitCode", "crashReport", "sync" }`, where `account` is the row [`shulker accounts`](#shulker-accounts) prints, `pid` is the game's own process, and `sync` is absent under `--no-sync`. `outcome` (`ok` or `crashed`), `exitCode` and `crashReport` are there only under `--wait` or `--stream`, since a detached launch returns while the game is still running; `exitCode` is absent when it is 0, and `crashReport` when the game wrote none. Under `--dry-run` it is `{ "instance", "version", "inherits", "mainClass", "java", "gameDir", "nativesDir", "assetIndex", "classpath", "classpathBytes", "loaderLibraries", "loaderLibrariesBytes" }` instead, where the two `loaderLibraries` keys are absent for a version that inherits from nothing.
 
@@ -1304,6 +1312,7 @@ A file changed both in the directory and in the source fails the sync with `buil
 | `--with <feature>` | Turn a feature on for this run only; repeat for more |
 | `--without <feature>` | Turn a feature off for this run only; repeat for more |
 | `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
+| `-v, --verbose` | Print a line for every file fetched, rather than one count per group |
 
 ### `shulker instances`
 
@@ -1605,7 +1614,7 @@ The watcher a detached [`play`](#shulker-play) leaves behind, and not something 
 
 ### `shulker mod add|remove|list`
 
-`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--with-deps`, `--skip-missing`, `--yes`.
+`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--with-deps`, `--skip-missing`, `--yes`, `--verbose`.
 
 ```sh
 shulker mod add sodium
@@ -1614,7 +1623,7 @@ shulker mod list
 
 ### `shulker modpack add|remove|list`
 
-A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. A raw manifest URL brings only the modpack's `shulker.json` and `shulker.lock`, so adding, locking or updating one warns that its overrides and local files never arrive. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--path`, `--as`, `--unlocked`, `--no-auto-update`, `--yes`, and for a modpack from a provider `--pin`, `--channel`, `--provider`.
+A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. A raw manifest URL brings only the modpack's `shulker.json` and `shulker.lock`, so adding, locking or updating one warns that its overrides and local files never arrive. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--path`, `--as`, `--unlocked`, `--no-auto-update`, `--yes`, `--verbose`, and for a modpack from a provider `--pin`, `--channel`, `--provider`.
 
 A modpack can be a Modrinth or CurseForge modpack, named by its slug: `shulker modpack add cozy` looks it up on each provider in the manifest's order, or on the one `--provider` names, and writes `{"type": "modpack", "provider", "project"}` under the slug unless `--as` says otherwise. It picks its version like a mod: the newest in its channel that fits the project's Minecraft and loader, or the newest overall when the project sets neither, in which case the project takes the pack's platform. None fitting fails with `no-compatible-version`. That version's archive is fetched into the cache and read as an archive is below, so its mods lock as the modpack's and its overrides are laid before your own; the lock records its provider, version and `sha512`. `pin`, `unpin`, `update` and `outdated` treat it as they treat a mod, and `sync` never moves it. A locked one builds offline from the cache; one not yet locked can't be fetched offline. `--ref`, `--path`, `--unlocked` and `--no-auto-update` are refused: the archive is a provider version, always locked, and moves only with `update`. An archive whose author turned off third-party downloads stops with `missing-files` until you put it in `downloads/`.
 
@@ -1632,7 +1641,7 @@ shulker modpack remove base-pack
 
 ### `shulker resourcepack add|remove|list`
 
-`shulker resourcepack add fresh-animations` is `shulker add fresh-animations --type resourcepack`, and the same for `remove` and `list`. The provider's own project type decides what an entry is, so the plain `shulker add` usually needs no `--type` at all. `add` records the provider's file name as the entry's `filename`, so the pack is placed as `resourcepacks/<that name>` under the name other packs' `options.txt` already enable, and it keeps that name when it updates, so a pack you enabled in game stays enabled. An entry with no `filename` is placed as `resourcepacks/<key>.zip`. Flags: `--channel`, `--pin`, `--provider`, `--as`, `--skip-missing`.
+`shulker resourcepack add fresh-animations` is `shulker add fresh-animations --type resourcepack`, and the same for `remove` and `list`. The provider's own project type decides what an entry is, so the plain `shulker add` usually needs no `--type` at all. `add` records the provider's file name as the entry's `filename`, so the pack is placed as `resourcepacks/<that name>` under the name other packs' `options.txt` already enable, and it keeps that name when it updates, so a pack you enabled in game stays enabled. An entry with no `filename` is placed as `resourcepacks/<key>.zip`. Flags: `--channel`, `--pin`, `--provider`, `--as`, `--skip-missing`, `--verbose`.
 
 ```sh
 shulker resourcepack add fresh-animations
@@ -1641,7 +1650,7 @@ shulker resourcepack list
 
 ### `shulker shader add|remove|list`
 
-`shulker shader add complementary-reimagined` is `shulker add complementary-reimagined --type shader`, and the same for `remove` and `list`. A shader is placed under its entry's `filename`, which `add` sets to the provider's file name, or as `shaderpacks/<key>.zip` without one, and enabled through its shader mod's own config: `config/iris.properties`, or `config/oculus.properties` on Forge. One that ships vanilla core shaders needs no shader mod at all, so it is placed in `resourcepacks/` and enabled like a resource pack. Flags: `--channel`, `--pin`, `--provider`, `--as`, `--skip-missing`.
+`shulker shader add complementary-reimagined` is `shulker add complementary-reimagined --type shader`, and the same for `remove` and `list`. A shader is placed under its entry's `filename`, which `add` sets to the provider's file name, or as `shaderpacks/<key>.zip` without one, and enabled through its shader mod's own config: `config/iris.properties`, or `config/oculus.properties` on Forge. One that ships vanilla core shaders needs no shader mod at all, so it is placed in `resourcepacks/` and enabled like a resource pack. Flags: `--channel`, `--pin`, `--provider`, `--as`, `--skip-missing`, `--verbose`.
 
 ```sh
 shulker shader add complementary-reimagined
@@ -1650,7 +1659,7 @@ shulker shader list
 
 ### `shulker datapack add|remove|list`
 
-`shulker datapack add terralith` is `shulker add terralith --type datapack`, and the same for `remove` and `list`. Modrinth files datapacks as mods, so a project whose only files are datapacks adds as one without `--type`, and one that ships both a mod and a datapack, like Terralith, adds as the mod unless `--type datapack` asks for its datapack files. A datapack is placed on both sides under its entry's `filename`, which `add` sets to the provider's file name, or as `<key>.zip` without one, in the folder of a global datapack mod the side places: `config/paxi/datapacks/` for Paxi, and `config/openloader/data/` before Minecraft 1.21 or `config/openloader/packs/` from it for Open Loader. With neither, a server places it in its world's `datapacks/` folder, named by `level-name`, which the game loads without a mod; a client places it in `datapacks/` and warns, since only some global datapack mods read that folder. `--side` narrows it to one side. A hybrid, a datapack that carries `assets/` as well, loads its assets only as a resource pack: `--resourcepack` records `"resourcepack": true`, which also places the same zip under the same name in the client's `resourcepacks/`, so one entry keeps both copies on one version. A local zip holding both `data/` and `assets/` needs `--type` or `--resourcepack`, which implies `--type datapack`. Load order isn't managed: ship Paxi's `datapack_load_order.json` as an override. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--resourcepack`, `--skip-missing`.
+`shulker datapack add terralith` is `shulker add terralith --type datapack`, and the same for `remove` and `list`. Modrinth files datapacks as mods, so a project whose only files are datapacks adds as one without `--type`, and one that ships both a mod and a datapack, like Terralith, adds as the mod unless `--type datapack` asks for its datapack files. A datapack is placed on both sides under its entry's `filename`, which `add` sets to the provider's file name, or as `<key>.zip` without one, in the folder of a global datapack mod the side places: `config/paxi/datapacks/` for Paxi, and `config/openloader/data/` before Minecraft 1.21 or `config/openloader/packs/` from it for Open Loader. With neither, a server places it in its world's `datapacks/` folder, named by `level-name`, which the game loads without a mod; a client places it in `datapacks/` and warns, since only some global datapack mods read that folder. `--side` narrows it to one side. A hybrid, a datapack that carries `assets/` as well, loads its assets only as a resource pack: `--resourcepack` records `"resourcepack": true`, which also places the same zip under the same name in the client's `resourcepacks/`, so one entry keeps both copies on one version. A local zip holding both `data/` and `assets/` needs `--type` or `--resourcepack`, which implies `--type datapack`. Load order isn't managed: ship Paxi's `datapack_load_order.json` as an override. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--resourcepack`, `--skip-missing`, `--verbose`.
 
 ```sh
 shulker datapack add terralith

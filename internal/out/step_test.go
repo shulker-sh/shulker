@@ -45,6 +45,20 @@ func TestDownloadBarSettlesTheRunningStep(t *testing.T) {
 	pr.Finish()
 }
 
+func TestGroupSettlesIntoOneCountOrNothing(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	g := p.Progress("fetching", []Download{{Name: "sodium"}, {Name: "iris"}, {Name: "lithium"}}).Counts("mod", "mods")
+	g.Bytes(3 << 20)
+	g.Advance()
+	g.Advance()
+	g.Finish()
+	p.Progress("fetching", []Download{{Name: "sodium"}}).Counts("mod", "mods").Finish()
+	if stderr.String() != "  ✔ Fetched 2 mods (3.0 MB)\n" {
+		t.Fatalf("stderr: %q", stderr.String())
+	}
+}
+
 func TestStepWording(t *testing.T) {
 	var stderr bytes.Buffer
 	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}

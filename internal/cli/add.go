@@ -34,7 +34,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a.warnRawURLs()
-			a.printer.ClearFetches = true
+			a.printer.ClearFetches = !a.everyFetch
 			urls, err := a.providerURLs(args)
 			if err != nil {
 				return err
@@ -175,6 +175,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	if applies(kind, "with-deps") {
 		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another")
 	}
+	a.registerEveryFetch(cmd)
 	if applies(kind, "yes") {
 		a.yesFlag(cmd, "move a version the lock holds, or unlock a modpack built for another Minecraft, without being asked first")
 	}

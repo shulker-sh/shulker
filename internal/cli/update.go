@@ -18,7 +18,7 @@ import (
 )
 
 func (a *app) updateCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "update [mod...]",
 		Annotations: acts(),
 		Aliases:     []string{"upgrade"},
@@ -73,6 +73,8 @@ func (a *app) updateCmd() *cobra.Command {
 			})
 		},
 	}
+	a.registerEveryFetch(cmd)
+	return cmd
 }
 
 func (a *app) pinCmd() *cobra.Command {

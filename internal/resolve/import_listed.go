@@ -43,6 +43,13 @@ func (im *importer) listedByID(ctx context.Context) error {
 		var missing []string
 		var rows []out.Detail
 		var byHand []manual.File
+		var fetches []string
+		for _, f := range byProvider[name] {
+			if !f.Optional {
+				fetches = append(fetches, f.Path)
+			}
+		}
+		end := r.startGroup(fetches)
 		for _, f := range byProvider[name] {
 			if f.Optional {
 				rep.Warnings = append(rep.Warnings, fmt.Sprintf("skipped %s project %s file %s: the pack marks it optional", p.Title(), f.Project, f.Version))
@@ -59,9 +66,11 @@ func (im *importer) listedByID(ctx context.Context) error {
 				continue
 			}
 			if err != nil {
+				end(true)
 				return err
 			}
 		}
+		end(false)
 		if len(missing) > 0 {
 			e := out.Errorf("missing-files", "%s a manual download", out.Count(len(missing), "file needs", "files need"))
 			e.Items, e.Rows = missing, rows

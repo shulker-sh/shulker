@@ -54,7 +54,7 @@ func (a *app) importCmd() *cobra.Command {
 		Short:       "Create a project from a modpack file, URL, slug or shulker source",
 		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			a.printer.ClearFetches = true
+			a.printer.ClearFetches = !a.everyFetch
 			return a.runImport(cmd, args[0], &f)
 		},
 	}
@@ -66,6 +66,7 @@ func (a *app) importCmd() *cobra.Command {
 	cmd.Flags().StringVar(&f.side, "side", "", "take one side only: client or server (default: every side the pack declares)")
 	cmd.Flags().BoolVar(&f.ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
 	cmd.Flags().BoolVar(&f.noServerPack, "no-server-pack", false, "don't read the server files the pack pairs with for which mods are client-only")
+	a.registerEveryFetch(cmd)
 	return cmd
 }
 
