@@ -62,6 +62,19 @@ func TestPlayInAProjectWithNoInstanceOffersToCreateOne(t *testing.T) {
 	waitForFile(t, filepath.Join(gameDir, "args.txt"))
 }
 
+func TestPlayYesCreatesTheInstanceWithoutAsking(t *testing.T) {
+	h := newHarness(t)
+	root := projectPlayHarness(t, h)
+	h.mustRun(t, "accounts", "login", "--use")
+
+	code, stdout, stderr := h.run(t, "play", "--yes")
+
+	if code != 0 || !strings.Contains(stdout, "Created instance pack") {
+		t.Fatalf("exit %d: %s%s", code, stdout, stderr)
+	}
+	waitForFile(t, filepath.Join(root, "pack", "args.txt"))
+}
+
 func TestPlayInAProjectWithNoInstanceCreatesNothingWhenDeclined(t *testing.T) {
 	h := newHarness(t)
 	root := projectPlayHarness(t, h)

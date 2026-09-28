@@ -31,11 +31,13 @@ stdout, errors included. Act on error.code rather than the message, and run
 "shulker lock" when lockStale is true.`
 
 type app struct {
-	printer     *out.Printer
-	style       out.Options
-	stdin       io.Reader
-	tty         func() bool
-	asker       asker
+	printer *out.Printer
+	style   out.Options
+	stdin   io.Reader
+	tty     func() bool
+	asker   asker
+	// yes is the command's --yes: every confirm it would put is answered Yes without asking.
+	yes         bool
 	dir         string
 	instance    string
 	d           *deps

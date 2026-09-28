@@ -82,6 +82,7 @@ func (a *app) playCmd() *cobra.Command {
 			return a.play(cmd, args, opts)
 		},
 	}
+	a.yesFlag(cmd, "create a shulker instance for a project that has none without being asked first")
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "assemble the launch and print it instead of starting the game")
 	cmd.Flags().BoolVar(&opts.noSync, "no-sync", false, "start the game without updating the instance first")
 	cmd.Flags().BoolVar(&opts.wait, "wait", false, "wait for the game and record how the run ended before returning")
@@ -410,7 +411,7 @@ func (a *app) projectInstance(cmd *cobra.Command, dir string, create bool) (conf
 }
 
 func (a *app) createProjectInstance(cmd *cobra.Command, p *project.Project, dir string, create bool) (config.Instance, *linkReport, error) {
-	if !create || !a.canPick() {
+	if !create || !a.asksYes() {
 		return config.Instance{}, nil, notRegistered(dir)
 	}
 	yes, err := a.askYes("Create a shulker instance for " + p.Manifest.DisplayName("client") + " and play it?")

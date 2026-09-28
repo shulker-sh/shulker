@@ -110,7 +110,7 @@ func TestSyncServeAndExportTryEveryDownloadUnlessFailFast(t *testing.T) {
 		args []string
 	}{
 		{"client", []string{"sync"}},
-		{"server", []string{"serve", "--accept-eula"}},
+		{"server", []string{"serve", "--yes"}},
 		{"client", []string{"export", "mrpack", "--version", "1.0.0"}},
 	} {
 		t.Run(tc.args[0], func(t *testing.T) {

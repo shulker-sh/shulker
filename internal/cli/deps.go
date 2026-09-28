@@ -186,7 +186,7 @@ func (a *app) resolverFor(ctx context.Context, p *project.Project, mode resolve.
 	if err != nil {
 		return nil, err
 	}
-	if a.canPick() {
+	if a.asksYes() {
 		r.AskUnlock = func(key, minecraft string) (bool, error) {
 			return a.askYes(fmt.Sprintf("Unlock %s and resolve its mods for Minecraft %s?", key, minecraft))
 		}

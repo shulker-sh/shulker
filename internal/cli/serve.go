@@ -45,7 +45,7 @@ func (a *app) projectJava(ctx context.Context, p *project.Project) (java.Binary,
 }
 
 func (a *app) serveCmd() *cobra.Command {
-	var force, acceptEula bool
+	var force bool
 	cmd := &cobra.Command{
 		Use:         "serve",
 		Annotations: acts(),
@@ -93,7 +93,7 @@ func (a *app) serveCmd() *cobra.Command {
 				return err
 			}
 			if !build.HasEula(rep.Dir) {
-				if err := a.requireEula(acceptEula); err != nil {
+				if err := a.requireEula(); err != nil {
 					return err
 				}
 				b.EULA = true
@@ -158,14 +158,14 @@ func (a *app) serveCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory, seeded files included")
 	a.registerFailFast(cmd)
-	cmd.Flags().BoolVar(&acceptEula, "accept-eula", false, "accept the Minecraft EULA and record it in config.json without prompting")
+	a.yesFlag(cmd, "accept the Minecraft EULA and record it in config.json without prompting")
 	return cmd
 }
 
-// requireEula has this user accept the Minecraft EULA, by the prompt or --accept-eula, and records
+// requireEula has this user accept the Minecraft EULA, by the prompt or --yes, and records
 // it in config.json. A manifest never accepts it for them.
-func (a *app) requireEula(flag bool) error {
-	accepted := flag
+func (a *app) requireEula() error {
+	accepted := a.yes
 	if !accepted && a.canPick() {
 		l := a.printer.Err()
 		l.Text("Running a Minecraft server requires accepting the EULA: " + l.T.Cyan(eulaURL))
@@ -176,7 +176,7 @@ func (a *app) requireEula(flag bool) error {
 	}
 	if !accepted {
 		e := out.Errorf("eula-required", "accept the Minecraft EULA (%s) to run a server", eulaURL)
-		e.Help = "pass --accept-eula, or run `shulker config set eula true`"
+		e.Help = "pass --yes, or run `shulker config set eula true`"
 		return e
 	}
 	path, err := a.configFile()

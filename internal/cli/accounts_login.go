@@ -87,7 +87,6 @@ func (a *app) showDeviceCode(d account.Device) {
 }
 
 func (a *app) accountsLogoutCmd() *cobra.Command {
-	var yes bool
 	cmd := &cobra.Command{
 		Use:         "logout [name]",
 		Annotations: acts(),
@@ -98,14 +97,12 @@ func (a *app) accountsLogoutCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if !yes {
-				signOut, err := a.confirm("Sign "+r.Name+" out?", "--yes")
-				if err != nil {
-					return err
-				}
-				if !signOut {
-					return a.printer.Emit(nil, func(l *out.Lines) { l.Info(r.Name + " is still signed in") })
-				}
+			signOut, err := a.confirm("Sign " + r.Name + " out?")
+			if err != nil {
+				return err
+			}
+			if !signOut {
+				return a.printer.Emit(nil, func(l *out.Lines) { l.Info(r.Name + " is still signed in") })
 			}
 			path, store, err := a.accountStore()
 			if err != nil {
@@ -132,7 +129,7 @@ func (a *app) accountsLogoutCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "sign out without being asked first")
+	a.yesFlag(cmd, "sign out without being asked first")
 	return cmd
 }
 

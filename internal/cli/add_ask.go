@@ -12,12 +12,12 @@ import (
 // addAsking is r.Add with the two refusals a terminal can answer turned into questions: which
 // loader a project with none should use, and whether to move a version the lock holds.
 func (a *app) addAsking(ctx context.Context, r *resolve.Resolver, slug string, opts resolve.AddOptions) error {
-	if !a.canPick() {
+	if !a.asksYes() {
 		return r.Add(ctx, slug, opts)
 	}
 	r.AskMove = a.askMove
 	err := r.Add(ctx, slug, opts)
-	if out.CodeOf(err) != "loader-required" {
+	if out.CodeOf(err) != "loader-required" || !a.canPick() {
 		return err
 	}
 	a.printer.Settle()
@@ -37,6 +37,9 @@ func (a *app) addAsking(ctx context.Context, r *resolve.Resolver, slug string, o
 
 // askMove prints the refusal without its nudge, then asks the nudge's lead back as the question.
 func (a *app) askMove(held *out.Error) (bool, error) {
+	if a.yes {
+		return true, nil
+	}
 	a.printer.Settle()
 	shown := *held
 	shown.Nudge = out.Nudge{}

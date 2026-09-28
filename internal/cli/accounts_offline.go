@@ -84,7 +84,7 @@ func (a *app) accountsAddCmd() *cobra.Command {
 }
 
 func (a *app) accountsRemoveCmd() *cobra.Command {
-	var yes, force bool
+	var force bool
 	cmd := &cobra.Command{
 		Use:         "remove <name>",
 		Annotations: acts(),
@@ -106,14 +106,12 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 				return unprovenOwnership(r.Name+" can't be re-created without an account that owns Minecraft",
 					out.Nudge{Lead: "Remove it anyway", Command: "shulker accounts remove " + accountSelector(r) + " --force"})
 			}
-			if !yes {
-				remove, err := a.confirm("Remove "+r.Name+"?", "--yes")
-				if err != nil {
-					return err
-				}
-				if !remove {
-					return a.printer.Emit(nil, func(l *out.Lines) { l.Info(r.Name + " is still there") })
-				}
+			remove, err := a.confirm("Remove " + r.Name + "?")
+			if err != nil {
+				return err
+			}
+			if !remove {
+				return a.printer.Emit(nil, func(l *out.Lines) { l.Info(r.Name + " is still there") })
 			}
 			path, store, err := a.accountStore()
 			if err != nil {
@@ -141,7 +139,7 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "remove it without being asked first")
+	a.yesFlag(cmd, "remove it without being asked first")
 	cmd.Flags().BoolVar(&force, "force", false, "remove it with no account in sight that could create it again")
 	return cmd
 }

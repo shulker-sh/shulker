@@ -294,6 +294,7 @@ A CurseForge file URL is resolved by its file id, so it reaches a project the sl
 | `--no-auto-update` | Keep a modpack at its locked version on `shulker sync`; `shulker update` still moves it |
 | `--with-deps` | Move dependency versions the lock holds when a mod being added needs another. One a locked modpack pins is listed in `shulker.json` as it moves, so it no longer follows the modpack. On a terminal, an add without it prints what would have to move and asks `Move it?` (`Move them?` for several), and yes does the same |
 | `--skip-missing` | Add what resolves and skip each name that isn't found or has no compatible version, with a warning for each. Without it, `add` looks every name up first and, when any misses, adds nothing: the error lists each name that missed and gives the command that adds the rest. A provider it can't reach still fails the whole command, since the name may be there |
+| `-y, --yes` | Answer Yes to what `add` asks: moving a version the lock holds, as `--with-deps` does, and unlocking a modpack built for another Minecraft |
 
 An argument that names an existing file, or ends in `.jar`, `.zip` or `.mrpack`, is a local file rather than a slug, and is locked in the same run. A file inside the project is referenced where it lies. One outside it is copied into `files/`, and so is one in `downloads/`, an overrides folder or a folder a side builds into, since those files aren't the project's to keep. Adding the same file again refreshes its copy and relocks it, which is how a rebuilt jar gets in; a different file already in `files/` under the same name is never replaced. The key is a jar's mod id or, for a pack, its file name without the extension, lowercased with anything a key can't hold turned into dashes, and `--as` overrides either. A jar is a mod, and a bare `add` reads a zip's type from what it holds: a resource pack holds `pack.mcmeta`, a datapack `pack.mcmeta` and `data/` without `assets/`, a shader `shaders/`. One with both `data/` and `assets/` needs `--type`. `--pin`, `--channel` and `--provider` don't apply to a local file.
 
@@ -1007,6 +1008,7 @@ shulker play smp --dry-run
 | `--wait` | Wait for the game and record how the run ended before returning |
 | `--stream` | Wait for the game and show its output as it runs; the log is still written |
 | `--dry-run` | Assemble the launch and print it instead of starting the game |
+| `-y, --yes` | Create a shulker instance for a project that has none without being asked first |
 
 With `--json`, the data is `{ "instance", "version", "account", "pid", "gameDir", "log", "outcome", "exitCode", "crashReport", "sync" }`, where `account` is the row [`shulker accounts`](#shulker-accounts) prints, `pid` is the game's own process, and `sync` is absent under `--no-sync`. `outcome` (`ok` or `crashed`), `exitCode` and `crashReport` are there only under `--wait` or `--stream`, since a detached launch returns while the game is still running; `exitCode` is absent when it is 0, and `crashReport` when the game wrote none. Under `--dry-run` it is `{ "instance", "version", "inherits", "mainClass", "java", "gameDir", "nativesDir", "assetIndex", "classpath", "classpathBytes", "loaderLibraries", "loaderLibrariesBytes" }` instead, where the two `loaderLibraries` keys are absent for a version that inherits from nothing.
 
@@ -1014,17 +1016,17 @@ With `--json`, the data is `{ "instance", "version", "account", "pid", "gameDir"
 
 Build the server side and run it in the foreground. It downloads whatever the lock needs first, the way `install` does, so a fresh clone reaches a running server in one command.
 
-A server build that already holds an `eula.txt`, written by hand or copied from an override folder, runs as it is: nothing is asked or recorded, and no build writes over it. Otherwise, until you accept the Minecraft EULA, `serve` asks `Accept and record "eula": true in your shulker config?` on a terminal, with No preselected, and Yes records it in `config.json` before the server starts, so no project asks again. Off a terminal, or with `--no-input` or `--json`, nothing is asked and it fails with `eula-required` unless `--accept-eula` is passed. `shulker config set eula true` accepts it ahead of time.
+A server build that already holds an `eula.txt`, written by hand or copied from an override folder, runs as it is: nothing is asked or recorded, and no build writes over it. Otherwise, until you accept the Minecraft EULA, `serve` asks `Accept and record "eula": true in your shulker config?` on a terminal, with No preselected, and Yes records it in `config.json` before the server starts, so no project asks again. Off a terminal, or with `--no-input` or `--json`, nothing is asked and it fails with `eula-required` unless `--yes` is passed. `shulker config set eula true` accepts it ahead of time.
 
 ```sh
 shulker serve
-shulker serve server --accept-eula
+shulker serve server --yes
 ```
 
 | Flag | Description |
 | --- | --- |
 | `--force` | Overwrite files edited in the build directory, seeded files included |
-| `--accept-eula` | Accept the Minecraft EULA and record it in config.json without prompting |
+| `-y, --yes` | Accept the Minecraft EULA and record it in config.json without prompting |
 | `--fail-fast` | Stop at the first file that fails to download, rather than trying them all |
 
 ### `shulker link`
@@ -1603,7 +1605,7 @@ The watcher a detached [`play`](#shulker-play) leaves behind, and not something 
 
 ### `shulker mod add|remove|list`
 
-`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--with-deps`, `--skip-missing`.
+`shulker mod add sodium` is `shulker add sodium --type mod`, and the same for `remove` and `list`. Flags: `--side`, `--channel`, `--pin`, `--provider`, `--as`, `--with-deps`, `--skip-missing`, `--yes`.
 
 ```sh
 shulker mod add sodium
@@ -1612,13 +1614,13 @@ shulker mod list
 
 ### `shulker modpack add|remove|list`
 
-A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. A raw manifest URL brings only the modpack's `shulker.json` and `shulker.lock`, so adding, locking or updating one warns that its overrides and local files never arrive. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--path`, `--as`, `--unlocked`, `--no-auto-update`, and for a modpack from a provider `--pin`, `--channel`, `--provider`.
+A modpack is another shulker project whose mods and overrides merge into this one. `shulker modpack add ../base-pack` is `shulker add ../base-pack --type modpack`; the source is a local path, git URL, or raw manifest URL. A raw manifest URL brings only the modpack's `shulker.json` and `shulker.lock`, so adding, locking or updating one warns that its overrides and local files never arrive. `remove` prunes the mods only that modpack provided, and `list` shows each modpack's locked ref and whether a local one has changed. Flags: `--ref`, `--path`, `--as`, `--unlocked`, `--no-auto-update`, `--yes`, and for a modpack from a provider `--pin`, `--channel`, `--provider`.
 
 A modpack can be a Modrinth or CurseForge modpack, named by its slug: `shulker modpack add cozy` looks it up on each provider in the manifest's order, or on the one `--provider` names, and writes `{"type": "modpack", "provider", "project"}` under the slug unless `--as` says otherwise. It picks its version like a mod: the newest in its channel that fits the project's Minecraft and loader, or the newest overall when the project sets neither, in which case the project takes the pack's platform. None fitting fails with `no-compatible-version`. That version's archive is fetched into the cache and read as an archive is below, so its mods lock as the modpack's and its overrides are laid before your own; the lock records its provider, version and `sha512`. `pin`, `unpin`, `update` and `outdated` treat it as they treat a mod, and `sync` never moves it. A locked one builds offline from the cache; one not yet locked can't be fetched offline. `--ref`, `--path`, `--unlocked` and `--no-auto-update` are refused: the archive is a provider version, always locked, and moves only with `update`. An archive whose author turned off third-party downloads stops with `missing-files` until you put it in `downloads/`.
 
 A modpack can also be a Modrinth modpack archive: `shulker modpack add packs/cozy.mrpack`, or a bare `shulker add packs/cozy.mrpack`, writes a `file` entry, taking the path the way `add` takes a local file — referenced where it lies inside the project, copied into `files/` from outside it, and keyed by the file name unless `--as` says otherwise. Its mods lock as the modpack's: each is found by its hash on Modrinth, or reused from the shulker project an exported archive carries, and a file neither knows, or one that project had as a local file, is laid by the modpack itself, as are its `overrides`, `client-overrides` and `server-overrides` folders, before your own. An archive is locked unless `--unlocked` says otherwise. The lock records its bytes, so changing the file makes the lock out of date and the next `lock` or `sync` reads it again, unless `--no-auto-update` holds it until `shulker update`. With the file deleted, the build lays the archive from the cache and warns. A CurseForge modpack zip is taken the same way, by `shulker modpack add packs/craft.zip` or by a bare `add` of a zip that holds a CurseForge `manifest.json`: each file it names locks as the modpack's by its CurseForge project and file ID, a file whose author doesn't allow third-party downloads stops the lock with `missing-files` until you put it in `downloads/`, where it locks as a manual download, and the pack's overrides folder is laid by the modpack. Those IDs carry no hash, so the cache can't stand in for CurseForge: reading the zip needs the network even when every file it names is cached, and offline it fails with `modpack-offline`. A locked zip whose bytes haven't changed builds from the lock and needs no network. A file that is neither a Modrinth nor a CurseForge modpack is refused.
 
-A modpack that ships a `shulker.lock` is **locked**: its exact versions, dependencies included, are copied into this project's lock and marked with the modpack they came from, and its Minecraft and loader must match this project's exactly. A modpack without a lock, or one added with `--unlocked`, is **floating**: its mods are resolved here like your own, and its Minecraft and loader only have to admit this project's versions. A mod you list in `shulker.json` yourself always wins over either. Change your mind later with `shulker set requires.<key>.locked true|false`. On a terminal, adding a locked modpack built for another Minecraft asks `Unlock <name> and resolve its mods for Minecraft <version>?`, and yes adds it as `--unlocked` would.
+A modpack that ships a `shulker.lock` is **locked**: its exact versions, dependencies included, are copied into this project's lock and marked with the modpack they came from, and its Minecraft and loader must match this project's exactly. A modpack without a lock, or one added with `--unlocked`, is **floating**: its mods are resolved here like your own, and its Minecraft and loader only have to admit this project's versions. A mod you list in `shulker.json` yourself always wins over either. Change your mind later with `shulker set requires.<key>.locked true|false`. On a terminal, adding a locked modpack built for another Minecraft asks `Unlock <name> and resolve its mods for Minecraft <version>?`, and Yes, or `--yes` anywhere, adds it as `--unlocked` would.
 
 ```sh
 shulker modpack add https://github.com/shulker-sh/base-pack.git --ref v3

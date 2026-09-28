@@ -2,7 +2,8 @@ package cli
 
 import (
 	"errors"
-	"fmt"
+
+	"github.com/spf13/cobra"
 
 	"shulker.sh/shulker/internal/out"
 )
@@ -25,23 +26,35 @@ func (a *app) askText(title, description, placeholder string) (string, error) {
 }
 
 // confirm asks before something that can't be undone. Off a terminal there is nobody to ask, so
-// the flag that answers the question is required there instead: doing nothing is the safe default,
-// and a script that means it says so.
-func (a *app) confirm(question, flag string) (bool, error) {
-	if !a.canPick() {
+// --yes is required there instead: doing nothing is the safe default, and a script that means it
+// says so.
+func (a *app) confirm(question string) (bool, error) {
+	if !a.yes && !a.canPick() {
 		e := out.Errorf("usage", "shulker asks before this, and can't ask here")
-		e.Help = fmt.Sprintf("pass %s to answer it", flag)
+		e.Help = "pass --yes to answer it"
 		return false, e
 	}
 	return a.askYes(question)
 }
 
-// askYes puts a yes-or-no question with No preselected, so a stray enter declines.
+// askYes puts a yes-or-no question with No preselected, so a stray enter declines. --yes answers
+// it without asking.
 func (a *app) askYes(question string) (bool, error) {
+	if a.yes {
+		return true, nil
+	}
 	a.printer.Settle()
 	yes, err := a.questions().Confirm(question, a.stdin)
 	return yes, escaped(err)
 }
+
+// yesFlag gives cmd the --yes that answers each confirm it puts; usage says what Yes does there.
+func (a *app) yesFlag(cmd *cobra.Command, usage string) {
+	cmd.Flags().BoolVarP(&a.yes, "yes", "y", false, usage)
+}
+
+// asksYes reports whether a question can be answered, by a person or by --yes.
+func (a *app) asksYes() bool { return a.yes || a.canPick() }
 
 // escaped is what leaving a wizard half-answered means: the run ends where ctrl-c would leave
 // it, with nothing created and nothing to read.

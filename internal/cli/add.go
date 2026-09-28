@@ -175,6 +175,9 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 	if applies(kind, "with-deps") {
 		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another")
 	}
+	if applies(kind, "yes") {
+		a.yesFlag(cmd, "move a version the lock holds, or unlock a modpack built for another Minecraft, without being asked first")
+	}
 	if applies(kind, "as") {
 		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a pack or hosted modpack's provider slug, a modpack archive file's name, the name in a modpack's manifest)")
 	}

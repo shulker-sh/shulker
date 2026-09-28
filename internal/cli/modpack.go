@@ -20,19 +20,19 @@ var contentTypes = []string{manifest.TypeMod, manifest.TypeModpack, manifest.Typ
 // flag and refuse the ones the chosen type has no use for, so a group command
 // and its `--type` spelling take the same flags.
 var typeFlags = map[string][]string{
-	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as", "with-deps", "skip-missing"},
-	manifest.TypeModpack:      {"ref", "path", "as", "unlocked", "no-auto-update", "channel", "pin", "provider"},
+	manifest.TypeMod:          {"side", "channel", "pin", "provider", "as", "with-deps", "skip-missing", "yes"},
+	manifest.TypeModpack:      {"ref", "path", "as", "unlocked", "no-auto-update", "channel", "pin", "provider", "yes"},
 	manifest.TypeResourcePack: {"channel", "pin", "provider", "as", "skip-missing"},
 	manifest.TypeShader:       {"channel", "pin", "provider", "as", "skip-missing"},
 	manifest.TypeDatapack:     {"side", "channel", "pin", "provider", "as", "resourcepack", "skip-missing"},
 }
 
-var allTypeFlags = []string{"as", "channel", "no-auto-update", "path", "pin", "provider", "ref", "resourcepack", "side", "skip-missing", "unlocked", "with-deps"}
+var allTypeFlags = []string{"as", "channel", "no-auto-update", "path", "pin", "provider", "ref", "resourcepack", "side", "skip-missing", "unlocked", "with-deps", "yes"}
 
 // inferredFlags are the flags an entry may take while its type is still the
 // provider's to settle. A modpack is never inferred — it takes a source, not a
 // provider slug — so the modpack's own flags need --type before they apply.
-var inferredFlags = []string{"side", "channel", "pin", "provider", "as", "with-deps", "skip-missing"}
+var inferredFlags = []string{"side", "channel", "pin", "provider", "as", "with-deps", "skip-missing", "yes"}
 
 func (a *app) typeGroupCmds() []*cobra.Command {
 	cmds := make([]*cobra.Command, 0, len(contentTypes))

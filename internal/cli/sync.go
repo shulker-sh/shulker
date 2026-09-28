@@ -204,7 +204,7 @@ func (a *app) syncEnv() (*sync.Env, error) {
 		a.printer.Warn("couldn't read play.saveBackups, keeping %d automatic backups: %v", keep, err)
 	}
 	a.se = &sync.Env{Env: d.Env, Registry: config.RegistryPath(path, cfg), Saves: r.saves(), SaveBackups: keep}
-	if a.canPick() {
+	if a.asksYes() {
 		a.se.AskUnlock = func(key, minecraft string) (bool, error) {
 			return a.askYes(fmt.Sprintf("Unlock %s and resolve its mods for Minecraft %s?", key, minecraft))
 		}
