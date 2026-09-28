@@ -905,14 +905,19 @@ func TestInstancesRepairRehooksWhatLostItsHook(t *testing.T) {
 	friends := filepath.Join(prismDir, "instances", "shulker-friends")
 	quiet := filepath.Join(prismDir, "instances", "shulker-quiet")
 
-	if stdout := h.mustRun(t, "instances", "repair"); strings.Contains(stdout, "Rehooked") || !strings.Contains(stdout, "Every instance is registered") {
-		t.Fatalf("repair with every hook in place: %s", stdout)
+	if stdout, stderr := h.mustRunStderr(t, "instances", "repair"); strings.Contains(stdout, "Rehooked") || !strings.Contains(stdout, "Every instance is registered") || strings.Contains(stderr, "Restart") {
+		t.Fatalf("repair with every hook in place:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}
 
+	// Prism writes its own copy of instance.cfg back while it runs and can't be seen running, so a
+	// rehook there comes with the restart that makes it stick.
 	writeFile(t, filepath.Join(friends, launcher.PrismInstanceFile), "[General]\nname=Friends\n")
-	stdout := h.mustRun(t, "instances", "repair")
+	stdout, stderr := h.mustRunStderr(t, "instances", "repair")
 	if !strings.Contains(stdout, "Rehooked 1 instance") || !strings.Contains(stdout, "• friends (Prism Launcher)") || strings.Contains(stdout, "Every instance is registered") {
 		t.Fatalf("repair reports the instance it hooked again: %s", stdout)
+	}
+	if strings.Count(stderr, "Restart Prism Launcher") != 1 {
+		t.Fatalf("a rehook in Prism warns to restart it once: %s", stderr)
 	}
 	if cfg := readINIFile(t, filepath.Join(friends, launcher.PrismInstanceFile)); !launcher.IsShulkerSlot(cfg["PreLaunchCommand"]) {
 		t.Fatalf("the pre-launch command is back: %+v", cfg)
@@ -939,7 +944,7 @@ func TestInstancesRepairRehooksWhatLostItsHook(t *testing.T) {
 	if err := os.Remove(filepath.Join(friends, launcher.PrismInstanceFile)); err != nil {
 		t.Fatal(err)
 	}
-	stdout, stderr := h.mustRunStderr(t, "instances", "repair")
+	stdout, stderr = h.mustRunStderr(t, "instances", "repair")
 	if !strings.Contains(stderr, "friends") || !strings.Contains(stderr, filepath.Join(friends, launcher.PrismInstanceFile)) || strings.Contains(stdout, "Rehooked") {
 		t.Fatalf("an instance that can't be rehooked:\nstdout: %s\nstderr: %s", stdout, stderr)
 	}

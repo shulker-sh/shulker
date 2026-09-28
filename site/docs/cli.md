@@ -1329,7 +1329,7 @@ A folder counts as one shulker syncs when it holds a `shulker.json` that builds 
 
 A row's name is the one its launcher shows, read from the file the launcher keeps it in, or the folder's name when there is none to read. Rename an instance in the launcher and repair follows: the row takes the new name and prints a `renamed` line, and its id stays, so `-i` and any script using it keep working.
 
-Repair writes rows and instance files, never a launcher's pre-launch command: a directory it finds again is listed and syncs with `-i`, and a [`link`](#shulker-link-prism) is what makes the launcher refresh it before each launch.
+A registered instance whose hooks are on but missing from its launcher, or left pointing at another shulker binary, is hooked again and listed under `Rehooked`; one linked with `--no-hooks` stays unhooked, and one whose launcher file is gone is a warning naming that file. A directory repair finds and registers anew gets no pre-launch command: it is listed and syncs with `-i`, and a [`link`](#shulker-link-prism) is what makes the launcher refresh it before each launch. After a rehook, restart the launcher if it's open before playing: Prism Launcher keeps its own copy of an instance's settings while it runs and writes that copy back at the next launch, taking the hook with it.
 
 A row written again keeps the time of the last sync that worked, which the directory's own `.shulker/instance.json` records, even when the sync after it failed: that time is when the directory was last built correctly. The message from that failure isn't kept, since it lives only on the registry row, so [`shulker instances`](#shulker-instances) reports no failure for a repaired row until the next sync.
 

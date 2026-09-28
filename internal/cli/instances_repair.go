@@ -114,6 +114,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 			res.Rehooked = append(res.Rehooked, *in)
 		}
 	}
+	a.warnRestart(res.Rehooked)
 	for _, found := range launcher.Scan(launcherName, launcherDir, r.Instances, project.InstanceAt) {
 		if registered[filepath.Clean(found.Dir)] {
 			continue
@@ -143,6 +144,26 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 	}
 	_, err = config.UpdateInstances(path, func([]config.Instance) []config.Instance { return instances })
 	return res, err
+}
+
+// warnRestart names each launcher a rehook went into that is open, or can't tell whether it is. An
+// open launcher may hold its own copy of the instance and write it back at the next launch, and
+// Prism does, so the hook would go again.
+func (a *app) warnRestart(rehooked []config.Instance) {
+	seen := map[string]bool{}
+	for _, in := range rehooked {
+		e := launcher.Find(in.Launcher)
+		if e == nil || seen[e.Name] {
+			continue
+		}
+		seen[e.Name] = true
+		switch running, detectable := e.IsRunning(); {
+		case running:
+			a.printer.Warn("%s is open; restart it before playing, or it may write back its own copy without the hooks", e.Title)
+		case !detectable:
+			a.printer.Warn("Restart %s before playing if it's open, or it may write back its own copy without the hooks", e.Title)
+		}
+	}
 }
 
 // warnReplaced warns that a managed file shulker couldn't read was written over, naming where the
