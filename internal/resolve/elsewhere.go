@@ -6,15 +6,16 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/provider"
 )
 
 // hostedElsewhere finds, on the manifest's other providers in its order, the version hosting the
-// same bytes as v, for a file p's author blocks from third-party download: its sha1 is looked up
-// on each, and the first hit wins. A provider that can't be asked is skipped.
-func (r *Resolver) hostedElsewhere(ctx context.Context, p provider.Provider, v *provider.Version) *hosted {
+// same bytes as h's, for a file whose author blocks third-party download: its sha1 is looked up on
+// each, and the first hit wins and goes in the listing index. A provider that can't be asked is
+// skipped.
+func (r *Resolver) hostedElsewhere(ctx context.Context, h hosted) (*hosted, error) {
+	p, v := h.p, h.v
 	if v.File.Sha1 == "" {
-		return nil
+		return nil, nil
 	}
 	for _, name := range r.Manifest.ProviderOrder() {
 		if name == p.Name() {
@@ -30,11 +31,11 @@ func (r *Resolver) hostedElsewhere(ctx context.Context, p provider.Provider, v *
 			r.Warnings = append(r.Warnings, fmt.Sprintf("%s wasn't looked up on %s (%s)", v.File.Filename, q.Title(), out.AsError(err).Message))
 			continue
 		}
-		if h, ok := found[v.File.Filename]; ok && h.Version.File.URL != "" {
-			return &hosted{p: q, proj: &h.Project, v: &h.Version}
+		if there, ok := found[v.File.Filename]; ok && there.Version.File.URL != "" {
+			return &hosted{p: q, proj: &there.Project, v: &there.Version}, r.recordHash(p, h.proj.ID, q, there.Project)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // placeAnywhere is place, and for a file its author blocks from third-party download, place from
@@ -44,7 +45,10 @@ func (r *Resolver) placeAnywhere(ctx context.Context, h hosted, key, requiredBy,
 	if out.CodeOf(err) != "manual-download" {
 		return h, id, prior, err
 	}
-	elsewhere := r.hostedElsewhere(ctx, h.p, h.v)
+	elsewhere, recordErr := r.hostedElsewhere(ctx, h)
+	if recordErr != nil {
+		return h, id, prior, recordErr
+	}
 	if elsewhere == nil {
 		return h, id, prior, err
 	}

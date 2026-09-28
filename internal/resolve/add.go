@@ -59,6 +59,8 @@ type Resolver struct {
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
 	// file order is arbitrary.
 	keepNewest bool
+	// listings is the listing index, read once the first add asks it.
+	listings *cache.ListingIndex
 	// adopted are the pending mods install filled from downloads/.
 	adopted []string
 	// locked are the mods this resolver locked, which keeping one again doesn't report.
@@ -531,6 +533,16 @@ func (r *Resolver) setSource(entry *manifest.Require, key string, p provider.Pro
 }
 
 func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, key, requiredBy, sideOverride, channel string, replace bool) (string, *lock.Mod, error) {
+	if !replace {
+		id, indexed, err := r.indexedMod(p.Name(), proj.ID)
+		if err != nil {
+			return "", nil, err
+		}
+		if indexed && (key == "" || key == id) {
+			prior, err := r.keepIndexed(id, requiredBy, p, proj)
+			return id, prior, err
+		}
+	}
 	r.log("fetching %s %s", proj.Slug, v.Number)
 	got, err := r.obtainFrom(ctx, p, proj, v)
 	if err != nil {
@@ -584,11 +596,11 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 		case existing.Provider != p.Name() && replace:
 			r.log("switching %s from %s to %s", id, existing.Provider, p.Name())
 		case existing.Provider != p.Name():
-			aliased := r.Lock.Mods[id]
-			setAlias(&aliased, p.Name(), proj.ID)
-			r.Lock.Mods[id] = aliased
-			r.log("keeping %s %s from %s (%s project %s recorded as an alias)", id, existing.VersionNumber, existing.Provider, p.Name(), proj.ID)
-			return id, prior, nil
+			r.keepAlias(id, p, proj)
+			if r.Lock.JarID(id) != info.ID {
+				return id, prior, nil
+			}
+			return id, prior, r.recordJarID(existing, p, proj.ID, info.ID)
 		case existing.Version != v.ID:
 			r.logKept(id, existing)
 			return id, prior, nil
@@ -638,8 +650,14 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	if proj.Slug != id {
 		entry.Slug = proj.Slug
 	}
-	if was := r.Lock.JarID(id); prior != nil && was != info.ID {
+	was := r.Lock.JarID(id)
+	if prior != nil && was != info.ID {
 		r.log("%s %s now identifies itself as %s", id, v.Number, info.ID)
+	}
+	if prior != nil && !replacesProject && prior.Provider != p.Name() && was == info.ID {
+		if err := r.recordJarID(*prior, p, proj.ID, info.ID); err != nil {
+			return "", nil, err
+		}
 	}
 	r.Lock.Mods[id] = entry
 	if r.locked == nil {
