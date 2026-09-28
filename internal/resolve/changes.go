@@ -92,7 +92,11 @@ func (r *Resolver) Changes(before Snapshot) *Changes {
 		_, listed := mods[id]
 		switch {
 		case !existed || (listed && !before.listed[id]):
-			c.Added = append(c.Added, AddedMod{ID: id, VersionNumber: now.VersionNumber, Side: now.Side, Provider: now.Provider, RequiredBy: nonNil(now.RequiredBy), AlreadyLocked: existed})
+			requiredBy := []string{}
+			if !listed {
+				requiredBy = nonNil(now.RequiredBy)
+			}
+			c.Added = append(c.Added, AddedMod{ID: id, VersionNumber: now.VersionNumber, Side: now.Side, Provider: now.Provider, RequiredBy: requiredBy, AlreadyLocked: existed})
 		case old.Sha512 != now.Sha512 || old.Provider != now.Provider || old.Side != now.Side || old.Channel != now.Channel:
 			ch := Change{ID: id, From: old.VersionNumber, To: now.VersionNumber}
 			if old.Provider != now.Provider {
@@ -161,7 +165,7 @@ func nonNil(s []string) []string {
 func (c *Changes) Unshipped(sides []string, mods map[string]lock.Mod, placements map[string]build.Placement) []string {
 	var warnings []string
 	for _, m := range c.Added {
-		if _, isMod := mods[m.ID]; !isMod || len(m.RequiredBy) > 0 || len(sides) == 0 || IsSideDeclared(sides, m.Side) {
+		if _, isMod := mods[m.ID]; !isMod || len(mods[m.ID].RequiredBy) > 0 || len(sides) == 0 || IsSideDeclared(sides, m.Side) {
 			continue
 		}
 		if place := placements[m.ID]; len(place.OS) > 0 || len(place.Feature) > 0 {

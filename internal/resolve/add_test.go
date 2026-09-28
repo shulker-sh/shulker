@@ -343,6 +343,29 @@ func TestKeepingAModLockedBeforeTheCommandSaysSo(t *testing.T) {
 	}
 }
 
+func TestANamedModIsNotShownAsRequired(t *testing.T) {
+	_, _, h := twoHosts(t)
+	before := h.r.Snapshot()
+
+	h.mustAdd("fabric-api", AddOptions{})
+	h.mustAdd("sodium", AddOptions{})
+
+	c := h.r.Changes(before)
+	i := slices.IndexFunc(c.Added, func(m AddedMod) bool { return m.ID == "fabric-api" })
+	if i < 0 || len(c.Added[i].RequiredBy) != 0 {
+		t.Fatalf("fabric-api was named, so its change shows no required-by: %+v", c.Added)
+	}
+	if got := h.mod("fabric-api").RequiredBy; !slices.Equal(got, []string{"sodium"}) {
+		t.Fatalf("the lock still records sodium requiring fabric-api: %q", got)
+	}
+	if err := h.r.Remove([]string{"sodium"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.mod("fabric-api").RequiredBy; len(got) != 0 {
+		t.Fatalf("removing sodium leaves fabric-api named and required by nothing: %q", got)
+	}
+}
+
 func TestAddRefusesAVersionOffTheChannel(t *testing.T) {
 	cf := envtest.NewHost(envtest.NewCDN(t), "curse").LikeCurseForge()
 	betaDependency(t, cf)

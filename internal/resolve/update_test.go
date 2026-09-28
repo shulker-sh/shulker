@@ -29,12 +29,12 @@ func TestSplitLocalFilesKeepsTheOrderGiven(t *testing.T) {
 func TestUnshippedWarnsOnlyForAnUnconditionedModOffEverySide(t *testing.T) {
 	c := &Changes{Added: []AddedMod{
 		{ID: "sodium", Side: "client"},
-		{ID: "lithium", Side: "client", RequiredBy: []string{"base"}},
+		{ID: "lithium", Side: "client"},
 		{ID: "iris", Side: "client"},
 		{ID: "fresh-animations", Side: "client"},
 		{ID: "fabric-api", Side: "both"},
 	}}
-	mods := map[string]lock.Mod{"sodium": {}, "lithium": {}, "iris": {}, "fabric-api": {}}
+	mods := map[string]lock.Mod{"sodium": {}, "lithium": {RequiredBy: []string{"base"}}, "iris": {}, "fabric-api": {}}
 	placements := map[string]build.Placement{"iris": {Feature: manifest.StringList{"shaders"}}}
 
 	got := c.Unshipped([]string{"server"}, mods, placements)
