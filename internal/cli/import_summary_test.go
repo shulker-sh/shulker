@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/provider/curseforge"
 	"shulker.sh/shulker/internal/provider/modrinth"
@@ -55,5 +57,20 @@ func TestImportedRowsLeaveOutWhatThereIsNoneOf(t *testing.T) {
 	}
 	if want := []string{"2 mods from Modrinth", "1 override file"}; !slices.Equal(got, want) {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestKeptYoursListsTenThenCountsTheRest(t *testing.T) {
+	var kept []string
+	for i := range 12 {
+		kept = append(kept, fmt.Sprintf("overrides/config/%02d.cfg", i))
+	}
+	rows := importRows(out.Theme{}, nil, kept, nil)
+	if len(rows) != 1 || rows[0].Label != "kept yours" {
+		t.Fatalf("rows: %+v", rows)
+	}
+	children := rows[0].Children
+	if len(children) != 11 || children[9] != "overrides/config/09.cfg" || children[10] != "…and 2 more" {
+		t.Fatalf("children: %q", children)
 	}
 }

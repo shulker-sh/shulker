@@ -166,16 +166,23 @@ func importedRows(providers provider.Providers, mods *resolve.Imported, override
 // how to build the project.
 func (a *app) emitImport(res importResult, rows ...out.Row) error {
 	return a.printer.Emit(res, func(l *out.Lines) {
-		l.OKInto("Imported "+res.Name+" "+res.Version, res.Dir, resolve.PlatformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version), append(rows, importRows(res.Mods, res.KeptYours, res.LeftOut)...)...)
+		l.OKInto("Imported "+res.Name+" "+res.Version, res.Dir, resolve.PlatformLabel(res.Minecraft, res.Loader.Type, res.Loader.Version), append(rows, importRows(l.T, res.Mods, res.KeptYours, res.LeftOut)...)...)
 		l.Nudge("Play it in a launcher", "shulker link <launcher>")
 	})
 }
 
+// shownKept is how many kept-yours entries an import's report lists before counting the rest.
+const shownKept = 10
+
 // importRows are the rows an import's report ends with, each only when it has something to say.
-func importRows(mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
+func importRows(t out.Theme, mods *resolve.Imported, keptYours, leftOut []string) []out.Row {
 	var rows []out.Row
 	if len(keptYours) > 0 {
-		rows = append(rows, out.Row{Label: "kept yours", Children: keptYours})
+		children := slices.Clone(keptYours[:min(len(keptYours), shownKept)])
+		if more := len(keptYours) - shownKept; more > 0 {
+			children = append(children, t.Grey(fmt.Sprintf("…and %d more", more)))
+		}
+		rows = append(rows, out.Row{Label: "kept yours", Children: children})
 	}
 	if len(leftOut) > 0 {
 		rows = append(rows, out.Row{Label: "left out for side", Children: leftOut})
