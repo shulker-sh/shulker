@@ -99,3 +99,17 @@ func TestIdentifyAsksEachProviderInManifestOrder(t *testing.T) {
 		t.Errorf("warnings %v", im.rep.Warnings)
 	}
 }
+
+func TestIdentifySaysOneFileWasntLookedUp(t *testing.T) {
+	alpha := fake.New("alpha")
+	alpha.Unavailable = out.Errorf("provider-unavailable", "alpha needs a key")
+	im := newImporter(fakeResolver(alpha), &packarchive.Archive{}, false)
+	im.toIdentify(packarchive.Override{Layer: "overrides", Path: "mods/shiny.jar", Data: []byte("a")}, "")
+	if err := im.identify(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	want := "1 file wasn't looked up on Alpha (alpha needs a key); kept as an override"
+	if len(im.rep.Warnings) != 1 || im.rep.Warnings[0] != want {
+		t.Errorf("warnings %q, want %q", im.rep.Warnings, want)
+	}
+}

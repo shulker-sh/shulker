@@ -487,7 +487,11 @@ func (im *importer) identify(ctx context.Context) error {
 		}
 		p, err := im.r.Providers.Get(name)
 		if err != nil {
-			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s weren't looked up on %s (%s); kept as overrides", out.Count(len(files), "file", "files"), im.r.Providers.Title(name), out.AsError(err).Message))
+			kept := "overrides"
+			if len(files) == 1 {
+				kept = "an override"
+			}
+			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s looked up on %s (%s); kept as %s", out.Count(len(files), "file wasn't", "files weren't"), im.r.Providers.Title(name), out.AsError(err).Message, kept))
 			continue
 		}
 		im.r.log("looking up %s on %s", out.Count(len(files), "file", "files"), p.Title())
