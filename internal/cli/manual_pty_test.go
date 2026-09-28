@@ -115,7 +115,8 @@ func handmadeJar(t *testing.T) []byte {
 }
 
 // TestDownloadWaitInAPty runs the built binary at a real terminal: enter checks without ending
-// the wait while the file is missing, the wait ends by itself once the file lands, and esc skips.
+// the wait while the file is missing, the wait ends by itself once the file lands, a bracketed
+// paste of the file's path takes it, and esc skips.
 func TestDownloadWaitInAPty(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the binary")
@@ -170,6 +171,28 @@ func TestDownloadWaitInAPty(t *testing.T) {
 		data, _ := os.ReadFile(filepath.Join(dir, "shulker.lock"))
 		if strings.Contains(string(data), `"sha512": ""`) {
 			t.Fatalf("the dropped file fills the pending mod:\n%s", data)
+		}
+	})
+
+	t.Run("a pasted path", func(t *testing.T) {
+		dir := pendingManualProject(t, jar)
+		elsewhere := filepath.Join(t.TempDir(), "My Mods", "handmade.jar")
+		os.MkdirAll(filepath.Dir(elsewhere), 0o755)
+		os.WriteFile(elsewhere, jar, 0o644)
+		cmd, term := start(dir)
+		term.waitFor(t, "Press Enter")
+		done := exited(cmd)
+		term.f.WriteString("\x1b[200~" + strings.ReplaceAll(elsewhere, " ", `\ `) + "\x1b[201~")
+		select {
+		case err := <-done:
+			if err != nil || !strings.Contains(term.String(), "Built client") {
+				t.Fatalf("install after the pasted file is taken: %v\n%s", err, term)
+			}
+		case <-time.After(30 * time.Second):
+			t.Fatalf("the paste was never taken:\n%s", term)
+		}
+		if _, err := os.Stat(filepath.Join(dir, "downloads", "handmade-1.0.jar")); err != nil {
+			t.Fatalf("the pasted file lands in downloads/ under its expected name: %v", err)
 		}
 	})
 

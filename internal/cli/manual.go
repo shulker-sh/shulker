@@ -65,18 +65,23 @@ func (a *app) awaitDownloads(ctx context.Context, downloads string, e *out.Error
 		Files: rows,
 		Check: func() ([]out.WaitFile, error) {
 			status, err := w.Check()
-			if err != nil {
-				return nil, err
-			}
-			checked := make([]out.WaitFile, len(status))
-			for i, s := range status {
-				checked[i] = out.WaitFile{Found: s.Found, Note: s.Note}
-			}
-			return checked, nil
+			return waitFiles(status), err
 		},
 		Every: downloadCheckEvery,
+		Paste: func(text string) ([]out.WaitFile, string, error) {
+			status, note, err := w.Take(text)
+			return waitFiles(status), note, err
+		},
 	}, a.stdin)
 	return skip, escaped(err)
+}
+
+func waitFiles(status []manual.Status) []out.WaitFile {
+	files := make([]out.WaitFile, len(status))
+	for i, s := range status {
+		files[i] = out.WaitFile{Found: s.Found, Note: s.Note}
+	}
+	return files
 }
 
 // watchedFolders are the folders downloads.watch names, besides the project's downloads/. A

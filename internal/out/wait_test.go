@@ -119,3 +119,24 @@ func TestWaitChecksOnceAtATime(t *testing.T) {
 		}
 	}
 }
+
+func TestWaitTakesAPastedPath(t *testing.T) {
+	m := newTestWait(&fakeChecks{answers: [][]bool{{false, false}}})
+	var pasted []string
+	m.w.Paste = func(text string) ([]WaitFile, string, error) {
+		pasted = append(pasted, text)
+		if text == "/tmp/nope.jar" {
+			return []WaitFile{{}, {}}, "/tmp/nope.jar isn't one of the files", nil
+		}
+		return []WaitFile{{Found: true}, {Found: true}}, "", nil
+	}
+	run(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/tmp/nope.jar"), Paste: true})
+	if view := m.View(); m.done || !strings.Contains(view, "/tmp/nope.jar isn't one of the files") {
+		t.Fatalf("a paste that matches nothing is noted:\n%s", view)
+	}
+	run(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	run(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/tmp/a.jar /tmp/b.jar"), Paste: true})
+	if !m.done || m.skipped || len(pasted) != 2 {
+		t.Fatalf("typing isn't a paste, and a paste that finds every file ends the wait: done=%v pasted=%q", m.done, pasted)
+	}
+}

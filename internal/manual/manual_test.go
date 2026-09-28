@@ -7,6 +7,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -156,5 +158,46 @@ func TestCheckFindsAFileByItsOwnExtension(t *testing.T) {
 	os.WriteFile(filepath.Join(downloads, "renamed.mrpack"), []byte("pack"), 0o644)
 	if found, err := w.Check(); err != nil || !found[0].Found {
 		t.Fatalf("a modpack's .mrpack is a candidate: %+v %v", found, err)
+	}
+}
+
+func TestPastedPathsReadsWhatATerminalDropsIn(t *testing.T) {
+	for text, want := range map[string][]string{
+		"/tmp/a.jar\n":                        {"/tmp/a.jar"},
+		`/tmp/My\ Mods/a\ (1).jar /tmp/b.jar`: {"/tmp/My Mods/a (1).jar", "/tmp/b.jar"},
+		`'/tmp/My Mods/a.jar'`:                {"/tmp/My Mods/a.jar"},
+		`"/tmp/My Mods/a.jar"`:                {"/tmp/My Mods/a.jar"},
+		"file:///tmp/My%20Mods/a.jar":         {"/tmp/My Mods/a.jar"},
+	} {
+		if got := pastedPaths(text); !slices.Equal(got, want) {
+			t.Errorf("pastedPaths(%q) = %q, want %q", text, got, want)
+		}
+	}
+}
+
+func TestTakeHashesAPastedPathAgainstTheMissingFiles(t *testing.T) {
+	downloads, folder, file := watched(t)
+	right := filepath.Join(folder, "My Mods", "renamed.jar")
+	os.MkdirAll(filepath.Dir(right), 0o755)
+	write(t, right, "right", time.Hour)
+	write(t, filepath.Join(folder, "other.jar"), "other", time.Hour)
+	w := NewWait(downloads, nil, []File{file})
+
+	found, note, err := w.Take(filepath.Join(folder, "other.jar"))
+	if err != nil || found[0].Found || note != filepath.Join(folder, "other.jar")+" isn't one of the files" {
+		t.Fatalf("a file that matches nothing is noted: %+v %q %v", found, note, err)
+	}
+	found, note, err = w.Take(strings.ReplaceAll(right, " ", `\ `))
+	if err != nil || !found[0].Found || note != "" {
+		t.Fatalf("%+v %q %v", found, note, err)
+	}
+	if landed(t, downloads) != "right" {
+		t.Fatal("it lands under the expected name")
+	}
+	if _, err := os.Stat(right); err != nil {
+		t.Fatalf("a file that predates the wait is copied: %v", err)
+	}
+	if _, note, _ := w.Take(filepath.Join(folder, "gone.jar")); note != filepath.Join(folder, "gone.jar")+" isn't a file" {
+		t.Fatalf("a path to nothing is noted: %q", note)
 	}
 }

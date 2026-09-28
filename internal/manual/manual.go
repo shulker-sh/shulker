@@ -9,11 +9,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
+	"unicode"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
@@ -67,8 +71,10 @@ type Status struct {
 // duplicate of it, or a file that arrived after the wait started is. A find in a watched folder
 // lands in the downloads folder under its expected name: copied when it was already there when
 // the wait started, moved when it arrived during it. Each file's hashes are remembered by its size
-// and modification time, so checking every few seconds hashes only what changed.
+// and modification time, so checking every few seconds hashes only what changed. Check and Take
+// may run at once.
 type Wait struct {
+	mu        sync.Mutex
 	downloads string
 	watch     []string
 	files     []File
@@ -118,6 +124,8 @@ func NewWait(downloads string, watch []string, list []File) *Wait {
 // Check looks in the downloads folder and every watched folder again and says where each file
 // stands. A file once found stays found.
 func (w *Wait) Check() ([]Status, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	entries, err := w.read(w.downloads)
 	if err != nil {
 		return nil, err
@@ -190,6 +198,83 @@ func (w *Wait) checkWatched(dir string) error {
 		}
 	}
 	return nil
+}
+
+// Take hashes the files at the paths pasted or dragged into the terminal against the files still
+// missing and lands each match as a watched-folder find is landed. The note says what was pasted
+// that is none of them.
+func (w *Wait) Take(text string) ([]Status, string, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	var notes []string
+	for _, path := range pastedPaths(text) {
+		st, err := os.Stat(path)
+		if err != nil || !st.Mode().IsRegular() {
+			notes = append(notes, path+" isn't a file")
+			continue
+		}
+		h, err := w.hash(path)
+		if err != nil {
+			notes = append(notes, fmt.Sprintf("%s can't be read: %v", path, err))
+			continue
+		}
+		i := slices.IndexFunc(w.files, func(f File) bool { return f.matches(h) })
+		if i < 0 {
+			notes = append(notes, path+" isn't one of the files")
+			continue
+		}
+		if w.status[i].Found {
+			continue
+		}
+		c := candidate{path: path, name: filepath.Base(path), modTime: st.ModTime(), arrived: st.ModTime().After(w.started)}
+		if err := w.take(c, w.files[i]); err != nil {
+			return nil, "", err
+		}
+		w.status[i] = Status{Found: true}
+	}
+	return slices.Clone(w.status), strings.Join(notes, "; "), nil
+}
+
+// pastedPaths reads the paths in text the way a terminal writes a dropped file: separated by
+// spaces, each quoted or with its spaces escaped by a backslash, or as a file:// URL.
+func pastedPaths(text string) []string {
+	var paths []string
+	var b strings.Builder
+	var quote rune
+	escaped, started := false, false
+	end := func() {
+		if started {
+			path := b.String()
+			if u, err := url.Parse(path); err == nil && u.Scheme == "file" {
+				path = u.Path
+			}
+			paths = append(paths, path)
+		}
+		b.Reset()
+		started = false
+	}
+	for _, r := range text {
+		switch {
+		case escaped:
+			b.WriteRune(r)
+			escaped = false
+		case r == '\\' && quote != '\'' && runtime.GOOS != "windows":
+			escaped, started = true, true
+		case quote != 0 && r == quote:
+			quote = 0
+		case quote != 0:
+			b.WriteRune(r)
+		case r == '\'' || r == '"':
+			quote, started = r, true
+		case unicode.IsSpace(r):
+			end()
+		default:
+			b.WriteRune(r)
+			started = true
+		}
+	}
+	end()
+	return paths
 }
 
 // namedBy reports whether name is the file's own name or a browser's duplicate of it, like

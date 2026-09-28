@@ -27,6 +27,9 @@ type DownloadWait struct {
 	// drawing loop, on enter and every Every.
 	Check func() ([]WaitFile, error)
 	Every time.Duration
+	// Paste takes what was pasted or dragged into the terminal as paths to the files, and says
+	// where each file stands after, with a note on what it couldn't take. It runs off the loop.
+	Paste func(text string) ([]WaitFile, string, error)
 }
 
 // AwaitDownloads draws w until every file is found, or esc skips the rest, which reports skipped.
@@ -50,10 +53,17 @@ type waitCheckedMsg struct {
 	err   error
 }
 
+type waitPastedMsg struct {
+	files []WaitFile
+	note  string
+	err   error
+}
+
 type waiter struct {
 	theme    Theme
 	w        DownloadWait
 	checking bool
+	note     string
 	done     bool
 	skipped  bool
 	err      error
@@ -86,6 +96,13 @@ func (m *waiter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if msg.Paste && m.w.Paste != nil {
+			text := string(msg.Runes)
+			return m, func() tea.Msg {
+				files, note, err := m.w.Paste(text)
+				return waitPastedMsg{files, note, err}
+			}
+		}
 		switch msg.Type {
 		case tea.KeyCtrlC:
 			return m.end(false, ErrPickCancelled)
@@ -98,15 +115,27 @@ func (m *waiter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.check(), m.tick())
 	case waitCheckedMsg:
 		m.checking = false
-		if msg.err != nil {
-			return m.end(false, msg.err)
+		return m.update(msg.files, msg.err)
+	case waitPastedMsg:
+		m.note = msg.note
+		return m.update(msg.files, msg.err)
+	}
+	return m, nil
+}
+
+func (m *waiter) update(files []WaitFile, err error) (tea.Model, tea.Cmd) {
+	if err != nil {
+		return m.end(false, err)
+	}
+	for i, f := range files {
+		// A check that started before a paste took a file answers after it, without that file.
+		m.w.Files[i].Found = m.w.Files[i].Found || f.Found
+		if !m.w.Files[i].Found {
+			m.w.Files[i].Note = f.Note
 		}
-		for i, f := range msg.files {
-			m.w.Files[i].Found, m.w.Files[i].Note = f.Found, f.Note
-		}
-		if m.allFound() {
-			return m.end(false, nil)
-		}
+	}
+	if m.allFound() {
+		return m.end(false, nil)
 	}
 	return m, nil
 }
@@ -143,8 +172,17 @@ func (m *waiter) View() string {
 			l.line("    " + t.Yellow(f.Note))
 		}
 	}
-	if !m.done {
+	if m.done {
+		return b.String()
+	}
+	if m.note != "" {
 		l.Blank()
+		l.Warn(m.note)
+	}
+	l.Blank()
+	if m.w.Paste != nil {
+		l.Muted("Press Enter to check now, drop a file here to take it, or Esc to skip the files still missing")
+	} else {
 		l.Muted("Press Enter to check now, or Esc to skip the files still missing")
 	}
 	return b.String()
