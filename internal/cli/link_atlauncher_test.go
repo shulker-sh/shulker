@@ -168,3 +168,28 @@ func writeATLInstance(t *testing.T, instDir string, v map[string]any) {
 		t.Fatal(err)
 	}
 }
+
+func TestReconcileTurnsATLauncherCommandsBackOnAndSaysSo(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "my-pack")
+	launcherDir := t.TempDir()
+	h.mustRun(t, "link", "atlauncher", "--launcher-dir", launcherDir, "--name", "Friends SMP")
+	instDir := filepath.Join(launcherDir, "instances", "FriendsSMP")
+	path := filepath.Join(instDir, launcher.ATLauncherInstanceFile)
+
+	if _, stderr := h.mustRunStderr(t, "instances", "repair"); strings.Contains(stderr, "commands") {
+		t.Fatalf("commands already on are nothing to say: %s", stderr)
+	}
+
+	writeFile(t, path, strings.Replace(readFile(t, path), `"enableCommands": true`, `"enableCommands": false`, 1))
+	if settings := readATLInstance(t, instDir)["launcher"].(map[string]any); settings["enableCommands"] != false {
+		t.Fatalf("fixture: %v", settings["enableCommands"])
+	}
+	_, stderr := h.mustRunStderr(t, "instances", "repair")
+	if !strings.Contains(stderr, "Turned commands back on in ATLauncher for friends-smp") {
+		t.Fatalf("turning commands back on warns: %s", stderr)
+	}
+	if settings := readATLInstance(t, instDir)["launcher"].(map[string]any); settings["enableCommands"] != true {
+		t.Fatalf("enableCommands is back on: %v", settings)
+	}
+}

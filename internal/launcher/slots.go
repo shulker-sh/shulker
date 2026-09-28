@@ -103,6 +103,9 @@ type Slots struct {
 	PostExit  string
 	Java      string
 	Wrapper   string
+	// Commands is read only: the launcher's own switch for running an instance's commands, nil
+	// where it has none or the instance leaves it unset. Writing a command turns it on.
+	Commands *bool
 }
 
 // WrapperCommand is settings.wrapper as one string for a launcher's own wrapper slot. Each launcher
@@ -182,7 +185,12 @@ func readATLauncherSlots(e *Entry, in config.Instance) (Slots, bool, error) {
 	if err != nil || !found {
 		return Slots{}, found, err
 	}
-	return Slots{PreLaunch: jsonStringValue(settings["preLaunchCommand"]), PostExit: jsonStringValue(settings["postExitCommand"]), Wrapper: jsonStringValue(settings["wrapperCommand"])}, true, nil
+	return Slots{
+		PreLaunch: jsonStringValue(settings["preLaunchCommand"]),
+		PostExit:  jsonStringValue(settings["postExitCommand"]),
+		Wrapper:   jsonStringValue(settings["wrapperCommand"]),
+		Commands:  jsonBool(settings["enableCommands"]),
+	}, true, nil
 }
 
 func readGDLauncherSlots(e *Entry, in config.Instance) (Slots, bool, error) {
@@ -439,6 +447,14 @@ func atlauncherSettings(instanceDir string) (settings, top map[string]json.RawMe
 
 func gdlauncherTop(instanceDir string) (map[string]json.RawMessage, bool, error) {
 	return readJSONObject(filepath.Join(instanceDir, GDLauncherInstanceFile))
+}
+
+func jsonBool(raw json.RawMessage) *bool {
+	var b bool
+	if json.Unmarshal(raw, &b) != nil {
+		return nil
+	}
+	return &b
 }
 
 func jsonStringValue(raw json.RawMessage) string {

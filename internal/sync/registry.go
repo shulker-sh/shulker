@@ -30,22 +30,25 @@ func Reconcile(e *Env, in config.Instance) (rehooked bool) {
 		// A plain synced directory has no slot to fill, so it gets no scripts either.
 		return false
 	}
-	var adopted []string
+	var r launcher.Reconciled
 	f, err := instance.Load(in.Dir)
 	if err == nil {
 		var exe string
 		if exe, err = launcher.ShulkerPath(); err == nil {
-			adopted, rehooked, err = launcher.Reconcile(entry, in, f, exe)
+			r, err = launcher.Reconcile(entry, in, f, exe)
 		}
 	}
-	for _, command := range adopted {
+	for _, command := range r.Adopted {
 		e.warnUnreproducible(*entry.Slot, command)
+	}
+	if r.CommandsOn {
+		e.Warn("turned commands back on in %s for %s, since shulker's hooks run as its commands", entry.Title, in.ID)
 	}
 	if err != nil {
 		e.Warn("hooks not set up for %s: %v", launcher.Named(in), err)
 		return false
 	}
-	return rehooked
+	return r.Rehooked
 }
 
 // warnUnreproducible reports the tokens an adopted command uses that shulker can't reproduce,

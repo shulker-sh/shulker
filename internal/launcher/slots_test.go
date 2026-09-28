@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 )
 
 // slotRow is the registry row for an instance folder: the slot functions take the row, since the
@@ -307,5 +308,31 @@ func TestWrapperCommandQuotesTheWayEachParserReads(t *testing.T) {
 	}
 	if got := wrapperCommand("prism", nil, "darwin"); got != "" {
 		t.Fatalf("no wrapper, no command: %q", got)
+	}
+}
+
+// Only a write that leaves ATLauncher's commands on turns them back on: with both hooks off and no
+// wrapper, reconcile drops enableCommands, which is no switch turned on.
+func TestReconcileSaysWhenItTurnsATLauncherCommandsBackOn(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		off  bool
+		want bool
+	}{
+		{"hooks on", false, true},
+		{"hooks off", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			write(t, filepath.Join(dir, ATLauncherInstanceFile), `{"launcher":{"enableCommands":false}}`)
+			f := instance.New()
+			if tc.off {
+				f.Settings.Hooks.PreLaunch, f.Settings.Hooks.PostExit = instance.Off(), instance.Off()
+			}
+			r, err := Reconcile(Find("atlauncher"), slotRow("atlauncher", dir), f, "/bin/shulker")
+			if err != nil || r.CommandsOn != tc.want {
+				t.Fatalf("CommandsOn = %v, %v; want %v", r.CommandsOn, err, tc.want)
+			}
+		})
 	}
 }

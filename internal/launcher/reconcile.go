@@ -15,25 +15,25 @@ import (
 // and settings.shulker pointed at exe, the binary now running. It is idempotent, so link, every
 // registering sync and `instances repair` can all call it, and a hand-edited switch takes effect
 // through the same path that first set it. A launcher with no slot fills none and gets no scripts.
-// adopted is each foreign command the launcher's slots held, moved into f's own settings so the
-// generated script keeps running it instead of destroying it. rehooked says a hook that is on was
-// missing or pointed at another binary before this call put it back.
-func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (adopted []string, rehooked bool, err error) {
+// A foreign command the launcher's slots held moves into f's own settings, so the generated script
+// keeps running it instead of destroying it.
+func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (Reconciled, error) {
+	var r Reconciled
 	if e == nil || e.Slot == nil {
-		return nil, false, nil
+		return r, nil
 	}
 	slot := *e.Slot
 	instanceDir := e.InstanceDir(in.Dir)
 	current, found, err := ReadSlots(e, in)
 	if err != nil {
-		return nil, false, err
+		return r, err
 	}
 	if !found {
-		return nil, false, noSlots(e, in)
+		return r, noSlots(e, in)
 	}
-	rehooked = (f.Settings.PreLaunch() || f.Settings.PostExit()) && !hooksInPlace(slot, in, f, current, exe)
+	r.Rehooked = (f.Settings.PreLaunch() || f.Settings.PostExit()) && !hooksInPlace(slot, in, f, current, exe)
 	f.Settings.Shulker = exe
-	adopted = adoptSlots(f, current)
+	r.Adopted = adoptSlots(f, current)
 	if slot.UsesShim {
 		captureLauncherJava(f, current.Java)
 	}
@@ -51,11 +51,11 @@ func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (adop
 			h.Adopted = f.Settings.Commands.PreLaunch
 		}
 		if err := WriteHook(h); err != nil {
-			return adopted, false, err
+			return r, err
 		}
 		want.PreLaunch = slotCommandOf(slot, in, HookPreLaunch)
 	} else if err := RemoveHook(in.Dir, HookPreLaunch); err != nil {
-		return adopted, false, err
+		return r, err
 	}
 	if f.Settings.PostExit() {
 		h := Hook{
@@ -68,27 +68,41 @@ func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (adop
 			h.Adopted = f.Settings.Commands.PostExit
 		}
 		if err := WriteHook(h); err != nil {
-			return adopted, false, err
+			return r, err
 		}
 		want.PostExit = slotCommandOf(slot, in, HookPostExit)
 	} else if err := RemoveHook(in.Dir, HookPostExit); err != nil {
-		return adopted, false, err
+		return r, err
 	}
 	if slot.UsesShim {
 		if want.Java, err = reconcileShim(in, f, exe); err != nil {
-			return adopted, false, err
+			return r, err
 		}
 	} else {
 		// The shim prepends the wrapper itself; every other launcher has a slot of its own for it.
 		want.Wrapper = WrapperCommand(in.Launcher, f.Settings.Wrapper)
 	}
 	if err := WriteSlots(e, in, want); err != nil {
-		return adopted, false, err
+		return r, err
 	}
-	if err := f.Save(in.Dir); err != nil {
-		return adopted, false, err
+	if current.Commands != nil && !*current.Commands {
+		after, _, err := ReadSlots(e, in)
+		if err != nil {
+			return r, err
+		}
+		r.CommandsOn = after.Commands != nil && *after.Commands
 	}
-	return adopted, rehooked, nil
+	return r, f.Save(in.Dir)
+}
+
+// Reconciled is what a reconcile did that is worth telling the player.
+type Reconciled struct {
+	// Adopted is each foreign command the launcher's slots held, now in the instance's own settings.
+	Adopted []string
+	// Rehooked says a hook that is on was missing or pointed at another binary, and is back.
+	Rehooked bool
+	// CommandsOn says the player had switched the launcher's commands off, and the write turned them on.
+	CommandsOn bool
 }
 
 // noSlots is the error for a launcher file that is gone or no longer holds the instance.
