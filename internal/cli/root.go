@@ -48,6 +48,7 @@ type app struct {
 	exe         func() (string, error)
 	installer   func(ctx context.Context, java, jar string, args []string) error
 	watcher     func(req game.Launch) (int, error)
+	openURL     func(url string) error
 	isRunning   bool
 	backedUp    map[saves.Home]bool
 	log         *auditlog.Log
@@ -74,7 +75,7 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 }
 
 func newApp(stdout, stderr io.Writer) *app {
-	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal, build: describeBuild, exe: selfupdate.Executable, installer: server.RunInstaller}
+	return &app{printer: &out.Printer{Stdout: stdout, Stderr: stderr}, stdin: os.Stdin, tty: stdinIsTerminal, build: describeBuild, exe: selfupdate.Executable, installer: server.RunInstaller, openURL: openURL}
 }
 
 func (a *app) run(ctx context.Context, args []string) int {

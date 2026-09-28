@@ -1,22 +1,30 @@
 package cli
 
 import (
+	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/loader"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/resolve"
 )
 
 // searchDebounce is how long the query has to sit still before it is searched: one or two
 // requests for a phrase typed at a normal pace.
 const searchDebounce = 250 * time.Millisecond
 
-// browseSearch is a bare search: a query line over results that follow it, which only reads, so
-// leaving it prints the results on screen as `shulker search <that query>` would have.
+// browseSearch is a bare search: a query line over a table of results that follows it, with a
+// details view per result. It only reads, so leaving it prints nothing; in a project, a result's
+// details can add it, which runs `add` as if it had been named.
 func (a *app) browseSearch(cmd *cobra.Command, kind string, names []string, limit int) error {
 	if !a.canPick() {
 		return checkArgs(cmd, nil, 1, -1)
@@ -24,20 +32,144 @@ func (a *app) browseSearch(cmd *cobra.Command, kind string, names []string, limi
 	if _, err := a.deps(); err != nil {
 		return err
 	}
+	p := a.searchProject()
+	merge := a.searchMerge(p)
 	a.printer.Settle()
 	ctx := cmd.Context()
 	s := newLiveSearch(a.printer.ErrTheme, a.titles(), func(query string) (searchReply, error) {
-		return a.search(ctx, query, kind, names, limit, false, true)
+		return a.search(ctx, query, kind, names, limit, false, merge)
 	})
-	if err := a.printer.Browse(a.searchTitle(names), s, a.stdin); err != nil {
+	several := len(names) > 1
+	headers, styles := searchColumns(a.printer.ErrTheme, several)
+	keys := []out.DetailKey{{Key: "o", Help: "open page", Run: func(value string) {
+		if r, ok := s.result(value); ok {
+			a.openPage(r)
+		}
+	}}}
+	if p != nil {
+		keys = append([]out.DetailKey{{Key: "a", Help: "add"}}, keys...)
+	}
+	key, value, err := a.printer.BrowseTable(out.TableBrowser{
+		Title: a.searchTitle(names), Headers: headers, Styles: styles, Source: searchRows{s, several},
+		Details: func(value string, width int) string {
+			r, ok := s.result(value)
+			if !ok {
+				return ""
+			}
+			return a.searchDetails(ctx, p, r, width)
+		},
+		Keys: keys,
+	}, a.stdin)
+	if err != nil || key != "a" {
 		return err
 	}
-	reply, ok := s.last()
+	r, ok := s.result(value)
 	if !ok {
 		return nil
 	}
-	a.warn(reply.warnings)
-	return a.printSearch(reply, false)
+	return a.addFound(cmd, r)
+}
+
+// addFound runs `add <slug>` for r, from the provider it was found on when only one had it, since
+// the same slug can be another project on the other.
+func (a *app) addFound(cmd *cobra.Command, r searchResult) error {
+	add, _, err := cmd.Root().Find([]string{"add"})
+	if err != nil {
+		return err
+	}
+	if r.Type != "" {
+		if err := add.Flags().Set("type", r.Type); err != nil {
+			return err
+		}
+	}
+	if len(r.Providers) == 1 {
+		if err := add.Flags().Set("provider", r.Providers[0].Provider); err != nil {
+			return err
+		}
+	}
+	add.SetContext(cmd.Context())
+	a.printer.Command = strings.TrimPrefix(add.CommandPath(), "shulker ")
+	return add.RunE(add, []string{r.Slug})
+}
+
+// openPage opens r's page on the first provider that has one.
+func (a *app) openPage(r searchResult) {
+	for _, h := range r.Providers {
+		if h.Page != "" {
+			_ = a.openURL(h.Page)
+			return
+		}
+	}
+}
+
+// searchDetails is r's details view: who made it and what it is, its id, downloads and page on
+// each provider, and, in project p with a lock, whether it has a version for p's Minecraft and
+// loader.
+func (a *app) searchDetails(ctx context.Context, p *project.Project, r searchResult, width int) string {
+	var b strings.Builder
+	l := &out.Lines{W: &b, T: a.printer.ErrTheme}
+	t := l.T
+	head := t.Bold(r.Title)
+	if r.Author != "" {
+		head += " " + t.Grey("by "+r.Author)
+	}
+	l.Plain(head)
+	if r.Summary != "" {
+		for line := range strings.SplitSeq(ansi.Wordwrap(r.Summary, max(min(width, 100)-4, 20), ""), "\n") {
+			l.Plain(line)
+		}
+	}
+	about := []string{r.Type}
+	if r.Side == "client" || r.Side == "server" {
+		about = append(about, r.Side+" only")
+	}
+	l.Muted(strings.Join(slices.DeleteFunc(about, func(s string) bool { return s == "" }), " "+t.GlyphDot()+" "))
+	l.Blank()
+	pad := func(s string, width int) string { return s + strings.Repeat(" ", max(width-out.Width(s), 0)) }
+	nameWidth, idWidth := 0, 0
+	for _, h := range r.Providers {
+		nameWidth, idWidth = max(nameWidth, out.Width(a.titles().Title(h.Provider))), max(idWidth, out.Width(h.ID))
+	}
+	for _, h := range r.Providers {
+		line := t.Bold(pad(a.titles().Title(h.Provider), nameWidth)) + "  " + t.Grey(pad(h.ID, idWidth))
+		if h.Downloads > 0 {
+			line += "  " + downloadCount(h.Downloads) + " downloads"
+		}
+		l.Plain(line)
+		if h.Page != "" {
+			l.Plain(strings.Repeat(" ", nameWidth+2) + h.Page)
+		}
+	}
+	if p != nil && p.Lock != nil {
+		l.Blank()
+		a.searchFit(ctx, l, p, r)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// searchFit says whether r has a version for p's Minecraft and, for what a loader runs, its
+// loader: one request, to the first provider r was found on.
+func (a *app) searchFit(ctx context.Context, l *out.Lines, p *project.Project, r searchResult) {
+	d, err := a.deps()
+	if err != nil {
+		l.Warn(out.AsError(err).Message)
+		return
+	}
+	res := resolve.NewAt(d.Env, p.Dir)
+	res.Manifest, res.Lock = p.Manifest, p.Lock
+	platform := "Minecraft " + p.Lock.Minecraft
+	if !manifest.IsPackKind(r.Type) && p.Lock.Loader.Type != "" {
+		platform += " with " + loader.Title(p.Lock.Loader.Type)
+	}
+	fits, err := res.Fits(ctx, r.Providers[0].Provider, r.Providers[0].ID, r.Type)
+	switch {
+	case err != nil:
+		l.Warn(out.AsError(err).Message)
+	case fits:
+		l.OK("Has a version for "+platform, "")
+	default:
+		l.Warn("No version for " + platform)
+	}
 }
 
 func (a *app) searchTitle(names []string) string {
@@ -140,20 +272,23 @@ func (l *liveSearch) Rows() []out.Choice {
 		for _, h := range r.Providers {
 			aside = append(aside, l.titles.Title(h.Provider))
 		}
-		aside = append(aside, r.Type)
+		if r.Type != "" {
+			aside = append(aside, r.Type)
+		}
 		if r.Downloads > 0 {
 			aside = append(aside, downloadCount(r.Downloads)+" downloads")
 		}
 		rows = append(rows, out.Choice{
 			Label: t.Bold(r.Title) + " " + t.Grey(r.Slug) + t.Aside(strings.Join(aside, ", ")),
-			Value: r.Providers[0].Provider + ":" + r.Providers[0].ID,
+			Value: searchValue(r),
 		})
 	}
 	return rows
 }
 
-func (l *liveSearch) Status() string {
-	r := l.settle()
+func (l *liveSearch) Status() string { return l.statusOf(l.settle()) }
+
+func (l *liveSearch) statusOf(r *liveReply) string {
 	t := l.theme
 	switch {
 	case r == nil:
@@ -173,14 +308,45 @@ func (l *liveSearch) Status() string {
 	return fmt.Sprintf("%d results", len(r.reply.results.Results))
 }
 
-// last is the reply on screen, which leaving the form prints.
-func (l *liveSearch) last() (searchReply, bool) {
+// result is the result on screen whose row has value.
+func (l *liveSearch) result(value string) (searchResult, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.shown == nil {
-		return searchReply{}, false
+		return searchResult{}, false
 	}
-	return l.shown.reply, true
+	for _, r := range l.shown.reply.results.Results {
+		if searchValue(r) == value {
+			return r, true
+		}
+	}
+	return searchResult{}, false
+}
+
+// searchValue is what a result's row means: its first provider and its id there, which no other
+// result shares.
+func searchValue(r searchResult) string { return r.Providers[0].Provider + ":" + r.Providers[0].ID }
+
+// searchRows is a live search as the table browser reads it: the rows on screen, as the static
+// table draws them, and the status line.
+type searchRows struct {
+	*liveSearch
+	several bool
+}
+
+func (s searchRows) Rows() out.TableAnswer {
+	r := s.settle()
+	answer := out.TableAnswer{Status: s.statusOf(r)}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if isTooShort(s.query) || s.shown == nil {
+		return answer
+	}
+	answer.Query = s.shown.query
+	for _, res := range s.shown.reply.results.Results {
+		answer.Rows = append(answer.Rows, out.TableRow{Cells: searchRow(s.titles, res, s.several), Value: searchValue(res)})
+	}
+	return answer
 }
 
 // settle waits out the debounce for the query as it stands, then answers it from the session's

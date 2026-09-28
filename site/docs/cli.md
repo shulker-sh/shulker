@@ -308,7 +308,7 @@ shulker resourcepack add "./Resource Packs/Mod Menu Helper"
 
 Search every provider shulker has set up for projects matching the words, and print them as one table, most downloaded first, with the slug to add each by. A Modrinth and a CurseForge result are one row when their slug and type match and so do their names, once tags like `(Fabric)` or ` - DISCONTINUED` and punctuation are dropped, or their authors; the current project's lock pairs any others it holds as one mod. Source says which provider a row was found on, or `both`, and goes under `--provider`; Downloads is the sum. The command writes nothing: `shulker.json` and the lock only change through `add`. Projects CurseForge classes as something shulker has no entry type for, worlds and plugins among them, are left out. A `modpack` row is a provider modpack, which `add` takes by its slug.
 
-With no words, `shulker search` opens a search box over a list of results that follows it as you type, searching once you pause for a quarter of a second and have typed at least two characters. Tab moves into the list to scroll it and shift+tab back to the box; enter does nothing, since nothing is chosen here. Esc or ctrl-c leaves and prints the results on screen, as `shulker search` with those words would. A query that fails keeps the last results on screen, with the error under the box. Off a terminal, or with `--no-input` or `--json`, the words are required.
+With no words, `shulker search` opens a search box over a table of results that follows it as you type, searching once you pause for a quarter of a second and have typed at least two characters. Tab or enter moves into the table, which the arrow keys and the mouse wheel scroll, and shift+tab moves back to the box. Enter on a result opens its details: its author and summary, its id, downloads and page on each provider, and, in a project, whether it has a version for the project's Minecraft and loader. There, `o` opens its page in the browser, `a` adds it as `shulker add <slug>` would and leaves (in a project only), and esc goes back to the results. Esc or ctrl-c leaves and prints nothing. A query that fails keeps the last results on screen, with the error under the box. Off a terminal, or with `--no-input` or `--json`, the words are required.
 
 ```sh
 shulker search
@@ -324,7 +324,7 @@ shulker search jei --provider curseforge --limit 5
 | `--limit <n>` | Results to print per provider (default 10, as many as each provider answers with: at most 100 from Modrinth, 50 from CurseForge) |
 | `-v, --verbose` | Also print each provider's id, and its downloads in place of the sum |
 
-With `--json`, `data.results` lists each row as `{ "slug", "title", "type", "side", "author", "downloads", "providers" }`, where `providers` holds its hit on each provider as `{ "provider", "id", "title", "downloads", "page" }`, and `data.query` is the words as one string.
+With `--json`, `data.results` lists each row as `{ "slug", "title", "type", "side", "author", "summary", "downloads", "providers" }`, where `providers` holds its hit on each provider as `{ "provider", "id", "title", "downloads", "page" }`, and `data.query` is the words as one string.
 
 ### `shulker remove`
 

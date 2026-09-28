@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/resolve"
 )
@@ -21,6 +22,7 @@ type searchResult struct {
 	Type      string      `json:"type,omitempty"`
 	Side      string      `json:"side,omitempty"`
 	Author    string      `json:"author,omitempty"`
+	Summary   string      `json:"summary,omitempty"`
 	Downloads int64       `json:"downloads,omitempty"`
 	Providers []searchHit `json:"providers"`
 }
@@ -66,7 +68,7 @@ func (a *app) searchCmd() *cobra.Command {
 				return a.browseSearch(cmd, typ, names, limit)
 			}
 			query := strings.Join(args, " ")
-			reply, err := a.search(cmd.Context(), query, typ, names, limit, true, true)
+			reply, err := a.search(cmd.Context(), query, typ, names, limit, true, a.searchMerge(a.searchProject()))
 			if err != nil {
 				return err
 			}
@@ -91,9 +93,8 @@ type searchReply struct {
 
 // search asks each provider in names. A provider that fails becomes a warning and is left out;
 // the search fails only when none answered. steps puts each provider's search on its own step
-// line, which the live search can't have drawing under its form. merge folds each listing found on
-// several providers into one row; without it, each provider's hit is a row of its own.
-func (a *app) search(ctx context.Context, query, kind string, names []string, limit int, steps, merge bool) (searchReply, error) {
+// line, which the live search can't have drawing under its form. merge makes the hits into rows.
+func (a *app) search(ctx context.Context, query, kind string, names []string, limit int, steps bool, merge func([]provider.Hit) []provider.Result) (searchReply, error) {
 	d, err := a.deps()
 	if err != nil {
 		return searchReply{}, err
@@ -111,15 +112,7 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 	}
 	hits, searched, skipped, failures := d.Providers.Search(ctx, names, query, kind, limit, step)
 	reply := searchReply{results: searchResults{Query: query, Results: []searchResult{}}, searched: searched}
-	var rows []provider.Result
-	if merge {
-		rows = provider.Merge(hits, a.searchPairs())
-	} else {
-		for _, hit := range hits {
-			rows = append(rows, provider.Result{Hits: []provider.Hit{hit}})
-		}
-	}
-	for _, r := range rows {
+	for _, r := range merge(hits) {
 		reply.results.Results = append(reply.results.Results, searchResultOf(r))
 	}
 	if len(reply.searched) > 0 {
@@ -137,14 +130,35 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 	return reply, resolve.NoneAvailable("no provider is available", skipped)
 }
 
-// searchPairs pairs the hits the current project's lock holds as one mod's aliases. Search works
-// outside a project, and in one whose lock can't be read, with no pairs.
-func (a *app) searchPairs() func(x, y provider.Hit) bool {
+// searchProject is the project a search runs in, or nil: search works outside a project, and in
+// one that can't be read.
+func (a *app) searchProject() *project.Project {
 	p, err := a.openProject()
-	if err != nil || p.Lock == nil {
+	if err != nil {
 		return nil
 	}
-	return func(x, y provider.Hit) bool { return p.Lock.Aliased(x.Provider, x.ID, y.Provider, y.ID) }
+	return p
+}
+
+// searchMerge folds each listing found on several providers into one row, pairing too the hits
+// p's lock holds as one mod's aliases. It reads p once, so the live search can call it off the
+// drawing loop.
+func (a *app) searchMerge(p *project.Project) func([]provider.Hit) []provider.Result {
+	var pairs func(x, y provider.Hit) bool
+	if p != nil && p.Lock != nil {
+		l := p.Lock
+		pairs = func(x, y provider.Hit) bool { return l.Aliased(x.Provider, x.ID, y.Provider, y.ID) }
+	}
+	return func(hits []provider.Hit) []provider.Result { return provider.Merge(hits, pairs) }
+}
+
+// searchUnmerged is each provider's hit as a row of its own.
+func searchUnmerged(hits []provider.Hit) []provider.Result {
+	rows := make([]provider.Result, 0, len(hits))
+	for _, hit := range hits {
+		rows = append(rows, provider.Result{Hits: []provider.Hit{hit}})
+	}
+	return rows
 }
 
 func (a *app) printSearch(reply searchReply, verbose bool) error {
@@ -160,37 +174,28 @@ func (a *app) printSearch(reply searchReply, verbose bool) error {
 	})
 }
 
-// searchTable is a row per listing. Source names the providers it was found on, and goes when only
-// one was searched; verbose adds each provider's id and splits the downloads between them.
+// searchTable is a row per listing; verbose adds each provider's id and splits the downloads
+// between them.
 func (a *app) searchTable(l *out.Lines, reply searchReply, verbose bool) {
 	t := l.T
 	several := len(reply.searched) > 1
-	headers := []string{"Name", "Slug", "Type", "Side"}
-	styles := []lipgloss.Style{t.StyleBold(), t.Style(), t.StyleGrey(), t.Style()}
-	if several {
-		headers = append(headers, "Source")
-		styles = append(styles, t.StyleGrey())
-	}
+	headers, styles := searchColumns(t, several)
 	if verbose {
+		headers, styles = headers[:len(headers)-1], styles[:len(styles)-1]
 		for _, name := range reply.searched {
-			title := a.titles().Title(name)
+			title := a.titles().Title(name) + " "
 			if !several {
 				title = ""
 			}
-			headers = append(headers, strings.TrimSpace(title+" ID"), strings.TrimSpace(title+" Downloads"))
+			headers = append(headers, title+"ID", title+"Downloads")
 			styles = append(styles, t.StyleGrey(), t.Style())
 		}
-	} else {
-		headers = append(headers, "Downloads")
-		styles = append(styles, t.Style())
 	}
 	var rows [][]string
 	for _, r := range reply.results.Results {
-		row := []string{r.Title, r.Slug, r.Type, r.Side}
-		if several {
-			row = append(row, a.searchSource(r))
-		}
+		row := searchRow(a.titles(), r, several)
 		if verbose {
+			row = row[:len(row)-1]
 			for _, name := range reply.searched {
 				id, downloads := "", ""
 				if i := slices.IndexFunc(r.Providers, func(h searchHit) bool { return h.Provider == name }); i >= 0 {
@@ -198,19 +203,34 @@ func (a *app) searchTable(l *out.Lines, reply searchReply, verbose bool) {
 				}
 				row = append(row, id, downloads)
 			}
-		} else {
-			row = append(row, downloadCount(r.Downloads))
 		}
 		rows = append(rows, row)
 	}
 	l.Table(headers, rows, out.Columns(styles...))
 }
 
-func (a *app) searchSource(r searchResult) string {
-	if len(r.Providers) > 1 {
-		return "both"
+// searchColumns are a search table's headers and styles, the static one's and the live one's
+// alike. Source names the providers a row was found on, so it goes when only one was searched.
+func searchColumns(t out.Theme, several bool) ([]string, []lipgloss.Style) {
+	headers := []string{"Name", "Slug", "Type", "Side"}
+	styles := []lipgloss.Style{t.StyleBold(), t.Style(), t.StyleGrey(), t.Style()}
+	if several {
+		headers = append(headers, "Source")
+		styles = append(styles, t.StyleGrey())
 	}
-	return a.titles().Title(r.Providers[0].Provider)
+	return append(headers, "Downloads"), append(styles, t.Style())
+}
+
+func searchRow(titles provider.Providers, r searchResult, several bool) []string {
+	row := []string{r.Title, r.Slug, r.Type, r.Side}
+	if several {
+		source := "both"
+		if len(r.Providers) == 1 {
+			source = titles.Title(r.Providers[0].Provider)
+		}
+		row = append(row, source)
+	}
+	return append(row, downloadCount(r.Downloads))
 }
 
 func noSearchMatches(reply searchReply) string {
@@ -219,7 +239,7 @@ func noSearchMatches(reply searchReply) string {
 
 func searchResultOf(r provider.Result) searchResult {
 	res := searchResult{
-		Slug: r.Slug(), Title: r.Title(), Type: r.Type(), Side: r.Side(), Author: r.Author(),
+		Slug: r.Slug(), Title: r.Title(), Type: r.Type(), Side: r.Side(), Author: r.Author(), Summary: r.Summary(),
 		Downloads: r.Downloads(), Providers: []searchHit{},
 	}
 	for _, h := range r.Hits {

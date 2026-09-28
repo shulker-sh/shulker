@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"context"
 	"errors"
+	"io"
+	"shulker.sh/shulker/internal/manifest"
 	"slices"
 	"strings"
 	"testing"
@@ -99,8 +102,8 @@ func TestLiveSearchDropsASupersededReply(t *testing.T) {
 	f.duringFetch["sodiumx"] = func() { f.s.SetQuery("sodiumxy") }
 	f.s.SetQuery("sodiumx")
 	f.s.Rows()
-	if reply, ok := f.s.last(); !ok || reply.results.Query != "sodium" {
-		t.Errorf("last %+v %v, want the sodium reply kept over the one typed past", reply, ok)
+	if shown := shownQuery(f.s); shown != "sodium" {
+		t.Errorf("shown %q, want the sodium reply kept over the one typed past", shown)
 	}
 }
 
@@ -114,8 +117,8 @@ func TestLiveSearchCachesEachQuery(t *testing.T) {
 	if !slices.Equal(f.fetched, []string{"sod", "sodium"}) {
 		t.Errorf("fetched %v, want each query once", f.fetched)
 	}
-	if reply, _ := f.s.last(); reply.results.Query != "sod" {
-		t.Errorf("last %q after backspacing to sod", reply.results.Query)
+	if shown := shownQuery(f.s); shown != "sod" {
+		t.Errorf("shown %q after backspacing to sod", shown)
 	}
 }
 
@@ -131,8 +134,8 @@ func TestLiveSearchKeepsTheLastGoodResultsOnFailure(t *testing.T) {
 	if status := f.s.Status(); !strings.Contains(status, "curseforge search sodiumx: 503") {
 		t.Errorf("status %q, want the failure", status)
 	}
-	if reply, _ := f.s.last(); reply.results.Query != "sodium" {
-		t.Errorf("last %q", reply.results.Query)
+	if shown := shownQuery(f.s); shown != "sodium" {
+		t.Errorf("shown %q", shown)
 	}
 	f.fail["sodiumx"] = false
 	f.s.SetQuery("sodium")
@@ -155,7 +158,61 @@ func TestLiveSearchForgetsResultsWhenTheQueryIsCleared(t *testing.T) {
 	f.s.SetQuery("sodium")
 	f.s.Rows()
 	f.s.SetQuery("")
-	if _, ok := f.s.last(); ok {
-		t.Error("a cleared query still has results to print")
+	if shown := shownQuery(f.s); shown != "" {
+		t.Errorf("a cleared query still shows %q", shown)
+	}
+}
+
+// shownQuery is the query whose results are on screen, or "" for none.
+func shownQuery(l *liveSearch) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.shown == nil {
+		return ""
+	}
+	return l.shown.query
+}
+
+func TestSearchRowsAreTheStaticTablesRows(t *testing.T) {
+	f := newFakeSearches()
+	f.s.SetQuery("sodium")
+	answer := searchRows{f.s, true}.Rows()
+	if answer.Query != "sodium" || answer.Status != "1 result" || len(answer.Rows) != 1 {
+		t.Fatalf("answer %+v", answer)
+	}
+	if row := answer.Rows[0]; row.Value != "modrinth:id-sodium" || !slices.Equal(row.Cells, []string{"Title sodium", "sodium", "", "", "modrinth", ""}) {
+		t.Errorf("row %+v", row)
+	}
+	f.s.SetQuery("s")
+	if answer := (searchRows{f.s, true}).Rows(); len(answer.Rows) != 0 || !strings.Contains(answer.Status, "two") {
+		t.Errorf("too short: %+v", answer)
+	}
+}
+
+func TestSearchDetailsSayWhetherAVersionFits(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	a := h.newApp(io.Discard, io.Discard)
+	ctx := context.Background()
+	reply, err := a.search(ctx, "sodium", "", manifest.DefaultProviders, 10, false, a.searchMerge(nil))
+	if err != nil || len(reply.results.Results) != 1 {
+		t.Fatalf("search: %v %+v", err, reply)
+	}
+	r := reply.results.Results[0]
+	p, err := a.openProject()
+	if err != nil {
+		t.Fatal(err)
+	}
+	details := a.searchDetails(ctx, p, r, 100)
+	for _, want := range []string{
+		"Sodium", "mod • client only", "Modrinth", "AANobbMI", "https://modrinth.com/mod/sodium", "228.1M downloads",
+		"CurseForge", "394468", "Has a version for Minecraft 26.2 with Fabric",
+	} {
+		if !strings.Contains(details, want) {
+			t.Errorf("missing %q in:\n%s", want, details)
+		}
+	}
+	if details := a.searchDetails(ctx, nil, r, 100); strings.Contains(details, "version for") {
+		t.Errorf("outside a project:\n%s", details)
 	}
 }
