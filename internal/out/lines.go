@@ -317,11 +317,14 @@ func (l *Lines) Table(headers []string, rows [][]string, style func(row, col int
 			shortened[i][col] = Tilde(cell)
 		}
 	}
-	rows = shortened
-	rendered := render(rows)
-	if excess := lipgloss.Width(rendered) - (TerminalWidth(l.W) - len(gutter)); excess > 0 {
-		rendered = render(fold(headers, rows, excess))
+	if widths, cut := fitColumns(headers, shortened, TerminalWidth(l.W)-len(gutter), -1); cut >= 0 {
+		for _, row := range shortened {
+			if cut < len(row) {
+				row[cut] = ansi.Wrap(row[cut], widths[cut], "/-")
+			}
+		}
 	}
+	rendered := render(shortened)
 	for line := range strings.SplitSeq(rendered, "\n") {
 		l.line(strings.TrimRight(line, " "))
 	}
@@ -333,31 +336,40 @@ func Columns(styles ...lipgloss.Style) func(row, col int) lipgloss.Style {
 	return func(_, col int) lipgloss.Style { return styles[min(col, len(styles)-1)] }
 }
 
-// fold wraps the cells of the widest column to take up the excess, down to that column's floor.
-func fold(headers []string, rows [][]string, excess int) [][]string {
+// fitColumns is each column's width, its header included, fitted into room with two spaces
+// between columns. When they are wider, one column gives up the excess, down to tableFloor or its
+// header: cut, or the widest when cut is -1. It returns the column cut, or -1 when all fit.
+func fitColumns(headers []string, rows [][]string, room, cut int) ([]int, int) {
 	widths := make([]int, len(headers))
+	cells := make([]int, len(headers))
+	for col, header := range headers {
+		widths[col] = Width(header)
+	}
 	for _, row := range rows {
 		for col, cell := range row {
 			if col < len(widths) {
-				widths[col] = max(widths[col], lipgloss.Width(cell))
+				cells[col] = max(cells[col], Width(cell))
+				widths[col] = max(widths[col], cells[col])
 			}
 		}
 	}
-	widest := 0
-	for col, w := range widths {
-		if w > widths[widest] {
-			widest = col
+	total := 2 * (len(widths) - 1)
+	for _, w := range widths {
+		total += w
+	}
+	if total <= room {
+		return widths, -1
+	}
+	if cut < 0 {
+		cut = 0
+		for col, w := range cells {
+			if w > cells[cut] {
+				cut = col
+			}
 		}
 	}
-	limit := max(widths[widest]-excess, tableFloor, lipgloss.Width(headers[widest]))
-	folded := make([][]string, len(rows))
-	for i, row := range rows {
-		folded[i] = slices.Clone(row)
-		if widest < len(row) {
-			folded[i][widest] = ansi.Wrap(row[widest], limit, "/-")
-		}
-	}
-	return folded
+	widths[cut] = max(cells[cut]-(total-room), tableFloor, Width(headers[cut]))
+	return widths, cut
 }
 
 // Nudge is a grey lead-in ending in a colon, then the command to run.
