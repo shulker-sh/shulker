@@ -121,10 +121,11 @@ type Downloads struct {
 	Watch *[]string `json:"watch,omitempty"`
 }
 
-// Watched is every folder to watch, with a leading ~ read as home.
+// Watched is every folder to watch, with a leading ~ read as home. Unset, it is the OS's Downloads
+// folder.
 func (d Downloads) Watched(home string) []string {
 	if d.Watch == nil {
-		return []string{filepath.Join(home, "Downloads")}
+		return []string{osDownloads(home, runtime.GOOS, os.Getenv("XDG_CONFIG_HOME"))}
 	}
 	dirs := make([]string, 0, len(*d.Watch))
 	for _, dir := range *d.Watch {
@@ -134,6 +135,36 @@ func (d Downloads) Watched(home string) []string {
 		dirs = append(dirs, dir)
 	}
 	return dirs
+}
+
+// osDownloads is the user's Downloads folder: the one xdg-user-dirs names on Linux, where it is
+// renamed with the desktop's language, and ~/Downloads everywhere else.
+func osDownloads(home, goos, xdgConfig string) string {
+	fallback := filepath.Join(home, "Downloads")
+	if goos != "linux" {
+		return fallback
+	}
+	if xdgConfig == "" {
+		xdgConfig = filepath.Join(home, ".config")
+	}
+	data, err := os.ReadFile(filepath.Join(xdgConfig, "user-dirs.dirs"))
+	if err != nil {
+		return fallback
+	}
+	for line := range strings.Lines(string(data)) {
+		value, ok := strings.CutPrefix(strings.TrimSpace(line), "XDG_DOWNLOAD_DIR=")
+		if !ok {
+			continue
+		}
+		value = strings.Trim(value, `"`)
+		if rest, ok := strings.CutPrefix(value, "$HOME"); ok {
+			return home + rest
+		}
+		if filepath.IsAbs(value) {
+			return value
+		}
+	}
+	return fallback
 }
 
 type CurseForge struct {

@@ -296,3 +296,23 @@ func TestDownloadsWatchedReadsTildeAsHome(t *testing.T) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
+
+func TestOSDownloadsReadsLinuxUserDirs(t *testing.T) {
+	home := t.TempDir()
+	if got := osDownloads(home, "linux", ""); got != filepath.Join(home, "Downloads") {
+		t.Fatalf("with no user-dirs.dirs, linux falls back to ~/Downloads: %s", got)
+	}
+	os.MkdirAll(filepath.Join(home, ".config"), 0o755)
+	os.WriteFile(filepath.Join(home, ".config", "user-dirs.dirs"), []byte("# written by xdg-user-dirs-update\nXDG_DESKTOP_DIR=\"$HOME/Desktop\"\nXDG_DOWNLOAD_DIR=\"$HOME/Téléchargements\"\n"), 0o644)
+	if got := osDownloads(home, "linux", ""); got != filepath.Join(home, "Téléchargements") {
+		t.Fatalf("user-dirs.dirs names it: %s", got)
+	}
+	xdg := t.TempDir()
+	os.WriteFile(filepath.Join(xdg, "user-dirs.dirs"), []byte("XDG_DOWNLOAD_DIR=\"/srv/dl\"\n"), 0o644)
+	if got := osDownloads(home, "linux", xdg); got != "/srv/dl" {
+		t.Fatalf("XDG_CONFIG_HOME's file wins, and an absolute path stands: %s", got)
+	}
+	if got := osDownloads(home, "darwin", ""); got != filepath.Join(home, "Downloads") {
+		t.Fatalf("elsewhere it is ~/Downloads: %s", got)
+	}
+}
