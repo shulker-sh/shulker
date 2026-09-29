@@ -250,3 +250,29 @@ func TestConvertNamesShaderModsByIntegration(t *testing.T) {
 		}
 	}
 }
+
+func TestFiledAsksVersionFilesOnceBySha512(t *testing.T) {
+	var paths []string
+	var body struct {
+		Hashes    []string `json:"hashes"`
+		Algorithm string   `json:"algorithm"`
+	}
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		json.NewDecoder(r.Body).Decode(&body)
+		w.Write([]byte(`{"aaa":{"id":"v1","project_id":"p1","files":[]}}`))
+	}))
+	defer srv.Close()
+	m := New(fetch.New("test"))
+	m.BaseURL = srv.URL
+	found, unchecked, err := m.Filed(context.Background(), map[string]provider.LockedFile{"sodium": {Sha512: "aaa"}, "gone": {Sha512: "bbb"}, "pending": {}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(paths, []string{"POST /version_files"}) || body.Algorithm != "sha512" || !slices.Equal(body.Hashes, []string{"aaa", "bbb"}) {
+		t.Fatalf("requests %v, body %+v", paths, body)
+	}
+	if len(found) != 1 || found["sodium"] != (provider.Filing{Project: "p1", Version: "v1"}) || !slices.Equal(unchecked, []string{"pending"}) {
+		t.Fatalf("found %+v, unchecked %v", found, unchecked)
+	}
+}

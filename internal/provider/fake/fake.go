@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 
@@ -37,6 +38,11 @@ type Provider struct {
 	UnhashedTypes []string
 	// Requests counts the lookups made, by method name.
 	Requests map[string]int
+	// ByContent says the provider indexes files by their bytes, as CurseForge does, so Filed
+	// needs each file's bytes.
+	ByContent bool
+	// FiledErr, when set, is what Filed fails with, as a provider that can't be reached does.
+	FiledErr error
 }
 
 func New(name string) *Provider {
@@ -190,6 +196,34 @@ func (p *Provider) identifySHA1(sha1s map[string]string) map[string]provider.Hos
 		}
 	}
 	return found
+}
+
+// Filed finds each file by its sha512, or, on a provider that indexes content, by the sha1 of its
+// bytes at Path, leaving it unchecked when there are none.
+func (p *Provider) Filed(_ context.Context, files map[string]provider.LockedFile) (map[string]provider.Filing, []string, error) {
+	p.Requests["Filed"]++
+	if p.FiledErr != nil {
+		return nil, nil, p.FiledErr
+	}
+	found := map[string]provider.Filing{}
+	var unchecked []string
+	for _, key := range slices.Sorted(maps.Keys(files)) {
+		f := files[key]
+		matches := func(v provider.Version) bool { return f.Sha512 != "" && v.File.Sha512 == f.Sha512 }
+		if p.ByContent {
+			data, err := os.ReadFile(f.Path)
+			if f.Path == "" || err != nil {
+				unchecked = append(unchecked, key)
+				continue
+			}
+			sum := sha1.Sum(data)
+			matches = func(v provider.Version) bool { return v.File.Sha1 == hex.EncodeToString(sum[:]) }
+		}
+		if i := slices.IndexFunc(p.Files, matches); i >= 0 {
+			found[key] = provider.Filing{Project: p.Files[i].ProjectID, Version: p.Files[i].ID}
+		}
+	}
+	return found, unchecked, nil
 }
 
 func (p *Provider) host() string { return p.name + ".test" }

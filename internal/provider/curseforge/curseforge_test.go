@@ -449,3 +449,33 @@ func TestAModpackFileTaggedWithNoLoaderIsListed(t *testing.T) {
 		t.Fatalf("RLCraft 2.9.3 is tagged 1.12.2 alone and still the newest release: %+v", newest)
 	}
 }
+
+func TestFiledFingerprintsTheCachedFilesInOneRequest(t *testing.T) {
+	var paths []string
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		w.Write([]byte(`{"data":{"exactMatches":[{"file":{"id":100,"modId":10,"fileFingerprint":3817166195}}]}}`))
+	}))
+	defer srv.Close()
+	c := New(fetch.New("test"), "key")
+	c.BaseURL = srv.URL
+	dir := t.TempDir()
+	jei, other := filepath.Join(dir, "jei"), filepath.Join(dir, "other")
+	os.WriteFile(jei, []byte("shulker"), 0o644)
+	os.WriteFile(other, []byte("other"), 0o644)
+	found, unchecked, err := c.Filed(context.Background(), map[string]provider.LockedFile{
+		"jei":      {Type: "mod", Path: jei},
+		"other":    {Type: "mod", Path: other},
+		"uncached": {Type: "mod"},
+		"pack":     {Type: "modpack", Path: jei},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(paths, []string{"POST /fingerprints"}) {
+		t.Fatalf("requests: %v", paths)
+	}
+	if len(found) != 1 || found["jei"] != (provider.Filing{Project: "10", Version: "100"}) || !slices.Equal(unchecked, []string{"pack", "uncached"}) {
+		t.Fatalf("found %+v, unchecked %v", found, unchecked)
+	}
+}

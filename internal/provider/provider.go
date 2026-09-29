@@ -81,6 +81,20 @@ type Hosted struct {
 	Version Version
 }
 
+// LockedFile is a file a lock holds from a provider: its project type, its sha512, and the path
+// of its bytes when the cache has them, for a provider that indexes files by their content.
+type LockedFile struct {
+	Type   string
+	Sha512 string
+	Path   string
+}
+
+// Filing is where a provider files a file: its project and version ids.
+type Filing struct {
+	Project string
+	Version string
+}
+
 // Ref is what a provider URL names: a project, by slug or id, and one of its versions when the
 // URL points at one. Provider is filled by Providers.ParseURL.
 type Ref struct {
@@ -145,6 +159,10 @@ type Provider interface {
 	// IdentifySHA1 is Identify for files known by sha1 alone, keyed as given. A provider that
 	// doesn't index files by sha1 finds none.
 	IdentifySHA1(ctx context.Context, sha1s map[string]string) (map[string]Hosted, error)
+	// Filed finds, in one request, where the provider files each of these files, keyed as given.
+	// A file it no longer has is left out, and one it can't look up from what is given, such as
+	// a file it indexes by content whose bytes aren't at hand, is in unchecked.
+	Filed(ctx context.Context, files map[string]LockedFile) (found map[string]Filing, unchecked []string, err error)
 
 	// ParseURL reads what a URL on the provider's own hosts names. It is ErrNotHosted for a URL
 	// on another host, and a usage error for a shape on its hosts it doesn't read.

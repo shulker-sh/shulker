@@ -475,6 +475,44 @@ func (c *CurseForge) Identify(ctx context.Context, files map[string][]byte) (map
 	return found, nil
 }
 
+// Filed fingerprints each file the cache holds and looks them all up in one request. A modpack is
+// unchecked, since CurseForge's fingerprints leave modpacks out, as is a file whose bytes aren't
+// at hand.
+func (c *CurseForge) Filed(ctx context.Context, files map[string]provider.LockedFile) (map[string]provider.Filing, []string, error) {
+	found := map[string]provider.Filing{}
+	prints := map[string]uint32{}
+	var all []uint32
+	var unchecked []string
+	for _, key := range slices.Sorted(maps.Keys(files)) {
+		f := files[key]
+		if f.Type == manifest.TypeModpack || f.Path == "" {
+			unchecked = append(unchecked, key)
+			continue
+		}
+		data, err := os.ReadFile(f.Path)
+		if err != nil {
+			unchecked = append(unchecked, key)
+			continue
+		}
+		prints[key] = Fingerprint(data)
+		all = append(all, prints[key])
+	}
+	if len(all) == 0 {
+		return found, unchecked, nil
+	}
+	slices.Sort(all)
+	matches, err := c.matchFingerprints(ctx, slices.Compact(all))
+	if err != nil {
+		return nil, nil, err
+	}
+	for key, print := range prints {
+		if m, ok := matches[print]; ok {
+			found[key] = provider.Filing{Project: strconv.Itoa(m.ModID), Version: strconv.Itoa(m.FileID)}
+		}
+	}
+	return found, unchecked, nil
+}
+
 // IdentifySHA1 finds nothing: CurseForge indexes files by its own fingerprint, not by sha1.
 func (c *CurseForge) IdentifySHA1(context.Context, map[string]string) (map[string]provider.Hosted, error) {
 	return map[string]provider.Hosted{}, nil

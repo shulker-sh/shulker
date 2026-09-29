@@ -328,6 +328,35 @@ func (m *Modrinth) IdentifySHA1(ctx context.Context, sha1s map[string]string) (m
 	return found, nil
 }
 
+// Filed asks version_files for every file by its sha512, in one request.
+func (m *Modrinth) Filed(ctx context.Context, files map[string]provider.LockedFile) (map[string]provider.Filing, []string, error) {
+	found := map[string]provider.Filing{}
+	var hashes, unchecked []string
+	for _, key := range slices.Sorted(maps.Keys(files)) {
+		if sum := files[key].Sha512; sum != "" {
+			hashes = append(hashes, sum)
+		} else {
+			unchecked = append(unchecked, key)
+		}
+	}
+	if len(hashes) == 0 {
+		return found, unchecked, nil
+	}
+	slices.Sort(hashes)
+	raw := map[string]version{}
+	if err := m.call(ctx, func() error {
+		return m.Client.PostJSON(ctx, m.BaseURL+"/version_files", map[string]any{"hashes": slices.Compact(hashes), "algorithm": "sha512"}, &raw)
+	}); err != nil {
+		return nil, nil, fmt.Errorf("modrinth version_files: %w", err)
+	}
+	for key, f := range files {
+		if v, ok := raw[f.Sha512]; ok && f.Sha512 != "" {
+			found[key] = provider.Filing{Project: v.ProjectID, Version: v.ID}
+		}
+	}
+	return found, unchecked, nil
+}
+
 // versionsByHash finds the versions whose files have these sha1s, in one request. A hash Modrinth
 // doesn't know is left out.
 func (m *Modrinth) versionsByHash(ctx context.Context, sha1s []string) (map[string]provider.Version, error) {
