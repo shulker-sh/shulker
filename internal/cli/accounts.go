@@ -4,7 +4,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
@@ -97,7 +97,7 @@ func writeAccounts(l *out.Lines, groups []accountGroup, cfg config.Config) {
 	styles := []lipgloss.Style{t.StyleBold(), t.StyleGrey()}
 	if marks {
 		headers = append([]string{""}, headers...)
-		styles = append([]lipgloss.Style{t.StyleGreen().Bold(true)}, styles...)
+		styles = append([]lipgloss.Style{t.StyleGreen().Inherit(t.StyleBold())}, styles...)
 	}
 	if launchers {
 		headers = append(headers, "Launcher")

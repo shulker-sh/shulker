@@ -3,7 +3,7 @@ package cli
 import (
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/config"
@@ -96,9 +96,9 @@ func printInstanceEntries(l *out.Lines, entries []project.InstanceEntry, verbose
 		switch {
 		case col == 0:
 			if e.Status == project.StatusSynced && e.LastError == "" && e.LaunchError == "" {
-				return t.StyleGreen().Bold(true)
+				return t.StyleGreen().Inherit(t.StyleBold())
 			}
-			return t.StyleYellow().Bold(true)
+			return t.StyleYellow().Inherit(t.StyleBold())
 		case col == 1:
 			return t.StyleBold()
 		case col == 2 || col > 4:

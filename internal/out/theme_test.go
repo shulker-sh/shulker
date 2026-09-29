@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 var sgrSeq = regexp.MustCompile(`\x1b\[[0-9;]*m`)
@@ -229,7 +229,7 @@ func TestTableRulesUnderGreyHeadersAndPadsCells(t *testing.T) {
 	coloured := render(coloured(), func(l *Lines) {
 		l.Table([]string{"Name", "Note", "More"}, [][]string{{"x", "y", "z"}}, Columns(l.T.StyleBold(), l.T.StyleGrey()))
 	})
-	if !strings.HasPrefix(coloured[0], "  \x1b[38;5;248mName") || !strings.Contains(coloured[2], "\x1b[1mx\x1b[0m") || strings.Count(coloured[2], "\x1b[38;5;248m") != 2 {
+	if !strings.HasPrefix(coloured[0], "  \x1b[38;5;248mName") || !strings.Contains(coloured[2], "\x1b[1mx\x1b[m") || strings.Count(coloured[2], "\x1b[38;5;248m") != 2 {
 		t.Fatalf("coloured table, columns past the list taking the last style: %q", coloured)
 	}
 }

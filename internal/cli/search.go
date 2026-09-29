@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/lock"

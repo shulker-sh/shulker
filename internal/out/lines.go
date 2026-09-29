@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
-	"github.com/charmbracelet/lipgloss/tree"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
+	"charm.land/lipgloss/v2/tree"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -252,7 +252,8 @@ func (l *Lines) Tree(rows ...Row) {
 		return
 	}
 	t := l.T
-	root := tree.New().Enumerator(t.enumerator).Indenter(t.indenter).EnumeratorStyle(t.Style().Foreground(t.lipglossGrey()).PaddingLeft(2).PaddingRight(1))
+	branch := t.StyleGrey().PaddingLeft(2).PaddingRight(1)
+	root := tree.New().Enumerator(t.enumerator).Indenter(t.indenter).EnumeratorStyle(branch).IndenterStyle(branch)
 	for _, row := range rows {
 		node := tree.Root(l.rowText(row))
 		for _, child := range row.Children {
@@ -303,7 +304,7 @@ const tableFloor = 12
 // column wraps no narrower than tableFloor or its header, and past that the table overflows.
 func (l *Lines) Table(headers []string, rows [][]string, style func(row, col int) lipgloss.Style) {
 	t := l.T
-	grey := t.Style().Foreground(t.lipglossGrey())
+	grey := t.StyleGrey()
 	cells := func(row, col int) lipgloss.Style {
 		cell := grey
 		if row != table.HeaderRow {

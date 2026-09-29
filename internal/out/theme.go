@@ -1,6 +1,7 @@
 package out
 
 import (
+	"image/color"
 	"io"
 	"net/url"
 	"os"
@@ -8,11 +9,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 	"golang.org/x/term"
 )
 
@@ -200,45 +200,41 @@ func (t Theme) ArrowInto() string       { return t.glyph("»", ">>") }
 func (t Theme) ArrowPick() string       { return t.glyph("‣", "*") }
 func (t Theme) Ellipsis() string        { return t.glyph("…", "...") }
 
-var (
-	colourRenderer = sync.OnceValue(func() *lipgloss.Renderer { return renderer(termenv.ANSI256) })
-	plainRenderer  = sync.OnceValue(func() *lipgloss.Renderer { return renderer(termenv.Ascii) })
-)
+// Style is the blank lipgloss style a charm surface builds on. A lipgloss style renders its paint
+// whatever the stream, so the colour roles below set none without colour, and a surface that paints
+// a style itself writes through Profile.
+func (t Theme) Style() lipgloss.Style { return lipgloss.NewStyle() }
 
-func renderer(profile termenv.Profile) *lipgloss.Renderer {
-	r := lipgloss.NewRenderer(io.Discard)
-	r.SetColorProfile(profile)
-	return r
-}
-
-// Style is the blank lipgloss style a charm surface builds on. lipgloss detects colour from
-// stdout on its own, so its styles are bound to a renderer with the theme's own profile instead:
-// a bar on stderr follows the theme's decision the way every hand-painted line does.
-func (t Theme) Style() lipgloss.Style {
+// Profile is the colour profile a charm surface is downsampled to where it is written: ASCII keeps
+// the cursor moves a live line makes and drops the paint.
+func (t Theme) Profile() colorprofile.Profile {
 	if t.HasColor {
-		return colourRenderer().NewStyle()
+		return colorprofile.ANSI256
 	}
-	return plainRenderer().NewStyle()
+	return colorprofile.ASCII
 }
 
-// Profile is the termenv profile for a charm surface that paints with termenv directly.
-func (t Theme) Profile() termenv.Profile {
-	if t.HasColor {
-		return termenv.ANSI256
+func (t Theme) foreground(c color.Color) lipgloss.Style {
+	if !t.HasColor {
+		return t.Style()
 	}
-	return termenv.Ascii
+	return t.Style().Foreground(c)
 }
-
-func (t Theme) lipglossGrey() lipgloss.Color { return lipgloss.Color(strconv.Itoa(t.GreyIndex)) }
 
 // The colour roles as lipgloss styles, for the cells of a Table: the same paint Bold, Grey, Cyan,
-// Green, Yellow and Red give a string.
-func (t Theme) StyleBold() lipgloss.Style   { return t.Style().Bold(true) }
-func (t Theme) StyleGrey() lipgloss.Style   { return t.Style().Foreground(t.lipglossGrey()) }
-func (t Theme) StyleCyan() lipgloss.Style   { return t.Style().Foreground(lipgloss.Color("6")) }
-func (t Theme) StyleGreen() lipgloss.Style  { return t.Style().Foreground(lipgloss.Color("2")) }
-func (t Theme) StyleYellow() lipgloss.Style { return t.Style().Foreground(lipgloss.Color("3")) }
-func (t Theme) StyleRed() lipgloss.Style    { return t.Style().Foreground(lipgloss.Color("1")) }
+// Green, Yellow, Red and Command give a string.
+func (t Theme) StyleBold() lipgloss.Style {
+	if !t.HasColor {
+		return t.Style()
+	}
+	return t.Style().Bold(true)
+}
+func (t Theme) StyleGrey() lipgloss.Style    { return t.foreground(lipgloss.ANSIColor(t.GreyIndex)) }
+func (t Theme) StyleCyan() lipgloss.Style    { return t.foreground(lipgloss.Cyan) }
+func (t Theme) StyleGreen() lipgloss.Style   { return t.foreground(lipgloss.Green) }
+func (t Theme) StyleYellow() lipgloss.Style  { return t.foreground(lipgloss.Yellow) }
+func (t Theme) StyleRed() lipgloss.Style     { return t.foreground(lipgloss.Red) }
+func (t Theme) StyleCommand() lipgloss.Style { return t.StyleCyan().Inherit(t.StyleBold()) }
 
 // Link wraps text in an OSC 8 file:// hyperlink when the terminal follows them.
 func (t Theme) Link(text, path string) string {
