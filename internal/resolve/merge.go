@@ -52,7 +52,7 @@ func (m *Merged) Undo() {
 	for _, path := range slices.Backward(m.Created) {
 		os.RemoveAll(path)
 	}
-	for _, f := range m.replaced {
+	for _, f := range slices.Backward(m.replaced) {
 		fsutil.Write(f.path, f.data)
 	}
 }

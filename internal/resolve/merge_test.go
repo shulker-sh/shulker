@@ -112,3 +112,19 @@ func TestMergeMovesADependencyToThePacksKeyForAReplacedEntry(t *testing.T) {
 		t.Fatalf("lib is now required by the pack's key: %q", got)
 	}
 }
+
+func TestUndoPutsBackWhatAFileHeldBeforeTheFirstReplace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "options.txt")
+	os.WriteFile(path, []byte("yours"), 0o644)
+	rep := &Merged{}
+	if err := rep.replace(path, []byte("first")); err != nil {
+		t.Fatal(err)
+	}
+	if err := rep.replace(path, []byte("second")); err != nil {
+		t.Fatal(err)
+	}
+	rep.Undo()
+	if got, _ := os.ReadFile(path); string(got) != "yours" {
+		t.Fatalf("undo left %q", got)
+	}
+}
