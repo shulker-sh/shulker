@@ -4,6 +4,7 @@ package build
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -35,6 +36,7 @@ import (
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/internal/server"
+	"shulker.sh/shulker/internal/takedown"
 	"shulker.sh/shulker/internal/version/minecraft"
 )
 
@@ -95,6 +97,9 @@ type Report struct {
 	// CacheChanged names the files whose cached copy no longer matched its hash and was fetched
 	// again.
 	CacheChanged []string `json:"-"`
+	// Takedowns are the files the directory's last takedown check found gone from their provider
+	// or filed under another project, that the lock still holds.
+	Takedowns []takedown.File `json:"-"`
 	// State is why the directory's state file was read as empty, warned apart from Warnings since
 	// its fix is a command.
 	State   *instance.StateError `json:"-"`
@@ -105,15 +110,18 @@ type Report struct {
 }
 
 // SecurityWarnings are the warnings about what the build's protections caught, apart from Warnings
-// since each ends with security.Nudge.
-func (r *Report) SecurityWarnings() []string {
-	var warnings []string
+// since each ends with security.Nudge. usedBy names the instances a takedown warning lists.
+func (r *Report) SecurityWarnings(ps provider.Providers, usedBy UsedBy) []out.SecurityWarning {
+	var warnings []out.SecurityWarning
 	switch len(r.CacheChanged) {
 	case 0:
 	case 1:
-		warnings = append(warnings, fmt.Sprintf("The cache held a changed copy of %s, so it was downloaded again.", r.CacheChanged[0]))
+		warnings = append(warnings, security.Warn(security.CacheHash, fmt.Sprintf("The cache held a changed copy of %s, so it was downloaded again.", r.CacheChanged[0]), nil))
 	default:
-		warnings = append(warnings, fmt.Sprintf("The cache held changed copies of %s, so they were downloaded again.", strings.Join(r.CacheChanged, ", ")))
+		warnings = append(warnings, security.Warn(security.CacheHash, fmt.Sprintf("The cache held changed copies of %s, so they were downloaded again.", strings.Join(r.CacheChanged, ", ")), nil))
+	}
+	if len(r.Takedowns) > 0 {
+		warnings = append(warnings, TakedownWarning(r.Takedowns, ps, usedBy))
 	}
 	return warnings
 }
@@ -142,6 +150,9 @@ type Options struct {
 	// KeepConflicts leaves a conflicting file as it is on disk and builds everything else, recording
 	// the file at its new source version so it counts as edited in place from then on.
 	KeepConflicts bool
+	// Takedowns is a takedown check just run for the directory, recorded in its state; nil keeps
+	// the last one.
+	Takedowns *instance.Takedowns
 }
 
 // Builder builds, diffs and exports one project from its manifest, lock and cached files.
@@ -387,7 +398,8 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	}
 	prev, stateErr := instance.ReadState(dir)
 	report.State = stateErr
-	next := instance.State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, LauncherImage: prev.LauncherImage, Packs: b.placedPackNames(desired)}
+	next := instance.State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, LauncherImage: prev.LauncherImage, Packs: b.placedPackNames(desired), Takedowns: cmp.Or(opts.Takedowns, prev.Takedowns)}
+	report.Takedowns = recordedTakedowns(next.Takedowns, b.Lock)
 	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
 		return nil, err

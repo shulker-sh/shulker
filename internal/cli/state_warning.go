@@ -7,11 +7,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"shulker.sh/shulker/internal/account"
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
-	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/schema"
 )
 
@@ -33,15 +33,31 @@ func (a *app) warnState(e *instance.StateError, force string) {
 
 // warnBuild is warnFor for a build's report, its state warning last so its nudge sits under the
 // warnings rather than between them.
-func (a *app) warnBuild(side string, several bool, warnings, securityWarnings []string, state *instance.StateError, force string) {
+func (a *app) warnBuild(side string, several bool, warnings []string, securityWarnings []out.SecurityWarning, state *instance.StateError, force string) {
 	if several {
 		defer a.scopeWarnings(side)()
 	}
 	a.warn(warnings)
 	for _, w := range securityWarnings {
-		a.printer.WarnSecurity(security.Warn(security.CacheHash, w, nil))
+		a.printer.WarnSecurity(w)
 	}
 	a.warnState(state, force)
+}
+
+// securityWarnings are rep's security warnings, a takedown's naming the registered instances that
+// use each file.
+func (a *app) securityWarnings(rep *build.Report) []out.SecurityWarning {
+	return rep.SecurityWarnings(a.titles(), func(sha512s []string) map[string][]string {
+		d, err := a.deps()
+		if err != nil {
+			return nil
+		}
+		entries, err := a.loadInstanceEntries()
+		if err != nil {
+			return nil
+		}
+		return build.InstancesUsing(d.Cache, entries, sha512s)
+	})
 }
 
 // forceCommand is the command that rebuilds dir with --force: p's own build for its build
