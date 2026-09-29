@@ -16,6 +16,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - A lock entry that names Modrinth or CurseForge has to download from that provider's own hosts: `build`, `install`, `sync` and a launch refuse one that doesn't as `provenance-mismatch`, and say who can fix it. For your own project that's `shulker lock <key>`; for a synced source, its author. A launch keeps its last good build and starts on it.
 
+- Shulker holds back Modrinth and CurseForge versions published in the last 7 days when it chooses one, so a hijacked mod's new release has time to be caught before it reaches you. `add`, `update`, `lock` and a floating modpack take the newest version old enough, and say which they held back, how old each is, the day it qualifies and the `shulker pin` that takes it now; `outdated` marks them too. A mod with nothing old enough fails `release-too-new`. A pin takes its version whatever its age, with a warning, and `sync` installs a source's lock as its author locked it, warning about each entry that young. `security.minReleaseAge` in `config.json` sets the days, and `0` turns it off. Under `--json`, every security warning is also typed in the new `securityWarnings`, with its protection and facts.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.
