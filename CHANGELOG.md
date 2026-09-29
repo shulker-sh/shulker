@@ -12,6 +12,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - `shulker security` explains how shulker keeps bad files off your machine: its stance, each protection and what it stops, and the settings that change them. Every security warning and error now ends by pointing at it, and under `--json` a security error names the protection that refused in `error.protection`.
 
+- `shulker lock <key>` looks an entry up again from its provider at the version it is locked at and rewrites the file the lock names for it, leaving every other entry alone. It puts right a lock whose file doesn't match its provider without moving it to a newer version the way `update` does.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.
