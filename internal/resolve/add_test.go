@@ -459,6 +459,21 @@ func TestANamedVersionIsLockedAsTheJarsOwn(t *testing.T) {
 	}
 }
 
+func TestASha1OnlyFileTheCacheHoldsIsNotDownloadedAgain(t *testing.T) {
+	c := envtest.NewCDN(t)
+	alpha := envtest.NewHost(c, "alpha").LikeCurseForge()
+	v := alpha.Publish(mod("a-apple", "appleskin"), provider.Version{Number: "3.0.9", File: provider.File{Filename: "appleskin.jar"}}, modJar(t, "appleskin", "3.0.9", "*"))
+	h := newHarness(t, alpha)
+	h.mustAdd("a-apple", AddOptions{})
+	c.Truncate(v)
+	h.nextCommand()
+	delete(h.r.Lock.Mods, "appleskin")
+	delete(h.r.Manifest.Requires, "appleskin")
+	if err := h.add("a-apple", AddOptions{}); err != nil {
+		t.Fatalf("the cached copy should be taken rather than downloaded again: %v", err)
+	}
+}
+
 func TestInstallAdoptsAPendingDownloadBySha1(t *testing.T) {
 	c := envtest.NewCDN(t)
 	alpha := envtest.NewHost(c, "alpha")

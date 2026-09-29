@@ -49,7 +49,7 @@ func (r *Resolver) sweepDownloads() ([]dropped, error) {
 			return nil, err
 		}
 		h := sha1.New()
-		sha, err := r.Cache.Put(io.TeeReader(f, h))
+		sha, err := r.Cache.PutManual(io.TeeReader(f, h))
 		f.Close()
 		if err != nil {
 			return nil, err

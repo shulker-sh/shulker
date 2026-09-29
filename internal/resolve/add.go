@@ -524,6 +524,10 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 		url := v.File.URL
 		return obtained{path: path, sha512: v.File.Sha512, url: &url}, err
 	}
+	if sha, ok := r.Cache.BySha1(v.File.Sha1); ok && v.File.URL != "" && !r.Cache.IsManual(sha) {
+		url := v.File.URL
+		return obtained{path: r.Cache.Object(sha), sha512: sha, url: &url}, nil
+	}
 	if v.File.URL != "" {
 		sha, err := r.Cache.Fetch(ctx, r.Fetch, v.File.URL)
 		if err == nil {
