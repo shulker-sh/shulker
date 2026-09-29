@@ -229,6 +229,20 @@ func IsPackZip(p string) bool {
 	return (dir == "resourcepacks" || dir == "shaderpacks" || IsDatapackZip(p)) && strings.EqualFold(path.Ext(p), ".zip")
 }
 
+// KindAt is the kind of entry an override file at p locks as, by the folder it sits in: a
+// resource pack, shader or datapack in their folders, and a mod anywhere else.
+func KindAt(p string) string {
+	switch {
+	case path.Dir(p) == "resourcepacks":
+		return manifest.TypeResourcePack
+	case path.Dir(p) == "shaderpacks":
+		return manifest.TypeShader
+	case IsDatapackZip(p):
+		return manifest.TypeDatapack
+	}
+	return manifest.TypeMod
+}
+
 // IsDatapackZip reports whether an override path is a zip in one of lock.DatapackFolders.
 func IsDatapackZip(p string) bool {
 	return slices.Contains(lock.DatapackFolders, path.Dir(p)) && strings.EqualFold(path.Ext(p), ".zip")

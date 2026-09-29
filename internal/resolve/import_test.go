@@ -49,11 +49,10 @@ func TestAGroupCountsWhatItHolds(t *testing.T) {
 		fetches []groupFetch
 		want    string
 	}{
-		{[]groupFetch{fetchAt("mods/a.jar"), fetchAt("mods/b.jar")}, "Fetched 2 mods"},
-		{[]groupFetch{fetchAt("resourcepacks/a.zip"), fetchAt("resourcepacks/b.zip")}, "Fetched 2 resource packs"},
-		{[]groupFetch{fetchAt("mods/a.jar"), fetchAt("shaderpacks/b.zip")}, "Fetched 2 files"},
-		{[]groupFetch{fetchAt("config/a.toml"), fetchAt("config/b.toml")}, "Fetched 2 files"},
 		{[]groupFetch{{name: "a.jar", kind: manifest.TypeMod}, {name: "b.jar", kind: manifest.TypeMod}}, "Fetched 2 mods"},
+		{[]groupFetch{{name: "a.zip", kind: manifest.TypeResourcePack}, {name: "b.zip", kind: manifest.TypeResourcePack}}, "Fetched 2 resource packs"},
+		{[]groupFetch{{name: "a.jar", kind: manifest.TypeMod}, {name: "b.zip", kind: manifest.TypeShader}}, "Fetched 2 files"},
+		{[]groupFetch{{name: "a.toml"}, {name: "b.toml"}}, "Fetched 2 files"},
 	} {
 		var stderr bytes.Buffer
 		p := &out.Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
@@ -73,7 +72,7 @@ func TestAGroupHoldsTheStepsAndNotesItsLoopLogs(t *testing.T) {
 	p := &out.Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
 	var steps []string
 	r := &Resolver{Progress: p.Progress, Note: p.Note, Log: func(format string, args ...any) { steps = append(steps, fmt.Sprintf(format, args...)) }}
-	end := r.startGroup([]groupFetch{fetchAt("mods/sodium.jar"), fetchAt("mods/iris.jar")})
+	end := r.startGroup([]groupFetch{{name: "sodium.jar", kind: manifest.TypeMod}, {name: "iris.jar", kind: manifest.TypeMod}})
 	r.fetching("sodium", "0.9")
 	r.log("switching iris from alpha to beta")
 	r.noteKept("iris", "shaders", lock.Mod{VersionNumber: "1.8"})

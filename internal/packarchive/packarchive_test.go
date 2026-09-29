@@ -10,8 +10,24 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 )
+
+func TestKindAtReadsTheFolder(t *testing.T) {
+	for p, want := range map[string]string{
+		"mods/a.jar":                       manifest.TypeMod,
+		"config/a.jar":                     manifest.TypeMod,
+		"resourcepacks/a.zip":              manifest.TypeResourcePack,
+		"resourcepacks/nested/a.zip":       manifest.TypeMod,
+		"shaderpacks/a.zip":                manifest.TypeShader,
+		lock.DatapackFolders[0] + "/a.zip": manifest.TypeDatapack,
+	} {
+		if got := KindAt(p); got != want {
+			t.Errorf("KindAt(%q) = %q, want %q", p, got, want)
+		}
+	}
+}
 
 func writeZip(t *testing.T, entries map[string]string) string {
 	t.Helper()

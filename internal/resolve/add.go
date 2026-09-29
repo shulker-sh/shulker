@@ -9,7 +9,6 @@ import (
 	"maps"
 	"net/url"
 	"os"
-	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -24,7 +23,6 @@ import (
 	"shulker.sh/shulker/internal/manual"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
-	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -132,22 +130,6 @@ type AddOptions struct {
 // file that is no kind shulker locks.
 type groupFetch struct {
 	name, kind string
-}
-
-// fetchAt is the file at a path in the game directory, its kind read from the folder it sits in.
-func fetchAt(p string) groupFetch {
-	f := groupFetch{name: path.Base(p)}
-	switch {
-	case strings.HasPrefix(p, "mods/"):
-		f.kind = manifest.TypeMod
-	case strings.HasPrefix(p, "resourcepacks/"):
-		f.kind = manifest.TypeResourcePack
-	case strings.HasPrefix(p, "shaderpacks/"):
-		f.kind = manifest.TypeShader
-	case packarchive.IsDatapackZip(p):
-		f.kind = manifest.TypeDatapack
-	}
-	return f
 }
 
 // startGroup puts a loop's fetches on one live line that settles into a count of them, "✔ Fetched

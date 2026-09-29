@@ -527,7 +527,7 @@ func (im *importer) lockIdentified(ctx context.Context) (err error) {
 	var fetches []groupFetch
 	for _, o := range queued {
 		if h, ok := im.found[o.Layer+"/"+o.Path]; ok && h.v.File.URL != "" {
-			fetches = append(fetches, fetchAt(o.Path))
+			fetches = append(fetches, groupFetch{name: path.Base(o.Path), kind: packarchive.KindAt(o.Path)})
 		}
 	}
 	end := im.r.startGroup(fetches)
@@ -624,15 +624,7 @@ func downloadFailure(err error, host string) (downloadFault, bool) {
 // folder, and under resourcepacks/ as well unless it carries assets/, which make it load as a
 // resource pack there.
 func (im *importer) fileKind(ctx context.Context, filePath string, proj *provider.Project, v *provider.Version) (string, error) {
-	kind := manifest.TypeMod
-	switch {
-	case path.Dir(filePath) == "resourcepacks":
-		kind = manifest.TypeResourcePack
-	case path.Dir(filePath) == "shaderpacks":
-		kind = manifest.TypeShader
-	case packarchive.IsDatapackZip(filePath):
-		kind = manifest.TypeDatapack
-	}
+	kind := packarchive.KindAt(filePath)
 	datapack := proj.Type == manifest.TypeDatapack || slices.Contains(v.Loaders, provider.DatapackLoader)
 	switch {
 	case kind == manifest.TypeDatapack && datapack:
