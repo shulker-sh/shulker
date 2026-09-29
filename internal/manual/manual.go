@@ -144,6 +144,9 @@ func (w *Wait) Check() ([]Status, error) {
 			}
 		}
 	}
+	for i := range w.status {
+		w.status[i].Note = ""
+	}
 	for _, dir := range w.watch {
 		if err := w.checkWatched(dir); err != nil {
 			return nil, err

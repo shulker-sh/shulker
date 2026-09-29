@@ -151,6 +151,19 @@ func TestCheckLeavesANameMatchWithOtherBytesAndSaysSo(t *testing.T) {
 	}
 }
 
+func TestCheckDropsTheNoteOnceTheWrongCopyIsGone(t *testing.T) {
+	downloads, folder, file := watched(t)
+	write(t, filepath.Join(folder, "a.jar"), "wrong", time.Hour)
+	w := NewWait(downloads, []string{folder}, []File{file})
+	if found, err := w.Check(); err != nil || found[0].Note == "" {
+		t.Fatalf("%+v %v", found, err)
+	}
+	os.Remove(filepath.Join(folder, "a.jar"))
+	if found, err := w.Check(); err != nil || found[0].Found || found[0].Note != "" {
+		t.Fatalf("%+v %v", found, err)
+	}
+}
+
 func TestCheckFindsAFileByItsOwnExtension(t *testing.T) {
 	downloads := t.TempDir()
 	_, s512 := sums("pack")
