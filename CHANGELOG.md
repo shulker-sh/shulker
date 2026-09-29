@@ -18,6 +18,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - Shulker holds back Modrinth and CurseForge versions published in the last 7 days when it chooses one, so a hijacked mod's new release has time to be caught before it reaches you. `add`, `update`, `lock` and a floating modpack take the newest version old enough, and say which they held back, how old each is, the day it qualifies and the `shulker pin` that takes it now; `outdated` marks them too. A mod with nothing old enough fails `release-too-new`. A pin takes its version whatever its age, with a warning, and `sync` installs a source's lock as its author locked it, warning about each entry that young. `security.minReleaseAge` in `config.json` sets the days, and `0` turns it off. Under `--json`, every security warning is also typed in the new `securityWarnings`, with its protection and facts.
 
+- `shulker audit` reports what in a project, or an instance with `-i`, deserves a closer look: lock entries that download from outside their provider, jars and packs no provider published and where each comes from, jars in `mods/` that changed since shulker placed them or that the lock doesn't name, and versions younger than `security.minReleaseAge`. It goes online for nothing, `audit <key>...` narrows it to those entries, and it fails only for entries from outside their provider, so CI can gate on it.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.

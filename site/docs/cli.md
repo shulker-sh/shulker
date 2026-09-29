@@ -14,6 +14,7 @@ outline: [2, 3]
 | [`shulker remove <mod>...`](#shulker-remove) | Remove mods or modpacks from the manifest and prune what only they provided |
 | [`shulker lock [key...]`](#shulker-lock) | Bring the lock in line with shulker.json without upgrading, or look entries up again at their locked version |
 | [`shulker check [lock\|files\|deps\|server]...`](#shulker-check) | Fail when the lock is stale, a locked file can't be fetched, or a mod's dependencies aren't met |
+| [`shulker audit [key...]`](#shulker-audit) | Report lock entries and files that deserve a closer look |
 | [`shulker match [file...]`](#shulker-match) | Lock override jars and packs that Modrinth or CurseForge host |
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
 | [`shulker outdated [mod...]`](#shulker-outdated) | Show mods with a newer compatible version |
@@ -118,7 +119,7 @@ These say which directory a command acts on, so only the commands that act on on
 | `-C, --dir <path>` | Project directory (default: current directory). It has to name a directory that exists, or it is a usage error before the command runs; `init`, `create` and `import` take one that doesn't exist yet, since they create the project there. An empty `-C ""` is the current directory |
 | `-i, --instance <id>` | Act on a registered instance instead of a project directory, by id, name, or directory; `--id` is accepted as an alias. Can't be combined with `-C`. [`shulker instances`](#shulker-instances) lists them |
 
-- Both: [`shulker add`](#shulker-add), [`shulker remove`](#shulker-remove), [`shulker list`](#shulker-list), [`shulker search`](#shulker-search), [`shulker lock`](#shulker-lock), [`shulker check`](#shulker-check), [`shulker match`](#shulker-match), [`shulker update`](#shulker-update), [`shulker outdated`](#shulker-outdated), [`shulker suggests`](#shulker-suggests), [`shulker pin`](#shulker-pin), [`shulker unpin`](#shulker-unpin), [`shulker ignore`](#shulker-ignore), [`shulker unignore`](#shulker-unignore), [`shulker set`](#shulker-set), [`shulker unset`](#shulker-unset), [`shulker get`](#shulker-get), [`shulker export mrpack`](#shulker-export-mrpack), [`shulker export curseforge`](#shulker-export-curseforge), [`shulker feature on|off`](#shulker-feature-on-off), [`shulker feature reset`](#shulker-feature-reset), [`shulker feature list`](#shulker-feature-list), [`shulker install`](#shulker-install), [`shulker build`](#shulker-build), [`shulker diff`](#shulker-diff), [`shulker pull`](#shulker-pull), [`shulker history list|show|prune`](#shulker-history-list), [`shulker rollback`](#shulker-rollback), [`shulker play`](#shulker-play), [`shulker serve`](#shulker-serve), [`shulker link`](#shulker-link), [`shulker link shulker|atlauncher|gdlauncher|mojang|prism|multimc`](#shulker-link), [`shulker sync`](#shulker-sync), [`shulker instance get|set|unset|edit|dump|log`](#shulker-instance), [`shulker unlink`](#shulker-unlink), [`shulker saves`](#shulker-saves), [`shulker saves prune`](#shulker-saves-prune), [`shulker backup`](#shulker-backup), [`shulker restore`](#shulker-restore), [`shulker hook pre-launch|post-exit|wrap`](#shulker-hook-pre-launch), [`shulker mod add|remove|list`](#shulker-mod-add-remove-list), [`shulker modpack add|remove|list`](#shulker-modpack-add-remove-list), [`shulker resourcepack add|remove|list`](#shulker-resourcepack-add-remove-list), [`shulker shader add|remove|list`](#shulker-shader-add-remove-list), [`shulker datapack add|remove|list`](#shulker-datapack-add-remove-list), [`shulker player`](#shulker-player)
+- Both: [`shulker add`](#shulker-add), [`shulker remove`](#shulker-remove), [`shulker list`](#shulker-list), [`shulker search`](#shulker-search), [`shulker lock`](#shulker-lock), [`shulker check`](#shulker-check), [`shulker audit`](#shulker-audit), [`shulker match`](#shulker-match), [`shulker update`](#shulker-update), [`shulker outdated`](#shulker-outdated), [`shulker suggests`](#shulker-suggests), [`shulker pin`](#shulker-pin), [`shulker unpin`](#shulker-unpin), [`shulker ignore`](#shulker-ignore), [`shulker unignore`](#shulker-unignore), [`shulker set`](#shulker-set), [`shulker unset`](#shulker-unset), [`shulker get`](#shulker-get), [`shulker export mrpack`](#shulker-export-mrpack), [`shulker export curseforge`](#shulker-export-curseforge), [`shulker feature on|off`](#shulker-feature-on-off), [`shulker feature reset`](#shulker-feature-reset), [`shulker feature list`](#shulker-feature-list), [`shulker install`](#shulker-install), [`shulker build`](#shulker-build), [`shulker diff`](#shulker-diff), [`shulker pull`](#shulker-pull), [`shulker history list|show|prune`](#shulker-history-list), [`shulker rollback`](#shulker-rollback), [`shulker play`](#shulker-play), [`shulker serve`](#shulker-serve), [`shulker link`](#shulker-link), [`shulker link shulker|atlauncher|gdlauncher|mojang|prism|multimc`](#shulker-link), [`shulker sync`](#shulker-sync), [`shulker instance get|set|unset|edit|dump|log`](#shulker-instance), [`shulker unlink`](#shulker-unlink), [`shulker saves`](#shulker-saves), [`shulker saves prune`](#shulker-saves-prune), [`shulker backup`](#shulker-backup), [`shulker restore`](#shulker-restore), [`shulker hook pre-launch|post-exit|wrap`](#shulker-hook-pre-launch), [`shulker mod add|remove|list`](#shulker-mod-add-remove-list), [`shulker modpack add|remove|list`](#shulker-modpack-add-remove-list), [`shulker resourcepack add|remove|list`](#shulker-resourcepack-add-remove-list), [`shulker shader add|remove|list`](#shulker-shader-add-remove-list), [`shulker datapack add|remove|list`](#shulker-datapack-add-remove-list), [`shulker player`](#shulker-player)
 - `-C` only: [`shulker init`](#shulker-init), [`shulker create`](#shulker-create), [`shulker import`](#shulker-import), [`shulker cache info`](#shulker-cache-info), [`shulker cache prune`](#shulker-cache-prune)
 - `-i` only: [`shulker log`](#shulker-log)
 
@@ -411,6 +412,29 @@ shulker check --all
 In a GitHub Actions run each problem item is also an annotation on the run (see [`--annotations`](#global-flags)); `check-failed` adds none of its own, since it repeats them.
 
 With `--json`, `data.scopes` lists the checks that ran and a clean run's `data.problems` is empty. A failing run ends with `check-failed`: its `items` are every problem's own items, each as `<code>: <item>`, one per thing to annotate, and `data.problems` lists each problem as an error, `{ "code", "message", "items", "help" }`.
+
+### `shulker audit`
+
+Report what in the project, or an instance with `-i`, deserves a closer look. `check` is about whether a project builds; `audit` is about where its files come from. It reads the lock and the files on disk and goes online for nothing.
+
+- **Provenance:** a lock entry that names a provider but downloads from outside that provider's hosts, the entry every other command refuses as `provenance-mismatch`. `shulker lock <key>` looks it up again.
+- **Unpublished files:** every jar and pack no provider published, with where it comes from: a local `file` entry, an entry downloaded from a URL of its own, or a file an override folder lays, a modpack's included and every feature's folder with them.
+- **Installed jars:** every jar in `mods/` whose bytes no longer match what the lock names, or what the build recorded for one an override laid, and every jar there that neither accounts for. A project's are its sides' build directories; an instance's is its own directory. `shulker build --force` puts the locked copies back.
+- **Young versions:** locked versions published more recently than `security.minReleaseAge`.
+
+Name keys to audit only those entries, and every entry a named modpack brings; a key the lock doesn't hold fails `mod-not-found`. Files that no entry names, such as override jars and unlisted jars in `mods/`, are left out of a narrowed audit. A key that is also a subcommand of `audit` goes after `--`: `shulker audit -- jar`.
+
+It exits non-zero only for provenance problems, ending with `audit-failed`, so a pack author's CI can gate on it. Unpublished files, installed jars and young versions are listed but don't fail it, since a pack may reasonably have them.
+
+With `-i`, an instance that builds in place is audited as its own project. A linked or synced one is audited against the lock its last sync built from: its local source, or the copy of a remote source that sync kept in the cache. One that has never synced fails `not-synced`.
+
+```sh
+shulker audit
+shulker audit sodium
+shulker audit -i friends --json
+```
+
+With `--json`, `data` holds one list per check, each empty when it found nothing: `provenance` (`key`, `provider`, `host`, `modpack`), `unpublished` (`key`, `path`, `from` as `file`, `download` or `override`, `source`, `modpack`), `installed` (`dir`, `path`, `key`, `problem` as `changed` or `unlisted`) and `young` (`key`, `version`, `published`, `ageDays`, `qualifies`), with `minReleaseAge` in days and the named `keys`. A failing run carries the same `data` under `audit-failed`, whose `items` are the keys from outside their provider.
 
 ### `shulker match`
 
@@ -1981,6 +2005,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-changed` | A cached file no longer matched its hash, so the build deleted it, and it has no URL to download it from again: a local file or a manual download. `shulker install` puts the locked copy back |
 | `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
+| `audit-failed` | `audit` found lock entries that download from outside their provider. `items`: their keys; `data`: the whole report |
 | `check-failed` | `check` found a problem; each one printed above it. `items`: every problem's items as `<code>: <item>`; `data.problems`: each problem as an error |
 | `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes, and the file at `install` |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
@@ -2089,7 +2114,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `not-on-provider` | `lock <key>` named a modpack from a git, URL or folder source, which has no provider version to look up |
 | `not-pinned` | The mod has no pin |
 | `not-shulker` | The instance belongs to another launcher, which starts it itself |
-| `not-synced` | The directory has no record of the source it was synced from |
+| `not-synced` | The directory has no record of the source it was synced from, or `audit -i` found no lock from the instance's last sync |
 | `offline-account` | `accounts logout` or `accounts refresh` was given an offline account, which has no sign-in; `accounts remove` deletes it |
 | `override-path` | A path named to `match` isn't a jar in `mods/` or a zip in `resourcepacks/`, `shaderpacks/` or a datapack folder of `overrides/`, `client-overrides/` or `server-overrides/` |
 | `overrides-invalid` | The `shulker.overrides.json` at a modpack archive's root, where an export records which folder each override came from, isn't valid; it reaches you as `mrpack-marker` |

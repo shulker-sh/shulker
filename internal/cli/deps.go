@@ -135,15 +135,24 @@ func (a *app) scopeDir() (string, error) {
 		}
 		return os.Getwd()
 	}
-	if a.dir != "" {
-		return "", out.Errorf("usage", "pass -C or -i, not both: -i already says which directory to act on")
-	}
-	entries, err := a.selectInstances(a.instance, instanceSelection{})
+	entry, err := a.scopeInstance()
 	if err != nil {
 		return "", err
 	}
+	return entry.Dir, nil
+}
+
+// scopeInstance is the registered instance -i names, refused alongside -C.
+func (a *app) scopeInstance() (project.InstanceEntry, error) {
+	if a.dir != "" {
+		return project.InstanceEntry{}, out.Errorf("usage", "pass -C or -i, not both: -i already says which directory to act on")
+	}
+	entries, err := a.selectInstances(a.instance, instanceSelection{})
+	if err != nil {
+		return project.InstanceEntry{}, err
+	}
 	a.logInstance(entries[0].ID)
-	return entries[0].Dir, nil
+	return entries[0], nil
 }
 
 func (a *app) openProjectAt(dir string) (*project.Project, error) {
