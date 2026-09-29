@@ -18,6 +18,7 @@ import (
 
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 )
 
 func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {
@@ -56,7 +57,7 @@ func secureGitSource(source string) error {
 	}
 	e := out.Errorf("url-insecure", "%s isn't https or ssh", source)
 	e.Help = "use an https:// or ssh:// remote, or git@host:repo"
-	return e
+	return security.Refusal(e)
 }
 
 func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (string, error) {

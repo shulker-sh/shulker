@@ -276,7 +276,7 @@ func (a *app) rollbackCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			a.warnBuild(side, false, rep.Warnings, rep.State, a.forceCommand(p, side, rep.Dir))
+			a.warnBuild(side, false, rep.Warnings, rep.SecurityWarnings(), rep.State, a.forceCommand(p, side, rep.Dir))
 			res := rollbackResult{Entry: e, Snapshot: snapshot.ID, Builds: []*build.Report{rep}}
 			if prune {
 				dropped, err := build.PruneHistory(p.Dir, p.Manifest.HistoryKeep())

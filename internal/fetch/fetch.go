@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 )
 
 var (
@@ -175,8 +176,8 @@ func (c *Client) do(ctx context.Context, method, url string, header http.Header,
 // insecure refuses a URL that isn't https, whether a caller or a redirect named it.
 func insecure(url string) *out.Error {
 	e := out.Errorf("url-insecure", "%s isn't https", url)
-	e.Help = "shulker downloads over https only"
-	return e
+	e.Help = "use an https:// address instead"
+	return security.Refusal(e)
 }
 
 // retryWaits are the pauses before each retry of a request whose connection dropped.

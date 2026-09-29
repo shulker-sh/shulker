@@ -14,6 +14,12 @@ const Stance = "Mods run with everything your account can reach, and a linked in
 // Nudge ends every security warning and error, pointing at `shulker security`.
 var Nudge = out.Nudge{Lead: "Read what shulker checks and why", Command: "shulker security"}
 
+// Refusal ends e with Nudge, for an error that is a protection refusing something.
+func Refusal(e *out.Error) *out.Error {
+	e.Nudge = Nudge
+	return e
+}
+
 // Protection is one thing shulker does to keep a bad file off the player's machine.
 type Protection struct {
 	ID string `json:"id"`

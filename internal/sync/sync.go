@@ -15,6 +15,7 @@ import (
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/saves"
+	"shulker.sh/shulker/internal/security"
 )
 
 // AssumeClientWarning is what a sync says when it builds a client the manifest doesn't declare.
@@ -106,6 +107,9 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 		return Result{}, err
 	}
 	e.WarnEach(rep.Warnings)
+	for _, w := range rep.SecurityWarnings() {
+		e.WarnNudge(security.Nudge, "%s", w)
+	}
 	if side == "client" {
 		e.syncLauncherImage(into, b)
 	}

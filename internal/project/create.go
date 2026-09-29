@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
+	"shulker.sh/shulker/internal/security"
 )
 
 // NewManifest is the manifest a new project starts from: name defaults to dir's own name,
@@ -58,7 +59,7 @@ func Create(dir string, m *manifest.Manifest, l *lock.Lock, overrides []packarch
 	}
 	for _, o := range overrides {
 		if !filepath.IsLocal(filepath.FromSlash(o.Path)) {
-			return out.Errorf("path-outside", "%s/%s is outside its folder", o.Layer, o.Path)
+			return security.Refusal(out.Errorf("path-outside", "%s/%s is outside its folder", o.Layer, o.Path))
 		}
 		abs := filepath.Join(dir, o.Layer, filepath.FromSlash(o.Path))
 		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {

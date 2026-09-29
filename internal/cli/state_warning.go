@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
+	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/schema"
 )
 
@@ -32,11 +33,14 @@ func (a *app) warnState(e *instance.StateError, force string) {
 
 // warnBuild is warnFor for a build's report, its state warning last so its nudge sits under the
 // warnings rather than between them.
-func (a *app) warnBuild(side string, several bool, warnings []string, state *instance.StateError, force string) {
+func (a *app) warnBuild(side string, several bool, warnings, securityWarnings []string, state *instance.StateError, force string) {
 	if several {
 		defer a.scopeWarnings(side)()
 	}
 	a.warn(warnings)
+	for _, w := range securityWarnings {
+		a.printer.WarnNudge(security.Nudge, "%s", w)
+	}
 	a.warnState(state, force)
 }
 

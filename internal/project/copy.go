@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 )
 
 // OwnPaths are the paths of a project's own files, relative to its folder: its lock, override
@@ -39,7 +40,7 @@ func CopyOwnFiles(src, dir string, paths []string) ([]string, error) {
 	var created []string
 	for _, rel := range paths {
 		if !filepath.IsLocal(filepath.FromSlash(rel)) {
-			return created, out.Errorf("path-outside", "%s is outside the project", rel)
+			return created, security.Refusal(out.Errorf("path-outside", "%s is outside the project", rel))
 		}
 		from, to := filepath.Join(src, filepath.FromSlash(rel)), filepath.Join(dir, filepath.FromSlash(rel))
 		if _, err := os.Stat(from); err != nil {

@@ -18,6 +18,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 )
 
 // At is where in a git source a project is read: the ref to resolve, the remote HEAD when empty,
@@ -157,7 +158,7 @@ func subfolder(root, path string) (string, error) {
 		return root, nil
 	}
 	if !manifest.IsSubfolder(path) {
-		return "", out.Errorf("path-outside", "%s is outside the repository", path)
+		return "", security.Refusal(out.Errorf("path-outside", "%s is outside the repository", path))
 	}
 	return filepath.Join(root, filepath.FromSlash(path)), nil
 }

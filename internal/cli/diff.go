@@ -75,7 +75,7 @@ func (a *app) diffCmd() *cobra.Command {
 					if err != nil {
 						return err
 					}
-					a.warnBuild(side, len(sides) > 1, rep.Warnings, rep.State, a.forceCommand(p, side, rep.Dir))
+					a.warnBuild(side, len(sides) > 1, rep.Warnings, nil, rep.State, a.forceCommand(p, side, rep.Dir))
 					reports = append(reports, rep)
 					where[rep] = "the build directory"
 					if dir != "" && dir != buildDir {
@@ -163,7 +163,7 @@ func (a *app) pullCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			a.warnBuild(side, false, rep.Warnings, rep.State, a.forceCommand(p, side, rep.Dir))
+			a.warnBuild(side, false, rep.Warnings, nil, rep.State, a.forceCommand(p, side, rep.Dir))
 			if rep.ManifestChanged {
 				if err := p.SaveManifest(); err != nil {
 					return err

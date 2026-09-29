@@ -39,6 +39,10 @@ func TestAPlainHTTPGitSourceIsRefused(t *testing.T) {
 			t.Fatalf("%s: code=%d %s", source, code, stdout)
 		}
 	}
+	_, _, stderr := h.run(t, "modpack", "add", "http://127.0.0.1:1/pack.git")
+	if !strings.Contains(stderr, "Read what shulker checks and why:\n    $ shulker security\n") {
+		t.Fatalf("a refusal points at shulker security: %q", stderr)
+	}
 }
 
 func TestAGitSourceThatRedirectsToPlainHTTPIsRefused(t *testing.T) {

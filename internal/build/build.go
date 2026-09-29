@@ -33,6 +33,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/internal/server"
 	"shulker.sh/shulker/internal/version/minecraft"
 )
@@ -91,6 +92,9 @@ type Report struct {
 	KeptConflicts []string `json:"keptConflicts,omitempty"`
 	Excluded      []string `json:"excluded"`
 	Warnings      []string `json:"-"`
+	// CacheChanged names the files whose cached copy no longer matched its hash and was fetched
+	// again.
+	CacheChanged []string `json:"-"`
 	// State is why the directory's state file was read as empty, warned apart from Warnings since
 	// its fix is a command.
 	State   *instance.StateError `json:"-"`
@@ -98,6 +102,20 @@ type Report struct {
 	History string               `json:"history,omitempty"`
 	// InstalledLoader is set when the loader's own installer ran into the dir after the build.
 	InstalledLoader *instance.InstalledLoader `json:"installedLoader,omitempty"`
+}
+
+// SecurityWarnings are the warnings about what the build's protections caught, apart from Warnings
+// since each ends with security.Nudge.
+func (r *Report) SecurityWarnings() []string {
+	var warnings []string
+	switch len(r.CacheChanged) {
+	case 0:
+	case 1:
+		warnings = append(warnings, fmt.Sprintf("The cache held a changed copy of %s, so it was downloaded again.", r.CacheChanged[0]))
+	default:
+		warnings = append(warnings, fmt.Sprintf("The cache held changed copies of %s, so they were downloaded again.", strings.Join(r.CacheChanged, ", ")))
+	}
+	return warnings
 }
 
 // Options change how a build runs. Dir builds somewhere other than the side's build directory, and
@@ -709,7 +727,7 @@ func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[st
 // layFile puts one override file, read from path, at rel in desired.
 func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole func(string) bool, desired map[string]source, report *Report) error {
 	if !filepath.IsLocal(filepath.FromSlash(rel)) {
-		return out.Errorf("path-outside", "%s/%s is outside its folder", l.label, rel)
+		return security.Refusal(out.Errorf("path-outside", "%s/%s is outside its folder", l.label, rel))
 	}
 	var err error
 	src := source{origin: path, pack: l.pack, feature: l.feature}
@@ -1092,12 +1110,12 @@ func (b *Builder) placeCached(c cached, abs string, report *Report) error {
 	if c.url == "" || manual {
 		e := out.Errorf("cache-changed", "the cache held a changed copy of %s", c.name)
 		e.Help = "run `shulker install` to put the locked copy back"
-		return e
+		return security.Refusal(e)
 	}
 	if _, err := b.Cache.Ensure(context.Background(), b.Fetch, c.url, c.sha512); err != nil {
 		return err
 	}
-	report.Warnings = append(report.Warnings, fmt.Sprintf("The cache held a changed copy of %s, so it was downloaded again.", c.name))
+	report.CacheChanged = append(report.CacheChanged, c.name)
 	return b.Cache.CopyTo(c.sha512, abs)
 }
 
