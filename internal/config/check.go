@@ -20,6 +20,7 @@ const (
 	AccountsStoresKey  = "accounts.stores"
 	PlaySaveBackupsKey = "play.saveBackups"
 	LogKeepDaysKey     = "log.keepDays"
+	MinReleaseAgeKey   = "security.minReleaseAge"
 )
 
 // CheckValue rejects a value config.json can hold but shulker can't use, at the point it is typed
@@ -36,6 +37,8 @@ func CheckValue(key string, v any, stores []string) (any, error) {
 		return backupCount(key, v)
 	case LogKeepDaysKey:
 		return dayCount(key, v)
+	case MinReleaseAgeKey:
+		return ageDays(key, v)
 	}
 	if name, ok := strings.CutPrefix(key, "play."); ok {
 		if err := CheckPlaySetting(key, name, v); err != nil {
@@ -60,6 +63,15 @@ func dayCount(key string, v any) (any, error) {
 	n, err := strconv.Atoi(fmt.Sprint(v))
 	if err != nil || n < 1 {
 		return nil, out.Errorf("usage", "%s takes a whole number of days, at least 1, not %s", key, valueText(v))
+	}
+	return n, nil
+}
+
+// ageDays reads an age in days typed plainly or with --literal; 0 turns the check off.
+func ageDays(key string, v any) (any, error) {
+	n, err := strconv.Atoi(fmt.Sprint(v))
+	if err != nil || n < 0 {
+		return nil, out.Errorf("usage", "%s takes a whole number of days, 0 for none, not %s", key, valueText(v))
 	}
 	return n, nil
 }

@@ -244,6 +244,26 @@ func TestConfigSaveBackups(t *testing.T) {
 	}
 }
 
+func TestConfigMinReleaseAge(t *testing.T) {
+	h := newHarness(t)
+	if got := strings.TrimSpace(h.mustRun(t, "config", "get", "security.minReleaseAge")); got != "7" {
+		t.Fatalf("default security.minReleaseAge = %q", got)
+	}
+	for _, bad := range []string{"-1", "week", "2.5"} {
+		if env := h.runSetting(t, 2, "config", "set", "security.minReleaseAge", bad); env.Error == nil || env.Error.Code != "usage" {
+			t.Fatalf("config set security.minReleaseAge %s: %+v", bad, env.Error)
+		}
+	}
+	h.mustRun(t, "config", "set", "security.minReleaseAge", "0")
+	cfg, err := config.LoadFile(h.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Security.ReleaseAge() != 0 {
+		t.Fatalf("ReleaseAge() = %v", cfg.Security.ReleaseAge())
+	}
+}
+
 func TestConfigLogKeepDays(t *testing.T) {
 	h := newHarness(t)
 	if got := strings.TrimSpace(h.mustRun(t, "config", "get", "log.keepDays")); got != "30" {

@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/instance"
@@ -32,7 +33,7 @@ const (
 )
 
 // Keys are the config.json keys `shulker config` reads and sets.
-var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "downloads.watch", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "store"}
+var Keys = []string{"accounts.default", "accounts.stores", "curseforge.key", "downloads.watch", "eula", "instances", "log.keepDays", "play.java", "play.jvmArgs", "play.memory", "play.saveBackups", "play.window", "play.wrapper", "registry", "saves", "security.minReleaseAge", "store"}
 
 // Secrets are the keys whose values `shulker config` masks unless asked to reveal them.
 var Secrets = []string{"curseforge.key"}
@@ -77,6 +78,7 @@ type Config struct {
 	Play       Play       `json:"play"`
 	Registry   string     `json:"registry,omitempty"`
 	Saves      string     `json:"saves,omitempty"`
+	Security   Security   `json:"security"`
 	Store      string     `json:"store,omitempty"`
 }
 
@@ -113,6 +115,23 @@ func (l Log) Days() int {
 		return DefaultLogKeepDays
 	}
 	return *l.KeepDays
+}
+
+// Security is the settings of the protections `shulker security` lists.
+type Security struct {
+	// MinReleaseAge is how many days old a provider version must be before shulker chooses it.
+	MinReleaseAge *int `json:"minReleaseAge,omitempty"`
+}
+
+const DefaultMinReleaseAge = 7
+
+// ReleaseAge is MinReleaseAge with its default filled in; 0 turns the check off.
+func (s Security) ReleaseAge() time.Duration {
+	days := DefaultMinReleaseAge
+	if s.MinReleaseAge != nil {
+		days = max(*s.MinReleaseAge, 0)
+	}
+	return time.Duration(days) * 24 * time.Hour
 }
 
 // Downloads is where a wait for manual downloads looks besides a project's downloads/.
