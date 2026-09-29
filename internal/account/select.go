@@ -174,3 +174,23 @@ func Picks(accounts []Resolved) []string {
 	}
 	return picks
 }
+
+// Removable is the accounts `accounts remove` deletes: the offline ones.
+func Removable(accounts []Resolved) []Resolved {
+	return slices.DeleteFunc(slices.Clone(accounts), func(r Resolved) bool { return r.Source != SourceOffline })
+}
+
+// Selectors names each of some accounts the shortest way that picks it out of all of them: its
+// name when no other account shares it, its id when one does.
+func Selectors(all, some []Resolved) []string {
+	names := make([]string, len(some))
+	for i, r := range some {
+		shared := slices.ContainsFunc(all, func(o Resolved) bool { return o.ID != r.ID && strings.EqualFold(o.Name, r.Name) })
+		if shared {
+			names[i] = r.ID
+		} else {
+			names[i] = QuoteName(r.Name)
+		}
+	}
+	return names
+}

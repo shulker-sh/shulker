@@ -326,3 +326,26 @@ func TestIsDefaultMatchesTheConfiguredIDInEitherForm(t *testing.T) {
 		t.Fatal("no default, or another id, is not this account")
 	}
 }
+
+func TestSelectorsNameAnAccountByIDOnlyWhenItsNameIsShared(t *testing.T) {
+	steve := Resolved{ID: "id-steve", Name: "Steve", Source: SourceOffline}
+	alex := Resolved{ID: "id-alex", Name: "Alex", Source: SourceOffline}
+	spaced := Resolved{ID: "id-spaced", Name: "Big Steve", Source: SourceOffline}
+	all := []Resolved{steve, alex, spaced, {ID: "id-alex-2", Name: "Alex", Source: "prism"}}
+	got := Selectors(all, []Resolved{steve, alex, spaced})
+	want := []string{"Steve", "id-alex", `"Big Steve"`}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Selectors = %q, want %q", got, want)
+	}
+}
+
+func TestRemovableKeepsOnlyOfflineAccounts(t *testing.T) {
+	steve := Resolved{ID: "id-steve", Name: "Steve", Source: SourceOffline}
+	all := []Resolved{{ID: "id-notch", Name: "Notch", Source: SourceShulker}, steve, {ID: "id-alex", Name: "Alex", Source: "prism"}}
+	if got := Removable(all); len(got) != 1 || got[0] != steve {
+		t.Fatalf("Removable = %+v", got)
+	}
+	if len(all) != 3 {
+		t.Fatalf("Removable changed its input: %+v", all)
+	}
+}

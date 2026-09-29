@@ -91,16 +91,20 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 		Short:       "Delete an offline account",
 		Args:        exactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r, err := a.selectAccount(args[0])
+			accounts, cfg, err := a.accounts()
 			if err != nil {
+				return err
+			}
+			r, err := account.Select(accounts, args[0], a.printer.Warn, a.accountPicker())
+			if err != nil {
+				if e := out.AsError(err); e.Code == "account-not-found" {
+					e.Candidates = account.Selectors(accounts, account.Removable(accounts))
+					e.Pass = e.Candidates
+				}
 				return err
 			}
 			if r.Source != account.SourceOffline {
 				return notOfflineAccount(r)
-			}
-			accounts, cfg, err := a.accounts()
-			if err != nil {
-				return err
 			}
 			if !force && !account.OwnsTheGame(accounts) {
 				return unprovenOwnership(r.Name+" can't be re-created without an account that owns Minecraft",

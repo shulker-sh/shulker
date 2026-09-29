@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -222,6 +223,16 @@ func TestAccountsRemoveNamesLogoutForAMicrosoftAccount(t *testing.T) {
 	}
 	if len(readAccountStore(t, h).Accounts) != 1 {
 		t.Error("the account should still be there")
+	}
+}
+
+func TestAccountsRemoveSuggestsOnlyWhatItCanRemove(t *testing.T) {
+	h := withOwner(t)
+	h.mustRun(t, "accounts", "add", "Steve")
+	code, stdout, _ := h.run(t, "accounts", "remove", "Stve", "--yes", "--json")
+	e := failureCode(t, stdout)
+	if code == 0 || e.Code != "account-not-found" || !slices.Equal(e.Candidates, []string{"Steve"}) {
+		t.Fatalf("exit %d: %s", code, stdout)
 	}
 }
 
