@@ -367,6 +367,9 @@ func (b *Builder) Target(side, dir string) string {
 // Build writes side into its target directory, keeping the player's edits to files shulker owns
 // and failing on a conflict unless opts.Force is set.
 func (b *Builder) Build(side string, opts Options) (*Report, error) {
+	if err := CheckProvenance(b.Providers, b.Manifest, b.Lock, b.Packs, ""); err != nil {
+		return nil, err
+	}
 	dir := b.Target(side, opts.Dir)
 	inPlace := sameDir(dir, b.Dir)
 	report := &Report{Side: side, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}

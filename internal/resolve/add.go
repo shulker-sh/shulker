@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/jarmeta"
@@ -909,6 +910,9 @@ func contains(list []string, s string) bool {
 // given, it leaves out files that none of them use. A download the host fails goes on to the next
 // file unless FailFast, and the error joins the failed downloads' and the missing files'.
 func (r *Resolver) Install(ctx context.Context, sides ...string) ([]string, []string, error) {
+	if err := build.CheckProvenance(r.Providers, r.Manifest, r.Lock, r.Packs, ""); err != nil {
+		return nil, nil, err
+	}
 	return r.install(ctx, r.lockFiles, sides)
 }
 

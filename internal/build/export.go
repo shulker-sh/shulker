@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -413,7 +412,7 @@ func (b *Builder) exportFiles(ctx context.Context, f packarchive.Format, sides [
 			}
 			continue
 		}
-		from := origin(b.Providers, e.provider, e.url)
+		from := origin(e.provider, e.url)
 		if !bundle {
 			missing.add(e.kind, e.key+" ("+from+")")
 			continue
@@ -688,30 +687,16 @@ func reportList(report *ExportReport, kind string, bundled bool) *[]string {
 	return &report.Mods
 }
 
-// origin names where a mod came from: its provider alone for a download from one of the
-// provider's own hosts, and the host beside it for a download from anywhere else.
-func origin(ps provider.Providers, name string, u *string) string {
-	if name == "" {
+// origin names where a mod came from: its provider, or that it was a local file or a manual
+// download. A provider's file is always on its own hosts, since the lock is checked for that first.
+func origin(name string, u *string) string {
+	switch {
+	case name == "":
 		return "local file"
-	}
-	if u == nil {
+	case u == nil:
 		return name + ", manual download"
 	}
-	parsed, err := url.Parse(*u)
-	if err != nil || parsed.Host == "" {
-		return name
-	}
-	host := parsed.Hostname()
-	var hosts []string
-	if p, ok := ps[name]; ok {
-		hosts = p.Hosts()
-	}
-	for _, domain := range hosts {
-		if host == domain || strings.HasSuffix(host, "."+domain) {
-			return name
-		}
-	}
-	return name + ", " + parsed.Host
+	return name
 }
 
 // splitOverrides lays the sides' files out by layer: a bundled file goes where its entry's side

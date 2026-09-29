@@ -268,3 +268,10 @@ func releaseKey(number string) string {
 	})
 	return strings.Join(fields, ".")
 }
+
+// Serves reports whether host is one of p's own hosts or a subdomain of one.
+func Serves(p Provider, host string) bool {
+	return slices.ContainsFunc(p.Hosts(), func(domain string) bool {
+		return host == domain || strings.HasSuffix(host, "."+domain)
+	})
+}

@@ -86,6 +86,11 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 	if err != nil {
 		return Result{}, err
 	}
+	if remote {
+		if err := build.CheckProvenance(e.Providers, p.Manifest, p.Lock, nil, src.Name); err != nil {
+			return Result{}, err
+		}
+	}
 	fetched, err := FetchLocked(ctx, e, p, nil, side == "server")
 	if err != nil {
 		return Result{}, err
