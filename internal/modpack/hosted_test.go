@@ -89,8 +89,8 @@ func TestFetchHostedTakesAManualDownloadByItsHash(t *testing.T) {
 	if err := s.fetchHosted(context.Background(), l); err != nil {
 		t.Fatal(err)
 	}
-	if !s.Cache.Has(l.Pin.Sha512) {
-		t.Fatal("the dropped archive is not in the cache")
+	if !s.Cache.Has(l.Pin.Sha512) || !s.Cache.IsManual(l.Pin.Sha512) {
+		t.Fatal("the dropped archive is not in the cache, marked manual")
 	}
 	if len(*log) != 0 {
 		t.Errorf("log = %q, want nothing for a file already on disk", *log)

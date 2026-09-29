@@ -65,6 +65,8 @@ type Resolver struct {
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
 	// file order is arbitrary.
 	keepNewest bool
+	// groupCached counts the manual downloads the open group took from the cache.
+	groupCached int
 	// group is the live line a run of fetches draws on in place of a step each; see startGroup.
 	group *out.Progress
 	// held are the notes made while a group's live line was drawn, printed once it settles.
@@ -173,15 +175,38 @@ func (r *Resolver) startGroup(fetches []groupFetch) (end func(failed bool)) {
 		if r.Fetch != nil {
 			r.Fetch.Progress = nil
 		}
+		defer r.afterGroup()
 		if failed {
 			g.Abort()
-		} else {
-			g.Finish()
+			return
 		}
-		for _, it := range r.held {
-			r.Note(it)
-		}
-		r.held = nil
+		g.Finish()
+	}
+}
+
+// afterGroup prints what a group's live line held back: its notes and the files taken from the cache.
+func (r *Resolver) afterGroup() {
+	for _, it := range r.held {
+		r.Note(it)
+	}
+	r.held = nil
+	r.reportCached(r.groupCached)
+	r.groupCached = 0
+}
+
+// tookFromCache notes a manual download taken from the cache: a step of its own, or a count the
+// group's line is followed by.
+func (r *Resolver) tookFromCache(filename string) {
+	if r.group != nil {
+		r.groupCached++
+		return
+	}
+	r.log("taking %s from the cache", filename)
+}
+
+func (r *Resolver) reportCached(n int) {
+	if n > 0 {
+		r.log("took %s from the cache", out.Count(n, "manual download", "manual downloads"))
 	}
 }
 
@@ -581,6 +606,10 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 		if f.Sha1 == v.File.Sha1 {
 			return obtained{path: r.Cache.Object(f.Sha512), sha512: f.Sha512, page: v.Page}, nil
 		}
+	}
+	if sha, ok := r.Cache.BySha1(v.File.Sha1); ok {
+		r.tookFromCache(v.File.Filename)
+		return obtained{path: r.Cache.Object(sha), sha512: sha, page: v.Page}, nil
 	}
 	e := out.Errorf("manual-download", "%s can't be downloaded automatically", v.File.Filename)
 	e.Items = []string{v.Page}
@@ -1102,16 +1131,23 @@ func versionNumber(p provider.Provider, number string, info *jarmeta.Info) strin
 // adoptPending fills each pending mod a file in downloads/ matches by sha1: its sha512 and size
 // from the file, and its mod id and version from the jar.
 func (r *Resolver) adoptPending(files []dropped) error {
+	cached := 0
+	defer func() { r.reportCached(cached) }()
 	for _, id := range r.lockIDs() {
 		m := r.Lock.Mods[id]
 		if !m.IsPending() {
 			continue
 		}
-		i := slices.IndexFunc(files, func(f dropped) bool { return f.Sha1 == m.Sha1 })
-		if i < 0 {
+		var sha string
+		if i := slices.IndexFunc(files, func(f dropped) bool { return f.Sha1 == m.Sha1 }); i >= 0 {
+			sha = files[i].Sha512
+		} else if found, ok := r.Cache.BySha1(m.Sha1); ok {
+			sha = found
+			cached++
+		} else {
 			continue
 		}
-		path := r.Cache.Object(files[i].Sha512)
+		path := r.Cache.Object(sha)
 		info, err := r.readJar(path, m.Filename)
 		if err != nil {
 			return prefixed("mod "+id, err)
@@ -1120,7 +1156,7 @@ func (r *Resolver) adoptPending(files []dropped) error {
 		if err != nil {
 			return err
 		}
-		m.Sha512, m.Sha1, m.Size = files[i].Sha512, "", st.Size()
+		m.Sha512, m.Sha1, m.Size = sha, "", st.Size()
 		if info.ID != "" && info.ID != id {
 			m.ModID = info.ID
 		}

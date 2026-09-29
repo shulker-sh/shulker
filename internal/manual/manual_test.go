@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -235,5 +236,22 @@ func TestAFoundFileSaysWhichFolderItWasFoundIn(t *testing.T) {
 		if err != nil || found[0].From != folder || found[1].From != downloads || !found[2].Found || found[2].From != "" {
 			t.Fatalf("a find keeps the folder it was first found in, and a dropped file has none: %+v %v", found, err)
 		}
+	}
+}
+
+func TestCheckFindsAFileTheCacheHolds(t *testing.T) {
+	c := &cache.Cache{Dir: t.TempDir()}
+	s1, _ := sums("by sha1")
+	_, s512 := sums("by sha512")
+	w := NewWait(t.TempDir(), nil, []File{{Name: "a.jar", Sha1: s1}, {Name: "b.mrpack", Sha512: s512}})
+	w.Cache = c
+	if found, err := w.Check(); err != nil || found[0].Found || found[1].Found {
+		t.Fatalf("the cache holds neither yet: %+v %v", found, err)
+	}
+	c.PutManual(strings.NewReader("by sha1"))
+	c.Put(strings.NewReader("by sha512"))
+	found, err := w.Check()
+	if err != nil || !found[0].Found || !found[0].Cached || !found[1].Found || !found[1].Cached {
+		t.Fatalf("a file that lands in the cache is found there: %+v %v", found, err)
 	}
 }

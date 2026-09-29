@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -69,7 +70,7 @@ func (s *Store) openArchive(ctx context.Context, l *Loaded, p manifest.Require) 
 			e.Help = "run `shulker lock`"
 			return e
 		}
-		if err := s.cacheFile(path); err != nil {
+		if err := s.cacheFile(path, s.Cache.Put); err != nil {
 			return err
 		}
 	}
@@ -143,7 +144,7 @@ func (s *Store) fetchHosted(ctx context.Context, l *Loaded) error {
 			return err
 		}
 		if got == l.Pin.Sha512 {
-			return s.cacheFile(path)
+			return s.cacheFile(path, s.Cache.PutManual)
 		}
 	}
 	e := out.Errorf("missing-files", "modpack %s %s needs a manual download", l.Name, l.Pin.VersionNumber)
@@ -189,13 +190,13 @@ func (s *Store) archivePath(rel string) string {
 	return filepath.Join(s.ProjectDir, filepath.FromSlash(rel))
 }
 
-func (s *Store) cacheFile(path string) error {
+func (s *Store) cacheFile(path string, put func(io.Reader) (string, error)) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	_, err = s.Cache.Put(f)
+	_, err = put(f)
 	return err
 }
 

@@ -108,6 +108,10 @@ func TestImportWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	}
 
 	h.tty = false
+	if _, stderr := h.mustRunStderr(t, "import", archive, "--dir", filepath.Join(t.TempDir(), "cached")); !strings.Contains(stderr, "Took 1 manual download from the cache") {
+		t.Fatalf("the next import takes the file from the cache: %s", stderr)
+	}
+	os.RemoveAll(h.cache)
 	if code, stdout, _ := h.run(t, "--json", "import", archive, "--dir", filepath.Join(t.TempDir(), "again")); code == 0 || failureCode(t, stdout).Code != "missing-files" {
 		t.Fatalf("off a terminal import fails: code=%d %s", code, stdout)
 	}

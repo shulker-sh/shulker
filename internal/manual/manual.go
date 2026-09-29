@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode"
 
+	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/out"
 )
@@ -60,12 +61,13 @@ func Of(err error) []File {
 	return nil
 }
 
-// Status is where one file of a wait stands: found, with the folder it was found in, empty for a
-// file dropped on the terminal, or not found, with a note on a copy that isn't it.
+// Status is where one file of a wait stands: found, in the cache or in the folder From, empty for
+// a file dropped on the terminal, or not found, with a note on a copy that isn't it.
 type Status struct {
-	Found bool
-	From  string
-	Note  string
+	Found  bool
+	Cached bool
+	From   string
+	Note   string
 }
 
 // Wait looks for files dropped into a project's downloads folder, where any file of the right
@@ -74,8 +76,11 @@ type Status struct {
 // lands in the downloads folder under its expected name: copied when it was already there when
 // the wait started, moved when it arrived during it. Each file's hashes are remembered by its size
 // and modification time, so checking every few seconds hashes only what changed. Check and Take
-// may run at once.
+// may run at once. With a Cache, a file that lands in it, as another project's wait puts one, is
+// found there.
 type Wait struct {
+	Cache *cache.Cache
+
 	mu        sync.Mutex
 	downloads string
 	watch     []string
@@ -144,6 +149,14 @@ func (w *Wait) Check() ([]Status, error) {
 			if !w.status[i].Found && f.matches(h) {
 				w.status[i] = Status{Found: true, From: w.downloads}
 			}
+		}
+	}
+	for i, f := range w.files {
+		if w.status[i].Found || w.Cache == nil {
+			continue
+		}
+		if _, ok := w.Cache.BySha1(f.Sha1); ok || w.Cache.Has(f.Sha512) {
+			w.status[i] = Status{Found: true, Cached: true}
 		}
 	}
 	for i := range w.status {

@@ -56,6 +56,9 @@ func (a *app) awaitDownloads(ctx context.Context, downloads string, e *out.Error
 	}
 	a.printer.Settle()
 	w := manual.NewWait(downloads, a.watchedFolders(), files)
+	if d, err := a.deps(); err == nil {
+		w.Cache = d.Cache
+	}
 	rows := make([]out.WaitFile, len(files))
 	for i, f := range files {
 		rows[i] = out.WaitFile{Name: f.Name, Page: f.Page}
@@ -89,6 +92,8 @@ func foundFrom(downloads string, s manual.Status) string {
 	switch {
 	case !s.Found:
 		return ""
+	case s.Cached:
+		return "from the cache"
 	case s.From == "":
 		return "dropped here"
 	case s.From == downloads:

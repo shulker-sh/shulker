@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
@@ -195,6 +196,57 @@ func TestAddTreatsAForbiddenDownloadAsManual(t *testing.T) {
 	h.mustAdd("locked", AddOptions{})
 	if got := h.mod("locked"); got.URL != nil || got.Page != v.Page {
 		t.Fatalf("locked lock entry: %+v", got)
+	}
+}
+
+func TestAManualDownloadTheCacheHoldsIsTakenFromIt(t *testing.T) {
+	c := envtest.NewCDN(t)
+	cf := envtest.NewHost(c, "curse").LikeCurseForge()
+	nodist, locked := modJar(t, "nodist", "1.0.0", "client"), modJar(t, "locked", "1.0.0", "*")
+	cf.PublishManual(mod("300000", "nodist"), provider.Version{ID: "5100001", Number: "1.0.0", File: provider.File{Filename: "nodist-1.0.0.jar"}}, nodist)
+	c.Forbid(cf.Publish(mod("400000", "locked"), provider.Version{ID: "5200001", Number: "1.0.0", File: provider.File{Filename: "locked-1.0.0.jar"}}, locked))
+	h := newHarness(t, cf)
+	h.drop("nodist-1.0.0.jar", nodist)
+	h.drop("locked-1.0.0.jar", locked)
+	h.mustAdd("nodist", AddOptions{})
+	h.mustAdd("locked", AddOptions{})
+	if !h.r.Cache.IsManual(h.mod("nodist").Sha512) || !h.r.Cache.IsManual(h.mod("locked").Sha512) {
+		t.Fatal("a file taken from downloads/ is marked manual in the cache")
+	}
+
+	if err := os.RemoveAll(filepath.Join(h.r.Dir, DownloadsDir)); err != nil {
+		t.Fatal(err)
+	}
+	h.nextCommand()
+	for _, id := range []string{"nodist", "locked"} {
+		delete(h.r.Lock.Mods, id)
+		delete(h.r.Manifest.Requires, id)
+		h.mustAdd(id, AddOptions{})
+		if got := h.mod(id); got.URL != nil || got.Sha512 == "" {
+			t.Fatalf("%s is locked as a manual download: %+v", id, got)
+		}
+	}
+	if !h.logged("taking nodist-1.0.0.jar from the cache") || !h.logged("taking locked-1.0.0.jar from the cache") {
+		t.Fatalf("each take from the cache is a step: %q", h.log)
+	}
+}
+
+func TestInstallFillsAPendingDownloadFromTheCache(t *testing.T) {
+	h := newHarness(t, envtest.NewHost(envtest.NewCDN(t), "alpha"))
+	jar := modJar(t, "rtg", "1.0.0", "*")
+	if _, err := h.r.Cache.PutManual(bytes.NewReader(jar)); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha1.Sum(jar)
+	h.r.Lock.Mods["rtg"] = lock.Mod{Provider: "alpha", Project: "a-rtg", Version: "v1", VersionNumber: "1.0.0", Filename: "rtg.jar", Page: "https://example.com/rtg", Sha1: hex.EncodeToString(sum[:]), Side: "both", RequiredBy: []string{}}
+	if _, _, err := h.install(); err != nil {
+		t.Fatalf("a pending download the cache holds isn't missing: %v", err)
+	}
+	if m := h.mod("rtg"); m.IsPending() || m.Sha512 != sha512Hex(jar) {
+		t.Fatalf("the cached copy fills the pending entry: %+v", m)
+	}
+	if !h.logged("took 1 manual download from the cache") {
+		t.Fatalf("the take is reported: %q", h.log)
 	}
 }
 
