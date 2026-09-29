@@ -15,7 +15,6 @@ import (
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
-	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/jarmeta"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/lock"
@@ -580,17 +579,8 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 		}
 	}
 	if v.File.URL != "" {
-		sha, err := r.Cache.Fetch(ctx, r.Fetch, v.File.URL)
+		sha, err := r.Cache.FetchChecked(ctx, r.Fetch, v.File.URL, v.File.Sha1)
 		if err == nil {
-			got, err := fsutil.SHA1(r.Cache.Object(sha))
-			if err != nil {
-				return obtained{}, err
-			}
-			if got != v.File.Sha1 {
-				e := out.Errorf("checksum-mismatch", "the download from %s doesn't match the sha1 its provider gives", v.File.URL)
-				e.Rows = []out.Detail{{Label: "want", Text: v.File.Sha1}, {Label: "got", Text: got}}
-				return obtained{}, e
-			}
 			url := v.File.URL
 			return obtained{path: r.Cache.Object(sha), sha512: sha, url: &url}, nil
 		}

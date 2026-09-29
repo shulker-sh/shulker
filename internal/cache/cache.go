@@ -69,16 +69,10 @@ func (c *Cache) put(r io.Reader, manual bool) (string, error) {
 	return sha, c.commit(tmp.Name(), sha, hex.EncodeToString(h1.Sum(nil)), manual)
 }
 
-// commit lands the file at tmpPath as the object sha, and records it under its sha1, which is
-// hashed from the file when empty, and as manual when it is. An object already there is recorded
-// again all the same. The sha1 entry is written first, so a manual object is always found by it.
+// commit lands the file at tmpPath as the object sha, and records it under its sha1, and as manual
+// when it is. An object already there is recorded again all the same. The sha1 entry is written
+// first, so a manual object is always found by it.
 func (c *Cache) commit(tmpPath, sha, sum1 string, manual bool) error {
-	var err error
-	if sum1 == "" {
-		if sum1, err = fsutil.SHA1(tmpPath); err != nil {
-			return err
-		}
-	}
 	dst := c.Object(sha)
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
@@ -173,37 +167,43 @@ func (c *Cache) Ensure(ctx context.Context, client *fetch.Client, url, sha strin
 	if c.Has(sha) {
 		return c.Object(sha), nil
 	}
-	tmp, err := c.TempFile("dl")
-	if err != nil {
-		return "", err
-	}
-	defer os.Remove(tmp.Name())
-	got, err := client.Download(ctx, url, tmp)
-	tmp.Close()
-	if err != nil {
-		return "", err
-	}
-	if got != sha {
+	_, err := c.fetch(ctx, client, url, func(got, _ string) error {
+		if got == sha {
+			return nil
+		}
 		e := out.Errorf("checksum-mismatch", "the download from %s doesn't match its sha512", url)
 		e.Rows = []out.Detail{{Label: "want", Text: sha}, {Label: "got", Text: got}}
-		return "", e
-	}
-	return c.Object(sha), c.commit(tmp.Name(), sha, "", false)
+		return e
+	})
+	return c.Object(sha), err
 }
 
 // Fetch downloads url into the cache when its hash isn't known in advance, and returns the path.
 func (c *Cache) Fetch(ctx context.Context, client *fetch.Client, url string) (string, error) {
+	return c.fetch(ctx, client, url, nil)
+}
+
+// fetch downloads url into the cache, hashing it as it arrives, and returns its sha512. check sees
+// both hashes before the file is committed, and a check that fails leaves nothing behind.
+func (c *Cache) fetch(ctx context.Context, client *fetch.Client, url string, check func(sha, sum1 string) error) (string, error) {
 	tmp, err := c.TempFile("dl")
 	if err != nil {
 		return "", err
 	}
 	defer os.Remove(tmp.Name())
-	sha, err := client.Download(ctx, url, tmp)
+	h1 := sha1.New()
+	sha, err := client.Download(ctx, url, io.MultiWriter(tmp, h1))
 	tmp.Close()
 	if err != nil {
 		return "", err
 	}
-	return sha, c.commit(tmp.Name(), sha, "", false)
+	sum1 := hex.EncodeToString(h1.Sum(nil))
+	if check != nil {
+		if err := check(sha, sum1); err != nil {
+			return "", err
+		}
+	}
+	return sha, c.commit(tmp.Name(), sha, sum1, false)
 }
 
 func (c *Cache) CopyTo(sha, dst string) error {
@@ -219,20 +219,14 @@ func (c *Cache) CopyTo(sha, dst string) error {
 }
 
 // FetchChecked downloads a file the first time it is locked, checking the sha1 its source
-// publishes, and returns its sha512.
+// publishes, and returns its sha512. An empty sha1 checks nothing.
 func (c *Cache) FetchChecked(ctx context.Context, client *fetch.Client, url, sha1 string) (string, error) {
-	sha, err := c.Fetch(ctx, client, url)
-	if err != nil || sha1 == "" {
-		return sha, err
-	}
-	got, err := fsutil.SHA1(c.Object(sha))
-	if err != nil {
-		return "", err
-	}
-	if got != sha1 {
-		e := out.Errorf("checksum-mismatch", "the download from %s doesn't match the sha1 its metadata gives", url)
+	return c.fetch(ctx, client, url, func(_, got string) error {
+		if sha1 == "" || got == sha1 {
+			return nil
+		}
+		e := out.Errorf("checksum-mismatch", "the download from %s doesn't match the sha1 its source gives", url)
 		e.Rows = []out.Detail{{Label: "want", Text: sha1}, {Label: "got", Text: got}}
-		return "", e
-	}
-	return sha, nil
+		return e
+	})
 }

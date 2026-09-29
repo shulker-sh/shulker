@@ -148,3 +148,21 @@ func TestMarkManualMarksAPlainObject(t *testing.T) {
 		t.Fatal("a marked object is found by its sha1")
 	}
 }
+
+func TestAFetchWhoseSha1MismatchesLeavesNothing(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("a curseforge jar"))
+	}))
+	defer srv.Close()
+	c := newCache(t)
+	if _, err := c.FetchChecked(context.Background(), fetch.New("test"), srv.URL+"/a.jar", sha1Of("another jar")); err == nil {
+		t.Fatal("a download whose sha1 mismatches was taken")
+	}
+	if _, ok := c.BySha1(sha1Of("a curseforge jar")); ok {
+		t.Fatal("a download whose sha1 mismatches reached the cache")
+	}
+	sha, err := c.FetchChecked(context.Background(), fetch.New("test"), srv.URL+"/a.jar", sha1Of("a curseforge jar"))
+	if err != nil || !c.Has(sha) {
+		t.Fatalf("a download whose sha1 matches is cached: %v", err)
+	}
+}
