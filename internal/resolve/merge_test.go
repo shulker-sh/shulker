@@ -42,13 +42,14 @@ func TestMergeReplacesWhatTheEarlierImportWroteAndKeepsWhatTheUserChanged(t *tes
 	}
 	write("overrides/config/x.cfg", "x old")
 	write("overrides/config/y.cfg", "y mine")
+	overrides := []packarchive.Override{
+		{Layer: "overrides", Path: "config/x.cfg", Data: []byte("x old")},
+		{Layer: "overrides", Path: "config/y.cfg", Data: []byte("y old")},
+	}
 	earlier := NewEarlier(&packarchive.Archive{
-		Files: []packarchive.File{{Hashes: map[string]string{"sha512": sha("1")}}, {Hashes: map[string]string{"sha512": sha("2")}}},
-		Overrides: []packarchive.Override{
-			{Layer: "overrides", Path: "config/x.cfg", Data: []byte("x old")},
-			{Layer: "overrides", Path: "config/y.cfg", Data: []byte("y old")},
-		},
-	})
+		Files:     []packarchive.File{{Hashes: map[string]string{"sha512": sha("1")}}, {Hashes: map[string]string{"sha512": sha("2")}}},
+		Overrides: overrides,
+	}, overrides)
 	pl := lock.New()
 	pl.Mods["a"] = lock.Mod{Provider: "modrinth", Project: "pa", Version: "a3", Sha512: sha("3")}
 	pl.Mods["b"] = lock.Mod{Provider: "modrinth", Project: "pb", Version: "b4", Sha512: sha("4")}
@@ -98,7 +99,7 @@ func TestMergeMovesADependencyToThePacksKeyForAReplacedEntry(t *testing.T) {
 	inc := &Incoming{
 		Manifest: &manifest.Manifest{Name: "pack", Requires: map[string]manifest.Require{"shiny": {}}},
 		Lock:     pl,
-		Earlier:  NewEarlier(&packarchive.Archive{Files: []packarchive.File{{Hashes: map[string]string{"sha512": sha("1")}}}}),
+		Earlier:  NewEarlier(&packarchive.Archive{Files: []packarchive.File{{Hashes: map[string]string{"sha512": sha("1")}}}}, nil),
 	}
 
 	if _, err := Merge(p, inc, []string{"client"}); err != nil {

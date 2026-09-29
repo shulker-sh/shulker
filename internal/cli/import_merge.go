@@ -48,7 +48,7 @@ func (a *app) mergeImport(cmd *cobra.Command, d *deps, p *project.Project, arc *
 		}
 		mods = imported
 		inc = &resolve.Incoming{Manifest: r.Manifest, Lock: r.Lock, Overrides: mods.Overrides, Dir: staging, HasBlocks: arc.Marker != nil}
-		inc.Earlier = resolve.NewAt(d.Env, dir).ReadEarlier(ctx, p.Lock.Imported, record)
+		inc.Earlier = resolve.NewAt(d.Env, dir).ReadEarlier(ctx, p.Lock.Imported, record, r.Manifest, r.Lock)
 	}
 	name, version := inc.Manifest.Name, inc.Manifest.Version
 	var rep *resolve.Merged

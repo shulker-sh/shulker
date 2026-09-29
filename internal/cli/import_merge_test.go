@@ -236,6 +236,23 @@ func TestAReimportReplacesTheFilesTheEarlierImportWrote(t *testing.T) {
 	}
 }
 
+func TestAReimportKeepsNothingTheImportChangedAsItWroteIt(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric")
+	fresh := h.jars["fresh-animations"]
+	archive := writeMergePack(t, h, "fabric-loader", "0.17.3", nil, map[string][]byte{
+		"overrides/options.txt":                     []byte("fov:0.5\nresourcePacks:[\"vanilla\",\"file/" + fresh.filename + "\"]\n"),
+		"overrides/resourcepacks/" + fresh.filename: fresh.data,
+	})
+	importMerge(t, h, archive)
+
+	res := importMerge(t, h, archive)
+
+	if len(res.Data.KeptYours) != 0 {
+		t.Fatalf("nothing was changed since the last import, so nothing is kept: %q", res.Data.KeptYours)
+	}
+}
+
 func TestAReimportKeepsAFileTheUserChanged(t *testing.T) {
 	h := reimportCozy(t)
 	cozy := filepath.Join(h.dir, "overrides", "config", "cozy.txt")

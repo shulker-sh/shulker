@@ -224,15 +224,7 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 	if err := r.AdoptLocalFiles(); err != nil {
 		return nil, err
 	}
-	mods.Overrides = seedFromSeedMods(m, r.Lock, mods.Overrides, mods)
-	if arc.Marker != nil {
-		mods.Overrides = build.DropManifestOwned(m, mods.Overrides)
-		refolder(m, mods.Overrides, arc.Marker.Folders)
-	} else {
-		var warnings []string
-		mods.Overrides, warnings = build.AdoptPackChoices(m, r.Lock, mods.Overrides)
-		mods.Warnings = append(mods.Warnings, warnings...)
-	}
+	mods.Overrides = placeOverrides(m, r.Lock, arc.Marker, mods.Overrides, mods)
 	if opts.ServerPack && arc.Path != "" {
 		mods.ServerPack, err = r.serverPackOf(ctx, arc)
 		if err != nil {
@@ -240,6 +232,21 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 		}
 	}
 	return mods, nil
+}
+
+// placeOverrides is what an import does to the overrides it keeps once its files are locked: a seed
+// mod's defaults move to where the mod seeds them from, and then a marker's manifest takes the
+// files it owns, or a pack without one gives the manifest its resource pack and shader choices.
+func placeOverrides(m *manifest.Manifest, l *lock.Lock, marker *packarchive.Marker, overrides []packarchive.Override, rep *Imported) []packarchive.Override {
+	overrides = seedFromSeedMods(m, l, overrides, rep)
+	if marker != nil {
+		overrides = build.DropManifestOwned(m, overrides)
+		refolder(m, overrides, marker.Folders)
+		return overrides
+	}
+	overrides, warnings := build.AdoptPackChoices(m, l, overrides)
+	rep.Warnings = append(rep.Warnings, warnings...)
+	return overrides
 }
 
 // refolder puts each override the export recorded a folder for back in it, where that folder is
