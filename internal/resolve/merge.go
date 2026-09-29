@@ -242,6 +242,9 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 		if rel == "" {
 			continue
 		}
+		if !filepath.IsLocal(filepath.FromSlash(rel)) {
+			return rep, out.Errorf("path-outside", "%s is outside the project", rel)
+		}
 		from, to := filepath.Join(inc.Dir, filepath.FromSlash(rel)), filepath.Join(p.Dir, filepath.FromSlash(rel))
 		_, err := os.Lstat(to)
 		if err == nil && !replacedFiles[rel] {

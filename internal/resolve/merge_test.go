@@ -25,6 +25,29 @@ func TestMergeFailsOnALocalFileThePackLacks(t *testing.T) {
 	}
 }
 
+func TestMergeRefusesALocalFileOutsideTheSource(t *testing.T) {
+	root := t.TempDir()
+	dir, src := filepath.Join(root, "a", "project"), filepath.Join(root, "b", "source")
+	for _, d := range []string{dir, src} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "secret"), []byte("key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := &project.Project{Dir: dir, Manifest: &manifest.Manifest{Name: "p", Requires: map[string]manifest.Require{}}, Lock: lock.New()}
+	pl := lock.New()
+	pl.Mods["evil"] = lock.Mod{File: "../../secret"}
+	inc := &Incoming{Manifest: &manifest.Manifest{Name: "pack", Requires: map[string]manifest.Require{"evil": {File: "../../secret"}}}, Lock: pl, Dir: src}
+	if _, err := Merge(p, inc, []string{"client"}); out.CodeOf(err) != "path-outside" {
+		t.Fatalf("want path-outside, got %v", err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("something was written into the project: %v", entries)
+	}
+}
+
 func TestMergeReplacesWhatTheEarlierImportWroteAndKeepsWhatTheUserChanged(t *testing.T) {
 	dir := t.TempDir()
 	sha := func(c string) string { return strings.Repeat(c, 128) }

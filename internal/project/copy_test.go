@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestOwnPathsNamesTheProjectsFilesOnce(t *testing.T) {
@@ -88,5 +89,22 @@ func TestCopySourceUndoRemovesWhatAFailedCopyMade(t *testing.T) {
 	entries, _ := os.ReadDir(dir)
 	if len(entries) != 0 {
 		t.Fatalf("undo left %v", entries)
+	}
+}
+
+func TestCopyOwnFilesRefusesAPathOutsideTheSource(t *testing.T) {
+	root := t.TempDir()
+	src, dir := filepath.Join(root, "a", "src"), filepath.Join(root, "b", "dst")
+	if err := os.WriteFile(filepath.Join(root, "secret"), []byte("key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{src, dir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	created, err := CopyOwnFiles(src, dir, []string{"../../secret"})
+	if out.CodeOf(err) != "path-outside" || len(created) != 0 {
+		t.Fatalf("want path-outside and nothing created, got %v %v", created, err)
 	}
 }
