@@ -40,6 +40,17 @@ func (p *Printer) close() {
 	}
 }
 
+// opensFrame is whether open(w) would write the blank line above the output.
+func (p *Printer) opensFrame(w io.Writer) bool {
+	w = unwrap(w)
+	if p.JSON || !p.isFramed(w) {
+		return false
+	}
+	p.frame.mu.Lock()
+	defer p.frame.mu.Unlock()
+	return !p.frame.opened
+}
+
 func (p *Printer) isFramed(w io.Writer) bool {
 	if p.Framed != nil {
 		return p.Framed(w)

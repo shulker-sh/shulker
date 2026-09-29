@@ -1,7 +1,9 @@
 package out
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -23,7 +25,11 @@ func (s *fakeTableSource) Rows() TableAnswer {
 	for i := range s.rows {
 		rows = append(rows, TableRow{Cells: []string{fmt.Sprintf("%s row %02d", s.query, i), "slug"}, Value: fmt.Sprint(i)})
 	}
-	return TableAnswer{Query: s.query, Rows: rows, Status: fmt.Sprintf("%d results", len(rows))}
+	status := ""
+	if len(rows) == 0 {
+		status = "Type to search."
+	}
+	return TableAnswer{Query: s.query, Rows: rows, Status: status}
 }
 
 func newTestBrowser(t *testing.T, rows int) (*tableBrowser, *fakeTableSource) {
@@ -184,5 +190,88 @@ func TestTableBrowserCutsTheNameColumn(t *testing.T) {
 	typeQuery(m, "a-very-long-query-that-wont-fit")
 	if view := m.View(); !strings.Contains(view, "…") || !strings.Contains(view, "slug") {
 		t.Errorf("narrow table:\n%s", view)
+	}
+}
+
+func TestTableBrowserCountsThePosition(t *testing.T) {
+	m, _ := newTestBrowser(t, 18)
+	typeQuery(m, "so")
+	if view := m.View(); !strings.Contains(view, "18 results") || strings.Contains(view, " of ") {
+		t.Errorf("query line focused:\n%s", view)
+	}
+	hit(m, tea.KeyTab)
+	hit(m, tea.KeyDown)
+	hit(m, tea.KeyDown)
+	if view := m.View(); !strings.Contains(view, "3 of 18 results") {
+		t.Errorf("third row:\n%s", view)
+	}
+	one, _ := newTestBrowser(t, 1)
+	typeQuery(one, "so")
+	hit(one, tea.KeyTab)
+	if view := one.View(); !strings.Contains(view, "1 result\n") {
+		t.Errorf("one row:\n%s", view)
+	}
+}
+
+func TestTableBrowserMarksHiddenRows(t *testing.T) {
+	m, _ := newTestBrowser(t, 30)
+	typeQuery(m, "so")
+	if view := m.View(); strings.Contains(view, "↑") || !strings.Contains(view, "↓ 20 more\n") {
+		t.Errorf("at the top:\n%s", view)
+	}
+	hit(m, tea.KeyTab)
+	for range 15 {
+		hit(m, tea.KeyDown)
+	}
+	if view := m.View(); !strings.Contains(view, "↑ 6 more\n") || !strings.Contains(view, "↓ 14 more\n") {
+		t.Errorf("in the middle: top %d\n%s", m.top, view)
+	}
+	for range 14 {
+		hit(m, tea.KeyDown)
+	}
+	if view := m.View(); !strings.Contains(view, "↑ 20 more\n") || strings.Count(view, " more\n") != 1 {
+		t.Errorf("at the bottom:\n%s", view)
+	}
+	few, _ := newTestBrowser(t, 5)
+	typeQuery(few, "so")
+	if view := few.View(); strings.Contains(view, " more") {
+		t.Errorf("every row shown:\n%s", view)
+	}
+}
+
+func TestTableBrowserIsAsTallAsItsContent(t *testing.T) {
+	m, _ := newTestBrowser(t, 0)
+	deliver(m, m.ask())
+	if view := m.View(); strings.Contains(view, "\n\n\n") || !strings.Contains(view, "Type to search.\n\n") {
+		t.Errorf("empty query:\n%q", view)
+	}
+	few, _ := newTestBrowser(t, 3)
+	typeQuery(few, "so")
+	if view := few.View(); !strings.Contains(view, "so row 02  slug\n\n") || strings.Contains(view, "\n\n\n") {
+		t.Errorf("three rows:\n%q", view)
+	}
+}
+
+func TestTableBrowserDrawsTheFrameItOpens(t *testing.T) {
+	m, _ := newTestBrowser(t, 0)
+	m.frame = true
+	if view := m.View(); !strings.HasPrefix(view, "\n") {
+		t.Errorf("framed view:\n%q", view)
+	}
+	hit(m, tea.KeyEsc)
+	if m.View() != "" {
+		t.Errorf("left: %q", m.View())
+	}
+}
+
+func TestTableBrowserEscLeavesNoBlankLines(t *testing.T) {
+	var term bytes.Buffer
+	p := &Printer{Stdout: &term, Stderr: &term, Framed: func(io.Writer) bool { return true }}
+	if _, _, err := p.BrowseTable(TableBrowser{Title: "Search", Headers: []string{"Name"}, Source: &fakeTableSource{}}, strings.NewReader("\x1b")); err != nil {
+		t.Fatal(err)
+	}
+	p.Finish()
+	if strings.HasPrefix(term.String(), "\n") || strings.HasSuffix(term.String(), "\n") {
+		t.Errorf("esc left blank lines: %q", term.String())
 	}
 }

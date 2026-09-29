@@ -177,7 +177,7 @@ func TestSearchRowsAreTheStaticTablesRows(t *testing.T) {
 	f := newFakeSearches()
 	f.s.SetQuery("sodium")
 	answer := searchRows{f.s, true}.Rows()
-	if answer.Query != "sodium" || answer.Status != "1 result" || len(answer.Rows) != 1 {
+	if answer.Query != "sodium" || answer.Status != "" || len(answer.Rows) != 1 {
 		t.Fatalf("answer %+v", answer)
 	}
 	if row := answer.Rows[0]; row.Value != "modrinth:id-sodium" || !slices.Equal(row.Cells, []string{"Title sodium", "sodium", "", "", "modrinth", ""}) {

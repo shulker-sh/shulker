@@ -1,6 +1,7 @@
 package out
 
 import (
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -21,7 +22,8 @@ type TableSource interface {
 }
 
 // TableAnswer is a source's rows and status line. Query is the query the rows answer, which is an
-// earlier one when the latest failed and the last good rows stay on screen.
+// earlier one when the latest failed and the last good rows stay on screen. With no status, the
+// status line counts the rows.
 type TableAnswer struct {
 	Query  string
 	Rows   []TableRow
@@ -66,7 +68,9 @@ func (p *Printer) BrowseTable(b TableBrowser, in io.Reader) (key, value string, 
 		lipgloss.SetColorProfile(termenv.Ascii)
 	}
 	m := newTableBrowser(t, b, p.width())
-	p.open(p.Stderr)
+	// The view draws the frame's opening line itself, so leaving with nothing clears it too; what
+	// runs after opens the frame again when it prints.
+	m.frame = p.opensFrame(p.Stderr)
 	program := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithMouseCellMotion())
 	if _, err := program.Run(); err != nil {
 		return "", "", err
@@ -99,6 +103,7 @@ type tableBrowser struct {
 	b     TableBrowser
 	theme Theme
 	width int
+	frame bool
 	input textinput.Model
 	table table.Model
 	focus browseFocus
@@ -283,6 +288,9 @@ func (m *tableBrowser) View() string {
 	}
 	t := m.theme
 	var b strings.Builder
+	if m.frame {
+		b.WriteString("\n")
+	}
 	b.WriteString(gutter + t.Bold(m.b.Title) + "\n")
 	if m.focus == focusDetails {
 		details := m.details
@@ -298,7 +306,7 @@ func (m *tableBrowser) View() string {
 		return b.String()
 	}
 	b.WriteString(gutter + m.input.View() + "\n\n")
-	b.WriteString(gutter + m.status + "\n")
+	b.WriteString(gutter + m.statusLine() + "\n")
 	b.WriteString(m.tableView())
 	help := "tab results " + t.GlyphDot() + " esc exit"
 	if m.focus == focusResults {
@@ -308,9 +316,24 @@ func (m *tableBrowser) View() string {
 	return b.String()
 }
 
-// tableView is the header, its rule and the window of rows, always pickRows tall so the help line
-// stays put. Widths are fitted over every row, not just the window, so columns hold still as it
-// scrolls.
+// statusLine is the source's status or, without one, the number of rows and, once they have the
+// cursor, its position among them.
+func (m *tableBrowser) statusLine() string {
+	n := len(m.values)
+	switch {
+	case m.status != "" || n == 0:
+		return m.status
+	case n == 1:
+		return "1 result"
+	case m.focus == focusResults:
+		return fmt.Sprintf("%d of %d results", m.table.Cursor()+1, n)
+	}
+	return fmt.Sprintf("%d results", n)
+}
+
+// tableView is the header, its rule and the window of rows, with a line above and below it
+// counting the rows it hides that way. Widths are fitted over every row, not just the window, so
+// columns hold still as it scrolls.
 func (m *tableBrowser) tableView() string {
 	t := m.theme
 	rows := m.table.Rows()
@@ -318,8 +341,7 @@ func (m *tableBrowser) tableView() string {
 	blank := strings.Repeat(" ", Width(t.ArrowPick())+1)
 	var b strings.Builder
 	if len(rows) == 0 {
-		b.WriteString(strings.Repeat("\n", pickRows+2))
-		return b.String()
+		return ""
 	}
 	cells := make([][]string, len(rows))
 	for i, r := range rows {
@@ -350,16 +372,19 @@ func (m *tableBrowser) tableView() string {
 	b.WriteString(gutter + blank + t.Grey(strings.Repeat("─", total)) + "\n")
 	column := func(col int) lipgloss.Style { return m.b.Styles[min(col, len(m.b.Styles)-1)] }
 	cursor := m.table.Cursor()
-	for i := m.top; i < m.top+pickRows; i++ {
-		if i >= len(rows) {
-			b.WriteString("\n")
-			continue
-		}
+	end := min(m.top+pickRows, len(rows))
+	if m.top > 0 {
+		b.WriteString(gutter + blank + t.Grey(fmt.Sprintf("↑ %d more", m.top)) + "\n")
+	}
+	for i := m.top; i < end; i++ {
 		mark := blank
 		if i == cursor && m.focus == focusResults {
 			mark = arrow
 		}
 		b.WriteString(gutter + mark + line(rows[i], column) + "\n")
+	}
+	if end < len(rows) {
+		b.WriteString(gutter + blank + t.Grey(fmt.Sprintf("↓ %d more", len(rows)-end)) + "\n")
 	}
 	return b.String()
 }

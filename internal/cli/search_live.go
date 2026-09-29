@@ -289,9 +289,19 @@ func (l *liveSearch) Rows() []out.Choice {
 	return rows
 }
 
-func (l *liveSearch) Status() string { return l.statusOf(l.settle()) }
+func (l *liveSearch) Status() string {
+	r := l.settle()
+	if notice := l.noticeOf(r); notice != "" || r == nil {
+		return notice
+	}
+	if len(r.reply.results.Results) == 1 {
+		return "1 result"
+	}
+	return fmt.Sprintf("%d results", len(r.reply.results.Results))
+}
 
-func (l *liveSearch) statusOf(r *liveReply) string {
+// noticeOf is r's status when it is more than a count of results.
+func (l *liveSearch) noticeOf(r *liveReply) string {
 	t := l.theme
 	switch {
 	case r == nil:
@@ -305,10 +315,8 @@ func (l *liveSearch) statusOf(r *liveReply) string {
 		return t.Yellow("! " + strings.Join(r.reply.warnings, "; "))
 	case len(r.reply.results.Results) == 0:
 		return noSearchMatches(r.reply)
-	case len(r.reply.results.Results) == 1:
-		return "1 result"
 	}
-	return fmt.Sprintf("%d results", len(r.reply.results.Results))
+	return ""
 }
 
 // result is the result on screen whose row has value.
@@ -331,7 +339,7 @@ func (l *liveSearch) result(value string) (searchResult, bool) {
 func searchValue(r searchResult) string { return r.Providers[0].Provider + ":" + r.Providers[0].ID }
 
 // searchRows is a live search as the table browser reads it: the rows on screen, as the static
-// table draws them, and the status line.
+// table draws them, and the status line, which the browser counts the rows on.
 type searchRows struct {
 	*liveSearch
 	several bool
@@ -339,7 +347,7 @@ type searchRows struct {
 
 func (s searchRows) Rows() out.TableAnswer {
 	r := s.settle()
-	answer := out.TableAnswer{Status: s.statusOf(r)}
+	answer := out.TableAnswer{Status: s.noticeOf(r)}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if isTooShort(s.query) || s.shown == nil {
