@@ -33,7 +33,7 @@ func TestAnUnreachableModpackReadsAsOffline(t *testing.T) {
 				srv = httptest.NewServer(http.FileServer(http.Dir(served)))
 				source = srv.URL + "/remote.git"
 			} else {
-				srv = httptest.NewServer(http.FileServer(http.Dir(h.dir)))
+				srv = httptest.NewTLSServer(http.FileServer(http.Dir(h.dir)))
 				source = srv.URL + "/shulker.json"
 			}
 			h.dir = ""

@@ -18,7 +18,7 @@ import (
 
 func TestVersionsAsksForEveryLoader(t *testing.T) {
 	var loaders string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		loaders = r.URL.Query().Get("loaders")
 		w.Write([]byte("[]"))
 	}))
@@ -35,7 +35,7 @@ func TestVersionsAsksForEveryLoader(t *testing.T) {
 
 func TestSearchAsksForTheTypeAsAFacet(t *testing.T) {
 	var got url.Values
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got = r.URL.Query()
 		w.Write([]byte(`{"hits":[{"project_id":"AANobbMI","slug":"sodium","title":"Sodium","description":"The fastest rendering mod","project_type":"mod","downloads":228124617,"client_side":"required","server_side":"unsupported"}]}`))
 	}))
@@ -74,7 +74,7 @@ func TestWaitsOutARateLimitOnce(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls++
 				if calls <= tc.limited {
 					w.Header().Set("X-Ratelimit-Reset", tc.reset)
@@ -110,7 +110,7 @@ func TestIdentifyAsksOnceForVersionsAndOnceForProjects(t *testing.T) {
 		Hashes    []string `json:"hashes"`
 		Algorithm string   `json:"algorithm"`
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.Method+" "+r.URL.Path)
 		switch r.URL.Path {
 		case "/version_files":
@@ -143,7 +143,7 @@ func TestIdentifyAsksOnceForVersionsAndOnceForProjects(t *testing.T) {
 func TestProjectsAsksOnce(t *testing.T) {
 	calls := 0
 	var ids string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		ids = r.URL.Query().Get("ids")
 		w.Write([]byte(`[{"id":"p1","slug":"one","project_type":"mod"}]`))
@@ -161,7 +161,7 @@ func TestProjectsAsksOnce(t *testing.T) {
 }
 
 func TestProjectTellsDatapacksApart(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/project/terralith":
 			w.Write([]byte(`{"id":"8oi3bsk5","slug":"terralith","project_type":"mod","loaders":["datapack","fabric","neoforge"]}`))

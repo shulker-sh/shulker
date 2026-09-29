@@ -18,7 +18,7 @@ import (
 )
 
 func TestDownloadFailure(t *testing.T) {
-	cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	cdn := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.Itoa(9189206))
 		w.Write(make([]byte, 344<<10))
 	}))

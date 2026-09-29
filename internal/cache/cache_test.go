@@ -39,7 +39,7 @@ func TestAPutObjectIsFoundByItsSha1(t *testing.T) {
 }
 
 func TestAFetchedObjectIsFoundByItsSha1(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("a curseforge jar"))
 	}))
 	defer srv.Close()
@@ -150,7 +150,7 @@ func TestMarkManualMarksAPlainObject(t *testing.T) {
 }
 
 func TestAFetchWhoseSha1MismatchesLeavesNothing(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("a curseforge jar"))
 	}))
 	defer srv.Close()

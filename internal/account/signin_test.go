@@ -124,7 +124,7 @@ func newFakeMSA(t *testing.T) *fakeMSA {
 		}
 		writeJSON(w, map[string]any{"id": "069a79f4-44e9-4726-a5be-fca90e38aaf5", "name": "Notch"})
 	})
-	f.server = httptest.NewServer(mux)
+	f.server = httptest.NewTLSServer(mux)
 	t.Cleanup(f.server.Close)
 	return f
 }

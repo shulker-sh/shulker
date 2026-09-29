@@ -234,7 +234,7 @@ func TestLinkMojangFromRemoteSource(t *testing.T) {
 
 func TestLinkMojangFromManifestURL(t *testing.T) {
 	h, dir := projectWithLockedPack(t, "base")
-	srv := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	srv := httptest.NewTLSServer(http.FileServer(http.Dir(dir)))
 	defer srv.Close()
 	source := srv.URL + "/shulker.json"
 

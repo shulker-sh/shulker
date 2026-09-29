@@ -24,7 +24,7 @@ func runtimeIndex(t *testing.T, index map[string]map[string]string) *mojang.Runt
 			}}
 		}
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		json.NewEncoder(w).Encode(body)
 	}))
 	t.Cleanup(srv.Close)

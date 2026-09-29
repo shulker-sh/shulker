@@ -12,7 +12,7 @@ import (
 )
 
 func TestFetchArchiveLeavesNonArchivesToTheSourceReaders(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/readme", "/pack.mrpack":
 			w.Write([]byte("not a zip"))

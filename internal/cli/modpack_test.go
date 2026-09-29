@@ -365,7 +365,7 @@ func TestGitModpack(t *testing.T) {
 func TestURLModpackAndHandEdits(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tiny.json" {
 			http.NotFound(w, r)
 			return

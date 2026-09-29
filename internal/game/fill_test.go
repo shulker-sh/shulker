@@ -140,7 +140,7 @@ func TestFillRunsALoaderInstallerOnceWithTheClientJarInPlace(t *testing.T) {
 	installer := []byte("installer jar")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/installer.jar", func(w http.ResponseWriter, r *http.Request) { w.Write(installer) })
-	srv := httptest.NewServer(mux)
+	srv := httptest.NewTLSServer(mux)
 	t.Cleanup(srv.Close)
 	row := loader.Fake{Name: "neoforge", Installer: srv.URL + "/installer.jar"}.Row()
 	var runs []string

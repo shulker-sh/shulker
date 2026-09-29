@@ -9,16 +9,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 func TestIsNetwork(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "broken", http.StatusInternalServerError)
 	}))
 	url := srv.URL + "/x"
-	c := New("test")
+	c := trusting(srv)
 	if err := c.GetJSON(context.Background(), url, &struct{}{}); err == nil || IsNetwork(err) {
 		t.Fatalf("an HTTP error is not a network error: %v", err)
 	}
@@ -42,11 +45,11 @@ func TestIsNetwork(t *testing.T) {
 
 func TestRateLimitedSaysWhenToRetry(t *testing.T) {
 	for header, want := range map[string]time.Duration{"X-Ratelimit-Reset": 7 * time.Second, "Retry-After": 3 * time.Second} {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(header, strconv.Itoa(int(want/time.Second)))
 			w.WriteHeader(http.StatusTooManyRequests)
 		}))
-		err := New("test").GetJSON(context.Background(), srv.URL, &struct{}{})
+		err := trusting(srv).GetJSON(context.Background(), srv.URL, &struct{}{})
 		srv.Close()
 		var se *StatusError
 		if !errors.Is(err, ErrRateLimited) || !errors.As(err, &se) || se.RetryAfter != want {
@@ -66,7 +69,7 @@ func noRetryWaits(t *testing.T) {
 func dropping(t *testing.T, drops int) (*httptest.Server, *int) {
 	t.Helper()
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if calls <= drops {
 			conn, _, err := w.(http.Hijacker).Hijack()
@@ -86,7 +89,7 @@ func dropping(t *testing.T, drops int) (*httptest.Server, *int) {
 func TestADroppedConnectionIsRetried(t *testing.T) {
 	noRetryWaits(t)
 	srv, calls := dropping(t, 2)
-	c := New("test")
+	c := trusting(srv)
 	var got struct{ Method, Body string }
 	if err := c.PostJSON(context.Background(), srv.URL, map[string]int{"n": 1}, &got); err != nil {
 		t.Fatal(err)
@@ -99,7 +102,7 @@ func TestADroppedConnectionIsRetried(t *testing.T) {
 func TestADroppedConnectionFailsOnceTheRetriesRunOut(t *testing.T) {
 	noRetryWaits(t)
 	srv, calls := dropping(t, 3)
-	c := New("test")
+	c := trusting(srv)
 	var buf bytes.Buffer
 	_, err := c.Download(context.Background(), srv.URL+"/a.jar", &buf)
 	if err == nil || !IsNetwork(err) || *calls != 3 {
@@ -110,12 +113,38 @@ func TestADroppedConnectionFailsOnceTheRetriesRunOut(t *testing.T) {
 func TestAServerErrorIsNotRetried(t *testing.T) {
 	noRetryWaits(t)
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		http.Error(w, "broken", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	if err := New("test").GetJSON(context.Background(), srv.URL, &struct{}{}); err == nil || calls != 1 {
+	if err := trusting(srv).GetJSON(context.Background(), srv.URL, &struct{}{}); err == nil || calls != 1 {
 		t.Fatalf("calls %d, err %v", calls, err)
+	}
+}
+
+// trusting is a client for srv, a TLS test server.
+func trusting(srv *httptest.Server) *Client {
+	c := New("test")
+	c.HTTP = srv.Client()
+	return c
+}
+
+func TestPlainHTTPIsRefused(t *testing.T) {
+	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("jar"))
+	}))
+	defer plain.Close()
+	srv := httptest.NewTLSServer(http.RedirectHandler(plain.URL+"/a.jar", http.StatusFound))
+	defer srv.Close()
+	c := trusting(srv)
+	for _, url := range []string{plain.URL + "/a.jar", srv.URL + "/a.jar"} {
+		_, err := c.Download(context.Background(), url, io.Discard)
+		if out.CodeOf(err) != "url-insecure" || !strings.Contains(err.Error(), plain.URL+"/a.jar") {
+			t.Fatalf("%s: want url-insecure naming the plain URL, got %v", url, err)
+		}
+	}
+	if _, err := c.Remote(context.Background(), plain.URL+"/a.jar"); out.CodeOf(err) != "url-insecure" {
+		t.Fatalf("remote: %v", err)
 	}
 }

@@ -42,7 +42,7 @@ func TestIdentifyOnMatchesByFingerprintThenLookalike(t *testing.T) {
 	rezipped := jarWith(t, map[string]string{"fabric.mod.json": `{"id": "sodium"}`})
 	other := jarWith(t, map[string]string{"fabric.mod.json": `{"id": "lithium"}`})
 	sum := sha1.Sum(other)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(rezipped) }))
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(rezipped) }))
 	defer server.Close()
 	modrinth := fake.New("modrinth")
 	modrinth.Known = []provider.Project{{ID: "AANobbMI", Slug: "sodium", Type: manifest.TypeMod}}

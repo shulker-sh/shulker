@@ -13,7 +13,7 @@ import (
 // servePack serves a project's shulker.json and shulker.lock under /pack/, as a raw URL host does.
 func servePack(t *testing.T, dir string) string {
 	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimPrefix(r.URL.Path, "/pack/")
 		if name != "shulker.json" && name != "shulker.lock" {
 			http.NotFound(w, r)

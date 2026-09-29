@@ -40,7 +40,7 @@ func newHostedStore(t *testing.T) (*Store, *[]string) {
 }
 
 func TestFetchHostedCachesTheArchiveFromItsURL(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/pack.mrpack" {
 			http.NotFound(w, r)
 			return
@@ -63,7 +63,7 @@ func TestFetchHostedCachesTheArchiveFromItsURL(t *testing.T) {
 }
 
 func TestFetchHostedRefusesADownloadWithTheWrongHash(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("other bytes")) }))
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("other bytes")) }))
 	t.Cleanup(srv.Close)
 	s, _ := newHostedStore(t)
 	url := srv.URL + "/pack.mrpack"

@@ -251,7 +251,7 @@ func TestSyncFromManifestURL(t *testing.T) {
 	h.mustRun(t, "add", "sodium")
 	files := map[string]bool{"shulker.json": true, "shulker.lock": true}
 	down, broken, hits := false, false, 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits++
 		if down {
 			http.Error(w, "unavailable", http.StatusServiceUnavailable)

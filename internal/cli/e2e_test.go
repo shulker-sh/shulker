@@ -556,7 +556,7 @@ func newHarness(t *testing.T) *harness {
 	h.runtime.register(mux, func() string { return base })
 	h.registerCurseForge(t, mux, func() string { return base })
 	h.msa = h.fakeSignIn(mux)
-	h.server = httptest.NewServer(mux)
+	h.server = httptest.NewTLSServer(mux)
 	base = h.server.URL
 	library := func(name, path string) map[string]any {
 		jar, ok := h.neoLibs[path]

@@ -9,7 +9,7 @@ import (
 )
 
 func TestWaiting(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/missing" {
 			http.NotFound(w, r)
 			return
@@ -20,7 +20,7 @@ func TestWaiting(t *testing.T) {
 
 	var started []string
 	open := 0
-	c := New("test")
+	c := trusting(srv)
 	c.Waiting = func(host string) func() {
 		started = append(started, host)
 		open++

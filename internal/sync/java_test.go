@@ -19,7 +19,7 @@ func TestServerSyncKeepsTheInstalledRuntimeOffline(t *testing.T) {
 		t.Fatalf("a server sync fetches the lock's runtime: %v", res.Fetched)
 	}
 
-	h.e.Runtimes.IndexURL = "http://127.0.0.1:1/jrt/all.json"
+	h.e.Runtimes.IndexURL = "https://127.0.0.1:1/jrt/all.json"
 	res = h.mustSync(into, Request{})
 	if !h.warned("offline, keeping the installed Java runtime java-runtime-epsilon 25.0.1") {
 		t.Fatalf("offline runtime refresh: %v", h.env.Warnings)

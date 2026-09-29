@@ -193,7 +193,7 @@ func cacheLocalCopy(t *testing.T, h *harness, jar fakeJar) {
 func TestURLModpackFileEntryFails(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tiny.json" {
 			http.NotFound(w, r)
 			return

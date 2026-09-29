@@ -19,6 +19,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"shulker.sh/shulker/internal/out"
 )
 
 var (
@@ -143,6 +145,9 @@ func (c *Client) do(ctx context.Context, method, url string, header http.Header,
 	if err != nil {
 		return nil, err
 	}
+	if req.URL.Scheme != "https" {
+		return nil, insecure(url)
+	}
 	req.Header.Set("User-Agent", c.UserAgent)
 	for k, vs := range c.Header {
 		req.Header[k] = vs
@@ -155,12 +160,23 @@ func (c *Client) do(ctx context.Context, method, url string, header http.Header,
 		return nil, err
 	}
 	resp.Body = waitingBody{resp.Body, done}
+	if resp.Request.URL.Scheme != "https" {
+		resp.Body.Close()
+		return nil, insecure(resp.Request.URL.String())
+	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		answer, _ := io.ReadAll(io.LimitReader(resp.Body, errorBody))
 		resp.Body.Close()
 		return nil, &StatusError{URL: url, Status: resp.StatusCode, Body: answer, RetryAfter: retryAfter(resp)}
 	}
 	return resp, nil
+}
+
+// insecure refuses a URL that isn't https, whether a caller or a redirect named it.
+func insecure(url string) *out.Error {
+	e := out.Errorf("url-insecure", "%s isn't https", url)
+	e.Help = "shulker downloads over https only"
+	return e
 }
 
 // retryWaits are the pauses before each retry of a request whose connection dropped.

@@ -21,13 +21,13 @@ func TestRemoteReadsAZipEntryByRanges(t *testing.T) {
 	io.WriteString(w, `{"world_version":4903}`)
 	zw.Close()
 	var served int64
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cw := &countingResponse{ResponseWriter: w, n: &served}
 		http.ServeContent(cw, r, "server.jar", time.Time{}, bytes.NewReader(buf.Bytes()))
 	}))
 	defer srv.Close()
 
-	f, err := New("test").Remote(context.Background(), srv.URL)
+	f, err := trusting(srv).Remote(context.Background(), srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,14 +49,14 @@ func TestRemoteReadsAZipEntryByRanges(t *testing.T) {
 }
 
 func TestRemoteRefusesAServerThatIgnoresRanges(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", "10")
 		if r.Method == http.MethodGet {
 			io.WriteString(w, "0123456789")
 		}
 	}))
 	defer srv.Close()
-	f, err := New("test").Remote(context.Background(), srv.URL)
+	f, err := trusting(srv).Remote(context.Background(), srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,10 +88,10 @@ func TestRemoteReadsRangesFromWhereItsURLRedirects(t *testing.T) {
 	mux.HandleFunc("/cdn/file", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeContent(w, r, "file", time.Time{}, bytes.NewReader(data))
 	})
-	srv := httptest.NewServer(mux)
+	srv := httptest.NewTLSServer(mux)
 	defer srv.Close()
 
-	f, err := New("test").Remote(context.Background(), srv.URL+"/file")
+	f, err := trusting(srv).Remote(context.Background(), srv.URL+"/file")
 	if err != nil {
 		t.Fatal(err)
 	}

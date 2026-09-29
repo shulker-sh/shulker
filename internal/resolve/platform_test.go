@@ -91,7 +91,7 @@ func TestLoaderProvidesComesFromTheJar(t *testing.T) {
 	jar := zipBytes(t, "quilt.mod.json", `{"schema_version":1,"quilt_loader":{"id":"quilt_loader","version":"0.31.0-beta.4","provides":[{"id":"fabricloader","version":"0.19.5"}]}}`)
 	sum := sha512.Sum512(jar)
 	sha := hex.EncodeToString(sum[:])
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/quilt-loader-0.31.0-beta.4.jar" {
 			http.NotFound(w, r)
 			return

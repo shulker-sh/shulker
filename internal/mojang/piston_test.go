@@ -47,7 +47,7 @@ func fakePiston(t *testing.T, jar []byte) *Piston {
 	mux.HandleFunc("/server.jar", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeContent(w, r, "server.jar", time.Time{}, bytes.NewReader(jar))
 	})
-	srv := httptest.NewServer(mux)
+	srv := httptest.NewTLSServer(mux)
 	t.Cleanup(srv.Close)
 	base = srv.URL
 	p := NewPiston(fetch.New("test"))

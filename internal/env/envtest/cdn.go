@@ -34,7 +34,7 @@ type CDN struct {
 func NewCDN(t *testing.T) *CDN {
 	t.Helper()
 	c := &CDN{files: map[string][]byte{}, forbidden: map[string]bool{}, truncated: map[string]bool{}}
-	c.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	c.srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		data, ok := c.files[r.URL.Path]

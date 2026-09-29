@@ -11,7 +11,7 @@ import (
 )
 
 func TestServerErrorIsNotNetwork(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
@@ -24,7 +24,7 @@ func TestServerErrorIsNotNetwork(t *testing.T) {
 }
 
 func TestUnlistedGameIsInvalid(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"versions":[]}`))
 	}))
 	defer srv.Close()

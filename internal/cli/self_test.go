@@ -52,7 +52,7 @@ func newSelfUpdateHarness(t *testing.T, current, tag string, corrupt bool) *self
 	mux.HandleFunc("/download/"+tag+"/checksums.txt", func(w http.ResponseWriter, _ *http.Request) {
 		fmt.Fprintf(w, "%s  %s\n", checksum, asset)
 	})
-	server := httptest.NewServer(mux)
+	server := httptest.NewTLSServer(mux)
 	t.Cleanup(server.Close)
 
 	h := &selfUpdateHarness{exe: filepath.Join(t.TempDir(), "shulker")}

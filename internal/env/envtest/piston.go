@@ -164,7 +164,7 @@ func NewPiston(t *testing.T) *Piston {
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
-	p.srv = httptest.NewServer(mux)
+	p.srv = httptest.NewTLSServer(mux)
 	t.Cleanup(p.srv.Close)
 	base = p.srv.URL
 	return p

@@ -26,7 +26,7 @@ type keyServer struct {
 }
 
 func (k *keyServer) start(t *testing.T) *httptest.Server {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/key" {
 			k.keyFetches++
 			if !strings.HasPrefix(r.UserAgent(), "shulker/") || r.Header.Get("X-Shulker-Client") != "cli" || r.Header.Get("X-Api-Key") != "" {
@@ -110,7 +110,7 @@ func TestVersionsQueriesEachLoaderType(t *testing.T) {
 		"4": {fileJSON(2, "Fabric", "Quilt"), fileJSON(3, "Fabric")},
 	}
 	var asked []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/mods/10" {
 			json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"id": 10, "name": "Shiny", "slug": "shiny"}})
 			return
@@ -144,7 +144,7 @@ func TestVersionsQueriesEachLoaderType(t *testing.T) {
 
 func TestSearchSortsByPopularityAndKeepsClassesShulkerCanAdd(t *testing.T) {
 	var got url.Values
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got = r.URL.Query()
 		json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{
 			{"id": 394468, "name": "Sodium", "slug": "sodium", "summary": "The fastest rendering mod", "classId": 6, "downloadCount": 151434981},
@@ -175,7 +175,7 @@ func TestSearchSortsByPopularityAndKeepsClassesShulkerCanAdd(t *testing.T) {
 
 func TestModsThenFilesAskTwice(t *testing.T) {
 	var paths []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.Method+" "+r.URL.Path)
 		switch r.URL.Path {
 		case "/mods":
@@ -213,7 +213,7 @@ func TestModsThenFilesAskTwice(t *testing.T) {
 }
 
 func TestRateLimitIsNamed(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer srv.Close()
@@ -226,7 +226,7 @@ func TestRateLimitIsNamed(t *testing.T) {
 
 func TestForbiddenAfterTheKeyWorkedIsALockout(t *testing.T) {
 	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if calls > 1 {
 			w.WriteHeader(http.StatusForbidden)
@@ -249,7 +249,7 @@ func TestForbiddenAfterTheKeyWorkedIsALockout(t *testing.T) {
 }
 
 func TestFilesNamesAFileWithNothingToDownload(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"data":[{"id":100,"modId":10,"displayName":"1.0","fileName":"jei.jar","downloadUrl":"https://x/jei.jar","hashes":[]}]}`))
 	}))
 	defer srv.Close()
@@ -266,7 +266,7 @@ func TestFilesNamesAFileWithNothingToDownload(t *testing.T) {
 
 func TestIdentifyFingerprintsThenAsksForProjectsAndFiles(t *testing.T) {
 	var paths []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.Method+" "+r.URL.Path)
 		switch r.URL.Path {
 		case "/fingerprints":
@@ -340,7 +340,7 @@ func TestURLsRoundTrip(t *testing.T) {
 }
 
 func TestAFileIDReachesAProjectTheSearchMisses(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/mods/search":
 			w.Write([]byte(`{"data":[]}`))
@@ -372,7 +372,7 @@ func TestAFileIDReachesAProjectTheSearchMisses(t *testing.T) {
 }
 
 func TestAVersionNamesItsServerPack(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/mods/10":
 			w.Write([]byte(`{"data":{"id":10,"slug":"atm","name":"ATM","classId":4471,"links":{"websiteUrl":"https://www.curseforge.com/minecraft/modpacks/atm"}}}`))
@@ -428,7 +428,7 @@ func TestAModpackFileTaggedWithNoLoaderIsListed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/mods/285109" {
 			json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"id": 285109, "name": "RLCraft", "slug": "rlcraft", "classId": 4471}})
 			return

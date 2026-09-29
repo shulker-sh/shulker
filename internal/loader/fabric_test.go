@@ -32,7 +32,7 @@ func (f *fakeFile) sha512() string {
 func fakeRemote(t *testing.T, base string, routes map[string]any) *Remote {
 	t.Helper()
 	var srv *httptest.Server
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, ok := routes[r.URL.Path]
 		if !ok {
 			http.NotFound(w, r)

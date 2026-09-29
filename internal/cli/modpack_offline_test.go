@@ -94,7 +94,7 @@ func TestAnUnreachableGitModpackKeepsItsPinWhileTheOthersRefresh(t *testing.T) {
 func TestAnUnreachableURLModpackKeepsItsPinnedHash(t *testing.T) {
 	h := newInPlace(t)
 	manifest := `{"name": "tiny", "minecraft": "~26.2", "loader": {"type": "fabric", "version": "*"}, "requires": {"sodium": {}}, "client": {}}`
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tiny.json" {
 			http.NotFound(w, r)
 			return
@@ -152,7 +152,7 @@ func TestAModpackThatAnswersWithAnErrorStillFails(t *testing.T) {
 	t.Run("http 404", func(t *testing.T) {
 		h := newInPlace(t)
 		found := true
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !found || r.URL.Path != "/tiny.json" {
 				http.NotFound(w, r)
 				return
@@ -175,7 +175,7 @@ func TestSyncOfflineInPlaceKeepsEveryModpackAtItsPin(t *testing.T) {
 	h := newInPlace(t)
 	alpha := serveGitPack(t, "alpha", `"sodium": {}`)
 	h.mustRun(t, "modpack", "add", alpha.source, "--ref", "main")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/tiny.json" {
 			http.NotFound(w, r)
 			return

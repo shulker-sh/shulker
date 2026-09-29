@@ -154,7 +154,7 @@ func TestLockedModpacksPinningOneModDifferently(t *testing.T) {
 // no network, and a prune keeps what the project's lock pins.
 func TestURLModpackWithALockIsLocked(t *testing.T) {
 	h, dir := projectWithLockedPack(t, "base")
-	srv := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	srv := httptest.NewTLSServer(http.FileServer(http.Dir(dir)))
 	defer srv.Close()
 	source := srv.URL + "/shulker.json"
 
@@ -185,7 +185,7 @@ func TestURLModpackWithoutALockStaysFloating(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, "shulker.lock")); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	srv := httptest.NewTLSServer(http.FileServer(http.Dir(dir)))
 	defer srv.Close()
 
 	h.mustRun(t, "modpack", "add", srv.URL+"/shulker.json")
