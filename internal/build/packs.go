@@ -90,7 +90,7 @@ func (b *Builder) collectPacks(cond conditions, desired map[string]source, repor
 		if !b.Cache.Has(ref.pack.Sha512) {
 			return notInstalled(ref.key)
 		}
-		desired[ref.path] = fromCache(ref.pack.Sha512)
+		desired[ref.path] = fromCache(ref.pack.Sha512, urlOf(ref.pack.URL), ref.path)
 	}
 	return nil
 }
@@ -560,7 +560,7 @@ func (b *Builder) collectDatapacks(side, levelName string, cond conditions, desi
 		if !b.Cache.Has(p.Sha512) {
 			return notInstalled(key)
 		}
-		desired[folder+"/"+p.Filename] = fromCache(p.Sha512)
+		desired[folder+"/"+p.Filename] = fromCache(p.Sha512, urlOf(p.URL), p.Filename)
 		placed = append(placed, key)
 	}
 	if !loaded && len(placed) > 0 {

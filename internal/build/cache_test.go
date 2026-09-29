@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"shulker.sh/shulker/internal/cache"
@@ -236,5 +237,50 @@ func TestBuildIngestsFilesBeforeSweepingThem(t *testing.T) {
 	sum := sha512.Sum512([]byte("settings worth keeping"))
 	if !p.b.Cache.Has(hex.EncodeToString(sum[:])) {
 		t.Fatal("the bytes should reach the cache before the file is removed")
+	}
+}
+
+func TestBuildFetchesAChangedCacheObjectAgain(t *testing.T) {
+	p := newProject(t)
+	sodium := p.modrinth.Publish(provider.Project{ID: "AANobbMI", Slug: "sodium", Title: "Sodium"}, provider.Version{ID: "QANobbMI", Number: "0.9.2", File: provider.File{Filename: "sodium-fabric-0.9.2+mc26.2.jar"}}, modJar(t, "sodium", "0.9.2"))
+	p.lockMod("sodium", p.modrinth, sodium)
+	p.save()
+	if err := os.WriteFile(p.b.Cache.Object(sodium.File.Sha512), []byte("infected"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	report := p.mustBuild("client", Options{})
+	if got := p.built("client", "mods/"+sodium.File.Filename); got != string(p.cdn.Bytes(sodium)) {
+		t.Fatal("the build places the locked bytes, fetched again")
+	}
+	if !contains(report.Warnings, "The cache held a changed copy of "+sodium.File.Filename+", so it was downloaded again.") {
+		t.Fatalf("warnings: %q", report.Warnings)
+	}
+	if data, _ := os.ReadFile(p.b.Cache.Object(sodium.File.Sha512)); string(data) != string(p.cdn.Bytes(sodium)) {
+		t.Fatal("the cache holds the locked bytes again")
+	}
+}
+
+func TestBuildFailsOnAChangedCacheObjectWithNoURL(t *testing.T) {
+	p := newProject(t)
+	private := modJar(t, "private", "1.0")
+	p.lockLocalMod("private", "private-1.0.jar", private)
+	p.save()
+	if err := os.WriteFile(p.b.Cache.Object(p.b.Lock.Mods["private"].Sha512), []byte("infected"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := p.build("client", Options{})
+	if out.CodeOf(err) != "cache-changed" || !strings.Contains(err.Error(), "private-1.0.jar") {
+		t.Fatalf("want cache-changed naming the file, got %v", err)
+	}
+	if p.hasBuilt("client", "mods/private-1.0.jar") {
+		t.Fatal("a changed copy must not be placed")
+	}
+	entries, _ := os.ReadDir(p.builtPath("client", "mods"))
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Fatalf("a temp file was left: %s", e.Name())
+		}
 	}
 }

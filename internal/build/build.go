@@ -4,6 +4,7 @@ package build
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -166,7 +167,9 @@ type content interface {
 	bytes(b *Builder, abs string, m keyMerge) ([]byte, error)
 }
 
-type cached struct{ sha512 string }
+// cached is a file placed from the cache, with the URL it is fetched from again when the cached
+// copy has changed; a file with no URL, like a manual download, has none.
+type cached struct{ sha512, url, name string }
 
 func (c cached) hash(b *Builder) (string, error) {
 	data, err := os.ReadFile(b.Cache.Object(c.sha512))
@@ -200,7 +203,17 @@ func (o ownedContent) bytes(_ *Builder, abs string, m keyMerge) ([]byte, error) 
 	return o.render(existing, m.kept, m.dropped)
 }
 
-func fromCache(sha512 string) source { return source{content: cached{sha512}} }
+func fromCache(sha512, url, name string) source {
+	return source{content: cached{sha512: sha512, url: url, name: name}}
+}
+
+// urlOf is a lock's optional URL, empty when it has none.
+func urlOf(url *string) string {
+	if url == nil {
+		return ""
+	}
+	return *url
+}
 
 func ownedSource(f ownedFile) source { return source{content: ownedContent{f}} }
 
@@ -446,7 +459,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		return nil, err
 	}
 	for _, rel := range writes {
-		if err := b.write(filepath.Join(dir, filepath.FromSlash(rel)), desired[rel], merges[rel]); err != nil {
+		if err := b.write(filepath.Join(dir, filepath.FromSlash(rel)), desired[rel], merges[rel], report); err != nil {
 			return nil, err
 		}
 		report.Written = append(report.Written, rel)
@@ -497,7 +510,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 		if !b.Cache.Has(m.Sha512) {
 			return nil, nil, notInstalled(id)
 		}
-		desired["mods/"+m.Filename] = fromCache(m.Sha512)
+		desired["mods/"+m.Filename] = fromCache(m.Sha512, urlOf(m.URL), m.Filename)
 		placed[b.Lock.JarID(id)] = true
 	}
 	vars := templateVars(b.Manifest, b.Lock, side)
@@ -772,7 +785,7 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 	if vanilla == nil || !b.Cache.Has(vanilla.Sha512) {
 		return launcherMissing
 	}
-	desired[l.VanillaServerPath(b.Lock.Minecraft)] = fromCache(vanilla.Sha512)
+	desired[l.VanillaServerPath(b.Lock.Minecraft)] = fromCache(vanilla.Sha512, vanilla.URL, l.VanillaServerPath(b.Lock.Minecraft))
 	if b.Lock.Loader.Type == "" {
 		return nil
 	}
@@ -780,7 +793,7 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 		return launcherMissing
 	}
 	if l.ServerLaunchJar != "" {
-		desired[l.ServerLaunchJar] = fromCache(jar.Sha512)
+		desired[l.ServerLaunchJar] = fromCache(jar.Sha512, jar.URL, l.ServerLaunchJar)
 	}
 	for name, dl := range jar.Libraries {
 		path, err := loader.MavenPath(name)
@@ -790,7 +803,7 @@ func (b *Builder) collectLauncher(desired map[string]source) error {
 		if !b.Cache.Has(dl.Sha512) {
 			return launcherMissing
 		}
-		desired["libraries/"+path] = fromCache(dl.Sha512)
+		desired["libraries/"+path] = fromCache(dl.Sha512, dl.URL, "libraries/"+path)
 	}
 	return nil
 }
@@ -947,9 +960,9 @@ func (b *Builder) plan(dir string, desired map[string]source, prev instance.Stat
 	return plans, nil
 }
 
-func (b *Builder) write(abs string, s source, m keyMerge) error {
+func (b *Builder) write(abs string, s source, m keyMerge, report *Report) error {
 	if c, ok := s.content.(cached); ok {
-		return b.Cache.CopyTo(c.sha512, abs)
+		return b.placeCached(c, abs, report)
 	}
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return err
@@ -1066,6 +1079,26 @@ func (b *Builder) awaitsDownload(key, sha512 string, url *string, file string, r
 	}
 	report.Warnings = append(report.Warnings, fmt.Sprintf("%s is left out until its manual download is in downloads/; `shulker install` asks for it.", key))
 	return true
+}
+
+// placeCached copies c out of the cache to abs. A cached copy that no longer matches its hash is
+// fetched again from its URL; one with no URL, or downloaded by hand, fails the build instead.
+func (b *Builder) placeCached(c cached, abs string, report *Report) error {
+	manual := b.Cache.IsManual(c.sha512)
+	err := b.Cache.CopyTo(c.sha512, abs)
+	if !errors.Is(err, cache.ErrChanged) {
+		return err
+	}
+	if c.url == "" || manual {
+		e := out.Errorf("cache-changed", "the cache held a changed copy of %s", c.name)
+		e.Help = "run `shulker install` to put the locked copy back"
+		return e
+	}
+	if _, err := b.Cache.Ensure(context.Background(), b.Fetch, c.url, c.sha512); err != nil {
+		return err
+	}
+	report.Warnings = append(report.Warnings, fmt.Sprintf("The cache held a changed copy of %s, so it was downloaded again.", c.name))
+	return b.Cache.CopyTo(c.sha512, abs)
 }
 
 func notInstalled(what string) *out.Error {
