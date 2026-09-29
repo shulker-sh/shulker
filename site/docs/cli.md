@@ -101,14 +101,25 @@ These work with every command.
 
 | Flag | Description |
 | --- | --- |
-| `-C, --dir <path>` | Project directory (default: current directory) |
-| `-i, --instance <id>` | Act on a registered instance instead of a project directory, by id, name, or directory; `--id` is accepted as an alias. Can't be combined with `-C`. [`shulker instances`](#shulker-instances) lists them |
 | `--json` | Print machine-readable JSON, including errors; see [JSON output](#json-output) |
 | `--no-input` | Ask nothing: every prompt takes its default, and a required value left unset is a usage error naming the flag that supplies it. Output that isn't going to a terminal implies it, and so does `--json` |
 | `--no-color` | Print without colour. Setting `NO_COLOR` or `TERM=dumb` does the same, and colour is off whenever the output is not a terminal |
 | `--ascii` | Print with ASCII glyphs (`*`, `x`, `|-`, `->`, `>>`) in place of `✔`, `✘`, `├─`, `⟶`, and `»` |
 | `--annotations` | Also print each error and warning to stderr as a GitHub Actions workflow command, `::error title=<headline> (<code>)::<item>` for each of an error's items (or `::error title=<code>::<headline>` for one without) and `::warning::<warning>`, which the runner shows as annotations on the run. On by default when `GITHUB_ACTIONS=true`. Works with `--json`, whose output stays on stdout |
 | `--no-annotations` | Print no GitHub Actions annotations, even when `GITHUB_ACTIONS=true` |
+
+## Project and instance flags
+
+These say which directory a command acts on, so only the commands that act on one take them. Anywhere else they are an unknown flag.
+
+| Flag | Description |
+| --- | --- |
+| `-C, --dir <path>` | Project directory (default: current directory) |
+| `-i, --instance <id>` | Act on a registered instance instead of a project directory, by id, name, or directory; `--id` is accepted as an alias. Can't be combined with `-C`. [`shulker instances`](#shulker-instances) lists them |
+
+- Both: [`shulker add`](#shulker-add), [`shulker remove`](#shulker-remove), [`shulker list`](#shulker-list), [`shulker search`](#shulker-search), [`shulker lock`](#shulker-lock), [`shulker check`](#shulker-check), [`shulker match`](#shulker-match), [`shulker update`](#shulker-update), [`shulker outdated`](#shulker-outdated), [`shulker suggests`](#shulker-suggests), [`shulker pin`](#shulker-pin), [`shulker unpin`](#shulker-unpin), [`shulker ignore`](#shulker-ignore), [`shulker unignore`](#shulker-unignore), [`shulker set`](#shulker-set), [`shulker unset`](#shulker-unset), [`shulker get`](#shulker-get), [`shulker export mrpack`](#shulker-export-mrpack), [`shulker export curseforge`](#shulker-export-curseforge), [`shulker feature on|off`](#shulker-feature-on-off), [`shulker feature reset`](#shulker-feature-reset), [`shulker feature list`](#shulker-feature-list), [`shulker install`](#shulker-install), [`shulker build`](#shulker-build), [`shulker diff`](#shulker-diff), [`shulker pull`](#shulker-pull), [`shulker history list|show|prune`](#shulker-history-list), [`shulker rollback`](#shulker-rollback), [`shulker play`](#shulker-play), [`shulker serve`](#shulker-serve), [`shulker link`](#shulker-link), [`shulker link shulker|atlauncher|gdlauncher|mojang|prism|multimc`](#shulker-link), [`shulker sync`](#shulker-sync), [`shulker instance get|set|unset|edit|dump|log`](#shulker-instance), [`shulker unlink`](#shulker-unlink), [`shulker saves`](#shulker-saves), [`shulker saves prune`](#shulker-saves-prune), [`shulker backup`](#shulker-backup), [`shulker restore`](#shulker-restore), [`shulker hook pre-launch|post-exit|wrap`](#shulker-hook-pre-launch), [`shulker mod add|remove|list`](#shulker-mod-add-remove-list), [`shulker modpack add|remove|list`](#shulker-modpack-add-remove-list), [`shulker resourcepack add|remove|list`](#shulker-resourcepack-add-remove-list), [`shulker shader add|remove|list`](#shulker-shader-add-remove-list), [`shulker datapack add|remove|list`](#shulker-datapack-add-remove-list), [`shulker player`](#shulker-player)
+- `-C` only: [`shulker init`](#shulker-init), [`shulker create`](#shulker-create), [`shulker import`](#shulker-import), [`shulker cache info`](#shulker-cache-info), [`shulker cache prune`](#shulker-cache-prune)
+- `-i` only: [`shulker log`](#shulker-log)
 
 ## Projects
 
@@ -1382,7 +1393,7 @@ Print a setting as it is in effect. `--verbose` adds where it came from: set in 
 
 ```sh
 shulker instance get memory
-shulker -i smp instance get window
+shulker instance get window -i smp
 shulker instance get
 ```
 
@@ -1401,7 +1412,7 @@ shulker instance set memory 8G
 shulker instance set window 1920x1080
 shulker instance set jvmArgs --literal '["-XX:+UseZGC"]'
 shulker instance set account Notch
-shulker -i smp instance set hooks.preLaunch false
+shulker instance set hooks.preLaunch false -i smp
 ```
 
 | Flag | Description |
@@ -1510,7 +1521,7 @@ Delete all but the newest `--keep` backups of a save group or instance, whicheve
 
 ```sh
 shulker saves prune --group default --keep 3
-shulker -i smp saves prune --keep 0
+shulker saves prune -i smp --keep 0
 shulker saves prune --all --keep 5
 ```
 
@@ -1563,7 +1574,7 @@ Before it writes anything, `restore` backs up the worlds the target holds, as [`
 ```sh
 shulker restore
 shulker restore 2
-shulker -i smp restore --backup 20260918-203015-smp-backup
+shulker restore -i smp --backup 20260918-203015-smp-backup
 shulker restore --group default --backup ~/Downloads/worlds.zip
 shulker restore --world survival
 shulker restore --world survival --as survival-old

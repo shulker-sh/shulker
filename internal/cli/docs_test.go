@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -51,7 +52,7 @@ func TestCLIReferenceCoversEveryCommand(t *testing.T) {
 		}
 		for _, m := range usageFlag.FindAllStringSubmatch(cmd.NonInheritedFlags().FlagUsages(), -1) {
 			name := m[1]
-			if name != "help" && !regexp.MustCompile(`--`+name+`([^\w-]|$)`).MatchString(body) {
+			if name != "help" && name != "dir" && name != "instance" && !regexp.MustCompile(`--`+name+`([^\w-]|$)`).MatchString(body) {
 				missing = append(missing, path+" --"+name)
 			}
 		}
@@ -59,6 +60,64 @@ func TestCLIReferenceCoversEveryCommand(t *testing.T) {
 	visit(newApp(io.Discard, io.Discard).root())
 	if len(missing) > 0 {
 		t.Fatalf("site/docs/cli.md has no section or flag row for:\n  %s", strings.Join(missing, "\n  "))
+	}
+}
+
+// TestCLIReferenceListsScopeFlags holds the command lists under "Project and instance flags" to
+// the commands that define -C and -i.
+func TestCLIReferenceListsScopeFlags(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "site", "docs", "cli.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels := map[string]string{"Both": "dir instance", "`-C` only": "dir", "`-i` only": "instance"}
+	documented := map[string]string{}
+	for _, line := range strings.Split(docsSection(string(data), "## Project and instance flags"), "\n") {
+		label, list, ok := strings.Cut(strings.TrimPrefix(line, "- "), ": ")
+		if !ok || !strings.HasPrefix(line, "- ") {
+			continue
+		}
+		flags, known := labels[label]
+		if !known {
+			t.Fatalf("unknown list %q", label)
+		}
+		for _, m := range regexp.MustCompile("`(shulker [^`]+)`").FindAllStringSubmatch(list, -1) {
+			for _, path := range expandAlternatives(m[1]) {
+				documented[path] = flags
+			}
+		}
+	}
+	defined := map[string]string{}
+	var visit func(*cobra.Command)
+	visit = func(cmd *cobra.Command) {
+		var flags []string
+		for _, name := range []string{"dir", "instance"} {
+			if cmd.LocalNonPersistentFlags().Lookup(name) != nil {
+				flags = append(flags, name)
+			}
+		}
+		if len(flags) > 0 {
+			defined[cmd.CommandPath()] = strings.Join(flags, " ")
+		}
+		for _, sub := range cmd.Commands() {
+			visit(sub)
+		}
+	}
+	visit(newApp(io.Discard, io.Discard).root())
+	var wrong []string
+	for path, flags := range defined {
+		if documented[path] != flags {
+			wrong = append(wrong, fmt.Sprintf("%s takes %q, documented %q", path, flags, documented[path]))
+		}
+	}
+	for path, flags := range documented {
+		if defined[path] == "" {
+			wrong = append(wrong, fmt.Sprintf("%s takes neither, documented %q", path, flags))
+		}
+	}
+	sort.Strings(wrong)
+	if len(wrong) > 0 {
+		t.Fatalf("site/docs/cli.md \"Project and instance flags\" is wrong:\n  %s", strings.Join(wrong, "\n  "))
 	}
 }
 
