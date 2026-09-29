@@ -22,6 +22,8 @@ import (
 //	atlauncher/<loader>-<version>/ a loader installer's client install, whose libraries ATLauncher gets
 //	game/                          the store a direct launch assembles from: versions/, libraries/, assets/
 //	index/listings.json            the listing index: proven pairs of two providers' listings of one item
+//	index/sha1/<aa>/<sha1>         the sha512 of the object with this sha1
+//	index/manual/<sha512>          marks an object downloaded by hand, which no provider serves
 //
 // Paths are built here and nowhere else.
 
@@ -45,6 +47,14 @@ func (c *Cache) InstallerLog(at time.Time) (string, error) {
 
 func (c *Cache) Object(sha string) string {
 	return filepath.Join(c.Dir, "objects", sha[:2], sha)
+}
+
+func (c *Cache) manualMarker(sha string) string {
+	return filepath.Join(c.Dir, "index", "manual", sha)
+}
+
+func (c *Cache) sha1Entry(sum1 string) string {
+	return filepath.Join(c.Dir, "index", "sha1", sum1[:2], sum1)
 }
 
 // PackMirror is the bare git mirror of a pack source.

@@ -109,6 +109,11 @@ func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
 			p.Bytes += size
 		}
 	}
+	if !dryRun {
+		if err := c.dropIndexEntries(); err != nil {
+			return Pruned{}, err
+		}
+	}
 	listings, err := c.pruneListings(dryRun)
 	if err != nil {
 		return Pruned{}, err
