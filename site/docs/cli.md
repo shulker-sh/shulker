@@ -2074,7 +2074,6 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `not-shulker` | The instance belongs to another launcher, which starts it itself |
 | `not-synced` | The directory has no record of the source it was synced from |
 | `offline-account` | `accounts logout` or `accounts refresh` was given an offline account, which has no sign-in; `accounts remove` deletes it |
-| `override-outside` | An override would be written outside its folder. A modpack archive whose index or entries name such a path is refused as `mrpack-invalid` or `curseforge-invalid` first, so this is a second guard |
 | `override-path` | A path named to `match` isn't a jar in `mods/` or a zip in `resourcepacks/`, `shaderpacks/` or a datapack folder of `overrides/`, `client-overrides/` or `server-overrides/` |
 | `overrides-invalid` | The `shulker.overrides.json` at a modpack archive's root, where an export records which folder each override came from, isn't valid; it reaches you as `mrpack-marker` |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |
@@ -2082,6 +2081,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `pack-unknown` | `client.resourcePacks` or `client.shader` names a pack the lock doesn't have, as a pack of a modpack in `requires` can be. Fix the name, or add the pack first |
 | `path-invalid` | `shulker.json`, `config.json` or an instance's settings have no such field, or the path goes inside a single value or a list. `candidates`: the fields allowed there |
 | `path-not-set` | `get`, `config get` or `instance get` names a field that isn't set |
+| `path-outside` | A path a lock, manifest or modpack archive names would leave its folder: a local file, an override, or a git modpack's `path`. The schemas and the archive readers refuse such a path first, so this is a second guard |
 | `path-taken` | `import` built the new project, but the folder it goes into has a file where the project has a folder, or the other way round; nothing was moved into it |
 | `pin-mismatch` | The pinned version belongs to a different project |
 | `platform-not-found` | No published Minecraft or loader version matches the manifest's `minecraft` or `loader.version` range |

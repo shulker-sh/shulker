@@ -267,7 +267,7 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 	}
 	for _, o := range overrides {
 		if !filepath.IsLocal(filepath.FromSlash(o.Path)) {
-			return rep, out.Errorf("override-outside", "%s/%s is outside its folder", o.Layer, o.Path)
+			return rep, out.Errorf("path-outside", "%s/%s is outside its folder", o.Layer, o.Path)
 		}
 		to := filepath.Join(p.Dir, filepath.FromSlash(o.Layer), filepath.FromSlash(o.Path))
 		if _, err := os.Lstat(to); err == nil {

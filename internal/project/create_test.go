@@ -36,8 +36,8 @@ func TestCreateRefusesAnOverrideOutsideItsFolder(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "a", "b")
 	overrides := []packarchive.Override{{Layer: "overrides", Path: "../../ESCAPED.txt", Data: []byte("x")}}
 	err := Create(dir, &manifest.Manifest{}, lock.New(), overrides)
-	if out.CodeOf(err) != "override-outside" {
-		t.Fatalf("want override-outside, got %v", err)
+	if out.CodeOf(err) != "path-outside" {
+		t.Fatalf("want path-outside, got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "..", "ESCAPED.txt")); !os.IsNotExist(err) {
 		t.Fatalf("written outside the project: %v", err)
