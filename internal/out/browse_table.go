@@ -6,12 +6,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/table"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 )
 
 // TableSource answers a table browser as its query changes. Rows runs off the drawing loop and may
@@ -63,16 +62,12 @@ type DetailKey struct {
 // with no Run leaves with its key and the value of the row whose details were open.
 func (p *Printer) BrowseTable(b TableBrowser, in io.Reader) (key, value string, err error) {
 	t := p.ErrTheme
-	if !t.HasColor {
-		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
-		lipgloss.SetColorProfile(termenv.Ascii)
-	}
 	m := newTableBrowser(t, b, p.width())
 	p.endLive(true)
 	// The view draws the frame's opening line itself, so leaving with nothing clears it too; what
 	// runs after opens the frame again when it prints.
 	m.frame = p.opensFrame(p.Stderr)
-	program := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithMouseCellMotion())
+	program := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithColorProfile(t.Profile()))
 	if _, err := program.Run(); err != nil {
 		return "", "", err
 	}
@@ -124,6 +119,8 @@ type tableBrowser struct {
 func newTableBrowser(t Theme, b TableBrowser, width int) *tableBrowser {
 	input := textinput.New()
 	input.Prompt = "> "
+	// The prompt and the text take no paint, and the cursor none beyond the block it draws.
+	input.SetStyles(textinput.Styles{Cursor: textinput.CursorStyle{Shape: tea.CursorBlock, Blink: true}})
 	input.Focus()
 	columns := make([]table.Column, len(b.Headers))
 	for i, h := range b.Headers {
@@ -154,19 +151,34 @@ func (m *tableBrowser) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.focus == focusDetails && msg.value == m.detailsFor {
 			m.details = msg.text
 		}
-	case tea.MouseMsg:
-		if m.focus != focusDetails && msg.Action == tea.MouseActionPress {
+	case tea.MouseWheelMsg:
+		if m.focus != focusDetails {
 			switch msg.Button {
-			case tea.MouseButtonWheelUp:
+			case tea.MouseWheelUp:
 				m.move(-1)
-			case tea.MouseButtonWheelDown:
+			case tea.MouseWheelDown:
 				m.move(1)
 			}
 		}
-	case tea.KeyMsg:
+	case tea.PasteMsg:
+		if m.focus == focusQuery {
+			return m, m.edit(msg)
+		}
+	case tea.KeyPressMsg:
 		return m.onKey(msg)
 	}
 	return m, nil
+}
+
+// edit hands a key or a paste to the query line, and asks again when it changed the query.
+func (m *tableBrowser) edit(msg tea.Msg) tea.Cmd {
+	before := m.input.Value()
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	if m.input.Value() != before {
+		return tea.Batch(cmd, m.ask())
+	}
+	return cmd
 }
 
 // answered takes an answer to the query on the line; one to a query since typed past is dropped.
@@ -191,37 +203,31 @@ func (m *tableBrowser) answered(msg answerMsg) {
 	m.follow()
 }
 
-func (m *tableBrowser) onKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if k.Type == tea.KeyCtrlC {
+func (m *tableBrowser) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if k.String() == "ctrl+c" {
 		return m.leave("", "")
 	}
 	switch m.focus {
 	case focusQuery:
-		switch k.Type {
-		case tea.KeyEsc:
+		switch k.String() {
+		case "esc":
 			return m.leave("", "")
-		case tea.KeyTab, tea.KeyEnter:
+		case "tab", "enter":
 			if len(m.values) > 0 {
 				m.focus = focusResults
 				m.input.Blur()
 			}
 			return m, nil
 		}
-		before := m.input.Value()
-		var cmd tea.Cmd
-		m.input, cmd = m.input.Update(k)
-		if m.input.Value() != before {
-			return m, tea.Batch(cmd, m.ask())
-		}
-		return m, cmd
+		return m, m.edit(k)
 	case focusResults:
-		switch k.Type {
-		case tea.KeyEsc:
+		switch k.String() {
+		case "esc":
 			return m.leave("", "")
-		case tea.KeyShiftTab:
+		case "shift+tab":
 			m.focus = focusQuery
 			return m, m.input.Focus()
-		case tea.KeyEnter:
+		case "enter":
 			return m, m.open()
 		}
 		m.table.Focus()
@@ -230,7 +236,7 @@ func (m *tableBrowser) onKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.follow()
 		return m, nil
 	}
-	if k.Type == tea.KeyEsc {
+	if k.String() == "esc" {
 		m.focus = focusResults
 		return m, nil
 	}
@@ -283,7 +289,13 @@ func (m *tableBrowser) follow() {
 	}
 }
 
-func (m *tableBrowser) View() string {
+func (m *tableBrowser) View() tea.View {
+	v := tea.NewView(m.content())
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
+}
+
+func (m *tableBrowser) content() string {
 	if m.done {
 		return ""
 	}

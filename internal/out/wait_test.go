@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // fakeChecks answers a wait's checks from a script, one answer per check, repeating the last.
@@ -66,14 +66,14 @@ func msgs(cmd tea.Cmd) []tea.Msg {
 func TestWaitListsEachFileAsMissingOrFound(t *testing.T) {
 	f := &fakeChecks{answers: [][]bool{{true, false}}}
 	m := newTestWait(f)
-	view := m.View()
+	view := m.View().Content
 	for _, want := range []string{"2 files need a manual download into downloads", "o a.jar", "https://a", "o b.jar", "Enter"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view lacks %q:\n%s", want, view)
 		}
 	}
-	run(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if view := m.View(); !strings.Contains(view, "* a.jar") || !strings.Contains(view, "o b.jar") || m.done {
+	run(m, keyPress("enter"))
+	if view := m.View().Content; !strings.Contains(view, "* a.jar") || !strings.Contains(view, "o b.jar") || m.done {
 		t.Fatalf("enter checks, and a.jar is found:\n%s", view)
 	}
 }
@@ -89,19 +89,19 @@ func TestWaitEndsByItselfOnceEveryFileIsFound(t *testing.T) {
 	if !m.done || m.skipped || m.err != nil {
 		t.Fatalf("a tick finds the last file and the wait ends: done=%v skipped=%v err=%v", m.done, m.skipped, m.err)
 	}
-	if view := m.View(); strings.Contains(view, "Enter") || !strings.Contains(view, "* b.jar") {
+	if view := m.View().Content; strings.Contains(view, "Enter") || !strings.Contains(view, "* b.jar") {
 		t.Fatalf("the last view is the checklist without its keys:\n%s", view)
 	}
 }
 
 func TestWaitSkipsOnEscAndAbortsOnCtrlC(t *testing.T) {
 	m := newTestWait(&fakeChecks{answers: [][]bool{{false, false}}})
-	run(m, tea.KeyMsg{Type: tea.KeyEsc})
+	run(m, keyPress("esc"))
 	if !m.done || !m.skipped {
 		t.Fatalf("esc skips: done=%v skipped=%v", m.done, m.skipped)
 	}
 	m = newTestWait(&fakeChecks{answers: [][]bool{{false, false}}})
-	run(m, tea.KeyMsg{Type: tea.KeyCtrlC})
+	run(m, keyPress("ctrl+c"))
 	if !m.done || m.skipped || !errors.Is(m.err, ErrPickCancelled) {
 		t.Fatalf("ctrl-c aborts: done=%v skipped=%v err=%v", m.done, m.skipped, m.err)
 	}
@@ -110,7 +110,7 @@ func TestWaitSkipsOnEscAndAbortsOnCtrlC(t *testing.T) {
 func TestWaitChecksOnceAtATime(t *testing.T) {
 	f := &fakeChecks{answers: [][]bool{{false, false}}}
 	m := newTestWait(f)
-	_, first := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	_, first := m.Update(keyPress("enter"))
 	_, second := m.Update(waitTickMsg{})
 	if first == nil {
 		t.Fatal("enter starts a check")
@@ -132,12 +132,12 @@ func TestWaitTakesAPastedPath(t *testing.T) {
 		}
 		return []WaitFile{{Found: true}, {Found: true}}, "", nil
 	}
-	run(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/tmp/nope.jar"), Paste: true})
-	if view := m.View(); m.done || !strings.Contains(view, "/tmp/nope.jar isn't one of the files") {
+	run(m, tea.PasteMsg{Content: "/tmp/nope.jar"})
+	if view := m.View().Content; m.done || !strings.Contains(view, "/tmp/nope.jar isn't one of the files") {
 		t.Fatalf("a paste that matches nothing is noted:\n%s", view)
 	}
-	run(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
-	run(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/tmp/a.jar /tmp/b.jar"), Paste: true})
+	run(m, keyPress("x"))
+	run(m, tea.PasteMsg{Content: "/tmp/a.jar /tmp/b.jar"})
 	if !m.done || m.skipped || len(pasted) != 2 {
 		t.Fatalf("typing isn't a paste, and a paste that finds every file ends the wait: done=%v pasted=%q", m.done, pasted)
 	}
@@ -146,16 +146,16 @@ func TestWaitTakesAPastedPath(t *testing.T) {
 func TestEnterShowsTheCheckForAtLeastItsHold(t *testing.T) {
 	m := newTestWait(&fakeChecks{answers: [][]bool{{false, false}}})
 	m.hold = time.Hour
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if view := m.View(); !strings.Contains(view, "Checking...") || strings.Contains(view, "Enter") {
+	_, cmd := m.Update(keyPress("enter"))
+	if view := m.View().Content; !strings.Contains(view, "Checking...") || strings.Contains(view, "Enter") {
 		t.Fatalf("enter shows the check in place of the keys:\n%s", view)
 	}
 	_, held := m.Update(cmd())
-	if held == nil || !strings.Contains(m.View(), "Checking...") {
-		t.Fatalf("a check that answers at once still shows until its hold is up:\n%s", m.View())
+	if held == nil || !strings.Contains(m.View().Content, "Checking...") {
+		t.Fatalf("a check that answers at once still shows until its hold is up:\n%s", m.View().Content)
 	}
 	m.Update(waitHeldMsg{})
-	if view := m.View(); strings.Contains(view, "Checking...") || !strings.Contains(view, "Enter") {
+	if view := m.View().Content; strings.Contains(view, "Checking...") || !strings.Contains(view, "Enter") {
 		t.Fatalf("the keys come back once the hold is up:\n%s", view)
 	}
 }
@@ -166,14 +166,14 @@ func TestAFoundRowSaysWhereItCameFromAndDropsItsNote(t *testing.T) {
 		return []WaitFile{{Note: "a.jar in ~/Downloads isn't the expected file"}, {}}, nil
 	}
 	run(m, waitTickMsg{})
-	if !strings.Contains(m.View(), "isn't the expected file") {
-		t.Fatalf("the note shows while a.jar is missing:\n%s", m.View())
+	if !strings.Contains(m.View().Content, "isn't the expected file") {
+		t.Fatalf("the note shows while a.jar is missing:\n%s", m.View().Content)
 	}
 	m.w.Check = func() ([]WaitFile, error) {
 		return []WaitFile{{Found: true, From: "from ~/Downloads"}, {}}, nil
 	}
 	run(m, waitTickMsg{})
-	view := m.View()
+	view := m.View().Content
 	if strings.Contains(view, "isn't the expected file") || !strings.Contains(view, "* a.jar (from ~/Downloads)") {
 		t.Fatalf("a found row drops its note and says where it came from:\n%s", view)
 	}

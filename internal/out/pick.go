@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -34,7 +34,7 @@ const pickRows = 10
 func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, error) {
 	m := newPicker(p.ErrTheme, title, choices)
 	p.openPrompt()
-	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr)).Run(); err != nil {
+	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithColorProfile(p.ErrTheme.Profile())).Run(); err != nil {
 		return "", err
 	}
 	if m.cancelled {
@@ -68,11 +68,18 @@ func newPicker(t Theme, title string, choices []Choice) *picker {
 func (m *picker) Init() tea.Cmd { return nil }
 
 func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	k, ok := msg.(tea.KeyMsg)
+	if p, ok := msg.(tea.PasteMsg); ok {
+		if m.filtering {
+			m.query += p.Content
+			m.refilter()
+		}
+		return m, nil
+	}
+	k, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return m, nil
 	}
-	if k.Type == tea.KeyCtrlC {
+	if k.String() == "ctrl+c" {
 		m.done, m.cancelled = true, true
 		return m, tea.Quit
 	}
@@ -103,24 +110,25 @@ func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *picker) filter(k tea.KeyMsg) {
-	switch k.Type {
-	case tea.KeyEsc:
+func (m *picker) filter(k tea.KeyPressMsg) {
+	switch k.String() {
+	case "esc":
 		m.filtering, m.query = false, ""
-	case tea.KeyEnter:
+	case "enter":
 		m.filtering = false
 		return
-	case tea.KeyBackspace:
+	case "backspace":
 		if m.query == "" {
 			m.filtering = false
 			return
 		}
 		r := []rune(m.query)
 		m.query = string(r[:len(r)-1])
-	case tea.KeyRunes, tea.KeySpace:
-		m.query += string(k.Runes)
 	default:
-		return
+		if k.Text == "" {
+			return
+		}
+		m.query += k.Text
 	}
 	m.refilter()
 }
@@ -159,9 +167,9 @@ func (m *picker) chosen() string {
 	return m.choices[m.shown[m.cursor]].Value
 }
 
-func (m *picker) View() string {
+func (m *picker) View() tea.View {
 	if m.done {
-		return ""
+		return tea.NewView("")
 	}
 	t := m.theme
 	var b strings.Builder
@@ -187,7 +195,7 @@ func (m *picker) View() string {
 		help = "enter done • esc clear"
 	}
 	b.WriteString("\n" + gutter + t.Grey(help))
-	return b.String()
+	return tea.NewView(b.String())
 }
 
 func options(choices []Choice) []huh.Option[string] {

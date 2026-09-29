@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // WaitFile is one row of a download checklist: the file's name over the page it comes from, and a
@@ -39,7 +39,7 @@ type DownloadWait struct {
 func (p *Printer) AwaitDownloads(ctx context.Context, w DownloadWait, in io.Reader) (skipped bool, err error) {
 	m := newWaiter(p.ErrTheme, w)
 	p.openPrompt()
-	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithContext(ctx)).Run(); err != nil {
+	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithContext(ctx), tea.WithColorProfile(p.ErrTheme.Profile())).Run(); err != nil {
 		if errors.Is(err, tea.ErrProgramKilled) {
 			return false, ErrPickCancelled
 		}
@@ -107,20 +107,21 @@ func (m *waiter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.Paste && m.w.Paste != nil {
-			text := string(msg.Runes)
+	case tea.PasteMsg:
+		if m.w.Paste != nil {
+			text := msg.Content
 			return m, func() tea.Msg {
 				files, note, err := m.w.Paste(text)
 				return waitPastedMsg{files, note, err}
 			}
 		}
-		switch msg.Type {
-		case tea.KeyCtrlC:
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "ctrl+c":
 			return m.end(false, ErrPickCancelled)
-		case tea.KeyEsc:
+		case "esc":
 			return m.end(true, nil)
-		case tea.KeyEnter:
+		case "enter":
 			m.asked = time.Now()
 			return m, m.check()
 		}
@@ -185,7 +186,7 @@ func (m *waiter) allFound() bool {
 
 // View is the checklist, and while it waits the keys under it. The last view stays on screen as
 // the record of what was found.
-func (m *waiter) View() string {
+func (m *waiter) View() tea.View {
 	t := m.theme
 	var b strings.Builder
 	l := &Lines{W: &b, T: t}
@@ -202,7 +203,7 @@ func (m *waiter) View() string {
 		}
 	}
 	if m.done {
-		return b.String()
+		return tea.NewView(b.String())
 	}
 	if m.note != "" {
 		l.Blank()
@@ -216,5 +217,5 @@ func (m *waiter) View() string {
 	} else {
 		l.Muted("Press Enter to check now, or Esc to skip the files still missing")
 	}
-	return b.String()
+	return tea.NewView(b.String())
 }

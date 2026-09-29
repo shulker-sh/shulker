@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/spinner"
+	"charm.land/bubbles/v2/spinner"
 )
 
 func TestStepsSettleOffTerminal(t *testing.T) {
@@ -155,7 +155,7 @@ func TestSpinnerFramesSitOneSpaceBeforeTheText(t *testing.T) {
 	if got := newSpinner(Theme{ASCII: true}).View(); got != "|" {
 		t.Fatalf("ascii spinner starts at %q", got)
 	}
-	if got := newSpinner(Theme{HasColor: true}).View(); got != "\x1b[1;36m⣾\x1b[0m" && got != "\x1b[36;1m⣾\x1b[0m" {
+	if got := newSpinner(Theme{HasColor: true}).View(); got != "\x1b[1;36m⣾\x1b[m" {
 		t.Fatalf("coloured spinner %q", got)
 	}
 }
