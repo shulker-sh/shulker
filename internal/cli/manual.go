@@ -65,23 +65,36 @@ func (a *app) awaitDownloads(ctx context.Context, downloads string, e *out.Error
 		Files: rows,
 		Check: func() ([]out.WaitFile, error) {
 			status, err := w.Check()
-			return waitFiles(status), err
+			return waitFiles(downloads, status), err
 		},
 		Every: downloadCheckEvery,
 		Paste: func(text string) ([]out.WaitFile, string, error) {
 			status, note, err := w.Take(text)
-			return waitFiles(status), note, err
+			return waitFiles(downloads, status), note, err
 		},
 	}, a.stdin)
 	return skip, escaped(err)
 }
 
-func waitFiles(status []manual.Status) []out.WaitFile {
+func waitFiles(downloads string, status []manual.Status) []out.WaitFile {
 	files := make([]out.WaitFile, len(status))
 	for i, s := range status {
-		files[i] = out.WaitFile{Found: s.Found, Note: s.Note}
+		files[i] = out.WaitFile{Found: s.Found, From: foundFrom(downloads, s), Note: s.Note}
 	}
 	return files
+}
+
+// foundFrom is where a found file came from, as its row says it.
+func foundFrom(downloads string, s manual.Status) string {
+	switch {
+	case !s.Found:
+		return ""
+	case s.From == "":
+		return "dropped here"
+	case s.From == downloads:
+		return "from " + resolve.DownloadsDir + "/"
+	}
+	return "from " + out.Tilde(s.From)
 }
 
 // watchedFolders are the folders downloads.watch names, besides the project's downloads/. A

@@ -11,11 +11,13 @@ import (
 )
 
 // WaitFile is one row of a download checklist: the file's name over the page it comes from, and a
-// note under them when something is wrong with a copy that was found.
+// note under them when something is wrong with a copy that was found. From says where a found
+// file came from, "from ~/Downloads" for one.
 type WaitFile struct {
 	Name  string
 	Page  string
 	Found bool
+	From  string
 	Note  string
 }
 
@@ -48,6 +50,13 @@ func (p *Printer) AwaitDownloads(ctx context.Context, w DownloadWait, in io.Read
 
 type waitTickMsg struct{}
 
+// waitHeldMsg ends the hold of a check enter asked for.
+type waitHeldMsg struct{}
+
+// checkingHold is how long the footer reads "Checking…" after enter, so a check that finds
+// nothing still reads as having happened.
+const checkingHold = 500 * time.Millisecond
+
 type waitCheckedMsg struct {
 	files []WaitFile
 	err   error
@@ -63,14 +72,17 @@ type waiter struct {
 	theme    Theme
 	w        DownloadWait
 	checking bool
-	note     string
-	done     bool
-	skipped  bool
-	err      error
+	// asked is when enter asked for a check whose "Checking…" still shows; zero when none does.
+	asked   time.Time
+	hold    time.Duration
+	note    string
+	done    bool
+	skipped bool
+	err     error
 }
 
 func newWaiter(t Theme, w DownloadWait) *waiter {
-	return &waiter{theme: t, w: w}
+	return &waiter{theme: t, w: w, hold: checkingHold}
 }
 
 func (m *waiter) Init() tea.Cmd { return tea.Batch(m.check(), m.tick()) }
@@ -109,13 +121,27 @@ func (m *waiter) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEsc:
 			return m.end(true, nil)
 		case tea.KeyEnter:
+			m.asked = time.Now()
 			return m, m.check()
 		}
 	case waitTickMsg:
 		return m, tea.Batch(m.check(), m.tick())
 	case waitCheckedMsg:
 		m.checking = false
-		return m.update(msg.files, msg.err)
+		model, cmd := m.update(msg.files, msg.err)
+		if m.done || m.asked.IsZero() {
+			return model, cmd
+		}
+		left := m.hold - time.Since(m.asked)
+		if left <= 0 {
+			m.asked = time.Time{}
+			return model, cmd
+		}
+		return model, tea.Tick(left, func(time.Time) tea.Msg { return waitHeldMsg{} })
+	case waitHeldMsg:
+		if !m.checking {
+			m.asked = time.Time{}
+		}
 	case waitPastedMsg:
 		m.note = msg.note
 		return m.update(msg.files, msg.err)
@@ -129,9 +155,12 @@ func (m *waiter) update(files []WaitFile, err error) (tea.Model, tea.Cmd) {
 	}
 	for i, f := range files {
 		// A check that started before a paste took a file answers after it, without that file.
-		m.w.Files[i].Found = m.w.Files[i].Found || f.Found
-		if !m.w.Files[i].Found {
-			m.w.Files[i].Note = f.Note
+		row := &m.w.Files[i]
+		switch {
+		case !row.Found && f.Found:
+			row.Found, row.From, row.Note = true, f.From, ""
+		case !row.Found:
+			row.Note = f.Note
 		}
 	}
 	if m.allFound() {
@@ -166,7 +195,7 @@ func (m *waiter) View() string {
 		if f.Found {
 			mark = t.paint(t.GlyphOK(), sgrGreen, sgrBold)
 		}
-		l.line("  " + mark + " " + f.Name)
+		l.line("  " + mark + " " + f.Name + t.Aside(f.From))
 		l.line("    " + t.Grey(f.Page))
 		if f.Note != "" {
 			l.line("    " + t.Yellow(f.Note))
@@ -180,7 +209,9 @@ func (m *waiter) View() string {
 		l.Warn(m.note)
 	}
 	l.Blank()
-	if m.w.Paste != nil {
+	if !m.asked.IsZero() {
+		l.Muted("Checking" + t.Ellipsis())
+	} else if m.w.Paste != nil {
 		l.Muted("Press Enter to check now, drop a file here to take it, or Esc to skip the files still missing")
 	} else {
 		l.Muted("Press Enter to check now, or Esc to skip the files still missing")

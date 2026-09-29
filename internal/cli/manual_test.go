@@ -100,7 +100,7 @@ func TestImportWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	}, "\r")
 
 	code, stdout, stderr := h.run(t, "import", archive, "--dir", dir)
-	if code != 0 || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "✔ nodist-1.0.0.jar") {
+	if code != 0 || !strings.Contains(stderr, downloads) || !strings.Contains(stderr, "✔ nodist-1.0.0.jar (from downloads/)") {
 		t.Fatalf("import: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 	if _, l := readProject(t, dir); l.Mods["nodist"].Sha512 != h.jars["nodist"].sha512 {
@@ -165,7 +165,7 @@ func TestInstallTakesAManualDownloadFromAWatchedFolder(t *testing.T) {
 	h.stdin = keysOnceWaiting(t, filepath.Join(h.dir, "downloads"), func() {}, "")
 
 	code, stdout, stderr := h.run(t, "install")
-	if code != 0 || !strings.Contains(stdout, "Built client") {
+	if code != 0 || !strings.Contains(stdout, "Built client") || !strings.Contains(stderr, "nodist-1.0.0.jar (from "+browser+")") {
 		t.Fatalf("the wait finds the file in ~/Downloads and goes on by itself: code=%d stdout=%s stderr=%s", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(browser, "nodist-1.0.0.jar")); err != nil {

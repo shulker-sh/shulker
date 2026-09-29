@@ -26,12 +26,14 @@ func (f *fakeChecks) check() ([]WaitFile, error) {
 }
 
 func newTestWait(f *fakeChecks) *waiter {
-	return newWaiter(Theme{ASCII: true}, DownloadWait{
+	m := newWaiter(Theme{ASCII: true}, DownloadWait{
 		Title: "2 files need a manual download into downloads",
 		Files: []WaitFile{{Name: "a.jar", Page: "https://a"}, {Name: "b.jar", Page: "https://b"}},
 		Check: f.check,
 		Every: time.Millisecond,
 	})
+	m.hold = time.Millisecond
+	return m
 }
 
 // run feeds msg to m and then every message its commands produce, leaving ticks unsent.
@@ -138,5 +140,41 @@ func TestWaitTakesAPastedPath(t *testing.T) {
 	run(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/tmp/a.jar /tmp/b.jar"), Paste: true})
 	if !m.done || m.skipped || len(pasted) != 2 {
 		t.Fatalf("typing isn't a paste, and a paste that finds every file ends the wait: done=%v pasted=%q", m.done, pasted)
+	}
+}
+
+func TestEnterShowsTheCheckForAtLeastItsHold(t *testing.T) {
+	m := newTestWait(&fakeChecks{answers: [][]bool{{false, false}}})
+	m.hold = time.Hour
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if view := m.View(); !strings.Contains(view, "Checking...") || strings.Contains(view, "Enter") {
+		t.Fatalf("enter shows the check in place of the keys:\n%s", view)
+	}
+	_, held := m.Update(cmd())
+	if held == nil || !strings.Contains(m.View(), "Checking...") {
+		t.Fatalf("a check that answers at once still shows until its hold is up:\n%s", m.View())
+	}
+	m.Update(waitHeldMsg{})
+	if view := m.View(); strings.Contains(view, "Checking...") || !strings.Contains(view, "Enter") {
+		t.Fatalf("the keys come back once the hold is up:\n%s", view)
+	}
+}
+
+func TestAFoundRowSaysWhereItCameFromAndDropsItsNote(t *testing.T) {
+	m := newTestWait(&fakeChecks{answers: [][]bool{{false, false}}})
+	m.w.Check = func() ([]WaitFile, error) {
+		return []WaitFile{{Note: "a.jar in ~/Downloads isn't the expected file"}, {}}, nil
+	}
+	run(m, waitTickMsg{})
+	if !strings.Contains(m.View(), "isn't the expected file") {
+		t.Fatalf("the note shows while a.jar is missing:\n%s", m.View())
+	}
+	m.w.Check = func() ([]WaitFile, error) {
+		return []WaitFile{{Found: true, From: "from ~/Downloads"}, {}}, nil
+	}
+	run(m, waitTickMsg{})
+	view := m.View()
+	if strings.Contains(view, "isn't the expected file") || !strings.Contains(view, "* a.jar (from ~/Downloads)") {
+		t.Fatalf("a found row drops its note and says where it came from:\n%s", view)
 	}
 }

@@ -214,3 +214,26 @@ func TestTakeHashesAPastedPathAgainstTheMissingFiles(t *testing.T) {
 		t.Fatalf("a path to nothing is noted: %q", note)
 	}
 }
+
+func TestAFoundFileSaysWhichFolderItWasFoundIn(t *testing.T) {
+	downloads, folder, file := watched(t)
+	s1, _ := sums("mine")
+	other := File{Name: "b.jar", Sha1: s1}
+	s1, _ = sums("dropped")
+	pasted := File{Name: "c.jar", Sha1: s1}
+	w := NewWait(downloads, []string{folder}, []File{file, other, pasted})
+	os.MkdirAll(downloads, 0o755)
+	write(t, filepath.Join(folder, "a.jar"), "right", time.Hour)
+	write(t, filepath.Join(downloads, "b.jar"), "mine", time.Hour)
+	drop := filepath.Join(t.TempDir(), "c.jar")
+	write(t, drop, "dropped", time.Hour)
+	if _, _, err := w.Take(drop); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		found, err := w.Check()
+		if err != nil || found[0].From != folder || found[1].From != downloads || !found[2].Found || found[2].From != "" {
+			t.Fatalf("a find keeps the folder it was first found in, and a dropped file has none: %+v %v", found, err)
+		}
+	}
+}

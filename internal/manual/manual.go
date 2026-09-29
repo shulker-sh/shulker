@@ -60,9 +60,11 @@ func Of(err error) []File {
 	return nil
 }
 
-// Status is where one file of a wait stands: found, or not with a note on a copy that isn't it.
+// Status is where one file of a wait stands: found, with the folder it was found in, empty for a
+// file dropped on the terminal, or not found, with a note on a copy that isn't it.
 type Status struct {
 	Found bool
+	From  string
 	Note  string
 }
 
@@ -139,8 +141,8 @@ func (w *Wait) Check() ([]Status, error) {
 			return nil, err
 		}
 		for i, f := range w.files {
-			if f.matches(h) {
-				w.status[i] = Status{Found: true}
+			if !w.status[i].Found && f.matches(h) {
+				w.status[i] = Status{Found: true, From: w.downloads}
 			}
 		}
 	}
@@ -191,7 +193,7 @@ func (w *Wait) checkWatched(dir string) error {
 				if err := w.take(c, f); err != nil {
 					return err
 				}
-				w.status[i] = Status{Found: true}
+				w.status[i] = Status{Found: true, From: dir}
 				break
 			}
 			if isNamed && !named {
