@@ -102,7 +102,7 @@ func (a *app) accountsLogoutCmd() *cobra.Command {
 				return err
 			}
 			if !signOut {
-				return a.printer.Emit(nil, func(l *out.Lines) { l.Info(r.Name + " is still signed in") })
+				return a.printer.Emit(nil, func(l *out.Lines) { l.Info(r.Name + " is still signed in.") })
 			}
 			path, store, err := a.accountStore()
 			if err != nil {
@@ -121,7 +121,7 @@ func (a *app) accountsLogoutCmd() *cobra.Command {
 				l.OK("Signed out "+r.Name, r.ID)
 				switch {
 				case moved != nil:
-					l.Info(moved.Name + " is the default account now")
+					l.Info(moved.Name + " is the default account now.")
 				case r.Default:
 					l.Info("No default account")
 					l.Nudge("Pick one", "shulker accounts use <name>")

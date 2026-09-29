@@ -95,7 +95,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			resolved := named
 			upToDate := func(l *out.Lines) {
 				for _, name := range resolved {
-					l.Info(name + " is already in the pack")
+					l.Info(name + " is already in the pack.")
 				}
 			}
 			var dir string

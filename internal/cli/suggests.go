@@ -45,7 +45,7 @@ func (a *app) suggestsCmd() *cobra.Command {
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				if len(res.Suggestions) == 0 {
-					l.Info("No suggestions.")
+					l.Info("No suggestions")
 				}
 				var items []out.Item
 				for _, s := range res.Suggestions {

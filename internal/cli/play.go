@@ -196,7 +196,7 @@ func (a *app) play(cmd *cobra.Command, args []string, opts playOptions) error {
 			synced.print(l)
 		}
 		if adopted {
-			l.Info(who.Name + " is the default account now")
+			l.Info(who.Name + " is the default account now.")
 		}
 		res.print(l)
 	})

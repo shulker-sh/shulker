@@ -204,7 +204,7 @@ func TestSelfUpdateCheckWorksOnEveryRoute(t *testing.T) {
 	if code := h.run("--check"); code != 0 {
 		t.Fatalf("exit %d: %s", code, &h.stdout)
 	}
-	if got := h.stdout.String(); got != "  i The latest release is shulker 0.0.2\n\n  Rebuild it with:\n    $ go build .\n" {
+	if got := h.stdout.String(); got != "  i The latest release is shulker 0.0.2.\n\n  Rebuild it with:\n    $ go build .\n" {
 		t.Fatalf("source --check: %q", got)
 	}
 	h.stdout.Reset()

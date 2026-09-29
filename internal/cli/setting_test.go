@@ -122,7 +122,7 @@ func TestSetGetUnset(t *testing.T) {
 		t.Fatalf("get server.memory error = %+v", env.Error)
 	}
 
-	if got := h.mustRun(t, "unset", "server.memory"); got != "  i server.memory was not set\n" {
+	if got := h.mustRun(t, "unset", "server.memory"); got != "  i server.memory was not set.\n" {
 		t.Fatalf("unset of an unset path = %q", got)
 	}
 	var change map[string]any

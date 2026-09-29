@@ -231,7 +231,7 @@ func (a *app) instanceUnsetCmd() *cobra.Command {
 			from, ok := field.Get(f.doc)
 			if !ok {
 				return a.printer.Emit(settingChange{Path: field.Path}, func(l *out.Lines) {
-					l.Info(field.Path + " was not set")
+					l.Info(field.Path + " was not set.")
 				})
 			}
 			field.Remove(f.doc)
@@ -283,7 +283,7 @@ func (a *app) instanceEditCmd() *cobra.Command {
 				if res.Changed {
 					l.OK("Saved "+res.File, "")
 				} else {
-					l.Info(res.File + " is unchanged")
+					l.Info(res.File + " is unchanged.")
 				}
 			})
 		},

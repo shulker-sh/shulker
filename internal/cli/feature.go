@@ -345,7 +345,7 @@ func (a *app) featureListCmd() *cobra.Command {
 			}
 			return a.printer.Emit(res, func(l *out.Lines) {
 				if len(res) == 0 {
-					l.Info("No features.")
+					l.Info("No features")
 					return
 				}
 				var items []out.Item

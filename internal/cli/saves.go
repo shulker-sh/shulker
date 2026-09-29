@@ -153,7 +153,7 @@ func (a *app) listSaveGroups() error {
 	}
 	return a.printer.Emit(rows, func(l *out.Lines) {
 		if len(rows) == 0 {
-			l.Info("No save groups yet; `shulker link shulker` makes an instance that joins group " + saves.Default)
+			l.Info("No save groups yet; `shulker link shulker` makes an instance that joins group " + saves.Default + ".")
 			return
 		}
 		t := l.T
@@ -205,7 +205,7 @@ func (a *app) printSavesView(view savesView, l *out.Lines) {
 	l.Blank()
 	l.Heading("Backups")
 	if len(view.Backups) == 0 {
-		l.Info("No backups yet; `" + a.savesCommand(view.savesTarget, "backup") + "` takes one")
+		l.Info("No backups yet; `" + a.savesCommand(view.savesTarget, "backup") + "` takes one.")
 		return
 	}
 	printBackupsTable(view, l)

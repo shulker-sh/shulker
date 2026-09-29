@@ -76,7 +76,7 @@ func (a *app) unsetCmd() *cobra.Command {
 			from, ok := field.Get(doc)
 			if !ok {
 				return a.printer.Emit(settingChange{Path: field.Path}, func(l *out.Lines) {
-					l.Info(field.Path + " was not set")
+					l.Info(field.Path + " was not set.")
 				})
 			}
 			field.Remove(doc)
@@ -124,7 +124,7 @@ func (a *app) getCmd() *cobra.Command {
 
 func printSettingChange(l *out.Lines, path string, from, to any) {
 	if from != nil && settingText(from) == settingText(to) {
-		l.Info(fmt.Sprintf("%s is already %s", path, settingText(to)))
+		l.Info(fmt.Sprintf("%s is already %s.", path, settingText(to)))
 		return
 	}
 	l.Items(out.Item{Kind: out.Change, Name: path, From: settingText(from), To: settingText(to)})

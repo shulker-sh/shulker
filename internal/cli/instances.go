@@ -67,7 +67,7 @@ func (a *app) loadInstanceEntries() ([]project.InstanceEntry, error) {
 // Verbose adds the directory, wrapped in a link so it copies, and the source and ref.
 func printInstanceEntries(l *out.Lines, entries []project.InstanceEntry, verbose bool) {
 	if len(entries) == 0 {
-		l.Info("Nothing is linked yet")
+		l.Info("Nothing is linked yet.")
 		l.Nudge("Link a pack into a launcher", "shulker link <launcher>")
 		return
 	}

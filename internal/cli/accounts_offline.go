@@ -115,7 +115,7 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 				return err
 			}
 			if !remove {
-				return a.printer.Emit(nil, func(l *out.Lines) { l.Info(r.Name + " is still there") })
+				return a.printer.Emit(nil, func(l *out.Lines) { l.Info(r.Name + " is still there.") })
 			}
 			path, store, err := a.accountStore()
 			if err != nil {
@@ -135,7 +135,7 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 				l.OK("Removed "+r.Name, r.ID)
 				switch {
 				case moved != nil:
-					l.Info(moved.Name + " is the default account now")
+					l.Info(moved.Name + " is the default account now.")
 				case gone.Default:
 					l.Info("No default account")
 					l.Nudge("Pick one", "shulker accounts use <name>")

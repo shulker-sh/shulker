@@ -199,7 +199,7 @@ func (a *app) configUnsetCmd() *cobra.Command {
 			from, ok := field.Get(doc)
 			if !ok {
 				return a.printer.Emit(configChange{Path: key}, func(l *out.Lines) {
-					l.Info(key + " was not set")
+					l.Info(key + " was not set.")
 				})
 			}
 			change := configChange{Path: key, From: from}

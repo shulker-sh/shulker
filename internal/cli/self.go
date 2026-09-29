@@ -149,12 +149,12 @@ func (s selfUninstallResult) print(l *out.Lines) {
 	if s.Removed != "" {
 		l.OK("Removed "+s.Removed, "")
 	} else {
-		l.Info("The binary is " + route.Owner() + "'s to remove")
+		l.Info("The binary is " + route.Owner() + "'s to remove.")
 	}
 	if s.Purged {
 		l.OK("Forgot the registry", "")
 		if len(s.Forgotten) > 0 {
-			l.Info(out.Count(len(s.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`")
+			l.Info(out.Count(len(s.Forgotten), "directory", "directories") + " shulker synced can't be found again by `instances repair`.")
 			items := make([]out.Item, 0, len(s.Forgotten))
 			for _, in := range s.Forgotten {
 				items = append(items, out.Item{Kind: out.Note, Name: in.ID, Aside: []string{in.Dir}})
@@ -162,7 +162,7 @@ func (s selfUninstallResult) print(l *out.Lines) {
 			l.Items(items...)
 		}
 	} else {
-		l.Info("The registry and every instance folder are untouched")
+		l.Info("The registry and every instance folder are untouched.")
 		l.Nudge("Reinstall, then", "shulker instances repair")
 	}
 	if s.Renamed != "" {
@@ -228,7 +228,7 @@ func (a *app) selfUpdate(ctx context.Context, check, without, require bool) erro
 	if check {
 		return a.printer.Emit(res, func(l *out.Lines) {
 			if res.Available == nil {
-				l.Info("The latest release is shulker " + res.Latest)
+				l.Info("The latest release is shulker " + res.Latest + ".")
 			} else {
 				l.Items(out.Item{Kind: out.Change, Name: "shulker", From: b.Version, To: res.Latest, Aside: []string{"update available"}})
 			}

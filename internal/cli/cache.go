@@ -123,7 +123,7 @@ func (a *app) cachePruneCmd() *cobra.Command {
 					l.Info("Nothing to prune")
 					return
 				case pruned.Empty():
-					l.Info("Nothing to prune; everything in the cache is " + rootsText(r))
+					l.Info("Nothing to prune; everything in the cache is " + rootsText(r) + ".")
 					return
 				}
 				if pruned.Bytes == 0 {

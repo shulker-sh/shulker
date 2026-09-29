@@ -92,7 +92,7 @@ func (a *app) historyListCmd() *cobra.Command {
 			}
 			return a.printer.Emit(rows, func(l *out.Lines) {
 				if len(rows) == 0 {
-					l.Info("No history entries yet; one is taken before an in-place build changes anything")
+					l.Info("No history entries yet; one is taken before an in-place build changes anything.")
 					return
 				}
 				t := l.T
@@ -153,7 +153,7 @@ func (a *app) historyShowCmd() *cobra.Command {
 				l.Tree(rows...)
 				l.Blank()
 				if len(changes) == 0 {
-					l.Info("Restoring it would change nothing")
+					l.Info("Restoring it would change nothing.")
 				} else {
 					l.Text("Restoring it would:")
 					items := make([]out.Item, 0, len(changes))

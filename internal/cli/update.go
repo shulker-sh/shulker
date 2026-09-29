@@ -218,7 +218,7 @@ func (a *app) relock(cmd *cobra.Command, plan relockPlan, run func(*project.Proj
 		case created:
 			l.OK("Created shulker.lock", "")
 		case len(res.Reresolved) > 0:
-			l.Info("Re-resolved every mod: " + strings.Join(res.Reresolved, "; "))
+			l.Info("Re-resolved every mod: " + strings.Join(res.Reresolved, "; ") + ".")
 		}
 		printLocalFiles(l, local)
 		res.printItems(l)
@@ -362,7 +362,7 @@ func (a *app) outdatedCmd() *cobra.Command {
 
 func printLocalFiles(l *out.Lines, local []string) {
 	for _, key := range local {
-		l.Info(key + " is a local file; nothing to check")
+		l.Info(key + " is a local file; nothing to check.")
 	}
 }
 

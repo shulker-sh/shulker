@@ -77,7 +77,7 @@ func TestConfigCurseForgeKey(t *testing.T) {
 	if stdout := h.mustRun(t, "config", "unset", "curseforge.key"); stdout != "  ~ curseforge.key \"••••wxyz\" ⟶ (unset)\n" {
 		t.Errorf("unset output = %q", stdout)
 	}
-	if stdout := h.mustRun(t, "config", "unset", "curseforge.key"); stdout != "  i curseforge.key was not set\n" {
+	if stdout := h.mustRun(t, "config", "unset", "curseforge.key"); stdout != "  i curseforge.key was not set.\n" {
 		t.Errorf("second unset output = %q", stdout)
 	}
 	if doc := readConfigDoc(t, h.config); len(doc) != 2 || doc["extra"] != true || doc["$schema"] == nil {

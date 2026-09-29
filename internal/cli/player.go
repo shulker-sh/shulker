@@ -52,7 +52,7 @@ func (a *app) playerCmd() *cobra.Command {
 			}
 			return a.printer.Emit(results, func(l *out.Lines) {
 				if len(results) == 0 {
-					l.Info("No players to check.")
+					l.Info("No players to check")
 					return
 				}
 				var items []out.Item
