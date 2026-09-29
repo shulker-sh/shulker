@@ -61,22 +61,20 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			return a.printer.Emit(res, func(l *out.Lines) {
 				l.Heading("Cache " + usage.Dir)
 				rows := []out.Row{
-					{Text: out.HumanBytes(usage.Bytes) + ", " + out.Count(usage.Objects, "object", "objects")},
+					{Text: out.HumanBytes(usage.Bytes) + " in " + out.Count(usage.Objects, "object", "objects")},
 					{Text: out.Sentence(rootsText(r))},
 				}
 				if usage.Manual > 0 {
 					rows = append(rows, out.Row{Text: out.Count(usage.Manual, "manual download", "manual downloads") + ", kept by prune"})
 				}
-				if usage.Listings > 0 {
-					rows = append(rows, out.Row{Text: out.Count(usage.Listings, "listing pair", "listing pairs") + " in the listing index"})
-				}
+				rows = append(rows, out.Row{Text: "Listing index: " + out.Count(usage.Listings, "pair", "pairs")})
 				switch {
 				case would.Empty():
-					rows = append(rows, out.Row{Text: "nothing to prune"})
+					rows = append(rows, out.Row{Text: "Nothing can be freed"})
 				case would.Bytes == 0:
-					rows = append(rows, out.Row{Text: prunedAside(would) + " prunable"})
+					rows = append(rows, out.Row{Text: out.Sentence(prunedAside(would)) + " can be dropped"})
 				default:
-					rows = append(rows, out.Row{Text: out.HumanBytes(would.Bytes) + " prunable (" + prunedAside(would) + ")"})
+					rows = append(rows, out.Row{Text: out.HumanBytes(would.Bytes) + " can be freed (" + prunedAside(would) + ")"})
 				}
 				l.Tree(rows...)
 				if !would.Empty() && len(r.Unreadable) == 0 {
@@ -163,25 +161,25 @@ func (a *app) cacheRoots(named []string) (build.Roots, error) {
 	return build.CacheRoots(d.Cache, entries, dir, named)
 }
 
-// rootsText says what keeps the cache's files: "used by 36 instances and this project".
+// rootsText says what keeps the cache's files: "kept for 36 instances and the project here".
 func rootsText(r build.Roots) string {
 	var parts []string
 	if r.Instances > 0 {
 		parts = append(parts, out.Count(r.Instances, "instance", "instances"))
 	}
 	if r.Project {
-		parts = append(parts, "this project")
+		parts = append(parts, "the project here")
 	}
 	if r.LockFiles > 0 {
 		parts = append(parts, out.Count(r.LockFiles, "lock file", "lock files"))
 	}
 	switch len(parts) {
 	case 0:
-		return "used by nothing: no instance is registered and this is not a project"
+		return "kept for nothing: no instance is registered and this is not a project"
 	case 1:
-		return "used by " + parts[0]
+		return "kept for " + parts[0]
 	}
-	return "used by " + strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
+	return "kept for " + strings.Join(parts[:len(parts)-1], ", ") + " and " + parts[len(parts)-1]
 }
 
 func prunedAside(p cache.Pruned) string {

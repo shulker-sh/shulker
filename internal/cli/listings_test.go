@@ -33,7 +33,7 @@ func TestCacheInfoCountsTheListingIndexAndPruneDropsUnusedPairs(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout := h.mustRun(t, "cache", "info")
-	if !strings.Contains(stdout, "1 listing pair in the listing index") || !strings.Contains(stdout, "nothing to prune") {
+	if !strings.Contains(stdout, "Listing index: 1 pair") || !strings.Contains(stdout, "Nothing can be freed") {
 		t.Fatalf("cache info: %s", stdout)
 	}
 
@@ -43,7 +43,7 @@ func TestCacheInfoCountsTheListingIndexAndPruneDropsUnusedPairs(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeFile(t, c.ListingIndex(), string(data))
-	if stdout := h.mustRun(t, "cache", "info"); !strings.Contains(stdout, "1 unused listing pair prunable") {
+	if stdout := h.mustRun(t, "cache", "info"); !strings.Contains(stdout, "1 unused listing pair can be dropped") {
 		t.Fatalf("cache info: %s", stdout)
 	}
 	if stdout := h.mustRun(t, "cache", "prune"); !strings.Contains(stdout, "Dropped 1 unused listing pair") {
