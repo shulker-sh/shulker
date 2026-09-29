@@ -31,6 +31,7 @@ const (
 	ReleaseAge       ID = "release-age"
 	Takedowns        ID = "takedowns"
 	PlacedJars       ID = "placed-jars"
+	SyncReview       ID = "sync-review"
 )
 
 // Refusal marks e as protection id refusing something: it names the protection for --json and ends
@@ -69,6 +70,7 @@ var protections = []Protection{
 	{ID: CacheHash, On: true, Summary: "Every file placed from the cache is checked against its hash, so a copy changed in the cache can't spread to other instances."},
 	{ID: ManifestJVMArgs, On: true, Summary: "A manifest can't add its own flags to the java command line, such as -javaagent, so a source can't run code outside its mods."},
 	{ID: PlacedJars, On: true, Summary: "A build checks every jar it placed in mods/ against the copy it locked, and warns when one has changed since rather than keeping it quietly, so a jar rewritten on your disk, as Fractureiser did, gets noticed."},
+	{ID: SyncReview, On: true, Summary: "A sync lists the mods it adds, the files no provider published and the entries now locked from another project, and asks before applying them at a terminal, so a pack's new code doesn't reach you unseen."},
 	{ID: Takedowns, On: true, Summary: "An audit, and a sync once a day, ask Modrinth and CurseForge whether they still have each locked file, so a file taken down after you locked it, as malware is, gets noticed rather than placed from the cache for good."},
 }
 

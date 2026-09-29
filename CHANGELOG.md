@@ -26,6 +26,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - A build that finds a jar it placed in `mods/` changed since warns that it no longer matches the locked copy, rather than listing it as kept, and names `shulker audit <key>` and `--force`, which puts the locked copy back. The jar itself stays as it is. `--json` lists these as `changedJars`.
 
+- `sync` at a terminal lists the mods it adds, the files no provider published and the entries now locked from another project, and asks before applying them. `--no-input`, `play`, `link` and the launcher hooks apply them and warn. The pack's entry in the in-game mod list shows a month of these changes by day, plus notices for files gone from their provider and jars changed since they were placed.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.

@@ -39,6 +39,8 @@ type Request struct {
 	// KeepConflicts is a launch's sync, which keeps the player's side of a conflict rather than
 	// failing.
 	KeepConflicts bool
+	// Review is asked whether to apply the changes the sync brings; nil applies them and warns.
+	Review func(dir string, c *instance.Changes) (bool, error)
 }
 
 // Result is what a sync built and recorded.
@@ -54,7 +56,12 @@ type Result struct {
 	Dir        string        `json:"dir"`
 	Fetched    []string      `json:"fetched"`
 	Build      *build.Report `json:"build"`
-	Saves      *saves.Result `json:"saves,omitempty"`
+	// Review is what the sync brought that the player should see, nil when it brought nothing or
+	// the directory had no earlier build to compare against.
+	Review *instance.Changes `json:"review,omitempty"`
+	// Declined says the player turned the review down, so nothing was built.
+	Declined bool          `json:"declined,omitempty"`
+	Saves    *saves.Result `json:"saves,omitempty"`
 	// Project is the one the side was built from.
 	Project *project.Project `json:"-"`
 	// Relock is what an in-place sync's relock did; nil for a sync that relocked nothing.
@@ -81,7 +88,11 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 	if err != nil {
 		return Result{}, err
 	}
-	defer func() { e.stampSync(into, err) }()
+	defer func() {
+		if !res.Declined {
+			e.stampSync(into, err)
+		}
+	}()
 	lf, inst, err := SourceLocalFiles(e, src, into)
 	if err != nil {
 		return Result{}, err
@@ -111,7 +122,25 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 	}
 	checked := e.checkTakedowns(ctx, into, p.Lock, src.Offline)
 	origin := instance.Origin{Source: src.Name, Ref: src.Ref, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256}
-	rep, err := b.Build(side, build.Options{Force: req.Force, Dir: into, NoDataLinks: !ownBuild, OS: req.OS, Features: overrides, Origin: origin, BeforeModChange: e.beforeModChange(req.Backup, into), KeepConflicts: req.KeepConflicts, Takedowns: checked})
+	opts := build.Options{Force: req.Force, Dir: into, NoDataLinks: !ownBuild, OS: req.OS, Features: overrides, Origin: origin, BeforeModChange: e.beforeModChange(req.Backup, into), KeepConflicts: req.KeepConflicts, Takedowns: checked}
+	review, err := b.Review(side, opts)
+	if err != nil {
+		return Result{}, err
+	}
+	if !review.IsEmpty() {
+		review.At = env.Clock(e.Now).UTC().Format(time.RFC3339)
+		if req.Review == nil {
+			e.WarnSecurity(ChangesWarning(review, e.Providers))
+		} else if ok, err := req.Review(into, review); err != nil {
+			return Result{}, err
+		} else if !ok {
+			return Result{Source: src.Name, Kind: src.Kind, Side: side, Dir: into, Fetched: fetched, Review: review, Declined: true, Project: p}, nil
+		}
+		opts.Changes = review
+	} else {
+		review = nil
+	}
+	rep, err := b.Build(side, opts)
 	if err != nil {
 		return Result{}, err
 	}
@@ -146,7 +175,7 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 			e.Warn("couldn't record %s as the offline fallback: %v.", src.Name, err)
 		}
 	}
-	res = Result{Source: src.Name, Kind: src.Kind, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep, Saves: linked, Project: p}
+	res = Result{Source: src.Name, Kind: src.Kind, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep, Review: review, Saves: linked, Project: p}
 	if !src.LastGood.IsZero() {
 		res.LastGoodAt = src.LastGood.Format(time.RFC3339)
 	}

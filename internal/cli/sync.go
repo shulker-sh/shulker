@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/account"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
@@ -49,6 +51,9 @@ func (a *app) syncCmd() *cobra.Command {
 				return err
 			}
 			req.Backup = "sync"
+			if a.canPick() {
+				req.Review = a.reviewChanges
+			}
 			if !req.Force {
 				req.rerun = rerunForced(cmd, args)
 			}
@@ -145,6 +150,10 @@ func (a *app) syncCmd() *cobra.Command {
 }
 
 func (s syncResult) print(l *out.Lines) {
+	if s.Declined {
+		l.Info("Left " + s.Dir + " as it was.")
+		return
+	}
 	if s.Changes != nil {
 		s.Changes.printItems(l)
 	}
@@ -154,6 +163,10 @@ func (s syncResult) print(l *out.Lines) {
 // printInto is the sync under a line that already named the folder: how many files it placed,
 // with no path.
 func (s syncResult) printInto(l *out.Lines) {
+	if s.Declined {
+		l.Info("Left as it was.")
+		return
+	}
 	if s.Changes != nil {
 		s.Changes.printItems(l)
 	}
@@ -165,6 +178,9 @@ func (s syncResult) printInto(l *out.Lines) {
 // isIdle is a sync that changed nothing: no lock change, no file placed or taken away, no saves
 // moved.
 func (s syncResult) isIdle(l *out.Lines) bool {
+	if s.Declined {
+		return false
+	}
 	b := s.Build
 	if s.Changes != nil && s.Changes.Changes != nil && !s.Changes.IsEmpty() {
 		return false
@@ -245,6 +261,9 @@ func (a *app) synced(res sync.Result, req syncRequest, err error) (syncResult, e
 	if err != nil {
 		return syncResult{}, a.lastOf(err)
 	}
+	if res.Declined {
+		return syncResult{Result: res}, nil
+	}
 	a.printer.LockStale = res.Project.IsLockStale()
 	a.warnKeptConflicts(res.Build.KeptConflicts, res.Project, res.Side, res.Dir)
 	a.warnState(res.Build.State, a.syncTakeOver(req, res.Project, res.Side, res.Dir))
@@ -274,4 +293,19 @@ func (a *app) loadLocal(dir string) (*local.File, error) {
 		return nil, err
 	}
 	return sync.LoadLocal(se, dir)
+}
+
+// reviewChanges lists what a sync into dir brings that the player should see, and asks whether to
+// apply it, Yes preselected.
+func (a *app) reviewChanges(dir string, c *instance.Changes) (bool, error) {
+	a.printer.Settle()
+	l := a.printer.Err()
+	rows := sync.ChangeRows(c, a.titles())
+	l.Info("Syncing " + account.QuoteName(dir) + " brings " + out.Count(len(rows), "change", "changes") + " to review:")
+	tree := make([]out.Row, len(rows))
+	for i, r := range rows {
+		tree[i] = out.Row{Text: r}
+	}
+	l.Tree(tree...)
+	return a.askYesFirst("Apply " + countWord(len(rows) == 1, "it", "them") + "?")
 }
