@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"slices"
 	"sort"
-	"strings"
 
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/out"
 )
@@ -123,7 +123,7 @@ func (mrpack) decode(file string, z *zipEntries) (*Archive, error) {
 		if f.Hashes["sha512"] == "" || f.Hashes["sha1"] == "" || len(f.Downloads) == 0 {
 			return nil, out.Errorf("mrpack-invalid", "index file %s lacks sha1, sha512, or a download url", f.Path)
 		}
-		if !mrpackPathInside(f.Path) {
+		if !fsutil.IsPortableLocal(f.Path) {
 			return nil, out.Errorf("mrpack-invalid", "index file %s is outside the pack's folder", f.Path)
 		}
 		for _, d := range f.Downloads {
@@ -165,36 +165,6 @@ func (mrpack) decode(file string, z *zipEntries) (*Archive, error) {
 		a.Marker = root
 	}
 	return a, nil
-}
-
-// mrpackPathInside reports whether an index path stays inside the folder it is laid out in, on
-// every platform: the mrpack spec has launchers refuse `..`, a rooted path, a drive letter and a
-// Windows device name, whichever system reads the pack.
-func mrpackPathInside(p string) bool {
-	if p == "" || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "\\") || (len(p) >= 2 && p[1] == ':') {
-		return false
-	}
-	for _, part := range strings.FieldsFunc(p, func(r rune) bool { return r == '/' || r == '\\' }) {
-		if part == ".." || strings.Contains(part, ":") || windowsDeviceName(part) {
-			return false
-		}
-	}
-	return true
-}
-
-// windowsDeviceName reports whether Windows opens a path component as a device rather than a
-// file, which it does whatever extension follows the name.
-func windowsDeviceName(part string) bool {
-	name, _, _ := strings.Cut(part, ".")
-	name = strings.ToUpper(strings.TrimRight(name, " "))
-	switch name {
-	case "CON", "PRN", "AUX", "NUL":
-		return true
-	}
-	if len(name) == 4 && (strings.HasPrefix(name, "COM") || strings.HasPrefix(name, "LPT")) {
-		return name[3] >= '1' && name[3] <= '9'
-	}
-	return false
 }
 
 // mrpackSide is the side an index file's env needs it on: client, server, or both when the env

@@ -6,10 +6,13 @@ package schema
 import (
 	"bytes"
 	"embed"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+
+	"shulker.sh/shulker/internal/fsutil"
 )
 
 //go:embed v1/manifest.json v1/lock.json v1/instance.json v1/registry.json v1/accounts.json v1/state.json v1/local.json v1/config.json v1/overrides.json
@@ -62,11 +65,21 @@ func compile(kind Kind) (*jsonschema.Schema, error) {
 	}
 	c := jsonschema.NewCompiler()
 	c.AssertFormat()
+	c.RegisterFormat(relativePathFormat)
 	if err := c.AddResource(id, doc); err != nil {
 		return nil, err
 	}
 	return c.Compile(id)
 }
+
+// relativePathFormat holds a relativePath to fsutil.IsPortableLocal, which also refuses the Windows
+// device names the pattern leaves out.
+var relativePathFormat = &jsonschema.Format{Name: "relative-path", Validate: func(v any) error {
+	if rel, ok := v.(string); ok && !fsutil.IsPortableLocal(rel) {
+		return errors.New("leaves its folder or names a Windows device like CON or NUL")
+	}
+	return nil
+}}
 
 func Raw(kind Kind) ([]byte, error) {
 	return files.ReadFile(string(kind))

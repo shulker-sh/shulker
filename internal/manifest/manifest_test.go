@@ -318,6 +318,8 @@ func TestParseRejects(t *testing.T) {
 		`"requires":{},"server":{"jvmArgs":["-javaagent:evil.jar"]}`,
 		`"requires":{"extras":{"file":"../../extras.jar"}},"client":{}`,
 		`"requires":{"extras":{"file":"C:/extras.jar"}},"client":{}`,
+		`"requires":{"extras":{"file":"files/COM1.jar"}},"client":{}`,
+		`"requires":{"cozy":{"type":"modpack","source":"https://example.com/cozy.git","path":"packs/aux"}},"client":{}`,
 		`"requires":{"cozy":{"type":"modpack","source":"https://example.com/cozy.git","path":"../../.ssh"}},"client":{}`,
 	} {
 		if _, err := Parse(doc(rest)); err == nil {

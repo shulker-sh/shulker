@@ -151,9 +151,9 @@ No other properties are allowed.
 
 ### relativePath
 
-Path relative to the project root, forward slashes: no leading slash, no .. segment, no colon, so it can't leave the project or name a drive.
+Path relative to the project root, forward slashes: no leading slash, no .. segment, no colon and no Windows device name like CON or NUL, so it can't leave the project or name a drive or device.
 
-Type: `string`. pattern `^(?:[^/\\:.][^/\\:]*|\.(?:[^/\\:.][^/\\:]*)?|\.\.[^/\\:]+)(?:[/\\](?:[^/\\:.][^/\\:]*|\.(?:[^/\\:.][^/\\:]*)?|\.\.[^/\\:]+))*$`, min length 1
+Type: `string`. format `relative-path`, pattern `^(?:[^/\\:.][^/\\:]*|\.(?:[^/\\:.][^/\\:]*)?|\.\.[^/\\:]+)(?:[/\\](?:[^/\\:.][^/\\:]*|\.(?:[^/\\:.][^/\\:]*)?|\.\.[^/\\:]+))*$`, min length 1
 
 ### variables
 
