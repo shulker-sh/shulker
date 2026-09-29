@@ -164,3 +164,26 @@ func TestAPromptEndsTheLiveLines(t *testing.T) {
 		})
 	}
 }
+
+func TestAPendingLineIsReplacedByWhatFollows(t *testing.T) {
+	p, read := ptyPrinter(t)
+	p.Err().OK("Launched pack as Notch (Minecraft 26.2)", "")
+	p.Pending("Waiting for Minecraft to close")
+	p.Out().OK("Minecraft closed after 12m 4s", "")
+	p.Finish()
+	rows, col := screen(read(), 80)
+	want := []string{"", "  ✔ Launched pack as Notch (Minecraft 26.2)", "  ✔ Minecraft closed after 12m 4s", "", ""}
+	if strings.Join(rows, "\n") != strings.Join(want, "\n") || col != 0 {
+		t.Fatalf("screen %q, cursor in column %d", rows, col)
+	}
+}
+
+func TestAPendingLineStaysOffATerminal(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	p.Pending("Waiting for Minecraft to close")
+	p.Out().OK("Minecraft closed after 12m 4s", "")
+	if stderr.String() != "  ○ Waiting for Minecraft to close\n" {
+		t.Fatalf("stderr %q", stderr.String())
+	}
+}

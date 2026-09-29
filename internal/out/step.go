@@ -113,6 +113,28 @@ func (p *Printer) Working(format string, args ...any) {
 	p.step(OneLine(fmt.Sprintf(format, args...)), true)
 }
 
+// Pending shows something waited on as a grey pending line. On a terminal it is a live line
+// without a spinner, which the next output replaces in place, as a finished wait's result does;
+// off a terminal it prints and stays.
+func (p *Printer) Pending(text string) {
+	if p.JSON {
+		return
+	}
+	p.steps.mu.Lock()
+	defer p.steps.mu.Unlock()
+	p.settleLocked(true)
+	p.open(p.Stderr)
+	f, isTTY := p.Stderr.(*os.File)
+	if !isTTY || !IsTerminal(f) {
+		(&Lines{W: p.Stderr, T: p.ErrTheme}).Pending(text)
+		return
+	}
+	t := p.ErrTheme
+	room := terminalWidth(f) - len(gutter) - 3
+	fmt.Fprint(f, "\r\x1b[J"+gutter+t.Grey(t.GlyphPending()+" "+ansi.Truncate(text, room, t.Ellipsis())))
+	p.steps.running = &step{text: text, clears: true, tty: f}
+}
+
 func (p *Printer) step(text string, clears bool) {
 	if p.JSON {
 		return
@@ -173,8 +195,10 @@ func (p *Printer) settleLocked(done bool) {
 	}
 	p.steps.running = nil
 	if s.tty != nil {
-		close(s.stop)
-		<-s.stopped
+		if s.stop != nil {
+			close(s.stop)
+			<-s.stopped
+		}
 		fmt.Fprint(s.tty, "\r\x1b[J")
 	}
 	if done && !s.clears {

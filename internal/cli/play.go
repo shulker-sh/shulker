@@ -251,9 +251,13 @@ func (a *app) playWaited(launch game.Launch, stream bool, launched string) (int,
 	rec := a.watchRun(launch, mirror, func(r watchReply) {
 		pid = r.PID
 		if pid != 0 && !a.printer.JSON {
-			l := a.printer.Err()
-			l.OK(launched, "")
-			l.Pending("Waiting for Minecraft to close")
+			a.printer.Err().OK(launched, "")
+			// The game's own output streams under the line, so it can't be replaced in place.
+			if stream {
+				a.printer.Err().Pending("Waiting for Minecraft to close")
+			} else {
+				a.printer.Pending("Waiting for Minecraft to close")
+			}
 		}
 	})
 	if rec.Outcome == instance.OutcomeNotStarted {
