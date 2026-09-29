@@ -20,6 +20,9 @@ func CopyPath(from, to string) error {
 		if e.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
+		if !e.Type().IsRegular() {
+			return nil
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
