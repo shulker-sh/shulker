@@ -161,7 +161,7 @@ func (a *app) warnRestart(rehooked []config.Instance) {
 		case running:
 			a.printer.Warn("%s is open; restart it before playing, or it may write back its own copy without the hooks", e.Title)
 		case !detectable:
-			a.printer.Warn("Restart %s before playing if it's open, or it may write back its own copy without the hooks", e.Title)
+			a.printer.Warn("restart %s before playing if it's open, or it may write back its own copy without the hooks", e.Title)
 		}
 	}
 }
