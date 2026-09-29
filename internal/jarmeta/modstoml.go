@@ -15,6 +15,9 @@ type modsTOML struct {
 		Version string `toml:"version"`
 	} `toml:"mods"`
 	Dependencies map[string]toml.Primitive `toml:"dependencies"`
+	Mixins       []struct {
+		Config string `toml:"config"`
+	} `toml:"mixins"`
 }
 
 type modsTOMLDependency struct {
@@ -108,6 +111,12 @@ func readModsTOML(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	if len(sides) == 1 && sides["client"] {
 		info.Side, info.SideFromDependencies = "client", true
 	}
+	for _, m := range raw.Mixins {
+		if m.Config != "" {
+			info.Mixins = append(info.Mixins, m.Config)
+		}
+	}
+	info.Mixins = append(info.Mixins, manifestList(zr, "MixinConfigs")...)
 	addJarJar(zr, info, files)
 	return info, nil
 }
@@ -193,6 +202,17 @@ func addJarJar(zr *zip.Reader, info *Info, files []string) {
 	for _, jar := range meta.Jars {
 		addNested(zr, info, jar.Path, files)
 	}
+}
+
+// manifestList is a comma-separated manifest attribute, such as Forge's MixinConfigs.
+func manifestList(zr *zip.Reader, name string) []string {
+	var found []string
+	for part := range strings.SplitSeq(manifestAttribute(zr, name), ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			found = append(found, part)
+		}
+	}
+	return found
 }
 
 func manifestAttribute(zr *zip.Reader, name string) string {

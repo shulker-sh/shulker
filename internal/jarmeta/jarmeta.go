@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"shulker.sh/shulker/internal/loader"
@@ -52,8 +54,19 @@ type Info struct {
 	// DependencySides are the dependencies FML checks on one side only, "client" or "server" by id.
 	DependencySides map[string]string
 	Nested          []*Info
+	// Entrypoints are the classes the loader calls into, each under the kind of entrypoint it is.
+	Entrypoints []Entrypoint
+	// Mixins are the mixin config files the jar asks the loader to apply.
+	Mixins []string
 	// UsesMavenRanges marks ranges written in Maven syntax (NeoForge and Forge) rather than Fabric's.
 	UsesMavenRanges bool
+}
+
+// Entrypoint is a class or member a jar asks its loader to call, such as Fabric's "main" or
+// "client" entrypoints.
+type Entrypoint struct {
+	Kind  string
+	Value string
 }
 
 var allFiles = []string{"quilt.mod.json", "fabric.mod.json", "META-INF/neoforge.mods.toml", "META-INF/mods.toml"}
@@ -103,6 +116,23 @@ func readLegacyJar(path, name string) (*Info, error) {
 		return nil, metadataInvalid(name, "zip", err)
 	}
 	return readLegacyForge(zr), nil
+}
+
+// ReadZip reads the metadata loader l would from an open jar, returning nil for a jar that declares
+// none.
+func ReadZip(zr *zip.Reader, l loader.Loader) (*Info, error) {
+	if l.ModAnnotations {
+		return readLegacyForge(zr), nil
+	}
+	files := allFiles
+	if l.Name != "" {
+		files = l.MetadataFiles
+	}
+	info, err := readZip(zr, files)
+	if errors.Is(err, errNoMetadata) {
+		return nil, nil
+	}
+	return info, err
 }
 
 func metadataInvalid(name, source string, err error) *out.Error {
@@ -185,15 +215,17 @@ func readFabric(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		return nil, err
 	}
 	var raw struct {
-		ID          string          `json:"id"`
-		Version     string          `json:"version"`
-		Environment string          `json:"environment"`
-		Depends     json.RawMessage `json:"depends"`
-		Breaks      json.RawMessage `json:"breaks"`
-		Conflicts   json.RawMessage `json:"conflicts"`
-		Recommends  json.RawMessage `json:"recommends"`
-		Suggests    json.RawMessage `json:"suggests"`
-		Provides    []string        `json:"provides"`
+		ID          string                     `json:"id"`
+		Version     string                     `json:"version"`
+		Environment string                     `json:"environment"`
+		Depends     json.RawMessage            `json:"depends"`
+		Breaks      json.RawMessage            `json:"breaks"`
+		Conflicts   json.RawMessage            `json:"conflicts"`
+		Recommends  json.RawMessage            `json:"recommends"`
+		Suggests    json.RawMessage            `json:"suggests"`
+		Provides    []string                   `json:"provides"`
+		Entrypoints map[string]json.RawMessage `json:"entrypoints"`
+		Mixins      []json.RawMessage          `json:"mixins"`
 		Jars        []struct {
 			File string `json:"file"`
 		} `json:"jars"`
@@ -221,6 +253,10 @@ func readFabric(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	for _, id := range raw.Provides {
 		info.Provides[id] = raw.Version
 	}
+	info.Entrypoints = entrypoints(raw.Entrypoints)
+	for _, m := range raw.Mixins {
+		info.Mixins = append(info.Mixins, stringOr(m, "config")...)
+	}
 	for _, nested := range raw.Jars {
 		addNested(zr, info, nested.File, files)
 	}
@@ -235,13 +271,15 @@ func readQuilt(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 	data = gsonStrings(data)
 	var raw struct {
 		Loader struct {
-			ID       string            `json:"id"`
-			Version  string            `json:"version"`
-			Depends  []json.RawMessage `json:"depends"`
-			Breaks   []json.RawMessage `json:"breaks"`
-			Provides []json.RawMessage `json:"provides"`
-			Jars     []string          `json:"jars"`
+			ID          string                     `json:"id"`
+			Version     string                     `json:"version"`
+			Depends     []json.RawMessage          `json:"depends"`
+			Breaks      []json.RawMessage          `json:"breaks"`
+			Provides    []json.RawMessage          `json:"provides"`
+			Entrypoints map[string]json.RawMessage `json:"entrypoints"`
+			Jars        []string                   `json:"jars"`
 		} `json:"quilt_loader"`
+		Mixin     json.RawMessage `json:"mixin"`
 		Minecraft struct {
 			Environment string `json:"environment"`
 		} `json:"minecraft"`
@@ -292,10 +330,47 @@ func readQuilt(zr *zip.Reader, f *zip.File, files []string) (*Info, error) {
 		}
 		info.Provides[stripGroup(p.ID)] = p.Version
 	}
+	info.Entrypoints = entrypoints(raw.Loader.Entrypoints)
+	info.Mixins = stringOr(raw.Mixin, "config")
 	for _, file := range raw.Loader.Jars {
 		addNested(zr, info, file, files)
 	}
 	return info, nil
+}
+
+// entrypoints reads Fabric's and Quilt's entrypoints, where each kind holds one entry or an array
+// of them, and an entry is a string or an object with its "value" and an "adapter".
+func entrypoints(raw map[string]json.RawMessage) []Entrypoint {
+	var found []Entrypoint
+	for _, kind := range slices.Sorted(maps.Keys(raw)) {
+		for _, value := range stringOr(raw[kind], "value") {
+			found = append(found, Entrypoint{Kind: kind, Value: value})
+		}
+	}
+	return found
+}
+
+// stringOr reads a string, an object holding the string under field, or an array of either.
+func stringOr(raw json.RawMessage, field string) []string {
+	var list []json.RawMessage
+	if json.Unmarshal(raw, &list) != nil {
+		list = []json.RawMessage{raw}
+	}
+	var found []string
+	for _, item := range list {
+		var s string
+		if json.Unmarshal(item, &s) != nil {
+			var obj map[string]any
+			if json.Unmarshal(item, &obj) != nil {
+				continue
+			}
+			s, _ = obj[field].(string)
+		}
+		if s != "" {
+			found = append(found, s)
+		}
+	}
+	return found
 }
 
 type quiltDep struct {

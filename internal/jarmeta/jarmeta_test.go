@@ -391,3 +391,42 @@ func TestReadModsTOMLSides(t *testing.T) {
 		})
 	}
 }
+
+func TestReadEntrypointsAndMixins(t *testing.T) {
+	tests := []struct {
+		name        string
+		files       map[string]string
+		entrypoints []Entrypoint
+		mixins      []string
+	}{
+		{
+			name: "fabric",
+			files: map[string]string{"fabric.mod.json": `{"id":"a","entrypoints":{"main":["a.Main",{"adapter":"kotlin","value":"a.Kt"}],"client":"a.Client"},
+				"mixins":["a.mixins.json",{"config":"a.client.mixins.json","environment":"client"}]}`},
+			entrypoints: []Entrypoint{{"client", "a.Client"}, {"main", "a.Main"}, {"main", "a.Kt"}},
+			mixins:      []string{"a.mixins.json", "a.client.mixins.json"},
+		},
+		{
+			name:        "quilt",
+			files:       map[string]string{"quilt.mod.json": `{"quilt_loader":{"id":"a","entrypoints":{"init":"a.Init"}},"mixin":"a.mixins.json"}`},
+			entrypoints: []Entrypoint{{"init", "a.Init"}},
+			mixins:      []string{"a.mixins.json"},
+		},
+		{
+			name: "neoforge",
+			files: map[string]string{
+				"META-INF/neoforge.mods.toml": "[[mods]]\nmodId=\"a\"\n[[mixins]]\nconfig=\"a.mixins.json\"\n",
+				"META-INF/MANIFEST.MF":        "Manifest-Version: 1.0\nMixinConfigs: b.mixins.json, c.mixins.json\n",
+			},
+			mixins: []string{"a.mixins.json", "b.mixins.json", "c.mixins.json"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			info := readBytes(t, buildZip(t, tt.files))
+			if !slices.Equal(info.Entrypoints, tt.entrypoints) || !slices.Equal(info.Mixins, tt.mixins) {
+				t.Fatalf("got %v %v", info.Entrypoints, info.Mixins)
+			}
+		})
+	}
+}
