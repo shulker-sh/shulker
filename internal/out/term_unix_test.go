@@ -6,6 +6,9 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/creack/pty"
+	"golang.org/x/term"
 )
 
 func blockingPipe(t *testing.T) (read, write int) {
@@ -61,5 +64,34 @@ func TestReadReplyGivesUpWhenTheTerminalIsSilent(t *testing.T) {
 func TestParseBackgroundWithoutOSC11(t *testing.T) {
 	if _, ok := parseBackground([]byte("\x1b[?62;22c")); ok {
 		t.Fatal("a DA1-only reply means OSC 11 is unsupported")
+	}
+}
+
+func TestQueryLeavesTypedAheadInputForTheShell(t *testing.T) {
+	master, tty, err := pty.Open()
+	if err != nil {
+		t.Skip("no pty:", err)
+	}
+	defer master.Close()
+	defer tty.Close()
+	if _, err := master.WriteString("shulker add modmenu\r"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	start := time.Now()
+	if _, ok := queryBackground(tty, tty); ok {
+		t.Fatal("queried the terminal over input already waiting")
+	}
+	if elapsed := time.Since(start); elapsed > replyTimeout/2 {
+		t.Fatalf("waited %v on a query that should have been skipped", elapsed)
+	}
+	// The shell's line editor reads in raw mode, where input survives the query's mode switches.
+	state, err := term.MakeRaw(int(tty.Fd()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer term.Restore(int(tty.Fd()), state)
+	if got := readReply(int(tty.Fd()), 100*time.Millisecond); string(got) != "shulker add modmenu\n" {
+		t.Fatalf("typed-ahead input after the query: %q", got)
 	}
 }

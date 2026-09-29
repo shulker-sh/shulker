@@ -67,7 +67,7 @@ func queryGrey(stdout, stderr io.Writer, outTTY bool) int {
 	if !ok {
 		return GreyFallback
 	}
-	bg, ok := queryBackground(f)
+	bg, ok := queryBackground(os.Stdin, f)
 	if !ok {
 		return GreyFallback
 	}
