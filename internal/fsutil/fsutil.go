@@ -24,11 +24,17 @@ func Write(path string, data []byte) error {
 }
 
 func WriteFrom(path string, r io.Reader) error {
-	return writeFrom(path, r, 0o644)
+	return writeFrom(path, r, 0o644, nil)
 }
 
-// writeFrom is WriteFrom with the mode a new file gets.
-func writeFrom(path string, r io.Reader, mode fs.FileMode) error {
+// WriteFromChecked is WriteFrom that has check look at the written temp file before it replaces
+// path; a check that fails leaves path as it was and no temp file behind.
+func WriteFromChecked(path string, r io.Reader, check func(tmp string) error) error {
+	return writeFrom(path, r, 0o644, check)
+}
+
+// writeFrom is WriteFrom with the mode a new file gets and an optional check.
+func writeFrom(path string, r io.Reader, mode fs.FileMode, check func(tmp string) error) error {
 	if target, err := filepath.EvalSymlinks(path); err == nil {
 		path = target
 	}
@@ -58,6 +64,11 @@ func writeFrom(path string, r io.Reader, mode fs.FileMode) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
+	if check != nil {
+		if err := check(tmp.Name()); err != nil {
+			return err
+		}
+	}
 	return os.Rename(tmp.Name(), path)
 }
 
@@ -75,7 +86,7 @@ func Replace(path string, data []byte) (kept string, err error) {
 	if err != nil {
 		return "", err
 	}
-	return kept, writeFrom(path, bytes.NewReader(data), mode)
+	return kept, writeFrom(path, bytes.NewReader(data), mode, nil)
 }
 
 // MoveAside renames the file at path to <name>.replaced, clobbering only an

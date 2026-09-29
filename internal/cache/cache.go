@@ -206,6 +206,12 @@ func (c *Cache) fetch(ctx context.Context, client *fetch.Client, url string, che
 	return sha, c.commit(tmp.Name(), sha, sum1, false)
 }
 
+// ErrChanged is a cached object whose bytes no longer hash to its name. Objects are plain files
+// the player owns, so any mod in any instance can rewrite one.
+var ErrChanged = errors.New("the cached object changed")
+
+// CopyTo places the object sha at dst. The copy is hashed before it replaces dst; a copy that
+// doesn't match removes the object and returns ErrChanged, leaving dst as it was.
 func (c *Cache) CopyTo(sha, dst string) error {
 	src, err := os.Open(c.Object(sha))
 	if err != nil {
@@ -215,7 +221,25 @@ func (c *Cache) CopyTo(sha, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	return fsutil.WriteFrom(dst, src)
+	// The copy is hashed from the written temp file rather than through a tee: io.Copy from a bare
+	// *os.File uses copy_file_range, which clones on Btrfs and XFS (docs/research/cache-clones.md).
+	err = fsutil.WriteFromChecked(dst, src, func(tmp string) error {
+		got, err := fsutil.SHA512(tmp)
+		if err != nil {
+			return err
+		}
+		if got != sha {
+			return ErrChanged
+		}
+		return nil
+	})
+	if errors.Is(err, ErrChanged) {
+		src.Close()
+		if err := os.Remove(c.Object(sha)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return err
 }
 
 // FetchChecked downloads a file the first time it is locked, checking the sha1 its source

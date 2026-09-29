@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -164,5 +166,51 @@ func TestAFetchWhoseSha1MismatchesLeavesNothing(t *testing.T) {
 	sha, err := c.FetchChecked(context.Background(), fetch.New("test"), srv.URL+"/a.jar", sha1Of("a curseforge jar"))
 	if err != nil || !c.Has(sha) {
 		t.Fatalf("a download whose sha1 matches is cached: %v", err)
+	}
+}
+
+func TestCopyToPlacesAnObjectThatHashesRight(t *testing.T) {
+	c := newCache(t)
+	sha, err := c.Put(strings.NewReader("a mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(t.TempDir(), "mods", "a.jar")
+	if err := c.CopyTo(sha, dst); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(dst); err != nil || string(data) != "a mod" {
+		t.Fatalf("placed %q, %v", data, err)
+	}
+}
+
+func TestCopyToRefusesAChangedObject(t *testing.T) {
+	c := newCache(t)
+	sha, err := c.Put(strings.NewReader("a mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(c.Object(sha), []byte("a mod, infected"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(t.TempDir(), "mods")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dir, "a.jar")
+	if err := os.WriteFile(dst, []byte("the old copy"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.CopyTo(sha, dst); !errors.Is(err, ErrChanged) {
+		t.Fatalf("want ErrChanged, got %v", err)
+	}
+	if c.Has(sha) {
+		t.Fatal("a changed object stays in the cache")
+	}
+	if data, _ := os.ReadFile(dst); string(data) != "the old copy" {
+		t.Fatalf("the destination changed: %q", data)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 1 {
+		t.Fatalf("a temp file was left beside the destination: %v", entries)
 	}
 }
