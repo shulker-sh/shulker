@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/glamour/ansi"
-	"github.com/muesli/termenv"
+	"charm.land/glamour/v2"
+	"charm.land/glamour/v2/ansi"
+	"github.com/charmbracelet/colorprofile"
 )
 
 const markdownColumns = 80
@@ -23,8 +23,6 @@ func (l *Lines) Markdown(text string) {
 	}
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStyles(t.markdownStyle()),
-		// Only a coloured theme gets here, and glamour v1 still takes termenv's profile.
-		glamour.WithColorProfile(termenv.ANSI256),
 		glamour.WithChromaFormatter("terminal16"),
 		glamour.WithWordWrap(min(TerminalWidth(l.W), markdownColumns)),
 	)
@@ -37,9 +35,11 @@ func (l *Lines) Markdown(text string) {
 		fmt.Fprint(l.W, text)
 		return
 	}
+	// glamour renders full colour, which is downsampled where it is written.
+	w := &colorprofile.Writer{Forward: l.W, Profile: t.Profile()}
 	// glamour pads every line out to the wrap width for the sake of backgrounds, which this style has none of.
 	for line := range strings.SplitSeq(strings.TrimRight(rendered, "\n"), "\n") {
-		fmt.Fprintln(l.W, strings.TrimRight(line, " "))
+		fmt.Fprintln(w, strings.TrimRight(line, " "))
 	}
 }
 
