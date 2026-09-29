@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
-	"shulker.sh/shulker/internal/auditlog"
+	"shulker.sh/shulker/internal/cmdlog"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/launcher"
 	"shulker.sh/shulker/internal/out"
@@ -53,7 +53,7 @@ type app struct {
 	openURL     func(url string) error
 	isRunning   bool
 	backedUp    map[saves.Home]bool
-	log         *auditlog.Log
+	log         *cmdlog.Log
 	logState    logState
 	failFast    bool
 	everyFetch  bool

@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"shulker.sh/shulker/internal/auditlog"
+	"shulker.sh/shulker/internal/cmdlog"
 	"shulker.sh/shulker/internal/config"
 )
 
@@ -47,9 +47,9 @@ const (
 func (a *app) openLog(args []string) {
 	path, err := config.Path()
 	if err == nil {
-		path = filepath.Join(filepath.Dir(path), auditlog.FileName)
+		path = filepath.Join(filepath.Dir(path), cmdlog.FileName)
 	}
-	a.log = auditlog.New(path, args)
+	a.log = cmdlog.New(path, args)
 	a.log.OnFail = func(err error) {
 		// A hook's output lands in a launcher, which shows any of it as though the launch had
 		// gone wrong.
@@ -96,7 +96,7 @@ func (a *app) logActing() {
 
 // trimLog drops the entries past log.keepDays.
 func (a *app) trimLog() {
-	err := auditlog.Trim(a.log.Path, configuredKeepDays(), a.log.Now())
+	err := cmdlog.Trim(a.log.Path, configuredKeepDays(), a.log.Now())
 	if err == nil {
 		return
 	}

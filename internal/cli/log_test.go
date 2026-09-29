@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"shulker.sh/shulker/internal/auditlog"
+	"shulker.sh/shulker/internal/cmdlog"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
 )
@@ -35,18 +35,18 @@ func seedLog(t *testing.T) logFixture {
 	}
 	writeFile(t, filepath.Join(filepath.Dir(path), "registry.json"), string(data))
 	ago := func(d time.Duration) string { return time.Now().Add(-d).UTC().Format(time.RFC3339Nano) }
-	entries := []auditlog.Entry{
-		{At: ago(48 * time.Hour), Group: "mods", Cmd: "add", Level: auditlog.LevelWarn, Msg: "jei has no build for 26.2"},
-		{At: ago(2 * time.Hour), Group: "launchers", Cmd: "sync", Instance: "friends", Level: auditlog.LevelInfo, Msg: "start"},
-		{At: ago(90 * time.Minute), Group: "launchers", Cmd: "hook wrap", Instance: game, Level: auditlog.LevelError, Code: "launch-not-started", Msg: "can't run Java at /x/java: no such file"},
-		{At: ago(time.Hour), Group: "shulker", Cmd: "cache prune", Level: auditlog.LevelInfo, Msg: "start"},
+	entries := []cmdlog.Entry{
+		{At: ago(48 * time.Hour), Group: "mods", Cmd: "add", Level: cmdlog.LevelWarn, Msg: "jei has no build for 26.2"},
+		{At: ago(2 * time.Hour), Group: "launchers", Cmd: "sync", Instance: "friends", Level: cmdlog.LevelInfo, Msg: "start"},
+		{At: ago(90 * time.Minute), Group: "launchers", Cmd: "hook wrap", Instance: game, Level: cmdlog.LevelError, Code: "launch-not-started", Msg: "can't run Java at /x/java: no such file"},
+		{At: ago(time.Hour), Group: "shulker", Cmd: "cache prune", Level: cmdlog.LevelInfo, Msg: "start"},
 	}
 	writeFile(t, path, logLines(t, entries...))
 	return logFixture{path: path, game: game}
 }
 
 // logLines is entries as log.jsonl stores them.
-func logLines(t *testing.T, entries ...auditlog.Entry) string {
+func logLines(t *testing.T, entries ...cmdlog.Entry) string {
 	t.Helper()
 	var b strings.Builder
 	for _, e := range entries {
@@ -123,8 +123,8 @@ func TestLogIndentsEveryLineOfAMessage(t *testing.T) {
 	path := isolatedLog(t)
 	at := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano)
 	writeFile(t, path, logLines(t,
-		auditlog.Entry{At: at, Group: "launchers", Cmd: "sync", Level: auditlog.LevelError, Code: "source-offline", Msg: "couldn't reach the pack\nit has never synced here"},
-		auditlog.Entry{At: at, Group: "launchers", Cmd: "sync", Level: auditlog.LevelWarn, Msg: "kept the old copy\nit is a day old"},
+		cmdlog.Entry{At: at, Group: "launchers", Cmd: "sync", Level: cmdlog.LevelError, Code: "source-offline", Msg: "couldn't reach the pack\nit has never synced here"},
+		cmdlog.Entry{At: at, Group: "launchers", Cmd: "sync", Level: cmdlog.LevelWarn, Msg: "kept the old copy\nit is a day old"},
 	))
 	code, stdout, stderr := run(t, "log", "--no-color")
 	if code != out.ExitOK {
@@ -175,7 +175,7 @@ func TestLogLeavesOutItsOwnRun(t *testing.T) {
 	}
 	_, stdout, _ := run(t, "log", "--json")
 	r := logReportOf(t, stdout)
-	if r.Read == 0 || slices.ContainsFunc(r.Entries, func(e auditlog.Entry) bool { return e.Cmd != "instances repair" }) {
+	if r.Read == 0 || slices.ContainsFunc(r.Entries, func(e cmdlog.Entry) bool { return e.Cmd != "instances repair" }) {
 		t.Fatalf("report = %+v", r)
 	}
 	run(t, "log", "--since", "nope")
@@ -324,8 +324,8 @@ func seedSecretLog(t *testing.T) (home string) {
 	}
 	defer f.Close()
 	seeded := logLines(t,
-		auditlog.Entry{At: at, Group: "mods", Cmd: "search", Level: auditlog.LevelWarn, Msg: "curseforge: GET https://api.curseforge.com/v1/mods/search?key=" + logKey + " failed"},
-		auditlog.Entry{At: at, Group: "launchers", Cmd: "sync", Instance: game, Level: auditlog.LevelError, Code: "source-fetch-failed", Msg: "can't clone https://ghp_s3cr3t@github.com/org/pack.git into " + game},
+		cmdlog.Entry{At: at, Group: "mods", Cmd: "search", Level: cmdlog.LevelWarn, Msg: "curseforge: GET https://api.curseforge.com/v1/mods/search?key=" + logKey + " failed"},
+		cmdlog.Entry{At: at, Group: "launchers", Cmd: "sync", Instance: game, Level: cmdlog.LevelError, Code: "source-fetch-failed", Msg: "can't clone https://ghp_s3cr3t@github.com/org/pack.git into " + game},
 	)
 	if _, err := f.WriteString(seeded); err != nil {
 		t.Fatal(err)

@@ -13,8 +13,8 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 
-	"shulker.sh/shulker/internal/auditlog"
 	"shulker.sh/shulker/internal/cache"
+	"shulker.sh/shulker/internal/cmdlog"
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider/curseforge"
@@ -22,7 +22,7 @@ import (
 
 const defaultLogWindow = "24h"
 
-var logLevels = []string{auditlog.LevelInfo, auditlog.LevelWarn, auditlog.LevelError}
+var logLevels = []string{cmdlog.LevelInfo, cmdlog.LevelWarn, cmdlog.LevelError}
 
 type logReport struct {
 	Version  string            `json:"version"`
@@ -34,7 +34,7 @@ type logReport struct {
 	Read     int               `json:"read"`
 	Matched  int               `json:"matched"`
 	Redacted bool              `json:"redacted"`
-	Entries  []auditlog.Entry  `json:"entries"`
+	Entries  []cmdlog.Entry    `json:"entries"`
 	// labels names each entry's instance as the instances table does, or is empty for an entry
 	// whose instance is no longer registered.
 	labels []string
@@ -54,7 +54,7 @@ func (a *app) logCmd() *cobra.Command {
 		Args:        noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			now := time.Now()
-			from, err := auditlog.ParseSince(f.since, now)
+			from, err := cmdlog.ParseSince(f.since, now)
 			if err != nil {
 				e := out.Errorf("usage", "--since is neither a duration nor a date")
 				e.Rows = []out.Detail{{Label: "Since", Text: f.since}}
@@ -64,7 +64,7 @@ func (a *app) logCmd() *cobra.Command {
 			if f.level != "" && !slices.Contains(logLevels, f.level) {
 				return out.Errorf("usage", "--level is one of %s, not %q", strings.Join(logLevels, ", "), f.level)
 			}
-			filter := auditlog.Filter{Since: from, Group: f.group, Cmd: f.cmd, Code: f.code, Level: f.level}
+			filter := cmdlog.Filter{Since: from, Group: f.group, Cmd: f.cmd, Code: f.code, Level: f.level}
 			if a.instance != "" {
 				found, err := a.selectInstances(a.instance, instanceSelection{})
 				if err != nil {
@@ -73,7 +73,7 @@ func (a *app) logCmd() *cobra.Command {
 				in := found[0]
 				filter.Instance = slices.DeleteFunc([]string{in.ID, in.Name, in.Dir}, func(s string) bool { return s == "" })
 			}
-			entries, err := auditlog.Read(a.log.Path)
+			entries, err := cmdlog.Read(a.log.Path)
 			if err != nil {
 				a.printer.Warn("can't read shulker's log at %s, so there is nothing to show: %v.", a.log.Path, err)
 				entries = nil
@@ -87,7 +87,7 @@ func (a *app) logCmd() *cobra.Command {
 				KeepDays: keepDays,
 				Filter:   f.described(a.instance),
 				Read:     len(entries),
-				Entries:  []auditlog.Entry{},
+				Entries:  []cmdlog.Entry{},
 			}
 			for _, e := range entries {
 				if filter.Match(e) {
@@ -119,7 +119,7 @@ func (a *app) logCmd() *cobra.Command {
 
 // logRedaction is what `shulker log` hides by default: the home directory, and every CurseForge key
 // shulker may have sent.
-func logRedaction() auditlog.Redaction {
+func logRedaction() cmdlog.Redaction {
 	home, _ := os.UserHomeDir()
 	var configured, cacheDir string
 	if path, err := config.Path(); err == nil {
@@ -130,11 +130,11 @@ func logRedaction() auditlog.Redaction {
 	if c, err := cache.Open(); err == nil {
 		cacheDir = c.Dir
 	}
-	return auditlog.Redaction{Home: home, Keys: curseforge.Keys(configured, cacheDir)}
+	return cmdlog.Redaction{Home: home, Keys: curseforge.Keys(configured, cacheDir)}
 }
 
 // redact scrubs the report's entries, and the filter it names, which can hold an instance's path.
-func redact(r *logReport, with auditlog.Redaction) {
+func redact(r *logReport, with cmdlog.Redaction) {
 	r.Redacted = true
 	for i, e := range r.Entries {
 		r.Entries[i] = with.Entry(e)
@@ -192,7 +192,7 @@ func printLog(l *out.Lines, r logReport, isWidest bool) {
 // printLogEntries is the table of entries: the level glyph in the first column, time, command and
 // instance grey, then the event. An error's code is red with its message as the cell's second line.
 // The instance column is left out when no entry names one.
-func printLogEntries(l *out.Lines, entries []auditlog.Entry, labels []string) {
+func printLogEntries(l *out.Lines, entries []cmdlog.Entry, labels []string) {
 	t := l.T
 	stamp := "15:04:05"
 	today := time.Now().Format(time.DateOnly)
@@ -212,12 +212,12 @@ func printLogEntries(l *out.Lines, entries []auditlog.Entry, labels []string) {
 		}
 		mark, event := "", logSummary(e)
 		switch e.Level {
-		case auditlog.LevelError:
+		case cmdlog.LevelError:
 			mark, event = t.GlyphError(), t.Red(cmp.Or(e.Code, "error"))
 			if e.Msg != "" {
 				event += "\n" + e.Msg
 			}
-		case auditlog.LevelWarn:
+		case cmdlog.LevelWarn:
 			mark, event = "!", e.Msg
 		}
 		rows[i] = []string{mark, at, logCmdName(e), cmp.Or(labels[i], e.Instance), event}
@@ -230,7 +230,7 @@ func printLogEntries(l *out.Lines, entries []auditlog.Entry, labels []string) {
 	}
 	l.Table(headers, rows, func(row, col int) lipgloss.Style {
 		switch {
-		case col == 0 && entries[row].Level == auditlog.LevelError:
+		case col == 0 && entries[row].Level == cmdlog.LevelError:
 			return t.StyleRed()
 		case col == 0:
 			return t.StyleYellow()
@@ -243,7 +243,7 @@ func printLogEntries(l *out.Lines, entries []auditlog.Entry, labels []string) {
 
 // instanceLabels names the instance each entry acted on: a run logs the folder it started in, and
 // the entries after it the instance's id, and both read as the instance's label.
-func (a *app) instanceLabels(entries []auditlog.Entry) []string {
+func (a *app) instanceLabels(entries []cmdlog.Entry) []string {
 	labels := make([]string, len(entries))
 	instances, err := a.loadInstances()
 	if err != nil {
@@ -265,11 +265,11 @@ func (a *app) instanceLabels(entries []auditlog.Entry) []string {
 }
 
 // logCmdName is the command an entry names. The root's own runs, like a bare `shulker`, have none.
-func logCmdName(e auditlog.Entry) string {
+func logCmdName(e cmdlog.Entry) string {
 	return cmp.Or(e.Cmd, "shulker")
 }
 
-func logSummary(e auditlog.Entry) string {
+func logSummary(e cmdlog.Entry) string {
 	switch {
 	case e.Msg == "start":
 		return "run"

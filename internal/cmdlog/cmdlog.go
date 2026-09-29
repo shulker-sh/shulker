@@ -1,6 +1,6 @@
-// Package auditlog appends what shulker runs did to log.jsonl, one JSON entry per line: the run's
+// Package cmdlog appends what shulker runs did to log.jsonl, one JSON entry per line: the run's
 // start and end, the result it reported, and every warning and error it showed.
-package auditlog
+package cmdlog
 
 import (
 	"bytes"

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"shulker.sh/shulker/internal/auditlog"
+	"shulker.sh/shulker/internal/cmdlog"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -20,20 +20,20 @@ func isolatedLog(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("SHULKER_CONFIG", filepath.Join(dir, "config.json"))
-	return filepath.Join(dir, auditlog.FileName)
+	return filepath.Join(dir, cmdlog.FileName)
 }
 
-func logEntries(t *testing.T, path string) []auditlog.Entry {
+func logEntries(t *testing.T, path string) []cmdlog.Entry {
 	t.Helper()
 	f, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	var entries []auditlog.Entry
+	var entries []cmdlog.Entry
 	scan := bufio.NewScanner(f)
 	for scan.Scan() {
-		var e auditlog.Entry
+		var e cmdlog.Entry
 		if err := json.Unmarshal(scan.Bytes(), &e); err != nil {
 			t.Fatalf("line %q: %v", scan.Text(), err)
 		}
@@ -72,7 +72,7 @@ func TestFailedRunLogsItsError(t *testing.T) {
 	if len(entries) != 3 {
 		t.Fatalf("entries = %+v", entries)
 	}
-	if e := entries[1]; e.Level != auditlog.LevelError || e.Code != "usage" || !strings.Contains(e.Msg, "nope") {
+	if e := entries[1]; e.Level != cmdlog.LevelError || e.Code != "usage" || !strings.Contains(e.Msg, "nope") {
 		t.Errorf("error = %+v", e)
 	}
 	if end := entries[2]; end.Exit == nil || *end.Exit != code || code != out.ExitUsage {
@@ -129,7 +129,7 @@ func TestBrokenConfigIsStillLogged(t *testing.T) {
 		t.Fatalf("exit %d", code)
 	}
 	entries := logEntries(t, path)
-	if len(entries) != 3 || entries[0].Msg != "start" || entries[0].Flags["json"] != "true" || entries[1].Level != auditlog.LevelError || entries[2].Exit == nil || *entries[2].Exit == 0 {
+	if len(entries) != 3 || entries[0].Msg != "start" || entries[0].Flags["json"] != "true" || entries[1].Level != cmdlog.LevelError || entries[2].Exit == nil || *entries[2].Exit == 0 {
 		t.Fatalf("entries = %+v", entries)
 	}
 }
