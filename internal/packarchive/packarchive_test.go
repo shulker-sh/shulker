@@ -208,6 +208,43 @@ func TestReadRefuses(t *testing.T) {
 	}
 }
 
+func TestReadRefusesAnIndexPathOutsideTheFolder(t *testing.T) {
+	paths := []string{"../../ESCAPED.txt", "mods/../../x.jar", "/etc/x", "\\\\server\\x", "\\x", "C:/x.jar", "c:x.jar", "mods/CON", "mods/nul.jar", "COM1/x.jar", "mods/lpt9.txt", "mods/Aux .jar"}
+	for _, p := range paths {
+		t.Run(p, func(t *testing.T) {
+			file := writeZip(t, map[string]string{"modrinth.index.json": mrpackIndexWith(t, p)})
+			_, err := Read(file)
+			if out.CodeOf(err) != "mrpack-invalid" || !strings.Contains(err.Error(), p) {
+				t.Fatalf("want mrpack-invalid naming %q, got %v", p, err)
+			}
+		})
+	}
+	for _, p := range []string{"mods/a.jar", "config/console.txt", "mods/com10.jar", "mods/..a.jar"} {
+		if _, err := Read(writeZip(t, map[string]string{"modrinth.index.json": mrpackIndexWith(t, p)})); err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+	}
+}
+
+func mrpackIndexWith(t *testing.T, path string) string {
+	t.Helper()
+	index := map[string]any{
+		"formatVersion": 1,
+		"game":          "minecraft",
+		"dependencies":  map[string]string{"minecraft": "26.2"},
+		"files": []map[string]any{{
+			"path":      path,
+			"hashes":    map[string]string{"sha1": "a", "sha512": "b"},
+			"downloads": []string{"https://cdn.modrinth.com/data/x/a.jar"},
+		}},
+	}
+	data, err := json.Marshal(index)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
 func TestReadTakesTheMarker(t *testing.T) {
 	m := `{"$schema": "https://shulker.sh/schema/v1/manifest.json", "name": "cozy", "minecraft": "26.2", "loader": {"type": "fabric", "version": "0.17.3"}, "requires": {}, "client": {}}`
 	locked := lock.New()
