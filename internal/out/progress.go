@@ -42,16 +42,14 @@ type Progress struct {
 	// halted is set once the bar stops drawing for good, which can come before Finish.
 	halted  bool
 	halting sync.Once
+	// owner is the printer the bar draws for, which remembers the groups that settled into a line.
 	owner   *Printer
 	wheel   spinner.Model
 	bar     progress.Model
 	pending tea.Cmd
 	stop    chan struct{}
 	stopped chan struct{}
-	// firstTime records the group's line as shown, and reports whether no group of the same files
-	// and counts showed one before.
-	firstTime func(key string) bool
-	names     []string
+	names   []string
 }
 
 // Download names one file the bar will cover; Size is 0 when unknown.
@@ -71,17 +69,9 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 	p.endLive(true)
 	p.open(p.Stderr)
 	pr := newProgress(p.Err(), verb, files)
-	pr.firstTime = func(key string) bool {
-		p.steps.mu.Lock()
-		defer p.steps.mu.Unlock()
-		if slices.Contains(p.steps.groups, key) {
-			return false
-		}
-		p.steps.groups = append(p.steps.groups, key)
-		return true
-	}
+	pr.owner = p
 	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
-		pr.tty, pr.owner = f, p
+		pr.tty = f
 		pr.stop, pr.stopped = make(chan struct{}), make(chan struct{})
 		p.steps.mu.Lock()
 		p.steps.bar = pr
@@ -89,6 +79,18 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 		go pr.spin()
 	}
 	return pr
+}
+
+// firstGroup records a group's line as shown, and reports whether no group of the same files and
+// counts showed one before.
+func (p *Printer) firstGroup(key string) bool {
+	p.steps.mu.Lock()
+	defer p.steps.mu.Unlock()
+	if slices.Contains(p.steps.groups, key) {
+		return false
+	}
+	p.steps.groups = append(p.steps.groups, key)
+	return true
 }
 
 func newProgress(l *Lines, verb string, files []Download) *Progress {
@@ -164,7 +166,7 @@ func (pr *Progress) Finish() {
 	}
 	pr.halt()
 	key := strings.Join(append([]string{pr.verb, pr.many}, pr.names...), "\x00")
-	if pr.done == 0 || pr.firstTime != nil && !pr.firstTime(key) {
+	if pr.done == 0 || pr.owner != nil && !pr.owner.firstGroup(key) {
 		return
 	}
 	noun, one := "files", "file"
