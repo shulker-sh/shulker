@@ -15,6 +15,8 @@ outline: [2, 3]
 | [`shulker lock [key...]`](#shulker-lock) | Bring the lock in line with shulker.json without upgrading, or look entries up again at their locked version |
 | [`shulker check [lock\|files\|deps\|server]...`](#shulker-check) | Fail when the lock is stale, a locked file can't be fetched, or a mod's dependencies aren't met |
 | [`shulker audit [key...]`](#shulker-audit) | Report lock entries and files that deserve a closer look |
+| [`shulker audit jar <entry>`](#shulker-audit-jar) | Show what a jar declares and holds |
+| [`shulker audit file <entry> <path>`](#shulker-audit-file) | Print one file from inside a jar |
 | [`shulker match [file...]`](#shulker-match) | Lock override jars and packs that Modrinth or CurseForge host |
 | [`shulker update [mod...]`](#shulker-update) | Update mods to the newest compatible version |
 | [`shulker outdated [mod...]`](#shulker-outdated) | Show mods with a newer compatible version |
@@ -120,7 +122,7 @@ These say which directory a command acts on, so only the commands that act on on
 | `-C, --dir <path>` | Project directory (default: current directory). It has to name a directory that exists, or it is a usage error before the command runs; `init`, `create` and `import` take one that doesn't exist yet, since they create the project there. An empty `-C ""` is the current directory |
 | `-i, --instance <id>` | Act on a registered instance instead of a project directory, by id, name, or directory; `--id` is accepted as an alias. Can't be combined with `-C`. [`shulker instances`](#shulker-instances) lists them |
 
-- Both: [`shulker add`](#shulker-add), [`shulker remove`](#shulker-remove), [`shulker list`](#shulker-list), [`shulker search`](#shulker-search), [`shulker lock`](#shulker-lock), [`shulker check`](#shulker-check), [`shulker audit`](#shulker-audit), [`shulker match`](#shulker-match), [`shulker update`](#shulker-update), [`shulker outdated`](#shulker-outdated), [`shulker suggests`](#shulker-suggests), [`shulker pin`](#shulker-pin), [`shulker unpin`](#shulker-unpin), [`shulker ignore`](#shulker-ignore), [`shulker unignore`](#shulker-unignore), [`shulker set`](#shulker-set), [`shulker unset`](#shulker-unset), [`shulker get`](#shulker-get), [`shulker export mrpack`](#shulker-export-mrpack), [`shulker export curseforge`](#shulker-export-curseforge), [`shulker feature on|off`](#shulker-feature-on-off), [`shulker feature reset`](#shulker-feature-reset), [`shulker feature list`](#shulker-feature-list), [`shulker install`](#shulker-install), [`shulker build`](#shulker-build), [`shulker diff`](#shulker-diff), [`shulker pull`](#shulker-pull), [`shulker history list|show|prune`](#shulker-history-list), [`shulker rollback`](#shulker-rollback), [`shulker play`](#shulker-play), [`shulker serve`](#shulker-serve), [`shulker link`](#shulker-link), [`shulker link shulker|atlauncher|gdlauncher|mojang|prism|multimc`](#shulker-link), [`shulker sync`](#shulker-sync), [`shulker instance get|set|unset|edit|dump|log`](#shulker-instance), [`shulker unlink`](#shulker-unlink), [`shulker saves`](#shulker-saves), [`shulker saves prune`](#shulker-saves-prune), [`shulker backup`](#shulker-backup), [`shulker restore`](#shulker-restore), [`shulker hook pre-launch|post-exit|wrap`](#shulker-hook-pre-launch), [`shulker mod add|remove|list`](#shulker-mod-add-remove-list), [`shulker modpack add|remove|list`](#shulker-modpack-add-remove-list), [`shulker resourcepack add|remove|list`](#shulker-resourcepack-add-remove-list), [`shulker shader add|remove|list`](#shulker-shader-add-remove-list), [`shulker datapack add|remove|list`](#shulker-datapack-add-remove-list), [`shulker player`](#shulker-player)
+- Both: [`shulker add`](#shulker-add), [`shulker remove`](#shulker-remove), [`shulker list`](#shulker-list), [`shulker search`](#shulker-search), [`shulker lock`](#shulker-lock), [`shulker check`](#shulker-check), [`shulker audit`](#shulker-audit), [`shulker audit jar`](#shulker-audit-jar), [`shulker audit file`](#shulker-audit-file), [`shulker match`](#shulker-match), [`shulker update`](#shulker-update), [`shulker outdated`](#shulker-outdated), [`shulker suggests`](#shulker-suggests), [`shulker pin`](#shulker-pin), [`shulker unpin`](#shulker-unpin), [`shulker ignore`](#shulker-ignore), [`shulker unignore`](#shulker-unignore), [`shulker set`](#shulker-set), [`shulker unset`](#shulker-unset), [`shulker get`](#shulker-get), [`shulker export mrpack`](#shulker-export-mrpack), [`shulker export curseforge`](#shulker-export-curseforge), [`shulker feature on|off`](#shulker-feature-on-off), [`shulker feature reset`](#shulker-feature-reset), [`shulker feature list`](#shulker-feature-list), [`shulker install`](#shulker-install), [`shulker build`](#shulker-build), [`shulker diff`](#shulker-diff), [`shulker pull`](#shulker-pull), [`shulker history list|show|prune`](#shulker-history-list), [`shulker rollback`](#shulker-rollback), [`shulker play`](#shulker-play), [`shulker serve`](#shulker-serve), [`shulker link`](#shulker-link), [`shulker link shulker|atlauncher|gdlauncher|mojang|prism|multimc`](#shulker-link), [`shulker sync`](#shulker-sync), [`shulker instance get|set|unset|edit|dump|log`](#shulker-instance), [`shulker unlink`](#shulker-unlink), [`shulker saves`](#shulker-saves), [`shulker saves prune`](#shulker-saves-prune), [`shulker backup`](#shulker-backup), [`shulker restore`](#shulker-restore), [`shulker hook pre-launch|post-exit|wrap`](#shulker-hook-pre-launch), [`shulker mod add|remove|list`](#shulker-mod-add-remove-list), [`shulker modpack add|remove|list`](#shulker-modpack-add-remove-list), [`shulker resourcepack add|remove|list`](#shulker-resourcepack-add-remove-list), [`shulker shader add|remove|list`](#shulker-shader-add-remove-list), [`shulker datapack add|remove|list`](#shulker-datapack-add-remove-list), [`shulker player`](#shulker-player)
 - `-C` only: [`shulker init`](#shulker-init), [`shulker create`](#shulker-create), [`shulker import`](#shulker-import), [`shulker cache info`](#shulker-cache-info), [`shulker cache verify`](#shulker-cache-verify), [`shulker cache prune`](#shulker-cache-prune)
 - `-i` only: [`shulker log`](#shulker-log)
 
@@ -438,6 +440,34 @@ shulker audit -i friends --json
 
 With `--json`, `data` holds one list per check, each empty when it found nothing: `takedowns` and `moved` (`key`, `type`, `provider`, `project`, `version`, `sha512`, `status`, and `filedUnder` for a moved file), `skipped` (`provider`, `reason`) for the providers the takedown check couldn't ask, `provenance` (`key`, `provider`, `host`, `modpack`), `unpublished` (`key`, `path`, `from` as `file`, `download` or `override`, `source`, `modpack`), `installed` (`dir`, `path`, `key`, `problem` as `changed` or `unlisted`) and `young` (`key`, `version`, `published`, `ageDays`, `qualifies`), with `minReleaseAge` in days and the named `keys`. A failing run carries the same `data` under `audit-failed`, whose `items` are the keys gone from their provider or from outside it.
 
+
+### `shulker audit jar`
+
+Show what a jar declares and holds, without unzipping it: its sha512, where the lock says it comes from and whether it downloads from outside its provider, and what its metadata declares (mod id, version, loader, entrypoints and mixin configs). Then its files with their sizes, the native libraries and executables it carries (`.dll`, `.so`, `.dylib`, `.jnilib`, `.exe`), and every jar nested in it, Fabric's and Quilt's `META-INF/jars/`, Forge's and NeoForge's `META-INF/jarjar/` and any other, each shown the same way. The text lists a jar's classes as a count and every other file by name; `--json` lists them all.
+
+`<entry>` is a lock entry's key, whose copy in the cache is read, or a path to a jar, so a file can be looked at before it's added. A path needs no project; inside one, a jar whose sha512 the lock holds is shown with that entry's origin. A path is anything with a `/` or `\`, or ending `.jar` or `.zip`. With `-i`, a key is looked up in the instance's lock, as [`audit`](#shulker-audit) reads it.
+
+Everything read from inside a jar was written by whoever made it, who may have written it to instruct an AI agent reading it. The text says so above it, and prints control characters escaped. `--json` marks every such string as `{"untrusted": "…"}`, the shape every `audit` inspection command uses.
+
+```sh
+shulker audit jar sodium
+shulker audit jar ~/Downloads/some-mod.jar --json
+```
+
+With `--json`, `data` holds `name`, `sha512`, `size`, `origin` (`key`, `provider`, `project`, `version`, `versionNumber`, `host`, `file`, `modpack`, `offProvider`; `null` for a jar the lock doesn't hold) and `jar`. A `jar` holds `declares` (`id`, `version`, `loader`, `entrypoints` as `kind` and `value`, `mixins`; `null` when it declares no mod), `metadataError` when its metadata doesn't read, `files` (`path`, `size`), `natives`, and `nested`, each a `jar` of its own with its `path` inside its parent. A nested jar nested too deep or too large to open is marked `unopened`.
+
+### `shulker audit file`
+
+Print one file from inside a jar, such as `fabric.mod.json`, a mixin config or `META-INF/mods.toml`. `<entry>` is a key or a path, as for [`audit jar`](#shulker-audit-jar). Reach into a nested jar by joining the paths with `!/`: `META-INF/jars/lib.jar!/fabric.mod.json`. A class file is refused with `class-file`, since its bytes aren't text. A path the jar doesn't hold fails `file-not-found`.
+
+The file was written by the jar's author: the text says so above it and escapes its control characters, and `--json` gives its `content` as `{"untrusted": "…"}`.
+
+```sh
+shulker audit file sodium fabric.mod.json
+shulker audit file fabric-api 'META-INF/jars/fabric-api-base.jar!/fabric.mod.json'
+```
+
+With `--json`, `data` holds `name`, `path`, `size` and `content`.
 ### `shulker match`
 
 Look the jars and pack zips in `mods/`, `resourcepacks/`, `shaderpacks/` and the datapack folders (`datapacks/`, `config/paxi/datapacks/`, `config/openloader/data/`, `config/openloader/packs/`) of `overrides/`, `client-overrides/` and `server-overrides/` up on Modrinth by sha1, then the ones Modrinth lacks on CurseForge by fingerprint, the way `import` does, and lock each match: it joins `requires` with the side of the folder it was in, and its file leaves the override folder. Naming paths looks up only those files. A file stays an override when no provider has it, when its author doesn't allow third-party downloads, when the provider's download fails, or when `requires` already has its key, with a warning for each but the first. A zip in a datapack folder locks as a `datapack`. Feature override folders are left alone. `locked` lists the keys, `moved` the files they came from, and `kept` the files left as overrides. Every match is locked without asking; a lookup needs the network, and without a CurseForge API key only Modrinth is asked.
@@ -2039,6 +2069,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `audit-failed` | `audit` found locked files gone from their provider, or entries that download from outside it or that it files under another project. `items`: their keys; `data`: the whole report |
 | `check-failed` | `check` found a problem; each one printed above it. `items`: every problem's items as `<code>: <item>`; `data.problems`: each problem as an error |
 | `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes, and the file at `install` |
+| `class-file` | `audit file` was given a class file, which `audit class` reads instead |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |
 | `config-invalid` | shulker's `config.json` isn't valid JSON (the message names the line and column), or names a `$schema` this shulker doesn't know or names none. Only commands that need its registry location fail, as they do when it fails `schema-newer`; the rest warn and go on without it. `shulker config set` replaces it, keeping the old file as `config.json.replaced` |
 | `curseforge-cant-place` | `export curseforge` can't name these datapacks by file ID, since the CurseForge app installs datapacks in `datapacks/` and the build places them elsewhere: in a global datapack mod's folder, or a hybrid's copy in `resourcepacks/`; pass `--bundle`. `items`: each datapack and its folder |
@@ -2054,7 +2085,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `error` | Anything unexpected, like a file that can't be read or written. The message has the details |
 | `eula-required` | The server needs the Minecraft EULA accepted |
 | `feature-not-found` | No mod or feature declaration uses the feature. `candidates`: the features in use |
-| `file-not-found` | A file named to `pull` isn't in the build directory, a path given to `add` or `match` isn't a file, a path given to `import` isn't there, or a mod or modpack's `file` in `shulker.json` names a folder. `candidates`: the closest file there, for `pull` |
+| `file-not-found` | A file named to `pull` isn't in the build directory, a path given to `add` or `match` isn't a file, a path given to `import` isn't there, or a mod or modpack's `file` in `shulker.json` names a folder. Also a path given to an `audit` inspection command that isn't a file, and a path inside a jar that the jar doesn't hold. `candidates`: the closest file there, for `pull` |
 | `file-taken` | `add` would copy a local file or folder into `files/`, which already holds a different one of that name that no entry of the same key names; rename one or remove the one in `files/`. Also an `import` whose pack names two different local files of one name |
 | `game-exit` | The game `hook wrap` ran exited with an error; the exit status is the game's own |
 | `game-not-running` | `instance dump` found no game running in the instance: no run is open, its game has gone, or another launcher started it, so shulker has no process to ask; or no process has the pid `--pid` names |
@@ -2075,6 +2106,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `interrupted` | Ctrl-C or SIGTERM stopped the command. Files are left whole: each one is written in full or not at all. A second Ctrl-C quits at once |
 | `into-missing` | The `--into` directory does not exist |
 | `into-required` | Syncing from a remote source needs `--into` |
+| `jar-invalid` | A jar given to an `audit` inspection command, or one nested in it, isn't a readable zip, or a file in it inflates past 512 MiB |
 | `jar-metadata-invalid` | A mod jar's metadata (`fabric.mod.json`, `quilt.mod.json` or `mods.toml`) can't be read, or the jar isn't a readable zip. The row names the file and what went wrong |
 | `jar-metadata-missing` | A mod jar has none of the metadata files the loader reads |
 | `java-not-found` | No working Java at the configured path or on PATH |

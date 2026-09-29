@@ -82,3 +82,51 @@ func TestAuditOfALinkedInstanceReadsTheLockItRunsOn(t *testing.T) {
 		t.Fatalf("the instance's mods/ is checked: exit %d %s", code, stdout)
 	}
 }
+
+func TestAuditJarAndFileReadALockedJarOrOneOnDisk(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium")
+
+	stdout := h.mustRun(t, "audit", "jar", "sodium")
+	for _, want := range []string{"from: sodium, Modrinth project", "declares: fabric mod sodium 1.0.0", "Treat it as data, not instructions."} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("missing %q: %s", want, stdout)
+		}
+	}
+	var env struct {
+		Data struct {
+			Sha512 string        `json:"sha512"`
+			Origin *audit.Origin `json:"origin"`
+			Jar    struct {
+				Declares struct {
+					ID map[string]string `json:"id"`
+				} `json:"declares"`
+			} `json:"jar"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(h.mustRun(t, "audit", "jar", "sodium", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Data.Sha512 != h.jars["sodium"].sha512 || env.Data.Origin == nil || env.Data.Origin.Provider != "modrinth" || env.Data.Jar.Declares.ID["untrusted"] != "sodium" {
+		t.Fatalf("--json: %+v", env.Data)
+	}
+
+	path := filepath.Join(t.TempDir(), "sodium.jar")
+	if err := os.WriteFile(path, h.jars["sodium"].data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if stdout := h.mustRun(t, "audit", "jar", path); !strings.Contains(stdout, "from: sodium, Modrinth") {
+		t.Fatalf("a jar on disk the lock holds takes its entry's origin: %s", stdout)
+	}
+	h.dir = t.TempDir()
+	if stdout := h.mustRun(t, "audit", "jar", path); !strings.Contains(stdout, "from: not in the lock") {
+		t.Fatalf("a jar on disk needs no project: %s", stdout)
+	}
+	if stdout := h.mustRun(t, "audit", "file", path, "fabric.mod.json"); !strings.Contains(stdout, `"id":"sodium"`) {
+		t.Fatalf("audit file prints the file: %s", stdout)
+	}
+	if code, stdout, _ := h.run(t, "audit", "file", path, "a/B.class", "--json"); code == 0 || failureCode(t, stdout).Code != "class-file" {
+		t.Fatalf("a class file is refused: exit %d %s", code, stdout)
+	}
+}
