@@ -35,7 +35,7 @@ func TestAPlainHTTPGitSourceIsRefused(t *testing.T) {
 	h.mustRun(t, "create", "--loader", "fabric")
 	for _, source := range []string{"http://127.0.0.1:1/pack.git", "git://127.0.0.1:1/pack.git"} {
 		code, stdout, _ := h.run(t, "modpack", "add", source, "--json")
-		if code == 0 || failureCode(t, stdout).Code != "url-insecure" || !strings.Contains(stdout, source) {
+		if e := failureCode(t, stdout); code == 0 || e.Code != "url-insecure" || e.Protection != "https" || !strings.Contains(stdout, source) {
 			t.Fatalf("%s: code=%d %s", source, code, stdout)
 		}
 	}

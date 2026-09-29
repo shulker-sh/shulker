@@ -203,6 +203,15 @@ func TestReadRefuses(t *testing.T) {
 			}
 		})
 	}
+	for _, c := range cases {
+		want := ""
+		if strings.HasPrefix(c.name, "unsafe ") {
+			want = "paths"
+		}
+		if _, err := Read(c.file); out.AsError(err).Protection != want {
+			t.Fatalf("%s: protection %q, want %q", c.name, out.AsError(err).Protection, want)
+		}
+	}
 	if IsArchive(notZip) || !IsArchive(writeZip(t, map[string]string{"manifest.json": cfManifest})) {
 		t.Fatal("IsArchive tells an archive by its content")
 	}

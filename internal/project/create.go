@@ -59,7 +59,7 @@ func Create(dir string, m *manifest.Manifest, l *lock.Lock, overrides []packarch
 	}
 	for _, o := range overrides {
 		if !filepath.IsLocal(filepath.FromSlash(o.Path)) {
-			return security.Refusal(out.Errorf("path-outside", "%s/%s is outside its folder", o.Layer, o.Path))
+			return security.Refusal(security.Paths, out.Errorf("path-outside", "%s/%s is outside its folder", o.Layer, o.Path))
 		}
 		abs := filepath.Join(dir, o.Layer, filepath.FromSlash(o.Path))
 		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {

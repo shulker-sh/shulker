@@ -158,7 +158,7 @@ func subfolder(root, path string) (string, error) {
 		return root, nil
 	}
 	if !manifest.IsSubfolder(path) {
-		return "", security.Refusal(out.Errorf("path-outside", "%s is outside the repository", path))
+		return "", security.Refusal(security.Paths, out.Errorf("path-outside", "%s is outside the repository", path))
 	}
 	return filepath.Join(root, filepath.FromSlash(path)), nil
 }

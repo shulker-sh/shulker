@@ -1740,7 +1740,7 @@ shulker cache prune
 
 ### `shulker security`
 
-Explain how shulker keeps bad files off your machine. It opens with what shulker aims for, lists what it does on every run and what each protection stops, and ends with a table of the settings that change a protection, once there are any. No project or source can turn off a protection that has no setting. Every security warning and error ends by pointing here, under `Read what shulker checks and why:`. With `--json`, `data` holds the `stance` and a `protections` row for each: its `id`, a one-sentence `summary`, whether it is `on`, and for a configurable one its `setting`, `value` and what it `changes`.
+Explain how shulker keeps bad files off your machine. It opens with what shulker aims for, lists what it does on every run and what each protection stops, and ends with a table of the settings that change a protection, once there are any. No project or source can turn off a protection that has no setting. Every security warning and error ends by pointing here, under `Read what shulker checks and why:`, and under `--json` a security error names its row in `error.protection`. With `--json`, `data` holds the `stance` and a `protections` row for each: its `id`, a one-sentence `summary`, whether it is `on`, and for a configurable one its `setting`, `value` and what it `changes`.
 
 ```sh
 shulker security
@@ -1890,9 +1890,9 @@ With `--json`, every command prints one JSON object on stdout, whether it succee
 | `lockStale` | `shulker.lock` doesn't match `shulker.json`; `shulker lock` brings it in line. Commands that build from the lock warn, naming each difference, and carry on; `export` refuses |
 | `warnings` | Everything shulker would print as a `!` line without `--json`. Always present, empty when there are none |
 | `data` | The command's result, left out when it has none. When a command that works through several entries fails, like `sync --all`, it holds the result for each entry |
-| `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `help`, `candidates` or `items` |
+| `error` | Present when `ok` is `false`: `code`, `message`, and sometimes `help`, `candidates`, `items` or `protection` |
 
-`help` says what to do about the error, like the command to run. `candidates` lists values you could pass instead, like the sides when a command is given something that is not one. `items` lists what the error is about, like the files in conflict. All three are left out when empty.
+`help` says what to do about the error, like the command to run. `candidates` lists values you could pass instead, like the sides when a command is given something that is not one. `items` lists what the error is about, like the files in conflict. All three are left out when empty. `protection` is set only when a security protection refused something: it is the `id` of that protection's row in [`shulker security --json`](#shulker-security), so `mrpack-invalid` from a pack that tried to write outside its folder (`paths`) reads apart from one that is only malformed.
 
 | Exit status | Meaning |
 | --- | --- |

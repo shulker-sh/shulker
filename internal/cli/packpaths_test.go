@@ -38,7 +38,7 @@ func TestImportRefusesAnIndexPathOutsideThePack(t *testing.T) {
 			escapingPack(t, h, "evil.mrpack", path)
 			dest := filepath.Join(t.TempDir(), "a", "b", "proj")
 			code, stdout, _ := h.run(t, "import", "-C", dest, filepath.Join(h.dir, "evil.mrpack"), "--json")
-			if code == 0 || failureCode(t, stdout).Code != "mrpack-invalid" {
+			if e := failureCode(t, stdout); code == 0 || e.Code != "mrpack-invalid" || e.Protection != "paths" {
 				t.Fatalf("code=%d %s", code, stdout)
 			}
 			assertNothingEscaped(t, dest)
@@ -109,7 +109,7 @@ func TestImportRefusesAnIndexDownloadOffTheMrpackHosts(t *testing.T) {
 			h := archiveProject(t)
 			offHostPack(t, h, "evil.mrpack", download)
 			code, stdout, _ := h.run(t, "import", "-C", filepath.Join(t.TempDir(), "proj"), filepath.Join(h.dir, "evil.mrpack"), "--json")
-			if code == 0 || failureCode(t, stdout).Code != "mrpack-invalid" || !strings.Contains(stdout, from) {
+			if e := failureCode(t, stdout); code == 0 || e.Code != "mrpack-invalid" || e.Protection != "mrpack-hosts" || !strings.Contains(stdout, from) {
 				t.Fatalf("code=%d %s", code, stdout)
 			}
 		})

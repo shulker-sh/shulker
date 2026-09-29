@@ -97,7 +97,7 @@ func (mrpack) detect(z *zipEntries) bool { return z.has(mrpackIndexName) }
 
 func (mrpack) decode(file string, z *zipEntries) (*Archive, error) {
 	if raw := z.unsafe(); raw != "" {
-		return nil, security.Refusal(out.Errorf("mrpack-invalid", "%s contains an unsafe entry %q", file, raw))
+		return nil, security.Refusal(security.Paths, out.Errorf("mrpack-invalid", "%s contains an unsafe entry %q", file, raw))
 	}
 	data, err := z.read(mrpackIndexName)
 	if err != nil {
@@ -125,11 +125,11 @@ func (mrpack) decode(file string, z *zipEntries) (*Archive, error) {
 			return nil, out.Errorf("mrpack-invalid", "index file %s lacks sha1, sha512, or a download url", f.Path)
 		}
 		if !fsutil.IsPortableLocal(f.Path) {
-			return nil, security.Refusal(out.Errorf("mrpack-invalid", "index file %s is outside the pack's folder", f.Path))
+			return nil, security.Refusal(security.Paths, out.Errorf("mrpack-invalid", "index file %s is outside the pack's folder", f.Path))
 		}
 		for _, d := range f.Downloads {
 			if from := mrpackHosted(d); from != "" {
-				return nil, security.Refusal(out.Errorf("mrpack-invalid", "index file %s downloads from %s, which Modrinth launchers don't", f.Path, from))
+				return nil, security.Refusal(security.MrpackHosts, out.Errorf("mrpack-invalid", "index file %s downloads from %s, which Modrinth launchers don't", f.Path, from))
 			}
 		}
 		a.Files = append(a.Files, File{Path: f.Path, Hashes: f.Hashes, Side: mrpackSide(f.Env), Downloads: f.Downloads, Size: f.FileSize})

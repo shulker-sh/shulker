@@ -727,7 +727,7 @@ func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[st
 // layFile puts one override file, read from path, at rel in desired.
 func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole func(string) bool, desired map[string]source, report *Report) error {
 	if !filepath.IsLocal(filepath.FromSlash(rel)) {
-		return security.Refusal(out.Errorf("path-outside", "%s/%s is outside its folder", l.label, rel))
+		return security.Refusal(security.Paths, out.Errorf("path-outside", "%s/%s is outside its folder", l.label, rel))
 	}
 	var err error
 	src := source{origin: path, pack: l.pack, feature: l.feature}
@@ -1110,7 +1110,7 @@ func (b *Builder) placeCached(c cached, abs string, report *Report) error {
 	if c.url == "" || manual {
 		e := out.Errorf("cache-changed", "the cache held a changed copy of %s", c.name)
 		e.Help = "run `shulker install` to put the locked copy back"
-		return security.Refusal(e)
+		return security.Refusal(security.CacheHash, e)
 	}
 	if _, err := b.Cache.Ensure(context.Background(), b.Fetch, c.url, c.sha512); err != nil {
 		return err

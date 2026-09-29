@@ -57,7 +57,7 @@ func secureGitSource(source string) error {
 	}
 	e := out.Errorf("url-insecure", "%s isn't https or ssh", source)
 	e.Help = "use an https:// or ssh:// remote, or git@host:repo"
-	return security.Refusal(e)
+	return security.Refusal(security.HTTPS, e)
 }
 
 func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (string, error) {

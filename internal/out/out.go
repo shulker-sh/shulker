@@ -41,6 +41,8 @@ type Error struct {
 	Exit       int      `json:"-"`
 	// Data is the partial result of a command that failed part-way; it goes in the envelope's data.
 	Data any `json:"-"`
+	// Protection is the id of the `shulker security` row that refused, for a security error.
+	Protection string `json:"protection,omitempty"`
 	// Help is what to do about the error: the "help:" row under a human error line, and help in JSON.
 	Help string `json:"help,omitempty"`
 	// Cause is the reason in the parser's or checker's own words, without the file's name, for a

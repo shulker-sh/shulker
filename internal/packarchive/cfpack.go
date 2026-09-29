@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/loader"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 )
 
 // cfpack is the CurseForge modpack format: a manifest naming each file by CurseForge project and
@@ -161,7 +162,7 @@ func (cfpack) detect(z *zipEntries) bool {
 
 func (cfpack) decode(file string, z *zipEntries) (*Archive, error) {
 	if raw := z.unsafe(); raw != "" {
-		return nil, out.Errorf("curseforge-invalid", "%s contains an unsafe entry %q", file, raw)
+		return nil, security.Refusal(security.Paths, out.Errorf("curseforge-invalid", "%s contains an unsafe entry %q", file, raw))
 	}
 	data, err := z.read(cfManifestName)
 	if err != nil {

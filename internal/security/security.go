@@ -14,15 +14,29 @@ const Stance = "Mods run with everything your account can reach, and a linked in
 // Nudge ends every security warning and error, pointing at `shulker security`.
 var Nudge = out.Nudge{Lead: "Read what shulker checks and why", Command: "shulker security"}
 
-// Refusal ends e with Nudge, for an error that is a protection refusing something.
-func Refusal(e *out.Error) *out.Error {
+// ID names a protection: its row in `shulker security --json`, and an error's protection field.
+type ID string
+
+const (
+	Paths            ID = "paths"
+	OverrideSymlinks ID = "override-symlinks"
+	HTTPS            ID = "https"
+	MrpackHosts      ID = "mrpack-hosts"
+	CacheHash        ID = "cache-hash"
+	ManifestJVMArgs  ID = "manifest-jvm-args"
+)
+
+// Refusal marks e as protection id refusing something: it names the protection for --json and ends
+// with Nudge.
+func Refusal(id ID, e *out.Error) *out.Error {
+	e.Protection = string(id)
 	e.Nudge = Nudge
 	return e
 }
 
 // Protection is one thing shulker does to keep a bad file off the player's machine.
 type Protection struct {
-	ID string `json:"id"`
+	ID ID `json:"id"`
 	// Summary is one sentence on what shulker does and what that stops.
 	Summary string `json:"summary"`
 	On      bool   `json:"on"`
@@ -34,12 +48,12 @@ type Protection struct {
 }
 
 var protections = []Protection{
-	{ID: "paths", On: true, Summary: "No path in a pack, lock or manifest can reach outside its folder, so a pack can't write over files elsewhere on your machine."},
-	{ID: "override-symlinks", On: true, Summary: "Symlinks in a source's override folders are skipped, so one can't copy a file from elsewhere on your disk, like an SSH key, into an instance."},
-	{ID: "https", On: true, Summary: "Every download, API call and redirect uses https, and every git remote https or ssh, so nothing can be swapped on its way to you."},
-	{ID: "mrpack-hosts", On: true, Summary: "An mrpack downloads only from the hosts Modrinth allows, so a pack can't pull its files from anywhere else."},
-	{ID: "cache-hash", On: true, Summary: "Every file placed from the cache is checked against its hash, so a copy changed in the cache can't spread to other instances."},
-	{ID: "manifest-jvm-args", On: true, Summary: "A manifest can't add its own flags to the java command line, such as -javaagent, so a source can't run code outside its mods."},
+	{ID: Paths, On: true, Summary: "No path in a pack, lock or manifest can reach outside its folder, so a pack can't write over files elsewhere on your machine."},
+	{ID: OverrideSymlinks, On: true, Summary: "Symlinks in a source's override folders are skipped, so one can't copy a file from elsewhere on your disk, like an SSH key, into an instance."},
+	{ID: HTTPS, On: true, Summary: "Every download, API call and redirect uses https, and every git remote https or ssh, so nothing can be swapped on its way to you."},
+	{ID: MrpackHosts, On: true, Summary: "An mrpack downloads only from the hosts Modrinth allows, so a pack can't pull its files from anywhere else."},
+	{ID: CacheHash, On: true, Summary: "Every file placed from the cache is checked against its hash, so a copy changed in the cache can't spread to other instances."},
+	{ID: ManifestJVMArgs, On: true, Summary: "A manifest can't add its own flags to the java command line, such as -javaagent, so a source can't run code outside its mods."},
 }
 
 // Protections lists every protection, in the order `shulker security` shows them.

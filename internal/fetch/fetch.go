@@ -177,7 +177,7 @@ func (c *Client) do(ctx context.Context, method, url string, header http.Header,
 func insecure(url string) *out.Error {
 	e := out.Errorf("url-insecure", "%s isn't https", url)
 	e.Help = "use an https:// address instead"
-	return security.Refusal(e)
+	return security.Refusal(security.HTTPS, e)
 }
 
 // retryWaits are the pauses before each retry of a request whose connection dropped.
