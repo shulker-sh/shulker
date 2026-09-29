@@ -124,3 +124,27 @@ func TestPruneKeepsManualDownloadsUnlessAsked(t *testing.T) {
 		t.Fatalf("usage counts no manual download once it is gone: %+v %v", u, err)
 	}
 }
+
+func TestADamagedSha1EntryFindsNothing(t *testing.T) {
+	c := newCache(t)
+	for _, content := range []string{"", "a", "not a sha512"} {
+		writeFile(t, c.sha1Entry(sha1Of("a mod")), content)
+		if _, ok := c.BySha1(sha1Of("a mod")); ok {
+			t.Fatalf("an entry holding %q was found", content)
+		}
+	}
+}
+
+func TestMarkManualMarksAPlainObject(t *testing.T) {
+	c := newCache(t)
+	sha, err := c.Put(strings.NewReader("a jar downloaded by hand"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.MarkManual(sha); err != nil || !c.IsManual(sha) {
+		t.Fatalf("the object is marked manual: %v", err)
+	}
+	if got, ok := c.BySha1(sha1Of("a jar downloaded by hand")); !ok || got != sha {
+		t.Fatal("a marked object is found by its sha1")
+	}
+}

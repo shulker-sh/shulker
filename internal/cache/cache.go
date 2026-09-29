@@ -32,8 +32,9 @@ func Open() (*Cache, error) {
 	return &Cache{Dir: filepath.Join(base, "shulker")}, nil
 }
 
+// Has reports whether the object sha is cached; a sha that isn't a sha512 names none.
 func (c *Cache) Has(sha string) bool {
-	if sha == "" {
+	if len(sha) != sha512.Size*2 {
 		return false
 	}
 	_, err := os.Stat(c.Object(sha))
@@ -94,6 +95,12 @@ func (c *Cache) commit(tmpPath, sha, sum1 string, manual bool) error {
 	if err := fsutil.Write(entry, []byte(sha)); err != nil || !manual {
 		return err
 	}
+	return c.MarkManual(sha)
+}
+
+// MarkManual marks the cached object sha as downloaded by hand. Every object already has its sha1
+// entry, so a manual object is always found by it.
+func (c *Cache) MarkManual(sha string) error {
 	marker := c.manualMarker(sha)
 	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
 		return err
@@ -121,35 +128,41 @@ func (c *Cache) BySha1(sum1 string) (string, bool) {
 	return sha, c.Has(sha)
 }
 
-// dropIndexEntries removes each sha1 entry and manual marker whose object is gone.
+// dropIndexEntries removes each manual marker and sha1 entry whose object is gone. A marker is
+// named for its object and a sha1 entry holds it.
 func (c *Cache) dropIndexEntries() error {
 	markers, err := entriesAt(filepath.Join(c.Dir, "index", "manual"), 1)
 	if err != nil {
 		return err
 	}
-	for _, path := range markers {
-		if c.Has(filepath.Base(path)) {
-			continue
-		}
-		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-	}
-	paths, err := entriesAt(filepath.Join(c.Dir, "index", "sha1"), 2)
+	entries, err := entriesAt(filepath.Join(c.Dir, "index", "sha1"), 2)
 	if err != nil {
 		return err
 	}
-	for _, path := range paths {
-		b, err := os.ReadFile(path)
+	for _, marker := range markers {
+		if err := c.dropUnless(marker, filepath.Base(marker)); err != nil {
+			return err
+		}
+	}
+	for _, entry := range entries {
+		b, err := os.ReadFile(entry)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		if err == nil && c.Has(string(b)) {
-			continue
-		}
-		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := c.dropUnless(entry, string(b)); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// dropUnless removes the index entry at path unless the object sha is cached.
+func (c *Cache) dropUnless(path, sha string) error {
+	if c.Has(sha) {
+		return nil
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	return nil
 }

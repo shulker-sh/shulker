@@ -80,6 +80,23 @@ func TestAGroupAlreadySettledRunsAgainQuietly(t *testing.T) {
 	}
 }
 
+func TestARetractedFileIsNotCounted(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	g := p.Progress("fetching", []Download{{Name: "sodium"}, {Name: "rtg"}}).Counts("mod", "mods")
+	g.Advance()
+	g.Advance()
+	g.Retract()
+	g.Finish()
+	g = p.Progress("fetching", []Download{{Name: "rtg"}}).Counts("mod", "mods")
+	g.Advance()
+	g.Retract()
+	g.Finish()
+	if stderr.String() != "  ✔ Fetched 1 mod\n" {
+		t.Fatalf("stderr: %q", stderr.String())
+	}
+}
+
 func TestStepWording(t *testing.T) {
 	var stderr bytes.Buffer
 	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}

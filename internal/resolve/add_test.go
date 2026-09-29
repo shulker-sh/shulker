@@ -271,9 +271,12 @@ func TestInstallWarnsOfStrayDownloadsAndListsMissingFiles(t *testing.T) {
 		t.Fatalf("install: %v %v %v", fetched, warnings, err)
 	}
 	for _, id := range []string{"nodist", "locked"} {
-		if !h.r.Cache.Has(h.mod(id).Sha512) {
-			t.Fatalf("%s was not taken from %s/", id, DownloadsDir)
+		if !h.r.Cache.Has(h.mod(id).Sha512) || !h.r.Cache.IsManual(h.mod(id).Sha512) {
+			t.Fatalf("%s was not taken from %s/ as a manual download", id, DownloadsDir)
 		}
+	}
+	if h.r.Cache.IsManual(sha512Hex([]byte("not a mod"))) {
+		t.Fatal("a stray file in downloads/ is not a manual download, so a prune may drop it")
 	}
 
 	if err := os.RemoveAll(filepath.Join(h.r.Dir, DownloadsDir)); err != nil {

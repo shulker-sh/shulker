@@ -145,6 +145,17 @@ func (pr *Progress) Advance() {
 	pr.redraw()
 }
 
+// Retract takes back an Advance for a file that turned out to need no fetch.
+func (pr *Progress) Retract() {
+	if pr == nil {
+		return
+	}
+	pr.mu.Lock()
+	pr.done = max(0, pr.done-1)
+	pr.mu.Unlock()
+	pr.redraw()
+}
+
 // Finish clears the bar and prints the ok line with the byte count, or clears it alone when
 // nothing was fetched.
 func (pr *Progress) Finish() {

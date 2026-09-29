@@ -34,6 +34,7 @@ func (r *Resolver) sweepDownloads() ([]dropped, error) {
 	dir := r.downloads()
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
+		r.droppedSums = map[string]bool{}
 		return nil, nil
 	}
 	if err != nil {
@@ -49,7 +50,7 @@ func (r *Resolver) sweepDownloads() ([]dropped, error) {
 			return nil, err
 		}
 		h := sha1.New()
-		sha, err := r.Cache.PutManual(io.TeeReader(f, h))
+		sha, err := r.Cache.Put(io.TeeReader(f, h))
 		f.Close()
 		if err != nil {
 			return nil, err
@@ -57,5 +58,21 @@ func (r *Resolver) sweepDownloads() ([]dropped, error) {
 		files = append(files, dropped{Name: e.Name(), Sha512: sha, Sha1: hex.EncodeToString(h.Sum(nil))})
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Name < files[j].Name })
+	r.droppedSums = map[string]bool{}
+	for _, f := range files {
+		r.droppedSums[f.Sha512] = true
+	}
 	return files, nil
+}
+
+// isDropped reports whether the object sha is a file in the downloads folder: a copy by hand, which
+// says nothing of whether its provider's URL serves it. It reads the last sweep, sweeping only when
+// none has run, since every cached file a provider hashes by sha1 alone asks.
+func (r *Resolver) isDropped(sha string) (bool, error) {
+	if r.droppedSums == nil {
+		if _, err := r.sweepDownloads(); err != nil {
+			return false, err
+		}
+	}
+	return r.droppedSums[sha], nil
 }

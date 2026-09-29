@@ -65,14 +65,19 @@ type Resolver struct {
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
 	// file order is arbitrary.
 	keepNewest bool
-	// groupCached counts the manual downloads the open group took from the cache.
-	groupCached int
+	// groupCached are the manual downloads the open group took from the cache, by file name.
+	groupCached map[string]bool
+	// advanced is set when the open group counted the fetch the next obtain makes.
+	advanced bool
 	// group is the live line a run of fetches draws on in place of a step each; see startGroup.
 	group *out.Progress
 	// held are the notes made while a group's live line was drawn, printed once it settles.
 	held []out.Item
 	// listings is the listing index, read once the first add asks it.
 	listings *cache.ListingIndex
+	// droppedSums are the sha512s of the files the last sweep found in the downloads folder, nil
+	// before one runs.
+	droppedSums map[string]bool
 	// adopted are the pending mods install filled from downloads/.
 	adopted []string
 	// locked are the mods this resolver locked, which keeping one again doesn't report.
@@ -190,15 +195,21 @@ func (r *Resolver) afterGroup() {
 		r.Note(it)
 	}
 	r.held = nil
-	r.reportCached(r.groupCached)
-	r.groupCached = 0
+	r.reportCached(len(r.groupCached))
+	r.groupCached = nil
 }
 
-// tookFromCache notes a manual download taken from the cache: a step of its own, or a count the
-// group's line is followed by.
-func (r *Resolver) tookFromCache(filename string) {
+// tookFromCache notes a manual download taken from the cache: a step of its own, or, taken off the
+// group's count of fetches when the group counted it, a count the group's line is followed by.
+func (r *Resolver) tookFromCache(filename string, advanced bool) {
 	if r.group != nil {
-		r.groupCached++
+		if advanced {
+			r.group.Retract()
+		}
+		if r.groupCached == nil {
+			r.groupCached = map[string]bool{}
+		}
+		r.groupCached[filename] = true
 		return
 	}
 	r.log("taking %s from the cache", filename)
@@ -216,6 +227,7 @@ func (r *Resolver) fetching(slug, version string) {
 	if r.group != nil {
 		r.group.File(slug)
 		r.group.Advance()
+		r.advanced = true
 		return
 	}
 	r.log("fetching %s %s", slug, version)
@@ -569,14 +581,22 @@ type obtained struct {
 }
 
 func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provider.Version) (obtained, error) {
+	advanced := r.advanced
+	r.advanced = false
 	if v.File.Sha512 != "" {
 		path, err := r.Cache.Ensure(ctx, r.Fetch, v.File.URL, v.File.Sha512)
 		url := v.File.URL
 		return obtained{path: path, sha512: v.File.Sha512, url: &url}, err
 	}
 	if sha, ok := r.Cache.BySha1(v.File.Sha1); ok && v.File.URL != "" && !r.Cache.IsManual(sha) {
-		url := v.File.URL
-		return obtained{path: r.Cache.Object(sha), sha512: sha, url: &url}, nil
+		isDropped, err := r.isDropped(sha)
+		if err != nil {
+			return obtained{}, err
+		}
+		if !isDropped {
+			url := v.File.URL
+			return obtained{path: r.Cache.Object(sha), sha512: sha, url: &url}, nil
+		}
 	}
 	if v.File.URL != "" {
 		sha, err := r.Cache.Fetch(ctx, r.Fetch, v.File.URL)
@@ -604,11 +624,11 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	}
 	for _, f := range files {
 		if f.Sha1 == v.File.Sha1 {
-			return obtained{path: r.Cache.Object(f.Sha512), sha512: f.Sha512, page: v.Page}, nil
+			return obtained{path: r.Cache.Object(f.Sha512), sha512: f.Sha512, page: v.Page}, r.Cache.MarkManual(f.Sha512)
 		}
 	}
 	if sha, ok := r.Cache.BySha1(v.File.Sha1); ok {
-		r.tookFromCache(v.File.Filename)
+		r.tookFromCache(v.File.Filename, advanced)
 		return obtained{path: r.Cache.Object(sha), sha512: sha, page: v.Page}, nil
 	}
 	e := out.Errorf("manual-download", "%s can't be downloaded automatically", v.File.Filename)
@@ -938,6 +958,8 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 	for _, f := range files {
 		if !r.lockHas(f.Sha512) {
 			warnings = append(warnings, fmt.Sprintf("%s/%s matches no mod in the lock", DownloadsDir, f.Name))
+		} else if err := r.Cache.MarkManual(f.Sha512); err != nil {
+			return nil, nil, err
 		}
 	}
 	var fetched []string
@@ -1141,6 +1163,9 @@ func (r *Resolver) adoptPending(files []dropped) error {
 		var sha string
 		if i := slices.IndexFunc(files, func(f dropped) bool { return f.Sha1 == m.Sha1 }); i >= 0 {
 			sha = files[i].Sha512
+			if err := r.Cache.MarkManual(sha); err != nil {
+				return err
+			}
 		} else if found, ok := r.Cache.BySha1(m.Sha1); ok {
 			sha = found
 			cached++

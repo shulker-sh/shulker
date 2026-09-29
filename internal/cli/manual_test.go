@@ -108,7 +108,7 @@ func TestImportWaitsForAManualDownloadAtATerminal(t *testing.T) {
 	}
 
 	h.tty = false
-	if _, stderr := h.mustRunStderr(t, "import", archive, "--dir", filepath.Join(t.TempDir(), "cached")); !strings.Contains(stderr, "Took 1 manual download from the cache") {
+	if _, stderr := h.mustRunStderr(t, "import", archive, "--dir", filepath.Join(t.TempDir(), "cached")); !strings.Contains(stderr, "Took 1 manual download from the cache") || strings.Contains(stderr, "Fetched 1 mod") {
 		t.Fatalf("the next import takes the file from the cache: %s", stderr)
 	}
 	os.RemoveAll(h.cache)
