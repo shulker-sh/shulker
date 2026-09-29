@@ -41,11 +41,24 @@ func ptyPrinter(t *testing.T) (*Printer, func() []byte) {
 		}
 	}()
 	t.Cleanup(func() { tty.Close(); master.Close(); <-done })
+	// read waits for the terminal to go quiet for a few frames, or gives up after a while so a
+	// line that never stops drawing still fails the test that reads it.
 	read := func() []byte {
-		time.Sleep(4 * frameEvery)
-		mu.Lock()
-		defer mu.Unlock()
-		return bytes.Clone(raw.Bytes())
+		var last []byte
+		quiet := 0
+		for deadline := time.Now().Add(5 * time.Second); quiet < 3 && time.Now().Before(deadline); {
+			time.Sleep(frameEvery)
+			mu.Lock()
+			now := bytes.Clone(raw.Bytes())
+			mu.Unlock()
+			if bytes.Equal(now, last) {
+				quiet++
+			} else {
+				quiet = 0
+			}
+			last = now
+		}
+		return last
 	}
 	return &Printer{Stdout: tty, Stderr: tty}, read
 }
@@ -113,8 +126,19 @@ func startBar(p *Printer) *Progress {
 	pr := p.Progress("fetching", []Download{{Name: "a.jar", Size: 10}, {Name: "b.jar", Size: 10}})
 	pr.File("a.jar")
 	pr.Bytes(5)
-	time.Sleep(3 * frameEvery)
+	waitUntilDrawn(pr)
 	return pr
+}
+
+func waitUntilDrawn(pr *Progress) {
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(frameEvery / 4) {
+		pr.mu.Lock()
+		drawn := len(pr.drawn) > 0
+		pr.mu.Unlock()
+		if drawn {
+			return
+		}
+	}
 }
 
 func TestAnErrorClearsTheBarAndStartsAtColumnZero(t *testing.T) {
@@ -135,7 +159,7 @@ func TestALineDuringTheBarLandsAboveIt(t *testing.T) {
 	p.Warn("a.jar is slow")
 	pr.Advance()
 	pr.Advance()
-	time.Sleep(2 * frameEvery)
+	waitUntilDrawn(pr)
 	pr.Finish()
 	p.Finish()
 	rows, col := screen(read(), 80)
@@ -147,7 +171,7 @@ func TestALineDuringTheBarLandsAboveIt(t *testing.T) {
 
 func TestAPromptEndsTheLiveLines(t *testing.T) {
 	for name, start := range map[string]func(p *Printer){
-		"step": func(p *Printer) { p.Step("resolving Minecraft 26.2"); time.Sleep(3 * frameEvery) },
+		"step": func(p *Printer) { p.Step("resolving Minecraft 26.2") },
 		"bar":  func(p *Printer) { startBar(p) },
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -185,5 +209,37 @@ func TestAPendingLineStaysOffATerminal(t *testing.T) {
 	p.Out().OK("Minecraft closed after 12m 4s", "")
 	if stderr.String() != "  ○ Waiting for Minecraft to close\n" {
 		t.Fatalf("stderr %q", stderr.String())
+	}
+}
+
+func TestAStepDuringTheBarSettlesAboveIt(t *testing.T) {
+	p, read := ptyPrinter(t)
+	pr := startBar(p)
+	p.Step("installing fabric 0.19.5")
+	p.Step("copying config/ into the instance")
+	pr.Advance()
+	pr.Advance()
+	pr.Finish()
+	p.Finish()
+	rows, col := screen(read(), 80)
+	want := []string{"", "  ✔ Installed fabric 0.19.5", "  ✔ Copied config/ into the instance", "  ✔ Fetched 2 files (5 B)", "", ""}
+	if strings.Join(rows, "\n") != strings.Join(want, "\n") || col != 0 {
+		t.Fatalf("screen %q, cursor in column %d", rows, col)
+	}
+}
+
+func TestASecondBarClearsTheFirst(t *testing.T) {
+	p, read := ptyPrinter(t)
+	first := startBar(p)
+	second := p.Progress("fetching", []Download{{Name: "c.jar", Size: 10}})
+	second.Advance()
+	second.Finish()
+	first.Advance()
+	first.Finish()
+	p.Finish()
+	rows, col := screen(read(), 80)
+	want := []string{"", "  ✔ Fetched 1 file", "  ✔ Fetched 1 file (5 B)", "", ""}
+	if strings.Join(rows, "\n") != strings.Join(want, "\n") || col != 0 {
+		t.Fatalf("screen %q, cursor in column %d", rows, col)
 	}
 }

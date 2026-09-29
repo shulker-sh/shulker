@@ -68,7 +68,7 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 	if p.JSON {
 		return nil
 	}
-	p.Settle()
+	p.endLive(true)
 	p.open(p.Stderr)
 	pr := newProgress(p.Err(), verb, files)
 	pr.firstTime = func(key string) bool {

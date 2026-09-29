@@ -125,8 +125,8 @@ func (p *Printer) Pending(text string) {
 	p.settleLocked(true)
 	p.open(p.Stderr)
 	f, isTTY := p.Stderr.(*os.File)
-	if !isTTY || !IsTerminal(f) {
-		(&Lines{W: p.Stderr, T: p.ErrTheme}).Pending(text)
+	if !isTTY || !IsTerminal(f) || p.steps.bar != nil {
+		(&Lines{W: p.errLocked(), T: p.ErrTheme}).Pending(text)
 		return
 	}
 	t := p.ErrTheme
@@ -148,13 +148,14 @@ func (p *Printer) step(text string, clears bool) {
 	p.settleLocked(true)
 	verb, _, _ := strings.Cut(text, " ")
 	f, isTTY := p.Stderr.(*os.File)
-	isTTY = isTTY && IsTerminal(f)
+	// A spinner under a live bar would fight it for the row, so the step only settles.
+	isTTY = isTTY && IsTerminal(f) && p.steps.bar == nil
 	if clears && !isTTY {
 		return
 	}
 	p.open(p.Stderr)
 	if !strings.HasSuffix(verb, "ing") {
-		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(Sentence(text))
+		(&Lines{W: p.errLocked(), T: p.ErrTheme}).Done(Sentence(text))
 		return
 	}
 	s := &step{text: text, clears: clears}
@@ -202,7 +203,7 @@ func (p *Printer) settleLocked(done bool) {
 		fmt.Fprint(s.tty, "\r\x1b[J")
 	}
 	if done && !s.clears {
-		(&Lines{W: p.Stderr, T: p.ErrTheme}).Done(Sentence(settledText(s.text)))
+		(&Lines{W: p.errLocked(), T: p.ErrTheme}).Done(Sentence(settledText(s.text)))
 	}
 }
 
@@ -253,6 +254,23 @@ func (p *Printer) endLive(done bool) {
 	if bar := p.liveBar(); bar != nil {
 		bar.halt()
 	}
+}
+
+// errLocked is stderr for a line written with the step lock held, which lands above a live bar.
+func (p *Printer) errLocked() io.Writer {
+	if bar := p.steps.bar; bar != nil {
+		return aboveBar{bar, p.Stderr}
+	}
+	return p.Stderr
+}
+
+type aboveBar struct {
+	bar *Progress
+	w   io.Writer
+}
+
+func (a aboveBar) Write(b []byte) (int, error) {
+	return a.bar.above(func() (int, error) { return a.w.Write(b) })
 }
 
 func (p *Printer) liveBar() *Progress {
