@@ -54,7 +54,7 @@ func CacheRoots(c *cache.Cache, instances []project.InstanceEntry, dir string, n
 			r.Unreadable = append(r.Unreadable, path+" can't be read, so pruning could remove files it needs ("+out.AsError(err).Message+"); fix it, or leave out its --lock")
 			continue
 		}
-		r.Locks = append(r.Locks, cache.Root{Lock: lk})
+		r.Locks = append(r.Locks, cache.Root{Lock: lk, Name: path})
 	}
 	seen := map[string]bool{}
 	for _, in := range instances {
@@ -63,7 +63,7 @@ func CacheRoots(c *cache.Cache, instances []project.InstanceEntry, dir string, n
 			continue
 		}
 		seen[at] = true
-		locks, present, unreadable, err := dirRoots(c, at, cache.Root{Source: in.Source, Ref: in.Ref, Path: in.Path})
+		locks, present, unreadable, err := dirRoots(c, at, cache.Root{Source: in.Source, Ref: in.Ref, Path: in.Path, Name: in.Label()})
 		if err != nil {
 			return Roots{}, err
 		}
@@ -81,7 +81,7 @@ func CacheRoots(c *cache.Cache, instances []project.InstanceEntry, dir string, n
 	if _, err := os.Stat(filepath.Join(dir, manifest.FileName)); err != nil {
 		return r, nil
 	}
-	locks, _, unreadable, err := dirRoots(c, dir, cache.Root{})
+	locks, _, unreadable, err := dirRoots(c, dir, cache.Root{Name: dir})
 	if err != nil {
 		return Roots{}, err
 	}
@@ -120,6 +120,7 @@ func dirRoots(c *cache.Cache, dir string, from cache.Root) (roots []cache.Root, 
 		}
 	}
 	var paths []string
+	names := map[string]string{}
 	// A directory synced from a git or manifest URL runs on the lock of the checkout it was
 	// built from, and falls back offline to the one its last good sync recorded.
 	if kind := modpack.Classify(from.Source); from.Source != "" && kind != modpack.Local {
@@ -133,7 +134,9 @@ func dirRoots(c *cache.Cache, dir string, from cache.Root) (roots []cache.Root, 
 			return nil, false, nil, err
 		}
 		for _, e := range entries {
-			paths = append(paths, filepath.Join(HistoryPath(d), e.ID, lock.FileName))
+			path := filepath.Join(HistoryPath(d), e.ID, lock.FileName)
+			paths = append(paths, path)
+			names[path] = from.Name + " (history " + e.ID + ")"
 		}
 	}
 	for _, path := range paths {
@@ -149,6 +152,9 @@ func dirRoots(c *cache.Cache, dir string, from cache.Root) (roots []cache.Root, 
 		}
 		root := from
 		root.Lock = lk
+		if name, ok := names[path]; ok {
+			root.Name = name
+		}
 		roots = append(roots, root)
 	}
 	return roots, true, unreadable, nil

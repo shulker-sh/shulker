@@ -21,6 +21,9 @@ type Root struct {
 	Source string
 	Ref    string
 	Path   string
+	// Name says whose lock it is, for a report: an instance, a project, a history entry of either,
+	// or a lock file.
+	Name string
 }
 
 // Pruned counts what a prune removed, by kind.
