@@ -105,6 +105,12 @@ type Entry struct {
 	after   func(e *Entry, res InstanceResult) string
 }
 
+// HasHooks reports whether e's instances carry shulker's hooks in launcher slots. An entry with no
+// Slot has none to fill or release, as shulker's own instances run the hooks themselves.
+func (e *Entry) HasHooks() bool {
+	return e != nil && e.Slot != nil
+}
+
 // Linked is a registry row plus the intent its instance.json records, which is where the side and
 // ref and path the relink command needs now live.
 type Linked struct {

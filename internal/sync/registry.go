@@ -26,7 +26,7 @@ func Reconcile(e *Env, in config.Instance) (rehooked bool) {
 		e.Warn("%v", err)
 	}
 	entry := launcher.Find(in.Launcher)
-	if entry == nil || entry.Slot == nil {
+	if !entry.HasHooks() {
 		// A plain synced directory has no slot to fill, so it gets no scripts either.
 		return false
 	}

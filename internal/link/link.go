@@ -182,7 +182,7 @@ func Into(ctx context.Context, e *Env, entry *launcher.Entry, src *sync.Source, 
 	if !entry.Usage.Names {
 		rep.Shown = rep.ID
 	}
-	if entry.Slot != nil {
+	if entry.HasHooks() {
 		rep.Command = launcher.SlotCommand(entry.Name, res.GameDir, launcher.HookPreLaunch)
 	}
 	return rep, nil

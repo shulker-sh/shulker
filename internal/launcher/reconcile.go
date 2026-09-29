@@ -19,7 +19,7 @@ import (
 // keeps running it instead of destroying it.
 func Reconcile(e *Entry, in config.Instance, f *instance.File, exe string) (Reconciled, error) {
 	var r Reconciled
-	if e == nil || e.Slot == nil {
+	if !e.HasHooks() {
 		return r, nil
 	}
 	slot := *e.Slot
