@@ -18,6 +18,11 @@ All notable changes to shulker are documented here. The format is based on
 - `-C` has to name a directory that exists, or it is a usage error before the command runs, rather than a missing `shulker.json` or nothing at all. `init`, `create` and `import` still take a new one.
 - `search -C` and `search -i` fail when the project they name can't be opened, instead of searching as if outside a project.
 
+### Security
+
+- A `.mrpack` whose index names a path outside the pack's folder is refused as `mrpack-invalid`: a `..` component, a leading `/` or `\`, a drive letter, or a Windows device name like `CON`. Such a pack could write files anywhere on `import`, or anywhere above the build on `add` then `build`.
+- A symlink in an override folder is skipped on build, rather than the file it points at being copied into the instance.
+
 ## [0.0.1] - 2026-09-26
 
 The first release of shulker, a package manager for Minecraft modpacks. A pack is a `shulker.json` you edit and a `shulker.lock` that records exact versions and hashes, so every machine builds the same pack.
