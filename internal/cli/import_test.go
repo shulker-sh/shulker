@@ -29,6 +29,10 @@ func readProject(t *testing.T, dir string) (*manifest.Manifest, *lock.Lock) {
 	return m, l
 }
 
+// mrpackCDN is where the harness serves a jar an mrpack lists by download, on a host the format
+// allows; the harness routes it to its own server.
+const mrpackCDN = "https://cdn.modrinth.com/cdn/"
+
 // mrpackEnv is the index env for a file needed on side, as the Modrinth format writes it.
 func mrpackEnv(side string) map[string]string {
 	env := map[string]string{"client": "required", "server": "required"}
@@ -280,7 +284,7 @@ func TestImportMrpackForeign(t *testing.T) {
 	h.jars["extra"] = extra
 	sodium, fabricAPI := h.jars["sodium"], h.jars["fabric-api"]
 	file := func(jar fakeJar, side string) mrpackIndexFile {
-		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv(side), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv(side), Downloads: []string{mrpackCDN + jar.filename}, FileSize: int64(len(jar.data))}
 	}
 	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "2.0", Name: "Someone's Pack", Summary: "hello",
@@ -342,7 +346,7 @@ func TestImportMrpackLocksHostedPacks(t *testing.T) {
 	h := newHarness(t)
 	fresh, complementary, sodium := h.jars["fresh-animations"], h.jars["complementary"], h.jars["sodium"]
 	file := func(dir string, jar fakeJar, name string) mrpackIndexFile {
-		return mrpackIndexFile{Path: dir + "/" + name, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("client"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+		return mrpackIndexFile{Path: dir + "/" + name, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("client"), Downloads: []string{mrpackCDN + jar.filename}, FileSize: int64(len(jar.data))}
 	}
 	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "1.0", Name: "Packs",
@@ -413,11 +417,11 @@ func TestImportMrpackKeepsAnIndexFileModrinthFailsToServe(t *testing.T) {
 		return h.run(t, "import", archive, "--dir", filepath.Join(h.dir, "mirrored"), "--json")
 	}
 
-	if code, stdout, _ := importWith(t, h.server.URL+"/cdn/"+sodium.filename); code == 0 || !strings.Contains(stdout, "modpack-download") || !strings.Contains(stdout, "no other URL") {
+	if code, stdout, _ := importWith(t, mrpackCDN+sodium.filename); code == 0 || !strings.Contains(stdout, "modpack-download") || !strings.Contains(stdout, "no other URL") {
 		t.Fatalf("exit %d: %s", code, stdout)
 	}
 
-	code, stdout, stderr := importWith(t, h.server.URL+"/cdn/"+sodium.filename, h.server.URL+"/cdn/mirror/"+sodium.filename)
+	code, stdout, stderr := importWith(t, mrpackCDN+sodium.filename, "https://github.com/cdn/mirror/"+sodium.filename)
 	if code != 0 {
 		t.Fatalf("exit %d: %s%s", code, stdout, stderr)
 	}
@@ -608,7 +612,7 @@ func TestImportSettlesEachPhaseIntoOneLine(t *testing.T) {
 	h := newHarness(t)
 	sodium, fabricAPI := h.jars["sodium"], h.jars["fabric-api"]
 	file := func(jar fakeJar) mrpackIndexFile {
-		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Downloads: []string{mrpackCDN + jar.filename}, FileSize: int64(len(jar.data))}
 	}
 	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: "2.0", Name: "Phases",

@@ -122,7 +122,7 @@ func TestImportMrpackLocksDatapacks(t *testing.T) {
 	h := newHarness(t)
 	terralith, autoslabs := h.jars["terralith"], h.jars["autoslabs"]
 	file := func(rel string, jar fakeJar) mrpackIndexFile {
-		return mrpackIndexFile{Path: rel, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+		return mrpackIndexFile{Path: rel, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("both"), Downloads: []string{mrpackCDN + jar.filename}, FileSize: int64(len(jar.data))}
 	}
 	unknown := makeJarFiles(t, "inmis", "inmis_recipe_fix.zip", map[string]string{"pack.mcmeta": datapackMcmeta, "data/inmis/recipe/fix.json": "{}"})
 	index := mrpackIndex{
@@ -316,7 +316,7 @@ func TestImportMrpackKeepsAHybridDatapackAsBoth(t *testing.T) {
 		FormatVersion: 1, Game: "minecraft", VersionID: "40", Name: "Better",
 		Files: []mrpackIndexFile{{
 			Path: "resourcepacks/AutoslabsCompat.zip", Hashes: map[string]string{"sha1": autoslabs.sha1, "sha512": autoslabs.sha512}, Env: mrpackEnv("both"),
-			Downloads: []string{h.server.URL + "/cdn/" + autoslabs.filename}, FileSize: int64(len(autoslabs.data)),
+			Downloads: []string{mrpackCDN + autoslabs.filename}, FileSize: int64(len(autoslabs.data)),
 		}},
 		Dependencies: map[string]string{"minecraft": "26.2", "fabric-loader": "0.17.3"},
 	}

@@ -179,7 +179,7 @@ func writeMrpack(t *testing.T, path string, files []mrpackFile, entries map[stri
 // sides.
 func listedByDownload(c *envtest.CDN, v provider.Version) mrpackFile {
 	data := c.Bytes(v)
-	url := c.Serve("/mrpack/"+v.File.Filename, data)
+	url := c.ServeOnModrinth("/mrpack/"+v.File.Filename, data)
 	return mrpackFile{Path: "mods/" + v.File.Filename, Hashes: map[string]string{"sha1": v.File.Sha1, "sha512": sha512Hex(data)}, Env: map[string]string{"client": "required", "server": "required"}, Downloads: []string{url}, FileSize: int64(len(data))}
 }
 

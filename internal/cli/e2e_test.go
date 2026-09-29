@@ -26,6 +26,7 @@ import (
 	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/env"
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/fetch/fetchtest"
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/launcher"
@@ -33,6 +34,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/mojang"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/player"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/provider/curseforge"
@@ -787,6 +789,7 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 		a.exe = func() (string, error) { return h.exe, nil }
 	}
 	f := fetch.New("test")
+	f.HTTP = fetchtest.Routed(h.server, packarchive.MrpackHosts...)
 	piston := mojang.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"
 	mr := modrinth.New(f)

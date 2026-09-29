@@ -126,3 +126,26 @@ func TestExportMrpackBundlesALocalJarInItsSidesOverrides(t *testing.T) {
 		t.Fatalf("report: %+v", report)
 	}
 }
+
+func TestExportMrpackBundlesAFileOnAPlainHTTPURL(t *testing.T) {
+	p := newProject(t)
+	p.b.Manifest.Server = nil
+	for _, m := range []struct{ id, slug, scheme string }{{"AANobbMI", "sodium", "http"}, {"gvQqBUqZ", "lithium", "https"}} {
+		v := p.modrinth.Publish(provider.Project{ID: m.id, Slug: m.slug, Title: m.slug}, provider.Version{ID: "V" + m.id, Number: "1.0", File: provider.File{Filename: m.slug + "-1.0.jar"}}, modJar(t, m.slug, "1.0"))
+		v.File.URL = m.scheme + "://cdn.modrinth.com/data/" + m.id + "/" + m.slug + "-1.0.jar"
+		p.lockMod(m.slug, p.modrinth, v)
+	}
+	p.save()
+
+	format, _ := packarchive.Lookup("mrpack")
+	report, err := p.b.Export(context.Background(), ExportOptions{Format: format, Version: "1.0", Output: p.archivePath(), Bundle: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := p.archive()["overrides/mods/sodium-1.0.jar"]; !ok || strings.Join(report.BundledMods, ",") != "sodium" {
+		t.Fatalf("an http:// URL on an allowed host is bundled: %+v", report)
+	}
+	if listed := p.listed(); len(listed) != 1 || listed[0].Downloads[0] != "https://cdn.modrinth.com/data/gvQqBUqZ/lithium-1.0.jar" {
+		t.Fatalf("an https URL on an allowed host is listed: %+v", listed)
+	}
+}

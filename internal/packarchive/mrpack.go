@@ -3,6 +3,7 @@ package packarchive
 import (
 	"encoding/json"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 
@@ -67,19 +68,20 @@ func (mrpack) Usage() Usage {
 func (mrpack) Places(kind, path string) bool { return true }
 
 func (mrpack) Lists(f File) bool {
-	if len(f.Downloads) == 0 {
-		return false
-	}
-	parsed, err := url.Parse(f.Downloads[0])
+	return len(f.Downloads) > 0 && mrpackHosted(f.Downloads[0]) == ""
+}
+
+// mrpackHosted is where a download comes from when it isn't https on one of MrpackHosts, or empty
+// when a Modrinth launcher would download it.
+func mrpackHosted(download string) string {
+	parsed, err := url.Parse(download)
 	if err != nil {
-		return false
+		return download
 	}
-	for _, h := range MrpackHosts {
-		if parsed.Hostname() == h {
-			return true
-		}
+	if parsed.Scheme == "https" && slices.Contains(MrpackHosts, parsed.Hostname()) {
+		return ""
 	}
-	return false
+	return parsed.Scheme + "://" + parsed.Host
 }
 
 func (mrpack) CantPlace(what string) *out.Error {
@@ -123,6 +125,11 @@ func (mrpack) decode(file string, z *zipEntries) (*Archive, error) {
 		}
 		if !mrpackPathInside(f.Path) {
 			return nil, out.Errorf("mrpack-invalid", "index file %s is outside the pack's folder", f.Path)
+		}
+		for _, d := range f.Downloads {
+			if from := mrpackHosted(d); from != "" {
+				return nil, out.Errorf("mrpack-invalid", "index file %s downloads from %s, which Modrinth launchers don't", f.Path, from)
+			}
 		}
 		a.Files = append(a.Files, File{Path: f.Path, Hashes: f.Hashes, Side: mrpackSide(f.Env), Downloads: f.Downloads, Size: f.FileSize})
 	}

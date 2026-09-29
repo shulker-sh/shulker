@@ -2054,8 +2054,8 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `modpack-ref` | A modpack's `ref` doesn't apply to its source, or wasn't found |
 | `modpack-unlocked` | A modpack has no commit, archive hash or version in the lock; run `shulker update`, or `shulker lock` before pinning a hosted one |
 | `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
-| `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files, and a local `file` entry has no download at all; pass `--bundle`. `items`: the files |
-| `mrpack-invalid` | The modpack is malformed, or its index names a path outside the pack's folder: a `..` component, a leading `/` or `\`, a drive letter, or a Windows device name like `CON` or `NUL` |
+| `mrpack-host-not-allowed` | Modrinth launchers only download over https from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files, and a local `file` entry has no download at all; pass `--bundle`. `items`: the files |
+| `mrpack-invalid` | The modpack is malformed; its index names a path outside the pack's folder (a `..` component, a leading `/` or `\`, a drive letter, or a Windows device name like `CON` or `NUL`); or a file downloads from anywhere but https on `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` or `gitlab.com`, the hosts a Modrinth launcher allows |
 | `mrpack-marker` | The modpack's own `shulker.json`, `shulker.lock` or `shulker.overrides.json` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-accounts` | shulker can see no account at all, so there is nothing to play with |

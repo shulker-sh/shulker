@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"shulker.sh/shulker/internal/fetch/fetchtest"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/provider"
 	"shulker.sh/shulker/internal/provider/fake"
@@ -63,6 +64,18 @@ func (c *CDN) Serve(path string, data []byte) string {
 	defer c.mu.Unlock()
 	c.files[path] = data
 	return c.srv.URL + path
+}
+
+// ServeOnModrinth publishes data at path and returns the cdn.modrinth.com URL for it, which an
+// mrpack may list and a client from Client reaches here.
+func (c *CDN) ServeOnModrinth(path string, data []byte) string {
+	c.Serve(path, data)
+	return "https://cdn.modrinth.com" + path
+}
+
+// Client is an HTTP client that reaches the CDN for cdn.modrinth.com as well as at its own URL.
+func (c *CDN) Client() *http.Client {
+	return fetchtest.Routed(c.srv, "cdn.modrinth.com")
 }
 
 // Forbid has the CDN refuse v.

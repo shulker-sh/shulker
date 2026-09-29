@@ -63,6 +63,9 @@ func newHarness(t *testing.T, providers ...*envtest.Host) *harness {
 		Log:       func(format string, args ...any) { h.log = append(h.log, fmt.Sprintf(format, args...)) },
 		Note:      func(it out.Item) { h.notes = append(h.notes, it) },
 	}
+	if h.cdn != nil {
+		h.r.Fetch.HTTP = h.cdn.Client()
+	}
 	h.r.Lock.Minecraft, h.r.Lock.DataVersion = "26.2", 4600
 	h.r.Lock.Loader = lock.Loader{Type: "fabric", Version: "0.17.3"}
 	for _, p := range providers {

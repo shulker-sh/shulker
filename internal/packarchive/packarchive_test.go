@@ -212,7 +212,7 @@ func TestReadRefusesAnIndexPathOutsideTheFolder(t *testing.T) {
 	paths := []string{"../../ESCAPED.txt", "mods/../../x.jar", "/etc/x", "\\\\server\\x", "\\x", "C:/x.jar", "c:x.jar", "mods/CON", "mods/nul.jar", "COM1/x.jar", "mods/lpt9.txt", "mods/Aux .jar"}
 	for _, p := range paths {
 		t.Run(p, func(t *testing.T) {
-			file := writeZip(t, map[string]string{"modrinth.index.json": mrpackIndexWith(t, p)})
+			file := writeZip(t, map[string]string{"modrinth.index.json": mrpackIndexWith(t, p, "https://cdn.modrinth.com/data/x/a.jar")})
 			_, err := Read(file)
 			if out.CodeOf(err) != "mrpack-invalid" || !strings.Contains(err.Error(), p) {
 				t.Fatalf("want mrpack-invalid naming %q, got %v", p, err)
@@ -220,13 +220,31 @@ func TestReadRefusesAnIndexPathOutsideTheFolder(t *testing.T) {
 		})
 	}
 	for _, p := range []string{"mods/a.jar", "config/console.txt", "mods/com10.jar", "mods/..a.jar"} {
-		if _, err := Read(writeZip(t, map[string]string{"modrinth.index.json": mrpackIndexWith(t, p)})); err != nil {
+		if _, err := Read(writeZip(t, map[string]string{"modrinth.index.json": mrpackIndexWith(t, p, "https://cdn.modrinth.com/data/x/a.jar")})); err != nil {
 			t.Fatalf("%s: %v", p, err)
 		}
 	}
 }
 
-func mrpackIndexWith(t *testing.T, path string) string {
+func TestReadRefusesADownloadOffTheMrpackHosts(t *testing.T) {
+	for download, from := range map[string]string{
+		"https://evil.example/a.jar":          "https://evil.example",
+		"http://cdn.modrinth.com/data/a.jar":  "http://cdn.modrinth.com",
+		"https://cdn.modrinth.com.evil/a.jar": "https://cdn.modrinth.com.evil",
+	} {
+		_, err := Read(writeZip(t, map[string]string{"modrinth.index.json": mrpackIndexWith(t, "mods/a.jar", download)}))
+		if out.CodeOf(err) != "mrpack-invalid" || !strings.Contains(err.Error(), "mods/a.jar") || !strings.Contains(err.Error(), from) {
+			t.Fatalf("%s: want mrpack-invalid naming the file and %s, got %v", download, from, err)
+		}
+	}
+	for _, download := range []string{"https://cdn.modrinth.com/data/a.jar", "https://github.com/o/r/releases/a.jar", "https://raw.githubusercontent.com/o/r/a.jar", "https://gitlab.com/o/r/a.jar"} {
+		if _, err := Read(writeZip(t, map[string]string{"modrinth.index.json": mrpackIndexWith(t, "mods/a.jar", download)})); err != nil {
+			t.Fatalf("%s: %v", download, err)
+		}
+	}
+}
+
+func mrpackIndexWith(t *testing.T, path, download string) string {
 	t.Helper()
 	index := map[string]any{
 		"formatVersion": 1,
@@ -235,7 +253,7 @@ func mrpackIndexWith(t *testing.T, path string) string {
 		"files": []map[string]any{{
 			"path":      path,
 			"hashes":    map[string]string{"sha1": "a", "sha512": "b"},
-			"downloads": []string{"https://cdn.modrinth.com/data/x/a.jar"},
+			"downloads": []string{download},
 		}},
 	}
 	data, err := json.Marshal(index)
@@ -334,7 +352,7 @@ func TestFormatFacts(t *testing.T) {
 	if !cf.Places("datapack", "datapacks/x.zip") || cf.Places("datapack", "global_packs/required_data/x.zip") || !mr.Places("datapack", "global_packs/required_data/x.zip") {
 		t.Fatal("only CurseForge minds where a datapack goes")
 	}
-	if mr.Lists(File{Downloads: []string{"https://example.com/a.jar"}}) || !mr.Lists(File{Downloads: []string{"https://github.com/a.jar"}}) || cf.Lists(File{Provider: "modrinth", Project: "1", Version: "2"}) || cf.Lists(File{Provider: "curseforge", Project: "AANobbMI", Version: "2"}) {
+	if mr.Lists(File{Downloads: []string{"https://example.com/a.jar"}}) || mr.Lists(File{Downloads: []string{"http://cdn.modrinth.com/a.jar"}}) || !mr.Lists(File{Downloads: []string{"https://github.com/a.jar"}}) || cf.Lists(File{Provider: "modrinth", Project: "1", Version: "2"}) || cf.Lists(File{Provider: "curseforge", Project: "AANobbMI", Version: "2"}) {
 		t.Fatal("listing rules")
 	}
 	if cf.NotListed("1 mod", 1).Code != "curseforge-not-found" || mr.NotListed("2 mods", 2).Code != "mrpack-host-not-allowed" || cf.CantPlace("1 datapack").Code != "curseforge-cant-place" {

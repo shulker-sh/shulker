@@ -29,7 +29,7 @@ type modrinthPackVersion struct {
 func hostedMrpack(t *testing.T, h *harness, filename, note string) fakeJar {
 	t.Helper()
 	file := func(jar fakeJar, side string) mrpackIndexFile {
-		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv(side), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))}
+		return mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv(side), Downloads: []string{mrpackCDN + jar.filename}, FileSize: int64(len(jar.data))}
 	}
 	index := mrpackIndex{
 		FormatVersion: 1, Game: "minecraft", VersionID: note, Name: "Cozy",

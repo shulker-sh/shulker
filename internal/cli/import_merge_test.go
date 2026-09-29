@@ -19,7 +19,7 @@ func writeMergePack(t *testing.T, h *harness, loaderKey, loaderVersion string, j
 	t.Helper()
 	var files []mrpackIndexFile
 	for _, jar := range jars {
-		files = append(files, mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("both"), Downloads: []string{h.server.URL + "/cdn/" + jar.filename}, FileSize: int64(len(jar.data))})
+		files = append(files, mrpackIndexFile{Path: "mods/" + jar.filename, Hashes: map[string]string{"sha1": jar.sha1, "sha512": jar.sha512}, Env: mrpackEnv("both"), Downloads: []string{mrpackCDN + jar.filename}, FileSize: int64(len(jar.data))})
 	}
 	path := filepath.Join(t.TempDir(), "merged.mrpack")
 	writeMrpack(t, path, mrpackIndex{FormatVersion: 1, Game: "minecraft", VersionID: "3.0", Name: "Merged", Files: files, Dependencies: map[string]string{"minecraft": "26.2", loaderKey: loaderVersion}}, entries)

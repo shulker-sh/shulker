@@ -37,6 +37,7 @@ func New(t *testing.T) *Env {
 	e.CurseForge = NewHost(e.CDN, "curseforge").LikeCurseForge()
 	e.CurseForge.Label = "CurseForge"
 	f := fetch.New("test")
+	f.HTTP = e.CDN.Client()
 	c := &cache.Cache{Dir: t.TempDir()}
 	piston, runtimes, profiles := mojang.NewPiston(f), mojang.NewRuntimes(f), mojang.NewProfiles(f)
 	e.Piston.Mojang(piston, runtimes, profiles)
