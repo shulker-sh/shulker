@@ -167,6 +167,10 @@ func (c *Cache) keep(roots []Root) map[string]bool {
 				keep[c.Object(sha)] = true
 			}
 		}
+		// A provider's archive is fetched again for a re-import; a local one can't be.
+		if im := l.Imported; im != nil && im.Provider == "" {
+			keep[c.Object(im.Sha512)] = true
+		}
 	}
 	return keep
 }

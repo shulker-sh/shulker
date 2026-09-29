@@ -195,6 +195,24 @@ func TestPruneKeepsALocksModpacks(t *testing.T) {
 	}
 }
 
+func TestPruneKeepsOnlyALocalImportsArchive(t *testing.T) {
+	c := newCache(t)
+	local, hosted := object(t, c, "local"), object(t, c, "hosted")
+	fromFile, fromProvider := lock.New(), lock.New()
+	fromFile.Imported = &lock.Imported{Sha512: local}
+	fromProvider.Imported = &lock.Imported{Provider: "modrinth", Project: "p", Version: "v", Sha512: hosted}
+
+	if _, err := c.Prune([]Root{{Lock: fromFile}, {Lock: fromProvider}}, false); err != nil {
+		t.Fatal(err)
+	}
+	if !exists(c.Object(local)) {
+		t.Fatal("a local import's archive can't be fetched again, so it stays")
+	}
+	if exists(c.Object(hosted)) {
+		t.Fatal("a provider's archive is fetched again, so it goes")
+	}
+}
+
 func TestSourceLocksNamesTheCheckoutsLocks(t *testing.T) {
 	c := newCache(t)
 	root := Root{Source: "https://example.com/pack.git", Ref: "main", Path: "packs/one"}
