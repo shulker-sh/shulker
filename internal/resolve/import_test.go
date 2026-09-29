@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"shulker.sh/shulker/internal/fetch"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/out"
 )
 
@@ -42,20 +43,21 @@ func TestDownloadFailure(t *testing.T) {
 	}
 }
 
-func TestAGroupHoldsTheStepsItsLoopLogs(t *testing.T) {
+func TestAGroupHoldsTheStepsAndNotesItsLoopLogs(t *testing.T) {
 	var stderr bytes.Buffer
 	p := &out.Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
 	var steps []string
-	r := &Resolver{Progress: p.Progress, Log: func(format string, args ...any) { steps = append(steps, fmt.Sprintf(format, args...)) }}
+	r := &Resolver{Progress: p.Progress, Note: p.Note, Log: func(format string, args ...any) { steps = append(steps, fmt.Sprintf(format, args...)) }}
 	end := r.startGroup([]string{"mods/sodium.jar", "mods/iris.jar"})
 	r.fetching("sodium", "0.9")
-	r.log("keeping iris 1.8 already in lock")
+	r.log("switching iris from alpha to beta")
+	r.noteKept("iris", "shaders", lock.Mod{VersionNumber: "1.8"})
 	end(false)
 	r.fetching("lithium", "0.15")
 	if len(steps) != 1 || steps[0] != "fetching lithium 0.15" {
 		t.Errorf("steps %q: only the fetch after the group is its own step", steps)
 	}
-	if stderr.String() != "  ✔ Fetched 1 mod\n" {
+	if stderr.String() != "  ✔ Fetched 1 mod\n  • iris 1.8 already in the pack (required by shaders)\n" {
 		t.Errorf("stderr %q", stderr.String())
 	}
 }

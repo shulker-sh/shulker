@@ -36,6 +36,7 @@ func NewAt(e *env.Env, dir string) *Resolver {
 		Fetch:      e.Fetch,
 		Meta:       &Meta{Piston: e.Piston, Loaders: e.Loaders},
 		Log:        e.Log,
+		Note:       e.Note,
 		Progress:   e.Progress,
 		FailFast:   e.FailFast,
 		EveryFetch: e.EveryFetch,

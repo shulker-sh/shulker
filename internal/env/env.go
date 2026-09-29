@@ -35,6 +35,8 @@ type Env struct {
 	EveryFetch bool
 	// Log reports each download and install as its own step line.
 	Log func(format string, args ...any)
+	// Note prints a list row about one entry where it happens, such as one kept over the file asked for.
+	Note func(it out.Item)
 	// Working shows work under way that clears when it ends, for a step whose outcome is its
 	// own line.
 	Working func(format string, args ...any)

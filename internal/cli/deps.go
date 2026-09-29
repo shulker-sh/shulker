@@ -98,6 +98,7 @@ func (a *app) deps() (*deps, error) {
 func (a *app) newDeps(e *env.Env) *deps {
 	e.FailFast, e.EveryFetch = a.failFast, a.everyFetch
 	e.Log = a.progress
+	e.Note = a.printer.Note
 	e.Working = a.printer.Working
 	e.Progress = a.printer.Progress
 	e.Warn = a.printer.Warn

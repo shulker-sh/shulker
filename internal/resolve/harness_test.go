@@ -16,6 +16,7 @@ import (
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -39,10 +40,11 @@ func dependsOn(projectID string) provider.Dependency {
 // harness is a Resolver on a fabric 26.2 project in a temp dir, with the manifest's providers in
 // the order given and every log line kept.
 type harness struct {
-	t   *testing.T
-	r   *Resolver
-	cdn *envtest.CDN
-	log []string
+	t     *testing.T
+	r     *Resolver
+	cdn   *envtest.CDN
+	log   []string
+	notes []out.Item
 }
 
 func newHarness(t *testing.T, providers ...*envtest.Host) *harness {
@@ -59,6 +61,7 @@ func newHarness(t *testing.T, providers ...*envtest.Host) *harness {
 		Cache:     &cache.Cache{Dir: t.TempDir()},
 		Fetch:     fetch.New("test"),
 		Log:       func(format string, args ...any) { h.log = append(h.log, fmt.Sprintf(format, args...)) },
+		Note:      func(it out.Item) { h.notes = append(h.notes, it) },
 	}
 	h.r.Lock.Minecraft, h.r.Lock.DataVersion = "26.2", 4600
 	h.r.Lock.Loader = lock.Loader{Type: "fabric", Version: "0.17.3"}

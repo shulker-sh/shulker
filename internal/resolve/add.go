@@ -39,6 +39,8 @@ type Resolver struct {
 	Packs     []*modpack.Loaded
 	Meta      *Meta
 	Log       func(format string, args ...any)
+	// Note prints a list row about one entry, such as a dependency kept at the version the pack has.
+	Note func(it out.Item)
 	// Warnings are raised while resolving, for the command to print when it finishes.
 	Warnings []string
 	// FailFast stops Install at the first download that fails, rather than trying every file and
@@ -64,6 +66,8 @@ type Resolver struct {
 	keepNewest bool
 	// group is the live line a run of fetches draws on in place of a step each; see startGroup.
 	group *out.Progress
+	// held are the notes made while a group's live line was drawn, printed once it settles.
+	held []out.Item
 	// listings is the listing index, read once the first add asks it.
 	listings *cache.ListingIndex
 	// adopted are the pending mods install filled from downloads/.
@@ -154,9 +158,13 @@ func (r *Resolver) startGroup(paths []string) (end func(failed bool)) {
 		}
 		if failed {
 			g.Abort()
-			return
+		} else {
+			g.Finish()
 		}
-		g.Finish()
+		for _, it := range r.held {
+			r.Note(it)
+		}
+		r.held = nil
 	}
 }
 
@@ -654,7 +662,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 				return "", nil, err
 			}
 			if !newer {
-				r.logKept(id, existing)
+				r.noteKept(id, requiredBy, existing)
 				return id, prior, nil
 			}
 			replacesProject = true
@@ -667,7 +675,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			}
 			return id, prior, r.recordJarID(existing, p, proj.ID, info.ID)
 		case existing.Version != v.ID:
-			r.logKept(id, existing)
+			r.noteKept(id, requiredBy, existing)
 			return id, prior, nil
 		default:
 			return id, prior, nil
@@ -732,12 +740,21 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 	return id, prior, nil
 }
 
-// logKept reports keeping a mod's locked file over the one asked for, unless this resolver locked
-// it: that is the same command settling on one file, not an entry the user had.
-func (r *Resolver) logKept(id string, existing lock.Mod) {
-	if !r.locked[id] {
-		r.log("keeping %s %s already in lock", id, existing.VersionNumber)
+// noteKept notes keeping a mod's locked file over the one requiredBy asked for, unless this
+// resolver locked it: that is the same command settling on one file, not an entry the user had.
+func (r *Resolver) noteKept(id, requiredBy string, existing lock.Mod) {
+	if r.locked[id] || r.Note == nil {
+		return
 	}
+	it := out.Item{Kind: out.Note, Name: id, Version: existing.VersionNumber, Text: "already in the pack"}
+	if requiredBy != "" {
+		it.Aside = []string{"required by " + requiredBy}
+	}
+	if r.group != nil {
+		r.held = append(r.held, it)
+		return
+	}
+	r.Note(it)
 }
 
 // newerThanLocked reports whether info's jar is newer than the one the entry locks. An entry whose

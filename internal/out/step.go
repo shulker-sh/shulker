@@ -143,6 +143,13 @@ func (p *Printer) step(text string, clears bool) {
 	p.steps.running = s
 }
 
+// Note prints it as a list row among the steps: a remark about one entry rather than work done.
+func (p *Printer) Note(it Item) {
+	if !p.JSON {
+		p.Err().Items(it)
+	}
+}
+
 // Settle finishes the running step. Anything written through Out or Err settles first; code that
 // writes to Stderr directly must call it.
 func (p *Printer) Settle() { p.settle(true) }

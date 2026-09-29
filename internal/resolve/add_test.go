@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -323,8 +324,8 @@ func TestKeepingAModThisCommandLockedIsSilent(t *testing.T) {
 	h.mustAdd("sodium", AddOptions{})
 	h.mustAdd("iris", AddOptions{})
 
-	if h.logged("keeping sodium") {
-		t.Fatalf("sodium was locked by this command, so keeping it says nothing: %q", h.log)
+	if len(h.notes) > 0 {
+		t.Fatalf("sodium was locked by this command, so keeping it says nothing: %+v", h.notes)
 	}
 	if got := h.mod("sodium").VersionNumber; got != "0.9.3" {
 		t.Fatalf("sodium = %s, want 0.9.3 kept", got)
@@ -338,8 +339,9 @@ func TestKeepingAModLockedBeforeTheCommandSaysSo(t *testing.T) {
 	h.nextCommand()
 	h.mustAdd("iris", AddOptions{})
 
-	if !h.logged("keeping sodium 0.9.3 already in lock") {
-		t.Fatalf("sodium was locked before this command, so keeping it is logged: %q", h.log)
+	want := out.Item{Kind: out.Note, Name: "sodium", Version: "0.9.3", Text: "already in the pack", Aside: []string{"required by iris"}}
+	if len(h.notes) != 1 || !reflect.DeepEqual(h.notes[0], want) {
+		t.Fatalf("sodium was locked before this command, so keeping it is noted: %+v", h.notes)
 	}
 }
 
