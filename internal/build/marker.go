@@ -27,7 +27,7 @@ func (b *Builder) markerOn(dir string) bool {
 
 // markerInfo is what side's marker says about the pack: the manifest's metadata, the mods sel
 // placed, the conditions the build was made under, and the manifest and lock as they are on disk.
-func (b *Builder) markerInfo(side string, cond conditions, sel selection) (marker.Info, error) {
+func (b *Builder) markerInfo(side string, cond conditions, sel selection, n *notices) (marker.Info, error) {
 	lockData, err := os.ReadFile(b.LockPath)
 	if err != nil {
 		return marker.Info{}, err
@@ -60,14 +60,14 @@ func (b *Builder) markerInfo(side string, cond conditions, sel selection) (marke
 		Authors:     b.Manifest.Authors,
 		License:     b.Manifest.License,
 		Links:       b.Manifest.Links,
-		Description: b.markerDescription(direct, deps, cond),
+		Description: b.markerDescription(direct, deps, cond, n),
 		Direct:      direct,
 		Deps:        deps,
 		Files:       map[string][]byte{manifest.FileName: manifestData, lock.FileName: lockData},
 	}, nil
 }
 
-func (b *Builder) markerDescription(direct, deps []string, cond conditions) marker.Description {
+func (b *Builder) markerDescription(direct, deps []string, cond conditions, n *notices) marker.Description {
 	entries := b.directEntries(cond)
 	items := func(ids []string) []marker.Item {
 		items := make([]marker.Item, len(ids))
@@ -79,7 +79,7 @@ func (b *Builder) markerDescription(direct, deps []string, cond conditions) mark
 	d := marker.Description{
 		Text:     b.Manifest.Description,
 		Summary:  fmt.Sprintf("Minecraft %s • %s %s • %d mods", b.Lock.Minecraft, b.Lock.Loader.Type, b.Lock.Loader.Version, len(direct)+len(deps)),
-		Sections: []marker.Section{{Title: "Mods", Items: items(direct)}, {Title: "Dependencies", Items: items(deps)}},
+		Sections: append(b.noticeSections(n), marker.Section{Title: "Mods", Items: items(direct)}, marker.Section{Title: "Dependencies", Items: items(deps)}),
 	}
 	if b.mentionsOS() {
 		d.Labels = append(d.Labels, marker.Label{Name: "OS", Value: cond.osLabel()})

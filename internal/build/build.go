@@ -168,6 +168,10 @@ type Options struct {
 	// Takedowns is a takedown check just run for the directory, recorded in its state; nil keeps
 	// the last one.
 	Takedowns *instance.Takedowns
+	// Changes are what the sync running this build brought, added to the directory's changelog.
+	Changes *instance.Changes
+	// notices are what the marker tells the player about the directory; a build fills them in.
+	notices *notices
 }
 
 // Builder builds, diffs and exports one project from its manifest, lock and cached files.
@@ -399,6 +403,18 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	dir := b.Target(side, opts.Dir)
 	inPlace := sameDir(dir, b.Dir)
 	report := &Report{Side: side, Dir: dir, Written: []string{}, Kept: []string{}, ChangedJars: []ChangedJar{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
+	prev, stateErr := instance.ReadState(dir)
+	report.State = stateErr
+	next := instance.State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, LauncherImage: prev.LauncherImage, Takedowns: cmp.Or(opts.Takedowns, prev.Takedowns), Entries: LockedEntries(b.Lock), Changelog: changelog(prev.Changelog, opts.Changes, time.Now())}
+	report.Takedowns = recordedTakedowns(next.Takedowns, b.Lock)
+	opts.notices = &notices{changelog: next.Changelog, takedowns: report.Takedowns}
+	if !opts.Force {
+		changed, err := changedSince(dir, prev)
+		if err != nil {
+			return nil, err
+		}
+		opts.notices.changedJars = changed
+	}
 	desired, dirs, err := b.collect(side, opts, report)
 	if err != nil {
 		return nil, err
@@ -411,10 +427,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	if opts.NoDataLinks || inPlace {
 		dirs = nil
 	}
-	prev, stateErr := instance.ReadState(dir)
-	report.State = stateErr
-	next := instance.State{Side: side, Origin: opts.Origin, Files: map[string]string{}, InstalledLoader: prev.InstalledLoader, LauncherImage: prev.LauncherImage, Packs: b.placedPackNames(desired), Takedowns: cmp.Or(opts.Takedowns, prev.Takedowns)}
-	report.Takedowns = recordedTakedowns(next.Takedowns, b.Lock)
+	next.Packs = b.placedPackNames(desired)
 	links, err := b.planLinks(dir, side, dirs, prev, report)
 	if err != nil {
 		return nil, err
@@ -599,7 +612,7 @@ func (b *Builder) collect(side string, opts Options, report *Report) (map[string
 			return nil, nil, err
 		}
 		if l := loader.Running(b.Lock); l.MarkerFile != "" && b.markerOn(dir) {
-			info, err := b.markerInfo(side, cond, sel)
+			info, err := b.markerInfo(side, cond, sel, opts.notices)
 			if err != nil {
 				return nil, nil, err
 			}
