@@ -190,7 +190,7 @@ func TestSyncFromUnreachableGitUsesTheCache(t *testing.T) {
 	gitRun(t, h.dir, "clone", "-q", "--bare", h.dir, remote)
 	gitRun(t, remote, "update-server-info")
 	var failing atomic.Bool
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if failing.Load() {
 			http.Error(w, "broken", http.StatusInternalServerError)
 			return

@@ -34,7 +34,7 @@ func serveGitPack(t *testing.T, name, mods string) *servedGitPack {
 	g.remote = filepath.Join(served, name+".git")
 	gitRun(t, g.work, "clone", "-q", "--bare", g.work, g.remote)
 	gitRun(t, g.remote, "update-server-info")
-	g.srv = httptest.NewServer(http.FileServer(http.Dir(served)))
+	g.srv = httptest.NewTLSServer(http.FileServer(http.Dir(served)))
 	t.Cleanup(g.srv.Close)
 	g.source = g.srv.URL + "/" + name + ".git"
 	return g

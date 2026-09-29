@@ -21,3 +21,16 @@ func TestSubfolderStaysInsideTheCheckout(t *testing.T) {
 		t.Fatalf("the root: %q, %v", got, err)
 	}
 }
+
+func TestSecureGitSource(t *testing.T) {
+	for _, source := range []string{"http://example.com/pack.git", "HTTP://example.com/pack.git", "git://example.com/pack.git", "git+http://example.com/pack.git"} {
+		if err := secureGitSource(source); out.CodeOf(err) != "url-insecure" {
+			t.Errorf("%s: want url-insecure, got %v", source, err)
+		}
+	}
+	for _, source := range []string{"https://example.com/pack.git", "ssh://git@example.com/pack.git", "git@example.com:me/pack.git", "file:///srv/pack.git", "/srv/pack.git", "../pack"} {
+		if err := secureGitSource(source); err != nil {
+			t.Errorf("%s: %v", source, err)
+		}
+	}
+}

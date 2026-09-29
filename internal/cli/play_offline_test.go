@@ -30,7 +30,7 @@ func TestAnUnreachableModpackReadsAsOffline(t *testing.T) {
 				remote := filepath.Join(served, "remote.git")
 				gitRun(t, h.dir, "clone", "-q", "--bare", h.dir, remote)
 				gitRun(t, remote, "update-server-info")
-				srv = httptest.NewServer(http.FileServer(http.Dir(served)))
+				srv = httptest.NewTLSServer(http.FileServer(http.Dir(served)))
 				source = srv.URL + "/remote.git"
 			} else {
 				srv = httptest.NewTLSServer(http.FileServer(http.Dir(h.dir)))

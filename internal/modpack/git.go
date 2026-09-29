@@ -27,7 +27,8 @@ func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {
 	}
 	cmd := exec.CommandContext(ctx, bin, args...)
 	// A server that accepts the connection and then sends nothing would otherwise hang git forever.
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_HTTP_LOW_SPEED_LIMIT=1", "GIT_HTTP_LOW_SPEED_TIME=60")
+	// GIT_ALLOW_PROTOCOL holds redirects and submodules to the same transports as a source.
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_HTTP_LOW_SPEED_LIMIT=1", "GIT_HTTP_LOW_SPEED_TIME=60", "GIT_ALLOW_PROTOCOL="+strings.Join(gitProtocols, ":"))
 	killGroup(cmd)
 	cmd.WaitDelay = 5 * time.Second
 	var stdout, stderr bytes.Buffer
@@ -42,7 +43,26 @@ func (s *Store) git(ctx context.Context, args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
+// gitProtocols are the transports a git source may use: https, ssh (scp-style git@host:repo too)
+// and local paths. Plain http and git:// can be tampered with in transit, and an unpinned ref
+// takes whatever arrives.
+var gitProtocols = []string{"https", "ssh", "file"}
+
+// secureGitSource refuses a git source on a transport outside gitProtocols.
+func secureGitSource(source string) error {
+	scheme, _, found := strings.Cut(source, "://")
+	if !found || slices.Contains(gitProtocols, strings.TrimPrefix(strings.ToLower(scheme), "git+")) {
+		return nil
+	}
+	e := out.Errorf("url-insecure", "%s isn't https or ssh", source)
+	e.Help = "use an https:// or ssh:// remote, or git@host:repo"
+	return e
+}
+
 func (s *Store) ensureMirror(ctx context.Context, what origin, source string) (string, error) {
+	if err := secureGitSource(source); err != nil {
+		return "", err
+	}
 	if s.isOffline() {
 		return "", fmt.Errorf("%s: %s: %w", what.label, source, fetch.ErrOffline)
 	}

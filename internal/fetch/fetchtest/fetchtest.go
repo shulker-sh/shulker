@@ -7,13 +7,15 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"slices"
 )
 
-// TrustTestServers has http.DefaultTransport, the one a fetch.New client uses, accept a TLS test
-// server's certificate. A package whose tests fetch calls it from an init.
+// TrustTestServers has http.DefaultTransport, the one a fetch.New client uses, and git accept a
+// TLS test server's certificate. A package whose tests fetch calls it from an init.
 func TrustTestServers() {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	os.Setenv("GIT_SSL_NO_VERIFY", "true")
 }
 
 // Routed is a client that sends a request for any of hosts to srv, so a test can name the real
