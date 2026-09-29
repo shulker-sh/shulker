@@ -12,7 +12,7 @@ import (
 type asker interface {
 	Pick(title string, choices []out.Choice, in io.Reader) (string, error)
 	Ask(title, description, placeholder string, in io.Reader) (string, error)
-	Confirm(question string, in io.Reader) (bool, error)
+	Confirm(question string, yes bool, in io.Reader) (bool, error)
 	BrowseMarks(title, description string, src out.BrowseSource, in io.Reader) ([]string, error)
 }
 

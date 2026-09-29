@@ -9,11 +9,10 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// Confirm puts a yes-or-no question on one line, No preselected so a stray enter declines. Esc is
-// No as well; only ctrl-c leaves it unanswered.
-func (p *Printer) Confirm(question string, in io.Reader) (bool, error) {
+// Confirm puts a yes-or-no question on one line, with Yes preselected when yes is set and No
+// otherwise, so a stray enter takes the safe answer. Esc is No; only ctrl-c leaves it unanswered.
+func (p *Printer) Confirm(question string, yes bool, in io.Reader) (bool, error) {
 	t := p.ErrTheme
-	var yes bool
 	keys := huh.NewDefaultKeyMap()
 	keys.Confirm.Toggle = key.NewBinding(key.WithKeys("left", "right", "h", "l", "tab"))
 	keys.Confirm.Reject = key.NewBinding(key.WithKeys("n", "N", "esc"))

@@ -48,7 +48,7 @@ func (s *scripted) Ask(title, _, placeholder string, _ io.Reader) (string, error
 	return answer, nil
 }
 
-func (s *scripted) Confirm(question string, _ io.Reader) (bool, error) {
+func (s *scripted) Confirm(question string, _ bool, _ io.Reader) (bool, error) {
 	s.asked = append(s.asked, question)
 	answer, ok := s.answers[question]
 	if !ok || (answer != "yes" && answer != "no") {
@@ -135,7 +135,7 @@ func (o offering) Ask(string, string, string, io.Reader) (string, error) {
 	return "", out.ErrPickCancelled
 }
 
-func (o offering) Confirm(string, io.Reader) (bool, error) {
+func (o offering) Confirm(string, bool, io.Reader) (bool, error) {
 	return false, out.ErrPickCancelled
 }
 

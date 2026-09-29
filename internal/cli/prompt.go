@@ -44,7 +44,17 @@ func (a *app) askYes(question string) (bool, error) {
 		return true, nil
 	}
 	a.printer.Settle()
-	yes, err := a.questions().Confirm(question, a.stdin)
+	yes, err := a.questions().Confirm(question, false, a.stdin)
+	return yes, escaped(err)
+}
+
+// askYesFirst is askYes with Yes preselected, for a question most answer yes to.
+func (a *app) askYesFirst(question string) (bool, error) {
+	if a.yes {
+		return true, nil
+	}
+	a.printer.Settle()
+	yes, err := a.questions().Confirm(question, true, a.stdin)
 	return yes, escaped(err)
 }
 
