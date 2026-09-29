@@ -25,6 +25,7 @@ All notable changes to shulker are documented here. The format is based on
 - A `.mrpack` whose files download from anywhere but https on `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` or `gitlab.com` is refused as `mrpack-invalid` on `import`, `add`, build and sync, as Modrinth launchers refuse it. Export bundles a file on an `http://` URL rather than linking it.
 - A build checks each file it copies out of the cache against its hash. A changed copy is deleted and downloaded again with a warning, or fails the build as `cache-changed` when it has no URL, so one mod that rewrites the cache no longer reaches every instance built from it.
 - `server.jvmArgs` is gone from the manifest, since a source's author could put `-javaagent:` or `-XX:OnOutOfMemoryError=` on your java command line. `server.memory` and the `server.jvmFlags` preset stay, as do your own `play.jvmArgs` and an instance's `jvmArgs`. A manifest that still has the key fails validation.
+- A local file's path in `shulker.json` or `shulker.lock`, and a git modpack's `path`, must stay inside the project or repository on every OS: a `..` segment, a leading `/` or `\`, a colon, or a Windows device name like `CON` or `NUL` fails validation. Merging a source and copying a project's files refuse such a path as `path-outside`, and skip symlinks, so a source can no longer read or write files elsewhere on disk.
 - A symlink in an override folder is skipped on build, rather than the file it points at being copied into the instance.
 
 ## [0.0.1] - 2026-09-26
