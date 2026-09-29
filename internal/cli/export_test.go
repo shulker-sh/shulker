@@ -70,7 +70,7 @@ func (h *harness) allowMrpackHost(t *testing.T) {
 		t.Fatal(err)
 	}
 	saved := packarchive.MrpackHosts
-	packarchive.MrpackHosts = append([]string{u.Hostname()}, saved...)
+	packarchive.MrpackHosts = append([]string{u.Hostname(), "edge.forgecdn.net"}, saved...)
 	t.Cleanup(func() { packarchive.MrpackHosts = saved })
 }
 
@@ -88,7 +88,7 @@ func writeOverride(t *testing.T, dir, rel, content string) {
 func TestExportMrpack(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "add", "sodium", "--provider", "curseforge")
 	h.editManifest(t, func(m map[string]any) {
 		m["version"] = "1.0"
 		m["note"] = "A demo pack"
@@ -106,7 +106,7 @@ func TestExportMrpack(t *testing.T) {
 	code, stdout, _ := h.run(t, "export", "mrpack", "--json")
 	var env out.Envelope
 	_ = json.Unmarshal([]byte(stdout), &env)
-	if code == 0 || env.Error.Code != "mrpack-host-not-allowed" || len(env.Error.Items) != 2 || !strings.HasPrefix(env.Error.Items[0], "fabric-api (modrinth, 127.0.0.1") {
+	if code == 0 || env.Error.Code != "mrpack-host-not-allowed" || len(env.Error.Items) != 2 || env.Error.Items[0] != "fabric-api (curseforge)" {
 		t.Fatalf("export with a foreign host: code=%d env=%+v", code, env)
 	}
 
@@ -127,7 +127,7 @@ func TestExportMrpack(t *testing.T) {
 		t.Fatalf("files: %+v", index.Files)
 	}
 	api, sodium := index.Files[0], index.Files[1]
-	if api.Path != "mods/"+h.jars["fabric-api"].filename || api.Hashes["sha512"] != h.jars["fabric-api"].sha512 || api.Hashes["sha1"] != h.jars["fabric-api"].sha1 || api.FileSize != int64(len(h.jars["fabric-api"].data)) || api.Env["client"] != "required" || api.Env["server"] != "required" || api.Downloads[0] != h.server.URL+"/cdn/"+h.jars["fabric-api"].filename {
+	if api.Path != "mods/"+h.jars["fabric-api"].filename || api.Hashes["sha512"] != h.jars["fabric-api"].sha512 || api.Hashes["sha1"] != h.jars["fabric-api"].sha1 || api.FileSize != int64(len(h.jars["fabric-api"].data)) || api.Env["client"] != "required" || api.Env["server"] != "required" || api.Downloads[0] != "https://edge.forgecdn.net/cfcdn/5000010/"+h.jars["fabric-api"].filename {
 		t.Fatalf("fabric-api entry: %+v", api)
 	}
 	if sodium.Path != "mods/"+h.jars["sodium"].filename || sodium.Env["client"] != "required" || sodium.Env["server"] != "unsupported" {
@@ -210,7 +210,7 @@ func TestExportMrpackCarriesPacks(t *testing.T) {
 func TestExportMrpackBundlesForeignHosts(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
-	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "add", "sodium", "--provider", "curseforge")
 	h.mustRun(t, "install")
 
 	code, _, _ := h.run(t, "export", "mrpack")
@@ -218,7 +218,7 @@ func TestExportMrpackBundlesForeignHosts(t *testing.T) {
 		t.Fatal("export without a version should fail")
 	}
 	_, stderr := h.mustRunStderr(t, "export", "mrpack", "--version", "0.1", "--bundle")
-	if !strings.Contains(stderr, "bundled fabric-api from modrinth, 127.0.0.1") || !strings.Contains(stderr, "bundled sodium") {
+	if !strings.Contains(stderr, "bundled fabric-api from curseforge into") || !strings.Contains(stderr, "bundled sodium") {
 		t.Fatalf("bundle warnings: %s", stderr)
 	}
 	index, entries := readMrpack(t, filepath.Join(h.dir, "build", "pack-0.1.mrpack"))

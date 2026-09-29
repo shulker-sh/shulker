@@ -137,6 +137,7 @@ func newProject(t *testing.T) *testProject {
 		Fetch:     fetch.New("test"),
 		Log:       func(format string, args ...any) { p.log = append(p.log, fmt.Sprintf(format, args...)) },
 	}
+	p.b.Fetch.HTTP = p.cdn.Client()
 	p.b.Lock.Minecraft = "26.2"
 	p.b.Lock.Loader = lock.Loader{Type: "fabric", Version: "0.17.3"}
 	p.b.Lock.Java = lock.Java{Major: 21, Component: "java-runtime-delta"}

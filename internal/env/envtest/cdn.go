@@ -73,9 +73,10 @@ func (c *CDN) ServeOnModrinth(path string, data []byte) string {
 	return "https://cdn.modrinth.com" + path
 }
 
-// Client is an HTTP client that reaches the CDN for cdn.modrinth.com as well as at its own URL.
+// Client is an HTTP client that reaches the CDN for cdn.modrinth.com and every fake host's own
+// .test domain as well as at its own URL.
 func (c *CDN) Client() *http.Client {
-	return fetchtest.Routed(c.srv, "cdn.modrinth.com")
+	return fetchtest.Routed(c.srv, "cdn.modrinth.com", ".test")
 }
 
 // Forbid has the CDN refuse v.
@@ -170,7 +171,8 @@ func (h *Host) Publish(proj provider.Project, v provider.Version, data []byte) p
 		v.File.Sha512 = Sha512Hex(data)
 	}
 	if v.File.URL == "" {
-		v.File.URL = h.CDN.Serve(PathOf(v), data)
+		h.CDN.Serve(PathOf(v), data)
+		v.File.URL = "https://" + h.Hosts()[0] + PathOf(v)
 	}
 	h.Files = append(h.Files, v)
 	return v

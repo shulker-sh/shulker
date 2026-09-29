@@ -303,7 +303,7 @@ func newHarness(t *testing.T) *harness {
 		return map[string]any{
 			"id": id, "project_id": projectID, "version_number": number, "version_type": "release",
 			"date_published": published, "game_versions": []string{"26.2"}, "loaders": loaders,
-			"files":        []map[string]any{{"url": base + "/cdn/" + jar.filename, "filename": jar.filename, "primary": true, "hashes": hashes, "size": len(jar.data)}},
+			"files":        []map[string]any{{"url": "https://cdn.modrinth.com/cdn/" + jar.filename, "filename": jar.filename, "primary": true, "hashes": hashes, "size": len(jar.data)}},
 			"dependencies": deps,
 		}
 	}
@@ -789,7 +789,7 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 		a.exe = func() (string, error) { return h.exe, nil }
 	}
 	f := fetch.New("test")
-	f.HTTP = fetchtest.Routed(h.server, packarchive.MrpackHosts...)
+	f.HTTP = fetchtest.Routed(h.server, append(slices.Clone(packarchive.MrpackHosts), "edge.forgecdn.net")...)
 	piston := mojang.NewPiston(f)
 	piston.ManifestURL = h.server.URL + "/piston/manifest.json"
 	mr := modrinth.New(f)

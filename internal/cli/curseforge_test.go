@@ -59,7 +59,7 @@ func (h *harness) registerCurseForge(t *testing.T, mux *http.ServeMux, base func
 		600000: {id: 600000, slug: "fresh-animations", class: 12, downloads: 4_000_000, files: []cfFile{{id: 5300001, jar: h.jars["cf-fresh-animations"], date: "2026-09-01T00:00:00Z", channel: 1}}},
 	}
 	fileJSON := func(f cfFile, m *cfMod) map[string]any {
-		var url any = base() + "/cfcdn/" + strconv.Itoa(f.id) + "/" + f.jar.filename
+		var url any = "https://edge.forgecdn.net/cfcdn/" + strconv.Itoa(f.id) + "/" + f.jar.filename
 		if f.url == "null" {
 			url = nil
 		}

@@ -77,7 +77,7 @@ func TestExportRefusesAModCurseForgeLacksUnlessBundled(t *testing.T) {
 	x.cf.Known = slices.DeleteFunc(x.cf.Known, func(p provider.Project) bool { return p.ID == "394468" })
 
 	e := failure(t, mustFail(x.exportCurseForge(false)))
-	if e.Code != "curseforge-not-found" || len(e.Items) != 1 || e.Items[0] != "sodium (modrinth, "+strings.TrimPrefix(x.cdn.URL(), "https://")+")" || e.Nudge.Command != "shulker export curseforge --bundle" {
+	if e.Code != "curseforge-not-found" || len(e.Items) != 1 || e.Items[0] != "sodium (modrinth)" || e.Nudge.Command != "shulker export curseforge --bundle" {
 		t.Fatalf("unmatched mod: %+v", e)
 	}
 
