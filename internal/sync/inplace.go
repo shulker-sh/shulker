@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/launcher"
+	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
 	"shulker.sh/shulker/internal/out"
@@ -34,6 +38,10 @@ func InPlaceProject(dir string) (*project.Project, string, bool, error) {
 // InPlace refreshes the modpacks that follow their source, relocks without moving the project's
 // own mods, and builds the instance where it stands.
 func InPlace(ctx context.Context, e *Env, p *project.Project, side string, req Request) (Result, error) {
+	before, err := readProjectFiles(p.Dir)
+	if err != nil {
+		return Result{}, err
+	}
 	rl, err := e.relock(ctx, p, req)
 	if err != nil {
 		return Result{}, err
@@ -43,8 +51,51 @@ func InPlace(ctx context.Context, e *Env, p *project.Project, side string, req R
 	if err != nil {
 		return Result{}, err
 	}
+	if res.Declined && rl.WasSaved {
+		if err := restoreProjectFiles(p.Dir, before); err != nil {
+			return Result{}, err
+		}
+		if err := build.DropHistory(p.Dir, rl.History); err != nil {
+			return Result{}, err
+		}
+		return res, nil
+	}
 	res.Relock = &rl
 	return res, nil
+}
+
+// projectFiles are a project's manifest and lock as they were on disk, by file name; nil for one
+// that wasn't there, as a new project's lock isn't before its first relock.
+type projectFiles map[string][]byte
+
+func readProjectFiles(dir string) (projectFiles, error) {
+	files := projectFiles{}
+	for _, name := range []string{manifest.FileName, lock.FileName} {
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return nil, err
+		}
+		files[name] = data
+	}
+	return files, nil
+}
+
+// restoreProjectFiles puts back the manifest and lock a declined sync's relock rewrote, so the
+// project is left as it was along with its files.
+func restoreProjectFiles(dir string, files projectFiles) error {
+	for name, data := range files {
+		path := filepath.Join(dir, name)
+		if data == nil {
+			if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
+			continue
+		}
+		if err := fsutil.Write(path, data); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (e *Env) relock(ctx context.Context, p *project.Project, req Request) (resolve.Relocked, error) {

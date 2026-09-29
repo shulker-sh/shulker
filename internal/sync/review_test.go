@@ -1,12 +1,16 @@
 package sync
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/env/envtest"
 	"shulker.sh/shulker/internal/instance"
+	"shulker.sh/shulker/internal/lock"
+	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/provider"
 )
 
@@ -94,5 +98,35 @@ func TestSyncDeclinedLeavesTheDirectoryAsItWas(t *testing.T) {
 	}
 	if h.warned("applied without asking") {
 		t.Fatalf("a sync the player was asked about doesn't warn: %v", h.env.Warnings)
+	}
+}
+
+func TestDecliningAnInPlaceSyncPutsTheRelockBack(t *testing.T) {
+	h := newHarness(t)
+	h.editManifest(func(m *manifest.Manifest) { m.Client.Build = "." })
+	h.add("sodium")
+	h.mustSync(h.dir, Request{})
+	lithium := h.env.Modrinth.Publish(provider.Project{ID: "gvQqBUqZ", Slug: "lithium", Title: "Lithium"}, provider.Version{ID: "LiThIuM1", Number: "0.14", File: provider.File{Filename: "lithium-0.14.jar"}}, envtest.ModJar(t, "lithium", "0.14", "client"))
+	h.add("lithium")
+	h.editLock(func(l *lock.Lock) { delete(l.Mods, "lithium") })
+	manifestBefore, lockBefore := readFile(t, filepath.Join(h.dir, manifest.FileName)), readFile(t, filepath.Join(h.dir, lock.FileName))
+	historyBefore, err := build.History(h.dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := InPlace(context.Background(), h.e, h.project(), "client", Request{Reason: "sync", Review: func(string, *instance.Changes) (bool, error) { return false, nil }})
+
+	if err != nil || !res.Declined {
+		t.Fatalf("declined %v, err %v", res.Declined, err)
+	}
+	if readFile(t, filepath.Join(h.dir, lock.FileName)) != lockBefore || readFile(t, filepath.Join(h.dir, manifest.FileName)) != manifestBefore {
+		t.Fatal("a declined in-place sync puts the manifest and lock back")
+	}
+	if history, err := build.History(h.dir); err != nil || len(history) != len(historyBefore) {
+		t.Fatalf("a declined sync keeps no history entry: %d before, %d after, %v", len(historyBefore), len(history), err)
+	}
+	if exists(filepath.Join(h.dir, "mods", lithium.File.Filename)) {
+		t.Fatal("a declined sync places nothing")
 	}
 }

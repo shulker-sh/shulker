@@ -42,6 +42,8 @@ type Relocked struct {
 	WasSaved bool
 	// Dropped is the validation error of the entries a DropsFailing relock took out again.
 	Dropped error
+	// History is the entry an in-place project kept before the rewrite; zero when it kept none.
+	History build.HistoryEntry
 }
 
 // Relock re-resolves p's lock with run and saves it: a modpack whose ref or path moved is resolved
@@ -108,9 +110,11 @@ func (r *Resolver) Relock(ctx context.Context, store *modpack.Store, p *project.
 	}
 	if side, ok := p.Manifest.InPlaceSide(); ok {
 		keep := p.Manifest.HistoryKeep()
-		if _, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Side: side, Reason: opts.Reason}); err != nil {
+		taken, err := build.TakeHistory(p.Dir, keep, build.HistoryEntry{Side: side, Reason: opts.Reason})
+		if err != nil {
 			return Relocked{}, err
 		}
+		rl.History = taken
 		warning, err := build.HistoryWarning(p.Dir, keep)
 		if err != nil {
 			return Relocked{}, err

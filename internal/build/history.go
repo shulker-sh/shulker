@@ -377,6 +377,14 @@ func RestoreHistory(dir string, e HistoryEntry) error {
 	})
 }
 
+// DropHistory removes the entry e, as when what it was kept before never happened.
+func DropHistory(dir string, e HistoryEntry) error {
+	if e.ID == "" {
+		return nil
+	}
+	return os.RemoveAll(historyEntryPath(dir, e.ID))
+}
+
 // PruneHistory removes every entry but the newest keep, and reports what went.
 // A negative keep removes nothing.
 func PruneHistory(dir string, keep int) ([]HistoryEntry, error) {
