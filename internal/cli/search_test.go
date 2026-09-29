@@ -100,6 +100,9 @@ func TestSearchOneProvider(t *testing.T) {
 	if code == 0 || !strings.Contains(stderr, "--provider takes one of modrinth, curseforge") {
 		t.Errorf("exit %d, stderr %s", code, stderr)
 	}
+	if !strings.Contains(stderr, "usage: shulker search") || !strings.Contains(stderr, "help: shulker search --help lists every flag") || strings.Contains(stderr, "pick one") || strings.Contains(stderr, "For example") {
+		t.Errorf("a bad flag value folds usage and help rows: %s", stderr)
+	}
 }
 
 func TestSearchWithoutCurseForge(t *testing.T) {

@@ -19,6 +19,8 @@ func TestPicks(t *testing.T) {
 		{"a near miss lists the closest", Error{Given: "sodim", Candidates: []string{"iris", "sodium", "sodium-extra", "lithium"}}, "did you mean", []string{"sodium"}},
 		{"a choice lists every option", Error{Candidates: []string{"client", "dev"}}, "pick one", []string{"client", "dev"}},
 		{"nothing close in a short list lists them all", Error{Given: "zzz", Candidates: []string{"client", "server"}}, "pick one", []string{"client", "server"}},
+		{"a bad flag value lists nothing", Error{Code: "usage", Flag: "--provider", Given: "nope", Candidates: []string{"modrinth", "curseforge"}}, "", nil},
+		{"a bad flag value near a good one lists nothing either", Error{Code: "usage", Flag: "--loader", Given: "fabirc", Candidates: []string{"fabric", "quilt"}}, "", nil},
 		{"nothing close in a long list lists nothing", Error{Given: "zzzzzz", Candidates: six}, "", nil},
 		{"a pick can read one way and pass another", Error{Given: "server.vew-distance", Candidates: []string{"view-distance", "motd"}, Pass: []string{"server.view-distance", "server.motd"}}, "did you mean", []string{"view-distance"}},
 	} {

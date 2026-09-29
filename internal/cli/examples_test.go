@@ -9,7 +9,6 @@ func TestErrorsShowAnExampleCommand(t *testing.T) {
 	h := newHarness(t)
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
-	fresh := newHarness(t)
 
 	for _, tc := range []struct {
 		h    *harness
@@ -18,7 +17,6 @@ func TestErrorsShowAnExampleCommand(t *testing.T) {
 	}{
 		{h, []string{"remove", "sodim"}, []string{"did you mean:", "‣ sodium", "For example:", "$ shulker remove sodium\n"}},
 		{h, []string{"set", "sever.memory", "4G"}, []string{"did you mean:", "‣ server", "$ shulker set server.memory 4G\n"}},
-		{fresh, []string{"create", "--name", "pack", "--side", "clint"}, []string{"did you mean:", "‣ client", "$ shulker create --name pack --side client\n"}},
 	} {
 		code, _, stderr := tc.h.run(t, tc.args...)
 		if code == 0 {

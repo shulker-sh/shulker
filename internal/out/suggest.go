@@ -29,6 +29,11 @@ func (e *Error) picks() (label string, picks []pick) {
 	if e.Given == "" {
 		return "pick one", all
 	}
+	if e.Code == "usage" && e.Flag != "" {
+		// A bad flag value is a command-line mistake like any other, and its tree carries the
+		// usage and help rows instead of suggested values.
+		return "", nil
+	}
 	for _, hit := range near.Closest(e.Given, passes, 3) {
 		picks = append(picks, all[slices.Index(passes, hit)])
 	}
