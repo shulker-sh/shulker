@@ -64,7 +64,7 @@ func (a *app) awaitDownloads(ctx context.Context, downloads string, e *out.Error
 		rows[i] = out.WaitFile{Name: f.Name, Page: f.Page}
 	}
 	skip, err = a.printer.AwaitDownloads(ctx, out.DownloadWait{
-		Title: fmt.Sprintf("%s a manual download into %s", out.Count(len(files), "file needs", "files need"), downloads),
+		Title: fmt.Sprintf("%s a manual download into %s.", out.Count(len(files), "file needs", "files need"), downloads),
 		Files: rows,
 		Check: func() ([]out.WaitFile, error) {
 			status, err := w.Check()

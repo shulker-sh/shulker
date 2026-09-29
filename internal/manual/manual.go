@@ -250,7 +250,7 @@ func (w *Wait) Take(text string) ([]Status, string, error) {
 		}
 		w.status[i] = Status{Found: true}
 	}
-	return slices.Clone(w.status), strings.Join(notes, "; "), nil
+	return slices.Clone(w.status), out.Period(strings.Join(notes, "; ")), nil
 }
 
 // pastedPaths reads the paths in text the way a terminal writes a dropped file: separated by

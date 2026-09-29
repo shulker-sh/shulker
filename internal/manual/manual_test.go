@@ -198,7 +198,7 @@ func TestTakeHashesAPastedPathAgainstTheMissingFiles(t *testing.T) {
 	w := NewWait(downloads, nil, []File{file})
 
 	found, note, err := w.Take(filepath.Join(folder, "other.jar"))
-	if err != nil || found[0].Found || note != filepath.Join(folder, "other.jar")+" isn't one of the files" {
+	if err != nil || found[0].Found || note != filepath.Join(folder, "other.jar")+" isn't one of the files." {
 		t.Fatalf("a file that matches nothing is noted: %+v %q %v", found, note, err)
 	}
 	found, note, err = w.Take(strings.ReplaceAll(right, " ", `\ `))
@@ -211,7 +211,7 @@ func TestTakeHashesAPastedPathAgainstTheMissingFiles(t *testing.T) {
 	if _, err := os.Stat(right); err != nil {
 		t.Fatalf("a file that predates the wait is copied: %v", err)
 	}
-	if _, note, _ := w.Take(filepath.Join(folder, "gone.jar")); note != filepath.Join(folder, "gone.jar")+" isn't a file" {
+	if _, note, _ := w.Take(filepath.Join(folder, "gone.jar")); note != filepath.Join(folder, "gone.jar")+" isn't a file." {
 		t.Fatalf("a path to nothing is noted: %q", note)
 	}
 }

@@ -307,7 +307,7 @@ func nothingAdded(missed []missedName, again, kind string) *out.Error {
 	}
 	e.Items = items
 	if again != "" {
-		e.Nudge = out.Nudge{Lead: "Add the rest", Command: again, After: "Or skip the ones not found by adding --skip-missing"}
+		e.Nudge = out.Nudge{Lead: "Add the rest", Command: again, After: "Or skip the ones not found by adding --skip-missing."}
 	}
 	return e
 }
