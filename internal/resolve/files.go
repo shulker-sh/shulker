@@ -188,6 +188,9 @@ func (r *Resolver) restoreLocal(f downloadable) string {
 	if inner := r.nestedPack(f); inner != "" {
 		return fmt.Sprintf("%s: %s comes from modpack %s inside modpack %s, so only the cache can serve it, and the cache has no copy of it", f.id, f.file, inner, f.modpack)
 	}
+	if !filepath.IsLocal(filepath.FromSlash(f.file)) {
+		return fmt.Sprintf("%s: %s is outside the project", f.id, f.file)
+	}
 	dir := r.fileDir(f.id, f.modpack, f.file)
 	path := filepath.Join(dir, filepath.FromSlash(f.file))
 	st, err := os.Stat(path)

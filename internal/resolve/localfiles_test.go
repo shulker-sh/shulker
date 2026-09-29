@@ -181,3 +181,18 @@ func TestALocalJarLocksUnderTheKeyItIsListedAs(t *testing.T) {
 		t.Fatalf("the lock adopts the new jar under the same key: %+v", mine)
 	}
 }
+
+func TestRestoreLocalRefusesAFileOutsideTheProject(t *testing.T) {
+	h := newHarness(t)
+	secret := filepath.Join(filepath.Dir(h.r.Dir), "secret")
+	if err := os.WriteFile(secret, []byte("key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	problem := h.r.restoreLocal(downloadable{id: "evil", file: "../secret", sha512: envtest.Sha512Hex([]byte("key"))})
+	if problem != "evil: ../secret is outside the project" {
+		t.Fatalf("problem: %q", problem)
+	}
+	if h.r.Cache.Has(envtest.Sha512Hex([]byte("key"))) {
+		t.Fatal("a file outside the project must not reach the cache")
+	}
+}
