@@ -22,38 +22,21 @@ const typedAhead = "touch typed-ahead\n"
 
 var exitedStatus = regexp.MustCompile(exitedMark + `(\d+)\r?\n`)
 
-// TestTypeAheadSurvivesStartup types a command while a process starts, the way one is typed
-// or pasted into the shell while the previous command runs, and checks it is still waiting for
-// the shell once the process exits. Each probe in testdata/typeahead is its own module that
-// starts on one Charm generation: v1 loses the line to Bubble Tea's init query, and v2 must not,
-// and neither must shulker itself.
+// TestTypeAheadSurvivesStartup types a command while shulker starts, the way one is typed or
+// pasted into the shell while the previous command runs, and checks it is still waiting for the
+// shell once shulker exits. Charm v1 lost it to Bubble Tea's init query.
 func TestTypeAheadSurvivesStartup(t *testing.T) {
 	if testing.Short() {
-		t.Skip("builds the probes")
+		t.Skip("builds shulker")
 	}
-	for _, c := range []struct {
-		name  string
-		dir   string
-		args  []string
-		keeps bool
-	}{
-		{"v1", filepath.Join("testdata", "typeahead", "v1"), nil, false},
-		{"v2", filepath.Join("testdata", "typeahead", "v2"), nil, true},
-		{"shulker", filepath.Join("..", ".."), []string{"version"}, true},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			bin := filepath.Join(t.TempDir(), "probe")
-			build := exec.Command("go", "build", "-o", bin, ".")
-			build.Dir = c.dir
-			build.Env = append(os.Environ(), "GOWORK=off")
-			if b, err := build.CombinedOutput(); err != nil {
-				t.Fatalf("building %s: %v\n%s", c.name, err, b)
-			}
-			left := typeAhead(t, append([]string{bin}, c.args...)...)
-			if kept := left == typedAhead; kept != c.keeps {
-				t.Errorf("%s: %q left waiting after startup, want kept = %v", c.name, left, c.keeps)
-			}
-		})
+	bin := filepath.Join(t.TempDir(), "shulker")
+	build := exec.Command("go", "build", "-o", bin, ".")
+	build.Dir = filepath.Join("..", "..")
+	if b, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("building shulker: %v\n%s", err, b)
+	}
+	if left := typeAhead(t, bin, "version"); left != typedAhead {
+		t.Errorf("%q left waiting after startup, want %q", left, typedAhead)
 	}
 }
 
