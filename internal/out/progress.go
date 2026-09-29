@@ -3,6 +3,7 @@ package out
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,6 +44,10 @@ type Progress struct {
 	pending tea.Cmd
 	stop    chan struct{}
 	stopped chan struct{}
+	// firstTime records the group's line as shown, and reports whether no group of the same files
+	// and counts showed one before.
+	firstTime func(key string) bool
+	names     []string
 }
 
 // Download names one file the bar will cover; Size is 0 when unknown.
@@ -53,6 +58,8 @@ type Download struct {
 
 // Progress starts a bar for the files. It fills by bytes when every size is
 // known and by file count otherwise; the longest name sizes the name column.
+// A group of the same files and counts this run already settled, as a command
+// run again after a download wait has, settles into no line.
 func (p *Printer) Progress(verb string, files []Download) *Progress {
 	if p.JSON {
 		return nil
@@ -60,6 +67,15 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 	p.Settle()
 	p.open(p.Stderr)
 	pr := newProgress(p.Err(), verb, files)
+	pr.firstTime = func(key string) bool {
+		p.steps.mu.Lock()
+		defer p.steps.mu.Unlock()
+		if slices.Contains(p.steps.groups, key) {
+			return false
+		}
+		p.steps.groups = append(p.steps.groups, key)
+		return true
+	}
 	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
 		pr.tty = f
 		pr.stop, pr.stopped = make(chan struct{}), make(chan struct{})
@@ -72,6 +88,7 @@ func newProgress(l *Lines, verb string, files []Download) *Progress {
 	pr := &Progress{l: l, verb: verb, total: len(files), sizes: map[string]int64{}, wheel: newSpinner(l.T), bar: newBar(l.T)}
 	known := true
 	for _, f := range files {
+		pr.names = append(pr.names, f.Name)
 		pr.longest = max(pr.longest, Width(f.Name))
 		pr.sizes[f.Name] = f.Size
 		pr.totalBy += f.Size
@@ -128,7 +145,8 @@ func (pr *Progress) Finish() {
 		return
 	}
 	pr.halt()
-	if pr.done == 0 {
+	key := strings.Join(append([]string{pr.verb, pr.many}, pr.names...), "\x00")
+	if pr.done == 0 || pr.firstTime != nil && !pr.firstTime(key) {
 		return
 	}
 	noun, one := "files", "file"

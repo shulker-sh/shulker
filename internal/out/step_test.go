@@ -59,6 +59,27 @@ func TestGroupSettlesIntoOneCountOrNothing(t *testing.T) {
 	}
 }
 
+func TestAGroupAlreadySettledRunsAgainQuietly(t *testing.T) {
+	var stderr bytes.Buffer
+	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}
+	files := []Download{{Name: "sodium"}, {Name: "iris"}}
+	for range 2 {
+		g := p.Progress("fetching", files).Counts("mod", "mods")
+		g.Advance()
+		g.Advance()
+		g.Finish()
+	}
+	g := p.Progress("fetching", files[:1]).Counts("mod", "mods")
+	g.Advance()
+	g.Finish()
+	g = p.Progress("fetching", files).Counts("pack file", "pack files")
+	g.Advance()
+	g.Finish()
+	if stderr.String() != "  ✔ Fetched 2 mods\n  ✔ Fetched 1 mod\n  ✔ Fetched 1 pack file\n" {
+		t.Fatalf("stderr: %q", stderr.String())
+	}
+}
+
 func TestStepWording(t *testing.T) {
 	var stderr bytes.Buffer
 	p := &Printer{Stdout: &bytes.Buffer{}, Stderr: &stderr}

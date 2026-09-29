@@ -18,6 +18,8 @@ type stepState struct {
 	mu      sync.Mutex
 	running *step
 	shown   []string
+	// groups are the progress groups that settled into a line, by groupKey.
+	groups []string
 }
 
 type step struct {
