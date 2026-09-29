@@ -959,7 +959,7 @@ shulker accounts stores add prism
 shulker accounts stores remove shulker
 ```
 
-Both print the list before and after. Adding a launcher already in the list changes nothing and says so. A launcher shulker can't read accounts from, one that isn't in the list, and a change that would leave the list empty are all usage errors — unset `accounts.stores` to go back to the default instead of emptying it. Adding a launcher that isn't installed warns once, naming the directory that was checked; it is not an error, and nothing says it again afterwards.
+Both print the list before and after. Adding a launcher already in the list, or removing one that isn't in it, changes nothing and says so. A launcher shulker can't read accounts from and a change that would leave the list empty are both usage errors — unset `accounts.stores` to go back to the default instead of emptying it. Adding a launcher that isn't installed warns once, naming the directory that was checked; it is not an error, and nothing says it again afterwards.
 
 ### `shulker accounts stores set`
 

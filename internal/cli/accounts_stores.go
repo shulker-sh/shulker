@@ -54,7 +54,7 @@ func (a *app) storesAddCmd() *cobra.Command {
 			}
 			if slices.Contains(from, args[0]) {
 				return a.printer.Emit(configChange{Path: config.AccountsStoresKey, From: from, To: from}, func(l *out.Lines) {
-					l.Info(config.AccountsStoresKey + " already reads accounts from " + args[0])
+					l.Info("Config key " + config.AccountsStoresKey + " already reads accounts from " + args[0])
 				})
 			}
 			return a.changeStores(from, append(slices.Clone(from), args[0]))
@@ -73,12 +73,15 @@ func (a *app) storesRemoveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			to := slices.DeleteFunc(slices.Clone(from), func(p string) bool { return p == args[0] })
-			if len(to) == len(from) {
-				e := out.Errorf("usage", "%s does not read accounts from %s", config.AccountsStoresKey, args[0])
-				e.Candidates, e.Given = from, args[0]
-				return e
+			if err := config.CheckStores(args, launcher.AccountStores()); err != nil {
+				return err
 			}
+			if !slices.Contains(from, args[0]) {
+				return a.printer.Emit(configChange{Path: config.AccountsStoresKey, From: from, To: from}, func(l *out.Lines) {
+					l.Info("Config key " + config.AccountsStoresKey + " doesn't read accounts from " + args[0])
+				})
+			}
+			to := slices.DeleteFunc(slices.Clone(from), func(p string) bool { return p == args[0] })
 			return a.changeStores(from, to)
 		},
 	}

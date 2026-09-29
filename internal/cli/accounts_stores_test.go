@@ -106,7 +106,7 @@ func TestProvidersRejectWhatTheListCannotHold(t *testing.T) {
 		{"unknown launcher", "can't read accounts from technic", []string{"add", "technic"}},
 		{"unknown in a set", "can't read accounts from technic", []string{"set", "shulker", "technic"}},
 		{"repeated in a set", "names prism twice", []string{"set", "prism", "prism"}},
-		{"not in the list", "does not read accounts from prism", []string{"remove", "prism"}},
+		{"unknown in a remove", "can't read accounts from technic", []string{"remove", "technic"}},
 		{"emptied", "can't be empty", []string{"remove", "shulker"}},
 		{"set to nothing", "can't be empty", []string{"set"}},
 	} {
@@ -129,11 +129,22 @@ func TestProvidersRejectWhatTheListCannotHold(t *testing.T) {
 func TestProvidersAddNotesALauncherAlreadyInTheList(t *testing.T) {
 	h := newHarness(t)
 	code, stdout, stderr := h.run(t, "accounts", "stores", "add", "shulker")
-	if code != 0 || !strings.Contains(stdout+stderr, "i accounts.stores already reads accounts from shulker") {
+	if code != 0 || !strings.Contains(stdout+stderr, "i Config key accounts.stores already reads accounts from shulker") {
 		t.Fatalf("exit %d:\n%s%s", code, stdout, stderr)
 	}
 	if _, err := os.Stat(h.config); !os.IsNotExist(err) {
 		t.Errorf("a store already there changes nothing: %v", err)
+	}
+}
+
+func TestProvidersRemoveNotesALauncherNotInTheList(t *testing.T) {
+	h := newHarness(t)
+	code, stdout, stderr := h.run(t, "accounts", "stores", "remove", "prism")
+	if code != 0 || !strings.Contains(stdout+stderr, "i Config key accounts.stores doesn't read accounts from prism") {
+		t.Fatalf("exit %d:\n%s%s", code, stdout, stderr)
+	}
+	if _, err := os.Stat(h.config); !os.IsNotExist(err) {
+		t.Errorf("a store not there changes nothing: %v", err)
 	}
 }
 
