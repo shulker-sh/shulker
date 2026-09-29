@@ -164,8 +164,25 @@ func TestSelfUninstallPurgeLeavesShulkersOwnInstancesFindable(t *testing.T) {
 	h.mustRun(t, "link", "shulker", "--as", "smp")
 
 	stdout := h.mustRun(t, "self", "uninstall", "--purge")
-	if !strings.Contains(stdout, "smp (Shulker: pack)") || strings.Contains(stdout, "can't be found again") {
-		t.Fatalf("a shulker instance is unhooked with the rest and found again by a repair of the instances root: %s", stdout)
+	if strings.Contains(stdout, "smp") || strings.Contains(stdout, "can't be found again") {
+		t.Fatalf("a shulker instance has no hook to release and is found again by a repair of the instances root: %s", stdout)
+	}
+}
+
+func TestSelfUninstallNamesWhatRepairRehooks(t *testing.T) {
+	h, _, _, _ := uninstallHarness(t)
+	shulkerInstances(t, h)
+	h.mustRun(t, "link", "shulker", "--as", "smp")
+
+	uninstalled := h.mustRun(t, "self", "uninstall")
+	if err := os.WriteFile(h.exe, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	repaired := h.mustRun(t, "instances", "repair")
+	for _, stdout := range []string{uninstalled, repaired} {
+		if !strings.Contains(stdout, " 2 instances") || strings.Contains(stdout, "smp") {
+			t.Fatalf("uninstall and repair name the same instances:\n%s\n%s", uninstalled, repaired)
+		}
 	}
 }
 

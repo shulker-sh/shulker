@@ -86,6 +86,9 @@ func (a *app) selfUninstall(purge bool) error {
 			res.Forgotten = append(res.Forgotten, in)
 			continue
 		}
+		if e.Slot == nil {
+			continue
+		}
 		// The slot-clearing path unlink uses: an adopted command goes back, shulker's own slots and
 		// scripts go, and a Mojang profile gets its own Java back. The row's launcherDir is what
 		// reaches the profile of an instance whose folder is gone.
