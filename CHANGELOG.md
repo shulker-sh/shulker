@@ -22,6 +22,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - `shulker cache verify` checks the whole cache: it rehashes every object, asks Modrinth and CurseForge once for every file a registered instance, the project here or any of their history entries locks and names the ones gone from their provider, and lists the objects nothing uses for `cache prune`. It fails on a changed object or a takedown, and `--fix` drops the changed objects so they download again.
 
+- `sync`, the launcher hooks and `hook wrap` ask Modrinth and CurseForge once a day whether they still have each locked file, and warn about one gone from its provider or filed under another project, naming the instances that use it and the `audit`, `update` or `remove` to run. It's a warning, not a block: the cached copy is still placed. `build` repeats the last check's warning without going online.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.

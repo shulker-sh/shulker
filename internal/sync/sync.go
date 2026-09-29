@@ -16,7 +16,6 @@ import (
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/saves"
-	"shulker.sh/shulker/internal/security"
 )
 
 // AssumeClientWarning is what a sync says when it builds a client the manifest doesn't declare.
@@ -110,14 +109,15 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 	if err != nil {
 		return Result{}, err
 	}
+	checked := e.checkTakedowns(ctx, into, p.Lock, src.Offline)
 	origin := instance.Origin{Source: src.Name, Ref: src.Ref, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256}
-	rep, err := b.Build(side, build.Options{Force: req.Force, Dir: into, NoDataLinks: !ownBuild, OS: req.OS, Features: overrides, Origin: origin, BeforeModChange: e.beforeModChange(req.Backup, into), KeepConflicts: req.KeepConflicts})
+	rep, err := b.Build(side, build.Options{Force: req.Force, Dir: into, NoDataLinks: !ownBuild, OS: req.OS, Features: overrides, Origin: origin, BeforeModChange: e.beforeModChange(req.Backup, into), KeepConflicts: req.KeepConflicts, Takedowns: checked})
 	if err != nil {
 		return Result{}, err
 	}
 	e.WarnEach(rep.Warnings)
-	for _, w := range rep.SecurityWarnings() {
-		e.WarnSecurity(security.Warn(security.CacheHash, w, nil))
+	for _, w := range rep.SecurityWarnings(e.Providers, e.usedBy) {
+		e.WarnSecurity(w)
 	}
 	if side == "client" {
 		e.syncLauncherImage(into, b)

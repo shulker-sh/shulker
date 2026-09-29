@@ -402,6 +402,13 @@ func newHarness(t *testing.T) *harness {
 					}
 				}
 			}
+			for projectID := range h.modrinthPacks {
+				for _, v := range versions(projectID) {
+					if v["files"].([]map[string]any)[0]["hashes"].(map[string]string)[body.Algorithm] == hash {
+						found[hash] = v
+					}
+				}
+			}
 		}
 		writeJSON(w, found)
 	})
