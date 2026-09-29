@@ -20,6 +20,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - `shulker audit` reports what in a project, or an instance with `-i`, deserves a closer look: locked files Modrinth or CurseForge no longer has, lock entries that download from outside their provider or that it files under another project, jars and packs no provider published and where each comes from, jars in `mods/` that changed since shulker placed them or that the lock doesn't name, and versions younger than `security.minReleaseAge`. It asks each provider once for the whole lock and says when it couldn't, `audit <key>...` narrows it to those entries, and it fails for files gone from their provider and entries from outside it, so CI can gate on it. `shulker security` lists the check.
 
+- `shulker cache verify` checks the whole cache: it rehashes every object, asks Modrinth and CurseForge once for every file a registered instance, the project here or any of their history entries locks and names the ones gone from their provider, and lists the objects nothing uses for `cache prune`. It fails on a changed object or a takedown, and `--fix` drops the changed objects so they download again.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.

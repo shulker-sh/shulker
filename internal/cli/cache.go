@@ -1,13 +1,17 @@
 package cli
 
 import (
+	"cmp"
+	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
 )
 
 type cacheInfo struct {
@@ -26,7 +30,7 @@ func (a *app) cacheCmd() *cobra.Command {
 		Use:   "cache",
 		Short: "Inspect and trim the downloads shulker shares between projects",
 	}
-	cmd.AddCommand(a.cacheInfoCmd(), a.cachePruneCmd())
+	cmd.AddCommand(a.cacheInfoCmd(), a.cacheVerifyCmd(), a.cachePruneCmd())
 	return cmd
 }
 
@@ -141,6 +145,136 @@ func (a *app) cachePruneCmd() *cobra.Command {
 	lockFlag(cmd, &named)
 	cmd.Flags().BoolVar(&manual, "manual", false, "also remove manual downloads, which nothing can fetch again.")
 	return cmd
+}
+
+func (a *app) cacheVerifyCmd() *cobra.Command {
+	var named []string
+	var fix bool
+	cmd := &cobra.Command{
+		Use:         "verify",
+		Annotations: decides(),
+		Short:       "Check every cached file against its hash and its provider",
+		Long:        "Check every cached file against its hash and its provider: rehash every object, ask Modrinth and CurseForge whether they still have each file that an instance, the project here or any of their history entries locks, and list the objects none of them uses. It fails on a changed object or a file gone from its provider. --fix drops the changed objects, so the next build downloads them again.",
+		Args:        noArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			d, err := a.deps()
+			if err != nil {
+				return err
+			}
+			r, err := a.cacheRoots(named)
+			if err != nil {
+				return err
+			}
+			for _, problem := range r.Unreadable {
+				a.printer.Warn("%s", problem)
+			}
+			if fix {
+				a.logActing()
+			}
+			v, err := r.Verify(cmd.Context(), d.Cache, d.Providers, fix)
+			if err != nil {
+				return err
+			}
+			if !v.Fails() {
+				return a.printer.Emit(v, func(l *out.Lines) { printCacheCheck(l, v, d.Providers) })
+			}
+			if !a.printer.JSON {
+				printCacheCheck(a.printer.Out(), v, d.Providers)
+			}
+			return cacheVerifyFailed(v)
+		},
+	}
+	a.dirFlag(cmd)
+	lockFlag(cmd, &named)
+	cmd.Flags().BoolVar(&fix, "fix", false, "drop the changed objects, so the next build downloads them again.")
+	return cmd
+}
+
+// cacheVerifyFailed sums up what failed the check, each already printed in full above it.
+func cacheVerifyFailed(v *build.CacheCheck) error {
+	var parts []string
+	if n := len(v.Changed); n > 0 && !v.Dropped {
+		parts = append(parts, changedHeadline(n))
+	}
+	if n := len(v.Takedowns); n > 0 {
+		parts = append(parts, goneHeadline(n))
+	}
+	if n := len(v.Moved); n > 0 {
+		parts = append(parts, movedHeadline(n))
+	}
+	e := out.Errorf("cache-verify-failed", "%s", strings.Join(parts, "; "))
+	e.Data, e.IsSummary = v, true
+	if !v.Dropped {
+		for _, o := range v.Changed {
+			e.Items = append(e.Items, o.Sha512)
+		}
+	}
+	for _, f := range slices.Concat(v.Takedowns, v.Moved) {
+		e.Items = append(e.Items, f.Keys...)
+	}
+	return e
+}
+
+func changedHeadline(n int) string {
+	return out.Count(n, "object", "objects") + " in the cache no longer " + countWord(n == 1, "matches its", "match their") + " hash"
+}
+
+func movedHeadline(n int) string {
+	return out.Count(n, "file is", "files are") + " filed under another project than the lock says"
+}
+
+func printCacheCheck(l *out.Lines, v *build.CacheCheck, ps provider.Providers) {
+	section := sections(l)
+	if len(v.Changed)+len(v.Takedowns)+len(v.Moved) == 0 {
+		section()
+		checked := "rehashed " + out.Count(v.Objects, "object", "objects") + ", checked takedowns"
+		if len(v.Skipped) > 0 {
+			checked = "rehashed " + out.Count(v.Objects, "object", "objects")
+		}
+		l.OK("No problems found", checked)
+	}
+	printSkipped(l, v.Skipped, ps, section)
+	if n := len(v.Changed); n > 0 {
+		section()
+		if v.Dropped {
+			l.OK("Dropped "+out.Count(n, "changed object", "changed objects"), "the next build downloads "+countWord(n == 1, "it", "them")+" again")
+		} else {
+			l.Failed(changedHeadline(n))
+		}
+		var rows []out.Row
+		for _, o := range v.Changed {
+			rows = append(rows, out.Row{Text: o.Sha512[:12] + " (" + out.HumanBytes(o.Size) + ")"})
+		}
+		l.Tree(rows...)
+		if !v.Dropped {
+			l.Nudge("Drop "+countWord(n == 1, "it", "them")+" so "+countWord(n == 1, "it downloads", "they download")+" again", "shulker cache verify --fix")
+		}
+	}
+	if n := len(v.Takedowns); n > 0 {
+		section()
+		l.Failed(goneHeadline(n))
+		var rows []out.Row
+		for _, f := range v.Takedowns {
+			rows = append(rows, out.Row{Label: strings.Join(f.Keys, ", "), Text: ps.Title(f.Provider) + " no longer has version " + cmp.Or(f.Number, f.Version) + ", locked by " + strings.Join(f.Roots, ", ")})
+		}
+		l.Tree(rows...)
+		l.Blank()
+		l.Paragraph("A file gone from its provider is a reason to look, not proof: authors delete their own old versions too. Run `shulker audit <key>` where it's locked to look at it, then `update` or `remove` it there.")
+	}
+	if n := len(v.Moved); n > 0 {
+		section()
+		l.Failed(movedHeadline(n))
+		var rows []out.Row
+		for _, f := range v.Moved {
+			rows = append(rows, out.Row{Label: strings.Join(f.Keys, ", "), Text: fmt.Sprintf("%s files it under project %s, not %s, locked by %s", ps.Title(f.Provider), f.FiledUnder, f.Project, strings.Join(f.Roots, ", "))})
+		}
+		l.Tree(rows...)
+	}
+	if n := len(v.Unused); n > 0 {
+		section()
+		l.Info(out.Count(n, "object", "objects") + " no instance or project uses, " + out.HumanBytes(v.UnusedBytes))
+		l.Nudge("Free "+countWord(n == 1, "it", "them"), "shulker cache prune")
+	}
 }
 
 func (a *app) cacheRoots(named []string) (build.Roots, error) {

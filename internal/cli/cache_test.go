@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/config"
 )
@@ -128,5 +129,52 @@ func TestCacheLockFlagCountsTheLockFile(t *testing.T) {
 	stdout = h.mustRun(t, "cache", "info", "--lock", named, "--lock", named)
 	if !strings.Contains(stdout, "Kept for the project here and 2 lock files") {
 		t.Fatalf("the flag repeats: %s", stdout)
+	}
+}
+
+func cacheCheckOf(t *testing.T, stdout string) (bool, build.CacheCheck) {
+	t.Helper()
+	var env struct {
+		OK   bool             `json:"ok"`
+		Data build.CacheCheck `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
+		t.Fatalf("%v: %s", err, stdout)
+	}
+	return env.OK, env.Data
+}
+
+func TestCacheVerifyFindsChangedObjectsAndFilesGoneFromAHistoryEntrysLock(t *testing.T) {
+	h := newInPlace(t)
+	h.mustRun(t, "add", "sodium")
+	h.mustRun(t, "build")
+	c := &cache.Cache{Dir: h.cache}
+	stray := strayObject(t, c, "nothing references me")
+	if stdout := h.mustRun(t, "cache", "verify"); !strings.Contains(stdout, "No problems found (rehashed") || !strings.Contains(stdout, "$ shulker cache prune") {
+		t.Fatalf("a clean cache: %s", stdout)
+	}
+
+	h.mustRun(t, "remove", "sodium")
+	h.mustRun(t, "build")
+	delete(h.jars, "sodium")
+	code, stdout, _ := h.run(t, "cache", "verify", "--json")
+	ok, v := cacheCheckOf(t, stdout)
+	if code == 0 || ok || failureCode(t, stdout).Code != "cache-verify-failed" || len(v.Takedowns) != 1 || v.Takedowns[0].Keys[0] != "sodium" ||
+		len(v.Takedowns[0].Roots) != 1 || !strings.Contains(v.Takedowns[0].Roots[0], "(history ") {
+		t.Fatalf("sodium is gone, locked only by a history entry: exit %d %s", code, stdout)
+	}
+	if len(v.Unused) != 1 || c.Object(v.Unused[0].Sha512) != stray {
+		t.Fatalf("unused: %+v", v.Unused)
+	}
+
+	writeFile(t, stray, "changed")
+	code, stdout, stderr := h.run(t, "cache", "verify")
+	if code == 0 || !strings.Contains(stdout, "1 object in the cache no longer matches its hash") || !strings.Contains(stderr, "cache-verify-failed") {
+		t.Fatalf("a changed object fails the check: exit %d\n%s\n%s", code, stdout, stderr)
+	}
+	code, stdout, _ = h.run(t, "cache", "verify", "--fix", "--json")
+	ok, v = cacheCheckOf(t, stdout)
+	if _, err := os.Stat(stray); !v.Dropped || len(v.Changed) != 1 || err == nil {
+		t.Fatalf("--fix drops the changed object: exit %d %s", code, stdout)
 	}
 }

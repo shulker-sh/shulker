@@ -86,6 +86,7 @@ outline: [2, 3]
 | [`shulker export curseforge [source]`](#shulker-export-curseforge) | Export a CurseForge modpack |
 | [`shulker docs [topic]...`](#shulker-docs) | Print shulker's documentation |
 | [`shulker cache info`](#shulker-cache-info) | Show the cache's size and how much prune would free |
+| [`shulker cache verify`](#shulker-cache-verify) | Check every cached file against its hash and its provider |
 | [`shulker cache prune`](#shulker-cache-prune) | Remove cached files no instance or project references |
 | [`shulker security`](#shulker-security) | Explain how shulker keeps bad files off your machine |
 | [`shulker log`](#shulker-log) | Show what shulker did, from its log |
@@ -120,7 +121,7 @@ These say which directory a command acts on, so only the commands that act on on
 | `-i, --instance <id>` | Act on a registered instance instead of a project directory, by id, name, or directory; `--id` is accepted as an alias. Can't be combined with `-C`. [`shulker instances`](#shulker-instances) lists them |
 
 - Both: [`shulker add`](#shulker-add), [`shulker remove`](#shulker-remove), [`shulker list`](#shulker-list), [`shulker search`](#shulker-search), [`shulker lock`](#shulker-lock), [`shulker check`](#shulker-check), [`shulker audit`](#shulker-audit), [`shulker match`](#shulker-match), [`shulker update`](#shulker-update), [`shulker outdated`](#shulker-outdated), [`shulker suggests`](#shulker-suggests), [`shulker pin`](#shulker-pin), [`shulker unpin`](#shulker-unpin), [`shulker ignore`](#shulker-ignore), [`shulker unignore`](#shulker-unignore), [`shulker set`](#shulker-set), [`shulker unset`](#shulker-unset), [`shulker get`](#shulker-get), [`shulker export mrpack`](#shulker-export-mrpack), [`shulker export curseforge`](#shulker-export-curseforge), [`shulker feature on|off`](#shulker-feature-on-off), [`shulker feature reset`](#shulker-feature-reset), [`shulker feature list`](#shulker-feature-list), [`shulker install`](#shulker-install), [`shulker build`](#shulker-build), [`shulker diff`](#shulker-diff), [`shulker pull`](#shulker-pull), [`shulker history list|show|prune`](#shulker-history-list), [`shulker rollback`](#shulker-rollback), [`shulker play`](#shulker-play), [`shulker serve`](#shulker-serve), [`shulker link`](#shulker-link), [`shulker link shulker|atlauncher|gdlauncher|mojang|prism|multimc`](#shulker-link), [`shulker sync`](#shulker-sync), [`shulker instance get|set|unset|edit|dump|log`](#shulker-instance), [`shulker unlink`](#shulker-unlink), [`shulker saves`](#shulker-saves), [`shulker saves prune`](#shulker-saves-prune), [`shulker backup`](#shulker-backup), [`shulker restore`](#shulker-restore), [`shulker hook pre-launch|post-exit|wrap`](#shulker-hook-pre-launch), [`shulker mod add|remove|list`](#shulker-mod-add-remove-list), [`shulker modpack add|remove|list`](#shulker-modpack-add-remove-list), [`shulker resourcepack add|remove|list`](#shulker-resourcepack-add-remove-list), [`shulker shader add|remove|list`](#shulker-shader-add-remove-list), [`shulker datapack add|remove|list`](#shulker-datapack-add-remove-list), [`shulker player`](#shulker-player)
-- `-C` only: [`shulker init`](#shulker-init), [`shulker create`](#shulker-create), [`shulker import`](#shulker-import), [`shulker cache info`](#shulker-cache-info), [`shulker cache prune`](#shulker-cache-prune)
+- `-C` only: [`shulker init`](#shulker-init), [`shulker create`](#shulker-create), [`shulker import`](#shulker-import), [`shulker cache info`](#shulker-cache-info), [`shulker cache verify`](#shulker-cache-verify), [`shulker cache prune`](#shulker-cache-prune)
 - `-i` only: [`shulker log`](#shulker-log)
 
 ## Projects
@@ -1752,6 +1753,24 @@ shulker cache info
 | --- | --- |
 | `--lock` | Also keep what this lock file references, as `cache prune --lock` would; repeat for more |
 
+### `shulker cache verify`
+
+Check the whole cache, since it belongs to the machine rather than a project. It rehashes every object against the sha512 it is stored under, asks Modrinth and CurseForge whether they still have each file a root locks, and lists the objects no root uses. The roots are the ones `cache prune` keeps: every registered instance, the project you run it in, the history entries each keeps, and each lock file `--lock` names. The takedown check sends one request per provider for all of them together, and names every root that locks a file gone from its provider, as it does for [`audit`](#shulker-audit). A provider that can't be asked is reported as skipped rather than passed, and a changed object is left out of it.
+
+It exits non-zero on a changed object, a file gone from its provider, or a file its provider files under another project, ending with `cache-verify-failed`. A changed object means something rewrote the cache, and every build placing it would spread the change; `--fix` drops the changed objects, so the next build that needs one downloads it again, and a run whose only problem was a changed object it dropped succeeds. Unused objects are listed with their total size and don't fail it: [`cache prune`](#shulker-cache-prune) removes them.
+
+```sh
+shulker cache verify
+shulker cache verify --fix
+```
+
+| Flag | Description |
+| --- | --- |
+| `--fix` | Drop the changed objects, so the next build downloads them again |
+| `--lock` | Also check what this lock file references, as `cache prune --lock` keeps it; repeat for more |
+
+With `--json`, `data` holds `objects` (how many were rehashed), `changed` (`sha512`, `size`) and whether `dropped`, `takedowns` and `moved` (each file's `provider`, `project`, `version`, `versionNumber`, `sha512` and `status`, `filedUnder` for a moved one, and the `keys` and `roots` that lock it), `skipped` (`provider`, `reason`), and `unused` (`sha512`, `size`) with `unusedBytes`. A failing run carries the same `data` under `cache-verify-failed`, whose `items` are the changed objects' hashes and the flagged files' keys.
+
 ### `shulker cache prune`
 
 Remove everything in the cache that no root references. A root is a registered instance or the project you run it in: its `shulker.lock`, the lock of every history entry it keeps, the modpack checkouts and offline sync fallbacks its sources need, and the archive of a pack last imported from a file, which a re-import reads and no provider can fetch again. Manual downloads stay unless `--manual` is passed: a file you downloaded by hand is taken from the cache the next time any project needs it, and nothing can fetch it again. Installer logs and half-finished downloads always go, and so do listing index pairs no command has used for 90 days. The managed Java runtimes and your CurseForge key are never touched, and nothing a build placed can be removed from a directory without its bytes reaching the cache first, so rolling an instance back still works offline. A registered folder that no longer exists is skipped; one that is there but whose lock can't be read stops the prune, since it may be an instance that still needs its files. A detached build from `sync --into` is no root of its own: it runs on its source project's lock, which is kept while that project is a registered instance's source, a registered instance itself, or the project you run the prune in. Otherwise, and always for a detached build from a git or URL source, the prune may remove its files from the cache, and its next sync downloads them again; its own directory keeps them either way.
@@ -2005,6 +2024,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `build-conflict` | Files changed both in the build directory and in the source; run `diff`, or pass `--force` to overwrite, which also resets seeded files. A sync for a launch keeps them instead, and a seeded file never conflicts. `items`: the files |
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-changed` | A cached file no longer matched its hash, so the build deleted it, and it has no URL to download it from again: a local file or a manual download. `shulker install` puts the locked copy back |
+| `cache-verify-failed` | `cache verify` found a changed object it didn't drop, a file gone from its provider, or one its provider files under another project. `items`: the changed objects' hashes and the flagged files' keys; `data`: the whole report |
 | `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
 | `audit-failed` | `audit` found locked files gone from their provider, or entries that download from outside it or that it files under another project. `items`: their keys; `data`: the whole report |
 | `check-failed` | `check` found a problem; each one printed above it. `items`: every problem's items as `<code>: <item>`; `data.problems`: each problem as an error |

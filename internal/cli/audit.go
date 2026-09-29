@@ -12,6 +12,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/provider"
+	"shulker.sh/shulker/internal/takedown"
 )
 
 func (a *app) auditCmd() *cobra.Command {
@@ -129,11 +130,7 @@ func provenanceHeadline(n int) string {
 }
 
 func printAudit(l *out.Lines, rep *audit.Report, ps provider.Providers) {
-	gap := func() {}
-	section := func() {
-		gap()
-		gap = l.Blank
-	}
+	section := sections(l)
 	if len(rep.Takedowns)+len(rep.Provenance)+len(rep.Moved)+len(rep.Unpublished)+len(rep.Installed)+len(rep.Young) == 0 {
 		section()
 		checked := "checked takedowns, provenance, unpublished files, installed jars, release age"
@@ -142,10 +139,7 @@ func printAudit(l *out.Lines, rep *audit.Report, ps provider.Providers) {
 		}
 		l.OK("No problems found", checked)
 	}
-	for _, sk := range rep.Skipped {
-		section()
-		l.Info("Skipped the takedown check for " + ps.Title(sk.Provider) + ": " + sk.Reason)
-	}
+	printSkipped(l, rep.Skipped, ps, section)
 	if n := len(rep.Takedowns); n > 0 {
 		section()
 		l.Failed(goneHeadline(n))
@@ -240,6 +234,24 @@ func unpublishedOrigin(u audit.Unpublished) string {
 		text = u.Key + ", " + text
 	}
 	return text
+}
+
+// sections starts each part of a report after a blank line, the first right away.
+func sections(l *out.Lines) func() {
+	gap := func() {}
+	return func() {
+		gap()
+		gap = l.Blank
+	}
+}
+
+// printSkipped says which providers the takedown check couldn't ask, so their files read as
+// unchecked rather than passed.
+func printSkipped(l *out.Lines, skipped []takedown.Skipped, ps provider.Providers, section func()) {
+	for _, sk := range skipped {
+		section()
+		l.Info("Skipped the takedown check for " + ps.Title(sk.Provider) + ": " + sk.Reason)
+	}
 }
 
 // countWord is singular for one of something and plural otherwise.
