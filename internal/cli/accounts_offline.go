@@ -76,10 +76,10 @@ func (a *app) accountsAddCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&uuid, "uuid", "", "play under this uuid instead of the one the name derives")
-	cmd.Flags().BoolVar(&allowInvalid, "allow-invalid-name", false, "take a name no Minecraft account could have")
-	cmd.Flags().BoolVar(&force, "force", false, "create it even though an account already answers to that name")
-	cmd.Flags().BoolVar(&use, "use", false, "make it the default account straight away")
+	cmd.Flags().StringVar(&uuid, "uuid", "", "play under this uuid instead of the one the name derives.")
+	cmd.Flags().BoolVar(&allowInvalid, "allow-invalid-name", false, "take a name no Minecraft account could have.")
+	cmd.Flags().BoolVar(&force, "force", false, "create it even though an account already answers to that name.")
+	cmd.Flags().BoolVar(&use, "use", false, "make it the default account straight away.")
 	return cmd
 }
 
@@ -143,8 +143,8 @@ func (a *app) accountsRemoveCmd() *cobra.Command {
 			})
 		},
 	}
-	a.yesFlag(cmd, "remove it without being asked first")
-	cmd.Flags().BoolVar(&force, "force", false, "remove it with no account in sight that could create it again")
+	a.yesFlag(cmd, "remove it without being asked first.")
+	cmd.Flags().BoolVar(&force, "force", false, "remove it with no account in sight that could create it again.")
 	return cmd
 }
 

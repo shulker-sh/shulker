@@ -56,8 +56,8 @@ func (a *app) instancesRepairCmd() *cobra.Command {
 			return a.printer.Emit(res, res.print)
 		},
 	}
-	cmd.Flags().StringVar(&launcherName, "launcher", "", "only scan this launcher: "+launcher.NameList())
-	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "scan this directory instead of the launcher's own, or instead of the instances root for shulker")
+	cmd.Flags().StringVar(&launcherName, "launcher", "", "only scan this launcher: "+launcher.NameList()+".")
+	cmd.Flags().StringVar(&launcherDir, "launcher-dir", "", "scan this directory instead of the launcher's own, or instead of the instances root for shulker.")
 	return cmd
 }
 

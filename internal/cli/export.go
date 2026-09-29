@@ -38,9 +38,9 @@ type exportFlags struct {
 func (e *exportFlags) register(cmd *cobra.Command, extension, bundle string) {
 	cmd.Flags().StringVar(&e.version, "version", "", "version written into the pack (default: \"version\" in shulker.json)")
 	cmd.Flags().StringVarP(&e.output, "output", "o", "", "archive path (default: build/<name>-<version>"+extension+", or the current directory for a git or URL source)")
-	cmd.Flags().StringVar(&e.osName, "os", "", "include mods gated on this os: macos, windows, or linux (default: leave them out)")
+	cmd.Flags().StringVar(&e.osName, "os", "", "include mods gated on this os: macos, windows, or linux (default: leave them out).")
 	cmd.Flags().BoolVar(&e.bundle, "bundle", false, bundle)
-	cmd.Flags().BoolVar(&e.assumeClient, "assume-client", false, "export a client even when the source declares none, built from the mods and overrides both sides share")
+	cmd.Flags().BoolVar(&e.assumeClient, "assume-client", false, "export a client even when the source declares none, built from the mods and overrides both sides share.")
 	cmd.Flags().StringVar(&e.at.Ref, "ref", "", "branch, tag, or commit to export from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&e.at.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
 	e.ff.register(cmd, "for this run only")
@@ -198,7 +198,7 @@ func (a *app) exportFormatCmd(f packarchive.Format) *cobra.Command {
 	flags.register(cmd, f.Extension(), usage.Bundle)
 	a.registerFailFast(cmd)
 	if f.Sided() {
-		cmd.Flags().StringVar(&flags.side, "side", "", "export one side only (default: every declared side)")
+		cmd.Flags().StringVar(&flags.side, "side", "", "export one side only (default: every declared side).")
 	}
 	return cmd
 }

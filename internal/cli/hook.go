@@ -72,7 +72,7 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 	}
 	a.uncheckedDirFlag(cmd)
 	a.instanceFlag(cmd)
-	cmd.Flags().DurationVar(&deadline, "deadline", 0, "stop the update after this long and explain why (default: no deadline)")
+	cmd.Flags().DurationVar(&deadline, "deadline", 0, "stop the update after this long and explain why (default: no deadline).")
 	return cmd
 }
 

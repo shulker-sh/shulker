@@ -115,7 +115,7 @@ func (a *app) instanceGetCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also say where the value comes from")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also say where the value comes from.")
 	return cmd
 }
 
@@ -195,7 +195,7 @@ func (a *app) instanceSetCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for a list")
+	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for a list.")
 	return cmd
 }
 

@@ -6,13 +6,13 @@ import (
 )
 
 func (a *app) registerFailFast(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&a.failFast, "fail-fast", false, "stop at the first file that fails to download, rather than trying them all")
+	cmd.Flags().BoolVar(&a.failFast, "fail-fast", false, "stop at the first file that fails to download, rather than trying them all.")
 }
 
 // registerEveryFetch gives cmd the -v that keeps a line for every file a run of fetches gets,
 // where the run would otherwise settle into one count.
 func (a *app) registerEveryFetch(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(&a.everyFetch, "verbose", "v", false, "print a line for every file fetched, rather than one count per group")
+	cmd.Flags().BoolVarP(&a.everyFetch, "verbose", "v", false, "print a line for every file fetched, rather than one count per group.")
 }
 
 // splitJoined is the errors an errors.Join holds, err alone when it is any other error, and none

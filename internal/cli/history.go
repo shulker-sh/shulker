@@ -298,7 +298,7 @@ func (a *app) rollbackCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	cmd.Flags().BoolVar(&prune, "prune", false, "also trim history to the number the manifest keeps")
+	cmd.Flags().BoolVar(&prune, "prune", false, "also trim history to the number the manifest keeps.")
 	return cmd
 }
 

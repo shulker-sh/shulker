@@ -37,7 +37,7 @@ func (a *app) instancesCmd() *cobra.Command {
 			return a.printer.Emit(entries, func(l *out.Lines) { printInstanceEntries(l, entries, verbose) })
 		},
 	}
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also print each instance's path, source and ref")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also print each instance's path, source and ref.")
 	cmd.AddCommand(a.instancesRepairCmd())
 	return cmd
 }

@@ -195,7 +195,7 @@ func (a *app) pullCmd() *cobra.Command {
 	a.scopeFlags(cmd)
 	cmd.Flags().StringVar(&side, "side", "", "side whose build directory to pull from (default: the only declared side)")
 	cmd.Flags().StringVar(&into, "into", "", "directory the side was synced into (default: whichever of the build directory and its sync directories has edits)")
-	cmd.Flags().StringArrayVar(&keys, "key", nil, "start managing this key of the named .properties file; repeat for more")
+	cmd.Flags().StringArrayVar(&keys, "key", nil, "start managing this key of the named .properties file; repeat for more.")
 	cmd.Flags().StringVar(&as, "as", "", "requires key for the one named jar or pack adopted as a file entry (default: a jar's mod id, a pack file's name)")
 	cmd.Flags().StringVar(&to, "to", "", "override folder to write into: client, server, or a feature name (default: where the file already lives, or overrides/ for a new one)")
 	return cmd

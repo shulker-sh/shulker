@@ -31,7 +31,7 @@ var multimcEntry = &Entry{
 		DirHint:   "the folder that holds multimc.cfg",
 		NoDefault: "MultiMC is portable, so shulker can't find its folder",
 		Names:     true,
-		Force:     "repoint the modpack an instance already follows",
+		Force:     "repoint the modpack an instance already follows.",
 	},
 	relink: relinkLauncher, forget: forgetInstance, name: multimcName, gameDirs: multimcGameDirs,
 	readSlots: readMultiMCSlots, writeSlots: writeMultiMCSlots, slotFile: instanceFileIn(MultiMCInstanceFile),

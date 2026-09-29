@@ -30,7 +30,7 @@ var prismEntry = &Entry{
 		Noun:  "instance",
 		Dir:   "launcher data directory (default: Prism Launcher's)",
 		Names: true,
-		Force: "repoint the modpack an instance already follows",
+		Force: "repoint the modpack an instance already follows.",
 	},
 	Accounts: prismAccounts,
 	relink:   relinkLauncher, forget: forgetInstance, name: prismName, gameDirs: prismGameDirs,

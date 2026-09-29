@@ -91,15 +91,15 @@ func (a *app) playCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	a.yesFlag(cmd, "create a shulker instance for a project that has none without being asked first")
-	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "assemble the launch and print it instead of starting the game")
-	cmd.Flags().BoolVar(&opts.noSync, "no-sync", false, "start the game without updating the instance first")
-	cmd.Flags().BoolVar(&opts.wait, "wait", false, "wait for the game and record how the run ended before returning")
-	cmd.Flags().BoolVar(&opts.stream, "stream", false, "wait for the game and mirror its output to the terminal")
-	cmd.Flags().StringVar(&opts.account, "account", "", "play as this account (default: the instance's pinned account, else the default account)")
-	cmd.Flags().StringVar(&opts.window, "window", "", "open the game at this size for this run, like 1280x720")
-	cmd.Flags().StringVar(&opts.world, "world", "", "boot straight into this save, named by its folder in saves/")
-	cmd.Flags().StringVar(&opts.server, "server", "", "join this server straight away, as <address>[:<port>]")
+	a.yesFlag(cmd, "create a shulker instance for a project that has none without being asked first.")
+	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "assemble the launch and print it instead of starting the game.")
+	cmd.Flags().BoolVar(&opts.noSync, "no-sync", false, "start the game without updating the instance first.")
+	cmd.Flags().BoolVar(&opts.wait, "wait", false, "wait for the game and record how the run ended before returning.")
+	cmd.Flags().BoolVar(&opts.stream, "stream", false, "wait for the game and mirror its output to the terminal.")
+	cmd.Flags().StringVar(&opts.account, "account", "", "play as this account (default: the instance's pinned account, else the default account).")
+	cmd.Flags().StringVar(&opts.window, "window", "", "open the game at this size for this run, like 1280x720.")
+	cmd.Flags().StringVar(&opts.world, "world", "", "boot straight into this save, named by its folder in saves/.")
+	cmd.Flags().StringVar(&opts.server, "server", "", "join this server straight away, as <address>[:<port>].")
 	a.registerEveryFetch(cmd)
 	return cmd
 }

@@ -74,7 +74,7 @@ func (cfpack) Usage() Usage {
 		Short:   "Export a CurseForge modpack (.zip) for the CurseForge app",
 		Archive: "a CurseForge zip with a manifest.json of type minecraftModpack",
 		Listed:  "by file ID",
-		Bundle:  "put files that aren't on CurseForge inside the archive",
+		Bundle:  "put files that aren't on CurseForge inside the archive.",
 		Bundled: "the CurseForge app will warn that it isn't on CurseForge",
 	}
 }

@@ -60,13 +60,13 @@ func (a *app) importCmd() *cobra.Command {
 	}
 	a.uncheckedDirFlag(cmd)
 	cmd.Flags().StringVar(&f.name, "name", "", "project name (default: the pack name, slugified)")
-	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the modpack unless it is this kind: "+strings.Join(packarchive.Names(), ", ")+", source, or modpack for one the project requires (default: detected)")
-	cmd.Flags().StringVar(&f.provider, "provider", "", "look a slug up on this provider only: modrinth or curseforge (default: the first that has it)")
+	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the modpack unless it is this kind: "+strings.Join(packarchive.Names(), ", ")+", source, or modpack for one the project requires (default: detected).")
+	cmd.Flags().StringVar(&f.provider, "provider", "", "look a slug up on this provider only: modrinth or curseforge (default: the first that has it).")
 	cmd.Flags().StringVar(&f.at.Ref, "ref", "", "git ref of a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&f.at.Path, "path", "", "folder of a git source's repository holding its shulker.json (default: the root)")
-	cmd.Flags().StringVar(&f.side, "side", "", "take one side only: client or server (default: every side the pack declares)")
-	cmd.Flags().BoolVar(&f.ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one")
-	cmd.Flags().BoolVar(&f.noServerPack, "no-server-pack", false, "don't read the server files the pack pairs with for which mods are client-only")
+	cmd.Flags().StringVar(&f.side, "side", "", "take one side only: client or server (default: every side the pack declares).")
+	cmd.Flags().BoolVar(&f.ignoreShulker, "ignore-shulker", false, "ignore the shulker manifest and lock inside the modpack and import it as any other one.")
+	cmd.Flags().BoolVar(&f.noServerPack, "no-server-pack", false, "don't read the server files the pack pairs with for which mods are client-only.")
 	a.registerEveryFetch(cmd)
 	return cmd
 }

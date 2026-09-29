@@ -103,7 +103,7 @@ func (a *app) configGetCmd() *cobra.Command {
 			return a.printer.Emit(value, func(l *out.Lines) { writeValue(l.W, value) })
 		},
 	}
-	cmd.Flags().BoolVar(&reveal, "reveal", false, "print curseforge.key in full")
+	cmd.Flags().BoolVar(&reveal, "reveal", false, "print curseforge.key in full.")
 	return cmd
 }
 
@@ -174,8 +174,8 @@ func (a *app) configSetCmd() *cobra.Command {
 			return a.emitConfigChange(change)
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "change the registry even if it leaves linked instances behind")
-	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for a list or an object")
+	cmd.Flags().BoolVar(&force, "force", false, "change the registry even if it leaves linked instances behind.")
+	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for a list or an object.")
 	return cmd
 }
 
@@ -217,7 +217,7 @@ func (a *app) configUnsetCmd() *cobra.Command {
 			return a.emitConfigChange(change)
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "change the registry even if it leaves linked instances behind")
+	cmd.Flags().BoolVar(&force, "force", false, "change the registry even if it leaves linked instances behind.")
 	return cmd
 }
 

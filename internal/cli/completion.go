@@ -47,7 +47,7 @@ func (a *app) completionCmd() *cobra.Command {
 				return shell.write(cmd.Root(), cmd.OutOrStdout(), !noDescriptions)
 			},
 		}
-		sub.Flags().BoolVar(&noDescriptions, "no-descriptions", false, "leave command descriptions out of the completions")
+		sub.Flags().BoolVar(&noDescriptions, "no-descriptions", false, "leave command descriptions out of the completions.")
 		cmd.AddCommand(sub)
 	}
 	return cmd

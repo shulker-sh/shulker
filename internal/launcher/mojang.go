@@ -43,7 +43,7 @@ var mojangEntry = &Entry{
 		Noun:    "profile",
 		Dir:     "launcher directory (default: the official launcher's .minecraft folder)",
 		Names:   true,
-		Force:   "repoint the modpack a profile already follows",
+		Force:   "repoint the modpack a profile already follows.",
 	},
 	Accounts: mojangAccounts,
 	relink:   relinkLauncher, forget: forgetMojang, name: mojangName, gameDirs: mojangGameDirs,

@@ -54,7 +54,7 @@ func (a *app) setCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for lists, objects, or a value kept as a string")
+	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for lists, objects, or a value kept as a string.")
 	return cmd
 }
 
@@ -118,7 +118,7 @@ func (a *app) getCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	cmd.Flags().BoolVar(&locked, "locked", false, "read shulker.lock instead")
+	cmd.Flags().BoolVar(&locked, "locked", false, "read shulker.lock instead.")
 	return cmd
 }
 

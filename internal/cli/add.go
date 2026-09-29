@@ -147,16 +147,16 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		cmd.Flags().StringVar(&opts.Side, "side", "", "override side: client, server, both")
 	}
 	if applies(kind, "resourcepack") {
-		cmd.Flags().BoolVar(&opts.ResourcePack, "resourcepack", false, "also place the datapack in resourcepacks/, for one that carries assets/")
+		cmd.Flags().BoolVar(&opts.ResourcePack, "resourcepack", false, "also place the datapack in resourcepacks/, for one that carries assets/.")
 	}
 	if applies(kind, "skip-missing") {
-		cmd.Flags().BoolVar(&skipMissing, "skip-missing", false, "add what resolves and skip each name that isn't found or has no compatible version, instead of adding nothing")
+		cmd.Flags().BoolVar(&skipMissing, "skip-missing", false, "add what resolves and skip each name that isn't found or has no compatible version, instead of adding nothing.")
 	}
 	if applies(kind, "channel") {
 		cmd.Flags().StringVar(&opts.Channel, "channel", "", "least stable channel accepted: release, beta, alpha")
 	}
 	if applies(kind, "pin") {
-		cmd.Flags().StringVar(&opts.Pin, "pin", "", "pin to a provider version id")
+		cmd.Flags().StringVar(&opts.Pin, "pin", "", "pin to a provider version id.")
 	}
 	if applies(kind, "provider") {
 		cmd.Flags().StringVar(&opts.Provider, "provider", "", "provider to use for this mod")
@@ -168,17 +168,17 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 		cmd.Flags().StringVar(&at.Path, "path", "", "folder of a git source's repository that holds the modpack's shulker.json (default: the root)")
 	}
 	if applies(kind, "unlocked") {
-		cmd.Flags().BoolVar(&unlocked, "unlocked", false, "resolve the modpack's mods here instead of copying the versions its lock pins")
+		cmd.Flags().BoolVar(&unlocked, "unlocked", false, "resolve the modpack's mods here instead of copying the versions its lock pins.")
 	}
 	if applies(kind, "no-auto-update") {
-		cmd.Flags().BoolVar(&noAutoUpdate, "no-auto-update", false, "keep the modpack at its locked version on `shulker sync`; `shulker update` still moves it")
+		cmd.Flags().BoolVar(&noAutoUpdate, "no-auto-update", false, "keep the modpack at its locked version on `shulker sync`; `shulker update` still moves it.")
 	}
 	if applies(kind, "with-deps") {
-		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another")
+		cmd.Flags().BoolVar(&opts.WithDeps, "with-deps", false, "move dependency versions the lock holds when a mod being added needs another.")
 	}
 	a.registerEveryFetch(cmd)
 	if applies(kind, "yes") {
-		a.yesFlag(cmd, "move a version the lock holds, or unlock a modpack built for another Minecraft, without being asked first")
+		a.yesFlag(cmd, "move a version the lock holds, or unlock a modpack built for another Minecraft, without being asked first.")
 	}
 	if applies(kind, "as") {
 		cmd.Flags().StringVar(&as, "as", "", "key used in requires, messages and requiredBy (default: a mod's jar id, a pack or hosted modpack's provider slug, a modpack archive file's name, the name in a modpack's manifest)")

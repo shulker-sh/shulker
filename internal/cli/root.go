@@ -158,8 +158,8 @@ func (a *app) root() *cobra.Command {
 	// they are put back after the flags are defined with the zero defaults
 	// help prints.
 	jsonOut, noInput, noColor, ascii := a.printer.JSON, a.printer.NoInput, a.style.NoColor, a.style.ASCII
-	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", false, "print machine-readable JSON, including errors")
-	root.PersistentFlags().BoolVar(&a.printer.NoInput, "no-input", false, "ask nothing: take every default, and fail on a missing required value")
+	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", false, "print machine-readable JSON, including errors.")
+	root.PersistentFlags().BoolVar(&a.printer.NoInput, "no-input", false, "ask nothing: take every default, and fail on a missing required value.")
 	// --id is the same flag: the row calls it id, and the flag says which instance.
 	root.SetGlobalNormalizationFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 		if name == "id" {
@@ -167,10 +167,10 @@ func (a *app) root() *cobra.Command {
 		}
 		return pflag.NormalizedName(name)
 	})
-	root.PersistentFlags().BoolVar(&a.style.NoColor, "no-color", false, "print without colour (NO_COLOR does the same)")
-	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ »")
-	root.PersistentFlags().Bool("annotations", false, "also print errors and warnings as GitHub Actions annotations (the default when GITHUB_ACTIONS=true)")
-	root.PersistentFlags().Bool("no-annotations", false, "print no GitHub Actions annotations, even when GITHUB_ACTIONS=true")
+	root.PersistentFlags().BoolVar(&a.style.NoColor, "no-color", false, "print without colour (NO_COLOR does the same).")
+	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ ».")
+	root.PersistentFlags().Bool("annotations", false, "also print errors and warnings as GitHub Actions annotations (the default when GITHUB_ACTIONS=true).")
+	root.PersistentFlags().Bool("no-annotations", false, "print no GitHub Actions annotations, even when GITHUB_ACTIONS=true.")
 	a.printer.JSON, a.printer.NoInput, a.style.NoColor, a.style.ASCII = jsonOut, noInput, noColor, ascii
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.createCmd(), a.addCmd(), a.searchCmd(), a.removeCmd(), a.listCmd(), a.lockCmd(), a.checkCmd(), a.matchCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.ignoreCmd(), a.unignoreCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.instancesCmd(), a.instanceCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.historyCmd(), a.rollbackCmd(), a.backupCmd(), a.restoreCmd(), a.savesCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.accountsCmd(), a.playCmd(), a.watchCmd(), a.selfCmd(), a.docsCmd(), a.cacheCmd(), a.logCmd(), a.completionCmd())
 	root.AddCommand(a.typeGroupCmds()...)
@@ -224,7 +224,7 @@ func (d *existingDir) Type() string   { return "string" }
 // spelled --id too.
 func (a *app) instanceFlag(c *cobra.Command) {
 	instance := a.instance
-	c.Flags().StringVarP(&a.instance, "instance", "i", "", "act on a registered instance, by id, name, or directory")
+	c.Flags().StringVarP(&a.instance, "instance", "i", "", "act on a registered instance, by id, name, or directory.")
 	a.instance = instance
 }
 

@@ -131,15 +131,15 @@ func (a *app) syncCmd() *cobra.Command {
 	}
 	a.scopeFlags(cmd)
 	cmd.Flags().StringVar(&req.Into, "into", "", "output directory (default: the side's build directory)")
-	cmd.Flags().BoolVar(&req.Force, "force", false, "overwrite files edited in the output directory, seeded files included")
-	cmd.Flags().BoolVar(&req.AssumeClient, "assume-client", false, "build a client even when the source declares none, from the mods and overrides both sides share")
+	cmd.Flags().BoolVar(&req.Force, "force", false, "overwrite files edited in the output directory, seeded files included.")
+	cmd.Flags().BoolVar(&req.AssumeClient, "assume-client", false, "build a client even when the source declares none, from the mods and overrides both sides share.")
 	cmd.Flags().StringVar(&req.At.Ref, "ref", "", "branch, tag, or commit to sync from a git source (default: the remote HEAD)")
 	cmd.Flags().StringVar(&req.At.Path, "path", "", "folder of a git source's repository that holds its shulker.json (default: the root)")
-	cmd.Flags().StringVar(&req.OS, "os", "", "build for this os instead of the detected one: macos, windows, or linux")
-	sel.registerWith(cmd, "sync every instance (narrow with --launcher or --side)", "side to build from a source (default: the only declared side); with -i, --all, or the picker, only client or server instances")
+	cmd.Flags().StringVar(&req.OS, "os", "", "build for this os instead of the detected one: macos, windows, or linux.")
+	sel.registerWith(cmd, "sync every instance (narrow with --launcher or --side).", "side to build from a source (default: the only declared side); with -i, --all, or the picker, only client or server instances")
 	a.registerFailFast(cmd)
 	a.registerEveryFetch(cmd)
-	cmd.Flags().BoolVar(&offline, "offline", false, "don't use the network; build from the last successful sync and cached files")
+	cmd.Flags().BoolVar(&offline, "offline", false, "don't use the network; build from the last successful sync and cached files.")
 	req.features.register(cmd, "for this run only")
 	return cmd
 }

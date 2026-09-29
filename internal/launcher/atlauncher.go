@@ -40,7 +40,7 @@ var atlauncherEntry = &Entry{
 		Noun:  "instance",
 		Dir:   "launcher data directory (default: ATLauncher's)",
 		Names: true,
-		Force: "repoint the modpack an instance already follows, or link over one shulker didn't link",
+		Force: "repoint the modpack an instance already follows, or link over one shulker didn't link.",
 	},
 	relink: relinkLauncher, forget: forgetInstance, name: atlauncherName, gameDirs: atlauncherGameDirs,
 	readSlots: readATLauncherSlots, writeSlots: writeATLauncherSlots, slotFile: instanceFileIn(ATLauncherInstanceFile),

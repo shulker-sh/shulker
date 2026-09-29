@@ -75,7 +75,7 @@ func (a *app) docsCmd() *cobra.Command {
 			return e
 		},
 	}
-	cmd.Flags().BoolVarP(&search, "search", "s", false, "search every page for the words instead of looking up a page or heading")
+	cmd.Flags().BoolVarP(&search, "search", "s", false, "search every page for the words instead of looking up a page or heading.")
 	return cmd
 }
 

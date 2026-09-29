@@ -101,7 +101,7 @@ func (a *app) ignoreCmd() *cobra.Command {
 	cmd.Flags().StringVar(&note, "note", "", "why the constraint is safe to ignore (required)")
 	cmd.Flags().StringVar(&rule, "rule", "", "the problem's rule, depends or breaks (printed with the problem)")
 	cmd.Flags().StringVar(&declared, "declared", "", "the range the jar declares (printed with the problem); with it, nothing is resolved")
-	cmd.Flags().BoolVar(&force, "force", false, "replace an existing ignore for the pair")
+	cmd.Flags().BoolVar(&force, "force", false, "replace an existing ignore for the pair.")
 	return cmd
 }
 

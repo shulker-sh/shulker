@@ -54,10 +54,10 @@ func (a *app) restoreCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	where.register(cmd, "restore into this save group rather than an instance", "restore every instance's newest backup")
-	cmd.Flags().StringVar(&req.named, "backup", "", "restore this backup, by its name in the target's backups or a zip's path")
-	cmd.Flags().StringArrayVar(&req.only, "world", nil, "restore only this world from the backup, by its folder name; repeatable")
-	cmd.Flags().StringVar(&req.as, "as", "", "restore the backup's one world under this folder name")
+	where.register(cmd, "restore into this save group rather than an instance.", "restore every instance's newest backup")
+	cmd.Flags().StringVar(&req.named, "backup", "", "restore this backup, by its name in the target's backups or a zip's path.")
+	cmd.Flags().StringArrayVar(&req.only, "world", nil, "restore only this world from the backup, by its folder name; repeatable.")
+	cmd.Flags().StringVar(&req.as, "as", "", "restore the backup's one world under this folder name.")
 	return cmd
 }
 

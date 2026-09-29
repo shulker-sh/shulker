@@ -113,7 +113,7 @@ func (a *app) logCmd() *cobra.Command {
 	cmd.Flags().StringVar(&f.cmd, "cmd", "", "only this command and the ones under it, like sync or \"hook wrap\"")
 	cmd.Flags().StringVar(&f.code, "code", "", "only entries with this error code")
 	cmd.Flags().StringVar(&f.level, "level", "", "only entries at this level: info, warn, error")
-	cmd.Flags().BoolVar(&f.unredacted, "unredacted", false, "print entries as stored, with the credentials, keys and home directory the default hides")
+	cmd.Flags().BoolVar(&f.unredacted, "unredacted", false, "print entries as stored, with the credentials, keys and home directory the default hides.")
 	return cmd
 }
 

@@ -58,7 +58,7 @@ func (a *app) selfUninstallCmd() *cobra.Command {
 			return a.selfUninstall(purge)
 		},
 	}
-	cmd.Flags().BoolVar(&purge, "purge", false, "also forget the registry, the index instances repair rebuilds from")
+	cmd.Flags().BoolVar(&purge, "purge", false, "also forget the registry, the index instances repair rebuilds from.")
 	return cmd
 }
 
@@ -190,9 +190,9 @@ func (a *app) selfUpdateCmd() *cobra.Command {
 			return a.selfUpdate(cmd.Context(), check, without, require)
 		},
 	}
-	cmd.Flags().BoolVar(&check, "check", false, "only report whether a newer release is available")
-	cmd.Flags().BoolVar(&without, "without-attestation", false, "skip the build provenance check")
-	cmd.Flags().BoolVar(&require, "require-attestation", false, "fail unless gh verifies the build provenance")
+	cmd.Flags().BoolVar(&check, "check", false, "only report whether a newer release is available.")
+	cmd.Flags().BoolVar(&without, "without-attestation", false, "skip the build provenance check.")
+	cmd.Flags().BoolVar(&require, "require-attestation", false, "fail unless gh verifies the build provenance.")
 	return cmd
 }
 

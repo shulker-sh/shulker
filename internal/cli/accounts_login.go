@@ -71,7 +71,7 @@ func (a *app) accountsLoginCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().BoolVar(&use, "use", false, "make it the default account straight away")
+	cmd.Flags().BoolVar(&use, "use", false, "make it the default account straight away.")
 	return cmd
 }
 
@@ -129,7 +129,7 @@ func (a *app) accountsLogoutCmd() *cobra.Command {
 			})
 		},
 	}
-	a.yesFlag(cmd, "sign out without being asked first")
+	a.yesFlag(cmd, "sign out without being asked first.")
 	return cmd
 }
 

@@ -97,7 +97,7 @@ func (a *app) unlinkCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	sel.register(cmd, "unlink every entry the name matches, or every entry when there's no name")
+	sel.register(cmd, "unlink every entry the name matches, or every entry when there's no name.")
 	return cmd
 }
 

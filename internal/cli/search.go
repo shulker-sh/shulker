@@ -85,9 +85,9 @@ func (a *app) searchCmd() *cobra.Command {
 	}
 	a.scopeFlags(cmd)
 	cmd.Flags().StringVar(&typ, "type", "", typeFlagUsage)
-	cmd.Flags().StringVar(&providerName, "provider", "", "search one provider instead of every available one")
+	cmd.Flags().StringVar(&providerName, "provider", "", "search one provider instead of every available one.")
 	cmd.Flags().IntVar(&limit, "limit", 10, "results to print per provider")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also print each provider's id and downloads")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also print each provider's id and downloads.")
 	return cmd
 }
 

@@ -73,7 +73,7 @@ func (a *app) savesCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	where.register(cmd, "show this save group rather than an instance", "show every instance's worlds and backups")
+	where.register(cmd, "show this save group rather than an instance.", "show every instance's worlds and backups")
 	cmd.AddCommand(a.savesPruneCmd())
 	return cmd
 }
@@ -99,7 +99,7 @@ func (a *app) savesPruneCmd() *cobra.Command {
 		},
 	}
 	a.scopeFlags(cmd)
-	where.register(cmd, "prune this save group's backups rather than an instance's", "prune every instance's backups")
+	where.register(cmd, "prune this save group's backups rather than an instance's.", "prune every instance's backups")
 	cmd.Flags().IntVar(&keep, "keep", 0, "how many of the newest backups to keep (required)")
 	return cmd
 }

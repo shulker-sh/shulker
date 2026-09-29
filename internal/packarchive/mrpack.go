@@ -58,7 +58,7 @@ func (mrpack) Usage() Usage {
 		Short:   "Export a Modrinth modpack (.mrpack) for the Modrinth app and other launchers",
 		Archive: "a .mrpack",
 		Listed:  "by download",
-		Bundle:  "put files that Modrinth launchers cannot download inside the archive",
+		Bundle:  "put files that Modrinth launchers cannot download inside the archive.",
 		Bundled: "recipients receive the file itself, not a download link",
 	}
 }

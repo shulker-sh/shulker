@@ -75,7 +75,7 @@ func (a *app) versionCmd() *cobra.Command {
 			return a.printer.Emit(info, func(l *out.Lines) { printVersion(l, info, verbose) })
 		},
 	}
-	cmd.Flags().BoolVar(&verbose, "verbose", false, "also print the build and the environment: Go, install route, binary, config and cache")
+	cmd.Flags().BoolVar(&verbose, "verbose", false, "also print the build and the environment: Go, install route, binary, config and cache.")
 	return cmd
 }
 

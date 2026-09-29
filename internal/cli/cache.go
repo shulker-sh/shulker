@@ -89,7 +89,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 }
 
 func lockFlag(cmd *cobra.Command, named *[]string) {
-	cmd.Flags().StringArrayVar(named, "lock", nil, "also keep what this lock file references; repeat for more")
+	cmd.Flags().StringArrayVar(named, "lock", nil, "also keep what this lock file references; repeat for more.")
 }
 
 func (a *app) cachePruneCmd() *cobra.Command {
@@ -139,7 +139,7 @@ func (a *app) cachePruneCmd() *cobra.Command {
 	}
 	a.dirFlag(cmd)
 	lockFlag(cmd, &named)
-	cmd.Flags().BoolVar(&manual, "manual", false, "also remove manual downloads, which nothing can fetch again")
+	cmd.Flags().BoolVar(&manual, "manual", false, "also remove manual downloads, which nothing can fetch again.")
 	return cmd
 }
 

@@ -20,7 +20,7 @@ var Shulker = &Entry{
 		Short: "Create an instance shulker owns and launches itself",
 		Noun:  "instance",
 		As:    "nickname for this instance, which names its folder and finds it with -i (default: from the pack's name)",
-		Force: "repoint the modpack an instance already follows",
+		Force: "repoint the modpack an instance already follows.",
 	},
 	relink: relinkShulker, forget: forgetShulker, name: shulkerName, gameDirs: instanceGameDirs,
 	place: placeShulker, link: linkShulker,

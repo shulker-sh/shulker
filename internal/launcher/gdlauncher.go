@@ -54,7 +54,7 @@ var gdlauncherEntry = &Entry{
 		Noun:  "instance",
 		Dir:   "launcher runtime directory (default: GDLauncher's)",
 		Names: true,
-		Force: "repoint the modpack an instance already follows, link over one shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet",
+		Force: "repoint the modpack an instance already follows, link over one shulker didn't link, and use the locked loader version even if GDLauncher can't install it yet.",
 	},
 	relink: relinkLauncher, forget: forgetInstance, name: gdlauncherName, gameDirs: gdlauncherGameDirs,
 	readSlots: readGDLauncherSlots, writeSlots: writeGDLauncherSlots, slotFile: instanceFileIn(GDLauncherInstanceFile),

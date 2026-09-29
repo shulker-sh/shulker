@@ -21,8 +21,8 @@ type featureFlags struct {
 }
 
 func (f *featureFlags) register(cmd *cobra.Command, scope string) {
-	cmd.Flags().StringArrayVar(&f.with, "with", nil, "turn a feature on "+scope+"; repeat for more")
-	cmd.Flags().StringArrayVar(&f.without, "without", nil, "turn a feature off "+scope+"; repeat for more")
+	cmd.Flags().StringArrayVar(&f.with, "with", nil, "turn a feature on "+scope+"; repeat for more.")
+	cmd.Flags().StringArrayVar(&f.without, "without", nil, "turn a feature off "+scope+"; repeat for more.")
 }
 
 func (f featureFlags) check(b *build.Builder) error {
@@ -169,13 +169,13 @@ type featureWhere struct {
 }
 
 func (f *featureWhere) register(cmd *cobra.Command, verb string) {
-	cmd.Flags().StringVar(&f.into, "into", "", verb+" a synced directory instead of this project")
+	cmd.Flags().StringVar(&f.into, "into", "", verb+" a synced directory instead of this project.")
 	f.sel.register(cmd, "")
 }
 
 func (f *featureWhere) registerChange(cmd *cobra.Command) {
 	f.register(cmd, "change the choice for")
-	cmd.Flags().BoolVar(&f.sync, "sync", false, "sync the --into or -i directory from its recorded source right away")
+	cmd.Flags().BoolVar(&f.sync, "sync", false, "sync the --into or -i directory from its recorded source right away.")
 }
 
 // featureDir resolves -i (narrowed by --launcher and --side) to the instance's directory.
