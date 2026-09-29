@@ -62,7 +62,6 @@ type Server struct {
 	Variables  Variables      `json:"variables,omitempty"`
 	Memory     string         `json:"memory,omitempty"`
 	JVMFlags   string         `json:"jvmFlags,omitempty"`
-	JVMArgs    []string       `json:"jvmArgs,omitempty"`
 	Properties map[string]any `json:"properties,omitempty"`
 	// ResourcePack is the requires key of the locked resource pack whose URL and sha1 the build
 	// writes into server.properties, for joining clients to download.

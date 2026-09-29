@@ -315,6 +315,7 @@ func TestParseRejects(t *testing.T) {
 		`"requires":{},"client":{},"icon":"../icon.png"`,
 		`"requires":{},"client":{},"icon":"/tmp/icon.png"`,
 		`"requires":{},"client":{},"icon":"icon.jpg"`,
+		`"requires":{},"server":{"jvmArgs":["-javaagent:evil.jar"]}`,
 	} {
 		if _, err := Parse(doc(rest)); err == nil {
 			t.Errorf("%s should be invalid", rest)

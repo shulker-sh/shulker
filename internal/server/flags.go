@@ -49,8 +49,10 @@ var aikarsLarge = []string{
 	"-XX:InitiatingHeapOccupancyPercent=20",
 }
 
-// JVMArgs are a server's heap flags, its preset's tuning flags and the author's own, in that order.
-func JVMArgs(memory, preset string, extra []string) ([]string, error) {
+// JVMArgs are a server's heap flags followed by its preset's tuning flags. A manifest can't add its
+// own: its author would control the java command line, down to -javaagent: and
+// -XX:OnOutOfMemoryError.
+func JVMArgs(memory, preset string) ([]string, error) {
 	if memory == "" {
 		memory = manifest.DefaultServerMemory
 	}
@@ -73,7 +75,7 @@ func JVMArgs(memory, preset string, extra []string) ([]string, error) {
 		e.Help = fmt.Sprintf("use %q or %q", FlagsAikars, FlagsNone)
 		return nil, e
 	}
-	return append(args, extra...), nil
+	return args, nil
 }
 
 func memoryMB(memory string) (int, error) {

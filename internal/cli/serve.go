@@ -70,7 +70,7 @@ func (a *app) serveCmd() *cobra.Command {
 				p.Manifest.Server = &manifest.Server{}
 			}
 			srv := p.Manifest.Server
-			jvm, err := server.JVMArgs(srv.Memory, srv.JVMFlags, srv.JVMArgs)
+			jvm, err := server.JVMArgs(srv.Memory, srv.JVMFlags)
 			if err != nil {
 				return err
 			}

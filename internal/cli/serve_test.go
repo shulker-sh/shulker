@@ -32,7 +32,7 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	jdk := h.fakeJDK(t, "25.0.1", "0")
 	h.editManifest(t, func(m map[string]any) {
 		m["java"] = jdk
-		m["server"] = map[string]any{"memory": "2G", "jvmArgs": []any{"-Dshulker.test=1"}}
+		m["server"] = map[string]any{"memory": "2G"}
 	})
 	h.tty = true
 	h.stdin = strings.NewReader("y\n")
@@ -74,8 +74,8 @@ func TestServeRunsServerAndStops(t *testing.T) {
 	if got[0] != "-Xms2G" || got[1] != "-Xmx2G" || !strings.Contains(string(args), "-XX:+UseG1GC\n") {
 		t.Fatalf("args: %v", got)
 	}
-	tail := strings.Join(got[len(got)-4:], " ")
-	if tail != "-Dshulker.test=1 -jar fabric-server-launch.jar --nogui" {
+	tail := strings.Join(got[len(got)-3:], " ")
+	if tail != "-jar fabric-server-launch.jar --nogui" {
 		t.Fatalf("args tail: %s", tail)
 	}
 

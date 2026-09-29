@@ -565,11 +565,6 @@
           "default": "aikars",
           "description": "JVM flags preset used by serve. aikars applies Aikar's G1 flags (12 GB+ variant chosen from memory, -Xms set equal to -Xmx); none passes only the memory flags."
         },
-        "jvmArgs": {
-          "type": "array",
-          "items": { "type": "string", "minLength": 1 },
-          "description": "Extra JVM arguments appended after the preset, e.g. ZGC flags."
-        },
         "properties": { "$ref": "#/$defs/serverProperties" },
         "resourcePack": {
           "type": "string",

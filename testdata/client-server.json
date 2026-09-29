@@ -40,7 +40,6 @@
     "variables": { "motd": "West Coast SMP (dev build)" },
     "memory": "6G",
     "jvmFlags": "aikars",
-    "jvmArgs": ["-Dfile.encoding=UTF-8"],
     "properties": {
       "level-name": "westcoast",
       "motd": "${motd}",

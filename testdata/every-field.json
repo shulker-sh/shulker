@@ -56,7 +56,6 @@
     "variables": { "motd": "Server" },
     "memory": "6G",
     "jvmFlags": "aikars",
-    "jvmArgs": ["-XX:+UseZGC"],
     "properties": { "motd": "${motd}", "max-players": 20, "hardcore": false },
     "resourcePack": "extras",
     "players": {

@@ -52,7 +52,7 @@ func TestSetGetUnset(t *testing.T) {
 	h.mustRun(t, "set", "variables.port", "25565")
 	h.mustRun(t, "set", "variables.fancy", "true")
 	h.mustRun(t, "set", "variables.zip", "--literal", `"02134"`)
-	h.mustRun(t, "set", "server.jvmArgs", "--literal", `["-XX:+UseZGC"]`)
+	h.mustRun(t, "set", "authors", "--literal", `["Ann", "Bo"]`)
 	h.mustRun(t, "set", "server.players.ops", "Notch")
 	h.mustRun(t, "set", "server.players.ops", "069a79f4-44e9-4726-a5be-fca90e38aaf5")
 	h.mustRun(t, "set", "server.players.ops", "notch")
@@ -87,7 +87,7 @@ func TestSetGetUnset(t *testing.T) {
 		{"variables.port", m.Variables["port"], json.Number("25565")},
 		{"variables.fancy", m.Variables["fancy"], true},
 		{"variables.zip", m.Variables["zip"], "02134"},
-		{"jvmArgs", strings.Join(m.Server.JVMArgs, " "), "-XX:+UseZGC"},
+		{"authors", strings.Join(m.Authors, " "), "Ann Bo"},
 		{"loader.note", m.Loader.Note, "kept on save"},
 		{"op name", m.Server.Players.Ops[0].Name, "Notch"},
 		{"op uuid", m.Server.Players.Ops[1].UUID, "069a79f4-44e9-4726-a5be-fca90e38aaf5"},
@@ -156,9 +156,9 @@ func TestSetRejectsBadPathsAndValues(t *testing.T) {
 		args     []string
 	}{
 		{1, "path-invalid", "single value", []string{"set", "name.first", "x"}},
-		{1, "path-invalid", "is a list", []string{"set", "server.jvmArgs.first", "x"}},
+		{1, "path-invalid", "is a list", []string{"set", "authors.first", "x"}},
 		{2, "usage", "true or false", []string{"set", "server.properties.hardcore", "yes"}},
-		{2, "usage", "--literal", []string{"set", "server.jvmArgs", "UseZGC"}},
+		{2, "usage", "--literal", []string{"set", "authors", "Ann"}},
 		{2, "usage", "--literal", []string{"set", "variables.x", "--literal", "{nope"}},
 		{1, "manifest-invalid", "server.memory: ", []string{"set", "server.memory", "6"}},
 		{1, "manifest-invalid", "name", []string{"unset", "name"}},

@@ -528,7 +528,6 @@ The edited `shulker.json` is checked against the schema before anything is writt
 shulker set server.memory 6G
 shulker set server.properties.max-players 20
 shulker set variables.zip --literal '"02134"'
-shulker set server.jvmArgs --literal '["-XX:+UseZGC"]'
 shulker set server.players.ops Notch
 ```
 
