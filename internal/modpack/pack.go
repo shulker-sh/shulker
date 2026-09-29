@@ -161,7 +161,9 @@ func (s *Store) Resolve(ctx context.Context, name string, p manifest.Require) (*
 		if err != nil {
 			return nil, err
 		}
-		l.Dir = subfolder(export, p.Path)
+		if l.Dir, err = subfolder(export, p.Path); err != nil {
+			return nil, err
+		}
 		if err := s.loadDir(l); err != nil {
 			return nil, err
 		}
@@ -235,7 +237,10 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 				return nil, "", err
 			}
 		}
-		l.Dir = subfolder(dir, pinned.Path)
+		var err error
+		if l.Dir, err = subfolder(dir, pinned.Path); err != nil {
+			return nil, "", err
+		}
 		if err := s.loadDir(l); err != nil {
 			return nil, "", err
 		}

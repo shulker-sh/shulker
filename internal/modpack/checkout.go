@@ -73,7 +73,9 @@ func (s *Store) Checkout(ctx context.Context, source string, at At) (*Checkout, 
 		if err != nil {
 			return nil, err
 		}
-		c.Dir = subfolder(export, at.Path)
+		if c.Dir, err = subfolder(export, at.Path); err != nil {
+			return nil, err
+		}
 		if at.Path != "" && !isOnDisk(filepath.Join(c.Dir, manifest.FileName)) {
 			return nil, out.Errorf("source-path", "no %s in %s of %s at %s", manifest.FileName, at.Path, source, c.Commit[:12])
 		}
@@ -148,11 +150,16 @@ func CheckPath(path string, kind Kind) error {
 	return nil
 }
 
-func subfolder(root, path string) string {
+// subfolder is the folder path names inside the checkout at root. A lock or a manifest from the
+// source names path, so one that leaves root is refused rather than read.
+func subfolder(root, path string) (string, error) {
 	if path == "" {
-		return root
+		return root, nil
 	}
-	return filepath.Join(root, filepath.FromSlash(path))
+	if !manifest.IsSubfolder(path) {
+		return "", out.Errorf("path-outside", "%s is outside the repository", path)
+	}
+	return filepath.Join(root, filepath.FromSlash(path)), nil
 }
 
 func refNotFound(code, ref, source string, err error) error {
@@ -228,7 +235,11 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 	c.Offline = true
 	if fullCommit.MatchString(c.Ref) {
 		if dir := s.Cache.PackSource(c.Ref); isOnDisk(dir) {
-			c.Commit, c.Dir = c.Ref, subfolder(dir, c.Path)
+			sub, err := subfolder(dir, c.Path)
+			if err != nil {
+				return nil, err
+			}
+			c.Commit, c.Dir = c.Ref, sub
 			c.Warning = out.Sentence(fmt.Sprintf("%s, using %s at %s, already downloaded", offlineReason(cause), c.Source, c.Ref[:12]))
 			return c, nil
 		}
@@ -238,7 +249,11 @@ func (s *Store) gitFallback(c *Checkout, cause error) (*Checkout, error) {
 	if !ok || rec.Commit == "" || !isOnDisk(s.Cache.PackSource(rec.Commit)) {
 		return nil, neverSynced(c, cause)
 	}
-	c.Commit, c.Dir, c.LastGood = rec.Commit, subfolder(s.Cache.PackSource(rec.Commit), c.Path), rec.At
+	sub, err := subfolder(s.Cache.PackSource(rec.Commit), c.Path)
+	if err != nil {
+		return nil, err
+	}
+	c.Commit, c.Dir, c.LastGood = rec.Commit, sub, rec.At
 	c.Warning = out.Sentence(fmt.Sprintf("%s, using %s at %s from the last successful sync %s", offlineReason(cause), c.Source, rec.Commit[:12], out.Ago(rec.At)))
 	return c, nil
 }
