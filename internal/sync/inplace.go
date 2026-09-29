@@ -62,6 +62,9 @@ func (e *Env) relock(ctx context.Context, p *project.Project, req Request) (reso
 		return resolve.Relocked{}, err
 	}
 	e.WarnEach(res.Warnings)
+	for _, w := range res.SecurityWarnings {
+		e.WarnSecurity(w)
+	}
 	return res, nil
 }
 

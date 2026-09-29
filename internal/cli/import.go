@@ -224,6 +224,9 @@ func (a *app) importPack(ctx context.Context, d *deps, arc *packarchive.Archive,
 	r.DownloadsIn, r.SkipPending = downloads, skip
 	mods, err := r.ImportProject(ctx, arc, resolve.ImportOptions{Name: f.name, IgnoreMarker: f.ignoreShulker, ServerPack: !f.noServerPack})
 	a.warn(r.Warnings)
+	for _, w := range r.AgeWarnings() {
+		a.printer.WarnSecurity(w)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -338,6 +341,9 @@ func (a *app) importHosted(ctx context.Context, d *deps, dir string, target *pro
 	}
 	pin, err := r.ObtainImport(ctx, slug, manifest.Require{Type: manifest.TypeModpack, Provider: f.provider}, was)
 	a.warn(r.Warnings)
+	for _, w := range r.AgeWarnings() {
+		a.printer.WarnSecurity(w)
+	}
 	if err != nil {
 		return nil, nil, nil, err
 	}

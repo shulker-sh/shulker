@@ -8,6 +8,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/provider"
 )
 
 type Outdated struct {
@@ -16,6 +17,8 @@ type Outdated struct {
 	Latest  string `json:"latest"`
 	Pinned  bool   `json:"pinned"`
 	Modpack bool   `json:"modpack,omitempty"`
+	// Held is a newer version the release age holds back, which Latest is not.
+	Held *Held `json:"held,omitempty"`
 }
 
 // Update re-resolves the named mods and modpacks to their newest allowed versions, or all of them
@@ -125,20 +128,32 @@ func (r *Resolver) Outdated(ctx context.Context, ids []string) ([]Outdated, erro
 		if err != nil {
 			return nil, err
 		}
-		newest, newer, err := newerThan(ctx, p, m.Project, r.queryFor(manifest.TypeMod, p.Name()), r.channelFor(id), m.Version)
+		newest, newer, held, err := r.newerThan(ctx, id, p, m.Project, r.queryFor(manifest.TypeMod, p.Name()), r.channelFor(id), m.Version)
 		if err != nil {
 			return nil, err
 		}
-		if !newer {
-			continue
+		if o, ok := outdatedOf(id, m.VersionNumber, newest, newer, held); ok {
+			o.Pinned = r.Manifest.Mods()[id].Pin != ""
+			res = append(res, o)
 		}
-		entry := r.Manifest.Mods()[id]
-		res = append(res, Outdated{ID: id, Current: m.VersionNumber, Latest: newest.Number, Pinned: entry.Pin != ""})
 	}
 	if res == nil {
 		res = []Outdated{}
 	}
 	return res, nil
+}
+
+// outdatedOf is an entry's row in Outdated: a newer version it can move to, a newer one the release
+// age holds back, or both.
+func outdatedOf(key, current string, newest *provider.Version, newer bool, held *Held) (Outdated, bool) {
+	if !newer && held == nil {
+		return Outdated{}, false
+	}
+	o := Outdated{ID: key, Current: current, Latest: current, Held: held}
+	if newer {
+		o.Latest = newest.Number
+	}
+	return o, true
 }
 
 // Pin holds a mod or hosted modpack at version, the locked one when version is empty, and returns
@@ -215,7 +230,7 @@ func (r *Resolver) relock(ctx context.Context, id string, prev lock.Mod) error {
 	if err != nil {
 		return err
 	}
-	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), entry.Pin, entry.Channel)
+	v, err := r.pickVersion(ctx, id, p, proj, r.queryFor(manifest.TypeMod, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
 		return channelSetting(err, id)
 	}

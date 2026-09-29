@@ -244,6 +244,18 @@ func Newest(versions []Version, channel, loaderName string) (Version, bool) {
 	return best, true
 }
 
+// NewestBy is Newest among the versions published by cutoff, and the newest version it skipped for
+// being published later, when it skipped one. ok is false when none was published by cutoff.
+func NewestBy(versions []Version, channel, loaderName string, cutoff time.Time) (took Version, skipped *Version, ok bool) {
+	newest, found := Newest(versions, channel, loaderName)
+	if !found || !newest.Published.After(cutoff) {
+		return newest, nil, found
+	}
+	old := slices.DeleteFunc(slices.Clone(versions), func(v Version) bool { return v.Published.After(cutoff) })
+	took, ok = Newest(old, channel, loaderName)
+	return took, &newest, ok
+}
+
 func newest(versions []Version, channel string, keep func(Version) bool) (Version, bool) {
 	var best Version
 	found := false

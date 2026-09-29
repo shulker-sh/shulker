@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/cache"
@@ -58,6 +59,19 @@ type Resolver struct {
 	// LockModpack locks a hosted modpack entry and puts it in the manifest under key, in place of
 	// the modpack already there.
 	LockModpack func(ctx context.Context, key string, entry manifest.Require) error
+
+	// MinReleaseAge is how long ago a provider version must have been published for the resolver
+	// to choose it; 0 chooses any. A pin is taken whatever its age.
+	MinReleaseAge time.Duration
+	// Now is the time release ages are measured to; nil is the clock.
+	Now func() time.Time
+	// held and young are what the release age held back and the young pins taken; see Held and
+	// AgeWarnings.
+	held  []Held
+	young []Young
+	// floors are the provider versions the lock held before a relock, by provider/project, which
+	// a choice never moves back from.
+	floors map[string]string
 
 	// keepNewest has a mod another project already locks under the same jar id replace it when
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
@@ -363,7 +377,7 @@ func (r *Resolver) Add(ctx context.Context, slug string, opts AddOptions) error 
 		return loaderRequired()
 	}
 	held := holdVersions(r.Lock)
-	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeMod, p.Name()), opts.Pin, opts.Channel)
+	v, err := r.pickVersion(ctx, opts.As, p, proj, r.queryFor(manifest.TypeMod, p.Name()), opts.Pin, opts.Channel)
 	if err != nil {
 		return err
 	}
@@ -442,10 +456,15 @@ func (r *Resolver) queryFor(kind, providerName string) versionQuery {
 	return versionQuery{kind: manifest.TypeMod, game: r.Lock.Minecraft, tags: loader.ProviderLoaders(r.Lock.Loader.Type), loader: r.Lock.Loader.Type}
 }
 
-// pickVersion is the version pin names, or the newest one q finds on channel.
-func pickVersion(ctx context.Context, p provider.Provider, proj *provider.Project, q versionQuery, pin, channel string) (*provider.Version, error) {
+// pickVersion is the version pin names, or the newest one q finds on channel that is old enough.
+// key is the entry's requires key, empty for one only known once it is placed.
+func (r *Resolver) pickVersion(ctx context.Context, key string, p provider.Provider, proj *provider.Project, q versionQuery, pin, channel string) (*provider.Version, error) {
 	if pin != "" {
-		return pinnedVersion(ctx, p, proj, q.kind, pin)
+		v, err := pinnedVersion(ctx, p, proj, q.kind, pin)
+		if err == nil {
+			r.pinnedYoung(key, proj, v)
+		}
+		return v, err
 	}
 	tags := q.tags
 	if q.untagged {
@@ -460,7 +479,10 @@ func pickVersion(ctx context.Context, p provider.Provider, proj *provider.Projec
 			return len(v.Loaders) > 0 && !slices.ContainsFunc(v.Loaders, func(l string) bool { return slices.Contains(q.tags, l) })
 		})
 	}
-	v, ok := provider.Newest(versions, channel, q.loader)
+	v, ok, err := r.choose(p, proj, key, versions, q, channel)
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		e := out.Errorf("no-compatible-version", "%s has no %s version%s", proj.Slug, channelLabel(channel), platformSuffix(q.game, q.loader))
 		e.Candidates, e.Pass = otherChannels(versions)
@@ -480,17 +502,29 @@ func channelSetting(err error, key string) error {
 	return err
 }
 
-// newerThan is the newest version q finds on channel, and whether it is not the locked one.
-func newerThan(ctx context.Context, p provider.Provider, projectID string, q versionQuery, channel string, locked string) (*provider.Version, bool, error) {
+// newerThan is the newest version q finds on channel that is old enough, and whether it is not
+// the locked one, with the newer version the release age holds back, if any.
+func (r *Resolver) newerThan(ctx context.Context, key string, p provider.Provider, projectID string, q versionQuery, channel string, locked string) (*provider.Version, bool, *Held, error) {
 	versions, err := p.Versions(ctx, projectID, q.game, q.tags)
 	if err != nil {
-		return nil, false, err
+		return nil, false, nil, err
 	}
-	newest, ok := provider.Newest(versions, channel, q.loader)
+	newest, skipped, ok := provider.NewestBy(versions, channel, q.loader, r.cutoff())
+	var held *Held
+	if skipped != nil && skipped.ID != locked {
+		took := newest
+		if i := slices.IndexFunc(versions, func(v provider.Version) bool { return v.ID == locked }); i >= 0 && (!ok || versions[i].Published.After(newest.Published)) {
+			took, ok = versions[i], false
+		}
+		if took.ID != "" {
+			h := r.heldOf(p.Name(), projectID, key, took, *skipped)
+			held = &h
+		}
+	}
 	if !ok || newest.ID == locked {
-		return nil, false, nil
+		return nil, false, held, nil
 	}
-	return &newest, true, nil
+	return &newest, true, held, nil
 }
 
 // pinnedVersion is the provider version pin names, refused when it belongs to another project.
@@ -865,7 +899,7 @@ func (r *Resolver) addDeps(ctx context.Context, p provider.Provider, v *provider
 			return err
 		}
 		if dv == nil {
-			dv, err = pickVersion(ctx, p, dproj, r.queryFor(manifest.TypeMod, p.Name()), "", channel)
+			dv, err = r.pickVersion(ctx, "", p, dproj, r.queryFor(manifest.TypeMod, p.Name()), "", channel)
 			if err != nil {
 				return prefixed("dependency of "+parentID, err)
 			}

@@ -428,7 +428,7 @@ shulker match --dry-run
 
 ### `shulker update`
 
-Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. Local `file` entries have no newer version to move to: a bare `update` leaves them as they are, and naming one says it is a local file. In an instance (a project whose side builds into its own directory), `update` then builds that side in place, backing up its worlds first when the mods change, and leaves the instances synced from it to `shulker sync`, which it names when there are any; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
+Re-resolve mods to the newest compatible versions. With no arguments, fetches every modpack again, whatever its `autoUpdate`, and updates every mod; naming a modpack updates it and its mods. Local `file` entries have no newer version to move to: a bare `update` leaves them as they are, and naming one says it is a local file. A version published more recently than [`security.minReleaseAge`](#configuration) is held back for the newest old enough, never older than the version already locked, and `update` warns with each one held back, how old it is, the day it qualifies and the `pin` that takes it now; under `--json` they are in `securityWarnings`, as `data.held` with `key`, `took`, `skipped`, `skippedId`, `published`, `ageDays` and `qualifies`. `add` and `lock` hold back and warn the same way. In an instance (a project whose side builds into its own directory), `update` then builds that side in place, backing up its worlds first when the mods change, and leaves the instances synced from it to `shulker sync`, which it names when there are any; elsewhere it only writes the lock and `shulker install` builds it. Alias: `upgrade`.
 
 ```sh
 shulker update
@@ -441,7 +441,7 @@ shulker update sodium iris
 
 ### `shulker outdated`
 
-Show mods, and modpacks from a provider, with a newer compatible version without changing anything, like a dry run of `update`. A modpack's row is marked `modpack`. Local `file` entries are skipped, and naming one says it is a local file rather than that it is up to date.
+Show mods, and modpacks from a provider, with a newer compatible version without changing anything, like a dry run of `update`. A modpack's row is marked `modpack`. A newer version [`security.minReleaseAge`](#configuration) holds back is marked `held back` with its age and the day it qualifies, with the `pin` that takes it now; under `--json`, `held` holds its facts. Local `file` entries are skipped, and naming one says it is a local file rather than that it is up to date.
 
 ```sh
 shulker outdated
@@ -466,7 +466,7 @@ With `--json`, `data.suggestions` lists each one as `{ "mod", "kind", "on", "dec
 
 ### `shulker pin`
 
-Pin a mod, or a modpack from a provider, to a provider version id, or to the version a Modrinth or CurseForge URL names. The URL must be of the provider and project the mod is locked from, else `usage`; to switch projects, `remove` it and `add` the URL. Without a version, pins it to the version already in the lock. Pinning a mod or modpack to a beta or alpha file accepts that channel for it: its `channel` in `shulker.json` widens to match, with a warning, so its dependencies may be that channel too and it keeps following it after `unpin`. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`.
+Pin a mod, or a modpack from a provider, to a provider version id, or to the version a Modrinth or CurseForge URL names. The URL must be of the provider and project the mod is locked from, else `usage`; to switch projects, `remove` it and `add` the URL. Without a version, pins it to the version already in the lock. Pinning a mod or modpack to a beta or alpha file accepts that channel for it: its `channel` in `shulker.json` widens to match, with a warning, so its dependencies may be that channel too and it keeps following it after `unpin`. A local `file` entry has no provider version, so `pin` and `unpin` refuse it with `local-file`. A pin takes its version whatever [`security.minReleaseAge`](#configuration) says, with a warning naming its age while it is younger.
 
 ```sh
 shulker pin iris k9RhZq2X
@@ -1291,7 +1291,7 @@ shulker link multimc https://github.com/shulker-sh/base-pack.git --launcher-dir 
 
 ### `shulker sync`
 
-Download and build one side of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. A manifest URL brings only that `shulker.json` and the `shulker.lock` beside it, never the project's overrides or local files, so a sync from one warns, naming any feature override folders and icon its manifest points at, and fails `source-incomplete` when it has a local `file` entry; sync from the repository's git URL, with `--path` for a project in a subfolder, to get them. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<side>/`. Before a sync adds, replaces or removes a mod, it backs up the directory's worlds, as [`shulker backup`](#shulker-backup) would, with the reason `sync`; `play.saveBackups` in [Configuration](#configuration) says how many it keeps.
+Download and build one side of a project straight into a directory, without setting up a project there. The source can be a project directory, a git URL, or a manifest URL. A manifest URL brings only that `shulker.json` and the `shulker.lock` beside it, never the project's overrides or local files, so a sync from one warns, naming any feature override folders and icon its manifest points at, and fails `source-incomplete` when it has a local `file` entry; sync from the repository's git URL, with `--path` for a project in a subfolder, to get them. Worlds, logs, screenshots and crash reports stay in the directory you sync into, and nothing is written into the source project; only the project's own build directories link them to its `data/<side>/`. Before a sync adds, replaces or removes a mod, it backs up the directory's worlds, as [`shulker backup`](#shulker-backup) would, with the reason `sync`; `play.saveBackups` in [Configuration](#configuration) says how many it keeps. A source from a URL installs its lock as its author locked it whatever [`security.minReleaseAge`](#configuration) says, since those are the versions the author tested, and warns with each entry published more recently than that, how old it is and the day it qualifies; under `--json` they are in `securityWarnings`, as `data.young`. A hosted modpack the project floats is chosen under the setting, as `update` chooses one.
 
 ```sh
 shulker sync https://github.com/shulker-sh/base-pack.git --side server --into /srv/minecraft
@@ -2113,6 +2113,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `rate-limited` | Modrinth or CurseForge is refusing shulker's requests for making too many; CurseForge refusing a key it has already accepted in the same run counts too. A Modrinth limit that resets within a minute is waited out once first; the help says when to run the command again |
 | `registry-has-instances` | `config set` or `config unset` would move the registry away from instances the new one doesn't have; `--force` changes it anyway. `items`: the directories left behind |
 | `registry-invalid` | shulker's `registry.json`, the list of linked instances and synced directories, isn't valid JSON (the message names the line and column), names a `$schema` this shulker doesn't know or names none, or doesn't match its schema; `shulker instances repair` rebuilds it, keeping the old file as `registry.json.replaced` |
+| `release-too-new` | Every version of the mod, or of a dependency, on its channel was published more recently than [`security.minReleaseAge`](#configuration), so none can be chosen yet. The message says how old the newest is; the help says the day it qualifies and the `add --pin` that takes it now. `protection`: `release-age` |
 | `requires-taken` | Another `requires` entry already holds the key, or the mod's jar id is already locked under another key; pass `--as <key>` |
 | `requires-unsupported` | A `requires` entry or a project being added is a kind shulker can't resolve |
 | `resourcepack-conflict` | `server.resourcePack` pushes a pack while `resource-pack` or `resource-pack-sha1` is also set in `server.properties` |

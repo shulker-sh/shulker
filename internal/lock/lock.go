@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"maps"
 	"os"
 	"slices"
 	"sort"
@@ -279,6 +280,42 @@ func (l *Lock) Packs(kind string) map[string]Pack {
 		*section = map[string]Pack{}
 	}
 	return *section
+}
+
+// Locked is one entry the lock holds at a provider version, whatever its kind.
+type Locked struct {
+	Key           string
+	Provider      string
+	Project       string
+	Version       string
+	VersionNumber string
+	Published     time.Time
+}
+
+// ProviderEntries are the entries l holds at a provider version: its modpacks, its mods, then each
+// kind of pack, each by key.
+func (l *Lock) ProviderEntries() []Locked {
+	var entries []Locked
+	add := func(key, providerName, project, version, number string, published time.Time) {
+		if providerName != "" && project != "" && version != "" {
+			entries = append(entries, Locked{Key: key, Provider: providerName, Project: project, Version: version, VersionNumber: number, Published: published})
+		}
+	}
+	for _, key := range slices.Sorted(maps.Keys(l.Modpacks)) {
+		mp := l.Modpacks[key]
+		add(key, mp.Provider, mp.Project, mp.Version, mp.VersionNumber, mp.Published)
+	}
+	for _, key := range slices.Sorted(maps.Keys(l.Mods)) {
+		m := l.Mods[key]
+		add(key, m.Provider, m.Project, m.Version, m.VersionNumber, m.Published)
+	}
+	for _, section := range l.PackSections() {
+		for _, key := range slices.Sorted(maps.Keys(section)) {
+			pk := section[key]
+			add(key, pk.Provider, pk.Project, pk.Version, pk.VersionNumber, pk.Published)
+		}
+	}
+	return entries
 }
 
 // PackSections are the lock's pack sections, in manifest.PackKinds order.

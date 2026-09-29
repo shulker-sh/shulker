@@ -30,16 +30,18 @@ func New(ctx context.Context, e *env.Env, p *project.Project, mode PackMode) (*R
 // NewAt is a resolver on e for dir alone, as an import has before dir holds a project.
 func NewAt(e *env.Env, dir string) *Resolver {
 	return &Resolver{
-		Dir:        dir,
-		Providers:  e.Providers,
-		Cache:      e.Cache,
-		Fetch:      e.Fetch,
-		Meta:       &Meta{Piston: e.Piston, Loaders: e.Loaders},
-		Log:        e.Log,
-		Note:       e.Note,
-		Progress:   e.Progress,
-		FailFast:   e.FailFast,
-		EveryFetch: e.EveryFetch,
+		Dir:           dir,
+		Providers:     e.Providers,
+		Cache:         e.Cache,
+		Fetch:         e.Fetch,
+		Meta:          &Meta{Piston: e.Piston, Loaders: e.Loaders},
+		Log:           e.Log,
+		Note:          e.Note,
+		Progress:      e.Progress,
+		FailFast:      e.FailFast,
+		EveryFetch:    e.EveryFetch,
+		MinReleaseAge: e.MinReleaseAge,
+		Now:           e.Now,
 	}
 }
 
@@ -54,8 +56,12 @@ func NewStore(e *env.Env, p *project.Project) *modpack.Store {
 	obtain := func(ctx context.Context, name string, entry manifest.Require) (lock.Modpack, error) {
 		r := NewAt(e, p.Dir)
 		r.Manifest, r.Lock = p.Manifest, p.Lock
+		r.holdFloors(p.Lock)
 		pin, err := r.ObtainModpack(ctx, name, entry)
 		e.WarnEach(r.Warnings)
+		for _, w := range r.AgeWarnings() {
+			e.WarnSecurity(w)
+		}
 		return pin, err
 	}
 	return &modpack.Store{Cache: e.Cache, ProjectDir: p.Dir, Fetch: e.Fetch, Log: e.Log, Working: e.Working, Warn: e.Warn, WarnsRawURL: e.WarnsRawURL, Lock: p.Lock, Consume: consume, Obtain: obtain}

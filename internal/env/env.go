@@ -4,6 +4,8 @@
 package env
 
 import (
+	"time"
+
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/fetch"
 	"shulker.sh/shulker/internal/loader"
@@ -27,6 +29,11 @@ type Env struct {
 	// EULA is whether config.json records this user's acceptance of the Minecraft EULA, which a
 	// server build writes to eula.txt. A manifest can't accept it on anyone's behalf.
 	EULA bool
+	// MinReleaseAge is security.minReleaseAge: how long ago a provider version must have been
+	// published for shulker to choose it.
+	MinReleaseAge time.Duration
+	// Now is the time release ages are measured to; nil is the clock.
+	Now func() time.Time
 	// FailFast stops an install at the first download that fails, rather than trying every file
 	// and failing with them all.
 	FailFast bool
@@ -51,6 +58,14 @@ type Env struct {
 	// WarnsRawURL is set for a command that adds or links a source, which warns that a raw
 	// manifest URL brings no overrides.
 	WarnsRawURL bool
+}
+
+// Clock is now's time, or the clock's when now is nil.
+func Clock(now func() time.Time) time.Time {
+	if now != nil {
+		return now()
+	}
+	return time.Now()
 }
 
 // WarnEach reports each warning through Warn.

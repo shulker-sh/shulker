@@ -199,7 +199,7 @@ func (r *Resolver) relockPack(ctx context.Context, key, kind string, entry manif
 	if err != nil {
 		return err
 	}
-	v, err := pickVersion(ctx, p, proj, r.queryFor(kind, p.Name()), entry.Pin, entry.Channel)
+	v, err := r.pickVersion(ctx, key, p, proj, r.queryFor(kind, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
 		return channelSetting(err, key)
 	}
@@ -231,7 +231,7 @@ func (r *Resolver) checkPackFilenames() error {
 // lockPack picks the pack's version, fetches it into the cache and records it in
 // the lock under key, returning the channel it accepted: channel, widened for a pin.
 func (r *Resolver) lockPack(ctx context.Context, p provider.Provider, proj *provider.Project, key, kind, pin, channel string) (string, error) {
-	v, err := pickVersion(ctx, p, proj, r.queryFor(kind, p.Name()), pin, channel)
+	v, err := r.pickVersion(ctx, key, p, proj, r.queryFor(kind, p.Name()), pin, channel)
 	if err != nil {
 		return "", err
 	}
@@ -328,14 +328,14 @@ func (r *Resolver) outdatedPacks(ctx context.Context, ids []string) ([]Outdated,
 			if err != nil {
 				return nil, err
 			}
-			newest, newer, err := newerThan(ctx, p, locked.Project, r.queryFor(kind, p.Name()), listed[key].Channel, locked.Version)
+			newest, newer, held, err := r.newerThan(ctx, key, p, locked.Project, r.queryFor(kind, p.Name()), listed[key].Channel, locked.Version)
 			if err != nil {
 				return nil, err
 			}
-			if !newer {
-				continue
+			if o, ok := outdatedOf(key, locked.VersionNumber, newest, newer, held); ok {
+				o.Pinned = listed[key].Pin != ""
+				res = append(res, o)
 			}
-			res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: listed[key].Pin != ""})
 		}
 	}
 	return res, nil

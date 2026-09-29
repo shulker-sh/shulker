@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/internal/sync"
 )
 
@@ -277,6 +278,9 @@ func (a *app) relockOpened(cmd *cobra.Command, p *project.Project, opts relockOp
 		return relocked{}, err
 	}
 	a.warn(res.Warnings)
+	for _, w := range res.SecurityWarnings {
+		a.printer.WarnSecurity(w)
+	}
 	rl := relocked{lockChanges: *a.lockChangesOf(p, &res), validation: res.Validation, wasSaved: res.WasSaved, dropped: res.Dropped}
 	if res.WasSaved {
 		a.printer.LockStale = false
@@ -341,6 +345,13 @@ func (a *app) outdatedCmd() *cobra.Command {
 					return
 				}
 				var items []out.Item
+				var held []*resolve.Held
+				for _, o := range res {
+					if o.Held != nil {
+						held = append(held, o.Held)
+					}
+				}
+				moves := false
 				for _, o := range res {
 					it := out.Item{Kind: out.Change, Name: o.ID, From: o.Current, To: o.Latest}
 					if o.Modpack {
@@ -349,10 +360,35 @@ func (a *app) outdatedCmd() *cobra.Command {
 					if o.Pinned {
 						it.Aside = append(it.Aside, "pinned")
 					}
+					if o.Held != nil {
+						age := o.Held.Text()
+						if len(held) > 1 {
+							age = "id " + o.Held.SkippedID + ", " + age
+						}
+						if o.Latest == o.Current {
+							it.To = o.Held.Skipped
+							it.Aside = append(it.Aside, "held back: "+age)
+						} else {
+							it.Aside = append(it.Aside, o.Held.Skipped+" held back: "+age)
+						}
+					}
+					moves = moves || o.Latest != o.Current
 					items = append(items, it)
 				}
 				l.Items(items...)
-				l.Nudge("Move the lock to these versions", "shulker update")
+				if moves {
+					l.Nudge("Move the lock to these versions", "shulker update")
+				}
+				switch len(held) {
+				case 0:
+					return
+				case 1:
+					n := held[0].PinNudge()
+					l.Nudge(n.Lead, n.Command)
+				default:
+					l.Nudge("Take a held-back version now", "shulker pin <mod> <id>")
+				}
+				l.Nudge(security.Nudge.Lead, security.Nudge.Command)
 			})
 		},
 	}

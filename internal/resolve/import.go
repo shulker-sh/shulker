@@ -1065,20 +1065,21 @@ func unpackFile(f *zip.File, to string) error {
 
 // ConsumeArchive locks what a modpack archive holds as that modpack's own lock and manifest, the
 // way Import locks one into a new project, and records in its pin the files the archive lays
-// itself. r's own lock is left alone; only its providers, provider order, cache and fetch client
-// are used.
+// itself. r's own lock is left alone; only its providers, provider order, cache, fetch client and
+// release age are used, and what the release age held back is r's to report.
 func (r *Resolver) ConsumeArchive(ctx context.Context, l *modpack.Loaded) error {
 	a := l.Archive
 	typ, version := a.Loader.Type, a.Loader.Version
 	m := &manifest.Manifest{Name: l.Name, Minecraft: a.Minecraft, Loader: manifest.Loader{Type: typ, Version: version}, Requires: map[string]manifest.Require{}, Providers: r.Manifest.Providers}
 	pl := lock.New()
 	pl.Minecraft, pl.Loader = a.Minecraft, lock.Loader{Type: typ, Version: version}
-	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log, Progress: r.Progress, EveryFetch: r.EveryFetch, builds: r.Manifest.Sides()}
+	scratch := &Resolver{Dir: r.Dir, Manifest: m, Lock: pl, Providers: r.Providers, Cache: r.Cache, Fetch: r.Fetch, Log: r.Log, Progress: r.Progress, EveryFetch: r.EveryFetch, MinReleaseAge: r.MinReleaseAge, Now: r.Now, builds: r.Manifest.Sides()}
 	byID := a.Format.Provider() != ""
 	if byID && r.Fetch != nil && r.Fetch.Offline {
 		return archiveOffline(l.Name, a.Format, nil)
 	}
 	rep, err := scratch.importArchive(ctx, a, false)
+	r.held, r.young = append(r.held, scratch.Held()...), append(r.young, scratch.young...)
 	if byID && fetch.IsNetwork(err) {
 		return archiveOffline(l.Name, a.Format, err)
 	}

@@ -80,14 +80,15 @@ func (a *app) deps() (*deps, error) {
 	providers := provider.Providers{mr.Name(): mr, cf.Name(): cf}
 	loaders := &loader.Remote{Fetch: f, Cache: c, Log: a.progress, RunInstaller: a.installer}
 	a.d = a.newDeps(&env.Env{
-		Fetch:     f,
-		Cache:     c,
-		Providers: providers,
-		Loaders:   loaders,
-		Piston:    mojang.NewPiston(f),
-		Runtimes:  mojang.NewRuntimes(f),
-		Players:   player.NewResolver(mojang.NewProfiles(f)),
-		EULA:      cfg.EULA,
+		Fetch:         f,
+		Cache:         c,
+		Providers:     providers,
+		Loaders:       loaders,
+		Piston:        mojang.NewPiston(f),
+		Runtimes:      mojang.NewRuntimes(f),
+		Players:       player.NewResolver(mojang.NewProfiles(f)),
+		EULA:          cfg.EULA,
+		MinReleaseAge: cfg.Security.ReleaseAge(),
 	})
 	a.d.signin = account.NewSignIn(f)
 	a.d.resources = game.MojangResources

@@ -128,7 +128,7 @@ func (r *Resolver) obtainModpack(ctx context.Context, name string, entry manifes
 		e.Help = fmt.Sprintf("set requires.%s.type to %s", name, proj.Type)
 		return lock.Modpack{}, e
 	}
-	v, err := pickVersion(ctx, p, proj, r.queryFor(manifest.TypeModpack, p.Name()), entry.Pin, entry.Channel)
+	v, err := r.pickVersion(ctx, name, p, proj, r.queryFor(manifest.TypeModpack, p.Name()), entry.Pin, entry.Channel)
 	if err != nil {
 		return lock.Modpack{}, channelSetting(err, name)
 	}
@@ -227,14 +227,14 @@ func (r *Resolver) outdatedModpacks(ctx context.Context, ids []string) ([]Outdat
 		if err != nil {
 			return nil, err
 		}
-		newest, newer, err := newerThan(ctx, p, locked.Project, r.queryFor(manifest.TypeModpack, p.Name()), entry.Channel, locked.Version)
+		newest, newer, held, err := r.newerThan(ctx, key, p, locked.Project, r.queryFor(manifest.TypeModpack, p.Name()), entry.Channel, locked.Version)
 		if err != nil {
 			return nil, err
 		}
-		if !newer {
-			continue
+		if o, ok := outdatedOf(key, locked.VersionNumber, newest, newer, held); ok {
+			o.Pinned, o.Modpack = entry.Pin != "", true
+			res = append(res, o)
 		}
-		res = append(res, Outdated{ID: key, Current: locked.VersionNumber, Latest: newest.Number, Pinned: entry.Pin != "", Modpack: true})
 	}
 	return res, nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/modpack"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 )
 
@@ -34,6 +35,8 @@ type Relocked struct {
 	// Warnings are the resolver's, the validation's, the mods that ship on no side, and the
 	// history entry's, in the order they are raised.
 	Warnings []string
+	// SecurityWarnings are what security.minReleaseAge held back, and the young pins it took.
+	SecurityWarnings []out.SecurityWarning
 	// WasSaved reports whether the manifest and lock were written; a relock that keeps an
 	// unchanged lock writes nothing.
 	WasSaved bool
@@ -56,6 +59,7 @@ func (r *Resolver) Relock(ctx context.Context, store *modpack.Store, p *project.
 		return Relocked{}, err
 	}
 	before := r.Snapshot()
+	r.holdFloors(r.Lock)
 	if err := r.resolveMovedRefs(ctx, store); err != nil {
 		return Relocked{}, err
 	}
@@ -92,6 +96,7 @@ func (r *Resolver) Relock(ctx context.Context, store *modpack.Store, p *project.
 	rl.Warnings = append(rl.Warnings, r.Warnings...)
 	rl.Warnings = append(rl.Warnings, v.Warnings...)
 	rl.Warnings = append(rl.Warnings, rl.Changes.Unshipped(p.Manifest.Sides(), r.Lock.Mods, placements)...)
+	rl.SecurityWarnings = r.AgeWarnings()
 	if opts.KeepUnchanged && !stale {
 		now, err := json.Marshal(p.Lock)
 		if err != nil {

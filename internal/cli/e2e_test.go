@@ -87,17 +87,19 @@ func makeJarFiles(t *testing.T, id, filename string, files map[string]string) fa
 }
 
 type harness struct {
-	server         *httptest.Server
-	cdnDown        map[string]bool
-	cdnCut         map[string]bool
-	cdnDrop        map[string]bool
-	jars           map[string]fakeJar
-	dir            string
-	cache          string
-	config         string
-	home           string
-	newer          bool
-	sodiumBeta     bool
+	server     *httptest.Server
+	cdnDown    map[string]bool
+	cdnCut     map[string]bool
+	cdnDrop    map[string]bool
+	jars       map[string]fakeJar
+	dir        string
+	cache      string
+	config     string
+	home       string
+	newer      bool
+	sodiumBeta bool
+	// now is the time release ages are measured to; zero is the clock.
+	now            time.Time
 	newerAPI       bool
 	serverJar      fakeJar
 	quiltLoader    fakeJar
@@ -771,6 +773,11 @@ func eulaIn(path string) bool {
 	return err == nil && cfg.EULA
 }
 
+func releaseAgeIn(path string) time.Duration {
+	cfg, _ := config.LoadFile(path)
+	return cfg.Security.ReleaseAge()
+}
+
 // newApp is what every run in a test is built from: the harness's own directories and stdin, and
 // every client pointed at its fake server.
 func (h *harness) newApp(stdout, stderr io.Writer) *app {
@@ -810,15 +817,19 @@ func (h *harness) newApp(stdout, stderr io.Writer) *app {
 	c := &cache.Cache{Dir: h.cache}
 	loaders := &loader.Remote{Fetch: f, Cache: c, Log: a.progress, RunInstaller: a.installer}
 	a.d = a.newDeps(&env.Env{
-		Fetch:     f,
-		Cache:     c,
-		Providers: providers,
-		Loaders:   loaders,
-		Piston:    piston,
-		Runtimes:  runtimes,
-		Players:   players,
-		EULA:      eulaIn(h.config),
+		Fetch:         f,
+		Cache:         c,
+		Providers:     providers,
+		Loaders:       loaders,
+		Piston:        piston,
+		Runtimes:      runtimes,
+		Players:       players,
+		EULA:          eulaIn(h.config),
+		MinReleaseAge: releaseAgeIn(h.config),
 	})
+	if !h.now.IsZero() {
+		a.d.Now = func() time.Time { return h.now }
+	}
 	a.d.metaURLs = map[string]string{launcher.GDLauncherMetaURL: h.server.URL + "/gdl"}
 	a.d.signin = h.msa.signIn(f, h.server.URL)
 	a.d.resources = h.server.URL + "/resources"

@@ -7,6 +7,7 @@ import (
 
 	"shulker.sh/shulker/internal/build"
 	"shulker.sh/shulker/internal/config"
+	"shulker.sh/shulker/internal/env"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/local"
 	"shulker.sh/shulker/internal/modpack"
@@ -89,6 +90,9 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 	if remote {
 		if err := build.CheckProvenance(e.Providers, p.Manifest, p.Lock, nil, src.Name); err != nil {
 			return Result{}, err
+		}
+		if young := resolve.YoungEntries(p.Lock, e.MinReleaseAge, env.Clock(e.Now)); len(young) > 0 {
+			e.WarnSecurity(resolve.YoungWarning(young, e.MinReleaseAge))
 		}
 	}
 	fetched, err := FetchLocked(ctx, e, p, nil, side == "server")
