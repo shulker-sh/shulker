@@ -415,16 +415,17 @@ With `--json`, `data.scopes` lists the checks that ran and a clean run's `data.p
 
 ### `shulker audit`
 
-Report what in the project, or an instance with `-i`, deserves a closer look. `check` is about whether a project builds; `audit` is about where its files come from. It reads the lock and the files on disk and goes online for nothing.
+Report what in the project, or an instance with `-i`, deserves a closer look. `check` is about whether a project builds; `audit` is about where its files come from. It reads the lock and the files on disk, and goes online only for the takedown check.
 
-- **Provenance:** a lock entry that names a provider but downloads from outside that provider's hosts, the entry every other command refuses as `provenance-mismatch`. `shulker lock <key>` looks it up again.
+- **Takedowns:** a locked file its provider no longer has, asked in one request per provider: Modrinth by sha512, CurseForge by the fingerprint of the copy in the cache. Neither says why a file went, and authors delete their own old versions too, so a vanished file is a reason to look, not proof. `shulker update <key>` moves off it and `shulker remove <key>` drops it. A provider that can't be asked, because shulker can't reach it or CurseForge has no key, is reported as skipped rather than passed, and a CurseForge file the cache doesn't hold, or a CurseForge modpack, which its fingerprints leave out, isn't checked.
+- **Provenance:** a lock entry that names a provider but downloads from outside that provider's hosts, the entry every other command refuses as `provenance-mismatch`, or a file its provider files under another project than the lock names. `shulker lock <key>` looks it up again.
 - **Unpublished files:** every jar and pack no provider published, with where it comes from: a local `file` entry, an entry downloaded from a URL of its own, or a file an override folder lays, a modpack's included and every feature's folder with them.
 - **Installed jars:** every jar in `mods/` whose bytes no longer match what the lock names, or what the build recorded for one an override laid, and every jar there that neither accounts for. A project's are its sides' build directories; an instance's is its own directory. `shulker build --force` puts the locked copies back.
 - **Young versions:** locked versions published more recently than `security.minReleaseAge`.
 
 Name keys to audit only those entries, and every entry a named modpack brings; a key the lock doesn't hold fails `mod-not-found`. Files that no entry names, such as override jars and unlisted jars in `mods/`, are left out of a narrowed audit. A key that is also a subcommand of `audit` goes after `--`: `shulker audit -- jar`.
 
-It exits non-zero only for provenance problems, ending with `audit-failed`, so a pack author's CI can gate on it. Unpublished files, installed jars and young versions are listed but don't fail it, since a pack may reasonably have them.
+It exits non-zero for takedowns and provenance problems, ending with `audit-failed`, so a pack author's CI can gate on it. Unpublished files, installed jars and young versions are listed but don't fail it, since a pack may reasonably have them.
 
 With `-i`, an instance that builds in place is audited as its own project. A linked or synced one is audited against the lock its last sync built from: its local source, or the copy of a remote source that sync kept in the cache. One that has never synced fails `not-synced`.
 
@@ -434,7 +435,7 @@ shulker audit sodium
 shulker audit -i friends --json
 ```
 
-With `--json`, `data` holds one list per check, each empty when it found nothing: `provenance` (`key`, `provider`, `host`, `modpack`), `unpublished` (`key`, `path`, `from` as `file`, `download` or `override`, `source`, `modpack`), `installed` (`dir`, `path`, `key`, `problem` as `changed` or `unlisted`) and `young` (`key`, `version`, `published`, `ageDays`, `qualifies`), with `minReleaseAge` in days and the named `keys`. A failing run carries the same `data` under `audit-failed`, whose `items` are the keys from outside their provider.
+With `--json`, `data` holds one list per check, each empty when it found nothing: `takedowns` and `moved` (`key`, `type`, `provider`, `project`, `version`, `sha512`, `status`, and `filedUnder` for a moved file), `skipped` (`provider`, `reason`) for the providers the takedown check couldn't ask, `provenance` (`key`, `provider`, `host`, `modpack`), `unpublished` (`key`, `path`, `from` as `file`, `download` or `override`, `source`, `modpack`), `installed` (`dir`, `path`, `key`, `problem` as `changed` or `unlisted`) and `young` (`key`, `version`, `published`, `ageDays`, `qualifies`), with `minReleaseAge` in days and the named `keys`. A failing run carries the same `data` under `audit-failed`, whose `items` are the keys gone from their provider or from outside it.
 
 ### `shulker match`
 
@@ -2005,7 +2006,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `build-reserved` | A side that builds in place has overrides that would write `shulker.json`, `shulker.lock`, `shulker.local.json`, `.shulker/` or a data directory. `items`: the files |
 | `cache-changed` | A cached file no longer matched its hash, so the build deleted it, and it has no URL to download it from again: a local file or a manual download. `shulker install` puts the locked copy back |
 | `cache-root-unreadable` | A registered instance's `shulker.lock`, or a lock file named with `--lock`, is there but can't be read, so `cache prune` stops rather than remove files it may need; `cache info` still reports and names it |
-| `audit-failed` | `audit` found lock entries that download from outside their provider. `items`: their keys; `data`: the whole report |
+| `audit-failed` | `audit` found locked files gone from their provider, or entries that download from outside it or that it files under another project. `items`: their keys; `data`: the whole report |
 | `check-failed` | `check` found a problem; each one printed above it. `items`: every problem's items as `<code>: <item>`; `data.problems`: each problem as an error |
 | `checksum-mismatch` | A download's hash isn't the one recorded for it: the sha512 in the lock or from the provider, or the sha1 in a version JSON or Java runtime manifest. Rows show both hashes, and the file at `install` |
 | `config-dir-unset` | The OS can't say where this user's config or data folder is, usually because `HOME` isn't set. Set `SHULKER_CONFIG` and `SHULKER_DATA` instead |

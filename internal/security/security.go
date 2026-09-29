@@ -29,6 +29,7 @@ const (
 	CacheHash        ID = "cache-hash"
 	ManifestJVMArgs  ID = "manifest-jvm-args"
 	ReleaseAge       ID = "release-age"
+	Takedowns        ID = "takedowns"
 )
 
 // Refusal marks e as protection id refusing something: it names the protection for --json and ends
@@ -66,6 +67,7 @@ var protections = []Protection{
 	{ID: Provenance, On: true, Summary: "A lock entry that names a provider has to download from that provider's own hosts, so a lock can't pass a file from anywhere else off as a mod it names."},
 	{ID: CacheHash, On: true, Summary: "Every file placed from the cache is checked against its hash, so a copy changed in the cache can't spread to other instances."},
 	{ID: ManifestJVMArgs, On: true, Summary: "A manifest can't add its own flags to the java command line, such as -javaagent, so a source can't run code outside its mods."},
+	{ID: Takedowns, On: true, Summary: "An audit asks Modrinth and CurseForge whether they still have each locked file, so a file taken down after you locked it, as malware is, gets noticed rather than placed from the cache for good."},
 }
 
 // Days is d in whole days, as security.minReleaseAge counts them.

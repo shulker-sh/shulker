@@ -1,9 +1,11 @@
-// Package audit reports what in a project or instance deserves a closer look: entries that
-// download from outside their provider, files no provider published, installed jars that no
-// longer match the lock, and versions younger than security.minReleaseAge.
+// Package audit reports what in a project or instance deserves a closer look: files their provider
+// no longer has, entries that download from outside their provider or that it files under another
+// project, files no provider published, installed jars that no longer match the lock, and versions
+// younger than security.minReleaseAge.
 package audit
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
@@ -29,6 +31,7 @@ import (
 	"shulker.sh/shulker/internal/resolve"
 	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/internal/sync"
+	"shulker.sh/shulker/internal/takedown"
 )
 
 // Where an unpublished file comes from.
@@ -83,30 +86,44 @@ type Options struct {
 
 // Report is what an audit found, one list per check.
 type Report struct {
-	Keys          []string         `json:"keys,omitempty"`
-	Provenance    []build.Mismatch `json:"provenance"`
-	Unpublished   []Unpublished    `json:"unpublished"`
-	Installed     []Installed      `json:"installed"`
-	Young         []resolve.Young  `json:"young"`
-	MinReleaseAge int              `json:"minReleaseAge"`
+	Keys []string `json:"keys,omitempty"`
+	// Takedowns are the files their provider no longer has.
+	Takedowns  []takedown.File  `json:"takedowns"`
+	Provenance []build.Mismatch `json:"provenance"`
+	// Moved are the files their provider files under another project than the lock names.
+	Moved []takedown.File `json:"moved"`
+	// Skipped are the providers the takedown check couldn't ask, whose files went unchecked.
+	Skipped       []takedown.Skipped `json:"skipped"`
+	Unpublished   []Unpublished      `json:"unpublished"`
+	Installed     []Installed        `json:"installed"`
+	Young         []resolve.Young    `json:"young"`
+	MinReleaseAge int                `json:"minReleaseAge"`
 }
 
 // Fails reports whether the audit found something that fails it: unpublished files, installed
 // jars and young versions are listed without failing it, since a pack may reasonably have them.
-func (r *Report) Fails() bool { return len(r.Provenance) > 0 }
+func (r *Report) Fails() bool { return len(r.Takedowns)+len(r.Provenance)+len(r.Moved) > 0 }
 
-// Run audits b's lock, offline.
-func Run(b *build.Builder, o Options) (*Report, error) {
+// Run audits b's lock. Only the takedown check goes online, one request per provider.
+func Run(ctx context.Context, b *build.Builder, o Options) (*Report, error) {
 	scope, err := scopeOf(b.Lock, o.Keys)
 	if err != nil {
 		return nil, err
 	}
-	r := &Report{Keys: o.Keys, Provenance: []build.Mismatch{}, Unpublished: []Unpublished{}, Installed: []Installed{}, Young: []resolve.Young{}, MinReleaseAge: security.Days(o.MinReleaseAge)}
+	r := &Report{Keys: o.Keys, Takedowns: []takedown.File{}, Provenance: []build.Mismatch{}, Moved: []takedown.File{}, Unpublished: []Unpublished{}, Installed: []Installed{}, Young: []resolve.Young{}, MinReleaseAge: security.Days(o.MinReleaseAge)}
 	for _, m := range build.Mismatches(b.Providers, b.Lock) {
 		if scope.has(m.Key) {
 			r.Provenance = append(r.Provenance, m)
 		}
 	}
+	var entries []takedown.Entry
+	for _, e := range takedown.Entries(b.Lock) {
+		if scope.has(e.Key) {
+			entries = append(entries, e)
+		}
+	}
+	checked := takedown.Check(ctx, b.Providers, b.Cache, entries)
+	r.Takedowns, r.Moved, r.Skipped = append(r.Takedowns, checked.With(takedown.Gone)...), append(r.Moved, checked.With(takedown.Moved)...), checked.Skipped
 	for _, y := range resolve.YoungEntries(b.Lock, o.MinReleaseAge, o.Now) {
 		if scope.has(y.Key) {
 			r.Young = append(r.Young, y)

@@ -27,7 +27,7 @@ func TestAuditListsWhatDeservesALookAndFailsOnlyOnProvenance(t *testing.T) {
 	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
 	h.mustRun(t, "add", "sodium")
 	h.mustRun(t, "build")
-	if stdout := h.mustRun(t, "audit"); !strings.Contains(stdout, "No problems found") {
+	if stdout := h.mustRun(t, "audit"); !strings.Contains(stdout, "No problems found (checked takedowns, provenance") {
 		t.Fatalf("clean project: %s", stdout)
 	}
 	if _, rep := auditReport(t, h.mustRun(t, "audit", "--json", "--", "sodium")); len(rep.Keys) != 1 || rep.Keys[0] != "sodium" {
@@ -49,7 +49,7 @@ func TestAuditListsWhatDeservesALookAndFailsOnlyOnProvenance(t *testing.T) {
 
 	h.sendSodiumElsewhere(t)
 	code, stdout, stderr := h.run(t, "audit")
-	if code == 0 || !strings.Contains(stdout, "sodium: locked from Modrinth, downloads from evil.example") || !strings.Contains(stdout, "$ shulker lock sodium") || !strings.Contains(stderr, "1 entry downloads from outside its provider") {
+	if code == 0 || !strings.Contains(stdout, "sodium: locked from Modrinth, downloads from evil.example") || !strings.Contains(stdout, "$ shulker lock sodium") || !strings.Contains(stderr, "1 entry doesn't come from where the lock says") {
 		t.Fatalf("provenance fails the audit: exit %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
 	code, stdout, _ = h.run(t, "audit", "--json")

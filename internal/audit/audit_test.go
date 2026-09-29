@@ -1,6 +1,8 @@
 package audit
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -64,7 +66,7 @@ func (f *fixture) run(o Options) *Report {
 	if o.Now.IsZero() {
 		o.Now = envtest.Day(30)
 	}
-	r, err := Run(build.New(f.e.Env, f.p, nil), o)
+	r, err := Run(context.Background(), build.New(f.e.Env, f.p, nil), o)
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -160,8 +162,40 @@ func TestNamedKeysNarrowEveryCheck(t *testing.T) {
 
 func TestANamedKeyTheLockDoesntHoldIsRefused(t *testing.T) {
 	f := newFixture(t)
-	_, err := Run(build.New(f.e.Env, f.p, nil), Options{Keys: []string{"sodum"}})
+	_, err := Run(context.Background(), build.New(f.e.Env, f.p, nil), Options{Keys: []string{"sodum"}})
 	if e := out.AsError(err); e.Code != "mod-not-found" || !slices.Contains(e.Candidates, "sodium") {
 		t.Fatalf("expected mod-not-found: %v", err)
+	}
+}
+
+func TestAFileItsProviderNoLongerHasIsATakedown(t *testing.T) {
+	f := newFixture(t)
+	f.e.Modrinth.Files = slices.DeleteFunc(f.e.Modrinth.Files, func(v provider.Version) bool { return v.ProjectID == "lithium-id" })
+
+	r := f.run(Options{})
+	if !r.Fails() || len(r.Takedowns) != 1 || r.Takedowns[0].Key != "lithium" || len(r.Moved) != 0 || f.e.Modrinth.Requests["Filed"] != 1 {
+		t.Fatalf("takedowns: %+v, requests %v", r.Takedowns, f.e.Modrinth.Requests)
+	}
+}
+
+func TestAFileItsProviderFilesUnderAnotherProjectFailsProvenance(t *testing.T) {
+	f := newFixture(t)
+	m := f.p.Lock.Mods["lithium"]
+	m.Project = "not-lithium"
+	f.p.Lock.Mods["lithium"] = m
+
+	r := f.run(Options{})
+	if !r.Fails() || len(r.Moved) != 1 || r.Moved[0].Key != "lithium" || r.Moved[0].FiledUnder != "lithium-id" || len(r.Takedowns) != 0 {
+		t.Fatalf("moved: %+v", r)
+	}
+}
+
+func TestATakedownCheckThatCantReachItsProviderIsSkippedNotPassed(t *testing.T) {
+	f := newFixture(t)
+	f.e.Modrinth.FiledErr = errors.New("--offline")
+
+	r := f.run(Options{})
+	if r.Fails() || len(r.Skipped) != 1 || r.Skipped[0].Provider != "modrinth" {
+		t.Fatalf("skipped: %+v", r)
 	}
 }

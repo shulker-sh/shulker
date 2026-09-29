@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -18,7 +19,7 @@ func (a *app) auditCmd() *cobra.Command {
 		Use:         "audit [key...]",
 		Annotations: reads(),
 		Short:       "Report lock entries and files that deserve a closer look",
-		Long:        "Report what deserves a closer look in the project, or an instance with -i: lock entries that download from outside their provider, files no provider published, jars in mods/ that no longer match the lock or that it doesn't name, and versions younger than security.minReleaseAge. It fails only for entries from outside their provider, so CI can gate on it. Name keys to audit only those entries and the ones each named modpack brings.",
+		Long:        "Report what deserves a closer look in the project, or an instance with -i: locked files their provider no longer has, lock entries that download from outside their provider or that it files under another project, files no provider published, jars in mods/ that no longer match the lock or that it doesn't name, and versions younger than security.minReleaseAge. It fails for files gone from their provider and entries from outside it, so CI can gate on it. Name keys to audit only those entries and the ones each named modpack brings.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			b, dirs, err := a.auditTarget(cmd)
 			if err != nil {
@@ -32,7 +33,7 @@ func (a *app) auditCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			rep, err := audit.Run(b, audit.Options{Keys: args, Dirs: dirs, MinReleaseAge: age, Now: env.Clock(d.Now)})
+			rep, err := audit.Run(cmd.Context(), b, audit.Options{Keys: args, Dirs: dirs, MinReleaseAge: age, Now: env.Clock(d.Now)})
 			if err != nil {
 				return err
 			}
@@ -42,13 +43,7 @@ func (a *app) auditCmd() *cobra.Command {
 			if !a.printer.JSON {
 				printAudit(a.printer.Out(), rep, b.Providers)
 			}
-			n := len(rep.Provenance)
-			e := out.Errorf("audit-failed", "%s from outside %s provider", out.Count(n, "entry downloads", "entries download"), countWord(n == 1, "its", "their"))
-			e.Data, e.IsSummary = rep, true
-			for _, m := range rep.Provenance {
-				e.Items = append(e.Items, m.Key)
-			}
-			return e
+			return auditFailed(rep)
 		},
 	}
 	a.scopeFlags(cmd)
@@ -96,24 +91,90 @@ func (a *app) auditBuilder(cmd *cobra.Command, p *project.Project) (*build.Build
 	return a.builder(cmd.Context(), p)
 }
 
-func printAudit(l *out.Lines, rep *audit.Report, ps provider.Providers) {
-	if len(rep.Provenance)+len(rep.Unpublished)+len(rep.Installed)+len(rep.Young) == 0 {
-		l.OK("No problems found", "checked provenance, unpublished files, installed jars, release age")
-		return
+// auditFailed sums up what failed the audit, each already printed in full above it.
+func auditFailed(rep *audit.Report) error {
+	var parts []string
+	if n := len(rep.Takedowns); n > 0 {
+		parts = append(parts, goneHeadline(n))
 	}
+	if n := len(rep.Provenance) + len(rep.Moved); n > 0 {
+		parts = append(parts, provenanceHeadline(n))
+	}
+	e := out.Errorf("audit-failed", "%s", strings.Join(parts, "; "))
+	e.Data, e.IsSummary = rep, true
+	e.Items = failedKeys(rep)
+	return e
+}
+
+func failedKeys(rep *audit.Report) []string {
+	var keys []string
+	for _, f := range rep.Takedowns {
+		keys = append(keys, f.Key)
+	}
+	for _, m := range rep.Provenance {
+		keys = append(keys, m.Key)
+	}
+	for _, f := range rep.Moved {
+		keys = append(keys, f.Key)
+	}
+	return keys
+}
+
+func goneHeadline(n int) string {
+	return out.Count(n, "file", "files") + " gone from " + countWord(n == 1, "its", "their") + " provider"
+}
+
+func provenanceHeadline(n int) string {
+	return out.Count(n, "entry doesn't", "entries don't") + " come from where the lock says"
+}
+
+func printAudit(l *out.Lines, rep *audit.Report, ps provider.Providers) {
 	gap := func() {}
 	section := func() {
 		gap()
 		gap = l.Blank
 	}
-	if n := len(rep.Provenance); n > 0 {
+	if len(rep.Takedowns)+len(rep.Provenance)+len(rep.Moved)+len(rep.Unpublished)+len(rep.Installed)+len(rep.Young) == 0 {
 		section()
-		l.Failed(out.Count(n, "entry downloads", "entries download") + " from outside " + countWord(n == 1, "its", "their") + " provider")
+		checked := "checked takedowns, provenance, unpublished files, installed jars, release age"
+		if len(rep.Skipped) > 0 {
+			checked = "checked provenance, unpublished files, installed jars, release age"
+		}
+		l.OK("No problems found", checked)
+	}
+	for _, sk := range rep.Skipped {
+		section()
+		l.Info("Skipped the takedown check for " + ps.Title(sk.Provider) + ": " + sk.Reason)
+	}
+	if n := len(rep.Takedowns); n > 0 {
+		section()
+		l.Failed(goneHeadline(n))
+		var rows []out.Row
+		var keys []string
+		for _, f := range rep.Takedowns {
+			rows = append(rows, out.Row{Label: f.Key, Text: ps.Title(f.Provider) + " no longer has the locked version, " + cmp.Or(f.Number, f.Version)})
+			keys = append(keys, f.Key)
+		}
+		l.Tree(rows...)
+		l.Blank()
+		l.Paragraph("A file gone from its provider is a reason to look, not proof: authors delete their own old versions too.")
+		named := strings.Join(keys, " ")
+		l.Nudge("Look at "+countWord(n == 1, "it", "them"), "shulker audit "+named)
+		l.Nudge("Move off "+countWord(n == 1, "it", "them"), "shulker update "+named)
+		l.Nudge("Or remove "+countWord(n == 1, "it", "them"), "shulker remove "+named)
+	}
+	if n := len(rep.Provenance) + len(rep.Moved); n > 0 {
+		section()
+		l.Failed(provenanceHeadline(n))
 		var rows []out.Row
 		var keys []string
 		for _, m := range rep.Provenance {
 			rows = append(rows, out.Row{Label: m.Key, Text: fmt.Sprintf("locked from %s, downloads from %s", ps.Title(m.Provider), m.Host)})
 			keys = append(keys, m.Key)
+		}
+		for _, f := range rep.Moved {
+			rows = append(rows, out.Row{Label: f.Key, Text: fmt.Sprintf("%s files it under project %s, not %s", ps.Title(f.Provider), f.FiledUnder, f.Project)})
+			keys = append(keys, f.Key)
 		}
 		l.Tree(rows...)
 		l.Nudge("Look "+countWord(n == 1, "it", "them")+" up again from "+countWord(n == 1, "its", "their")+" provider", "shulker lock "+strings.Join(keys, " "))
