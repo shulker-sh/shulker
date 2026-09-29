@@ -14,6 +14,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - `shulker lock <key>` looks an entry up again from its provider at the version it is locked at and rewrites the file the lock names for it, leaving every other entry alone. It puts right a lock whose file doesn't match its provider without moving it to a newer version the way `update` does.
 
+- A lock entry that names Modrinth or CurseForge has to download from that provider's own hosts: `build`, `install`, `sync` and a launch refuse one that doesn't as `provenance-mismatch`, and say who can fix it. For your own project that's `shulker lock <key>`; for a synced source, its author. A launch keeps its last good build and starts on it.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.
