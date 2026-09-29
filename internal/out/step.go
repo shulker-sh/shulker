@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -47,7 +47,7 @@ func newSpinner(t Theme) spinner.Model {
 		frames[i] = strings.TrimSpace(f)
 	}
 	kind.Frames = frames
-	return spinner.New(spinner.WithSpinner(kind), spinner.WithStyle(t.Style().Foreground(lipgloss.Color("6")).Bold(true)))
+	return spinner.New(spinner.WithSpinner(kind), spinner.WithStyle(t.StyleCommand()))
 }
 
 // slowAfter is how long a step runs before its spinner says how long it has waited, and on what.
@@ -212,10 +212,11 @@ func (s *step) spin(t Theme, w *waits) {
 	tick := time.NewTicker(frameEvery)
 	defer tick.Stop()
 	start := time.Now()
+	frames := &colorprofile.Writer{Forward: s.tty, Profile: t.Profile()}
 	for {
 		room := terminalWidth(s.tty) - len(gutter) - 3
 		text := Tilde(Sentence(s.text)) + slowAside(time.Since(start), w.latest())
-		fmt.Fprint(s.tty, "\r\x1b[J"+gutter+s.wheel.View()+" "+t.Grey(ansi.Truncate(text, room, t.Ellipsis())))
+		fmt.Fprint(frames, "\r\x1b[J"+gutter+s.wheel.View()+" "+t.Grey(ansi.Truncate(text, room, t.Ellipsis())))
 		select {
 		case <-s.stop:
 			return

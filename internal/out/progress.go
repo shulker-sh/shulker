@@ -2,6 +2,7 @@ package out
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"slices"
 	"strconv"
@@ -9,9 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/progress"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -25,9 +28,11 @@ const (
 // Progress draws a download bar on a terminal and settles into one ok line.
 // Off a terminal only the final line prints; with --json nothing does.
 type Progress struct {
-	mu      sync.Mutex
-	l       *Lines
-	tty     *os.File
+	mu  sync.Mutex
+	l   *Lines
+	tty *os.File
+	// w is tty downsampled to the theme's profile, which every frame is written through.
+	w       io.Writer
 	verb    string
 	total   int
 	done    int
@@ -71,7 +76,7 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 	pr := newProgress(p.Err(), verb, files)
 	pr.owner = p
 	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
-		pr.tty = f
+		pr.tty, pr.w = f, &colorprofile.Writer{Forward: f, Profile: p.ErrTheme.Profile()}
 		pr.stop, pr.stopped = make(chan struct{}), make(chan struct{})
 		p.steps.mu.Lock()
 		p.steps.bar = pr
@@ -200,7 +205,7 @@ func (pr *Progress) halt() {
 		close(pr.stop)
 		<-pr.stopped
 		pr.mu.Lock()
-		fmt.Fprint(pr.tty, pr.backToTop(terminalWidth(pr.tty)))
+		fmt.Fprint(pr.w, pr.backToTop(terminalWidth(pr.tty)))
 		pr.drawn, pr.halted = nil, true
 		pr.mu.Unlock()
 	})
@@ -212,16 +217,19 @@ func (pr *Progress) above(write func() (int, error)) (int, error) {
 	pr.mu.Lock()
 	defer pr.mu.Unlock()
 	if !pr.halted {
-		fmt.Fprint(pr.tty, pr.backToTop(terminalWidth(pr.tty)))
+		fmt.Fprint(pr.w, pr.backToTop(terminalWidth(pr.tty)))
 		pr.drawn = nil
 	}
 	return write()
 }
 
 func newBar(t Theme) progress.Model {
-	bar := progress.New(progress.WithSolidFill("6"), progress.WithWidth(barWidth), progress.WithFillCharacters('━', '─'), progress.WithSpringOptions(8, 1), progress.WithColorProfile(t.Profile()))
-	bar.EmptyColor = strconv.Itoa(t.GreyIndex)
-	bar.PercentageStyle = t.Style().Foreground(t.lipglossGrey())
+	bar := progress.New(progress.WithWidth(barWidth), progress.WithFillCharacters('━', '─'), progress.WithSpringOptions(8, 1))
+	bar.FullColor, bar.EmptyColor = nil, nil
+	if t.HasColor {
+		bar.FullColor, bar.EmptyColor = lipgloss.Cyan, lipgloss.ANSIColor(t.GreyIndex)
+	}
+	bar.PercentageStyle = t.StyleGrey()
 	if t.ASCII {
 		bar.Full, bar.Empty = '#', '-'
 	}
@@ -263,8 +271,7 @@ func (pr *Progress) ease() {
 		}
 		msg := cmd()
 		pr.mu.Lock()
-		next, c := pr.bar.Update(msg)
-		pr.bar, pr.pending = next.(progress.Model), c
+		pr.bar, pr.pending = pr.bar.Update(msg)
 		pr.mu.Unlock()
 	}
 }
@@ -297,7 +304,7 @@ func (pr *Progress) redraw() {
 		b.WriteString(line + "\n")
 		pr.drawn = append(pr.drawn, Width(line))
 	}
-	fmt.Fprint(pr.tty, b.String())
+	fmt.Fprint(pr.w, b.String())
 }
 
 // backToTop moves up over the previous frame as the terminal shows it now:
