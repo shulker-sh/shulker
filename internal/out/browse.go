@@ -7,11 +7,10 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 )
 
 // BrowseSource answers a browser as its query changes. Rows and Status each run off the
@@ -39,7 +38,7 @@ func (q *browseQuery) Set(text string) {
 
 // browseTheme is the query line's theme, with huh's loading spinner moved into the gutter: it
 // takes the multi-select cursor's style, which no browser otherwise draws.
-func browseTheme(t Theme) *huh.Theme {
+func browseTheme(t Theme) *huh.Styles {
 	h := askTheme(t)
 	for _, f := range []*huh.FieldStyles{&h.Focused, &h.Blurred} {
 		f.MultiSelectSelector = lipgloss.NewStyle().PaddingLeft(len(gutter))
@@ -53,10 +52,6 @@ func browseTheme(t Theme) *huh.Theme {
 // ErrPickCancelled.
 func (p *Printer) BrowseMarks(title, description string, src BrowseSource, in io.Reader) ([]string, error) {
 	t := p.ErrTheme
-	if !t.HasColor {
-		// lipgloss reads the terminal itself, so --no-color has to reach it separately.
-		lipgloss.SetColorProfile(termenv.Ascii)
-	}
 	m := &browseMarks{}
 	q := &markedQuery{browseQuery: browseQuery{src: src}, view: &m.view}
 	rowWidth := p.width() - len(gutter) - Width(t.ArrowPick()+" ") - Width("[ ] ") - 1
@@ -85,7 +80,7 @@ func (p *Printer) BrowseMarks(title, description string, src BrowseSource, in io
 	keys.Input.Next = key.NewBinding(key.WithKeys("tab", "enter"), key.WithHelp("tab", "results"))
 	keys.Input.Submit = key.NewBinding()
 	keys.MultiSelect.Prev = key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "query"))
-	keys.MultiSelect.Toggle = key.NewBinding(key.WithKeys(" "), key.WithHelp("space", "mark"))
+	keys.MultiSelect.Toggle = key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "mark"))
 	// huh turns Next off and Submit on for the last field in a group, which the list always is.
 	keys.MultiSelect.Next = key.NewBinding()
 	keys.MultiSelect.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "add"))
@@ -103,7 +98,7 @@ func (p *Printer) BrowseMarks(title, description string, src BrowseSource, in io
 	// the key help.
 	height := 3 + 1 + 1 + pickRows + 2
 	p.openPrompt()
-	form := huh.NewForm(group).WithTheme(marksTheme(t)).WithOutput(p.Stderr).WithInput(in).
+	form := huh.NewForm(group).WithTheme(formTheme(marksTheme(t))).WithProgramOptions(p.drawOptions()...).WithOutput(p.Stderr).WithInput(in).
 		WithWidth(p.width()).WithHeight(height).
 		WithKeyMap(keys).WithLayout(gutterLayout{quit: keys.Quit, group: group})
 	if err := form.Run(); err != nil {
@@ -188,14 +183,14 @@ func (m *browseMarks) Set(marked []string) {
 // --ascii reaches it too, and the pick arrow back. A multi-select draws its cursor and its
 // loading spinner with the same style, so the gutter is padding: the spinner keeps it and drops
 // the arrow.
-func marksTheme(t Theme) *huh.Theme {
+func marksTheme(t Theme) *huh.Styles {
 	h := browseTheme(t)
 	plain := lipgloss.NewStyle()
 	marked := plain.SetString("[" + t.GlyphOK() + "] ")
 	cursor := plain.PaddingLeft(len(gutter)).SetString(t.ArrowPick() + " ")
 	if t.HasColor {
-		marked = marked.Foreground(lipgloss.Color("2"))
-		cursor = cursor.Foreground(lipgloss.Color("6"))
+		marked = marked.Foreground(lipgloss.Green)
+		cursor = cursor.Foreground(lipgloss.Cyan)
 	}
 	for _, f := range []*huh.FieldStyles{&h.Focused, &h.Blurred} {
 		f.SelectedPrefix, f.UnselectedPrefix = marked, plain.SetString("[ ] ")

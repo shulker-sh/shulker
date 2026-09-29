@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
+	"github.com/muesli/termenv"
 )
 
 const markdownColumns = 80
@@ -22,7 +23,8 @@ func (l *Lines) Markdown(text string) {
 	}
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStyles(t.markdownStyle()),
-		glamour.WithColorProfile(t.Profile()),
+		// Only a coloured theme gets here, and glamour v1 still takes termenv's profile.
+		glamour.WithColorProfile(termenv.ANSI256),
 		glamour.WithChromaFormatter("terminal16"),
 		glamour.WithWordWrap(min(TerminalWidth(l.W), markdownColumns)),
 	)

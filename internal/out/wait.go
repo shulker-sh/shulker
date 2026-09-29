@@ -39,7 +39,7 @@ type DownloadWait struct {
 func (p *Printer) AwaitDownloads(ctx context.Context, w DownloadWait, in io.Reader) (skipped bool, err error) {
 	m := newWaiter(p.ErrTheme, w)
 	p.openPrompt()
-	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithContext(ctx), tea.WithColorProfile(p.ErrTheme.Profile())).Run(); err != nil {
+	if _, err := tea.NewProgram(m, append(p.drawOptions(), tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithContext(ctx))...).Run(); err != nil {
 		if errors.Is(err, tea.ErrProgramKilled) {
 			return false, ErrPickCancelled
 		}

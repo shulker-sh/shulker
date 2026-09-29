@@ -3,13 +3,12 @@ package out
 import (
 	"errors"
 	"io"
-	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -34,7 +33,7 @@ const pickRows = 10
 func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, error) {
 	m := newPicker(p.ErrTheme, title, choices)
 	p.openPrompt()
-	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithColorProfile(p.ErrTheme.Profile())).Run(); err != nil {
+	if _, err := tea.NewProgram(m, append(p.drawOptions(), tea.WithInput(in), tea.WithOutput(p.Stderr))...).Run(); err != nil {
 		return "", err
 	}
 	if m.cancelled {
@@ -231,16 +230,21 @@ func (l gutterLayout) View(f *huh.Form) string {
 
 func (gutterLayout) GroupWidth(_ *huh.Form, _ *huh.Group, w int) int { return w }
 
+// formTheme hands huh styles built from the theme's own grey, whatever background huh detects.
+func formTheme(styles *huh.Styles) huh.Theme {
+	return huh.ThemeFunc(func(bool) *huh.Styles { return styles })
+}
+
 // pickTheme keeps the picker inside shulker's own vocabulary: the two-space gutter, the ‣ pick
 // arrow in cyan, grey help, and no border, background or padding. The rows themselves are left
 // unstyled here, because they arrive carrying the theme's own colours and a style wrapped around
 // them would end at the first reset inside.
-func pickTheme(t Theme) *huh.Theme {
-	h := huh.ThemeBase()
+func pickTheme(t Theme) *huh.Styles {
+	h := huh.ThemeBase(t.GreyIndex != GreyLight)
 	plain := lipgloss.NewStyle()
 	cursor := plain.SetString(gutter + t.ArrowPick() + " ")
 	if t.HasColor {
-		cursor = cursor.Foreground(lipgloss.Color("6"))
+		cursor = cursor.Foreground(lipgloss.Cyan)
 	}
 	for _, f := range []*huh.FieldStyles{&h.Focused, &h.Blurred} {
 		f.Base, f.Card = plain, plain
@@ -250,7 +254,7 @@ func pickTheme(t Theme) *huh.Theme {
 	}
 	h.Form.Base, h.Group.Base = plain, plain
 	if t.HasColor {
-		grey := lipgloss.Color(strconv.Itoa(t.GreyIndex))
+		grey := lipgloss.ANSIColor(t.GreyIndex)
 		h.Help.ShortKey = plain.Foreground(grey)
 		h.Help.ShortDesc = plain.Foreground(grey)
 		h.Help.ShortSeparator = plain.Foreground(grey)

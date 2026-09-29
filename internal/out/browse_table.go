@@ -67,7 +67,7 @@ func (p *Printer) BrowseTable(b TableBrowser, in io.Reader) (key, value string, 
 	// The view draws the frame's opening line itself, so leaving with nothing clears it too; what
 	// runs after opens the frame again when it prints.
 	m.frame = p.opensFrame(p.Stderr)
-	program := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithColorProfile(t.Profile()))
+	program := tea.NewProgram(m, append(p.drawOptions(), tea.WithInput(in), tea.WithOutput(p.Stderr))...)
 	if _, err := program.Run(); err != nil {
 		return "", "", err
 	}

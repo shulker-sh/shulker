@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 
+	tea "charm.land/bubbletea/v2"
 	"golang.org/x/term"
 )
 
@@ -73,4 +74,18 @@ func (p *Printer) width() int {
 		return terminalWidth(f)
 	}
 	return 80
+}
+
+// offTerminalSize is the width and height a program draws in off a terminal: room for any view,
+// which sizes itself to the printer's width, so Bubble Tea clips none of it.
+const offTerminalSize = 1000
+
+// drawOptions are the options every program shulker runs draws with: the theme's colour profile
+// and, off a terminal, a size, since Bubble Tea reads none there and draws nothing into 0x0.
+func (p *Printer) drawOptions() []tea.ProgramOption {
+	opts := []tea.ProgramOption{tea.WithColorProfile(p.ErrTheme.Profile())}
+	if !IsTerminal(p.Stderr) {
+		opts = append(opts, tea.WithWindowSize(offTerminalSize, offTerminalSize))
+	}
+	return opts
 }
