@@ -65,7 +65,7 @@ func (r *Resolver) ReadEarlier(ctx context.Context, was, now *lock.Imported, m *
 		if err != nil {
 			return nil
 		}
-		if got, err := r.obtainFrom(ctx, p, proj, v); err != nil || got.sha512 != was.Sha512 {
+		if got, err := r.obtainFrom(ctx, p, proj, v, false); err != nil || got.sha512 != was.Sha512 {
 			return nil
 		}
 	}

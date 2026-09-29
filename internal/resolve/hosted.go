@@ -139,7 +139,7 @@ func (r *Resolver) obtainModpack(ctx context.Context, name string, entry manifes
 	}
 	channel := r.relistedChannel(name, entry, v)
 	r.log("fetching modpack %s %s", proj.Slug, v.Number)
-	got, err := r.obtainFrom(ctx, p, proj, v)
+	got, err := r.obtainFrom(ctx, p, proj, v, false)
 	if err != nil {
 		return lock.Modpack{}, prefixed("modpack "+name, err)
 	}

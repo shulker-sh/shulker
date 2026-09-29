@@ -630,7 +630,7 @@ func (im *importer) fileKind(ctx context.Context, filePath string, proj *provide
 	case kind == manifest.TypeDatapack && datapack:
 		return kind, nil
 	case kind == manifest.TypeResourcePack && datapack && proj.Type != manifest.TypeResourcePack:
-		got, err := im.r.obtain(ctx, proj, v)
+		got, err := im.r.obtain(ctx, proj, v, false)
 		if err != nil {
 			return "", err
 		}

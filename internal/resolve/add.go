@@ -63,14 +63,9 @@ type Resolver struct {
 	// its jar is newer, the way FML picks among files sharing a mod id. Import sets it: a pack's
 	// file order is arbitrary.
 	keepNewest bool
-	// groupCached are the manual downloads the open group took from the cache, by file name.
-	groupCached map[string]bool
-	// advanced is set when the open group counted the fetch the next obtain makes.
-	advanced bool
-	// group is the live line a run of fetches draws on in place of a step each; see startGroup.
-	group *out.Progress
-	// held are the notes made while a group's live line was drawn, printed once it settles.
-	held []out.Item
+	// group is the open run of fetches that draws one live line in place of a step each; see
+	// startGroup.
+	group *fetchGroup
 	// listings is the listing index, read once the first add asks it.
 	listings *cache.ListingIndex
 	// droppedSums are the sha512s of the files the last sweep found in the downloads folder, nil
@@ -132,6 +127,14 @@ type groupFetch struct {
 	name, kind string
 }
 
+// fetchGroup is a run of fetches on one live line, and what it holds back until the line settles:
+// the notes made under it and the manual downloads it took from the cache, by file name.
+type fetchGroup struct {
+	line   *out.Progress
+	held   []out.Item
+	cached map[string]bool
+}
+
 // startGroup puts a loop's fetches on one live line that settles into a count of them, "✔ Fetched
 // 60 mods", rather than a step each. The count names the kind every fetch shares, and files when
 // they share none. end settles the line, or clears it for the error that follows when failed.
@@ -153,7 +156,8 @@ func (r *Resolver) startGroup(fetches []groupFetch) (end func(failed bool)) {
 	if g == nil {
 		return func(bool) {}
 	}
-	r.group = g
+	group := &fetchGroup{line: g, cached: map[string]bool{}}
+	r.group = group
 	if r.Fetch != nil {
 		r.Fetch.Progress = g.Bytes
 	}
@@ -162,7 +166,7 @@ func (r *Resolver) startGroup(fetches []groupFetch) (end func(failed bool)) {
 		if r.Fetch != nil {
 			r.Fetch.Progress = nil
 		}
-		defer r.afterGroup()
+		defer r.afterGroup(group)
 		if failed {
 			g.Abort()
 			return
@@ -171,27 +175,22 @@ func (r *Resolver) startGroup(fetches []groupFetch) (end func(failed bool)) {
 	}
 }
 
-// afterGroup prints what a group's live line held back: its notes and the files taken from the cache.
-func (r *Resolver) afterGroup() {
-	for _, it := range r.held {
+// afterGroup prints what g's live line held back: its notes and the files taken from the cache.
+func (r *Resolver) afterGroup(g *fetchGroup) {
+	for _, it := range g.held {
 		r.Note(it)
 	}
-	r.held = nil
-	r.reportCached(len(r.groupCached))
-	r.groupCached = nil
+	r.reportCached(len(g.cached))
 }
 
 // tookFromCache notes a manual download taken from the cache: a step of its own, or, taken off the
 // group's count of fetches when the group counted it, a count the group's line is followed by.
-func (r *Resolver) tookFromCache(filename string, advanced bool) {
+func (r *Resolver) tookFromCache(filename string, counted bool) {
 	if r.group != nil {
-		if advanced {
-			r.group.Retract()
+		if counted {
+			r.group.line.Retract()
 		}
-		if r.groupCached == nil {
-			r.groupCached = map[string]bool{}
-		}
-		r.groupCached[filename] = true
+		r.group.cached[filename] = true
 		return
 	}
 	r.log("taking %s from the cache", filename)
@@ -204,15 +203,15 @@ func (r *Resolver) reportCached(n int) {
 }
 
 // fetching is one fetch of slug at version: a count on the group's line when one is open, else a
-// step of its own.
-func (r *Resolver) fetching(slug, version string) {
+// step of its own. It reports whether the group counted it.
+func (r *Resolver) fetching(slug, version string) (counted bool) {
 	if r.group != nil {
-		r.group.File(slug)
-		r.group.Advance()
-		r.advanced = true
-		return
+		r.group.line.File(slug)
+		r.group.line.Advance()
+		return true
 	}
 	r.log("fetching %s %s", slug, version)
+	return false
 }
 
 func (r *Resolver) log(format string, args ...any) {
@@ -562,9 +561,9 @@ type obtained struct {
 	page   string
 }
 
-func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provider.Version) (obtained, error) {
-	advanced := r.advanced
-	r.advanced = false
+// obtain is v's file in the cache. counted is whether the open group counted it as a fetch, which
+// a manual download the cache already holds takes back.
+func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provider.Version, counted bool) (obtained, error) {
 	if v.File.Sha512 != "" {
 		path, err := r.Cache.Ensure(ctx, r.Fetch, v.File.URL, v.File.Sha512)
 		url := v.File.URL
@@ -610,7 +609,7 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 		}
 	}
 	if sha, ok := r.Cache.BySha1(v.File.Sha1); ok {
-		r.tookFromCache(v.File.Filename, advanced)
+		r.tookFromCache(v.File.Filename, counted)
 		return obtained{path: r.Cache.Object(sha), sha512: sha, page: v.Page}, nil
 	}
 	e := out.Errorf("manual-download", "%s can't be downloaded automatically", v.File.Filename)
@@ -620,9 +619,14 @@ func (r *Resolver) obtain(ctx context.Context, proj *provider.Project, v *provid
 	return obtained{}, e
 }
 
+// fetchFrom is obtainFrom for a fetch the user sees: a step, or a count on the open group's line.
+func (r *Resolver) fetchFrom(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version) (obtained, error) {
+	return r.obtainFrom(ctx, p, proj, v, r.fetching(proj.Slug, v.Number))
+}
+
 // obtainFrom is obtain, naming the file and p in the error when p fails to serve it.
-func (r *Resolver) obtainFrom(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version) (obtained, error) {
-	got, err := r.obtain(ctx, proj, v)
+func (r *Resolver) obtainFrom(ctx context.Context, p provider.Provider, proj *provider.Project, v *provider.Version, counted bool) (obtained, error) {
+	got, err := r.obtain(ctx, proj, v, counted)
 	if code := out.CodeOf(err); err != nil && v.File.URL != "" && (code == "" || code == "checksum-mismatch") {
 		url := v.File.URL
 		err = downloadable{id: proj.Slug, filename: v.File.Filename, host: p.Title(), url: &url}.downloadError(err)
@@ -664,8 +668,7 @@ func (r *Resolver) place(ctx context.Context, p provider.Provider, proj *provide
 			return id, prior, err
 		}
 	}
-	r.fetching(proj.Slug, v.Number)
-	got, err := r.obtainFrom(ctx, p, proj, v)
+	got, err := r.fetchFrom(ctx, p, proj, v)
 	if err != nil {
 		return "", nil, err
 	}
@@ -799,7 +802,7 @@ func (r *Resolver) noteKept(id, requiredBy string, existing lock.Mod) {
 		it.Aside = []string{"required by " + requiredBy}
 	}
 	if r.group != nil {
-		r.held = append(r.held, it)
+		r.group.held = append(r.group.held, it)
 		return
 	}
 	r.Note(it)
