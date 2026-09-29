@@ -42,7 +42,7 @@ func Reconcile(e *Env, in config.Instance) (rehooked bool) {
 		e.warnUnreproducible(*entry.Slot, command)
 	}
 	if r.CommandsOn {
-		e.Warn("turned commands back on in %s for %s, since shulker's hooks run as its commands", entry.Title, in.ID)
+		e.Warn("turned commands back on in %s for %s, since shulker's hooks run as its commands.", entry.Title, in.ID)
 	}
 	if err != nil {
 		e.Warn("hooks not set up for %s: %v", launcher.Named(in), err)
@@ -61,7 +61,7 @@ func (e *Env) warnUnreproducible(slot launcher.Slot, command string) {
 		}
 	}
 	if len(named) > 0 {
-		e.Warn("the command shulker adopted uses %s, which only the launcher can fill in, so it will be empty when shulker runs it", strings.Join(named, " and "))
+		e.Warn("the command shulker adopted uses %s, which only the launcher can fill in, so it will be empty when shulker runs it.", strings.Join(named, " and "))
 	}
 }
 

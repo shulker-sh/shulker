@@ -203,7 +203,7 @@ func (a *app) syncEnv() (*sync.Env, error) {
 	}
 	keep, err := a.saveBackups()
 	if err != nil {
-		a.printer.Warn("couldn't read play.saveBackups, keeping %d automatic backups: %v", keep, err)
+		a.printer.Warn("couldn't read play.saveBackups, keeping %d automatic backups: %v.", keep, err)
 	}
 	a.se = &sync.Env{Env: d.Env, Registry: config.RegistryPath(path, cfg), Saves: r.saves(), SaveBackups: keep}
 	if a.asksYes() {

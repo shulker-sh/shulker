@@ -148,7 +148,7 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			}
 			code, gaveWay, err := game.Run(game.Launch{Java: java, Argv: argv, Wrapper: f.Settings.Wrapper}, a.stdin, a.gameStdout(), a.printer.Stderr)
 			if gaveWay != nil {
-				a.printer.Warn("can't run the wrapper %q, so the game starts with Java alone: %v", f.Settings.Wrapper[0], gaveWay)
+				a.printer.Warn("can't run the wrapper %q, so the game starts with Java alone: %v.", f.Settings.Wrapper[0], gaveWay)
 			}
 			if err != nil {
 				if launching {

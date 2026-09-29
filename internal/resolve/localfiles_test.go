@@ -148,7 +148,7 @@ func TestReconcileKeepsAGoneLocalFileWhileTheCacheHasIt(t *testing.T) {
 	if got := h.mod("private-mod"); got.Sha512 != sha512Hex(jar) {
 		t.Fatalf("the entry the cache serves is kept: %+v", got)
 	}
-	if want := []string{"private-mod: files/private-mod-1.4.jar is gone; using the copy in the cache"}; !reflect.DeepEqual(h.r.Warnings, want) {
+	if want := []string{"private-mod: files/private-mod-1.4.jar is gone; using the copy in the cache."}; !reflect.DeepEqual(h.r.Warnings, want) {
 		t.Fatalf("warnings: %q", h.r.Warnings)
 	}
 	h.mustReconcile()

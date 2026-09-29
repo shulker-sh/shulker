@@ -63,7 +63,7 @@ func (r *Resolver) settleHeld(ctx context.Context, held heldMods, p provider.Pro
 		r.log("moving %s %s, which %s needs another version of", m.dep, m.found, m.mod)
 		if m.modpack != "" {
 			r.list(m.dep)
-			r.Warnings = append(r.Warnings, fmt.Sprintf("%s is now listed in shulker.json, so it no longer follows modpack %s", m.dep, m.modpack))
+			r.Warnings = append(r.Warnings, fmt.Sprintf("%s is now listed in shulker.json, so it no longer follows modpack %s.", m.dep, m.modpack))
 		}
 		r.dropLocked(m.dep)
 	}

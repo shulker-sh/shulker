@@ -94,7 +94,7 @@ func HistoryWarning(dir string, keep int) (string, error) {
 	if err != nil || len(entries) <= keep {
 		return "", err
 	}
-	return fmt.Sprintf("%d history entries are kept; `shulker history prune` trims them to %d", len(entries), keep), nil
+	return fmt.Sprintf("%d history entries are kept; `shulker history prune` trims them to %d.", len(entries), keep), nil
 }
 
 func HistoryPath(dir string) string {

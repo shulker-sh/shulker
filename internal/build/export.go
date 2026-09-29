@@ -142,7 +142,7 @@ func (b *Builder) Export(ctx context.Context, opts ExportOptions) (*ExportReport
 		for _, m := range integrations.SeedMods {
 			keys = append(keys, m.Key)
 		}
-		report.Warnings = append(report.Warnings, fmt.Sprintf("seeded files ship as plain overrides, which launchers write over the player's copy on each update: %s; add %s to keep them seeded", strings.Join(plain, ", "), strings.Join(keys[:len(keys)-1], ", ")+" or "+keys[len(keys)-1]))
+		report.Warnings = append(report.Warnings, fmt.Sprintf("seeded files ship as plain overrides, which launchers write over the player's copy on each update: %s; add %s to keep them seeded.", strings.Join(plain, ", "), strings.Join(keys[:len(keys)-1], ", ")+" or "+keys[len(keys)-1]))
 	}
 	overrides := splitOverrides(sides)
 	for _, o := range overrides {
@@ -253,7 +253,7 @@ func (b *Builder) exportCollect(t *exportSide, version, osName string, features 
 	}
 	for _, e := range rep.Excluded {
 		if strings.Contains(e, "(needs os ") {
-			warnings = append(warnings, fmt.Sprintf("%s: left out of %s; pass --os to export that variation", e, t.side))
+			warnings = append(warnings, fmt.Sprintf("%s: left out of %s; pass --os to export that variation.", e, t.side))
 		}
 	}
 	for path, s := range desired {
@@ -371,7 +371,7 @@ func (b *Builder) exportFiles(ctx context.Context, f packarchive.Format, sides [
 				unplaced.add(e.installsAs, e.key+" ("+path.Dir(e.path)+"/)")
 				continue
 			}
-			bundleInto(e, data, fmt.Sprintf("bundled %s into the archive at %s, since a %s launcher wouldn't place it there", e.key, e.path, f.Title()))
+			bundleInto(e, data, fmt.Sprintf("bundled %s into the archive at %s, since a %s launcher wouldn't place it there.", e.key, e.path, f.Title()))
 			continue
 		}
 		sum := sha1.Sum(data)
@@ -418,7 +418,7 @@ func (b *Builder) exportFiles(ctx context.Context, f packarchive.Format, sides [
 			missing.add(e.kind, e.key+" ("+from+")")
 			continue
 		}
-		bundleInto(e, blobs[e.key], fmt.Sprintf("bundled %s from %s into the archive; %s", e.key, from, f.Usage().Bundled))
+		bundleInto(e, blobs[e.key], fmt.Sprintf("bundled %s from %s into the archive; %s.", e.key, from, f.Usage().Bundled))
 	}
 	if missing.total() > 0 {
 		return nil, nil, bundleNudge(f.NotListed(kindCount(missing.counts), missing.total()), missing.items, command)
@@ -454,7 +454,7 @@ func (b *Builder) identifyOn(ctx context.Context, f packarchive.Format, lookup [
 	switch {
 	case err == nil:
 	case bundle:
-		report.Warnings = append(report.Warnings, fmt.Sprintf("%s lookup failed, so these are bundled: %s", f.Title(), out.AsError(err).Message))
+		report.Warnings = append(report.Warnings, fmt.Sprintf("%s lookup failed, so these are bundled: %s.", f.Title(), out.AsError(err).Message))
 		return matched, nil
 	default:
 		e := out.AsError(err)
@@ -473,12 +473,12 @@ func (b *Builder) identifyOn(ctx context.Context, f packarchive.Format, lookup [
 				fail.Items = []string{key}
 				return nil, fail
 			}
-			report.Warnings = append(report.Warnings, fmt.Sprintf("%s lookup for %s failed, so it is bundled: %s", f.Title(), key, out.AsError(err).Message))
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s lookup for %s failed, so it is bundled: %s.", f.Title(), key, out.AsError(err).Message))
 			continue
 		}
 		if ok {
 			matched[key] = v
-			report.Warnings = append(report.Warnings, fmt.Sprintf("%s matches %s file %s by contents, but its bytes differ from the locked file", key, f.Title(), v.ID))
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s matches %s file %s by contents, but its bytes differ from the locked file.", key, f.Title(), v.ID))
 		}
 	}
 	return matched, nil
@@ -562,7 +562,7 @@ func (b *Builder) describeListed(ctx context.Context, f packarchive.Format, file
 		projects, err = p.Projects(ctx, ids)
 	}
 	if err != nil {
-		report.Warnings = append(report.Warnings, fmt.Sprintf("%s project lookup failed, so the pack's listing names project IDs: %s", f.Title(), out.AsError(err).Message))
+		report.Warnings = append(report.Warnings, fmt.Sprintf("%s project lookup failed, so the pack's listing names project IDs: %s.", f.Title(), out.AsError(err).Message))
 		return
 	}
 	for i := range files {

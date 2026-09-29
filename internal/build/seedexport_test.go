@@ -60,7 +60,7 @@ func TestExportPutsSeededFilesInTheFirstPlacedSeedModsFolder(t *testing.T) {
 				if (c.folder == "") != (warned >= 0) {
 					t.Fatalf("the warning goes only with no seed mod placed: %v", report.Warnings)
 				}
-				if warned >= 0 && report.Warnings[warned] != "seeded files ship as plain overrides, which launchers write over the player's copy on each update: config/seeded.json, options.txt; add configmanager, yosbr or configured-defaults to keep them seeded" {
+				if warned >= 0 && report.Warnings[warned] != "seeded files ship as plain overrides, which launchers write over the player's copy on each update: config/seeded.json, options.txt; add configmanager, yosbr or configured-defaults to keep them seeded." {
 					t.Fatalf("warning: %s", report.Warnings[warned])
 				}
 			})

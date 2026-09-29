@@ -133,7 +133,7 @@ func (a *app) unlink(configPath string, l project.InstanceEntry) (unlinkResult, 
 			err = lf.Save()
 		}
 		if err != nil {
-			a.printer.Warn("couldn't drop %s from %s in %s: %v", l.Dir, local.FileName, l.Source, err)
+			a.printer.Warn("couldn't drop %s from %s in %s: %v.", l.Dir, local.FileName, l.Source, err)
 		}
 	}
 	return r, nil

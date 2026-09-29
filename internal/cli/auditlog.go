@@ -56,7 +56,7 @@ func (a *app) openLog(args []string) {
 		if isHook(a.log.Cmd) {
 			return
 		}
-		a.printer.Warn("can't write shulker's log, so this run goes unrecorded: %v", err)
+		a.printer.Warn("can't write shulker's log, so this run goes unrecorded: %v.", err)
 	}
 	a.printer.Recorder = a.log
 }

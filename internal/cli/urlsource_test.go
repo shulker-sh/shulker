@@ -49,7 +49,7 @@ func TestRawURLSourceWarnsItCarriesNoOverrides(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "link", "shulker", source, "--as", "raw", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	want := "pack is a raw manifest URL, so its overrides aren't included\nUse its git URL instead, with path for a pack in a subfolder"
+	want := "pack is a raw manifest URL, so its overrides aren't included.\nUse its git URL instead, with path for a pack in a subfolder"
 	if got := rawURLWarnings(env.Warnings); len(got) != 1 || got[0] != want {
 		t.Fatalf("a link to a raw URL warns once: %q", env.Warnings)
 	}

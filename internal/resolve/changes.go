@@ -171,7 +171,7 @@ func (c *Changes) Unshipped(sides []string, mods map[string]lock.Mod, placements
 		if place := placements[m.ID]; len(place.OS) > 0 || len(place.Feature) > 0 {
 			continue
 		}
-		warnings = append(warnings, fmt.Sprintf("%s is %s only, so no side of this project ships it; shulker set requires.%s.side both ships it anyway", m.ID, m.Side, m.ID))
+		warnings = append(warnings, fmt.Sprintf("%s is %s only, so no side of this project ships it; shulker set requires.%s.side both ships it anyway.", m.ID, m.Side, m.ID))
 	}
 	return warnings
 }

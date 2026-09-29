@@ -269,7 +269,7 @@ func TestCheckAnnotatesEachProblemInGitHubActions(t *testing.T) {
 		m["ignore"] = []any{map[string]any{"rule": "depends", "mod": "sodium", "on": "nothing", "declared": "*", "note": "stale"}}
 	})
 	stale := "::error title=shulker.lock does not match shulker.json (lock-stale)::sodium: side client -> server\n"
-	warning := "::warning::ignore entry 1 (depends: sodium on nothing) matched nothing\n"
+	warning := "::warning::ignore entry 1 (depends: sodium on nothing) matched nothing.\n"
 
 	_, _, stderr := h.run(t, "check")
 	if strings.Contains(stderr, "::error") {

@@ -109,7 +109,7 @@ func TestAssumeClientBuildsAnUndeclaredClient(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "sync", h.dir, "--into", into, "--assume-client", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Data.Side != "client" || len(env.Warnings) != 1 || env.Warnings[0] != "shulker.json declares no client; building from shared mods and overrides" {
+	if env.Data.Side != "client" || len(env.Warnings) != 1 || env.Warnings[0] != "shulker.json declares no client; building from shared mods and overrides." {
 		t.Fatalf("assumed client: side=%s warnings=%v", env.Data.Side, env.Warnings)
 	}
 	if data, _ := os.ReadFile(filepath.Join(into, "config", "shared.txt")); string(data) != "shared\n" {

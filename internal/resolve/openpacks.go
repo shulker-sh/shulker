@@ -49,11 +49,11 @@ func OpenPacks(ctx context.Context, store *modpack.Store, p *project.Project, mo
 			switch {
 			case name == mode.Linked:
 			case !ok && len(p.Lock.Modpacks) > 0:
-				warnings = append(warnings, fmt.Sprintf("modpack %s is not in the lock yet; resolving it", name))
+				warnings = append(warnings, fmt.Sprintf("modpack %s is not in the lock yet; resolving it.", name))
 			case moved && mp.IsHosted():
-				warnings = append(warnings, fmt.Sprintf("modpack %s has changed since the lock; resolving it", name))
+				warnings = append(warnings, fmt.Sprintf("modpack %s has changed since the lock; resolving it.", name))
 			case moved:
-				warnings = append(warnings, fmt.Sprintf("modpack %s has a new source since the lock; resolving it", name))
+				warnings = append(warnings, fmt.Sprintf("modpack %s has a new source since the lock; resolving it.", name))
 			}
 			l, err := store.Resolve(ctx, name, mp)
 			if err != nil {

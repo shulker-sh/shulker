@@ -413,7 +413,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 				report.Kept = append(report.Kept, f.rel+" "+k+" (edited in place)")
 			}
 			for _, k := range f.merge.overrode {
-				report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was edited in place and changed in the manifest; the manifest value was written", f.rel, k))
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was edited in place and changed in the manifest; the manifest value was written.", f.rel, k))
 			}
 			if len(f.merge.seeded) > 0 {
 				report.Warnings = append(report.Warnings, fmt.Sprintf("%s changed in the pack and in game at %s; kept yours. Delete it to take the pack's, or `shulker build --force` for every file.", f.rel, strings.Join(f.merge.seeded, ", ")))
@@ -1061,7 +1061,7 @@ func (b *Builder) awaitsDownload(key, sha512 string, url *string, file string, r
 	if sha512 != "" && (url != nil || file != "" || b.Cache.Has(sha512)) {
 		return false
 	}
-	report.Warnings = append(report.Warnings, fmt.Sprintf("%s is left out until its manual download is in downloads/; `shulker install` asks for it", key))
+	report.Warnings = append(report.Warnings, fmt.Sprintf("%s is left out until its manual download is in downloads/; `shulker install` asks for it.", key))
 	return true
 }
 

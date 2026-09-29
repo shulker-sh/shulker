@@ -39,7 +39,7 @@ func TestUnshippedWarnsOnlyForAnUnconditionedModOffEverySide(t *testing.T) {
 
 	got := c.Unshipped([]string{"server"}, mods, placements)
 
-	want := []string{"sodium is client only, so no side of this project ships it; shulker set requires.sodium.side both ships it anyway"}
+	want := []string{"sodium is client only, so no side of this project ships it; shulker set requires.sodium.side both ships it anyway."}
 	if !slices.Equal(got, want) {
 		t.Fatalf("got %q, want %q", got, want)
 	}

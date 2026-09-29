@@ -72,6 +72,6 @@ func (im *importer) alreadyRequired(o packarchive.Override, proj *provider.Proje
 	if !listed && !locked {
 		return false
 	}
-	im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("requires already has %s, so %s stays an override", key, o.Layer+"/"+o.Path))
+	im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("requires already has %s, so %s stays an override.", key, o.Layer+"/"+o.Path))
 	return true
 }

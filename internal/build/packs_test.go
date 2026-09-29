@@ -81,7 +81,7 @@ func TestChooseShader(t *testing.T) {
 }
 
 func unloadable(key string) string {
-	return key + " is placed, but nothing in this build can load it; shulker add iris"
+	return key + " is placed, but nothing in this build can load it; shulker add iris."
 }
 
 // lockFresh locks a resource pack from the fake CurseForge under key, placed as filename.

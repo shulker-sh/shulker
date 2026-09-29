@@ -78,7 +78,7 @@ func (a *app) warnKeptConflicts(kept []string, p *project.Project, side, dir str
 	if p != nil && config.SameDir(dir, filepath.Join(p.Dir, p.Manifest.BuildDir(side))) {
 		keep = ", `shulker pull` keeps yours"
 	}
-	a.printer.WarnNudge(out.Nudge{Lead: "Take the pack's version", Command: force}, "kept your version of %s; `shulker diff` shows the pack's%s", strings.Join(kept, ", "), keep)
+	a.printer.WarnNudge(out.Nudge{Lead: "Take the pack's version", Command: force}, "kept your version of %s; `shulker diff` shows the pack's%s.", strings.Join(kept, ", "), keep)
 }
 
 // rerunForced is the command line that ran cmd, with --force added. Flags that only change how

@@ -138,7 +138,7 @@ func (a *app) repairInstances(launcherName, launcherDir string) (repairResult, e
 	if res.Rebuilt {
 		kept, err := config.WriteInstances(path, instances)
 		if err == nil {
-			a.printer.Warn("%s; rebuilt it and kept the old one as %s", out.AsError(loadErr).Message, kept)
+			a.printer.Warn("%s; rebuilt it and kept the old one as %s.", out.AsError(loadErr).Message, kept)
 		}
 		return res, err
 	}
@@ -159,9 +159,9 @@ func (a *app) warnRestart(rehooked []config.Instance) {
 		seen[e.Name] = true
 		switch running, detectable := e.IsRunning(); {
 		case running:
-			a.printer.Warn("%s is open; restart it before playing, or it may write back its own copy without the hooks", e.Title)
+			a.printer.Warn("%s is open; restart it before playing, or it may write back its own copy without the hooks.", e.Title)
 		case !detectable:
-			a.printer.Warn("restart %s before playing if it's open, or it may write back its own copy without the hooks", e.Title)
+			a.printer.Warn("restart %s before playing if it's open, or it may write back its own copy without the hooks.", e.Title)
 		}
 	}
 }
@@ -169,7 +169,7 @@ func (a *app) warnRestart(rehooked []config.Instance) {
 // warnReplaced warns that a managed file shulker couldn't read was written over, naming where the
 // old one was kept.
 func (a *app) warnReplaced(unreadable error, kept string) {
-	a.printer.Warn("%s; replaced it and kept the old one as %s", out.AsError(unreadable).Message, kept)
+	a.printer.Warn("%s; replaced it and kept the old one as %s.", out.AsError(unreadable).Message, kept)
 }
 
 func (r repairResult) print(l *out.Lines) {

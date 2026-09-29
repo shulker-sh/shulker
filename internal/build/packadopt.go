@@ -62,7 +62,7 @@ func adoptPackList(m *manifest.Manifest, form packForm, o packarchive.Override) 
 	m.Client.ResourcePacks = &chosen
 	var warnings []string
 	for _, name := range dropped {
-		warnings = append(warnings, fmt.Sprintf("%s enables %s, which the pack doesn't place; left out of client.resourcePacks", o.Path, name))
+		warnings = append(warnings, fmt.Sprintf("%s enables %s, which the pack doesn't place; left out of client.resourcePacks.", o.Path, name))
 	}
 	return true, warnings
 }
@@ -77,7 +77,7 @@ func adoptShader(m *manifest.Manifest, o packarchive.Override) (bool, []string) 
 	key, found := packKeyByFile(m.Shaders(), file)
 	m.Client.Shader = &key
 	if file != "" && !found {
-		return true, []string{fmt.Sprintf("%s selects %s, which the pack doesn't place; no shader is selected", o.Path, file)}
+		return true, []string{fmt.Sprintf("%s selects %s, which the pack doesn't place; no shader is selected.", o.Path, file)}
 	}
 	return true, nil
 }

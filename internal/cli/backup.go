@@ -81,7 +81,7 @@ func (a *app) backupSource(target savesTarget) saves.Source {
 func (a *app) zipping(step func(format string, args ...any)) func(world string, open bool) {
 	return func(world string, open bool) {
 		if open {
-			a.printer.Warn("%s is open in a running game; its backup may be torn", world)
+			a.printer.Warn("%s is open in a running game; its backup may be torn.", world)
 		}
 		step("zipping %s", world)
 	}

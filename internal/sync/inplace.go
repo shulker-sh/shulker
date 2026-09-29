@@ -131,7 +131,7 @@ func ForLaunch(ctx context.Context, e *Env, dir, reason string) (Result, error) 
 	if err == nil || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return res, err
 	}
-	e.Warn("couldn't update, building what the lock already has: %v", err)
+	e.Warn("couldn't update, building what the lock already has: %v.", err)
 	req.Side = side
 	return buildInPlace(ctx, e, p.Dir, req)
 }

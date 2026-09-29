@@ -219,7 +219,7 @@ func (s *Store) Open(ctx context.Context, name string, p manifest.Require, pinne
 			return nil, "", err
 		}
 		if current != pinned.DirSha256 {
-			warning = fmt.Sprintf("modpack %s has changed since the lock; run `shulker lock`", name)
+			warning = fmt.Sprintf("modpack %s has changed since the lock; run `shulker lock`.", name)
 		}
 	case Git:
 		if pinned.Commit == "" {
@@ -411,7 +411,7 @@ func (s *Store) warnRawURL(name string, m *manifest.Manifest) {
 	if missing := pointedAt(m); len(missing) > 0 {
 		rows = "\nNor are " + strings.Join(missing, " and ")
 	}
-	s.Warn("%s is a raw manifest URL, so its overrides aren't included%s\nUse its git URL instead, with path for a pack in a subfolder", name, rows)
+	s.Warn("%s is a raw manifest URL, so its overrides aren't included.%s\nUse its git URL instead, with path for a pack in a subfolder", name, rows)
 }
 
 // pointedAt is what a manifest names in its own directory, beyond the default override folders

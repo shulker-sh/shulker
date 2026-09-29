@@ -162,7 +162,7 @@ func (a *app) searchMerge(p *project.Project) func([]provider.Hit) []provider.Re
 	}
 	ix, err := d.Cache.ReadListings()
 	if err != nil {
-		a.printer.Warn("the listing index wasn't read (%s)", err)
+		a.printer.Warn("the listing index wasn't read (%s).", err)
 	}
 	var mu sync.Mutex
 	touched := map[[2]cache.Listing]bool{}

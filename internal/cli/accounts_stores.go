@@ -144,7 +144,7 @@ func (a *app) warnMissingLaunchers(from, to []string) {
 			continue
 		}
 		if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
-			a.printer.Warn("%s isn't at %s, so there are no accounts to read there yet", e.Title, dir)
+			a.printer.Warn("%s isn't at %s, so there are no accounts to read there yet.", e.Title, dir)
 		}
 	}
 }

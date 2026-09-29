@@ -75,7 +75,7 @@ func (a *app) logCmd() *cobra.Command {
 			}
 			entries, err := auditlog.Read(a.log.Path)
 			if err != nil {
-				a.printer.Warn("can't read shulker's log at %s, so there is nothing to show: %v", a.log.Path, err)
+				a.printer.Warn("can't read shulker's log at %s, so there is nothing to show: %v.", a.log.Path, err)
 				entries = nil
 			}
 			keepDays := configuredKeepDays()

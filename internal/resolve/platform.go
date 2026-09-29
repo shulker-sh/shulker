@@ -118,7 +118,7 @@ func (mt *Meta) FillDataVersion(ctx context.Context, l *lock.Lock) (warning stri
 	}
 	dataVersion, err := mt.Piston.DataVersion(ctx, l.Minecraft)
 	if err != nil {
-		return fmt.Sprintf("couldn't read the Minecraft %s data version, so ${minecraft.dataVersion} stays unset until the next relock: %v", l.Minecraft, err)
+		return fmt.Sprintf("couldn't read the Minecraft %s data version, so ${minecraft.dataVersion} stays unset until the next relock: %v.", l.Minecraft, err)
 	}
 	l.DataVersion = dataVersion
 	return ""

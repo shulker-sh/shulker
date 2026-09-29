@@ -144,9 +144,9 @@ func CheckProperties(values map[string]string, game minecraft.Version) PropertyC
 		p, known := byKey[key]
 		switch {
 		case !known:
-			msg := fmt.Sprintf("server.properties key %q is not a known key", key)
+			msg := fmt.Sprintf("server.properties key %q is not a known key.", key)
 			if near := nearestKey(key); near != "" {
-				msg += fmt.Sprintf("; did you mean %q?", near)
+				msg = fmt.Sprintf("server.properties key %q is not a known key; did you mean %q?", key, near)
 			}
 			c.Warnings = append(c.Warnings, msg)
 			continue
@@ -158,7 +158,7 @@ func CheckProperties(values map[string]string, game minecraft.Version) PropertyC
 			c.Problems = append(c.Problems, msg+")")
 			continue
 		case p.Since != "" && minecraft.Compare(game, minecraft.MustParse(p.Since)) < 0:
-			c.Warnings = append(c.Warnings, fmt.Sprintf("server.properties key %q was added in Minecraft %s and is ignored by %s", key, p.Since, game))
+			c.Warnings = append(c.Warnings, fmt.Sprintf("server.properties key %q was added in Minecraft %s and is ignored by %s.", key, p.Since, game))
 		}
 		if problem, warning := p.checkValue(values[key]); problem != "" {
 			c.Problems = append(c.Problems, problem)
@@ -184,7 +184,7 @@ func (p Property) checkValue(value string) (problem, warning string) {
 			return fmt.Sprintf("%s (%q is not an integer)", p.Key, value), ""
 		}
 		if b := p.Bounds; b != nil && (n < b.Min || n > b.Max) {
-			return "", fmt.Sprintf("server.properties key %q is %d, outside %d-%d; the game clamps it", p.Key, n, b.Min, b.Max)
+			return "", fmt.Sprintf("server.properties key %q is %d, outside %d-%d; the game clamps it.", p.Key, n, b.Min, b.Max)
 		}
 	case Enum:
 		for _, v := range p.Values {

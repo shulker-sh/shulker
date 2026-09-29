@@ -322,7 +322,7 @@ func forgetInstance(e *Entry, l config.Instance) (Forgotten, error) {
 	f := Forgotten{}
 	running, detectable := e.IsRunning()
 	if running {
-		f.Warning = fmt.Sprintf("%s is open; it may put back the pre-launch sync this removes from %s. Quit it, then check the instance's settings", e.Title, l.ID)
+		f.Warning = fmt.Sprintf("%s is open; it may put back the pre-launch sync this removes from %s. Quit it, then check the instance's settings.", e.Title, l.ID)
 	}
 	if _, err := os.Stat(e.InstanceDir(l.Dir)); errors.Is(err, os.ErrNotExist) {
 		gone := unlinked(e, l, "Its instance was already gone")

@@ -276,7 +276,7 @@ func (b *Builder) selectMods(c conditions) selection {
 	for id, m := range b.Lock.Mods {
 		if included[id] {
 			if ok, isDirect := admitted[id]; isDirect && !ok {
-				sel.warnings = append(sel.warnings, fmt.Sprintf("%s is gated off (%s) but %s requires it; included", id, reasons[id], strings.Join(includedRequirers(m.RequiredBy, included), ", ")))
+				sel.warnings = append(sel.warnings, fmt.Sprintf("%s is gated off (%s) but %s requires it; included.", id, reasons[id], strings.Join(includedRequirers(m.RequiredBy, included), ", ")))
 			}
 			continue
 		}
@@ -387,7 +387,7 @@ func warnFeatureConflict(report *Report, was, now, rel string) {
 	if report == nil || was == "" || now == "" || was == now {
 		return
 	}
-	report.Warnings = append(report.Warnings, fmt.Sprintf("%s and %s both write %s; %s wins", was, now, rel, now))
+	report.Warnings = append(report.Warnings, fmt.Sprintf("%s and %s both write %s; %s wins.", was, now, rel, now))
 }
 
 // FeatureOverrides is every feature decision in force for a build: the layered decisions, then

@@ -116,6 +116,6 @@ func (a *app) watchedFolders() []string {
 			return cfg.Downloads.Watched(home)
 		}
 	}
-	a.printer.Warn("couldn't read downloads.watch, looking only in downloads/: %v", err)
+	a.printer.Warn("couldn't read downloads.watch, looking only in downloads/: %v.", err)
 	return nil
 }

@@ -243,7 +243,7 @@ func TestConfigItCantRead(t *testing.T) {
 			if _, err := a.deps(); err != nil {
 				t.Fatalf("deps over the config: %v", err)
 			}
-			warned, nudge, _ := strings.Cut(stderr.String(), "; ignoring it\n")
+			warned, nudge, _ := strings.Cut(stderr.String(), "; ignoring it.\n")
 			if warned == stderr.String() || strings.Contains(nudge, "shulker self update") != (tc.code == "schema-newer") {
 				t.Fatalf("deps warned %q", stderr.String())
 			}
@@ -254,7 +254,7 @@ func TestConfigItCantRead(t *testing.T) {
 			}
 
 			env = h.runEnvelope(t, 0, "config", "set", "store", "elsewhere")
-			if len(env.Warnings) != 1 || !strings.HasSuffix(env.Warnings[0], "; replaced it and kept the old one as "+h.config+".replaced") {
+			if len(env.Warnings) != 1 || !strings.HasSuffix(env.Warnings[0], "; replaced it and kept the old one as "+h.config+".replaced.") {
 				t.Fatalf("config set warnings: %q", env.Warnings)
 			}
 			if data, _ := os.ReadFile(h.config + ".replaced"); string(data) != tc.config {

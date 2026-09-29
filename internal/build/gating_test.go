@@ -89,7 +89,7 @@ func TestGatedDependencyStillShipsWhenRequired(t *testing.T) {
 	if len(report.Excluded) != 0 || len(p.mods()) != 2 {
 		t.Fatalf("required dependency dropped: %q %v", report.Excluded, p.mods())
 	}
-	if !slices.Contains(report.Warnings, "fabric-api is gated off (needs feature api) but sodium requires it; included") {
+	if !slices.Contains(report.Warnings, "fabric-api is gated off (needs feature api) but sodium requires it; included.") {
 		t.Fatalf("expected a warning, got: %q", report.Warnings)
 	}
 }

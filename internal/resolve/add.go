@@ -515,7 +515,7 @@ func (r *Resolver) pinnedChannel(id string, v *provider.Version, channel string)
 	if provider.ChannelAllows(channel, v.Channel) {
 		return channel
 	}
-	r.Warnings = append(r.Warnings, fmt.Sprintf("%s %s is a %s; accepting %s for it", id, v.Number, v.Channel, v.Channel))
+	r.Warnings = append(r.Warnings, fmt.Sprintf("%s %s is a %s; accepting %s for it.", id, v.Number, v.Channel, v.Channel))
 	return v.Channel
 }
 
@@ -932,7 +932,7 @@ func (r *Resolver) install(ctx context.Context, lockedFiles func() []downloadabl
 	var warnings []string
 	for _, f := range files {
 		if !r.lockHas(f.Sha512) {
-			warnings = append(warnings, fmt.Sprintf("%s/%s matches no mod in the lock", DownloadsDir, f.Name))
+			warnings = append(warnings, fmt.Sprintf("%s/%s matches no mod in the lock.", DownloadsDir, f.Name))
 		} else if err := r.Cache.MarkManual(f.Sha512); err != nil {
 			return nil, nil, err
 		}

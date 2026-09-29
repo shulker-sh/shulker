@@ -67,7 +67,7 @@ func RequireLock(e *Env, p *project.Project) error {
 		return err
 	}
 	if diffs := p.LockDifferences(); len(diffs) > 0 {
-		e.Warn("shulker.lock is out of date with shulker.json (%s); run `shulker lock`", strings.Join(diffs, "; "))
+		e.Warn("shulker.lock is out of date with shulker.json (%s); run `shulker lock`.", strings.Join(diffs, "; "))
 	}
 	e.WarnEach(p.GoneFiles(e.Cache.Has))
 	return nil

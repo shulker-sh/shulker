@@ -154,7 +154,7 @@ func TestValidateTakesOrOnlyFromAnArray(t *testing.T) {
 	if !reflect.DeepEqual(v.Problems, wantProblems) {
 		t.Errorf("problems %+v, want %+v", v.Problems, wantProblems)
 	}
-	wantWarnings := []string{`easy_npc breaks easy_model_entities <2.4.0 || >=3.0.0, but "||" inside one range string is read as a version, not as "or"`}
+	wantWarnings := []string{`easy_npc breaks easy_model_entities <2.4.0 || >=3.0.0, but "||" inside one range string is read as a version, not as "or".`}
 	if !reflect.DeepEqual(v.Warnings, wantWarnings) {
 		t.Errorf("warnings %q, want %q", v.Warnings, wantWarnings)
 	}
@@ -194,7 +194,7 @@ func TestValidateWarnsOnceOnAnUnreadableRange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"factory_blocks depends on minecraft [1.21,1.21.1,1.21.2] but the range has more than two bounds: not checked"}
+	want := []string{"factory_blocks depends on minecraft [1.21,1.21.1,1.21.2] but the range has more than two bounds: not checked."}
 	if !reflect.DeepEqual(v.Warnings, want) || len(v.Problems) > 0 {
 		t.Fatalf("warnings %q, problems %+v, want %q", v.Warnings, v.Problems, want)
 	}

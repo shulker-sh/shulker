@@ -228,7 +228,7 @@ func (r *Resolver) ImportProject(ctx context.Context, arc *packarchive.Archive, 
 	if opts.ServerPack && arc.Path != "" {
 		mods.ServerPack, err = r.serverPackOf(ctx, arc)
 		if err != nil {
-			mods.Warnings = append(mods.Warnings, fmt.Sprintf("the pack's server files weren't read (%v); each mod's side comes from its own metadata", err))
+			mods.Warnings = append(mods.Warnings, fmt.Sprintf("the pack's server files weren't read (%v); each mod's side comes from its own metadata.", err))
 		}
 	}
 	return mods, nil
@@ -467,7 +467,7 @@ func (im *importer) settleHybrids(ctx context.Context) error {
 			entry.ResourcePack = true
 			im.r.Manifest.Requires[key] = entry
 			if name := c.name(); name != p.Filename {
-				im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: its resource pack copy was resourcepacks/%s and is now placed as resourcepacks/%s; enable it again in game", key, name, p.Filename))
+				im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: its resource pack copy was resourcepacks/%s and is now placed as resourcepacks/%s; enable it again in game.", key, name, p.Filename))
 			}
 		}
 	}
@@ -498,7 +498,7 @@ func (im *importer) identify(ctx context.Context) error {
 			if len(files) == 1 {
 				kept = "an override"
 			}
-			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s looked up on %s (%s); kept as %s", out.Count(len(files), "file wasn't", "files weren't"), im.r.Providers.Title(name), out.AsError(err).Message, kept))
+			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s looked up on %s (%s); kept as %s.", out.Count(len(files), "file wasn't", "files weren't"), im.r.Providers.Title(name), out.AsError(err).Message, kept))
 			continue
 		}
 		im.r.log("looking up %s on %s", out.Count(len(files), "file", "files"), p.Title())
@@ -540,7 +540,7 @@ func (im *importer) lockIdentified(ctx context.Context) (err error) {
 			continue
 		}
 		if h.v.File.URL == "" {
-			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s is on %s, but its author doesn't allow third-party downloads; kept as an override", file, h.p.Title()))
+			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s is on %s, but its author doesn't allow third-party downloads; kept as an override.", file, h.p.Title()))
 			im.unmanaged(o)
 			continue
 		}
@@ -584,7 +584,7 @@ func (im *importer) lockFile(ctx context.Context, p provider.Provider, layer, fi
 func (im *importer) lockOverride(ctx context.Context, p provider.Provider, o packarchive.Override, side string, proj *provider.Project, v *provider.Version) (bool, error) {
 	locked, failed, err := im.lockFile(ctx, p, o.Layer, o.Path, side, proj, v)
 	if failed != "" {
-		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s/%s: %s's download failed (%s); kept as an override, so try matching it again later", o.Layer, o.Path, p.Title(), failed))
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s/%s: %s's download failed (%s); kept as an override, so try matching it again later.", o.Layer, o.Path, p.Title(), failed))
 	}
 	return locked, err
 }
@@ -679,7 +679,7 @@ func (im *importer) lockMod(ctx context.Context, p provider.Provider, file, pack
 	if prior, ok := im.markerManifestMod(id); ok {
 		entry = prior
 		if entry.Pin != "" {
-			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: the marker pinned %v but the pack ships %s; pin dropped", id, entry.Pin, v.Number))
+			im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: the marker pinned %v but the pack ships %s; pin dropped.", id, entry.Pin, v.Number))
 			entry.Pin = ""
 		}
 	}
@@ -716,11 +716,11 @@ func (im *importer) duplicate(id string, prior *lock.Mod, project, filename stri
 	kept := im.r.Lock.Mods[id]
 	switch {
 	case prior.Project == project && prior.Filename == filename:
-		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s", id, kept.Filename))
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept %s.", id, kept.Filename))
 	case prior.Project == project:
-		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack (%s, %s); kept %s", id, prior.Filename, filename, kept.Filename))
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack (%s, %s); kept %s.", id, prior.Filename, filename, kept.Filename))
 	default:
-		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack (%s, %s); kept %s, the newest", id, prior.Filename, filename, kept.Filename))
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack (%s, %s); kept %s, the newest.", id, prior.Filename, filename, kept.Filename))
 	}
 	return kept.Project != prior.Project
 }
@@ -782,7 +782,7 @@ func shippedChannel(v *provider.Version) string {
 // pack already listed is a duplicate: the first is kept, with a warning.
 func (im *importer) canListPack(key, kind string) (bool, error) {
 	if held, taken := im.r.Manifest.Requires[key]; taken && held.Kind() == kind {
-		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept the first", key))
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s appears twice in the pack; kept the first.", key))
 		return false, nil
 	}
 	if !manifest.IsValidKey(key) {
@@ -904,7 +904,7 @@ func (im *importer) reuse(id, side string) {
 	im.matched[id] = true
 	entry := im.a.Marker.Lock.Mods[id]
 	if side != "" && entry.Side != side {
-		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: the marker says side %s but the pack ships it for %s; using %s", id, entry.Side, side, side))
+		im.rep.Warnings = append(im.rep.Warnings, fmt.Sprintf("%s: the marker says side %s but the pack ships it for %s; using %s.", id, entry.Side, side, side))
 		entry.Side = side
 	}
 	im.r.Lock.Mods[id] = entry

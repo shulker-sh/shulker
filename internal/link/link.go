@@ -67,7 +67,7 @@ type Report struct {
 // NoClientPack is what a link says when the pack it is about to follow declares no client. The
 // instance has a client block of its own, so the build goes ahead on the pack's shared mods and
 // overrides; without the line a server-only pack would just give a near-empty instance.
-const NoClientPack = "The source declares no client; building one from its shared mods and overrides"
+const NoClientPack = "The source declares no client; building one from its shared mods and overrides."
 
 // Into links the source into one launcher: the launcher's own placement, checks and link step
 // around the project, registry row and build every link shares.

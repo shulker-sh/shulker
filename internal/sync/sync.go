@@ -18,7 +18,7 @@ import (
 )
 
 // AssumeClientWarning is what a sync says when it builds a client the manifest doesn't declare.
-const AssumeClientWarning = "shulker.json declares no client; building from shared mods and overrides"
+const AssumeClientWarning = "shulker.json declares no client; building from shared mods and overrides."
 
 // Request is what a sync is asked for beyond its source.
 type Request struct {
@@ -130,7 +130,7 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 	}
 	if remote && !src.Offline {
 		if err := e.Store().RecordGood(src.Checkout); err != nil {
-			e.Warn("couldn't record %s as the offline fallback: %v", src.Name, err)
+			e.Warn("couldn't record %s as the offline fallback: %v.", src.Name, err)
 		}
 	}
 	res = Result{Source: src.Name, Kind: src.Kind, Path: src.Path, Commit: src.Commit, Sha256: src.Sha256, Offline: src.Offline, Side: side, Dir: into, Fetched: fetched, Build: rep, Saves: linked, Project: p}

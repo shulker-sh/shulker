@@ -51,7 +51,7 @@ func (a *app) accountsLoginCmd() *cobra.Command {
 			used := r.IsDefault(cfg.Accounts.Default)
 			switch {
 			case r.State == account.NoProfile:
-				a.printer.Warn("%s owns no Java profile, so it can't launch or be the default account; Minecraft: Java Edition is at minecraft.net", r.Name)
+				a.printer.Warn("%s owns no Java profile, so it can't launch or be the default account; Minecraft: Java Edition is at minecraft.net.", r.Name)
 			case (use || cfg.Accounts.Default == "") && !used:
 				if _, err := a.changeDefault(r.ID); err != nil {
 					return err
@@ -299,7 +299,7 @@ func accountSelector(r account.Resolved) string { return account.QuoteName(r.Nam
 func renewFailed(err error) string {
 	e := out.AsError(err)
 	if len(e.Rows) > 0 && e.Rows[0].IsCommand {
-		return e.Message + "; run `" + e.Rows[0].Text + "`"
+		return e.Message + "; run `" + e.Rows[0].Text + "`."
 	}
 	return e.Message
 }

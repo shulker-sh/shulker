@@ -186,7 +186,7 @@ func (b *Builder) reportUnloadableShaders(desired map[string]source, present map
 	for _, key := range b.placedShaders(desired) {
 		p := b.Lock.Shaders[key]
 		if !slices.ContainsFunc(integrations.Shaders, func(s integrations.Shader) bool { return s.Loads(p.Loaders, present) }) {
-			report.Warnings = append(report.Warnings, key+" is placed, but nothing in this build can load it; shulker add "+integrations.Shaders[0].Key)
+			report.Warnings = append(report.Warnings, key+" is placed, but nothing in this build can load it; shulker add "+integrations.Shaders[0].Key+".")
 		}
 	}
 }
@@ -213,11 +213,11 @@ func (b *Builder) seed(side string, opts Options, rel, key, want string, renamed
 	}
 	if len(renamed) > 0 && b.listForm().rename(was, renamed) == want {
 		for _, old := range slices.Sorted(maps.Keys(renamed)) {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was renamed %s, but the %s changed in game still names it; kept it, `shulker build --force` writes %s's", rel, old, renamed[old], key, manifest.FileName))
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s was renamed %s, but the %s changed in game still names it; kept it, `shulker build --force` writes %s's.", rel, old, renamed[old], key, manifest.FileName))
 		}
 		return was
 	}
-	report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s changed in %s and in game; kept the game's, `shulker build --force` writes %s's", rel, key, manifest.FileName, manifest.FileName))
+	report.Warnings = append(report.Warnings, fmt.Sprintf("%s: %s changed in %s and in game; kept the game's, `shulker build --force` writes %s's.", rel, key, manifest.FileName, manifest.FileName))
 	return was
 }
 
@@ -442,7 +442,7 @@ func (b *Builder) reportPackList(side string, opts Options, desired map[string]s
 	if cl := b.Manifest.Client; cl == nil || cl.ResourcePacks == nil {
 		for _, name := range placed {
 			if !slices.Contains(entries, form.entry(name)) {
-				report.Warnings = append(report.Warnings, fmt.Sprintf("%s is placed but not enabled; turn it on in game under Options, Resource Packs", strings.TrimSuffix(name, ".zip")))
+				report.Warnings = append(report.Warnings, fmt.Sprintf("%s is placed but not enabled; turn it on in game under Options, Resource Packs.", strings.TrimSuffix(name, ".zip")))
 			}
 		}
 	}
@@ -451,7 +451,7 @@ func (b *Builder) reportPackList(side string, opts Options, desired map[string]s
 	}
 	for _, entry := range entries {
 		if name, ok := form.name(entry); ok && !slices.Contains(placed, name) {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("%s enables %s, but no pack is placed under that name", OptionsFile, name))
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s enables %s, but no pack is placed under that name.", OptionsFile, name))
 		}
 	}
 	return nil
@@ -564,7 +564,7 @@ func (b *Builder) collectDatapacks(side, levelName string, cond conditions, desi
 		placed = append(placed, key)
 	}
 	if !loaded && len(placed) > 0 {
-		report.Warnings = append(report.Warnings, fmt.Sprintf("%s: placed in %s/, which only some global datapack mods read; add one, such as %s, to load it in every world", strings.Join(placed, ", "), folder, integrations.DatapackLoaders[0].Key))
+		report.Warnings = append(report.Warnings, fmt.Sprintf("%s: placed in %s/, which only some global datapack mods read; add one, such as %s, to load it in every world.", strings.Join(placed, ", "), folder, integrations.DatapackLoaders[0].Key))
 	}
 	return nil
 }

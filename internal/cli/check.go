@@ -181,7 +181,7 @@ func (a *app) checkServer(ctx context.Context, p *project.Project, r *resolve.Re
 	_, err = a.freshestJava(ctx, p, sync.ServerJavaFix)
 	switch {
 	case out.CodeOf(err) == "runtime-unavailable":
-		warnings = append(warnings, sync.RuntimeWarning(err))
+		warnings = append(warnings, sync.RuntimeWarning(err)+".")
 	case err != nil:
 		errs = append(errs, err)
 	}

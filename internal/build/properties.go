@@ -159,7 +159,7 @@ func mergedProperties(prev source, data []byte, from keySource, src source, rel 
 				continue
 			}
 			if was := origins[k].feature; was != "" && from.feature != "" && was != from.feature && old != v {
-				conflicts = append(conflicts, fmt.Sprintf("%s and %s set %s in %s differently; %s wins", was, from.feature, k, rel, from.feature))
+				conflicts = append(conflicts, fmt.Sprintf("%s and %s set %s in %s differently; %s wins.", was, from.feature, k, rel, from.feature))
 			}
 		}
 		merged[k] = v

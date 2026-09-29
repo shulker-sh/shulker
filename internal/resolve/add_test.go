@@ -267,7 +267,7 @@ func TestInstallWarnsOfStrayDownloadsAndListsMissingFiles(t *testing.T) {
 	h.drop("log.json", nil)
 	h.r.Cache = &cache.Cache{Dir: t.TempDir()}
 	fetched, warnings, err := h.install()
-	if err != nil || len(fetched) != 0 || len(warnings) != 1 || warnings[0] != DownloadsDir+"/unrelated.jar matches no mod in the lock" {
+	if err != nil || len(fetched) != 0 || len(warnings) != 1 || warnings[0] != DownloadsDir+"/unrelated.jar matches no mod in the lock." {
 		t.Fatalf("install: %v %v %v", fetched, warnings, err)
 	}
 	for _, id := range []string{"nodist", "locked"} {
@@ -307,7 +307,7 @@ func TestPinningABetaFileAcceptsBeta(t *testing.T) {
 
 	h.mustAdd("667391", AddOptions{Pin: "5600001"})
 
-	if !slices.Contains(h.r.Warnings, "framework 0.6.16 is a beta; accepting beta for it") {
+	if !slices.Contains(h.r.Warnings, "framework 0.6.16 is a beta; accepting beta for it.") {
 		t.Fatalf("add should say the pin widens the channel: %v", h.r.Warnings)
 	}
 	if got := h.mod("framework").Channel; got != "beta" {
@@ -335,7 +335,7 @@ func TestPinWidensTheChannel(t *testing.T) {
 	if _, err := h.r.Pin(context.Background(), "jei", "5000003"); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(h.r.Warnings, "jei 1.0.1-beta is a beta; accepting beta for it") {
+	if !slices.Contains(h.r.Warnings, "jei 1.0.1-beta is a beta; accepting beta for it.") {
 		t.Fatalf("pin should say the pin widens the channel: %v", h.r.Warnings)
 	}
 	if got := h.r.Manifest.Mods()["jei"].Channel; got != "beta" {

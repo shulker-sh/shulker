@@ -207,10 +207,10 @@ func Policy(results []Result, acceptChange bool) ([]string, error) {
 	for _, r := range results {
 		switch r.State {
 		case Renamed:
-			warnings = append(warnings, fmt.Sprintf("player %s is now named %s (%s)", r.Previous, r.Name, r.UUID))
+			warnings = append(warnings, fmt.Sprintf("player %s is now named %s (%s).", r.Previous, r.Name, r.UUID))
 		case Reassigned:
 			if acceptChange {
-				warnings = append(warnings, fmt.Sprintf("player %s is now a different account: %s was %s", r.Name, r.UUID, r.Previous))
+				warnings = append(warnings, fmt.Sprintf("player %s is now a different account: %s was %s.", r.Name, r.UUID, r.Previous))
 				continue
 			}
 			reassigned = append(reassigned, fmt.Sprintf("%s: the lock has %s, Mojang now reports %s", r.Name, r.Previous, r.UUID))

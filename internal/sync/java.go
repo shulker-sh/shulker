@@ -67,7 +67,7 @@ func ProjectJava(ctx context.Context, e *Env, p *project.Project) (java.Binary, 
 		if out.CodeOf(err) != "runtime-unavailable" {
 			return java.Binary{}, err
 		}
-		e.Warn("%s; using java on PATH", RuntimeWarning(err))
+		e.Warn("%s; using java on PATH.", RuntimeWarning(err))
 		return java.Find("", p.Lock.Java.Major)
 	}
 	return java.At(rt.Home)

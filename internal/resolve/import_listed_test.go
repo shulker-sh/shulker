@@ -161,7 +161,7 @@ func TestImportKeepsTheNewestOfTwoProjectsWithOneModID(t *testing.T) {
 		if order[0] == newer {
 			first, second = second, first
 		}
-		want := "computercraft appears twice in the pack (" + first + ", " + second + "); kept cc-tweaked-1.120.2.jar, the newest"
+		want := "computercraft appears twice in the pack (" + first + ", " + second + "); kept cc-tweaked-1.120.2.jar, the newest."
 		if strings.Join(res.Warnings, "\n") != want {
 			t.Fatalf("warnings: %q", res.Warnings)
 		}

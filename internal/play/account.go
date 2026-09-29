@@ -139,9 +139,9 @@ func Session(ctx context.Context, e *Env, r account.Resolved) (account.Account, 
 	}
 	switch warning {
 	case account.WarnTokenExpired:
-		e.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session", r.Name, launcher.Title(r.Source))
+		e.Warn("%s's session token has run out and only %s can renew it; online servers and Realms will reject this session.", r.Name, launcher.Title(r.Source))
 	case account.WarnOffline:
-		e.Warn("shulker couldn't reach Microsoft, so %s plays on the session it already had; online servers and Realms will reject it", r.Name)
+		e.Warn("shulker couldn't reach Microsoft, so %s plays on the session it already had; online servers and Realms will reject it.", r.Name)
 	}
 	if !renewed {
 		return signed, nil

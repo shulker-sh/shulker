@@ -76,7 +76,7 @@ func Assemble(ctx context.Context, e *Env, in config.Instance, req Request) (*Pl
 	// A pack that can't be read costs the launch only its client.memory, never the launch: the
 	// sync before it has already said what is wrong, and the game starts from what is on disk.
 	if _, err := resolve.Packs(ctx, e.Env.Env, p); err != nil {
-		e.Warn("using %s: the modpacks couldn't be read for a client.memory: %v", instance.DefaultMemory, err)
+		e.Warn("using %s: the modpacks couldn't be read for a client.memory: %v.", instance.DefaultMemory, err)
 	}
 	if plan.Settings, err = settings(e, f, p); err != nil {
 		return nil, err

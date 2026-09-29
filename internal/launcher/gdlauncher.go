@@ -179,7 +179,7 @@ func linkGDLauncher(ctx context.Context, _ *Entry, req *Link, _ Placement) (Inst
 		return InstanceResult{}, err
 	}
 	if running, _ := GDLauncherRunning(); running {
-		req.WarnNudge(out.Nudge{Lead: "Quit it, then link again", Command: "shulker link gdlauncher"}, "GDLauncher is open and may overwrite this instance")
+		req.WarnNudge(out.Nudge{Lead: "Quit it, then link again", Command: "shulker link gdlauncher"}, "GDLauncher is open and may overwrite this instance.")
 	}
 	g := &GDLauncher{Dir: req.LauncherDir}
 	return g.WriteInstance(GDLauncherInstance{
@@ -211,22 +211,22 @@ func gdlauncherLoaderVersion(ctx context.Context, req *Link) (string, error) {
 	listed, err := meta.LoaderVersions(ctx, req.LoaderType, req.Minecraft)
 	switch {
 	case err != nil:
-		req.Warn("couldn't check whether GDLauncher can install %s %s (%v); the instance asks for it anyway", req.LoaderType, want, err)
+		req.Warn("couldn't check whether GDLauncher can install %s %s (%v); the instance asks for it anyway.", req.LoaderType, want, err)
 		return want, nil
 	case slices.Contains(listed, want):
 		return want, nil
 	case len(listed) == 0:
-		req.Warn("GDLauncher can't install %s for Minecraft %s yet, so the instance won't start until it can", req.LoaderType, req.Minecraft)
+		req.Warn("GDLauncher can't install %s for Minecraft %s yet, so the instance won't start until it can.", req.LoaderType, req.Minecraft)
 		return want, nil
 	}
 	newest := slices.MaxFunc(listed, func(x, y string) int {
 		return maven.Compare(maven.Parse(x), maven.Parse(y))
 	})
 	if req.Force {
-		req.Warn("GDLauncher can't install %s %s yet, so the instance won't start until it can; without --force it would use %s", req.LoaderType, want, newest)
+		req.Warn("GDLauncher can't install %s %s yet, so the instance won't start until it can; without --force it would use %s.", req.LoaderType, want, newest)
 		return want, nil
 	}
-	req.Warn("GDLauncher can't install %s %s yet, so the instance uses %s, the newest it has; run this link again once GDLauncher adds %s, or pass --force to use it anyway", req.LoaderType, want, newest, want)
+	req.Warn("GDLauncher can't install %s %s yet, so the instance uses %s, the newest it has; run this link again once GDLauncher adds %s, or pass --force to use it anyway.", req.LoaderType, want, newest, want)
 	return newest, nil
 }
 

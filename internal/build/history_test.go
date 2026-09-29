@@ -163,7 +163,7 @@ func TestHistoryWarnsPastTheKeptCountAndPruneTrimsIt(t *testing.T) {
 	}
 	p.file("config/x.txt", "mine again\n")
 	report := p.mustBuild("client", Options{Force: true})
-	if !slices.Contains(report.Warnings, "2 history entries are kept; `shulker history prune` trims them to 1") {
+	if !slices.Contains(report.Warnings, "2 history entries are kept; `shulker history prune` trims them to 1.") {
 		t.Fatalf("a change over the limit should warn: %q", report.Warnings)
 	}
 	before := p.history()

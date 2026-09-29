@@ -169,7 +169,7 @@ func (r *Resolver) Validate(sides ...string) (*Validation, error) {
 	})
 	for i, ig := range r.Manifest.Ignore {
 		if !used[i] {
-			v.Warnings = append(v.Warnings, fmt.Sprintf("ignore entry %d (%s: %s on %s) matched nothing", i+1, ig.Rule, ig.Mod, ig.On))
+			v.Warnings = append(v.Warnings, fmt.Sprintf("ignore entry %d (%s: %s on %s) matched nothing.", i+1, ig.Rule, ig.Mod, ig.On))
 		}
 	}
 	sort.Slice(v.Suggestions, func(i, j int) bool {
@@ -241,7 +241,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 			if ok {
 				match, err := satisfies(info, on, found, declared, sc.compatible[on])
 				if err != nil {
-					v.Warnings = append(v.Warnings, fmt.Sprintf("%s depends on %s %s but %s: not checked", id, on, declared, err))
+					v.Warnings = append(v.Warnings, fmt.Sprintf("%s depends on %s %s but %s: not checked.", id, on, declared, err))
 					continue
 				}
 				if match {
@@ -266,7 +266,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 			}
 			match, err := satisfies(info, on, found, declared, sc.compatible[on])
 			if err != nil {
-				v.Warnings = append(v.Warnings, fmt.Sprintf("%s optionally depends on %s %s but %s: not checked", id, on, declared, err))
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s optionally depends on %s %s but %s: not checked.", id, on, declared, err))
 				continue
 			}
 			if !match {
@@ -281,7 +281,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 			}
 			match, err := satisfies(info, on, found, declared, sc.compatible[on])
 			if err != nil {
-				v.Warnings = append(v.Warnings, fmt.Sprintf("%s breaks %s %s but %s: not checked", id, on, declared, err))
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s breaks %s %s but %s: not checked.", id, on, declared, err))
 				continue
 			}
 			if match {
@@ -294,7 +294,7 @@ func (r *Resolver) validateSide(side string, overrides jarmeta.DependencyOverrid
 				continue
 			}
 			if match, err := satisfies(info, on, found, info.Conflicts[on], sc.compatible[on]); err == nil && match {
-				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s)", id, info.Version, on, info.Conflicts[on], found))
+				v.Warnings = append(v.Warnings, fmt.Sprintf("%s %s conflicts with %s %s (installed %s).", id, info.Version, on, info.Conflicts[on], found))
 			}
 		}
 		for kind, set := range map[string]map[string]jarmeta.Range{"recommends": info.Recommends, "suggests": info.Suggests} {
@@ -322,7 +322,7 @@ func orInsideRange(id string, info *jarmeta.Info, installed map[string]string) [
 		for _, on := range sortedKeys(kind.ranges) {
 			declared := kind.ranges[on]
 			if _, ok := installed[on]; ok && slices.ContainsFunc(declared, func(alt string) bool { return strings.Contains(alt, "||") }) {
-				warnings = append(warnings, fmt.Sprintf(`%s %s %s %s, but "||" inside one range string is read as a version, not as "or"`, id, kind.verb, on, declared))
+				warnings = append(warnings, fmt.Sprintf(`%s %s %s %s, but "||" inside one range string is read as a version, not as "or".`, id, kind.verb, on, declared))
 			}
 		}
 	}

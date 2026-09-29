@@ -41,7 +41,7 @@ func TestLockReplacesALockItCantRead(t *testing.T) {
 			if err := json.Unmarshal([]byte(h.mustRun(t, "lock", "--json")), &env); err != nil {
 				t.Fatal(err)
 			}
-			if len(env.Warnings) != 1 || !strings.HasSuffix(env.Warnings[0], "; replaced it and kept the old one as shulker.lock.replaced") {
+			if len(env.Warnings) != 1 || !strings.HasSuffix(env.Warnings[0], "; replaced it and kept the old one as shulker.lock.replaced.") {
 				t.Fatalf("warnings: %q", env.Warnings)
 			}
 			if data, _ := os.ReadFile(path + ".replaced"); string(data) != tc.lock {

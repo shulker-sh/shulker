@@ -108,7 +108,7 @@ func TestIdentifySaysOneFileWasntLookedUp(t *testing.T) {
 	if err := im.identify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	want := "1 file wasn't looked up on Alpha (alpha needs a key); kept as an override"
+	want := "1 file wasn't looked up on Alpha (alpha needs a key); kept as an override."
 	if len(im.rep.Warnings) != 1 || im.rep.Warnings[0] != want {
 		t.Errorf("warnings %q, want %q", im.rep.Warnings, want)
 	}

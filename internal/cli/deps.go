@@ -64,10 +64,10 @@ func (a *app) deps() (*deps, error) {
 	cfg, err := config.LoadFile(path)
 	switch code := out.CodeOf(err); {
 	case code == "config-invalid":
-		a.printer.Warn("%s; ignoring it", out.AsError(err).Message)
+		a.printer.Warn("%s; ignoring it.", out.AsError(err).Message)
 		cfg = config.Config{}
 	case code == "schema-newer":
-		a.printer.WarnNudge(schema.UpdateNudge, "%s; ignoring it", out.AsError(err).Message)
+		a.printer.WarnNudge(schema.UpdateNudge, "%s; ignoring it.", out.AsError(err).Message)
 		cfg = config.Config{}
 	case err != nil:
 		return nil, err
@@ -257,6 +257,6 @@ func (a *app) requireLock(p *project.Project) error {
 
 func (a *app) warnLockDifferences(p *project.Project) {
 	if diffs := p.LockDifferences(); len(diffs) > 0 {
-		a.printer.Warn("shulker.lock is out of date with shulker.json (%s); run `shulker lock`", strings.Join(diffs, "; "))
+		a.printer.Warn("shulker.lock is out of date with shulker.json (%s); run `shulker lock`.", strings.Join(diffs, "; "))
 	}
 }

@@ -77,7 +77,7 @@ func (a *app) selfUninstall(purge bool) error {
 	res := selfUninstallResult{Unhooked: []config.Instance{}, Install: string(route), Purged: purge}
 	instances, err := a.loadInstances()
 	if err != nil {
-		a.printer.Warn("no instance was unhooked: %v", err)
+		a.printer.Warn("no instance was unhooked: %v.", err)
 	}
 	for _, in := range instances {
 		e := launcher.Find(in.Launcher)
@@ -93,7 +93,7 @@ func (a *app) selfUninstall(purge bool) error {
 		// scripts go, and a Mojang profile gets its own Java back. The row's launcherDir is what
 		// reaches the profile of an instance whose folder is gone.
 		if _, _, err := launcher.ReleaseSlots(e, in); err != nil {
-			a.printer.Warn("%s keeps shulker's hooks: %v", launcher.Named(in), err)
+			a.printer.Warn("%s keeps shulker's hooks: %v.", launcher.Named(in), err)
 			continue
 		}
 		res.Unhooked = append(res.Unhooked, in)
@@ -116,7 +116,7 @@ func (a *app) selfUninstall(purge bool) error {
 	}
 	if purge {
 		if err := a.forgetRegistry(); err != nil {
-			a.printer.Warn("the registry is still there: %v", err)
+			a.printer.Warn("the registry is still there: %v.", err)
 			res.Purged, res.Forgotten = false, nil
 		}
 	} else {
@@ -296,7 +296,7 @@ func (a *app) checkProvenance(ctx context.Context, r *selfupdate.Releases, tag, 
 		if require {
 			return "", out.Errorf("self-update-provenance", "build provenance could not be verified").WithCause("gh", err)
 		}
-		a.printer.Warn("build provenance could not be verified, continuing on the checksum")
+		a.printer.Warn("build provenance could not be verified, continuing on the checksum.")
 		return "unverified", nil
 	}
 	a.progress("build provenance verified")

@@ -314,7 +314,7 @@ func (p *Project) GoneFiles(cached func(sha512 string) bool) []string {
 
 // FileGone is the warning for a local file entry whose file has been deleted.
 func FileGone(key, rel string) string {
-	return fmt.Sprintf("%s: %s is gone; using the copy in the cache", key, rel)
+	return fmt.Sprintf("%s: %s is gone; using the copy in the cache.", key, rel)
 }
 
 func lockedProject(lm lock.Mod, provider string) (string, bool) {

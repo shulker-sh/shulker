@@ -114,7 +114,7 @@ func (b *Builder) applyLinks(dir, side string, plan linkPlan, report *Report) er
 			continue
 		}
 		if err := os.Rename(data, abs); err != nil {
-			report.Warnings = append(report.Warnings, fmt.Sprintf("%s stays in %s; move it into %s by hand (%v)", rel, data, abs, err))
+			report.Warnings = append(report.Warnings, fmt.Sprintf("%s stays in %s; move it into %s by hand (%v).", rel, data, abs, err))
 			continue
 		}
 		report.MovedBack = append(report.MovedBack, rel)

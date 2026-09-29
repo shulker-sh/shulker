@@ -28,7 +28,7 @@ func (r *Resolver) hostedElsewhere(ctx context.Context, h hosted) (*hosted, erro
 		r.log("looking %s up on %s by hash", v.File.Filename, q.Title())
 		found, err := q.IdentifySHA1(ctx, map[string]string{v.File.Filename: v.File.Sha1})
 		if err != nil {
-			r.Warnings = append(r.Warnings, fmt.Sprintf("%s wasn't looked up on %s (%s)", v.File.Filename, q.Title(), out.AsError(err).Message))
+			r.Warnings = append(r.Warnings, fmt.Sprintf("%s wasn't looked up on %s (%s).", v.File.Filename, q.Title(), out.AsError(err).Message))
 			continue
 		}
 		if there, ok := found[v.File.Filename]; ok && there.Version.File.URL != "" {

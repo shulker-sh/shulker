@@ -43,11 +43,11 @@ func (a *Archive) Manifest(name string) (*manifest.Manifest, []string) {
 	}
 	ml := a.Marker.Lock
 	if ml.Minecraft != a.Minecraft {
-		warnings = append(warnings, fmt.Sprintf("the marker was locked to Minecraft %s but the pack is for %s; using %s", ml.Minecraft, a.Minecraft, a.Minecraft))
+		warnings = append(warnings, fmt.Sprintf("the marker was locked to Minecraft %s but the pack is for %s; using %s.", ml.Minecraft, a.Minecraft, a.Minecraft))
 		m.Minecraft = a.Minecraft
 	}
 	if ml.Loader.Type != a.Loader.Type || ml.Loader.Version != a.Loader.Version {
-		warnings = append(warnings, fmt.Sprintf("the marker was locked to %s but the pack is for %s; using the pack's", loader.Describe(ml.Loader.Type, ml.Loader.Version), loader.Describe(a.Loader.Type, a.Loader.Version)))
+		warnings = append(warnings, fmt.Sprintf("the marker was locked to %s but the pack is for %s; using the pack's.", loader.Describe(ml.Loader.Type, ml.Loader.Version), loader.Describe(a.Loader.Type, a.Loader.Version)))
 		m.Loader = manifest.Loader{Type: a.Loader.Type, Version: a.Loader.Version}
 	}
 	if m.Version != a.Version {
@@ -62,7 +62,7 @@ func (a *Archive) Manifest(name string) (*manifest.Manifest, []string) {
 			}
 			sources = append(sources, source)
 		}
-		warnings = append(warnings, fmt.Sprintf("pack layers were flattened into the overrides: %s", strings.Join(sources, ", ")))
+		warnings = append(warnings, fmt.Sprintf("pack layers were flattened into the overrides: %s.", strings.Join(sources, ", ")))
 	}
 	m.Requires = map[string]manifest.Require{}
 	return m, warnings

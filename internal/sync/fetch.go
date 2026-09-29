@@ -79,7 +79,7 @@ func FetchLocked(ctx context.Context, e *Env, p *project.Project, sides []string
 				return nil, err
 			}
 			if err != nil {
-				e.Warn("%s", RuntimeWarning(err))
+				e.Warn("%s.", RuntimeWarning(err))
 			} else if rt.Fetched {
 				fetched = append(fetched, rt.Component+" "+rt.Version)
 			}

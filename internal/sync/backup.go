@@ -69,7 +69,7 @@ func BackupSource(e *Env, target saves.Target) saves.Source {
 func (e *Env) zipping(verb string) func(world string, open bool) {
 	return func(world string, open bool) {
 		if open {
-			e.Warn("%s is open in a running game; its backup may be torn", world)
+			e.Warn("%s is open in a running game; its backup may be torn.", world)
 		}
 		e.Log("%s %s", verb, world)
 	}
@@ -84,7 +84,7 @@ func (e *Env) beforeModChange(reason, dir string) func() error {
 	}
 	return func() error {
 		skip := func(err error) error {
-			e.Warn("couldn't back up the worlds in %s before the mods changed: %v", dir, err)
+			e.Warn("couldn't back up the worlds in %s before the mods changed: %v.", dir, err)
 			return nil
 		}
 		if _, err := e.instances(); err != nil {

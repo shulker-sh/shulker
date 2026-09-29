@@ -162,7 +162,7 @@ func TestPolicyWarnsOnRenamesAndFailsOnTheRest(t *testing.T) {
 	unknown := player.Result{Input: "alise", Name: "alise", State: player.Unknown, Candidates: []string{"Alice"}}
 
 	warnings, err := player.Policy([]player.Result{renamed}, false)
-	if err != nil || len(warnings) != 1 || warnings[0] != "player Bob is now named Bobby ("+bobUUID+")" {
+	if err != nil || len(warnings) != 1 || warnings[0] != "player Bob is now named Bobby ("+bobUUID+")." {
 		t.Fatalf("a rename warns: %v %v", warnings, err)
 	}
 
@@ -172,7 +172,7 @@ func TestPolicyWarnsOnRenamesAndFailsOnTheRest(t *testing.T) {
 		t.Fatalf("a reassignment fails until accepted: %+v", e)
 	}
 	warnings, err = player.Policy([]player.Result{reassigned}, true)
-	if err != nil || len(warnings) != 1 || warnings[0] != "player Alice is now a different account: "+alice2UUID+" was "+aliceUUID {
+	if err != nil || len(warnings) != 1 || warnings[0] != "player Alice is now a different account: "+alice2UUID+" was "+aliceUUID+"." {
 		t.Fatalf("an accepted reassignment warns: %v %v", warnings, err)
 	}
 
