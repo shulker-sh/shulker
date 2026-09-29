@@ -695,6 +695,9 @@ func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[st
 
 // layFile puts one override file, read from path, at rel in desired.
 func (b *Builder) layFile(l overrideLayer, path, rel string, data []byte, whole func(string) bool, desired map[string]source, report *Report) error {
+	if !filepath.IsLocal(filepath.FromSlash(rel)) {
+		return out.Errorf("override-outside", "%s/%s is outside its folder", l.label, rel)
+	}
 	var err error
 	src := source{origin: path, pack: l.pack, feature: l.feature}
 	if strings.HasSuffix(rel, TemplateSuffix) {

@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
 	"shulker.sh/shulker/internal/modpack"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
 	"shulker.sh/shulker/internal/project"
 )
@@ -265,6 +266,9 @@ func Merge(p *project.Project, inc *Incoming, sides []string) (*Merged, error) {
 		}
 	}
 	for _, o := range overrides {
+		if !filepath.IsLocal(filepath.FromSlash(o.Path)) {
+			return rep, out.Errorf("override-outside", "%s/%s is outside its folder", o.Layer, o.Path)
+		}
 		to := filepath.Join(p.Dir, filepath.FromSlash(o.Layer), filepath.FromSlash(o.Path))
 		if _, err := os.Lstat(to); err == nil {
 			if data, err := os.ReadFile(to); err == nil && inc.Earlier.wroteOverride(o.Layer+"/"+o.Path, data) {

@@ -2055,7 +2055,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `modpack-unlocked` | A modpack has no commit, archive hash or version in the lock; run `shulker update`, or `shulker lock` before pinning a hosted one |
 | `modpack-url-file` | A modpack fetched from a URL has a local `file` entry; a bare manifest carries no files, so serve the modpack from git or a directory |
 | `mrpack-host-not-allowed` | Modrinth launchers only download from `cdn.modrinth.com`, `github.com`, `raw.githubusercontent.com` and `gitlab.com`, so they won't download these files, and a local `file` entry has no download at all; pass `--bundle`. `items`: the files |
-| `mrpack-invalid` | The modpack is malformed |
+| `mrpack-invalid` | The modpack is malformed, or its index names a path outside the pack's folder: a `..` component, a leading `/` or `\`, a drive letter, or a Windows device name like `CON` or `NUL` |
 | `mrpack-marker` | The modpack's own `shulker.json`, `shulker.lock` or `shulker.overrides.json` can't be read, whether it came from the archive root or the marker jar |
 | `mrpack-unsupported` | The modpack's format isn't supported |
 | `no-accounts` | shulker can see no account at all, so there is nothing to play with |
@@ -2074,6 +2074,7 @@ Without `--json`, the error line ends with its code, like `✘ sodium is not in 
 | `not-shulker` | The instance belongs to another launcher, which starts it itself |
 | `not-synced` | The directory has no record of the source it was synced from |
 | `offline-account` | `accounts logout` or `accounts refresh` was given an offline account, which has no sign-in; `accounts remove` deletes it |
+| `override-outside` | An override would be written outside its folder. A modpack archive whose index or entries name such a path is refused as `mrpack-invalid` or `curseforge-invalid` first, so this is a second guard |
 | `override-path` | A path named to `match` isn't a jar in `mods/` or a zip in `resourcepacks/`, `shaderpacks/` or a datapack folder of `overrides/`, `client-overrides/` or `server-overrides/` |
 | `overrides-invalid` | The `shulker.overrides.json` at a modpack archive's root, where an export records which folder each override came from, isn't valid; it reaches you as `mrpack-marker` |
 | `ownership-unproven` | Shulker can see no account that owns Minecraft: Java Edition, so it won't create an offline account — or delete one, since the same gate would block creating it again; `--force` deletes it anyway |

@@ -7,6 +7,7 @@ import (
 
 	"shulker.sh/shulker/internal/lock"
 	"shulker.sh/shulker/internal/manifest"
+	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/packarchive"
 )
 
@@ -28,6 +29,18 @@ func TestCreateLaysOutScaffoldOverridesManifestAndLock(t *testing.T) {
 	}
 	if p, err := Open(dir); err != nil || p.Manifest.Name != "pack" || p.Lock.Minecraft != "26.2" {
 		t.Fatalf("reopen: %v", err)
+	}
+}
+
+func TestCreateRefusesAnOverrideOutsideItsFolder(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "a", "b")
+	overrides := []packarchive.Override{{Layer: "overrides", Path: "../../ESCAPED.txt", Data: []byte("x")}}
+	err := Create(dir, &manifest.Manifest{}, lock.New(), overrides)
+	if out.CodeOf(err) != "override-outside" {
+		t.Fatalf("want override-outside, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "..", "ESCAPED.txt")); !os.IsNotExist(err) {
+		t.Fatalf("written outside the project: %v", err)
 	}
 }
 
