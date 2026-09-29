@@ -11,6 +11,7 @@ import (
 	"shulker.sh/shulker/internal/java"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/internal/sync"
 )
 
@@ -55,14 +56,19 @@ func Assemble(ctx context.Context, e *Env, in config.Instance, req Request) (*Pl
 	plan := &Plan{Instance: in, Target: req.Target}
 	if req.Sync && f.Settings.PreLaunch() {
 		res, err := sync.ForLaunch(ctx, e.Env, in.Dir, req.Reason)
-		if err != nil {
+		refusal, refused := security.Refused(err)
+		switch {
+		case refused && hasBuild(in.Dir):
+			e.WarnNudge(refusal.Nudge, "%s", security.Warning(refusal))
+		case err != nil:
 			return nil, err
-		}
-		plan.Sync = &res
-		// The sync may have rewritten the file, and the project is opened only now, since a sync
-		// is what brings the lock the launch is assembled from up to date.
-		if f, err = instance.Load(in.Dir); err != nil {
-			return nil, err
+		default:
+			plan.Sync = &res
+			// The sync may have rewritten the file, and the project is opened only now, since a
+			// sync is what brings the lock the launch is assembled from up to date.
+			if f, err = instance.Load(in.Dir); err != nil {
+				return nil, err
+			}
 		}
 	}
 	p, err := project.Open(in.Dir)
@@ -159,4 +165,10 @@ func (p *Plan) Launch(e *Env, session account.Account, window string, now time.T
 		Log:     log,
 		Wrapper: p.Settings.Wrapper,
 	}, nil
+}
+
+// hasBuild reports whether dir holds a build to launch when a protection refused its sync.
+func hasBuild(dir string) bool {
+	st, err := instance.ReadState(dir)
+	return err == nil && len(st.Files) > 0
 }

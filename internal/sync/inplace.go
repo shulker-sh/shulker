@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/project"
 	"shulker.sh/shulker/internal/resolve"
+	"shulker.sh/shulker/internal/security"
 )
 
 // InPlaceProject is the project in dir when one of its sides builds into dir itself, which is
@@ -115,7 +116,7 @@ func Recorded(ctx context.Context, e *Env, req Request) (Result, error) {
 
 // ForLaunch is the sync before a launch of dir, which never stands between the player and the
 // game: it keeps the player's side of a conflict, a refresh that fails falls back to building the
-// lock already there, and a build that fails leaves what is on disk. reason names the command for
+// lock already there unless a protection refused it, and a build that fails leaves what is on disk. reason names the command for
 // the history entry.
 func ForLaunch(ctx context.Context, e *Env, dir, reason string) (Result, error) {
 	req := Request{Into: dir, Backup: "sync", KeepConflicts: true, Reason: reason}
@@ -128,7 +129,7 @@ func ForLaunch(ctx context.Context, e *Env, dir, reason string) (Result, error) 
 	}
 	req.Into = ""
 	res, err := InPlace(ctx, e, p, side, req)
-	if err == nil || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+	if _, refused := security.Refused(err); err == nil || errors.Is(ctx.Err(), context.DeadlineExceeded) || refused {
 		return res, err
 	}
 	e.Warn("couldn't update, building what the lock already has: %v.", err)

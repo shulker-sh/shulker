@@ -14,6 +14,7 @@ import (
 	"shulker.sh/shulker/internal/game"
 	"shulker.sh/shulker/internal/instance"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/security"
 	"shulker.sh/shulker/internal/sync"
 )
 
@@ -66,7 +67,7 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 			}
 			// A failure inside shulker must never stop the game starting: the launcher plays what is
 			// already on disk.
-			a.printer.Warn("%v", err)
+			a.warnLaunchSync(err)
 			return nil
 		},
 	}
@@ -126,7 +127,7 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			if stamped {
 				a.stampLaunch(dir, f.Settings)
 				if res, err := a.syncForLaunch(cmd, dir); err != nil {
-					a.printer.Warn("%v", err)
+					a.warnLaunchSync(err)
 				} else if err := a.printer.Emit(res, res.print); err != nil {
 					return err
 				}
@@ -281,4 +282,14 @@ func humanMinutes(d time.Duration) string {
 		return "1 minute"
 	}
 	return d.String()
+}
+
+// warnLaunchSync warns that a launch's sync failed. A security refusal keeps its rows, help and
+// nudge, since the game starts on the last good build and the player has to act before it updates.
+func (a *app) warnLaunchSync(err error) {
+	if e, refused := security.Refused(err); refused {
+		a.printer.WarnNudge(e.Nudge, "%s", security.Warning(e))
+		return
+	}
+	a.printer.Warn("%v", err)
 }

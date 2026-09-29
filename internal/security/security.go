@@ -3,7 +3,9 @@
 package security
 
 import (
+	"errors"
 	"slices"
+	"strings"
 
 	"shulker.sh/shulker/internal/out"
 )
@@ -60,3 +62,25 @@ var protections = []Protection{
 
 // Protections lists every protection, in the order `shulker security` shows them.
 func Protections() []Protection { return slices.Clone(protections) }
+
+// Refused is err's error when a protection refused something.
+func Refused(err error) (*out.Error, bool) {
+	var e *out.Error
+	if errors.As(err, &e) && e.Protection != "" {
+		return e, true
+	}
+	return nil, false
+}
+
+// Warning is a refusal written as a warning, for a launch that goes ahead on the last good build:
+// its message, rows and help, each after the first a row beneath it. Warn it with e.Nudge.
+func Warning(e *out.Error) string {
+	lines := []string{e.Message}
+	for _, row := range e.Rows {
+		lines = append(lines, row.Text)
+	}
+	if e.Help != "" {
+		lines = append(lines, "help: "+out.Period(out.Sentence(e.Help)))
+	}
+	return strings.Join(lines, "\n")
+}

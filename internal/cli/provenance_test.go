@@ -81,7 +81,7 @@ func TestPreLaunchKeepsTheLastBuildWhenTheLockIsRefused(t *testing.T) {
 	h.sendSodiumElsewhere(t)
 
 	code, stdout, stderr := h.run(t, "hook", "pre-launch", "-C", gameDir)
-	if code != 0 || !strings.Contains(stderr, "sodium is locked from Modrinth but downloads from evil.example") {
+	if code != 0 || !strings.Contains(stderr, "sodium is locked from Modrinth but downloads from evil.example") || !strings.Contains(stderr, "help: Run shulker lock sodium -C "+h.dir+" to look it up again") || !strings.Contains(stderr, "$ shulker security") || strings.Contains(stderr, "Couldn't update") {
 		t.Fatalf("pre-launch should warn and let the game start: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
@@ -91,5 +91,48 @@ func TestPreLaunchKeepsTheLastBuildWhenTheLockIsRefused(t *testing.T) {
 	code, stdout, _ = h.run(t, "sync", "-i", "friends", "--json")
 	if e := provenanceRefusal(t, code, stdout); e.Help != "run `shulker lock sodium -C "+h.dir+"` to look it up again from its provider" {
 		t.Fatalf("help: %q", e.Help)
+	}
+}
+
+func TestPlayLaunchesTheLastBuildWhenTheLockIsRefused(t *testing.T) {
+	h := newHarness(t)
+	project := h.dir
+	_, gameDir := playHarness(t, h, "--loader", "fabric")
+	h.mustRun(t, "accounts", "login", "--use")
+	h.dir = project
+	h.mustRun(t, "add", "sodium")
+	h.dir = ""
+	h.mustRun(t, "play", "-i", "pack")
+	waitForFile(t, filepath.Join(gameDir, "args.txt"))
+	if err := os.Remove(filepath.Join(gameDir, "args.txt")); err != nil {
+		t.Fatal(err)
+	}
+	h.dir = project
+	h.sendSodiumElsewhere(t)
+	h.dir = ""
+
+	code, stdout, stderr := h.run(t, "play", "-i", "pack")
+	if code != 0 || !strings.Contains(stdout, "Launched pack") || !strings.Contains(stderr, "sodium is locked from Modrinth but downloads from evil.example") || !strings.Contains(stderr, "help: Run shulker lock sodium -C "+project) || !strings.Contains(stderr, "$ shulker security") {
+		t.Fatalf("play should warn and launch the last build: code=%d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	waitForFile(t, filepath.Join(gameDir, "args.txt"))
+	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
+		t.Fatalf("the last good build should stay in place: %v", err)
+	}
+}
+
+func TestLockChangingCommandsAcceptAMismatchedLock(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "create", "--loader", "fabric", "--name", "pack")
+	h.mustRun(t, "add", "sodium", "fabric-api")
+	h.sendSodiumElsewhere(t)
+
+	h.mustRun(t, "lock")
+	h.mustRun(t, "update", "fabric-api")
+	h.mustRun(t, "pin", "fabric-api")
+	h.mustRun(t, "unpin", "fabric-api")
+	h.mustRun(t, "remove", "fabric-api")
+	if u := *h.readLock(t).Mods["sodium"].URL; u != "https://evil.example/sodium.jar" {
+		t.Fatalf("a command that didn't name sodium rewrote it to %s", u)
 	}
 }
