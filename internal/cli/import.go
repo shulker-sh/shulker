@@ -58,6 +58,7 @@ func (a *app) importCmd() *cobra.Command {
 			return a.runImport(cmd, args[0], &f)
 		},
 	}
+	a.dirFlag(cmd)
 	cmd.Flags().StringVar(&f.name, "name", "", "project name (default: the pack name, slugified)")
 	cmd.Flags().StringVar(&f.typ, "type", "", "refuse the modpack unless it is this kind: "+strings.Join(packarchive.Names(), ", ")+", source, or modpack for one the project requires (default: detected)")
 	cmd.Flags().StringVar(&f.provider, "provider", "", "look a slug up on this provider only: modrinth or curseforge (default: the first that has it)")

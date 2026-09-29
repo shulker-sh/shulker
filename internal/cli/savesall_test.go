@@ -147,7 +147,7 @@ func TestRestoreAndSavesAllRunOverTheSameRows(t *testing.T) {
 	if len(views) != 3 || len(views["default"].Result.Backups) != 2 || len(views["friends"].Result.Backups) != 2 || len(views["empty"].Result.Backups) != 0 {
 		t.Fatalf("saves --all: %+v", views)
 	}
-	if stdout := h.mustRun(t, "saves", "--all"); !strings.Contains(stdout, "shulker -i friends restore <n>") || !strings.Contains(stdout, "shulker restore <n> --group default") {
+	if stdout := h.mustRun(t, "saves", "--all"); !strings.Contains(stdout, "shulker restore <n> -i friends") || !strings.Contains(stdout, "shulker restore <n> --group default") {
 		t.Fatalf("each nudge names its own target: %s", stdout)
 	} else if !strings.Contains(stdout, "default save group (2 instances)\n  • survival") || !strings.Contains(stdout, "Friends (Prism Launcher)\n  • mine") || !strings.HasSuffix(stdout, "i No worlds or backups: Empty\n") || strings.Contains(stdout, "Backups\n") {
 		t.Fatalf("one section per target with worlds or backups, the rest on one line: %s", stdout)

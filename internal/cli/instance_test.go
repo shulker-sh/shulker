@@ -89,15 +89,15 @@ func TestInstanceActsOnANicknameFromElsewhere(t *testing.T) {
 	h := newHarness(t)
 	_, gameDir := playHarness(t, h)
 
-	h.mustRun(t, "-i", "pack", "instance", "set", "window", "1280x720")
-	h.mustRun(t, "-i", "pack", "instance", "set", "jvmArgs", "--literal", `["-Dmine=1"]`)
-	h.mustRun(t, "-i", "pack", "instance", "set", "hooks.preLaunch", "false")
+	h.mustRun(t, "instance", "set", "-i", "pack", "window", "1280x720")
+	h.mustRun(t, "instance", "set", "-i", "pack", "jvmArgs", "--literal", `["-Dmine=1"]`)
+	h.mustRun(t, "instance", "set", "-i", "pack", "hooks.preLaunch", "false")
 
 	s := instanceSettings(t, gameDir)
 	if s.Window != "1280x720" || len(s.JVMArgs) != 1 || s.JVMArgs[0] != "-Dmine=1" || s.PreLaunch() {
 		t.Fatalf("settings %+v", s)
 	}
-	if got := instanceSettingJSON(t, h, "-i", "pack", "instance", "get", "window"); got.Value != "1280x720" || got.From != "instance" {
+	if got := instanceSettingJSON(t, h, "instance", "get", "-i", "pack", "window"); got.Value != "1280x720" || got.From != "instance" {
 		t.Fatalf("get window %+v", got)
 	}
 }

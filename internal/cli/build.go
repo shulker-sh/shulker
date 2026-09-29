@@ -71,6 +71,7 @@ func (a *app) buildCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory, seeded files included")
 	cmd.Flags().BoolVar(&acceptPlayerChange, "accept-player-change", false, "relock a player name that now belongs to a different account")
 	cmd.Flags().StringVar(&osName, "os", "", "build for this os instead of the detected one: macos, windows, or linux")

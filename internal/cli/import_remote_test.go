@@ -34,7 +34,7 @@ func TestImportReadsAnArchiveAtAURL(t *testing.T) {
 	h := newHarness(t)
 	archive := hostedMrpack(t, h, "cozy-1.0.0.mrpack", "1.0.0")
 	dir := filepath.Join(t.TempDir(), "cozy")
-	h.mustRun(t, "-C", dir, "import", h.server.URL+"/cdn/"+archive.filename)
+	h.mustRun(t, "import", "-C", dir, h.server.URL+"/cdn/"+archive.filename)
 	if m := importedManifest(t, dir); m.Version != "1.0.0" {
 		t.Fatalf("manifest: %+v", m)
 	}
@@ -51,7 +51,7 @@ func TestImportLooksASlugUpAsAModpack(t *testing.T) {
 	archive := hostedMrpack(t, h, "cozy-1.0.0.mrpack", "1.0.0")
 	h.modrinthPacks = map[string]*modrinthPack{"COZYpack": {slug: "cozy", versions: []modrinthPackVersion{{id: "cozyV100", number: "1.0.0", published: "2026-09-01T00:00:00Z", archive: archive}}}}
 	dir := filepath.Join(t.TempDir(), "cozy")
-	h.mustRun(t, "-C", dir, "import", "cozy")
+	h.mustRun(t, "import", "-C", dir, "cozy")
 	if l := readLockAt(t, dir); l.Mods["sodium"].Sha512 == "" {
 		t.Fatalf("sodium isn't locked: %+v", l.Mods)
 	}
@@ -79,7 +79,7 @@ func TestImportCopiesALocalSource(t *testing.T) {
 	source := h.dir
 	dir := filepath.Join(t.TempDir(), "copy")
 	h.dir = ""
-	h.mustRun(t, "-C", dir, "import", source)
+	h.mustRun(t, "import", "-C", dir, source)
 	if m := importedManifest(t, dir); m.Name != "friends" || m.Requires["sodium"].Kind() != manifest.TypeMod {
 		t.Fatalf("manifest: %+v", m)
 	}
@@ -114,7 +114,7 @@ func TestImportCopiesAGitSourceAtARefAndPath(t *testing.T) {
 	gitRun(t, repo, "clone", "-q", "--bare", repo, remote)
 	dir := filepath.Join(t.TempDir(), "copy")
 	h.dir = ""
-	h.mustRun(t, "-C", dir, "import", "file://"+remote, "--ref", "stable", "--path", "packs/one")
+	h.mustRun(t, "import", "-C", dir, "file://"+remote, "--ref", "stable", "--path", "packs/one")
 	if m := importedManifest(t, dir); m.Name != "one" {
 		t.Fatalf("manifest: %+v", m)
 	}
@@ -140,7 +140,7 @@ func TestImportCopiesOnlyASourcesOwnFiles(t *testing.T) {
 	source := h.dir
 	dir := filepath.Join(t.TempDir(), "copy")
 	h.dir = ""
-	h.mustRun(t, "-C", dir, "import", source)
+	h.mustRun(t, "import", "-C", dir, source)
 	for _, rel := range []string{"mods", "options.txt", "notes.txt"} {
 		if _, err := os.Stat(filepath.Join(dir, rel)); !os.IsNotExist(err) {
 			t.Fatalf("%s was copied: %v", rel, err)

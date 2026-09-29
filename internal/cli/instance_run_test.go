@@ -28,7 +28,7 @@ func TestInstanceDumpFailsWhenNoGameIsRunning(t *testing.T) {
 	h := newHarness(t)
 	_, gameDir := playHarness(t, h)
 
-	if e := runError(t, h, "-i", "pack", "instance", "dump"); e.Code != "game-not-running" {
+	if e := runError(t, h, "instance", "dump", "-i", "pack"); e.Code != "game-not-running" {
 		t.Fatalf("no run at all: %+v", e)
 	}
 
@@ -37,12 +37,12 @@ func TestInstanceDumpFailsWhenNoGameIsRunning(t *testing.T) {
 		instance.Launch{StartedAt: "2026-09-23T00:00:00Z", EndedAt: "2026-09-23T00:01:00Z", Outcome: instance.OutcomeOK, Log: log},
 		instance.Launch{StartedAt: "2026-09-23T00:02:02Z"},
 	)
-	if e := runError(t, h, "-i", "pack", "instance", "dump"); e.Code != "game-not-running" {
+	if e := runError(t, h, "instance", "dump", "-i", "pack"); e.Code != "game-not-running" {
 		t.Fatalf("a closed run, and a launcher's open one with no pid: %+v", e)
 	}
 
 	writeRuns(t, gameDir, instance.Launch{StartedAt: "2026-09-23T00:02:02Z", Log: log, PID: deadPID(t)})
-	if e := runError(t, h, "-i", "pack", "instance", "dump"); e.Code != "game-not-running" {
+	if e := runError(t, h, "instance", "dump", "-i", "pack"); e.Code != "game-not-running" {
 		t.Fatalf("an open run whose game has gone: %+v", e)
 	}
 }
@@ -51,7 +51,7 @@ func TestInstanceLogPrintsTheLatestRunsLog(t *testing.T) {
 	h := newHarness(t)
 	_, gameDir := playHarness(t, h)
 
-	if e := runError(t, h, "-i", "pack", "instance", "log"); e.Code != "run-not-found" {
+	if e := runError(t, h, "instance", "log", "-i", "pack"); e.Code != "run-not-found" {
 		t.Fatalf("no run yet: %+v", e)
 	}
 
@@ -62,16 +62,16 @@ func TestInstanceLogPrintsTheLatestRunsLog(t *testing.T) {
 		instance.Launch{StartedAt: "2026-09-23T00:02:02Z", EndedAt: "2026-09-23T00:03:00Z", Outcome: instance.OutcomeOK, Log: log},
 	)
 
-	if got := h.mustRun(t, "-i", "pack", "instance", "log"); got != "one\ntwo\nthree\n" {
+	if got := h.mustRun(t, "instance", "log", "-i", "pack"); got != "one\ntwo\nthree\n" {
 		t.Fatalf("the newest run's log, as written:\n%q", got)
 	}
-	if got := h.mustRun(t, "-i", "pack", "instance", "log", "--limit", "2"); got != "two\nthree\n" {
+	if got := h.mustRun(t, "instance", "log", "-i", "pack", "--limit", "2"); got != "two\nthree\n" {
 		t.Fatalf("--limit keeps the last lines:\n%q", got)
 	}
 	var env struct {
 		Data instanceLog `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "-i", "pack", "instance", "log", "--limit", "1", "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "instance", "log", "-i", "pack", "--limit", "1", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	if env.Data.Log != log || strings.Join(env.Data.Lines, ",") != "three" {
@@ -91,7 +91,7 @@ func TestInstanceLogFollowsUntilTheRunCloses(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		code, stdout, _ := h.run(t, "-i", "pack", "instance", "log", "-f", "--limit", "1")
+		code, stdout, _ := h.run(t, "instance", "log", "-i", "pack", "-f", "--limit", "1")
 		done <- result{code, stdout}
 	}()
 
@@ -130,7 +130,7 @@ func TestPlayShowsTheGamesPidAndHowToDumpIt(t *testing.T) {
 	_, gameDir := playHarness(t, h)
 	h.mustRun(t, "accounts", "login", "--use")
 
-	stdout := h.mustRun(t, "-i", "pack", "play")
+	stdout := h.mustRun(t, "play", "-i", "pack")
 	waitForFile(t, filepath.Join(gameDir, "args.txt"))
 	if !regexp.MustCompile(`pid: [1-9][0-9]*\n`).MatchString(stdout) {
 		t.Fatalf("a detached launch shows the game's pid:\n%s", stdout)

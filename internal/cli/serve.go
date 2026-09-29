@@ -159,6 +159,7 @@ func (a *app) serveCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite files edited in the build directory, seeded files included")
 	a.registerFailFast(cmd)
 	a.yesFlag(cmd, "accept the Minecraft EULA and record it in config.json without prompting")

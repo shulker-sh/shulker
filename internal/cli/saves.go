@@ -72,6 +72,7 @@ func (a *app) savesCmd() *cobra.Command {
 			return a.printer.Emit(view, func(l *out.Lines) { a.printSavesView(view, l) })
 		},
 	}
+	a.scopeFlags(cmd)
 	where.register(cmd, "show this save group rather than an instance", "show every instance's worlds and backups")
 	cmd.AddCommand(a.savesPruneCmd())
 	return cmd
@@ -97,6 +98,7 @@ func (a *app) savesPruneCmd() *cobra.Command {
 			}, func(target savesTarget) (savesPruned, error) { return pruneBackups(target, keep) }, savesPruned.print)
 		},
 	}
+	a.scopeFlags(cmd)
 	where.register(cmd, "prune this save group's backups rather than an instance's", "prune every instance's backups")
 	cmd.Flags().IntVar(&keep, "keep", 0, "how many of the newest backups to keep (required)")
 	return cmd
@@ -310,11 +312,11 @@ func printBackupsTable(view savesView, l *out.Lines) {
 func (a *app) savesCommand(target savesTarget, command string) string {
 	switch {
 	case target.via != "":
-		return "shulker -i " + shellWord(target.via) + " " + command
+		return "shulker " + command + " -i " + shellWord(target.via)
 	case target.Dir == "":
 		return "shulker " + command + " --group " + target.Group
 	case a.instance != "":
-		return "shulker -i " + shellWord(a.instance) + " " + command
+		return "shulker " + command + " -i " + shellWord(a.instance)
 	case a.dir != "":
 		return "shulker " + command + " -C " + shellWord(target.Dir)
 	}

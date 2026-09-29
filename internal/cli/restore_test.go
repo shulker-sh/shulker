@@ -67,7 +67,7 @@ func TestRestorePutsTheZipsWorldsBackWhole(t *testing.T) {
 	h.dir = ""
 	stdout = h.mustRun(t, "saves", "-i", "pack")
 	h.dir = project
-	for _, want := range []string{"Restore one:", "shulker -i pack restore <n>"} {
+	for _, want := range []string{"Restore one:", "shulker restore <n> -i pack"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("saves lacks %q: %s", want, stdout)
 		}

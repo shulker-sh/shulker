@@ -105,6 +105,7 @@ func (a *app) diffCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().StringVar(&into, "into", "", "directory the side was synced into (default: the build directory and every directory it was synced into)")
 	return cmd
 }
@@ -191,6 +192,7 @@ func (a *app) pullCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().StringVar(&side, "side", "", "side whose build directory to pull from (default: the only declared side)")
 	cmd.Flags().StringVar(&into, "into", "", "directory the side was synced into (default: whichever of the build directory and its sync directories has edits)")
 	cmd.Flags().StringArrayVar(&keys, "key", nil, "start managing this key of the named .properties file; repeat for more")

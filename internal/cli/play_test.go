@@ -40,7 +40,7 @@ func TestPlayDryRunFillsTheStore(t *testing.T) {
 	h := newHarness(t)
 	store, gameDir := playHarness(t, h)
 
-	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play", "--dry-run")
+	stdout, stderr := h.mustRunStderr(t, "play", "-i", "pack", "--dry-run")
 
 	for _, want := range []string{"Would launch pack", "26.2", "main class: net.minecraft.client.main.Main", "memory: " + instance.DefaultMemory, "asset index: 26", "classpath: 2 jars"} {
 		if !strings.Contains(stdout, want) {
@@ -71,7 +71,7 @@ func TestPlayDryRunFillsTheStore(t *testing.T) {
 		}
 	}
 
-	rep := playJSON(t, h, "-i", "pack", "play", "--dry-run")
+	rep := playJSON(t, h, "play", "-i", "pack", "--dry-run")
 	if rep.Instance != "pack" || rep.Version != "26.2" || rep.Inherits != "" || rep.AssetIndex != "26" {
 		t.Fatalf("report %+v", rep)
 	}
@@ -84,7 +84,7 @@ func TestPlayDryRunFillsTheStore(t *testing.T) {
 
 	// Everything is in the store now, so a re-run reaches the network for nothing.
 	before := h.storeHits
-	h.mustRun(t, "-i", "pack", "play", "--dry-run")
+	h.mustRun(t, "play", "-i", "pack", "--dry-run")
 	if h.storeHits != before {
 		t.Fatalf("a re-run downloaded %d files", h.storeHits-before)
 	}
@@ -100,7 +100,7 @@ func TestPlayRefusesAnotherLaunchersInstance(t *testing.T) {
 	h.mustRun(t, "link", "prism", "--launcher-dir", launcherDir, "--name", "Friends")
 	h.dir = ""
 
-	code, stdout, _ := h.run(t, "-i", "friends", "play", "--dry-run", "--json")
+	code, stdout, _ := h.run(t, "play", "-i", "friends", "--dry-run", "--json")
 
 	if code == 0 || !strings.Contains(stdout, `"not-shulker"`) {
 		t.Fatalf("exit %d: %s", code, stdout)
@@ -156,7 +156,7 @@ func TestPlayStartsTheGameDetachedAndLogsIt(t *testing.T) {
 	_, gameDir := playHarness(t, h)
 	h.mustRun(t, "accounts", "login", "--use")
 
-	stdout, stderr := h.mustRunStderr(t, "-i", "pack", "play")
+	stdout, stderr := h.mustRunStderr(t, "play", "-i", "pack")
 
 	for _, want := range []string{"Launched pack as Notch (Minecraft 26.2)", "log: "} {
 		if !strings.Contains(stdout, want) {
@@ -194,7 +194,7 @@ func TestPlayStartsTheGameDetachedAndLogsIt(t *testing.T) {
 		}
 	}
 
-	res := playedJSON(t, h, "-i", "pack", "play")
+	res := playedJSON(t, h, "play", "-i", "pack")
 	if res.Instance != "pack" || res.Version != "26.2" || res.GameDir != gameDir || res.PID == 0 {
 		t.Fatalf("result %+v", res)
 	}
@@ -215,7 +215,7 @@ func TestPlayWithNoDefaultTakesTheOnlyAccountThereIs(t *testing.T) {
 	h.mustRun(t, "accounts", "login")
 	h.mustRun(t, "config", "unset", "accounts.default")
 
-	stdout := h.mustRun(t, "-i", "pack", "play")
+	stdout := h.mustRun(t, "play", "-i", "pack")
 
 	if !strings.Contains(stdout, "Notch is the default account now") {
 		t.Fatalf("a launch that settles the default account says so:\n%s", stdout)
@@ -224,7 +224,7 @@ func TestPlayWithNoDefaultTakesTheOnlyAccountThereIs(t *testing.T) {
 		t.Fatalf("accounts.default = %q", got)
 	}
 	// Settled, so the next launch says nothing about it.
-	if stdout := h.mustRun(t, "-i", "pack", "play"); strings.Contains(stdout, "default account now") {
+	if stdout := h.mustRun(t, "play", "-i", "pack"); strings.Contains(stdout, "default account now") {
 		t.Fatalf("the question is asked once:\n%s", stdout)
 	}
 }

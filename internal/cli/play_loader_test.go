@@ -24,7 +24,7 @@ func TestPlayLaunchesAModdedInstance(t *testing.T) {
 			store, gameDir := playHarness(t, h, "--loader", tc.loader)
 			h.mustRun(t, "accounts", "login", "--use")
 
-			rep := playJSON(t, h, "-i", "pack", "play", "--dry-run")
+			rep := playJSON(t, h, "play", "-i", "pack", "--dry-run")
 			if rep.Version != tc.version || rep.Inherits != "26.2" || rep.MainClass != tc.mainClass {
 				t.Fatalf("report %+v", rep)
 			}
@@ -35,14 +35,14 @@ func TestPlayLaunchesAModdedInstance(t *testing.T) {
 			if rep.Classpath != tc.libraries+2 {
 				t.Fatalf("classpath %+v", rep)
 			}
-			stdout := h.mustRun(t, "-i", "pack", "play", "--dry-run")
+			stdout := h.mustRun(t, "play", "-i", "pack", "--dry-run")
 			for _, want := range []string{"Would launch pack", tc.version, "inherits: 26.2", "loader libraries: " + out.Count(tc.libraries, "jar", "jars")} {
 				if !strings.Contains(stdout, want) {
 					t.Fatalf("play --dry-run: %q is missing from\n%s", want, stdout)
 				}
 			}
 
-			h.mustRun(t, "-i", "pack", "play", "--no-sync")
+			h.mustRun(t, "play", "-i", "pack", "--no-sync")
 
 			argv := waitForFile(t, filepath.Join(gameDir, "args.txt"))
 			jar := filepath.Join(store, "libraries", filepath.FromSlash(tc.library))
@@ -62,8 +62,8 @@ func TestPlayRunsALoaderInstallerOnceWithTheClientJarInPlace(t *testing.T) {
 	h := newHarness(t)
 	playHarness(t, h, "--loader", "neoforge")
 
-	h.mustRun(t, "-i", "pack", "play", "--dry-run")
-	h.mustRun(t, "-i", "pack", "play", "--dry-run")
+	h.mustRun(t, "play", "-i", "pack", "--dry-run")
+	h.mustRun(t, "play", "-i", "pack", "--dry-run")
 
 	if len(h.installs) != 1 {
 		t.Fatalf("the installer ran %d times: %v", len(h.installs), h.installs)
@@ -83,7 +83,7 @@ func TestPlayLaunchesOfflineFromTheStore(t *testing.T) {
 			}
 			_, gameDir := playHarness(t, h, args...)
 			h.mustRun(t, "accounts", "login", "--use")
-			h.mustRun(t, "-i", "pack", "play", "--no-sync")
+			h.mustRun(t, "play", "-i", "pack", "--no-sync")
 			argv := filepath.Join(gameDir, "args.txt")
 			waitForFile(t, argv)
 			if err := os.Remove(argv); err != nil {
@@ -91,7 +91,7 @@ func TestPlayLaunchesOfflineFromTheStore(t *testing.T) {
 			}
 
 			h.server.Close()
-			h.mustRun(t, "-i", "pack", "play", "--no-sync")
+			h.mustRun(t, "play", "-i", "pack", "--no-sync")
 			waitForFile(t, argv)
 		})
 	}

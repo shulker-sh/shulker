@@ -99,6 +99,7 @@ func (a *app) createCmd() *cobra.Command {
 			return a.createProject(cmd, dir, &opts)
 		},
 	}
+	a.dirFlag(cmd)
 	initFlags(cmd, &opts)
 	return cmd
 }

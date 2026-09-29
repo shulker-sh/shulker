@@ -90,6 +90,7 @@ func (a *app) playCmd() *cobra.Command {
 			return a.play(cmd, args, opts)
 		},
 	}
+	a.scopeFlags(cmd)
 	a.yesFlag(cmd, "create a shulker instance for a project that has none without being asked first")
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "assemble the launch and print it instead of starting the game")
 	cmd.Flags().BoolVar(&opts.noSync, "no-sync", false, "start the game without updating the instance first")

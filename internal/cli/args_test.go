@@ -49,3 +49,43 @@ func TestFlagErrorsAreReworded(t *testing.T) {
 		}
 	}
 }
+
+func TestScopeFlagsBelongToTheCommandsThatReadThem(t *testing.T) {
+	cases := map[string][]string{
+		"unknown flag -C":         {"version", "-C", "elsewhere"},
+		"unknown flag -i":         {"init", "-i", "nosuch"},
+		"unknown flag --dir":      {"instances", "--dir", "elsewhere"},
+		"unknown flag --instance": {"cache", "info", "--instance", "nosuch"},
+		"unknown flag --id":       {"accounts", "--id", "nosuch"},
+	}
+	for message, args := range cases {
+		code, stdout, _ := run(t, append([]string{"--json"}, args...)...)
+		if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || e.Message != message {
+			t.Errorf("%v: exit %d, %+v", args, code, e)
+		}
+	}
+	root := newApp(nil, nil).root()
+	for _, c := range []struct {
+		path          []string
+		dir, instance bool
+	}{
+		{[]string{"list"}, true, true},
+		{[]string{"sync"}, true, true},
+		{[]string{"feature", "on"}, true, true},
+		{[]string{"hook", "pre-launch"}, true, true},
+		{[]string{"init"}, true, false},
+		{[]string{"cache", "prune"}, true, false},
+		{[]string{"log"}, false, true},
+		{[]string{"version"}, false, false},
+		{[]string{"accounts"}, false, false},
+	} {
+		cmd, _, err := root.Find(c.path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dir, instance := cmd.Flags().Lookup("dir") != nil, cmd.Flags().Lookup("instance") != nil
+		if dir != c.dir || instance != c.instance {
+			t.Errorf("%v: -C %t, -i %t", c.path, dir, instance)
+		}
+	}
+}

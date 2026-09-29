@@ -85,6 +85,7 @@ func (a *app) matchCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "look the files up and report what would be locked, changing nothing")
 	return cmd
 }

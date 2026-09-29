@@ -7,7 +7,7 @@ import (
 )
 
 func (a *app) lockCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "lock",
 		Annotations: acts(),
 		Short:       "Bring shulker.lock in line with shulker.json without upgrading anything",
@@ -18,4 +18,6 @@ func (a *app) lockCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }

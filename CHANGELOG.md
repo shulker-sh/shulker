@@ -14,6 +14,7 @@ All notable changes to shulker are documented here. The format is based on
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.
 - Importing a pack again replaces the entries and override files the earlier import wrote and you haven't changed, keeps only yours, and never goes back to an older version. RLCraft re-imported as 2.9.2d after 2.9.3, since CurseForge tags 2.9.3 with no loader.
+- `-C` and `-i` belong to the commands that act on a project or instance, and go after the command: `shulker sync -i smp`, not `shulker -i smp sync`. Passing one to a command that ignored it, such as `version` or `accounts`, is now a usage error.
 
 ## [0.0.1] - 2026-09-26
 

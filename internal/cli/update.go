@@ -73,12 +73,13 @@ func (a *app) updateCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	a.registerEveryFetch(cmd)
 	return cmd
 }
 
 func (a *app) pinCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "pin <mod> [version|url]",
 		Annotations: acts(),
 		Short:       "Pin a mod to a provider version id or URL, or to its locked version",
@@ -105,10 +106,12 @@ func (a *app) pinCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 func (a *app) unpinCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "unpin <mod>",
 		Annotations: acts(),
 		Short:       "Remove a mod's pin and re-resolve it",
@@ -120,6 +123,8 @@ func (a *app) unpinCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 type lockChanges struct {
@@ -306,7 +311,7 @@ func (a *app) followedModpack(p *project.Project) string {
 }
 
 func (a *app) outdatedCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "outdated [mod...]",
 		Annotations: reads(),
 		Short:       "Show mods with a newer compatible version (dry run of update)",
@@ -351,6 +356,8 @@ func (a *app) outdatedCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 func printLocalFiles(l *out.Lines, local []string) {

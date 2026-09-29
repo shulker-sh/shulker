@@ -483,11 +483,11 @@ func TestImportCreatesTheProjectInTheCurrentFolder(t *testing.T) {
 	if strings.Contains(stdout, "cd ") || !strings.Contains(stdout, "Play it in a launcher:\n    $ shulker link <launcher>") || strings.Contains(stdout, "shulker install") {
 		t.Fatalf("nudge: %s", stdout)
 	}
-	h.mustRun(t, "-C", "new", "import", archive)
+	h.mustRun(t, "import", "-C", "new", archive)
 	if _, err := os.Stat(filepath.Join(here, "new", manifest.FileName)); err != nil {
 		t.Fatalf("not imported into new: %v", err)
 	}
-	if code, stdout, _ := h.run(t, "-C", "other", "import", archive, "extra", "--json"); code != out.ExitUsage || failureCode(t, stdout).Code != "usage" {
+	if code, stdout, _ := h.run(t, "import", "-C", "other", archive, "extra", "--json"); code != out.ExitUsage || failureCode(t, stdout).Code != "usage" {
 		t.Fatalf("a second argument: exit %d: %s", code, stdout)
 	}
 }
@@ -503,19 +503,19 @@ func TestImportReadsAPathOnlyWhenItLooksLikeOne(t *testing.T) {
 	}
 	writeFile(t, filepath.Join(here, "feat", "build", "feat-1.0.zip"), string(data))
 
-	h.mustRun(t, "-C", "imp", "import", "feat/build/feat-1.0.zip")
+	h.mustRun(t, "import", "-C", "imp", "feat/build/feat-1.0.zip")
 	if _, err := os.Stat(filepath.Join(here, "imp", manifest.FileName)); err != nil {
 		t.Fatalf("a relative path is read from the current folder, not -C: %v", err)
 	}
 
-	if code, stdout, _ := h.run(t, "--json", "-C", "other", "import", "feat/missing.zip"); code == 0 || failureCode(t, stdout).Code != "file-not-found" {
+	if code, stdout, _ := h.run(t, "--json", "import", "-C", "other", "feat/missing.zip"); code == 0 || failureCode(t, stdout).Code != "file-not-found" {
 		t.Fatalf("a path that isn't there is not a slug: exit %d: %s", code, stdout)
 	}
-	code, stdout, _ := h.run(t, "--json", "-C", "imp", "import", "./imp")
+	code, stdout, _ := h.run(t, "--json", "import", "-C", "imp", "./imp")
 	if e := failureCode(t, stdout); code == 0 || e.Code != "import-into-self" || e.Message != "can't import imp into itself" {
 		t.Fatalf("importing the -C folder into itself: exit %d: %s", code, stdout)
 	}
-	if code, stdout, _ := h.run(t, "--json", "-C", "imp2", "import", "imp"); code == 0 || failureCode(t, stdout).Code != "mod-not-found" {
+	if code, stdout, _ := h.run(t, "--json", "import", "-C", "imp2", "imp"); code == 0 || failureCode(t, stdout).Code != "mod-not-found" {
 		t.Fatalf("a bare word is a slug even with a folder of that name: exit %d: %s", code, stdout)
 	}
 }
@@ -558,7 +558,7 @@ func TestImportSideNarrowsANewProject(t *testing.T) {
 	var env struct {
 		Data importResult `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "-C", dir, "import", archive, "--side", "client", "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "import", "-C", dir, archive, "--side", "client", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(env.Data.Sides, []string{"client"}) {

@@ -79,6 +79,7 @@ func (a *app) searchCmd() *cobra.Command {
 			return a.printSearch(reply, verbose)
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().StringVar(&typ, "type", "", typeFlagUsage)
 	cmd.Flags().StringVar(&providerName, "provider", "", "search one provider instead of every available one")
 	cmd.Flags().IntVar(&limit, "limit", 10, "results to print per provider")

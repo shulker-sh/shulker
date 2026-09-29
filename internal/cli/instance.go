@@ -114,6 +114,7 @@ func (a *app) instanceGetCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "also say where the value comes from")
 	return cmd
 }
@@ -193,6 +194,7 @@ func (a *app) instanceSetCmd() *cobra.Command {
 			return a.emitSettingChange(settingChange{Path: field.Path, From: from, To: to})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for a list")
 	return cmd
 }
@@ -212,7 +214,7 @@ func (a *app) pinnedAccountID(v any) (string, error) {
 }
 
 func (a *app) instanceUnsetCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "unset <path>",
 		Annotations: acts(),
 		Short:       "Remove a setting from this instance, back to the default",
@@ -239,10 +241,12 @@ func (a *app) instanceUnsetCmd() *cobra.Command {
 			return a.emitSettingChange(settingChange{Path: field.Path, From: from})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 func (a *app) instanceEditCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "edit",
 		Annotations: acts(),
 		Short:       "Open this instance's instance.json in your editor",
@@ -284,6 +288,8 @@ func (a *app) instanceEditCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 // runEditor opens path in the editor $VISUAL or $EDITOR names, the way git does, and waits for it.

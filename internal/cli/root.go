@@ -155,11 +155,9 @@ func (a *app) root() *cobra.Command {
 	// These values are read from the arguments before cobra parses them, so
 	// they are put back after the flags are defined with the zero defaults
 	// help prints.
-	jsonOut, noInput, dir, noColor, ascii := a.printer.JSON, a.printer.NoInput, a.dir, a.style.NoColor, a.style.ASCII
+	jsonOut, noInput, noColor, ascii := a.printer.JSON, a.printer.NoInput, a.style.NoColor, a.style.ASCII
 	root.PersistentFlags().BoolVar(&a.printer.JSON, "json", false, "print machine-readable JSON, including errors")
 	root.PersistentFlags().BoolVar(&a.printer.NoInput, "no-input", false, "ask nothing: take every default, and fail on a missing required value")
-	root.PersistentFlags().StringVarP(&a.dir, "dir", "C", "", "project directory (default: current directory)")
-	root.PersistentFlags().StringVarP(&a.instance, "instance", "i", "", "act on a registered instance, by id, name, or directory")
 	// --id is the same flag: the row calls it id, and the flag says which instance.
 	root.SetGlobalNormalizationFunc(func(_ *pflag.FlagSet, name string) pflag.NormalizedName {
 		if name == "id" {
@@ -171,7 +169,7 @@ func (a *app) root() *cobra.Command {
 	root.PersistentFlags().BoolVar(&a.style.ASCII, "ascii", false, "print with ASCII glyphs instead of ✔ ✘ ├─ ⟶ »")
 	root.PersistentFlags().Bool("annotations", false, "also print errors and warnings as GitHub Actions annotations (the default when GITHUB_ACTIONS=true)")
 	root.PersistentFlags().Bool("no-annotations", false, "print no GitHub Actions annotations, even when GITHUB_ACTIONS=true")
-	a.printer.JSON, a.printer.NoInput, a.dir, a.style.NoColor, a.style.ASCII = jsonOut, noInput, dir, noColor, ascii
+	a.printer.JSON, a.printer.NoInput, a.style.NoColor, a.style.ASCII = jsonOut, noInput, noColor, ascii
 	root.AddCommand(a.versionCmd(), a.initCmd(), a.createCmd(), a.addCmd(), a.searchCmd(), a.removeCmd(), a.listCmd(), a.lockCmd(), a.checkCmd(), a.matchCmd(), a.updateCmd(), a.outdatedCmd(), a.suggestsCmd(), a.pinCmd(), a.unpinCmd(), a.ignoreCmd(), a.unignoreCmd(), a.installCmd(), a.buildCmd(), a.diffCmd(), a.pullCmd(), a.syncCmd(), a.serveCmd(), a.linkCmd(), a.instancesCmd(), a.instanceCmd(), a.unlinkCmd(), a.exportCmd(), a.importCmd(), a.historyCmd(), a.rollbackCmd(), a.backupCmd(), a.restoreCmd(), a.savesCmd(), a.setCmd(), a.unsetCmd(), a.getCmd(), a.configCmd(), a.featureCmd(), a.playerCmd(), a.accountsCmd(), a.playCmd(), a.watchCmd(), a.selfCmd(), a.docsCmd(), a.cacheCmd(), a.logCmd(), a.completionCmd())
 	root.AddCommand(a.typeGroupCmds()...)
 	// hook is hidden: the generated scripts run it, nobody types it.
@@ -181,6 +179,28 @@ func (a *app) root() *cobra.Command {
 	a.installHelp(root)
 	a.markRunning(root)
 	return root
+}
+
+// dirFlag gives c -C, for a command that reads a.dir. Binding the flag resets a.dir to its empty
+// default, so a directory set before the commands are built is put back.
+func (a *app) dirFlag(c *cobra.Command) {
+	dir := a.dir
+	c.Flags().StringVarP(&a.dir, "dir", "C", "", "project directory (default: current directory)")
+	a.dir = dir
+}
+
+// instanceFlag gives c -i, for a command that reads a.instance. The root's normalization lets it be
+// spelled --id too.
+func (a *app) instanceFlag(c *cobra.Command) {
+	instance := a.instance
+	c.Flags().StringVarP(&a.instance, "instance", "i", "", "act on a registered instance, by id, name, or directory")
+	a.instance = instance
+}
+
+// scopeFlags gives c both -C and -i, for a command that acts on a project or instance directory.
+func (a *app) scopeFlags(c *cobra.Command) {
+	a.dirFlag(c)
+	a.instanceFlag(c)
 }
 
 // groupCommands gives every command that only groups others an action: its

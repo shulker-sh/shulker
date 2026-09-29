@@ -79,6 +79,7 @@ func (a *app) instanceDumpCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().IntVar(&pid, "pid", 0, "dump this Java process instead, for a game started through a wrapper")
 	return cmd
 }
@@ -171,6 +172,7 @@ func (a *app) instanceLogCmd() *cobra.Command {
 			return a.followLog(cmd.Context(), dir, rec, f, partial)
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "keep printing new output until the game exits")
 	cmd.Flags().IntVar(&limit, "limit", 0, "print only the last N lines")
 	return cmd

@@ -242,8 +242,8 @@ func TestLinkAuthorsTheInstanceOutsideAProject(t *testing.T) {
 		t.Fatalf("an authored instance syncs from itself: %+v", instances)
 	}
 
-	h.mustRun(t, "-C", gameDir, "add", "sodium")
-	h.mustRun(t, "-C", gameDir, "sync")
+	h.mustRun(t, "add", "-C", gameDir, "sodium")
+	h.mustRun(t, "sync", "-C", gameDir)
 	if _, err := os.Stat(filepath.Join(gameDir, "mods", h.jars["sodium"].filename)); err != nil {
 		t.Fatalf("an authored instance grows with add: %v", err)
 	}

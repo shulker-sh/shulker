@@ -54,6 +54,7 @@ func (a *app) linkCmd() *cobra.Command {
 			return a.linkAsked(cmd)
 		},
 	}
+	a.scopeFlags(cmd)
 	for _, e := range launcher.All {
 		cmd.AddCommand(a.launcherLinkCmd(e))
 	}
@@ -122,6 +123,7 @@ func (a *app) launcherLinkCmd(e *launcher.Entry) *cobra.Command {
 			return a.printer.Emit(rep, rep.print)
 		},
 	}
+	a.scopeFlags(cmd)
 	k.register(cmd, e)
 	return cmd
 }

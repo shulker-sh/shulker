@@ -273,6 +273,7 @@ func (a *app) featureSetCmd(verb string, on bool) *cobra.Command {
 			return a.emitFeatureChange(cmd, sc, where.sync, true, featureChange{Feature: name, On: &on}, line)
 		},
 	}
+	a.scopeFlags(cmd)
 	where.registerChange(cmd)
 	return cmd
 }
@@ -312,6 +313,7 @@ func (a *app) featureResetCmd() *cobra.Command {
 			return a.emitFeatureChange(cmd, sc, where.sync, had, featureChange{Feature: name, Reset: &had}, line)
 		},
 	}
+	a.scopeFlags(cmd)
 	where.registerChange(cmd)
 	return cmd
 }
@@ -365,6 +367,7 @@ func (a *app) featureListCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	where.register(cmd, "list the choices for")
 	return cmd
 }

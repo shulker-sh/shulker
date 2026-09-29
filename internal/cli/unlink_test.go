@@ -183,7 +183,7 @@ func TestUnlinkThenLinkAdoptsTheSameFolder(t *testing.T) {
 	h.mustRun(t, "link", "prism", "--launcher-dir", prismDir, "--name", "Friends")
 	instDir := filepath.Join(prismDir, "instances", "shulker-friends")
 	gameDir := filepath.Join(instDir, "minecraft")
-	h.mustRun(t, "-C", gameDir, "add", "fresh-animations")
+	h.mustRun(t, "add", "-C", gameDir, "fresh-animations")
 
 	r := unlinkJSON(t, h, "Friends")
 	if len(r) != 1 || r[0].Relink != "shulker link prism "+h.dir+" --name Friends --launcher-dir "+prismDir {

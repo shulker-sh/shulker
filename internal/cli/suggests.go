@@ -65,6 +65,7 @@ func (a *app) suggestsCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&optional, "optional", false, "also list optional integrations")
 	return cmd
 }

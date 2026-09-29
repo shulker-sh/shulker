@@ -51,6 +51,7 @@ func (a *app) removeCmdFor(kind string) *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	if kind == "" {
 		cmd.Flags().StringVar(&typ, "type", "", typeFlagUsage)
 	}

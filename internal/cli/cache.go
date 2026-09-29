@@ -82,6 +82,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			})
 		},
 	}
+	a.dirFlag(cmd)
 	lockFlag(cmd, &named)
 	return cmd
 }
@@ -134,6 +135,7 @@ func (a *app) cachePruneCmd() *cobra.Command {
 			})
 		},
 	}
+	a.dirFlag(cmd)
 	lockFlag(cmd, &named)
 	return cmd
 }

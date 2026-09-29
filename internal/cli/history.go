@@ -71,7 +71,7 @@ func historyIndex(args []string) (int, error) {
 }
 
 func (a *app) historyListCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "list",
 		Annotations: reads(),
 		Aliases:     []string{"ls"},
@@ -107,10 +107,12 @@ func (a *app) historyListCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 func (a *app) historyShowCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "show [n]",
 		Annotations: reads(),
 		Short:       "Show a history entry and what restoring it would change",
@@ -164,6 +166,8 @@ func (a *app) historyShowCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 func changeItem(c build.HistoryChange) out.Item {
@@ -177,7 +181,7 @@ func changeItem(c build.HistoryChange) out.Item {
 }
 
 func (a *app) historyPruneCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "prune",
 		Annotations: acts(),
 		Short:       "Remove history entries beyond the number the manifest keeps",
@@ -213,6 +217,8 @@ func (a *app) historyPruneCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 func (a *app) rollbackCmd() *cobra.Command {
@@ -291,6 +297,7 @@ func (a *app) rollbackCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&prune, "prune", false, "also trim history to the number the manifest keeps")
 	return cmd
 }

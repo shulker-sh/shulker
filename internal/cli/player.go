@@ -63,6 +63,7 @@ func (a *app) playerCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&all, "all", false, "check every player in the manifest")
 	return cmd
 }

@@ -97,6 +97,7 @@ func (a *app) ignoreCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().StringVar(&note, "note", "", "why the constraint is safe to ignore (required)")
 	cmd.Flags().StringVar(&rule, "rule", "", "the problem's rule, depends or breaks (printed with the problem)")
 	cmd.Flags().StringVar(&declared, "declared", "", "the range the jar declares (printed with the problem); with it, nothing is resolved")
@@ -105,7 +106,7 @@ func (a *app) ignoreCmd() *cobra.Command {
 }
 
 func (a *app) unignoreCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "unignore <mod> <on>",
 		Annotations: acts(),
 		Short:       "Drop an ignored dependency problem so it is checked again",
@@ -134,4 +135,6 @@ func (a *app) unignoreCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }

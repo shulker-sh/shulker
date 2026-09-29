@@ -13,7 +13,7 @@ func playedArgv(t *testing.T, h *harness, gameDir string, args ...string) string
 	t.Helper()
 	argsFile := filepath.Join(gameDir, "args.txt")
 	os.Remove(argsFile)
-	h.mustRun(t, append([]string{"-i", "pack", "play", "--no-sync"}, args...)...)
+	h.mustRun(t, append([]string{"play", "-i", "pack", "--no-sync"}, args...)...)
 	return waitForFile(t, argsFile)
 }
 
@@ -32,8 +32,8 @@ func TestPlayTakesEachLaunchSettingFromTheInstanceOverTheDefault(t *testing.T) {
 		}
 	}
 
-	h.mustRun(t, "-i", "pack", "instance", "set", "memory", "8G")
-	h.mustRun(t, "-i", "pack", "instance", "set", "jvmArgs", "--literal", `["-Dmine=1"]`)
+	h.mustRun(t, "instance", "set", "-i", "pack", "memory", "8G")
+	h.mustRun(t, "instance", "set", "-i", "pack", "jvmArgs", "--literal", `["-Dmine=1"]`)
 	argv = playedArgv(t, h, gameDir)
 	if !strings.Contains(argv, "-Xms8G\n-Xmx8G\n-Dmine=1\nnet.minecraft.client.main.Main\n") {
 		t.Fatalf("the instance's own keys win, after the version's JVM arguments:\n%s", argv)
@@ -51,7 +51,7 @@ func TestPlayWindowFlagWinsForOneRun(t *testing.T) {
 	_, gameDir := playHarness(t, h)
 	h.mustRun(t, "accounts", "login", "--use")
 	h.mustRun(t, "config", "set", "play.window", "1024x768")
-	h.mustRun(t, "-i", "pack", "instance", "set", "window", "1280x720")
+	h.mustRun(t, "instance", "set", "-i", "pack", "window", "1280x720")
 
 	if argv := playedArgv(t, h, gameDir, "--window", "800x600"); !strings.Contains(argv, "--width\n800\n--height\n600\n") || strings.Contains(argv, "1280") {
 		t.Fatalf("--window wins over both tiers:\n%s", argv)
@@ -62,7 +62,7 @@ func TestPlayWindowFlagWinsForOneRun(t *testing.T) {
 	if argv := playedArgv(t, h, gameDir); !strings.Contains(argv, "--width\n1280\n--height\n720\n") {
 		t.Fatalf("the next run is back to the instance's window:\n%s", argv)
 	}
-	if code, stdout, _ := h.run(t, "-i", "pack", "play", "--window", "big", "--json"); code != 2 || !strings.Contains(stdout, `"usage"`) {
+	if code, stdout, _ := h.run(t, "play", "-i", "pack", "--window", "big", "--json"); code != 2 || !strings.Contains(stdout, `"usage"`) {
 		t.Fatalf("--window big: exit %d\n%s", code, stdout)
 	}
 }
@@ -75,11 +75,11 @@ func TestPlayRunsTheJavaAndWrapperEitherTierNames(t *testing.T) {
 	mine := filepath.Join(h.fakeJDK(t, "25.0.1", "0"), "bin", "java")
 
 	h.mustRun(t, "config", "set", "play.java", global)
-	if got := playJSON(t, h, "-i", "pack", "play", "--dry-run"); got.Java != global {
+	if got := playJSON(t, h, "play", "-i", "pack", "--dry-run"); got.Java != global {
 		t.Fatalf("play.java is the default java: %q", got.Java)
 	}
-	h.mustRun(t, "-i", "pack", "instance", "set", "java", mine)
-	if got := playJSON(t, h, "-i", "pack", "play", "--dry-run"); got.Java != mine {
+	h.mustRun(t, "instance", "set", "-i", "pack", "java", mine)
+	if got := playJSON(t, h, "play", "-i", "pack", "--dry-run"); got.Java != mine {
 		t.Fatalf("the instance's java wins: %q", got.Java)
 	}
 
@@ -105,24 +105,24 @@ func TestPlayUsesTheInstancesPinnedAccount(t *testing.T) {
 	h.mustRun(t, "accounts", "login", "--use")
 	h.msa.signsIn("jeb", "Jeb_", dinnerbone)
 	h.mustRun(t, "accounts", "login")
-	h.mustRun(t, "-i", "pack", "instance", "set", "account", "Jeb_")
+	h.mustRun(t, "instance", "set", "-i", "pack", "account", "Jeb_")
 
-	if res := playedJSON(t, h, "-i", "pack", "play", "--no-sync"); res.Account.Name != "Jeb_" {
+	if res := playedJSON(t, h, "play", "-i", "pack", "--no-sync"); res.Account.Name != "Jeb_" {
 		t.Fatalf("the pin wins over the default account: %+v", res.Account)
 	}
 	if argv := waitForFile(t, filepath.Join(gameDir, "args.txt")); !strings.Contains(argv, "--username\nJeb_\n") {
 		t.Fatalf("the game played as someone else:\n%s", argv)
 	}
-	if res := playedJSON(t, h, "-i", "pack", "play", "--no-sync", "--account", "Notch"); res.Account.Name != "Notch" {
+	if res := playedJSON(t, h, "play", "-i", "pack", "--no-sync", "--account", "Notch"); res.Account.Name != "Notch" {
 		t.Fatalf("--account wins over the pin for one run: %+v", res.Account)
 	}
 
 	h.mustRun(t, "accounts", "logout", "Jeb_", "--yes")
-	env := h.runSetting(t, 1, "-i", "pack", "play", "--no-sync")
+	env := h.runSetting(t, 1, "play", "-i", "pack", "--no-sync")
 	if env.Error == nil || env.Error.Code != "account-not-found" || !strings.Contains(env.Error.Message, "pinned") {
 		t.Fatalf("a pin whose account has gone fails rather than falling back: %+v", env.Error)
 	}
-	if _, _, stderr := h.run(t, "-i", "pack", "play", "--no-sync"); !strings.Contains(stderr, "shulker instance unset account") {
+	if _, _, stderr := h.run(t, "play", "-i", "pack", "--no-sync"); !strings.Contains(stderr, "shulker instance unset account") {
 		t.Fatalf("the error names the way back to the default account:\n%s", stderr)
 	}
 }

@@ -194,6 +194,7 @@ func (a *app) exportFormatCmd(f packarchive.Format) *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	flags.register(cmd, f.Extension(), usage.Bundle)
 	a.registerFailFast(cmd)
 	if f.Sided() {

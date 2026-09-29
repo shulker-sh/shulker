@@ -41,11 +41,11 @@ func TestAnUnreachableModpackReadsAsOffline(t *testing.T) {
 			h.mustRun(t, "accounts", "login", "--use")
 			srv.Close()
 
-			_, stderr := h.mustRunStderr(t, "-i", "pack", "sync")
+			_, stderr := h.mustRunStderr(t, "sync", "-i", "pack")
 			if want := "offline, keeping modpack pack at "; !strings.Contains(stderr, want) {
 				t.Fatalf("sync: %q is missing from\n%s", want, stderr)
 			}
-			_, stderr = h.mustRunStderr(t, "-i", "pack", "play")
+			_, stderr = h.mustRunStderr(t, "play", "-i", "pack")
 			if want := "offline, keeping modpack pack at "; !strings.Contains(stderr, want) || strings.Contains(stderr, "couldn't update") {
 				t.Fatalf("play keeps the pin without giving up the relock:\n%s", stderr)
 			}

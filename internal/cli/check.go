@@ -80,6 +80,7 @@ func (a *app) checkCmd() *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&all, "all", false, "run every check, server included when the project declares one")
 	cmd.Flags().BoolVar(&strict, "strict", false, "fail on warnings too")
 	a.registerFailFast(cmd)

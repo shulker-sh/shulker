@@ -129,6 +129,7 @@ func (a *app) syncCmd() *cobra.Command {
 			return a.printer.Emit(res, res.print)
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().StringVar(&req.Into, "into", "", "output directory (default: the side's build directory)")
 	cmd.Flags().BoolVar(&req.Force, "force", false, "overwrite files edited in the output directory, seeded files included")
 	cmd.Flags().BoolVar(&req.AssumeClient, "assume-client", false, "build a client even when the source declares none, from the mods and overrides both sides share")

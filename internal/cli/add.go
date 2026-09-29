@@ -139,6 +139,7 @@ func (a *app) addCmdFor(kind string) *cobra.Command {
 			})
 		},
 	}
+	a.scopeFlags(cmd)
 	if kind == "" {
 		cmd.Flags().StringVar(&typ, "type", "", typeFlagUsage)
 	}

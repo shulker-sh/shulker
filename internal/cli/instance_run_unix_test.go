@@ -68,7 +68,7 @@ func TestInstanceDumpPrintsTheMainAndRenderThreads(t *testing.T) {
 	pid := dumpingGame(t, log)
 	writeRuns(t, gameDir, instance.Launch{StartedAt: "2026-09-23T00:02:02Z", Log: log, PID: pid})
 
-	stdout := h.mustRun(t, "-i", "pack", "instance", "dump")
+	stdout := h.mustRun(t, "instance", "dump", "-i", "pack")
 	for _, want := range []string{"MissingModsWindow.open", `"Render thread" #30`, log} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("dump shows %q:\n%s", want, stdout)
@@ -85,7 +85,7 @@ func TestInstanceDumpPrintsTheMainAndRenderThreads(t *testing.T) {
 			Threads []game.Thread `json:"threads"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal([]byte(h.mustRun(t, "-i", "pack", "instance", "dump", "--json")), &env); err != nil {
+	if err := json.Unmarshal([]byte(h.mustRun(t, "instance", "dump", "-i", "pack", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
 	if env.Data.PID != pid || env.Data.Log != log || len(env.Data.Threads) != 3 {
@@ -104,7 +104,7 @@ func TestInstanceDumpRefusesAWrappedRunUnlessGivenJavasPid(t *testing.T) {
 	java := dumpingGame(t, log)
 	writeRuns(t, gameDir, instance.Launch{StartedAt: "2026-09-23T00:02:02Z", Log: log, PID: wrapper, Wrapped: true})
 
-	e := runError(t, h, "-i", "pack", "instance", "dump")
+	e := runError(t, h, "instance", "dump", "-i", "pack")
 	if e.Code != "game-wrapped" || !strings.Contains(e.Help, "--pid") {
 		t.Fatalf("a wrapped run is refused, with the way round it: %+v", e)
 	}
@@ -112,11 +112,11 @@ func TestInstanceDumpRefusesAWrappedRunUnlessGivenJavasPid(t *testing.T) {
 		t.Fatal("nothing was signalled")
 	}
 
-	stdout := h.mustRun(t, "-i", "pack", "instance", "dump", "--pid", strconv.Itoa(java))
+	stdout := h.mustRun(t, "instance", "dump", "-i", "pack", "--pid", strconv.Itoa(java))
 	if !strings.Contains(stdout, "MissingModsWindow.open") {
 		t.Fatalf("--pid dumps the process it names:\n%s", stdout)
 	}
-	if e := runError(t, h, "-i", "pack", "instance", "dump", "--pid", strconv.Itoa(deadPID(t))); e.Code != "game-not-running" {
+	if e := runError(t, h, "instance", "dump", "-i", "pack", "--pid", strconv.Itoa(deadPID(t))); e.Code != "game-not-running" {
 		t.Fatalf("--pid of a process that has gone: %+v", e)
 	}
 }

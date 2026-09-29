@@ -57,7 +57,7 @@ func TestPlayDetachedRecordsTheRunWhenTheGameExits(t *testing.T) {
 	h.mustRun(t, "accounts", "login", "--use")
 	playGame(t, gameDir, crashingGame("3"))
 
-	res := playedJSON(t, h, "-i", "pack", "play")
+	res := playedJSON(t, h, "play", "-i", "pack")
 	h.watching.Wait()
 
 	run := onlyRun(t, gameDir)
@@ -96,7 +96,7 @@ func TestPlayDetachedLeavesAnOlderCrashReportOutOfTheRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	h.mustRun(t, "-i", "pack", "play")
+	h.mustRun(t, "play", "-i", "pack")
 	h.watching.Wait()
 
 	if run := onlyRun(t, gameDir); run.Outcome != instance.OutcomeOK || run.CrashReport != "" || run.ExitCode != 0 {
@@ -110,7 +110,7 @@ func TestPlayWaitRecordsTheRunBeforeItReturns(t *testing.T) {
 	h.mustRun(t, "accounts", "login", "--use")
 	playGame(t, gameDir, crashingGame("5"))
 
-	code, stdout, stderr := h.run(t, "-i", "pack", "play", "--wait")
+	code, stdout, stderr := h.run(t, "play", "-i", "pack", "--wait")
 
 	// A game that ran and crashed is the player's business: the launch itself did its job.
 	if code != 0 {
@@ -137,7 +137,7 @@ func TestPlayWaitRecordsTheRunBeforeItReturns(t *testing.T) {
 		t.Fatal(err)
 	}
 	playGame(t, gameDir, "exit 0\n")
-	res := playedJSON(t, h, "-i", "pack", "play", "--wait", "--no-sync")
+	res := playedJSON(t, h, "play", "-i", "pack", "--wait", "--no-sync")
 	if res.Outcome != instance.OutcomeOK || res.ExitCode != 0 || res.CrashReport != "" || res.PID == 0 {
 		t.Fatalf("result %+v", res)
 	}
@@ -149,7 +149,7 @@ func TestPlayStreamMirrorsTheGameAndStillWritesTheLog(t *testing.T) {
 	h.mustRun(t, "accounts", "login", "--use")
 	playGame(t, gameDir, "echo '[Render thread] Setting user: Notch'\nexit 0\n")
 
-	stdout := h.mustRun(t, "-i", "pack", "play", "--stream")
+	stdout := h.mustRun(t, "play", "-i", "pack", "--stream")
 
 	if !strings.Contains(stdout, "[Render thread] Setting user: Notch") || !strings.Contains(stdout, "Minecraft closed after") {
 		t.Fatalf("play --stream shows the game as it runs, then how it ended:\n%s", stdout)
@@ -160,7 +160,7 @@ func TestPlayStreamMirrorsTheGameAndStillWritesTheLog(t *testing.T) {
 	}
 
 	// Under --json the envelope owns stdout, so the game's output goes to stderr instead.
-	code, stdout, stderr := h.run(t, "-i", "pack", "play", "--stream", "--no-sync", "--json")
+	code, stdout, stderr := h.run(t, "play", "-i", "pack", "--stream", "--no-sync", "--json")
 	if code != 0 || !strings.Contains(stderr, "Setting user: Notch") {
 		t.Fatalf("exit %d, stderr:\n%s", code, stderr)
 	}
@@ -222,7 +222,7 @@ func TestPlayClosesTheRunAKilledWatcherLeftBeforeStartingItsOwn(t *testing.T) {
 	started := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
 	writeRuns(t, gameDir, instance.Launch{StartedAt: started, PID: deadPID(t)})
 
-	h.mustRun(t, "-i", "pack", "play", "--wait", "--no-sync")
+	h.mustRun(t, "play", "-i", "pack", "--wait", "--no-sync")
 
 	records := instance.LoadLaunches(gameDir)
 	if len(records) != 2 {
@@ -321,9 +321,9 @@ func TestTwoRunsOfOneInstanceEachCloseTheirOwnRecord(t *testing.T) {
 	// The first game ends while the second is still running, so the newest open record when the
 	// first watcher closes is the second run's, not its own.
 	playGame(t, gameDir, "sleep 1\nexit 7\n")
-	h.mustRun(t, "-i", "pack", "play", "--no-sync")
+	h.mustRun(t, "play", "-i", "pack", "--no-sync")
 	playGame(t, gameDir, "sleep 2\nexit 0\n")
-	h.mustRun(t, "-i", "pack", "play", "--no-sync")
+	h.mustRun(t, "play", "-i", "pack", "--no-sync")
 	h.watching.Wait()
 
 	records := instance.LoadLaunches(gameDir)

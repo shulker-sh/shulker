@@ -70,12 +70,13 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 			return nil
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().DurationVar(&deadline, "deadline", 0, "stop the update after this long and explain why (default: no deadline)")
 	return cmd
 }
 
 func (a *app) hookPostExitCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "post-exit",
 		Annotations: acts(),
 		Short:       "Record how the run ended after the game exits",
@@ -95,13 +96,15 @@ func (a *app) hookPostExitCmd() *cobra.Command {
 			return nil
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 // hookWrapCmd stands in for Java where the launcher has no command slots: the Mojang shim names the
 // instance with -C and hands the game's own argv over after --. That argv carries the session access
 // token, so it goes to Java and nowhere else: no warning, no record and no output repeats it.
 func (a *app) hookWrapCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "wrap -- <java arguments>",
 		Annotations: acts(),
 		Short:       "Sync the instance, then run the game with this machine's Java",
@@ -164,6 +167,8 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			return nil
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 // gameStdout is where a game run in the foreground writes: stdout, unless that is the JSON

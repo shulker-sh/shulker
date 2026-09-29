@@ -53,12 +53,13 @@ func (a *app) setCmd() *cobra.Command {
 			return a.saveSettings(p, doc, field, from)
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&literal, "literal", false, "parse the value as JSON, for lists, objects, or a value kept as a string")
 	return cmd
 }
 
 func (a *app) unsetCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:         "unset <path>",
 		Annotations: acts(),
 		Short:       "Remove a field from shulker.json by its dotted path",
@@ -82,6 +83,8 @@ func (a *app) unsetCmd() *cobra.Command {
 			return a.saveSettings(p, doc, field, from)
 		},
 	}
+	a.scopeFlags(cmd)
+	return cmd
 }
 
 func (a *app) getCmd() *cobra.Command {
@@ -114,6 +117,7 @@ func (a *app) getCmd() *cobra.Command {
 			return a.printer.Emit(value, func(l *out.Lines) { writeValue(l.W, value) })
 		},
 	}
+	a.scopeFlags(cmd)
 	cmd.Flags().BoolVar(&locked, "locked", false, "read shulker.lock instead")
 	return cmd
 }

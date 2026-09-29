@@ -103,6 +103,7 @@ func (a *app) logCmd() *cobra.Command {
 			return a.printer.Emit(r, func(l *out.Lines) { printLog(l, r, isWidest) })
 		},
 	}
+	a.instanceFlag(cmd)
 	cmd.Flags().StringVar(&f.since, "since", defaultLogWindow, "entries from this long ago (24h, 7d) or this date (2026-09-01) on")
 	var groups []string
 	for _, g := range helpGroups {

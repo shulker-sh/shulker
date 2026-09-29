@@ -33,6 +33,7 @@ func (a *app) backupCmd() *cobra.Command {
 			}, func(target savesTarget) (backupResult, error) { return a.backup(target, only) }, backupResult.print, "no-worlds")
 		},
 	}
+	a.scopeFlags(cmd)
 	where.register(cmd, "back up this save group rather than an instance", "back up every instance")
 	cmd.Flags().StringArrayVar(&only, "world", nil, "back up only this world, by its folder name; repeatable")
 	return cmd

@@ -69,9 +69,9 @@ func TestLinkShulker(t *testing.T) {
 	// passes -C, which -i refuses to sit beside, so the scope flag is the only one for this block.
 	project := h.dir
 	h.dir = ""
-	h.mustRun(t, "-i", "pack", "sync")
-	h.mustRun(t, "-i", "pack", "update")
-	if out := h.mustRun(t, "-i", "pack", "history"); out == "" {
+	h.mustRun(t, "sync", "-i", "pack")
+	h.mustRun(t, "update", "-i", "pack")
+	if out := h.mustRun(t, "history", "list", "-i", "pack"); out == "" {
 		t.Fatal("history should read the instance's own log")
 	}
 	h.dir = project
@@ -124,7 +124,7 @@ func TestLinkAndSyncListModsNotThePackItself(t *testing.T) {
 	h.mustRun(t, "add", "sodium")
 	project := h.dir
 	h.dir = ""
-	stdout = h.mustRun(t, "-i", "pack", "sync")
+	stdout = h.mustRun(t, "sync", "-i", "pack")
 	h.dir = project
 	if strings.Contains(stdout, "(modpack)") || !strings.Contains(stdout, "+ sodium") {
 		t.Fatalf("sync should list the mods that changed, not the pack: %s", stdout)
