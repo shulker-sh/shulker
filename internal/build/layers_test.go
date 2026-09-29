@@ -1,6 +1,8 @@
 package build
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -117,5 +119,26 @@ func TestFeaturesSettingOneKeyDifferentlyWarn(t *testing.T) {
 	}
 	if got := p.built("client", "config/mod.properties"); !strings.Contains(got, "scale=3") || !strings.Contains(got, "base=1") {
 		t.Fatalf("merged properties: %q", got)
+	}
+}
+
+func TestOverrideFoldersSkipSymlinks(t *testing.T) {
+	p := newProject(t)
+	secret := filepath.Join(t.TempDir(), "id_ed25519")
+	writeFile(t, secret, "private key\n")
+	p.file("overrides/config/real.txt", "real\n")
+	if err := os.Symlink(secret, filepath.Join(p.b.Dir, "overrides", "config", "key")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Dir(secret), filepath.Join(p.b.Dir, "overrides", "linked")); err != nil {
+		t.Fatal(err)
+	}
+
+	p.mustBuild("client", Options{})
+	if p.hasBuilt("client", "config/key") || p.hasBuilt("client", "linked/id_ed25519") {
+		t.Fatal("a symlinked override must not be copied into the build")
+	}
+	if got := p.built("client", "config/real.txt"); got != "real\n" {
+		t.Fatalf("regular override: %q", got)
 	}
 }

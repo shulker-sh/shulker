@@ -678,7 +678,7 @@ func (b *Builder) layer(l overrideLayer, whole func(string) bool, desired map[st
 			}
 			return err
 		}
-		if d.IsDir() {
+		if !d.Type().IsRegular() {
 			return nil
 		}
 		rel, _ := filepath.Rel(root, path)
