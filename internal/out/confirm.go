@@ -3,7 +3,6 @@ package out
 import (
 	"errors"
 	"io"
-	"strconv"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
@@ -36,15 +35,16 @@ func (p *Printer) Confirm(question string, in io.Reader) (bool, error) {
 	return yes, nil
 }
 
-// confirmTheme is the picker's theme with the two answers after the question: the chosen one in
-// cyan, like the pick arrow, the other grey. Without colour the chosen one is bracketed.
+// confirmTheme is the picker's theme with the two answers after the question: the chosen one on a
+// cyan background, like the pick arrow's colour, the other grey. Without colour the chosen one is
+// bracketed.
 func confirmTheme(t Theme) *huh.Theme {
 	h := pickTheme(t)
-	chosen := lipgloss.NewStyle().MarginLeft(1).Transform(func(s string) string { return "[" + s + "]" })
-	other := lipgloss.NewStyle().MarginLeft(1).Transform(func(s string) string { return " " + s + " " })
+	chosen := t.Style().MarginLeft(1).Transform(func(s string) string { return "[" + s + "]" })
+	other := t.Style().MarginLeft(1).Transform(func(s string) string { return " " + s + " " })
 	if t.HasColor {
-		chosen = lipgloss.NewStyle().MarginLeft(2).Foreground(lipgloss.Color("6"))
-		other = lipgloss.NewStyle().MarginLeft(2).Foreground(lipgloss.Color(strconv.Itoa(t.GreyIndex)))
+		chosen = t.Style().MarginLeft(1).Padding(0, 1).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("6"))
+		other = t.Style().MarginLeft(1).Padding(0, 1).Foreground(t.lipglossGrey())
 	}
 	for _, f := range []*huh.FieldStyles{&h.Focused, &h.Blurred} {
 		f.FocusedButton, f.BlurredButton = chosen, other
