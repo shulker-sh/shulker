@@ -33,7 +33,7 @@ const pickRows = 10
 // takes its rows already styled, so the picker decides nothing about colour that the theme hasn't.
 func (p *Printer) Pick(title string, choices []Choice, in io.Reader) (string, error) {
 	m := newPicker(p.ErrTheme, title, choices)
-	p.open(p.Stderr)
+	p.openPrompt()
 	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr)).Run(); err != nil {
 		return "", err
 	}

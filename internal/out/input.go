@@ -28,7 +28,7 @@ func (p *Printer) Ask(title, description, placeholder string, in io.Reader) (str
 	}
 	// A form left to size itself gives the group no room for the field, which draws the question
 	// as blank lines with only the key help under them.
-	p.open(p.Stderr)
+	p.openPrompt()
 	form := huh.NewForm(huh.NewGroup(field)).WithTheme(askTheme(t)).WithOutput(p.Stderr).WithInput(in).WithWidth(p.width()).WithHeight(height)
 	if err := form.Run(); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {

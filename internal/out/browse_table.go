@@ -68,6 +68,7 @@ func (p *Printer) BrowseTable(b TableBrowser, in io.Reader) (key, value string, 
 		lipgloss.SetColorProfile(termenv.Ascii)
 	}
 	m := newTableBrowser(t, b, p.width())
+	p.endLive(true)
 	// The view draws the frame's opening line itself, so leaving with nothing clears it too; what
 	// runs after opens the frame again when it prints.
 	m.frame = p.opensFrame(p.Stderr)

@@ -39,6 +39,10 @@ type Progress struct {
 	many    string
 	longest int
 	drawn   []int
+	// halted is set once the bar stops drawing for good, which can come before Finish.
+	halted  bool
+	halting sync.Once
+	owner   *Printer
 	wheel   spinner.Model
 	bar     progress.Model
 	pending tea.Cmd
@@ -77,8 +81,11 @@ func (p *Printer) Progress(verb string, files []Download) *Progress {
 		return true
 	}
 	if f, ok := p.Stderr.(*os.File); ok && IsTerminal(f) {
-		pr.tty = f
+		pr.tty, pr.owner = f, p
 		pr.stop, pr.stopped = make(chan struct{}), make(chan struct{})
+		p.steps.mu.Lock()
+		p.steps.bar = pr
+		p.steps.mu.Unlock()
 		go pr.spin()
 	}
 	return pr
@@ -175,12 +182,27 @@ func (pr *Progress) halt() {
 	if pr.tty == nil {
 		return
 	}
-	close(pr.stop)
-	<-pr.stopped
+	pr.owner.release(pr)
+	pr.halting.Do(func() {
+		close(pr.stop)
+		<-pr.stopped
+		pr.mu.Lock()
+		fmt.Fprint(pr.tty, pr.backToTop(terminalWidth(pr.tty)))
+		pr.drawn, pr.halted = nil, true
+		pr.mu.Unlock()
+	})
+}
+
+// above runs write with the bar cleared off the terminal, so a line lands at column 0 rather than
+// over the bar; the next frame draws the bar again below it.
+func (pr *Progress) above(write func() (int, error)) (int, error) {
 	pr.mu.Lock()
-	fmt.Fprint(pr.tty, pr.backToTop(terminalWidth(pr.tty)))
-	pr.drawn = nil
-	pr.mu.Unlock()
+	defer pr.mu.Unlock()
+	if !pr.halted {
+		fmt.Fprint(pr.tty, pr.backToTop(terminalWidth(pr.tty)))
+		pr.drawn = nil
+	}
+	return write()
 }
 
 func newBar(t Theme) progress.Model {
@@ -250,6 +272,9 @@ func (pr *Progress) redraw() {
 	}
 	pr.mu.Lock()
 	defer pr.mu.Unlock()
+	if pr.halted {
+		return
+	}
 	width := terminalWidth(pr.tty)
 	lines := pr.render(width)
 	var b strings.Builder

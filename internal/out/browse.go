@@ -102,7 +102,7 @@ func (p *Printer) BrowseMarks(title, description string, src BrowseSource, in io
 	// The query, its description and its line, the gap, the status line and the rows, the gap and
 	// the key help.
 	height := 3 + 1 + 1 + pickRows + 2
-	p.open(p.Stderr)
+	p.openPrompt()
 	form := huh.NewForm(group).WithTheme(marksTheme(t)).WithOutput(p.Stderr).WithInput(in).
 		WithWidth(p.width()).WithHeight(height).
 		WithKeyMap(keys).WithLayout(gutterLayout{quit: keys.Quit, group: group})

@@ -325,7 +325,7 @@ func annotationEscaper(isProperty bool) *strings.Replacer {
 
 // Fail prints err as the run's error and returns the exit code the run ends with.
 func (p *Printer) Fail(err error) int {
-	p.settle(false)
+	p.endLive(false)
 	e := AsError(err)
 	p.record(e)
 	if p.JSON {
@@ -356,7 +356,7 @@ func (p *Printer) Raw() { p.printed = true }
 // Finish ends a run that succeeded. Under --json, a command that emitted nothing still prints an
 // envelope, so its warnings reach the caller.
 func (p *Printer) Finish() {
-	p.Settle()
+	p.endLive(true)
 	if p.JSON && !p.printed {
 		_ = p.encode(p.envelope(true, nil, nil))
 	}

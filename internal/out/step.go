@@ -20,6 +20,8 @@ type stepState struct {
 	shown   []string
 	// groups are the progress groups that settled into a line, by groupKey.
 	groups []string
+	// bar is the download bar drawing on the terminal, which every other line clears first.
+	bar *Progress
 }
 
 type step struct {
@@ -214,5 +216,31 @@ type settling struct {
 func (s settling) Write(b []byte) (int, error) {
 	s.p.Settle()
 	s.p.open(s.w)
+	if bar := s.p.liveBar(); bar != nil && IsTerminal(s.w) {
+		return bar.above(func() (int, error) { return s.w.Write(b) })
+	}
 	return s.w.Write(b)
+}
+
+// endLive ends every line still drawing before something else takes the terminal: the running
+// step settles, and the download bar clears and stops for good.
+func (p *Printer) endLive(done bool) {
+	p.settle(done)
+	if bar := p.liveBar(); bar != nil {
+		bar.halt()
+	}
+}
+
+func (p *Printer) liveBar() *Progress {
+	p.steps.mu.Lock()
+	defer p.steps.mu.Unlock()
+	return p.steps.bar
+}
+
+func (p *Printer) release(pr *Progress) {
+	p.steps.mu.Lock()
+	defer p.steps.mu.Unlock()
+	if p.steps.bar == pr {
+		p.steps.bar = nil
+	}
 }

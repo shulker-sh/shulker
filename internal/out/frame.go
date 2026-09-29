@@ -57,3 +57,10 @@ func (p *Printer) isFramed(w io.Writer) bool {
 	}
 	return IsTerminal(w)
 }
+
+// openPrompt readies stderr for a prompt: it ends the live lines, which would otherwise keep
+// drawing under it, and opens the frame.
+func (p *Printer) openPrompt() {
+	p.endLive(true)
+	p.open(p.Stderr)
+}

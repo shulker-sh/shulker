@@ -24,7 +24,7 @@ func (p *Printer) Confirm(question string, in io.Reader) (bool, error) {
 	keys.Confirm.Toggle = key.NewBinding(key.WithKeys("left", "right", "h", "l", "tab"))
 	keys.Confirm.Reject = key.NewBinding(key.WithKeys("n", "N", "esc"))
 	field := huh.NewConfirm().Title(gutter + question).Affirmative("Yes").Negative("No").Inline(true).WithButtonAlignment(lipgloss.Left).Value(&yes)
-	p.open(p.Stderr)
+	p.openPrompt()
 	form := huh.NewForm(huh.NewGroup(field)).WithTheme(confirmTheme(t)).WithOutput(p.Stderr).WithInput(in).
 		WithKeyMap(keys).WithShowHelp(false).WithWidth(p.width()).WithHeight(1)
 	if err := form.Run(); err != nil {

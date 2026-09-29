@@ -38,7 +38,7 @@ type DownloadWait struct {
 // Ctrl-c ends it with ErrPickCancelled, and a failed check with its error.
 func (p *Printer) AwaitDownloads(ctx context.Context, w DownloadWait, in io.Reader) (skipped bool, err error) {
 	m := newWaiter(p.ErrTheme, w)
-	p.open(p.Stderr)
+	p.openPrompt()
 	if _, err := tea.NewProgram(m, tea.WithInput(in), tea.WithOutput(p.Stderr), tea.WithContext(ctx)).Run(); err != nil {
 		if errors.Is(err, tea.ErrProgramKilled) {
 			return false, ErrPickCancelled
