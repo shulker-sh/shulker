@@ -25,26 +25,33 @@ var exitedStatus = regexp.MustCompile(exitedMark + `(\d+)\r?\n`)
 // TestTypeAheadSurvivesStartup types a command while a process starts, the way one is typed
 // or pasted into the shell while the previous command runs, and checks it is still waiting for
 // the shell once the process exits. Each probe in testdata/typeahead is its own module that
-// starts on one Charm generation: v1 loses the line to Bubble Tea's init query, and v2 must not.
+// starts on one Charm generation: v1 loses the line to Bubble Tea's init query, and v2 must not,
+// and neither must shulker itself.
 func TestTypeAheadSurvivesStartup(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the probes")
 	}
 	for _, c := range []struct {
-		probe string
+		name  string
+		dir   string
+		args  []string
 		keeps bool
-	}{{"v1", false}, {"v2", true}} {
-		t.Run(c.probe, func(t *testing.T) {
+	}{
+		{"v1", filepath.Join("testdata", "typeahead", "v1"), nil, false},
+		{"v2", filepath.Join("testdata", "typeahead", "v2"), nil, true},
+		{"shulker", filepath.Join("..", ".."), []string{"version"}, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
 			bin := filepath.Join(t.TempDir(), "probe")
 			build := exec.Command("go", "build", "-o", bin, ".")
-			build.Dir = filepath.Join("testdata", "typeahead", c.probe)
-			build.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=")
+			build.Dir = c.dir
+			build.Env = append(os.Environ(), "GOWORK=off")
 			if b, err := build.CombinedOutput(); err != nil {
-				t.Fatalf("building the %s probe: %v\n%s", c.probe, err, b)
+				t.Fatalf("building %s: %v\n%s", c.name, err, b)
 			}
-			left := typeAhead(t, bin)
+			left := typeAhead(t, append([]string{bin}, c.args...)...)
 			if kept := left == typedAhead; kept != c.keeps {
-				t.Errorf("%s: %q left waiting after startup, want kept = %v", c.probe, left, c.keeps)
+				t.Errorf("%s: %q left waiting after startup, want kept = %v", c.name, left, c.keeps)
 			}
 		})
 	}
@@ -64,6 +71,15 @@ func typeAhead(t *testing.T, program ...string) string {
 	if err := pty.Setsize(master, &pty.Winsize{Rows: 24, Cols: 80}); err != nil {
 		t.Fatal(err)
 	}
+	// Go watches a terminal it opens with kqueue, and on macOS a switch to raw mode and back then
+	// drops a line typed ahead, which no shell would. A copy of the descriptor Go never opened isn't
+	// watched.
+	fd, err := unix.Dup(int(tty.Fd()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tty.Close()
+	tty = os.NewFile(uintptr(fd), "tty")
 	shell := exec.Command("/bin/sh", append([]string{"-c", `"$@"; echo "` + exitedMark + `$?"; exec sleep 30`, "sh"}, program...)...)
 	shell.Stdin, shell.Stdout, shell.Stderr = tty, tty, tty
 	shell.Env = append(os.Environ(), "TERM=xterm-256color")
