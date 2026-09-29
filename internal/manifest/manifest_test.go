@@ -316,6 +316,9 @@ func TestParseRejects(t *testing.T) {
 		`"requires":{},"client":{},"icon":"/tmp/icon.png"`,
 		`"requires":{},"client":{},"icon":"icon.jpg"`,
 		`"requires":{},"server":{"jvmArgs":["-javaagent:evil.jar"]}`,
+		`"requires":{"extras":{"file":"../../extras.jar"}},"client":{}`,
+		`"requires":{"extras":{"file":"C:/extras.jar"}},"client":{}`,
+		`"requires":{"cozy":{"type":"modpack","source":"https://example.com/cozy.git","path":"../../.ssh"}},"client":{}`,
 	} {
 		if _, err := Parse(doc(rest)); err == nil {
 			t.Errorf("%s should be invalid", rest)
@@ -332,6 +335,9 @@ func TestParseRejects(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := Parse(doc(`"requires":{},"client":{},"icon":"assets/Icon.PNG"`)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Parse(doc(`"requires":{"extras":{"file":"files/extras.jar"},"cozy":{"type":"modpack","source":"https://example.com/cozy.git","path":"packs/cozy"}},"client":{}`)); err != nil {
 		t.Fatal(err)
 	}
 }

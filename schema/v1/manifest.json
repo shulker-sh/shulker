@@ -218,8 +218,8 @@
     "relativePath": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^[^/\\\\]",
-      "description": "Path relative to the project root, forward slashes, no leading slash. The tool rejects .. segments."
+      "pattern": "^(?:[^/\\\\:.][^/\\\\:]*|\\.(?:[^/\\\\:.][^/\\\\:]*)?|\\.\\.[^/\\\\:]+)(?:[/\\\\](?:[^/\\\\:.][^/\\\\:]*|\\.(?:[^/\\\\:.][^/\\\\:]*)?|\\.\\.[^/\\\\:]+))*$",
+      "description": "Path relative to the project root, forward slashes: no leading slash, no .. segment, no colon, so it can't leave the project or name a drive."
     },
     "variables": {
       "type": "object",
@@ -279,10 +279,8 @@
           "description": "Branch, tag, or commit for a git source. The lock records the resolved commit."
         },
         "path": {
-          "type": "string",
-          "minLength": 1,
-          "pattern": "^[^/\\\\]",
-          "description": "Folder inside a git source's repository that holds the modpack's shulker.json, forward slashes, relative to the repository root. Omitted means the root. The tool rejects .. segments."
+          "$ref": "#/$defs/relativePath",
+          "description": "Folder inside a git source's repository that holds the modpack's shulker.json, forward slashes, relative to the repository root. Omitted means the root."
         },
         "autoUpdate": {
           "type": "boolean",

@@ -3,6 +3,7 @@ package lock
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -104,6 +105,12 @@ func TestFileEntries(t *testing.T) {
 	}
 	if _, err := Parse(doc(`"file":"files/extras.jar","filename":"extras.jar","size":10,"side":"both","requiredBy":[],"aliases":{}`, pack)); err == nil {
 		t.Error("a file entry needs its sha512")
+	}
+	for _, file := range []string{"../../x.jar", "files/../../x.jar", "/tmp/x.jar", `\\x.jar`, "C:/x.jar", "files/x.jar:hidden"} {
+		escaping := strings.Replace(mod, `"files/extras.jar"`, strconv.Quote(file), 1)
+		if _, err := Parse(doc(escaping, pack)); out.CodeOf(err) != "lock-invalid" {
+			t.Errorf("file %s should be lock-invalid: %v", file, err)
+		}
 	}
 }
 
