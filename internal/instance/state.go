@@ -10,6 +10,7 @@ import (
 	"shulker.sh/shulker/internal/fsutil"
 	"shulker.sh/shulker/internal/managed"
 	"shulker.sh/shulker/internal/out"
+	"shulker.sh/shulker/internal/takedown"
 	"shulker.sh/shulker/schema"
 )
 
@@ -52,6 +53,15 @@ type State struct {
 	InstalledLoader *InstalledLoader `json:"installedLoader,omitempty"`
 	// LauncherImage is the hash of the instance image shulker last wrote into the launcher.
 	LauncherImage string `json:"launcherImage,omitempty"`
+	// Takedowns is the last takedown check a sync ran for the directory, which a build warns from.
+	Takedowns *Takedowns `json:"takedowns,omitempty"`
+}
+
+// Takedowns is when a sync last asked the providers about a directory's locked files, and the
+// ones it found gone or filed under another project.
+type Takedowns struct {
+	CheckedAt string          `json:"checkedAt"`
+	Files     []takedown.File `json:"files"`
 }
 
 // InstalledLoader is a loader that its own installer set up, rather than shulker.

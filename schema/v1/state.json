@@ -94,6 +94,35 @@
     "launcherImage": {
       "type": "string",
       "description": "The hash of the instance image shulker last wrote into the launcher."
+    },
+    "takedowns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkedAt", "files"],
+      "description": "The last takedown check a sync ran for the directory: which locked files their provider no longer has, or files under another project. A build warns from it.",
+      "properties": {
+        "checkedAt": { "type": "string", "description": "When the check ran." },
+        "files": {
+          "type": "array",
+          "description": "The files the check found gone or moved.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "type", "provider", "project", "version", "versionNumber", "sha512", "status"],
+            "properties": {
+              "key": { "type": "string", "description": "The entry's key." },
+              "type": { "type": "string", "description": "The entry's kind: modpack, mod or a pack kind." },
+              "provider": { "type": "string", "description": "The provider the lock names." },
+              "project": { "type": "string", "description": "The project the lock names." },
+              "version": { "type": "string", "description": "The version id the lock names." },
+              "versionNumber": { "type": "string", "description": "The version as its provider names it." },
+              "sha512": { "type": "string", "pattern": "^[0-9a-f]{128}$", "description": "The file's SHA-512." },
+              "status": { "type": "string", "enum": ["gone", "moved"], "description": "What the provider said: gone, or moved to another project." },
+              "filedUnder": { "type": "string", "description": "The project the provider files a moved file under." }
+            }
+          }
+        }
+      }
     }
   }
 }
