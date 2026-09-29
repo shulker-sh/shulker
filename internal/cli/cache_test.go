@@ -68,6 +68,26 @@ func TestCacheInfoNamesItsRootsAndPruneFreesTheRest(t *testing.T) {
 	}
 }
 
+func TestCachePruneKeepsManualDownloadsUnlessAsked(t *testing.T) {
+	h := newInPlace(t)
+	c := &cache.Cache{Dir: h.cache}
+	sha, err := c.PutManual(strings.NewReader("a jar downloaded by hand"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stdout := h.mustRun(t, "cache", "info"); !strings.Contains(stdout, "1 manual download, kept by prune") {
+		t.Fatalf("info counts the manual download: %s", stdout)
+	}
+	h.mustRun(t, "cache", "prune")
+	if !c.Has(sha) {
+		t.Fatal("a plain prune keeps a manual download")
+	}
+	h.mustRun(t, "cache", "prune", "--manual")
+	if c.Has(sha) {
+		t.Fatal("prune --manual removes it")
+	}
+}
+
 // A root that can't be read stops a prune, but an inspection still reports: it
 // is the command that names which instance is broken.
 func TestCacheInfoReportsAnUnreadableRoot(t *testing.T) {

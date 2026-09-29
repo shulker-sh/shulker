@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -41,6 +42,7 @@ type Usage struct {
 	Dir      string `json:"dir"`
 	Bytes    int64  `json:"bytes"`
 	Objects  int    `json:"objects"`
+	Manual   int    `json:"manual"`
 	Listings int    `json:"listings"`
 }
 
@@ -58,16 +60,49 @@ func (c *Cache) Usage() (Usage, error) {
 	if err != nil {
 		return Usage{}, err
 	}
-	u.Bytes, u.Objects, u.Listings = size, len(objects), len(ix.Pairs)
+	manual, err := c.manualObjects()
+	if err != nil {
+		return Usage{}, err
+	}
+	u.Bytes, u.Objects, u.Manual, u.Listings = size, len(objects), len(manual), len(ix.Pairs)
 	return u, nil
 }
 
-// Prune removes everything the roots don't reference, and the listing index's
-// pairs unused for 90 days. It walks only the trees listed here, so the managed
-// Java runtimes and the shared CurseForge key are never candidates; a dry run
-// reports what would go and removes nothing.
-func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
+// manualObjects are the paths of the objects marked manual that are still there.
+func (c *Cache) manualObjects() (map[string]bool, error) {
+	markers, err := entriesAt(filepath.Join(c.Dir, "index", "manual"), 1)
+	if err != nil {
+		return nil, err
+	}
+	objects := map[string]bool{}
+	for _, m := range markers {
+		if sha := filepath.Base(m); c.Has(sha) {
+			objects[c.Object(sha)] = true
+		}
+	}
+	return objects, nil
+}
+
+// PruneOptions are how a prune runs: a dry run reports what would go and removes nothing, and
+// Manual lets the manual downloads go too, which nothing can fetch again.
+type PruneOptions struct {
+	DryRun bool
+	Manual bool
+}
+
+// Prune removes everything the roots don't reference but the manual downloads,
+// and the listing index's pairs unused for 90 days. It walks only the trees
+// listed here, so the managed Java runtimes and the shared CurseForge key are
+// never candidates.
+func (c *Cache) Prune(roots []Root, o PruneOptions) (Pruned, error) {
 	keep := c.keep(roots)
+	if !o.Manual {
+		manual, err := c.manualObjects()
+		if err != nil {
+			return Pruned{}, err
+		}
+		maps.Copy(keep, manual)
+	}
 	var p Pruned
 	trees := []struct {
 		dir   string
@@ -100,7 +135,7 @@ func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
 			if err != nil {
 				return Pruned{}, err
 			}
-			if !dryRun {
+			if !o.DryRun {
 				if err := os.RemoveAll(path); err != nil {
 					return Pruned{}, err
 				}
@@ -109,12 +144,12 @@ func (c *Cache) Prune(roots []Root, dryRun bool) (Pruned, error) {
 			p.Bytes += size
 		}
 	}
-	if !dryRun {
+	if !o.DryRun {
 		if err := c.dropIndexEntries(); err != nil {
 			return Pruned{}, err
 		}
 	}
-	listings, err := c.pruneListings(dryRun)
+	listings, err := c.pruneListings(o.DryRun)
 	if err != nil {
 		return Pruned{}, err
 	}

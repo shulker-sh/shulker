@@ -63,7 +63,7 @@ func TestCacheRootsKeepTheProjectsHistoryEntries(t *testing.T) {
 	if !r.Project || r.Count() != 1 || len(r.Locks) != 2 || r.Instances != 0 {
 		t.Fatalf("roots: %+v", r)
 	}
-	if _, err := r.Prune(p.b.Cache, false); err != nil {
+	if _, err := r.Prune(p.b.Cache, cache.PruneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !exists(p.b.Cache.Object(sodium.File.Sha512)) {
@@ -103,7 +103,7 @@ func TestCacheRootsFollowASeparateDirInstanceToItsProject(t *testing.T) {
 	if r.Instances != 1 || r.Project || len(r.Locks) != 1 {
 		t.Fatalf("roots: %+v", r)
 	}
-	if _, err := r.Prune(p.b.Cache, false); err != nil {
+	if _, err := r.Prune(p.b.Cache, cache.PruneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !exists(p.b.Cache.Object(sodium.File.Sha512)) {
@@ -139,7 +139,7 @@ func TestCacheRootsReadARemoteSourcesCheckoutLock(t *testing.T) {
 	if r.Instances != 1 || len(r.Locks) != 1 || r.Locks[0].Source != source || r.Locks[0].Ref != "main" {
 		t.Fatalf("roots: %+v", r)
 	}
-	if _, err := r.Prune(c, false); err != nil {
+	if _, err := r.Prune(c, cache.PruneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !exists(c.Object(sodium.File.Sha512)) {
@@ -158,10 +158,10 @@ func TestCacheRootsCarryAnUnreadableInstanceLock(t *testing.T) {
 	if r.Instances != 1 || len(r.Locks) != 0 || len(r.Unreadable) != 1 {
 		t.Fatalf("roots: %+v", r)
 	}
-	if _, err := r.Prune(c, true); err != nil {
+	if _, err := r.Prune(c, cache.PruneOptions{DryRun: true}); err != nil {
 		t.Fatalf("a dry run reports past an unreadable root: %v", err)
 	}
-	_, err := r.Prune(c, false)
+	_, err := r.Prune(c, cache.PruneOptions{})
 	if e := out.AsError(err); err == nil || e.Code != "cache-root-unreadable" || e.Message != r.Unreadable[0] {
 		t.Fatalf("a prune refuses an unreadable root: %v", err)
 	}
@@ -180,13 +180,13 @@ func TestCacheRootsCountNamedLocks(t *testing.T) {
 	if r.LockFiles != 1 || r.Count() != 1 || r.Project || len(r.Locks) != 1 {
 		t.Fatalf("a named lock should count as a root: %+v", r)
 	}
-	if _, err := r.Prune(p.b.Cache, false); err != nil {
+	if _, err := r.Prune(p.b.Cache, cache.PruneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !exists(p.b.Cache.Object(sodium.File.Sha512)) {
 		t.Fatal("a named lock's mods must survive a prune")
 	}
-	if _, err := mustRoots(t, p.b.Cache, nil, elsewhere).Prune(p.b.Cache, false); err != nil {
+	if _, err := mustRoots(t, p.b.Cache, nil, elsewhere).Prune(p.b.Cache, cache.PruneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if exists(p.b.Cache.Object(sodium.File.Sha512)) {
@@ -212,7 +212,7 @@ func TestCacheRootsCarryAnUnreadableNamedLock(t *testing.T) {
 	if r.Count() != 2 || !r.Project || r.LockFiles != 1 || len(r.Unreadable) != 1 || len(r.Locks) != 1 {
 		t.Fatalf("roots: %+v", r)
 	}
-	_, err := r.Prune(p.b.Cache, false)
+	_, err := r.Prune(p.b.Cache, cache.PruneOptions{})
 	if out.CodeOf(err) != "cache-root-unreadable" {
 		t.Fatalf("a prune refuses an unreadable named lock: %v", err)
 	}

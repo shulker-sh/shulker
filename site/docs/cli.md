@@ -1713,7 +1713,7 @@ shulker docs --search build directory
 
 ### `shulker cache info`
 
-Show where the shared download cache is, how much space it uses, how many files it holds, how many listing pairs the listing index holds, and how much `cache prune` would free. The roots line names what is keeping files: every instance in the registry, the project you are standing in when there is one, and each lock file `--lock` names, counted as `lock files`. A registered instance or named lock file whose lock can't be read is named as a warning and no prune line is suggested, since `cache prune` refuses while one is unreadable; the prunable figure is then counted as if that instance needed nothing.
+Show where the shared download cache is, how much space it uses, how many files it holds, how many of those are manual downloads, how many listing pairs the listing index holds, and how much `cache prune` would free. The roots line names what is keeping files: every instance in the registry, the project you are standing in when there is one, and each lock file `--lock` names, counted as `lock files`. A registered instance or named lock file whose lock can't be read is named as a warning and no prune line is suggested, since `cache prune` refuses while one is unreadable; the prunable figure is then counted as if that instance needed nothing.
 
 ```sh
 shulker cache info
@@ -1725,7 +1725,7 @@ shulker cache info
 
 ### `shulker cache prune`
 
-Remove everything in the cache that no root references. A root is a registered instance or the project you run it in: its `shulker.lock`, the lock of every history entry it keeps, the modpack checkouts and offline sync fallbacks its sources need, and the archive of a pack last imported from a file, which a re-import reads and no provider can fetch again. Installer logs and half-finished downloads always go, and so do listing index pairs no command has used for 90 days. The managed Java runtimes and your CurseForge key are never touched, and nothing a build placed can be removed from a directory without its bytes reaching the cache first, so rolling an instance back still works offline. A registered folder that no longer exists is skipped; one that is there but whose lock can't be read stops the prune, since it may be an instance that still needs its files. A detached build from `sync --into` is no root of its own: it runs on its source project's lock, which is kept while that project is a registered instance's source, a registered instance itself, or the project you run the prune in. Otherwise, and always for a detached build from a git or URL source, the prune may remove its files from the cache, and its next sync downloads them again; its own directory keeps them either way.
+Remove everything in the cache that no root references. A root is a registered instance or the project you run it in: its `shulker.lock`, the lock of every history entry it keeps, the modpack checkouts and offline sync fallbacks its sources need, and the archive of a pack last imported from a file, which a re-import reads and no provider can fetch again. Manual downloads stay unless `--manual` is passed: a file you downloaded by hand is taken from the cache the next time any project needs it, and nothing can fetch it again. Installer logs and half-finished downloads always go, and so do listing index pairs no command has used for 90 days. The managed Java runtimes and your CurseForge key are never touched, and nothing a build placed can be removed from a directory without its bytes reaching the cache first, so rolling an instance back still works offline. A registered folder that no longer exists is skipped; one that is there but whose lock can't be read stops the prune, since it may be an instance that still needs its files. A detached build from `sync --into` is no root of its own: it runs on its source project's lock, which is kept while that project is a registered instance's source, a registered instance itself, or the project you run the prune in. Otherwise, and always for a detached build from a git or URL source, the prune may remove its files from the cache, and its next sync downloads them again; its own directory keeps them either way.
 
 `--lock` adds a lock file as a root of its own, by path, whatever its name, a relative one taken from the directory you run shulker in rather than `--dir`, so a machine with no registered instances, like a CI runner caching several packs, can keep every pack's files in one prune: `shulker cache prune --lock a/shulker.lock --lock b/shulker.lock`. Only that lock is kept, not the history entries or sources of the project it came from. A named lock that isn't there fails with `lock-not-found`, and one that can't be read stops the prune like an unreadable instance.
 
@@ -1736,6 +1736,7 @@ shulker cache prune
 | Flag | Description |
 | --- | --- |
 | `--lock` | Also keep what this lock file references; repeat for more |
+| `--manual` | Also remove manual downloads, which nothing can fetch again |
 
 ### `shulker log`
 

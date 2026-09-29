@@ -50,7 +50,7 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			would, err := r.Prune(d.Cache, true)
+			would, err := r.Prune(d.Cache, cache.PruneOptions{DryRun: true})
 			if err != nil {
 				return err
 			}
@@ -63,6 +63,9 @@ func (a *app) cacheInfoCmd() *cobra.Command {
 				rows := []out.Row{
 					{Text: out.HumanBytes(usage.Bytes) + ", " + out.Count(usage.Objects, "object", "objects")},
 					{Text: out.Sentence(rootsText(r))},
+				}
+				if usage.Manual > 0 {
+					rows = append(rows, out.Row{Text: out.Count(usage.Manual, "manual download", "manual downloads") + ", kept by prune"})
 				}
 				if usage.Listings > 0 {
 					rows = append(rows, out.Row{Text: out.Count(usage.Listings, "listing pair", "listing pairs") + " in the listing index"})
@@ -93,6 +96,7 @@ func lockFlag(cmd *cobra.Command, named *[]string) {
 
 func (a *app) cachePruneCmd() *cobra.Command {
 	var named []string
+	var manual bool
 	cmd := &cobra.Command{
 		Use:         "prune",
 		Annotations: acts(),
@@ -107,7 +111,7 @@ func (a *app) cachePruneCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			pruned, err := r.Prune(d.Cache, false)
+			pruned, err := r.Prune(d.Cache, cache.PruneOptions{Manual: manual})
 			if err != nil {
 				return err
 			}
@@ -137,6 +141,7 @@ func (a *app) cachePruneCmd() *cobra.Command {
 	}
 	a.dirFlag(cmd)
 	lockFlag(cmd, &named)
+	cmd.Flags().BoolVar(&manual, "manual", false, "also remove manual downloads, which nothing can fetch again")
 	return cmd
 }
 

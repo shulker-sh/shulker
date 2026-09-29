@@ -65,7 +65,7 @@ func TestPruneKeepsWhatARootReferences(t *testing.T) {
 	l.ResourcePacks["fresh"] = lock.Pack{Sha512: pack}
 	l.Server = &lock.Download{Sha512: server}
 	l.Loader = lock.Loader{Type: "fabric", Version: "0.17.3", Client: &lock.Download{Sha512: client}, Server: &lock.ServerJar{Sha512: serverJar, Libraries: map[string]lock.Download{"asm": {Sha512: library}}}}
-	pruned, err := c.Prune([]Root{{Lock: l}}, false)
+	pruned, err := c.Prune([]Root{{Lock: l}}, PruneOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestPruneDryRunRemovesNothing(t *testing.T) {
 	log := filepath.Join(c.Dir, "logs", "installer-20260101-000000.log")
 	writeFile(t, log, "log")
 
-	pruned, err := c.Prune(nil, true)
+	pruned, err := c.Prune(nil, PruneOptions{DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestPruneKeepsASourcesMirrorAndFallbacks(t *testing.T) {
 		writeFile(t, path, "x")
 	}
 
-	pruned, err := c.Prune([]Root{root}, false)
+	pruned, err := c.Prune([]Root{root}, PruneOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestPruneKeepsALocksModpacks(t *testing.T) {
 	stray := filepath.Join(c.PackSource("dead"), lock.FileName)
 	writeFile(t, stray, "x")
 
-	if _, err := c.Prune([]Root{{Lock: l}}, false); err != nil {
+	if _, err := c.Prune([]Root{{Lock: l}}, PruneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range kept {
@@ -202,7 +202,7 @@ func TestPruneKeepsOnlyALocalImportsArchive(t *testing.T) {
 	fromFile.Imported = &lock.Imported{Sha512: local}
 	fromProvider.Imported = &lock.Imported{Provider: "modrinth", Project: "p", Version: "v", Sha512: hosted}
 
-	if _, err := c.Prune([]Root{{Lock: fromFile}, {Lock: fromProvider}}, false); err != nil {
+	if _, err := c.Prune([]Root{{Lock: fromFile}, {Lock: fromProvider}}, PruneOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if !exists(c.Object(local)) {

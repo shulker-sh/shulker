@@ -93,11 +93,11 @@ func CacheRoots(c *cache.Cache, instances []project.InstanceEntry, dir string, n
 
 // Prune removes what no root references. A dry run reports even past an unreadable root; a real
 // prune refuses one, since it may be a live instance whose files would go.
-func (r Roots) Prune(c *cache.Cache, dryRun bool) (cache.Pruned, error) {
-	if !dryRun && len(r.Unreadable) > 0 {
+func (r Roots) Prune(c *cache.Cache, o cache.PruneOptions) (cache.Pruned, error) {
+	if !o.DryRun && len(r.Unreadable) > 0 {
 		return cache.Pruned{}, out.Errorf("cache-root-unreadable", "%s", r.Unreadable[0])
 	}
-	return c.Prune(r.Locks, dryRun)
+	return c.Prune(r.Locks, o)
 }
 
 // dirRoots reads the locks one directory keeps alive: its own and one per

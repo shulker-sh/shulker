@@ -109,14 +109,14 @@ func TestPruneDropsListingsUnusedFor90Days(t *testing.T) {
 	recent.LastUsed = day(89)
 	writeListings(t, c, old, recent)
 
-	would, err := c.Prune(nil, true)
+	would, err := c.Prune(nil, PruneOptions{DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if would.Listings != 1 || len(readListings(t, c).Pairs) != 2 {
 		t.Fatalf("dry run: would drop %d, index has %+v", would.Listings, readListings(t, c).Pairs)
 	}
-	pruned, err := c.Prune(nil, false)
+	pruned, err := c.Prune(nil, PruneOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

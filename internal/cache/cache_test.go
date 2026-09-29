@@ -73,7 +73,7 @@ func TestPruneDropsTheIndexEntriesOfAnObjectItRemoves(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Prune(nil, false); err != nil {
+	if _, err := c.Prune(nil, PruneOptions{Manual: true}); err != nil {
 		t.Fatal(err)
 	}
 	if exists(c.sha1Entry(sha1Of("nothing references me"))) || exists(c.manualMarker(sha)) {
@@ -99,5 +99,28 @@ func TestAManualPutIsMarkedAndFoundByItsSha1(t *testing.T) {
 	}
 	if c.IsManual(plain) {
 		t.Fatal("a plain put is marked manual")
+	}
+}
+
+func TestPruneKeepsManualDownloadsUnlessAsked(t *testing.T) {
+	c := newCache(t)
+	sha, err := c.PutManual(strings.NewReader("a jar downloaded by hand"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u, err := c.Usage(); err != nil || u.Manual != 1 {
+		t.Fatalf("usage counts the manual download: %+v %v", u, err)
+	}
+	if p, err := c.Prune(nil, PruneOptions{}); err != nil || p.Files != 0 || !c.Has(sha) || !c.IsManual(sha) {
+		t.Fatalf("a manual download nothing references is kept: %+v %v", p, err)
+	}
+	if p, err := c.Prune(nil, PruneOptions{DryRun: true, Manual: true}); err != nil || p.Files != 1 || !c.Has(sha) {
+		t.Fatalf("a dry run with manual counts it and keeps it: %+v %v", p, err)
+	}
+	if p, err := c.Prune(nil, PruneOptions{Manual: true}); err != nil || p.Files != 1 || c.Has(sha) || c.IsManual(sha) {
+		t.Fatalf("with manual it goes, marker and all: %+v %v", p, err)
+	}
+	if u, err := c.Usage(); err != nil || u.Manual != 0 {
+		t.Fatalf("usage counts no manual download once it is gone: %+v %v", u, err)
 	}
 }
