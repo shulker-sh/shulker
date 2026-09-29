@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/selfupdate"
 )
@@ -302,6 +303,34 @@ func TestEveryRunnableCommandDeclaresWhatItsRunsDo(t *testing.T) {
 		if c.Runnable() && !slices.Contains([]string{logReads, logActs, logDecides, logNever}, c.Annotations[logMode]) {
 			t.Errorf("%q declares neither reads nor acts, so the log can't tell whether to keep a clean run", c.CommandPath())
 		}
+		for _, sub := range c.Commands() {
+			walk(sub)
+		}
+	}
+	walk(newApp(io.Discard, io.Discard).root())
+}
+
+func TestEveryHelpIsPlainText(t *testing.T) {
+	var walk func(c *cobra.Command)
+	walk = func(c *cobra.Command) {
+		if c.Hidden {
+			return
+		}
+		args := append(strings.Fields(strings.TrimPrefix(c.CommandPath(), "shulker")), "--help", "--no-color")
+		_, stdout, _ := run(t, args...)
+		if strings.Contains(stdout, "**") {
+			t.Errorf("%s help prints markdown emphasis:\n%s", c.CommandPath(), stdout)
+		}
+		for _, line := range strings.Split(stdout, "\n") {
+			if strings.HasSuffix(line, "-") {
+				t.Errorf("%s help breaks a line at a hyphen: %q", c.CommandPath(), line)
+			}
+		}
+		c.NonInheritedFlags().VisitAll(func(f *pflag.Flag) {
+			if f.Value.Type() == "bool" && strings.Contains(stdout, "--"+f.Name+" <") {
+				t.Errorf("%s help gives the boolean --%s a value name", c.CommandPath(), f.Name)
+			}
+		})
 		for _, sub := range c.Commands() {
 			walk(sub)
 		}

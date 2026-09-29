@@ -239,14 +239,22 @@ func TestTildeShortensHomePathsButNotLinkTargets(t *testing.T) {
 	}
 }
 
+func TestWrapBreaksOnlyAtSpaces(t *testing.T) {
+	lines := Wrap("print it with --json or pass --ref", 16)
+	want := []string{"print it with", "--json or pass", "--ref"}
+	if !slices.Equal(lines, want) {
+		t.Fatalf("got %q", lines)
+	}
+}
+
 func TestWrapProseKeepsPathsWhole(t *testing.T) {
 	text := "Couldn't back up the worlds in ~/Library/Application Support/PrismLauncher/instances/pack before the mods changed"
-	lines := wrapProse(text, 40)
+	lines := Wrap(text, 40)
 	want := []string{"Couldn't back up the worlds in", "~/Library/Application Support/PrismLauncher/instances/pack", "before the mods changed"}
 	if !slices.Equal(lines, want) {
 		t.Fatalf("got %q", lines)
 	}
-	if got := wrapProse(text, 0); len(got) != 1 {
+	if got := Wrap(text, 0); len(got) != 1 {
 		t.Fatalf("a limit of 0 wraps: %q", got)
 	}
 }

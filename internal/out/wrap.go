@@ -18,7 +18,7 @@ func (l *Lines) prose(glyph, text string) {
 		limit = min(TerminalWidth(l.W), proseColumns) - len(gutter) - Width(glyph) - 1
 	}
 	indent := strings.Repeat(" ", Width(glyph)+1)
-	for i, line := range wrapProse(text, limit) {
+	for i, line := range Wrap(text, limit) {
 		if i == 0 {
 			l.line(glyph + " " + line)
 			continue
@@ -27,10 +27,10 @@ func (l *Lines) prose(glyph, text string) {
 	}
 }
 
-// wrapProse breaks text at spaces into lines no wider than limit, never inside a path: a space
-// between two words that both hold a / joins them. A word wider than limit gets a line of its
-// own. A limit of 0 keeps one line.
-func wrapProse(text string, limit int) []string {
+// Wrap breaks text at spaces into lines no wider than limit, never inside a path or a word, so a
+// flag like --json stays whole: a space between two words that both hold a / joins them. A word
+// wider than limit gets a line of its own. A limit of 0 keeps one line.
+func Wrap(text string, limit int) []string {
 	if limit <= 0 || Width(text) <= limit {
 		return []string{text}
 	}

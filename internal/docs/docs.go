@@ -21,6 +21,7 @@ var (
 	headingLine  = regexp.MustCompile("^(#{1,6}) +(.+?) *$")
 	blankRuns    = regexp.MustCompile(`\n{3,}`)
 	markdownLink = regexp.MustCompile(`\[((?:[^\[\]]|\[[^\]]*\])*)\]\([^)]*\)`)
+	strong       = regexp.MustCompile(`\*\*([^*\s](?:[^*]*[^*\s])?)\*\*`)
 	nonSlug      = regexp.MustCompile(`[^a-z0-9]+`)
 )
 
@@ -271,9 +272,14 @@ func normalize(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
 
-// PlainLinks is markdown with each link reduced to its text.
-func PlainLinks(markdown string) string {
-	return markdownLink.ReplaceAllString(markdown, "$1")
+// Plain is markdown with each link reduced to its text and strong emphasis to its words. Code
+// spans keep their backquotes, and what is inside them stays as written.
+func Plain(markdown string) string {
+	parts := strings.Split(markdownLink.ReplaceAllString(markdown, "$1"), "`")
+	for i := 0; i < len(parts); i += 2 {
+		parts[i] = strong.ReplaceAllString(parts[i], "$1")
+	}
+	return strings.Join(parts, "`")
 }
 
 // CommandHelp is what a command's --help shows.
@@ -312,11 +318,13 @@ func (s *Section) help() CommandHelp {
 	var paragraph []string
 	i := 0
 	for ; i < len(lines) && !isFence(lines[i]); i++ {
-		if line := strings.TrimSpace(lines[i]); line != "" {
-			paragraph = append(paragraph, line)
-		} else if len(paragraph) > 0 {
+		line := strings.TrimSpace(lines[i])
+		if (line == "" || strings.HasPrefix(line, "- ")) && len(paragraph) > 0 {
 			h.Description = append(h.Description, strings.Join(paragraph, " "))
 			paragraph = nil
+		}
+		if line != "" {
+			paragraph = append(paragraph, line)
 		}
 	}
 	if len(paragraph) > 0 {

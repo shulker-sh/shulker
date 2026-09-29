@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/charmbracelet/x/ansi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -144,7 +143,7 @@ func (a *app) helpJSON(cmd *cobra.Command) {
 	if documented {
 		d.Docs = docsURL + "/cli#" + doc.Anchor
 		for _, paragraph := range doc.Description {
-			d.Description = append(d.Description, docs.PlainLinks(paragraph))
+			d.Description = append(d.Description, docs.Plain(paragraph))
 		}
 		d.Examples = append(d.Examples, doc.Examples...)
 	} else if cmd.Short != "" {
@@ -195,7 +194,7 @@ func (a *app) help(cmd *cobra.Command) {
 		if i > 0 {
 			l.Blank()
 		}
-		for line := range strings.SplitSeq(ansi.Wordwrap(t.Markup(docs.PlainLinks(paragraph)), width, ""), "\n") {
+		for _, line := range out.Wrap(t.Markup(docs.Plain(paragraph)), width) {
 			l.Plain(line)
 		}
 	}
@@ -341,8 +340,12 @@ func flagRows(t out.Theme, flags *pflag.FlagSet) []helpFlag {
 }
 
 // flagKind is the flag's value type as help shows it, with a list flag named by its element, and
-// its usage without the backquotes that name that type.
+// its usage without the backquotes that name that type. A flag that takes no value has no type to
+// name, so pflag's reading of its first backquoted phrase as one is dropped.
 func flagKind(f *pflag.Flag) (kind, usage string) {
+	if f.NoOptDefVal != "" {
+		return "", f.Usage
+	}
 	kind, usage = pflag.UnquoteUsage(f)
 	return strings.TrimSuffix(strings.TrimSuffix(kind, "Array"), "Slice"), usage
 }

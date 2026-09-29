@@ -119,6 +119,9 @@ func TestHelpFor(t *testing.T) {
 	if lock, _ := HelpFor("shulker lock"); len(lock.Description) != 2 {
 		t.Errorf("lock description %q", lock.Description)
 	}
+	if check, _ := HelpFor("shulker check"); !slices.ContainsFunc(check.Description, func(p string) bool { return strings.HasPrefix(p, "- `deps`") }) {
+		t.Errorf("a list item is a paragraph of its own: %q", check.Description)
+	}
 	if sync, _ := HelpFor("shulker sync"); !sync.HasMore {
 		t.Error("sync goes on past its example but More is false")
 	}
@@ -147,10 +150,10 @@ func TestAnchorsMatchTheSite(t *testing.T) {
 	}
 }
 
-func TestPlainLinks(t *testing.T) {
-	got := PlainLinks("see [`shulker pull [file...]`](https://shulker.sh/docs/cli#shulker-pull) and [gh](https://cli.github.com)")
-	if got != "see `shulker pull [file...]` and gh" {
-		t.Fatalf("PlainLinks = %q", got)
+func TestPlain(t *testing.T) {
+	got := Plain("see [`shulker pull [file...]`](https://shulker.sh/docs/cli#shulker-pull) and [gh](https://cli.github.com), **Own** and `a**b`")
+	if got != "see `shulker pull [file...]` and gh, Own and `a**b`" {
+		t.Fatalf("Plain = %q", got)
 	}
 }
 

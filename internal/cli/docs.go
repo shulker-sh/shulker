@@ -190,7 +190,7 @@ func (a *app) emitDocsSearch(pages []*docs.Page, query string, hits []docs.Hit) 
 // excerpt trims a line to about docsExcerptWidth runes around the first match
 // of the phrase, which it bolds.
 func excerpt(t out.Theme, line, phrase string) string {
-	runes := []rune(strings.TrimSpace(docs.PlainLinks(line)))
+	runes := []rune(strings.TrimSpace(docs.Plain(line)))
 	lower := []rune(strings.ToLower(string(runes)))
 	if len(lower) != len(runes) {
 		lower = runes
