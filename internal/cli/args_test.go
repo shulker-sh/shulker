@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -87,5 +89,31 @@ func TestScopeFlagsBelongToTheCommandsThatReadThem(t *testing.T) {
 		if dir != c.dir || instance != c.instance {
 			t.Errorf("%v: -C %t, -i %t", c.path, dir, instance)
 		}
+	}
+}
+
+func TestDirFlagNamesAnExistingDirectory(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "shulker.json")
+	if err := os.WriteFile(file, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(t.TempDir(), "nowhere")
+	cases := map[string][]string{
+		"--dir names " + missing + ", which doesn't exist": {"list", "-C", missing},
+		"--dir names " + missing + ", which doesn't exist": {"cache", "info", "--dir", missing},
+		"--dir names " + file + ", which is a file":        {"search", "sodium", "-C", file},
+	}
+	for message, args := range cases {
+		code, stdout, _ := run(t, append([]string{"--json"}, args...)...)
+		if e := failureCode(t, stdout); code != out.ExitUsage || e.Code != "usage" || e.Message != message {
+			t.Errorf("%v: exit %d, %+v", args, code, e)
+		}
+	}
+}
+
+func TestAnEmptyDirFlagIsTheCurrentDirectory(t *testing.T) {
+	code, stdout, _ := run(t, "--json", "list", "-C", "")
+	if e := failureCode(t, stdout); code == out.ExitUsage || e.Code != "manifest-not-found" {
+		t.Errorf("exit %d, %+v", code, e)
 	}
 }

@@ -4,7 +4,9 @@ package cli
 import (
 	"cmp"
 	"context"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"os/signal"
 	"regexp"
@@ -181,13 +183,42 @@ func (a *app) root() *cobra.Command {
 	return root
 }
 
-// dirFlag gives c -C, for a command that reads a.dir. Binding the flag resets a.dir to its empty
-// default, so a directory set before the commands are built is put back.
+// dirFlag gives c -C, for a command that reads a.dir. The path has to name a directory, which is
+// checked as the flag is parsed.
 func (a *app) dirFlag(c *cobra.Command) {
+	c.Flags().VarP(&existingDir{&a.dir}, "dir", "C", "project directory (default: current directory)")
+}
+
+// uncheckedDirFlag gives c a -C that may name a directory that doesn't exist, for a command that
+// creates the project there or that reports a missing directory itself. Binding the flag resets a.dir to its empty default, so a directory
+// set before the commands are built is put back.
+func (a *app) uncheckedDirFlag(c *cobra.Command) {
 	dir := a.dir
 	c.Flags().StringVarP(&a.dir, "dir", "C", "", "project directory (default: current directory)")
 	a.dir = dir
 }
+
+// existingDir is a -C value that has to name a directory. An empty one is the current directory,
+// as it is for git -C.
+type existingDir struct{ dir *string }
+
+func (d *existingDir) Set(path string) error {
+	info, err := os.Stat(path)
+	switch {
+	case path == "":
+	case errors.Is(err, fs.ErrNotExist):
+		return flagReason("names " + path + ", which doesn't exist")
+	case err != nil:
+		return flagReason("names " + path + ", which can't be read")
+	case !info.IsDir():
+		return flagReason("names " + path + ", which is a file")
+	}
+	*d.dir = path
+	return nil
+}
+
+func (d *existingDir) String() string { return *d.dir }
+func (d *existingDir) Type() string   { return "string" }
 
 // instanceFlag gives c -i, for a command that reads a.instance. The root's normalization lets it be
 // spelled --id too.

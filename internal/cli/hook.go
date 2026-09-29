@@ -70,7 +70,8 @@ func (a *app) hookPreLaunchCmd() *cobra.Command {
 			return nil
 		},
 	}
-	a.scopeFlags(cmd)
+	a.uncheckedDirFlag(cmd)
+	a.instanceFlag(cmd)
 	cmd.Flags().DurationVar(&deadline, "deadline", 0, "stop the update after this long and explain why (default: no deadline)")
 	return cmd
 }
@@ -96,7 +97,8 @@ func (a *app) hookPostExitCmd() *cobra.Command {
 			return nil
 		},
 	}
-	a.scopeFlags(cmd)
+	a.uncheckedDirFlag(cmd)
+	a.instanceFlag(cmd)
 	return cmd
 }
 
@@ -167,7 +169,8 @@ func (a *app) hookWrapCmd() *cobra.Command {
 			return nil
 		},
 	}
-	a.scopeFlags(cmd)
+	a.uncheckedDirFlag(cmd)
+	a.instanceFlag(cmd)
 	return cmd
 }
 

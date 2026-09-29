@@ -32,7 +32,10 @@ func (a *app) browseSearch(cmd *cobra.Command, kind string, names []string, limi
 	if _, err := a.deps(); err != nil {
 		return err
 	}
-	p := a.searchProject()
+	p, err := a.searchProject(cmd)
+	if err != nil {
+		return err
+	}
 	merge := a.searchMerge(p)
 	a.printer.Settle()
 	ctx := cmd.Context()

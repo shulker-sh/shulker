@@ -370,3 +370,13 @@ func TestPreLaunchOutsideAnInstancePrintsAnEnvelope(t *testing.T) {
 		t.Fatalf("envelope %+v", env)
 	}
 }
+
+func TestHooksLeaveALaunchAloneWhenTheirDirectoryIsGone(t *testing.T) {
+	h := newHarness(t)
+	gone := filepath.Join(t.TempDir(), "gone")
+	for _, kind := range []string{"pre-launch", "post-exit"} {
+		if code, stdout, stderr := h.run(t, "hook", kind, "-C", gone); code != 0 {
+			t.Errorf("%s on a missing directory should warn and exit 0: code=%d\nstdout: %s\nstderr: %s", kind, code, stdout, stderr)
+		}
+	}
+}

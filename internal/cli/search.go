@@ -71,7 +71,11 @@ func (a *app) searchCmd() *cobra.Command {
 				return a.browseSearch(cmd, typ, names, limit)
 			}
 			query := strings.Join(args, " ")
-			reply, err := a.search(cmd.Context(), query, typ, names, limit, true, a.searchMerge(a.searchProject()))
+			p, err := a.searchProject(cmd)
+			if err != nil {
+				return err
+			}
+			reply, err := a.search(cmd.Context(), query, typ, names, limit, true, a.searchMerge(p))
 			if err != nil {
 				return err
 			}
@@ -135,13 +139,13 @@ func (a *app) search(ctx context.Context, query, kind string, names []string, li
 }
 
 // searchProject is the project a search runs in, or nil: search works outside a project, and in
-// one that can't be read.
-func (a *app) searchProject() *project.Project {
+// one that can't be read. A project named by -C or -i has to open.
+func (a *app) searchProject(cmd *cobra.Command) (*project.Project, error) {
 	p, err := a.openProject()
-	if err != nil {
-		return nil
+	if err != nil && !cmd.Flags().Changed("dir") && !cmd.Flags().Changed("instance") {
+		return nil, nil
 	}
-	return p
+	return p, err
 }
 
 // searchMerge folds each listing found on several providers into one row, pairing too the hits

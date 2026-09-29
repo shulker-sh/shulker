@@ -188,3 +188,15 @@ func projectFiles(t *testing.T, dir string) string {
 	}
 	return b.String()
 }
+
+func TestSearchFailsOnAScopeItCantOpen(t *testing.T) {
+	h := newHarness(t)
+	h.mustRun(t, "search", "sodium")
+	if e := runError(t, h, "search", "sodium", "-C", h.dir); e.Code != "manifest-not-found" {
+		t.Errorf("-C on a folder with no project: %+v", e)
+	}
+	h.dir = ""
+	if e := runError(t, h, "search", "sodium", "-i", "nosuch"); e.Code != "no-instances" {
+		t.Errorf("-i naming no instance: %+v", e)
+	}
+}

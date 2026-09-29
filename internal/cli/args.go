@@ -22,6 +22,10 @@ func flagError(err error) (*out.Error, bool) {
 	case errors.As(err, &needsValue):
 		return out.Errorf("usage", "%s needs a value", typedFlag(needsValue.GetSpecifiedName(), needsValue.GetSpecifiedShortnames())), true
 	case errors.As(err, &invalid):
+		var reason flagReason
+		if errors.As(err, &reason) {
+			return out.Errorf("usage", "--%s %s", invalid.GetFlag().Name, string(reason)), true
+		}
 		if f := invalid.GetFlag(); f.Value.Type() == "bool" {
 			return out.Errorf("usage", "--%s takes true or false, not %q", f.Name, invalid.GetValue()), true
 		}
@@ -31,6 +35,11 @@ func flagError(err error) (*out.Error, bool) {
 	}
 	return nil, false
 }
+
+// flagReason is why a flag's value refuses what it was given, worded to follow the flag's name.
+type flagReason string
+
+func (r flagReason) Error() string { return string(r) }
 
 // typedFlag is the flag as it was typed: pflag names a shorthand by its letter
 // and says it came from a group like -xz.
