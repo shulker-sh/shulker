@@ -79,7 +79,7 @@ func (m *Modrinth) call(ctx context.Context, request func() error) error {
 }
 
 func rateLimited(reset time.Duration) error {
-	e := out.Errorf("rate-limited", "modrinth is rate-limiting shulker's requests")
+	e := out.Errorf("rate-limited", "Modrinth is rate-limiting shulker's requests")
 	e.Help = "run the command again in a minute"
 	if reset > longestWait {
 		e.Help = fmt.Sprintf("run the command again in %s", reset.Round(time.Minute))
@@ -388,7 +388,7 @@ func convert(v version) (provider.Version, error) {
 		}
 	}
 	if !found || pv.File.Sha512 == "" {
-		return pv, out.Errorf("version-no-file", "modrinth version %s has no file shulker can download", v.ID)
+		return pv, out.Errorf("version-no-file", "Modrinth version %s has no file shulker can download", v.ID)
 	}
 	for _, d := range v.Dependencies {
 		pv.Dependencies = append(pv.Dependencies, provider.Dependency{ProjectID: d.ProjectID, VersionID: d.VersionID, Type: d.DependencyType})
@@ -421,7 +421,7 @@ func (m *Modrinth) ParseURL(u *url.URL) (provider.Ref, error) {
 	default:
 		return provider.Ref{}, provider.ErrNotHosted
 	}
-	return provider.Ref{}, out.Errorf("usage", "modrinth can't read %s", u)
+	return provider.Ref{}, out.Errorf("usage", "Modrinth can't read %s", u)
 }
 
 func (m *Modrinth) URLShapes() []string {

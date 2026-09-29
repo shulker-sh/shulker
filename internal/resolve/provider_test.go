@@ -28,7 +28,7 @@ func TestLookupSkipsAnUnavailableProviderAndKeepsTheMissHelp(t *testing.T) {
 	r := fakeResolver(alpha, beta)
 	_, _, err := r.lookup(context.Background(), "shiny", "", "")
 	e := out.AsError(err)
-	if e.Code != "mod-not-found" || e.Message != "shiny was not found on alpha" || len(e.Items) != 1 || e.Items[0] != "skipped: beta needs a key" {
+	if e.Code != "mod-not-found" || e.Message != "shiny was not found on Alpha" || len(e.Items) != 1 || e.Items[0] != "skipped: beta needs a key" {
 		t.Fatalf("got %+v", e)
 	}
 	alpha.Known = []provider.Project{{ID: "p1", Slug: "shiny", Type: manifest.TypeMod}}

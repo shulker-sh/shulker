@@ -168,7 +168,7 @@ func (c *CurseForge) Available() error {
 	if c.key != "" {
 		return nil
 	}
-	e := out.Errorf("provider-unavailable", "curseforge needs an API key")
+	e := out.Errorf("provider-unavailable", "CurseForge needs an API key")
 	e.Help = "set " + KeyEnv + " or run `shulker config set curseforge.key <key>`"
 	return e
 }
@@ -279,7 +279,7 @@ func (c *CurseForge) Project(ctx context.Context, slugOrID, kind string) (*provi
 			kinds = append(kinds, classTypes[m.ClassID])
 		}
 		sort.Strings(kinds)
-		e := out.Errorf("type-ambiguous", "curseforge has %s as %s", slugOrID, strings.Join(kinds, " and "))
+		e := out.Errorf("type-ambiguous", "CurseForge has %s as %s", slugOrID, strings.Join(kinds, " and "))
 		e.Help = "pass `--type` to say which one you mean"
 		e.Candidates, e.Given, e.Flag = kinds, slugOrID, "--type"
 		return nil, e
@@ -580,7 +580,7 @@ func (c *CurseForge) call(ctx context.Context, what string, request func() error
 		return nil
 	}
 	if errors.Is(err, fetch.ErrRateLimited) || c.keyWorked && errors.Is(err, fetch.ErrForbidden) {
-		e := out.Errorf("rate-limited", "curseforge is rate-limiting shulker's requests")
+		e := out.Errorf("rate-limited", "CurseForge is rate-limiting shulker's requests")
 		e.Help = "CurseForge doesn't say for how long, and reports put it at an hour or more; run the command again later"
 		return e
 	}
@@ -588,7 +588,7 @@ func (c *CurseForge) call(ctx context.Context, what string, request func() error
 		if c.KeyFile != "" {
 			return sharedKeyRejected("the newer one from shulker.sh was rejected too")
 		}
-		e := out.Errorf("curseforge-key-rejected", "curseforge %s: the API key was rejected", what)
+		e := out.Errorf("curseforge-key-rejected", "CurseForge %s: the API key was rejected", what)
 		e.Help = "set " + KeyEnv + " or run `shulker config set curseforge.key <key>`"
 		return e
 	}
@@ -619,7 +619,7 @@ func (c *CurseForge) refreshKey(ctx context.Context) error {
 }
 
 func sharedKeyRejected(detail string) error {
-	e := out.Errorf("curseforge-key-rejected", "curseforge rejected shulker's built-in API key and %s", detail)
+	e := out.Errorf("curseforge-key-rejected", "CurseForge rejected shulker's built-in API key and %s", detail)
 	e.Help = "set " + KeyEnv + " or run `shulker config set curseforge.key <key>`, or report it at https://github.com/shulker-sh/shulker/issues"
 	return e
 }
@@ -647,7 +647,7 @@ func (c *CurseForge) ParseURL(u *url.URL) (provider.Ref, error) {
 	case len(parts) == 5 && (parts[3] == "files" || parts[3] == "download") && numeric(parts[4]):
 		return provider.Ref{Project: parts[2], Version: parts[4]}, nil
 	}
-	return provider.Ref{}, out.Errorf("usage", "curseforge can't read %s", u)
+	return provider.Ref{}, out.Errorf("usage", "CurseForge can't read %s", u)
 }
 
 func (c *CurseForge) URLShapes() []string {
@@ -707,7 +707,7 @@ func convertFile(f file) (provider.Version, error) {
 		}
 	}
 	if v.File.Filename == "" || v.File.Sha1 == "" {
-		return v, out.Errorf("version-no-file", "curseforge file %d has no file shulker can download", f.ID)
+		return v, out.Errorf("version-no-file", "CurseForge file %d has no file shulker can download", f.ID)
 	}
 	for _, g := range f.GameVersions {
 		if _, isLoader := loader.Lookup(strings.ToLower(g)); isLoader {

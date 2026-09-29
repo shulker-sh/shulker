@@ -294,7 +294,7 @@ func TestCurseForgeAddFallsThrough(t *testing.T) {
 	}
 
 	code, stdout, _ := h.run(t, "--json", "add", "nothing-anywhere")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || !strings.Contains(e.Message, "modrinth or curseforge") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || !strings.Contains(e.Message, "Modrinth or CurseForge") {
 		t.Fatalf("expected mod-not-found, got %d %s", code, stdout)
 	}
 
@@ -336,7 +336,7 @@ func TestCurseForgeSwitchAndAbsenceOutput(t *testing.T) {
 		t.Fatalf("expected provider-unavailable naming the key, got %d %s", code, stdout)
 	}
 	code, stdout, _ = h.run(t, "--json", "add", "jei")
-	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || !strings.Contains(e.Message, "not found on modrinth") || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "skipped: curseforge needs an API key") {
+	if e := failureCode(t, stdout); code == 0 || e.Code != "mod-not-found" || !strings.Contains(e.Message, "not found on Modrinth") || len(e.Items) != 1 || !strings.HasPrefix(e.Items[0], "skipped: CurseForge needs an API key") {
 		t.Fatalf("expected a modrinth miss naming the skipped curseforge, got %d %s", code, stdout)
 	}
 }

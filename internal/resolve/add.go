@@ -274,7 +274,7 @@ func (r *Resolver) Missed(before Snapshot, err error) bool {
 func notFound(slug string, missed []provider.Provider, skipped []*out.Error) *out.Error {
 	var names []string
 	for _, p := range missed {
-		names = append(names, p.Name())
+		names = append(names, p.Title())
 	}
 	e := out.Errorf("mod-not-found", "%s was not found on %s", slug, strings.Join(names, " or "))
 	for _, reason := range skipped {
@@ -462,7 +462,7 @@ func newerThan(ctx context.Context, p provider.Provider, projectID string, q ver
 func pinnedVersion(ctx context.Context, p provider.Provider, proj *provider.Project, kind, pin string) (*provider.Version, error) {
 	v, err := p.Version(ctx, pin)
 	if errors.Is(err, provider.ErrNotFound) {
-		e := out.Errorf("version-not-found", "%s has no version %s for %s", p.Name(), pin, proj.Slug)
+		e := out.Errorf("version-not-found", "%s has no version %s for %s", p.Title(), pin, proj.Slug)
 		e.Help = "list versions at " + p.VersionsPage(kind, proj.Slug)
 		return nil, e
 	}

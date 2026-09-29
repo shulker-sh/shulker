@@ -54,7 +54,7 @@ func TestAddFallsThroughToTheNextProvider(t *testing.T) {
 	}
 
 	err := h.add("nothing-anywhere", AddOptions{})
-	if e := out.AsError(err); e == nil || e.Code != "mod-not-found" || !strings.Contains(e.Message, "alpha or beta") {
+	if e := out.AsError(err); e == nil || e.Code != "mod-not-found" || !strings.Contains(e.Message, "Alpha or Beta") {
 		t.Fatalf("expected mod-not-found, got %v", err)
 	}
 
@@ -151,7 +151,7 @@ func TestAddNamesAProviderItCannotReach(t *testing.T) {
 		t.Fatalf("expected provider-unavailable naming the key, got %v", err)
 	}
 	err = h.add("jei", AddOptions{})
-	if e := out.AsError(err); e == nil || e.Code != "mod-not-found" || e.Message != "jei was not found on alpha" || len(e.Items) != 1 || e.Items[0] != "skipped: beta needs an API key" {
+	if e := out.AsError(err); e == nil || e.Code != "mod-not-found" || e.Message != "jei was not found on Alpha" || len(e.Items) != 1 || e.Items[0] != "skipped: beta needs an API key" {
 		t.Fatalf("expected a miss naming the skipped provider, got %v", err)
 	}
 }

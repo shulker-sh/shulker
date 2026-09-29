@@ -124,7 +124,7 @@ func (r *Resolver) obtainModpack(ctx context.Context, name string, entry manifes
 		return lock.Modpack{}, err
 	}
 	if proj.Type != "" && proj.Type != manifest.TypeModpack {
-		e := out.Errorf("type-mismatch", "requires.%s is a modpack, and %s on %s is a %s", name, proj.Slug, p.Name(), proj.Type)
+		e := out.Errorf("type-mismatch", "requires.%s is a modpack, and %s on %s is a %s", name, proj.Slug, p.Title(), proj.Type)
 		e.Help = fmt.Sprintf("set requires.%s.type to %s", name, proj.Type)
 		return lock.Modpack{}, e
 	}

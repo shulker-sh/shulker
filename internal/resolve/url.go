@@ -21,7 +21,7 @@ func (r *Resolver) target(ctx context.Context, u provider.Ref) (project, version
 	}
 	v, err := p.ProjectVersion(ctx, u.Project, u.Version)
 	if errors.Is(err, provider.ErrNotFound) {
-		return "", "", out.Errorf("version-not-found", "%s has no version %s for %s", u.Provider, u.Version, u.Project)
+		return "", "", out.Errorf("version-not-found", "%s has no version %s for %s", p.Title(), u.Version, u.Project)
 	}
 	if err != nil {
 		return "", "", err
@@ -33,7 +33,7 @@ func (r *Resolver) target(ctx context.Context, u provider.Ref) (project, version
 // Flags that name something else are refused.
 func (r *Resolver) FromURL(ctx context.Context, u provider.Ref, opts AddOptions) (string, AddOptions, error) {
 	if opts.Provider != "" && opts.Provider != u.Provider {
-		return "", opts, out.Errorf("usage", "--provider %s disagrees with the %s URL", opts.Provider, u.Provider)
+		return "", opts, out.Errorf("usage", "--provider %s disagrees with the %s URL", opts.Provider, r.Providers.Title(u.Provider))
 	}
 	project, version, err := r.target(ctx, u)
 	if err != nil {
@@ -65,7 +65,7 @@ func (r *Resolver) PinURL(ctx context.Context, key string, u provider.Ref) (stri
 		return "", out.Errorf("usage", "%s is not locked from a provider", key)
 	}
 	if u.Provider != lockedProvider {
-		return "", switchProject(out.Errorf("usage", "%s is locked from %s, not %s", key, lockedProvider, u.Provider), key)
+		return "", switchProject(out.Errorf("usage", "%s is locked from %s, not %s", key, r.Providers.Title(lockedProvider), r.Providers.Title(u.Provider)), key)
 	}
 	project, version, err := r.target(ctx, u)
 	if err != nil {

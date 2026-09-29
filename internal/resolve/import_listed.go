@@ -137,7 +137,7 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 	r, rep := im.r, im.rep
 	project, ok := found.projects[f.Project]
 	if !ok {
-		return nil, nil, out.Errorf("mod-not-found", "%s has no project %s", p.Name(), f.Project)
+		return nil, nil, out.Errorf("mod-not-found", "%s has no project %s", p.Title(), f.Project)
 	}
 	proj := &project
 	if err := found.unusable[f.Version]; err != nil {
@@ -145,7 +145,7 @@ func (im *importer) listedFile(ctx context.Context, p provider.Provider, found l
 	}
 	version, ok := found.versions[f.Version]
 	if !ok {
-		return nil, nil, out.Errorf("version-not-found", "%s has no file %s for %s", p.Name(), f.Version, proj.Slug)
+		return nil, nil, out.Errorf("version-not-found", "%s has no file %s for %s", p.Title(), f.Version, proj.Slug)
 	}
 	v := &version
 	if v.ProjectID != proj.ID {
