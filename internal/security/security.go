@@ -6,6 +6,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"shulker.sh/shulker/internal/out"
 )
@@ -27,6 +28,7 @@ const (
 	Provenance       ID = "provenance"
 	CacheHash        ID = "cache-hash"
 	ManifestJVMArgs  ID = "manifest-jvm-args"
+	ReleaseAge       ID = "release-age"
 )
 
 // Refusal marks e as protection id refusing something: it names the protection for --json and ends
@@ -66,8 +68,25 @@ var protections = []Protection{
 	{ID: ManifestJVMArgs, On: true, Summary: "A manifest can't add its own flags to the java command line, such as -javaagent, so a source can't run code outside its mods."},
 }
 
-// Protections lists every protection, in the order `shulker security` shows them.
-func Protections() []Protection { return slices.Clone(protections) }
+// Days is d in whole days, as security.minReleaseAge counts them.
+func Days(d time.Duration) int { return int(d / (24 * time.Hour)) }
+
+// Protections lists every protection, in the order `shulker security` shows them, with the release
+// age as security.minReleaseAge sets it.
+func Protections(releaseAge time.Duration) []Protection {
+	value := "off"
+	if days := Days(releaseAge); days > 0 {
+		value = out.Count(days, "day", "days")
+	}
+	return append(slices.Clone(protections), Protection{
+		ID:      ReleaseAge,
+		Summary: "A version published more recently than the release age is held back when shulker chooses one, so a hijacked mod's new release has time to be caught and taken down before it reaches you.",
+		On:      releaseAge > 0,
+		Setting: "security.minReleaseAge",
+		Value:   value,
+		Changes: "How many days old a version must be before add, update, lock or a floating modpack takes it; 0 turns it off",
+	})
+}
 
 // Refused is err's error when a protection refused something.
 func Refused(err error) (*out.Error, bool) {

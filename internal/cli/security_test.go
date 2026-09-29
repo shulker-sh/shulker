@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"shulker.sh/shulker/internal/cache"
 	"shulker.sh/shulker/internal/out"
@@ -20,13 +21,14 @@ func TestSecurityExplainsEveryProtection(t *testing.T) {
 	if !strings.HasPrefix(stdout, "  Mods run with everything your account can reach") {
 		t.Fatalf("opens with the stance: %q", stdout)
 	}
-	for _, p := range security.Protections() {
-		if !strings.Contains(stdout, "  • "+p.Summary+"\n") {
+	week := security.Protections(7 * 24 * time.Hour)
+	for _, p := range week {
+		if p.Setting == "" && !strings.Contains(stdout, "  • "+p.Summary+"\n") {
 			t.Fatalf("missing %s in %q", p.ID, stdout)
 		}
 	}
-	if strings.Contains(stdout, "Settings") {
-		t.Fatalf("no settings table while nothing is configurable: %q", stdout)
+	if !strings.Contains(stdout, "security.minReleaseAge  7 days") {
+		t.Fatalf("release age row: %q", stdout)
 	}
 
 	var env struct {
@@ -35,13 +37,20 @@ func TestSecurityExplainsEveryProtection(t *testing.T) {
 	if err := json.Unmarshal([]byte(h.mustRun(t, "security", "--json")), &env); err != nil {
 		t.Fatal(err)
 	}
-	if env.Data.Stance != security.Stance || len(env.Data.Protections) != len(security.Protections()) {
+	if env.Data.Stance != security.Stance || len(env.Data.Protections) != len(week) {
 		t.Fatalf("json: %+v", env.Data)
 	}
 	for _, p := range env.Data.Protections {
 		if p.ID == "" || p.Summary == "" || !p.On {
 			t.Fatalf("json row: %+v", p)
 		}
+	}
+	h.mustRun(t, "config", "set", "security.minReleaseAge", "0")
+	if err := json.Unmarshal([]byte(h.mustRun(t, "security", "--json")), &env); err != nil {
+		t.Fatal(err)
+	}
+	if age := env.Data.Protections[len(env.Data.Protections)-1]; age.ID != security.ReleaseAge || age.On || age.Value != "off" {
+		t.Fatalf("release age off: %+v", age)
 	}
 }
 

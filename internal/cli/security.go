@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
+	"shulker.sh/shulker/internal/config"
 	"shulker.sh/shulker/internal/out"
 	"shulker.sh/shulker/internal/security"
 )
@@ -19,10 +22,27 @@ func (a *app) securityCmd() *cobra.Command {
 		Long:        "Explain how shulker keeps bad files off your machine: what it checks on every run, what each check stops, and the settings that change them. Every security warning and error points here.",
 		Args:        noArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			info := securityInfo{Stance: security.Stance, Protections: security.Protections()}
+			age, err := a.minReleaseAge()
+			if err != nil {
+				a.printer.Warn("couldn't read security.minReleaseAge, showing its default: %v.", err)
+			}
+			info := securityInfo{Stance: security.Stance, Protections: security.Protections(age)}
 			return a.printer.Emit(info, func(l *out.Lines) { printSecurity(l, info) })
 		},
 	}
+}
+
+// minReleaseAge is security.minReleaseAge, or its default when config.json can't be read.
+func (a *app) minReleaseAge() (time.Duration, error) {
+	path, err := a.configFile()
+	if err != nil {
+		return config.Security{}.ReleaseAge(), err
+	}
+	cfg, err := config.LoadFile(path)
+	if err != nil {
+		return config.Security{}.ReleaseAge(), err
+	}
+	return cfg.Security.ReleaseAge(), nil
 }
 
 func printSecurity(l *out.Lines, info securityInfo) {
