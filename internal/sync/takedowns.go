@@ -48,3 +48,12 @@ func (e *Env) usedBy(sha512s []string) map[string][]string {
 	}
 	return build.InstancesUsing(e.Cache, entries, sha512s)
 }
+
+// warnContext is what the warnings about a build of p into dir name.
+func (e *Env) warnContext(p *project.Project, side, dir string) build.WarnContext {
+	c := build.WarnContext{Providers: e.Providers, UsedBy: e.usedBy}
+	if e.Rebuild != nil {
+		c.Force = e.Rebuild(p, side, dir)
+	}
+	return c
+}

@@ -101,7 +101,8 @@ func (a *app) serveCmd() *cobra.Command {
 					return err
 				}
 			}
-			a.warnBuild("server", false, nil, a.securityWarnings(rep), rep.State, takeOver(cmd, nil, force))
+			rebuild := takeOver(cmd, nil, force)
+			a.warnBuild("server", false, nil, a.securityWarnings(rep, rebuild), rep.State, rebuild)
 			if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 				return err
 			}

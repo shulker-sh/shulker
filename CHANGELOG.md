@@ -24,6 +24,8 @@ All notable changes to shulker are documented here. The format is based on
 
 - `sync`, the launcher hooks and `hook wrap` ask Modrinth and CurseForge once a day whether they still have each locked file, and warn about one gone from its provider or filed under another project, naming the instances that use it and the `audit`, `update` or `remove` to run. It's a warning, not a block: the cached copy is still placed. `build` repeats the last check's warning without going online.
 
+- A build that finds a jar it placed in `mods/` changed since warns that it no longer matches the locked copy, rather than listing it as kept, and names `shulker audit <key>` and `--force`, which puts the locked copy back. The jar itself stays as it is. `--json` lists these as `changedJars`.
+
 ### Changed
 
 - `add` looks up every name before failing, and adds nothing when one isn't found or has no compatible version: the error lists each and gives the command that adds the rest. `--skip-missing` adds the rest and warns about each one skipped.

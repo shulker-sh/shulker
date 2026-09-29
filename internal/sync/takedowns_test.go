@@ -116,7 +116,7 @@ func TestBuildWarnsFromTheRecordedTakedownCheck(t *testing.T) {
 	if n := h.env.Modrinth.Requests["Filed"]; n != 1 {
 		t.Fatalf("a build asks no provider, Filed asked %d times", n)
 	}
-	warnings := rep.SecurityWarnings(h.e.Providers, h.e.usedBy)
+	warnings := rep.SecurityWarnings(build.WarnContext{Providers: h.e.Providers, UsedBy: h.e.usedBy})
 	if len(warnings) != 1 || warnings[0].Protection != "takedowns" || !strings.Contains(warnings[0].Message, "sodium: ") || !strings.Contains(warnings[0].Message, "used by survival") {
 		t.Fatalf("security warnings: %+v", warnings)
 	}

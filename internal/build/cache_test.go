@@ -253,7 +253,7 @@ func TestBuildFetchesAChangedCacheObjectAgain(t *testing.T) {
 	if got := p.built("client", "mods/"+sodium.File.Filename); got != string(p.cdn.Bytes(sodium)) {
 		t.Fatal("the build places the locked bytes, fetched again")
 	}
-	if w := report.SecurityWarnings(nil, nil); len(w) != 1 || w[0].Protection != "cache-hash" || w[0].Message != "The cache held a changed copy of "+sodium.File.Filename+", so it was downloaded again." {
+	if w := report.SecurityWarnings(WarnContext{}); len(w) != 1 || w[0].Protection != "cache-hash" || w[0].Message != "The cache held a changed copy of "+sodium.File.Filename+", so it was downloaded again." {
 		t.Fatalf("security warnings: %+v", w)
 	}
 	if data, _ := os.ReadFile(p.b.Cache.Object(sodium.File.Sha512)); string(data) != string(p.cdn.Bytes(sodium)) {

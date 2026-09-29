@@ -755,6 +755,8 @@ A file you edited in the build directory is kept until the source changes it too
 
 A build asks no provider anything, but it repeats the warning of the directory's last [takedown check](#shulker-sync) for every file the lock still holds.
 
+A jar shulker placed in `mods/` that has changed since, whether a mod updated itself, you edited it, or something worse rewrote it, stays as it is, like any file you changed. It isn't listed as kept: the build warns that it no longer matches the copy shulker locked, without guessing why, and names `shulker audit <key>` to look at it and `--force` to put the locked copy back. With `--json` these are `changedJars` (`path`, and `key` for a locked mod), apart from `kept`, and the warning is in `securityWarnings` with protection `placed-jars`.
+
 A file the manifest's `seedFiles` lists is never a conflict. When both changed it, every build keeps yours and warns `<path> changed in the pack and in game; kept yours`, naming the two ways to take the pack's: delete the file, or `--force`, which resets every seeded file along with the rest. A file merged per key, such as `options.txt` from `client.options` or a `.properties` override, is seeded key by key: the warning names the keys you changed, and the rest follow the pack.
 
 ```sh

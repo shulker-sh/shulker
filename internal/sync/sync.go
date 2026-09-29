@@ -116,7 +116,7 @@ func Run(ctx context.Context, e *Env, src *Source, req Request) (res Result, err
 		return Result{}, err
 	}
 	e.WarnEach(rep.Warnings)
-	for _, w := range rep.SecurityWarnings(e.Providers, e.usedBy) {
+	for _, w := range rep.SecurityWarnings(e.warnContext(p, side, into)) {
 		e.WarnSecurity(w)
 	}
 	if side == "client" {

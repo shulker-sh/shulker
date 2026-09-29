@@ -33,6 +33,9 @@ type Env struct {
 	// waits for them: skip carries on without the ones the lock can hold pending. Nil has nobody
 	// to ask, so mods already pending stay left out and any other missing file fails the fetch.
 	AwaitDownloads func(ctx context.Context, downloads string, missing *out.Error) (skip bool, err error)
+	// Rebuild is the command that rebuilds dir from p with --force, which a warning about a changed
+	// jar names; nil names none.
+	Rebuild func(p *project.Project, side, dir string) string
 	// backedUp is the save groups this run already backed up, so each is zipped once however
 	// many syncs touch it.
 	backedUp map[saves.Home]bool

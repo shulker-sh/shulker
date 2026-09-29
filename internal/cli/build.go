@@ -57,7 +57,8 @@ func (a *app) buildCmd() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				a.warnBuild(side, len(sides) > 1, rep.Warnings, a.securityWarnings(rep), rep.State, takeOver(cmd, args, force))
+				rebuild := takeOver(cmd, args, force)
+				a.warnBuild(side, len(sides) > 1, rep.Warnings, a.securityWarnings(rep, rebuild), rep.State, rebuild)
 				if err := a.installServerLoader(cmd.Context(), p, rep); err != nil {
 					return err
 				}

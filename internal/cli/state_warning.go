@@ -44,10 +44,10 @@ func (a *app) warnBuild(side string, several bool, warnings []string, securityWa
 	a.warnState(state, force)
 }
 
-// securityWarnings are rep's security warnings, a takedown's naming the registered instances that
-// use each file.
-func (a *app) securityWarnings(rep *build.Report) []out.SecurityWarning {
-	return rep.SecurityWarnings(a.titles(), func(sha512s []string) map[string][]string {
+// securityWarnings are rep's security warnings: a takedown's names the registered instances that
+// use each file, and a changed jar's the force command that puts the locked copy back.
+func (a *app) securityWarnings(rep *build.Report, force string) []out.SecurityWarning {
+	return rep.SecurityWarnings(build.WarnContext{Providers: a.titles(), Force: force, UsedBy: func(sha512s []string) map[string][]string {
 		d, err := a.deps()
 		if err != nil {
 			return nil
@@ -57,7 +57,7 @@ func (a *app) securityWarnings(rep *build.Report) []out.SecurityWarning {
 			return nil
 		}
 		return build.InstancesUsing(d.Cache, entries, sha512s)
-	})
+	}})
 }
 
 // forceCommand is the command that rebuilds dir with --force: p's own build for its build

@@ -85,11 +85,14 @@ type Report struct {
 	Written   []string `json:"written"`
 	Unchanged int      `json:"unchanged"`
 	Kept      []string `json:"kept"`
-	Removed   []string `json:"removed"`
-	Linked    []string `json:"linked"`
-	Moved     []string `json:"moved"`
-	MovedBack []string `json:"movedBack"`
-	Conflicts []string `json:"conflicts"`
+	// ChangedJars are the jars shulker placed in mods/ that changed since and were kept as they
+	// are, apart from Kept since each is warned about.
+	ChangedJars []ChangedJar `json:"changedJars"`
+	Removed     []string     `json:"removed"`
+	Linked      []string     `json:"linked"`
+	Moved       []string     `json:"moved"`
+	MovedBack   []string     `json:"movedBack"`
+	Conflicts   []string     `json:"conflicts"`
 	// KeptConflicts are the conflicts Options.KeepConflicts left as the player had them.
 	KeptConflicts []string `json:"keptConflicts,omitempty"`
 	Excluded      []string `json:"excluded"`
@@ -110,8 +113,8 @@ type Report struct {
 }
 
 // SecurityWarnings are the warnings about what the build's protections caught, apart from Warnings
-// since each ends with security.Nudge. usedBy names the instances a takedown warning lists.
-func (r *Report) SecurityWarnings(ps provider.Providers, usedBy UsedBy) []out.SecurityWarning {
+// since each ends with security.Nudge.
+func (r *Report) SecurityWarnings(c WarnContext) []out.SecurityWarning {
 	var warnings []out.SecurityWarning
 	switch len(r.CacheChanged) {
 	case 0:
@@ -120,10 +123,22 @@ func (r *Report) SecurityWarnings(ps provider.Providers, usedBy UsedBy) []out.Se
 	default:
 		warnings = append(warnings, security.Warn(security.CacheHash, fmt.Sprintf("The cache held changed copies of %s, so they were downloaded again.", strings.Join(r.CacheChanged, ", ")), nil))
 	}
+	if len(r.ChangedJars) > 0 {
+		warnings = append(warnings, changedJarsWarning(r.ChangedJars, c.Force))
+	}
 	if len(r.Takedowns) > 0 {
-		warnings = append(warnings, TakedownWarning(r.Takedowns, ps, usedBy))
+		warnings = append(warnings, TakedownWarning(r.Takedowns, c.Providers, c.UsedBy))
 	}
 	return warnings
+}
+
+// WarnContext is what a build's security warnings name beyond its report.
+type WarnContext struct {
+	// Providers title the providers a takedown warning names.
+	Providers provider.Providers
+	UsedBy    UsedBy
+	// Force is the command that rebuilds the directory with --force, putting locked copies back.
+	Force string
 }
 
 // Options change how a build runs. Dir builds somewhere other than the side's build directory, and
@@ -383,7 +398,7 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 	}
 	dir := b.Target(side, opts.Dir)
 	inPlace := sameDir(dir, b.Dir)
-	report := &Report{Side: side, Dir: dir, Written: []string{}, Kept: []string{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
+	report := &Report{Side: side, Dir: dir, Written: []string{}, Kept: []string{}, ChangedJars: []ChangedJar{}, Removed: []string{}, Linked: []string{}, Moved: []string{}, MovedBack: []string{}, Conflicts: []string{}, Excluded: []string{}, Warnings: []string{}, Forced: opts.Force}
 	desired, dirs, err := b.collect(side, opts, report)
 	if err != nil {
 		return nil, err
@@ -418,7 +433,11 @@ func (b *Builder) Build(side string, opts Options) (*Report, error) {
 		case stateUnchanged:
 			report.Unchanged++
 		case stateKept:
-			if f.src.owned() == nil {
+			switch {
+			case f.src.owned() != nil:
+			case isPlacedJar(f.rel):
+				report.ChangedJars = append(report.ChangedJars, ChangedJar{Path: f.rel, Key: b.modKey(f.rel)})
+			default:
 				report.Kept = append(report.Kept, f.rel)
 			}
 		case stateConflict, stateUntracked:
